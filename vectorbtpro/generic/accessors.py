@@ -1322,7 +1322,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
 
-        grouper = wrapper.create_index_grouper(by, **resolve_dict(groupby_kwargs))
+        grouper = wrapper.get_index_grouper(by, **resolve_dict(groupby_kwargs))
 
         if isinstance(cls_or_self, type):
             group_map = grouper.get_group_map()
@@ -1479,7 +1479,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             return resampled_obj
 
         if not isinstance(rule, Resampler):
-            rule = wrapper.create_resampler(rule, resample_kwargs=resample_kwargs, return_pd_resampler=False)
+            rule = wrapper.get_resampler(rule, resample_kwargs=resample_kwargs, return_pd_resampler=False)
         return cls_or_self.resample_to_index(
             rule,
             reduce_func_nb,
@@ -2228,7 +2228,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """`GenericAccessor.latest_at_index` but creating a resampler and using the left bound
         of the source and target index."""
         if not isinstance(rule, Resampler):
-            rule = self.wrapper.create_resampler(rule, resample_kwargs=resample_kwargs, return_pd_resampler=False)
+            rule = self.wrapper.get_resampler(rule, resample_kwargs=resample_kwargs, return_pd_resampler=False)
         return self.latest_at_index(
             rule,
             source_rbound=False,
@@ -2248,7 +2248,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         !!! note
             The timestamps in the source and target index should denote the open time."""
         if not isinstance(rule, Resampler):
-            rule = self.wrapper.create_resampler(rule, resample_kwargs=resample_kwargs, return_pd_resampler=False)
+            rule = self.wrapper.get_resampler(rule, resample_kwargs=resample_kwargs, return_pd_resampler=False)
         return self.latest_at_index(
             rule,
             source_rbound=True,

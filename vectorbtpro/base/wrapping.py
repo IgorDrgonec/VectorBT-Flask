@@ -3,6 +3,7 @@
 """Classes for wrapping NumPy arrays into Series/DataFrames."""
 
 import warnings
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -29,9 +30,14 @@ from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
 from vectorbtpro.utils.config import Configured, merge_dicts, resolve_dict
 from vectorbtpro.utils.datetime_ import infer_index_freq, try_to_datetime_index, prepare_freq, freq_to_timedelta64
 from vectorbtpro.utils.parsing import get_func_arg_names
-from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method
+from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method, cached_property
 from vectorbtpro.utils.array_ import is_range, cast_to_min_precision, cast_to_max_precision
 from vectorbtpro.utils.template import CustomTemplate
+
+if TYPE_CHECKING:
+    from vectorbtpro.base.accessors import BaseIDXAccessor as BaseIDXAccessorT
+else:
+    BaseIDXAccessorT = tp.Any
 
 ArrayWrapperT = tp.TypeVar("ArrayWrapperT", bound="ArrayWrapper")
 
@@ -878,34 +884,15 @@ class ArrayWrapper(Configured, PandasIndexer):
                     new_arr = new_arr[:, col_idxs]
         return new_arr
 
-    def create_resampler(
-        self,
-        rule: tp.Union[Resampler, tp.PandasResampler, tp.PandasFrequencyLike],
-        resample_kwargs: tp.KwargsLike = None,
-        return_pd_resampler: bool = False,
-    ) -> tp.Union[Resampler, tp.PandasResampler]:
-        """Create a resampler of type `vectorbtpro.base.resampling.base.Resampler`."""
-        if not isinstance(rule, Resampler):
-            if not isinstance(rule, PandasResampler):
-                resample_kwargs = merge_dicts(
-                    dict(closed="left", label="left"),
-                    resample_kwargs,
-                )
-                rule = pd.Series(index=self.index, dtype=object).resample(
-                    prepare_freq(rule), **resolve_dict(resample_kwargs)
-                )
-            if return_pd_resampler:
-                return rule
-            rule = Resampler.from_pd_resampler(rule)
-        if return_pd_resampler:
-            raise TypeError("Cannot convert Resampler to Pandas Resampler")
-        return rule
+    def get_resampler(self, *args, **kwargs) -> tp.Union[Resampler, tp.PandasResampler]:
+        """See `vectorbtpro.base.accessors.BaseIDXAccessor.get_resampler`."""
+        return self.index_acc.get_resampler(*args, **kwargs)
 
     def resample_meta(self: ArrayWrapperT, *args, wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> dict:
         """Perform resampling on `ArrayWrapper` and also return metadata.
 
-        `*args` and `**kwargs` are passed to `ArrayWrapper.create_resampler`."""
-        resampler = self.create_resampler(*args, **kwargs)
+        `*args` and `**kwargs` are passed to `ArrayWrapper.get_resampler`."""
+        resampler = self.get_resampler(*args, **kwargs)
         if isinstance(resampler, Resampler):
             _resampler = resampler
         else:
@@ -930,26 +917,21 @@ class ArrayWrapper(Configured, PandasIndexer):
         """Index."""
         return self._index
 
+    @cached_property(whitelist=True)
+    def index_acc(self) -> BaseIDXAccessorT:
+        """Get index accessor of the type `vectorbtpro.base.accessors.BaseIDXAccessor`."""
+        from vectorbtpro.base.accessors import BaseIDXAccessor
+
+        return BaseIDXAccessor(self.index, freq=self._freq)
+
     @property
     def ns_index(self) -> tp.Array1d:
-        """Convert index to an 64-bit integer array.
+        """See `vectorbtpro.base.accessors.BaseIDXAccessor.to_ns`."""
+        return self.index_acc.to_ns()
 
-        Timestamps will be converted to nanoseconds."""
-        index = self.index
-        if isinstance(index, pd.DatetimeIndex):
-            index = index.tz_localize(None).tz_localize("utc")
-        return index.values.astype(np.int64)
-
-    def get_period_ns_index(self, freq: tp.FrequencyLike, shift: bool = True) -> tp.Array1d:
-        """Convert index to period and then to an 64-bit integer array.
-
-        Timestamps will be converted to nanoseconds."""
-        index = self.index
-        if isinstance(index, pd.DatetimeIndex):
-            index = index.tz_localize(None).to_period(freq)
-            if shift:
-                index = index.shift()
-        return index.to_timestamp().values.astype(np.int64)
+    def get_period_ns_index(self, *args, **kwargs) -> tp.Array1d:
+        """See `vectorbtpro.base.accessors.BaseIDXAccessor.to_period_ns`."""
+        return self.index_acc.to_period_ns(*args, **kwargs)
 
     @property
     def columns(self) -> tp.Index:
@@ -1004,97 +986,38 @@ class ArrayWrapper(Configured, PandasIndexer):
         """Get group-aware `ArrayWrapper.shape_2d`."""
         return self.resolve(group_by=group_by).shape_2d
 
-    def get_freq(
-        self,
-        freq: tp.Optional[tp.FrequencyLike] = None,
-        **kwargs,
-    ) -> tp.Union[None, float, tp.PandasFrequency]:
-        """Index frequency as `pd.Timedelta` or None if it cannot be converted."""
-        from vectorbtpro._settings import settings
-
-        wrapping_cfg = settings["wrapping"]
-
-        if freq is None:
-            freq = self._freq
-        if freq is None:
-            freq = wrapping_cfg["freq"]
-        try:
-            return infer_index_freq(self.index, freq=freq, **kwargs)
-        except Exception as e:
-            return None
+    def get_freq(self, *args, **kwargs) -> tp.Union[None, float, tp.PandasFrequency]:
+        """See `vectorbtpro.base.accessors.BaseIDXAccessor.get_freq`."""
+        return self.index_acc.get_freq(*args, **kwargs)
 
     @property
     def freq(self) -> tp.Optional[pd.Timedelta]:
-        """`ArrayWrapper.get_freq` with date offsets and integer frequencies not allowed."""
-        return self.get_freq(allow_date_offset=False, allow_numeric=False)
+        """See `vectorbtpro.base.accessors.BaseIDXAccessor.freq`."""
+        return self.index_acc.freq
 
     @property
     def ns_freq(self) -> tp.Optional[int]:
-        """Convert frequency to a 64-bit integer.
-
-        Timedelta will be converted to nanoseconds."""
-        freq = self.get_freq(allow_date_offset=False, allow_numeric=True)
-        if freq is not None:
-            freq = freq_to_timedelta64(freq).astype(np.int64)
-        return freq
+        """See `vectorbtpro.base.accessors.BaseIDXAccessor.ns_freq`."""
+        return self.index_acc.ns_freq
 
     @property
     def any_freq(self) -> tp.Union[None, float, tp.PandasFrequency]:
-        """Index frequency of any type."""
-        return self.get_freq()
+        """See `vectorbtpro.base.accessors.BaseIDXAccessor.any_freq`."""
+        return self.index_acc.any_freq
 
     @property
     def period(self) -> int:
-        """Get the period of the index, without taking into account its datetime-like properties."""
-        return len(self.index)
+        """See `vectorbtpro.base.accessors.BaseIDXAccessor.period`."""
+        return self.index_acc.period
 
     @property
     def dt_period(self) -> float:
-        """Get the period of the index, taking into account its datetime-like properties."""
-        from vectorbtpro._settings import settings
+        """See `vectorbtpro.base.accessors.BaseIDXAccessor.dt_period`."""
+        return self.index_acc.dt_period
 
-        wrapping_cfg = settings["wrapping"]
-
-        if isinstance(self.index, pd.DatetimeIndex):
-            if self.freq is not None:
-                return (self.index[-1] - self.index[0]) / self.freq + 1
-            if not wrapping_cfg["silence_warnings"]:
-                warnings.warn(
-                    "Couldn't parse the frequency of index. Pass it as `freq` or "
-                    "define it globally under `settings.wrapping`.",
-                    stacklevel=2,
-                )
-        if isinstance(self.index[0], int) and isinstance(self.index[-1], int):
-            return self.index[-1] - self.index[0] + 1
-        if not wrapping_cfg["silence_warnings"]:
-            warnings.warn("Index is neither datetime-like nor integer", stacklevel=2)
-        return self.period
-
-    def to_timedelta(
-        self,
-        a: tp.MaybeArray,
-        to_pd: bool = False,
-        silence_warnings: tp.Optional[bool] = None,
-    ) -> tp.Union[pd.Index, tp.MaybeArray]:
-        """Convert array to duration using `ArrayWrapper.freq`."""
-        from vectorbtpro._settings import settings
-
-        wrapping_cfg = settings["wrapping"]
-
-        if silence_warnings is None:
-            silence_warnings = wrapping_cfg["silence_warnings"]
-
-        if self.freq is None:
-            if not silence_warnings:
-                warnings.warn(
-                    "Couldn't parse the frequency of index. Pass it as `freq` or "
-                    "define it globally under `settings.wrapping`.",
-                    stacklevel=2,
-                )
-            return a
-        if to_pd:
-            return pd.to_timedelta(a * self.freq)
-        return a * self.freq
+    def arr_to_timedelta(self, *args, **kwargs) -> tp.Union[pd.Index, tp.MaybeArray]:
+        """See `vectorbtpro.base.accessors.BaseIDXAccessor.arr_to_timedelta`."""
+        return self.index_acc.arr_to_timedelta(*args, **kwargs)
 
     @property
     def column_only_select(self) -> tp.Optional[bool]:
@@ -1177,30 +1100,9 @@ class ArrayWrapper(Configured, PandasIndexer):
             )
         return _self  # important for keeping cache
 
-    def create_index_grouper(self, by: tp.Union[Grouper, tp.PandasGroupByLike], **kwargs) -> Grouper:
-        """Create an index grouper of type `vectorbtpro.base.grouping.base.Grouper`."""
-        if isinstance(by, Grouper):
-            return by
-        if isinstance(by, (PandasGroupBy, PandasResampler)):
-            return Grouper.from_pd_group_by(by)
-        try:
-            return Grouper(index=self.index, group_by=by)
-        except Exception as e:
-            pass
-        if isinstance(self.index, pd.DatetimeIndex):
-            try:
-                by = to_offset(prepare_freq(by))
-                if by.n == 1:
-                    return Grouper(index=self.index, group_by=self.index.to_period(by))
-            except Exception as e:
-                pass
-            try:
-                pd_group_by = pd.Series(index=self.index, dtype=object).resample(prepare_freq(by), **kwargs)
-                return Grouper.from_pd_group_by(pd_group_by)
-            except Exception as e:
-                pass
-        pd_group_by = pd.Series(index=self.index, dtype=object).groupby(by, axis=0, **kwargs)
-        return Grouper.from_pd_group_by(pd_group_by)
+    def get_index_grouper(self, *args, **kwargs) -> Grouper:
+        """See `vectorbtpro.base.accessors.BaseIDXAccessor.get_grouper`."""
+        return self.index_acc.get_grouper(*args, **kwargs)
 
     def wrap(
         self,
@@ -1315,7 +1217,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                 out = out.applymap(lambda x: self.index[x] if x != -1 else np.nan)
         if to_timedelta:
             # Convert to timedelta
-            out = self.to_timedelta(out, silence_warnings=silence_warnings)
+            out = self.arr_to_timedelta(out, silence_warnings=silence_warnings)
         return out
 
     def wrap_reduced(
@@ -1413,7 +1315,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                 out = self.index[out] if out != -1 else np.nan
         if to_timedelta:
             # Convert to timedelta
-            out = self.to_timedelta(out, silence_warnings=silence_warnings)
+            out = self.arr_to_timedelta(out, silence_warnings=silence_warnings)
         return out
 
     def row_stack_and_wrap(self, *objs: tp.ArrayLike, group_by: tp.GroupByLike = None, **kwargs) -> tp.SeriesFrame:
@@ -1497,243 +1399,12 @@ class ArrayWrapper(Configured, PandasIndexer):
         return _self.wrap_reduced(np.full(_self.shape_2d[1], fill_value), **kwargs)
 
     def get_index_points(self, *args, **kwargs) -> tp.Array1d:
-        """See `vectorbtpro.base.indexing.get_index_points`.
-
-        Usage:
-            * Provide nothing to generate at the beginning:
-
-            ```pycon
-            >>> import vectorbtpro as vbt
-
-            >>> data = vbt.YFData.fetch("BTC-USD", start="2020-01-01", end="2020-02-01")
-
-            >>> data.wrapper.get_index_points()
-            array([0])
-            ```
-
-            * Provide `every` as an integer frequency to generate index points using NumPy:
-
-            ```pycon
-            >>> # Generate a point every five rows
-            >>> data.wrapper.get_index_points(every=5)
-            array([ 0,  5, 10, 15, 20, 25, 30])
-
-            >>> # Generate a point every five rows starting at 6th row
-            >>> data.wrapper.get_index_points(every=5, start=5)
-            array([ 5, 10, 15, 20, 25, 30])
-
-            >>> # Generate a point every five rows from 6th to 16th row
-            >>> data.wrapper.get_index_points(every=5, start=5, end=15)
-            array([ 5, 10])
-            ```
-
-            * Provide `every` as a time delta frequency to generate index points using Pandas:
-
-            ```pycon
-            >>> # Generate a point every week
-            >>> data.wrapper.get_index_points(every="W")
-            array([ 5, 12, 19, 26])
-
-            >>> # Generate a point every second day of the week
-            >>> data.wrapper.get_index_points(every="W", add_delta="2d")
-            array([ 7, 14, 21, 28])
-
-            >>> # Generate a point every week, starting at 11th row
-            >>> data.wrapper.get_index_points(every="W", start=10)
-            array([12, 19, 26])
-
-            >>> # Generate a point every week, starting exactly at 11th row
-            >>> data.wrapper.get_index_points(every="W", start=10, exact_start=True)
-            array([10, 12, 19, 26])
-
-            >>> # Generate a point every week, starting at 2020-01-10
-            >>> data.wrapper.get_index_points(every="W", start="2020-01-10")
-            array([12, 19, 26])
-            ```
-
-            * Instead of using `every`, provide indices explicitly:
-
-            ```pycon
-            >>> # Generate one point
-            >>> data.wrapper.get_index_points(on="2020-01-07")
-            array([7])
-
-            >>> # Generate multiple points
-            >>> data.wrapper.get_index_points(on=["2020-01-07", "2020-01-14"])
-            array([ 7, 14])
-            ```
-        """
-        return get_index_points(self.index, *args, **kwargs)
+        """See `vectorbtpro.base.accessors.BaseIDXAccessor.get_index_points`."""
+        return self.index_acc.get_index_points(*args, **kwargs)
 
     def get_index_ranges(self, *args, **kwargs) -> tp.Tuple[tp.Array1d, tp.Array1d]:
-        """See `vectorbtpro.base.indexing.get_index_ranges`.
-
-        Usage:
-            * Provide nothing to generate one largest index range:
-
-            ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import numpy as np
-
-            >>> data = vbt.YFData.fetch("BTC-USD", start="2020-01-01", end="2020-02-01")
-
-            >>> np.column_stack(data.wrapper.get_index_ranges())
-            array([[ 0, 32]])
-            ```
-
-            * Provide `every` as an integer frequency to generate index ranges using NumPy:
-
-            ```pycon
-            >>> # Generate a range every five rows
-            >>> np.column_stack(data.wrapper.get_index_ranges(every=5))
-            array([[ 0,  5],
-                   [ 5, 10],
-                   [10, 15],
-                   [15, 20],
-                   [20, 25],
-                   [25, 30]])
-
-            >>> # Generate a range every five rows, starting at 6th row
-            >>> np.column_stack(data.wrapper.get_index_ranges(
-            ...     every=5,
-            ...     start=5
-            ... ))
-            array([[ 5, 10],
-                   [10, 15],
-                   [15, 20],
-                   [20, 25],
-                   [25, 30]])
-
-            >>> # Generate a range every five rows from 6th to 16th row
-            >>> np.column_stack(data.wrapper.get_index_ranges(
-            ...     every=5,
-            ...     start=5,
-            ...     end=15
-            ... ))
-            array([[ 5, 10],
-                   [10, 15]])
-            ```
-
-            * Provide `every` as a time delta frequency to generate index ranges using Pandas:
-
-            ```pycon
-            >>> # Generate a range every week
-            >>> np.column_stack(data.wrapper.get_index_ranges(every="W"))
-            array([[ 5, 12],
-                   [12, 19],
-                   [19, 26]])
-
-            >>> # Generate a range every second day of the week
-            >>> np.column_stack(data.wrapper.get_index_ranges(
-            ...     every="W",
-            ...     add_start_delta="2d"
-            ... ))
-            array([[ 7, 12],
-                   [14, 19],
-                   [21, 26]])
-
-            >>> # Generate a range every week, starting at 11th row
-            >>> np.column_stack(data.wrapper.get_index_ranges(
-            ...     every="W",
-            ...     start=10
-            ... ))
-            array([[12, 19],
-                   [19, 26]])
-
-            >>> # Generate a range every week, starting exactly at 11th row
-            >>> np.column_stack(data.wrapper.get_index_ranges(
-            ...     every="W",
-            ...     start=10,
-            ...     exact_start=True
-            ... ))
-            array([[10, 12],
-                   [12, 19],
-                   [19, 26]])
-
-            >>> # Generate a range every week, starting at 2020-01-10
-            >>> np.column_stack(data.wrapper.get_index_ranges(
-            ...     every="W",
-            ...     start="2020-01-10"
-            ... ))
-            array([[12, 19],
-                   [19, 26]])
-
-            >>> # Generate a range every week, each starting at 2020-01-10
-            >>> np.column_stack(data.wrapper.get_index_ranges(
-            ...     every="W",
-            ...     start="2020-01-10",
-            ...     fixed_start=True
-            ... ))
-            array([[12, 19],
-                   [12, 26]])
-            ```
-
-            * Use a look-back period (instead of an end index):
-
-            ```pycon
-            >>> # Generate a range every week, looking 5 days back
-            >>> np.column_stack(data.wrapper.get_index_ranges(
-            ...     every="W",
-            ...     lookback_period=5
-            ... ))
-            array([[ 0,  5],
-                   [ 7, 12],
-                   [14, 19],
-                   [21, 26]])
-
-            >>> # Generate a range every week, looking 2 weeks back
-            >>> np.column_stack(data.wrapper.get_index_ranges(
-            ...     every="W",
-            ...     lookback_period="2W"
-            ... ))
-            array([[ 0, 12],
-                   [ 5, 19],
-                   [12, 26]])
-            ```
-
-            * Instead of using `every`, provide start and end indices explicitly:
-
-            ```pycon
-            >>> # Generate one range
-            >>> np.column_stack(data.wrapper.get_index_ranges(
-            ...     start="2020-01-01",
-            ...     end="2020-01-07"
-            ... ))
-            array([[1, 7]])
-
-            >>> # Generate ranges between multiple dates
-            >>> np.column_stack(data.wrapper.get_index_ranges(
-            ...     start=["2020-01-01", "2020-01-07"],
-            ...     end=["2020-01-07", "2020-01-14"]
-            ... ))
-            array([[ 1,  7],
-                   [ 7, 14]])
-
-            >>> # Generate ranges with a fixed start
-            >>> np.column_stack(data.wrapper.get_index_ranges(
-            ...     start="2020-01-01",
-            ...     end=["2020-01-07", "2020-01-14"]
-            ... ))
-            array([[ 1,  7],
-                   [ 1, 14]])
-            ```
-
-            * Use `closed_start` and `closed_end` to exclude any of the bounds:
-
-            ```pycon
-            >>> # Generate ranges between multiple dates
-            >>> # by excluding the start date and including the end date
-            >>> np.column_stack(data.wrapper.get_index_ranges(
-            ...     start=["2020-01-01", "2020-01-07"],
-            ...     end=["2020-01-07", "2020-01-14"],
-            ...     closed_start=False,
-            ...     closed_end=True
-            ... ))
-            array([[ 2,  8],
-                   [ 8, 15]])
-            ```
-        """
-        return get_index_ranges(self.index, self.any_freq, *args, **kwargs)
+        """See `vectorbtpro.base.accessors.BaseIDXAccessor.get_index_ranges`."""
+        return self.index_acc.get_index_ranges(*args, **kwargs)
 
     def fill_using_index_dict(
         self,
@@ -2260,12 +1931,12 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
         """Perform resampling on `Wrapping`.
 
         When overriding, make sure to create a resampler by passing `*args` and `**kwargs`
-        to `ArrayWrapper.create_resampler`."""
+        to `ArrayWrapper.get_resampler`."""
         raise NotImplementedError
 
     @property
     def wrapper(self) -> ArrayWrapper:
-        """Array wrapper."""
+        """Array wrapper of the type `ArrayWrapper`."""
         return self._wrapper
 
     @property

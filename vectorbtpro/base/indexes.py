@@ -316,7 +316,7 @@ def align_arr_indices_nb(a: tp.Array1d, b: tp.Array1d) -> tp.Array1d:
     return idxs
 
 
-def align_index_to(index1: tp.Index, index2: tp.Index, jitted: tp.JittedOption = None) -> pd.IndexSlice:
+def align_index_to(index1: tp.Index, index2: tp.Index, jitted: tp.JittedOption = None) -> tp.IndexSlice:
     """Align `index1` to have the same shape as `index2` if they have any levels in common.
 
     Returns index slice for the aligning."""
@@ -373,7 +373,7 @@ def align_index_to(index1: tp.Index, index2: tp.Index, jitted: tp.JittedOption =
     return pd.IndexSlice[func(unique1, unique2)]
 
 
-def align_indexes(*indexes: tp.MaybeTuple[tp.Index]) -> tp.List[tp.Index]:
+def align_indexes(*indexes: tp.MaybeTuple[tp.Index]) -> tp.List[tp.IndexSlice]:
     """Align multiple indexes to each other."""
     if len(indexes) == 1:
         indexes = indexes[0]

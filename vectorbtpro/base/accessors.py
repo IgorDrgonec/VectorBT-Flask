@@ -2,21 +2,519 @@
 
 """Custom pandas accessors for base operations with pandas objects."""
 
+import warnings
+
 import numpy as np
 import pandas as pd
 from pandas.api.types import is_scalar
+from pandas.core.groupby import GroupBy as PandasGroupBy
+from pandas.core.resample import Resampler as PandasResampler
+from pandas.tseries.frequencies import to_offset
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import combining, reshaping, indexes
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.base.indexing import row_points_defaults, row_ranges_defaults
+from vectorbtpro.base.indexing import row_points_defaults, row_ranges_defaults, get_index_points, get_index_ranges
+from vectorbtpro.base.grouping.base import Grouper
+from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.config import merge_dicts, resolve_dict
+from vectorbtpro.utils.config import merge_dicts, resolve_dict, Configured
 from vectorbtpro.utils.decorators import class_or_instanceproperty, class_or_instancemethod
 from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, attach_unary_magic_methods
 from vectorbtpro.utils.parsing import get_expr_var_names, get_context_vars
 from vectorbtpro.utils.template import deep_substitute
-from vectorbtpro.utils.datetime_ import freq_to_timedelta
+from vectorbtpro.utils.datetime_ import freq_to_timedelta, infer_index_freq, freq_to_timedelta64, prepare_freq
+
+
+class BaseIDXAccessor(Configured):
+    """Accessor on top of Index.
+
+    Accessible via `pd.Index.vbt` and all child accessors."""
+
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Configured._expected_keys or set()) | {
+        "obj",
+        "freq",
+    }
+
+    def __init__(self, obj: tp.Index, freq: tp.Optional[tp.FrequencyLike] = None, **kwargs) -> None:
+        checks.assert_instance_of(obj, pd.Index)
+
+        Configured.__init__(self, obj=obj, freq=freq, **kwargs)
+
+        self._obj = obj
+        self._freq = freq
+
+    @property
+    def obj(self):
+        """Pandas object."""
+        return self._obj
+
+    # ############# Index ############# #
+
+    def to_ns(self) -> tp.Array1d:
+        """Convert index to an 64-bit integer array.
+
+        Timestamps will be converted to nanoseconds."""
+        index = self.obj
+        if isinstance(index, pd.DatetimeIndex):
+            index = index.tz_localize(None).tz_localize("utc")
+        return index.values.astype(np.int64)
+
+    def to_period_ns(self, freq: tp.FrequencyLike, shift: bool = True) -> tp.Array1d:
+        """Convert index to period and then to an 64-bit integer array.
+
+        Timestamps will be converted to nanoseconds."""
+        index = self.obj
+        if isinstance(index, pd.DatetimeIndex):
+            index = index.tz_localize(None).to_period(freq)
+            if shift:
+                index = index.shift()
+        return index.to_timestamp().values.astype(np.int64)
+
+    @classmethod
+    def from_values(cls, *args, **kwargs) -> tp.Index:
+        """See `vectorbtpro.base.indexes.index_from_values`."""
+        return indexes.index_from_values(*args, **kwargs)
+
+    def repeat(self, *args, **kwargs) -> tp.Index:
+        """See `vectorbtpro.base.indexes.repeat_index`."""
+        return indexes.repeat_index(self.obj, *args, **kwargs)
+
+    def tile(self, *args, **kwargs) -> tp.Index:
+        """See `vectorbtpro.base.indexes.tile_index`."""
+        return indexes.tile_index(self.obj, *args, **kwargs)
+
+    @class_or_instancemethod
+    def stack(cls_or_self, *others: tp.Union[tp.IndexLike, "BaseIDXAccessor"], **kwargs) -> tp.Index:
+        """See `vectorbtpro.base.indexes.stack_indexes`."""
+        others = tuple(map(lambda x: x.obj if isinstance(x, BaseIDXAccessor) else x, others))
+        if isinstance(cls_or_self, type):
+            return indexes.stack_indexes(*others, **kwargs)
+        return indexes.stack_indexes(cls_or_self.obj, *others, **kwargs)
+
+    @class_or_instancemethod
+    def combine(cls_or_self, *others: tp.Union[tp.IndexLike, "BaseIDXAccessor"], **kwargs) -> tp.Index:
+        """See `vectorbtpro.base.indexes.combine_indexes`."""
+        others = tuple(map(lambda x: x.obj if isinstance(x, BaseIDXAccessor) else x, others))
+        if isinstance(cls_or_self, type):
+            return indexes.combine_indexes(*others, **kwargs)
+        return indexes.combine_indexes(cls_or_self.obj, *others, **kwargs)
+
+    def drop_levels(self, *args, **kwargs) -> tp.Index:
+        """See `vectorbtpro.base.indexes.drop_levels`."""
+        return indexes.drop_levels(self.obj, *args, **kwargs)
+
+    def rename_levels(self, *args, **kwargs) -> tp.Index:
+        """See `vectorbtpro.base.indexes.rename_levels`."""
+        return indexes.rename_levels(self.obj, *args, **kwargs)
+
+    def select_levels(self, *args, **kwargs) -> tp.Index:
+        """See `vectorbtpro.base.indexes.select_levels`."""
+        return indexes.select_levels(self.obj, *args, **kwargs)
+
+    def drop_redundant_levels(self, *args, **kwargs) -> tp.Index:
+        """See `vectorbtpro.base.indexes.drop_redundant_levels`."""
+        return indexes.drop_redundant_levels(self.obj, *args, **kwargs)
+
+    def drop_duplicate_levels(self, *args, **kwargs) -> tp.Index:
+        """See `vectorbtpro.base.indexes.drop_duplicate_levels`."""
+        return indexes.drop_duplicate_levels(self.obj, *args, **kwargs)
+
+    def align_to(self, *args, **kwargs) -> tp.IndexSlice:
+        """See `vectorbtpro.base.indexes.align_index_to`."""
+        return indexes.align_index_to(self.obj, *args, **kwargs)
+
+    def find_first_occurrence(self, *args, **kwargs) -> int:
+        """See `vectorbtpro.base.indexes.find_first_occurrence`."""
+        return indexes.find_first_occurrence(self.obj, *args, **kwargs)
+
+    # ############# Frequency ############# #
+
+    def get_freq(
+        self,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        **kwargs,
+    ) -> tp.Union[None, float, tp.PandasFrequency]:
+        """Index frequency as `pd.Timedelta` or None if it cannot be converted."""
+        from vectorbtpro._settings import settings
+
+        wrapping_cfg = settings["wrapping"]
+
+        if freq is None:
+            freq = self._freq
+        if freq is None:
+            freq = wrapping_cfg["freq"]
+        try:
+            return infer_index_freq(self.obj, freq=freq, **kwargs)
+        except Exception as e:
+            return None
+
+    @property
+    def freq(self) -> tp.Optional[pd.Timedelta]:
+        """`BaseIDXAccessor.get_freq` with date offsets and integer frequencies not allowed."""
+        return self.get_freq(allow_date_offset=False, allow_numeric=False)
+
+    @property
+    def ns_freq(self) -> tp.Optional[int]:
+        """Convert frequency to a 64-bit integer.
+
+        Timedelta will be converted to nanoseconds."""
+        freq = self.get_freq(allow_date_offset=False, allow_numeric=True)
+        if freq is not None:
+            freq = freq_to_timedelta64(freq).astype(np.int64)
+        return freq
+
+    @property
+    def any_freq(self) -> tp.Union[None, float, tp.PandasFrequency]:
+        """Index frequency of any type."""
+        return self.get_freq()
+
+    @property
+    def period(self) -> int:
+        """Get the period of the index, without taking into account its datetime-like properties."""
+        return len(self.obj)
+
+    @property
+    def dt_period(self) -> float:
+        """Get the period of the index, taking into account its datetime-like properties."""
+        from vectorbtpro._settings import settings
+
+        wrapping_cfg = settings["wrapping"]
+
+        if isinstance(self.obj, pd.DatetimeIndex):
+            if self.freq is not None:
+                return (self.obj[-1] - self.obj[0]) / self.freq + 1
+            if not wrapping_cfg["silence_warnings"]:
+                warnings.warn(
+                    "Couldn't parse the frequency of index. Pass it as `freq` or "
+                    "define it globally under `settings.wrapping`.",
+                    stacklevel=2,
+                )
+        if isinstance(self.obj[0], int) and isinstance(self.obj[-1], int):
+            return self.obj[-1] - self.obj[0] + 1
+        if not wrapping_cfg["silence_warnings"]:
+            warnings.warn("Index is neither datetime-like nor integer", stacklevel=2)
+        return self.period
+
+    def arr_to_timedelta(
+        self,
+        a: tp.MaybeArray,
+        to_pd: bool = False,
+        silence_warnings: tp.Optional[bool] = None,
+    ) -> tp.Union[pd.Index, tp.MaybeArray]:
+        """Convert array to duration using `BaseIDXAccessor.freq`."""
+        from vectorbtpro._settings import settings
+
+        wrapping_cfg = settings["wrapping"]
+
+        if silence_warnings is None:
+            silence_warnings = wrapping_cfg["silence_warnings"]
+
+        if self.freq is None:
+            if not silence_warnings:
+                warnings.warn(
+                    "Couldn't parse the frequency of index. Pass it as `freq` or "
+                    "define it globally under `settings.wrapping`.",
+                    stacklevel=2,
+                )
+            return a
+        if to_pd:
+            return pd.to_timedelta(a * self.freq)
+        return a * self.freq
+
+    # ############# Grouping ############# #
+
+    def get_grouper(self, by: tp.Union[Grouper, tp.PandasGroupByLike], **kwargs) -> Grouper:
+        """Get an index grouper of type `vectorbtpro.base.grouping.base.Grouper`."""
+        if isinstance(by, Grouper):
+            return by
+        if isinstance(by, (PandasGroupBy, PandasResampler)):
+            return Grouper.from_pd_group_by(by)
+        try:
+            return Grouper(index=self.obj, group_by=by)
+        except Exception as e:
+            pass
+        if isinstance(self.obj, pd.DatetimeIndex):
+            try:
+                by = to_offset(prepare_freq(by))
+                if by.n == 1:
+                    return Grouper(index=self.obj, group_by=self.obj.to_period(by))
+            except Exception as e:
+                pass
+            try:
+                pd_group_by = pd.Series(index=self.obj, dtype=object).resample(prepare_freq(by), **kwargs)
+                return Grouper.from_pd_group_by(pd_group_by)
+            except Exception as e:
+                pass
+        pd_group_by = pd.Series(index=self.obj, dtype=object).groupby(by, axis=0, **kwargs)
+        return Grouper.from_pd_group_by(pd_group_by)
+
+    def get_resampler(
+        self,
+        rule: tp.Union[Resampler, tp.PandasResampler, tp.PandasFrequencyLike],
+        resample_kwargs: tp.KwargsLike = None,
+        return_pd_resampler: bool = False,
+    ) -> tp.Union[Resampler, tp.PandasResampler]:
+        """Get an index resampler of type `vectorbtpro.base.resampling.base.Resampler`."""
+        if not isinstance(rule, Resampler):
+            if not isinstance(rule, PandasResampler):
+                resample_kwargs = merge_dicts(
+                    dict(closed="left", label="left"),
+                    resample_kwargs,
+                )
+                rule = pd.Series(index=self.obj, dtype=object).resample(
+                    prepare_freq(rule), **resolve_dict(resample_kwargs)
+                )
+            if return_pd_resampler:
+                return rule
+            rule = Resampler.from_pd_resampler(rule)
+        if return_pd_resampler:
+            raise TypeError("Cannot convert Resampler to Pandas Resampler")
+        return rule
+
+    # ############# Points and ranges ############# #
+
+    def get_index_points(self, *args, **kwargs) -> tp.Array1d:
+        """See `vectorbtpro.base.indexing.get_index_points`.
+
+        Usage:
+            * Provide nothing to generate at the beginning:
+
+            ```pycon
+            >>> import vectorbtpro as vbt
+
+            >>> data = vbt.YFData.fetch("BTC-USD", start="2020-01-01", end="2020-02-01")
+            >>> index = data.wrapper.index
+
+            >>> index.vbt.get_index_points()
+            array([0])
+            ```
+
+            * Provide `every` as an integer frequency to generate index points using NumPy:
+
+            ```pycon
+            >>> # Generate a point every five rows
+            >>> index.vbt.get_index_points(every=5)
+            array([ 0,  5, 10, 15, 20, 25, 30])
+
+            >>> # Generate a point every five rows starting at 6th row
+            >>> index.vbt.get_index_points(every=5, start=5)
+            array([ 5, 10, 15, 20, 25, 30])
+
+            >>> # Generate a point every five rows from 6th to 16th row
+            >>> index.vbt.get_index_points(every=5, start=5, end=15)
+            array([ 5, 10])
+            ```
+
+            * Provide `every` as a time delta frequency to generate index points using Pandas:
+
+            ```pycon
+            >>> # Generate a point every week
+            >>> index.vbt.get_index_points(every="W")
+            array([ 5, 12, 19, 26])
+
+            >>> # Generate a point every second day of the week
+            >>> index.vbt.get_index_points(every="W", add_delta="2d")
+            array([ 7, 14, 21, 28])
+
+            >>> # Generate a point every week, starting at 11th row
+            >>> index.vbt.get_index_points(every="W", start=10)
+            array([12, 19, 26])
+
+            >>> # Generate a point every week, starting exactly at 11th row
+            >>> index.vbt.get_index_points(every="W", start=10, exact_start=True)
+            array([10, 12, 19, 26])
+
+            >>> # Generate a point every week, starting at 2020-01-10
+            >>> index.vbt.get_index_points(every="W", start="2020-01-10")
+            array([12, 19, 26])
+            ```
+
+            * Instead of using `every`, provide indices explicitly:
+
+            ```pycon
+            >>> # Generate one point
+            >>> index.vbt.get_index_points(on="2020-01-07")
+            array([7])
+
+            >>> # Generate multiple points
+            >>> index.vbt.get_index_points(on=["2020-01-07", "2020-01-14"])
+            array([ 7, 14])
+            ```
+        """
+        return get_index_points(self.obj, *args, **kwargs)
+
+    def get_index_ranges(self, *args, **kwargs) -> tp.Tuple[tp.Array1d, tp.Array1d]:
+        """See `vectorbtpro.base.indexing.get_index_ranges`.
+
+        Usage:
+            * Provide nothing to generate one largest index range:
+
+            ```pycon
+            >>> import vectorbtpro as vbt
+            >>> import numpy as np
+
+            >>> data = vbt.YFData.fetch("BTC-USD", start="2020-01-01", end="2020-02-01")
+            >>> index = data.wrapper.index
+
+            >>> np.column_stack(index.vbt.get_index_ranges())
+            array([[ 0, 32]])
+            ```
+
+            * Provide `every` as an integer frequency to generate index ranges using NumPy:
+
+            ```pycon
+            >>> # Generate a range every five rows
+            >>> np.column_stack(index.vbt.get_index_ranges(every=5))
+            array([[ 0,  5],
+                   [ 5, 10],
+                   [10, 15],
+                   [15, 20],
+                   [20, 25],
+                   [25, 30]])
+
+            >>> # Generate a range every five rows, starting at 6th row
+            >>> np.column_stack(index.vbt.get_index_ranges(
+            ...     every=5,
+            ...     start=5
+            ... ))
+            array([[ 5, 10],
+                   [10, 15],
+                   [15, 20],
+                   [20, 25],
+                   [25, 30]])
+
+            >>> # Generate a range every five rows from 6th to 16th row
+            >>> np.column_stack(index.vbt.get_index_ranges(
+            ...     every=5,
+            ...     start=5,
+            ...     end=15
+            ... ))
+            array([[ 5, 10],
+                   [10, 15]])
+            ```
+
+            * Provide `every` as a time delta frequency to generate index ranges using Pandas:
+
+            ```pycon
+            >>> # Generate a range every week
+            >>> np.column_stack(index.vbt.get_index_ranges(every="W"))
+            array([[ 5, 12],
+                   [12, 19],
+                   [19, 26]])
+
+            >>> # Generate a range every second day of the week
+            >>> np.column_stack(index.vbt.get_index_ranges(
+            ...     every="W",
+            ...     add_start_delta="2d"
+            ... ))
+            array([[ 7, 12],
+                   [14, 19],
+                   [21, 26]])
+
+            >>> # Generate a range every week, starting at 11th row
+            >>> np.column_stack(index.vbt.get_index_ranges(
+            ...     every="W",
+            ...     start=10
+            ... ))
+            array([[12, 19],
+                   [19, 26]])
+
+            >>> # Generate a range every week, starting exactly at 11th row
+            >>> np.column_stack(index.vbt.get_index_ranges(
+            ...     every="W",
+            ...     start=10,
+            ...     exact_start=True
+            ... ))
+            array([[10, 12],
+                   [12, 19],
+                   [19, 26]])
+
+            >>> # Generate a range every week, starting at 2020-01-10
+            >>> np.column_stack(index.vbt.get_index_ranges(
+            ...     every="W",
+            ...     start="2020-01-10"
+            ... ))
+            array([[12, 19],
+                   [19, 26]])
+
+            >>> # Generate a range every week, each starting at 2020-01-10
+            >>> np.column_stack(index.vbt.get_index_ranges(
+            ...     every="W",
+            ...     start="2020-01-10",
+            ...     fixed_start=True
+            ... ))
+            array([[12, 19],
+                   [12, 26]])
+            ```
+
+            * Use a look-back period (instead of an end index):
+
+            ```pycon
+            >>> # Generate a range every week, looking 5 days back
+            >>> np.column_stack(index.vbt.get_index_ranges(
+            ...     every="W",
+            ...     lookback_period=5
+            ... ))
+            array([[ 0,  5],
+                   [ 7, 12],
+                   [14, 19],
+                   [21, 26]])
+
+            >>> # Generate a range every week, looking 2 weeks back
+            >>> np.column_stack(index.vbt.get_index_ranges(
+            ...     every="W",
+            ...     lookback_period="2W"
+            ... ))
+            array([[ 0, 12],
+                   [ 5, 19],
+                   [12, 26]])
+            ```
+
+            * Instead of using `every`, provide start and end indices explicitly:
+
+            ```pycon
+            >>> # Generate one range
+            >>> np.column_stack(index.vbt.get_index_ranges(
+            ...     start="2020-01-01",
+            ...     end="2020-01-07"
+            ... ))
+            array([[1, 7]])
+
+            >>> # Generate ranges between multiple dates
+            >>> np.column_stack(index.vbt.get_index_ranges(
+            ...     start=["2020-01-01", "2020-01-07"],
+            ...     end=["2020-01-07", "2020-01-14"]
+            ... ))
+            array([[ 1,  7],
+                   [ 7, 14]])
+
+            >>> # Generate ranges with a fixed start
+            >>> np.column_stack(index.vbt.get_index_ranges(
+            ...     start="2020-01-01",
+            ...     end=["2020-01-07", "2020-01-14"]
+            ... ))
+            array([[ 1,  7],
+                   [ 1, 14]])
+            ```
+
+            * Use `closed_start` and `closed_end` to exclude any of the bounds:
+
+            ```pycon
+            >>> # Generate ranges between multiple dates
+            >>> # by excluding the start date and including the end date
+            >>> np.column_stack(index.vbt.get_index_ranges(
+            ...     start=["2020-01-01", "2020-01-07"],
+            ...     end=["2020-01-07", "2020-01-14"],
+            ...     closed_start=False,
+            ...     closed_end=True
+            ... ))
+            array([[ 2,  8],
+                   [ 8, 15]])
+            ```
+        """
+        return get_index_ranges(self.obj, self.any_freq, *args, **kwargs)
+
 
 BaseAccessorT = tp.TypeVar("BaseAccessorT", bound="BaseAccessor")
 

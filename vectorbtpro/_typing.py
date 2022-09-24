@@ -14,6 +14,7 @@ from pandas import Series, DataFrame as Frame, Index
 from pandas.tseries.offsets import BaseOffset
 from pandas.core.groupby import GroupBy as PandasGroupBy
 from pandas.core.resample import Resampler as PandasResampler
+from pandas.core.indexing import _IndexSlice as IndexSlice
 
 try:
     from plotly.graph_objects import Figure, FigureWidget

@@ -678,7 +678,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
                     # Handle apply_to_timedelta
                     if apply_to_timedelta and to_timedelta:
-                        v = custom_reself.wrapper.to_timedelta(
+                        v = custom_reself.wrapper.arr_to_timedelta(
                             v,
                             silence_warnings=_silence_warnings,
                         )

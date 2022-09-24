@@ -1451,7 +1451,7 @@ def substitute_anchor(wrapper: ArrayWrapper, anchor: tp.Optional[tp.FrequencyLik
     """Substitute reset frequency by group lens."""
     if anchor is None:
         return np.array([wrapper.shape[0]])
-    return wrapper.create_index_grouper(anchor).get_group_lens()
+    return wrapper.get_index_grouper(anchor).get_group_lens()
 
 
 VWAP = IndicatorFactory(

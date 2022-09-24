@@ -917,17 +917,17 @@ class Drawdowns(Ranges):
             recovery_return = self_col.recovery_return.values
             status = self_col.get_field_arr("status")
 
-            decline_duration = to_1d_array(self_col.wrapper.to_timedelta(
+            decline_duration = to_1d_array(self_col.wrapper.arr_to_timedelta(
                 self_col.decline_duration.values,
                 to_pd=True,
                 silence_warnings=True
             ).astype(str))
-            recovery_duration = to_1d_array(self_col.wrapper.to_timedelta(
+            recovery_duration = to_1d_array(self_col.wrapper.arr_to_timedelta(
                 self_col.recovery_duration.values,
                 to_pd=True,
                 silence_warnings=True
             ).astype(str))
-            duration = to_1d_array(self_col.wrapper.to_timedelta(
+            duration = to_1d_array(self_col.wrapper.arr_to_timedelta(
                 self_col.duration.values,
                 to_pd=True,
                 silence_warnings=True

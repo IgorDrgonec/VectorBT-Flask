@@ -1577,7 +1577,7 @@ class TestArrayWrapper:
     def test_to_timedelta(self):
         sr = pd.Series([1, 2, np.nan], index=["x", "y", "z"], name="name")
         assert_series_equal(
-            vbt.ArrayWrapper.from_obj(sr, freq="1 days").to_timedelta(sr),
+            vbt.ArrayWrapper.from_obj(sr, freq="1 days").arr_to_timedelta(sr),
             pd.Series(
                 np.array([86400000000000, 172800000000000, "NaT"], dtype="timedelta64[ns]"),
                 index=sr.index,
@@ -1586,7 +1586,7 @@ class TestArrayWrapper:
         )
         df = sr.to_frame()
         assert_frame_equal(
-            vbt.ArrayWrapper.from_obj(df, freq="1 days").to_timedelta(df),
+            vbt.ArrayWrapper.from_obj(df, freq="1 days").arr_to_timedelta(df),
             pd.DataFrame(
                 np.array([86400000000000, 172800000000000, "NaT"], dtype="timedelta64[ns]"),
                 index=df.index,

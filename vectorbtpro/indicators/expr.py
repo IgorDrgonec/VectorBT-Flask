@@ -143,7 +143,7 @@ def returns(context: tp.KwargsLike = None) -> tp.Array2d:
 def vwap(context: tp.KwargsLike = None) -> tp.Array2d:
     """VWAP."""
     if isinstance(context["wrapper"].index, pd.DatetimeIndex):
-        group_lens = context["wrapper"].create_index_grouper("D").get_group_lens()
+        group_lens = context["wrapper"].get_index_grouper("D").get_group_lens()
     else:
         group_lens = np.array([context["wrapper"].shape[0]])
     return vwap_nb(context["high"], context["low"], context["close"], context["volume"], group_lens)
