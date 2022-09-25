@@ -753,6 +753,40 @@ def pypfopt_optimize(
 # ############# Riskfolio-Lib ############# #
 
 
+def prepare_returns(
+    returns: tp.AnyArray2d,
+    nan_to_zero: bool = True,
+    dropna_rows: bool = True,
+    dropna_cols: bool = True,
+    dropna_any: bool = True,
+) -> tp.Frame:
+    """Prepare returns."""
+    returns = to_pd_array(returns)
+    if returns.size == 0:
+        return returns
+    if nan_to_zero or dropna_rows or dropna_cols or dropna_any:
+        returns = returns.replace([np.inf, -np.inf], np.nan)
+    if nan_to_zero:
+        returns = returns.fillna(0.0)
+    if dropna_rows or dropna_cols:
+        if nan_to_zero:
+            valid_mask = returns != 0
+        else:
+            valid_mask = ~returns.isnull()
+        if dropna_rows:
+            if nan_to_zero or not dropna_any:
+                returns = returns.loc[valid_mask.any(axis=1)]
+                if returns.size == 0:
+                    return returns
+        if dropna_cols:
+            returns = returns.loc[:, valid_mask.any(axis=0)]
+            if returns.size == 0:
+                return returns
+    if not nan_to_zero and dropna_any:
+        returns = returns.dropna()
+    return returns
+
+
 def resolve_riskfolio_func_kwargs(
     riskfolio_func: tp.Callable,
     unused_arg_names: tp.Optional[tp.Set[str]] = None,
@@ -771,7 +805,7 @@ def resolve_riskfolio_func_kwargs(
     if func_kwargs is not None:
         return merge_dicts(
             select_pfopt_func_kwargs(riskfolio_func, matched_kwargs),
-            select_pfopt_func_kwargs(riskfolio_func, pfopt_func_dict(func_kwargs))
+            select_pfopt_func_kwargs(riskfolio_func, pfopt_func_dict(func_kwargs)),
         )
     return select_pfopt_func_kwargs(riskfolio_func, matched_kwargs)
 
@@ -832,18 +866,21 @@ def resolve_assets_constraints(constraints: tp.Union[tp.Frame, tp.Sequence]) -> 
         else:
             constraints = pd.DataFrame.from_records(constraints)
         constraints.columns = constraints.columns.str.title()
-        new_constraints = pd.DataFrame(columns=[
-            "Disabled",
-            "Type",
-            "Set",
-            "Position",
-            "Sign",
-            "Weight",
-            "Type Relative",
-            "Relative Set",
-            "Relative",
-            "Factor",
-        ], dtype=object)
+        new_constraints = pd.DataFrame(
+            columns=[
+                "Disabled",
+                "Type",
+                "Set",
+                "Position",
+                "Sign",
+                "Weight",
+                "Type Relative",
+                "Relative Set",
+                "Relative",
+                "Factor",
+            ],
+            dtype=object,
+        )
         for c in new_constraints.columns:
             if c in constraints.columns:
                 new_constraints[c] = constraints[c]
@@ -865,13 +902,16 @@ def resolve_factors_constraints(constraints: tp.Union[tp.Frame, tp.Sequence]) ->
         else:
             constraints = pd.DataFrame.from_records(constraints)
         constraints.columns = constraints.columns.str.title()
-        new_constraints = pd.DataFrame(columns=[
-            "Disabled",
-            "Factor",
-            "Sign",
-            "Value",
-            "Relative Factor",
-        ], dtype=object)
+        new_constraints = pd.DataFrame(
+            columns=[
+                "Disabled",
+                "Factor",
+                "Sign",
+                "Value",
+                "Relative Factor",
+            ],
+            dtype=object,
+        )
         for c in new_constraints.columns:
             if c in constraints.columns:
                 new_constraints[c] = constraints[c]
@@ -893,17 +933,20 @@ def resolve_assets_views(views: tp.Union[tp.Frame, tp.Sequence]) -> tp.Frame:
         else:
             views = pd.DataFrame.from_records(views)
         views.columns = views.columns.str.title()
-        new_views = pd.DataFrame(columns=[
-            "Disabled",
-            "Type",
-            "Set",
-            "Position",
-            "Sign",
-            "Return",
-            "Type Relative",
-            "Relative Set",
-            "Relative",
-        ], dtype=object)
+        new_views = pd.DataFrame(
+            columns=[
+                "Disabled",
+                "Type",
+                "Set",
+                "Position",
+                "Sign",
+                "Return",
+                "Type Relative",
+                "Relative Set",
+                "Relative",
+            ],
+            dtype=object,
+        )
         for c in new_views.columns:
             if c in views.columns:
                 new_views[c] = views[c]
@@ -925,13 +968,16 @@ def resolve_factors_views(views: tp.Union[tp.Frame, tp.Sequence]) -> tp.Frame:
         else:
             views = pd.DataFrame.from_records(views)
         views.columns = views.columns.str.title()
-        new_views = pd.DataFrame(columns=[
-            "Disabled",
-            "Factor",
-            "Sign",
-            "Value",
-            "Relative Factor",
-        ], dtype=object)
+        new_views = pd.DataFrame(
+            columns=[
+                "Disabled",
+                "Factor",
+                "Sign",
+                "Value",
+                "Relative Factor",
+            ],
+            dtype=object,
+        )
         for c in new_views.columns:
             if c in views.columns:
                 new_views[c] = views[c]
@@ -953,14 +999,17 @@ def resolve_hrp_constraints(constraints: tp.Union[tp.Frame, tp.Sequence]) -> tp.
         else:
             constraints = pd.DataFrame.from_records(constraints)
         constraints.columns = constraints.columns.str.title()
-        new_constraints = pd.DataFrame(columns=[
-            "Disabled",
-            "Type",
-            "Set",
-            "Position",
-            "Sign",
-            "Weight",
-        ], dtype=object)
+        new_constraints = pd.DataFrame(
+            columns=[
+                "Disabled",
+                "Type",
+                "Set",
+                "Position",
+                "Sign",
+                "Weight",
+            ],
+            dtype=object,
+        )
         for c in new_constraints.columns:
             if c in constraints.columns:
                 new_constraints[c] = constraints[c]
@@ -972,6 +1021,10 @@ def resolve_hrp_constraints(constraints: tp.Union[tp.Frame, tp.Sequence]) -> tp.
 
 def riskfolio_optimize(
     returns: tp.AnyArray2d,
+    nan_to_zero: tp.Optional[bool] = None,
+    dropna_rows: tp.Optional[bool] = None,
+    dropna_cols: tp.Optional[bool] = None,
+    dropna_any: tp.Optional[bool] = None,
     factors: tp.Optional[tp.AnyArray2d] = None,
     port: tp.Optional[RPortfolioT] = None,
     port_cls: tp.Union[None, str, tp.Type] = None,
@@ -993,12 +1046,20 @@ def riskfolio_optimize(
     func_kwargs: tp.KwargsLike = None,
     silence_warnings: bool = True,
     return_port: bool = False,
-    **kwargs
+    **kwargs,
 ) -> tp.Union[tp.Dict[str, float], tp.Tuple[tp.Dict[str, float], RPortfolioT]]:
     """Get allocation using Riskfolio-Lib.
 
     Args:
         returns (array_like): A dataframe that contains the returns of the assets.
+        nan_to_zero (bool): Whether to convert NaN values to zero.
+        dropna_rows (bool): Whether to drop rows with all NaN/zero values.
+
+            Gets applied only if `nan_to_zero` is True or `dropna_any` is False.
+        dropna_cols (bool): Whether to drop columns with all NaN/zero values.
+        dropna_any (bool): Whether to drop any NaN values.
+
+            Gets applied only if `nan_to_zero` is False.
         factors (array_like): A dataframe that contains the factors.
         port (Portfolio or HCPortfolio): Already initialized portfolio.
         port_cls (str or type): Portfolio class.
@@ -1098,10 +1159,10 @@ def riskfolio_optimize(
         ...     method_mu='hist', method_cov='hist', d=0.94,  # assets_stats
         ...     model='Classic', rm='MV', obj='Sharpe', hist=True, rf=0, l=0  # optimization
         ... )
-        {'MSFT': 0.04678360875751731,
-         'AMZN': 0.3285061231812311,
-         'KO': 0.1830857777881992,
-         'MA': 0.4416244902730524}
+        {'MSFT': 0.26297126323056036,
+         'AMZN': 0.13984467450137006,
+         'KO': 0.35870315943426767,
+         'MA': 0.238480902833802}
         ```
 
         * The same by splitting arguments:
@@ -1114,10 +1175,10 @@ def riskfolio_optimize(
         ...         optimization=dict(model='Classic', rm='MV', obj='Sharpe', hist=True, rf=0, l=0)
         ...     )
         ... )
-        {'MSFT': 0.04678360875751731,
-         'AMZN': 0.3285061231812311,
-         'KO': 0.1830857777881992,
-         'MA': 0.4416244902730524}
+        {'MSFT': 0.26297126323056036,
+         'AMZN': 0.13984467450137006,
+         'KO': 0.35870315943426767,
+         'MA': 0.238480902833802}
         ```
 
         * Asset constraints:
@@ -1134,10 +1195,10 @@ def riskfolio_optimize(
         ...         }
         ...     ]
         ... )
-        {'MSFT': 0.009998589725736489,
-         'AMZN': 0.3391616047487712,
-         'KO': 0.1987925970429111,
-         'MA': 0.452047208482581}
+        {'MSFT': 0.009999990814976588,
+         'AMZN': 0.19788481506569947,
+         'KO': 0.4553600308839969,
+         'MA': 0.336755163235327}
         ```
 
         * Asset class constraints:
@@ -1156,10 +1217,10 @@ def riskfolio_optimize(
         ...         }
         ...     ]
         ... )
-        {'MSFT': 1.5017548189020833e-08,
-         'AMZN': 0.09999997498168679,
-         'KO': 0.3431450186946893,
-         'MA': 0.5568549913060759}
+        {'MSFT': 0.03501297245802569,
+         'AMZN': 0.06498702655063979,
+         'KO': 0.4756624658301967,
+         'MA': 0.4243375351611379}
         ```
 
         * Hierarchical Risk Parity (HRP) Portfolio Optimization:
@@ -1176,10 +1237,10 @@ def riskfolio_optimize(
         ...     max_k=10,
         ...     leaf_order=True
         ... )
-        {'MSFT': 0.2134586531412399,
-         'AMZN': 0.11138805485337643,
-         'KO': 0.5164158985144643,
-         'MA': 0.15873739349091934}
+        {'MSFT': 0.19091632057853536,
+         'AMZN': 0.11069893826556164,
+         'KO': 0.28589872132122485,
+         'MA': 0.41248601983467814}
         ```
     """
     from vectorbtpro.utils.opt_packages import assert_can_import
@@ -1198,6 +1259,10 @@ def riskfolio_optimize(
             return setting
         return v
 
+    nan_to_zero = _resolve_setting("nan_to_zero", nan_to_zero)
+    dropna_rows = _resolve_setting("dropna_rows", dropna_rows)
+    dropna_cols = _resolve_setting("dropna_cols", dropna_cols)
+    dropna_any = _resolve_setting("dropna_any", dropna_any)
     factors = _resolve_setting("factors", factors)
     port = _resolve_setting("port", port)
     port_cls = _resolve_setting("port_cls", port_cls)
@@ -1224,18 +1289,27 @@ def riskfolio_optimize(
     silence_warnings = _resolve_setting("silence_warnings", silence_warnings)
     return_port = _resolve_setting("return_port", return_port)
     kwargs = merge_dicts(riskfolio_cfg, kwargs)
+    if pre_opt_kwargs is None:
+        pre_opt_kwargs = {}
+    if func_kwargs is None:
+        func_kwargs = {}
+    func_kwargs = pfopt_func_dict(func_kwargs)
+    unused_arg_names = set(kwargs.keys())
 
     with warnings.catch_warnings():
         if silence_warnings:
             warnings.simplefilter("ignore")
 
-        returns = to_pd_array(returns).dropna()
-        if pre_opt_kwargs is None:
-            pre_opt_kwargs = {}
-        if func_kwargs is None:
-            func_kwargs = {}
-        func_kwargs = pfopt_func_dict(func_kwargs)
-        unused_arg_names = set(kwargs.keys())
+        # Prepare returns
+        returns = prepare_returns(
+            returns,
+            nan_to_zero=nan_to_zero,
+            dropna_rows=dropna_rows,
+            dropna_cols=dropna_cols,
+            dropna_any=dropna_any,
+        )
+        if returns.size == 0:
+            return {}
 
         # Pre-optimize
         if pre_opt:
@@ -1871,10 +1945,13 @@ class PortfolioOptimizer(Analyzable):
             if n_config_params == 0 or (n_config_params == 1 and gc_names_none):
                 group_index = param_columns
             else:
-                group_index = combine_indexes((
-                    param_columns,
-                    pd.Index(gc_names, name="group_config"),
-                ), **stack_kwargs)
+                group_index = combine_indexes(
+                    (
+                        param_columns,
+                        pd.Index(gc_names, name="group_config"),
+                    ),
+                    **stack_kwargs,
+                )
         else:
             if n_config_params == 0 or (n_config_params == 1 and gc_names_none):
                 group_index = pd.Index(["group"], name="group")
@@ -2278,10 +2355,7 @@ class PortfolioOptimizer(Analyzable):
                 raise TypeError(f"Algo {_algo} not supported")
             if "on" not in kwargs:
                 group_config["on"] = nb.get_alloc_points_nb(
-                    weights,
-                    valid_only=valid_only,
-                    nonzero_only=nonzero_only,
-                    unique_only=unique_only
+                    weights, valid_only=valid_only, nonzero_only=nonzero_only, unique_only=unique_only
                 )
             group_config["args"] = (weights,)
 
@@ -2631,10 +2705,13 @@ class PortfolioOptimizer(Analyzable):
             if n_config_params == 0 or (n_config_params == 1 and gc_names_none):
                 group_index = param_columns
             else:
-                group_index = combine_indexes((
-                    param_columns,
-                    pd.Index(gc_names, name="group_config"),
-                ), **stack_kwargs)
+                group_index = combine_indexes(
+                    (
+                        param_columns,
+                        pd.Index(gc_names, name="group_config"),
+                    ),
+                    **stack_kwargs,
+                )
         else:
             if n_config_params == 0 or (n_config_params == 1 and gc_names_none):
                 group_index = pd.Index(["group"], name="group")
@@ -2945,10 +3022,13 @@ class PortfolioOptimizer(Analyzable):
         **kwargs,
     ) -> PortfolioOptimizerT:
         """`PortfolioOptimizer.from_optimize_func` applied on Riskfolio-Lib."""
-        returns = to_pd_array(returns)
         if wrapper is None:
-            wrapper = ArrayWrapper.from_obj(returns)
-        returns = RepFunc(lambda index_slice, _returns=returns: _returns.iloc[index_slice])
+            if not isinstance(returns, CustomTemplate):
+                wrapper = ArrayWrapper.from_obj(returns)
+            else:
+                raise TypeError("Must provide a wrapper if returns are a template")
+        if not isinstance(returns, CustomTemplate):
+            returns = RepFunc(lambda index_slice, _returns=returns: _returns.iloc[index_slice])
         return cls.from_optimize_func(wrapper, riskfolio_optimize, returns, **kwargs)
 
     # ############# Properties ############# #

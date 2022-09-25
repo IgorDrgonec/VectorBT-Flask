@@ -1203,6 +1203,11 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         """OHLC/4 (magnet)."""
         return (self.open + self.high + self.low + self.close) / 4
 
+    @property
+    def returns(self) -> tp.Optional[tp.SeriesFrame]:
+        """Returns."""
+        return self.close.vbt.to_returns()
+
     # ############# Selecting ############# #
 
     def select(self: DataT, symbols: tp.Union[tp.Symbol, tp.Symbols], **kwargs) -> DataT:
@@ -1599,6 +1604,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 with_kwargs[real_arg_name] = _self.hlc3
             elif real_arg_name not in kwargs and arg_name == "ohlc4":
                 with_kwargs[real_arg_name] = _self.ohlc4
+            elif real_arg_name not in kwargs and arg_name == "returns":
+                with_kwargs[real_arg_name] = _self.returns
         new_args, new_kwargs = extend_args(func, args, kwargs, **with_kwargs)
         return func(*new_args, **new_kwargs)
 
