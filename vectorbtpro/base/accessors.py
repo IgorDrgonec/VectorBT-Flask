@@ -100,6 +100,14 @@ class BaseIDXAccessor(Configured):
             return indexes.combine_indexes(*others, **kwargs)
         return indexes.combine_indexes(cls_or_self.obj, *others, **kwargs)
 
+    @class_or_instancemethod
+    def concat(cls_or_self, *others: tp.Union[tp.IndexLike, "BaseIDXAccessor"], **kwargs) -> tp.Index:
+        """See `vectorbtpro.base.indexes.concat_indexes`."""
+        others = tuple(map(lambda x: x.obj if isinstance(x, BaseIDXAccessor) else x, others))
+        if isinstance(cls_or_self, type):
+            return indexes.concat_indexes(*others, **kwargs)
+        return indexes.concat_indexes(cls_or_self.obj, *others, **kwargs)
+
     def drop_levels(self, *args, **kwargs) -> tp.Index:
         """See `vectorbtpro.base.indexes.drop_levels`."""
         return indexes.drop_levels(self.obj, *args, **kwargs)
@@ -654,16 +662,8 @@ class BaseAccessor(Wrapping):
         **kwargs,
     ) -> tp.Kwargs:
         """Resolve keyword arguments for initializing `BaseAccessor` after stacking along rows."""
-        wrapper_kwargs, kwargs = ArrayWrapper.extract_init_kwargs(**kwargs)
-        if "wrapper" in kwargs and kwargs["wrapper"] is not None:
-            wrapper = kwargs["wrapper"]
-            if len(wrapper_kwargs) > 0:
-                wrapper = wrapper.replace(**wrapper_kwargs)
-        else:
-            wrapper = ArrayWrapper.row_stack(*[obj.wrapper for obj in objs], **wrapper_kwargs)
-        kwargs["wrapper"] = wrapper
         if "obj" not in kwargs:
-            kwargs["obj"] = wrapper.row_stack_and_wrap(*[obj.obj for obj in objs], group_by=False)
+            kwargs["obj"] = kwargs["wrapper"].row_stack_and_wrap(*[obj.obj for obj in objs], group_by=False)
         return kwargs
 
     @classmethod
@@ -674,16 +674,8 @@ class BaseAccessor(Wrapping):
         **kwargs,
     ) -> tp.Kwargs:
         """Resolve keyword arguments for initializing `BaseAccessor` after stacking along columns."""
-        wrapper_kwargs, kwargs = ArrayWrapper.extract_init_kwargs(**kwargs)
-        if "wrapper" in kwargs and kwargs["wrapper"] is not None:
-            wrapper = kwargs["wrapper"]
-            if len(wrapper_kwargs) > 0:
-                wrapper = wrapper.replace(**wrapper_kwargs)
-        else:
-            wrapper = ArrayWrapper.column_stack(*[obj.wrapper for obj in objs], **wrapper_kwargs)
-        kwargs["wrapper"] = wrapper
         if "obj" not in kwargs:
-            kwargs["obj"] = wrapper.column_stack_and_wrap(
+            kwargs["obj"] = kwargs["wrapper"].column_stack_and_wrap(
                 *[obj.obj for obj in objs],
                 reindex_kwargs=reindex_kwargs,
                 group_by=False,
@@ -694,6 +686,7 @@ class BaseAccessor(Wrapping):
     def row_stack(
         cls: tp.Type[BaseAccessorT],
         *objs: tp.MaybeTuple[BaseAccessorT],
+        wrapper_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> BaseAccessorT:
         """Stack multiple `BaseAccessor` instances along rows.
@@ -705,6 +698,16 @@ class BaseAccessor(Wrapping):
         for obj in objs:
             if not checks.is_instance_of(obj, BaseAccessor):
                 raise TypeError("Each object to be merged must be an instance of BaseAccessor")
+        if wrapper_kwargs is None:
+            wrapper_kwargs = {}
+        if "wrapper" in kwargs and kwargs["wrapper"] is not None:
+            wrapper = kwargs["wrapper"]
+            if len(wrapper_kwargs) > 0:
+                wrapper = wrapper.replace(**wrapper_kwargs)
+        else:
+            wrapper = ArrayWrapper.row_stack(*[obj.wrapper for obj in objs], **wrapper_kwargs)
+        kwargs["wrapper"] = wrapper
+
         kwargs = cls.resolve_row_stack_kwargs(*objs, **kwargs)
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
         if checks.is_series(kwargs["obj"]):
@@ -715,6 +718,7 @@ class BaseAccessor(Wrapping):
     def column_stack(
         cls: tp.Type[BaseAccessorT],
         *objs: tp.MaybeTuple[BaseAccessorT],
+        wrapper_kwargs: tp.KwargsLike = None,
         reindex_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> BaseAccessorT:
@@ -727,6 +731,16 @@ class BaseAccessor(Wrapping):
         for obj in objs:
             if not checks.is_instance_of(obj, BaseAccessor):
                 raise TypeError("Each object to be merged must be an instance of BaseAccessor")
+        if wrapper_kwargs is None:
+            wrapper_kwargs = {}
+        if "wrapper" in kwargs and kwargs["wrapper"] is not None:
+            wrapper = kwargs["wrapper"]
+            if len(wrapper_kwargs) > 0:
+                wrapper = wrapper.replace(**wrapper_kwargs)
+        else:
+            wrapper = ArrayWrapper.column_stack(*[obj.wrapper for obj in objs], **wrapper_kwargs)
+        kwargs["wrapper"] = wrapper
+
         kwargs = cls.resolve_column_stack_kwargs(*objs, **kwargs)
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
         return cls.df_accessor_cls(**kwargs)

@@ -209,6 +209,174 @@ def combine_indexes(
     return new_index
 
 
+def concat_indexes(
+    *indexes: tp.MaybeTuple[tp.IndexLike],
+    index_concat_method: tp.MaybeTuple[tp.Union[str, tp.Callable]] = "append",
+    keys: tp.Optional[tp.IndexLike] = None,
+    stack_kwargs: tp.KwargsLike = None,
+    verify_integrity: bool = True,
+    axis: int = 1,
+) -> tp.Index:
+    """Concatenate indexes.
+    
+    The following index concatenation methods are supported:
+
+    * 'append': append one index to another
+    * 'union': build a union of indexes
+    * 'pd_concat': convert indexes to Pandas Series or DataFrames and use `pd.concat`
+    * 'factorize': factorize the concatenated index
+    * 'factorize_each': factorize each index and concatenate while keeping numbers unique
+    * 'reset': reset the concatenated index without applying `keys`
+    * Callable: a custom callable that takes the indexes and returns the concatenated index
+
+    Argument `index_concat_method` also accepts a tuple of two options: the second option gets applied
+    if the first one fails.
+
+    Use `keys` as an index with the same number of elements as there are indexes to add
+    another index level on top of the concatenated indexes.
+
+    If `verify_integrity` is True and `keys` is None, performs various checks depending on the axis."""
+    if len(indexes) == 1:
+        indexes = indexes[0]
+    indexes = list(indexes)
+    if keys is not None and not isinstance(keys, pd.Index):
+        keys = pd.Index(keys)
+    if stack_kwargs is None:
+        stack_kwargs = {}
+    if axis == 0:
+        factorized_name = "row_idx"
+    elif axis == 1:
+        factorized_name = "col_idx"
+    else:
+        factorized_name = "group_idx"
+
+    if keys is None:
+        all_ranges = True
+        for index in indexes:
+            if not checks.is_default_index(index):
+                all_ranges = False
+                break
+        if all_ranges:
+            return pd.RangeIndex(stop=sum(map(len, indexes)))
+    if isinstance(index_concat_method, tuple):
+        try:
+            return concat_indexes(
+                *indexes,
+                index_concat_method=index_concat_method[0],
+                keys=keys,
+                stack_kwargs=stack_kwargs,
+                verify_integrity=verify_integrity,
+                axis=axis,
+            )
+        except Exception as e:
+            return concat_indexes(
+                *indexes,
+                index_concat_method=index_concat_method[1],
+                keys=keys,
+                stack_kwargs=stack_kwargs,
+                verify_integrity=verify_integrity,
+                axis=axis,
+            )
+    if not isinstance(index_concat_method, str):
+        new_index = index_concat_method(indexes)
+    elif index_concat_method.lower() == "append":
+        new_index = None
+        for index in indexes:
+            if new_index is None:
+                new_index = index
+            else:
+                new_index = new_index.append(index)
+    elif index_concat_method.lower() == "union":
+        if keys is not None:
+            raise ValueError("Cannot apply keys after concatenating indexes through union")
+        new_index = None
+        for index in indexes:
+            if new_index is None:
+                new_index = index
+            else:
+                new_index = new_index.union(index)
+    elif index_concat_method.lower() == "pd_concat":
+        new_index = None
+        for index in indexes:
+            if isinstance(index, pd.MultiIndex):
+                index = index.to_frame().reset_index(drop=True)
+            else:
+                index = index.to_series().reset_index(drop=True)
+            if new_index is None:
+                new_index = index
+            else:
+                if isinstance(new_index, pd.DataFrame):
+                    if isinstance(index, pd.Series):
+                        index = index.to_frame()
+                elif isinstance(index, pd.Series):
+                    if isinstance(new_index, pd.DataFrame):
+                        new_index = new_index.to_frame()
+                new_index = pd.concat((new_index, index), ignore_index=True)
+        if isinstance(new_index, pd.Series):
+            new_index = pd.Index(new_index)
+        else:
+            new_index = pd.MultiIndex.from_frame(new_index)
+    elif index_concat_method.lower() == "factorize":
+        new_index = concat_indexes(
+            *indexes,
+            index_concat_method="append",
+            verify_integrity=False,
+            axis=axis,
+        )
+        new_index = pd.Index(pd.factorize(new_index)[0], name=factorized_name)
+    elif index_concat_method.lower() == "factorize_each":
+        new_index = None
+        for index in indexes:
+            index = pd.Index(pd.factorize(index)[0], name=factorized_name)
+            if new_index is None:
+                new_index = index
+                next_min = index.max() + 1
+            else:
+                new_index = new_index.append(index + next_min)
+                next_min = index.max() + 1 + next_min
+    elif index_concat_method.lower() == "reset":
+        return pd.RangeIndex(stop=sum(map(len, indexes)))
+    else:
+        if axis == 0:
+            raise ValueError(f"Invalid index concatenation method '{index_concat_method}'")
+        elif axis == 1:
+            raise ValueError(f"Invalid column concatenation method '{index_concat_method}'")
+        else:
+            raise ValueError(f"Invalid group concatenation method '{index_concat_method}'")
+    if keys is not None:
+        top_index = None
+        for i, index in enumerate(indexes):
+            repeated_index = repeat_index(keys[[i]], len(index))
+            if top_index is None:
+                top_index = repeated_index
+            else:
+                top_index = top_index.append(repeated_index)
+        new_index = stack_indexes((top_index, new_index), **stack_kwargs)
+    if verify_integrity:
+        if keys is None:
+            if axis == 0:
+                if not new_index.is_monotonic_increasing:
+                    raise ValueError("Concatenated index is not monotonically increasing")
+                if "mixed" in new_index.inferred_type:
+                    raise ValueError("Concatenated index is mixed")
+                if new_index.has_duplicates:
+                    raise ValueError("Concatenated index contains duplicates")
+            if axis == 1:
+                if new_index.has_duplicates:
+                    raise ValueError("Concatenated columns contain duplicates")
+            if axis == 2:
+                if new_index.has_duplicates:
+                    len_sum = 0
+                    for index in indexes:
+                        if len_sum > 0:
+                            prev_index = new_index[:len_sum]
+                            this_index = new_index[len_sum:len_sum + len(index)]
+                            if len(prev_index.intersection(this_index)) > 0:
+                                raise ValueError("Concatenated groups contain duplicates")
+                        len_sum += len(index)
+    return new_index
+
+
 def drop_levels(index: tp.Index, levels: tp.MaybeLevelSequence, strict: bool = True) -> tp.Index:
     """Drop `levels` in `index` by their name/position."""
     if not isinstance(index, pd.MultiIndex):

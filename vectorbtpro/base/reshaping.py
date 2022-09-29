@@ -218,6 +218,8 @@ def column_stack(*arrs: tp.MaybeSequence[tp.AnyArray]) -> tp.Array2d:
     arrs = list(arrs)
 
     first_arr = arrs[0]
+    if not hasattr(first_arr, "ndim"):
+        first_arr = np.asarray(first_arr)
     if first_arr.ndim == 1 or (first_arr.ndim == 2 and first_arr.shape[1] == 1):
         return np.concatenate(arrs).reshape((len(arrs), len(first_arr))).T
     return np.column_stack(arrs)

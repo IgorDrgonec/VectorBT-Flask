@@ -58,7 +58,7 @@ def get_alloc_points_nb(
         optimize_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.row_stack,
+    merge_func="row_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def optimize_meta_nb(
@@ -86,7 +86,7 @@ def optimize_meta_nb(
         allocate_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.row_stack,
+    merge_func="row_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def allocate_meta_nb(

@@ -8,27 +8,17 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 from pandas.core.groupby import GroupBy as PandasGroupBy
-from pandas.core.resample import Resampler as PandasResampler
-from pandas.tseries.frequencies import to_offset
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping
 from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.resampling.base import Resampler
-from vectorbtpro.base.indexing import (
-    IndexingError,
-    PandasIndexer,
-    get_index_points,
-    get_index_ranges,
-    index_dict,
-    hslice,
-    get_indices,
-)
-from vectorbtpro.base.indexes import repeat_index, stack_indexes
+from vectorbtpro.base.indexing import IndexingError, PandasIndexer, index_dict, hslice, get_indices
+from vectorbtpro.base.indexes import repeat_index, stack_indexes, concat_indexes
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
 from vectorbtpro.utils.config import Configured, merge_dicts, resolve_dict
-from vectorbtpro.utils.datetime_ import infer_index_freq, try_to_datetime_index, prepare_freq, freq_to_timedelta64
+from vectorbtpro.utils.datetime_ import infer_index_freq, try_to_datetime_index
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method, cached_property
 from vectorbtpro.utils.array_ import is_range, cast_to_min_precision, cast_to_max_precision
@@ -151,14 +141,15 @@ class ArrayWrapper(Configured, PandasIndexer):
         freq: tp.Optional[tp.FrequencyLike] = None,
         group_by: tp.GroupByLike = None,
         stack_columns: bool = True,
+        index_concat_method: tp.MaybeTuple[tp.Union[str, tp.Callable]] = "append",
+        keys: tp.Optional[tp.IndexLike] = None,
         stack_kwargs: tp.KwargsLike = None,
+        verify_integrity: bool = True,
         **kwargs,
     ) -> ArrayWrapperT:
         """Stack multiple `ArrayWrapper` instances along rows.
 
-        Indexes will be concatenated in the order instances appear in `wrappers`.
-        The merged index must have no duplicates or mixed data, and must be monotonically increasing.
-        A custom index can be provided via `index`.
+        Concatenates indexes using `vectorbtpro.base.indexes.concat_indexes`.
 
         Frequency must be the same across all indexes. A custom frequency can be provided via `freq`.
 
@@ -176,34 +167,18 @@ class ArrayWrapper(Configured, PandasIndexer):
         for wrapper in wrappers:
             if not checks.is_instance_of(wrapper, ArrayWrapper):
                 raise TypeError("Each object to be merged must be an instance of ArrayWrapper")
+        if keys is not None and not isinstance(keys, pd.Index):
+            keys = pd.Index(keys)
 
         if index is None:
-            new_index = None
-            all_ranges = True
-            name = None
-            for wrapper in wrappers:
-                if not checks.is_default_index(wrapper.index, check_names=False) or (
-                    name is not None and wrapper.index != name
-                ):
-                    all_ranges = False
-                    break
-                if name is None:
-                    name = wrapper.index.name
-            if all_ranges:
-                new_index = pd.RangeIndex(stop=sum([len(wrapper.index) for wrapper in wrappers]), name=name)
-            else:
-                for wrapper in wrappers:
-                    if new_index is None:
-                        new_index = wrapper.index
-                    else:
-                        if new_index.dtype != wrapper.index.dtype:
-                            raise ValueError("Indexes to be merged must have the same data type")
-                        new_index = new_index.append(wrapper.index)
-            if new_index.has_duplicates:
-                raise ValueError("Merged index contains duplicates")
-            if not new_index.is_monotonic_increasing:
-                raise ValueError("Merged index must be monotonically increasing")
-            index = new_index
+            index = concat_indexes(
+                [wrapper.index for wrapper in wrappers],
+                index_concat_method=index_concat_method,
+                keys=keys,
+                stack_kwargs=stack_kwargs,
+                verify_integrity=verify_integrity,
+                axis=0,
+            )
         elif not isinstance(index, pd.Index):
             index = pd.Index(index)
         kwargs["index"] = index
@@ -284,11 +259,11 @@ class ArrayWrapper(Configured, PandasIndexer):
         freq: tp.Optional[tp.FrequencyLike] = None,
         group_by: tp.GroupByLike = None,
         union_index: bool = True,
-        normalize_columns: tp.Optional[bool] = None,
-        normalize_groups: tp.Optional[bool] = None,
-        normalize_locally: bool = True,
+        col_concat_method: tp.MaybeTuple[tp.Union[str, tp.Callable]] = "append",
+        group_concat_method: tp.MaybeTuple[tp.Union[str, tp.Callable]] = ("append", "factorize_each"),
         keys: tp.Optional[tp.IndexLike] = None,
         stack_kwargs: tp.KwargsLike = None,
+        verify_integrity: bool = True,
         **kwargs,
     ) -> ArrayWrapperT:
         """Stack multiple `ArrayWrapper` instances along columns.
@@ -300,13 +275,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         Frequency must be the same across all indexes. A custom frequency can be provided via `freq`.
 
-        If columns level names are the same in each instance, will concatenate all columns.
-        If column level names differ and `normalize_columns` is True, will create a new column index
-        with the name `col_idx`. Otherwise, an error will be raised. If `normalize_locally` is True,
-        will index unique columns under their respective objects, otherwise globally.
-
-        If group level names differ and `normalize_groups` is True, applies the same approach as for columns.
-        Otherwise, an error will be raised (also when some instances are grouped and some are not).
+        Concatenates columns and groups using `vectorbtpro.base.indexes.concat_indexes`.
 
         If any of the instances has `column_only_select` being enabled, the final wrapper will also enable it.
         If any of the instances has `group_select` or other grouping-related flags being disabled, the final
@@ -363,48 +332,14 @@ class ArrayWrapper(Configured, PandasIndexer):
         kwargs["freq"] = freq
 
         if columns is None:
-            normalize = False
-            if normalize_columns is None or not normalize_columns:
-                new_columns = None
-                for wrapper in wrappers:
-                    wrapper_columns = wrapper.columns
-                    if new_columns is None:
-                        new_columns = wrapper_columns
-                    else:
-                        if new_columns.names != wrapper_columns.names:
-                            if normalize_columns is not None and not normalize_columns:
-                                raise ValueError(
-                                    "Objects to be merged must have the same column level names. "
-                                    "Use columns='normalize' to normalize columns."
-                                )
-                            normalize = True
-                            break
-                        new_columns = new_columns.append(wrapper_columns)
-            if normalize:
-                new_columns = None
-                if keys is not None and normalize_locally:
-                    for wrapper in wrappers:
-                        wrapper_columns = pd.RangeIndex(stop=len(wrapper.columns), name="col_idx")
-                        if new_columns is None:
-                            new_columns = wrapper_columns
-                        else:
-                            new_columns = new_columns.append(wrapper_columns)
-                else:
-                    total_column_count = sum([len(wrapper.columns) for wrapper in wrappers])
-                    new_columns = pd.RangeIndex(stop=total_column_count, name="col_idx")
-            elif keys is None:
-                if (new_columns == 0).all():
-                    new_columns = pd.RangeIndex(stop=len(new_columns))
-            if keys is not None:
-                top_columns = None
-                for i, wrapper in enumerate(wrappers):
-                    top_wrapper_columns = repeat_index(keys[[i]], len(wrapper.columns))
-                    if top_columns is None:
-                        top_columns = top_wrapper_columns
-                    else:
-                        top_columns = top_columns.append(top_wrapper_columns)
-                new_columns = stack_indexes((top_columns, new_columns), **resolve_dict(stack_kwargs))
-            columns = new_columns
+            columns = concat_indexes(
+                [wrapper.columns for wrapper in wrappers],
+                index_concat_method=col_concat_method,
+                keys=keys,
+                stack_kwargs=stack_kwargs,
+                verify_integrity=verify_integrity,
+                axis=1,
+            )
         elif not isinstance(columns, pd.Index):
             columns = pd.Index(columns)
         kwargs["columns"] = columns
@@ -422,52 +357,14 @@ class ArrayWrapper(Configured, PandasIndexer):
                         any_grouped = True
                         break
                 if any_grouped:
-                    normalize = False
-                    if normalize_groups is None or not normalize_groups:
-                        new_group_by = None
-                        for wrapper in wrappers:
-                            wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
-                            wrapper_group_by = wrapper_grouped_index[wrapper_groups]
-                            if new_group_by is None:
-                                new_group_by = wrapper_group_by
-                            else:
-                                if len(new_group_by.intersection(wrapper_group_by)) > 0:
-                                    if normalize_groups is not None and not normalize_groups:
-                                        raise ValueError("Objects to be merged must must have compatible group labels")
-                                    normalize = True
-                                    break
-                                if new_group_by.names != wrapper_group_by.names:
-                                    if normalize_groups is not None and not normalize_groups:
-                                        raise ValueError("Objects to be merged must have the same group level names")
-                                    normalize = True
-                                    break
-                                new_group_by = new_group_by.append(wrapper_group_by)
-                    if normalize:
-                        new_group_by = None
-                        if keys is not None and normalize_locally:
-                            for i, wrapper in enumerate(wrappers):
-                                wrapper_group_by = pd.Index(wrapper.grouper.get_groups(), name="group_idx")
-                                if new_group_by is None:
-                                    new_group_by = wrapper_group_by
-                                else:
-                                    new_group_by = new_group_by.append(wrapper_group_by)
-                        else:
-                            cnt_sum = 0
-                            indices = []
-                            for i, wrapper in enumerate(wrappers):
-                                indices.append(wrapper.grouper.get_groups() + cnt_sum)
-                                cnt_sum += wrapper.grouper.get_group_count()
-                            new_group_by = pd.Index(np.concatenate(indices), name="group_idx")
-                    if keys is not None:
-                        top_group_by = None
-                        for i, wrapper in enumerate(wrappers):
-                            top_wrapper_group_by = repeat_index(keys[[i]], len(wrapper.columns))
-                            if top_group_by is None:
-                                top_group_by = top_wrapper_group_by
-                            else:
-                                top_group_by = top_group_by.append(top_wrapper_group_by)
-                        new_group_by = stack_indexes((top_group_by, new_group_by), **resolve_dict(stack_kwargs))
-                    group_by = new_group_by
+                    group_by = concat_indexes(
+                        [wrapper.grouper.get_stretched_index() for wrapper in wrappers],
+                        index_concat_method=group_concat_method,
+                        keys=keys,
+                        stack_kwargs=stack_kwargs,
+                        verify_integrity=verify_integrity,
+                        axis=2,
+                    )
                 else:
                     group_by = False
             kwargs["group_by"] = group_by
@@ -1891,14 +1788,24 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
         return kwargs
 
     @classmethod
-    def row_stack(cls: tp.Type[WrappingT], *args: tp.MaybeTuple[WrappingT], **kwargs) -> WrappingT:
+    def row_stack(
+        cls: tp.Type[WrappingT],
+        *args: tp.MaybeTuple[WrappingT],
+        wrapper_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> WrappingT:
         """Stack multiple `Wrapping` instances along rows.
 
         Should use `ArrayWrapper.row_stack`."""
         raise NotImplementedError
 
     @classmethod
-    def column_stack(cls: tp.Type[WrappingT], *args: tp.MaybeTuple[WrappingT], **kwargs) -> WrappingT:
+    def column_stack(
+        cls: tp.Type[WrappingT],
+        *args: tp.MaybeTuple[WrappingT],
+        wrapper_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> WrappingT:
         """Stack multiple `Wrapping` instances along columns.
 
         Should use `ArrayWrapper.column_stack`."""

@@ -21,27 +21,6 @@ from vectorbtpro.utils.chunking import (
 from vectorbtpro.utils.parsing import match_ann_arg, Regex
 
 
-def column_stack(results: list) -> tp.MaybeTuple[list]:
-    """Stack columns from each array in results. Supports multiple arrays per result."""
-    if isinstance(results[0], (tuple, list, List)):
-        return tuple(map(np.column_stack, zip(*results)))
-    return np.column_stack(results)
-
-
-def row_stack(results: list) -> tp.MaybeTuple[list]:
-    """Stack rows from each array in results. Supports multiple arrays per result."""
-    if isinstance(results[0], (tuple, list, List)):
-        return tuple(map(np.row_stack, zip(*results)))
-    return np.row_stack(results)
-
-
-def concat(results: list) -> tp.MaybeTuple[list]:
-    """Concatenate elements from each array in results. Supports multiple arrays per result."""
-    if isinstance(results[0], (tuple, list, List)):
-        return tuple(map(np.concatenate, zip(*results)))
-    return np.concatenate(results)
-
-
 class GroupLensSizer(ArgSizer):
     """Class for getting the size from group lengths.
 

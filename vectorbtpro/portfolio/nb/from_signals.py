@@ -4066,7 +4066,7 @@ def ls_enex_signal_func_nb(
         direction=base_ch.FlexArraySlicer(axis=1),
         flex_2d=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def dir_to_ls_signals_nb(

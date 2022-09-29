@@ -748,7 +748,7 @@ def copy_trade_record_nb(new_records: tp.RecordArray, r: int, trade_record: tp.R
         trade_records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         col_map=base_ch.GroupMapSlicer(),
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def get_positions_nb(trade_records: tp.RecordArray, col_map: tp.GroupMap) -> tp.RecordArray:
@@ -943,7 +943,7 @@ def sqn_reduce_nb(pnl_arr: tp.Array1d, ddof: int = 0) -> float:
         best_price=None,
         flex_2d=None,
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def best_worst_price_nb(
@@ -1012,7 +1012,7 @@ def best_worst_price_nb(
         entry_price=ch.ArraySlicer(axis=0),
         best_price=ch.ArraySlicer(axis=0),
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def mfe_nb(
@@ -1046,7 +1046,7 @@ def mfe_nb(
         entry_price=ch.ArraySlicer(axis=0),
         worst_price=ch.ArraySlicer(axis=0),
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def mae_nb(

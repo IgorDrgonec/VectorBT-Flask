@@ -89,7 +89,7 @@ def rolling_sum_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = Non
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, minp=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def rolling_sum_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) -> tp.Array2d:
@@ -172,7 +172,7 @@ def rolling_prod_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = No
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, minp=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def rolling_prod_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) -> tp.Array2d:
@@ -255,7 +255,7 @@ def rolling_mean_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = No
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, minp=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def rolling_mean_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) -> tp.Array2d:
@@ -345,7 +345,7 @@ def rolling_std_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = Non
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, minp=None, ddof=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def rolling_std_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None, ddof: int = 0) -> tp.Array2d:
@@ -432,7 +432,7 @@ def wm_mean_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, minp=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def wm_mean_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) -> tp.Array2d:
@@ -554,7 +554,7 @@ def ewm_mean_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, ad
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), span=None, minp=None, adjust=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def ewm_mean_nb(arr: tp.Array2d, span: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array2d:
@@ -705,7 +705,7 @@ def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, adj
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), span=None, minp=None, adjust=None, ddof=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def ewm_std_nb(arr: tp.Array2d, span: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array2d:
@@ -727,7 +727,7 @@ def wwm_mean_1d_nb(arr: tp.Array1d, period: int, minp: tp.Optional[int] = None, 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), period=None, minp=None, adjust=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def wwm_mean_nb(arr: tp.Array2d, period: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array2d:
@@ -749,7 +749,7 @@ def wwm_std_1d_nb(arr: tp.Array1d, period: int, minp: tp.Optional[int] = None, a
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), period=None, minp=None, adjust=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def wwm_std_nb(arr: tp.Array2d, period: int, minp: tp.Optional[int] = None, adjust: bool = False) -> tp.Array2d:
@@ -873,7 +873,7 @@ def vidya_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None) -> 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, minp=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def vidya_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) -> tp.Array2d:
@@ -909,7 +909,7 @@ def ma_1d_nb(
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, wtype=None, minp=None, adjust=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def ma_nb(
@@ -950,7 +950,7 @@ def msd_1d_nb(
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, wtype=None, minp=None, adjust=None, ddof=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def msd_nb(
@@ -1071,7 +1071,7 @@ def rolling_cov_1d_nb(
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr1", axis=1),
     arg_take_spec=dict(arr1=ch.ArraySlicer(axis=1), arr2=ch.ArraySlicer(axis=1), window=None, minp=None, ddof=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def rolling_cov_nb(
@@ -1200,7 +1200,7 @@ def rolling_corr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d, window: int, minp: tp
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr1", axis=1),
     arg_take_spec=dict(arr1=ch.ArraySlicer(axis=1), arr2=ch.ArraySlicer(axis=1), window=None, minp=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def rolling_corr_nb(arr1: tp.Array2d, arr2: tp.Array2d, window: int, minp: tp.Optional[int] = None) -> tp.Array2d:
@@ -1334,7 +1334,7 @@ def rolling_ols_1d_nb(
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr1", axis=1),
     arg_take_spec=dict(arr1=ch.ArraySlicer(axis=1), arr2=ch.ArraySlicer(axis=1), window=None, minp=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def rolling_ols_nb(
@@ -1382,7 +1382,7 @@ def rolling_rank_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = No
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, minp=None, pct=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def rolling_rank_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None, pct: bool = False) -> tp.Array2d:
@@ -1424,7 +1424,7 @@ def rolling_min_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = Non
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, minp=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def rolling_min_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) -> tp.Array2d:
@@ -1466,7 +1466,7 @@ def rolling_max_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = Non
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, minp=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def rolling_max_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None) -> tp.Array2d:
@@ -1519,7 +1519,7 @@ def rolling_argmin_1d_nb(
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, minp=None, local=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def rolling_argmin_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None, local: bool = False) -> tp.Array2d:
@@ -1572,7 +1572,7 @@ def rolling_argmax_1d_nb(
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, minp=None, local=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def rolling_argmax_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None, local: bool = False) -> tp.Array2d:
@@ -1602,7 +1602,7 @@ def rolling_any_1d_nb(arr: tp.Array1d, window: int) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def rolling_any_nb(arr: tp.Array2d, window: int) -> tp.Array2d:
@@ -1632,7 +1632,7 @@ def rolling_all_1d_nb(arr: tp.Array1d, window: int) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def rolling_all_nb(arr: tp.Array2d, window: int) -> tp.Array2d:
@@ -1781,7 +1781,7 @@ def rolling_pattern_similarity_1d_nb(
         min_similarity=None,
         minp=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def rolling_pattern_similarity_nb(
@@ -1870,7 +1870,7 @@ def expanding_min_1d_nb(arr: tp.Array1d, minp: int = 1) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), minp=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def expanding_min_nb(arr: tp.Array2d, minp: int = 1) -> tp.Array2d:
@@ -1904,7 +1904,7 @@ def expanding_max_1d_nb(arr: tp.Array1d, minp: int = 1) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), minp=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def expanding_max_nb(arr: tp.Array2d, minp: int = 1) -> tp.Array2d:

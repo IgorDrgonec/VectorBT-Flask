@@ -83,7 +83,7 @@ def shuffle_1d_nb(arr: tp.Array1d, seed: tp.Optional[int] = None) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), seed=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True)
 def shuffle_nb(arr: tp.Array2d, seed: tp.Optional[int] = None) -> tp.Array2d:
@@ -240,7 +240,7 @@ def fillna_1d_nb(arr: tp.Array1d, value: tp.Scalar) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), value=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True)
 def fillna_nb(arr: tp.Array2d, value: tp.Scalar) -> tp.Array2d:
@@ -251,7 +251,7 @@ def fillna_nb(arr: tp.Array2d, value: tp.Scalar) -> tp.Array2d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def fbfill_nb(arr: tp.Array2d) -> tp.Array2d:
@@ -327,7 +327,7 @@ def bshift_1d_nb(arr: tp.Array1d, n: int = 1, fill_value: tp.Scalar = np.nan) ->
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), n=None, fill_value=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, is_generated_jit=True)
 def bshift_nb(arr: tp.Array2d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp.Array2d:
@@ -391,7 +391,7 @@ def fshift_1d_nb(arr: tp.Array1d, n: int = 1, fill_value: tp.Scalar = np.nan) ->
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), n=None, fill_value=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, is_generated_jit=True)
 def fshift_nb(arr: tp.Array2d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp.Array2d:
@@ -437,7 +437,7 @@ def diff_1d_nb(arr: tp.Array1d, n: int = 1) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), n=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def diff_nb(arr: tp.Array2d, n: int = 1) -> tp.Array2d:
@@ -465,7 +465,7 @@ def pct_change_1d_nb(arr: tp.Array1d, n: int = 1) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), n=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def pct_change_nb(arr: tp.Array2d, n: int = 1) -> tp.Array2d:
@@ -497,7 +497,7 @@ def bfill_1d_nb(arr: tp.Array1d) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def bfill_nb(arr: tp.Array2d) -> tp.Array2d:
@@ -526,7 +526,7 @@ def ffill_1d_nb(arr: tp.Array1d) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def ffill_nb(arr: tp.Array2d) -> tp.Array2d:
@@ -540,7 +540,7 @@ def ffill_nb(arr: tp.Array2d) -> tp.Array2d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, is_generated_jit=True, tags={"can_parallel"})
 def nanprod_nb(arr: tp.Array2d) -> tp.Array1d:
@@ -567,7 +567,7 @@ def nanprod_nb(arr: tp.Array2d) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, is_generated_jit=True, tags={"can_parallel"})
 def nancumsum_nb(arr: tp.Array2d) -> tp.Array2d:
@@ -594,7 +594,7 @@ def nancumsum_nb(arr: tp.Array2d) -> tp.Array2d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, is_generated_jit=True, tags={"can_parallel"})
 def nancumprod_nb(arr: tp.Array2d) -> tp.Array2d:
@@ -631,7 +631,7 @@ def nancnt_1d_nb(arr: tp.Array1d) -> int:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def nancnt_nb(arr: tp.Array2d) -> tp.Array1d:
@@ -645,7 +645,7 @@ def nancnt_nb(arr: tp.Array2d) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, is_generated_jit=True, tags={"can_parallel"})
 def nansum_nb(arr: tp.Array2d) -> tp.Array1d:
@@ -672,7 +672,7 @@ def nansum_nb(arr: tp.Array2d) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def nanmin_nb(arr: tp.Array2d) -> tp.Array1d:
@@ -686,7 +686,7 @@ def nanmin_nb(arr: tp.Array2d) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def nanmax_nb(arr: tp.Array2d) -> tp.Array1d:
@@ -700,7 +700,7 @@ def nanmax_nb(arr: tp.Array2d) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def nanmean_nb(arr: tp.Array2d) -> tp.Array1d:
@@ -714,7 +714,7 @@ def nanmean_nb(arr: tp.Array2d) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def nanmedian_nb(arr: tp.Array2d) -> tp.Array1d:
@@ -865,7 +865,7 @@ def nanstd_1d_nb(arr: tp.Array1d, ddof: int = 0) -> float:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), ddof=None),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def nanstd_nb(arr: tp.Array2d, ddof: int = 0) -> tp.Array1d:
@@ -901,7 +901,7 @@ def nancov_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d, ddof: int = 0) -> float:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr1", axis=1),
     arg_take_spec=dict(arr1=ch.ArraySlicer(axis=1), arr2=ch.ArraySlicer(axis=1), ddof=None),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def nancov_nb(arr1: tp.Array2d, arr2: tp.Array2d, ddof: int = 0) -> tp.Array1d:
@@ -946,7 +946,7 @@ def nancorr_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d) -> float:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr1", axis=1),
     arg_take_spec=dict(arr1=ch.ArraySlicer(axis=1), arr2=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def nancorr_nb(arr1: tp.Array2d, arr2: tp.Array2d) -> tp.Array1d:
@@ -1009,7 +1009,7 @@ def rank_1d_nb(arr: tp.Array1d, argsorted: tp.Optional[tp.Array1d] = None, pct: 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), argsorted=ch.ArraySlicer(axis=1), pct=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def rank_nb(arr: tp.Array2d, argsorted: tp.Optional[tp.Array2d] = None, pct: bool = False) -> tp.Array2d:
@@ -1033,7 +1033,7 @@ def rank_nb(arr: tp.Array2d, argsorted: tp.Optional[tp.Array2d] = None, pct: boo
         n_uniques=None,
         group_map=base_ch.GroupMapSlicer(),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def value_counts_nb(codes: tp.Array2d, n_uniques: int, group_map: tp.GroupMap) -> tp.Array2d:
@@ -1066,7 +1066,7 @@ def value_counts_1d_nb(codes: tp.Array1d, n_uniques: int) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="codes", axis=0),
     arg_take_spec=dict(codes=ch.ArraySlicer(axis=0), n_uniques=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def value_counts_per_row_nb(codes: tp.Array2d, n_uniques: int) -> tp.Array2d:
@@ -1130,7 +1130,7 @@ def crossed_above_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d, wait: int = 0) -> tp
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr1", axis=1),
     arg_take_spec=dict(arr1=ch.ArraySlicer(axis=1), arr2=ch.ArraySlicer(axis=1), wait=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def crossed_above_nb(arr1: tp.Array2d, arr2: tp.Array2d, wait: int = 0) -> tp.Array2d:
@@ -1150,7 +1150,7 @@ def crossed_above_nb(arr1: tp.Array2d, arr2: tp.Array2d, wait: int = 0) -> tp.Ar
         arr=ch.ArraySlicer(axis=1, mapper=base_ch.group_idxs_mapper),
         group_map=base_ch.GroupMapSlicer(),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def demean_nb(arr: tp.Array2d, group_map: tp.GroupMap) -> tp.Array2d:
@@ -1401,7 +1401,7 @@ def latest_at_index_1d_nb(
         nan_value=None,
         ffill=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"}, is_generated_jit=True)
 def latest_at_index_nb(

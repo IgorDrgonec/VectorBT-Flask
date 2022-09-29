@@ -45,7 +45,7 @@ from vectorbtpro.utils.template import Rep
 @register_chunkable(
     size=ch.ShapeSizer(arg_query="target_shape", axis=1),
     arg_take_spec=dict(target_shape=ch.ShapeSlicer(axis=1), wait=None, place_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def generate_nb(target_shape: tp.Shape, place_func_nb: tp.PlaceFunc, *args) -> tp.Array2d:
@@ -89,7 +89,7 @@ def generate_nb(target_shape: tp.Shape, place_func_nb: tp.PlaceFunc, *args) -> t
         exit_place_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def generate_ex_nb(
@@ -172,7 +172,7 @@ def generate_ex_nb(
         exit_place_func_nb=None,
         exit_args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted
 def generate_enex_nb(
@@ -321,7 +321,7 @@ def rand_by_prob_place_nb(
         entry_wait=None,
         exit_wait=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def generate_rand_enex_nb(
@@ -772,7 +772,7 @@ def ohlc_stop_place_nb(
         rank_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def rank_nb(
@@ -945,7 +945,7 @@ def clean_enex_1d_nb(
         keep_conflicts=None,
         reverse_order=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def clean_enex_nb(
@@ -1193,7 +1193,7 @@ def nth_index_1d_nb(mask: tp.Array1d, n: int) -> int:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="mask", axis=1),
     arg_take_spec=dict(mask=ch.ArraySlicer(axis=1), n=None),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def nth_index_nb(mask: tp.Array2d, n: int) -> tp.Array1d:
@@ -1214,7 +1214,7 @@ def norm_avg_index_1d_nb(mask: tp.Array1d) -> float:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="mask", axis=1),
     arg_take_spec=dict(mask=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def norm_avg_index_nb(mask: tp.Array2d) -> tp.Array1d:
@@ -1231,7 +1231,7 @@ def norm_avg_index_nb(mask: tp.Array2d) -> tp.Array1d:
         mask=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
         group_lens=ch.ArraySlicer(axis=0),
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def norm_avg_index_grouped_nb(mask, group_lens):

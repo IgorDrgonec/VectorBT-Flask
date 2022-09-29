@@ -147,7 +147,7 @@ def bbands_nb(
 @register_chunkable(
     size=ch.ArraySizer(arg_query="close", axis=1),
     arg_take_spec=dict(close=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def rsi_up_down_nb(close: tp.Array2d) -> tp.Tuple[tp.Array2d, tp.Array2d]:
@@ -323,7 +323,7 @@ def macd_nb(
         low=ch.ArraySlicer(axis=1),
         close=ch.ArraySlicer(axis=1),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def tr_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d) -> tp.Array2d:
@@ -392,7 +392,7 @@ def atr_nb(
         close=ch.ArraySlicer(axis=1),
         volume=ch.ArraySlicer(axis=1),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def obv_nb(close: tp.Array2d, volume: tp.Array2d) -> tp.Array2d:
@@ -497,7 +497,7 @@ def ols_spread_nb(
         volume=ch.ArraySlicer(axis=1),
         group_lens=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def vwap_nb(
@@ -535,7 +535,7 @@ def vwap_nb(
         down_th=base_ch.FlexArraySlicer(axis=1),
         flex_2d=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def pivot_info_nb(
@@ -621,7 +621,7 @@ def pivot_info_nb(
         last_pivot=ch.ArraySlicer(axis=1),
         last_idx=ch.ArraySlicer(axis=1),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def pivot_value_nb(high: tp.Array2d, low: tp.Array2d, last_pivot: tp.Array2d, last_idx: tp.Array2d) -> tp.Array2d:
@@ -645,7 +645,7 @@ def pivot_value_nb(high: tp.Array2d, low: tp.Array2d, last_pivot: tp.Array2d, la
         conf_idx=ch.ArraySlicer(axis=1),
         last_pivot=ch.ArraySlicer(axis=1),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def pivots_nb(
@@ -671,7 +671,7 @@ def pivots_nb(
 @register_chunkable(
     size=ch.ArraySizer(arg_query="pivots", axis=1),
     arg_take_spec=dict(pivots=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def pivots_to_modes_nb(pivots: tp.Array2d) -> tp.Array2d:
@@ -821,7 +821,7 @@ def supertrend_acc_nb(in_state: SuperTrendAIS) -> SuperTrendAOS:
         period=None,
         multiplier=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def supertrend_nb(

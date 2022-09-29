@@ -6,7 +6,7 @@ import pytest
 from numba import njit
 
 import vectorbtpro as vbt
-from vectorbtpro.base import wrapping, grouping, combining, indexes, indexing, reshaping, resampling
+from vectorbtpro.base import wrapping, grouping, combining, indexes, indexing, reshaping, resampling, merging
 
 from tests.utils import *
 
@@ -665,16 +665,34 @@ class TestArrayWrapper:
                 vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2),
                 vbt.ArrayWrapper(pd.Index([2, 3, 4]), pd.Index(["a", "b"], name="c"), 2),
             )
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(pd.Index([2, 3, 4]), pd.Index(["a", "b"], name="c"), 2),
+            verify_integrity=False,
+        )
+        assert_index_equal(wrapper.index, pd.Index([0, 1, 2, 2, 3, 4]))
         with pytest.raises(Exception):
             vbt.ArrayWrapper.row_stack(
                 vbt.ArrayWrapper(pd.Index([2, 1, 0]), pd.Index(["a", "b"], name="c"), 2),
                 vbt.ArrayWrapper(pd.Index([3, 4, 5]), pd.Index(["a", "b"], name="c"), 2),
             )
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.Index([2, 1, 0]), pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(pd.Index([3, 4, 5]), pd.Index(["a", "b"], name="c"), 2),
+            verify_integrity=False,
+        )
+        assert_index_equal(wrapper.index, pd.Index([2, 1, 0, 3, 4, 5]))
         with pytest.raises(Exception):
             vbt.ArrayWrapper.row_stack(
                 vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2),
                 vbt.ArrayWrapper(pd.Index(["x", "y", "z"]), pd.Index(["a", "b"], name="c"), 2),
             )
+        wrapper = vbt.ArrayWrapper.row_stack(
+            vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2),
+            vbt.ArrayWrapper(pd.Index(["x", "y", "z"]), pd.Index(["a", "b"], name="c"), 2),
+            verify_integrity=False,
+        )
+        assert_index_equal(wrapper.index, pd.Index([0, 1, 2, "x", "y", "z"]))
         wrapper = vbt.ArrayWrapper.row_stack(
             vbt.ArrayWrapper(pd.Index([0, 1, 2]), pd.Index(["a", "b"], name="c"), 2),
             vbt.ArrayWrapper(pd.Index(["x", "y", "z"]), pd.Index(["a", "b"], name="c"), 2),
@@ -958,7 +976,7 @@ class TestArrayWrapper:
             vbt.ArrayWrapper(index, pd.Index(["a", "b"], name="c1"), 2),
             vbt.ArrayWrapper(index, pd.Index(["c", "d"], name="c2"), 2),
         )
-        assert_index_equal(wrapper.columns, pd.Index([0, 1, 2, 3], name="col_idx"))
+        assert_index_equal(wrapper.columns, pd.Index(["a", "b", "c", "d"]))
         wrapper = vbt.ArrayWrapper.column_stack(
             vbt.ArrayWrapper(index, pd.Index(["a", "b"], name="c"), 2),
             vbt.ArrayWrapper(index, pd.Index(["c", "d"], name="c"), 2),
@@ -975,17 +993,7 @@ class TestArrayWrapper:
         )
         assert_index_equal(
             wrapper.columns,
-            pd.MultiIndex.from_tuples([("k1", 0), ("k1", 1), ("k2", 0), ("k2", 1)], names=["k", "col_idx"]),
-        )
-        wrapper = vbt.ArrayWrapper.column_stack(
-            vbt.ArrayWrapper(index, pd.Index(["a", "b"], name="c1"), 2),
-            vbt.ArrayWrapper(index, pd.Index(["c", "d"], name="c2"), 2),
-            keys=pd.Index(["k1", "k2"], name="k"),
-            normalize_locally=False,
-        )
-        assert_index_equal(
-            wrapper.columns,
-            pd.MultiIndex.from_tuples([("k1", 0), ("k1", 1), ("k2", 2), ("k2", 3)], names=["k", "col_idx"]),
+            pd.MultiIndex.from_tuples([("k1", "a"), ("k1", "b"), ("k2", "c"), ("k2", "d")], names=["k", None]),
         )
         wrapper = vbt.ArrayWrapper.column_stack(
             vbt.ArrayWrapper(index, pd.Index(["a", "b"], name="c1"), 2),
@@ -998,31 +1006,21 @@ class TestArrayWrapper:
         wrapper = vbt.ArrayWrapper.column_stack(
             vbt.ArrayWrapper(index, columns1, 2, group_by=pd.Index([0, 1], name="g")),
             vbt.ArrayWrapper(index, columns2, 2, group_by=pd.Index([2, 3], name="g")),
-            normalize_groups=False,
         )
         wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
         assert_index_equal(
             wrapper_grouped_index[wrapper_groups],
             pd.Index([0, 1, 2, 3], name="g", dtype="int64"),
         )
-        with pytest.raises(Exception):
-            vbt.ArrayWrapper.column_stack(
-                vbt.ArrayWrapper(index, columns1, 2, group_by=pd.Index([0, 1], name="g")),
-                vbt.ArrayWrapper(index, columns2, 2, group_by=False),
-                normalize_groups=False,
-            )
-        with pytest.raises(Exception):
-            vbt.ArrayWrapper.column_stack(
-                vbt.ArrayWrapper(index, columns1, 2, group_by=pd.Index([0, 1], name="g")),
-                vbt.ArrayWrapper(index, columns2, 2, group_by=pd.Index([0, 1], name="g")),
-                normalize_groups=False,
-            )
-        with pytest.raises(Exception):
-            vbt.ArrayWrapper.column_stack(
-                vbt.ArrayWrapper(index, columns1, 2, group_by=pd.Index([0, 1], name="g1")),
-                vbt.ArrayWrapper(index, columns2, 2, group_by=pd.Index([2, 3], name="g2")),
-                normalize_groups=False,
-            )
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, group_by=pd.Index([0, 1], name="g")),
+            vbt.ArrayWrapper(index, columns2, 2, group_by=False),
+        )
+        wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
+        assert_index_equal(
+            wrapper_grouped_index[wrapper_groups],
+            pd.Index([0, 1, "c", "d"], dtype="object"),
+        )
         wrapper = vbt.ArrayWrapper.column_stack(
             vbt.ArrayWrapper(index, columns1, 2, group_by=pd.Index([0, 1], name="g")),
             vbt.ArrayWrapper(index, columns2, 2, group_by=pd.Index([0, 1], name="g")),
@@ -1031,6 +1029,15 @@ class TestArrayWrapper:
         assert_index_equal(
             wrapper_grouped_index[wrapper_groups],
             pd.Index([0, 1, 2, 3], name="group_idx", dtype="int64"),
+        )
+        wrapper = vbt.ArrayWrapper.column_stack(
+            vbt.ArrayWrapper(index, columns1, 2, group_by=pd.Index([0, 1], name="g1")),
+            vbt.ArrayWrapper(index, columns2, 2, group_by=pd.Index([2, 3], name="g2")),
+        )
+        wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
+        assert_index_equal(
+            wrapper_grouped_index[wrapper_groups],
+            pd.Index([0, 1, 2, 3], dtype="int64"),
         )
         wrapper = vbt.ArrayWrapper.column_stack(
             vbt.ArrayWrapper(index, columns1, 2, group_by=True),
@@ -1049,7 +1056,9 @@ class TestArrayWrapper:
         wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
         assert_index_equal(
             wrapper_grouped_index[wrapper_groups],
-            pd.MultiIndex.from_tuples([("o1", 0), ("o1", 0), ("o2", 0), ("o2", 0)], names=(None, "group_idx")),
+            pd.MultiIndex.from_tuples(
+                [("o1", "group"), ("o1", "group"), ("o2", "group"), ("o2", "group")], names=(None, "group")
+            ),
         )
         wrapper = vbt.ArrayWrapper.column_stack(
             vbt.ArrayWrapper(index, columns1, 2, group_by=True),
@@ -1059,18 +1068,17 @@ class TestArrayWrapper:
         wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
         assert_index_equal(
             wrapper_grouped_index[wrapper_groups],
-            pd.MultiIndex.from_tuples([("o1", 0), ("o1", 0), ("o2", 0), ("o2", 1)], names=(None, "group_idx")),
+            pd.MultiIndex.from_tuples([("o1", "group"), ("o1", "group"), ("o2", "c"), ("o2", "d")], names=(None, None)),
         )
         wrapper = vbt.ArrayWrapper.column_stack(
             vbt.ArrayWrapper(index, columns1, 2, group_by=True),
             vbt.ArrayWrapper(index, columns2, 2, group_by=False),
             keys=["o1", "o2"],
-            normalize_locally=False,
         )
         wrapper_groups, wrapper_grouped_index = wrapper.grouper.get_groups_and_index()
         assert_index_equal(
             wrapper_grouped_index[wrapper_groups],
-            pd.MultiIndex.from_tuples([("o1", 0), ("o1", 0), ("o2", 1), ("o2", 2)], names=(None, "group_idx")),
+            pd.MultiIndex.from_tuples([("o1", "group"), ("o1", "group"), ("o2", "c"), ("o2", "d")], names=(None, None)),
         )
         wrapper = vbt.ArrayWrapper.column_stack(
             vbt.ArrayWrapper(index, columns1, 2, group_by=pd.Index([0, 1], name="g")),
@@ -1379,8 +1387,7 @@ class TestArrayWrapper:
         assert sr2_grouped_wrapper.iloc[:2].ndim == 1
         assert sr2_grouped_wrapper.iloc[:2].grouped_ndim == 1
         assert_index_equal(
-            sr2_grouped_wrapper.iloc[:2].grouper.group_by,
-            pd.Index(["g1"], dtype="object", name="group")
+            sr2_grouped_wrapper.iloc[:2].grouper.group_by, pd.Index(["g1"], dtype="object", name="group")
         )
         assert_index_equal(
             df4_grouped_wrapper.iloc[:2, 0].index,
@@ -2255,7 +2262,7 @@ class TestWrapping:
 # ############# indexes.py ############# #
 
 
-class TestIndexFns:
+class TestIndexes:
     def test_get_index(self):
         assert_index_equal(indexes.get_index(sr1, 0), sr1.index)
         assert_index_equal(indexes.get_index(sr1, 1), pd.Index([sr1.name]))
@@ -2273,11 +2280,14 @@ class TestIndexFns:
             pd.Index([1, 2, 3], dtype="int64", name="b"),
         )
         assert_index_equal(
-            indexes.index_from_values([
-                np.random.uniform(size=(3, 3)),
-                np.random.uniform(size=(3, 3)),
-                np.random.uniform(size=(3, 3)),
-            ], name="c"),
+            indexes.index_from_values(
+                [
+                    np.random.uniform(size=(3, 3)),
+                    np.random.uniform(size=(3, 3)),
+                    np.random.uniform(size=(3, 3)),
+                ],
+                name="c",
+            ),
             pd.Index(["array_0", "array_1", "array_2"], dtype="object", name="c"),
         )
         rand_arr = np.random.uniform(size=(3, 3))
@@ -2286,12 +2296,15 @@ class TestIndexFns:
             pd.Index(["array_0", "array_0", "array_0"], dtype="object", name="c"),
         )
         assert_index_equal(
-            indexes.index_from_values([
-                rand_arr,
-                np.random.uniform(size=(3, 3)),
-                rand_arr,
-                np.random.uniform(size=(3, 3)),
-            ], name="c"),
+            indexes.index_from_values(
+                [
+                    rand_arr,
+                    np.random.uniform(size=(3, 3)),
+                    rand_arr,
+                    np.random.uniform(size=(3, 3)),
+                ],
+                name="c",
+            ),
             pd.Index(["array_0", "array_1", "array_0", "array_2"], dtype="object", name="c"),
         )
         assert_index_equal(
@@ -2626,11 +2639,260 @@ class TestIndexFns:
         with pytest.raises(Exception):
             indexes.pick_levels(index, required_levels=["c8", "c7", "i8", "i7"], optional_levels=["i7"])
 
+    def test_concat_indexes(self):
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.RangeIndex(stop=2),
+                pd.RangeIndex(stop=3),
+            ),
+            pd.RangeIndex(start=0, stop=5, step=1),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.Index([4, 5, 6], name="name"),
+                pd.Index([1, 2, 3], name="name"),
+                index_concat_method="append",
+            ),
+            pd.Index([4, 5, 6, 1, 2, 3], dtype="int64", name="name"),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.Index([4, 5, 6], name="name"),
+                pd.Index([1, 2, 3], name="name"),
+                index_concat_method="union",
+            ),
+            pd.Index([1, 2, 3, 4, 5, 6], dtype="int64", name="name"),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.Index([4, 5, 6], name="name"),
+                pd.Index([1, 2, 3], name="name"),
+                index_concat_method="pd_concat",
+            ),
+            pd.Index([4, 5, 6, 1, 2, 3], dtype="int64", name="name"),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.Index([4, 5, 6], name="name"),
+                pd.Index([1, 2, 3], name="name"),
+                index_concat_method="reset",
+            ),
+            pd.RangeIndex(start=0, stop=6, step=1),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.Index([3, 4, 5], name="name"),
+                pd.Index([1, 2, 3], name="name"),
+                index_concat_method="factorize",
+                verify_integrity=False,
+                axis=2,
+            ),
+            pd.Index([0, 1, 2, 3, 4, 0], name="group_idx", dtype="int64"),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.Index([3, 4, 5], name="name"),
+                pd.Index([1, 2, 3], name="name"),
+                index_concat_method="factorize_each",
+                axis=2,
+            ),
+            pd.Index([0, 1, 2, 3, 4, 5], name="group_idx", dtype="int64"),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.Index(["a", "b", "c"], name="name1"),
+                pd.Index([1, 2, 3], name="name2"),
+                index_concat_method="append",
+            ),
+            pd.Index(["a", "b", "c", 1, 2, 3]),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.Index(["a", "b", "c"], name="name1"),
+                pd.Index([1, 2, 3], name="name2"),
+                index_concat_method="union",
+            ),
+            pd.Index(["a", "b", "c", 1, 2, 3]),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.Index(["a", "b", "c"], name="name1"),
+                pd.Index([1, 2, 3], name="name2"),
+                index_concat_method="pd_concat",
+            ),
+            pd.Index(["a", "b", "c", 1, 2, 3]),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.Index(["a", "b", "c"], name="name1"),
+                pd.Index([1, 2, 3], name="name2"),
+                index_concat_method="reset",
+            ),
+            pd.RangeIndex(start=0, stop=6, step=1),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.Index(["a", "b", "c"], name="name1"),
+                pd.Index([1, 2, 3], name="name2"),
+                index_concat_method="factorize",
+                axis=2,
+            ),
+            pd.Index([0, 1, 2, 3, 4, 5], name="group_idx", dtype="int64"),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.Index(["a", "b", "c"], name="name1"),
+                pd.Index([1, 2, 3], name="name2"),
+                index_concat_method="factorize_each",
+                axis=2,
+            ),
+            pd.Index([0, 1, 2, 3, 4, 5], name="group_idx", dtype="int64"),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.MultiIndex.from_tuples([("a", 4), ("b", 5), ("c", 6)], names=("name1", "name2")),
+                pd.Index([1, 2, 3], name="name2"),
+                index_concat_method="append",
+            ),
+            pd.Index([("a", 4), ("b", 5), ("c", 6), 1, 2, 3]),
+        )
+        with pytest.raises(Exception):
+            indexes.concat_indexes(
+                pd.MultiIndex.from_tuples([("a", 4), ("b", 5), ("c", 6)], names=("name1", "name2")),
+                pd.Index([1, 2, 3], name="name2"),
+                index_concat_method="union",
+            )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.MultiIndex.from_tuples([("a", 4), ("b", 5), ("c", 6)], names=("name1", "name2")),
+                pd.Index([1, 2, 3], name="name2"),
+                index_concat_method="pd_concat",
+            ),
+            pd.MultiIndex.from_tuples(
+                [("a", 4), ("b", 5), ("c", 6), (None, 1), (None, 2), (None, 3)], names=("name1", "name2")
+            ),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.MultiIndex.from_tuples([("a", 4), ("b", 5), ("c", 6)], names=("name1", "name2")),
+                pd.Index([1, 2, 3], name="name2"),
+                index_concat_method="reset",
+            ),
+            pd.RangeIndex(start=0, stop=6, step=1),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.MultiIndex.from_tuples([("a", 4), ("b", 5), ("c", 6)], names=("name1", "name2")),
+                pd.Index([1, 2, 3], name="name2"),
+                index_concat_method="factorize",
+                axis=2,
+            ),
+            pd.Index([0, 1, 2, 3, 4, 5], name="group_idx", dtype="int64"),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.MultiIndex.from_tuples([("a", 4), ("b", 5), ("c", 6)], names=("name1", "name2")),
+                pd.Index([1, 2, 3], name="name2"),
+                index_concat_method="factorize_each",
+                axis=2,
+            ),
+            pd.Index([0, 1, 2, 3, 4, 5], name="group_idx", dtype="int64"),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.MultiIndex.from_tuples([("a", 4), ("b", 5), ("c", 6)], names=("name1", "name2")),
+                pd.Index([1, 2, 3], name="name2"),
+                index_concat_method=("append", "factorize_each"),
+                axis=2,
+            ),
+            pd.Index([("a", 4), ("b", 5), ("c", 6), 1, 2, 3], dtype="object"),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.MultiIndex.from_tuples([("a", 4), ("b", 5), ("c", 6)], names=("name1", "name2")),
+                pd.Index([1, 2, 3], name="name2"),
+                index_concat_method=("union", "factorize_each"),
+                axis=2,
+            ),
+            pd.Index([0, 1, 2, 3, 4, 5], name="group_idx", dtype="int64"),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.RangeIndex(stop=2),
+                pd.RangeIndex(stop=3),
+                keys=pd.Index(["x", "y"], name="key"),
+            ),
+            pd.MultiIndex.from_tuples([("x", 0), ("x", 1), ("y", 0), ("y", 1), ("y", 2)], names=["key", None]),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.Index([4, 5, 6], name="name"),
+                pd.Index([1, 2, 3], name="name"),
+                index_concat_method="append",
+                keys=pd.Index(["x", "y"], name="key"),
+            ),
+            pd.MultiIndex.from_tuples(
+                [("x", 4), ("x", 5), ("x", 6), ("y", 1), ("y", 2), ("y", 3)], names=["key", "name"]
+            ),
+        )
+        with pytest.raises(Exception):
+            indexes.concat_indexes(
+                pd.Index([4, 5, 6], name="name"),
+                pd.Index([1, 2, 3], name="name"),
+                index_concat_method="union",
+                keys=pd.Index(["x", "y"], name="key"),
+            )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.Index([4, 5, 6], name="name"),
+                pd.Index([1, 2, 3], name="name"),
+                index_concat_method="pd_concat",
+                keys=pd.Index(["x", "y"], name="key"),
+            ),
+            pd.MultiIndex.from_tuples(
+                [("x", 4), ("x", 5), ("x", 6), ("y", 1), ("y", 2), ("y", 3)], names=["key", "name"]
+            ),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.Index([4, 5, 6], name="name"),
+                pd.Index([1, 2, 3], name="name"),
+                index_concat_method="reset",
+                keys=pd.Index(["x", "y"], name="key"),
+            ),
+            pd.RangeIndex(start=0, stop=6, step=1),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.Index([3, 4, 5], name="name"),
+                pd.Index([1, 2, 3], name="name"),
+                index_concat_method="factorize",
+                keys=pd.Index(["x", "y"], name="key"),
+                verify_integrity=False,
+                axis=2,
+            ),
+            pd.MultiIndex.from_tuples(
+                [("x", 0), ("x", 1), ("x", 2), ("y", 3), ("y", 4), ("y", 0)], names=["key", "group_idx"]
+            ),
+        )
+        assert_index_equal(
+            indexes.concat_indexes(
+                pd.Index([3, 4, 5], name="name"),
+                pd.Index([1, 2, 3], name="name"),
+                index_concat_method="factorize_each",
+                keys=pd.Index(["x", "y"], name="key"),
+                axis=2,
+            ),
+            pd.MultiIndex.from_tuples(
+                [("x", 0), ("x", 1), ("x", 2), ("y", 3), ("y", 4), ("y", 5)], names=["key", "group_idx"]
+            ),
+        )
+
 
 # ############# reshaping.py ############# #
 
 
-class TestReshapeFns:
+class TestReshaping:
     def test_soft_to_ndim(self):
         np.testing.assert_array_equal(reshaping.soft_to_ndim(a2, 1), a2)
         assert_series_equal(reshaping.soft_to_ndim(sr2, 1), sr2)
@@ -5057,7 +5319,7 @@ class TestIndexing:
 # ############# combining.py ############# #
 
 
-class TestCombineFns:
+class TestCombining:
     def test_apply_and_concat_none(self):
         def apply_func(i, x, a):
             x[i] = a[i]
@@ -5215,6 +5477,395 @@ class TestCombineFns:
         )
 
 
+# ############# merging.py ############# #
+
+
+class TestMerging:
+    def test_concat_merge(self):
+        np.testing.assert_array_equal(
+            merging.concat_merge([0, 1, 2]),
+            np.array([0, 1, 2]),
+        )
+        np.testing.assert_array_equal(
+            merging.concat_merge(([0, 1, 2], [3, 4, 5])),
+            np.array([0, 1, 2, 3, 4, 5]),
+        )
+        np.testing.assert_array_equal(
+            merging.concat_merge((([0, 1, 2],), ([0, 1, 2],)))[0],
+            np.array([0, 1, 2, 0, 1, 2]),
+        )
+        np.testing.assert_array_equal(
+            merging.concat_merge((([0, 1, 2], [3, 4, 5]), ([0, 1, 2], [3, 4, 5])))[0],
+            np.array([0, 1, 2, 0, 1, 2]),
+        )
+        np.testing.assert_array_equal(
+            merging.concat_merge((([0, 1, 2], [3, 4, 5]), ([0, 1, 2], [3, 4, 5])))[1],
+            np.array([3, 4, 5, 3, 4, 5]),
+        )
+        assert_series_equal(
+            merging.concat_merge([0, 1, 2], keys=pd.Index(["a", "b", "c"], name="d")),
+            pd.Series([0, 1, 2], index=pd.Index(["a", "b", "c"], name="d")),
+        )
+        assert_series_equal(
+            merging.concat_merge([0, 1, 2], wrap_kwargs=dict(index=pd.Index(["a", "b", "c"], name="d"), name="name")),
+            pd.Series([0, 1, 2], index=pd.Index(["a", "b", "c"], name="d"), name="name"),
+        )
+        assert_series_equal(
+            merging.concat_merge(([0, 1, 2], [3, 4, 5]), keys=pd.Index(["k1", "k2"], name="key")),
+            pd.Series(
+                [0, 1, 2, 3, 4, 5],
+                index=pd.MultiIndex.from_tuples(
+                    [("k1", 0), ("k1", 1), ("k1", 2), ("k2", 0), ("k2", 1), ("k2", 2)], names=["key", None]
+                ),
+            ),
+        )
+        assert_series_equal(
+            merging.concat_merge(
+                ([0, 1, 2], [3, 4, 5]),
+                wrap_kwargs=dict(index=pd.Index(["a", "b", "c"], name="d"), name="name"),
+            ),
+            pd.Series(
+                [0, 1, 2, 3, 4, 5],
+                index=pd.Index(["a", "b", "c", "a", "b", "c"], name="d"),
+                name="name",
+            ),
+        )
+        assert_series_equal(
+            merging.concat_merge(
+                ([0, 1, 2], [3, 4, 5]),
+                wrap_kwargs=[
+                    dict(index=pd.Index(["a", "b", "c"], name="d"), name="name"),
+                    dict(index=pd.Index(["e", "f", "g"], name="h"), name="name"),
+                ],
+            ),
+            pd.Series(
+                [0, 1, 2, 3, 4, 5],
+                index=pd.Index(["a", "b", "c", "e", "f", "g"]),
+                name="name",
+            ),
+        )
+        sr1 = pd.Series([0, 1, 2], index=pd.Index(["a", "b", "c"], name="d"), name="name")
+        sr2 = pd.Series([3, 4, 5], index=pd.Index(["e", "f", "g"], name="h"), name="name")
+        assert_series_equal(
+            merging.concat_merge((sr1, sr2)),
+            pd.Series(
+                [0, 1, 2, 3, 4, 5],
+                index=pd.Index(["a", "b", "c", "e", "f", "g"]),
+                name="name",
+            ),
+        )
+        assert_series_equal(
+            merging.concat_merge((sr1, sr2), keys=pd.Index(["k1", "k2"], name="key")),
+            pd.Series(
+                [0, 1, 2, 3, 4, 5],
+                index=pd.MultiIndex.from_tuples(
+                    [("k1", "a"), ("k1", "b"), ("k1", "c"), ("k2", "e"), ("k2", "f"), ("k2", "g")], names=["key", None]
+                ),
+                name="name",
+            ),
+        )
+        assert_series_equal(
+            merging.concat_merge([dict(a=0, b=1, c=2), dict(d=3, e=4, f=5)], wrap=True),
+            pd.Series(
+                [0, 1, 2, 3, 4, 5],
+                index=pd.Index(["a", "b", "c", "d", "e", "f"]),
+            ),
+        )
+
+    def test_row_stack_merge(self):
+        np.testing.assert_array_equal(
+            merging.row_stack_merge(([0, 1, 2], [3, 4, 5])),
+            np.array([[0, 1, 2], [3, 4, 5]]),
+        )
+        np.testing.assert_array_equal(
+            merging.row_stack_merge((([0, 1, 2],), ([0, 1, 2],)))[0],
+            np.array([[0, 1, 2], [0, 1, 2]]),
+        )
+        np.testing.assert_array_equal(
+            merging.row_stack_merge((([0, 1, 2], [3, 4, 5]), ([0, 1, 2], [3, 4, 5])))[0],
+            np.array([[0, 1, 2], [0, 1, 2]]),
+        )
+        np.testing.assert_array_equal(
+            merging.row_stack_merge((([0, 1, 2], [3, 4, 5]), ([0, 1, 2], [3, 4, 5])))[1],
+            np.array([[3, 4, 5], [3, 4, 5]]),
+        )
+        assert_series_equal(
+            merging.row_stack_merge(([0, 1, 2], [3, 4, 5]), keys=pd.Index(["k1", "k2"], name="key")),
+            pd.Series(
+                [0, 1, 2, 3, 4, 5],
+                index=pd.MultiIndex.from_tuples(
+                    [("k1", 0), ("k1", 1), ("k1", 2), ("k2", 0), ("k2", 1), ("k2", 2)], names=["key", None]
+                ),
+            ),
+        )
+        assert_series_equal(
+            merging.row_stack_merge(
+                ([0, 1, 2], [3, 4, 5]),
+                wrap_kwargs=dict(index=pd.Index(["a", "b", "c"], name="d"), name="name"),
+            ),
+            pd.Series(
+                [0, 1, 2, 3, 4, 5],
+                index=pd.Index(["a", "b", "c", "a", "b", "c"], name="d"),
+                name="name",
+            ),
+        )
+        assert_series_equal(
+            merging.row_stack_merge(
+                ([0, 1, 2], [3, 4, 5]),
+                wrap_kwargs=[
+                    dict(index=pd.Index(["a", "b", "c"], name="d"), name="name"),
+                    dict(index=pd.Index(["e", "f", "g"], name="h"), name="name"),
+                ],
+            ),
+            pd.Series(
+                [0, 1, 2, 3, 4, 5],
+                index=pd.Index(["a", "b", "c", "e", "f", "g"]),
+                name="name",
+            ),
+        )
+        assert_frame_equal(
+            merging.row_stack_merge(
+                ([[0], [1], [2]], [[3], [4], [5]]),
+                wrap_kwargs=[
+                    dict(index=pd.Index(["a", "b", "c"], name="d"), columns=["name"]),
+                    dict(index=pd.Index(["e", "f", "g"], name="h"), columns=["name"]),
+                ],
+            ),
+            pd.DataFrame(
+                [[0], [1], [2], [3], [4], [5]],
+                index=pd.Index(["a", "b", "c", "e", "f", "g"]),
+                columns=["name"],
+            ),
+        )
+        sr1 = pd.Series([0, 1, 2], index=pd.Index(["a", "b", "c"], name="d"), name="name")
+        sr2 = pd.Series([3, 4, 5], index=pd.Index(["e", "f", "g"], name="h"), name="name")
+        assert_series_equal(
+            merging.row_stack_merge((sr1, sr2)),
+            pd.Series(
+                [0, 1, 2, 3, 4, 5],
+                index=pd.Index(["a", "b", "c", "e", "f", "g"]),
+                name="name",
+            ),
+        )
+        assert_series_equal(
+            merging.row_stack_merge((sr1, sr2), keys=pd.Index(["k1", "k2"], name="key")),
+            pd.Series(
+                [0, 1, 2, 3, 4, 5],
+                index=pd.MultiIndex.from_tuples(
+                    [("k1", "a"), ("k1", "b"), ("k1", "c"), ("k2", "e"), ("k2", "f"), ("k2", "g")], names=["key", None]
+                ),
+                name="name",
+            ),
+        )
+        assert_frame_equal(
+            merging.row_stack_merge((sr1.to_frame(), sr2.to_frame())),
+            pd.DataFrame(
+                [[0], [1], [2], [3], [4], [5]],
+                index=pd.Index(["a", "b", "c", "e", "f", "g"]),
+                columns=["name"],
+            ),
+        )
+        assert_frame_equal(
+            merging.row_stack_merge((sr1.to_frame(), sr2.to_frame()), keys=pd.Index(["k1", "k2"], name="key")),
+            pd.DataFrame(
+                [[0], [1], [2], [3], [4], [5]],
+                index=pd.MultiIndex.from_tuples(
+                    [("k1", "a"), ("k1", "b"), ("k1", "c"), ("k2", "e"), ("k2", "f"), ("k2", "g")], names=["key", None]
+                ),
+                columns=["name"],
+            ),
+        )
+        assert_series_equal(
+            merging.row_stack_merge([dict(a=0, b=1, c=2), dict(d=3, e=4, f=5)], wrap="sr"),
+            pd.Series(
+                [0, 1, 2, 3, 4, 5],
+                index=pd.Index(["a", "b", "c", "d", "e", "f"]),
+            ),
+        )
+        assert_frame_equal(
+            merging.row_stack_merge(
+                [dict(a=[0], b=[1], c=[2]), dict(a=[3], b=[4], c=[5])],
+                wrap="df",
+                ignore_index=True,
+            ),
+            pd.DataFrame(
+                [[0, 1, 2], [3, 4, 5]],
+                columns=pd.Index(["a", "b", "c"]),
+            ),
+        )
+        assert_series_equal(
+            merging.row_stack_merge((sr1.vbt, sr2.vbt)).obj,
+            pd.Series(
+                [0, 1, 2, 3, 4, 5],
+                index=pd.Index(["a", "b", "c", "e", "f", "g"]),
+                name="name",
+            ),
+        )
+        assert_series_equal(
+            merging.row_stack_merge((sr1.vbt, sr2.vbt), keys=pd.Index(["k1", "k2"], name="key")).obj,
+            pd.Series(
+                [0, 1, 2, 3, 4, 5],
+                index=pd.MultiIndex.from_tuples(
+                    [("k1", "a"), ("k1", "b"), ("k1", "c"), ("k2", "e"), ("k2", "f"), ("k2", "g")], names=["key", None]
+                ),
+                name="name",
+            ),
+        )
+        assert_frame_equal(
+            merging.row_stack_merge((sr1.to_frame().vbt, sr2.to_frame().vbt)).obj,
+            pd.DataFrame(
+                [[0], [1], [2], [3], [4], [5]],
+                index=pd.Index(["a", "b", "c", "e", "f", "g"]),
+                columns=["name"],
+            ),
+        )
+        assert_frame_equal(
+            merging.row_stack_merge(
+                (sr1.to_frame().vbt, sr2.to_frame().vbt), keys=pd.Index(["k1", "k2"], name="key")
+            ).obj,
+            pd.DataFrame(
+                [[0], [1], [2], [3], [4], [5]],
+                index=pd.MultiIndex.from_tuples(
+                    [("k1", "a"), ("k1", "b"), ("k1", "c"), ("k2", "e"), ("k2", "f"), ("k2", "g")], names=["key", None]
+                ),
+                columns=["name"],
+            ),
+        )
+
+    def test_column_stack_merge(self):
+        np.testing.assert_array_equal(
+            merging.column_stack_merge(([0, 1, 2], [3, 4, 5])),
+            np.array([[0, 3], [1, 4], [2, 5]]),
+        )
+        np.testing.assert_array_equal(
+            merging.column_stack_merge((([0, 1, 2],), ([0, 1, 2],)))[0],
+            np.array([[0, 0], [1, 1], [2, 2]]),
+        )
+        np.testing.assert_array_equal(
+            merging.column_stack_merge((([0, 1, 2], [3, 4, 5]), ([0, 1, 2], [3, 4, 5])))[0],
+            np.array([[0, 0], [1, 1], [2, 2]]),
+        )
+        np.testing.assert_array_equal(
+            merging.column_stack_merge((([0, 1, 2], [3, 4, 5]), ([0, 1, 2], [3, 4, 5])))[1],
+            np.array([[3, 3], [4, 4], [5, 5]]),
+        )
+        assert_frame_equal(
+            merging.column_stack_merge(([[0, 1, 2]], [[3, 4, 5]]), keys=pd.Index(["k1", "k2"], name="key")),
+            pd.DataFrame(
+                [[0, 1, 2, 3, 4, 5]],
+                columns=pd.MultiIndex.from_tuples(
+                    [("k1", 0), ("k1", 1), ("k1", 2), ("k2", 0), ("k2", 1), ("k2", 2)], names=["key", None]
+                ),
+            ),
+        )
+        assert_frame_equal(
+            merging.column_stack_merge(
+                ([[0, 1, 2]], [[3, 4, 5]]),
+                wrap_kwargs=dict(columns=pd.Index(["a", "b", "c"]), index=pd.Index(["d"])),
+            ),
+            pd.DataFrame(
+                [[0, 1, 2, 3, 4, 5]],
+                columns=pd.Index(["a", "b", "c", "a", "b", "c"]),
+                index=pd.Index(["d"]),
+            ),
+        )
+        assert_frame_equal(
+            merging.column_stack_merge(
+                ([[0, 1, 2]], [[3, 4, 5]]),
+                wrap_kwargs=[
+                    dict(columns=pd.Index(["a", "b", "c"], name="d")),
+                    dict(columns=pd.Index(["e", "f", "g"], name="h")),
+                ],
+            ),
+            pd.DataFrame(
+                [[0, 1, 2, 3, 4, 5]],
+                columns=pd.Index(["a", "b", "c", "e", "f", "g"]),
+            ),
+        )
+        df1 = pd.DataFrame([[0, 1, 2]], columns=pd.Index(["a", "b", "c"], name="d"), index=pd.Index(["i"]))
+        df2 = pd.DataFrame([[3, 4, 5]], columns=pd.Index(["e", "f", "g"], name="h"), index=pd.Index(["i"]))
+        assert_frame_equal(
+            merging.column_stack_merge((df1, df2)),
+            pd.DataFrame(
+                [[0, 1, 2, 3, 4, 5]],
+                columns=pd.Index(["a", "b", "c", "e", "f", "g"]),
+                index=pd.Index(["i"]),
+            ),
+        )
+        assert_frame_equal(
+            merging.column_stack_merge((df1, df2), keys=pd.Index(["k1", "k2"], name="key")),
+            pd.DataFrame(
+                [[0, 1, 2, 3, 4, 5]],
+                columns=pd.MultiIndex.from_tuples(
+                    [("k1", "a"), ("k1", "b"), ("k1", "c"), ("k2", "e"), ("k2", "f"), ("k2", "g")], names=["key", None]
+                ),
+                index=pd.Index(["i"]),
+            ),
+        )
+        assert_frame_equal(
+            merging.column_stack_merge([dict(a=0, b=1, c=2), dict(a=3, b=4, c=5)], wrap="sr"),
+            pd.DataFrame(
+                [[0, 3], [1, 4], [2, 5]],
+                index=pd.Index(["a", "b", "c"]),
+            ),
+        )
+        assert_frame_equal(
+            merging.column_stack_merge([dict(a=[0], b=[1], c=[2]), dict(d=[3], e=[4], f=[5])], wrap="df"),
+            pd.DataFrame(
+                [[0, 1, 2, 3, 4, 5]],
+                columns=pd.Index(["a", "b", "c", "d", "e", "f"]),
+            ),
+        )
+        assert_frame_equal(
+            merging.column_stack_merge((df1.vbt, df2.vbt)).obj,
+            pd.DataFrame(
+                [[0, 1, 2, 3, 4, 5]],
+                columns=pd.Index(["a", "b", "c", "e", "f", "g"]),
+                index=pd.Index(["i"]),
+            ),
+        )
+        assert_frame_equal(
+            merging.column_stack_merge((df1.vbt, df2.vbt), keys=pd.Index(["k1", "k2"], name="key")).obj,
+            pd.DataFrame(
+                [[0, 1, 2, 3, 4, 5]],
+                columns=pd.MultiIndex.from_tuples(
+                    [("k1", "a"), ("k1", "b"), ("k1", "c"), ("k2", "e"), ("k2", "f"), ("k2", "g")], names=["key", None]
+                ),
+                index=pd.Index(["i"]),
+            ),
+        )
+
+    def test_mixed_merge(self):
+        np.testing.assert_array_equal(
+            merging.mixed_merge([
+                ([0, 1, 2], [3, 4, 5], [6, 7, 8]),
+                ([9, 10, 11], [12, 13, 14], [15, 16, 17]),
+            ], func_names=("concat", "row_stack", "column_stack"))[0],
+            np.array([0, 1, 2, 9, 10, 11]),
+        )
+        np.testing.assert_array_equal(
+            merging.mixed_merge([
+                ([0, 1, 2], [3, 4, 5], [6, 7, 8]),
+                ([9, 10, 11], [12, 13, 14], [15, 16, 17]),
+            ], func_names=("concat", "row_stack", "column_stack"))[1],
+            np.array([[3, 4, 5], [12, 13, 14]]),
+        )
+        np.testing.assert_array_equal(
+            merging.mixed_merge([
+                ([0, 1, 2], [3, 4, 5], [6, 7, 8]),
+                ([9, 10, 11], [12, 13, 14], [15, 16, 17]),
+            ], func_names=("concat", "row_stack", "column_stack"))[2],
+            np.array([[6, 15], [7, 16], [8, 17]]),
+        )
+        np.testing.assert_array_equal(
+            merging.resolve_merge_func(("concat", "row_stack", "column_stack"))([
+                ([0, 1, 2], [3, 4, 5], [6, 7, 8]),
+                ([9, 10, 11], [12, 13, 14], [15, 16, 17]),
+            ])[0],
+            np.array([0, 1, 2, 9, 10, 11]),
+        )
+
+
 # ############# accessors.py ############# #
 
 
@@ -5346,7 +5997,7 @@ class TestAccessors:
         target_obj = pd.DataFrame(
             [[0, 0, 1], [1, 2, 3], [2, 4, 5]],
             index=pd.RangeIndex(start=0, stop=3, step=1),
-            columns=pd.RangeIndex(start=0, stop=3, step=1, name="col_idx"),
+            columns=pd.Index(["sr", "a", "b"], dtype="object"),
         )
         assert isinstance(acc, vbt.BaseDFAccessor)
         assert_index_equal(

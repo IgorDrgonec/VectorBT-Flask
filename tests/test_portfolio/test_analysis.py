@@ -794,7 +794,7 @@ class TestPortfolio:
         def reindex_second_obj(df):
             df = df.copy()
             df.index = pd.date_range("2020-01-03", "2020-01-07")
-            return df
+            return df.add_prefix("_")
 
         def column_stack_arrs(arrs, pf1, pf2, fill_value=np.nan):
             df1 = pd.DataFrame(arrs[0], index=pf1.wrapper.index)

@@ -203,7 +203,7 @@ def get_ranges_from_delta_nb(
         status_arr=ch.ArraySlicer(axis=0),
         freq=None,
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def range_duration_nb(
@@ -233,7 +233,7 @@ def range_duration_nb(
         overlapping=None,
         normalize=None,
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def range_coverage_nb(
@@ -289,7 +289,7 @@ def range_coverage_nb(
         col_map=base_ch.GroupMapSlicer(),
         index_len=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def ranges_to_mask_nb(
@@ -744,7 +744,7 @@ def drawdown_1d_nb(arr: tp.Array1d) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def drawdown_nb(arr: tp.Array2d) -> tp.Array2d:
@@ -952,7 +952,7 @@ def get_drawdowns_nb(
 @register_chunkable(
     size=ch.ArraySizer(arg_query="peak_val_arr", axis=0),
     arg_take_spec=dict(peak_val_arr=ch.ArraySlicer(axis=0), valley_val_arr=ch.ArraySlicer(axis=0)),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def dd_drawdown_nb(peak_val_arr: tp.Array1d, valley_val_arr: tp.Array1d) -> tp.Array1d:
@@ -966,7 +966,7 @@ def dd_drawdown_nb(peak_val_arr: tp.Array1d, valley_val_arr: tp.Array1d) -> tp.A
 @register_chunkable(
     size=ch.ArraySizer(arg_query="start_idx_arr", axis=0),
     arg_take_spec=dict(start_idx_arr=ch.ArraySlicer(axis=0), valley_idx_arr=ch.ArraySlicer(axis=0)),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def dd_decline_duration_nb(start_idx_arr: tp.Array1d, valley_idx_arr: tp.Array1d) -> tp.Array1d:
@@ -980,7 +980,7 @@ def dd_decline_duration_nb(start_idx_arr: tp.Array1d, valley_idx_arr: tp.Array1d
 @register_chunkable(
     size=ch.ArraySizer(arg_query="valley_idx_arr", axis=0),
     arg_take_spec=dict(valley_idx_arr=ch.ArraySlicer(axis=0), end_idx_arr=ch.ArraySlicer(axis=0)),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def dd_recovery_duration_nb(valley_idx_arr: tp.Array1d, end_idx_arr: tp.Array1d) -> tp.Array1d:
@@ -998,7 +998,7 @@ def dd_recovery_duration_nb(valley_idx_arr: tp.Array1d, end_idx_arr: tp.Array1d)
         valley_idx_arr=ch.ArraySlicer(axis=0),
         end_idx_arr=ch.ArraySlicer(axis=0),
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def dd_recovery_duration_ratio_nb(
@@ -1016,7 +1016,7 @@ def dd_recovery_duration_ratio_nb(
 @register_chunkable(
     size=ch.ArraySizer(arg_query="valley_val_arr", axis=0),
     arg_take_spec=dict(valley_val_arr=ch.ArraySlicer(axis=0), end_val_arr=ch.ArraySlicer(axis=0)),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def dd_recovery_return_nb(valley_val_arr: tp.Array1d, end_val_arr: tp.Array1d) -> tp.Array1d:

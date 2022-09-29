@@ -81,10 +81,10 @@ class TestAccessors:
         assert_frame_equal(acc.bm_returns, pd.concat((bm_returns, bm_returns2)))
 
     def test_column_stack(self):
-        rets2 = rets * 2
-        bm_returns2 = bm_returns * 2
+        rets2 = (rets * 2).add_prefix("_")
+        bm_returns2 = (bm_returns * 2).add_prefix("_")
         ret_acc2 = ret_acc.replace(
-            wrapper=ret_acc.wrapper.replace(index=rets2.index),
+            wrapper=ret_acc.wrapper.replace(index=rets2.index, columns=rets2.columns),
             obj=rets2,
             bm_returns=bm_returns2,
         )

@@ -307,6 +307,11 @@ class Grouper(Configured):
         """Return grouped index."""
         return self.get_groups_and_index(**kwargs)[1]
 
+    def get_stretched_index(self, **kwargs) -> tp.Index:
+        """Return stretched index."""
+        groups, index = self.get_groups_and_index(**kwargs)
+        return index[groups]
+
     def get_group_count(self, **kwargs) -> int:
         """Get number of groups."""
         return len(self.get_index(**kwargs))

@@ -32,7 +32,7 @@ def map_1d_nb(arr: tp.Array1d, map_func_nb: tp.MapFunc, *args) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), map_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def map_nb(arr: tp.Array2d, map_func_nb: tp.MapFunc, *args) -> tp.Array2d:
@@ -62,7 +62,7 @@ def map_1d_meta_nb(n: int, col: int, map_func_nb: tp.MapMetaFunc, *args) -> tp.A
 @register_chunkable(
     size=ch.ShapeSizer(arg_query="target_shape", axis=1),
     arg_take_spec=dict(target_shape=ch.ShapeSlicer(axis=1), map_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def map_meta_nb(target_shape: tp.Shape, map_func_nb: tp.MapMetaFunc, *args) -> tp.Array2d:
@@ -78,7 +78,7 @@ def map_meta_nb(target_shape: tp.Shape, map_func_nb: tp.MapMetaFunc, *args) -> t
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), apply_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def apply_nb(arr: tp.Array2d, apply_func_nb: tp.ApplyFunc, *args) -> tp.Array2d:
@@ -97,7 +97,7 @@ def apply_nb(arr: tp.Array2d, apply_func_nb: tp.ApplyFunc, *args) -> tp.Array2d:
 @register_chunkable(
     size=ch.ShapeSizer(arg_query="target_shape", axis=1),
     arg_take_spec=dict(target_shape=ch.ShapeSlicer(axis=1), apply_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def apply_meta_nb(target_shape: tp.Shape, apply_func_nb: tp.ApplyMetaFunc, *args) -> tp.Array2d:
@@ -113,7 +113,7 @@ def apply_meta_nb(target_shape: tp.Shape, apply_func_nb: tp.ApplyMetaFunc, *args
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=0),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=0), apply_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.row_stack,
+    merge_func="row_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def row_apply_nb(arr: tp.Array2d, apply_func_nb: tp.ApplyFunc, *args) -> tp.Array2d:
@@ -129,7 +129,7 @@ def row_apply_nb(arr: tp.Array2d, apply_func_nb: tp.ApplyFunc, *args) -> tp.Arra
 @register_chunkable(
     size=ch.ShapeSizer(arg_query="target_shape", axis=0),
     arg_take_spec=dict(target_shape=ch.ShapeSlicer(axis=0), apply_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.row_stack,
+    merge_func="row_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def row_apply_meta_nb(target_shape: tp.Shape, apply_func_nb: tp.ApplyMetaFunc, *args) -> tp.Array2d:
@@ -179,7 +179,7 @@ def rolling_reduce_1d_nb(
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, minp=None, reduce_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def rolling_reduce_nb(
@@ -232,7 +232,7 @@ def rolling_reduce_1d_meta_nb(
         reduce_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def rolling_reduce_meta_nb(
@@ -277,7 +277,7 @@ def rolling_freq_reduce_1d_nb(
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(index=None, arr=ch.ArraySlicer(axis=1), freq=None, reduce_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def rolling_freq_reduce_nb(
@@ -322,7 +322,7 @@ def rolling_freq_reduce_1d_meta_nb(
 @register_chunkable(
     size=ch.ArgSizer(arg_query="n_cols"),
     arg_take_spec=dict(n_cols=ch.CountAdapter(), index=None, freq=None, reduce_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def rolling_freq_reduce_meta_nb(
@@ -362,7 +362,7 @@ def groupby_reduce_1d_nb(arr: tp.Array1d, group_map: tp.GroupMap, reduce_func_nb
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), group_map=None, reduce_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def groupby_reduce_nb(arr: tp.Array2d, group_map: tp.GroupMap, reduce_func_nb: tp.ReduceFunc, *args) -> tp.Array2d:
@@ -404,7 +404,7 @@ def groupby_reduce_1d_meta_nb(
 @register_chunkable(
     size=ch.ArgSizer(arg_query="n_cols"),
     arg_take_spec=dict(n_cols=ch.CountAdapter(), group_map=None, reduce_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def groupby_reduce_meta_nb(
@@ -454,7 +454,7 @@ def reduce_index_ranges_1d_nb(
         reduce_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_index_ranges_nb(
@@ -504,7 +504,7 @@ def reduce_index_ranges_1d_meta_nb(
         reduce_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_index_ranges_meta_nb(
@@ -549,7 +549,7 @@ def apply_and_reduce_1d_nb(
         reduce_func_nb=None,
         reduce_args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(tags={"can_parallel"})
 def apply_and_reduce_nb(
@@ -596,7 +596,7 @@ def apply_and_reduce_1d_meta_nb(
         reduce_func_nb=None,
         reduce_args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(tags={"can_parallel"})
 def apply_and_reduce_meta_nb(
@@ -618,7 +618,7 @@ def apply_and_reduce_meta_nb(
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), reduce_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_nb(arr: tp.Array2d, reduce_func_nb: tp.ReduceFunc, *args) -> tp.Array1d:
@@ -636,7 +636,7 @@ def reduce_nb(arr: tp.Array2d, reduce_func_nb: tp.ReduceFunc, *args) -> tp.Array
 @register_chunkable(
     size=ch.ArgSizer(arg_query="n_cols"),
     arg_take_spec=dict(n_cols=ch.CountAdapter(), reduce_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_meta_nb(n_cols: int, reduce_func_nb: tp.ReduceMetaFunc, *args) -> tp.Array1d:
@@ -654,7 +654,7 @@ def reduce_meta_nb(n_cols: int, reduce_func_nb: tp.ReduceMetaFunc, *args) -> tp.
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), reduce_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_to_array_nb(arr: tp.Array2d, reduce_func_nb: tp.ReduceToArrayFunc, *args) -> tp.Array2d:
@@ -670,7 +670,7 @@ def reduce_to_array_nb(arr: tp.Array2d, reduce_func_nb: tp.ReduceToArrayFunc, *a
 @register_chunkable(
     size=ch.ArgSizer(arg_query="n_cols"),
     arg_take_spec=dict(n_cols=ch.CountAdapter(), reduce_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_to_array_meta_nb(n_cols: int, reduce_func_nb: tp.ReduceToArrayMetaFunc, *args) -> tp.Array2d:
@@ -691,7 +691,7 @@ def reduce_to_array_meta_nb(n_cols: int, reduce_func_nb: tp.ReduceToArrayMetaFun
         reduce_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_grouped_nb(
@@ -721,7 +721,7 @@ def reduce_grouped_nb(
 @register_chunkable(
     size=base_ch.GroupLensSizer(arg_query="group_map"),
     arg_take_spec=dict(group_map=base_ch.GroupMapSlicer(), reduce_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_grouped_meta_nb(group_map: tp.GroupMap, reduce_func_nb: tp.ReduceGroupedMetaFunc, *args) -> tp.Array1d:
@@ -747,7 +747,7 @@ def reduce_grouped_meta_nb(group_map: tp.GroupMap, reduce_func_nb: tp.ReduceGrou
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def flatten_forder_nb(arr: tp.Array2d) -> tp.Array1d:
@@ -767,7 +767,7 @@ def flatten_forder_nb(arr: tp.Array2d) -> tp.Array1d:
         reduce_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_flat_grouped_nb(
@@ -807,7 +807,7 @@ def reduce_flat_grouped_nb(
         reduce_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_grouped_to_array_nb(
@@ -835,7 +835,7 @@ def reduce_grouped_to_array_nb(
 @register_chunkable(
     size=base_ch.GroupLensSizer(arg_query="group_map"),
     arg_take_spec=dict(group_map=base_ch.GroupMapSlicer(), reduce_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_grouped_to_array_meta_nb(
@@ -868,7 +868,7 @@ def reduce_grouped_to_array_meta_nb(
         reduce_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_flat_grouped_to_array_nb(
@@ -908,7 +908,7 @@ def reduce_flat_grouped_to_array_nb(
         squeeze_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def squeeze_grouped_nb(arr: tp.Array2d, group_map: tp.GroupMap, squeeze_func_nb: tp.ReduceFunc, *args) -> tp.Array2d:
@@ -936,7 +936,7 @@ def squeeze_grouped_nb(arr: tp.Array2d, group_map: tp.GroupMap, squeeze_func_nb:
 @register_chunkable(
     size=base_ch.GroupLensSizer(arg_query="group_map"),
     arg_take_spec=dict(n_rows=None, group_map=base_ch.GroupMapSlicer(), squeeze_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def squeeze_grouped_meta_nb(

@@ -95,7 +95,7 @@ import numpy as np
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import ChildDict, Config, FrozenConfig
 from vectorbtpro.utils.datetime_ import get_local_tz, get_utc_tz
-from vectorbtpro.utils.execution import SequenceEngine, DaskEngine, RayEngine
+from vectorbtpro.utils.execution import SequenceEngine, ThreadPoolEngine, ProcessPoolEngine, DaskEngine, RayEngine
 from vectorbtpro.utils.jitting import NumPyJitter, NumbaJitter
 from vectorbtpro.utils.template import Sub, RepEval, deep_substitute
 
@@ -223,6 +223,20 @@ execution = ChildDict(
             cls=SequenceEngine,
             show_progress=False,
             pbar_kwargs=Config(),
+            clear_cache=False,
+            collect_garbage=False,
+            n_chunks=None,
+            chunk_len=None,
+        ),
+        threadpool=FrozenConfig(
+            cls=ThreadPoolEngine,
+            init_kwargs=Config(),
+            n_chunks=None,
+            chunk_len=None,
+        ),
+        processpool=FrozenConfig(
+            cls=ProcessPoolEngine,
+            init_kwargs=Config(),
             n_chunks=None,
             chunk_len=None,
         ),
@@ -1292,6 +1306,10 @@ pfopt = ChildDict(
         ignore_opt_errors=True,
     ),
     riskfolio=Config(
+        nan_to_zero=True,
+        dropna_rows=True,
+        dropna_cols=True,
+        dropna_any=True,
         factors=None,
         port=None,
         port_cls=None,

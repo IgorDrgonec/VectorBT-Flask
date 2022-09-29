@@ -490,7 +490,7 @@ class ArraySlicer(ShapeSlicer):
         return obj[tuple(slc)]
 
 
-@attr.s(frozen=True)
+@attr.s(frozen=True, init=False)
 class ContainerTaker(ChunkTaker):
     """Class for taking from a container with other chunk takers.
 
@@ -498,6 +498,20 @@ class ContainerTaker(ChunkTaker):
 
     cont_take_spec: tp.Optional[tp.ContainerTakeSpec] = attr.ib(default=None, validator=_assert_value_not_none)
     """Specification of the container."""
+
+    def __init__(
+        self,
+        cont_take_spec: tp.Optional[tp.ContainerTakeSpec] = None,
+        single_type: tp.Optional[tp.TypeLike] = None,
+        ignore_none: bool = True,
+        mapper: tp.Optional[ChunkMapper] = None,
+    ):
+        self.__attrs_init__(
+            single_type=single_type,
+            ignore_none=ignore_none,
+            mapper=mapper,
+            cont_take_spec=cont_take_spec,
+        )
 
     def take(self, obj: tp.Any, chunk_meta: ChunkMeta, **kwargs) -> tp.Any:
         raise NotImplementedError
@@ -550,15 +564,37 @@ class MappingTaker(ContainerTaker):
 class ArgsTaker(SequenceTaker):
     """Class for taking from a variable arguments container."""
 
-    def __init__(self, *args):
-        SequenceTaker.__init__(self, cont_take_spec=args)
+    def __init__(
+        self,
+        *args,
+        single_type: tp.Optional[tp.TypeLike] = None,
+        ignore_none: bool = True,
+        mapper: tp.Optional[ChunkMapper] = None,
+    ):
+        self.__attrs_init__(
+            single_type=single_type,
+            ignore_none=ignore_none,
+            mapper=mapper,
+            cont_take_spec=args,
+        )
 
 
 class KwargsTaker(MappingTaker):
     """Class for taking from a variable keyword arguments container."""
 
-    def __init__(self, **kwargs):
-        SequenceTaker.__init__(self, cont_take_spec=kwargs)
+    def __init__(
+        self,
+        single_type: tp.Optional[tp.TypeLike] = None,
+        ignore_none: bool = True,
+        mapper: tp.Optional[ChunkMapper] = None,
+        **kwargs,
+    ):
+        self.__attrs_init__(
+            single_type=single_type,
+            ignore_none=ignore_none,
+            mapper=mapper,
+            cont_take_spec=kwargs,
+        )
 
 
 def take_from_arg(arg: tp.Any, take_spec: tp.TakeSpec, chunk_meta: ChunkMeta, **kwargs) -> tp.Any:
@@ -695,7 +731,7 @@ def chunked(
     arg_take_spec: tp.Optional[tp.ArgTakeSpecLike] = None,
     template_context: tp.Optional[tp.Mapping] = None,
     prepend_chunk_meta: tp.Optional[bool] = None,
-    merge_func: tp.Optional[tp.Callable] = None,
+    merge_func: tp.Union[None, str, tp.Callable] = None,
     merge_kwargs: tp.KwargsLike = None,
     engine: tp.Optional[tp.EngineLike] = None,
     return_raw_chunks: bool = False,
@@ -714,6 +750,8 @@ def chunked(
         and `template_context` to `yield_arg_chunks`, which yields one chunk at a time.
     3. Executes all chunks by passing `engine` and `**engine_kwargs` to `vectorbtpro.utils.execution.execute`.
     4. Optionally, post-processes and merges the results by passing them and `**merge_kwargs` to `merge_func`.
+
+    Argument `merge_func` is resolved using `vectorbtpro.base.merging.resolve_merge_func`.
 
     Any template in both `engine_kwargs` and `merge_kwargs` will be substituted. You can use
     the keys `ann_args`, `chunk_meta`, `arg_take_spec`, and `funcs_args` to be replaced by the actual objects.
@@ -750,7 +788,8 @@ def chunked(
         >>> @vbt.chunked(
         ...     n_chunks=2,
         ...     size=vbt.LenSizer(arg_query='a'),
-        ...     arg_take_spec=dict(a=vbt.ChunkSlicer()))
+        ...     arg_take_spec=dict(a=vbt.ChunkSlicer())
+        ... )
         ... def f(a):
         ...     return np.mean(a)
 
@@ -824,14 +863,16 @@ def chunked(
         ...     ]),
         ...     kwargs=vbt.KwargsTaker(
         ...         c=vbt.MappingTaker(dict(
-        ...             d=vbt.ChunkSelector()
+        ...             d=vbt.ChunkSelector(),
+        ...             e=None
         ...         ))
         ...     )
         ... )
 
         >>> @vbt.chunked(
         ...     n_chunks=vbt.LenSizer(arg_query='a'),
-        ...     arg_take_spec=arg_take_spec)
+        ...     arg_take_spec=arg_take_spec
+        ... )
         ... def f(a, *args, b=None, **kwargs):
         ...     return a + sum(args) + sum(b) + sum(kwargs['c'].values())
 
@@ -848,7 +889,8 @@ def chunked(
         ...     n_chunks=2,
         ...     size=vbt.LenSizer(arg_query='a'),
         ...     arg_take_spec=dict(a=vbt.ChunkSlicer()),
-        ...     merge_func=np.concatenate)
+        ...     merge_func="concat"
+        ... )
         ... def f(a):
         ...     return a
 
@@ -864,7 +906,9 @@ def chunked(
         >>> @vbt.chunked(
         ...     n_chunks=2,
         ...     size=vbt.LenSizer(arg_query='a'),
-        ...     merge_func=np.concatenate)
+        ...     arg_take_spec=dict(a=None),
+        ...     merge_func="concat"
+        ... )
         ... def f(chunk_meta, a):
         ...     return a[chunk_meta.start:chunk_meta.end]
 
@@ -881,8 +925,10 @@ def chunked(
         >>> @vbt.chunked(
         ...     n_chunks=2,
         ...     size=vbt.LenSizer(arg_query='a'),
-        ...     merge_func=np.concatenate,
-        ...     prepend_chunk_meta=False)
+        ...     arg_take_spec=dict(a=None),
+        ...     merge_func="concat",
+        ...     prepend_chunk_meta=False
+        ... )
         ... def f(chunk_meta, a):
         ...     return a[chunk_meta.start:chunk_meta.end]
 
@@ -899,7 +945,8 @@ def chunked(
         ...     n_chunks=2,
         ...     size=vbt.LenSizer(arg_query='a'),
         ...     arg_take_spec=dict(a=vbt.ChunkSlicer()),
-        ...     engine_kwargs=dict(show_progress=True))  # see SequenceEngine
+        ...     show_progress=True
+        ... )
         ... def f(a):
         ...     return np.mean(a)
 
@@ -943,6 +990,10 @@ def chunked(
                 skip_one_chunk = chunking_cfg["skip_one_chunk"]
             chunk_meta = kwargs.pop("_chunk_meta", wrapper.options["chunk_meta"])
             arg_take_spec = kwargs.pop("_arg_take_spec", wrapper.options["arg_take_spec"])
+            if arg_take_spec is None:
+                arg_take_spec = {}
+            if isinstance(arg_take_spec, dict) and "chunk_meta" not in arg_take_spec:
+                arg_take_spec["chunk_meta"] = None
             template_context = merge_dicts(wrapper.options["template_context"], kwargs.pop("_template_context", {}))
             engine = kwargs.pop("_engine", wrapper.options["engine"])
             if engine is None:
@@ -993,6 +1044,10 @@ def chunked(
             results = execute(funcs_args, engine=engine, n_calls=len(chunk_meta), **engine_kwargs)
             if merge_func is not None:
                 context["funcs_args"] = funcs_args
+                if isinstance(merge_func, (str, tuple)):
+                    from vectorbtpro.base.merging import resolve_merge_func
+
+                    merge_func = resolve_merge_func(merge_func)
                 merge_kwargs = deep_substitute(merge_kwargs, context, sub_id="merge_kwargs")
                 return merge_func(results, **merge_kwargs)
             return results

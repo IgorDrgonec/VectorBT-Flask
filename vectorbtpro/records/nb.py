@@ -172,7 +172,7 @@ def is_col_id_sorted_nb(col_arr: tp.Array1d, id_arr: tp.Array1d) -> bool:
         col_map=base_ch.GroupMapSlicer(),
         n=None,
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def first_n_nb(col_map: tp.GroupMap, n: int) -> tp.Array1d:
@@ -197,7 +197,7 @@ def first_n_nb(col_map: tp.GroupMap, n: int) -> tp.Array1d:
         col_map=base_ch.GroupMapSlicer(),
         n=None,
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def last_n_nb(col_map: tp.GroupMap, n: int) -> tp.Array1d:
@@ -222,7 +222,7 @@ def last_n_nb(col_map: tp.GroupMap, n: int) -> tp.Array1d:
         col_map=base_ch.GroupMapSlicer(),
         n=None,
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def random_n_nb(col_map: tp.GroupMap, n: int) -> tp.Array1d:
@@ -248,7 +248,7 @@ def random_n_nb(col_map: tp.GroupMap, n: int) -> tp.Array1d:
         col_map=base_ch.GroupMapSlicer(),
         n=None,
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def top_n_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.GroupMap, n: int) -> tp.Array1d:
@@ -274,7 +274,7 @@ def top_n_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.GroupMap, n: int) -> tp.
         col_map=base_ch.GroupMapSlicer(),
         n=None,
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def bottom_n_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.GroupMap, n: int) -> tp.Array1d:
@@ -299,7 +299,7 @@ def bottom_n_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.GroupMap, n: int) -> 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="records", axis=0),
     arg_take_spec=dict(records=ch.ArraySlicer(axis=0), map_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(tags={"can_parallel"})
 def map_records_nb(records: tp.RecordArray, map_func_nb: tp.RecordsMapFunc, *args) -> tp.Array1d:
@@ -316,7 +316,7 @@ def map_records_nb(records: tp.RecordArray, map_func_nb: tp.RecordsMapFunc, *arg
 @register_chunkable(
     size=ch.ArgSizer(arg_query="n_values"),
     arg_take_spec=dict(n_values=ch.CountAdapter(), map_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(tags={"can_parallel"})
 def map_records_meta_nb(n_values: int, map_func_nb: tp.MappedReduceMetaFunc, *args) -> tp.Array1d:
@@ -338,7 +338,7 @@ def map_records_meta_nb(n_values: int, map_func_nb: tp.MappedReduceMetaFunc, *ar
         apply_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(tags={"can_parallel"})
 def apply_nb(arr: tp.Array1d, col_map: tp.GroupMap, apply_func_nb: tp.ApplyFunc, *args) -> tp.Array1d:
@@ -369,7 +369,7 @@ def apply_nb(arr: tp.Array1d, col_map: tp.GroupMap, apply_func_nb: tp.ApplyFunc,
         apply_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(tags={"can_parallel"})
 def apply_meta_nb(n_values: int, col_map: tp.GroupMap, apply_func_nb: tp.ApplyMetaFunc, *args) -> tp.Array1d:
@@ -404,7 +404,7 @@ def apply_meta_nb(n_values: int, col_map: tp.GroupMap, apply_func_nb: tp.ApplyMe
         reduce_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted
 def reduce_mapped_segments_nb(
@@ -485,7 +485,7 @@ def reduce_mapped_segments_nb(
         reduce_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_mapped_nb(
@@ -519,7 +519,7 @@ def reduce_mapped_nb(
 @register_chunkable(
     size=base_ch.GroupLensSizer(arg_query="col_map"),
     arg_take_spec=dict(col_map=base_ch.GroupMapSlicer(), fill_value=None, reduce_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_mapped_meta_nb(
@@ -556,7 +556,7 @@ def reduce_mapped_meta_nb(
         reduce_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_mapped_to_idx_nb(
@@ -597,7 +597,7 @@ def reduce_mapped_to_idx_nb(
         reduce_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_mapped_to_idx_meta_nb(
@@ -634,7 +634,7 @@ def reduce_mapped_to_idx_meta_nb(
         reduce_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_mapped_to_array_nb(
@@ -676,7 +676,7 @@ def reduce_mapped_to_array_nb(
 @register_chunkable(
     size=base_ch.GroupLensSizer(arg_query="col_map"),
     arg_take_spec=dict(col_map=base_ch.GroupMapSlicer(), fill_value=None, reduce_func_nb=None, args=ch.ArgsTaker()),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_mapped_to_array_meta_nb(
@@ -724,7 +724,7 @@ def reduce_mapped_to_array_meta_nb(
         reduce_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_mapped_to_idx_array_nb(
@@ -776,7 +776,7 @@ def reduce_mapped_to_idx_array_nb(
         reduce_func_nb=None,
         args=ch.ArgsTaker(),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def reduce_mapped_to_idx_array_meta_nb(
@@ -825,7 +825,7 @@ def reduce_mapped_to_idx_array_meta_nb(
         n_uniques=None,
         col_map=base_ch.GroupMapSlicer(),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def mapped_value_counts_per_col_nb(codes: tp.Array1d, n_uniques: int, col_map: tp.GroupMap) -> tp.Array2d:

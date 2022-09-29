@@ -68,7 +68,7 @@ def returns_1d_nb(arr: tp.Array1d, init_value: float = np.nan, log_returns: bool
         init_value=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
         log_returns=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def returns_nb(
@@ -112,7 +112,7 @@ def cum_returns_1d_nb(rets: tp.Array1d, start_value: float = 0.0, log_returns: b
 @register_chunkable(
     size=ch.ArraySizer(arg_query="rets", axis=1),
     arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), start_value=None, log_returns=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def cum_returns_nb(rets: tp.Array2d, start_value: float = 0.0, log_returns: bool = False) -> tp.Array2d:
@@ -147,7 +147,7 @@ def cum_returns_final_1d_nb(rets: tp.Array1d, start_value: float = 0.0, log_retu
 @register_chunkable(
     size=ch.ArraySizer(arg_query="rets", axis=1),
     arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), start_value=None, log_returns=None),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def cum_returns_final_nb(rets: tp.Array2d, start_value: float = 0.0, log_returns: bool = False) -> tp.Array1d:
@@ -177,7 +177,7 @@ def annualized_return_1d_nb(
 @register_chunkable(
     size=ch.ArraySizer(arg_query="rets", axis=1),
     arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), ann_factor=None, period=None, log_returns=None),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def annualized_return_nb(
@@ -202,7 +202,7 @@ def annualized_volatility_1d_nb(rets: tp.Array1d, ann_factor: float, levy_alpha:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="rets", axis=1),
     arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), ann_factor=None, levy_alpha=None, ddof=None),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def annualized_volatility_nb(rets: tp.Array2d, ann_factor: float, levy_alpha: float = 2.0, ddof: int = 0) -> tp.Array1d:
@@ -242,7 +242,7 @@ def max_drawdown_1d_nb(rets: tp.Array1d, log_returns: bool = False) -> float:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="rets", axis=1),
     arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), log_returns=None),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def max_drawdown_nb(rets: tp.Array2d, log_returns: bool = False) -> tp.Array1d:
@@ -273,7 +273,7 @@ def calmar_ratio_1d_nb(
 @register_chunkable(
     size=ch.ArraySizer(arg_query="rets", axis=1),
     arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), ann_factor=None, period=None, log_returns=None),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def calmar_ratio_nb(
@@ -318,7 +318,7 @@ def omega_ratio_1d_nb(adj_rets: tp.Array1d) -> float:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="adj_rets", axis=1),
     arg_take_spec=dict(adj_rets=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def omega_ratio_nb(adj_rets: tp.Array2d) -> tp.Array1d:
@@ -342,7 +342,7 @@ def sharpe_ratio_1d_nb(adj_rets: tp.Array1d, ann_factor: float, ddof: int = 0) -
 @register_chunkable(
     size=ch.ArraySizer(arg_query="adj_rets", axis=1),
     arg_take_spec=dict(adj_rets=ch.ArraySlicer(axis=1), ann_factor=None, ddof=None),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def sharpe_ratio_nb(adj_rets: tp.Array2d, ann_factor: float, ddof: int = 0) -> tp.Array1d:
@@ -372,7 +372,7 @@ def downside_risk_1d_nb(adj_rets: tp.Array1d, ann_factor: float) -> float:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="adj_rets", axis=1),
     arg_take_spec=dict(adj_rets=ch.ArraySlicer(axis=1), ann_factor=None),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def downside_risk_nb(adj_rets: tp.Array2d, ann_factor: float) -> tp.Array1d:
@@ -396,7 +396,7 @@ def sortino_ratio_1d_nb(adj_rets: tp.Array1d, ann_factor: float) -> float:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="adj_rets", axis=1),
     arg_take_spec=dict(adj_rets=ch.ArraySlicer(axis=1), ann_factor=None),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def sortino_ratio_nb(adj_rets: tp.Array2d, ann_factor: float) -> tp.Array1d:
@@ -420,7 +420,7 @@ def information_ratio_1d_nb(adj_rets: tp.Array1d, ddof: int = 0) -> float:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="adj_rets", axis=1),
     arg_take_spec=dict(adj_rets=ch.ArraySlicer(axis=1), ddof=None),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def information_ratio_nb(adj_rets: tp.Array2d, ddof: int = 0) -> tp.Array1d:
@@ -444,7 +444,7 @@ def beta_1d_nb(rets: tp.Array1d, bm_returns: tp.Array1d, ddof: int = 0) -> float
 @register_chunkable(
     size=ch.ArraySizer(arg_query="rets", axis=1),
     arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), bm_returns=ch.ArraySlicer(axis=1), ddof=None),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def beta_nb(rets: tp.Array2d, bm_returns: tp.Array2d, ddof: int = 0) -> tp.Array1d:
@@ -478,7 +478,7 @@ def alpha_1d_nb(adj_rets: tp.Array1d, adj_bm_returns: tp.Array1d, ann_factor: fl
 @register_chunkable(
     size=ch.ArraySizer(arg_query="adj_rets", axis=1),
     arg_take_spec=dict(adj_rets=ch.ArraySlicer(axis=1), adj_bm_returns=ch.ArraySlicer(axis=1), ann_factor=None),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def alpha_nb(adj_rets: tp.Array2d, adj_bm_returns: tp.Array2d, ann_factor: float) -> tp.Array1d:
@@ -525,7 +525,7 @@ def tail_ratio_noarr_1d_nb(rets: tp.Array1d) -> float:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="rets", axis=1),
     arg_take_spec=dict(rets=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def tail_ratio_nb(rets: tp.Array2d) -> tp.Array1d:
@@ -551,7 +551,7 @@ def value_at_risk_noarr_1d_nb(rets: tp.Array1d, cutoff: float = 0.05) -> float:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="rets", axis=1),
     arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), cutoff=None),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def value_at_risk_nb(rets: tp.Array2d, cutoff: float = 0.05) -> tp.Array1d:
@@ -578,7 +578,7 @@ def cond_value_at_risk_noarr_1d_nb(rets: tp.Array1d, cutoff: float = 0.05) -> fl
 @register_chunkable(
     size=ch.ArraySizer(arg_query="rets", axis=1),
     arg_take_spec=dict(rets=ch.ArraySlicer(axis=1), cutoff=None),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def cond_value_at_risk_nb(rets: tp.Array2d, cutoff: float = 0.05) -> tp.Array1d:
@@ -614,7 +614,7 @@ def capture_1d_nb(
         period=None,
         log_returns=None,
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def capture_nb(
@@ -698,7 +698,7 @@ def up_capture_1d_nb(
         period=None,
         log_returns=None,
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def up_capture_nb(
@@ -788,7 +788,7 @@ def down_capture_1d_nb(
         period=None,
         log_returns=None,
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def down_capture_nb(
@@ -881,7 +881,7 @@ def rolling_sharpe_acc_nb(in_state: RollSharpeAIS) -> RollSharpeAOS:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="returns", axis=1),
     arg_take_spec=dict(returns=ch.ArraySlicer(axis=1), window=None, ann_factor=None, minp=None, ddof=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def rolling_sharpe_ratio_nb(

@@ -424,34 +424,6 @@ def param_product_to_objs(obj: tp.Any, param_product: dict) -> tp.List[dict]:
     return new_objs
 
 
-def row_stack_merge_func(results: tp.List[tp.AnyArray], param_index: tp.Index) -> tp.MaybeTuple[tp.SeriesFrame]:
-    """Merge multiple Pandas objects along rows."""
-    from vectorbtpro.base.wrapping import Wrapping
-
-    if isinstance(results[0], (tuple, list, List)):
-        if len(results[0]) == 1:
-            return row_stack_merge_func(list(map(lambda x: x[0], results)), param_index),
-        return tuple(map(lambda x: row_stack_merge_func(x, param_index), zip(*results)))
-    if isinstance(results[0], Wrapping):
-        raise TypeError("Stacking wrapping instances along rows is not supported")
-    if not checks.is_iterable(results[0]) or isinstance(results[0], str):
-        return pd.Series(results, index=param_index)
-    return pd.concat(results, axis=0, keys=param_index)
-
-
-def column_stack_merge_func(results: tp.List[tp.AnyArray], param_index: tp.Index) -> tp.MaybeTuple[tp.Frame]:
-    """Merge multiple Pandas or `vectorbtpro.base.wrapping.Wrapping` objects along columns."""
-    from vectorbtpro.base.wrapping import Wrapping
-
-    if isinstance(results[0], (tuple, list, List)):
-        if len(results[0]) == 1:
-            return column_stack_merge_func(list(map(lambda x: x[0], results)), param_index),
-        return tuple(map(lambda x: column_stack_merge_func(x, param_index), zip(*results)))
-    if isinstance(results[0], Wrapping):
-        return type(results[0]).column_stack(results, wrapper_kwargs=dict(keys=param_index))
-    return pd.concat(results, axis=1, keys=param_index)
-
-
 def parameterized(
     *args,
     search_except_types: tp.Optional[tp.Sequence[type]] = None,
@@ -501,8 +473,9 @@ def parameterized(
 
     Argument `merge_func` also accepts one of the following strings:
 
-    * 'concat' or 'row_stack': use `row_stack_merge_func`
-    * 'column_stack': use `column_stack_merge_func`
+    * 'concat': uses `vectorbtpro.base.merging.concat_merge`
+    * 'row_stack': uses `vectorbtpro.base.merging.row_stack_merge`
+    * 'column_stack': uses `vectorbtpro.base.merging.column_stack_merge`
 
     When defining a custom merging function, make sure to use `param_index` (via templates) to build the final
     index/column hierarchy.
@@ -826,15 +799,11 @@ def parameterized(
             # Merge the results
             if merge_func is not None:
                 template_context["funcs_args"] = funcs_args
-                if isinstance(merge_func, str):
-                    if merge_func in ("concat", "row_stack"):
-                        merge_func = row_stack_merge_func
-                        merge_kwargs = dict(param_index=param_index)
-                    elif merge_func == "column_stack":
-                        merge_func = column_stack_merge_func
-                        merge_kwargs = dict(param_index=param_index)
-                    else:
-                        raise ValueError(f"Merge function '{merge_func}' is not supported")
+                if isinstance(merge_func, (str, tuple)):
+                    from vectorbtpro.base.merging import resolve_merge_func
+
+                    merge_func = resolve_merge_func(merge_func)
+                    merge_kwargs = {**dict(keys=param_index), **merge_kwargs}
                 merge_kwargs = deep_substitute(merge_kwargs, template_context, sub_id="merge_kwargs")
                 return merge_func(results, **merge_kwargs)
             return results

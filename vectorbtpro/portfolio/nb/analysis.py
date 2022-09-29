@@ -51,7 +51,7 @@ def get_short_size_nb(position_before: float, position_now: float) -> float:
         init_position=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
         direction=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def asset_flow_nb(
@@ -103,7 +103,7 @@ def asset_flow_nb(
 @register_chunkable(
     size=ch.ArraySizer(arg_query="asset_flow", axis=1),
     arg_take_spec=dict(asset_flow=ch.ArraySlicer(axis=1), init_position=base_ch.FlexArraySlicer(axis=1, flex_2d=True)),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def assets_nb(asset_flow: tp.Array2d, init_position: tp.FlexArray = np.asarray(0.0)) -> tp.Array2d:
@@ -187,7 +187,7 @@ def get_free_cash_diff_nb(
         cash_earnings=base_ch.FlexArraySlicer(axis=1),
         flex_2d=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def cash_flow_nb(
@@ -243,7 +243,7 @@ def cash_flow_nb(
 @register_chunkable(
     size=ch.ArraySizer(arg_query="group_lens", axis=0),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper), group_lens=ch.ArraySlicer(axis=0)),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def sum_grouped_nb(arr: tp.Array2d, group_lens: tp.Array1d) -> tp.Array2d:
@@ -274,7 +274,7 @@ def cash_flow_grouped_nb(cash_flow: tp.Array2d, group_lens: tp.Array1d) -> tp.Ar
         cash_deposits=base_ch.FlexArraySlicer(axis=1),
         flex_2d=None,
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def align_init_cash_nb(
@@ -359,7 +359,7 @@ def init_cash_nb(
         cash_sharing=None,
         flex_2d=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def cash_deposits_grouped_nb(
@@ -399,7 +399,7 @@ def cash_deposits_grouped_nb(
         split_shared=None,
         flex_2d=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def cash_deposits_nb(
@@ -440,7 +440,7 @@ def cash_deposits_nb(
         cash_deposits=base_ch.FlexArraySlicer(axis=1),
         flex_2d=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def cash_nb(
@@ -473,7 +473,7 @@ def cash_nb(
         cash_deposits_grouped=base_ch.FlexArraySlicer(axis=1),
         flex_2d=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def cash_grouped_nb(
@@ -565,7 +565,7 @@ def asset_value_grouped_nb(asset_value: tp.Array2d, group_lens: tp.Array1d) -> t
 @register_chunkable(
     size=ch.ArraySizer(arg_query="asset_value", axis=1),
     arg_take_spec=dict(asset_value=ch.ArraySlicer(axis=1), cash=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def gross_exposure_nb(asset_value: tp.Array2d, cash: tp.Array2d) -> tp.Array2d:
@@ -594,7 +594,7 @@ def value_nb(cash: tp.Array2d, asset_value: tp.Array2d) -> tp.Array2d:
         value=ch.ArraySlicer(axis=1),
         group_lens=ch.ArraySlicer(axis=0),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def allocations_nb(
@@ -630,7 +630,7 @@ def allocations_nb(
         cash_earnings=base_ch.FlexArraySlicer(axis=1),
         flex_2d=None,
     ),
-    merge_func=base_ch.concat,
+    merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def total_profit_nb(
@@ -720,7 +720,7 @@ def total_profit_grouped_nb(total_profit: tp.Array1d, group_lens: tp.Array1d) ->
         log_returns=None,
         flex_2d=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def returns_nb(
@@ -759,7 +759,7 @@ def get_asset_pnl_nb(
         asset_value=ch.ArraySlicer(axis=1),
         cash_flow=ch.ArraySlicer(axis=1),
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def asset_pnl_nb(
@@ -806,7 +806,7 @@ def get_asset_return_nb(
         cash_flow=ch.ArraySlicer(axis=1),
         log_returns=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def asset_returns_nb(
@@ -842,7 +842,7 @@ def asset_returns_nb(
         cash_deposits=base_ch.FlexArraySlicer(axis=1),
         flex_2d=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def market_value_nb(
@@ -872,7 +872,7 @@ def market_value_nb(
         cash_deposits=base_ch.FlexArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
         flex_2d=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def market_value_grouped_nb(

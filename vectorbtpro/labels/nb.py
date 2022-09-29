@@ -25,7 +25,7 @@ from vectorbtpro.utils import chunking as ch
 @register_chunkable(
     size=ch.ArraySizer(arg_query="close", axis=1),
     arg_take_spec=dict(close=ch.ArraySlicer(axis=1), window=None, wtype=None, wait=None, adjust=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True)
 def future_mean_nb(close: tp.Array2d, window: int, wtype: int, wait: int = 1, adjust: bool = False) -> tp.Array2d:
@@ -39,7 +39,7 @@ def future_mean_nb(close: tp.Array2d, window: int, wtype: int, wait: int = 1, ad
 @register_chunkable(
     size=ch.ArraySizer(arg_query="close", axis=1),
     arg_take_spec=dict(close=ch.ArraySlicer(axis=1), window=None, wtype=None, wait=None, adjust=None, ddof=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True)
 def future_std_nb(
@@ -60,7 +60,7 @@ def future_std_nb(
 @register_chunkable(
     size=ch.ArraySizer(arg_query="close", axis=1),
     arg_take_spec=dict(close=ch.ArraySlicer(axis=1), window=None, wait=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True)
 def future_min_nb(close: tp.Array2d, window: int, wait: int = 1) -> tp.Array2d:
@@ -74,7 +74,7 @@ def future_min_nb(close: tp.Array2d, window: int, wait: int = 1) -> tp.Array2d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="close", axis=1),
     arg_take_spec=dict(close=ch.ArraySlicer(axis=1), window=None, wait=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True)
 def future_max_nb(close: tp.Array2d, window: int, wait: int = 1) -> tp.Array2d:
@@ -88,7 +88,7 @@ def future_max_nb(close: tp.Array2d, window: int, wait: int = 1) -> tp.Array2d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="close", axis=1),
     arg_take_spec=dict(close=ch.ArraySlicer(axis=1), n=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True)
 def fixed_labels_nb(close: tp.Array2d, n: int) -> tp.Array2d:
@@ -99,7 +99,7 @@ def fixed_labels_nb(close: tp.Array2d, n: int) -> tp.Array2d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="close", axis=1),
     arg_take_spec=dict(close=ch.ArraySlicer(axis=1), window=None, wtype=None, wait=None, adjust=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True)
 def mean_labels_nb(close: tp.Array2d, window: int, wtype: int, wait: int = 1, adjust: bool = False) -> tp.Array2d:
@@ -129,7 +129,7 @@ def get_symmetric_down_th_nb(up_th: tp.FlexArray) -> tp.FlexArray:
         down_th=base_ch.FlexArraySlicer(axis=1),
         flex_2d=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def local_extrema_nb(close: tp.Array2d, up_th: tp.FlexArray, down_th: tp.FlexArray, flex_2d: bool = False) -> tp.Array2d:
@@ -193,7 +193,7 @@ def local_extrema_nb(close: tp.Array2d, up_th: tp.FlexArray, down_th: tp.FlexArr
 @register_chunkable(
     size=ch.ArraySizer(arg_query="close", axis=1),
     arg_take_spec=dict(close=ch.ArraySlicer(axis=1), local_extrema=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def bn_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d) -> tp.Array2d:
@@ -220,7 +220,7 @@ def bn_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d) -> tp.Array
 @register_chunkable(
     size=ch.ArraySizer(arg_query="close", axis=1),
     arg_take_spec=dict(close=ch.ArraySlicer(axis=1), local_extrema=ch.ArraySlicer(axis=1)),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def bn_cont_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d) -> tp.Array2d:
@@ -252,7 +252,7 @@ def bn_cont_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d) -> tp.
         down_th=base_ch.FlexArraySlicer(axis=1),
         flex_2d=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def bn_cont_sat_trend_labels_nb(
@@ -309,7 +309,7 @@ def bn_cont_sat_trend_labels_nb(
 @register_chunkable(
     size=ch.ArraySizer(arg_query="close", axis=1),
     arg_take_spec=dict(close=ch.ArraySlicer(axis=1), local_extrema=ch.ArraySlicer(axis=1), normalize=None),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def pct_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d, normalize: bool) -> tp.Array2d:
@@ -343,7 +343,7 @@ def pct_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d, normalize:
         mode=None,
         flex_2d=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True)
 def trend_labels_nb(
@@ -378,7 +378,7 @@ def trend_labels_nb(
         wait=None,
         flex_2d=None,
     ),
-    merge_func=base_ch.column_stack,
+    merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def breakout_labels_nb(

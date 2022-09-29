@@ -3,12 +3,12 @@
 """Engines for executing functions."""
 
 import multiprocessing
+import concurrent.futures
 import gc
 
 from numba.core.registry import CPUDispatcher
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.registries.ca_registry import CAQueryDelegator
 from vectorbtpro.utils.config import merge_dicts, Configured
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.parsing import get_func_arg_names
@@ -100,6 +100,8 @@ class SequenceEngine(ExecutionEngine):
         return self._collect_garbage
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
+        from vectorbtpro.registries.ca_registry import CAQueryDelegator
+
         results = []
         if n_calls is None and hasattr(funcs_args, "__len__"):
             n_calls = len(funcs_args)
@@ -118,6 +120,74 @@ class SequenceEngine(ExecutionEngine):
                     gc.collect()
 
         return results
+
+
+class ThreadPoolEngine(ExecutionEngine):
+    """Class for executing functions using `ThreadPoolExecutor` from `concurrent.futures`.
+
+    For defaults, see `engines.threadpool` in `vectorbtpro._settings.execution`."""
+
+    def __init__(self, init_kwargs: tp.KwargsLike = None) -> None:
+        from vectorbtpro._settings import settings
+
+        threadpool_cfg = settings["execution"]["engines"]["threadpool"]
+
+        init_kwargs = merge_dicts(init_kwargs, threadpool_cfg["init_kwargs"])
+
+        self._init_kwargs = init_kwargs
+
+        ExecutionEngine.__init__(self, init_kwargs=init_kwargs)
+
+    @property
+    def init_kwargs(self) -> tp.Kwargs:
+        """Keyword arguments used to initialize `ThreadPoolExecutor`."""
+        return self._init_kwargs
+
+    def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
+        with concurrent.futures.ThreadPoolExecutor(**self.init_kwargs) as executor:
+            futures = {executor.submit(func, *args, **kwargs): i for i, (func, args, kwargs) in enumerate(funcs_args)}
+            results = [None] * len(futures)
+            for fut in concurrent.futures.as_completed(futures):
+                results[futures[fut]] = fut.result()
+            return results
+
+
+def _process_chunk(chunk):
+    """Process a chunk."""
+    return [func(*args, **kwargs) for func, args, kwargs in chunk]
+
+
+class ProcessPoolEngine(ExecutionEngine):
+    """Class for executing functions using `ProcessPoolExecutor` from `concurrent.futures`.
+
+    For defaults, see `engines.processpool` in `vectorbtpro._settings.execution`."""
+
+    def __init__(self, init_kwargs: tp.KwargsLike = None) -> None:
+        from vectorbtpro._settings import settings
+
+        processpool_cfg = settings["execution"]["engines"]["processpool"]
+
+        init_kwargs = merge_dicts(init_kwargs, processpool_cfg["init_kwargs"])
+
+        self._init_kwargs = init_kwargs
+
+        ExecutionEngine.__init__(self, init_kwargs=init_kwargs)
+
+    @property
+    def init_kwargs(self) -> tp.Kwargs:
+        """Keyword arguments used to initialize `ProcessPoolExecutor`."""
+        return self._init_kwargs
+
+    def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
+        with concurrent.futures.ProcessPoolExecutor(**self.init_kwargs) as executor:
+            futures = {
+                executor.submit(func, *args, **kwargs): i
+                for i, (func, args, kwargs) in enumerate(funcs_args)
+            }
+            results = [None] * len(futures)
+            for fut in concurrent.futures.as_completed(futures):
+                results[futures[fut]] = fut.result()
+            return results
 
 
 class DaskEngine(ExecutionEngine):
