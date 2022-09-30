@@ -70,7 +70,7 @@ class Accessor:
             return self._accessor
         if isinstance(obj, (pd.Index, pd.Series, pd.DataFrame)):
             accessor_obj = self._accessor(obj)
-        elif isinstance(obj, Configured):
+        elif issubclass(self._accessor, type(obj)):
             accessor_obj = obj.replace(cls_=self._accessor)
         else:
             accessor_obj = self._accessor(obj.obj)
@@ -92,7 +92,7 @@ class CachedAccessor:
             return self._accessor
         if isinstance(obj, (pd.Index, pd.Series, pd.DataFrame)):
             accessor_obj = self._accessor(obj)
-        elif isinstance(obj, Configured):
+        elif issubclass(self._accessor, type(obj)):
             accessor_obj = obj.replace(cls_=self._accessor)
         else:
             accessor_obj = self._accessor(obj.obj)
