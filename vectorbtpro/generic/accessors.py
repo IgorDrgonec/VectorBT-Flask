@@ -4331,7 +4331,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
         """Create a heatmap figure based on object's multi-index and values.
 
-        If index is not a multi-index, calls `GenericDFAccessor.heatmap`.
+        If the object is two-dimensional or the index is not a multi-index, returns a regular heatmap.
 
         If multi-index contains more than two levels or you want them in specific order,
         pass `x_level` and `y_level`, each (`int` if index or `str` if name) corresponding
@@ -4375,30 +4375,28 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """
         from vectorbtpro.generic.plotting import Heatmap
 
-        if not isinstance(self.wrapper.index, pd.MultiIndex):
-            if column is not None:
-                _self = self.select_col(column=column)
-            else:
-                _self = self
+        if column is not None:
+            _self = self.select_col(column=column)
+        else:
+            _self = self
+        if _self.ndim == 2 or not isinstance(self.wrapper.index, pd.MultiIndex):
             if x_labels is None:
                 x_labels = _self.wrapper.columns
             if y_labels is None:
                 y_labels = _self.wrapper.index
-            heatmap = Heatmap(data=_self.to_2d_array(), x_labels=x_labels, y_labels=y_labels, **kwargs)
+            heatmap = Heatmap(data=_self.to_2d_array(), x_labels=x_labels, y_labels=y_labels, fig=fig, **kwargs)
             if return_fig:
                 return heatmap.fig
             return heatmap
-        else:
-            self_col = self.select_col(column=column)
 
         (x_level, y_level), (slider_level,) = indexes.pick_levels(
-            self_col.wrapper.index,
+            _self.wrapper.index,
             required_levels=(x_level, y_level),
             optional_levels=(slider_level,),
         )
 
-        x_level_vals = self_col.wrapper.index.get_level_values(x_level)
-        y_level_vals = self_col.wrapper.index.get_level_values(y_level)
+        x_level_vals = _self.wrapper.index.get_level_values(x_level)
+        y_level_vals = _self.wrapper.index.get_level_values(y_level)
         x_name = x_level_vals.name if x_level_vals.name is not None else "x"
         y_name = y_level_vals.name if y_level_vals.name is not None else "y"
         kwargs = merge_dicts(
@@ -4414,7 +4412,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         if slider_level is None:
             # No grouping
-            df = self_col.unstack_to_df(index_levels=y_level, column_levels=x_level, symmetric=symmetric, sort=sort)
+            df = _self.unstack_to_df(index_levels=y_level, column_levels=x_level, symmetric=symmetric, sort=sort)
             return df.vbt.heatmap(x_labels=x_labels, y_labels=y_labels, fig=fig, return_fig=return_fig, **kwargs)
 
         # Requires grouping
@@ -4422,7 +4420,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         if not return_fig:
             raise ValueError("Cannot use return_fig=False and slider_level simultaneously")
         _slider_labels = []
-        for i, (name, group) in enumerate(self_col.obj.groupby(level=slider_level)):
+        for i, (name, group) in enumerate(_self.obj.groupby(level=slider_level)):
             if slider_labels is not None:
                 name = slider_labels[i]
             _slider_labels.append(name)
@@ -4452,8 +4450,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             step["args"][0]["visible"][i] = True
             steps.append(step)
         prefix = (
-            f"{self_col.wrapper.index.names[slider_level]}: "
-            if self_col.wrapper.index.names[slider_level] is not None
+            f"{_self.wrapper.index.names[slider_level]}: "
+            if _self.wrapper.index.names[slider_level] is not None
             else None
         )
         sliders = [dict(active=active, currentvalue={"prefix": prefix}, pad={"t": 50}, steps=steps)]
@@ -4731,85 +4729,31 @@ class GenericAccessor(BaseAccessor, Analyzable):
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
-        obj = self.select_col_from_obj(self.obj, column=column)
+        self_col = self.select_col(column=column)
         if plot_obj:
             # Plot object
-            fig = obj.vbt.lineplot(
+            fig = self_col.lineplot(
                 trace_kwargs=obj_trace_kwargs,
                 add_trace_kwargs=add_trace_kwargs,
                 fig=fig,
             )
 
         # Reconstruct pattern and max error bands
-        # Must do the same and in the same order as in the pattern similarity function!
-        pattern = reshaping.to_1d_array(pattern)
-        max_error = np.broadcast_to(max_error, (len(pattern),))
-        # Rescale for calculations
-        if obj.shape[0] < pattern.shape[0]:
-            obj = nb.interp_resize_1d_nb(
-                obj,
-                len(pattern),
-                interp_mode,
-            )
-        elif pattern.shape[0] < obj.shape[0]:
-            pattern = nb.interp_resize_1d_nb(
-                pattern,
-                len(obj),
-                interp_mode,
-            )
-            max_error = nb.interp_resize_1d_nb(
-                max_error,
-                len(obj),
-                max_error_interp_mode,
-            )
-        if np.isnan(vmin):
-            vmin = np.nanmin(obj)
-        else:
-            vmin = vmin
-        if np.isnan(vmax):
-            vmax = np.nanmax(obj)
-        else:
-            vmax = vmax
-        if np.isnan(pmin):
-            pmin = np.nanmin(pattern)
-        else:
-            pmin = pmin
-        if np.isnan(pmax):
-            pmax = np.nanmax(pattern)
-        else:
-            pmax = pmax
-        if invert:
-            pattern = pmax + pmin - pattern
-        if rescale_mode == RescaleMode.Rebase:
-            if not np.isnan(pmin):
-                pmin = pmin / pattern[0] * obj.values[0]
-            if not np.isnan(pmax):
-                pmax = pmax / pattern[0] * obj.values[0]
-        if rescale_mode == RescaleMode.Rebase:
-            pattern = pattern / pattern[0] * obj.values[0]
-            max_error = max_error * pattern
-        pattern = np.clip(pattern, pmin, pmax)
-        if rescale_mode == RescaleMode.MinMax:
-            pattern = rescale(pattern, (pmin, pmax), (vmin, vmax))
-            if error_type == ErrorType.Absolute:
-                max_error = max_error / (pmax - pmin) * (vmax - vmin)
-            else:
-                max_error = max_error * pattern
-        if pattern.shape[0] != len(obj):
-            # Rescale for plotting
-            pattern = nb.interp_resize_1d_nb(
-                pattern,
-                len(obj),
-                InterpMode.Linear,
-            )
-            max_error = nb.interp_resize_1d_nb(
-                max_error,
-                len(obj),
-                InterpMode.Linear,
-            )
-        pattern_sr = pd.Series(pattern, index=obj.index)
-        max_error_sr = pd.Series(max_error, index=obj.index)
+        pattern_sr, max_error_sr = self_col.fit_pattern(
+            pattern,
+            interp_mode=interp_mode,
+            rescale_mode=rescale_mode,
+            vmin=vmin,
+            vmax=vmax,
+            pmin=pmin,
+            pmax=pmax,
+            invert=invert,
+            error_type=error_type,
+            max_error=max_error,
+            max_error_interp_mode=max_error_interp_mode,
+        )
 
+        # Plot pattern and max error bands
         def_pattern_trace_kwargs = dict(
             name=f"Pattern",
             connectgaps=True,
@@ -4951,6 +4895,54 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
     def __init__(self, obj: tp.Series, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> None:
         BaseSRAccessor.__init__(self, obj, **kwargs)
         GenericAccessor.__init__(self, obj, mapping=mapping, **kwargs)
+
+    def fit_pattern(
+        self,
+        pattern: tp.ArrayLike,
+        interp_mode: tp.Union[int, str] = "mixed",
+        rescale_mode: tp.Union[int, str] = "minmax",
+        vmin: float = np.nan,
+        vmax: float = np.nan,
+        pmin: float = np.nan,
+        pmax: float = np.nan,
+        invert: bool = False,
+        error_type: tp.Union[int, str] = "absolute",
+        max_error: tp.ArrayLike = np.nan,
+        max_error_interp_mode: tp.Union[None, int, str] = None,
+        jitted: tp.JittedOption = None,
+    ) -> tp.Tuple[tp.Series, tp.Series]:
+        """See `vectorbtpro.generic.nb.patterns.fit_pattern_nb`."""
+        if isinstance(interp_mode, str):
+            interp_mode = map_enum_fields(interp_mode, InterpMode)
+        if isinstance(rescale_mode, str):
+            rescale_mode = map_enum_fields(rescale_mode, RescaleMode)
+        if isinstance(error_type, str):
+            error_type = map_enum_fields(error_type, ErrorType)
+        if max_error_interp_mode is not None and isinstance(max_error_interp_mode, str):
+            max_error_interp_mode = map_enum_fields(max_error_interp_mode, InterpMode)
+        if max_error_interp_mode is None:
+            max_error_interp_mode = interp_mode
+        pattern = reshaping.to_1d_array(pattern)
+        max_error = np.broadcast_to(max_error, (len(pattern),))
+
+        func = jit_reg.resolve_option(nb.fit_pattern_nb, jitted)
+        fit_pattern, fit_max_error = func(
+            self.to_1d_array(),
+            pattern,
+            interp_mode=interp_mode,
+            rescale_mode=rescale_mode,
+            vmin=vmin,
+            vmax=vmax,
+            pmin=pmin,
+            pmax=pmax,
+            invert=invert,
+            error_type=error_type,
+            max_error=max_error,
+            max_error_interp_mode=max_error_interp_mode,
+        )
+        pattern_sr = self.wrapper.wrap(fit_pattern)
+        max_error_sr = self.wrapper.wrap(fit_max_error)
+        return pattern_sr, max_error_sr
 
     def to_renko(
         self,

@@ -8,6 +8,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.generic.enums import RescaleMode, InterpMode, ErrorType, DistanceMeasure
 from vectorbtpro.base.indexing import flex_select_auto_nb
+from vectorbtpro.utils.array_ import rescale_nb
 
 
 @register_jitted(cache=True)
@@ -104,6 +105,77 @@ def interp_resize_1d_nb(arr: tp.Array1d, target_size: int, interp_mode: int) -> 
     for i in range(target_size):
         out[i] = interp_nb(arr, i, arr.shape[0], target_size, interp_mode)
     return out
+
+
+@register_jitted(cache=True)
+def fit_pattern_nb(
+    arr: tp.Array1d,
+    pattern: tp.Array1d,
+    interp_mode: int = InterpMode.Mixed,
+    rescale_mode: int = RescaleMode.MinMax,
+    vmin: float = np.nan,
+    vmax: float = np.nan,
+    pmin: float = np.nan,
+    pmax: float = np.nan,
+    invert: bool = False,
+    error_type: int = ErrorType.Absolute,
+    max_error: tp.FlexArray = np.asarray(np.nan),
+    max_error_interp_mode: tp.Optional[int] = None,
+) -> tp.Tuple[tp.Array1d, tp.Array1d]:
+    """Fit pattern.
+
+    Returns the resized and rescaled pattern and max error."""
+    fit_arr = arr.astype(np.float_)
+    if fit_arr.shape[0] == pattern.shape[0]:
+        fit_pattern = pattern.astype(np.float_)
+        fit_max_error = np.empty_like(fit_pattern)
+        for i in range(fit_max_error.shape[0]):
+            fit_max_error[i] = flex_select_auto_nb(max_error, i)
+    else:
+        fit_pattern = interp_resize_1d_nb(
+            pattern,
+            len(fit_arr),
+            interp_mode,
+        )
+        fit_max_error = interp_resize_1d_nb(
+            max_error,
+            len(fit_arr),
+            max_error_interp_mode,
+        )
+    if np.isnan(vmin):
+        vmin = np.nanmin(fit_arr)
+    else:
+        vmin = vmin
+    if np.isnan(vmax):
+        vmax = np.nanmax(fit_arr)
+    else:
+        vmax = vmax
+    if np.isnan(pmin):
+        pmin = np.nanmin(fit_pattern)
+    else:
+        pmin = pmin
+    if np.isnan(pmax):
+        pmax = np.nanmax(fit_pattern)
+    else:
+        pmax = pmax
+    if invert:
+        fit_pattern = pmax + pmin - fit_pattern
+    if rescale_mode == RescaleMode.Rebase:
+        if not np.isnan(pmin):
+            pmin = pmin / fit_pattern[0] * fit_arr[0]
+        if not np.isnan(pmax):
+            pmax = pmax / fit_pattern[0] * fit_arr[0]
+    if rescale_mode == RescaleMode.Rebase:
+        fit_pattern = fit_pattern / fit_pattern[0] * fit_arr[0]
+        fit_max_error = fit_max_error * fit_pattern
+    fit_pattern = np.clip(fit_pattern, pmin, pmax)
+    if rescale_mode == RescaleMode.MinMax:
+        fit_pattern = rescale_nb(fit_pattern, (pmin, pmax), (vmin, vmax))
+        if error_type == ErrorType.Absolute:
+            fit_max_error = fit_max_error / (pmax - pmin) * (vmax - vmin)
+        else:
+            fit_max_error = fit_max_error * fit_pattern
+    return fit_pattern, fit_max_error
 
 
 @register_jitted(cache=True)
