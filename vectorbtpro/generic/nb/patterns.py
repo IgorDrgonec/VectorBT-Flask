@@ -125,29 +125,22 @@ def fit_pattern_nb(
     """Fit pattern.
 
     Returns the resized and rescaled pattern and max error."""
-    fit_arr = arr.astype(np.float_)
-    if fit_arr.shape[0] == pattern.shape[0]:
-        fit_pattern = pattern.astype(np.float_)
-        fit_max_error = np.empty_like(fit_pattern)
-        for i in range(fit_max_error.shape[0]):
-            fit_max_error[i] = flex_select_auto_nb(max_error, i)
-    else:
-        fit_pattern = interp_resize_1d_nb(
-            pattern,
-            len(fit_arr),
-            interp_mode,
-        )
-        fit_max_error = interp_resize_1d_nb(
-            max_error,
-            len(fit_arr),
-            max_error_interp_mode,
-        )
+    fit_pattern = interp_resize_1d_nb(
+        pattern,
+        len(arr),
+        interp_mode,
+    )
+    fit_max_error = interp_resize_1d_nb(
+        max_error,
+        len(arr),
+        max_error_interp_mode,
+    )
     if np.isnan(vmin):
-        vmin = np.nanmin(fit_arr)
+        vmin = np.nanmin(arr)
     else:
         vmin = vmin
     if np.isnan(vmax):
-        vmax = np.nanmax(fit_arr)
+        vmax = np.nanmax(arr)
     else:
         vmax = vmax
     if np.isnan(pmin):
@@ -162,11 +155,11 @@ def fit_pattern_nb(
         fit_pattern = pmax + pmin - fit_pattern
     if rescale_mode == RescaleMode.Rebase:
         if not np.isnan(pmin):
-            pmin = pmin / fit_pattern[0] * fit_arr[0]
+            pmin = pmin / fit_pattern[0] * arr[0]
         if not np.isnan(pmax):
-            pmax = pmax / fit_pattern[0] * fit_arr[0]
+            pmax = pmax / fit_pattern[0] * arr[0]
     if rescale_mode == RescaleMode.Rebase:
-        fit_pattern = fit_pattern / fit_pattern[0] * fit_arr[0]
+        fit_pattern = fit_pattern / fit_pattern[0] * arr[0]
         fit_max_error = fit_max_error * fit_pattern
     fit_pattern = np.clip(fit_pattern, pmin, pmax)
     if rescale_mode == RescaleMode.MinMax:
