@@ -661,11 +661,10 @@ data = ChildDict(
             client_config=dict(
                 username=None,
                 password=None,
-                chromedriver_path=None,
-                auto_login=True,
             ),
+            exchange=None,
             timeframe="D",
-            limit=5000,
+            limit=10000,
             fut_contract=None,
             extended_session=False,
         ),

@@ -1135,7 +1135,7 @@ class BinanceData(RemoteData):
         use_regex: bool = False,
         client: tp.Optional[BinanceClientT] = None,
         client_config: tp.KwargsLike = None,
-    ) -> tp.List[str]:
+    ) -> tp.Set[str]:
         """Get the list of symbols.
 
         Uses `CustomData.symbol_match` to check each symbol against `pattern`."""
@@ -1149,7 +1149,7 @@ class BinanceData(RemoteData):
                 if not cls.symbol_match(symbol, pattern, use_regex=use_regex):
                     continue
             all_symbols.append(symbol)
-        return sorted(all_symbols)
+        return set(all_symbols)
 
     @classmethod
     def fetch_symbol(
@@ -1395,7 +1395,7 @@ class CCXTData(RemoteData):
         use_regex: bool = False,
         exchange: tp.Optional[tp.Union[str, CCXTExchangeT]] = None,
         exchange_config: tp.Optional[tp.KwargsLike] = None,
-    ) -> tp.List[str]:
+    ) -> tp.Set[str]:
         """Get the list of symbols.
 
         Uses `CustomData.symbol_match` to check each symbol against `pattern`."""
@@ -1408,7 +1408,7 @@ class CCXTData(RemoteData):
                 if not cls.symbol_match(symbol, pattern, use_regex=use_regex):
                     continue
             all_symbols.append(symbol)
-        return sorted(all_symbols)
+        return set(all_symbols)
 
     @classmethod
     def resolve_exchange(
@@ -1776,7 +1776,7 @@ class AlpacaData(RemoteData):
         exchange: tp.Optional[str] = None,
         trading_client: tp.Optional[AlpacaClientT] = None,
         client_config: tp.KwargsLike = None,
-    ) -> tp.List[str]:
+    ) -> tp.Set[str]:
         """Get the list of symbols.
 
         Uses `CustomData.symbol_match` to check each symbol against `pattern`.
@@ -1826,7 +1826,7 @@ class AlpacaData(RemoteData):
                 if not cls.symbol_match(symbol, pattern, use_regex=use_regex):
                     continue
             all_symbols.append(symbol)
-        return sorted(all_symbols)
+        return set(all_symbols)
 
     @classmethod
     def resolve_client(
@@ -2090,7 +2090,7 @@ class PolygonData(RemoteData):
         client: tp.Optional[PolygonClientT] = None,
         client_config: tp.DictLike = None,
         **list_tickers_kwargs,
-    ) -> tp.List[str]:
+    ) -> tp.Set[str]:
         """Get the list of symbols.
 
         Uses `CustomData.symbol_match` to check each symbol against `pattern`.
@@ -2106,7 +2106,7 @@ class PolygonData(RemoteData):
                 if not cls.symbol_match(symbol, pattern, use_regex=use_regex):
                     continue
             all_symbols.append(symbol)
-        return sorted(all_symbols)
+        return set(all_symbols)
 
     @classmethod
     def resolve_client(cls, client: tp.Optional[PolygonClientT] = None, **client_config) -> PolygonClientT:
@@ -2469,7 +2469,7 @@ class AlphaVantageData(RemoteData):
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.alpha_vantage")
 
     @classmethod
-    def get_symbols(cls, keywords: str, apikey: tp.Optional[str] = None):
+    def get_symbols(cls, keywords: str, apikey: tp.Optional[str] = None) -> tp.Set[str]:
         """Get the list of symbols by searching for keywords."""
         alpha_vantage_cfg = cls.get_settings(key_id="custom")
 
@@ -2482,7 +2482,7 @@ class AlphaVantageData(RemoteData):
         query["apikey"] = apikey
         url = "https://www.alphavantage.co/query?" + urllib.parse.urlencode(query)
         df = pd.read_csv(url)
-        return sorted(df["symbol"].tolist())
+        return set(df["symbol"].tolist())
 
     @classmethod
     @lru_cache()
@@ -2992,6 +2992,21 @@ class TVData(RemoteData):
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.tv")
 
     @classmethod
+    def get_symbols(
+        cls,
+        text: str,
+        exchange: str = "",
+        client: tp.Optional[PolygonClientT] = None,
+        client_config: tp.DictLike = None,
+    ) -> tp.Set[str]:
+        """Search for symbols."""
+        if client_config is None:
+            client_config = {}
+        client = cls.resolve_client(client=client, **client_config)
+        all_symbols = client.search_symbol(text, exchange)
+        return set(map(lambda x: x["exchange"] + ":" + x["symbol"], all_symbols))
+
+    @classmethod
     def resolve_client(cls, client: tp.Optional[TvDatafeedT] = None, **client_config) -> TvDatafeedT:
         """Resolve the client.
 
@@ -3022,6 +3037,7 @@ class TVData(RemoteData):
         symbol: str,
         client: tp.Optional[TvDatafeedT] = None,
         client_config: tp.KwargsLike = None,
+        exchange: tp.Optional[str] = None,
         timeframe: tp.Optional[str] = None,
         limit: tp.Optional[int] = None,
         fut_contract: tp.Optional[int] = None,
@@ -3030,13 +3046,18 @@ class TVData(RemoteData):
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from TradingView.
 
         Args:
-            symbol (str): Symbol in format `EXCHANGE:SYMBOL`.
+            symbol (str): Symbol.
+
+                Symbol must be in the `EXCHANGE:SYMBOL` format if `exchange` is None.
             client (tvDatafeed.main.TvDatafeed): Client.
 
                 See `TVData.resolve_client`.
             client_config (dict): Client config.
 
                 See `TVData.resolve_client`.
+            exchange (str): Exchange.
+
+                Can be omitted if already provided via `symbol`.
             timeframe (str): Timeframe.
 
                 Allows human-readable strings such as "15 minutes".
@@ -3057,6 +3078,8 @@ class TVData(RemoteData):
         if client_config is None:
             client_config = {}
         client = cls.resolve_client(client=client, **client_config)
+        if exchange is None:
+            exchange = tv_cfg["exchange"]
         if timeframe is None:
             timeframe = tv_cfg["timeframe"]
         if limit is None:
@@ -3065,9 +3088,6 @@ class TVData(RemoteData):
             fut_contract = tv_cfg["fut_contract"]
         if extended_session is None:
             extended_session = tv_cfg["extended_session"]
-
-        if ":" not in symbol:
-            raise ValueError("Symbol must be in format EXCHANGE:SYMBOL")
 
         if not isinstance(timeframe, str):
             raise ValueError(f"Invalid timeframe '{timeframe}'")
@@ -3096,7 +3116,7 @@ class TVData(RemoteData):
 
         df = client.get_hist(
             symbol=symbol,
-            exchange=None,
+            exchange=exchange,
             interval=interval,
             n_bars=limit,
             fut_contract=fut_contract,
@@ -3104,6 +3124,7 @@ class TVData(RemoteData):
         )
         df.rename(
             columns={
+                "symbol": "Symbol",
                 "open": "Open",
                 "high": "High",
                 "low": "Low",
@@ -3113,6 +3134,8 @@ class TVData(RemoteData):
             inplace=True,
         )
 
+        if "Symbol" in df:
+            del df["Symbol"]
         if "Open" in df.columns:
             df["Open"] = df["Open"].astype(float)
         if "High" in df.columns:
