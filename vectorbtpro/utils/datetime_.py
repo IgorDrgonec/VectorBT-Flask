@@ -5,7 +5,6 @@
 from datetime import datetime, timezone, timedelta, tzinfo, time
 from dateutil.parser import parse
 
-import dateparser
 import numpy as np
 import pandas as pd
 from pandas.tseries.frequencies import to_offset
@@ -125,6 +124,7 @@ def try_to_datetime_index(index: tp.IndexLike, **kwargs) -> tp.Index:
     """Try converting an index to a datetime index.
 
     Keyword arguments are passed to `pd.to_datetime`."""
+    import dateparser
     from vectorbtpro._settings import settings
 
     datetime_cfg = settings["datetime"]
@@ -264,6 +264,7 @@ def to_timezone(tz: tp.TimezoneLike, to_py_timezone: tp.Optional[bool] = None, *
     If `to_py_timezone` is set to True, will convert to `datetime.timezone`. See global settings.
 
     `**kwargs` are passed to `dateparser.parse`."""
+    import dateparser
     from vectorbtpro._settings import settings
 
     datetime_cfg = settings["datetime"]
@@ -304,6 +305,7 @@ def to_tzaware_datetime(
     Raw timestamps are localized to UTC, while naive datetime is localized to `naive_tz`.
     Set `naive_tz` to None to use the default value defined under `vectorbtpro._settings.datetime`.
     To explicitly convert the datetime to a timezone, use `tz` (uses `to_timezone`)."""
+    import dateparser
     from vectorbtpro._settings import settings
 
     datetime_cfg = settings["datetime"]

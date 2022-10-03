@@ -63,7 +63,6 @@ Date
 
 import numpy as np
 import pandas as pd
-import scipy.stats as st
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.wrapping import ArrayWrapper
@@ -1186,6 +1185,7 @@ class _OLSS(OLSS):
 
             ![](/assets/images/api/OLSS.svg)
         """
+        import scipy.stats as st
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
 

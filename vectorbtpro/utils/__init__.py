@@ -57,12 +57,12 @@ from vectorbtpro.utils.schedule_ import AsyncJob, AsyncScheduler, CancelledError
 from vectorbtpro.utils.template import Sub, Rep, RepEval, RepFunc, deep_substitute
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.module_ import create__all__
+from vectorbtpro.utils.opt_packages import check_installed
+from vectorbtpro._settings import settings
 
 __blacklist__ = []
 
-try:
-    import plotly
-except ImportError:
+if not check_installed("plotly") or not settings["importing"]["plotly"]:
     __blacklist__.append("figure")
 else:
     from vectorbtpro.utils.figure import Figure, FigureWidget, make_figure, make_subplots

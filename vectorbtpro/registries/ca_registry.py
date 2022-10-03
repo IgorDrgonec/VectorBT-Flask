@@ -2335,3 +2335,7 @@ class CAQueryDelegator(CASetupDelegatorMixin):
     def child_setups(self) -> tp.Set[CABaseSetup]:
         """Get child setups by matching them using `CacheableRegistry.match_setups`."""
         return self.registry.match_setups(*self.args, **self.kwargs)
+
+
+clear_cache = CAQueryDelegator().clear_cache
+"""Clear cache globally."""

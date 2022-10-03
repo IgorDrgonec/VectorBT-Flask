@@ -105,6 +105,26 @@ __pdoc__: dict = {}
 
 _settings = {}
 
+importing = ChildDict(
+    plotly=True,
+    telegram=True,
+    quantstats=True,
+    sklearn=True,
+)
+"""_"""
+
+__pdoc__["importing"] = Sub(
+    """Sub-config with settings applied on import.
+    
+Disabling these options will make vectorbt load faster.
+
+```python
+${config_doc}
+```"""
+)
+
+_settings["importing"] = importing
+
 caching = ChildDict(
     disable=False,
     disable_whitelist=False,

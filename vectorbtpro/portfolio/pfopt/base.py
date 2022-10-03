@@ -4,7 +4,6 @@
 
 import inspect
 import warnings
-from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -33,24 +32,28 @@ from vectorbtpro.portfolio.pfopt.records import AllocRanges, AllocPoints
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
 
-if TYPE_CHECKING:
+if tp.TYPE_CHECKING:
     from vectorbtpro.portfolio.base import Portfolio as PortfolioT
 else:
     PortfolioT = tp.Any
 
 try:
-    from pypfopt.base_optimizer import BaseOptimizer
-
-    BaseOptimizerT = tp.TypeVar("BaseOptimizerT", bound=BaseOptimizer)
+    if not tp.TYPE_CHECKING:
+        raise ImportError
+    from pypfopt.base_optimizer import BaseOptimizer as BaseOptimizerT
 except ImportError as e:
     BaseOptimizerT = tp.Any
 try:
+    if not tp.TYPE_CHECKING:
+        raise ImportError
     from riskfolio import Portfolio as RPortfolio, HCPortfolio as RHCPortfolio
 
     RPortfolioT = tp.TypeVar("RPortfolioT", bound=tp.Union[RPortfolio, RHCPortfolio])
 except ImportError as e:
     RPortfolioT = tp.Any
 try:
+    if not tp.TYPE_CHECKING:
+        raise ImportError
     from universal.algo import Algo
     from universal.result import AlgoResult
 
@@ -459,6 +462,7 @@ def resolve_pypfopt_optimizer(
     from vectorbtpro.utils.opt_packages import assert_can_import
 
     assert_can_import("pypfopt")
+    from pypfopt.base_optimizer import BaseOptimizer
 
     if isinstance(optimizer, str):
         if optimizer.lower() == "efficient_frontier":

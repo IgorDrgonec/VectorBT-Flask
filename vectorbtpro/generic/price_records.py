@@ -153,7 +153,7 @@ class PriceRecords(Records):
         self._close = close
 
     def indexing_func_meta(self, *args, records_meta: tp.DictLike = None, **kwargs) -> dict:
-        """Perform indexing on `PriceRecords` and also return metadata."""
+        """Perform indexing on `PriceRecords` and return metadata."""
         if records_meta is None:
             records_meta = Records.indexing_func_meta(self, *args, **kwargs)
         prices = {}

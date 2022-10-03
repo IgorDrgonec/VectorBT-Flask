@@ -8,12 +8,13 @@ an adapter for quantstats, and other features based on returns."""
 from vectorbtpro.returns.accessors import ReturnsAccessor, ReturnsSRAccessor, ReturnsDFAccessor
 from vectorbtpro.returns.enums import *
 from vectorbtpro.utils.module_ import create__all__
+from vectorbtpro._settings import settings
 
 __blacklist__ = []
 
-try:
-    import quantstats
-except ImportError:
+from vectorbtpro.utils.opt_packages import check_installed
+
+if not check_installed("quantstats") or not settings["importing"]["quantstats"]:
     __blacklist__.append("qs_adapter")
 
 __all__ = create__all__(__name__)

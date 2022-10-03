@@ -137,7 +137,7 @@ class ColumnMapper(Wrapping):
         return new_indices, new_col_arr
 
     def indexing_func_meta(self, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> dict:
-        """Perform indexing on `ColumnMapper` and also return metadata."""
+        """Perform indexing on `ColumnMapper` and return metadata."""
         if wrapper_meta is None:
             wrapper_meta = self.wrapper.indexing_func_meta(
                 *args,

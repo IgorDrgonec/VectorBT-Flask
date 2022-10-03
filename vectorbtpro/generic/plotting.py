@@ -27,9 +27,9 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.array_ import rescale
 from vectorbtpro.utils.colors import map_value_to_cmap
 from vectorbtpro.utils.config import Configured, resolve_dict, merge_dicts
-from vectorbtpro.utils.figure import make_figure, FigureResampler, FigureWidgetResampler
+from vectorbtpro.utils.figure import make_figure
 
-__all__ = ["TraceUpdater", "Gauge", "Bar", "Scatter", "Histogram", "Box", "Heatmap", "Volume"]
+__all__ = ["clean_labels", "TraceUpdater", "Gauge", "Bar", "Scatter", "Histogram", "Box", "Heatmap", "Volume"]
 
 
 def clean_labels(labels: tp.Labels) -> tp.Labels:

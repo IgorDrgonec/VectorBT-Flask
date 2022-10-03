@@ -762,7 +762,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         return new_indices, new_records_arr
 
     def indexing_func_meta(self, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> dict:
-        """Perform indexing on `Records` and also return metadata.
+        """Perform indexing on `Records` and return metadata.
 
         By default, all fields that are mapped to index are indexed.
         To avoid indexing on some fields, set their setting `noindex` to True."""
@@ -826,7 +826,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         return new_records_arr
 
     def resample_meta(self: RecordsT, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> dict:
-        """Perform resampling on `Records` and also return metadata."""
+        """Perform resampling on `Records` and return metadata."""
         if wrapper_meta is None:
             wrapper_meta = self.wrapper.resample_meta(*args, **kwargs)
         new_records_arr = self.resample_records_arr(wrapper_meta["resampler"])

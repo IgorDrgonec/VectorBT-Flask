@@ -2,7 +2,7 @@
 
 """Modules that register objects across vectorbtpro."""
 
-from vectorbtpro.registries.ca_registry import ca_reg, CAQuery, CAQueryDelegator
+from vectorbtpro.registries.ca_registry import ca_reg, CAQuery, CAQueryDelegator, clear_cache
 from vectorbtpro.registries.ch_registry import ch_reg, register_chunkable
 from vectorbtpro.registries.jit_registry import jit_reg, register_jitted
 from vectorbtpro.utils.module_ import create__all__

@@ -719,7 +719,7 @@ class MappedArray(Analyzable):
         return Wrapping.replace(self, **kwargs)
 
     def indexing_func_meta(self, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> dict:
-        """Perform indexing on `MappedArray` and also return metadata."""
+        """Perform indexing on `MappedArray` and return metadata."""
         if wrapper_meta is None:
             wrapper_meta = self.wrapper.indexing_func_meta(
                 *args,
@@ -766,7 +766,7 @@ class MappedArray(Analyzable):
         )
 
     def resample_meta(self: MappedArrayT, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> dict:
-        """Perform resampling on `MappedArray` and also return metadata."""
+        """Perform resampling on `MappedArray` and return metadata."""
         if wrapper_meta is None:
             wrapper_meta = self.wrapper.resample_meta(*args, **kwargs)
         if isinstance(wrapper_meta["resampler"], Resampler):

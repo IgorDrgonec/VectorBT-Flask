@@ -3,7 +3,6 @@
 """Classes and functions for indexing."""
 
 import attr
-import dateparser
 from datetime import time
 
 import numpy as np
@@ -706,6 +705,8 @@ def get_index_points(
     """Translate indices or labels into index points.
 
     See `RowPoints` for argument descriptions."""
+    import dateparser
+
     if on is not None and isinstance(on, str):
         try:
             on = pd.Timestamp(on, tz=index.tzinfo)
@@ -863,6 +864,7 @@ def get_index_ranges(
     """Translate indices, labels, or bounds into index ranges.
 
     See `RowRanges` for argument descriptions."""
+    import dateparser
     from vectorbtpro.base.indexes import repeat_index
     from vectorbtpro.base.resampling.base import Resampler
 

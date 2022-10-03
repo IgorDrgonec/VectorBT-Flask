@@ -1668,11 +1668,11 @@ from vectorbtpro.utils.template import Rep, RepEval, RepFunc, deep_substitute
 from vectorbtpro.utils.chunking import ArgsTaker
 
 try:
-    import quantstats as qs
+    if not tp.TYPE_CHECKING:
+        raise ImportError
+    from vectorbtpro.returns.qs_adapter import QSAdapter as QSAdapterT
 except ImportError:
     QSAdapterT = tp.Any
-else:
-    from vectorbtpro.returns.qs_adapter import QSAdapter as QSAdapterT
 
 __pdoc__ = {}
 

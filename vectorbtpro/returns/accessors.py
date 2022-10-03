@@ -121,7 +121,6 @@ import warnings
 
 import numpy as np
 import pandas as pd
-from scipy.stats import skew, kurtosis
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.accessors import register_vbt_accessor, register_df_vbt_accessor, register_sr_vbt_accessor
@@ -720,6 +719,8 @@ class ReturnsAccessor(GenericAccessor):
 
         If `var_sharpe` is None, is calculated based on all columns.
         If `nb_trials` is None, is set to the number of columns."""
+        from scipy.stats import skew, kurtosis
+
         if risk_free is None:
             risk_free = self.defaults["risk_free"]
         if ddof is None:

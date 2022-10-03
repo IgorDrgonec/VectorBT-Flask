@@ -10,13 +10,14 @@ from vectorbtpro.generic.drawdowns import Drawdowns
 from vectorbtpro.generic.enums import *
 from vectorbtpro.generic.ranges import Ranges, PatternRanges, PSC
 from vectorbtpro.generic.splitters import RangeSplitter, RollingSplitter, ExpandingSplitter
+from vectorbtpro.generic.splitting import SSI, Splitter
 from vectorbtpro.utils.module_ import create__all__
+from vectorbtpro.utils.opt_packages import check_installed
+from vectorbtpro._settings import settings
 
 __blacklist__ = []
 
-try:
-    import plotly
-except ImportError:
+if not check_installed("plotly") or not settings["importing"]["plotly"]:
     __blacklist__.append("plotting")
 else:
     from vectorbtpro.generic.plotting import *

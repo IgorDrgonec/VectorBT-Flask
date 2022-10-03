@@ -204,21 +204,9 @@ from functools import partial
 import numpy as np
 import pandas as pd
 from pandas.core.resample import Resampler as PandasResampler
-from scipy import stats
-from sklearn.exceptions import NotFittedError
-from sklearn.preprocessing import (
-    Binarizer,
-    MinMaxScaler,
-    MaxAbsScaler,
-    Normalizer,
-    RobustScaler,
-    StandardScaler,
-    QuantileTransformer,
-    PowerTransformer,
-)
-from sklearn.utils.validation import check_is_fitted
 
 from vectorbtpro import _typing as tp
+from vectorbtpro._settings import settings
 from vectorbtpro.base import indexes, reshaping
 from vectorbtpro.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
 from vectorbtpro.base.grouping.base import Grouper
@@ -246,7 +234,6 @@ from vectorbtpro.utils.template import deep_substitute
 from vectorbtpro.utils.datetime_ import freq_to_timedelta64, try_to_datetime_index
 from vectorbtpro.utils.colors import adjust_opacity, map_value_to_cmap
 from vectorbtpro.utils.enum_ import map_enum_fields
-from vectorbtpro.utils.array_ import rescale
 
 try:
     import bottleneck as bn
@@ -322,38 +309,8 @@ __pdoc__[
 ```
 """
 
-transform_config = ReadonlyConfig(
-    {
-        "binarize": dict(transformer=Binarizer, docstring="See `sklearn.preprocessing.Binarizer`."),
-        "minmax_scale": dict(transformer=MinMaxScaler, docstring="See `sklearn.preprocessing.MinMaxScaler`."),
-        "maxabs_scale": dict(transformer=MaxAbsScaler, docstring="See `sklearn.preprocessing.MaxAbsScaler`."),
-        "normalize": dict(transformer=Normalizer, docstring="See `sklearn.preprocessing.Normalizer`."),
-        "robust_scale": dict(transformer=RobustScaler, docstring="See `sklearn.preprocessing.RobustScaler`."),
-        "scale": dict(transformer=StandardScaler, docstring="See `sklearn.preprocessing.StandardScaler`."),
-        "quantile_transform": dict(
-            transformer=QuantileTransformer,
-            docstring="See `sklearn.preprocessing.QuantileTransformer`.",
-        ),
-        "power_transform": dict(
-            transformer=PowerTransformer,
-            docstring="See `sklearn.preprocessing.PowerTransformer`.",
-        ),
-    }
-)
-"""_"""
-
-__pdoc__[
-    "transform_config"
-] = f"""Config of transform methods to be attached to `GenericAccessor`.
-
-```python
-{transform_config.prettify()}
-```
-"""
-
 
 @attach_nb_methods(nb_config)
-@attach_transform_methods(transform_config)
 class GenericAccessor(BaseAccessor, Analyzable):
     """Accessor on top of data of any type. For both, Series and DataFrames.
 
@@ -4641,8 +4598,10 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
             ![](/assets/images/api/sr_qqplot.svg)
         """
+        import scipy.stats as st
+
         obj = self.select_col_from_obj(self.obj, column=column)
-        qq = stats.probplot(obj, sparams=sparams, dist=dist)
+        qq = st.probplot(obj, sparams=sparams, dist=dist)
         fig = pd.Series(qq[0][1], index=qq[0][0]).vbt.scatterplot(fig=fig, **kwargs)
 
         if plot_line:
@@ -4883,6 +4842,52 @@ class GenericAccessor(BaseAccessor, Analyzable):
         return self._subplots
 
 
+if settings["importing"]["sklearn"]:
+    from sklearn.exceptions import NotFittedError
+    from sklearn.preprocessing import (
+        Binarizer,
+        MinMaxScaler,
+        MaxAbsScaler,
+        Normalizer,
+        RobustScaler,
+        StandardScaler,
+        QuantileTransformer,
+        PowerTransformer,
+    )
+    from sklearn.utils.validation import check_is_fitted
+
+    transform_config = ReadonlyConfig(
+        {
+            "binarize": dict(transformer=Binarizer, docstring="See `sklearn.preprocessing.Binarizer`."),
+            "minmax_scale": dict(transformer=MinMaxScaler, docstring="See `sklearn.preprocessing.MinMaxScaler`."),
+            "maxabs_scale": dict(transformer=MaxAbsScaler, docstring="See `sklearn.preprocessing.MaxAbsScaler`."),
+            "normalize": dict(transformer=Normalizer, docstring="See `sklearn.preprocessing.Normalizer`."),
+            "robust_scale": dict(transformer=RobustScaler, docstring="See `sklearn.preprocessing.RobustScaler`."),
+            "scale": dict(transformer=StandardScaler, docstring="See `sklearn.preprocessing.StandardScaler`."),
+            "quantile_transform": dict(
+                transformer=QuantileTransformer,
+                docstring="See `sklearn.preprocessing.QuantileTransformer`.",
+            ),
+            "power_transform": dict(
+                transformer=PowerTransformer,
+                docstring="See `sklearn.preprocessing.PowerTransformer`.",
+            ),
+        }
+    )
+    """_"""
+
+    __pdoc__[
+        "transform_config"
+    ] = f"""Config of transform methods to be attached to `GenericAccessor`.
+
+    ```python
+    {transform_config.prettify()}
+    ```
+    """
+
+    GenericAccessor = attach_transform_methods(transform_config)(GenericAccessor)
+
+
 GenericAccessor.override_metrics_doc(__pdoc__)
 GenericAccessor.override_subplots_doc(__pdoc__)
 
@@ -5018,10 +5023,12 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
-        if len(self.wrapper.columns) <= len(px.colors.qualitative.D3):
-            colors = px.colors.qualitative.D3
+        if fig.layout.colorway is not None:
+            colorway = fig.layout.colorway
         else:
-            colors = px.colors.qualitative.Alphabet
+            colorway = fig.layout.template.layout.colorway
+        if len(self.wrapper.columns) > len(colorway):
+            colorway = px.colors.qualitative.Alphabet
 
         pos_mask = self.obj.values > 0
         pos_mask_any = pos_mask.any()
@@ -5043,7 +5050,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
                             legendgroup="pfopt_" + str(c),
                             stackgroup="one",
                             line=dict(width=0, shape=line_shape),
-                            fillcolor=adjust_opacity(colors[c % len(colors)], 0.8),
+                            fillcolor=adjust_opacity(colorway[c % len(colorway)], 0.8),
                             showlegend=pos_showlegend,
                         ),
                         resolve_dict(trace_kwargs, i=c),
@@ -5065,7 +5072,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
                             legendgroup="pfopt_" + str(c),
                             stackgroup="two",
                             line=dict(width=0, shape=line_shape),
-                            fillcolor=adjust_opacity(colors[c % len(colors)], 0.8),
+                            fillcolor=adjust_opacity(colorway[c % len(colorway)], 0.8),
                             showlegend=neg_showlegend,
                         ),
                         resolve_dict(trace_kwargs, i=c),

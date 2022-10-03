@@ -104,7 +104,6 @@ assert_can_import("quantstats")
 from inspect import getmembers, isfunction, signature, Parameter
 
 import pandas as pd
-import quantstats as qs
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.returns.accessors import ReturnsAccessor
@@ -115,6 +114,7 @@ from vectorbtpro.utils.parsing import get_func_arg_names
 
 def attach_qs_methods(cls: tp.Type[tp.T], replace_signature: bool = True) -> tp.Type[tp.T]:
     """Class decorator to attach quantstats methods."""
+    import quantstats as qs
 
     checks.assert_subclass_of(cls, "QSAdapter")
 

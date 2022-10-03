@@ -45,22 +45,32 @@ from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.parsing import glob2re, get_func_arg_names
 
 try:
+    if not tp.TYPE_CHECKING:
+        raise ImportError
     from binance.client import Client as BinanceClientT
 except ImportError:
     BinanceClientT = tp.Any
 try:
+    if not tp.TYPE_CHECKING:
+        raise ImportError
     from ccxt.base.exchange import Exchange as CCXTExchangeT
 except ImportError:
     CCXTExchangeT = tp.Any
 try:
+    if not tp.TYPE_CHECKING:
+        raise ImportError
     from alpaca.common.rest import RESTClient as AlpacaClientT
 except ImportError:
     AlpacaClientT = tp.Any
 try:
+    if not tp.TYPE_CHECKING:
+        raise ImportError
     from polygon import RESTClient as PolygonClientT
 except ImportError:
     PolygonClientT = tp.Any
 try:
+    if not tp.TYPE_CHECKING:
+        raise ImportError
     from tvDatafeed import TvDatafeed as TvDatafeedT
 except ImportError:
     TvDatafeedT = tp.Any

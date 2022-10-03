@@ -3,12 +3,12 @@
 """Modules for messaging."""
 
 from vectorbtpro.utils.module_ import create__all__
+from vectorbtpro.utils.opt_packages import check_installed
+from vectorbtpro._settings import settings
 
 __blacklist__ = []
 
-try:
-    import telegram
-except ImportError:
+if not check_installed("telegram") or not settings["importing"]["telegram"]:
     __blacklist__.append("telegram")
 else:
     from vectorbtpro.messaging.telegram import TelegramBot

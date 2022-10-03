@@ -14,6 +14,8 @@ from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.parsing import get_func_arg_names
 
 try:
+    if not tp.TYPE_CHECKING:
+        raise ImportError
     from ray.remote_function import RemoteFunction as RemoteFunctionT
     from ray import ObjectRef as ObjectRefT
 except ImportError:

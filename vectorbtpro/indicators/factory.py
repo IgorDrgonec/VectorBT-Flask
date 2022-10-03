@@ -72,10 +72,14 @@ from vectorbtpro.utils.datetime_ import freq_to_timedelta64, infer_index_freq
 from vectorbtpro.utils.module_ import search_package_for_funcs
 
 try:
+    if not tp.TYPE_CHECKING:
+        raise ImportError
     from ta.utils import IndicatorMixin as IndicatorMixinT
 except ImportError:
     IndicatorMixinT = tp.Any
 try:
+    if not tp.TYPE_CHECKING:
+        raise ImportError
     from technical.consensus import Consensus as ConsensusT
 except ImportError:
     ConsensusT = tp.Any
