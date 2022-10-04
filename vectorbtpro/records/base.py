@@ -781,11 +781,14 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         if wrapper_meta["rows_changed"]:
             row_idxs = wrapper_meta["row_idxs"]
             index_fields = []
+            all_index_fields = []
             for field in new_records_arr.dtype.names:
                 field_mapping = self.get_field_mapping(field)
                 noindex = self.get_field_setting(field, "noindex", False)
-                if isinstance(field_mapping, str) and field_mapping == "index" and not noindex:
-                    index_fields.append(field)
+                if isinstance(field_mapping, str) and field_mapping == "index":
+                    all_index_fields.append(field)
+                    if not noindex:
+                        index_fields.append(field)
             if len(index_fields) > 0:
                 masks = []
                 for field in index_fields:
@@ -794,7 +797,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
                 mask = np.array(masks).all(axis=0)
                 new_indices = new_indices[mask]
                 new_records_arr = new_records_arr[mask]
-                for field in index_fields:
+                for field in all_index_fields:
                     new_records_arr[field] = new_records_arr[field] - row_idxs.start
         return dict(
             wrapper_meta=wrapper_meta,
