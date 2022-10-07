@@ -2312,6 +2312,11 @@ class PolygonData(RemoteData):
             )
 
         # Establish the timestamps
+        prev_end_ts = None
+        if end is not None:
+            end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
+        else:
+            end_ts = None
         if start is not None:
             start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
             first_data = _fetch(start_ts, 1)
@@ -2323,11 +2328,6 @@ class PolygonData(RemoteData):
                 start_ts = 0
         else:
             start_ts = None
-        prev_end_ts = None
-        if end is not None:
-            end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
-        else:
-            end_ts = None
 
         def _ts_to_str(ts: tp.Optional[int]) -> str:
             if ts is None:
