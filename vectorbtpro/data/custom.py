@@ -2254,6 +2254,17 @@ class PolygonData(RemoteData):
         elif unit == "Y":
             unit = "year"
 
+        # Establish the timestamps
+        if start is not None:
+            start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
+        else:
+            start_ts = None
+        if end is not None:
+            end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
+        else:
+            end_ts = None
+        prev_end_ts = None
+
         def _retry(method):
             @wraps(method)
             def retry_method(*args, **kwargs):
@@ -2310,24 +2321,6 @@ class PolygonData(RemoteData):
                     ),
                 )
             )
-
-        # Establish the timestamps
-        prev_end_ts = None
-        if end is not None:
-            end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
-        else:
-            end_ts = None
-        if start is not None:
-            start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
-            first_data = _fetch(start_ts, 1)
-            if len(first_data) == 0:
-                first_data = _fetch(0, 1)
-            if len(first_data) > 0:
-                start_ts = first_data[0]["t"]
-            else:
-                start_ts = 0
-        else:
-            start_ts = None
 
         def _ts_to_str(ts: tp.Optional[int]) -> str:
             if ts is None:
