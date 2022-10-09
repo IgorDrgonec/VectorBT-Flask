@@ -2242,9 +2242,9 @@ class SignalsAccessor(GenericAccessor):
             _self = self.select_col(column=column)
         else:
             _self = self
-        default_layout = dict()
-        default_layout["yaxis" + yref[1:]] = dict(tickmode="array", tickvals=[0, 1], ticktext=["false", "true"])
-        return _self.obj.vbt.lineplot(**merge_dicts(default_layout, kwargs))
+        default_kwargs = dict(trace_kwargs=dict(line=dict(shape="hv")))
+        default_kwargs["yaxis" + yref[1:]] = dict(tickmode="array", tickvals=[0, 1], ticktext=["false", "true"])
+        return _self.obj.vbt.lineplot(**merge_dicts(default_kwargs, kwargs))
 
     def plot_as_markers(
         self,

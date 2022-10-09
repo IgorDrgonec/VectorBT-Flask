@@ -877,3 +877,82 @@ def supertrend_nb(
             short[i, col] = out_state.short
 
     return trend, dir_, long, short
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="y", axis=1),
+    arg_take_spec=dict(
+        y=ch.ArraySlicer(axis=1),
+        lag=None,
+        factor=base_ch.FlexArraySlicer(axis=1),
+        influence=base_ch.FlexArraySlicer(axis=1),
+        down_factor=base_ch.FlexArraySlicer(axis=1),
+        std_influence=base_ch.FlexArraySlicer(axis=1),
+        flex_2d=None,
+    ),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def signal_detection_nb(
+    close: tp.Array2d,
+    lag: int,
+    factor: tp.FlexArray,
+    influence: tp.FlexArray,
+    down_factor: tp.Optional[tp.FlexArray] = None,
+    std_influence: tp.Optional[tp.FlexArray] = None,
+    flex_2d: bool = False,
+) -> tp.Tuple[tp.Array2d, tp.Array2d, tp.Array2d]:
+    """Apply function for `vectorbtpro.indicators.custom.SIGDET`."""
+    signal = np.full(close.shape, 0, dtype=np.int_)
+    close_mean_filter = close.astype(np.float_)
+    close_std_filter = close.astype(np.float_)
+    mean_filter = np.full(close.shape, np.nan, dtype=np.float_)
+    std_filter = np.full(close.shape, np.nan, dtype=np.float_)
+    upper_band = np.full(close.shape, np.nan, dtype=np.float_)
+    lower_band = np.full(close.shape, np.nan, dtype=np.float_)
+    if lag == 0:
+        raise ValueError("Lag cannot be zero")
+    if lag - 1 >= close.shape[0]:
+        raise ValueError("Lag must be smaller than close")
+
+    for col in prange(close.shape[1]):
+        mean_filter[lag - 1, col] = np.nanmean(close[:lag, col])
+        std_filter[lag - 1, col] = np.nanstd(close[:lag, col])
+
+        for i in range(lag, close.shape[0]):
+            _factor = abs(flex_select_auto_nb(factor, i, col, flex_2d))
+            if down_factor is None:
+                _down_factor = _factor
+            else:
+                _down_factor = abs(flex_select_auto_nb(down_factor, i, col, flex_2d))
+            _influence = abs(flex_select_auto_nb(influence, i, col, flex_2d))
+            if std_influence is None:
+                _std_influence = _influence
+            else:
+                _std_influence = abs(flex_select_auto_nb(std_influence, i, col, flex_2d))
+
+            up_crossed = close[i, col] - mean_filter[i - 1, col] >= _factor * std_filter[i - 1, col]
+            down_crossed = close[i, col] - mean_filter[i - 1, col] <= -_down_factor * std_filter[i - 1, col]
+            if up_crossed or down_crossed:
+                if up_crossed:
+                    signal[i, col] = 1
+                else:
+                    signal[i, col] = -1
+
+                close_mean_filter[i, col] = (
+                    _influence * close[i, col] + (1 - _influence) * close_mean_filter[i - 1, col]
+                )
+                close_std_filter[i, col] = (
+                    _std_influence * close[i, col] + (1 - _std_influence) * close_std_filter[i - 1, col]
+                )
+            else:
+                signal[i, col] = 0
+                close_mean_filter[i, col] = close[i, col]
+                close_std_filter[i, col] = close[i, col]
+
+            mean_filter[i, col] = np.nanmean(close_mean_filter[(i - lag + 1) : i + 1, col])
+            std_filter[i, col] = np.nanstd(close_std_filter[(i - lag + 1) : i + 1, col])
+            upper_band[i, col] = mean_filter[i, col] + _factor * std_filter[i - 1, col]
+            lower_band[i, col] = mean_filter[i, col] - _down_factor * std_filter[i - 1, col]
+
+    return signal, upper_band, lower_band
