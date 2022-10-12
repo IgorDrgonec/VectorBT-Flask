@@ -269,12 +269,19 @@ def range_coverage_nb(
                 temp[start_idx_arr[r] : end_idx_arr[r]] += 1
         if overlapping:
             if normalize:
-                out[col] = np.sum(temp > 1) / np.sum(temp > 0)
+                pos_temp_sum = np.sum(temp > 0)
+                if pos_temp_sum == 0:
+                    out[col] = np.nan
+                else:
+                    out[col] = np.sum(temp > 1) / pos_temp_sum
             else:
                 out[col] = np.sum(temp > 1)
         else:
             if normalize:
-                out[col] = np.sum(temp > 0) / index_lens[col]
+                if index_lens[col] == 0:
+                    out[col] = np.nan
+                else:
+                    out[col] = np.sum(temp > 0) / index_lens[col]
             else:
                 out[col] = np.sum(temp > 0)
     return out
@@ -422,7 +429,10 @@ def map_ranges_to_projections_nb(
                         else:
                             proj_out[k, i] = _start_value
                     else:
-                        proj_out[k, i] = proj_out[k, i - 1] * r_close[i] / r_close[i - 1]
+                        if r_close[i - 1] == 0:
+                            proj_out[k, i] = np.nan
+                        else:
+                            proj_out[k, i] = proj_out[k, i - 1] * r_close[i] / r_close[i - 1]
                 else:
                     proj_out[k, i] = r_close[i]
             if not np.isnan(proj_out[k, i]) and i > 0:
@@ -737,7 +747,10 @@ def drawdown_1d_nb(arr: tp.Array1d) -> tp.Array1d:
     for i in range(arr.shape[0]):
         if np.isnan(max_val) or arr[i] > max_val:
             max_val = arr[i]
-        out[i] = arr[i] / max_val - 1
+        if max_val == 0:
+            out[i] = np.nan
+        else:
+            out[i] = arr[i] / max_val - 1
     return out
 
 
@@ -959,7 +972,10 @@ def dd_drawdown_nb(peak_val_arr: tp.Array1d, valley_val_arr: tp.Array1d) -> tp.A
     """Compute the drawdown of each drawdown record."""
     out = np.empty(valley_val_arr.shape[0], dtype=np.float_)
     for r in prange(valley_val_arr.shape[0]):
-        out[r] = (valley_val_arr[r] - peak_val_arr[r]) / peak_val_arr[r]
+        if peak_val_arr[r] == 0:
+            out[r] = np.nan
+        else:
+            out[r] = (valley_val_arr[r] - peak_val_arr[r]) / peak_val_arr[r]
     return out
 
 
@@ -1009,7 +1025,10 @@ def dd_recovery_duration_ratio_nb(
     """Compute the ratio of the recovery duration to the decline duration of each drawdown record."""
     out = np.empty(start_idx_arr.shape[0], dtype=np.float_)
     for r in prange(start_idx_arr.shape[0]):
-        out[r] = (end_idx_arr[r] - valley_idx_arr[r]) / (valley_idx_arr[r] - start_idx_arr[r] + 1)
+        if valley_idx_arr[r] - start_idx_arr[r] + 1 == 0:
+            out[r] = np.nan
+        else:
+            out[r] = (end_idx_arr[r] - valley_idx_arr[r]) / (valley_idx_arr[r] - start_idx_arr[r] + 1)
     return out
 
 
@@ -1023,5 +1042,8 @@ def dd_recovery_return_nb(valley_val_arr: tp.Array1d, end_val_arr: tp.Array1d) -
     """Compute the recovery return of each drawdown record."""
     out = np.empty(end_val_arr.shape[0], dtype=np.float_)
     for r in prange(end_val_arr.shape[0]):
-        out[r] = (end_val_arr[r] - valley_val_arr[r]) / valley_val_arr[r]
+        if valley_val_arr[r] == 0:
+            out[r] = np.nan
+        else:
+            out[r] = (end_val_arr[r] - valley_val_arr[r]) / valley_val_arr[r]
     return out
