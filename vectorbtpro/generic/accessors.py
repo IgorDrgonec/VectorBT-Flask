@@ -1168,7 +1168,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     @class_or_instancemethod
     def groupby_apply(
         cls_or_self,
-        by: tp.Union[Grouper, tp.PandasGroupByLike],
+        by: tp.AnyGroupByLike,
         reduce_func_nb: tp.Union[str, tp.ReduceFunc, tp.GroupByReduceMetaFunc],
         *args,
         groupby_kwargs: tp.KwargsLike = None,
@@ -1300,7 +1300,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     @class_or_instancemethod
     def resample_apply(
         cls_or_self,
-        rule: tp.Union[Resampler, tp.PandasResampler, tp.PandasFrequencyLike],
+        rule: tp.AnyRuleLike,
         reduce_func_nb: tp.Union[str, tp.ReduceFunc, tp.GroupByReduceMetaFunc, tp.RangeReduceMetaFunc],
         *args,
         use_groupby_apply: bool = False,
@@ -3379,7 +3379,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     def split(
         self,
         splitter: SplitterT,
-        stack_kwargs: tp.KwargsLike = None,
+        index_stack_kwargs: tp.KwargsLike = None,
         keys: tp.Optional[tp.IndexLike] = None,
         plot: bool = False,
         trace_names: tp.TraceNames = None,
@@ -3463,9 +3463,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 split_columns = pd.Index(np.arange(len(split_indexes)), name="split_idx")
             split_columns = indexes.repeat_index(split_columns, len(self.wrapper.columns))
-            if stack_kwargs is None:
-                stack_kwargs = {}
-            set_df = set_df.vbt.stack_index(split_columns, **stack_kwargs)
+            if index_stack_kwargs is None:
+                index_stack_kwargs = {}
+            set_df = set_df.vbt.stack_index(split_columns, **index_stack_kwargs)
             results.append((set_df, split_indexes))
 
         if plot:
@@ -4833,7 +4833,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         return merge_dicts(Analyzable.plots_defaults.__get__(self), generic_plots_cfg)
 
-    _subplots: tp.ClassVar[Config] = Config(
+    _subplots: tp.ClassVar[Config] = HybridConfig(
         dict(plot=dict(check_is_not_grouped=True, plot_func="plot", pass_trace_names=False, tags="generic")),
     )
 

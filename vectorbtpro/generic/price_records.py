@@ -75,7 +75,11 @@ class PriceRecords(Records):
                         stack_price_objs = False
                         break
                 if stack_price_objs:
-                    kwargs[price_name] = kwargs["wrapper"].row_stack_and_wrap(*price_objs, group_by=False)
+                    kwargs[price_name] = kwargs["wrapper"].row_stack_arrs(
+                        *price_objs,
+                        group_by=False,
+                        wrap=False,
+                    )
         return kwargs
 
     @classmethod
@@ -107,10 +111,11 @@ class PriceRecords(Records):
                         stack_price_objs = False
                         break
                 if stack_price_objs:
-                    new_price = kwargs["wrapper"].column_stack_and_wrap(
+                    new_price = kwargs["wrapper"].column_stack_arrs(
                         *price_objs,
                         reindex_kwargs=reindex_kwargs,
                         group_by=False,
+                        wrap=False,
                     )
                     if price_name == "close":
                         if fbfill_close:

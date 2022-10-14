@@ -463,8 +463,8 @@ class OHLCVDFAccessor(GenericDFAccessor):
             opacity=0.75,
         )
         if plot_obj is go.Ohlc:
-            del init_ohlc_trace_kwargs["increasing"]["fillcolor"]
-            del init_ohlc_trace_kwargs["decreasing"]["fillcolor"]
+            del def_ohlc_trace_kwargs["increasing"]["fillcolor"]
+            del def_ohlc_trace_kwargs["decreasing"]["fillcolor"]
         _ohlc_trace_kwargs = merge_dicts(def_ohlc_trace_kwargs, ohlc_trace_kwargs)
         ohlc = plot_obj(**_ohlc_trace_kwargs)
         fig.add_trace(ohlc, **add_trace_kwargs)
@@ -508,7 +508,7 @@ class OHLCVDFAccessor(GenericDFAccessor):
 
         return merge_dicts(GenericAccessor.plots_defaults.__get__(self), ohlcv_plots_cfg)
 
-    _subplots: tp.ClassVar[Config] = Config(
+    _subplots: tp.ClassVar[Config] = HybridConfig(
         dict(
             plot=dict(
                 title="OHLC",

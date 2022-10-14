@@ -232,34 +232,38 @@ class BaseIDXAccessor(Configured):
 
     # ############# Grouping ############# #
 
-    def get_grouper(self, by: tp.Union[Grouper, tp.PandasGroupByLike], **kwargs) -> Grouper:
+    def get_grouper(self, by: tp.AnyGroupByLike, groupby_kwargs: tp.KwargsLike = None, **kwargs) -> Grouper:
         """Get an index grouper of type `vectorbtpro.base.grouping.base.Grouper`."""
+        if groupby_kwargs is None:
+            groupby_kwargs = {}
         if isinstance(by, Grouper):
+            if len(kwargs) > 0:
+                return by.replace(**kwargs)
             return by
         if isinstance(by, (PandasGroupBy, PandasResampler)):
-            return Grouper.from_pd_group_by(by)
+            return Grouper.from_pd_group_by(by, **kwargs)
         try:
-            return Grouper(index=self.obj, group_by=by)
+            return Grouper(index=self.obj, group_by=by, **kwargs)
         except Exception as e:
             pass
         if isinstance(self.obj, pd.DatetimeIndex):
             try:
                 by = to_offset(prepare_freq(by))
                 if by.n == 1:
-                    return Grouper(index=self.obj, group_by=self.obj.to_period(by))
+                    return Grouper(index=self.obj, group_by=self.obj.to_period(by), **kwargs)
             except Exception as e:
                 pass
             try:
-                pd_group_by = pd.Series(index=self.obj, dtype=object).resample(prepare_freq(by), **kwargs)
-                return Grouper.from_pd_group_by(pd_group_by)
+                pd_group_by = pd.Series(index=self.obj, dtype=object).resample(prepare_freq(by), **groupby_kwargs)
+                return Grouper.from_pd_group_by(pd_group_by, **kwargs)
             except Exception as e:
                 pass
-        pd_group_by = pd.Series(index=self.obj, dtype=object).groupby(by, axis=0, **kwargs)
-        return Grouper.from_pd_group_by(pd_group_by)
+        pd_group_by = pd.Series(index=self.obj, dtype=object).groupby(by, axis=0, **groupby_kwargs)
+        return Grouper.from_pd_group_by(pd_group_by, **kwargs)
 
     def get_resampler(
         self,
-        rule: tp.Union[Resampler, tp.PandasResampler, tp.PandasFrequencyLike],
+        rule: tp.AnyRuleLike,
         resample_kwargs: tp.KwargsLike = None,
         return_pd_resampler: bool = False,
     ) -> tp.Union[Resampler, tp.PandasResampler]:
@@ -283,244 +287,11 @@ class BaseIDXAccessor(Configured):
     # ############# Points and ranges ############# #
 
     def get_index_points(self, *args, **kwargs) -> tp.Array1d:
-        """See `vectorbtpro.base.indexing.get_index_points`.
-
-        Usage:
-            * Provide nothing to generate at the beginning:
-
-            ```pycon
-            >>> import vectorbtpro as vbt
-
-            >>> data = vbt.YFData.fetch("BTC-USD", start="2020-01-01", end="2020-02-01")
-            >>> index = data.wrapper.index
-
-            >>> index.vbt.get_index_points()
-            array([0])
-            ```
-
-            * Provide `every` as an integer frequency to generate index points using NumPy:
-
-            ```pycon
-            >>> # Generate a point every five rows
-            >>> index.vbt.get_index_points(every=5)
-            array([ 0,  5, 10, 15, 20, 25, 30])
-
-            >>> # Generate a point every five rows starting at 6th row
-            >>> index.vbt.get_index_points(every=5, start=5)
-            array([ 5, 10, 15, 20, 25, 30])
-
-            >>> # Generate a point every five rows from 6th to 16th row
-            >>> index.vbt.get_index_points(every=5, start=5, end=15)
-            array([ 5, 10])
-            ```
-
-            * Provide `every` as a time delta frequency to generate index points using Pandas:
-
-            ```pycon
-            >>> # Generate a point every week
-            >>> index.vbt.get_index_points(every="W")
-            array([ 5, 12, 19, 26])
-
-            >>> # Generate a point every second day of the week
-            >>> index.vbt.get_index_points(every="W", add_delta="2d")
-            array([ 7, 14, 21, 28])
-
-            >>> # Generate a point every week, starting at 11th row
-            >>> index.vbt.get_index_points(every="W", start=10)
-            array([12, 19, 26])
-
-            >>> # Generate a point every week, starting exactly at 11th row
-            >>> index.vbt.get_index_points(every="W", start=10, exact_start=True)
-            array([10, 12, 19, 26])
-
-            >>> # Generate a point every week, starting at 2020-01-10
-            >>> index.vbt.get_index_points(every="W", start="2020-01-10")
-            array([12, 19, 26])
-            ```
-
-            * Instead of using `every`, provide indices explicitly:
-
-            ```pycon
-            >>> # Generate one point
-            >>> index.vbt.get_index_points(on="2020-01-07")
-            array([7])
-
-            >>> # Generate multiple points
-            >>> index.vbt.get_index_points(on=["2020-01-07", "2020-01-14"])
-            array([ 7, 14])
-            ```
-        """
+        """See `vectorbtpro.base.indexing.get_index_points`."""
         return get_index_points(self.obj, *args, **kwargs)
 
     def get_index_ranges(self, *args, **kwargs) -> tp.Tuple[tp.Array1d, tp.Array1d]:
-        """See `vectorbtpro.base.indexing.get_index_ranges`.
-
-        Usage:
-            * Provide nothing to generate one largest index range:
-
-            ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import numpy as np
-
-            >>> data = vbt.YFData.fetch("BTC-USD", start="2020-01-01", end="2020-02-01")
-            >>> index = data.wrapper.index
-
-            >>> np.column_stack(index.vbt.get_index_ranges())
-            array([[ 0, 32]])
-            ```
-
-            * Provide `every` as an integer frequency to generate index ranges using NumPy:
-
-            ```pycon
-            >>> # Generate a range every five rows
-            >>> np.column_stack(index.vbt.get_index_ranges(every=5))
-            array([[ 0,  5],
-                   [ 5, 10],
-                   [10, 15],
-                   [15, 20],
-                   [20, 25],
-                   [25, 30]])
-
-            >>> # Generate a range every five rows, starting at 6th row
-            >>> np.column_stack(index.vbt.get_index_ranges(
-            ...     every=5,
-            ...     start=5
-            ... ))
-            array([[ 5, 10],
-                   [10, 15],
-                   [15, 20],
-                   [20, 25],
-                   [25, 30]])
-
-            >>> # Generate a range every five rows from 6th to 16th row
-            >>> np.column_stack(index.vbt.get_index_ranges(
-            ...     every=5,
-            ...     start=5,
-            ...     end=15
-            ... ))
-            array([[ 5, 10],
-                   [10, 15]])
-            ```
-
-            * Provide `every` as a time delta frequency to generate index ranges using Pandas:
-
-            ```pycon
-            >>> # Generate a range every week
-            >>> np.column_stack(index.vbt.get_index_ranges(every="W"))
-            array([[ 5, 12],
-                   [12, 19],
-                   [19, 26]])
-
-            >>> # Generate a range every second day of the week
-            >>> np.column_stack(index.vbt.get_index_ranges(
-            ...     every="W",
-            ...     add_start_delta="2d"
-            ... ))
-            array([[ 7, 12],
-                   [14, 19],
-                   [21, 26]])
-
-            >>> # Generate a range every week, starting at 11th row
-            >>> np.column_stack(index.vbt.get_index_ranges(
-            ...     every="W",
-            ...     start=10
-            ... ))
-            array([[12, 19],
-                   [19, 26]])
-
-            >>> # Generate a range every week, starting exactly at 11th row
-            >>> np.column_stack(index.vbt.get_index_ranges(
-            ...     every="W",
-            ...     start=10,
-            ...     exact_start=True
-            ... ))
-            array([[10, 12],
-                   [12, 19],
-                   [19, 26]])
-
-            >>> # Generate a range every week, starting at 2020-01-10
-            >>> np.column_stack(index.vbt.get_index_ranges(
-            ...     every="W",
-            ...     start="2020-01-10"
-            ... ))
-            array([[12, 19],
-                   [19, 26]])
-
-            >>> # Generate a range every week, each starting at 2020-01-10
-            >>> np.column_stack(index.vbt.get_index_ranges(
-            ...     every="W",
-            ...     start="2020-01-10",
-            ...     fixed_start=True
-            ... ))
-            array([[12, 19],
-                   [12, 26]])
-            ```
-
-            * Use a look-back period (instead of an end index):
-
-            ```pycon
-            >>> # Generate a range every week, looking 5 days back
-            >>> np.column_stack(index.vbt.get_index_ranges(
-            ...     every="W",
-            ...     lookback_period=5
-            ... ))
-            array([[ 0,  5],
-                   [ 7, 12],
-                   [14, 19],
-                   [21, 26]])
-
-            >>> # Generate a range every week, looking 2 weeks back
-            >>> np.column_stack(index.vbt.get_index_ranges(
-            ...     every="W",
-            ...     lookback_period="2W"
-            ... ))
-            array([[ 0, 12],
-                   [ 5, 19],
-                   [12, 26]])
-            ```
-
-            * Instead of using `every`, provide start and end indices explicitly:
-
-            ```pycon
-            >>> # Generate one range
-            >>> np.column_stack(index.vbt.get_index_ranges(
-            ...     start="2020-01-01",
-            ...     end="2020-01-07"
-            ... ))
-            array([[1, 7]])
-
-            >>> # Generate ranges between multiple dates
-            >>> np.column_stack(index.vbt.get_index_ranges(
-            ...     start=["2020-01-01", "2020-01-07"],
-            ...     end=["2020-01-07", "2020-01-14"]
-            ... ))
-            array([[ 1,  7],
-                   [ 7, 14]])
-
-            >>> # Generate ranges with a fixed start
-            >>> np.column_stack(index.vbt.get_index_ranges(
-            ...     start="2020-01-01",
-            ...     end=["2020-01-07", "2020-01-14"]
-            ... ))
-            array([[ 1,  7],
-                   [ 1, 14]])
-            ```
-
-            * Use `closed_start` and `closed_end` to exclude any of the bounds:
-
-            ```pycon
-            >>> # Generate ranges between multiple dates
-            >>> # by excluding the start date and including the end date
-            >>> np.column_stack(index.vbt.get_index_ranges(
-            ...     start=["2020-01-01", "2020-01-07"],
-            ...     end=["2020-01-07", "2020-01-14"],
-            ...     closed_start=False,
-            ...     closed_end=True
-            ... ))
-            array([[ 2,  8],
-                   [ 8, 15]])
-            ```
-        """
+        """See `vectorbtpro.base.indexing.get_index_ranges`."""
         return get_index_ranges(self.obj, self.any_freq, *args, **kwargs)
 
 
@@ -663,7 +434,7 @@ class BaseAccessor(Wrapping):
     ) -> tp.Kwargs:
         """Resolve keyword arguments for initializing `BaseAccessor` after stacking along rows."""
         if "obj" not in kwargs:
-            kwargs["obj"] = kwargs["wrapper"].row_stack_and_wrap(*[obj.obj for obj in objs], group_by=False)
+            kwargs["obj"] = kwargs["wrapper"].row_stack_arrs(*[obj.obj for obj in objs], group_by=False)
         return kwargs
 
     @classmethod
@@ -675,7 +446,7 @@ class BaseAccessor(Wrapping):
     ) -> tp.Kwargs:
         """Resolve keyword arguments for initializing `BaseAccessor` after stacking along columns."""
         if "obj" not in kwargs:
-            kwargs["obj"] = kwargs["wrapper"].column_stack_and_wrap(
+            kwargs["obj"] = kwargs["wrapper"].column_stack_arrs(
                 *[obj.obj for obj in objs],
                 reindex_kwargs=reindex_kwargs,
                 group_by=False,

@@ -25,6 +25,8 @@ from vectorbtpro.base.indexing import (
     RowRanges,
     ElemIdx,
     index_dict,
+    get_index_points,
+    get_index_ranges,
 )
 from vectorbtpro.base.reshaping import (
     to_1d_array,

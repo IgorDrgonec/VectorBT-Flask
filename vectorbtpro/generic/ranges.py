@@ -496,7 +496,7 @@ class Ranges(PriceRecords):
     def get_coverage(
         self,
         overlapping: bool = False,
-            normalize: bool = True,
+        normalize: bool = True,
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -537,7 +537,7 @@ class Ranges(PriceRecords):
         id_level: tp.Union[None, str, tp.IndexLike] = None,
         jitted: tp.JittedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
-        stack_kwargs: tp.KwargsLike = None,
+        index_stack_kwargs: tp.KwargsLike = None,
     ) -> tp.Union[tp.Tuple[tp.Array1d, tp.Array2d], tp.Frame]:
         """Generate a projection for each range record.
 
@@ -651,7 +651,7 @@ class Ranges(PriceRecords):
                 columns=stack_indexes(
                     self.wrapper.columns[self.col_arr[ridxs]],
                     id_level[ridxs],
-                    **resolve_dict(stack_kwargs),
+                    **resolve_dict(index_stack_kwargs),
                 ),
             ),
             wrap_kwargs,
@@ -1335,7 +1335,7 @@ class Ranges(PriceRecords):
 
         return merge_dicts(Records.plots_defaults.__get__(self), ranges_plots_cfg)
 
-    _subplots: tp.ClassVar[Config] = Config(
+    _subplots: tp.ClassVar[Config] = HybridConfig(
         dict(plot=dict(title="Ranges", check_is_not_grouped=True, plot_func="plot", tags="ranges")),
     )
 
@@ -1609,7 +1609,7 @@ class PatternRanges(Ranges):
         jitted: tp.JittedOption = None,
         execute_kwargs: tp.KwargsLike = None,
         attach_as_close: bool = True,
-        stack_kwargs: tp.KwargsLike = None,
+        index_stack_kwargs: tp.KwargsLike = None,
         wrapper_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> PatternRangesT:
@@ -1637,8 +1637,8 @@ class PatternRanges(Ranges):
         `**kwargs` will be passed to `PatternRanges.__init__`."""
         if seed is not None:
             set_seed(seed)
-        if stack_kwargs is None:
-            stack_kwargs = {}
+        if index_stack_kwargs is None:
+            index_stack_kwargs = {}
         arr = to_pd_array(arr)
         arr_2d = to_2d_array(arr)
         arr_wrapper = ArrayWrapper.from_obj(arr)
@@ -1687,7 +1687,7 @@ class PatternRanges(Ranges):
             param_product, param_columns = combine_params(
                 param_dct,
                 random_subset=random_subset,
-                stack_kwargs=stack_kwargs,
+                index_stack_kwargs=index_stack_kwargs,
             )
             if len(flat_search_configs) == 0:
                 flat_search_configs = []
@@ -1753,13 +1753,13 @@ class PatternRanges(Ranges):
         n_config_params = len(psc_names) // arr_2d.shape[1]
         if param_columns is not None:
             if n_config_params == 0 or (n_config_params == 1 and psc_names_none):
-                new_columns = combine_indexes((param_columns, arr_wrapper.columns), **stack_kwargs)
+                new_columns = combine_indexes((param_columns, arr_wrapper.columns), **index_stack_kwargs)
             else:
                 search_config_index = pd.Index(psc_names, name="search_config")
                 base_columns = stack_indexes(
-                    (search_config_index, tile_index(arr_wrapper.columns, n_config_params)), **stack_kwargs
+                    (search_config_index, tile_index(arr_wrapper.columns, n_config_params)), **index_stack_kwargs
                 )
-                new_columns = combine_indexes((param_columns, base_columns), **stack_kwargs)
+                new_columns = combine_indexes((param_columns, base_columns), **index_stack_kwargs)
         else:
             if n_config_params == 0 or (n_config_params == 1 and psc_names_none):
                 new_columns = arr_wrapper.columns
@@ -1767,7 +1767,7 @@ class PatternRanges(Ranges):
                 search_config_index = pd.Index(psc_names, name="search_config")
                 new_columns = stack_indexes(
                     (search_config_index, tile_index(arr_wrapper.columns, n_config_params)),
-                    **stack_kwargs,
+                    **index_stack_kwargs,
                 )
 
         # Wrap with class

@@ -2160,7 +2160,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             wrapped_objs = []
             for i, obj in enumerate(objs):
                 wrapped_objs.append(wrappers[i].wrap(obj, group_by=obj_group_by))
-            return wrapper.row_stack_and_wrap(*wrapped_objs, group_by=obj_group_by).values
+            return wrapper.row_stack_arrs(*wrapped_objs, group_by=obj_group_by, wrap=False)
         raise ValueError(f"Cannot figure out how to stack in-outputs with the name '{obj_name}' along rows")
 
     @classmethod
@@ -2249,7 +2249,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         Cash sharing must be the same among all objects.
 
         Close, benchmark close, cash deposits, cash earnings, call sequence, and other two-dimensional arrays
-        are stacked using `vectorbtpro.base.wrapping.ArrayWrapper.row_stack_and_wrap`. In-outputs
+        are stacked using `vectorbtpro.base.wrapping.ArrayWrapper.row_stack_arrs`. In-outputs
         are stacked using `Portfolio.row_stack_in_outputs`. Records are stacked using
         `vectorbtpro.records.base.Records.row_stack_records_arrs`.
 
@@ -2289,9 +2289,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         n_cols = kwargs["wrapper"].shape_2d[1]
 
         if "close" not in kwargs:
-            kwargs["close"] = kwargs["wrapper"].row_stack_and_wrap(
+            kwargs["close"] = kwargs["wrapper"].row_stack_arrs(
                 *[obj.close for obj in objs],
                 group_by=False,
+                wrap=False,
             )
         if "open" not in kwargs:
             stack_open_objs = True
@@ -2300,11 +2301,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     stack_open_objs = False
                     break
             if stack_open_objs:
-                kwargs["open"] = to_2d_array(
-                    kwargs["wrapper"].row_stack_and_wrap(
-                        *[obj.open for obj in objs],
-                        group_by=False,
-                    )
+                kwargs["open"] = kwargs["wrapper"].row_stack_arrs(
+                    *[obj.open for obj in objs],
+                    group_by=False,
+                    wrap=False,
                 )
         if "high" not in kwargs:
             stack_high_objs = True
@@ -2313,11 +2313,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     stack_high_objs = False
                     break
             if stack_high_objs:
-                kwargs["high"] = to_2d_array(
-                    kwargs["wrapper"].row_stack_and_wrap(
-                        *[obj.high for obj in objs],
-                        group_by=False,
-                    )
+                kwargs["high"] = kwargs["wrapper"].row_stack_arrs(
+                    *[obj.high for obj in objs],
+                    group_by=False,
+                    wrap=False,
                 )
         if "low" not in kwargs:
             stack_low_objs = True
@@ -2326,11 +2325,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     stack_low_objs = False
                     break
             if stack_low_objs:
-                kwargs["low"] = to_2d_array(
-                    kwargs["wrapper"].row_stack_and_wrap(
-                        *[obj.low for obj in objs],
-                        group_by=False,
-                    )
+                kwargs["low"] = kwargs["wrapper"].row_stack_arrs(
+                    *[obj.low for obj in objs],
+                    group_by=False,
+                    wrap=False,
                 )
         if "order_records" not in kwargs:
             kwargs["order_records"] = Orders.row_stack_records_arrs(*[obj.orders for obj in objs], **kwargs)
@@ -2425,11 +2423,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     stack_cash_deposits_objs = True
                     break
             if stack_cash_deposits_objs:
-                kwargs["cash_deposits"] = to_2d_array(
-                    kwargs["wrapper"].row_stack_and_wrap(
-                        *[obj.get_cash_deposits(group_by=cs_group_by) for obj in objs],
-                        group_by=cs_group_by,
-                    )
+                kwargs["cash_deposits"] = kwargs["wrapper"].row_stack_arrs(
+                    *[obj.get_cash_deposits(group_by=cs_group_by) for obj in objs],
+                    group_by=cs_group_by,
+                    wrap=False,
                 )
             else:
                 kwargs["cash_deposits"] = np.array([[0.0]])
@@ -2440,11 +2437,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     stack_cash_earnings_objs = True
                     break
             if stack_cash_earnings_objs:
-                kwargs["cash_earnings"] = to_2d_array(
-                    kwargs["wrapper"].row_stack_and_wrap(
-                        *[obj.get_cash_earnings(group_by=False) for obj in objs],
-                        group_by=False,
-                    )
+                kwargs["cash_earnings"] = kwargs["wrapper"].row_stack_arrs(
+                    *[obj.get_cash_earnings(group_by=False) for obj in objs],
+                    group_by=False,
+                    wrap=False,
                 )
             else:
                 kwargs["cash_earnings"] = np.array([[0.0]])
@@ -2455,11 +2451,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     stack_call_seq_objs = False
                     break
             if stack_call_seq_objs:
-                kwargs["call_seq"] = to_2d_array(
-                    kwargs["wrapper"].row_stack_and_wrap(
-                        *[obj.call_seq for obj in objs],
-                        group_by=False,
-                    )
+                kwargs["call_seq"] = kwargs["wrapper"].row_stack_arrs(
+                    *[obj.call_seq for obj in objs],
+                    group_by=False,
+                    wrap=False,
                 )
         if "bm_close" not in kwargs:
             stack_bm_close_objs = True
@@ -2468,11 +2463,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     stack_bm_close_objs = False
                     break
             if stack_bm_close_objs:
-                kwargs["bm_close"] = to_2d_array(
-                    kwargs["wrapper"].row_stack_and_wrap(
-                        *[obj.bm_close for obj in objs],
-                        group_by=False,
-                    )
+                kwargs["bm_close"] = kwargs["wrapper"].row_stack_arrs(
+                    *[obj.bm_close for obj in objs],
+                    group_by=False,
+                    wrap=False,
                 )
         if "in_outputs" not in kwargs:
             kwargs["in_outputs"] = cls.row_stack_in_outputs(*objs, **kwargs)
@@ -2560,11 +2554,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 wrapped_objs = []
                 for i, obj in enumerate(objs):
                     wrapped_objs.append(wrappers[i].wrap_reduced(obj, group_by=obj_group_by))
-                return wrapper.column_stack_and_wrap_reduced(*wrapped_objs, group_by=obj_group_by).values
+                return wrapper.concat_arrs(*wrapped_objs, group_by=obj_group_by).values
             wrapped_objs = []
             for i, obj in enumerate(objs):
                 wrapped_objs.append(wrappers[i].wrap(obj, group_by=obj_group_by))
-            return wrapper.column_stack_and_wrap(*wrapped_objs, group_by=obj_group_by).values
+            return wrapper.column_stack_arrs(*wrapped_objs, group_by=obj_group_by, wrap=False)
         raise ValueError(f"Cannot figure out how to stack in-outputs with the name '{obj_name}' along columns")
 
     @classmethod
@@ -2652,9 +2646,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         Cash sharing must be the same among all objects.
 
         Two-dimensional arrays are stacked using
-        `vectorbtpro.base.wrapping.ArrayWrapper.column_stack_and_wrap`
+        `vectorbtpro.base.wrapping.ArrayWrapper.column_stack_arrs`
         while one-dimensional arrays are stacked using
-        `vectorbtpro.base.wrapping.ArrayWrapper.column_stack_and_wrap_reduced`.
+        `vectorbtpro.base.wrapping.ArrayWrapper.concat_arrs`.
         In-outputs are stacked using `Portfolio.column_stack_in_outputs`. Records are stacked using
         `vectorbtpro.records.base.Records.column_stack_records_arrs`."""
         if len(objs) == 1:
@@ -2677,7 +2671,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cs_group_by = None if kwargs["cash_sharing"] else False
 
         if "close" not in kwargs:
-            new_close = kwargs["wrapper"].column_stack_and_wrap(
+            new_close = kwargs["wrapper"].column_stack_arrs(
                 *[obj.close for obj in objs],
                 group_by=False,
             )
@@ -2693,11 +2687,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     stack_open_objs = False
                     break
             if stack_open_objs:
-                kwargs["open"] = to_2d_array(
-                    kwargs["wrapper"].column_stack_and_wrap(
-                        *[obj.open for obj in objs],
-                        group_by=False,
-                    )
+                kwargs["open"] = kwargs["wrapper"].column_stack_arrs(
+                    *[obj.open for obj in objs],
+                    group_by=False,
+                    wrap=False,
                 )
         if "high" not in kwargs:
             stack_high_objs = True
@@ -2706,11 +2699,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     stack_high_objs = False
                     break
             if stack_high_objs:
-                kwargs["high"] = to_2d_array(
-                    kwargs["wrapper"].column_stack_and_wrap(
-                        *[obj.high for obj in objs],
-                        group_by=False,
-                    )
+                kwargs["high"] = kwargs["wrapper"].column_stack_arrs(
+                    *[obj.high for obj in objs],
+                    group_by=False,
+                    wrap=False,
                 )
         if "low" not in kwargs:
             stack_low_objs = True
@@ -2719,11 +2711,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     stack_low_objs = False
                     break
             if stack_low_objs:
-                kwargs["low"] = to_2d_array(
-                    kwargs["wrapper"].column_stack_and_wrap(
-                        *[obj.low for obj in objs],
-                        group_by=False,
-                    )
+                kwargs["low"] = kwargs["wrapper"].column_stack_arrs(
+                    *[obj.low for obj in objs],
+                    group_by=False,
+                    wrap=False,
                 )
         if "order_records" not in kwargs:
             kwargs["order_records"] = Orders.column_stack_records_arrs(*[obj.orders for obj in objs], **kwargs)
@@ -2737,7 +2728,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     break
             if stack_init_cash_objs:
                 kwargs["init_cash"] = to_1d_array(
-                    kwargs["wrapper"].column_stack_and_wrap_reduced(
+                    kwargs["wrapper"].concat_arrs(
                         *[obj.get_init_cash(group_by=cs_group_by) for obj in objs],
                         group_by=cs_group_by,
                     )
@@ -2750,7 +2741,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     break
             if stack_init_position_objs:
                 kwargs["init_position"] = to_1d_array(
-                    kwargs["wrapper"].column_stack_and_wrap_reduced(
+                    kwargs["wrapper"].concat_arrs(
                         *[obj.init_position for obj in objs],
                         group_by=False,
                     ),
@@ -2765,7 +2756,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     break
             if stack_init_price_objs:
                 kwargs["init_price"] = to_1d_array(
-                    kwargs["wrapper"].column_stack_and_wrap_reduced(
+                    kwargs["wrapper"].concat_arrs(
                         *[obj.init_price for obj in objs],
                         group_by=False,
                     ),
@@ -2779,12 +2770,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     stack_cash_deposits_objs = True
                     break
             if stack_cash_deposits_objs:
-                kwargs["cash_deposits"] = to_2d_array(
-                    kwargs["wrapper"].column_stack_and_wrap(
-                        *[obj.get_cash_deposits(group_by=cs_group_by) for obj in objs],
-                        group_by=cs_group_by,
-                        reindex_kwargs=dict(fill_value=0),
-                    )
+                kwargs["cash_deposits"] = kwargs["wrapper"].column_stack_arrs(
+                    *[obj.get_cash_deposits(group_by=cs_group_by) for obj in objs],
+                    group_by=cs_group_by,
+                    reindex_kwargs=dict(fill_value=0),
+                    wrap=False,
                 )
             else:
                 kwargs["cash_deposits"] = np.array([[0.0]])
@@ -2795,12 +2785,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     stack_cash_earnings_objs = True
                     break
             if stack_cash_earnings_objs:
-                kwargs["cash_earnings"] = to_2d_array(
-                    kwargs["wrapper"].column_stack_and_wrap(
-                        *[obj.get_cash_earnings(group_by=False) for obj in objs],
-                        group_by=False,
-                        reindex_kwargs=dict(fill_value=0),
-                    )
+                kwargs["cash_earnings"] = kwargs["wrapper"].column_stack_arrs(
+                    *[obj.get_cash_earnings(group_by=False) for obj in objs],
+                    group_by=False,
+                    reindex_kwargs=dict(fill_value=0),
+                    wrap=False,
                 )
             else:
                 kwargs["cash_earnings"] = np.array([[0.0]])
@@ -2811,12 +2800,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     stack_call_seq_objs = False
                     break
             if stack_call_seq_objs:
-                kwargs["call_seq"] = to_2d_array(
-                    kwargs["wrapper"].column_stack_and_wrap(
-                        *[obj.call_seq for obj in objs],
-                        group_by=False,
-                        reindex_kwargs=dict(fill_value=0),
-                    )
+                kwargs["call_seq"] = kwargs["wrapper"].column_stack_arrs(
+                    *[obj.call_seq for obj in objs],
+                    group_by=False,
+                    reindex_kwargs=dict(fill_value=0),
+                    wrap=False,
                 )
         if "bm_close" not in kwargs:
             stack_bm_close_objs = True
@@ -2825,11 +2813,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     stack_bm_close_objs = False
                     break
             if stack_bm_close_objs:
-                new_bm_close = to_2d_array(
-                    kwargs["wrapper"].column_stack_and_wrap(
-                        *[obj.bm_close for obj in objs],
-                        group_by=False,
-                    )
+                new_bm_close = kwargs["wrapper"].column_stack_arrs(
+                    *[obj.bm_close for obj in objs],
+                    group_by=False,
+                    wrap=False,
                 )
                 if fbfill_close:
                     new_bm_close = new_bm_close.vbt.fbfill()
@@ -10788,7 +10775,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             portfolio_plots_cfg,
         )
 
-    _subplots: tp.ClassVar[Config] = Config(
+    _subplots: tp.ClassVar[Config] = HybridConfig(
         dict(
             orders=dict(
                 title="Orders",

@@ -37,7 +37,7 @@ def teardown_module():
     vbt.settings.reset()
 
 
-# ############# generators.py ############# #
+# ############# generators ############# #
 
 
 class TestGenerators:

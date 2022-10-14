@@ -237,7 +237,7 @@ def broadcast_index(
     ignore_sr_names: tp.Optional[bool] = None,
     ignore_ranges: tp.Optional[bool] = None,
     check_index_names: tp.Optional[bool] = None,
-    **stack_kwargs,
+    **index_stack_kwargs,
 ) -> tp.Optional[tp.Index]:
     """Produce a broadcast index/columns.
 
@@ -260,7 +260,7 @@ def broadcast_index(
             Conflicting Series names are those that are different but not None.
         ignore_ranges (bool): Whether to ignore indexes of type `pd.RangeIndex`.
         check_index_names (bool): See `vectorbtpro.utils.checks.is_index_equal`.
-        **stack_kwargs: Keyword arguments passed to `vectorbtpro.base.indexes.stack_indexes`.
+        **index_stack_kwargs: Keyword arguments passed to `vectorbtpro.base.indexes.stack_indexes`.
 
     For defaults, see `vectorbtpro._settings.broadcasting`.
 
@@ -345,7 +345,7 @@ def broadcast_index(
                                     new_index = indexes.repeat_index(new_index, len(index), ignore_ranges=ignore_ranges)
                                 elif len(index) < len(new_index):
                                     index = indexes.repeat_index(index, len(new_index), ignore_ranges=ignore_ranges)
-                            new_index = indexes.stack_indexes([new_index, index], **stack_kwargs)
+                            new_index = indexes.stack_indexes([new_index, index], **index_stack_kwargs)
         else:
             raise ValueError(f"Invalid value '{index_from}' for {'columns' if axis == 1 else 'index'}_from")
     else:
@@ -611,7 +611,7 @@ def broadcast(
     ignore_sr_names: tp.Optional[bool] = None,
     ignore_ranges: tp.Optional[bool] = None,
     check_index_names: tp.Optional[bool] = None,
-    **stack_kwargs,
+    **index_stack_kwargs,
 ) -> tp.Any:
     """Bring any array-like object in `args` to the same shape by using NumPy broadcasting.
 
@@ -674,7 +674,7 @@ def broadcast(
         ignore_sr_names (bool): See `broadcast_index`.
         ignore_ranges (bool): See `broadcast_index`.
         check_index_names (bool): See `broadcast_index`.
-        **stack_kwargs: Keyword arguments passed to `vectorbtpro.base.indexes.stack_indexes`.
+        **index_stack_kwargs: Keyword arguments passed to `vectorbtpro.base.indexes.stack_indexes`.
 
     For defaults, see `vectorbtpro._settings.broadcasting`.
 
@@ -1240,7 +1240,7 @@ def broadcast(
             ignore_sr_names=ignore_sr_names,
             ignore_ranges=ignore_ranges,
             check_index_names=check_index_names,
-            **stack_kwargs,
+            **index_stack_kwargs,
         )
         new_columns = broadcast_index(
             list(aligned_objs.values()),
@@ -1250,7 +1250,7 @@ def broadcast(
             ignore_sr_names=ignore_sr_names,
             ignore_ranges=ignore_ranges,
             check_index_names=check_index_names,
-            **stack_kwargs,
+            **index_stack_kwargs,
         )
     else:
         new_index, new_columns = None, None
@@ -1281,7 +1281,7 @@ def broadcast(
             param_dct,
             random_subset=random_subset,
             seed=seed,
-            stack_kwargs=stack_kwargs,
+            index_stack_kwargs=index_stack_kwargs,
         )
         param_product = {k: np.asarray(v) for k, v in param_product.items()}
         n_params = len(param_columns)
@@ -1291,7 +1291,7 @@ def broadcast(
             new_columns = indexes.combine_indexes(
                 [param_columns, new_columns],
                 ignore_ranges=ignore_ranges,
-                **stack_kwargs,
+                **index_stack_kwargs,
             )
 
     # Tile
@@ -1308,13 +1308,13 @@ def broadcast(
                 param_columns = indexes.combine_indexes(
                     [tile, param_columns],
                     ignore_ranges=ignore_ranges,
-                    **stack_kwargs,
+                    **index_stack_kwargs,
                 )
             if new_columns is not None:
                 new_columns = indexes.combine_indexes(
                     [tile, new_columns],
                     ignore_ranges=ignore_ranges,
-                    **stack_kwargs,
+                    **index_stack_kwargs,
                 )
         if param_product is not None:
             param_product = {k: np.tile(v, n_tile) for k, v in param_product.items()}

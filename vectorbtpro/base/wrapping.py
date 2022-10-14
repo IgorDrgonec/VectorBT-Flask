@@ -3,7 +3,6 @@
 """Classes for wrapping NumPy arrays into Series/DataFrames."""
 
 import warnings
-from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -14,7 +13,7 @@ from vectorbtpro.base import indexes, reshaping
 from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.indexing import IndexingError, PandasIndexer, index_dict, hslice, get_indices
-from vectorbtpro.base.indexes import repeat_index, stack_indexes, concat_indexes
+from vectorbtpro.base.indexes import stack_indexes, concat_indexes
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
 from vectorbtpro.utils.config import Configured, merge_dicts, resolve_dict
@@ -24,7 +23,7 @@ from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method,
 from vectorbtpro.utils.array_ import is_range, cast_to_min_precision, cast_to_max_precision
 from vectorbtpro.utils.template import CustomTemplate
 
-if TYPE_CHECKING:
+if tp.TYPE_CHECKING:
     from vectorbtpro.base.accessors import BaseIDXAccessor as BaseIDXAccessorT
 else:
     BaseIDXAccessorT = tp.Any
@@ -143,7 +142,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         stack_columns: bool = True,
         index_concat_method: tp.MaybeTuple[tp.Union[str, tp.Callable]] = "append",
         keys: tp.Optional[tp.IndexLike] = None,
-        stack_kwargs: tp.KwargsLike = None,
+        index_stack_kwargs: tp.KwargsLike = None,
         verify_integrity: bool = True,
         **kwargs,
     ) -> ArrayWrapperT:
@@ -175,7 +174,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                 [wrapper.index for wrapper in wrappers],
                 index_concat_method=index_concat_method,
                 keys=keys,
-                stack_kwargs=stack_kwargs,
+                index_stack_kwargs=index_stack_kwargs,
                 verify_integrity=verify_integrity,
                 axis=0,
             )
@@ -205,7 +204,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                     if not checks.is_index_equal(new_columns, wrapper.columns):
                         if not stack_columns:
                             raise ValueError("Objects to be merged must have the same columns")
-                        new_columns = stack_indexes((new_columns, wrapper.columns), **resolve_dict(stack_kwargs))
+                        new_columns = stack_indexes((new_columns, wrapper.columns), **resolve_dict(index_stack_kwargs))
             columns = new_columns
         elif not isinstance(columns, pd.Index):
             columns = pd.Index(columns)
@@ -262,7 +261,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         col_concat_method: tp.MaybeTuple[tp.Union[str, tp.Callable]] = "append",
         group_concat_method: tp.MaybeTuple[tp.Union[str, tp.Callable]] = ("append", "factorize_each"),
         keys: tp.Optional[tp.IndexLike] = None,
-        stack_kwargs: tp.KwargsLike = None,
+        index_stack_kwargs: tp.KwargsLike = None,
         verify_integrity: bool = True,
         **kwargs,
     ) -> ArrayWrapperT:
@@ -336,7 +335,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                 [wrapper.columns for wrapper in wrappers],
                 index_concat_method=col_concat_method,
                 keys=keys,
-                stack_kwargs=stack_kwargs,
+                index_stack_kwargs=index_stack_kwargs,
                 verify_integrity=verify_integrity,
                 axis=1,
             )
@@ -361,7 +360,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                         [wrapper.grouper.get_stretched_index() for wrapper in wrappers],
                         index_concat_method=group_concat_method,
                         keys=keys,
-                        stack_kwargs=stack_kwargs,
+                        index_stack_kwargs=index_stack_kwargs,
                         verify_integrity=verify_integrity,
                         axis=2,
                     )
@@ -449,6 +448,9 @@ class ArrayWrapper(Configured, PandasIndexer):
                 ndim = 1
             else:
                 ndim = 2
+        else:
+            if len(columns) > 1:
+                ndim = 2
 
         grouper_arg_names = get_func_arg_names(Grouper.__init__)
         grouper_kwargs = dict()
@@ -495,6 +497,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         group_select: tp.Optional[bool] = None,
         return_slices: bool = True,
         return_none_slices: bool = True,
+        return_scalars: bool = True,
         group_by: tp.GroupByLike = None,
         wrapper_kwargs: tp.KwargsLike = None,
     ) -> dict:
@@ -548,13 +551,19 @@ class ArrayWrapper(Configured, PandasIndexer):
         n_rows = len(index)
         n_cols = len(columns)
 
-        def _resolve_arr(arr: tp.MaybeArray, n: int) -> tp.Union[tp.MaybeArray, slice]:
-            if return_slices and checks.is_np_array(arr) and is_range(arr):
-                if return_none_slices and arr[0] == 0 and arr[-1] == n - 1:
-                    return slice(None, None, None), False
-                return slice(arr[0], arr[-1] + 1, None), True
+        def _resolve_arr(arr, n):
+            if checks.is_np_array(arr) and is_range(arr):
+                if arr[0] == 0 and arr[-1] == n - 1:
+                    if return_none_slices:
+                        return slice(None, None, None), False
+                    return arr, False
+                if return_slices:
+                    return slice(arr[0], arr[-1] + 1, None), True
+                return arr, True
             if isinstance(arr, np.integer):
-                return arr.item(), True
+                arr = arr.item()
+            if isinstance(arr, int) and not return_scalars:
+                arr = np.array([arr])
             return arr, True
 
         if column_only_select:
@@ -982,6 +991,12 @@ class ArrayWrapper(Configured, PandasIndexer):
             return self.replace(**kwargs)
         return self  # important for keeping cache
 
+    def flip(self: ArrayWrapperT, **kwargs) -> ArrayWrapperT:
+        """Flip index and columns."""
+        if "grouper" not in kwargs:
+            kwargs["grouper"] = None
+        return self.replace(index=self.columns, columns=self.index, **kwargs)
+
     @cached_method(whitelist=True)
     def resolve(self: ArrayWrapperT, group_by: tp.GroupByLike = None, **kwargs) -> ArrayWrapperT:
         """Resolve this object.
@@ -1008,6 +1023,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         index: tp.Optional[tp.IndexLike] = None,
         columns: tp.Optional[tp.IndexLike] = None,
         zero_to_none: tp.Optional[bool] = None,
+        force_2d: bool = False,
         fillna: tp.Optional[tp.Scalar] = None,
         dtype: tp.Optional[tp.PandasDTypeLike] = None,
         min_precision: tp.Union[None, int, str] = None,
@@ -1098,9 +1114,11 @@ class ArrayWrapper(Configured, PandasIndexer):
                     strict=prec_strict,
                 )
             if arr.ndim == 1:
+                if force_2d:
+                    return _apply_dtype(pd.DataFrame(arr[:, None], index=index, columns=columns))
                 return _apply_dtype(pd.Series(arr, index=index, name=name))
             if arr.ndim == 2:
-                if arr.shape[1] == 1 and _self.ndim == 1:
+                if not force_2d and arr.shape[1] == 1 and _self.ndim == 1:
                     return _apply_dtype(pd.Series(arr[:, 0], index=index, name=name))
                 return _apply_dtype(pd.DataFrame(arr, index=index, columns=columns))
             raise ValueError(f"{arr.ndim}-d input is not supported")
@@ -1123,6 +1141,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         group_by: tp.GroupByLike = None,
         name_or_index: tp.NameIndex = None,
         columns: tp.Optional[tp.IndexLike] = None,
+        force_1d: bool = False,
         fillna: tp.Optional[tp.Scalar] = None,
         dtype: tp.Optional[tp.PandasDTypeLike] = None,
         to_timedelta: bool = False,
@@ -1166,31 +1185,33 @@ class ArrayWrapper(Configured, PandasIndexer):
             nonlocal name_or_index
 
             arr = np.asarray(arr)
+            if force_1d and arr.ndim == 0:
+                arr = arr[None]
             if fillna is not None:
                 arr[pd.isnull(arr)] = fillna
             if arr.ndim == 0:
                 # Scalar per Series/DataFrame
                 return _apply_dtype(pd.Series(arr))[0]
             if arr.ndim == 1:
-                if _self.ndim == 1:
+                if not force_1d and _self.ndim == 1:
                     if arr.shape[0] == 1:
                         # Scalar per Series/DataFrame with one column
                         return _apply_dtype(pd.Series(arr))[0]
                     # Array per Series
                     sr_name = columns[0]
-                    if sr_name == 0:  # was arr Series before
+                    if sr_name == 0:
                         sr_name = None
                     if isinstance(name_or_index, str):
                         name_or_index = None
                     return _apply_dtype(pd.Series(arr, index=name_or_index, name=sr_name))
-                # Scalar per column in arr DataFrame
+                # Scalar per column in DataFrame
                 return _apply_dtype(pd.Series(arr, index=columns, name=name_or_index))
             if arr.ndim == 2:
                 if arr.shape[1] == 1 and _self.ndim == 1:
                     arr = reshaping.soft_to_ndim(arr, 1)
                     # Array per Series
                     sr_name = columns[0]
-                    if sr_name == 0:  # was arr Series before
+                    if sr_name == 0:
                         sr_name = None
                     if isinstance(name_or_index, str):
                         name_or_index = None
@@ -1215,12 +1236,41 @@ class ArrayWrapper(Configured, PandasIndexer):
             out = self.arr_to_timedelta(out, silence_warnings=silence_warnings)
         return out
 
-    def row_stack_and_wrap(self, *objs: tp.ArrayLike, group_by: tp.GroupByLike = None, **kwargs) -> tp.SeriesFrame:
+    def concat_arrs(
+        self,
+        *objs: tp.ArrayLike,
+        group_by: tp.GroupByLike = None,
+        wrap: bool = True,
+        **kwargs,
+    ) -> tp.AnyArray1d:
+        """Stack reduced objects along columns and wrap the final object."""
+        _self = self.resolve(group_by=group_by)
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+
+        new_objs = []
+        for obj in objs:
+            new_objs.append(reshaping.to_1d_array(obj))
+
+        stacked_obj = np.concatenate(new_objs)
+        if wrap:
+            return _self.wrap_reduced(stacked_obj, **kwargs)
+        return stacked_obj
+
+    def row_stack_arrs(
+        self,
+        *objs: tp.ArrayLike,
+        group_by: tp.GroupByLike = None,
+        wrap: bool = True,
+        **kwargs,
+    ) -> tp.AnyArray:
         """Stack objects along rows and wrap the final object."""
         _self = self.resolve(group_by=group_by)
         if len(objs) == 1:
             objs = objs[0]
         objs = list(objs)
+
         new_objs = []
         for obj in objs:
             obj = reshaping.to_2d_array(obj)
@@ -1229,16 +1279,20 @@ class ArrayWrapper(Configured, PandasIndexer):
                     raise ValueError(f"Cannot broadcast {obj.shape[1]} to {_self.shape_2d[1]} columns")
                 obj = np.repeat(obj, _self.shape_2d[1], axis=1)
             new_objs.append(obj)
-        stacked_obj = np.row_stack(new_objs)
-        return _self.wrap(stacked_obj, **kwargs)
 
-    def column_stack_and_wrap(
+        stacked_obj = np.row_stack(new_objs)
+        if wrap:
+            return _self.wrap(stacked_obj, **kwargs)
+        return stacked_obj
+
+    def column_stack_arrs(
         self,
         *objs: tp.ArrayLike,
         reindex_kwargs: tp.KwargsLike = None,
         group_by: tp.GroupByLike = None,
+        wrap: bool = True,
         **kwargs,
-    ) -> tp.SeriesFrame:
+    ) -> tp.AnyArray2d:
         """Stack objects along columns and wrap the final object.
 
         `reindex_kwargs` will be passed to
@@ -1247,6 +1301,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         if len(objs) == 1:
             objs = objs[0]
         objs = list(objs)
+
         new_objs = []
         for obj in objs:
             if not checks.is_index_equal(obj.index, _self.index, check_names=False):
@@ -1260,25 +1315,11 @@ class ArrayWrapper(Configured, PandasIndexer):
                 if was_bool and is_object:
                     obj = obj.astype(None)
             new_objs.append(reshaping.to_2d_array(obj))
-        stacked_obj = np.column_stack(new_objs)
-        return _self.wrap(stacked_obj, **kwargs)
 
-    def column_stack_and_wrap_reduced(
-        self,
-        *objs: tp.ArrayLike,
-        group_by: tp.GroupByLike = None,
-        **kwargs,
-    ) -> tp.SeriesFrame:
-        """Stack reduced objects along columns and wrap the final object."""
-        _self = self.resolve(group_by=group_by)
-        if len(objs) == 1:
-            objs = objs[0]
-        objs = list(objs)
-        new_objs = []
-        for obj in objs:
-            new_objs.append(reshaping.to_1d_array(obj))
-        stacked_obj = np.concatenate(new_objs)
-        return _self.wrap_reduced(stacked_obj, **kwargs)
+        stacked_obj = np.column_stack(new_objs)
+        if wrap:
+            return _self.wrap(stacked_obj, **kwargs)
+        return stacked_obj
 
     def dummy(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.SeriesFrame:
         """Create a dummy Series/DataFrame."""

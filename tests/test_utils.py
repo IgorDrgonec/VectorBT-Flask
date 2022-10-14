@@ -75,7 +75,7 @@ def teardown_module():
     vbt.settings.reset()
 
 
-# ############# config.py ############# #
+# ############# config ############# #
 
 
 class TestConfig:
@@ -909,7 +909,7 @@ class TestConfig:
         assert new_h.my_cfg == h.my_cfg
 
 
-# ############# decorators.py ############# #
+# ############# decorators ############# #
 
 
 class TestDecorators:
@@ -953,7 +953,7 @@ class TestDecorators:
         assert cache_me.options["some"] == "key"
 
 
-# ############# attr_.py ############# #
+# ############# attr_ ############# #
 
 
 class TestAttr:
@@ -1001,7 +1001,7 @@ class TestAttr:
         assert callable(attr_.deep_getattr(C(), "b.a.a", call_last_attr=False))
 
 
-# ############# checks.py ############# #
+# ############# checks ############# #
 
 
 class TestChecks:
@@ -1426,7 +1426,7 @@ class TestChecks:
             checks.assert_dict_valid(dict(a=2, b=3, c=dict(d=4, f=5)), [["a", "b", "c"], ["d", "e"]])
 
 
-# ############# math_.py ############# #
+# ############# math_ ############# #
 
 
 class TestMath:
@@ -1524,7 +1524,7 @@ class TestMath:
         assert math_.add_nb(-a, -b) == -(a + b)
 
 
-# ############# array_.py ############# #
+# ############# array_ ############# #
 
 
 class TestArray:
@@ -1632,7 +1632,7 @@ class TestArray:
         assert np.sum(array_.rescale_float_to_int_nb(np.array([0.3, 0.3, 0.3, 0.1]), (10, 20), 70)) == 70
 
 
-# ############# random_.py ############# #
+# ############# random_ ############# #
 
 
 class TestRandom:
@@ -1653,7 +1653,7 @@ class TestRandom:
             assert test_seed_nb() == 0.3745401188473625
 
 
-# ############# mapping.py ############# #
+# ############# mapping ############# #
 
 Enum = namedtuple("Enum", ["Attr1", "Attr2"])(*range(2))
 
@@ -1695,7 +1695,7 @@ class TestMapping:
         assert mapping.apply_mapping(np.array(["world"]), mapping_like={"world": "hello"})[0] == "hello"
 
 
-# ############# enum_.py ############# #
+# ############# enum_ ############# #
 
 
 class TestEnum:
@@ -1788,7 +1788,7 @@ class TestEnum:
         )
 
 
-# ############# params.py ############# #
+# ############# params ############# #
 
 
 class TestParams:
@@ -1922,7 +1922,7 @@ class TestParams:
         )
 
 
-# ############# datetime_.py ############# #
+# ############# datetime_ ############# #
 
 
 class TestDatetime:
@@ -2038,7 +2038,7 @@ class TestDatetime:
         assert datetime_.datetime_to_ms(_datetime(2020, 1, 1, tzinfo=datetime_.get_utc_tz())) == 1577836800000
 
 
-# ############# schedule_.py ############# #
+# ############# schedule_ ############# #
 
 
 class TestScheduleManager:
@@ -2129,7 +2129,7 @@ class TestScheduleManager:
         assert kwargs["call_count"] == 5
 
 
-# ############# tagging.py ############# #
+# ############# tagging ############# #
 
 
 class TestTags:
@@ -2142,7 +2142,7 @@ class TestTags:
         assert not tagging.match_tags("hello and not world", ["hello", "world"])
 
 
-# ############# template.py ############# #
+# ############# template ############# #
 
 
 class TestTemplate:
@@ -2190,7 +2190,7 @@ class TestTemplate:
         )
 
 
-# ############# parsing.py ############# #
+# ############# parsing ############# #
 
 
 class TestParsing:
@@ -2304,7 +2304,7 @@ class TestParsing:
         assert parsing.get_context_vars(["c", "d", "e"], global_dict=dict(c=1, d=2, e=3)) == [1, 2, 3]
 
 
-# ############# execution.py ############# #
+# ############# execution ############# #
 
 
 def execute_func(a, *args, b=None, **kwargs):
@@ -2490,7 +2490,7 @@ class TestExecution:
         assert execution.execute(iter(funcs_args), chunk_len="auto") == [10, 35, 60]
 
 
-# ############# chunking.py ############# #
+# ############# chunking ############# #
 
 
 class TestChunking:
@@ -3021,7 +3021,7 @@ class TestChunking:
             np.testing.assert_array_equal(f8(np.arange(10)), np.arange(10))
 
 
-# ############# jitting.py ############# #
+# ############# jitting ############# #
 
 
 class TestJitting:

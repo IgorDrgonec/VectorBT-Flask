@@ -178,6 +178,12 @@ def midnight_nb(ts: int) -> int:
 
 
 @register_jitted(cache=True)
+def day_changed_nb(ts1: int, ts2: int) -> bool:
+    """Whether the day changed."""
+    return midnight_nb(ts1) != midnight_nb(ts2)
+
+
+@register_jitted(cache=True)
 def weekday_from_days_nb(days: int) -> int:
     """Get the weekday from the total number of days.
 

@@ -330,7 +330,7 @@ params = ChildDict(
     template_context=Config(),
     random_subset=None,
     seed=None,
-    stack_kwargs=Config(),
+    index_stack_kwargs=Config(),
     name_tuple_to_str=True,
     execute_kwargs=Config(),
 )
@@ -638,7 +638,7 @@ data = ChildDict(
             end="now UTC",
             timeframe="1d",
             adjusted=True,
-            limit=5000,
+            limit=50000,
             params=dict(),
             delay=500,
             retries=3,
@@ -943,6 +943,32 @@ ${config_doc}
 )
 
 _settings["ranges"] = ranges
+
+splitter = ChildDict(
+    stats=Config(
+        settings=dict(normalize=True),
+        filters=dict(
+            has_ndim_2=dict(
+                filter_func=lambda self, metric_settings: self.wrapper.ndim == 2,
+            ),
+            normalize=dict(
+                filter_func=lambda self, metric_settings: metric_settings["normalize"],
+            ),
+        ),
+    ),
+    plots=Config(),
+)
+"""_"""
+
+__pdoc__["splitter"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.generic.splitter.Splitter`.
+
+```python
+${config_doc}
+```"""
+)
+
+_settings["splitter"] = splitter
 
 drawdowns = ChildDict(
     stats=Config(

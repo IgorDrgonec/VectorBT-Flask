@@ -263,3 +263,60 @@ def map_bounds_to_source_ranges_nb(
     if skip_minus_one:
         return range_starts_out[:k], range_ends_out[:k]
     return range_starts_out, range_ends_out
+
+
+@register_jitted(cache=True)
+def resample_source_mask_nb(
+    source_mask: tp.Array1d,
+    source_index: tp.Array1d,
+    target_index: tp.Array1d,
+    source_freq: tp.Optional[tp.Scalar] = None,
+    target_freq: tp.Optional[tp.Scalar] = None,
+) -> tp.Array1d:
+    """Resample a source mask to the target index.
+
+    Becomes True only if the target bar is fully contained in the source bar. The source bar
+    is represented by a non-interrupting sequence of True values in the source mask."""
+    out = np.full(len(target_index), False, dtype=np.bool_)
+
+    from_j = 0
+    for i in range(len(target_index)):
+        if i > 0 and target_index[i] < target_index[i - 1]:
+            raise ValueError("Target index must be increasing")
+        target_lbound = target_index[i]
+        if target_freq is None:
+            if i + 1 < len(target_index):
+                target_rbound = target_index[i + 1]
+            else:
+                target_rbound = None
+        else:
+            target_rbound = target_index[i] + target_freq
+
+        found_start = False
+        for j in range(from_j, len(source_index)):
+            if j > 0 and source_index[j] < source_index[j - 1]:
+                raise ValueError("Source index must be increasing")
+            source_lbound = source_index[j]
+            if source_freq is None:
+                if j + 1 < len(source_index):
+                    source_rbound = source_index[j + 1]
+                else:
+                    source_rbound = None
+            else:
+                source_rbound = source_index[j] + source_freq
+
+            if target_rbound is not None and target_rbound <= source_lbound:
+                break
+            if found_start or (
+                target_lbound >= source_lbound and (source_rbound is None or target_lbound < source_rbound)
+            ):
+                if not found_start:
+                    from_j = j
+                    found_start = True
+                if not source_mask[j]:
+                    break
+                if source_rbound is None or (target_rbound is not None and target_rbound <= source_rbound):
+                    out[i] = True
+                    break
+
+    return out

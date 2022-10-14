@@ -34,7 +34,7 @@ class ExceptLevel:
     """Level position or name."""
 
 
-def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike) -> GroupByT:
+def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike, def_lvl_name: tp.Hashable = "group") -> GroupByT:
     """Convert mapper `group_by` to `pd.Index`.
 
     !!! note
@@ -44,7 +44,7 @@ def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike) -> GroupByT:
     if isinstance(group_by, CustomTemplate):
         group_by = group_by.substitute(context=dict(index=index), strict=True, sub_id="group_by")
     if group_by is True:
-        group_by = pd.Index(["group"] * len(index), name="group")  # one group
+        group_by = pd.Index(["group"] * len(index), name=def_lvl_name)  # one group
     elif isinstance(group_by, ExceptLevel):
         except_levels = group_by.level
         if isinstance(except_levels, (int, str)):
@@ -54,7 +54,7 @@ def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike) -> GroupByT:
             if i not in except_levels and name not in except_levels:
                 new_group_by.append(name)
         if len(new_group_by) == 0:
-            group_by = pd.Index(["group"] * len(index), name="group")
+            group_by = pd.Index(["group"] * len(index), name=def_lvl_name)
         else:
             if len(new_group_by) == 1:
                 new_group_by = new_group_by[0]
@@ -67,18 +67,18 @@ def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike) -> GroupByT:
         except (IndexError, KeyError):
             pass
     if not isinstance(group_by, pd.Index):
-        group_by = pd.Index(group_by, name="group")
+        group_by = pd.Index(group_by, name=def_lvl_name)
     if len(group_by) != len(index):
         raise ValueError("group_by and index must have the same length")
     return group_by
 
 
-def get_groups_and_index(index: tp.Index, group_by: tp.GroupByLike) -> tp.Tuple[tp.Array1d, tp.Index]:
+def get_groups_and_index(index: tp.Index, group_by: tp.GroupByLike, def_lvl_name: tp.Hashable = "group",) -> tp.Tuple[tp.Array1d, tp.Index]:
     """Return array of group indices pointing to the original index, and grouped index."""
     if group_by is None or group_by is False:
         return np.arange(len(index)), index
 
-    group_by = group_by_to_index(index, group_by)
+    group_by = group_by_to_index(index, group_by, def_lvl_name)
     codes, uniques = pd.factorize(group_by)
     if not isinstance(uniques, pd.Index):
         new_index = pd.Index(uniques)
@@ -120,6 +120,7 @@ class Grouper(Configured):
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Configured._expected_keys or set()) | {
         "index",
         "group_by",
+        "def_lvl_name",
         "allow_enable",
         "allow_disable",
         "allow_modify",
@@ -129,6 +130,7 @@ class Grouper(Configured):
         self,
         index: tp.Index,
         group_by: tp.GroupByLike = None,
+        def_lvl_name: tp.Hashable = "group",
         allow_enable: bool = True,
         allow_disable: bool = True,
         allow_modify: bool = True,
@@ -140,10 +142,11 @@ class Grouper(Configured):
         if group_by is None or group_by is False:
             group_by = None
         else:
-            group_by = group_by_to_index(index, group_by)
+            group_by = group_by_to_index(index, group_by, def_lvl_name=def_lvl_name)
 
         self._index = index
         self._group_by = group_by
+        self._def_lvl_name = def_lvl_name
         self._allow_enable = allow_enable
         self._allow_disable = allow_disable
         self._allow_modify = allow_modify
@@ -152,6 +155,7 @@ class Grouper(Configured):
             self,
             index=index,
             group_by=group_by,
+            def_lvl_name=def_lvl_name,
             allow_enable=allow_enable,
             allow_disable=allow_disable,
             allow_modify=allow_modify,
@@ -194,6 +198,11 @@ class Grouper(Configured):
         return self._group_by
 
     @property
+    def def_lvl_name(self) -> tp.Hashable:
+        """Default level name."""
+        return self._def_lvl_name
+
+    @property
     def allow_enable(self) -> bool:
         """Whether to allow enabling grouping."""
         return self._allow_enable
@@ -231,11 +240,11 @@ class Grouper(Configured):
         Doesn't care if grouping labels have been changed."""
         if group_by is None or (group_by is False and self.group_by is None):
             return False
-        group_by = group_by_to_index(self.index, group_by)
+        group_by = group_by_to_index(self.index, group_by, def_lvl_name=self.def_lvl_name)
         if isinstance(group_by, pd.Index) and isinstance(self.group_by, pd.Index):
             if not pd.Index.equals(group_by, self.group_by):
-                groups1 = get_groups_and_index(self.index, group_by)[0]
-                groups2 = get_groups_and_index(self.index, self.group_by)[0]
+                groups1 = get_groups_and_index(self.index, group_by, def_lvl_name=self.def_lvl_name)[0]
+                groups2 = get_groups_and_index(self.index, self.group_by, def_lvl_name=self.def_lvl_name)[0]
                 if not np.array_equal(groups1, groups2):
                     return True
             return False
@@ -291,13 +300,13 @@ class Grouper(Configured):
         if group_by is False and self.group_by is None:
             group_by = None
         self.check_group_by(group_by=group_by, **kwargs)
-        return group_by_to_index(self.index, group_by)
+        return group_by_to_index(self.index, group_by, def_lvl_name=self.def_lvl_name)
 
     @cached_method(whitelist=True)
     def get_groups_and_index(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.Tuple[tp.Array1d, tp.Index]:
         """See `get_groups_and_index`."""
         group_by = self.resolve_group_by(group_by=group_by, **kwargs)
-        return get_groups_and_index(self.index, group_by)
+        return get_groups_and_index(self.index, group_by, def_lvl_name=self.def_lvl_name)
 
     def get_groups(self, **kwargs) -> tp.Array1d:
         """Return groups array."""

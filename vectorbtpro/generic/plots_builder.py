@@ -11,7 +11,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base.wrapping import Wrapping
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import get_dict_attr, AttrResolverMixin
-from vectorbtpro.utils.config import Config, merge_dicts
+from vectorbtpro.utils.config import Config, HybridConfig, merge_dicts
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.tagging import match_tags
 from vectorbtpro.utils.template import deep_substitute, CustomTemplate
@@ -50,7 +50,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
 
         return merge_dicts(plots_builder_cfg, dict(settings=dict(freq=self.wrapper.freq)))
 
-    _subplots: tp.ClassVar[Config] = Config(dict())
+    _subplots: tp.ClassVar[Config] = HybridConfig(dict())
 
     @property
     def subplots(self) -> Config:
@@ -728,46 +728,47 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
         found_ids = dict()
         unique_idx = 0
         for trace in fig.data:
-            if "name" in trace:
-                name = trace["name"]
-            else:
-                name = None
-            if "marker" in trace:
-                marker = trace["marker"]
-            else:
-                marker = {}
-            if "symbol" in marker:
-                marker_symbol = marker["symbol"]
-            else:
-                marker_symbol = None
-            if "color" in marker:
-                marker_color = marker["color"]
-            else:
-                marker_color = None
-            if "line" in trace:
-                line = trace["line"]
-            else:
-                line = {}
-            if "dash" in line:
-                line_dash = line["dash"]
-            else:
-                line_dash = None
-            if "color" in line:
-                line_color = line["color"]
-            else:
-                line_color = None
+            if trace["showlegend"]:
+                if "name" in trace:
+                    name = trace["name"]
+                else:
+                    name = None
+                if "marker" in trace:
+                    marker = trace["marker"]
+                else:
+                    marker = {}
+                if "symbol" in marker:
+                    marker_symbol = marker["symbol"]
+                else:
+                    marker_symbol = None
+                if "color" in marker:
+                    marker_color = marker["color"]
+                else:
+                    marker_color = None
+                if "line" in trace:
+                    line = trace["line"]
+                else:
+                    line = {}
+                if "dash" in line:
+                    line_dash = line["dash"]
+                else:
+                    line_dash = None
+                if "color" in line:
+                    line_color = line["color"]
+                else:
+                    line_color = None
 
-            id = (name, marker_symbol, marker_color, line_dash, line_color)
-            if id in found_ids:
-                if hide_id_labels:
-                    trace["showlegend"] = False
-                if group_id_labels:
-                    trace["legendgroup"] = found_ids[id]
-            else:
-                if group_id_labels:
-                    trace["legendgroup"] = unique_idx
-                found_ids[id] = unique_idx
-                unique_idx += 1
+                id = (name, marker_symbol, marker_color, line_dash, line_color)
+                if id in found_ids:
+                    if hide_id_labels:
+                        trace["showlegend"] = False
+                    if group_id_labels:
+                        trace["legendgroup"] = found_ids[id]
+                else:
+                    if group_id_labels:
+                        trace["legendgroup"] = unique_idx
+                    found_ids[id] = unique_idx
+                    unique_idx += 1
 
         # Remove all except the last title if sharing the same axis
         if shared_xaxes:

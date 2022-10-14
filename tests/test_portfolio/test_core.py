@@ -28,7 +28,7 @@ def teardown_module():
     vbt.settings.reset()
 
 
-# ############# nb ############# #
+# ############# core ############# #
 
 
 def assert_same_tuple(tup1, tup2):

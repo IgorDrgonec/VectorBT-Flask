@@ -56,7 +56,7 @@ def teardown_module():
     vbt.settings.reset()
 
 
-# ############# accessors.py ############# #
+# ############# accessors ############# #
 
 
 class TestAccessors:
@@ -2671,7 +2671,7 @@ class TestAccessors:
         assert_index_equal(stats_df.columns, stats_index)
 
 
-# ############# factory.py ############# #
+# ############# factory ############# #
 
 
 class TestFactory:
@@ -3095,7 +3095,7 @@ class TestFactory:
         )
 
 
-# ############# generators.py ############# #
+# ############# generators ############# #
 
 
 class TestGenerators:

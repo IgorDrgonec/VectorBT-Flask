@@ -115,7 +115,6 @@ from vectorbtpro.records.decorators import attach_fields, override_field_config,
 from vectorbtpro.signals.enums import StopType
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
-from vectorbtpro.utils.template import Sub
 
 __pdoc__ = {}
 
@@ -465,7 +464,7 @@ class Orders(PriceRecords):
 
         return merge_dicts(PriceRecords.plots_defaults.__get__(self), orders_plots_cfg)
 
-    _subplots: tp.ClassVar[Config] = Config(
+    _subplots: tp.ClassVar[Config] = HybridConfig(
         dict(
             plot=dict(
                 title="Orders",

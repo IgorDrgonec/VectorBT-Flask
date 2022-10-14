@@ -71,11 +71,13 @@ class MetaData(type(Analyzable), type(DataWithColumns)):
     pass
 
 
-@attach_symbol_dict_methods([
-    "symbol_classes",
-    "fetch_kwargs",
-    "returned_kwargs",
-])
+@attach_symbol_dict_methods(
+    [
+        "symbol_classes",
+        "fetch_kwargs",
+        "returned_kwargs",
+    ]
+)
 class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     """Class that downloads, updates, and manages data coming from a data source."""
 
@@ -138,7 +140,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         if "data" not in kwargs:
             new_data = symbol_dict()
             for s in symbols:
-                new_data[s] = kwargs["wrapper"].row_stack_and_wrap(*[obj.data[s] for obj in objs], group_by=False)
+                new_data[s] = kwargs["wrapper"].row_stack_arrs(*[obj.data[s] for obj in objs], group_by=False)
             kwargs["data"] = new_data
         if "symbol_classes" not in kwargs:
             kwargs["symbol_classes"] = objs[-1].symbol_classes
@@ -190,7 +192,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         if "data" not in kwargs:
             new_data = symbol_dict()
             for s in symbols:
-                new_data[s] = kwargs["wrapper"].column_stack_and_wrap(*[obj.data[s] for obj in objs], group_by=False)
+                new_data[s] = kwargs["wrapper"].column_stack_arrs(*[obj.data[s] for obj in objs], group_by=False)
             kwargs["data"] = new_data
 
         kwargs = cls.resolve_column_stack_kwargs(*objs, **kwargs)
@@ -1028,12 +1030,12 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         self,
         symbols: tp.Optional[tp.Symbols] = None,
         level_name: str = "symbol",
-        stack_kwargs: tp.KwargsLike = None,
+        index_stack_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> ArrayWrapper:
         """Get wrapper where columns are symbols."""
-        if stack_kwargs is None:
-            stack_kwargs = {}
+        if index_stack_kwargs is None:
+            index_stack_kwargs = {}
         if symbols is None:
             symbols = self.symbols
             ndim = 1 if self.single_symbol else 2
@@ -1063,7 +1065,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 symbol_classes_columns = pd.Index(symbol_classes_frame.iloc[:, 0])
             else:
                 symbol_classes_columns = pd.MultiIndex.from_frame(symbol_classes_frame)
-            symbol_columns = stack_indexes((symbol_classes_columns, symbol_columns), **stack_kwargs)
+            symbol_columns = stack_indexes((symbol_classes_columns, symbol_columns), **index_stack_kwargs)
         return self.wrapper.replace(
             columns=symbol_columns,
             ndim=ndim,
@@ -1080,10 +1082,14 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         self,
         symbols: tp.Optional[tp.Symbols] = None,
         level_name: str = "symbol",
-        stack_kwargs: tp.KwargsLike = None,
+        index_stack_kwargs: tp.KwargsLike = None,
     ) -> dict:
         """Return a dict of Series/DataFrames with symbols as columns, keyed by column name."""
-        symbol_wrapper = self.get_symbol_wrapper(symbols=symbols, level_name=level_name, stack_kwargs=stack_kwargs)
+        symbol_wrapper = self.get_symbol_wrapper(
+            symbols=symbols,
+            level_name=level_name,
+            index_stack_kwargs=index_stack_kwargs,
+        )
         if symbols is None:
             symbols = self.symbols
 
@@ -1768,7 +1774,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         return merge_dicts(Analyzable.plots_defaults.__get__(self), data_plots_cfg)
 
-    _subplots: tp.ClassVar[Config] = Config(
+    _subplots: tp.ClassVar[Config] = HybridConfig(
         dict(
             plot=RepEval(
                 """

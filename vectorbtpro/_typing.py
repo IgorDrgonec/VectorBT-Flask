@@ -17,6 +17,8 @@ from pandas.core.resample import Resampler as PandasResampler
 from pandas.core.indexing import _IndexSlice as IndexSlice
 
 try:
+    if not TYPE_CHECKING:
+        raise ImportError
     from plotly.graph_objects import Figure, FigureWidget
     from plotly.basedatatypes import BaseFigure, BaseTraceType
 except ImportError:
@@ -36,6 +38,10 @@ if TYPE_CHECKING:
     from vectorbtpro.utils.chunking import Sizer, ChunkTaker, ChunkMeta, ChunkMetaGenerator
     from vectorbtpro.utils.jitting import Jitter
     from vectorbtpro.utils.template import CustomTemplate
+    from vectorbtpro.base.indexing import hslice
+    from vectorbtpro.base.grouping.base import Grouper
+    from vectorbtpro.base.resampling.base import Resampler
+    from vectorbtpro.generic.splitting.splitter import RelRange, GapRange
 else:
     Regex = "Regex"
     ExecutionEngine = "ExecutionEngine"
@@ -46,6 +52,11 @@ else:
     TraceUpdater = "TraceUpdater"
     Jitter = "Jitter"
     CustomTemplate = "CustomTemplate"
+    hslice = "hslice"
+    Grouper = "Grouper"
+    Resampler = "Resampler"
+    RelRange = "RelRange"
+    GapRange = "GapRange"
 
 # Generic types
 T = TypeVar("T")
@@ -115,7 +126,6 @@ MaybeLevelSequence = Union[Level, LevelSequence]
 TimedeltaLike = Union[pd.Timedelta, timedelta, np.timedelta64]
 FrequencyLike = Union[str, float, TimedeltaLike, BaseOffset]
 PandasFrequencyLike = Union[str, TimedeltaLike, BaseOffset]
-PandasGroupByLike = Union[PandasGroupBy, PandasResampler, PandasFrequencyLike]
 TimezoneLike = Union[None, str, float, timedelta, tzinfo]
 DatetimeLike = Union[str, float, pd.Timestamp, np.datetime64, datetime]
 TimeLike = Union[str, time]
@@ -129,10 +139,14 @@ class SupportsTZInfo(Protocol):
 
 
 # Indexing
+Slice = Union[slice, hslice]
 PandasIndexingFunc = Callable[[SeriesFrame], MaybeSeriesFrame]
 
 # Grouping
+PandasGroupByLike = Union[PandasGroupBy, PandasResampler, PandasFrequencyLike]
 GroupByLike = Union[None, bool, MaybeLevelSequence, IndexLike, CustomTemplate]
+AnyGroupByLike = Union[Grouper, PandasGroupByLike, GroupByLike]
+AnyRuleLike = Union[Resampler, PandasResampler, PandasFrequencyLike]
 GroupIdxs = Array1d
 GroupLens = Array1d
 GroupMap = Tuple[GroupIdxs, GroupLens]
@@ -224,3 +238,15 @@ JitterLike = Union[str, Jitter, Type[Jitter]]
 # Decorators
 ClassWrapper = Callable[[Type[T]], Type[T]]
 FlexClassWrapper = Union[Callable[[Type[T]], Type[T]], Type[T]]
+
+# Splitting
+RelRangeLike = Union[int, float, RelRange, Callable, CustomTemplate, GapRange]
+FixRangeLike = Union[Slice, Sequence[int], Sequence[bool], Callable, CustomTemplate, GapRange]
+ReadyRangeLike = Union[slice, Array1d]
+RangeLike = Union[RelRangeLike, FixRangeLike]
+FixSplit = Sequence[FixRangeLike]
+SplitLike = Union[int, float, MaybeSequence[RangeLike]]
+Splits = MaybeSequence[SplitLike]
+SplitsMask = Array3d
+SplitsArray = Union[Array2d, SplitsMask]
+BoundsArray = Array3d

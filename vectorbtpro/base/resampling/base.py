@@ -359,3 +359,47 @@ class Resampler(Configured):
             closed_rbound=closed_rbound,
             skip_minus_one=skip_minus_one,
         )
+
+    def resample_source_mask(
+        self,
+        source_mask: tp.ArrayLike,
+        jitted: tp.JittedOption = None,
+        silence_warnings: tp.Optional[bool] = None,
+    ) -> tp.Array1d:
+        """See `vectorbtpro.base.resampling.nb.target_within_source_index_nb`."""
+        if silence_warnings is None:
+            silence_warnings = self.silence_warnings
+        source_mask = np.broadcast_to(source_mask, (len(self.source_index),))
+        source_freq = self.source_freq
+        if source_freq is not None:
+            if not isinstance(source_freq, (int, float)):
+                try:
+                    source_freq = freq_to_timedelta64(source_freq)
+                except ValueError as e:
+                    if not silence_warnings:
+                        warnings.warn(f"Cannot convert {source_freq} to np.timedelta64. Setting to None.", stacklevel=2)
+                    source_freq = None
+        if source_freq is None:
+            if not silence_warnings:
+                warnings.warn("Using right bound of source index without frequency. Set source_freq.", stacklevel=2)
+        target_freq = self.target_freq
+        if target_freq is not None:
+            if not isinstance(target_freq, (int, float)):
+                try:
+                    target_freq = freq_to_timedelta64(target_freq)
+                except ValueError as e:
+                    if not silence_warnings:
+                        warnings.warn(f"Cannot convert {target_freq} to np.timedelta64. Setting to None.", stacklevel=2)
+                    target_freq = None
+        if target_freq is None:
+            if not silence_warnings:
+                warnings.warn("Using right bound of target index without frequency. Set target_freq.", stacklevel=2)
+
+        func = jit_reg.resolve_option(nb.resample_source_mask_nb, jitted)
+        return func(
+            source_mask,
+            self.source_index.values,
+            self.target_index.values,
+            source_freq,
+            target_freq,
+        )

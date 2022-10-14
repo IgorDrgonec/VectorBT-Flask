@@ -164,7 +164,7 @@ def combine_params(
     param_dct: tp.Dict[tp.Hashable, Param],
     random_subset: tp.Optional[int] = None,
     seed: tp.Optional[int] = None,
-    stack_kwargs: tp.KwargsLike = None,
+    index_stack_kwargs: tp.KwargsLike = None,
     name_tuple_to_str: tp.Union[None, bool, tp.Callable] = None,
 ) -> tp.Tuple[dict, pd.Index]:
     """Combine a dictionary with parameters of the type `Param`.
@@ -179,12 +179,12 @@ def combine_params(
         random_subset = params_cfg["random_subset"]
     if seed is None:
         seed = params_cfg["seed"]
-    stack_kwargs = merge_dicts(params_cfg["stack_kwargs"], stack_kwargs)
+    index_stack_kwargs = merge_dicts(params_cfg["index_stack_kwargs"], index_stack_kwargs)
     if name_tuple_to_str is None:
         name_tuple_to_str = params_cfg["name_tuple_to_str"]
 
-    if stack_kwargs is None:
-        stack_kwargs = {}
+    if index_stack_kwargs is None:
+        index_stack_kwargs = {}
 
     # Build a product
     param_index = None
@@ -253,13 +253,13 @@ def combine_params(
         for k in level_values[level].keys():
             levels.append(product_indexes[k])
         if len(levels) > 1:
-            _param_index = indexes.stack_indexes(levels, **stack_kwargs)
+            _param_index = indexes.stack_indexes(levels, **index_stack_kwargs)
         else:
             _param_index = levels[0]
         if param_index is None:
             param_index = _param_index
         else:
-            param_index = indexes.combine_indexes([param_index, _param_index], **stack_kwargs)
+            param_index = indexes.combine_indexes([param_index, _param_index], **index_stack_kwargs)
 
     # Generate parameter combinations using the operation tree
     if len(op_tree_operands) > 1:
@@ -432,7 +432,7 @@ def parameterized(
     skip_single_param: tp.Optional[bool] = None,
     template_context: tp.Optional[tp.Mapping] = None,
     random_subset: tp.Optional[int] = None,
-    stack_kwargs: tp.KwargsLike = None,
+    index_stack_kwargs: tp.KwargsLike = None,
     name_tuple_to_str: tp.Union[None, bool, tp.Callable] = None,
     merge_func: tp.Union[None, str, tp.Callable] = None,
     merge_kwargs: tp.KwargsLike = None,
@@ -629,10 +629,10 @@ def parameterized(
             random_subset = kwargs.pop("_random_subset", wrapper.options["random_subset"])
             if random_subset is None:
                 random_subset = params_cfg["random_subset"]
-            stack_kwargs = merge_dicts(
-                params_cfg["stack_kwargs"],
-                wrapper.options["stack_kwargs"],
-                kwargs.pop("_stack_kwargs", {})
+            index_stack_kwargs = merge_dicts(
+                params_cfg["index_stack_kwargs"],
+                wrapper.options["index_stack_kwargs"],
+                kwargs.pop("_index_stack_kwargs", {})
             )
             name_tuple_to_str = kwargs.pop("_name_tuple_to_str", wrapper.options["name_tuple_to_str"])
             if name_tuple_to_str is None:
@@ -710,7 +710,7 @@ def parameterized(
                 param_product, param_columns = combine_params(
                     param_dct,
                     random_subset=random_subset,
-                    stack_kwargs=stack_kwargs,
+                    index_stack_kwargs=index_stack_kwargs,
                     name_tuple_to_str=name_tuple_to_str,
                 )
                 product_param_configs = param_product_to_objs(paramable_kwargs, param_product)
@@ -735,7 +735,7 @@ def parameterized(
                     param_index = combine_indexes((
                         param_columns,
                         pd.Index(pc_names, name="param_config"),
-                    ), **stack_kwargs)
+                    ), **index_stack_kwargs)
             else:
                 if n_config_params == 0 or (n_config_params == 1 and pc_names_none):
                     param_index = pd.Index([0], name="param_config")
@@ -816,7 +816,7 @@ def parameterized(
                 skip_single_param=skip_single_param,
                 template_context=template_context,
                 random_subset=random_subset,
-                stack_kwargs=stack_kwargs,
+                index_stack_kwargs=index_stack_kwargs,
                 name_tuple_to_str=name_tuple_to_str,
                 merge_func=merge_func,
                 merge_kwargs=merge_kwargs,

@@ -24,7 +24,7 @@ def is_sorted_nb(arr: tp.Array1d) -> bool:
 
 def is_range(arr: tp.Array1d) -> bool:
     """Checks if array is arr range."""
-    return np.all(arr == np.arange(arr[0], arr[0] + len(arr)))
+    return np.all(np.diff(arr) == 1)
 
 
 @register_jitted(cache=True)

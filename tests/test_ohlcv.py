@@ -35,7 +35,7 @@ def teardown_module():
     vbt.settings.reset()
 
 
-# ############# accessors.py ############# #
+# ############# accessors ############# #
 
 
 class TestAccessors:

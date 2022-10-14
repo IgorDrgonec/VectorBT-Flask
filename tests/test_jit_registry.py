@@ -58,7 +58,7 @@ def jitted_f_my2():
     yield f_my2
 
 
-# ############# jit_registry.py ############# #
+# ############# jit_registry ############# #
 
 
 class TestJITRegistry:

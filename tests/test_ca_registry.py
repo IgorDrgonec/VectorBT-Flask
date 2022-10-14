@@ -22,7 +22,7 @@ def teardown_module():
     vbt.settings.reset()
 
 
-# ############# ca_registry.py ############# #
+# ############# ca_registry ############# #
 
 
 class TestCacheableRegistry:

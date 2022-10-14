@@ -1833,7 +1833,7 @@ class MappedArray(Analyzable):
 
         return merge_dicts(Analyzable.plots_defaults.__get__(self), mapped_array_plots_cfg)
 
-    _subplots: tp.ClassVar[Config] = Config(
+    _subplots: tp.ClassVar[Config] = HybridConfig(
         dict(
             to_pd_plot=dict(
                 check_is_not_grouped=True,

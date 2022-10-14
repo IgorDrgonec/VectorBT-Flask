@@ -51,7 +51,7 @@ def teardown_module():
     vbt.settings.reset()
 
 
-# ############# grouping.py ############# #
+# ############# grouping ############# #
 
 
 grouped_index = pd.MultiIndex.from_arrays(
@@ -326,7 +326,7 @@ class TestGrouper:
         assert vbt.Grouper(grouped_index) != vbt.Grouper(grouped_index, allow_modify=False)
 
 
-# ############# resampling.py ############# #
+# ############# resampling ############# #
 
 
 class TestResampler:
@@ -604,7 +604,7 @@ class TestResampler:
         )
 
 
-# ############# wrapping.py ############# #
+# ############# wrapping ############# #
 
 
 sr2_wrapper = vbt.ArrayWrapper.from_obj(sr2)
@@ -752,7 +752,7 @@ class TestArrayWrapper:
                 pd.MultiIndex.from_tuples([("a", "a"), ("b", "b")], names=["c1", "c2"]),
                 2,
             ),
-            stack_kwargs=dict(drop_duplicates=False),
+            index_stack_kwargs=dict(drop_duplicates=False),
         )
         assert_index_equal(
             wrapper.columns, pd.MultiIndex.from_tuples([("a", "a", "a"), ("b", "b", "b")], names=["c1", "c1", "c2"])
@@ -2259,7 +2259,7 @@ class TestWrapping:
             df4_grouped_wrapping.select_col()
 
 
-# ############# indexes.py ############# #
+# ############# indexes ############# #
 
 
 class TestIndexes:
@@ -2889,7 +2889,7 @@ class TestIndexes:
         )
 
 
-# ############# reshaping.py ############# #
+# ############# reshaping ############# #
 
 
 class TestReshaping:
@@ -4447,7 +4447,7 @@ class TestReshaping:
         )
 
 
-# ############# indexing.py ############# #
+# ############# indexing ############# #
 
 
 called_dict = {}
@@ -5316,7 +5316,7 @@ class TestIndexing:
         assert col_indices == slice(None, None, None)
 
 
-# ############# combining.py ############# #
+# ############# combining ############# #
 
 
 class TestCombining:
@@ -5477,7 +5477,7 @@ class TestCombining:
         )
 
 
-# ############# merging.py ############# #
+# ############# merging ############# #
 
 
 class TestMerging:
@@ -5866,7 +5866,7 @@ class TestMerging:
         )
 
 
-# ############# accessors.py ############# #
+# ############# accessors ############# #
 
 
 class TestAccessors:

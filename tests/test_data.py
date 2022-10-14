@@ -27,7 +27,7 @@ def teardown_module():
     vbt.settings.reset()
 
 
-# ############# base.py ############# #
+# ############# base ############# #
 
 
 class MyData(vbt.Data):
@@ -1761,7 +1761,7 @@ class TestData:
         )
 
 
-# ############# custom.py ############# #
+# ############# custom ############# #
 
 
 class TestCustom:
@@ -2221,7 +2221,7 @@ class TestCustom:
         )
 
 
-# ############# updater.py ############# #
+# ############# updater ############# #
 
 
 class TestDataUpdater:
@@ -2251,7 +2251,7 @@ class TestDataUpdater:
         assert updater.config["data"] == data
 
 
-# ############# saver.py ############# #
+# ############# saver ############# #
 
 
 class TestCSVDataSaver:

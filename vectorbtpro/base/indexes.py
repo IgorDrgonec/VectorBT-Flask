@@ -209,11 +209,35 @@ def combine_indexes(
     return new_index
 
 
+def combine_index_with_keys(index: tp.IndexLike, keys: tp.IndexLike, lens: tp.Sequence[int], **kwargs) -> tp.Index:
+    """Build keys based on index lengths."""
+    if not isinstance(index, pd.Index):
+        index = pd.Index(index)
+    if not isinstance(keys, pd.Index):
+        keys = pd.Index(keys)
+    new_index = None
+    new_keys = None
+    start_idx = 0
+    for i in range(len(keys)):
+        _index = index[start_idx:start_idx + lens[i]]
+        if new_index is None:
+            new_index = _index
+        else:
+            new_index = new_index.append(_index)
+        start_idx += lens[i]
+        new_key = keys[[i]].repeat(lens[i])
+        if new_keys is None:
+            new_keys = new_key
+        else:
+            new_keys = new_keys.append(new_key)
+    return stack_indexes([new_keys, new_index], **kwargs)
+
+
 def concat_indexes(
     *indexes: tp.MaybeTuple[tp.IndexLike],
     index_concat_method: tp.MaybeTuple[tp.Union[str, tp.Callable]] = "append",
     keys: tp.Optional[tp.IndexLike] = None,
-    stack_kwargs: tp.KwargsLike = None,
+    index_stack_kwargs: tp.KwargsLike = None,
     verify_integrity: bool = True,
     axis: int = 1,
 ) -> tp.Index:
@@ -241,8 +265,8 @@ def concat_indexes(
     indexes = list(indexes)
     if keys is not None and not isinstance(keys, pd.Index):
         keys = pd.Index(keys)
-    if stack_kwargs is None:
-        stack_kwargs = {}
+    if index_stack_kwargs is None:
+        index_stack_kwargs = {}
     if axis == 0:
         factorized_name = "row_idx"
     elif axis == 1:
@@ -264,7 +288,7 @@ def concat_indexes(
                 *indexes,
                 index_concat_method=index_concat_method[0],
                 keys=keys,
-                stack_kwargs=stack_kwargs,
+                index_stack_kwargs=index_stack_kwargs,
                 verify_integrity=verify_integrity,
                 axis=axis,
             )
@@ -273,7 +297,7 @@ def concat_indexes(
                 *indexes,
                 index_concat_method=index_concat_method[1],
                 keys=keys,
-                stack_kwargs=stack_kwargs,
+                index_stack_kwargs=index_stack_kwargs,
                 verify_integrity=verify_integrity,
                 axis=axis,
             )
@@ -351,7 +375,7 @@ def concat_indexes(
                 top_index = repeated_index
             else:
                 top_index = top_index.append(repeated_index)
-        new_index = stack_indexes((top_index, new_index), **stack_kwargs)
+        new_index = stack_indexes((top_index, new_index), **index_stack_kwargs)
     if verify_integrity:
         if keys is None:
             if axis == 0:

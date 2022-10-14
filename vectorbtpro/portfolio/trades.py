@@ -1754,7 +1754,7 @@ class Trades(Ranges):
 
         return merge_dicts(Ranges.plots_defaults.__get__(self), trades_plots_cfg)
 
-    _subplots: tp.ClassVar[Config] = Config(
+    _subplots: tp.ClassVar[Config] = HybridConfig(
         dict(
             plot=dict(
                 title="Trades",

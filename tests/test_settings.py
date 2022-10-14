@@ -10,7 +10,7 @@ def teardown_module():
     vbt.settings.reset()
 
 
-# ############# settings.py ############# #
+# ############# settings ############# #
 
 
 def is_lambda(v):

@@ -1719,7 +1719,7 @@ class PortfolioOptimizer(Analyzable):
         template_context: tp.KwargsLike = None,
         execute_kwargs: tp.KwargsLike = None,
         random_subset: tp.Optional[int] = None,
-        stack_kwargs: tp.KwargsLike = None,
+        index_stack_kwargs: tp.KwargsLike = None,
         wrapper_kwargs: tp.KwargsLike = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
@@ -1864,8 +1864,8 @@ class PortfolioOptimizer(Analyzable):
                 to rebalance many thousands of times. Usually, using a regular Python loop
                 and a Numba-compiled allocation function should suffice.
         """
-        if stack_kwargs is None:
-            stack_kwargs = {}
+        if index_stack_kwargs is None:
+            index_stack_kwargs = {}
         if pbar_kwargs is None:
             pbar_kwargs = {}
 
@@ -1929,7 +1929,7 @@ class PortfolioOptimizer(Analyzable):
             param_product, param_columns = combine_params(
                 param_dct,
                 random_subset=random_subset,
-                stack_kwargs=stack_kwargs,
+                index_stack_kwargs=index_stack_kwargs,
                 name_tuple_to_str=name_tuple_to_str,
             )
             product_group_configs = param_product_to_objs(paramable_kwargs, param_product)
@@ -1954,7 +1954,7 @@ class PortfolioOptimizer(Analyzable):
                         param_columns,
                         pd.Index(gc_names, name="group_config"),
                     ),
-                    **stack_kwargs,
+                    **index_stack_kwargs,
                 )
         else:
             if n_config_params == 0 or (n_config_params == 1 and gc_names_none):
@@ -2147,7 +2147,7 @@ class PortfolioOptimizer(Analyzable):
                 pbar.update(1)
 
         # Build column hierarchy
-        new_columns = combine_indexes((group_index, wrapper.columns), **stack_kwargs)
+        new_columns = combine_indexes((group_index, wrapper.columns), **index_stack_kwargs)
 
         # Create instance
         wrapper_kwargs = merge_dicts(
@@ -2407,7 +2407,7 @@ class PortfolioOptimizer(Analyzable):
         template_context: tp.KwargsLike = None,
         execute_kwargs: tp.KwargsLike = None,
         random_subset: tp.Optional[int] = None,
-        stack_kwargs: tp.KwargsLike = None,
+        index_stack_kwargs: tp.KwargsLike = None,
         wrapper_kwargs: tp.KwargsLike = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
@@ -2618,8 +2618,8 @@ class PortfolioOptimizer(Analyzable):
                 to rebalance many thousands of times. Usually, using a regular Python loop
                 and a Numba-compiled optimization function suffice.
         """
-        if stack_kwargs is None:
-            stack_kwargs = {}
+        if index_stack_kwargs is None:
+            index_stack_kwargs = {}
         if pbar_kwargs is None:
             pbar_kwargs = {}
 
@@ -2689,7 +2689,7 @@ class PortfolioOptimizer(Analyzable):
             param_product, param_columns = combine_params(
                 param_dct,
                 random_subset=random_subset,
-                stack_kwargs=stack_kwargs,
+                index_stack_kwargs=index_stack_kwargs,
                 name_tuple_to_str=name_tuple_to_str,
             )
             product_group_configs = param_product_to_objs(paramable_kwargs, param_product)
@@ -2714,7 +2714,7 @@ class PortfolioOptimizer(Analyzable):
                         param_columns,
                         pd.Index(gc_names, name="group_config"),
                     ),
-                    **stack_kwargs,
+                    **index_stack_kwargs,
                 )
         else:
             if n_config_params == 0 or (n_config_params == 1 and gc_names_none):
@@ -2961,7 +2961,7 @@ class PortfolioOptimizer(Analyzable):
                 pbar.update(1)
 
         # Build column hierarchy
-        new_columns = combine_indexes((group_index, wrapper.columns), **stack_kwargs)
+        new_columns = combine_indexes((group_index, wrapper.columns), **index_stack_kwargs)
 
         # Create instance
         wrapper_kwargs = merge_dicts(
@@ -3286,7 +3286,7 @@ class PortfolioOptimizer(Analyzable):
 
         return merge_dicts(Analyzable.plots_defaults.__get__(self), pfopt_plots_cfg)
 
-    _subplots: tp.ClassVar[Config] = Config(
+    _subplots: tp.ClassVar[Config] = HybridConfig(
         dict(
             alloc_ranges=dict(
                 title="Allocation Ranges",

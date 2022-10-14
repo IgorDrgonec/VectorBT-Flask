@@ -208,7 +208,7 @@ class ReturnsAccessor(GenericAccessor):
                     stack_bm_returns = False
                     break
             if stack_bm_returns:
-                kwargs["bm_returns"] = kwargs["wrapper"].row_stack_and_wrap(*bm_returns, group_by=False)
+                kwargs["bm_returns"] = kwargs["wrapper"].row_stack_arrs(*bm_returns, group_by=False)
         return kwargs
 
     @classmethod
@@ -237,7 +237,7 @@ class ReturnsAccessor(GenericAccessor):
                     stack_bm_returns = False
                     break
             if stack_bm_returns:
-                kwargs["bm_returns"] = kwargs["wrapper"].column_stack_and_wrap(
+                kwargs["bm_returns"] = kwargs["wrapper"].column_stack_arrs(
                     *bm_returns,
                     reindex_kwargs=reindex_kwargs,
                     group_by=False,
@@ -1794,7 +1794,7 @@ class ReturnsAccessor(GenericAccessor):
             returns_plots_cfg,
         )
 
-    _subplots: tp.ClassVar[Config] = Config(
+    _subplots: tp.ClassVar[Config] = HybridConfig(
         dict(
             plot_cumulative=dict(
                 title="Cumulative Returns",

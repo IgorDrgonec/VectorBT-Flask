@@ -59,7 +59,7 @@ def teardown_module():
     vbt.settings.reset()
 
 
-# ############# col_mapper.py ############# #
+# ############# col_mapper ############# #
 
 
 class TestColumnMapper:
@@ -103,7 +103,7 @@ class TestColumnMapper:
         assert not records_nosort.col_mapper.is_sorted()
 
 
-# ############# mapped_array.py ############# #
+# ############# mapped_array ############# #
 
 mapped_array = records.map_field("some_field1")
 mapped_array_grouped = records_grouped.map_field("some_field1")
@@ -1564,7 +1564,7 @@ class TestMappedArray:
         )
 
 
-# ############# base.py ############# #
+# ############# base ############# #
 
 
 class TestRecords:
@@ -2324,7 +2324,7 @@ class TestRecords:
         )
 
 
-# ############# ranges.py ############# #
+# ############# ranges ############# #
 
 ts = pd.DataFrame(
     {
@@ -4465,7 +4465,7 @@ class TestPatternRanges:
         assert_index_equal(stats_df.columns, stats_index)
 
 
-# ############# drawdowns.py ############# #
+# ############# drawdowns ############# #
 
 drawdowns = vbt.Drawdowns.from_price(ts2, wrapper_kwargs=dict(freq="1 days"))
 drawdowns_grouped = vbt.Drawdowns.from_price(ts2, wrapper_kwargs=dict(freq="1 days", group_by=group_by))
@@ -5216,7 +5216,7 @@ class TestDrawdowns:
         )
 
 
-# ############# orders.py ############# #
+# ############# orders ############# #
 
 open = pd.Series(
     [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5],
@@ -5979,7 +5979,7 @@ class TestFSOrders:
         assert_index_equal(stats_df.columns, stats_index)
 
 
-# ############# trades.py ############# #
+# ############# trades ############# #
 
 exit_trades = vbt.ExitTrades.from_orders(orders)
 exit_trades_grouped = vbt.ExitTrades.from_orders(orders_grouped)
@@ -7260,7 +7260,7 @@ class TestPositions:
         assert "Parent Id" not in records_readable.columns
 
 
-# ############# logs.py ############# #
+# ############# logs ############# #
 
 logs = vbt.Portfolio.from_orders(close, size, fees=0.01, log=True, freq="1 days").logs
 logs_grouped = logs.regroup(group_by)
