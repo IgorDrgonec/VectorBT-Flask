@@ -5834,6 +5834,80 @@ class TestMerging:
                 index=pd.Index(["i"]),
             ),
         )
+        sr1 = pd.Series([0, 1, 2, 4, 5], index=pd.date_range("2020-01-01", periods=5))
+        sr2 = pd.Series([6, 7, 8], index=pd.date_range("2020-01-04", periods=3))
+        assert_frame_equal(
+            merging.column_stack_merge((sr1, sr2), reset_index=False),
+            pd.DataFrame(
+                [[0.0, np.nan], [1.0, np.nan], [2.0, np.nan], [4.0, 6.0], [5.0, 7.0], [np.nan, 8.0]],
+                index=pd.date_range("2020-01-01", periods=6),
+            )
+        )
+        assert_frame_equal(
+            merging.column_stack_merge((sr1, sr2), reset_index=True),
+            pd.DataFrame([[0, 6.0], [1, 7.0], [2, 8.0], [4, np.nan], [5, np.nan]])
+        )
+        assert_frame_equal(
+            merging.column_stack_merge((sr1, sr2), reset_index="from_start"),
+            pd.DataFrame([[0, 6.0], [1, 7.0], [2, 8.0], [4, np.nan], [5, np.nan]])
+        )
+        assert_frame_equal(
+            merging.column_stack_merge((sr1, sr2), reset_index="from_end"),
+            pd.DataFrame([[0, np.nan], [1, np.nan], [2, 6.0], [4, 7.0], [5, 8.0]])
+        )
+        assert_frame_equal(
+            merging.column_stack_merge((sr1.vbt, sr2.vbt), reset_index=False).obj,
+            pd.DataFrame(
+                [[0.0, np.nan], [1.0, np.nan], [2.0, np.nan], [4.0, 6.0], [5.0, 7.0], [np.nan, 8.0]],
+                index=pd.date_range("2020-01-01", periods=6),
+            )
+        )
+        assert_frame_equal(
+            merging.column_stack_merge((sr1.vbt, sr2.vbt), reset_index=True).obj,
+            pd.DataFrame([[0.0, 6.0], [1.0, 7.0], [2.0, 8.0], [4.0, np.nan], [5.0, np.nan]])
+        )
+        assert_frame_equal(
+            merging.column_stack_merge((sr1.vbt, sr2.vbt), reset_index="from_start").obj,
+            pd.DataFrame([[0.0, 6.0], [1.0, 7.0], [2.0, 8.0], [4.0, np.nan], [5.0, np.nan]])
+        )
+        assert_frame_equal(
+            merging.column_stack_merge((sr1.vbt, sr2.vbt), reset_index="from_end").obj,
+            pd.DataFrame([[0.0, np.nan], [1.0, np.nan], [2.0, 6.0], [4.0, 7.0], [5.0, 8.0]])
+        )
+        arr1 = np.array([0, 1, 2, 4, 5])
+        arr2 = np.array([6, 7, 8])
+        with pytest.raises(Exception):
+            merging.column_stack_merge((arr1, arr2), reset_index=False)
+        np.testing.assert_array_equal(
+            merging.column_stack_merge((arr1, arr2), reset_index=True),
+            np.array([[0, 6.0], [1, 7.0], [2, 8.0], [4, np.nan], [5, np.nan]]),
+        )
+        np.testing.assert_array_equal(
+            merging.column_stack_merge((arr1, arr2), reset_index="from_start"),
+            np.array([[0, 6.0], [1, 7.0], [2, 8.0], [4, np.nan], [5, np.nan]]),
+        )
+        np.testing.assert_array_equal(
+            merging.column_stack_merge((arr1, arr2), reset_index="from_end"),
+            np.array([[0, np.nan], [1, np.nan], [2, 6.0], [4, 7.0], [5, 8.0]]),
+        )
+        arr1 = np.array([0, 1, 2])
+        arr2 = np.array([6, 7, 8])
+        np.testing.assert_array_equal(
+            merging.column_stack_merge((arr1, arr2), reset_index=False),
+            np.array([[0, 6], [1, 7], [2, 8]]),
+        )
+        np.testing.assert_array_equal(
+            merging.column_stack_merge((arr1, arr2), reset_index=True),
+            np.array([[0, 6], [1, 7], [2, 8]]),
+        )
+        np.testing.assert_array_equal(
+            merging.column_stack_merge((arr1, arr2), reset_index="from_start"),
+            np.array([[0, 6], [1, 7], [2, 8]]),
+        )
+        np.testing.assert_array_equal(
+            merging.column_stack_merge((arr1, arr2), reset_index="from_end"),
+            np.array([[0, 6], [1, 7], [2, 8]]),
+        )
 
     def test_mixed_merge(self):
         np.testing.assert_array_equal(

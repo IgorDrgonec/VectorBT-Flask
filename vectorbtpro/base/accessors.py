@@ -538,8 +538,20 @@ class BaseAccessor(Wrapping):
         wrapper_kwargs, kwargs = ArrayWrapper.extract_init_kwargs(**kwargs)
         if wrapper is None:
             wrapper = ArrayWrapper.from_obj(obj, **wrapper_kwargs)
-        elif len(wrapper_kwargs) > 0:
-            wrapper = wrapper.replace(**wrapper_kwargs)
+        else:
+            if len(wrapper_kwargs) > 0:
+                wrapper = wrapper.replace(**wrapper_kwargs)
+            if not wrapper.index.equals(obj.index):
+                obj = obj.copy(deep=False)
+                obj.index = wrapper.index
+            if isinstance(obj, pd.Series):
+                if obj.name != wrapper.name:
+                    obj = obj.copy(deep=False)
+                    obj.name = wrapper.name
+            else:
+                if not wrapper.index.equals(obj.columns):
+                    obj = obj.copy(deep=False)
+                    obj.columns = wrapper.columns
 
         Wrapping.__init__(self, wrapper, obj=obj, **kwargs)
 

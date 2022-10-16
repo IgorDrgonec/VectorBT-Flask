@@ -9,7 +9,6 @@ from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.drawdowns import Drawdowns
 from vectorbtpro.generic.enums import *
 from vectorbtpro.generic.ranges import Ranges, PatternRanges, PSC
-from vectorbtpro.generic.splitters import RangeSplitter, RollingSplitter, ExpandingSplitter
 from vectorbtpro.generic.splitting import *
 from vectorbtpro.utils.module_ import create__all__
 from vectorbtpro.utils.opt_packages import check_installed

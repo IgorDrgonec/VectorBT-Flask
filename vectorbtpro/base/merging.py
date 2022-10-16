@@ -16,10 +16,10 @@ from vectorbtpro.base.reshaping import column_stack
 
 def concat_merge(
     *objs,
+    keys: tp.Optional[tp.Index] = None,
     wrap: tp.Optional[bool] = None,
     wrapper: tp.Optional[ArrayWrapper] = None,
     wrap_kwargs: tp.KwargsLikeSequence = None,
-    keys: tp.Optional[tp.Index] = None,
     **kwargs,
 ) -> tp.MaybeTuple[tp.AnyArray]:
     """Merge multiple array-like objects through concatenation.
@@ -78,6 +78,8 @@ def concat_merge(
             wrap_kwargs = merge_dicts(dict(index=keys), wrap_kwargs)
             return pd.Series(objs, **wrap_kwargs)
         return np.asarray(objs)
+    if isinstance(objs[0], pd.Index):
+        objs = list(map(lambda x: x.to_series(), objs))
     if not isinstance(objs[0], pd.Series):
         if isinstance(objs[0], pd.DataFrame):
             raise ValueError("Use row stacking for concatenating DataFrames")
@@ -97,10 +99,10 @@ def concat_merge(
 
 def row_stack_merge(
     *objs,
+    keys: tp.Optional[tp.Index] = None,
     wrap: tp.Union[None, str, bool] = None,
     wrapper: tp.Optional[ArrayWrapper] = None,
     wrap_kwargs: tp.KwargsLikeSequence = None,
-    keys: tp.Optional[tp.Index] = None,
     **kwargs,
 ) -> tp.MaybeTuple[tp.AnyArray]:
     """Merge multiple array-like or `vectorbtpro.base.wrapping.Wrapping` objects through row stacking.
@@ -160,6 +162,8 @@ def row_stack_merge(
         wrap_kwargs = {}
     if wrap is None:
         wrap = wrapper is not None or keys is not None or len(wrap_kwargs) > 0
+    if isinstance(objs[0], pd.Index):
+        objs = list(map(lambda x: x.to_series(), objs))
     if not isinstance(objs[0], (pd.Series, pd.DataFrame)):
         if isinstance(wrap, str) or wrap:
             new_objs = []
@@ -192,10 +196,11 @@ def row_stack_merge(
 
 def column_stack_merge(
     *objs,
+    reset_index: tp.Union[None, bool, str] = None,
+    keys: tp.Optional[tp.Index] = None,
     wrap: tp.Union[None, str, bool] = None,
     wrapper: tp.Optional[ArrayWrapper] = None,
     wrap_kwargs: tp.KwargsLikeSequence = None,
-    keys: tp.Optional[tp.Index] = None,
     **kwargs,
 ) -> tp.MaybeTuple[tp.AnyArray]:
     """Merge multiple array-like or `vectorbtpro.base.wrapping.Wrapping` objects through column stacking.
@@ -216,17 +221,31 @@ def column_stack_merge(
     Keyword arguments `**kwargs` are passed to `pd.concat` and
     `vectorbtpro.base.wrapping.Wrapping.column_stack` only.
 
+    Argument `reset_index` supports the following options:
+
+    * False or None: Keep original index of each object
+    * True or 'from_start': Reset index of each object and align them at start
+    * 'from_end': Reset index of each object and align them at end
+
+    Options above work on Pandas, NumPy, and `vectorbtpro.base.wrapping.Wrapping` instances.
+
     !!! note
         All arrays are assumed to have the same type and dimensionality."""
     if len(objs) == 1:
         objs = objs[0]
     objs = list(objs)
+    if isinstance(reset_index, bool):
+        if reset_index:
+            reset_index = "from_start"
+        else:
+            reset_index = None
 
     if isinstance(objs[0], tuple):
         if len(objs[0]) == 1:
             return (
                 column_stack_merge(
                     list(map(lambda x: x[0], objs)),
+                    reset_index=reset_index,
                     keys=keys,
                     wrap=wrap,
                     wrapper=wrapper,
@@ -238,6 +257,7 @@ def column_stack_merge(
             map(
                 lambda x: column_stack_merge(
                     x,
+                    reset_index=reset_index,
                     keys=keys,
                     wrap=wrap,
                     wrapper=wrapper,
@@ -249,12 +269,28 @@ def column_stack_merge(
         )
 
     if isinstance(objs[0], Wrapping):
+        if reset_index is not None:
+            max_length = max(map(lambda x: x.wrapper.shape[0], objs))
+            new_objs = []
+            for obj in objs:
+                if isinstance(reset_index, str) and reset_index.lower() == "from_start":
+                    new_index = pd.RangeIndex(stop=obj.wrapper.shape[0])
+                    new_obj = obj.replace(wrapper=obj.wrapper.replace(index=new_index))
+                elif isinstance(reset_index, str) and reset_index.lower() == "from_end":
+                    new_index = pd.RangeIndex(start=max_length - obj.wrapper.shape[0], stop=max_length)
+                    new_obj = obj.replace(wrapper=obj.wrapper.replace(index=new_index))
+                else:
+                    raise ValueError(f"Invalid index resetting option '{reset_index}'")
+                new_objs.append(new_obj)
+            objs = new_objs
         kwargs = merge_dicts(dict(wrapper_kwargs=dict(keys=keys)), kwargs)
         return type(objs[0]).column_stack(objs, **kwargs)
     if wrap_kwargs is None:
         wrap_kwargs = {}
     if wrap is None:
         wrap = wrapper is not None or keys is not None or len(wrap_kwargs) > 0
+    if isinstance(objs[0], pd.Index):
+        objs = list(map(lambda x: x.to_series(), objs))
     if not isinstance(objs[0], (pd.Series, pd.DataFrame)):
         if isinstance(wrap, str) or wrap:
             new_objs = []
@@ -281,7 +317,34 @@ def column_stack_merge(
                             raise ValueError(f"Invalid wrapping option '{wrap}'")
             objs = new_objs
         else:
+            if reset_index is not None:
+                min_length = min(map(len, objs))
+                max_length = max(map(len, objs))
+                if min_length == max_length:
+                    return column_stack(objs)
+                new_obj = np.full((max_length, len(objs)), np.nan, dtype=np.float_)
+                for i, obj in enumerate(objs):
+                    if isinstance(reset_index, str) and reset_index.lower() == "from_start":
+                        new_obj[:len(obj), i] = np.asarray(obj)
+                    elif isinstance(reset_index, str) and reset_index.lower() == "from_end":
+                        new_obj[-len(obj):, i] = np.asarray(obj)
+                    else:
+                        raise ValueError(f"Invalid index resetting option '{reset_index}'")
+                return new_obj
             return column_stack(objs)
+    if reset_index is not None:
+        max_length = max(map(len, objs))
+        new_objs = []
+        for obj in objs:
+            new_obj = obj.copy(deep=False)
+            if isinstance(reset_index, str) and reset_index.lower() == "from_start":
+                new_obj.index = pd.RangeIndex(stop=len(new_obj))
+            elif isinstance(reset_index, str) and reset_index.lower() == "from_end":
+                new_obj.index = pd.RangeIndex(start=max_length - len(new_obj), stop=max_length)
+            else:
+                raise ValueError(f"Invalid index resetting option '{reset_index}'")
+            new_objs.append(new_obj)
+        objs = new_objs
     return pd.concat(objs, axis=1, keys=keys, **kwargs)
 
 

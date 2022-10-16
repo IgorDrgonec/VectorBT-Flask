@@ -948,8 +948,10 @@ splitter = ChildDict(
     stats=Config(
         settings=dict(normalize=True),
         filters=dict(
-            has_ndim_2=dict(
-                filter_func=lambda self, metric_settings: self.wrapper.ndim == 2,
+            has_multiple_sets=dict(
+                filter_func=lambda self, metric_settings: self.get_n_sets(
+                    set_group_by=metric_settings.get("set_group_by", None)
+                ) > 1,
             ),
             normalize=dict(
                 filter_func=lambda self, metric_settings: metric_settings["normalize"],
