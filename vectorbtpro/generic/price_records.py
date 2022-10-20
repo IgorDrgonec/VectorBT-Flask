@@ -115,14 +115,14 @@ class PriceRecords(Records):
                         *price_objs,
                         reindex_kwargs=reindex_kwargs,
                         group_by=False,
-                        wrap=False,
+                        wrap=True,
                     )
                     if price_name == "close":
                         if fbfill_close:
                             new_price = new_price.vbt.fbfill()
                         elif ffill_close:
                             new_price = new_price.vbt.ffill()
-                    kwargs[price_name] = new_price
+                    kwargs[price_name] = new_price.values
         return kwargs
 
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Records._expected_keys or set()) | {

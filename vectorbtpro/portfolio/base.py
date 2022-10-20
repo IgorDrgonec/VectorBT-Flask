@@ -8970,11 +8970,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             checks.assert_not_none(assets)
             checks.assert_not_none(wrapper)
 
-        close = to_2d_array(close).copy()
-        assets = to_2d_array(assets)
-        close[assets == 0] = 0.0  # for price being NaN
         func = jit_reg.resolve_option(nb.asset_value_nb, jitted)
-        asset_value = func(close, assets)
+        func = ch_reg.resolve_option(func, chunked)
+        asset_value = func(to_2d_array(close), to_2d_array(assets))
         if wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
             func = jit_reg.resolve_option(nb.sum_grouped_nb, jitted)
@@ -8988,7 +8986,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         direction: tp.Union[str, int] = "both",
         group_by: tp.GroupByLike = None,
         asset_value: tp.Optional[tp.SeriesFrame] = None,
-        free_cash: tp.Optional[tp.SeriesFrame] = None,
+        value: tp.Optional[tp.SeriesFrame] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
@@ -9006,11 +9004,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     jitted=jitted,
                     chunked=chunked,
                 )
-            if free_cash is None:
-                free_cash = cls_or_self.resolve_shortcut_attr(
-                    "cash",
+            if value is None:
+                value = cls_or_self.resolve_shortcut_attr(
+                    "value",
                     group_by=group_by,
-                    free=True,
                     jitted=jitted,
                     chunked=chunked,
                 )
@@ -9018,12 +9015,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 wrapper = cls_or_self.wrapper
         else:
             checks.assert_not_none(asset_value)
-            checks.assert_not_none(free_cash)
+            checks.assert_not_none(value)
             checks.assert_not_none(wrapper)
 
         func = jit_reg.resolve_option(nb.gross_exposure_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        gross_exposure = func(to_2d_array(asset_value), to_2d_array(free_cash))
+        gross_exposure = func(to_2d_array(asset_value), to_2d_array(value))
         return wrapper.wrap(gross_exposure, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     @class_or_instancemethod
@@ -9099,6 +9096,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             checks.assert_not_none(wrapper)
 
         func = jit_reg.resolve_option(nb.value_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         value = func(to_2d_array(cash), to_2d_array(asset_value))
         return wrapper.wrap(value, group_by=group_by, **resolve_dict(wrap_kwargs))
 

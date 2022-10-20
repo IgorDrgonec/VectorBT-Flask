@@ -1,7 +1,7 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for portfolio analysis."""
-
+import numpy as np
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
@@ -550,10 +550,22 @@ def init_value_grouped_nb(
     return out
 
 
-@register_jitted(cache=True)
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="close", axis=1),
+    arg_take_spec=dict(close=ch.ArraySlicer(axis=1), assets=ch.ArraySlicer(axis=1)),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
 def asset_value_nb(close: tp.Array2d, assets: tp.Array2d) -> tp.Array2d:
     """Get asset value series per column."""
-    return close * assets
+    out = np.empty(close.shape, dtype=np.float_)
+    for col in prange(close.shape[1]):
+        for i in range(close.shape[0]):
+            if assets[i, col] == 0:
+                out[i, col] = 0.0
+            else:
+                out[i, col] = close[i, col] * assets[i, col]
+    return out
 
 
 @register_jitted(cache=True)
@@ -564,27 +576,35 @@ def asset_value_grouped_nb(asset_value: tp.Array2d, group_lens: tp.Array1d) -> t
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="asset_value", axis=1),
-    arg_take_spec=dict(asset_value=ch.ArraySlicer(axis=1), cash=ch.ArraySlicer(axis=1)),
+    arg_take_spec=dict(asset_value=ch.ArraySlicer(axis=1), value=ch.ArraySlicer(axis=1)),
     merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def gross_exposure_nb(asset_value: tp.Array2d, cash: tp.Array2d) -> tp.Array2d:
+def gross_exposure_nb(asset_value: tp.Array2d, value: tp.Array2d) -> tp.Array2d:
     """Get gross exposure per column/group."""
     out = np.empty(asset_value.shape, dtype=np.float_)
     for col in prange(asset_value.shape[1]):
         for i in range(asset_value.shape[0]):
-            denom = add_nb(asset_value[i, col], cash[i, col])
-            if denom == 0:
-                out[i, col] = 0.0
+            if value[i, col] == 0:
+                out[i, col] = np.nan
             else:
-                out[i, col] = asset_value[i, col] / denom
+                out[i, col] = abs(asset_value[i, col] / value[i, col])
     return out
 
 
-@register_jitted(cache=True)
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="cash", axis=1),
+    arg_take_spec=dict(cash=ch.ArraySlicer(axis=1), asset_value=ch.ArraySlicer(axis=1)),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
 def value_nb(cash: tp.Array2d, asset_value: tp.Array2d) -> tp.Array2d:
     """Get portfolio value series per column/group."""
-    return cash + asset_value
+    out = np.empty(cash.shape, dtype=np.float_)
+    for col in prange(cash.shape[1]):
+        for i in range(cash.shape[0]):
+            out[i, col] = cash[i, col] + asset_value[i, col]
+    return out
 
 
 @register_chunkable(
