@@ -208,7 +208,11 @@ class ReturnsAccessor(GenericAccessor):
                     stack_bm_returns = False
                     break
             if stack_bm_returns:
-                kwargs["bm_returns"] = kwargs["wrapper"].row_stack_arrs(*bm_returns, group_by=False)
+                kwargs["bm_returns"] = kwargs["wrapper"].row_stack_arrs(
+                    *bm_returns,
+                    group_by=False,
+                    wrap=False,
+                )
         return kwargs
 
     @classmethod
@@ -241,6 +245,7 @@ class ReturnsAccessor(GenericAccessor):
                     *bm_returns,
                     reindex_kwargs=reindex_kwargs,
                     group_by=False,
+                    wrap=False,
                 )
         return kwargs
 
@@ -253,7 +258,8 @@ class ReturnsAccessor(GenericAccessor):
 
     def __init__(
         self,
-        obj: tp.SeriesFrame,
+        wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
+        obj: tp.Optional[tp.ArrayLike] = None,
         bm_returns: tp.Optional[tp.ArrayLike] = None,
         log_returns: bool = False,
         year_freq: tp.Optional[tp.FrequencyLike] = None,
@@ -262,7 +268,8 @@ class ReturnsAccessor(GenericAccessor):
     ) -> None:
         GenericAccessor.__init__(
             self,
-            obj,
+            wrapper,
+            obj=obj,
             bm_returns=bm_returns,
             log_returns=log_returns,
             year_freq=year_freq,
@@ -270,8 +277,6 @@ class ReturnsAccessor(GenericAccessor):
             **kwargs,
         )
 
-        if bm_returns is not None:
-            bm_returns = broadcast_to(bm_returns, obj)
         self._bm_returns = bm_returns
         self._log_returns = log_returns
         self._year_freq = year_freq
@@ -295,10 +300,13 @@ class ReturnsAccessor(GenericAccessor):
             self.to_2d_array()[wrapper_meta["row_idxs"], :][:, wrapper_meta["col_idxs"]],
             group_by=False,
         )
-        if self.bm_returns is not None:
-            new_bm_returns = wrapper_meta["new_wrapper"].wrap(
-                to_2d_array(self.bm_returns)[wrapper_meta["row_idxs"], :][:, wrapper_meta["col_idxs"]],
-                group_by=False,
+        if self._bm_returns is not None:
+            new_bm_returns = ArrayWrapper.select_from_flex_array(
+                self._bm_returns,
+                row_idxs=wrapper_meta["row_idxs"],
+                col_idxs=wrapper_meta["col_idxs"],
+                rows_changed=wrapper_meta["rows_changed"],
+                columns_changed=wrapper_meta["columns_changed"],
             )
         else:
             new_bm_returns = None
@@ -311,9 +319,9 @@ class ReturnsAccessor(GenericAccessor):
             )
         return self.replace(
             cls_=self.df_accessor_cls,
+            wrapper=wrapper_meta["new_wrapper"],
             obj=new_obj,
             bm_returns=new_bm_returns,
-            wrapper=wrapper_meta["new_wrapper"],
         )
 
     @property
@@ -326,6 +334,8 @@ class ReturnsAccessor(GenericAccessor):
         bm_returns = self._bm_returns
         if bm_returns is None:
             bm_returns = returns_cfg["bm_returns"]
+        if bm_returns is not None:
+            bm_returns = self.wrapper.wrap(bm_returns, group_by=False)
         return bm_returns
 
     @property
@@ -1508,7 +1518,7 @@ class ReturnsAccessor(GenericAccessor):
         new_obj = self.resample_apply(wrapper_meta["resampler"], nb.cum_returns_final_1d_nb)
         if fill_with_zero:
             new_obj = new_obj.vbt.fillna(0.0)
-        if self.bm_returns is not None:
+        if self._bm_returns is not None:
             new_bm_returns = self.bm_returns.vbt.resample_apply(wrapper_meta["resampler"], nb.cum_returns_final_1d_nb)
             if fill_with_zero:
                 new_bm_returns = new_bm_returns.vbt.fillna(0.0)
@@ -1826,14 +1836,23 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
 
     def __init__(
         self,
-        obj: tp.Series,
+        wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
+        obj: tp.Optional[tp.ArrayLike] = None,
         bm_returns: tp.Optional[tp.ArrayLike] = None,
         year_freq: tp.Optional[tp.FrequencyLike] = None,
         defaults: tp.KwargsLike = None,
         **kwargs,
     ) -> None:
-        GenericSRAccessor.__init__(self, obj, **kwargs)
-        ReturnsAccessor.__init__(self, obj, bm_returns=bm_returns, year_freq=year_freq, defaults=defaults, **kwargs)
+        GenericSRAccessor.__init__(self, wrapper, obj=obj, **kwargs)
+        ReturnsAccessor.__init__(
+            self,
+            wrapper,
+            obj=obj,
+            bm_returns=bm_returns,
+            year_freq=year_freq,
+            defaults=defaults,
+            **kwargs,
+        )
 
 
 @register_df_vbt_accessor("returns")
@@ -1844,11 +1863,20 @@ class ReturnsDFAccessor(ReturnsAccessor, GenericDFAccessor):
 
     def __init__(
         self,
-        obj: tp.Frame,
+        wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
+        obj: tp.Optional[tp.ArrayLike] = None,
         bm_returns: tp.Optional[tp.ArrayLike] = None,
         year_freq: tp.Optional[tp.FrequencyLike] = None,
         defaults: tp.KwargsLike = None,
         **kwargs,
     ) -> None:
-        GenericDFAccessor.__init__(self, obj, **kwargs)
-        ReturnsAccessor.__init__(self, obj, bm_returns=bm_returns, year_freq=year_freq, defaults=defaults, **kwargs)
+        GenericDFAccessor.__init__(self, wrapper, obj=obj, **kwargs)
+        ReturnsAccessor.__init__(
+            self,
+            wrapper,
+            obj=obj,
+            bm_returns=bm_returns,
+            year_freq=year_freq,
+            defaults=defaults,
+            **kwargs,
+        )

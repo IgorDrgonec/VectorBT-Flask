@@ -434,7 +434,11 @@ class BaseAccessor(Wrapping):
     ) -> tp.Kwargs:
         """Resolve keyword arguments for initializing `BaseAccessor` after stacking along rows."""
         if "obj" not in kwargs:
-            kwargs["obj"] = kwargs["wrapper"].row_stack_arrs(*[obj.obj for obj in objs], group_by=False)
+            kwargs["obj"] = kwargs["wrapper"].row_stack_arrs(
+                *[obj.obj for obj in objs],
+                group_by=False,
+                wrap=False,
+            )
         return kwargs
 
     @classmethod
@@ -450,6 +454,7 @@ class BaseAccessor(Wrapping):
                 *[obj.obj for obj in objs],
                 reindex_kwargs=reindex_kwargs,
                 group_by=False,
+                wrap=False,
             )
         return kwargs
 
@@ -481,7 +486,7 @@ class BaseAccessor(Wrapping):
 
         kwargs = cls.resolve_row_stack_kwargs(*objs, **kwargs)
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
-        if checks.is_series(kwargs["obj"]):
+        if kwargs["wrapper"].ndim == 1:
             return cls.sr_accessor_cls(**kwargs)
         return cls.df_accessor_cls(**kwargs)
 
@@ -516,42 +521,26 @@ class BaseAccessor(Wrapping):
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
         return cls.df_accessor_cls(**kwargs)
 
-    def indexing_func(self: BaseAccessorT, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> BaseAccessorT:
-        """Perform indexing on `BaseAccessor`."""
-        if wrapper_meta is None:
-            wrapper_meta = self.wrapper.indexing_func_meta(*args, **kwargs)
-        new_obj = wrapper_meta["new_wrapper"].wrap(
-            self.to_2d_array()[wrapper_meta["row_idxs"], :][:, wrapper_meta["col_idxs"]],
-            group_by=False,
-        )
-        if checks.is_series(new_obj):
-            return self.replace(cls_=self.sr_accessor_cls, obj=new_obj, wrapper=wrapper_meta["new_wrapper"])
-        return self.replace(cls_=self.df_accessor_cls, obj=new_obj, wrapper=wrapper_meta["new_wrapper"])
-
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Wrapping._expected_keys or set()) | {
         "obj",
     }
 
-    def __init__(self, obj: tp.SeriesFrame, wrapper: tp.Optional[ArrayWrapper] = None, **kwargs) -> None:
-        checks.assert_instance_of(obj, (pd.Series, pd.DataFrame))
-
+    def __init__(
+        self,
+        wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
+        obj: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> None:
         wrapper_kwargs, kwargs = ArrayWrapper.extract_init_kwargs(**kwargs)
-        if wrapper is None:
-            wrapper = ArrayWrapper.from_obj(obj, **wrapper_kwargs)
+        if not isinstance(wrapper, ArrayWrapper):
+            if obj is not None:
+                raise ValueError("Must either provide wrapper and object, or only object")
+            wrapper, obj = ArrayWrapper.from_obj(wrapper, **wrapper_kwargs), wrapper
         else:
+            if obj is None:
+                raise ValueError("Must either provide wrapper and object, or only object")
             if len(wrapper_kwargs) > 0:
                 wrapper = wrapper.replace(**wrapper_kwargs)
-            if not wrapper.index.equals(obj.index):
-                obj = obj.copy(deep=False)
-                obj.index = wrapper.index
-            if isinstance(obj, pd.Series):
-                if obj.name != wrapper.name:
-                    obj = obj.copy(deep=False)
-                    obj.name = wrapper.name
-            else:
-                if not wrapper.index.equals(obj.columns):
-                    obj = obj.copy(deep=False)
-                    obj.columns = wrapper.columns
 
         Wrapping.__init__(self, wrapper, obj=obj, **kwargs)
 
@@ -572,10 +561,25 @@ class BaseAccessor(Wrapping):
         """Accessor class for `pd.DataFrame`."""
         return BaseDFAccessor
 
+    def indexing_func(self: BaseAccessorT, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> BaseAccessorT:
+        """Perform indexing on `BaseAccessor`."""
+        if wrapper_meta is None:
+            wrapper_meta = self.wrapper.indexing_func_meta(*args, **kwargs)
+        new_obj = ArrayWrapper.select_from_flex_array(
+            self._obj,
+            row_idxs=wrapper_meta["row_idxs"],
+            col_idxs=wrapper_meta["col_idxs"],
+            rows_changed=wrapper_meta["rows_changed"],
+            columns_changed=wrapper_meta["columns_changed"],
+        )
+        if checks.is_series(new_obj):
+            return self.replace(cls_=self.sr_accessor_cls, wrapper=wrapper_meta["new_wrapper"], obj=new_obj)
+        return self.replace(cls_=self.df_accessor_cls, wrapper=wrapper_meta["new_wrapper"], obj=new_obj)
+
     @property
-    def obj(self):
+    def obj(self) -> tp.SeriesFrame:
         """Pandas object."""
-        return self._obj
+        return self.wrapper.wrap(self._obj, group_by=False)
 
     @class_or_instanceproperty
     def ndim(cls_or_self) -> tp.Optional[int]:
@@ -1562,10 +1566,19 @@ class BaseSRAccessor(BaseAccessor):
 
     Accessible via `pd.Series.vbt` and all child accessors."""
 
-    def __init__(self, obj: tp.Series, **kwargs) -> None:
-        checks.assert_instance_of(obj, pd.Series)
+    def __init__(
+        self,
+        wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
+        obj: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> None:
+        if wrapper.ndim == 2:
+            if wrapper.shape[1] == 1:
+                wrapper = wrapper.replace(ndim=1)
+            else:
+                raise TypeError("Series accessors work only one one-dimensional data")
 
-        BaseAccessor.__init__(self, obj, **kwargs)
+        BaseAccessor.__init__(self, wrapper, obj=obj, **kwargs)
 
     @class_or_instanceproperty
     def ndim(cls_or_self) -> int:
@@ -1585,10 +1598,16 @@ class BaseDFAccessor(BaseAccessor):
 
     Accessible via `pd.DataFrame.vbt` and all child accessors."""
 
-    def __init__(self, obj: tp.Frame, **kwargs) -> None:
-        checks.assert_instance_of(obj, pd.DataFrame)
+    def __init__(
+        self,
+        wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
+        obj: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> None:
+        if wrapper.ndim == 1:
+            wrapper = wrapper.replace(ndim=2)
 
-        BaseAccessor.__init__(self, obj, **kwargs)
+        BaseAccessor.__init__(self, wrapper, obj=obj, **kwargs)
 
     @class_or_instanceproperty
     def ndim(cls_or_self) -> int:

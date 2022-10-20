@@ -51,8 +51,8 @@ from pandas.core.accessor import DirNamesMixin
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.accessors import BaseIDXAccessor
+from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
-from vectorbtpro.utils.config import Configured
 
 ParentAccessorT = tp.TypeVar("ParentAccessorT", bound=object)
 AccessorT = tp.TypeVar("AccessorT", bound=object)
@@ -73,7 +73,7 @@ class Accessor:
         elif issubclass(self._accessor, type(obj)):
             accessor_obj = obj.replace(cls_=self._accessor)
         else:
-            accessor_obj = self._accessor(obj.obj)
+            accessor_obj = self._accessor(obj.wrapper, obj=obj._obj)
         return accessor_obj
 
 
@@ -95,7 +95,7 @@ class CachedAccessor:
         elif issubclass(self._accessor, type(obj)):
             accessor_obj = obj.replace(cls_=self._accessor)
         else:
-            accessor_obj = self._accessor(obj.obj)
+            accessor_obj = self._accessor(obj.wrapper, obj=obj._obj)
         object.__setattr__(obj, self._name, accessor_obj)
         return accessor_obj
 
@@ -143,17 +143,6 @@ def register_dataframe_accessor(name: str) -> tp.Callable:
     return register_accessor(name, pd.DataFrame)
 
 
-# By subclassing DirNamesMixin, we can build accessors on top of each other
-class Vbt_Accessor(DirNamesMixin, GenericAccessor):
-    """The main vectorbt accessor for `pd.Index`, `pd.Series`, and `pd.DataFrame`."""
-
-    def __init__(self, obj: tp.PandasArray, **kwargs) -> None:
-        self._obj = obj
-
-        DirNamesMixin.__init__(self)
-        GenericAccessor.__init__(self, obj, **kwargs)
-
-
 @register_index_accessor("vbt")
 class Vbt_IDXAccessor(DirNamesMixin, BaseIDXAccessor):
     """The main vectorbt accessor for `pd.Index`."""
@@ -165,26 +154,45 @@ class Vbt_IDXAccessor(DirNamesMixin, BaseIDXAccessor):
         BaseIDXAccessor.__init__(self, obj, **kwargs)
 
 
+class Vbt_Accessor(DirNamesMixin, GenericAccessor):
+    """The main vectorbt accessor for `pd.Series` and `pd.DataFrame`."""
+
+    def __init__(
+        self,
+        wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
+        obj: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> None:
+        DirNamesMixin.__init__(self)
+        GenericAccessor.__init__(self, wrapper, obj=obj, **kwargs)
+
+
 @register_series_accessor("vbt")
 class Vbt_SRAccessor(DirNamesMixin, GenericSRAccessor):
     """The main vectorbt accessor for `pd.Series`."""
 
-    def __init__(self, obj: tp.Series, **kwargs) -> None:
-        self._obj = obj
-
+    def __init__(
+        self,
+        wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
+        obj: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> None:
         DirNamesMixin.__init__(self)
-        GenericSRAccessor.__init__(self, obj, **kwargs)
+        GenericSRAccessor.__init__(self, wrapper, obj=obj, **kwargs)
 
 
 @register_dataframe_accessor("vbt")
 class Vbt_DFAccessor(DirNamesMixin, GenericDFAccessor):
     """The main vectorbt accessor for `pd.DataFrame`."""
 
-    def __init__(self, obj: tp.Frame, **kwargs) -> None:
-        self._obj = obj
-
+    def __init__(
+        self,
+        wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
+        obj: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> None:
         DirNamesMixin.__init__(self)
-        GenericDFAccessor.__init__(self, obj, **kwargs)
+        GenericDFAccessor.__init__(self, wrapper, obj=obj, **kwargs)
 
 
 def register_vbt_accessor(name: str, parent: tp.Type[DirNamesMixin] = Vbt_Accessor) -> tp.Callable:

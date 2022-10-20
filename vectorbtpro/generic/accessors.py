@@ -318,8 +318,14 @@ class GenericAccessor(BaseAccessor, Analyzable):
         "mapping",
     }
 
-    def __init__(self, obj: tp.SeriesFrame, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> None:
-        BaseAccessor.__init__(self, obj, mapping=mapping, **kwargs)
+    def __init__(
+        self,
+        wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
+        obj: tp.Optional[tp.ArrayLike] = None,
+        mapping: tp.Optional[tp.MappingLike] = None,
+        **kwargs,
+    ) -> None:
+        BaseAccessor.__init__(self, wrapper, obj=obj, mapping=mapping, **kwargs)
         StatsBuilderMixin.__init__(self)
         PlotsBuilderMixin.__init__(self)
 
@@ -4625,9 +4631,15 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
     Accessible via `pd.Series.vbt`."""
 
-    def __init__(self, obj: tp.Series, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> None:
-        BaseSRAccessor.__init__(self, obj, **kwargs)
-        GenericAccessor.__init__(self, obj, mapping=mapping, **kwargs)
+    def __init__(
+        self,
+        wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
+        obj: tp.Optional[tp.ArrayLike] = None,
+        mapping: tp.Optional[tp.MappingLike] = None,
+        **kwargs,
+    ) -> None:
+        BaseSRAccessor.__init__(self, wrapper, obj=obj, **kwargs)
+        GenericAccessor.__init__(self, wrapper, obj=obj, mapping=mapping, **kwargs)
 
     def fit_pattern(
         self,
@@ -4713,9 +4725,15 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
 
     Accessible via `pd.DataFrame.vbt`."""
 
-    def __init__(self, obj: tp.Frame, mapping: tp.Optional[tp.MappingLike] = None, **kwargs) -> None:
-        BaseDFAccessor.__init__(self, obj, **kwargs)
-        GenericAccessor.__init__(self, obj, mapping=mapping, **kwargs)
+    def __init__(
+        self,
+        wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
+        obj: tp.Optional[tp.ArrayLike] = None,
+        mapping: tp.Optional[tp.MappingLike] = None,
+        **kwargs,
+    ) -> None:
+        BaseDFAccessor.__init__(self, wrapper, obj=obj, **kwargs)
+        GenericAccessor.__init__(self, wrapper, obj=obj, mapping=mapping, **kwargs)
 
     def areaplot(
         self,

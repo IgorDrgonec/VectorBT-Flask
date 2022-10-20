@@ -221,10 +221,15 @@ class SignalsAccessor(GenericAccessor):
 
     Accessible via `pd.Series.vbt.signals` and `pd.DataFrame.vbt.signals`."""
 
-    def __init__(self, obj: tp.SeriesFrame, **kwargs) -> None:
-        checks.assert_dtype(obj, np.bool_)
+    def __init__(
+        self,
+        wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
+        obj: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> None:
+        GenericAccessor.__init__(self, wrapper, obj=obj, **kwargs)
 
-        GenericAccessor.__init__(self, obj, **kwargs)
+        checks.assert_dtype(self._obj, np.bool_)
 
     @class_or_instanceproperty
     def sr_accessor_cls(cls_or_self) -> tp.Type["SignalsSRAccessor"]:
@@ -2476,9 +2481,14 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
 
     Accessible via `pd.Series.vbt.signals`."""
 
-    def __init__(self, obj: tp.Series, **kwargs) -> None:
-        GenericSRAccessor.__init__(self, obj, **kwargs)
-        SignalsAccessor.__init__(self, obj, **kwargs)
+    def __init__(
+        self,
+        wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
+        obj: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> None:
+        GenericSRAccessor.__init__(self, wrapper, obj=obj, **kwargs)
+        SignalsAccessor.__init__(self, wrapper, obj=obj, **kwargs)
 
 
 @register_df_vbt_accessor("signals")
@@ -2487,6 +2497,11 @@ class SignalsDFAccessor(SignalsAccessor, GenericDFAccessor):
 
     Accessible via `pd.DataFrame.vbt.signals`."""
 
-    def __init__(self, obj: tp.Frame, **kwargs) -> None:
-        GenericDFAccessor.__init__(self, obj, **kwargs)
-        SignalsAccessor.__init__(self, obj, **kwargs)
+    def __init__(
+        self,
+        wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
+        obj: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> None:
+        GenericDFAccessor.__init__(self, wrapper, obj=obj, **kwargs)
+        SignalsAccessor.__init__(self, wrapper, obj=obj, **kwargs)

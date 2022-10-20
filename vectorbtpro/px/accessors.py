@@ -17,6 +17,7 @@ import plotly.express as px
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
 from vectorbtpro.base.reshaping import to_2d_array
+from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic.plotting import clean_labels
 from vectorbtpro.accessors import register_vbt_accessor, register_df_vbt_accessor, register_sr_vbt_accessor
 from vectorbtpro.utils import checks
@@ -93,8 +94,13 @@ class PXAccessor(BaseAccessor):
         ![](/assets/images/api/px_bar.svg)
     """
 
-    def __init__(self, obj: tp.SeriesFrame, **kwargs) -> None:
-        BaseAccessor.__init__(self, obj, **kwargs)
+    def __init__(
+        self,
+        wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
+        obj: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> None:
+        BaseAccessor.__init__(self, wrapper, obj=obj, **kwargs)
 
 
 @register_sr_vbt_accessor("px")
@@ -103,9 +109,14 @@ class PXSRAccessor(PXAccessor, BaseSRAccessor):
 
     Accessible via `pd.Series.vbt.px`."""
 
-    def __init__(self, obj: tp.Series, **kwargs) -> None:
-        BaseSRAccessor.__init__(self, obj, **kwargs)
-        PXAccessor.__init__(self, obj, **kwargs)
+    def __init__(
+        self,
+        wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
+        obj: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> None:
+        BaseSRAccessor.__init__(self, wrapper, obj=obj, **kwargs)
+        PXAccessor.__init__(self, wrapper, obj=obj, **kwargs)
 
 
 @register_df_vbt_accessor("px")
@@ -114,6 +125,11 @@ class PXDFAccessor(PXAccessor, BaseDFAccessor):
 
     Accessible via `pd.DataFrame.vbt.px`."""
 
-    def __init__(self, obj: tp.Frame, **kwargs) -> None:
-        BaseDFAccessor.__init__(self, obj, **kwargs)
-        PXAccessor.__init__(self, obj, **kwargs)
+    def __init__(
+        self,
+        wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
+        obj: tp.Optional[tp.ArrayLike] = None,
+        **kwargs,
+    ) -> None:
+        BaseDFAccessor.__init__(self, wrapper, obj=obj, **kwargs)
+        PXAccessor.__init__(self, wrapper, obj=obj, **kwargs)

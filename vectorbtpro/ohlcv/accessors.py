@@ -121,10 +121,16 @@ class OHLCVDFAccessor(GenericDFAccessor):
         "column_names",
     }
 
-    def __init__(self, obj: tp.Frame, column_names: tp.KwargsLike = None, **kwargs) -> None:
-        self._column_names = column_names
+    def __init__(
+        self,
+        wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
+        obj: tp.Optional[tp.ArrayLike] = None,
+        column_names: tp.KwargsLike = None,
+        **kwargs,
+    ) -> None:
+        GenericDFAccessor.__init__(self, wrapper, obj=obj, column_names=column_names, **kwargs)
 
-        GenericDFAccessor.__init__(self, obj, column_names=column_names, **kwargs)
+        self._column_names = column_names
 
     @property
     def column_names(self) -> tp.Kwargs:
