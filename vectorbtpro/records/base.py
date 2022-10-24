@@ -735,7 +735,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
             if "records_arr" in kwargs:
                 if self.records_arr is not kwargs.get("records_arr"):
                     kwargs["col_mapper"] = None
-        return Wrapping.replace(self, **kwargs)
+        return Analyzable.replace(self, **kwargs)
 
     def select_cols(
         self,

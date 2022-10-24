@@ -115,7 +115,7 @@ class TestSplitter:
             vbt.Splitter.from_splits(index, 0.5, fix_ranges=False).splits_arr, np.array([[0.5]])
         )
         np.testing.assert_array_equal(
-            vbt.Splitter.from_splits(index, 0.5, split_range_kwargs=dict(to_masks=True)).splits_arr,
+            vbt.Splitter.from_splits(index, 0.5, split_range_kwargs=dict(range_format="mask")).splits_arr,
             np.array([[[*[True] * 15, *[False] * 16]]]),
         )
         np.testing.assert_array_equal(
@@ -806,204 +806,272 @@ class TestSplitter:
             ],
             split_labels=[10, 11, 12],
         )
-        assert splitter.get_range() == slice(5, 31)
+        assert splitter.select_range() == slice(5, 31)
 
-        assert splitter.get_range(10, "set_0") == slice(5, 15)
-        assert splitter.get_range([10], "set_0") == slice(5, 15)
-        assert splitter.get_range(10, ["set_0", "set_1"]) == slice(5, 20)
-        assert splitter.get_range([10, 11, 12], "set_0") == slice(5, 25)
-        assert splitter.get_range(None, "set_0") == slice(5, 25)
+        assert splitter.select_range(split=10, set_="set_0") == slice(5, 15)
+        assert splitter.select_range(split=[10], set_="set_0") == slice(5, 15)
+        assert splitter.select_range(split=10, set_=["set_0", "set_1"]) == slice(5, 20)
+        assert splitter.select_range(split=[10, 11, 12], set_="set_0") == slice(5, 25)
+        assert splitter.select_range(split=None, set_="set_0") == slice(5, 25)
 
         with pytest.raises(Exception):
-            splitter.get_range(0, 0)
-        assert splitter.get_range(0, 0, split_as_indices=True) == slice(5, 15)
-        assert splitter.get_range(-1, -1, split_as_indices=True) == slice(20, 31)
-        assert splitter.get_range([0], 0, split_as_indices=True) == slice(5, 15)
-        assert splitter.get_range(0, [0, 1], split_as_indices=True) == slice(5, 20)
-        assert splitter.get_range([0, 1, 2], 0, split_as_indices=True) == slice(5, 25)
-        assert splitter.get_range(0, split_as_indices=True) == slice(5, 20)
-        assert splitter.get_range(None, 0, split_as_indices=True) == slice(5, 25)
+            splitter.select_range(split=0, set_=0)
+        assert splitter.select_range(split=0, set_=0, split_as_indices=True) == slice(5, 15)
+        assert splitter.select_range(split=-1, set_=-1, split_as_indices=True) == slice(20, 31)
+        assert splitter.select_range(split=[0], set_=0, split_as_indices=True) == slice(5, 15)
+        assert splitter.select_range(split=0, set_=[0, 1], split_as_indices=True) == slice(5, 20)
+        assert splitter.select_range(split=[0, 1, 2], set_=0, split_as_indices=True) == slice(5, 25)
+        assert splitter.select_range(split=0, split_as_indices=True) == slice(5, 20)
+        assert splitter.select_range(split=None, set_=0, split_as_indices=True) == slice(5, 25)
 
         split_group_by = [10, 11, 10]
         set_group_by = [12, 13]
 
-        assert splitter.get_range(
-            10,
-            12,
+        assert splitter.select_range(
+            split=10,
+            set_=12,
             split_group_by=split_group_by,
             set_group_by=set_group_by,
         ) == slice(5, 25, None)
-        assert splitter.get_range(
-            [10],
-            12,
+        assert splitter.select_range(
+            split=[10],
+            set_=12,
             split_group_by=split_group_by,
             set_group_by=set_group_by,
         ) == slice(5, 25, None)
-        assert splitter.get_range(
-            [10, 11],
-            12,
+        assert splitter.select_range(
+            split=[10, 11],
+            set_=12,
             split_group_by=split_group_by,
             set_group_by=set_group_by,
         ) == slice(5, 25, None)
-        assert splitter.get_range(
-            None,
-            12,
+        assert splitter.select_range(
+            split=None,
+            set_=12,
             split_group_by=split_group_by,
             set_group_by=set_group_by,
         ) == slice(5, 25, None)
-        assert splitter.get_range(
-            10,
-            [12],
+        assert splitter.select_range(
+            split=10,
+            set_=[12],
             split_group_by=split_group_by,
             set_group_by=set_group_by,
         ) == slice(5, 25, None)
-        assert splitter.get_range(
-            10,
-            [12, 13],
+        assert splitter.select_range(
+            split=10,
+            set_=[12, 13],
             split_group_by=split_group_by,
             set_group_by=set_group_by,
         ) == slice(5, 31, None)
-        assert splitter.get_range(
-            10,
-            None,
+        assert splitter.select_range(
+            split=10,
+            set_=None,
             split_group_by=split_group_by,
             set_group_by=set_group_by,
         ) == slice(5, 31, None)
 
         with pytest.raises(Exception):
-            splitter.get_range(
-                10,
-                0,
+            splitter.select_range(
+                split=10,
+                set_=0,
                 split_group_by=split_group_by,
                 set_group_by=set_group_by,
                 split_as_indices=True,
                 set_as_indices=True,
             )
         with pytest.raises(Exception):
-            splitter.get_range(
-                0,
-                12,
+            splitter.select_range(
+                split=0,
+                set_=12,
                 split_group_by=split_group_by,
                 set_group_by=set_group_by,
                 split_as_indices=True,
                 set_as_indices=True,
             )
 
-        assert splitter.get_range(
-            0,
-            0,
+        assert splitter.select_range(
+            split=0,
+            set_=0,
             split_group_by=split_group_by,
             set_group_by=set_group_by,
             split_as_indices=True,
             set_as_indices=True,
         ) == slice(5, 25, None)
-        assert splitter.get_range(
-            [0],
-            0,
+        assert splitter.select_range(
+            split=[0],
+            set_=0,
             split_group_by=split_group_by,
             set_group_by=set_group_by,
             split_as_indices=True,
             set_as_indices=True,
         ) == slice(5, 25, None)
-        assert splitter.get_range(
-            [0, 1],
-            0,
+        assert splitter.select_range(
+            split=[0, 1],
+            set_=0,
             split_group_by=split_group_by,
             set_group_by=set_group_by,
             split_as_indices=True,
             set_as_indices=True,
         ) == slice(5, 25, None)
-        assert splitter.get_range(
-            None,
-            0,
+        assert splitter.select_range(
+            split=None,
+            set_=0,
             split_group_by=split_group_by,
             set_group_by=set_group_by,
             split_as_indices=True,
             set_as_indices=True,
         ) == slice(5, 25, None)
-        assert splitter.get_range(
-            0,
-            [0],
+        assert splitter.select_range(
+            split=0,
+            set_=[0],
             split_group_by=split_group_by,
             set_group_by=set_group_by,
             split_as_indices=True,
             set_as_indices=True,
         ) == slice(5, 25, None)
-        assert splitter.get_range(
-            0,
-            [0, 1],
+        assert splitter.select_range(
+            split=0,
+            set_=[0, 1],
             split_group_by=split_group_by,
             set_group_by=set_group_by,
             split_as_indices=True,
             set_as_indices=True,
         ) == slice(5, 31, None)
-        assert splitter.get_range(
-            0,
-            None,
+        assert splitter.select_range(
+            split=0,
+            set_=None,
             split_group_by=split_group_by,
             set_group_by=set_group_by,
             split_as_indices=True,
             set_as_indices=True,
         ) == slice(5, 31, None)
 
-    def test_to_ready_range(self):
-        assert vbt.Splitter.to_ready_range(vbt.GapRange(slice(10, 20)), index=index) == slice(10, 20)
-        assert vbt.Splitter.to_ready_range(vbt.Rep("range_", context=dict(range_=slice(10, 20))), index=index) == slice(
-            10, 20
-        )
-        assert vbt.Splitter.to_ready_range(vbt.RepEval("slice(10, len(index))"), index=index) == slice(10, len(index))
-        assert vbt.Splitter.to_ready_range(lambda index: slice(10, len(index)), index=index) == slice(10, len(index))
+    def test_get_ready_range(self):
+        assert vbt.Splitter.get_ready_range(
+            vbt.GapRange(slice(10, 20)), index=index
+        ) == slice(10, 20)
+        assert vbt.Splitter.get_ready_range(
+            vbt.Rep("range_", context=dict(range_=slice(10, 20))), index=index
+        ) == slice(10, 20)
+        assert vbt.Splitter.get_ready_range(vbt.RepEval("slice(10, len(index))"), index=index) == slice(10, len(index))
+        assert vbt.Splitter.get_ready_range(lambda index: slice(10, len(index)), index=index) == slice(10, len(index))
         with pytest.raises(Exception):
-            vbt.Splitter.to_ready_range(10, index=index)
+            vbt.Splitter.get_ready_range(10, index=index)
         with pytest.raises(Exception):
-            vbt.Splitter.to_ready_range(0.5, index=index)
+            vbt.Splitter.get_ready_range(0.5, index=index)
         with pytest.raises(Exception):
-            vbt.Splitter.to_ready_range(vbt.RelRange(), index=index)
-        assert vbt.Splitter.to_ready_range(vbt.hslice(10, len(index)), index=index) == slice(10, len(index))
-        assert vbt.Splitter.to_ready_range(slice(None), index=index) == slice(0, len(index))
-        assert vbt.Splitter.to_ready_range(slice(None, len(index)), index=index) == slice(0, len(index))
-        assert vbt.Splitter.to_ready_range(slice(0, len(index)), index=index) == slice(0, len(index))
+            vbt.Splitter.get_ready_range(vbt.RelRange(), index=index)
+        assert vbt.Splitter.get_ready_range(vbt.hslice(10, len(index)), index=index) == slice(10, len(index))
+        assert vbt.Splitter.get_ready_range(slice(None), index=index) == slice(0, len(index))
+        assert vbt.Splitter.get_ready_range(slice(None, len(index)), index=index) == slice(0, len(index))
+        assert vbt.Splitter.get_ready_range(slice(0, len(index)), index=index) == slice(0, len(index))
         with pytest.raises(Exception):
-            vbt.Splitter.to_ready_range(slice(0, len(index), 2), index=index)
-        assert vbt.Splitter.to_ready_range(slice(-5, 0), index=index) == slice(len(index) - 5, len(index))
+            vbt.Splitter.get_ready_range(slice(0, len(index), 2), index=index)
+        assert vbt.Splitter.get_ready_range(slice(-5, 0), index=index) == slice(len(index) - 5, len(index))
         with pytest.raises(Exception):
-            vbt.Splitter.to_ready_range(slice(-5, 1), index=index)
+            vbt.Splitter.get_ready_range(slice(-5, 1), index=index)
         with pytest.raises(Exception):
-            vbt.Splitter.to_ready_range(slice(0, 0), index=index)
+            vbt.Splitter.get_ready_range(slice(0, 0), index=index)
         np.testing.assert_array_equal(
-            vbt.Splitter.to_ready_range(np.array([1, 3], dtype=object), index=index),
+            vbt.Splitter.get_ready_range(slice(5, 10), range_format="indices", index=index),
+            np.array([5, 6, 7, 8, 9]),
+        )
+        mask = np.full(len(index), False)
+        mask[5:10] = True
+        np.testing.assert_array_equal(
+            vbt.Splitter.get_ready_range(slice(5, 10), range_format="mask", index=index),
+            mask,
+        )
+
+        assert vbt.Splitter.get_ready_range(np.array([3, 2, 1], dtype=object), index=index) == slice(1, 4)
+        np.testing.assert_array_equal(
+            vbt.Splitter.get_ready_range(np.array([3, 2, 1], dtype=object), range_format="indices", index=index),
+            np.array([1, 2, 3]),
+        )
+        mask = np.full(len(index), False)
+        mask[[1, 2, 3]] = True
+        np.testing.assert_array_equal(
+            vbt.Splitter.get_ready_range(np.array([3, 2, 1], dtype=object), range_format="mask", index=index),
+            mask,
+        )
+        assert vbt.Splitter.get_ready_range(
+            np.array([3, 2, 1], dtype=object), range_format="slice", index=index
+        ) == slice(1, 4)
+        assert vbt.Splitter.get_ready_range(
+            np.array([3, 2, 1], dtype=object), range_format="slice_or_indices", index=index
+        ) == slice(1, 4)
+        assert vbt.Splitter.get_ready_range(
+            np.array([3, 2, 1], dtype=object), range_format="slice_or_mask", index=index
+        ) == slice(1, 4)
+        np.testing.assert_array_equal(
+            vbt.Splitter.get_ready_range(np.array([3, 1], dtype=object), index=index),
+            np.array([1, 3]),
+        )
+        mask = np.full(len(index), False)
+        mask[[1, 3]] = True
+        np.testing.assert_array_equal(
+            vbt.Splitter.get_ready_range(np.array([3, 1], dtype=object), range_format="mask", index=index),
+            mask,
+        )
+        with pytest.raises(Exception):
+            vbt.Splitter.get_ready_range(
+                np.array([3, 1], dtype=object), range_format="slice", index=index
+            )
+        np.testing.assert_array_equal(
+            vbt.Splitter.get_ready_range(np.array([3, 1], dtype=object), range_format="slice_or_indices", index=index),
             np.array([1, 3]),
         )
         np.testing.assert_array_equal(
-            vbt.Splitter.to_ready_range(np.array([1, 2, 3], dtype=object), try_to_slice=False, index=index),
+            vbt.Splitter.get_ready_range(np.array([3, 1], dtype=object), range_format="slice_or_mask", index=index),
+            mask,
+        )
+
+        mask = np.full(len(index), False)
+        mask[[1, 2, 3]] = True
+        mask = mask.astype(object)
+        assert vbt.Splitter.get_ready_range(mask, index=index) == slice(1, 4)
+        np.testing.assert_array_equal(
+            vbt.Splitter.get_ready_range(mask, range_format="indices", index=index),
             np.array([1, 2, 3]),
         )
-        assert vbt.Splitter.to_ready_range(np.array([1, 2, 3], dtype=object), index=index) == slice(1, 4)
-        assert vbt.Splitter.to_ready_range(np.array([3, 2, 1], dtype=object), index=index) == slice(1, 4)
+        np.testing.assert_array_equal(
+            vbt.Splitter.get_ready_range(mask, range_format="mask", index=index),
+            mask.astype(bool),
+        )
+        assert vbt.Splitter.get_ready_range(mask, range_format="slice", index=index) == slice(1, 4)
+        assert vbt.Splitter.get_ready_range(mask, range_format="slice_or_indices", index=index) == slice(1, 4)
+        assert vbt.Splitter.get_ready_range(mask, range_format="slice_or_mask", index=index) == slice(1, 4)
         mask = np.full(len(index), False)
         mask[[1, 3]] = True
         mask = mask.astype(object)
         np.testing.assert_array_equal(
-            vbt.Splitter.to_ready_range(mask, index=index),
+            vbt.Splitter.get_ready_range(mask, index=index),
             mask.astype(bool),
         )
-        mask = np.full(len(index), False)
-        mask[[1, 2, 3]] = True
-        mask = mask.astype(object)
         np.testing.assert_array_equal(
-            vbt.Splitter.to_ready_range(mask, try_to_slice=False, index=index),
+            vbt.Splitter.get_ready_range(mask, range_format="indices", index=index),
+            np.array([1, 3]),
+        )
+        with pytest.raises(Exception):
+            vbt.Splitter.get_ready_range(mask, range_format="slice", index=index)
+        np.testing.assert_array_equal(
+            vbt.Splitter.get_ready_range(mask, range_format="slice_or_mask", index=index),
             mask.astype(bool),
         )
-        assert vbt.Splitter.to_ready_range(mask, index=index) == slice(1, 4)
+        np.testing.assert_array_equal(
+            vbt.Splitter.get_ready_range(mask, range_format="slice_or_indices", index=index),
+            np.array([1, 3]),
+        )
+
         with pytest.raises(Exception):
-            vbt.Splitter.to_ready_range(np.array([-1, -2]), index=index)
+            vbt.Splitter.get_ready_range(np.array([-1, -2]), index=index)
         with pytest.raises(Exception):
-            vbt.Splitter.to_ready_range(np.array([0, 100]), index=index)
+            vbt.Splitter.get_ready_range(np.array([0, 100]), index=index)
         with pytest.raises(Exception):
-            vbt.Splitter.to_ready_range(np.array([100, 0]), index=index)
+            vbt.Splitter.get_ready_range(np.array([100, 0]), index=index)
         with pytest.raises(Exception):
-            vbt.Splitter.to_ready_range(np.array([100, 200]), index=index)
-        assert vbt.Splitter.to_ready_range(
+            vbt.Splitter.get_ready_range(np.array([100, 200]), index=index)
+        assert vbt.Splitter.get_ready_range(
             vbt.GapRange(vbt.Rep("range_", context=dict(range_=lambda index: vbt.hslice(10, 20)))),
             index=index,
             return_meta=True,
@@ -1023,7 +1091,10 @@ class TestSplitter:
             "length": 10,
             "range_": slice(10, 20, None),
         }
-        assert vbt.Splitter.to_ready_range(mask, index=index, return_meta=True) == {
+        mask = np.full(len(index), False)
+        mask[[1, 2, 3]] = True
+        mask = mask.astype(object)
+        assert vbt.Splitter.get_ready_range(mask, index=index, return_meta=True) == {
             "was_gap": False,
             "was_template": False,
             "was_callable": False,
@@ -1039,7 +1110,7 @@ class TestSplitter:
             "length": 3,
             "range_": slice(1, 4, None),
         }
-        assert vbt.Splitter.to_ready_range(np.array([1, 2, 3], dtype=object), index=index, return_meta=True) == {
+        assert vbt.Splitter.get_ready_range(np.array([1, 2, 3], dtype=object), index=index, return_meta=True) == {
             "was_gap": False,
             "was_template": False,
             "was_callable": False,
@@ -1177,7 +1248,7 @@ class TestSplitter:
                         mask,
                     ],
                     index=index,
-                    to_masks=True,
+                    range_format="mask",
                 )
             ),
             target_mask,
@@ -1236,92 +1307,81 @@ class TestSplitter:
         target_mask[1, 0, slice(0, 23, None)] = True
         target_mask[1, 1, slice(23, 31, None)] = True
         np.testing.assert_array_equal(
-            rel_splitter.to_fixed(split_range_kwargs=dict(to_masks=True)).splits_arr,
+            rel_splitter.to_fixed(split_range_kwargs=dict(range_format="mask")).splits_arr,
             target_mask,
         )
 
-    def test_to_target_range(self):
+    def test_remap_range(self):
+        def test_mask(out, slice_):
+            mask = np.full(len(out), False)
+            mask[slice_] = True
+            np.testing.assert_array_equal(out, mask)
+
         source_index = pd.date_range("2020-01-02", "2020-01-04", tz="utc")
         target_index = pd.date_range("2020-01-01", "2020-01-03", tz="utc")
-        assert vbt.Splitter.to_target_range(slice(None), target_index, index=source_index) == slice(1, 3)
+        test_mask(vbt.Splitter.remap_range(slice(None), target_index, index=source_index), slice(1, 3))
         target_index = pd.date_range("2020-01-02", "2020-01-04", tz="utc")
-        assert vbt.Splitter.to_target_range(slice(None), target_index, index=source_index) == slice(0, 3)
+        assert vbt.Splitter.remap_range(slice(None), target_index, index=source_index) == slice(None, None, None)
         target_index = pd.date_range("2020-01-03", "2020-01-05", tz="utc")
-        assert vbt.Splitter.to_target_range(slice(None), target_index, index=source_index) == slice(0, 2)
+        test_mask(vbt.Splitter.remap_range(slice(None), target_index, index=source_index), slice(0, 2))
         target_index = pd.date_range("2020-01-01 21:00:00", "2020-01-02 21:00:00", freq="4h", tz="utc")
-        assert vbt.Splitter.to_target_range(slice(None), target_index, index=source_index) == slice(1, 7)
+        test_mask(vbt.Splitter.remap_range(slice(None), target_index, index=source_index), slice(1, 7))
         target_index = pd.date_range("2020-01-02 21:00:00", "2020-01-03 21:00:00", freq="4h", tz="utc")
-        assert vbt.Splitter.to_target_range(slice(None), target_index, index=source_index) == slice(0, 7)
+        test_mask(vbt.Splitter.remap_range(slice(None), target_index, index=source_index), slice(0, 7))
         target_index = pd.date_range("2020-01-03 21:00:00", "2020-01-04 21:00:00", freq="4h", tz="utc")
-        assert vbt.Splitter.to_target_range(slice(None), target_index, index=source_index) == slice(0, 6)
+        test_mask(vbt.Splitter.remap_range(slice(None), target_index, index=source_index), slice(0, 6))
         target_index = pd.date_range("2020-01-01", "2020-01-04", freq="2d", tz="utc")
-        assert vbt.Splitter.to_target_range(slice(None), target_index, index=source_index) == slice(1, 2)
+        test_mask(vbt.Splitter.remap_range(slice(None), target_index, index=source_index), slice(1, 2))
         target_index = pd.date_range("2020-01-02", "2020-01-05", freq="2d", tz="utc")
-        assert vbt.Splitter.to_target_range(slice(None), target_index, index=source_index) == slice(0, 1)
+        test_mask(vbt.Splitter.remap_range(slice(None), target_index, index=source_index), slice(0, 1))
 
         target_index = pd.date_range("2020-01-01", "2020-01-03", tz="utc")
-        assert vbt.Splitter.to_target_range([0, 2], target_index, index=source_index) == slice(1, 2)
+        test_mask(vbt.Splitter.remap_range([0, 2], target_index, index=source_index), slice(1, 2))
         target_index = pd.date_range("2020-01-02", "2020-01-04", tz="utc")
         np.testing.assert_array_equal(
-            vbt.Splitter.to_target_range([0, 2], target_index, index=source_index),
+            vbt.Splitter.remap_range([0, 2], target_index, index=source_index),
             np.array([0, 2]),
         )
         target_index = pd.date_range("2020-01-03", "2020-01-05", tz="utc")
-        assert vbt.Splitter.to_target_range([0, 2], target_index, index=source_index) == slice(1, 2)
+        test_mask(vbt.Splitter.remap_range([0, 2], target_index, index=source_index), slice(1, 2))
         target_index = pd.date_range("2020-01-01 21:00:00", "2020-01-02 21:00:00", freq="4h", tz="utc")
-        assert vbt.Splitter.to_target_range([0, 2], target_index, index=source_index) == slice(1, 6)
+        test_mask(vbt.Splitter.remap_range([0, 2], target_index, index=source_index), slice(1, 6))
         target_index = pd.date_range("2020-01-02 21:00:00", "2020-01-03 21:00:00", freq="4h", tz="utc")
-        with pytest.raises(Exception):
-            vbt.Splitter.to_target_range([0, 2], target_index, index=source_index)
-        assert vbt.Splitter.to_target_range([0, 2], target_index, allow_zero_len=True, index=source_index) == slice(
-            0, 0
-        )
+        test_mask(vbt.Splitter.remap_range([0, 2], target_index, index=source_index), slice(0, 0))
         target_index = pd.date_range("2020-01-03 21:00:00", "2020-01-04 21:00:00", freq="4h", tz="utc")
-        assert vbt.Splitter.to_target_range([0, 2], target_index, index=source_index) == slice(1, 6)
+        test_mask(vbt.Splitter.remap_range([0, 2], target_index, index=source_index), slice(1, 6))
         target_index = pd.date_range("2020-01-01", "2020-01-04", freq="2d", tz="utc")
-        with pytest.raises(Exception):
-            vbt.Splitter.to_target_range([0, 2], target_index, index=source_index)
-        assert vbt.Splitter.to_target_range([0, 2], target_index, allow_zero_len=True, index=source_index) == slice(
-            0, 0
-        )
+        test_mask(vbt.Splitter.remap_range([0, 2], target_index, index=source_index), slice(0, 0))
         target_index = pd.date_range("2020-01-02", "2020-01-05", freq="2d", tz="utc")
-        with pytest.raises(Exception):
-            vbt.Splitter.to_target_range([0, 2], target_index, index=source_index)
-        assert vbt.Splitter.to_target_range([0, 2], target_index, allow_zero_len=True, index=source_index) == slice(
-            0, 0
-        )
+        test_mask(vbt.Splitter.remap_range([0, 2], target_index, index=source_index), slice(0, 0))
 
-    def test_take_range(self):
+    def test_get_ready_obj_range(self):
         arr = np.arange(len(index))
-        np.testing.assert_array_equal(vbt.Splitter.take_range(arr, slice(None), index=index), arr)
-        np.testing.assert_array_equal(vbt.Splitter.take_range(arr, slice(5, 10), index=index), arr[5:10])
-        assert_index_equal(vbt.Splitter.take_range(index, slice(None), index=index), index)
-        assert_index_equal(vbt.Splitter.take_range(index, slice(5, 10), index=index), index[5:10])
+        assert vbt.Splitter.get_ready_obj_range(arr, slice(None), index=index) == slice(0, 31)
+        assert vbt.Splitter.get_ready_obj_range(arr, slice(5, 10), index=index) == slice(5, 10)
+        assert vbt.Splitter.get_ready_obj_range(index, slice(None), index=index) == slice(0, 31)
+        assert vbt.Splitter.get_ready_obj_range(index, slice(5, 10), index=index) == slice(5, 10)
         sr = pd.Series(np.arange(len(index)), index=index)
-        assert_series_equal(vbt.Splitter.take_range(sr, slice(None), index=index), sr)
-        assert_series_equal(vbt.Splitter.take_range(sr, slice(5, 10), index=index), sr.iloc[5:10])
+        assert vbt.Splitter.get_ready_obj_range(sr, slice(None), index=index) == slice(0, 31)
+        assert vbt.Splitter.get_ready_obj_range(sr, slice(5, 10), index=index) == slice(5, 10)
         df = pd.DataFrame(np.arange(len(index)), index=index)
-        assert_frame_equal(vbt.Splitter.take_range(df, slice(None), index=index), df)
-        assert_frame_equal(vbt.Splitter.take_range(df, slice(5, 10), index=index), df.iloc[5:10])
+        assert vbt.Splitter.get_ready_obj_range(df, slice(None), index=index) == slice(0, 31)
+        assert vbt.Splitter.get_ready_obj_range(df, slice(5, 10), index=index) == slice(5, 10)
 
         obj_index = index.shift(-10)
         arr = np.arange(len(obj_index))
-        np.testing.assert_array_equal(
-            vbt.Splitter.take_range(arr, slice(None), obj_index=obj_index, index=index), arr[10:]
-        )
-        np.testing.assert_array_equal(
-            vbt.Splitter.take_range(arr, slice(5, 10), obj_index=obj_index, index=index), arr[15:20]
-        )
-        assert_index_equal(vbt.Splitter.take_range(obj_index, slice(None), index=index), obj_index[10:])
-        assert_index_equal(vbt.Splitter.take_range(obj_index, slice(5, 10), index=index), obj_index[15:20])
+        assert vbt.Splitter.get_ready_obj_range(arr, slice(None), obj_index=obj_index, index=index) == slice(10, 31)
+        assert vbt.Splitter.get_ready_obj_range(arr, slice(5, 10), obj_index=obj_index, index=index) == slice(15, 20)
+        assert vbt.Splitter.get_ready_obj_range(obj_index, slice(None), index=index) == slice(10, 31)
+        assert vbt.Splitter.get_ready_obj_range(obj_index, slice(5, 10), index=index) == slice(15, 20)
         sr = pd.Series(np.arange(len(obj_index)), index=obj_index)
-        assert_series_equal(vbt.Splitter.take_range(sr, slice(None), index=index), sr.iloc[10:])
-        assert_series_equal(vbt.Splitter.take_range(sr, slice(5, 10), index=index), sr.iloc[15:20])
-        assert_series_equal(vbt.Splitter.take_range(sr, slice(None), use_obj_index=False, index=index), sr)
-        assert_series_equal(vbt.Splitter.take_range(sr, slice(5, 10), use_obj_index=False, index=index), sr.iloc[5:10])
+        assert vbt.Splitter.get_ready_obj_range(sr, slice(None), index=index) == slice(10, 31)
+        assert vbt.Splitter.get_ready_obj_range(sr, slice(5, 10), index=index) == slice(15, 20)
+        assert vbt.Splitter.get_ready_obj_range(sr, slice(None), remap_to_obj=False, index=index) == slice(0, 31)
+        assert vbt.Splitter.get_ready_obj_range(sr, slice(5, 10), remap_to_obj=False, index=index) == slice(5, 10)
         df = pd.DataFrame(np.arange(len(obj_index)), index=obj_index)
-        assert_frame_equal(vbt.Splitter.take_range(df, slice(None), index=index), df.iloc[10:])
-        assert_frame_equal(vbt.Splitter.take_range(df, slice(5, 10), index=index), df.iloc[15:20])
+        assert vbt.Splitter.get_ready_obj_range(df, slice(None), index=index) == slice(10, 31)
+        assert vbt.Splitter.get_ready_obj_range(df, slice(5, 10), index=index) == slice(15, 20)
 
     def test_take_split_major_meta(self):
         sr = pd.Series(np.arange(len(index)), index=index.shift(-5))
@@ -1336,46 +1396,34 @@ class TestSplitter:
             splitter.take(
                 sr,
                 into="split_major_meta",
-                attach_bounds=True,
-                range_bounds_kwargs=dict(map_to_index=True),
-            )
+                attach_bounds="target",
+                index_bounds=True,
+            )[1]
         )
         assert len(new_obj) == 4
         assert new_obj[0]["split_idx"] == 0
         assert new_obj[0]["set_idx"] == 0
-        assert new_obj[0]["split_label"] == 0
-        assert new_obj[0]["set_label"] == "set_0"
-        assert new_obj[0]["range_"] == slice(0, 15, None)
-        assert_index_equal(new_obj[0]["obj_index"], sr.index)
-        assert new_obj[0]["obj_range"] == slice(5, 20, None)
-        assert new_obj[0]["obj_bounds"] == (pd.Timestamp("2020-01-01 00:00:00"), pd.Timestamp("2020-01-16 00:00:00"))
+        assert new_obj[0]["range_meta"]["range_"] == slice(0, 15, None)
+        assert new_obj[0]["obj_range_meta"]["range_"] == slice(5, 20, None)
+        assert new_obj[0]["bounds"] == (pd.Timestamp("2020-01-01 00:00:00"), pd.Timestamp("2020-01-16 00:00:00"))
         assert_series_equal(new_obj[0]["obj_slice"], sr.iloc[5:20])
         assert new_obj[1]["split_idx"] == 0
         assert new_obj[1]["set_idx"] == 1
-        assert new_obj[1]["split_label"] == 0
-        assert new_obj[1]["set_label"] == "set_1"
-        assert new_obj[1]["range_"] == slice(10, 25, None)
-        assert_index_equal(new_obj[1]["obj_index"], sr.index)
-        assert new_obj[1]["obj_range"] == slice(15, 30, None)
-        assert new_obj[1]["obj_bounds"] == (pd.Timestamp("2020-01-11 00:00:00"), pd.Timestamp("2020-01-26 00:00:00"))
+        assert new_obj[1]["range_meta"]["range_"] == slice(10, 25, None)
+        assert new_obj[1]["obj_range_meta"]["range_"] == slice(15, 30, None)
+        assert new_obj[1]["bounds"] == (pd.Timestamp("2020-01-11 00:00:00"), pd.Timestamp("2020-01-26 00:00:00"))
         assert_series_equal(new_obj[1]["obj_slice"], sr.iloc[15:30])
         assert new_obj[2]["split_idx"] == 1
         assert new_obj[2]["set_idx"] == 0
-        assert new_obj[2]["split_label"] == 1
-        assert new_obj[2]["set_label"] == "set_0"
-        assert new_obj[2]["range_"] == slice(5, 20, None)
-        assert_index_equal(new_obj[2]["obj_index"], sr.index)
-        assert new_obj[2]["obj_range"] == slice(10, 25, None)
-        assert new_obj[2]["obj_bounds"] == (pd.Timestamp("2020-01-06 00:00:00"), pd.Timestamp("2020-01-21 00:00:00"))
+        assert new_obj[2]["range_meta"]["range_"] == slice(5, 20, None)
+        assert new_obj[2]["obj_range_meta"]["range_"] == slice(10, 25, None)
+        assert new_obj[2]["bounds"] == (pd.Timestamp("2020-01-06 00:00:00"), pd.Timestamp("2020-01-21 00:00:00"))
         assert_series_equal(new_obj[2]["obj_slice"], sr.iloc[10:25])
         assert new_obj[3]["split_idx"] == 1
         assert new_obj[3]["set_idx"] == 1
-        assert new_obj[3]["split_label"] == 1
-        assert new_obj[3]["set_label"] == "set_1"
-        assert new_obj[3]["range_"] == slice(15, 31, None)
-        assert_index_equal(new_obj[3]["obj_index"], sr.index)
-        assert new_obj[3]["obj_range"] == slice(20, 31, None)
-        assert new_obj[3]["obj_bounds"] == (pd.Timestamp("2020-01-16 00:00:00"), pd.Timestamp("2020-01-27 00:00:00"))
+        assert new_obj[3]["range_meta"]["range_"] == slice(15, 31, None)
+        assert new_obj[3]["obj_range_meta"]["range_"] == slice(20, 31, None)
+        assert new_obj[3]["bounds"] == (pd.Timestamp("2020-01-16 00:00:00"), pd.Timestamp("2020-01-27 00:00:00"))
         assert_series_equal(new_obj[3]["obj_slice"], sr.iloc[20:31])
 
         new_obj = list(
@@ -1384,19 +1432,16 @@ class TestSplitter:
                 into="split_major_meta",
                 split_group_by=["a", "a"],
                 set_group_by=["b", "b"],
-                attach_bounds=True,
-                range_bounds_kwargs=dict(map_to_index=True),
-            )
+                attach_bounds="target",
+                index_bounds=True,
+            )[1]
         )
         assert len(new_obj) == 1
         assert new_obj[0]["split_idx"] == 0
         assert new_obj[0]["set_idx"] == 0
-        assert new_obj[0]["split_label"] == "a"
-        assert new_obj[0]["set_label"] == "b"
-        assert new_obj[0]["range_"] == slice(0, 31, None)
-        assert_index_equal(new_obj[0]["obj_index"], sr.index)
-        assert new_obj[0]["obj_range"] == slice(5, 31, None)
-        assert new_obj[0]["obj_bounds"] == (pd.Timestamp("2020-01-01 00:00:00"), pd.Timestamp("2020-01-27 00:00:00"))
+        assert new_obj[0]["range_meta"]["range_"] == slice(0, 31, None)
+        assert new_obj[0]["obj_range_meta"]["range_"] == slice(5, 31, None)
+        assert new_obj[0]["bounds"] == (pd.Timestamp("2020-01-01 00:00:00"), pd.Timestamp("2020-01-27 00:00:00"))
         assert_series_equal(new_obj[0]["obj_slice"], sr.iloc[5:31])
 
     def test_take_set_major_meta(self):
@@ -1412,46 +1457,34 @@ class TestSplitter:
             splitter.take(
                 sr,
                 into="set_major_meta",
-                attach_bounds=True,
-                range_bounds_kwargs=dict(map_to_index=True),
-            )
+                attach_bounds="target",
+                index_bounds=True,
+            )[1]
         )
         assert len(new_obj) == 4
         assert new_obj[0]["split_idx"] == 0
         assert new_obj[0]["set_idx"] == 0
-        assert new_obj[0]["split_label"] == 0
-        assert new_obj[0]["set_label"] == "set_0"
-        assert new_obj[0]["range_"] == slice(0, 15, None)
-        assert_index_equal(new_obj[0]["obj_index"], sr.index)
-        assert new_obj[0]["obj_range"] == slice(5, 20, None)
-        assert new_obj[0]["obj_bounds"] == (pd.Timestamp("2020-01-01 00:00:00"), pd.Timestamp("2020-01-16 00:00:00"))
+        assert new_obj[0]["range_meta"]["range_"] == slice(0, 15, None)
+        assert new_obj[0]["obj_range_meta"]["range_"] == slice(5, 20, None)
+        assert new_obj[0]["bounds"] == (pd.Timestamp("2020-01-01 00:00:00"), pd.Timestamp("2020-01-16 00:00:00"))
         assert_series_equal(new_obj[0]["obj_slice"], sr.iloc[5:20])
         assert new_obj[1]["split_idx"] == 1
         assert new_obj[1]["set_idx"] == 0
-        assert new_obj[1]["split_label"] == 1
-        assert new_obj[1]["set_label"] == "set_0"
-        assert new_obj[1]["range_"] == slice(5, 20, None)
-        assert_index_equal(new_obj[1]["obj_index"], sr.index)
-        assert new_obj[1]["obj_range"] == slice(10, 25, None)
-        assert new_obj[1]["obj_bounds"] == (pd.Timestamp("2020-01-06 00:00:00"), pd.Timestamp("2020-01-21 00:00:00"))
+        assert new_obj[1]["range_meta"]["range_"] == slice(5, 20, None)
+        assert new_obj[1]["obj_range_meta"]["range_"] == slice(10, 25, None)
+        assert new_obj[1]["bounds"] == (pd.Timestamp("2020-01-06 00:00:00"), pd.Timestamp("2020-01-21 00:00:00"))
         assert_series_equal(new_obj[1]["obj_slice"], sr.iloc[10:25])
         assert new_obj[2]["split_idx"] == 0
         assert new_obj[2]["set_idx"] == 1
-        assert new_obj[2]["split_label"] == 0
-        assert new_obj[2]["set_label"] == "set_1"
-        assert new_obj[2]["range_"] == slice(10, 25, None)
-        assert_index_equal(new_obj[2]["obj_index"], sr.index)
-        assert new_obj[2]["obj_range"] == slice(15, 30, None)
-        assert new_obj[2]["obj_bounds"] == (pd.Timestamp("2020-01-11 00:00:00"), pd.Timestamp("2020-01-26 00:00:00"))
+        assert new_obj[2]["range_meta"]["range_"] == slice(10, 25, None)
+        assert new_obj[2]["obj_range_meta"]["range_"] == slice(15, 30, None)
+        assert new_obj[2]["bounds"] == (pd.Timestamp("2020-01-11 00:00:00"), pd.Timestamp("2020-01-26 00:00:00"))
         assert_series_equal(new_obj[2]["obj_slice"], sr.iloc[15:30])
         assert new_obj[3]["split_idx"] == 1
         assert new_obj[3]["set_idx"] == 1
-        assert new_obj[3]["split_label"] == 1
-        assert new_obj[3]["set_label"] == "set_1"
-        assert new_obj[3]["range_"] == slice(15, 31, None)
-        assert_index_equal(new_obj[3]["obj_index"], sr.index)
-        assert new_obj[3]["obj_range"] == slice(20, 31, None)
-        assert new_obj[3]["obj_bounds"] == (pd.Timestamp("2020-01-16 00:00:00"), pd.Timestamp("2020-01-27 00:00:00"))
+        assert new_obj[3]["range_meta"]["range_"] == slice(15, 31, None)
+        assert new_obj[3]["obj_range_meta"]["range_"] == slice(20, 31, None)
+        assert new_obj[3]["bounds"] == (pd.Timestamp("2020-01-16 00:00:00"), pd.Timestamp("2020-01-27 00:00:00"))
         assert_series_equal(new_obj[3]["obj_slice"], sr.iloc[20:31])
 
         new_obj = list(
@@ -1460,22 +1493,19 @@ class TestSplitter:
                 into="set_major_meta",
                 split_group_by=["a", "a"],
                 set_group_by=["b", "b"],
-                attach_bounds=True,
-                range_bounds_kwargs=dict(map_to_index=True),
-            )
+                attach_bounds="target",
+                index_bounds=True,
+            )[1]
         )
         assert len(new_obj) == 1
         assert new_obj[0]["split_idx"] == 0
         assert new_obj[0]["set_idx"] == 0
-        assert new_obj[0]["split_label"] == "a"
-        assert new_obj[0]["set_label"] == "b"
-        assert new_obj[0]["range_"] == slice(0, 31, None)
-        assert_index_equal(new_obj[0]["obj_index"], sr.index)
-        assert new_obj[0]["obj_range"] == slice(5, 31, None)
-        assert new_obj[0]["obj_bounds"] == (pd.Timestamp("2020-01-01 00:00:00"), pd.Timestamp("2020-01-27 00:00:00"))
+        assert new_obj[0]["range_meta"]["range_"] == slice(0, 31, None)
+        assert new_obj[0]["obj_range_meta"]["range_"] == slice(5, 31, None)
+        assert new_obj[0]["bounds"] == (pd.Timestamp("2020-01-01 00:00:00"), pd.Timestamp("2020-01-27 00:00:00"))
         assert_series_equal(new_obj[0]["obj_slice"], sr.iloc[5:31])
 
-    def test_take_series(self):
+    def test_take_none(self):
         sr = pd.Series(np.arange(len(index)), index=index.shift(-5))
         splitter = vbt.Splitter.from_splits(
             index,
@@ -1484,12 +1514,12 @@ class TestSplitter:
                 [slice(5, 20), slice(15, None)],
             ],
         )
-        new_obj = splitter.take(sr, into="series")
+        new_obj = splitter.take(sr)
         assert_index_equal(
             new_obj.index,
             pd.MultiIndex.from_tuples([(0, "set_0"), (0, "set_1"), (1, "set_0"), (1, "set_1")], names=["split", "set"]),
         )
-        new_obj = splitter.take(sr, into="series", attach_bounds=True, range_bounds_kwargs=dict(map_to_index=True))
+        new_obj = splitter.take(sr, attach_bounds="target", index_bounds=True)
         assert_index_equal(
             new_obj.index,
             pd.MultiIndex.from_tuples(
@@ -1520,11 +1550,10 @@ class TestSplitter:
         )
         new_obj = splitter.take(
             sr,
-            into="series",
             split_group_by=["a", "a"],
             set_group_by=["b", "b"],
-            attach_bounds=True,
-            range_bounds_kwargs=dict(map_to_index=True),
+            attach_bounds="target",
+            index_bounds=True,
         )
         assert_index_equal(
             new_obj.index,
@@ -1540,59 +1569,6 @@ class TestSplitter:
             pd.Series(np.arange(5, 31), index=sr.index[5:31]),
         )
 
-    def test_take_frame(self):
-        sr = pd.Series(np.arange(len(index)), index=index.shift(-5))
-        splitter = vbt.Splitter.from_splits(
-            index,
-            [
-                [slice(0, 15), slice(10, 25)],
-                [slice(5, 20), slice(15, None)],
-            ],
-        )
-        new_obj = splitter.take(sr, into="frame")
-        assert_index_equal(
-            new_obj.index,
-            pd.Index([0, 1], dtype="int64", name="split"),
-        )
-        assert_index_equal(
-            new_obj.columns,
-            pd.Index(["set_0", "set_1"], dtype="object", name="set"),
-        )
-        assert_series_equal(
-            new_obj.iloc[0, 0],
-            pd.Series(np.arange(5, 20), index=sr.index[5:20]),
-        )
-        assert_series_equal(
-            new_obj.iloc[0, 1],
-            pd.Series(np.arange(15, 30), index=sr.index[15:30]),
-        )
-        assert_series_equal(
-            new_obj.iloc[1, 0],
-            pd.Series(np.arange(10, 25), index=sr.index[10:25]),
-        )
-        assert_series_equal(
-            new_obj.iloc[1, 1],
-            pd.Series(np.arange(20, 31), index=sr.index[20:31]),
-        )
-        new_obj = splitter.take(
-            sr,
-            into="frame",
-            split_group_by=["a", "a"],
-            set_group_by=["b", "b"],
-        )
-        assert_index_equal(
-            new_obj.index,
-            pd.Index(["a"], dtype="object", name="split_group"),
-        )
-        assert_index_equal(
-            new_obj.columns,
-            pd.Index(["b"], dtype="object", name="set_group"),
-        )
-        assert_series_equal(
-            new_obj.iloc[0, 0],
-            pd.Series(np.arange(5, 31), index=sr.index[5:31]),
-        )
-
     def test_take_stacked(self):
         sr = pd.Series(np.arange(len(index)), index=index.shift(-5))
         splitter = vbt.Splitter.from_splits(
@@ -1602,7 +1578,7 @@ class TestSplitter:
                 [slice(5, 20), slice(15, None)],
             ],
         )
-        new_obj = splitter.take(sr, into="stacked", attach_bounds=True, range_bounds_kwargs=dict(map_to_index=True))
+        new_obj = splitter.take(sr, into="stacked", attach_bounds="target", index_bounds=True)
         assert_frame_equal(
             new_obj,
             pd.DataFrame(
@@ -1651,8 +1627,8 @@ class TestSplitter:
             into="stacked",
             split_group_by=["a", "a"],
             set_group_by=["b", "b"],
-            attach_bounds=True,
-            range_bounds_kwargs=dict(map_to_index=True),
+            attach_bounds="target",
+            index_bounds=True,
         )
         assert_frame_equal(
             new_obj,
@@ -1680,8 +1656,8 @@ class TestSplitter:
         new_obj = splitter.take(
             sr,
             into="stacked_sets",
-            attach_bounds=True,
-            range_bounds_kwargs=dict(map_to_index=True),
+            attach_bounds="target",
+            index_bounds=True,
         )
         assert isinstance(new_obj, pd.Series)
         assert_index_equal(new_obj.index, pd.Index([0, 1], dtype="int64", name="split"))
@@ -1774,8 +1750,8 @@ class TestSplitter:
         new_obj = splitter.take(
             sr,
             into="stacked_splits",
-            attach_bounds=True,
-            range_bounds_kwargs=dict(map_to_index=True),
+            attach_bounds="target",
+            index_bounds=True,
         )
         assert isinstance(new_obj, pd.Series)
         assert_index_equal(new_obj.index, pd.Index(["set_0", "set_1"], dtype="object", name="set"))
@@ -1838,6 +1814,692 @@ class TestSplitter:
                     (1, pd.Timestamp("2020-01-16"), pd.Timestamp("2020-01-27"))
                 ], names=["split", "start", "end"]),
             ),
+        )
+
+    def test_apply(self):
+        splitter = vbt.Splitter.from_splits(
+            index,
+            [
+                [slice(0, 15), slice(10, 25)],
+                [slice(5, 20), slice(15, None)],
+            ],
+        )
+
+        def apply_func(a, *args, b=2, **kwargs):
+            return a + np.sum(args) + b + np.sum(list(kwargs.values()))
+
+        assert_series_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(1, 2, vbt.Rep("split_idx")),
+                apply_kwargs=dict(c=4, d=vbt.Rep("set_idx")),
+                merge_all=True,
+                merge_func="concat"
+            ),
+            pd.Series(
+                [9, 10, 10, 11],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0'),
+                    (0, 'set_1'),
+                    (1, 'set_0'),
+                    (1, 'set_1')
+                ], names=['split', 'set'])
+            )
+        )
+
+        def apply_func(a, b=None):
+            return a.sum() + b.sum()
+
+        assert_series_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(vbt.Takeable(np.arange(len(index))),),
+                apply_kwargs=dict(b=vbt.Takeable(np.arange(len(index)))),
+                merge_all=True,
+                merge_func="concat"
+            ),
+            pd.Series(
+                [210, 510, 360, 720],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0'),
+                    (0, 'set_1'),
+                    (1, 'set_0'),
+                    (1, 'set_1')
+                ], names=['split', 'set'])
+            )
+        )
+        assert_series_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(vbt.RepEval("np.arange(len(index))[range_]"),),
+                apply_kwargs=dict(b=vbt.RepEval("np.arange(len(index))[range_]")),
+                merge_all=True,
+                merge_func="concat",
+            ),
+            pd.Series(
+                [210, 510, 360, 720],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0'),
+                    (0, 'set_1'),
+                    (1, 'set_0'),
+                    (1, 'set_1')
+                ], names=['split', 'set'])
+            )
+        )
+        assert_series_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(vbt.RepEval("np.arange(index_len)[range_]"),),
+                apply_kwargs=dict(b=vbt.RepEval("np.arange(index_len)[range_]")),
+                merge_all=True,
+                merge_func="concat",
+                template_context=dict(index_len=len(index)),
+            ),
+            pd.Series(
+                [210, 510, 360, 720],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0'),
+                    (0, 'set_1'),
+                    (1, 'set_0'),
+                    (1, 'set_1')
+                ], names=['split', 'set'])
+            )
+        )
+        sr = pd.Series(np.arange(len(index)), index=index.shift(-5))
+        assert_series_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(vbt.Takeable(sr),),
+                apply_kwargs=dict(b=vbt.Takeable(sr)),
+                merge_all=True,
+                merge_func="concat"
+            ),
+            pd.Series(
+                [360, 660, 510, 550],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0'),
+                    (0, 'set_1'),
+                    (1, 'set_0'),
+                    (1, 'set_1')
+                ], names=['split', 'set'])
+            )
+        )
+        assert_series_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(vbt.Takeable(sr.values),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values)),
+                obj_index=sr.index,
+                merge_all=True,
+                merge_func="concat"
+            ),
+            pd.Series(
+                [360, 660, 510, 550],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0'),
+                    (0, 'set_1'),
+                    (1, 'set_0'),
+                    (1, 'set_1')
+                ], names=['split', 'set'])
+            )
+        )
+        assert_series_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                obj_index=sr.index,
+                merge_all=True,
+                merge_func="concat"
+            ),
+            pd.Series(
+                [405, 674, 555, 489],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0'),
+                    (0, 'set_1'),
+                    (1, 'set_0'),
+                    (1, 'set_1')
+                ], names=['split', 'set'])
+            )
+        )
+        assert_series_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                obj_index=sr.index,
+                attach_bounds=True,
+                merge_all=True,
+                merge_func="concat"
+            ),
+            pd.Series(
+                [405, 674, 555, 489],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0', 0, 15),
+                    (0, 'set_1', 10, 25),
+                    (1, 'set_0', 5, 20),
+                    (1, 'set_1', 15, 31)
+                ], names=['split', 'set', 'start', 'end'])
+            )
+        )
+        assert_series_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                obj_index=sr.index,
+                attach_bounds=True,
+                right_inclusive=True,
+                merge_all=True,
+                merge_func="concat"
+            ),
+            pd.Series(
+                [405, 674, 555, 489],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0', 0, 14),
+                    (0, 'set_1', 10, 24),
+                    (1, 'set_0', 5, 19),
+                    (1, 'set_1', 15, 30)
+                ], names=['split', 'set', 'start', 'end'])
+            )
+        )
+        assert_series_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                obj_index=sr.index,
+                attach_bounds=True,
+                index_bounds=True,
+                merge_all=True,
+                merge_func="concat"
+            ),
+            pd.Series(
+                [405, 674, 555, 489],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0', pd.Timestamp('2020-01-01'), pd.Timestamp('2020-01-16')),
+                    (0, 'set_1', pd.Timestamp('2020-01-11'), pd.Timestamp('2020-01-26')),
+                    (1, 'set_0', pd.Timestamp('2020-01-06'), pd.Timestamp('2020-01-21')),
+                    (1, 'set_1', pd.Timestamp('2020-01-16'), pd.Timestamp('2020-02-01'))
+                ], names=['split', 'set', 'start', 'end'])
+            )
+        )
+        assert_series_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                obj_index=sr.index,
+                attach_bounds="target",
+                merge_all=True,
+                merge_func="concat"
+            ),
+            pd.Series(
+                [405, 674, 555, 489],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0', 5, 20),
+                    (0, 'set_1', 15, 30),
+                    (1, 'set_0', 10, 25),
+                    (1, 'set_1', 20, 31)
+                ], names=['split', 'set', 'start', 'end'])
+            )
+        )
+        assert_series_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                obj_index=sr.index,
+                attach_bounds="target",
+                index_bounds=True,
+                merge_all=True,
+                merge_func="concat"
+            ),
+            pd.Series(
+                [405, 674, 555, 489],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0', pd.Timestamp('2020-01-01'), pd.Timestamp('2020-01-16')),
+                    (0, 'set_1', pd.Timestamp('2020-01-11'), pd.Timestamp('2020-01-26')),
+                    (1, 'set_0', pd.Timestamp('2020-01-06'), pd.Timestamp('2020-01-21')),
+                    (1, 'set_1', pd.Timestamp('2020-01-16'), pd.Timestamp('2020-01-27'))
+                ], names=['split', 'set', 'start', 'end'])
+            )
+        )
+        assert_series_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                obj_index=sr.index,
+                iteration="split_major",
+                merge_all=True,
+                merge_func="concat"
+            ),
+            pd.Series(
+                [405, 674, 555, 489],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0'),
+                    (0, 'set_1'),
+                    (1, 'set_0'),
+                    (1, 'set_1')
+                ], names=['split', 'set'])
+            )
+        )
+        assert_series_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                obj_index=sr.index,
+                iteration="split_wise",
+                merge_all=True,
+                merge_func="concat"
+            ),
+            pd.Series(
+                [405, 674, 555, 489],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0'),
+                    (0, 'set_1'),
+                    (1, 'set_0'),
+                    (1, 'set_1')
+                ], names=['split', 'set'])
+            )
+        )
+        assert_series_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                obj_index=sr.index,
+                iteration="set_major",
+                merge_all=True,
+                merge_func="concat"
+            ),
+            pd.Series(
+                [405, 555, 674, 489],
+                index=pd.MultiIndex.from_tuples([
+                    ('set_0', 0),
+                    ('set_0', 1),
+                    ('set_1', 0),
+                    ('set_1', 1)
+                ], names=['set', 'split'])
+            )
+        )
+        assert_series_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                obj_index=sr.index,
+                iteration="set_wise",
+                merge_all=True,
+                merge_func="concat"
+            ),
+            pd.Series(
+                [405, 555, 674, 489],
+                index=pd.MultiIndex.from_tuples([
+                    ('set_0', 0),
+                    ('set_0', 1),
+                    ('set_1', 0),
+                    ('set_1', 1)
+                ], names=['set', 'split'])
+            )
+        )
+        assert_frame_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                obj_index=sr.index,
+                iteration="split_major",
+                merge_all=False,
+                merge_func="concat"
+            ),
+            pd.DataFrame(
+                [[405, 674], [555, 489]],
+                index=pd.Index([0, 1], dtype="int64", name="split"),
+                columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+            )
+        )
+        assert_frame_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                obj_index=sr.index,
+                iteration="split_wise",
+                merge_all=False,
+                merge_func="concat"
+            ),
+            pd.DataFrame(
+                [[405, 674], [555, 489]],
+                index=pd.Index([0, 1], dtype="int64", name="split"),
+                columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+            )
+        )
+        assert_frame_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                obj_index=sr.index,
+                iteration="set_major",
+                merge_all=False,
+                merge_func="concat"
+            ),
+            pd.DataFrame(
+                [[405, 555], [674, 489]],
+                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+                columns=pd.Index([0, 1], dtype="int64", name="split"),
+            )
+        )
+        assert_frame_equal(
+            splitter.apply(
+                apply_func,
+                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                obj_index=sr.index,
+                iteration="set_wise",
+                merge_all=False,
+                merge_func="concat"
+            ),
+            pd.DataFrame(
+                [[405, 555], [674, 489]],
+                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+                columns=pd.Index([0, 1], dtype="int64", name="split"),
+            )
+        )
+
+        def apply_func(a, b=None):
+            return a.sum(), b.sum()
+
+        r = splitter.apply(
+            apply_func,
+            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            obj_index=sr.index,
+            iteration="split_major",
+            merge_all=True,
+            merge_func="concat"
+        )
+        assert_series_equal(
+            r[0],
+            pd.Series(
+                [195, 345, 270, 255],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0'),
+                    (0, 'set_1'),
+                    (1, 'set_0'),
+                    (1, 'set_1')
+                ], names=['split', 'set'])
+            )
+        )
+        assert_series_equal(
+            r[1],
+            pd.Series(
+                [210, 329, 285, 234],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0'),
+                    (0, 'set_1'),
+                    (1, 'set_0'),
+                    (1, 'set_1')
+                ], names=['split', 'set'])
+            )
+        )
+        r = splitter.apply(
+            apply_func,
+            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            obj_index=sr.index,
+            iteration="split_wise",
+            merge_all=True,
+            merge_func="concat"
+        )
+        assert_series_equal(
+            r[0],
+            pd.Series(
+                [195, 345, 270, 255],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0'),
+                    (0, 'set_1'),
+                    (1, 'set_0'),
+                    (1, 'set_1')
+                ], names=['split', 'set'])
+            )
+        )
+        assert_series_equal(
+            r[1],
+            pd.Series(
+                [210, 329, 285, 234],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0'),
+                    (0, 'set_1'),
+                    (1, 'set_0'),
+                    (1, 'set_1')
+                ], names=['split', 'set'])
+            )
+        )
+        r = splitter.apply(
+            apply_func,
+            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            obj_index=sr.index,
+            iteration="set_major",
+            merge_all=True,
+            merge_func="concat"
+        )
+        assert_series_equal(
+            r[0],
+            pd.Series(
+                [195, 270, 345, 255],
+                index=pd.MultiIndex.from_tuples([
+                    ('set_0', 0),
+                    ('set_0', 1),
+                    ('set_1', 0),
+                    ('set_1', 1)
+                ], names=['set', 'split'])
+            )
+        )
+        assert_series_equal(
+            r[1],
+            pd.Series(
+                [210, 285, 329, 234],
+                index=pd.MultiIndex.from_tuples([
+                    ('set_0', 0),
+                    ('set_0', 1),
+                    ('set_1', 0),
+                    ('set_1', 1)
+                ], names=['set', 'split'])
+            )
+        )
+        r = splitter.apply(
+            apply_func,
+            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            obj_index=sr.index,
+            iteration="set_wise",
+            merge_all=True,
+            merge_func="concat"
+        )
+        assert_series_equal(
+            r[0],
+            pd.Series(
+                [195, 270, 345, 255],
+                index=pd.MultiIndex.from_tuples([
+                    ('set_0', 0),
+                    ('set_0', 1),
+                    ('set_1', 0),
+                    ('set_1', 1)
+                ], names=['set', 'split'])
+            )
+        )
+        assert_series_equal(
+            r[1],
+            pd.Series(
+                [210, 285, 329, 234],
+                index=pd.MultiIndex.from_tuples([
+                    ('set_0', 0),
+                    ('set_0', 1),
+                    ('set_1', 0),
+                    ('set_1', 1)
+                ], names=['set', 'split'])
+            )
+        )
+        r = splitter.apply(
+            apply_func,
+            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            obj_index=sr.index,
+            iteration="split_major",
+            merge_all=False,
+            merge_func="concat"
+        )
+        assert_frame_equal(
+            r[0],
+            pd.DataFrame(
+                [[195, 345], [270, 255]],
+                index=pd.Index([0, 1], dtype="int64", name="split"),
+                columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+            )
+        )
+        assert_frame_equal(
+            r[1],
+            pd.DataFrame(
+                [[210, 329], [285, 234]],
+                index=pd.Index([0, 1], dtype="int64", name="split"),
+                columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+            )
+        )
+        r = splitter.apply(
+            apply_func,
+            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            obj_index=sr.index,
+            iteration="split_wise",
+            merge_all=False,
+            merge_func="concat"
+        )
+        assert_frame_equal(
+            r[0],
+            pd.DataFrame(
+                [[195, 345], [270, 255]],
+                index=pd.Index([0, 1], dtype="int64", name="split"),
+                columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+            )
+        )
+        assert_frame_equal(
+            r[1],
+            pd.DataFrame(
+                [[210, 329], [285, 234]],
+                index=pd.Index([0, 1], dtype="int64", name="split"),
+                columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+            )
+        )
+        r = splitter.apply(
+            apply_func,
+            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            obj_index=sr.index,
+            iteration="set_major",
+            merge_all=False,
+            merge_func="concat"
+        )
+        assert_frame_equal(
+            r[0],
+            pd.DataFrame(
+                [[195, 270], [345, 255]],
+                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+                columns=pd.Index([0, 1], dtype="int64", name="split"),
+            )
+        )
+        assert_frame_equal(
+            r[1],
+            pd.DataFrame(
+                [[210, 285], [329, 234]],
+                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+                columns=pd.Index([0, 1], dtype="int64", name="split"),
+            )
+        )
+        r = splitter.apply(
+            apply_func,
+            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            obj_index=sr.index,
+            iteration="set_wise",
+            merge_all=False,
+            merge_func="concat"
+        )
+        assert_frame_equal(
+            r[0],
+            pd.DataFrame(
+                [[195, 270], [345, 255]],
+                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+                columns=pd.Index([0, 1], dtype="int64", name="split"),
+            )
+        )
+        assert_frame_equal(
+            r[1],
+            pd.DataFrame(
+                [[210, 285], [329, 234]],
+                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+                columns=pd.Index([0, 1], dtype="int64", name="split"),
+            )
+        )
+        r = splitter.apply(
+            apply_func,
+            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            obj_index=sr.index,
+            iteration="split_major",
+            merge_all=True,
+        )
+        assert_series_equal(
+            r[0],
+            pd.Series(
+                [195, 345, 270, 255],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0'),
+                    (0, 'set_1'),
+                    (1, 'set_0'),
+                    (1, 'set_1')
+                ], names=['split', 'set'])
+            )
+        )
+        assert_series_equal(
+            r[1],
+            pd.Series(
+                [210, 329, 285, 234],
+                index=pd.MultiIndex.from_tuples([
+                    (0, 'set_0'),
+                    (0, 'set_1'),
+                    (1, 'set_0'),
+                    (1, 'set_1')
+                ], names=['split', 'set'])
+            )
+        )
+        r = splitter.apply(
+            apply_func,
+            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            obj_index=sr.index,
+            iteration="split_major",
+            merge_all=False,
+        )
+        assert_frame_equal(
+            r[0],
+            pd.DataFrame(
+                [[195, 345], [270, 255]],
+                index=pd.Index([0, 1], dtype="int64", name="split"),
+                columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+            )
+        )
+        assert_frame_equal(
+            r[1],
+            pd.DataFrame(
+                [[210, 329], [285, 234]],
+                index=pd.Index([0, 1], dtype="int64", name="split"),
+                columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+            )
         )
 
     def test_split_set(self):
@@ -2020,13 +2682,13 @@ class TestSplitter:
             vbt.Splitter.get_range_bounds(slice(5, 5), index=index)
         with pytest.raises(Exception):
             vbt.Splitter.get_range_bounds(np.array([]), index=index)
-        assert vbt.Splitter.get_range_bounds(slice(None), map_to_index=True, index=index) == (
+        assert vbt.Splitter.get_range_bounds(slice(None), index_bounds=True, index=index) == (
             index[0],
             index[-1] + index.freq,
         )
-        assert vbt.Splitter.get_range_bounds(slice(5, 10), map_to_index=True, index=index) == (index[5], index[10])
+        assert vbt.Splitter.get_range_bounds(slice(5, 10), index_bounds=True, index=index) == (index[5], index[10])
         assert vbt.Splitter.get_range_bounds(
-            slice(None), map_to_index=True, index=index[[0, 2]], freq=pd.Timedelta(days=1)
+            slice(None), index_bounds=True, index=index[[0, 2]], freq=pd.Timedelta(days=1)
         ) == (index[0], index[2] + pd.Timedelta(days=1))
 
     def test_get_bounds_arr(self):
@@ -2042,7 +2704,7 @@ class TestSplitter:
             splitter.bounds_arr, np.array([[[0, 5], [5, 10]], [[10, 15], [15, 20]], [[20, 25], [25, 31]]])
         )
         np.testing.assert_array_equal(
-            splitter.get_bounds_arr(map_to_index=True),
+            splitter.get_bounds_arr(index_bounds=True),
             np.array(
                 [
                     [[1577836800000000000, 1578268800000000000], [1578268800000000000, 1578700800000000000]],
@@ -3179,8 +3841,8 @@ class TestSplitter:
             splitter.stats(settings=dict(normalize=False)),
             pd.Series(
                 [
-                    pd.Timestamp("2020-01-01 00:00:00", freq="D"),
-                    pd.Timestamp("2020-01-31 00:00:00", freq="D"),
+                    pd.Timestamp("2020-01-01 00:00:00"),
+                    pd.Timestamp("2020-01-31 00:00:00"),
                     31,
                     4,
                     2,
@@ -3214,8 +3876,8 @@ class TestSplitter:
             splitter.stats(settings=dict(split_group_by=[0, 1, 0, 2], set_group_by=[0, 0])),
             pd.Series(
                 [
-                    pd.Timestamp("2020-01-01 00:00:00", freq="D"),
-                    pd.Timestamp("2020-01-31 00:00:00", freq="D"),
+                    pd.Timestamp("2020-01-01 00:00:00"),
+                    pd.Timestamp("2020-01-31 00:00:00"),
                     31,
                     3,
                     1,
@@ -3251,3 +3913,27 @@ class TestSplitter:
         )
         splitter.plots()
         splitter.plots(settings=dict(split_group_by=[0, 1, 0, 2], set_group_by=[0, 0])),
+
+
+class TestSKLSplitter:
+    def test_class(self):
+        skl_splitter = vbt.SKLSplitter(
+            "from_splits",
+            [
+                [slice(5, 5), slice(5, 6)],
+                [slice(6, 8), slice(8, 11)],
+                [slice(11, 15), slice(15, 20)],
+                [slice(20, 26), slice(26, None)],
+            ],
+            split_range_kwargs=dict(allow_zero_len=True),
+        )
+        sr = pd.Series(np.arange(len(index)), index=index)
+        splits = list(skl_splitter.split(sr))
+        np.testing.assert_array_equal(splits[0][0], np.array([], dtype=np.int64))
+        np.testing.assert_array_equal(splits[0][1], np.array([5], dtype=np.int64))
+        np.testing.assert_array_equal(splits[1][0], np.array([6, 7], dtype=np.int64))
+        np.testing.assert_array_equal(splits[1][1], np.array([8, 9, 10], dtype=np.int64))
+        np.testing.assert_array_equal(splits[2][0], np.array([11, 12, 13, 14], dtype=np.int64))
+        np.testing.assert_array_equal(splits[2][1], np.array([15, 16, 17, 18, 19], dtype=np.int64))
+        np.testing.assert_array_equal(splits[3][0], np.array([20, 21, 22, 23, 24, 25], dtype=np.int64))
+        np.testing.assert_array_equal(splits[3][1], np.array([26, 27, 28, 29, 30], dtype=np.int64))

@@ -716,7 +716,7 @@ class MappedArray(Analyzable):
             if "col_arr" in kwargs:
                 if self.col_arr is not kwargs.get("col_arr"):
                     kwargs["col_mapper"] = None
-        return Wrapping.replace(self, **kwargs)
+        return Analyzable.replace(self, **kwargs)
 
     def indexing_func_meta(self, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> dict:
         """Perform indexing on `MappedArray` and return metadata."""

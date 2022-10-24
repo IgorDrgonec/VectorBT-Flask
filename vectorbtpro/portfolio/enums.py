@@ -276,10 +276,10 @@ Attributes:
     Ignore: Ignore both signals.
     Entry: Execute the entry signal.
     Exit: Execute the exit signal.
-    Adjacent: Execute the adjacent signal.
+    Adjacent: Execute the signal adjacent to the current position.
     
         Takes effect only when in position, otherwise ignores.
-    Opposite: Execute the opposite signal.
+    Opposite: Execute the signal opposite to the current position.
     
         Takes effect only when in position, otherwise ignores.
 """

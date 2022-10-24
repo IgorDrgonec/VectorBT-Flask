@@ -275,6 +275,31 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         # Copy writeable attrs
         self._column_config = type(self)._column_config.copy()
 
+    def replace(self: DataT, **kwargs) -> DataT:
+        """See `vectorbtpro.utils.config.Configured.replace`.
+
+        Replaces the data's index and/or columns if they were changed in the wrapper."""
+        if "wrapper" in kwargs and "data" not in kwargs:
+            wrapper = kwargs["wrapper"]
+            data = self.config["data"]
+            new_data = symbol_dict()
+            data_changed = False
+            for k, v in data.items():
+                if isinstance(v, (pd.Series, pd.DataFrame)):
+                    if not v.index.equals(wrapper.index):
+                        v = v.copy(deep=False)
+                        v.index = wrapper.index
+                        data_changed = True
+                    if isinstance(v, pd.DataFrame):
+                        if not v.columns.equals(wrapper.columns):
+                            v = v.copy(deep=False)
+                            v.columns = wrapper.columns
+                            data_changed = True
+                new_data[k] = v
+            if data_changed:
+                kwargs["data"] = new_data
+        return Analyzable.replace(self, **kwargs)
+
     def indexing_func(self: DataT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> DataT:
         """Perform indexing on `Data`."""
         new_wrapper = pd_indexing_func(self.wrapper)
@@ -1151,17 +1176,36 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             return concat_data[columns]
         return tuple(concat_data.values())
 
-    def get_column(self, col_name: str) -> tp.Optional[tp.SeriesFrame]:
-        """Get column."""
-        if col_name in self.wrapper.columns:
-            return self.get(columns=col_name)
-        col_name = col_name.lower().strip().replace(" ", "_")
-        if hasattr(self.wrapper.columns, "str"):
-            column_names = self.wrapper.columns.str.lower().str.strip().str.replace(" ", "_").tolist()
-            if col_name in column_names:
-                col_index = column_names.index(col_name)
-                if col_index != -1:
-                    return self.get(columns=self.wrapper.columns[col_index])
+    def get_column(self, label: tp.Hashable) -> tp.Optional[tp.SeriesFrame]:
+        """Get column(s) that match a label."""
+        if label in self.wrapper.columns:
+            return self.get(columns=label)
+        if isinstance(label, str):
+            label = label.lower().strip().replace(" ", "_")
+        if isinstance(self.wrapper.columns, pd.MultiIndex):
+            for i in range(self.wrapper.columns.nlevels):
+                column_names = self.wrapper.columns.get_level_values(i)
+                indices = []
+                for j, column_name in enumerate(column_names):
+                    if isinstance(column_name, str):
+                        column_name = column_name.lower().strip().replace(" ", "_")
+                    if label == column_name:
+                        indices.append(j)
+                if len(indices) > 0:
+                    if len(indices) == 1:
+                        indices = indices[0]
+                    return self.get(columns=self.wrapper.columns[indices])
+        else:
+            indices = []
+            for j, column_name in enumerate(self.wrapper.columns):
+                if isinstance(column_name, str):
+                    column_name = column_name.lower().strip().replace(" ", "_")
+                if label == column_name:
+                    indices.append(j)
+            if len(indices) > 0:
+                if len(indices) == 1:
+                    indices = indices[0]
+                return self.get(columns=self.wrapper.columns[indices])
         return None
 
     @property

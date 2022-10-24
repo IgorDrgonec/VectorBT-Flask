@@ -1355,10 +1355,8 @@ Ranges.override_subplots_doc(__pdoc__)
 PatternRangesT = tp.TypeVar("PatternRangesT", bound="PatternRanges")
 
 
-class _DEF(object):
-    """Class for `PSC` that will be substituted by the respective argument in `PatternRanges.from_pattern_search`."""
-
-    pass
+_DEF = object()
+"""Use as a default value for optional arguments in `PSC`."""
 
 
 @attr.s(frozen=True, eq=False)
@@ -1367,50 +1365,50 @@ class PSC:
 
     Every field will be resolved into the format suitable for Numba."""
 
-    pattern: tp.Union[_DEF, tp.ArrayLike] = attr.ib(default=_DEF)
+    pattern: tp.Union[tp.ArrayLike] = attr.ib(default=_DEF)
     """Flexible pattern array.
     
     Can be smaller or bigger than the source array; in such a case, the values of the smaller array
     will be "stretched" by interpolation of the type in `PSC.interp_mode`."""
 
-    window: tp.Union[_DEF, None, int] = attr.ib(default=_DEF)
+    window: tp.Optional[int] = attr.ib(default=_DEF)
     """Minimum window.
     
     Defaults to the length of `PSC.pattern`."""
 
-    max_window: tp.Union[_DEF, None, int] = attr.ib(default=_DEF)
+    max_window: tp.Optional[int] = attr.ib(default=_DEF)
     """Maximum window (including)."""
 
-    row_select_prob: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    row_select_prob: tp.Union[float] = attr.ib(default=_DEF)
     """Row selection probability."""
 
-    window_select_prob: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    window_select_prob: tp.Union[float] = attr.ib(default=_DEF)
     """Window selection probability."""
 
-    roll_forward: tp.Union[_DEF, bool] = attr.ib(default=_DEF)
+    roll_forward: tp.Union[bool] = attr.ib(default=_DEF)
     """Whether to roll windows to the left of the current row, otherwise to the right."""
 
-    interp_mode: tp.Union[_DEF, int, str] = attr.ib(default=_DEF)
+    interp_mode: tp.Union[int, str] = attr.ib(default=_DEF)
     """Interpolation mode. See `vectorbtpro.generic.enums.InterpMode`."""
 
-    rescale_mode: tp.Union[_DEF, int, str] = attr.ib(default=_DEF)
+    rescale_mode: tp.Union[int, str] = attr.ib(default=_DEF)
     """Rescaling mode. See `vectorbtpro.generic.enums.RescaleMode`."""
 
-    vmin: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    vmin: tp.Union[float] = attr.ib(default=_DEF)
     """Minimum value of any window. Should only be used when the array has fixed bounds.
     
     Used in rescaling using `RescaleMode.MinMax` and checking against `PSC.min_pct_change` and `PSC.max_pct_change`.
     
     If `np.nan`, gets calculated dynamically."""
 
-    vmax: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    vmax: tp.Union[float] = attr.ib(default=_DEF)
     """Maximum value of any window. Should only be used when the array has fixed bounds.
     
     Used in rescaling using `RescaleMode.MinMax` and checking against `PSC.min_pct_change` and `PSC.max_pct_change`.
     
     If `np.nan`, gets calculated dynamically."""
 
-    pmin: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    pmin: tp.Union[float] = attr.ib(default=_DEF)
     """Value to be considered as the minimum of `PSC.pattern`.
     
     Used in rescaling using `RescaleMode.MinMax` and calculating the maximum distance at each point 
@@ -1418,7 +1416,7 @@ class PSC:
     
     If `np.nan`, gets calculated dynamically."""
 
-    pmax: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    pmax: tp.Union[float] = attr.ib(default=_DEF)
     """Value to be considered as the maximum of `PSC.pattern`.
     
     Used in rescaling using `RescaleMode.MinMax` and calculating the maximum distance at each point 
@@ -1426,27 +1424,27 @@ class PSC:
     
     If `np.nan`, gets calculated dynamically."""
 
-    invert: tp.Union[_DEF, bool] = attr.ib(default=_DEF)
+    invert: tp.Union[bool] = attr.ib(default=_DEF)
     """Whether to invert the pattern vertically."""
 
-    error_type: tp.Union[_DEF, int, str] = attr.ib(default=_DEF)
+    error_type: tp.Union[int, str] = attr.ib(default=_DEF)
     """Error type. See `vectorbtpro.generic.enums.ErrorType`."""
 
-    distance_measure: tp.Union[_DEF, int, str] = attr.ib(default=_DEF)
+    distance_measure: tp.Union[int, str] = attr.ib(default=_DEF)
     """Distance measure. See `vectorbtpro.generic.enums.DistanceMeasure`."""
 
-    max_error: tp.Union[_DEF, tp.ArrayLike] = attr.ib(default=_DEF)
+    max_error: tp.Union[tp.ArrayLike] = attr.ib(default=_DEF)
     """Maximum error at each point. Can be provided as a flexible array.
     
     If `max_error` is an array, it must be of the same size as the pattern array.
     It also should be provided within the same scale as the pattern."""
 
-    max_error_interp_mode: tp.Union[_DEF, None, int, str] = attr.ib(default=_DEF)
+    max_error_interp_mode: tp.Union[None, int, str] = attr.ib(default=_DEF)
     """Interpolation mode for `PSC.max_error`. See `vectorbtpro.generic.enums.InterpMode`.
     
     If None, defaults to `PSC.interp_mode`."""
 
-    max_error_as_maxdist: tp.Union[_DEF, bool] = attr.ib(default=_DEF)
+    max_error_as_maxdist: tp.Union[bool] = attr.ib(default=_DEF)
     """Whether `PSC.max_error` should be used as the maximum distance at each point.
     
     If False, crossing `PSC.max_error` will set the distance to the maximum distance
@@ -1454,36 +1452,36 @@ class PSC:
     
     If True and any of the points in a window is `np.nan`, the point will be skipped."""
 
-    max_error_strict: tp.Union[_DEF, bool] = attr.ib(default=_DEF)
+    max_error_strict: tp.Union[bool] = attr.ib(default=_DEF)
     """Whether crossing `PSC.max_error` even once should yield the similarity of `np.nan`."""
 
-    min_pct_change: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    min_pct_change: tp.Union[float] = attr.ib(default=_DEF)
     """Minimum percentage change of the window to stay a candidate for search.
 
     If any window doesn't cross this mark, its similarity becomes `np.nan`."""
 
-    max_pct_change: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    max_pct_change: tp.Union[float] = attr.ib(default=_DEF)
     """Maximum percentage change of the window to stay a candidate for search.
 
     If any window crosses this mark, its similarity becomes `np.nan`."""
 
-    min_similarity: tp.Union[_DEF, float] = attr.ib(default=_DEF)
+    min_similarity: tp.Union[float] = attr.ib(default=_DEF)
     """Minimum similarity.
     
     If any window doesn't cross this mark, its similarity becomes `np.nan`."""
 
-    minp: tp.Union[_DEF, None, int] = attr.ib(default=_DEF)
+    minp: tp.Optional[int] = attr.ib(default=_DEF)
     """Minimum number of observations in price window required to have a value."""
 
-    overlap_mode: tp.Union[_DEF, int, str] = attr.ib(default=_DEF)
+    overlap_mode: tp.Union[int, str] = attr.ib(default=_DEF)
     """Overlapping mode. See `vectorbtpro.generic.enums.OverlapMode`."""
 
-    max_records: tp.Union[_DEF, None, int] = attr.ib(default=_DEF)
+    max_records: tp.Optional[int] = attr.ib(default=_DEF)
     """Maximum number of records expected to be filled.
     
     Set to avoid creating empty arrays larger than needed."""
 
-    name: tp.Union[None, str] = attr.ib(default=None)
+    name: tp.Optional[str] = attr.ib(default=None)
     """Name of the config."""
 
     def __eq__(self, other):
