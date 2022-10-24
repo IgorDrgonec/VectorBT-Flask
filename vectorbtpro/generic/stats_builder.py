@@ -142,7 +142,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     and return whatever is acceptable to be returned by `calc_func`. Defaults to None.
                 * `fill_wrap_kwargs`: Whether to fill `wrap_kwargs` with `to_timedelta` and `silence_warnings`.
                     Defaults to False.
-                * `apply_to_timedelta`: Whether to apply `vectorbtpro.base.wrapping.ArrayWrapper.to_timedelta`
+                * `apply_to_timedelta`: Whether to apply `vectorbtpro.base.wrapping.ArrayWrapper.arr_to_timedelta`
                     on the result. To disable this globally, pass `to_timedelta=False` in `settings`.
                     Defaults to False.
                 * `pass_{arg}`: Whether to pass any argument from the settings (see below). Defaults to True if

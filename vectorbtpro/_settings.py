@@ -963,7 +963,7 @@ splitter = ChildDict(
 """_"""
 
 __pdoc__["splitter"] = Sub(
-    """Sub-config with settings applied to `vectorbtpro.generic.splitter.Splitter`.
+    """Sub-config with settings applied to `vectorbtpro.generic.splitting.base.Splitter`.
 
 ```python
 ${config_doc}

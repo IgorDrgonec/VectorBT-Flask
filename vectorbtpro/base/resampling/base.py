@@ -366,7 +366,7 @@ class Resampler(Configured):
         jitted: tp.JittedOption = None,
         silence_warnings: tp.Optional[bool] = None,
     ) -> tp.Array1d:
-        """See `vectorbtpro.base.resampling.nb.target_within_source_index_nb`."""
+        """See `vectorbtpro.base.resampling.nb.resample_source_mask_nb`."""
         if silence_warnings is None:
             silence_warnings = self.silence_warnings
         source_mask = np.broadcast_to(source_mask, (len(self.source_index),))

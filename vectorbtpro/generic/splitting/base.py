@@ -201,12 +201,12 @@ class Takeable:
     
     Otherwise, will assume that the object has the same index."""
 
-    obj_index: tp.Optional[tp.IndexLike] = attr.ib(default=_DEF)
+    index: tp.Optional[tp.IndexLike] = attr.ib(default=_DEF)
     """Index of the object.
     
     If not present, will be accessed using `Splitter.get_obj_index`."""
 
-    obj_freq: tp.Optional[tp.FrequencyLike] = attr.ib(default=_DEF)
+    freq: tp.Optional[tp.FrequencyLike] = attr.ib(default=_DEF)
     """Frequency of `Takeable.index`."""
 
 
@@ -2563,8 +2563,8 @@ class Splitter(Analyzable):
                 takeable.obj,
                 range_,
                 remap_to_obj=takeable.remap_to_obj if takeable.remap_to_obj is not _DEF else remap_to_obj,
-                obj_index=takeable.obj_index if takeable.obj_index is not _DEF else obj_index,
-                obj_freq=takeable.obj_freq if takeable.obj_freq is not _DEF else obj_freq,
+                obj_index=takeable.index if takeable.index is not _DEF else obj_index,
+                obj_freq=takeable.freq if takeable.freq is not _DEF else obj_freq,
                 range_format=range_format,
                 template_context=_template_context,
                 silence_warnings=silence_warnings,

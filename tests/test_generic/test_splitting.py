@@ -1975,8 +1975,8 @@ class TestSplitter:
         assert_series_equal(
             splitter.apply(
                 apply_func,
-                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
                 obj_index=sr.index,
                 merge_all=True,
                 merge_func="concat"
@@ -1994,8 +1994,8 @@ class TestSplitter:
         assert_series_equal(
             splitter.apply(
                 apply_func,
-                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
                 obj_index=sr.index,
                 attach_bounds=True,
                 merge_all=True,
@@ -2014,8 +2014,8 @@ class TestSplitter:
         assert_series_equal(
             splitter.apply(
                 apply_func,
-                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
                 obj_index=sr.index,
                 attach_bounds=True,
                 right_inclusive=True,
@@ -2035,8 +2035,8 @@ class TestSplitter:
         assert_series_equal(
             splitter.apply(
                 apply_func,
-                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
                 obj_index=sr.index,
                 attach_bounds=True,
                 index_bounds=True,
@@ -2056,8 +2056,8 @@ class TestSplitter:
         assert_series_equal(
             splitter.apply(
                 apply_func,
-                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
                 obj_index=sr.index,
                 attach_bounds="target",
                 merge_all=True,
@@ -2076,8 +2076,8 @@ class TestSplitter:
         assert_series_equal(
             splitter.apply(
                 apply_func,
-                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
                 obj_index=sr.index,
                 attach_bounds="target",
                 index_bounds=True,
@@ -2097,8 +2097,8 @@ class TestSplitter:
         assert_series_equal(
             splitter.apply(
                 apply_func,
-                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
                 obj_index=sr.index,
                 iteration="split_major",
                 merge_all=True,
@@ -2117,8 +2117,8 @@ class TestSplitter:
         assert_series_equal(
             splitter.apply(
                 apply_func,
-                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
                 obj_index=sr.index,
                 iteration="split_wise",
                 merge_all=True,
@@ -2137,8 +2137,8 @@ class TestSplitter:
         assert_series_equal(
             splitter.apply(
                 apply_func,
-                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
                 obj_index=sr.index,
                 iteration="set_major",
                 merge_all=True,
@@ -2157,8 +2157,8 @@ class TestSplitter:
         assert_series_equal(
             splitter.apply(
                 apply_func,
-                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
                 obj_index=sr.index,
                 iteration="set_wise",
                 merge_all=True,
@@ -2177,8 +2177,8 @@ class TestSplitter:
         assert_frame_equal(
             splitter.apply(
                 apply_func,
-                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
                 obj_index=sr.index,
                 iteration="split_major",
                 merge_all=False,
@@ -2193,8 +2193,8 @@ class TestSplitter:
         assert_frame_equal(
             splitter.apply(
                 apply_func,
-                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
                 obj_index=sr.index,
                 iteration="split_wise",
                 merge_all=False,
@@ -2209,8 +2209,8 @@ class TestSplitter:
         assert_frame_equal(
             splitter.apply(
                 apply_func,
-                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
                 obj_index=sr.index,
                 iteration="set_major",
                 merge_all=False,
@@ -2225,8 +2225,8 @@ class TestSplitter:
         assert_frame_equal(
             splitter.apply(
                 apply_func,
-                apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-                apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+                apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+                apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
                 obj_index=sr.index,
                 iteration="set_wise",
                 merge_all=False,
@@ -2244,8 +2244,8 @@ class TestSplitter:
 
         r = splitter.apply(
             apply_func,
-            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
             obj_index=sr.index,
             iteration="split_major",
             merge_all=True,
@@ -2277,8 +2277,8 @@ class TestSplitter:
         )
         r = splitter.apply(
             apply_func,
-            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
             obj_index=sr.index,
             iteration="split_wise",
             merge_all=True,
@@ -2310,8 +2310,8 @@ class TestSplitter:
         )
         r = splitter.apply(
             apply_func,
-            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
             obj_index=sr.index,
             iteration="set_major",
             merge_all=True,
@@ -2343,8 +2343,8 @@ class TestSplitter:
         )
         r = splitter.apply(
             apply_func,
-            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
             obj_index=sr.index,
             iteration="set_wise",
             merge_all=True,
@@ -2376,8 +2376,8 @@ class TestSplitter:
         )
         r = splitter.apply(
             apply_func,
-            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
             obj_index=sr.index,
             iteration="split_major",
             merge_all=False,
@@ -2401,8 +2401,8 @@ class TestSplitter:
         )
         r = splitter.apply(
             apply_func,
-            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
             obj_index=sr.index,
             iteration="split_wise",
             merge_all=False,
@@ -2426,8 +2426,8 @@ class TestSplitter:
         )
         r = splitter.apply(
             apply_func,
-            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
             obj_index=sr.index,
             iteration="set_major",
             merge_all=False,
@@ -2451,8 +2451,8 @@ class TestSplitter:
         )
         r = splitter.apply(
             apply_func,
-            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
             obj_index=sr.index,
             iteration="set_wise",
             merge_all=False,
@@ -2476,8 +2476,8 @@ class TestSplitter:
         )
         r = splitter.apply(
             apply_func,
-            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
             obj_index=sr.index,
             iteration="split_major",
             merge_all=True,
@@ -2508,8 +2508,8 @@ class TestSplitter:
         )
         r = splitter.apply(
             apply_func,
-            apply_args=(vbt.Takeable(sr.values, obj_index=sr.index.shift(-1)),),
-            apply_kwargs=dict(b=vbt.Takeable(sr.values, obj_index=sr.index.shift(-2))),
+            apply_args=(vbt.Takeable(sr.values, index=sr.index.shift(-1)),),
+            apply_kwargs=dict(b=vbt.Takeable(sr.values, index=sr.index.shift(-2))),
             obj_index=sr.index,
             iteration="split_major",
             merge_all=False,
