@@ -1368,6 +1368,62 @@ class Splitter(Analyzable):
             new_splits = np.asarray(new_splits, dtype=object)
         return self.replace(splits=new_splits, **kwargs)
 
+    def to_grouped(
+        self: SplitterT,
+        split: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
+        set_: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
+        split_group_by: tp.AnyGroupByLike = None,
+        set_group_by: tp.AnyGroupByLike = None,
+        split_as_indices: bool = False,
+        set_as_indices: bool = False,
+        merge_split_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> SplitterT:
+        """Merge all ranges within the same group and return a new `Splitter` instance."""
+        split_group_by = self.get_split_grouper(split_group_by=split_group_by)
+        split_labels = self.get_split_labels(split_group_by=split_group_by)
+        set_group_by = self.get_set_grouper(set_group_by=set_group_by)
+        set_labels = self.get_set_labels(set_group_by=set_group_by)
+        split_group_indices, set_group_indices, split_indices, set_indices = self.select_indices(
+            split=split,
+            set_=set_,
+            split_group_by=split_group_by,
+            set_group_by=set_group_by,
+            split_as_indices=split_as_indices,
+            set_as_indices=set_as_indices,
+        )
+        if split_group_by is not None:
+            split_labels = split_labels[split_group_indices]
+        if set_group_by is not None:
+            set_labels = set_labels[set_group_indices]
+
+        splits = []
+        for i in split_group_indices:
+            splits.append([])
+            for j in set_group_indices:
+                new_range = self.select_range(
+                    split=i,
+                    set_=j,
+                    split_group_by=split_group_by,
+                    set_group_by=set_group_by,
+                    split_as_indices=True,
+                    set_as_indices=True,
+                    merge_split_kwargs=merge_split_kwargs,
+                )
+                splits[-1].append(new_range)
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                splits = np.asarray(splits)
+        except Exception as e:
+            splits = np.asarray(splits, dtype=object)
+        if set_group_by is None or not set_group_by.is_grouped():
+            ndim = self.wrapper.ndim
+        else:
+            ndim = 1 if splits.shape[1] == 1 else 2
+        wrapper = self.wrapper.replace(index=split_labels, columns=set_labels, ndim=ndim)
+        return self.replace(wrapper=wrapper, splits=splits, **kwargs)
+
     # ############# Ranges ############# #
 
     @classmethod

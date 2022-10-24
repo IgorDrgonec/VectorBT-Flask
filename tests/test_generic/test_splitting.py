@@ -1311,6 +1311,35 @@ class TestSplitter:
             target_mask,
         )
 
+    def test_to_grouped(self):
+        splitter = vbt.Splitter.from_splits(
+            index,
+            [
+                [slice(5, 15), slice(10, 20)],
+                [slice(10, 20), slice(15, 25)],
+                [slice(15, 25), slice(20, None)],
+            ],
+        )
+        new_splitter = splitter.to_grouped(split_group_by=[0, 1, 0])
+        np.testing.assert_array_equal(
+            new_splitter.splits_arr,
+            np.array([
+                [slice(5, 25, None), slice(10, 31, None)],
+                [slice(10, 20, None), slice(15, 25, None)],
+            ], dtype=object)
+        )
+        assert_index_equal(new_splitter.wrapper.index, pd.Index([0, 1], dtype='int64', name='split_group'))
+        assert_index_equal(new_splitter.wrapper.columns, pd.Index(['set_0', 'set_1'], dtype='object', name='set'))
+        assert new_splitter.wrapper.ndim == 2
+        new_splitter = splitter.to_grouped(split_group_by=[0, 1, 0], set_group_by=True)
+        np.testing.assert_array_equal(
+            new_splitter.splits_arr,
+            np.array([[slice(5, 31, None)], [slice(10, 25, None)]], dtype=object)
+        )
+        assert_index_equal(new_splitter.wrapper.index, pd.Index([0, 1], dtype='int64', name='split_group'))
+        assert_index_equal(new_splitter.wrapper.columns, pd.Index(['group'], dtype='object', name='set_group'))
+        assert new_splitter.wrapper.ndim == 1
+
     def test_remap_range(self):
         def test_mask(out, slice_):
             mask = np.full(len(out), False)
