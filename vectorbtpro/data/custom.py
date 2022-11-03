@@ -1209,6 +1209,9 @@ class BinanceData(RemoteData):
 
         For defaults, see `custom.binance` in `vectorbtpro._settings.data`.
         """
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("binance")
         from binance.enums import HistoricalKlinesType
 
         binance_cfg = cls.get_settings(key_id="custom")
