@@ -99,11 +99,11 @@ def interp_nb(arr: tp.FlexArray, i: int, source_size: int, target_size: int, int
 
 
 @register_jitted(cache=True)
-def interp_resize_1d_nb(arr: tp.Array1d, target_size: int, interp_mode: int) -> tp.Array1d:
+def interp_resize_1d_nb(arr: tp.FlexArray, target_size: int, interp_mode: int) -> tp.Array1d:
     """Resize an array using `interp_nb`."""
     out = np.empty(target_size, dtype=np.float_)
     for i in range(target_size):
-        out[i] = interp_nb(arr, i, arr.shape[0], target_size, interp_mode)
+        out[i] = interp_nb(arr, i, arr.size, target_size, interp_mode)
     return out
 
 
@@ -125,6 +125,8 @@ def fit_pattern_nb(
     """Fit pattern.
 
     Returns the resized and rescaled pattern and max error."""
+    if max_error_interp_mode is None:
+        max_error_interp_mode = interp_mode
     fit_pattern = interp_resize_1d_nb(
         pattern,
         len(arr),
