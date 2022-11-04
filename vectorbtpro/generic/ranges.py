@@ -527,7 +527,7 @@ class Ranges(PriceRecords):
         proj_start: tp.Union[None, str, int, tp.FrequencyLike] = None,
         proj_period: tp.Union[None, str, int, tp.FrequencyLike] = None,
         incl_end_idx: bool = True,
-        stretch: bool = False,
+        extend: bool = False,
         rebase: bool = True,
         start_value: tp.ArrayLike = 1.0,
         ffill: bool = False,
@@ -549,10 +549,10 @@ class Ranges(PriceRecords):
         The second option requires the index to be datetime-like, or at least the frequency to be set.
 
         Set `proj_period` the same way as `proj_start` to generate a projection of a certain length.
-        Unless `stretch` is True, it still respects the duration of the range.
+        Unless `extend` is True, it still respects the duration of the range.
 
-        Set `stretch` to True to stretch the projection even after the end of the range.
-        The stretching period is taken from the longest range duration if `proj_period` is None,
+        Set `extend` to True to extend the projection even after the end of the range.
+        The extending period is taken from the longest range duration if `proj_period` is None,
         and from the longest `proj_period` if it's not None.
 
         Set `rebase` to True to make each projection start with 1, otherwise, each projection
@@ -617,7 +617,7 @@ class Ranges(PriceRecords):
             proj_period=proj_period,
             proj_period_use_index=proj_period_use_index,
             incl_end_idx=incl_end_idx,
-            stretch=stretch,
+            extend=extend,
             rebase=rebase,
             start_value=to_1d_array(start_value),
             ffill=ffill,
@@ -726,7 +726,7 @@ class Ranges(PriceRecords):
         proj_start: tp.Union[None, str, int, tp.FrequencyLike] = "current_or_0",
         proj_period: tp.Union[None, str, int, tp.FrequencyLike] = "max",
         incl_end_idx: bool = True,
-        stretch: bool = False,
+        extend: bool = False,
         ffill: bool = False,
         plot_past_period: tp.Union[None, str, int, tp.FrequencyLike] = "current_or_proj_period",
         plot_ohlc: tp.Union[bool, tp.Frame] = True,
@@ -774,7 +774,7 @@ class Ranges(PriceRecords):
                 a percentage such as "50%" representing a quantile. All of those options are based
                 on the duration of all the closed ranges filtered by the arguments above.
             incl_end_idx (bool): See `Ranges.get_projections`.
-            stretch (bool): See `Ranges.get_projections`.
+            extend (bool): See `Ranges.get_projections`.
             ffill (bool): See `Ranges.get_projections`.
             plot_past_period (str, int, or frequency_like): Past period to plot.
 
@@ -817,7 +817,7 @@ class Ranges(PriceRecords):
             ... ).plot_projections(
             ...     proj_start=0,
             ...     proj_period=4,
-            ...     stretch=True,
+            ...     extend=True,
             ...     plot_past_period=None
             ... )
             ```
@@ -995,7 +995,7 @@ class Ranges(PriceRecords):
                 proj_start=proj_start,
                 proj_period=proj_period,
                 incl_end_idx=incl_end_idx,
-                stretch=stretch,
+                extend=extend,
                 rebase=True,
                 start_value=close.iloc[-1],
                 ffill=ffill,

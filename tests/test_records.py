@@ -2890,7 +2890,7 @@ class TestRanges:
             ),
         )
         assert_frame_equal(
-            ranges.get_projections(proj_period=3, stretch=True),
+            ranges.get_projections(proj_period=3, extend=True),
             pd.DataFrame(
                 [
                     [1.0, 1.0, 1.0, 1.0, 1.0],
@@ -2914,7 +2914,7 @@ class TestRanges:
             ),
         )
         assert_frame_equal(
-            ranges.get_projections(proj_period="3d", stretch=True),
+            ranges.get_projections(proj_period="3d", extend=True),
             pd.DataFrame(
                 [
                     [1.0, 1.0, 1.0, 1.0, 1.0],
@@ -2959,7 +2959,7 @@ class TestRanges:
             ),
         )
         assert_frame_equal(
-            ranges.get_projections(proj_period=3, stretch=True, ffill=True),
+            ranges.get_projections(proj_period=3, extend=True, ffill=True),
             pd.DataFrame(
                 [
                     [1.0, 1.0, 1.0, 1.0, 1.0],
