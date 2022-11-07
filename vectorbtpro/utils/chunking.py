@@ -731,7 +731,7 @@ def chunked(
     arg_take_spec: tp.Optional[tp.ArgTakeSpecLike] = None,
     template_context: tp.Optional[tp.Mapping] = None,
     prepend_chunk_meta: tp.Optional[bool] = None,
-    merge_func: tp.Union[None, str, tp.Callable] = None,
+    merge_func: tp.Union[None, str, tuple, tp.Callable] = None,
     merge_kwargs: tp.KwargsLike = None,
     engine: tp.Optional[tp.EngineLike] = None,
     return_raw_chunks: bool = False,
@@ -739,7 +739,7 @@ def chunked(
     disable: tp.Optional[bool] = None,
     **engine_kwargs,
 ) -> tp.Callable:
-    """Decorator that chunks the function. Engine-agnostic.
+    """Decorator that chunks the inputs of a function. Engine-agnostic.
     Returns a new function with the same signature as the passed one.
 
     Does the following:

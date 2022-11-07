@@ -2282,9 +2282,9 @@ class TestParsing:
         ann_args = parsing.annotate_args(f, (0, 1), dict(c=3))
 
         flat_ann_args = parsing.flatten_ann_args(ann_args)
-        assert parsing.ignore_flat_ann_args(flat_ann_args, [0]) == flat_ann_args[1:]
-        assert parsing.ignore_flat_ann_args(flat_ann_args, ["a"]) == flat_ann_args[1:]
-        assert parsing.ignore_flat_ann_args(flat_ann_args, [parsing.Regex("a")]) == flat_ann_args[2:]
+        assert list(parsing.ignore_flat_ann_args(flat_ann_args, [0]).items()) == list(flat_ann_args.items())[1:]
+        assert list(parsing.ignore_flat_ann_args(flat_ann_args, ["a"]).items()) == list(flat_ann_args.items())[1:]
+        assert list(parsing.ignore_flat_ann_args(flat_ann_args, [parsing.Regex("a")]).items()) == list(flat_ann_args.items())[2:]
 
     def test_hash_args(self):
         def f(a, *args, b=2, **kwargs):

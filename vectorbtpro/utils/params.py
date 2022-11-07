@@ -434,11 +434,11 @@ def parameterized(
     random_subset: tp.Optional[int] = None,
     index_stack_kwargs: tp.KwargsLike = None,
     name_tuple_to_str: tp.Union[None, bool, tp.Callable] = None,
-    merge_func: tp.Union[None, str, tp.Callable] = None,
+    merge_func: tp.Union[None, str, tuple, tp.Callable] = None,
     merge_kwargs: tp.KwargsLike = None,
     **execute_kwargs,
 ) -> tp.Callable:
-    """Decorator that parameterizes the function. Engine-agnostic.
+    """Decorator that parameterizes a function. Engine-agnostic.
     Returns a new function with the same signature as the passed one.
 
     Does the following:

@@ -177,7 +177,7 @@ class RelRange:
         return slice(start, stop)
 
 
-@attr.s
+@attr.s(frozen=True)
 class GapRange:
     """Class that represents a range acting as a gap."""
 
@@ -189,7 +189,7 @@ _DEF = object()
 """Use as a default value for optional arguments in `Takeable`."""
 
 
-@attr.s
+@attr.s(frozen=True)
 class Takeable:
     """Class that represents an object from which a range can be taken."""
 
@@ -428,6 +428,35 @@ class Splitter(Analyzable):
             index,
             splits,
             fix_ranges=fix_ranges,
+            split_range_kwargs=split_range_kwargs,
+            template_context=template_context,
+            **kwargs,
+        )
+
+    @classmethod
+    def from_single(
+        cls: tp.Type[SplitterT],
+        index: tp.IndexLike,
+        split: tp.Optional[tp.SplitLike],
+        split_range_kwargs: tp.KwargsLike = None,
+        template_context: tp.KwargsLike = None,
+        **kwargs,
+    ) -> SplitterT:
+        """Create a new `Splitter` instance from a single split."""
+        if split_range_kwargs is None:
+            split_range_kwargs = {}
+        new_split = cls.split_range(
+            slice(None),
+            split,
+            template_context=template_context,
+            index=index,
+            **split_range_kwargs,
+        )
+        splits = [new_split]
+
+        return cls.from_splits(
+            index,
+            splits,
             split_range_kwargs=split_range_kwargs,
             template_context=template_context,
             **kwargs,
@@ -2357,8 +2386,7 @@ class Splitter(Analyzable):
     def apply(
         self,
         apply_func: tp.Callable,
-        apply_args: tp.ArgsLike = None,
-        apply_kwargs: tp.KwargsLike = None,
+        *args,
         split: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
         set_: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
         split_group_by: tp.AnyGroupByLike = None,
@@ -2378,10 +2406,11 @@ class Splitter(Analyzable):
         freq: tp.Optional[tp.FrequencyLike] = None,
         iteration: str = "split_wise",
         execute_kwargs: tp.KwargsLike = None,
-        merge_func: tp.Union[None, str, tp.Callable] = None,
+        merge_func: tp.Union[None, str, tuple, tp.Callable] = None,
         merge_kwargs: tp.KwargsLike = None,
         merge_all: bool = True,
         wrap_results: bool = True,
+        **kwargs,
     ) -> tp.Any:
         """Apply a function on each range.
 
@@ -2390,11 +2419,11 @@ class Splitter(Analyzable):
         Ranges belonging to the same split and set group will be merged.
 
         For each index pair, in a lazily manner, resolves the source range using `Splitter.select_range`
-        and `Splitter.get_ready_range`. Then, takes each argument from `apply_args` and `apply_kwargs`
+        and `Splitter.get_ready_range`. Then, takes each argument from `args` and `kwargs`
         wrapped with `Takeable`, remaps the range into each object's index using `Splitter.get_ready_obj_range`,
         and takes the slice from that object using `Splitter.take_range`. The original object will
         be substituted by this slice. At the end, substitutes any templates in the prepared
-        `apply_args` and `apply_kwargs` and saves the function and arguments for execution.
+        `args` and `kwargs` and saves the function and arguments for execution.
 
         For substitution, the following information is available:
 
@@ -2405,8 +2434,8 @@ class Splitter(Analyzable):
         * `range_meta`: Various information on the selected range
         * `obj_range_meta`: Various information on the range taken from each takeable argument.
             Positional arguments are denoted by position, keyword arguments are denoted by keys.
-        * `apply_args`: Positional arguments with ranges already selected
-        * `apply_kwargs`: Keyword arguments with ranges already selected
+        * `args`: Positional arguments with ranges already selected
+        * `kwargs`: Keyword arguments with ranges already selected
         * `bounds`: A tuple of either integer or index bounds (`index_bounds=True`).
             Can be source or target depending on `attach_bounds`.
         * `template_context`: Passed template context
@@ -2448,7 +2477,7 @@ class Splitter(Analyzable):
             >>> def apply_func(data):
             ...     return data.close.iloc[-1] - data.close.iloc[0]
 
-            >>> splitter.apply(apply_func, (vbt.Takeable(data),))
+            >>> splitter.apply(apply_func, vbt.Takeable(data))
             split  set
             0      set_0    -1636.467285
             1      set_0     3706.568359
@@ -2465,7 +2494,7 @@ class Splitter(Analyzable):
             ...     data = data.iloc[range_]
             ...     return data.close.iloc[-1] - data.close.iloc[0]
 
-            >>> splitter.apply(apply_func, (vbt.Rep("range_"), data))
+            >>> splitter.apply(apply_func, vbt.Rep("range_"), data)
             split  set
             0      set_0    -1636.467285
             1      set_0     3706.568359
@@ -2486,7 +2515,7 @@ class Splitter(Analyzable):
 
             >>> splitter.apply(
             ...     apply_func,
-            ...     (vbt.Takeable(data),),
+            ...     vbt.Takeable(data),
             ...     iteration="set_wise",
             ...     merge_func="row_stack",
             ...     merge_all=False,
@@ -2669,9 +2698,9 @@ class Splitter(Analyzable):
                 dict(range_=range_meta["range_"], range_meta=range_meta),
                 _template_context,
             )
-            obj_meta1, obj_range_meta1, _apply_args = _take_args(apply_args, range_meta["range_"], _template_context)
-            obj_meta2, obj_range_meta2, _apply_kwargs = _take_kwargs(
-                apply_kwargs, range_meta["range_"], _template_context
+            obj_meta1, obj_range_meta1, _args = _take_args(args, range_meta["range_"], _template_context)
+            obj_meta2, obj_range_meta2, _kwargs = _take_kwargs(
+                kwargs, range_meta["range_"], _template_context
             )
             obj_meta = {**obj_meta1, **obj_meta2}
             obj_range_meta = {**obj_range_meta1, **obj_range_meta2}
@@ -2680,16 +2709,16 @@ class Splitter(Analyzable):
                 dict(
                     obj_meta=obj_meta,
                     obj_range_meta=obj_range_meta,
-                    apply_args=_apply_args,
-                    apply_kwargs=_apply_kwargs,
+                    args=_args,
+                    kwargs=_kwargs,
                     bounds=_bounds[(i, j)],
                 ),
                 _template_context,
             )
             _apply_func = deep_substitute(apply_func, _template_context, sub_id="apply_func")
-            _apply_args = deep_substitute(_apply_args, _template_context, sub_id="apply_args")
-            _apply_kwargs = deep_substitute(_apply_kwargs, _template_context, sub_id="apply_kwargs")
-            return _apply_func, _apply_args, _apply_kwargs
+            _args = deep_substitute(_args, _template_context, sub_id="args")
+            _kwargs = deep_substitute(_kwargs, _template_context, sub_id="kwargs")
+            return _apply_func, _args, _kwargs
 
         def _attach_bounds(keys, range_bounds):
             range_bounds = pd.MultiIndex.from_tuples(range_bounds, names=["start", "end"])
@@ -3881,6 +3910,7 @@ if settings["importing"]["sklearn"]:
         Args:
             method (str or callable): Method that returns an instance of `Splitter`.
             *method_args: Positional arguments passed to `method`.
+            splitter_cls (type): Splitter class.
             split_group_by (any): Split groups. See `vectorbtpro.base.accessors.BaseIDXAccessor.get_grouper`.
 
                 Not passed to `method`.
@@ -3930,6 +3960,7 @@ if settings["importing"]["sklearn"]:
             self,
             method: tp.Union[str, tp.Callable],
             *method_args,
+            splitter_cls: tp.Type[Splitter] = Splitter,
             split_group_by: tp.AnyGroupByLike = None,
             set_group_by: tp.AnyGroupByLike = None,
             template_context: tp.KwargsLike = None,
@@ -3938,6 +3969,7 @@ if settings["importing"]["sklearn"]:
             self.method = method
             self.method_args = method_args
             self.method_kwargs = method_kwargs
+            self.splitter_cls = splitter_cls
             self.split_group_by = split_group_by
             self.set_group_by = set_group_by
             self.template_context = template_context
@@ -3951,11 +3983,11 @@ if settings["importing"]["sklearn"]:
             """Get splitter of type `Splitter`."""
             X, y, groups = indexable(X, y, groups)
             try:
-                index = Splitter.get_obj_index(X)
+                index = self.splitter_cls.get_obj_index(X)
             except ValueError as e:
                 index = pd.RangeIndex(stop=len(X))
             if isinstance(self.method, str):
-                method = getattr(Splitter, self.method)
+                method = getattr(self.splitter_cls, self.method)
             else:
                 method = self.method
             splitter = method(
