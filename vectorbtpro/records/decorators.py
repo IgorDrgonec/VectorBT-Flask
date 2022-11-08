@@ -97,7 +97,13 @@ def attach_fields(*args, on_conflict: str = "raise") -> tp.FlexClassWrapper:
             checks.assert_instance_of(attr_name, str)
             attr_name = attr_name.replace("NaN", "Nan")
             startswith_ = attr_name.startswith("_")
-            attr_name = re.sub(r"([A-Z])", r"_\1", attr_name)
+            new_attr_name = ""
+            for i in range(len(attr_name)):
+                if attr_name[i].isupper():
+                    if i > 0 and attr_name[i - 1].islower():
+                        new_attr_name += "_"
+                new_attr_name += attr_name[i]
+            attr_name = new_attr_name
             if not startswith_ and attr_name.startswith("_"):
                 attr_name = attr_name[1:]
             attr_name = attr_name.lower()
