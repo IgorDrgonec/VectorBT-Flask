@@ -1862,6 +1862,72 @@ class TestParams:
                 names=["c_d_1_e", "f_1"],
             ),
         )
+        assert fp(1, **kwargs, _selection=1) == (1, (), 2, {"c": dict(d=(2, dict(e=3))), "f": (5, 7)})
+        assert fp(1, **kwargs, _selection=1, _skip_single_param=False)[0] == [
+            (1, (), 2, {"c": dict(d=(2, dict(e=3))), "f": (5, 7)}),
+        ]
+        assert_index_equal(
+            fp(1, **kwargs, _selection=1, _skip_single_param=False)[1],
+            pd.MultiIndex.from_tuples(
+                [
+                    (3, 7),
+                ],
+                names=["c_d_1_e", "f_1"],
+            ),
+        )
+        assert fp(1, **kwargs, _selection=(3, 7)) == (1, (), 2, {"c": dict(d=(2, dict(e=3))), "f": (5, 7)})
+        assert fp(1, **kwargs, _selection=(3, 7), _skip_single_param=False)[0] == [
+            (1, (), 2, {"c": dict(d=(2, dict(e=3))), "f": (5, 7)}),
+        ]
+        assert_index_equal(
+            fp(1, **kwargs, _selection=(3, 7), _skip_single_param=False)[1],
+            pd.MultiIndex.from_tuples(
+                [
+                    (3, 7),
+                ],
+                names=["c_d_1_e", "f_1"],
+            ),
+        )
+        assert fp(1, **kwargs, _selection=[1])[0] == [
+            (1, (), 2, {"c": dict(d=(2, dict(e=3))), "f": (5, 7)}),
+        ]
+        assert_index_equal(
+            fp(1, **kwargs, _selection=[1])[1],
+            pd.MultiIndex.from_tuples(
+                [
+                    (3, 7),
+                ],
+                names=["c_d_1_e", "f_1"],
+            ),
+        )
+        assert fp(1, **kwargs, _selection=[1, (4, 7)])[0] == [
+            (1, (), 2, {"c": dict(d=(2, dict(e=3))), "f": (5, 7)}),
+            (1, (), 2, {"c": dict(d=(2, dict(e=4))), "f": (5, 7)}),
+        ]
+        assert_index_equal(
+            fp(1, **kwargs, _selection=[1, (4, 7)])[1],
+            pd.MultiIndex.from_tuples(
+                [
+                    (3, 7),
+                    (4, 7),
+                ],
+                names=["c_d_1_e", "f_1"],
+            ),
+        )
+        assert fp(1, **kwargs, _selection=vbt.RepFunc(lambda param_index: param_index[[1, 3]]))[0] == [
+            (1, (), 2, {"c": dict(d=(2, dict(e=3))), "f": (5, 7)}),
+            (1, (), 2, {"c": dict(d=(2, dict(e=4))), "f": (5, 7)}),
+        ]
+        assert_index_equal(
+            fp(1, **kwargs, _selection=vbt.RepFunc(lambda param_index: param_index[[1, 3]]))[1],
+            pd.MultiIndex.from_tuples(
+                [
+                    (3, 7),
+                    (4, 7),
+                ],
+                names=["c_d_1_e", "f_1"],
+            ),
+        )
 
         param_configs = [dict(a=1)]
         assert fp(param_configs=param_configs)[0] == [(1, (), 2, {})]
