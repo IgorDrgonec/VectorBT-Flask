@@ -953,9 +953,7 @@ class TestSplitter:
         ) == slice(5, 31, None)
 
     def test_get_ready_range(self):
-        assert vbt.Splitter.get_ready_range(
-            vbt.GapRange(slice(10, 20)), index=index
-        ) == slice(10, 20)
+        assert vbt.Splitter.get_ready_range(vbt.GapRange(slice(10, 20)), index=index) == slice(10, 20)
         assert vbt.Splitter.get_ready_range(
             vbt.Rep("range_", context=dict(range_=slice(10, 20))), index=index
         ) == slice(10, 20)
@@ -1020,9 +1018,7 @@ class TestSplitter:
             mask,
         )
         with pytest.raises(Exception):
-            vbt.Splitter.get_ready_range(
-                np.array([3, 1], dtype=object), range_format="slice", index=index
-            )
+            vbt.Splitter.get_ready_range(np.array([3, 1], dtype=object), range_format="slice", index=index)
         np.testing.assert_array_equal(
             vbt.Splitter.get_ready_range(np.array([3, 1], dtype=object), range_format="slice_or_indices", index=index),
             np.array([1, 3]),
@@ -1329,21 +1325,23 @@ class TestSplitter:
         new_splitter = splitter.to_grouped(split_group_by=[0, 1, 0])
         np.testing.assert_array_equal(
             new_splitter.splits_arr,
-            np.array([
-                [slice(5, 25, None), slice(10, 31, None)],
-                [slice(10, 20, None), slice(15, 25, None)],
-            ], dtype=object)
+            np.array(
+                [
+                    [slice(5, 25, None), slice(10, 31, None)],
+                    [slice(10, 20, None), slice(15, 25, None)],
+                ],
+                dtype=object,
+            ),
         )
-        assert_index_equal(new_splitter.wrapper.index, pd.Index([0, 1], dtype='int64', name='split_group'))
-        assert_index_equal(new_splitter.wrapper.columns, pd.Index(['set_0', 'set_1'], dtype='object', name='set'))
+        assert_index_equal(new_splitter.wrapper.index, pd.Index([0, 1], dtype="int64", name="split_group"))
+        assert_index_equal(new_splitter.wrapper.columns, pd.Index(["set_0", "set_1"], dtype="object", name="set"))
         assert new_splitter.wrapper.ndim == 2
         new_splitter = splitter.to_grouped(split_group_by=[0, 1, 0], set_group_by=True)
         np.testing.assert_array_equal(
-            new_splitter.splits_arr,
-            np.array([[slice(5, 31, None)], [slice(10, 25, None)]], dtype=object)
+            new_splitter.splits_arr, np.array([[slice(5, 31, None)], [slice(10, 25, None)]], dtype=object)
         )
-        assert_index_equal(new_splitter.wrapper.index, pd.Index([0, 1], dtype='int64', name='split_group'))
-        assert_index_equal(new_splitter.wrapper.columns, pd.Index(['group'], dtype='object', name='set_group'))
+        assert_index_equal(new_splitter.wrapper.index, pd.Index([0, 1], dtype="int64", name="split_group"))
+        assert_index_equal(new_splitter.wrapper.columns, pd.Index(["group"], dtype="object", name="set_group"))
         assert new_splitter.wrapper.ndim == 1
 
     def test_remap_range(self):
@@ -1816,10 +1814,13 @@ class TestSplitter:
                     [np.nan, 24.0],
                 ],
                 index=sr.index[5:25],
-                columns=pd.MultiIndex.from_tuples([
-                    (0, pd.Timestamp("2020-01-01"), pd.Timestamp("2020-01-16")),
-                    (1, pd.Timestamp("2020-01-06"), pd.Timestamp("2020-01-21")),
-                ], names=["split", "start", "end"]),
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        (0, pd.Timestamp("2020-01-01"), pd.Timestamp("2020-01-16")),
+                        (1, pd.Timestamp("2020-01-06"), pd.Timestamp("2020-01-21")),
+                    ],
+                    names=["split", "start", "end"],
+                ),
             ),
         )
         assert_frame_equal(
@@ -1844,10 +1845,13 @@ class TestSplitter:
                     [np.nan, 30.0],
                 ],
                 index=sr.index[15:31],
-                columns=pd.MultiIndex.from_tuples([
-                    (0, pd.Timestamp("2020-01-11"), pd.Timestamp("2020-01-26")),
-                    (1, pd.Timestamp("2020-01-16"), pd.Timestamp("2020-01-27"))
-                ], names=["split", "start", "end"]),
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        (0, pd.Timestamp("2020-01-11"), pd.Timestamp("2020-01-26")),
+                        (1, pd.Timestamp("2020-01-16"), pd.Timestamp("2020-01-27")),
+                    ],
+                    names=["split", "start", "end"],
+                ),
             ),
         )
 
@@ -1865,21 +1869,14 @@ class TestSplitter:
 
         assert_series_equal(
             splitter.apply(
-                apply_func,
-                1, 2, vbt.Rep("split_idx"),
-                c=4, d=vbt.Rep("set_idx"),
-                merge_all=True,
-                merge_func="concat"
+                apply_func, 1, 2, vbt.Rep("split_idx"), c=4, d=vbt.Rep("set_idx"), merge_all=True, merge_func="concat"
             ),
             pd.Series(
                 [9, 10, 10, 11],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0'),
-                    (0, 'set_1'),
-                    (1, 'set_0'),
-                    (1, 'set_1')
-                ], names=['split', 'set'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [(0, "set_0"), (0, "set_1"), (1, "set_0"), (1, "set_1")], names=["split", "set"]
+                ),
+            ),
         )
 
         def apply_func(a, b=None):
@@ -1891,17 +1888,14 @@ class TestSplitter:
                 vbt.Takeable(np.arange(len(index))),
                 b=vbt.Takeable(np.arange(len(index))),
                 merge_all=True,
-                merge_func="concat"
+                merge_func="concat",
             ),
             pd.Series(
                 [210, 510, 360, 720],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0'),
-                    (0, 'set_1'),
-                    (1, 'set_0'),
-                    (1, 'set_1')
-                ], names=['split', 'set'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [(0, "set_0"), (0, "set_1"), (1, "set_0"), (1, "set_1")], names=["split", "set"]
+                ),
+            ),
         )
         assert_series_equal(
             splitter.apply(
@@ -1913,13 +1907,10 @@ class TestSplitter:
             ),
             pd.Series(
                 [210, 510, 360, 720],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0'),
-                    (0, 'set_1'),
-                    (1, 'set_0'),
-                    (1, 'set_1')
-                ], names=['split', 'set'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [(0, "set_0"), (0, "set_1"), (1, "set_0"), (1, "set_1")], names=["split", "set"]
+                ),
+            ),
         )
         assert_series_equal(
             splitter.apply(
@@ -1932,32 +1923,20 @@ class TestSplitter:
             ),
             pd.Series(
                 [210, 510, 360, 720],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0'),
-                    (0, 'set_1'),
-                    (1, 'set_0'),
-                    (1, 'set_1')
-                ], names=['split', 'set'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [(0, "set_0"), (0, "set_1"), (1, "set_0"), (1, "set_1")], names=["split", "set"]
+                ),
+            ),
         )
         sr = pd.Series(np.arange(len(index)), index=index.shift(-5))
         assert_series_equal(
-            splitter.apply(
-                apply_func,
-                vbt.Takeable(sr),
-                b=vbt.Takeable(sr),
-                merge_all=True,
-                merge_func="concat"
-            ),
+            splitter.apply(apply_func, vbt.Takeable(sr), b=vbt.Takeable(sr), merge_all=True, merge_func="concat"),
             pd.Series(
                 [360, 660, 510, 550],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0'),
-                    (0, 'set_1'),
-                    (1, 'set_0'),
-                    (1, 'set_1')
-                ], names=['split', 'set'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [(0, "set_0"), (0, "set_1"), (1, "set_0"), (1, "set_1")], names=["split", "set"]
+                ),
+            ),
         )
         assert_series_equal(
             splitter.apply(
@@ -1966,17 +1945,14 @@ class TestSplitter:
                 b=vbt.Takeable(sr.values),
                 obj_index=sr.index,
                 merge_all=True,
-                merge_func="concat"
+                merge_func="concat",
             ),
             pd.Series(
                 [360, 660, 510, 550],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0'),
-                    (0, 'set_1'),
-                    (1, 'set_0'),
-                    (1, 'set_1')
-                ], names=['split', 'set'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [(0, "set_0"), (0, "set_1"), (1, "set_0"), (1, "set_1")], names=["split", "set"]
+                ),
+            ),
         )
         assert_series_equal(
             splitter.apply(
@@ -1985,17 +1961,14 @@ class TestSplitter:
                 b=vbt.Takeable(sr.values, index=sr.index.shift(-2)),
                 obj_index=sr.index,
                 merge_all=True,
-                merge_func="concat"
+                merge_func="concat",
             ),
             pd.Series(
                 [405, 674, 555, 489],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0'),
-                    (0, 'set_1'),
-                    (1, 'set_0'),
-                    (1, 'set_1')
-                ], names=['split', 'set'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [(0, "set_0"), (0, "set_1"), (1, "set_0"), (1, "set_1")], names=["split", "set"]
+                ),
+            ),
         )
         assert_series_equal(
             splitter.apply(
@@ -2005,17 +1978,15 @@ class TestSplitter:
                 obj_index=sr.index,
                 attach_bounds=True,
                 merge_all=True,
-                merge_func="concat"
+                merge_func="concat",
             ),
             pd.Series(
                 [405, 674, 555, 489],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0', 0, 15),
-                    (0, 'set_1', 10, 25),
-                    (1, 'set_0', 5, 20),
-                    (1, 'set_1', 15, 31)
-                ], names=['split', 'set', 'start', 'end'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [(0, "set_0", 0, 15), (0, "set_1", 10, 25), (1, "set_0", 5, 20), (1, "set_1", 15, 31)],
+                    names=["split", "set", "start", "end"],
+                ),
+            ),
         )
         assert_series_equal(
             splitter.apply(
@@ -2026,17 +1997,15 @@ class TestSplitter:
                 attach_bounds=True,
                 right_inclusive=True,
                 merge_all=True,
-                merge_func="concat"
+                merge_func="concat",
             ),
             pd.Series(
                 [405, 674, 555, 489],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0', 0, 14),
-                    (0, 'set_1', 10, 24),
-                    (1, 'set_0', 5, 19),
-                    (1, 'set_1', 15, 30)
-                ], names=['split', 'set', 'start', 'end'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [(0, "set_0", 0, 14), (0, "set_1", 10, 24), (1, "set_0", 5, 19), (1, "set_1", 15, 30)],
+                    names=["split", "set", "start", "end"],
+                ),
+            ),
         )
         assert_series_equal(
             splitter.apply(
@@ -2047,17 +2016,20 @@ class TestSplitter:
                 attach_bounds=True,
                 index_bounds=True,
                 merge_all=True,
-                merge_func="concat"
+                merge_func="concat",
             ),
             pd.Series(
                 [405, 674, 555, 489],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0', pd.Timestamp('2020-01-01'), pd.Timestamp('2020-01-16')),
-                    (0, 'set_1', pd.Timestamp('2020-01-11'), pd.Timestamp('2020-01-26')),
-                    (1, 'set_0', pd.Timestamp('2020-01-06'), pd.Timestamp('2020-01-21')),
-                    (1, 'set_1', pd.Timestamp('2020-01-16'), pd.Timestamp('2020-02-01'))
-                ], names=['split', 'set', 'start', 'end'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [
+                        (0, "set_0", pd.Timestamp("2020-01-01"), pd.Timestamp("2020-01-16")),
+                        (0, "set_1", pd.Timestamp("2020-01-11"), pd.Timestamp("2020-01-26")),
+                        (1, "set_0", pd.Timestamp("2020-01-06"), pd.Timestamp("2020-01-21")),
+                        (1, "set_1", pd.Timestamp("2020-01-16"), pd.Timestamp("2020-02-01")),
+                    ],
+                    names=["split", "set", "start", "end"],
+                ),
+            ),
         )
         assert_series_equal(
             splitter.apply(
@@ -2067,17 +2039,15 @@ class TestSplitter:
                 obj_index=sr.index,
                 attach_bounds="target",
                 merge_all=True,
-                merge_func="concat"
+                merge_func="concat",
             ),
             pd.Series(
                 [405, 674, 555, 489],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0', 5, 20),
-                    (0, 'set_1', 15, 30),
-                    (1, 'set_0', 10, 25),
-                    (1, 'set_1', 20, 31)
-                ], names=['split', 'set', 'start', 'end'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [(0, "set_0", 5, 20), (0, "set_1", 15, 30), (1, "set_0", 10, 25), (1, "set_1", 20, 31)],
+                    names=["split", "set", "start", "end"],
+                ),
+            ),
         )
         assert_series_equal(
             splitter.apply(
@@ -2088,17 +2058,20 @@ class TestSplitter:
                 attach_bounds="target",
                 index_bounds=True,
                 merge_all=True,
-                merge_func="concat"
+                merge_func="concat",
             ),
             pd.Series(
                 [405, 674, 555, 489],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0', pd.Timestamp('2020-01-01'), pd.Timestamp('2020-01-16')),
-                    (0, 'set_1', pd.Timestamp('2020-01-11'), pd.Timestamp('2020-01-26')),
-                    (1, 'set_0', pd.Timestamp('2020-01-06'), pd.Timestamp('2020-01-21')),
-                    (1, 'set_1', pd.Timestamp('2020-01-16'), pd.Timestamp('2020-01-27'))
-                ], names=['split', 'set', 'start', 'end'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [
+                        (0, "set_0", pd.Timestamp("2020-01-01"), pd.Timestamp("2020-01-16")),
+                        (0, "set_1", pd.Timestamp("2020-01-11"), pd.Timestamp("2020-01-26")),
+                        (1, "set_0", pd.Timestamp("2020-01-06"), pd.Timestamp("2020-01-21")),
+                        (1, "set_1", pd.Timestamp("2020-01-16"), pd.Timestamp("2020-01-27")),
+                    ],
+                    names=["split", "set", "start", "end"],
+                ),
+            ),
         )
         assert_series_equal(
             splitter.apply(
@@ -2108,17 +2081,14 @@ class TestSplitter:
                 obj_index=sr.index,
                 iteration="split_major",
                 merge_all=True,
-                merge_func="concat"
+                merge_func="concat",
             ),
             pd.Series(
                 [405, 674, 555, 489],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0'),
-                    (0, 'set_1'),
-                    (1, 'set_0'),
-                    (1, 'set_1')
-                ], names=['split', 'set'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [(0, "set_0"), (0, "set_1"), (1, "set_0"), (1, "set_1")], names=["split", "set"]
+                ),
+            ),
         )
         assert_series_equal(
             splitter.apply(
@@ -2128,17 +2098,14 @@ class TestSplitter:
                 obj_index=sr.index,
                 iteration="split_wise",
                 merge_all=True,
-                merge_func="concat"
+                merge_func="concat",
             ),
             pd.Series(
                 [405, 674, 555, 489],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0'),
-                    (0, 'set_1'),
-                    (1, 'set_0'),
-                    (1, 'set_1')
-                ], names=['split', 'set'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [(0, "set_0"), (0, "set_1"), (1, "set_0"), (1, "set_1")], names=["split", "set"]
+                ),
+            ),
         )
         assert_series_equal(
             splitter.apply(
@@ -2148,17 +2115,14 @@ class TestSplitter:
                 obj_index=sr.index,
                 iteration="set_major",
                 merge_all=True,
-                merge_func="concat"
+                merge_func="concat",
             ),
             pd.Series(
                 [405, 555, 674, 489],
-                index=pd.MultiIndex.from_tuples([
-                    ('set_0', 0),
-                    ('set_0', 1),
-                    ('set_1', 0),
-                    ('set_1', 1)
-                ], names=['set', 'split'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [("set_0", 0), ("set_0", 1), ("set_1", 0), ("set_1", 1)], names=["set", "split"]
+                ),
+            ),
         )
         assert_series_equal(
             splitter.apply(
@@ -2168,17 +2132,14 @@ class TestSplitter:
                 obj_index=sr.index,
                 iteration="set_wise",
                 merge_all=True,
-                merge_func="concat"
+                merge_func="concat",
             ),
             pd.Series(
                 [405, 555, 674, 489],
-                index=pd.MultiIndex.from_tuples([
-                    ('set_0', 0),
-                    ('set_0', 1),
-                    ('set_1', 0),
-                    ('set_1', 1)
-                ], names=['set', 'split'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [("set_0", 0), ("set_0", 1), ("set_1", 0), ("set_1", 1)], names=["set", "split"]
+                ),
+            ),
         )
         assert_frame_equal(
             splitter.apply(
@@ -2188,13 +2149,13 @@ class TestSplitter:
                 obj_index=sr.index,
                 iteration="split_major",
                 merge_all=False,
-                merge_func="concat"
+                merge_func="concat",
             ),
             pd.DataFrame(
                 [[405, 674], [555, 489]],
                 index=pd.Index([0, 1], dtype="int64", name="split"),
                 columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
-            )
+            ),
         )
         assert_frame_equal(
             splitter.apply(
@@ -2204,13 +2165,13 @@ class TestSplitter:
                 obj_index=sr.index,
                 iteration="split_wise",
                 merge_all=False,
-                merge_func="concat"
+                merge_func="concat",
             ),
             pd.DataFrame(
                 [[405, 674], [555, 489]],
                 index=pd.Index([0, 1], dtype="int64", name="split"),
                 columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
-            )
+            ),
         )
         assert_frame_equal(
             splitter.apply(
@@ -2220,13 +2181,13 @@ class TestSplitter:
                 obj_index=sr.index,
                 iteration="set_major",
                 merge_all=False,
-                merge_func="concat"
+                merge_func="concat",
             ),
             pd.DataFrame(
                 [[405, 555], [674, 489]],
                 index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
                 columns=pd.Index([0, 1], dtype="int64", name="split"),
-            )
+            ),
         )
         assert_frame_equal(
             splitter.apply(
@@ -2236,13 +2197,13 @@ class TestSplitter:
                 obj_index=sr.index,
                 iteration="set_wise",
                 merge_all=False,
-                merge_func="concat"
+                merge_func="concat",
             ),
             pd.DataFrame(
                 [[405, 555], [674, 489]],
                 index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
                 columns=pd.Index([0, 1], dtype="int64", name="split"),
-            )
+            ),
         )
 
         def apply_func(a, b=None):
@@ -2255,31 +2216,25 @@ class TestSplitter:
             obj_index=sr.index,
             iteration="split_major",
             merge_all=True,
-            merge_func="concat"
+            merge_func="concat",
         )
         assert_series_equal(
             r[0],
             pd.Series(
                 [195, 345, 270, 255],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0'),
-                    (0, 'set_1'),
-                    (1, 'set_0'),
-                    (1, 'set_1')
-                ], names=['split', 'set'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [(0, "set_0"), (0, "set_1"), (1, "set_0"), (1, "set_1")], names=["split", "set"]
+                ),
+            ),
         )
         assert_series_equal(
             r[1],
             pd.Series(
                 [210, 329, 285, 234],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0'),
-                    (0, 'set_1'),
-                    (1, 'set_0'),
-                    (1, 'set_1')
-                ], names=['split', 'set'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [(0, "set_0"), (0, "set_1"), (1, "set_0"), (1, "set_1")], names=["split", "set"]
+                ),
+            ),
         )
         r = splitter.apply(
             apply_func,
@@ -2288,31 +2243,25 @@ class TestSplitter:
             obj_index=sr.index,
             iteration="split_wise",
             merge_all=True,
-            merge_func="concat"
+            merge_func="concat",
         )
         assert_series_equal(
             r[0],
             pd.Series(
                 [195, 345, 270, 255],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0'),
-                    (0, 'set_1'),
-                    (1, 'set_0'),
-                    (1, 'set_1')
-                ], names=['split', 'set'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [(0, "set_0"), (0, "set_1"), (1, "set_0"), (1, "set_1")], names=["split", "set"]
+                ),
+            ),
         )
         assert_series_equal(
             r[1],
             pd.Series(
                 [210, 329, 285, 234],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0'),
-                    (0, 'set_1'),
-                    (1, 'set_0'),
-                    (1, 'set_1')
-                ], names=['split', 'set'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [(0, "set_0"), (0, "set_1"), (1, "set_0"), (1, "set_1")], names=["split", "set"]
+                ),
+            ),
         )
         r = splitter.apply(
             apply_func,
@@ -2321,31 +2270,25 @@ class TestSplitter:
             obj_index=sr.index,
             iteration="set_major",
             merge_all=True,
-            merge_func="concat"
+            merge_func="concat",
         )
         assert_series_equal(
             r[0],
             pd.Series(
                 [195, 270, 345, 255],
-                index=pd.MultiIndex.from_tuples([
-                    ('set_0', 0),
-                    ('set_0', 1),
-                    ('set_1', 0),
-                    ('set_1', 1)
-                ], names=['set', 'split'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [("set_0", 0), ("set_0", 1), ("set_1", 0), ("set_1", 1)], names=["set", "split"]
+                ),
+            ),
         )
         assert_series_equal(
             r[1],
             pd.Series(
                 [210, 285, 329, 234],
-                index=pd.MultiIndex.from_tuples([
-                    ('set_0', 0),
-                    ('set_0', 1),
-                    ('set_1', 0),
-                    ('set_1', 1)
-                ], names=['set', 'split'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [("set_0", 0), ("set_0", 1), ("set_1", 0), ("set_1", 1)], names=["set", "split"]
+                ),
+            ),
         )
         r = splitter.apply(
             apply_func,
@@ -2354,31 +2297,25 @@ class TestSplitter:
             obj_index=sr.index,
             iteration="set_wise",
             merge_all=True,
-            merge_func="concat"
+            merge_func="concat",
         )
         assert_series_equal(
             r[0],
             pd.Series(
                 [195, 270, 345, 255],
-                index=pd.MultiIndex.from_tuples([
-                    ('set_0', 0),
-                    ('set_0', 1),
-                    ('set_1', 0),
-                    ('set_1', 1)
-                ], names=['set', 'split'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [("set_0", 0), ("set_0", 1), ("set_1", 0), ("set_1", 1)], names=["set", "split"]
+                ),
+            ),
         )
         assert_series_equal(
             r[1],
             pd.Series(
                 [210, 285, 329, 234],
-                index=pd.MultiIndex.from_tuples([
-                    ('set_0', 0),
-                    ('set_0', 1),
-                    ('set_1', 0),
-                    ('set_1', 1)
-                ], names=['set', 'split'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [("set_0", 0), ("set_0", 1), ("set_1", 0), ("set_1", 1)], names=["set", "split"]
+                ),
+            ),
         )
         r = splitter.apply(
             apply_func,
@@ -2387,7 +2324,7 @@ class TestSplitter:
             obj_index=sr.index,
             iteration="split_major",
             merge_all=False,
-            merge_func="concat"
+            merge_func="concat",
         )
         assert_frame_equal(
             r[0],
@@ -2395,7 +2332,7 @@ class TestSplitter:
                 [[195, 345], [270, 255]],
                 index=pd.Index([0, 1], dtype="int64", name="split"),
                 columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
-            )
+            ),
         )
         assert_frame_equal(
             r[1],
@@ -2403,7 +2340,7 @@ class TestSplitter:
                 [[210, 329], [285, 234]],
                 index=pd.Index([0, 1], dtype="int64", name="split"),
                 columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
-            )
+            ),
         )
         r = splitter.apply(
             apply_func,
@@ -2412,7 +2349,7 @@ class TestSplitter:
             obj_index=sr.index,
             iteration="split_wise",
             merge_all=False,
-            merge_func="concat"
+            merge_func="concat",
         )
         assert_frame_equal(
             r[0],
@@ -2420,7 +2357,7 @@ class TestSplitter:
                 [[195, 345], [270, 255]],
                 index=pd.Index([0, 1], dtype="int64", name="split"),
                 columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
-            )
+            ),
         )
         assert_frame_equal(
             r[1],
@@ -2428,7 +2365,7 @@ class TestSplitter:
                 [[210, 329], [285, 234]],
                 index=pd.Index([0, 1], dtype="int64", name="split"),
                 columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
-            )
+            ),
         )
         r = splitter.apply(
             apply_func,
@@ -2437,7 +2374,7 @@ class TestSplitter:
             obj_index=sr.index,
             iteration="set_major",
             merge_all=False,
-            merge_func="concat"
+            merge_func="concat",
         )
         assert_frame_equal(
             r[0],
@@ -2445,7 +2382,7 @@ class TestSplitter:
                 [[195, 270], [345, 255]],
                 index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
                 columns=pd.Index([0, 1], dtype="int64", name="split"),
-            )
+            ),
         )
         assert_frame_equal(
             r[1],
@@ -2453,7 +2390,7 @@ class TestSplitter:
                 [[210, 285], [329, 234]],
                 index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
                 columns=pd.Index([0, 1], dtype="int64", name="split"),
-            )
+            ),
         )
         r = splitter.apply(
             apply_func,
@@ -2462,7 +2399,7 @@ class TestSplitter:
             obj_index=sr.index,
             iteration="set_wise",
             merge_all=False,
-            merge_func="concat"
+            merge_func="concat",
         )
         assert_frame_equal(
             r[0],
@@ -2470,7 +2407,7 @@ class TestSplitter:
                 [[195, 270], [345, 255]],
                 index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
                 columns=pd.Index([0, 1], dtype="int64", name="split"),
-            )
+            ),
         )
         assert_frame_equal(
             r[1],
@@ -2478,7 +2415,7 @@ class TestSplitter:
                 [[210, 285], [329, 234]],
                 index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
                 columns=pd.Index([0, 1], dtype="int64", name="split"),
-            )
+            ),
         )
         r = splitter.apply(
             apply_func,
@@ -2492,25 +2429,19 @@ class TestSplitter:
             r[0],
             pd.Series(
                 [195, 345, 270, 255],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0'),
-                    (0, 'set_1'),
-                    (1, 'set_0'),
-                    (1, 'set_1')
-                ], names=['split', 'set'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [(0, "set_0"), (0, "set_1"), (1, "set_0"), (1, "set_1")], names=["split", "set"]
+                ),
+            ),
         )
         assert_series_equal(
             r[1],
             pd.Series(
                 [210, 329, 285, 234],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 'set_0'),
-                    (0, 'set_1'),
-                    (1, 'set_0'),
-                    (1, 'set_1')
-                ], names=['split', 'set'])
-            )
+                index=pd.MultiIndex.from_tuples(
+                    [(0, "set_0"), (0, "set_1"), (1, "set_0"), (1, "set_1")], names=["split", "set"]
+                ),
+            ),
         )
         r = splitter.apply(
             apply_func,
@@ -2526,7 +2457,7 @@ class TestSplitter:
                 [[195, 345], [270, 255]],
                 index=pd.Index([0, 1], dtype="int64", name="split"),
                 columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
-            )
+            ),
         )
         assert_frame_equal(
             r[1],
@@ -2534,7 +2465,7 @@ class TestSplitter:
                 [[210, 329], [285, 234]],
                 index=pd.Index([0, 1], dtype="int64", name="split"),
                 columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
-            )
+            ),
         )
 
     def test_split_set(self):
@@ -3987,19 +3918,66 @@ class TestDecorators:
         split_f = vbt.split(f, splitter=splitter)
         assert split_f(index, sr, sr, b=sr, c=sr).values.tolist() == [155]
         with pytest.raises(Exception):
-            split_f = vbt.split(f, method="from_single", method_args=(vbt.RelRange(length=5),))
+            split_f = vbt.split(f, splitter_method="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)))
             split_f(index, sr, sr, b=sr, c=sr)
-        split_f = vbt.split(f, method="from_single", method_args=(vbt.RelRange(length=5),), index=index)
+        split_f = vbt.split(
+            f, splitter_method="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index=index
+        )
         assert split_f(index, sr, sr, b=sr, c=sr).values.tolist() == [155]
-        split_f = vbt.split(f, method="from_single", method_args=(vbt.RelRange(length=5),), index_from="index")
+        split_f = vbt.split(
+            f, splitter_method="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from="index"
+        )
         assert split_f(index, sr, sr, b=sr, c=sr).values.tolist() == [155]
-        split_f = vbt.split(f, method="from_single", method_args=(vbt.RelRange(length=5),), index_from="a")
+        split_f = vbt.split(
+            f, splitter_method="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from="a"
+        )
         assert split_f(index, sr, sr, b=sr, c=sr).values.tolist() == [155]
-        split_f = vbt.split(f, method="from_single", method_args=(vbt.RelRange(length=5),), index_from="my_args_0")
+        split_f = vbt.split(
+            f, splitter_method="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from="my_args_0"
+        )
         assert split_f(index, sr, sr, b=sr, c=sr).values.tolist() == [155]
-        split_f = vbt.split(f, method="from_single", method_args=(vbt.RelRange(length=5),), index_from=1)
+        split_f = vbt.split(
+            f, splitter_method="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from=1
+        )
         assert split_f(index, sr, sr, b=sr, c=sr).values.tolist() == [155]
-        split_f = vbt.split(f, method="from_single", method_args=(vbt.RelRange(length=5),), takeable_args=["index"])
+        split_f = vbt.split(
+            f,
+            splitter_method="from_single",
+            splitter_kwargs=dict(split=vbt.RelRange(length=5)),
+            takeable_args=["index"],
+        )
         assert split_f(index, sr, sr, b=sr, c=sr).values.tolist() == [129]
         split_f = vbt.split(f, splitter=splitter, takeable_args=["index", "a", "my_args_0", "b", "c"])
         assert split_f(index, sr, sr, b=sr, c=sr).values.tolist() == [25]
+
+    def test_cv_split(self):
+        def f(sr, i):
+            return sr[i]
+
+        sr = pd.Series(np.arange(len(index)), index=index)
+        splitter = vbt.Splitter.from_ranges(index, start=[0, 10], end=[10, 20], split=0.5)
+        cv_split_f = vbt.cv_split(f, splitter=splitter, takeable_args=["sr"], selection=lambda x: np.argmin(x))
+        assert cv_split_f(sr, vbt.Param([0, 1, 2])).values.tolist() == [0, 5, 10, 15]
+        assert cv_split_f(
+            sr, vbt.Param([0, 1, 2]), _selection=lambda x: np.argmax(x)
+        ).values.tolist() == [2, 7, 12, 17]
+        x, y = cv_split_f(sr, vbt.Param([0, 1, 2]), _return_grid=True)
+        assert x.values.tolist() == [[0, 1, 2], [0, 1, 2], [10, 11, 12], [10, 11, 12]]
+        assert y.values.tolist() == [0, 5, 10, 15]
+        x, y = cv_split_f(sr, vbt.Param([0, 1, 2]), _return_grid="all")
+        assert x.values.tolist() == [[0, 1, 2], [5, 6, 7], [10, 11, 12], [15, 16, 17]]
+        assert y.values.tolist() == [0, 5, 10, 15]
+        assert cv_split_f(
+            sr,
+            vbt.Param([0, 1, 2]),
+            _selection=vbt.RepFunc(lambda grid_result: np.argmin(grid_result)),
+            _prepend_grid_result=False,
+        ).values.tolist() == [0, 5, 10, 15]
+
+        def f2(sr, split_idx, set_idx, i):
+            return sr[split_idx + set_idx + i]
+
+        cv_split_f2 = vbt.cv_split(f2, splitter=splitter, takeable_args=["sr"], selection=lambda x: np.argmin(x))
+        assert cv_split_f2(
+            sr, vbt.Rep("split_idx"), vbt.Rep("set_idx"), vbt.Param([0, 1, 2])
+        ).values.tolist() == [0, 6, 11, 17]

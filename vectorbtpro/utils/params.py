@@ -482,7 +482,7 @@ def parameterized(
     merge_kwargs: tp.KwargsLike = None,
     return_meta: bool = False,
     use_meta: tp.KwargsLike = None,
-    selection: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
+    selection: tp.Union[None, tp.MaybeIterable[tp.Hashable], tp.Callable] = None,
     selection_args: tp.ArgsLike = None,
     selection_kwargs: tp.KwargsLike = None,
     **execute_kwargs,
@@ -499,9 +499,9 @@ def parameterized(
     `param_configs` that is optionally passed by the user. User-defined `param_configs` have more priority.
     5. Extracts arguments and keyword arguments from each parameter config and substitutes any templates (lazily)
     6. If `return_meta` is True, returns all the objects generated above as a dictionary
-    7. If `selection` is not None, either executes it with `**selection_kwargs` if it's a callable,
-    or translates it into indices that can be mapped to `param_index` and selects them from all the
-    objects generated above
+    7. If `selection` is not None, either executes it with `*selection_args` and `**selection_kwargs`
+    if it's a callable, or translates it into indices that can be mapped to `param_index` and selects
+    them from all the objects generated above
     8. Passes each set of the function and its arguments to `vectorbtpro.utils.execution.execute` for execution
     9. Optionally, post-processes and merges the results by passing them and `**merge_kwargs` to `merge_func`
 
@@ -887,7 +887,7 @@ def parameterized(
                         selection = {template_context["param_index"].get_loc(selection)}
                         found_param = True
                         template_context["single_param"] = True
-                    elif isinstance(selection, int):
+                    elif isinstance(selection, (int, np.integer)):
                         selection = {selection}
                         found_param = True
                         template_context["single_param"] = True
@@ -897,13 +897,13 @@ def parameterized(
                         for s in selection:
                             if s in template_context["param_index"]:
                                 new_selection.add(template_context["param_index"].get_loc(s))
-                            elif isinstance(s, int):
+                            elif isinstance(s, (int, np.integer)):
                                 new_selection.add(s)
                             else:
-                                raise ValueError("Selection couldn't be matched with parameter index")
+                                raise ValueError(f"Selection {selection} couldn't be matched with parameter index")
                         selection = new_selection
                     else:
-                        raise ValueError("Selection couldn't be matched with parameter index")
+                        raise ValueError(f"Selection {selection} couldn't be matched with parameter index")
                 template_context["param_index"] = template_context["param_index"][list(selection)]
                 new_param_configs = []
                 _selection = selection.copy()

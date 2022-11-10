@@ -68,13 +68,23 @@ class CustomTemplate:
         context_merge_kwargs = self.context_merge_kwargs
         if context_merge_kwargs is None:
             context_merge_kwargs = {}
-        return merge_dicts(
+        new_context = merge_dicts(
             template_cfg["context"],
-            dict(sub_id=sub_id, np=np, pd=pd, vbt=vbt),
             self.context,
             context,
             **context_merge_kwargs,
         )
+        new_context = merge_dicts(
+            dict(
+                context=new_context,
+                sub_id=sub_id,
+                np=np,
+                pd=pd,
+                vbt=vbt,
+            ),
+            new_context,
+        )
+        return new_context
 
     def resolve_strict(self, strict: tp.Optional[bool] = None) -> bool:
         """Resolve `CustomTemplate.strict`.

@@ -2084,7 +2084,6 @@ class Splitter(Analyzable):
         obj_freq: tp.Optional[tp.FrequencyLike] = None,
         range_format: str = "slice_or_any",
         attach_bounds: tp.Union[bool, str] = False,
-        index_bounds: bool = False,
         right_inclusive: bool = False,
         template_context: tp.KwargsLike = None,
         silence_warnings: bool = False,
@@ -2107,8 +2106,8 @@ class Splitter(Analyzable):
         If `attach_bounds` is enabled, measures the bounds of each range and makes it an additional
         level in the final index hierarchy. The argument supports the following options:
 
-        * True or 'source': Attach source bounds
-        * 'target': Attach target bounds
+        * True, 'index', 'source', or 'source_index': Attach source (index) bounds
+        * 'target' or 'target_index': Attach target (index) bounds
         * False: Do not attach
 
         Argument `into` supports the following options:
@@ -2198,7 +2197,14 @@ class Splitter(Analyzable):
                 attach_bounds = "source"
             else:
                 attach_bounds = None
+        index_bounds = False
         if attach_bounds is not None:
+            if attach_bounds.lower() == "index":
+                attach_bounds = "source"
+                index_bounds = True
+            if attach_bounds.lower() in ("source_index", "target_index"):
+                attach_bounds = attach_bounds.split("_")[0]
+                index_bounds = True
             if attach_bounds.lower() not in ("source", "target"):
                 raise ValueError(f"Invalid option attach_bounds='{attach_bounds}'")
         if index_combine_kwargs is None:
@@ -2386,7 +2392,7 @@ class Splitter(Analyzable):
     def apply(
         self,
         apply_func: tp.Callable,
-        *args,
+        *apply_args,
         split: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
         set_: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
         split_group_by: tp.AnyGroupByLike = None,
@@ -2398,7 +2404,6 @@ class Splitter(Analyzable):
         obj_freq: tp.Optional[tp.FrequencyLike] = None,
         range_format: str = "slice_or_any",
         attach_bounds: tp.Union[bool, str] = False,
-        index_bounds: bool = False,
         right_inclusive: bool = False,
         template_context: tp.KwargsLike = None,
         silence_warnings: bool = False,
@@ -2410,7 +2415,7 @@ class Splitter(Analyzable):
         merge_kwargs: tp.KwargsLike = None,
         merge_all: bool = True,
         wrap_results: bool = True,
-        **kwargs,
+        **apply_kwargs,
     ) -> tp.Any:
         """Apply a function on each range.
 
@@ -2436,8 +2441,7 @@ class Splitter(Analyzable):
             Positional arguments are denoted by position, keyword arguments are denoted by keys.
         * `args`: Positional arguments with ranges already selected
         * `kwargs`: Keyword arguments with ranges already selected
-        * `bounds`: A tuple of either integer or index bounds (`index_bounds=True`).
-            Can be source or target depending on `attach_bounds`.
+        * `bounds`: A tuple of either integer or index bounds. Can be source or target depending on `attach_bounds`.
         * `template_context`: Passed template context
 
         Since each range is processed lazily (that is, upon request), there are multiple iteration
@@ -2529,7 +2533,14 @@ class Splitter(Analyzable):
                 attach_bounds = "source"
             else:
                 attach_bounds = None
+        index_bounds = False
         if attach_bounds is not None:
+            if attach_bounds.lower() == "index":
+                attach_bounds = "source"
+                index_bounds = True
+            if attach_bounds.lower() in ("source_index", "target_index"):
+                attach_bounds = attach_bounds.split("_")[0]
+                index_bounds = True
             if attach_bounds.lower() not in ("source", "target"):
                 raise ValueError(f"Invalid option attach_bounds='{attach_bounds}'")
         if index_combine_kwargs is None:
@@ -2698,9 +2709,11 @@ class Splitter(Analyzable):
                 dict(range_=range_meta["range_"], range_meta=range_meta),
                 _template_context,
             )
-            obj_meta1, obj_range_meta1, _args = _take_args(args, range_meta["range_"], _template_context)
-            obj_meta2, obj_range_meta2, _kwargs = _take_kwargs(
-                kwargs, range_meta["range_"], _template_context
+            obj_meta1, obj_range_meta1, _apply_args = _take_args(
+                apply_args, range_meta["range_"], _template_context
+            )
+            obj_meta2, obj_range_meta2, _apply_kwargs = _take_kwargs(
+                apply_kwargs, range_meta["range_"], _template_context
             )
             obj_meta = {**obj_meta1, **obj_meta2}
             obj_range_meta = {**obj_range_meta1, **obj_range_meta2}
@@ -2709,16 +2722,16 @@ class Splitter(Analyzable):
                 dict(
                     obj_meta=obj_meta,
                     obj_range_meta=obj_range_meta,
-                    args=_args,
-                    kwargs=_kwargs,
+                    apply_args=_apply_args,
+                    apply_kwargs=_apply_kwargs,
                     bounds=_bounds[(i, j)],
                 ),
                 _template_context,
             )
             _apply_func = deep_substitute(apply_func, _template_context, sub_id="apply_func")
-            _args = deep_substitute(_args, _template_context, sub_id="args")
-            _kwargs = deep_substitute(_kwargs, _template_context, sub_id="kwargs")
-            return _apply_func, _args, _kwargs
+            _apply_args = deep_substitute(_apply_args, _template_context, sub_id="apply_args")
+            _apply_kwargs = deep_substitute(_apply_kwargs, _template_context, sub_id="apply_kwargs")
+            return _apply_func, _apply_args, _apply_kwargs
 
         def _attach_bounds(keys, range_bounds):
             range_bounds = pd.MultiIndex.from_tuples(range_bounds, names=["start", "end"])
