@@ -603,6 +603,8 @@ trades_shortcut_config = ReadonlyConfig(
             method_name="get_mae",
             method_kwargs=dict(use_returns=True),
         ),
+        edge_ratio=dict(obj_type="red_array"),
+        running_edge_ratio=dict(obj_type="array"),
     )
 )
 """_"""
@@ -770,14 +772,13 @@ class Trades(Ranges):
 
         See `vectorbtpro.portfolio.nb.records.best_worst_price_nb`."""
         return self.apply(
-            nb.best_worst_price_nb,
+            nb.best_price_nb,
             self._open,
             self._high,
             self._low,
             self._close,
             entry_price_open,
             exit_price_close,
-            True,
             **kwargs,
         )
 
@@ -786,14 +787,13 @@ class Trades(Ranges):
 
         See `vectorbtpro.portfolio.nb.records.best_worst_price_nb`."""
         return self.apply(
-            nb.best_worst_price_nb,
+            nb.worst_price_nb,
             self._open,
             self._high,
             self._low,
             self._close,
             entry_price_open,
             exit_price_close,
-            False,
             **kwargs,
         )
 
@@ -856,6 +856,108 @@ class Trades(Ranges):
             use_returns=use_returns,
         )
         return self.map_array(drawdown, **kwargs)
+
+    def get_edge_ratio(
+        self,
+        volatility: tp.Optional[tp.ArrayLike] = None,
+        entry_price_open: bool = False,
+        exit_price_close: bool = False,
+        max_duration: tp.Optional[int] = None,
+        flex_2d: bool = False,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """Get edge ratio.
+
+        See `vectorbtpro.portfolio.nb.records.edge_ratio_nb`.
+
+        If `volatility` is None, calculates the 14-period ATR based on the Wilder's moving average."""
+        col_map = self.col_mapper.get_col_map(group_by=group_by)
+        func = jit_reg.resolve_option(nb.edge_ratio_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        if volatility is None:
+            from vectorbtpro.indicators.nb import atr_nb
+            from vectorbtpro.generic.enums import WType
+
+            volatility = atr_nb(
+                high=to_2d_array(self.high),
+                low=to_2d_array(self.low),
+                close=to_2d_array(self.close),
+                window=14,
+                wtype=WType.Wilder,
+            )[1]
+        else:
+            volatility = np.asarray(volatility)
+        out = func(
+            self.values,
+            col_map,
+            self._open,
+            self._high,
+            self._low,
+            self._close,
+            volatility,
+            entry_price_open=entry_price_open,
+            exit_price_close=exit_price_close,
+            max_duration=max_duration,
+            flex_2d=flex_2d,
+        )
+        if wrap_kwargs is None:
+            wrap_kwargs = {}
+        return self.wrapper.wrap_reduced(out, group_by=group_by, **wrap_kwargs)
+
+    def get_running_edge_ratio(
+        self,
+        volatility: tp.Optional[tp.ArrayLike] = None,
+        entry_price_open: bool = False,
+        exit_price_close: bool = False,
+        max_duration: tp.Optional[int] = None,
+        incl_shorter: bool = False,
+        flex_2d: bool = False,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """Get running edge ratio.
+
+        See `vectorbtpro.portfolio.nb.records.running_edge_ratio_nb`.
+
+        If `volatility` is None, calculates the 14-period ATR based on the Wilder's moving average."""
+        col_map = self.col_mapper.get_col_map(group_by=group_by)
+        func = jit_reg.resolve_option(nb.running_edge_ratio_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        if volatility is None:
+            from vectorbtpro.indicators.nb import atr_nb
+            from vectorbtpro.generic.enums import WType
+
+            volatility = atr_nb(
+                high=to_2d_array(self.high),
+                low=to_2d_array(self.low),
+                close=to_2d_array(self.close),
+                window=14,
+                wtype=WType.Wilder,
+            )[1]
+        else:
+            volatility = np.asarray(volatility)
+        out = func(
+            self.values,
+            col_map,
+            self._open,
+            self._high,
+            self._low,
+            self._close,
+            volatility,
+            entry_price_open=entry_price_open,
+            exit_price_close=exit_price_close,
+            max_duration=max_duration,
+            incl_shorter=incl_shorter,
+            flex_2d=flex_2d,
+        )
+        if wrap_kwargs is None:
+            wrap_kwargs = {}
+        return self.wrapper.wrap(out, group_by=group_by, index=pd.RangeIndex(stop=len(out)), **wrap_kwargs)
 
     @property
     def stats_defaults(self) -> tp.Kwargs:
@@ -989,6 +1091,11 @@ class Trades(Ranges):
             sqn=dict(
                 title="SQN",
                 calc_func=RepEval("'sqn' if incl_open else 'status_closed.get_sqn'"),
+                tags=RepEval("['trades', *incl_open_tags]"),
+            ),
+            edge_ratio=dict(
+                title="Edge Ratio",
+                calc_func=RepEval("'edge_ratio' if incl_open else 'status_closed.get_edge_ratio'"),
                 tags=RepEval("['trades', *incl_open_tags]"),
             ),
         )
@@ -1425,6 +1532,74 @@ class Trades(Ranges):
         field_pct_scale=True,
     )
     """`Trades.plot_against_pnl` for `Trades.mae_returns`."""
+
+    def plot_running_edge_ratio(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        volatility: tp.Optional[tp.ArrayLike] = None,
+        entry_price_open: bool = False,
+        exit_price_close: bool = False,
+        max_duration: tp.Optional[int] = None,
+        incl_shorter: bool = False,
+        flex_2d: bool = False,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:
+        """Plot one column/group of edge ratio.
+
+        `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericSRAccessor.plot_against`."""
+        from vectorbtpro.utils.figure import get_domain
+
+        running_edge_ratio = self.resolve_shortcut_attr(
+            "running_edge_ratio",
+            volatility=volatility,
+            entry_price_open=entry_price_open,
+            exit_price_close=exit_price_close,
+            max_duration=max_duration,
+            incl_shorter=incl_shorter,
+            flex_2d=flex_2d,
+            group_by=group_by,
+            jitted=jitted,
+            chunked=chunked,
+        )
+        running_edge_ratio = self.select_col_from_obj(
+            running_edge_ratio,
+            column,
+            wrapper=self.wrapper.regroup(group_by)
+        )
+        kwargs = merge_dicts(
+            dict(
+                trace_kwargs=dict(name="Edge Ratio"),
+                other_trace_kwargs="hidden",
+            ),
+            kwargs,
+        )
+        fig = running_edge_ratio.vbt.plot_against(1, **kwargs)
+        x_domain = get_domain(xref, fig)
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=1.0,
+                    x1=x_domain[1],
+                    y1=1.0,
+                ),
+                hline_shape_kwargs,
+            )
+        )
+        return fig
 
     def plot(
         self,

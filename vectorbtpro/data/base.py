@@ -1591,12 +1591,12 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         `func` can be one of the following:
 
+        * "{name}": Name of a custom indicator or, if not found, the first from the below
         * "talib_{name}": Name of a TA-Lib indicator
         * "pandas_ta_{name}": Name of a Pandas TA indicator
         * "ta_{name}": Name of a TA indicator
         * "wqa101_{number}": Number of a WQA indicator
-        * "techcon_{number}": Number of a technical consensus indicator
-        * "{name}": Name of a custom indicator, otherwise of the above if found
+        * "techcon_{name}": Name of a technical consensus indicator
         * "from_{mode}": Name of the simulation mode in `vectorbtpro.portfolio.base.Portfolio`
         * Indicator: Any indicator class built with the indicator factory
         * Callable: Function to run

@@ -6708,6 +6708,72 @@ class TestExitTrades:
             ),
         )
 
+    def test_edge_ratio(self):
+        assert np.isnan(exit_trades["a"].edge_ratio)
+        np.testing.assert_array_almost_equal(
+            exit_trades.edge_ratio.values,
+            np.array([np.nan, np.nan, np.nan, np.nan]),
+        )
+        assert exit_trades["a"].get_edge_ratio(volatility=1) == 21.50000000000002
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_edge_ratio(volatility=1).values,
+            np.array([21.5, 0.046512, 3.583333, np.nan]),
+        )
+        assert exit_trades["a"].get_edge_ratio(volatility=1, max_duration=2) == 21.250000000000018
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_edge_ratio(volatility=1, max_duration=2).values,
+            np.array([21.25, 0.047059, 3.541667, np.nan]),
+        )
+
+    def test_running_edge_ratio(self):
+        np.testing.assert_array_almost_equal(
+            exit_trades["a"].running_edge_ratio.values,
+            np.array([np.nan, np.nan, np.nan]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.running_edge_ratio.values,
+            np.array([
+                [np.nan, np.nan, np.nan, np.nan],
+                [np.nan, np.nan, np.nan, np.nan],
+                [np.nan, np.nan, np.nan, np.nan],
+            ]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades["a"].get_running_edge_ratio(volatility=1).values,
+            np.array([17.75, 16.25, 26.5]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_running_edge_ratio(volatility=1).values,
+            np.array([
+                [17.750000000000014, 0.05633802816901404, 2.9583333333333344, np.nan],
+                [16.250000000000014, 0.06153846153846148, 16.250000000000014, np.nan],
+                [26.500000000000025, 0.03773584905660374, 26.500000000000025, np.nan],
+            ]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades["a"].get_running_edge_ratio(volatility=1, max_duration=2).values,
+            np.array([17.75, 16.25]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_running_edge_ratio(volatility=1, max_duration=2).values,
+            np.array([
+                [17.750000000000014, 0.05633802816901404, 2.9583333333333344, np.nan],
+                [16.250000000000014, 0.06153846153846148, 16.250000000000014, np.nan],
+            ]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades["a"].get_running_edge_ratio(volatility=1, incl_shorter=True).values,
+            np.array([17.75, 21.25, 21.5]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_running_edge_ratio(volatility=1, incl_shorter=True).values,
+            np.array([
+                [17.750000000000014, 0.05633802816901404, 2.9583333333333344, np.nan],
+                [21.250000000000018, 0.04705882352941173, 3.5416666666666674, np.nan],
+                [21.50000000000002, 0.0465116279069767, 3.583333333333335, np.nan],
+            ]),
+        )
+
     def test_long_records(self):
         assert isinstance(exit_trades.direction_long, vbt.ExitTrades)
         assert exit_trades.direction_long.wrapper == exit_trades.wrapper
