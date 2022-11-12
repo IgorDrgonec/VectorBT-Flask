@@ -1159,9 +1159,11 @@ def fill_init_pos_record_nb(record: tp.Record, col: int, position_now: float, pr
     record["id"] = 0
     record["col"] = col
     record["size"] = abs(position_now)
+    record["entry_order_id"] = -1
     record["entry_idx"] = -1
     record["entry_price"] = price
     record["entry_fees"] = 0.0
+    record["exit_order_id"] = -1
     record["exit_idx"] = -1
     record["exit_price"] = np.nan
     record["exit_fees"] = 0.0
@@ -1184,6 +1186,7 @@ def update_pos_record_nb(
     position_before: float,
     position_now: float,
     order_result: OrderResult,
+    order_id: int,
 ) -> None:
     """Update position record after filling an order."""
     if order_result.status == OrderStatus.Filled:
@@ -1192,9 +1195,11 @@ def update_pos_record_nb(
             record["id"] += 1
             record["col"] = col
             record["size"] = order_result.size
+            record["entry_order_id"] = order_id
             record["entry_idx"] = i
             record["entry_price"] = order_result.price
             record["entry_fees"] = order_result.fees
+            record["exit_order_id"] = -1
             record["exit_idx"] = -1
             record["exit_price"] = np.nan
             record["exit_fees"] = 0.0
@@ -1206,6 +1211,7 @@ def update_pos_record_nb(
             record["parent_id"] = record["id"]
         elif position_before != 0 and position_now == 0:
             # Position closed
+            record["exit_order_id"] = order_id
             record["exit_idx"] = i
             if np.isnan(record["exit_price"]):
                 exit_price = order_result.price
@@ -1231,10 +1237,12 @@ def update_pos_record_nb(
             # Position reversed
             record["id"] += 1
             record["size"] = abs(position_now)
+            record["entry_order_id"] = order_id
             record["entry_idx"] = i
             record["entry_price"] = order_result.price
             new_pos_fraction = abs(position_now) / abs(position_now - position_before)
             record["entry_fees"] = new_pos_fraction * order_result.fees
+            record["exit_order_id"] = -1
             record["exit_idx"] = -1
             record["exit_price"] = np.nan
             record["exit_fees"] = 0.0
@@ -1256,6 +1264,7 @@ def update_pos_record_nb(
                 record["size"] += order_result.size
             else:
                 # Position decreased
+                record["exit_order_id"] = order_id
                 if np.isnan(record["exit_price"]):
                     exit_price = order_result.price
                 else:

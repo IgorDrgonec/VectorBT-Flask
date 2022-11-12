@@ -1,7 +1,7 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for portfolio records."""
-import numpy as np
+
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
@@ -40,13 +40,15 @@ def weighted_price_reduce_meta_nb(
 
 @register_jitted(cache=True)
 def fill_trade_record_nb(
-    new_records: tp.Record,
+    new_records: tp.RecordArray,
     r: int,
     col: int,
     size: float,
+    entry_order_id: int,
     entry_idx: int,
     entry_price: float,
     entry_fees: float,
+    exit_order_id: int,
     exit_idx: int,
     exit_price: float,
     exit_fees: float,
@@ -62,9 +64,11 @@ def fill_trade_record_nb(
     new_records["id"][r] = r
     new_records["col"][r] = col
     new_records["size"][r] = size
+    new_records["entry_order_id"][r] = entry_order_id
     new_records["entry_idx"][r] = entry_idx
     new_records["entry_price"][r] = entry_price
     new_records["entry_fees"][r] = entry_fees
+    new_records["exit_order_id"][r] = exit_order_id
     new_records["exit_idx"][r] = exit_idx
     new_records["exit_price"][r] = exit_price
     new_records["exit_fees"][r] = exit_fees
@@ -72,6 +76,7 @@ def fill_trade_record_nb(
     new_records["return"][r] = ret
     new_records["direction"][r] = direction
     new_records["status"][r] = status
+    new_records["parent_id"][r] = parent_id
     new_records["parent_id"][r] = parent_id
 
 
@@ -104,15 +109,17 @@ def fill_entry_trades_in_position_nb(
     # Iterate over orders located within a single position
     for c in range(first_c, last_c + 1):
         if c == -1:
+            entry_order_id = -1
             entry_idx = -1
-            entry_price = init_price
             entry_size = first_entry_size
+            entry_price = init_price
             entry_fees = first_entry_fees
         else:
             order_record = order_records[col_idxs[col_start_idxs[col] + c]]
-            order_side = order_record["side"]
+            entry_order_id = order_record["id"]
             entry_idx = order_record["idx"]
             entry_price = order_record["price"]
+            order_side = order_record["side"]
 
             # Ignore exit orders
             if (direction == TradeDirection.Long and order_side == OrderSide.Sell) or (
@@ -135,14 +142,21 @@ def fill_entry_trades_in_position_nb(
         exit_fees = size_fraction * exit_fees_sum
 
         # Fill the record
+        if status == TradeStatus.Closed:
+            exit_order_record = order_records[col_idxs[col_start_idxs[col] + last_c]]
+            exit_order_id = exit_order_record["id"]
+        else:
+            exit_order_id = -1
         fill_trade_record_nb(
             new_records,
             r,
             col,
             entry_size,
+            entry_order_id,
             entry_idx,
             entry_price,
             entry_fees,
+            exit_order_id,
             exit_idx,
             exit_price,
             exit_fees,
@@ -219,25 +233,35 @@ def get_entry_trades_nb(
         >>> col_map = col_map_nb(sim_out.order_records['col'], target_shape[1])
         >>> entry_trade_records = get_entry_trades_nb(sim_out.order_records, close, col_map)
         >>> pd.DataFrame.from_records(entry_trade_records)
-           id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-        0   0    0   1.0          0         1.01     0.01010         3    3.060000
-        1   1    0   0.1          1         2.02     0.00202         3    3.060000
-        2   2    0   1.0          4         5.05     0.05050         5    5.940000
-        3   3    0   1.0          5         5.94     0.05940         5    6.000000
-        4   0    1   1.0          0         5.94     0.05940         3    3.948182
-        5   1    1   0.1          1         4.95     0.00495         3    3.948182
-        6   2    1   1.0          4         1.98     0.01980         5    1.010000
-        7   3    1   1.0          5         1.01     0.01010         5    1.000000
+           id  col  size  entry_order_id  entry_idx  entry_price  entry_fees  \\
+        0   0    0   1.0               0          0         1.01     0.01010
+        1   1    0   0.1               1          1         2.02     0.00202
+        2   2    0   1.0               4          4         5.05     0.05050
+        3   3    0   1.0               5          5         5.94     0.05940
+        4   0    1   1.0               0          0         5.94     0.05940
+        5   1    1   0.1               1          1         4.95     0.00495
+        6   2    1   1.0               4          4         1.98     0.01980
+        7   3    1   1.0               5          5         1.01     0.01010
 
-           exit_fees       pnl    return  direction  status  parent_id
-        0   0.030600  2.009300  1.989406          0       1          0
-        1   0.003060  0.098920  0.489703          0       1          0
-        2   0.059400  0.780100  0.154475          0       1          1
-        3   0.000000 -0.119400 -0.020101          1       0          2
-        4   0.039482  1.892936  0.318676          1       1          0
-        5   0.003948  0.091284  0.184411          1       1          0
-        6   0.010100  0.940100  0.474798          1       1          1
-        7   0.000000 -0.020100 -0.019901          0       0          2
+           exit_order_id  exit_idx  exit_price  exit_fees       pnl    return  \\
+        0              3         3    3.060000   0.030600  2.009300  1.989406
+        1              3         3    3.060000   0.003060  0.098920  0.489703
+        2              5         5    5.940000   0.059400  0.780100  0.154475
+        3             -1         5    6.000000   0.000000 -0.119400 -0.020101
+        4              3         3    3.948182   0.039482  1.892936  0.318676
+        5              3         3    3.948182   0.003948  0.091284  0.184411
+        6              5         5    1.010000   0.010100  0.940100  0.474798
+        7             -1         5    1.000000   0.000000 -0.020100 -0.019901
+
+           direction  status  parent_id
+        0          0       1          0
+        1          0       1          0
+        2          0       1          1
+        3          1       0          2
+        4          1       1          0
+        5          1       1          0
+        6          1       1          1
+        7          0       0          2
         ```
     """
     col_idxs, col_lens = col_map
@@ -469,25 +493,35 @@ def get_exit_trades_nb(
 
         >>> exit_trade_records = get_exit_trades_nb(sim_out.order_records, close, col_map)
         >>> pd.DataFrame.from_records(exit_trade_records)
-           id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-        0   0    0   1.0          0     1.101818    0.011018         2        2.97
-        1   1    0   0.1          0     1.101818    0.001102         3        3.96
-        2   2    0   1.0          4     5.050000    0.050500         5        5.94
-        3   3    0   1.0          5     5.940000    0.059400         5        6.00
-        4   0    1   1.0          0     5.850000    0.058500         2        4.04
-        5   1    1   0.1          0     5.850000    0.005850         3        3.03
-        6   2    1   1.0          4     1.980000    0.019800         5        1.01
-        7   3    1   1.0          5     1.010000    0.010100         5        1.00
+           id  col  size  entry_order_id  entry_idx  entry_price  entry_fees  \\
+        0   0    0   1.0               0          0     1.101818    0.011018
+        1   1    0   0.1               0          0     1.101818    0.001102
+        2   2    0   1.0               4          4     5.050000    0.050500
+        3   3    0   1.0               5          5     5.940000    0.059400
+        4   0    1   1.0               0          0     5.850000    0.058500
+        5   1    1   0.1               0          0     5.850000    0.005850
+        6   2    1   1.0               4          4     1.980000    0.019800
+        7   3    1   1.0               5          5     1.010000    0.010100
 
-           exit_fees       pnl    return  direction  status  parent_id
-        0    0.02970  1.827464  1.658589          0       1          0
-        1    0.00396  0.280756  2.548119          0       1          0
-        2    0.05940  0.780100  0.154475          0       1          1
-        3    0.00000 -0.119400 -0.020101          1       0          2
-        4    0.04040  1.711100  0.292496          1       1          0
-        5    0.00303  0.273120  0.466872          1       1          0
-        6    0.01010  0.940100  0.474798          1       1          1
-        7    0.00000 -0.020100 -0.019901          0       0          2
+           exit_order_id  exit_idx  exit_price  exit_fees       pnl    return  \\
+        0              2         2        2.97    0.02970  1.827464  1.658589
+        1              3         3        3.96    0.00396  0.280756  2.548119
+        2              5         5        5.94    0.05940  0.780100  0.154475
+        3             -1         5        6.00    0.00000 -0.119400 -0.020101
+        4              2         2        4.04    0.04040  1.711100  0.292496
+        5              3         3        3.03    0.00303  0.273120  0.466872
+        6              5         5        1.01    0.01010  0.940100  0.474798
+        7             -1         5        1.00    0.00000 -0.020100 -0.019901
+
+           direction  status  parent_id
+        0          0       1          0
+        1          0       1          0
+        2          0       1          1
+        3          1       0          2
+        4          1       1          0
+        5          1       1          0
+        6          1       1          1
+        7          0       0          2
         ```
     """
     col_idxs, col_lens = col_map
@@ -503,6 +537,7 @@ def get_exit_trades_nb(
             # Prepare initial position
             in_position = True
             parent_id = 0
+            entry_order_id = -1
             entry_idx = -1
             if _init_position >= 0:
                 direction = TradeDirection.Long
@@ -528,6 +563,7 @@ def get_exit_trades_nb(
             last_id = order_record["id"]
 
             i = order_record["idx"]
+            order_id = order_record["id"]
             order_size = order_record["size"]
             order_price = order_record["price"]
             order_fees = order_record["fees"]
@@ -541,6 +577,7 @@ def get_exit_trades_nb(
             if not in_position:
                 # Trade opened
                 in_position = True
+                entry_order_id = order_id
                 entry_idx = i
                 if order_side == OrderSide.Buy:
                     direction = TradeDirection.Long
@@ -570,6 +607,7 @@ def get_exit_trades_nb(
                         exit_size = order_size
                     exit_price = order_price
                     exit_fees = order_fees
+                    exit_order_id = order_id
                     exit_idx = i
 
                     # Take a size-weighted average of entry price
@@ -584,9 +622,11 @@ def get_exit_trades_nb(
                         counts[col],
                         col,
                         exit_size,
+                        entry_order_id,
                         entry_idx,
                         entry_price,
                         entry_fees,
+                        exit_order_id,
                         exit_idx,
                         exit_price,
                         exit_fees,
@@ -598,6 +638,7 @@ def get_exit_trades_nb(
 
                     if is_close_nb(order_size, entry_size_sum):
                         # Position closed
+                        entry_order_id = -1
                         entry_idx = -1
                         direction = -1
                         in_position = False
@@ -613,6 +654,7 @@ def get_exit_trades_nb(
                     cl_exit_size = entry_size_sum
                     cl_exit_price = order_price
                     cl_exit_fees = cl_exit_size / order_size * order_fees
+                    cl_exit_order_id = order_id
                     cl_exit_idx = i
 
                     # Take a size-weighted average of entry price
@@ -627,9 +669,11 @@ def get_exit_trades_nb(
                         counts[col],
                         col,
                         cl_exit_size,
+                        entry_order_id,
                         entry_idx,
                         entry_price,
                         entry_fees,
+                        cl_exit_order_id,
                         cl_exit_idx,
                         cl_exit_price,
                         cl_exit_fees,
@@ -643,6 +687,7 @@ def get_exit_trades_nb(
                     entry_size_sum = order_size - cl_exit_size
                     entry_gross_sum = entry_size_sum * order_price
                     entry_fees_sum = order_fees - cl_exit_fees
+                    entry_order_id = order_id
                     entry_idx = i
                     if direction == TradeDirection.Long:
                         direction = TradeDirection.Short
@@ -661,6 +706,7 @@ def get_exit_trades_nb(
                         break
             exit_price = last_close
             exit_fees = 0.0
+            exit_order_id = -1
             exit_idx = close.shape[0] - 1
 
             # Take a size-weighted average of entry price
@@ -675,9 +721,11 @@ def get_exit_trades_nb(
                 counts[col],
                 col,
                 exit_size,
+                entry_order_id,
                 entry_idx,
                 entry_price,
                 entry_fees,
+                exit_order_id,
                 exit_idx,
                 exit_price,
                 exit_fees,
@@ -696,9 +744,11 @@ def fill_position_record_nb(new_records: tp.RecordArray, r: int, trade_records: 
     # Aggregate trades
     col = trade_records["col"][0]
     size = np.sum(trade_records["size"])
+    entry_order_id = trade_records["entry_order_id"][0]
     entry_idx = trade_records["entry_idx"][0]
     entry_price = np.sum(trade_records["size"] * trade_records["entry_price"]) / size
     entry_fees = np.sum(trade_records["entry_fees"])
+    exit_order_id = trade_records["exit_order_id"][-1]
     exit_idx = trade_records["exit_idx"][-1]
     exit_price = np.sum(trade_records["size"] * trade_records["exit_price"]) / size
     exit_fees = np.sum(trade_records["exit_fees"])
@@ -710,9 +760,11 @@ def fill_position_record_nb(new_records: tp.RecordArray, r: int, trade_records: 
     new_records["id"][r] = r
     new_records["col"][r] = col
     new_records["size"][r] = size
+    new_records["entry_order_id"][r] = entry_order_id
     new_records["entry_idx"][r] = entry_idx
     new_records["entry_price"][r] = entry_price
     new_records["entry_fees"][r] = entry_fees
+    new_records["exit_order_id"][r] = exit_order_id
     new_records["exit_idx"][r] = exit_idx
     new_records["exit_price"][r] = exit_price
     new_records["exit_fees"][r] = exit_fees
@@ -729,9 +781,11 @@ def copy_trade_record_nb(new_records: tp.RecordArray, r: int, trade_record: tp.R
     new_records["id"][r] = r
     new_records["col"][r] = trade_record["col"]
     new_records["size"][r] = trade_record["size"]
+    new_records["entry_order_id"][r] = trade_record["entry_order_id"]
     new_records["entry_idx"][r] = trade_record["entry_idx"]
     new_records["entry_price"][r] = trade_record["entry_price"]
     new_records["entry_fees"][r] = trade_record["entry_fees"]
+    new_records["exit_order_id"][r] = trade_record["exit_order_id"]
     new_records["exit_idx"][r] = trade_record["exit_idx"]
     new_records["exit_price"][r] = trade_record["exit_price"]
     new_records["exit_fees"][r] = trade_record["exit_fees"]
@@ -765,21 +819,29 @@ def get_positions_nb(trade_records: tp.RecordArray, col_map: tp.GroupMap) -> tp.
         >>> col_map = col_map_nb(exit_trade_records['col'], target_shape[1])
         >>> position_records = get_positions_nb(exit_trade_records, col_map)
         >>> pd.DataFrame.from_records(position_records)
-           id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-        0   0    0   1.1          0     1.101818     0.01212         3    3.060000
-        1   1    0   1.0          4     5.050000     0.05050         5    5.940000
-        2   2    0   1.0          5     5.940000     0.05940         5    6.000000
-        3   0    1   1.1          0     5.850000     0.06435         3    3.948182
-        4   1    1   1.0          4     1.980000     0.01980         5    1.010000
-        5   2    1   1.0          5     1.010000     0.01010         5    1.000000
+           id  col  size  entry_order_id  entry_idx  entry_price  entry_fees  \\
+        0   0    0   1.1               0          0     1.101818     0.01212
+        1   1    0   1.0               4          4     5.050000     0.05050
+        2   2    0   1.0               5          5     5.940000     0.05940
+        3   0    1   1.1               0          0     5.850000     0.06435
+        4   1    1   1.0               4          4     1.980000     0.01980
+        5   2    1   1.0               5          5     1.010000     0.01010
 
-           exit_fees      pnl    return  direction  status  parent_id
-        0    0.03366  2.10822  1.739455          0       1          0
-        1    0.05940  0.78010  0.154475          0       1          1
-        2    0.00000 -0.11940 -0.020101          1       0          2
-        3    0.04343  1.98422  0.308348          1       1          0
-        4    0.01010  0.94010  0.474798          1       1          1
-        5    0.00000 -0.02010 -0.019901          0       0          2
+           exit_order_id  exit_idx  exit_price  exit_fees      pnl    return  \\
+        0              3         3    3.060000    0.03366  2.10822  1.739455
+        1              5         5    5.940000    0.05940  0.78010  0.154475
+        2             -1         5    6.000000    0.00000 -0.11940 -0.020101
+        3              3         3    3.948182    0.04343  1.98422  0.308348
+        4              5         5    1.010000    0.01010  0.94010  0.474798
+        5             -1         5    1.000000    0.00000 -0.02010 -0.019901
+
+           direction  status  parent_id
+        0          0       1          0
+        1          0       1          1
+        2          1       0          2
+        3          1       1          0
+        4          1       1          1
+        5          0       0          2
         ```
     """
     col_idxs, col_lens = col_map

@@ -1429,8 +1429,7 @@ class TestSplitter:
             splitter.take(
                 sr,
                 into="split_major_meta",
-                attach_bounds="target",
-                index_bounds=True,
+                attach_bounds="target_index",
             )[1]
         )
         assert len(new_obj) == 4
@@ -1465,8 +1464,7 @@ class TestSplitter:
                 into="split_major_meta",
                 split_group_by=["a", "a"],
                 set_group_by=["b", "b"],
-                attach_bounds="target",
-                index_bounds=True,
+                attach_bounds="target_index",
             )[1]
         )
         assert len(new_obj) == 1
@@ -1490,8 +1488,7 @@ class TestSplitter:
             splitter.take(
                 sr,
                 into="set_major_meta",
-                attach_bounds="target",
-                index_bounds=True,
+                attach_bounds="target_index",
             )[1]
         )
         assert len(new_obj) == 4
@@ -1526,8 +1523,7 @@ class TestSplitter:
                 into="set_major_meta",
                 split_group_by=["a", "a"],
                 set_group_by=["b", "b"],
-                attach_bounds="target",
-                index_bounds=True,
+                attach_bounds="target_index",
             )[1]
         )
         assert len(new_obj) == 1
@@ -1552,7 +1548,7 @@ class TestSplitter:
             new_obj.index,
             pd.MultiIndex.from_tuples([(0, "set_0"), (0, "set_1"), (1, "set_0"), (1, "set_1")], names=["split", "set"]),
         )
-        new_obj = splitter.take(sr, attach_bounds="target", index_bounds=True)
+        new_obj = splitter.take(sr, attach_bounds="target_index")
         assert_index_equal(
             new_obj.index,
             pd.MultiIndex.from_tuples(
@@ -1585,8 +1581,7 @@ class TestSplitter:
             sr,
             split_group_by=["a", "a"],
             set_group_by=["b", "b"],
-            attach_bounds="target",
-            index_bounds=True,
+            attach_bounds="target_index",
         )
         assert_index_equal(
             new_obj.index,
@@ -1611,7 +1606,7 @@ class TestSplitter:
                 [slice(5, 20), slice(15, None)],
             ],
         )
-        new_obj = splitter.take(sr, into="stacked", attach_bounds="target", index_bounds=True)
+        new_obj = splitter.take(sr, into="stacked", attach_bounds="target_index")
         assert_frame_equal(
             new_obj,
             pd.DataFrame(
@@ -1660,8 +1655,7 @@ class TestSplitter:
             into="stacked",
             split_group_by=["a", "a"],
             set_group_by=["b", "b"],
-            attach_bounds="target",
-            index_bounds=True,
+            attach_bounds="target_index",
         )
         assert_frame_equal(
             new_obj,
@@ -1689,8 +1683,7 @@ class TestSplitter:
         new_obj = splitter.take(
             sr,
             into="stacked_sets",
-            attach_bounds="target",
-            index_bounds=True,
+            attach_bounds="target_index",
         )
         assert isinstance(new_obj, pd.Series)
         assert_index_equal(new_obj.index, pd.Index([0, 1], dtype="int64", name="split"))
@@ -1783,8 +1776,7 @@ class TestSplitter:
         new_obj = splitter.take(
             sr,
             into="stacked_splits",
-            attach_bounds="target",
-            index_bounds=True,
+            attach_bounds="target_index",
         )
         assert isinstance(new_obj, pd.Series)
         assert_index_equal(new_obj.index, pd.Index(["set_0", "set_1"], dtype="object", name="set"))
@@ -2013,8 +2005,7 @@ class TestSplitter:
                 vbt.Takeable(sr.values, index=sr.index.shift(-1)),
                 b=vbt.Takeable(sr.values, index=sr.index.shift(-2)),
                 obj_index=sr.index,
-                attach_bounds=True,
-                index_bounds=True,
+                attach_bounds="index",
                 merge_all=True,
                 merge_func="concat",
             ),
@@ -2055,8 +2046,7 @@ class TestSplitter:
                 vbt.Takeable(sr.values, index=sr.index.shift(-1)),
                 b=vbt.Takeable(sr.values, index=sr.index.shift(-2)),
                 obj_index=sr.index,
-                attach_bounds="target",
-                index_bounds=True,
+                attach_bounds="target_index",
                 merge_all=True,
                 merge_func="concat",
             ),

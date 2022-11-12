@@ -66,47 +66,47 @@ Also available as `vectorbtpro.portfolio.base.Portfolio.positions`.
 ... )
 >>> entry_trades = vbt.Portfolio.from_orders(**pf_kwargs).entry_trades
 >>> entry_trades.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   1.0                0              1.0         1.0
-1         1       0   1.0                1              2.0         1.0
-2         2       0   1.0                2              3.0         1.0
-3         3       0   1.0                3              4.0         1.0
+   Entry Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0               0       0   1.0               0            0              1.0
+1               1       0   1.0               1            1              2.0
+2               2       0   1.0               2            2              3.0
+3               3       0   1.0               3            3              4.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees   PnL  Return Direction  Status  \\
-0               4             5.0       0.25  2.75  2.7500      Long  Closed
-1               4             5.0       0.25  1.75  0.8750      Long  Closed
-2               4             5.0       0.25  0.75  0.2500      Long  Closed
-3               4             5.0       0.25 -0.25 -0.0625      Long  Closed
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees   PnL  \\
+0         1.0              4           4             5.0       0.25  2.75
+1         1.0              4           4             5.0       0.25  1.75
+2         1.0              4           4             5.0       0.25  0.75
+3         1.0              4           4             5.0       0.25 -0.25
 
-   Parent Id
-0          0
-1          0
-2          0
-3          0
+   Return Direction  Status  Position Id
+0  2.7500      Long  Closed            0
+1  0.8750      Long  Closed            0
+2  0.2500      Long  Closed            0
+3 -0.0625      Long  Closed            0
 
 >>> # Exit trades
 >>> exit_trades = vbt.Portfolio.from_orders(**pf_kwargs).exit_trades
 >>> exit_trades.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   4.0                0              2.5         4.0
+   Exit Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0              0       0   4.0               0            0              2.5
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
-0               4             5.0        1.0  5.0     0.5      Long  Closed
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         4.0              4           4             5.0        1.0  5.0
 
-   Parent Id
-0          0
+   Return Direction  Status  Position Id
+0     0.5      Long  Closed            0
 
 >>> # Positions
 >>> positions = vbt.Portfolio.from_orders(**pf_kwargs).positions
 >>> positions.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   4.0                0              2.5         4.0
+   Position Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0            0       0   4.0               0            0              2.5
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
-0               4             5.0        1.0  5.0     0.5      Long  Closed
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         4.0              4           4             5.0        1.0  5.0
 
-   Parent Id
-0          0
+   Return Direction  Status
+0     0.5      Long  Closed
 
 >>> entry_trades.pnl.sum() == exit_trades.pnl.sum() == positions.pnl.sum()
 True
@@ -123,47 +123,47 @@ True
 ... )
 >>> entry_trades = vbt.Portfolio.from_orders(**pf_kwargs).entry_trades
 >>> entry_trades.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   4.0                0              1.0         1.0
+   Entry Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0               0       0   4.0               0            0              1.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
-0               4             3.5        4.0  5.0    1.25      Long  Closed
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         1.0              4           4             3.5        4.0  5.0
 
-   Parent Id
-0          0
+   Return Direction  Status  Position Id
+0    1.25      Long  Closed            0
 
 >>> # Exit trades
 >>> exit_trades = vbt.Portfolio.from_orders(**pf_kwargs).exit_trades
 >>> exit_trades.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   1.0                0              1.0        0.25
-1         1       0   1.0                0              1.0        0.25
-2         2       0   1.0                0              1.0        0.25
-3         3       0   1.0                0              1.0        0.25
+   Exit Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0              0       0   1.0               0            0              1.0
+1              1       0   1.0               0            0              1.0
+2              2       0   1.0               0            0              1.0
+3              3       0   1.0               0            0              1.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees   PnL  Return Direction  Status  \\
-0               1             2.0        1.0 -0.25   -0.25      Long  Closed
-1               2             3.0        1.0  0.75    0.75      Long  Closed
-2               3             4.0        1.0  1.75    1.75      Long  Closed
-3               4             5.0        1.0  2.75    2.75      Long  Closed
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees   PnL  \\
+0        0.25              1           1             2.0        1.0 -0.25
+1        0.25              2           2             3.0        1.0  0.75
+2        0.25              3           3             4.0        1.0  1.75
+3        0.25              4           4             5.0        1.0  2.75
 
-   Parent Id
-0          0
-1          0
-2          0
-3          0
+   Return Direction  Status  Position Id
+0   -0.25      Long  Closed            0
+1    0.75      Long  Closed            0
+2    1.75      Long  Closed            0
+3    2.75      Long  Closed            0
 
 >>> # Positions
 >>> positions = vbt.Portfolio.from_orders(**pf_kwargs).positions
 >>> positions.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   4.0                0              1.0         1.0
+   Position Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0            0       0   4.0               0            0              1.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
-0               4             3.5        4.0  5.0    1.25      Long  Closed
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         1.0              4           4             3.5        4.0  5.0
 
-   Parent Id
-0          0
+   Return Direction  Status
+0    1.25      Long  Closed
 
 >>> entry_trades.pnl.sum() == exit_trades.pnl.sum() == positions.pnl.sum()
 True
@@ -180,65 +180,65 @@ True
 ... )
 >>> entry_trades = vbt.Portfolio.from_orders(**pf_kwargs).entry_trades
 >>> entry_trades.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   1.0                0              1.0         1.0
-1         1       0   1.0                1              2.0         0.5
-2         2       0   1.0                2              3.0         0.5
-3         3       0   1.0                3              4.0         0.5
+   Entry Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0               0       0   1.0               0            0              1.0
+1               1       0   1.0               1            1              2.0
+2               2       0   1.0               2            2              3.0
+3               3       0   1.0               3            3              4.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
-0               1             2.0        0.5 -0.5  -0.500      Long  Closed
-1               2             3.0        0.5 -2.0  -1.000     Short  Closed
-2               3             4.0        0.5  0.0   0.000      Long  Closed
-3               4             5.0        1.0 -2.5  -0.625     Short  Closed
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         1.0              1           1             2.0        0.5 -0.5
+1         0.5              2           2             3.0        0.5 -2.0
+2         0.5              3           3             4.0        0.5  0.0
+3         0.5              4           4             5.0        1.0 -2.5
 
-   Parent Id
-0          0
-1          1
-2          2
-3          3
+   Return Direction  Status  Position Id
+0  -0.500      Long  Closed            0
+1  -1.000     Short  Closed            1
+2   0.000      Long  Closed            2
+3  -0.625     Short  Closed            3
 
 >>> # Exit trades
 >>> exit_trades = vbt.Portfolio.from_orders(**pf_kwargs).exit_trades
 >>> exit_trades.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   1.0                0              1.0         1.0
-1         1       0   1.0                1              2.0         0.5
-2         2       0   1.0                2              3.0         0.5
-3         3       0   1.0                3              4.0         0.5
+   Exit Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0              0       0   1.0               0            0              1.0
+1              1       0   1.0               1            1              2.0
+2              2       0   1.0               2            2              3.0
+3              3       0   1.0               3            3              4.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
-0               1             2.0        0.5 -0.5  -0.500      Long  Closed
-1               2             3.0        0.5 -2.0  -1.000     Short  Closed
-2               3             4.0        0.5  0.0   0.000      Long  Closed
-3               4             5.0        1.0 -2.5  -0.625     Short  Closed
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         1.0              1           1             2.0        0.5 -0.5
+1         0.5              2           2             3.0        0.5 -2.0
+2         0.5              3           3             4.0        0.5  0.0
+3         0.5              4           4             5.0        1.0 -2.5
 
-   Parent Id
-0          0
-1          1
-2          2
-3          3
+   Return Direction  Status  Position Id
+0  -0.500      Long  Closed            0
+1  -1.000     Short  Closed            1
+2   0.000      Long  Closed            2
+3  -0.625     Short  Closed            3
 
 >>> # Positions
 >>> positions = vbt.Portfolio.from_orders(**pf_kwargs).positions
 >>> positions.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   1.0                0              1.0         1.0
-1         1       0   1.0                1              2.0         0.5
-2         2       0   1.0                2              3.0         0.5
-3         3       0   1.0                3              4.0         0.5
+   Position Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0            0       0   1.0               0            0              1.0
+1            1       0   1.0               1            1              2.0
+2            2       0   1.0               2            2              3.0
+3            3       0   1.0               3            3              4.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
-0               1             2.0        0.5 -0.5  -0.500      Long  Closed
-1               2             3.0        0.5 -2.0  -1.000     Short  Closed
-2               3             4.0        0.5  0.0   0.000      Long  Closed
-3               4             5.0        1.0 -2.5  -0.625     Short  Closed
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         1.0              1           1             2.0        0.5 -0.5
+1         0.5              2           2             3.0        0.5 -2.0
+2         0.5              3           3             4.0        0.5  0.0
+3         0.5              4           4             5.0        1.0 -2.5
 
-   Parent Id
-0          0
-1          1
-2          2
-3          3
+   Return Direction  Status
+0  -0.500      Long  Closed
+1  -1.000     Short  Closed
+2   0.000      Long  Closed
+3  -0.625     Short  Closed
 
 >>> entry_trades.pnl.sum() == exit_trades.pnl.sum() == positions.pnl.sum()
 True
@@ -255,38 +255,38 @@ True
 ... )
 >>> entry_trades = vbt.Portfolio.from_orders(**pf_kwargs).entry_trades
 >>> entry_trades.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   1.0                0              1.0         1.0
+   Entry Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0               0       0   1.0               0            0              1.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction Status  \\
-0               4             5.0        0.0  3.0     3.0      Long   Open
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         1.0             -1           4             5.0        0.0  3.0
 
-   Parent Id
-0          0
+   Return Direction Status  Position Id
+0     3.0      Long   Open            0
 
 >>> # Exit trades
 >>> exit_trades = vbt.Portfolio.from_orders(**pf_kwargs).exit_trades
 >>> exit_trades.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   1.0                0              1.0         1.0
+   Exit Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0              0       0   1.0               0            0              1.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction Status  \\
-0               4             5.0        0.0  3.0     3.0      Long   Open
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         1.0             -1           4             5.0        0.0  3.0
 
-   Parent Id
-0          0
+   Return Direction Status  Position Id
+0     3.0      Long   Open            0
 
 >>> # Positions
 >>> positions = vbt.Portfolio.from_orders(**pf_kwargs).positions
 >>> positions.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   1.0                0              1.0         1.0
+   Position Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0            0       0   1.0               0            0              1.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction Status  \\
-0               4             5.0        0.0  3.0     3.0      Long   Open
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         1.0             -1           4             5.0        0.0  3.0
 
-   Parent Id
-0          0
+   Return Direction Status
+0     3.0      Long   Open
 
 >>> entry_trades.pnl.sum() == exit_trades.pnl.sum() == positions.pnl.sum()
 True
@@ -520,9 +520,11 @@ trades_field_config = ReadonlyConfig(
             "start_idx": dict(name="entry_idx"),  # remap field of Ranges
             "end_idx": dict(name="exit_idx"),  # remap field of Ranges
             "size": dict(title="Size"),
+            "entry_order_id": dict(title="Entry Order Id", mapping="ids"),
             "entry_idx": dict(title="Entry Index", mapping="index"),
             "entry_price": dict(title="Avg Entry Price"),
             "entry_fees": dict(title="Entry Fees"),
+            "exit_order_id": dict(title="Exit Order Id", mapping="ids"),
             "exit_idx": dict(title="Exit Index", mapping="index"),
             "exit_price": dict(title="Avg Exit Price"),
             "exit_fees": dict(title="Exit Fees"),
