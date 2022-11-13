@@ -1583,6 +1583,18 @@ class TestSplitter:
             set_group_by=["b", "b"],
             attach_bounds="target_index",
         )
+        assert_series_equal(
+            new_obj,
+            pd.Series(np.arange(5, 31), index=sr.index[5:31]),
+        )
+        new_obj = splitter.take(
+            sr,
+            split_group_by=["a", "a"],
+            set_group_by=["b", "b"],
+            attach_bounds="target_index",
+            squeeze_one_split=False,
+            squeeze_one_set=False,
+        )
         assert_index_equal(
             new_obj.index,
             pd.MultiIndex.from_tuples(
@@ -1656,6 +1668,19 @@ class TestSplitter:
             split_group_by=["a", "a"],
             set_group_by=["b", "b"],
             attach_bounds="target_index",
+        )
+        assert_series_equal(
+            new_obj,
+            pd.Series(np.arange(5, 31), index=sr.index[5:31]),
+        )
+        new_obj = splitter.take(
+            sr,
+            into="stacked",
+            split_group_by=["a", "a"],
+            set_group_by=["b", "b"],
+            attach_bounds="target_index",
+            squeeze_one_split=False,
+            squeeze_one_set=False,
         )
         assert_frame_equal(
             new_obj,
@@ -3906,39 +3931,39 @@ class TestDecorators:
         sr = pd.Series(np.arange(len(index)), index=index)
         splitter = vbt.Splitter.from_single(index, vbt.RelRange(length=5))
         split_f = vbt.split(f, splitter=splitter)
-        assert split_f(index, sr, sr, b=sr, c=sr).values.tolist() == [155]
+        assert split_f(index, sr, sr, b=sr, c=sr) == 155
         with pytest.raises(Exception):
             split_f = vbt.split(f, splitter_method="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)))
             split_f(index, sr, sr, b=sr, c=sr)
         split_f = vbt.split(
             f, splitter_method="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index=index
         )
-        assert split_f(index, sr, sr, b=sr, c=sr).values.tolist() == [155]
+        assert split_f(index, sr, sr, b=sr, c=sr) == 155
         split_f = vbt.split(
             f, splitter_method="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from="index"
         )
-        assert split_f(index, sr, sr, b=sr, c=sr).values.tolist() == [155]
+        assert split_f(index, sr, sr, b=sr, c=sr) == 155
         split_f = vbt.split(
             f, splitter_method="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from="a"
         )
-        assert split_f(index, sr, sr, b=sr, c=sr).values.tolist() == [155]
+        assert split_f(index, sr, sr, b=sr, c=sr) == 155
         split_f = vbt.split(
             f, splitter_method="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from="my_args_0"
         )
-        assert split_f(index, sr, sr, b=sr, c=sr).values.tolist() == [155]
+        assert split_f(index, sr, sr, b=sr, c=sr) == 155
         split_f = vbt.split(
             f, splitter_method="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from=1
         )
-        assert split_f(index, sr, sr, b=sr, c=sr).values.tolist() == [155]
+        assert split_f(index, sr, sr, b=sr, c=sr) == 155
         split_f = vbt.split(
             f,
             splitter_method="from_single",
             splitter_kwargs=dict(split=vbt.RelRange(length=5)),
             takeable_args=["index"],
         )
-        assert split_f(index, sr, sr, b=sr, c=sr).values.tolist() == [129]
+        assert split_f(index, sr, sr, b=sr, c=sr) == 129
         split_f = vbt.split(f, splitter=splitter, takeable_args=["index", "a", "my_args_0", "b", "c"])
-        assert split_f(index, sr, sr, b=sr, c=sr).values.tolist() == [25]
+        assert split_f(index, sr, sr, b=sr, c=sr) == 25
 
     def test_cv_split(self):
         def f(sr, i):

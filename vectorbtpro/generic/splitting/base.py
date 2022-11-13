@@ -2078,6 +2078,8 @@ class Splitter(Analyzable):
         set_group_by: tp.AnyGroupByLike = None,
         split_as_indices: bool = False,
         set_as_indices: bool = False,
+        squeeze_one_split: bool = True,
+        squeeze_one_set: bool = True,
         into: tp.Optional[str] = None,
         remap_to_obj: bool = True,
         obj_index: tp.Optional[tp.IndexLike] = None,
@@ -2140,7 +2142,6 @@ class Splitter(Analyzable):
             ... )
             >>> splitter.take(data.close, into="stacked")
             split                                0            1             2
-            set                              set_0        set_0         set_0
             Date
             2020-01-01 00:00:00+00:00  7200.174316          NaN           NaN
             2020-01-02 00:00:00+00:00  6985.470215          NaN           NaN
@@ -2165,12 +2166,10 @@ class Splitter(Analyzable):
             >>> splitter.take(
             ...     data.close,
             ...     into="stacked",
-            ...     attach_bounds=True,
-            ...     index_bounds=True,
+            ...     attach_bounds="index",
             ...     column_stack_kwargs=dict(reset_index=True)
             ... )
             split                         0                         1  \\
-            set                       set_0                     set_0
             start 2020-01-01 00:00:00+00:00 2020-06-29 00:00:00+00:00
             end   2020-01-06 00:00:00+00:00 2020-07-04 00:00:00+00:00
             0                   7200.174316               9190.854492
@@ -2180,7 +2179,6 @@ class Splitter(Analyzable):
             4                   7411.317383               9087.303711
 
             split                         2
-            set                       set_0
             start 2020-12-27 00:00:00+00:00
             end   2021-01-01 00:00:00+00:00
             0                  26272.294922
@@ -2228,6 +2226,9 @@ class Splitter(Analyzable):
             split_labels = split_labels[split_group_indices]
         if set_group_by is not None:
             set_labels = set_labels[set_group_indices]
+        one_split = len(split_labels) == 1 and squeeze_one_split
+        one_set = len(set_labels) == 1 and squeeze_one_set
+        one_range = one_split and one_set
 
         def _get_bounds(range_meta, obj_meta, obj_range_meta):
             if attach_bounds is not None:
@@ -2304,6 +2305,8 @@ class Splitter(Analyzable):
 
         def _attach_bounds(keys, range_bounds):
             range_bounds = pd.MultiIndex.from_tuples(range_bounds, names=["start", "end"])
+            if keys is None:
+                return range_bounds
             index_stack_kwargs = dict(index_combine_kwargs)
             index_stack_kwargs.pop("ignore_ranges", None)
             return stack_indexes((keys, range_bounds), **index_stack_kwargs)
@@ -2316,7 +2319,14 @@ class Splitter(Analyzable):
                     range_meta = _get_range_meta(i, j)
                     range_objs.append(range_meta["obj_slice"])
                     range_bounds.append(range_meta["bounds"])
-            keys = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
+            if one_range:
+                return range_objs[0]
+            if one_set:
+                keys = split_labels
+            elif one_split:
+                keys = set_labels
+            else:
+                keys = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
             if attach_bounds:
                 keys = _attach_bounds(keys, range_bounds)
             return pd.Series(range_objs, index=keys, dtype=object)
@@ -2353,7 +2363,14 @@ class Splitter(Analyzable):
                     range_meta = _get_range_meta(i, j)
                     range_objs.append(range_meta["obj_slice"])
                     range_bounds.append(range_meta["bounds"])
-            keys = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
+            if one_range:
+                return range_objs[0]
+            if one_set:
+                keys = split_labels
+            elif one_split:
+                keys = set_labels
+            else:
+                keys = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
             if attach_bounds:
                 keys = _attach_bounds(keys, range_bounds)
             return column_stack_merge(range_objs, keys=keys, **column_stack_kwargs)
@@ -2366,10 +2383,15 @@ class Splitter(Analyzable):
                     range_meta = _get_range_meta(i, j)
                     range_objs.append(range_meta["obj_slice"])
                     range_bounds.append(range_meta["bounds"])
-                keys = set_labels
-                if attach_bounds:
-                    keys = _attach_bounds(keys, range_bounds)
-                new_split_objs.append(column_stack_merge(range_objs, keys=keys, **column_stack_kwargs))
+                if one_set and squeeze_one_set:
+                    new_split_objs.append(range_objs[0])
+                else:
+                    keys = set_labels
+                    if attach_bounds:
+                        keys = _attach_bounds(keys, range_bounds)
+                    new_split_objs.append(column_stack_merge(range_objs, keys=keys, **column_stack_kwargs))
+            if one_split and squeeze_one_split:
+                return new_split_objs[0]
             return pd.Series(new_split_objs, index=split_labels, dtype=object)
         if isinstance(into, str) and into.lower() == "stacked_splits":
             new_set_objs = []
@@ -2380,10 +2402,15 @@ class Splitter(Analyzable):
                     range_meta = _get_range_meta(i, j)
                     range_objs.append(range_meta["obj_slice"])
                     range_bounds.append(range_meta["bounds"])
-                keys = split_labels
-                if attach_bounds:
-                    keys = _attach_bounds(keys, range_bounds)
-                new_set_objs.append(column_stack_merge(range_objs, keys=keys, **column_stack_kwargs))
+                if one_set and squeeze_one_set:
+                    new_set_objs.append(range_objs[0])
+                else:
+                    keys = split_labels
+                    if attach_bounds:
+                        keys = _attach_bounds(keys, range_bounds)
+                    new_set_objs.append(column_stack_merge(range_objs, keys=keys, **column_stack_kwargs))
+            if one_set and squeeze_one_set:
+                return new_set_objs[0]
             return pd.Series(new_set_objs, index=set_labels, dtype=object)
         raise ValueError(f"Invalid option into='{into}'")
 
@@ -2399,6 +2426,8 @@ class Splitter(Analyzable):
         set_group_by: tp.AnyGroupByLike = None,
         split_as_indices: bool = False,
         set_as_indices: bool = False,
+        squeeze_one_split: bool = True,
+        squeeze_one_set: bool = True,
         remap_to_obj: bool = True,
         obj_index: tp.Optional[tp.IndexLike] = None,
         obj_freq: tp.Optional[tp.FrequencyLike] = None,
@@ -2482,12 +2511,12 @@ class Splitter(Analyzable):
             ...     return data.close.iloc[-1] - data.close.iloc[0]
 
             >>> splitter.apply(apply_func, vbt.Takeable(data))
-            split  set
-            0      set_0    -1636.467285
-            1      set_0     3706.568359
-            2      set_0     2944.720703
-            3      set_0     -118.113281
-            4      set_0    17098.916016
+            split
+            0    -1636.467285
+            1     3706.568359
+            2     2944.720703
+            3     -118.113281
+            4    17098.916016
             dtype: float64
             ```
 
@@ -2499,12 +2528,12 @@ class Splitter(Analyzable):
             ...     return data.close.iloc[-1] - data.close.iloc[0]
 
             >>> splitter.apply(apply_func, vbt.Rep("range_"), data)
-            split  set
-            0      set_0    -1636.467285
-            1      set_0     3706.568359
-            2      set_0     2944.720703
-            3      set_0     -118.113281
-            4      set_0    17098.916016
+            split
+            0    -1636.467285
+            1     3706.568359
+            2     2944.720703
+            3     -118.113281
+            4    17098.916016
             dtype: float64
             ```
 
@@ -2523,7 +2552,7 @@ class Splitter(Analyzable):
             ...     iteration="set_wise",
             ...     merge_func="row_stack",
             ...     merge_all=False,
-            ... ).vbt.drop_levels("split", axis=0).vbt.plot()
+            ... ).T.vbt.drop_levels("split", axis=0).vbt.plot()
             ```
 
             ![](/assets/images/api/Splitter_apply.svg)
@@ -2566,6 +2595,9 @@ class Splitter(Analyzable):
             split_labels = split_labels[split_group_indices]
         if set_group_by is not None:
             set_labels = set_labels[set_group_indices]
+        one_split = len(split_labels) == 1 and squeeze_one_split
+        one_set = len(set_labels) == 1 and squeeze_one_set
+        one_range = one_split and one_set
         template_context = merge_dicts(
             {
                 "splitter": self,
@@ -2576,6 +2608,9 @@ class Splitter(Analyzable):
                 "set_indices": set_indices,
                 "split_labels": split_labels,
                 "set_labels": set_labels,
+                "one_split": one_split,
+                "one_set": one_set,
+                "one_range": one_range,
             },
             template_context,
         )
@@ -2735,6 +2770,8 @@ class Splitter(Analyzable):
 
         def _attach_bounds(keys, range_bounds):
             range_bounds = pd.MultiIndex.from_tuples(range_bounds, names=["start", "end"])
+            if keys is None:
+                return range_bounds
             index_stack_kwargs = dict(index_combine_kwargs)
             index_stack_kwargs.pop("ignore_ranges", None)
             return stack_indexes((keys, range_bounds), **index_stack_kwargs)
@@ -2801,8 +2838,15 @@ class Splitter(Analyzable):
         if merge_all:
             if iteration.lower() in ("split_wise", "set_wise"):
                 results = [result for _results in results for result in _results]
+            if one_range:
+                return results[0]
             if iteration.lower() in ("split_major", "split_wise"):
-                keys = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
+                if one_set:
+                    keys = split_labels
+                elif one_split:
+                    keys = set_labels
+                else:
+                    keys = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
                 if attach_bounds:
                     range_bounds = []
                     for i in split_group_indices:
@@ -2810,7 +2854,12 @@ class Splitter(Analyzable):
                             range_bounds.append(bounds[(i, j)])
                     keys = _attach_bounds(keys, range_bounds)
             else:
-                keys = combine_indexes((set_labels, split_labels), **index_combine_kwargs)
+                if one_set:
+                    keys = split_labels
+                elif one_split:
+                    keys = set_labels
+                else:
+                    keys = combine_indexes((set_labels, split_labels), **index_combine_kwargs)
                 if attach_bounds:
                     range_bounds = []
                     for j in set_group_indices:
@@ -2847,22 +2896,33 @@ class Splitter(Analyzable):
             for i in set_group_indices:
                 new_results.append(results[i * len(split_group_indices) : (i + 1) * len(split_group_indices)])
             results = new_results
+        if one_range:
+            return results[0][0]
         if iteration.lower() in ("split_major", "split_wise"):
             major_keys = split_labels
             minor_keys = set_labels
+            one_major = one_split
+            one_minor = one_set
         else:
             major_keys = set_labels
             minor_keys = split_labels
+            one_major = one_set
+            one_minor = one_split
 
         if merge_func is not None:
             merged_results = []
             for _results in results:
-                template_context["funcs_args"] = funcs_args
-                if isinstance(merge_func, (str, tuple)):
-                    merge_func = resolve_merge_func(merge_func)
-                    merge_kwargs = {**dict(keys=minor_keys), **merge_kwargs}
-                merge_kwargs = deep_substitute(merge_kwargs, template_context, sub_id="merge_kwargs")
-                merged_results.append(merge_func(_results, **merge_kwargs))
+                if one_minor:
+                    merged_results.append(_results[0])
+                else:
+                    template_context["funcs_args"] = funcs_args
+                    if isinstance(merge_func, (str, tuple)):
+                        merge_func = resolve_merge_func(merge_func)
+                        merge_kwargs = {**dict(keys=minor_keys), **merge_kwargs}
+                    merge_kwargs = deep_substitute(merge_kwargs, template_context, sub_id="merge_kwargs")
+                    merged_results.append(merge_func(_results, **merge_kwargs))
+            if one_major:
+                return merged_results[0]
             if wrap_results:
 
                 def _wrap_output(_results):
@@ -2875,23 +2935,47 @@ class Splitter(Analyzable):
                     return tuple(map(_wrap_output, zip(*merged_results)))
                 return _wrap_output(merged_results)
             return merged_results
+
+        if one_major:
+            results = results[0]
+        elif one_minor:
+            results = [_results[0] for _results in results]
         if wrap_results:
 
             def _wrap_output(_results):
+                if one_minor:
+                    try:
+                        return pd.Series(_results, index=major_keys)
+                    except Exception as e:
+                        return pd.Series(_results, index=major_keys, dtype=object)
+                if one_major:
+                    try:
+                        return pd.Series(_results, index=minor_keys)
+                    except Exception as e:
+                        return pd.Series(_results, index=minor_keys, dtype=object)
                 try:
                     return pd.DataFrame(_results, index=major_keys, columns=minor_keys)
                 except Exception as e:
                     return pd.DataFrame(_results, index=major_keys, columns=minor_keys, dtype=object)
 
-            if isinstance(results[0][0], tuple):
-                new_results = []
-                for k in range(len(results[0][0])):
-                    new_results.append([])
-                    for i in range(len(results)):
-                        new_results[-1].append([])
-                        for j in range(len(results[0])):
-                            new_results[-1][-1].append(results[i][j][k])
-                return tuple(map(_wrap_output, new_results))
+            if one_major or one_minor:
+                if isinstance(results[0], tuple):
+                    new_results = []
+                    for k in range(len(results[0])):
+                        new_results.append([])
+                        for i in range(len(results)):
+                            new_results[-1].append(results[i][k])
+                    return tuple(map(_wrap_output, new_results))
+            else:
+                if isinstance(results[0][0], tuple):
+                    new_results = []
+                    for k in range(len(results[0][0])):
+                        new_results.append([])
+                        for i in range(len(results)):
+                            new_results[-1].append([])
+                            for j in range(len(results[0])):
+                                new_results[-1][-1].append(results[i][j][k])
+                    return tuple(map(_wrap_output, new_results))
             return _wrap_output(results)
         return results
 

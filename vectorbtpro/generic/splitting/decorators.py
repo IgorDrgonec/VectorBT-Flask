@@ -65,9 +65,9 @@ def split(
         >>> index = pd.date_range("2020-01-01", "2020-01-06")
         >>> sr = pd.Series(np.arange(len(index)), index=index)
         >>> f(sr)
-        split  set
-        0      set_0     3
-        1      set_0    12
+        split
+        0     3
+        1    12
         dtype: int64
         ```
 
@@ -83,9 +83,9 @@ def split(
         ...     return sr[index].sum()
 
         >>> f(index, sr)
-        split  set
-        0      set_0     3
-        1      set_0    12
+        split
+        0     3
+        1    12
         dtype: int64
         ```
 
@@ -98,9 +98,9 @@ def split(
         ...     return sr.sum()
 
         >>> f(vbt.Takeable(sr))
-        split  set
-        0      set_0     3
-        1      set_0    12
+        split
+        0     3
+        1    12
         dtype: int64
         ```
 
@@ -121,9 +121,9 @@ def split(
         >>> h12_sr = pd.Series(np.arange(len(h12_index)), index=h12_index)
         >>> d2_sr = pd.Series(np.arange(len(d2_index)), index=d2_index)
         >>> f(h12_sr, d2_sr)
-        split  set
-        0      set_0    15
-        1      set_0    42
+        split
+        0    15
+        1    42
         dtype: int64
         ```
     """
