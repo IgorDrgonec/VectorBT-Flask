@@ -3155,5 +3155,10 @@ class TVData(RemoteData):
 
         return df
 
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
+        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
+        kwargs = merge_dicts(fetch_kwargs, kwargs)
+        return self.fetch_symbol(symbol, **kwargs)
+
 
 TVData.override_column_config_doc(__pdoc__)
