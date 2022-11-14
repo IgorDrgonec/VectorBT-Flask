@@ -665,6 +665,58 @@ class TestSplitter:
             ),
         )
 
+    def test_from_grouper(self):
+        np.testing.assert_array_equal(
+            vbt.Splitter.from_grouper(index, by="W").splits_arr,
+            np.array(
+                [
+                    [slice(0, 5, None)],
+                    [slice(5, 12, None)],
+                    [slice(12, 19, None)],
+                    [slice(19, 26, None)],
+                    [slice(26, 31, None)],
+                ],
+                dtype=object,
+            ),
+        )
+        assert_index_equal(
+            vbt.Splitter.from_grouper(index, by="W").wrapper.index,
+            pd.PeriodIndex(
+                [
+                    "2019-12-30/2020-01-05",
+                    "2020-01-06/2020-01-12",
+                    "2020-01-13/2020-01-19",
+                    "2020-01-20/2020-01-26",
+                    "2020-01-27/2020-02-02",
+                ],
+                dtype="period[W-SUN]",
+            ),
+        )
+        np.testing.assert_array_equal(
+            vbt.Splitter.from_grouper(index, by="W", min_length=7).splits_arr,
+            np.array(
+                [
+                    [slice(5, 12, None)],
+                    [slice(12, 19, None)],
+                    [slice(19, 26, None)],
+                ],
+                dtype=object,
+            ),
+        )
+        np.testing.assert_array_equal(
+            vbt.Splitter.from_grouper(index, by="W", split=0.5).splits_arr,
+            np.array(
+                [
+                    [slice(0, 2, None), slice(2, 5, None)],
+                    [slice(5, 8, None), slice(8, 12, None)],
+                    [slice(12, 15, None), slice(15, 19, None)],
+                    [slice(19, 22, None), slice(22, 26, None)],
+                    [slice(26, 28, None), slice(28, 31, None)],
+                ],
+                dtype=object,
+            ),
+        )
+
     def test_from_sklearn(self):
         from sklearn.model_selection import TimeSeriesSplit
 
@@ -3973,9 +4025,7 @@ class TestDecorators:
         splitter = vbt.Splitter.from_ranges(index, start=[0, 10], end=[10, 20], split=0.5)
         cv_split_f = vbt.cv_split(f, splitter=splitter, takeable_args=["sr"], selection=lambda x: np.argmin(x))
         assert cv_split_f(sr, vbt.Param([0, 1, 2])).values.tolist() == [0, 5, 10, 15]
-        assert cv_split_f(
-            sr, vbt.Param([0, 1, 2]), _selection=lambda x: np.argmax(x)
-        ).values.tolist() == [2, 7, 12, 17]
+        assert cv_split_f(sr, vbt.Param([0, 1, 2]), _selection=lambda x: np.argmax(x)).values.tolist() == [2, 7, 12, 17]
         x, y = cv_split_f(sr, vbt.Param([0, 1, 2]), _return_grid=True)
         assert x.values.tolist() == [[0, 1, 2], [0, 1, 2], [10, 11, 12], [10, 11, 12]]
         assert y.values.tolist() == [0, 5, 10, 15]
@@ -3993,6 +4043,9 @@ class TestDecorators:
             return sr[split_idx + set_idx + i]
 
         cv_split_f2 = vbt.cv_split(f2, splitter=splitter, takeable_args=["sr"], selection=lambda x: np.argmin(x))
-        assert cv_split_f2(
-            sr, vbt.Rep("split_idx"), vbt.Rep("set_idx"), vbt.Param([0, 1, 2])
-        ).values.tolist() == [0, 6, 11, 17]
+        assert cv_split_f2(sr, vbt.Rep("split_idx"), vbt.Rep("set_idx"), vbt.Param([0, 1, 2])).values.tolist() == [
+            0,
+            6,
+            11,
+            17,
+        ]

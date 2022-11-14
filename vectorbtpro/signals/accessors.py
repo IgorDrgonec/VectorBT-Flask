@@ -2288,6 +2288,7 @@ class SignalsAccessor(GenericAccessor):
             if isinstance(y, pd.DataFrame):
                 y = self.select_col_from_obj(y, column=column)
             obj, y = reshaping.broadcast(obj, y, columns_from="keep")
+            obj = obj.fillna(False).astype(np.bool_)
             if y.name is None:
                 y = y.rename("Y")
 

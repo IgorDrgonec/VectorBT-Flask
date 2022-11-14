@@ -233,7 +233,14 @@ class BaseIDXAccessor(Configured):
     # ############# Grouping ############# #
 
     def get_grouper(self, by: tp.AnyGroupByLike, groupby_kwargs: tp.KwargsLike = None, **kwargs) -> Grouper:
-        """Get an index grouper of type `vectorbtpro.base.grouping.base.Grouper`."""
+        """Get an index grouper of type `vectorbtpro.base.grouping.base.Grouper`.
+
+        Argument `by` can be a grouper itself, an instance of Pandas `GroupBy`,
+        an instance of Pandas `Resampler`, but also any supported input to any of them
+        such as a frequency or an array of indices.
+
+        Keyword arguments `groupby_kwargs` are passed to the Pandas methods `groupby` and `resample`,
+        while `**kwargs` are passed to initialize `vectorbtpro.base.grouping.base.Grouper`."""
         if groupby_kwargs is None:
             groupby_kwargs = {}
         if isinstance(by, Grouper):

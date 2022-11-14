@@ -1117,6 +1117,84 @@ class Splitter(Analyzable):
         )
 
     @classmethod
+    def from_grouper(
+        cls: tp.Type[SplitterT],
+        index: tp.IndexLike,
+        by: tp.AnyGroupByLike,
+        min_length: tp.Union[None, int, float] = None,
+        groupby_kwargs: tp.KwargsLike = None,
+        grouper_kwargs: tp.KwargsLike = None,
+        split: tp.Optional[tp.SplitLike] = None,
+        split_range_kwargs: tp.KwargsLike = None,
+        template_context: tp.KwargsLike = None,
+        split_labels: tp.Optional[tp.IndexLike] = None,
+        **kwargs,
+    ) -> SplitterT:
+        """Create a new `Splitter` instance from a grouper.
+
+        See `vectorbtpro.base.accessors.BaseIDXAccessor.get_grouper`.
+
+        Uses `Splitter.from_splits` to prepare the splits array and labels, and to build the instance.
+
+        Usage:
+            * Map each month into a range:
+
+            ```pycon
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+
+            >>> index = pd.date_range("2020", "2021", freq="D")
+
+            >>> splitter = vbt.Splitter.from_grouper(index, "M", min_length=28)
+            >>> splitter.plot()
+            ```
+
+            ![](/assets/images/api/from_grouper.svg)
+        """
+        if min_length is not None:
+            if isinstance(min_length, (float, np.floating)) and 0 <= abs(min_length) <= 1:
+                min_length = int(len(index) * min_length)
+            if isinstance(min_length, (float, np.floating)) and not min_length.is_integer():
+                raise TypeError("Floating number for minimum length must be between 0 and 1")
+            min_length = int(min_length)
+            if min_length < 1 or min_length > len(index):
+                raise TypeError(f"Minimum length must be within [{1}, {len(index)}]")
+        if grouper_kwargs is None:
+            grouper_kwargs = {}
+        if split_range_kwargs is None:
+            split_range_kwargs = {}
+        index = try_to_datetime_index(index)
+        grouper = BaseIDXAccessor(index).get_grouper(by, groupby_kwargs=groupby_kwargs, **grouper_kwargs)
+        splits = []
+        indices = []
+        for i, new_split in enumerate(grouper.yield_group_idxs()):
+            if min_length is not None and len(new_split) < min_length:
+                continue
+            if split is not None:
+                new_split = cls.split_range(
+                    new_split,
+                    split,
+                    template_context=template_context,
+                    index=index,
+                    **split_range_kwargs,
+                )
+            else:
+                new_split = [new_split]
+            splits.append(new_split)
+            indices.append(i)
+
+        if split_labels is None:
+            split_labels = grouper.get_index()[indices]
+        return cls.from_splits(
+            index,
+            splits,
+            split_range_kwargs=split_range_kwargs,
+            template_context=template_context,
+            split_labels=split_labels,
+            **kwargs,
+        )
+
+    @classmethod
     def from_sklearn(
         cls: tp.Type[SplitterT],
         index: tp.IndexLike,
@@ -3843,43 +3921,45 @@ class Splitter(Analyzable):
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
-        if self.n_splits > 0 and self.n_sets > 0:
-            if mask_kwargs is None:
-                mask_kwargs = {}
-            set_masks = list(
-                self.get_iter_set_masks(
+        split_group_by = self.get_split_grouper(split_group_by=split_group_by)
+        set_group_by = self.get_set_grouper(set_group_by=set_group_by)
+        set_labels = self.get_set_labels(set_group_by=set_group_by)
+        if fig.layout.colorway is not None:
+            colorway = fig.layout.colorway
+        else:
+            colorway = fig.layout.template.layout.colorway
+        if len(set_labels) > len(colorway):
+            colorway = px.colors.qualitative.Alphabet
+
+        if self.get_n_splits(split_group_by=split_group_by) > 0:
+            if self.get_n_sets(set_group_by=set_group_by) > 0:
+                if mask_kwargs is None:
+                    mask_kwargs = {}
+                for i, mask in enumerate(self.get_iter_set_masks(
                     split_group_by=split_group_by,
                     set_group_by=set_group_by,
                     **mask_kwargs,
-                )
-            )
-            if fig.layout.colorway is not None:
-                colorway = fig.layout.colorway
-            else:
-                colorway = fig.layout.template.layout.colorway
-            if len(set_masks) > len(colorway):
-                colorway = px.colors.qualitative.Alphabet
-            for i, mask in enumerate(set_masks):
-                df = mask.vbt.wrapper.fill()
-                df[mask] = i
-                color = adjust_opacity(colorway[i % len(colorway)], 0.8)
-                trace_name = str(df.columns[i])
-                _trace_kwargs = merge_dicts(
-                    dict(
-                        showscale=False,
-                        showlegend=True,
-                        name=trace_name,
-                        colorscale=[color, color],
-                        hovertemplate="%{x}<br>Split: %{y}<br>Set: " + trace_name,
-                    ),
-                    resolve_dict(trace_kwargs, i=i),
-                )
-                fig = df.vbt.ts_heatmap(
-                    trace_kwargs=_trace_kwargs,
-                    add_trace_kwargs=add_trace_kwargs,
-                    is_y_category=True,
-                    fig=fig,
-                )
+                )):
+                    df = mask.vbt.wrapper.fill()
+                    df[mask] = i
+                    color = adjust_opacity(colorway[i % len(colorway)], 0.8)
+                    trace_name = str(set_labels[i])
+                    _trace_kwargs = merge_dicts(
+                        dict(
+                            showscale=False,
+                            showlegend=True,
+                            name=trace_name,
+                            colorscale=[color, color],
+                            hovertemplate="%{x}<br>Split: %{y}<br>Set: " + trace_name,
+                        ),
+                        resolve_dict(trace_kwargs, i=i),
+                    )
+                    fig = df.vbt.ts_heatmap(
+                        trace_kwargs=_trace_kwargs,
+                        add_trace_kwargs=add_trace_kwargs,
+                        is_y_category=True,
+                        fig=fig,
+                    )
         return fig
 
     def plot_coverage(
@@ -3928,35 +4008,37 @@ class Splitter(Analyzable):
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
-        if self.n_splits > 0 and self.n_sets > 0:
-            if mask_kwargs is None:
-                mask_kwargs = {}
-            set_masks = list(
-                self.get_iter_set_masks(
+        split_group_by = self.get_split_grouper(split_group_by=split_group_by)
+        set_group_by = self.get_set_grouper(set_group_by=set_group_by)
+        set_labels = self.get_set_labels(set_group_by=set_group_by)
+        if fig.layout.colorway is not None:
+            colorway = fig.layout.colorway
+        else:
+            colorway = fig.layout.template.layout.colorway
+        if len(set_labels) > len(colorway):
+            colorway = px.colors.qualitative.Alphabet
+
+        if self.get_n_splits(split_group_by=split_group_by) > 0:
+            if self.get_n_sets(set_group_by=set_group_by) > 0:
+                if mask_kwargs is None:
+                    mask_kwargs = {}
+                for i, mask in enumerate(self.get_iter_set_masks(
                     split_group_by=split_group_by,
                     set_group_by=set_group_by,
                     **mask_kwargs,
-                )
-            )
-            if fig.layout.colorway is not None:
-                colorway = fig.layout.colorway
-            else:
-                colorway = fig.layout.template.layout.colorway
-            if len(set_masks) > len(colorway):
-                colorway = px.colors.qualitative.Alphabet
-            for i, mask in enumerate(set_masks):
-                _trace_kwargs = merge_dicts(
-                    dict(
-                        name=str(mask.columns[i]),
-                        line=dict(color=colorway[i % len(colorway)], shape="hv"),
-                    ),
-                    resolve_dict(trace_kwargs, i=i),
-                )
-                fig = mask.sum(axis=1).vbt.lineplot(
-                    trace_kwargs=_trace_kwargs,
-                    add_trace_kwargs=add_trace_kwargs,
-                    fig=fig,
-                )
+                )):
+                    _trace_kwargs = merge_dicts(
+                        dict(
+                            name=str(set_labels[i]),
+                            line=dict(color=colorway[i % len(colorway)], shape="hv"),
+                        ),
+                        resolve_dict(trace_kwargs, i=i),
+                    )
+                    fig = mask.sum(axis=1).vbt.lineplot(
+                        trace_kwargs=_trace_kwargs,
+                        add_trace_kwargs=add_trace_kwargs,
+                        fig=fig,
+                    )
         return fig
 
     @property

@@ -38,6 +38,8 @@ def clean_labels(labels: tp.Labels) -> tp.Labels:
     Plotly doesn't support multi-indexes."""
     if isinstance(labels, pd.MultiIndex):
         labels = labels.to_flat_index()
+    if isinstance(labels, pd.PeriodIndex):
+        labels = labels.map(str)
     if len(labels) > 0 and isinstance(labels[0], tuple):
         labels = list(map(str, labels))
     return labels
