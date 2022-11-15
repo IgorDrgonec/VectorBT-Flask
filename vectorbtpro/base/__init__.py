@@ -40,6 +40,7 @@ from vectorbtpro.base.reshaping import (
     broadcast_to,
 )
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
+from vectorbtpro.base.merging import concat_merge, row_stack_merge, column_stack_merge
 from vectorbtpro.utils.module_ import create__all__
 
 __all__ = create__all__(__name__)

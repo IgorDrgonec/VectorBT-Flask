@@ -22,9 +22,8 @@ from vectorbtpro.generic.splitting.base import Splitter, Takeable
 
 def split(
     *args,
-    splitter: tp.Optional[Splitter] = None,
+    splitter: tp.Union[None, str, Splitter, tp.Callable] = None,
     splitter_cls: tp.Type[Splitter] = Splitter,
-    splitter_method: tp.Optional[str] = None,
     splitter_kwargs: tp.KwargsLike = None,
     index: tp.Optional[tp.IndexLike] = None,
     index_from: tp.Optional[tp.AnnArgQuery] = None,
@@ -36,11 +35,12 @@ def split(
 
     Does the following:
 
-    1. Resolves the splitter of the type `vectorbtpro.generic.splitting.base.Splitter`
-    either by using an already provided splitter instance in `splitter`, or by running a splitter method
-    (`splitter_method`) while passing `index` and `**splitter_kwargs`. Index is getting resolved either
-    using an already provided `index`, by parsing the argument under a name/position
-    provided in `index_from`, or by parsing the first argument from `takeable_args` (in this order).
+    1. Resolves the splitter of the type `vectorbtpro.generic.splitting.base.Splitter` using
+    the argument `splitter`. It can be either an already provided splitter instance, the name of
+    splitter class method, or an arbitrary callable. If any of the latter, it will pass `index` and
+    `**splitter_kwargs`. Index is getting resolved either using an already provided `index`,
+    by parsing the argument under a name/position provided in `index_from`, or by parsing the
+    first argument from `takeable_args` (in this order).
     2. Wraps arguments in `takeable_args` with `vectorbtpro.generic.splitting.base.Takeable`
     3. Runs `vectorbtpro.generic.splitting.base.Splitter.apply` with arguments passed
     to the function as `args` and `kwargs`, but also `**apply_kwargs` (the ones passed to
@@ -55,7 +55,7 @@ def split(
         >>> import pandas as pd
 
         >>> @vbt.split(
-        ...     splitter_method="from_n_rolling",
+        ...     splitter="from_n_rolling",
         ...     splitter_kwargs=dict(n=2),
         ...     takeable_args=["sr"]
         ... )
@@ -75,7 +75,7 @@ def split(
 
         ```pycon
         >>> @vbt.split(
-        ...     splitter_method="from_n_rolling",
+        ...     splitter="from_n_rolling",
         ...     splitter_kwargs=dict(n=2),
         ...     takeable_args=["index"]
         ... )
@@ -108,7 +108,7 @@ def split(
 
         ```pycon
         >>> @vbt.split(
-        ...     splitter_method="from_n_rolling",
+        ...     splitter="from_n_rolling",
         ...     splitter_kwargs=dict(n=2),
         ...     index=index,
         ...     takeable_args=["h12_sr", "d2_sr"]
@@ -132,8 +132,9 @@ def split(
         @wraps(func)
         def wrapper(*args, **kwargs) -> tp.Any:
             splitter = kwargs.pop("_splitter", wrapper.options["splitter"])
+            if splitter is None:
+                raise ValueError("Must provide splitter")
             splitter_cls = kwargs.pop("_splitter_cls", wrapper.options["splitter_cls"])
-            splitter_method = kwargs.pop("_splitter_method", wrapper.options["splitter_method"])
             splitter_kwargs = merge_dicts(wrapper.options["splitter_kwargs"], kwargs.pop("_splitter_kwargs", {}))
             index = kwargs.pop("_index", wrapper.options["index"])
             index_from = kwargs.pop("_index_from", wrapper.options["index_from"])
@@ -148,19 +149,16 @@ def split(
             apply_kwargs = merge_dicts(wrapper.options["apply_kwargs"], kwargs.pop("_apply_kwargs", {}))
 
             ann_args = annotate_args(func, args, kwargs)
-            if splitter is None:
-                if splitter_method is not None:
-                    if index is None and index_from is not None:
-                        index = splitter_cls.get_obj_index(match_ann_arg(ann_args, index_from))
-                    if index is None and len(takeable_args) > 0:
-                        index = splitter_cls.get_obj_index(match_ann_arg(ann_args, list(takeable_args)[0]))
-                    if index is None:
-                        raise ValueError("Must provide splitter, index, index_from, or takeable_args")
-                    if isinstance(splitter_method, str):
-                        splitter_method = getattr(splitter_cls, splitter_method)
-                    splitter = splitter_method(index, template_context=template_context, **splitter_kwargs)
-                else:
-                    raise ValueError("Must provide splitter or splitter_method")
+            if not isinstance(splitter, splitter_cls):
+                if index is None and index_from is not None:
+                    index = splitter_cls.get_obj_index(match_ann_arg(ann_args, index_from))
+                if index is None and len(takeable_args) > 0:
+                    index = splitter_cls.get_obj_index(match_ann_arg(ann_args, list(takeable_args)[0]))
+                if index is None:
+                    raise ValueError("Must provide splitter, index, index_from, or takeable_args")
+                if isinstance(splitter, str):
+                    splitter = getattr(splitter_cls, splitter)
+                splitter = splitter(index, template_context=template_context, **splitter_kwargs)
             if len(takeable_args) > 0:
                 flat_ann_args = flatten_ann_args(ann_args)
                 for takeable_arg in takeable_args:
@@ -181,7 +179,6 @@ def split(
             dict(
                 splitter=splitter,
                 splitter_cls=splitter_cls,
-                splitter_method=splitter_method,
                 splitter_kwargs=splitter_kwargs,
                 index=index,
                 index_from=index_from,
@@ -252,7 +249,7 @@ def cv_split(
         >>> import pandas as pd
 
         >>> @vbt.cv_split(
-        ...     splitter_method="from_n_rolling",
+        ...     splitter="from_n_rolling",
         ...     splitter_kwargs=dict(n=3, split=0.5),
         ...     takeable_args=["sr"],
         ...     parameterized_kwargs=dict(merge_func="concat"),

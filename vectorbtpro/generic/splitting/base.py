@@ -2170,7 +2170,7 @@ class Splitter(Analyzable):
         index_combine_kwargs: tp.KwargsLike = None,
         column_stack_kwargs: tp.KwargsLike = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
-    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[dict, tp.Generator[dict, None, None]]]:
+    ) -> tp.Any:
         """Take all ranges from an array-like object and optionally column-stack them.
 
         Uses `Splitter.select_indices` to get the indices for selected splits and sets.
@@ -2199,6 +2199,9 @@ class Splitter(Analyzable):
             Returns meta with indices and labels, and the generator.
         * 'set_major_meta': Generator with ranges processed lazily in set-major order.
             Returns meta with indices and labels, and the generator.
+
+        Prepend any stacked option with "from_start_" (also "reset_") or "from_end_" to reset the index
+        from start and from end respectively.
 
         Usage:
             * Roll a window and stack it along columns by keeping the index:
@@ -2266,8 +2269,6 @@ class Splitter(Analyzable):
             4                  29001.720703
             ```
         """
-        if isinstance(obj, PandasIndexer) and not isinstance(obj, Wrapping):
-            raise TypeError("Only arrays and Wrapping instances can be stacked")
         if isinstance(attach_bounds, bool):
             if attach_bounds:
                 attach_bounds = "source"
@@ -2408,6 +2409,15 @@ class Splitter(Analyzable):
             if attach_bounds:
                 keys = _attach_bounds(keys, range_bounds)
             return pd.Series(range_objs, index=keys, dtype=object)
+        if isinstance(into, str) and into.lower().startswith("reset_"):
+            column_stack_kwargs["reset_index"] = "from_start"
+            into = into.lower().replace("reset_", "")
+        if isinstance(into, str) and into.lower().startswith("from_start_"):
+            column_stack_kwargs["reset_index"] = "from_start"
+            into = into.lower().replace("from_start_", "")
+        if isinstance(into, str) and into.lower().startswith("from_end_"):
+            column_stack_kwargs["reset_index"] = "from_end"
+            into = into.lower().replace("from_end_", "")
         if isinstance(into, str) and into.lower() in ("split_major_meta", "set_major_meta"):
             meta = {
                 "split_group_indices": split_group_indices,
@@ -2480,7 +2490,7 @@ class Splitter(Analyzable):
                     range_meta = _get_range_meta(i, j)
                     range_objs.append(range_meta["obj_slice"])
                     range_bounds.append(range_meta["bounds"])
-                if one_set and squeeze_one_set:
+                if one_split and squeeze_one_split:
                     new_set_objs.append(range_objs[0])
                 else:
                     keys = split_labels

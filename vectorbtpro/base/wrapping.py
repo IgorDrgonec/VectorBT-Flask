@@ -25,8 +25,10 @@ from vectorbtpro.utils.template import CustomTemplate
 
 if tp.TYPE_CHECKING:
     from vectorbtpro.base.accessors import BaseIDXAccessor as BaseIDXAccessorT
+    from vectorbtpro.generic.splitting.base import Splitter as SplitterT
 else:
     BaseIDXAccessorT = tp.Any
+    SplitterT = tp.Any
 
 ArrayWrapperT = tp.TypeVar("ArrayWrapperT", bound="ArrayWrapper")
 
@@ -1775,6 +1777,25 @@ class ArrayWrapper(Configured, PandasIndexer):
             new_obj = self.wrap(new_obj, group_by=False)
         return new_obj
 
+    def split(
+        self,
+        splitter: tp.Union[str, SplitterT, tp.Callable],
+        splitter_cls: tp.Optional[tp.Type[SplitterT]] = None,
+        splitter_kwargs: tp.KwargsLike = None,
+        template_context: tp.KwargsLike = None,
+        **take_kwargs,
+    ) -> tp.Any:
+        """Split using `vectorbtpro.generic.splitting.base.Splitter`."""
+        from vectorbtpro.generic.splitting.base import Splitter
+
+        if splitter_cls is None:
+            splitter_cls = Splitter
+        if not isinstance(splitter, splitter_cls):
+            if isinstance(splitter, str):
+                splitter = getattr(splitter_cls, splitter)
+            splitter = splitter(self.index, template_context=template_context, **splitter_kwargs)
+        return splitter.take(self, template_context=template_context, **take_kwargs)
+
 
 WrappingT = tp.TypeVar("WrappingT", bound="Wrapping")
 
@@ -2085,3 +2106,22 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
         if wrapper.grouped_ndim == 1:
             return obj
         raise TypeError("Only one group is allowed. Use indexing or column argument.")
+
+    def split(
+        self,
+        splitter: tp.Union[str, SplitterT, tp.Callable],
+        splitter_cls: tp.Optional[tp.Type[SplitterT]] = None,
+        splitter_kwargs: tp.KwargsLike = None,
+        template_context: tp.KwargsLike = None,
+        **take_kwargs,
+    ) -> tp.Any:
+        """Split using `vectorbtpro.generic.splitting.base.Splitter`."""
+        from vectorbtpro.generic.splitting.base import Splitter
+
+        if splitter_cls is None:
+            splitter_cls = Splitter
+        if not isinstance(splitter, splitter_cls):
+            if isinstance(splitter, str):
+                splitter = getattr(splitter_cls, splitter)
+            splitter = splitter(self.wrapper.index, template_context=template_context, **splitter_kwargs)
+        return splitter.take(self, template_context=template_context, **take_kwargs)

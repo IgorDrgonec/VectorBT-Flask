@@ -919,7 +919,7 @@ class Heatmap(Configured, TraceUpdater):
 
     def update(self, data: tp.ArrayLike) -> None:
         with self.fig.batch_update():
-            self.update_trace(trace, data)
+            self.update_trace(self.traces[0], data)
 
 
 class Volume(Configured, TraceUpdater):
@@ -1073,4 +1073,4 @@ class Volume(Configured, TraceUpdater):
 
     def update(self, data: tp.ArrayLike) -> None:
         with self.fig.batch_update():
-            self.update_trace(trace, data)
+            self.update_trace(self.traces[0], data)

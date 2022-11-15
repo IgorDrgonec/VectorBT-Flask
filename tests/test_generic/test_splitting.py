@@ -3985,31 +3985,31 @@ class TestDecorators:
         split_f = vbt.split(f, splitter=splitter)
         assert split_f(index, sr, sr, b=sr, c=sr) == 155
         with pytest.raises(Exception):
-            split_f = vbt.split(f, splitter_method="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)))
+            split_f = vbt.split(f, splitter="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)))
             split_f(index, sr, sr, b=sr, c=sr)
         split_f = vbt.split(
-            f, splitter_method="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index=index
+            f, splitter="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index=index
         )
         assert split_f(index, sr, sr, b=sr, c=sr) == 155
         split_f = vbt.split(
-            f, splitter_method="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from="index"
+            f, splitter="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from="index"
         )
         assert split_f(index, sr, sr, b=sr, c=sr) == 155
         split_f = vbt.split(
-            f, splitter_method="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from="a"
+            f, splitter="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from="a"
         )
         assert split_f(index, sr, sr, b=sr, c=sr) == 155
         split_f = vbt.split(
-            f, splitter_method="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from="my_args_0"
+            f, splitter="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from="my_args_0"
         )
         assert split_f(index, sr, sr, b=sr, c=sr) == 155
         split_f = vbt.split(
-            f, splitter_method="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from=1
+            f, splitter="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from=1
         )
         assert split_f(index, sr, sr, b=sr, c=sr) == 155
         split_f = vbt.split(
             f,
-            splitter_method="from_single",
+            splitter="from_single",
             splitter_kwargs=dict(split=vbt.RelRange(length=5)),
             takeable_args=["index"],
         )
