@@ -1141,7 +1141,20 @@ def simulate_nb(
 
                     # Update position record
                     if fill_pos_record:
-                        update_pos_record_nb(pos_record_now, i, col, exec_state.position, position_now, order_result)
+                        if order_result.status == OrderStatus.Filled:
+                            if order_counts[col] > 0:
+                                order_id = order_records["id"][order_counts[col] - 1, col]
+                            else:
+                                order_id = -1
+                            update_pos_record_nb(
+                                pos_record_now,
+                                i,
+                                col,
+                                exec_state.position,
+                                position_now,
+                                order_result,
+                                order_id,
+                            )
 
                     # Post-order callback
                     post_order_ctx = PostOrderContext(
@@ -2029,7 +2042,20 @@ def simulate_row_wise_nb(
 
                     # Update position record
                     if fill_pos_record:
-                        update_pos_record_nb(pos_record_now, i, col, exec_state.position, position_now, order_result)
+                        if order_result.status == OrderStatus.Filled:
+                            if order_counts[col] > 0:
+                                order_id = order_records["id"][order_counts[col] - 1, col]
+                            else:
+                                order_id = -1
+                            update_pos_record_nb(
+                                pos_record_now,
+                                i,
+                                col,
+                                exec_state.position,
+                                position_now,
+                                order_result,
+                                order_id,
+                            )
 
                     # Post-order callback
                     post_order_ctx = PostOrderContext(
@@ -3055,7 +3081,20 @@ def flex_simulate_nb(
 
                     # Update position record
                     if fill_pos_record:
-                        update_pos_record_nb(pos_record_now, i, col, exec_state.position, position_now, order_result)
+                        if order_result.status == OrderStatus.Filled:
+                            if order_counts[col] > 0:
+                                order_id = order_records["id"][order_counts[col] - 1, col]
+                            else:
+                                order_id = -1
+                            update_pos_record_nb(
+                                pos_record_now,
+                                i,
+                                col,
+                                exec_state.position,
+                                position_now,
+                                order_result,
+                                order_id,
+                            )
 
                     # Post-order callback
                     post_order_ctx = PostOrderContext(
@@ -3847,7 +3886,20 @@ def flex_simulate_row_wise_nb(
 
                     # Update position record
                     if fill_pos_record:
-                        update_pos_record_nb(pos_record_now, i, col, exec_state.position, position_now, order_result)
+                        if order_result.status == OrderStatus.Filled:
+                            if order_counts[col] > 0:
+                                order_id = order_records["id"][order_counts[col] - 1, col]
+                            else:
+                                order_id = -1
+                            update_pos_record_nb(
+                                pos_record_now,
+                                i,
+                                col,
+                                exec_state.position,
+                                position_now,
+                                order_result,
+                                order_id,
+                            )
 
                     # Post-order callback
                     post_order_ctx = PostOrderContext(

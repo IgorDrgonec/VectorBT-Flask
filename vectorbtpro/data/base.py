@@ -12,6 +12,7 @@ from pathlib import Path
 import traceback
 import inspect
 import string
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -554,9 +555,30 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         return self.replace(cls_=new_cls, fetch_kwargs=new_fetch_kwargs, returned_kwargs=new_returned_kwargs, **kwargs)
 
     @classmethod
+    def invert_data(cls, pd_dict: tp.Dict[tp.Hashable, tp.SeriesFrame]) -> tp.Dict[tp.Hashable, tp.SeriesFrame]:
+        """Invert data by swapping keys and columns."""
+        if len(pd_dict) == 0:
+            return pd_dict
+        new_pd_dict = defaultdict(list)
+        for k, v in pd_dict.items():
+            if isinstance(v, pd.Series):
+                new_pd_dict[v.name].append(v.rename(k))
+            else:
+                for c in v.columns:
+                    new_pd_dict[c].append(v[c].rename(k))
+        new_pd_dict2 = {}
+        for k, v in new_pd_dict.items():
+            if len(v) == 1:
+                new_pd_dict2[k] = v[0]
+            else:
+                new_pd_dict2[k] = pd.concat(v, axis=1)
+        return new_pd_dict2
+
+    @classmethod
     def from_data(
         cls: tp.Type[DataT],
-        data: symbol_dict,
+        data: tp.Union[symbol_dict, tp.SeriesFrame],
+        symbol_oriented: bool = False,
         single_symbol: bool = True,
         symbol_classes: tp.Optional[symbol_dict] = None,
         tz_localize: tp.Optional[tp.TimezoneLike] = None,
@@ -574,6 +596,9 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         Args:
             data (dict): Dictionary of array-like objects keyed by symbol.
+            symbol_oriented (bool): Whether columns are symbols and should be swapped.
+
+                Uses `Data.invert_data`.
             single_symbol (bool): Whether there is only one symbol in `data`.
             symbol_classes (symbol_dict): See `Data.symbol_classes`.
             tz_localize (timezone_like): See `Data.prepare_tzaware_index`.
@@ -611,6 +636,11 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             returned_kwargs = symbol_dict()
         if last_index is None:
             last_index = symbol_dict()
+
+        if isinstance(data, (pd.Series, pd.DataFrame)):
+            data = dict(symbol=data)
+        if symbol_oriented:
+            data = cls.invert_data(data)
 
         data = symbol_dict(data)
         for symbol, obj in data.items():
@@ -1561,12 +1591,12 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         `func` can be one of the following:
 
+        * "{name}": Name of a custom indicator or, if not found, the first from the below
         * "talib_{name}": Name of a TA-Lib indicator
         * "pandas_ta_{name}": Name of a Pandas TA indicator
         * "ta_{name}": Name of a TA indicator
         * "wqa101_{number}": Number of a WQA indicator
-        * "techcon_{number}": Number of a technical consensus indicator
-        * "{name}": Name of a custom indicator, otherwise of the above if found
+        * "techcon_{name}": Name of a technical consensus indicator
         * "from_{mode}": Name of the simulation mode in `vectorbtpro.portfolio.base.Portfolio`
         * Indicator: Any indicator class built with the indicator factory
         * Callable: Function to run

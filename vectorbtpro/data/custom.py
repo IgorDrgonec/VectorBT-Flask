@@ -1209,6 +1209,9 @@ class BinanceData(RemoteData):
 
         For defaults, see `custom.binance` in `vectorbtpro._settings.data`.
         """
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("binance")
         from binance.enums import HistoricalKlinesType
 
         binance_cfg = cls.get_settings(key_id="custom")
@@ -3151,6 +3154,11 @@ class TVData(RemoteData):
             df["Volume"] = df["Volume"].astype(float)
 
         return df
+
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
+        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
+        kwargs = merge_dicts(fetch_kwargs, kwargs)
+        return self.fetch_symbol(symbol, **kwargs)
 
 
 TVData.override_column_config_doc(__pdoc__)

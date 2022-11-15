@@ -2409,6 +2409,7 @@ class TestFactory:
             "self_aliases",
             "set_settings",
             "short_name",
+            "split",
             "stats",
             "stats_defaults",
             "subplots",

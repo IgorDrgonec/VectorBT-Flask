@@ -66,47 +66,47 @@ Also available as `vectorbtpro.portfolio.base.Portfolio.positions`.
 ... )
 >>> entry_trades = vbt.Portfolio.from_orders(**pf_kwargs).entry_trades
 >>> entry_trades.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   1.0                0              1.0         1.0
-1         1       0   1.0                1              2.0         1.0
-2         2       0   1.0                2              3.0         1.0
-3         3       0   1.0                3              4.0         1.0
+   Entry Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0               0       0   1.0               0            0              1.0
+1               1       0   1.0               1            1              2.0
+2               2       0   1.0               2            2              3.0
+3               3       0   1.0               3            3              4.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees   PnL  Return Direction  Status  \\
-0               4             5.0       0.25  2.75  2.7500      Long  Closed
-1               4             5.0       0.25  1.75  0.8750      Long  Closed
-2               4             5.0       0.25  0.75  0.2500      Long  Closed
-3               4             5.0       0.25 -0.25 -0.0625      Long  Closed
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees   PnL  \\
+0         1.0              4           4             5.0       0.25  2.75
+1         1.0              4           4             5.0       0.25  1.75
+2         1.0              4           4             5.0       0.25  0.75
+3         1.0              4           4             5.0       0.25 -0.25
 
-   Parent Id
-0          0
-1          0
-2          0
-3          0
+   Return Direction  Status  Position Id
+0  2.7500      Long  Closed            0
+1  0.8750      Long  Closed            0
+2  0.2500      Long  Closed            0
+3 -0.0625      Long  Closed            0
 
 >>> # Exit trades
 >>> exit_trades = vbt.Portfolio.from_orders(**pf_kwargs).exit_trades
 >>> exit_trades.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   4.0                0              2.5         4.0
+   Exit Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0              0       0   4.0               0            0              2.5
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
-0               4             5.0        1.0  5.0     0.5      Long  Closed
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         4.0              4           4             5.0        1.0  5.0
 
-   Parent Id
-0          0
+   Return Direction  Status  Position Id
+0     0.5      Long  Closed            0
 
 >>> # Positions
 >>> positions = vbt.Portfolio.from_orders(**pf_kwargs).positions
 >>> positions.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   4.0                0              2.5         4.0
+   Position Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0            0       0   4.0               0            0              2.5
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
-0               4             5.0        1.0  5.0     0.5      Long  Closed
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         4.0              4           4             5.0        1.0  5.0
 
-   Parent Id
-0          0
+   Return Direction  Status
+0     0.5      Long  Closed
 
 >>> entry_trades.pnl.sum() == exit_trades.pnl.sum() == positions.pnl.sum()
 True
@@ -123,47 +123,47 @@ True
 ... )
 >>> entry_trades = vbt.Portfolio.from_orders(**pf_kwargs).entry_trades
 >>> entry_trades.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   4.0                0              1.0         1.0
+   Entry Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0               0       0   4.0               0            0              1.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
-0               4             3.5        4.0  5.0    1.25      Long  Closed
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         1.0              4           4             3.5        4.0  5.0
 
-   Parent Id
-0          0
+   Return Direction  Status  Position Id
+0    1.25      Long  Closed            0
 
 >>> # Exit trades
 >>> exit_trades = vbt.Portfolio.from_orders(**pf_kwargs).exit_trades
 >>> exit_trades.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   1.0                0              1.0        0.25
-1         1       0   1.0                0              1.0        0.25
-2         2       0   1.0                0              1.0        0.25
-3         3       0   1.0                0              1.0        0.25
+   Exit Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0              0       0   1.0               0            0              1.0
+1              1       0   1.0               0            0              1.0
+2              2       0   1.0               0            0              1.0
+3              3       0   1.0               0            0              1.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees   PnL  Return Direction  Status  \\
-0               1             2.0        1.0 -0.25   -0.25      Long  Closed
-1               2             3.0        1.0  0.75    0.75      Long  Closed
-2               3             4.0        1.0  1.75    1.75      Long  Closed
-3               4             5.0        1.0  2.75    2.75      Long  Closed
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees   PnL  \\
+0        0.25              1           1             2.0        1.0 -0.25
+1        0.25              2           2             3.0        1.0  0.75
+2        0.25              3           3             4.0        1.0  1.75
+3        0.25              4           4             5.0        1.0  2.75
 
-   Parent Id
-0          0
-1          0
-2          0
-3          0
+   Return Direction  Status  Position Id
+0   -0.25      Long  Closed            0
+1    0.75      Long  Closed            0
+2    1.75      Long  Closed            0
+3    2.75      Long  Closed            0
 
 >>> # Positions
 >>> positions = vbt.Portfolio.from_orders(**pf_kwargs).positions
 >>> positions.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   4.0                0              1.0         1.0
+   Position Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0            0       0   4.0               0            0              1.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
-0               4             3.5        4.0  5.0    1.25      Long  Closed
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         1.0              4           4             3.5        4.0  5.0
 
-   Parent Id
-0          0
+   Return Direction  Status
+0    1.25      Long  Closed
 
 >>> entry_trades.pnl.sum() == exit_trades.pnl.sum() == positions.pnl.sum()
 True
@@ -180,65 +180,65 @@ True
 ... )
 >>> entry_trades = vbt.Portfolio.from_orders(**pf_kwargs).entry_trades
 >>> entry_trades.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   1.0                0              1.0         1.0
-1         1       0   1.0                1              2.0         0.5
-2         2       0   1.0                2              3.0         0.5
-3         3       0   1.0                3              4.0         0.5
+   Entry Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0               0       0   1.0               0            0              1.0
+1               1       0   1.0               1            1              2.0
+2               2       0   1.0               2            2              3.0
+3               3       0   1.0               3            3              4.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
-0               1             2.0        0.5 -0.5  -0.500      Long  Closed
-1               2             3.0        0.5 -2.0  -1.000     Short  Closed
-2               3             4.0        0.5  0.0   0.000      Long  Closed
-3               4             5.0        1.0 -2.5  -0.625     Short  Closed
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         1.0              1           1             2.0        0.5 -0.5
+1         0.5              2           2             3.0        0.5 -2.0
+2         0.5              3           3             4.0        0.5  0.0
+3         0.5              4           4             5.0        1.0 -2.5
 
-   Parent Id
-0          0
-1          1
-2          2
-3          3
+   Return Direction  Status  Position Id
+0  -0.500      Long  Closed            0
+1  -1.000     Short  Closed            1
+2   0.000      Long  Closed            2
+3  -0.625     Short  Closed            3
 
 >>> # Exit trades
 >>> exit_trades = vbt.Portfolio.from_orders(**pf_kwargs).exit_trades
 >>> exit_trades.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   1.0                0              1.0         1.0
-1         1       0   1.0                1              2.0         0.5
-2         2       0   1.0                2              3.0         0.5
-3         3       0   1.0                3              4.0         0.5
+   Exit Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0              0       0   1.0               0            0              1.0
+1              1       0   1.0               1            1              2.0
+2              2       0   1.0               2            2              3.0
+3              3       0   1.0               3            3              4.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
-0               1             2.0        0.5 -0.5  -0.500      Long  Closed
-1               2             3.0        0.5 -2.0  -1.000     Short  Closed
-2               3             4.0        0.5  0.0   0.000      Long  Closed
-3               4             5.0        1.0 -2.5  -0.625     Short  Closed
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         1.0              1           1             2.0        0.5 -0.5
+1         0.5              2           2             3.0        0.5 -2.0
+2         0.5              3           3             4.0        0.5  0.0
+3         0.5              4           4             5.0        1.0 -2.5
 
-   Parent Id
-0          0
-1          1
-2          2
-3          3
+   Return Direction  Status  Position Id
+0  -0.500      Long  Closed            0
+1  -1.000     Short  Closed            1
+2   0.000      Long  Closed            2
+3  -0.625     Short  Closed            3
 
 >>> # Positions
 >>> positions = vbt.Portfolio.from_orders(**pf_kwargs).positions
 >>> positions.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   1.0                0              1.0         1.0
-1         1       0   1.0                1              2.0         0.5
-2         2       0   1.0                2              3.0         0.5
-3         3       0   1.0                3              4.0         0.5
+   Position Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0            0       0   1.0               0            0              1.0
+1            1       0   1.0               1            1              2.0
+2            2       0   1.0               2            2              3.0
+3            3       0   1.0               3            3              4.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction  Status  \\
-0               1             2.0        0.5 -0.5  -0.500      Long  Closed
-1               2             3.0        0.5 -2.0  -1.000     Short  Closed
-2               3             4.0        0.5  0.0   0.000      Long  Closed
-3               4             5.0        1.0 -2.5  -0.625     Short  Closed
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         1.0              1           1             2.0        0.5 -0.5
+1         0.5              2           2             3.0        0.5 -2.0
+2         0.5              3           3             4.0        0.5  0.0
+3         0.5              4           4             5.0        1.0 -2.5
 
-   Parent Id
-0          0
-1          1
-2          2
-3          3
+   Return Direction  Status
+0  -0.500      Long  Closed
+1  -1.000     Short  Closed
+2   0.000      Long  Closed
+3  -0.625     Short  Closed
 
 >>> entry_trades.pnl.sum() == exit_trades.pnl.sum() == positions.pnl.sum()
 True
@@ -255,38 +255,38 @@ True
 ... )
 >>> entry_trades = vbt.Portfolio.from_orders(**pf_kwargs).entry_trades
 >>> entry_trades.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   1.0                0              1.0         1.0
+   Entry Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0               0       0   1.0               0            0              1.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction Status  \\
-0               4             5.0        0.0  3.0     3.0      Long   Open
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         1.0             -1           4             5.0        0.0  3.0
 
-   Parent Id
-0          0
+   Return Direction Status  Position Id
+0     3.0      Long   Open            0
 
 >>> # Exit trades
 >>> exit_trades = vbt.Portfolio.from_orders(**pf_kwargs).exit_trades
 >>> exit_trades.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   1.0                0              1.0         1.0
+   Exit Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0              0       0   1.0               0            0              1.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction Status  \\
-0               4             5.0        0.0  3.0     3.0      Long   Open
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         1.0             -1           4             5.0        0.0  3.0
 
-   Parent Id
-0          0
+   Return Direction Status  Position Id
+0     3.0      Long   Open            0
 
 >>> # Positions
 >>> positions = vbt.Portfolio.from_orders(**pf_kwargs).positions
 >>> positions.records_readable
-   Trade Id  Column  Size  Entry Timestamp  Avg Entry Price  Entry Fees  \\
-0         0       0   1.0                0              1.0         1.0
+   Position Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
+0            0       0   1.0               0            0              1.0
 
-   Exit Timestamp  Avg Exit Price  Exit Fees  PnL  Return Direction Status  \\
-0               4             5.0        0.0  3.0     3.0      Long   Open
+   Entry Fees  Exit Order Id  Exit Index  Avg Exit Price  Exit Fees  PnL  \\
+0         1.0             -1           4             5.0        0.0  3.0
 
-   Parent Id
-0          0
+   Return Direction Status
+0     3.0      Long   Open
 
 >>> entry_trades.pnl.sum() == exit_trades.pnl.sum() == positions.pnl.sum()
 True
@@ -520,9 +520,11 @@ trades_field_config = ReadonlyConfig(
             "start_idx": dict(name="entry_idx"),  # remap field of Ranges
             "end_idx": dict(name="exit_idx"),  # remap field of Ranges
             "size": dict(title="Size"),
+            "entry_order_id": dict(title="Entry Order Id", mapping="ids"),
             "entry_idx": dict(title="Entry Index", mapping="index"),
             "entry_price": dict(title="Avg Entry Price"),
             "entry_fees": dict(title="Entry Fees"),
+            "exit_order_id": dict(title="Exit Order Id", mapping="ids"),
             "exit_idx": dict(title="Exit Index", mapping="index"),
             "exit_price": dict(title="Avg Exit Price"),
             "exit_fees": dict(title="Exit Fees"),
@@ -603,6 +605,8 @@ trades_shortcut_config = ReadonlyConfig(
             method_name="get_mae",
             method_kwargs=dict(use_returns=True),
         ),
+        edge_ratio=dict(obj_type="red_array"),
+        running_edge_ratio=dict(obj_type="array"),
     )
 )
 """_"""
@@ -770,14 +774,13 @@ class Trades(Ranges):
 
         See `vectorbtpro.portfolio.nb.records.best_worst_price_nb`."""
         return self.apply(
-            nb.best_worst_price_nb,
+            nb.best_price_nb,
             self._open,
             self._high,
             self._low,
             self._close,
             entry_price_open,
             exit_price_close,
-            True,
             **kwargs,
         )
 
@@ -786,14 +789,13 @@ class Trades(Ranges):
 
         See `vectorbtpro.portfolio.nb.records.best_worst_price_nb`."""
         return self.apply(
-            nb.best_worst_price_nb,
+            nb.worst_price_nb,
             self._open,
             self._high,
             self._low,
             self._close,
             entry_price_open,
             exit_price_close,
-            False,
             **kwargs,
         )
 
@@ -856,6 +858,108 @@ class Trades(Ranges):
             use_returns=use_returns,
         )
         return self.map_array(drawdown, **kwargs)
+
+    def get_edge_ratio(
+        self,
+        volatility: tp.Optional[tp.ArrayLike] = None,
+        entry_price_open: bool = False,
+        exit_price_close: bool = False,
+        max_duration: tp.Optional[int] = None,
+        flex_2d: bool = False,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """Get edge ratio.
+
+        See `vectorbtpro.portfolio.nb.records.edge_ratio_nb`.
+
+        If `volatility` is None, calculates the 14-period ATR based on the Wilder's moving average."""
+        col_map = self.col_mapper.get_col_map(group_by=group_by)
+        func = jit_reg.resolve_option(nb.edge_ratio_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        if volatility is None:
+            from vectorbtpro.indicators.nb import atr_nb
+            from vectorbtpro.generic.enums import WType
+
+            volatility = atr_nb(
+                high=to_2d_array(self.high),
+                low=to_2d_array(self.low),
+                close=to_2d_array(self.close),
+                window=14,
+                wtype=WType.Wilder,
+            )[1]
+        else:
+            volatility = np.asarray(volatility)
+        out = func(
+            self.values,
+            col_map,
+            self._open,
+            self._high,
+            self._low,
+            self._close,
+            volatility,
+            entry_price_open=entry_price_open,
+            exit_price_close=exit_price_close,
+            max_duration=max_duration,
+            flex_2d=flex_2d,
+        )
+        if wrap_kwargs is None:
+            wrap_kwargs = {}
+        return self.wrapper.wrap_reduced(out, group_by=group_by, **wrap_kwargs)
+
+    def get_running_edge_ratio(
+        self,
+        volatility: tp.Optional[tp.ArrayLike] = None,
+        entry_price_open: bool = False,
+        exit_price_close: bool = False,
+        max_duration: tp.Optional[int] = None,
+        incl_shorter: bool = False,
+        flex_2d: bool = False,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """Get running edge ratio.
+
+        See `vectorbtpro.portfolio.nb.records.running_edge_ratio_nb`.
+
+        If `volatility` is None, calculates the 14-period ATR based on the Wilder's moving average."""
+        col_map = self.col_mapper.get_col_map(group_by=group_by)
+        func = jit_reg.resolve_option(nb.running_edge_ratio_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        if volatility is None:
+            from vectorbtpro.indicators.nb import atr_nb
+            from vectorbtpro.generic.enums import WType
+
+            volatility = atr_nb(
+                high=to_2d_array(self.high),
+                low=to_2d_array(self.low),
+                close=to_2d_array(self.close),
+                window=14,
+                wtype=WType.Wilder,
+            )[1]
+        else:
+            volatility = np.asarray(volatility)
+        out = func(
+            self.values,
+            col_map,
+            self._open,
+            self._high,
+            self._low,
+            self._close,
+            volatility,
+            entry_price_open=entry_price_open,
+            exit_price_close=exit_price_close,
+            max_duration=max_duration,
+            incl_shorter=incl_shorter,
+            flex_2d=flex_2d,
+        )
+        if wrap_kwargs is None:
+            wrap_kwargs = {}
+        return self.wrapper.wrap(out, group_by=group_by, index=pd.RangeIndex(stop=len(out)), **wrap_kwargs)
 
     @property
     def stats_defaults(self) -> tp.Kwargs:
@@ -989,6 +1093,11 @@ class Trades(Ranges):
             sqn=dict(
                 title="SQN",
                 calc_func=RepEval("'sqn' if incl_open else 'status_closed.get_sqn'"),
+                tags=RepEval("['trades', *incl_open_tags]"),
+            ),
+            edge_ratio=dict(
+                title="Edge Ratio",
+                calc_func=RepEval("'edge_ratio' if incl_open else 'status_closed.get_edge_ratio'"),
                 tags=RepEval("['trades', *incl_open_tags]"),
             ),
         )
@@ -1425,6 +1534,74 @@ class Trades(Ranges):
         field_pct_scale=True,
     )
     """`Trades.plot_against_pnl` for `Trades.mae_returns`."""
+
+    def plot_running_edge_ratio(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        volatility: tp.Optional[tp.ArrayLike] = None,
+        entry_price_open: bool = False,
+        exit_price_close: bool = False,
+        max_duration: tp.Optional[int] = None,
+        incl_shorter: bool = False,
+        flex_2d: bool = False,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        xref: str = "x",
+        yref: str = "y",
+        hline_shape_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.BaseFigure:
+        """Plot one column/group of edge ratio.
+
+        `**kwargs` are passed to `vectorbtpro.generic.accessors.GenericSRAccessor.plot_against`."""
+        from vectorbtpro.utils.figure import get_domain
+
+        running_edge_ratio = self.resolve_shortcut_attr(
+            "running_edge_ratio",
+            volatility=volatility,
+            entry_price_open=entry_price_open,
+            exit_price_close=exit_price_close,
+            max_duration=max_duration,
+            incl_shorter=incl_shorter,
+            flex_2d=flex_2d,
+            group_by=group_by,
+            jitted=jitted,
+            chunked=chunked,
+        )
+        running_edge_ratio = self.select_col_from_obj(
+            running_edge_ratio,
+            column,
+            wrapper=self.wrapper.regroup(group_by)
+        )
+        kwargs = merge_dicts(
+            dict(
+                trace_kwargs=dict(name="Edge Ratio"),
+                other_trace_kwargs="hidden",
+            ),
+            kwargs,
+        )
+        fig = running_edge_ratio.vbt.plot_against(1, **kwargs)
+        x_domain = get_domain(xref, fig)
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=1.0,
+                    x1=x_domain[1],
+                    y1=1.0,
+                ),
+                hline_shape_kwargs,
+            )
+        )
+        return fig
 
     def plot(
         self,

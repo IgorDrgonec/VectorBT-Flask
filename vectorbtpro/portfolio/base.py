@@ -1807,20 +1807,6 @@ shortcut_config = ReadonlyConfig(
             indexing_func=partial(records_indexing_func, cls="logs_cls"),
             resample_func=partial(records_resample_func, cls="logs_cls"),
         ),
-        "trades": dict(
-            obj_type="records",
-            field_aliases=("trade_records",),
-            wrap_func=lambda pf, obj, **kwargs: pf.trades_cls.from_records(
-                pf.orders.wrapper,
-                obj,
-                open=pf._open,
-                high=pf._high,
-                low=pf._low,
-                close=pf._close,
-            ),
-            indexing_func=partial(records_indexing_func, cls="trades_cls"),
-            resample_func=partial(records_resample_func, cls="trades_cls"),
-        ),
         "entry_trades": dict(
             obj_type="records",
             field_aliases=("entry_trade_records",),
@@ -1849,6 +1835,21 @@ shortcut_config = ReadonlyConfig(
             indexing_func=partial(records_indexing_func, cls="exit_trades_cls"),
             resample_func=partial(records_resample_func, cls="exit_trades_cls"),
         ),
+        "trades": dict(
+            obj_type="records",
+            field_aliases=("trade_records",),
+            wrap_func=lambda pf, obj, **kwargs: pf.trades_cls.from_records(
+                pf.orders.wrapper,
+                obj,
+                open=pf._open,
+                high=pf._high,
+                low=pf._low,
+                close=pf._close,
+            ),
+            indexing_func=partial(records_indexing_func, cls="trades_cls"),
+            resample_func=partial(records_resample_func, cls="trades_cls"),
+        ),
+        "trade_history": dict(),
         "positions": dict(
             obj_type="records",
             field_aliases=("position_records",),
@@ -8260,6 +8261,56 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if self.trades_type == TradesType.ExitTrades:
             return self.resolve_shortcut_attr("exit_trades", group_by=group_by, **kwargs)
         return self.resolve_shortcut_attr("positions", group_by=group_by, **kwargs)
+
+    def get_trade_history(
+        self,
+        orders: tp.Optional[Orders] = None,
+        entry_trades_cls: tp.Optional[type] = None,
+        exit_trades_cls: tp.Optional[type] = None,
+        **kwargs,
+    ) -> tp.Frame:
+        """Get (entry and exit) trade history as a DataFrame."""
+        if orders is None:
+            orders = self.orders
+        entry_trades = self.resolve_shortcut_attr(
+            "entry_trades", orders=orders, entry_trades_cls=entry_trades_cls, **kwargs
+        )
+        exit_trades = self.resolve_shortcut_attr(
+            "exit_trades", orders=orders, exit_trades_cls=exit_trades_cls, **kwargs
+        )
+
+        order_history = orders.records_readable
+        del order_history["Size"]
+        del order_history["Price"]
+        del order_history["Fees"]
+        entry_trade_history = entry_trades.records_readable
+        exit_trade_history = exit_trades.records_readable
+        entry_trade_history.rename(columns={"Entry Order Id": "Order Id"}, inplace=True)
+        exit_trade_history.rename(columns={"Exit Order Id": "Order Id"}, inplace=True)
+        del entry_trade_history["Entry Index"]
+        del exit_trade_history["Exit Index"]
+        entry_trade_history.rename(columns={"Avg Entry Price": "Price"}, inplace=True)
+        exit_trade_history.rename(columns={"Avg Exit Price": "Price"}, inplace=True)
+        entry_trade_history.rename(columns={"Entry Fees": "Fees"}, inplace=True)
+        exit_trade_history.rename(columns={"Exit Fees": "Fees"}, inplace=True)
+        del entry_trade_history["Exit Order Id"]
+        del exit_trade_history["Entry Order Id"]
+        del entry_trade_history["Exit Index"]
+        del exit_trade_history["Entry Index"]
+        del entry_trade_history["Avg Exit Price"]
+        del exit_trade_history["Avg Entry Price"]
+        del entry_trade_history["Exit Fees"]
+        del exit_trade_history["Entry Fees"]
+
+        trade_history = pd.concat((entry_trade_history, exit_trade_history), axis=0)
+        trade_history = pd.merge(order_history, trade_history, on=["Column", "Order Id"])
+        trade_history = trade_history.sort_values(by=["Column", "Order Id", "Position Id"])
+        trade_history["Entry Trade Id"] = trade_history["Entry Trade Id"].fillna(-1).astype(int)
+        trade_history["Exit Trade Id"] = trade_history["Exit Trade Id"].fillna(-1).astype(int)
+        trade_history["Entry Trade Id"] = trade_history.pop("Entry Trade Id")
+        trade_history["Exit Trade Id"] = trade_history.pop("Exit Trade Id")
+        trade_history["Position Id"] = trade_history.pop("Position Id")
+        return trade_history
 
     @class_or_instancemethod
     def get_drawdowns(

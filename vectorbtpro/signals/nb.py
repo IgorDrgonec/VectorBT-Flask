@@ -148,15 +148,23 @@ def generate_ex_nb(
                 _last_exit_i = exit_place_func_nb(c, *args)
                 if _last_exit_i != -1:
                     last_exit_i = from_i + _last_exit_i
+                elif skip_until_exit:
+                    last_exit_i = -1
         return last_exit_i
 
     for col in prange(entries.shape[1]):
         from_i = -1
         last_exit_i = -1
+        should_stop = False
         for i in range(entries.shape[0]):
             if entries[i, col]:
                 last_exit_i = _place_exits(from_i, i, col, last_exit_i)
+                if skip_until_exit and last_exit_i == -1 and from_i != -1:
+                    should_stop = True
+                    break
                 from_i = i
+        if should_stop:
+            continue
         last_exit_i = _place_exits(from_i, entries.shape[0], col, last_exit_i)
     return out
 

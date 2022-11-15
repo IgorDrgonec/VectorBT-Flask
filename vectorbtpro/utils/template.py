@@ -38,6 +38,9 @@ class CustomTemplate:
 
     Checks against `sub_id` passed by `deep_substitute`."""
 
+    context_merge_kwargs: tp.KwargsLike = attr.ib(default=None)
+    """Keyword arguments passed to `vectorbtpro.utils.config.merge_dicts`."""
+
     def meets_sub_id(self, sub_id: tp.Optional[Hashable] = None) -> bool:
         """Return whether the substitution id of the template meets the global substitution id."""
         if self.sub_id is not None and sub_id is not None:
@@ -62,7 +65,26 @@ class CustomTemplate:
 
         template_cfg = settings["template"]
 
-        return merge_dicts(template_cfg["context"], dict(sub_id=sub_id, np=np, pd=pd, vbt=vbt), self.context, context)
+        context_merge_kwargs = self.context_merge_kwargs
+        if context_merge_kwargs is None:
+            context_merge_kwargs = {}
+        new_context = merge_dicts(
+            template_cfg["context"],
+            self.context,
+            context,
+            **context_merge_kwargs,
+        )
+        new_context = merge_dicts(
+            dict(
+                context=new_context,
+                sub_id=sub_id,
+                np=np,
+                pd=pd,
+                vbt=vbt,
+            ),
+            new_context,
+        )
+        return new_context
 
     def resolve_strict(self, strict: tp.Optional[bool] = None) -> bool:
         """Resolve `CustomTemplate.strict`.

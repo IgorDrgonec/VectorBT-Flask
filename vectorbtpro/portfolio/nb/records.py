@@ -40,13 +40,15 @@ def weighted_price_reduce_meta_nb(
 
 @register_jitted(cache=True)
 def fill_trade_record_nb(
-    new_records: tp.Record,
+    new_records: tp.RecordArray,
     r: int,
     col: int,
     size: float,
+    entry_order_id: int,
     entry_idx: int,
     entry_price: float,
     entry_fees: float,
+    exit_order_id: int,
     exit_idx: int,
     exit_price: float,
     exit_fees: float,
@@ -62,9 +64,11 @@ def fill_trade_record_nb(
     new_records["id"][r] = r
     new_records["col"][r] = col
     new_records["size"][r] = size
+    new_records["entry_order_id"][r] = entry_order_id
     new_records["entry_idx"][r] = entry_idx
     new_records["entry_price"][r] = entry_price
     new_records["entry_fees"][r] = entry_fees
+    new_records["exit_order_id"][r] = exit_order_id
     new_records["exit_idx"][r] = exit_idx
     new_records["exit_price"][r] = exit_price
     new_records["exit_fees"][r] = exit_fees
@@ -72,6 +76,7 @@ def fill_trade_record_nb(
     new_records["return"][r] = ret
     new_records["direction"][r] = direction
     new_records["status"][r] = status
+    new_records["parent_id"][r] = parent_id
     new_records["parent_id"][r] = parent_id
 
 
@@ -104,15 +109,17 @@ def fill_entry_trades_in_position_nb(
     # Iterate over orders located within a single position
     for c in range(first_c, last_c + 1):
         if c == -1:
+            entry_order_id = -1
             entry_idx = -1
-            entry_price = init_price
             entry_size = first_entry_size
+            entry_price = init_price
             entry_fees = first_entry_fees
         else:
             order_record = order_records[col_idxs[col_start_idxs[col] + c]]
-            order_side = order_record["side"]
+            entry_order_id = order_record["id"]
             entry_idx = order_record["idx"]
             entry_price = order_record["price"]
+            order_side = order_record["side"]
 
             # Ignore exit orders
             if (direction == TradeDirection.Long and order_side == OrderSide.Sell) or (
@@ -135,14 +142,21 @@ def fill_entry_trades_in_position_nb(
         exit_fees = size_fraction * exit_fees_sum
 
         # Fill the record
+        if status == TradeStatus.Closed:
+            exit_order_record = order_records[col_idxs[col_start_idxs[col] + last_c]]
+            exit_order_id = exit_order_record["id"]
+        else:
+            exit_order_id = -1
         fill_trade_record_nb(
             new_records,
             r,
             col,
             entry_size,
+            entry_order_id,
             entry_idx,
             entry_price,
             entry_fees,
+            exit_order_id,
             exit_idx,
             exit_price,
             exit_fees,
@@ -219,25 +233,35 @@ def get_entry_trades_nb(
         >>> col_map = col_map_nb(sim_out.order_records['col'], target_shape[1])
         >>> entry_trade_records = get_entry_trades_nb(sim_out.order_records, close, col_map)
         >>> pd.DataFrame.from_records(entry_trade_records)
-           id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-        0   0    0   1.0          0         1.01     0.01010         3    3.060000
-        1   1    0   0.1          1         2.02     0.00202         3    3.060000
-        2   2    0   1.0          4         5.05     0.05050         5    5.940000
-        3   3    0   1.0          5         5.94     0.05940         5    6.000000
-        4   0    1   1.0          0         5.94     0.05940         3    3.948182
-        5   1    1   0.1          1         4.95     0.00495         3    3.948182
-        6   2    1   1.0          4         1.98     0.01980         5    1.010000
-        7   3    1   1.0          5         1.01     0.01010         5    1.000000
+           id  col  size  entry_order_id  entry_idx  entry_price  entry_fees  \\
+        0   0    0   1.0               0          0         1.01     0.01010
+        1   1    0   0.1               1          1         2.02     0.00202
+        2   2    0   1.0               4          4         5.05     0.05050
+        3   3    0   1.0               5          5         5.94     0.05940
+        4   0    1   1.0               0          0         5.94     0.05940
+        5   1    1   0.1               1          1         4.95     0.00495
+        6   2    1   1.0               4          4         1.98     0.01980
+        7   3    1   1.0               5          5         1.01     0.01010
 
-           exit_fees       pnl    return  direction  status  parent_id
-        0   0.030600  2.009300  1.989406          0       1          0
-        1   0.003060  0.098920  0.489703          0       1          0
-        2   0.059400  0.780100  0.154475          0       1          1
-        3   0.000000 -0.119400 -0.020101          1       0          2
-        4   0.039482  1.892936  0.318676          1       1          0
-        5   0.003948  0.091284  0.184411          1       1          0
-        6   0.010100  0.940100  0.474798          1       1          1
-        7   0.000000 -0.020100 -0.019901          0       0          2
+           exit_order_id  exit_idx  exit_price  exit_fees       pnl    return  \\
+        0              3         3    3.060000   0.030600  2.009300  1.989406
+        1              3         3    3.060000   0.003060  0.098920  0.489703
+        2              5         5    5.940000   0.059400  0.780100  0.154475
+        3             -1         5    6.000000   0.000000 -0.119400 -0.020101
+        4              3         3    3.948182   0.039482  1.892936  0.318676
+        5              3         3    3.948182   0.003948  0.091284  0.184411
+        6              5         5    1.010000   0.010100  0.940100  0.474798
+        7             -1         5    1.000000   0.000000 -0.020100 -0.019901
+
+           direction  status  parent_id
+        0          0       1          0
+        1          0       1          0
+        2          0       1          1
+        3          1       0          2
+        4          1       1          0
+        5          1       1          0
+        6          1       1          1
+        7          0       0          2
         ```
     """
     col_idxs, col_lens = col_map
@@ -469,25 +493,35 @@ def get_exit_trades_nb(
 
         >>> exit_trade_records = get_exit_trades_nb(sim_out.order_records, close, col_map)
         >>> pd.DataFrame.from_records(exit_trade_records)
-           id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-        0   0    0   1.0          0     1.101818    0.011018         2        2.97
-        1   1    0   0.1          0     1.101818    0.001102         3        3.96
-        2   2    0   1.0          4     5.050000    0.050500         5        5.94
-        3   3    0   1.0          5     5.940000    0.059400         5        6.00
-        4   0    1   1.0          0     5.850000    0.058500         2        4.04
-        5   1    1   0.1          0     5.850000    0.005850         3        3.03
-        6   2    1   1.0          4     1.980000    0.019800         5        1.01
-        7   3    1   1.0          5     1.010000    0.010100         5        1.00
+           id  col  size  entry_order_id  entry_idx  entry_price  entry_fees  \\
+        0   0    0   1.0               0          0     1.101818    0.011018
+        1   1    0   0.1               0          0     1.101818    0.001102
+        2   2    0   1.0               4          4     5.050000    0.050500
+        3   3    0   1.0               5          5     5.940000    0.059400
+        4   0    1   1.0               0          0     5.850000    0.058500
+        5   1    1   0.1               0          0     5.850000    0.005850
+        6   2    1   1.0               4          4     1.980000    0.019800
+        7   3    1   1.0               5          5     1.010000    0.010100
 
-           exit_fees       pnl    return  direction  status  parent_id
-        0    0.02970  1.827464  1.658589          0       1          0
-        1    0.00396  0.280756  2.548119          0       1          0
-        2    0.05940  0.780100  0.154475          0       1          1
-        3    0.00000 -0.119400 -0.020101          1       0          2
-        4    0.04040  1.711100  0.292496          1       1          0
-        5    0.00303  0.273120  0.466872          1       1          0
-        6    0.01010  0.940100  0.474798          1       1          1
-        7    0.00000 -0.020100 -0.019901          0       0          2
+           exit_order_id  exit_idx  exit_price  exit_fees       pnl    return  \\
+        0              2         2        2.97    0.02970  1.827464  1.658589
+        1              3         3        3.96    0.00396  0.280756  2.548119
+        2              5         5        5.94    0.05940  0.780100  0.154475
+        3             -1         5        6.00    0.00000 -0.119400 -0.020101
+        4              2         2        4.04    0.04040  1.711100  0.292496
+        5              3         3        3.03    0.00303  0.273120  0.466872
+        6              5         5        1.01    0.01010  0.940100  0.474798
+        7             -1         5        1.00    0.00000 -0.020100 -0.019901
+
+           direction  status  parent_id
+        0          0       1          0
+        1          0       1          0
+        2          0       1          1
+        3          1       0          2
+        4          1       1          0
+        5          1       1          0
+        6          1       1          1
+        7          0       0          2
         ```
     """
     col_idxs, col_lens = col_map
@@ -503,6 +537,7 @@ def get_exit_trades_nb(
             # Prepare initial position
             in_position = True
             parent_id = 0
+            entry_order_id = -1
             entry_idx = -1
             if _init_position >= 0:
                 direction = TradeDirection.Long
@@ -528,6 +563,7 @@ def get_exit_trades_nb(
             last_id = order_record["id"]
 
             i = order_record["idx"]
+            order_id = order_record["id"]
             order_size = order_record["size"]
             order_price = order_record["price"]
             order_fees = order_record["fees"]
@@ -541,6 +577,7 @@ def get_exit_trades_nb(
             if not in_position:
                 # Trade opened
                 in_position = True
+                entry_order_id = order_id
                 entry_idx = i
                 if order_side == OrderSide.Buy:
                     direction = TradeDirection.Long
@@ -570,6 +607,7 @@ def get_exit_trades_nb(
                         exit_size = order_size
                     exit_price = order_price
                     exit_fees = order_fees
+                    exit_order_id = order_id
                     exit_idx = i
 
                     # Take a size-weighted average of entry price
@@ -584,9 +622,11 @@ def get_exit_trades_nb(
                         counts[col],
                         col,
                         exit_size,
+                        entry_order_id,
                         entry_idx,
                         entry_price,
                         entry_fees,
+                        exit_order_id,
                         exit_idx,
                         exit_price,
                         exit_fees,
@@ -598,6 +638,7 @@ def get_exit_trades_nb(
 
                     if is_close_nb(order_size, entry_size_sum):
                         # Position closed
+                        entry_order_id = -1
                         entry_idx = -1
                         direction = -1
                         in_position = False
@@ -613,6 +654,7 @@ def get_exit_trades_nb(
                     cl_exit_size = entry_size_sum
                     cl_exit_price = order_price
                     cl_exit_fees = cl_exit_size / order_size * order_fees
+                    cl_exit_order_id = order_id
                     cl_exit_idx = i
 
                     # Take a size-weighted average of entry price
@@ -627,9 +669,11 @@ def get_exit_trades_nb(
                         counts[col],
                         col,
                         cl_exit_size,
+                        entry_order_id,
                         entry_idx,
                         entry_price,
                         entry_fees,
+                        cl_exit_order_id,
                         cl_exit_idx,
                         cl_exit_price,
                         cl_exit_fees,
@@ -643,6 +687,7 @@ def get_exit_trades_nb(
                     entry_size_sum = order_size - cl_exit_size
                     entry_gross_sum = entry_size_sum * order_price
                     entry_fees_sum = order_fees - cl_exit_fees
+                    entry_order_id = order_id
                     entry_idx = i
                     if direction == TradeDirection.Long:
                         direction = TradeDirection.Short
@@ -661,6 +706,7 @@ def get_exit_trades_nb(
                         break
             exit_price = last_close
             exit_fees = 0.0
+            exit_order_id = -1
             exit_idx = close.shape[0] - 1
 
             # Take a size-weighted average of entry price
@@ -675,9 +721,11 @@ def get_exit_trades_nb(
                 counts[col],
                 col,
                 exit_size,
+                entry_order_id,
                 entry_idx,
                 entry_price,
                 entry_fees,
+                exit_order_id,
                 exit_idx,
                 exit_price,
                 exit_fees,
@@ -696,9 +744,11 @@ def fill_position_record_nb(new_records: tp.RecordArray, r: int, trade_records: 
     # Aggregate trades
     col = trade_records["col"][0]
     size = np.sum(trade_records["size"])
+    entry_order_id = trade_records["entry_order_id"][0]
     entry_idx = trade_records["entry_idx"][0]
     entry_price = np.sum(trade_records["size"] * trade_records["entry_price"]) / size
     entry_fees = np.sum(trade_records["entry_fees"])
+    exit_order_id = trade_records["exit_order_id"][-1]
     exit_idx = trade_records["exit_idx"][-1]
     exit_price = np.sum(trade_records["size"] * trade_records["exit_price"]) / size
     exit_fees = np.sum(trade_records["exit_fees"])
@@ -710,9 +760,11 @@ def fill_position_record_nb(new_records: tp.RecordArray, r: int, trade_records: 
     new_records["id"][r] = r
     new_records["col"][r] = col
     new_records["size"][r] = size
+    new_records["entry_order_id"][r] = entry_order_id
     new_records["entry_idx"][r] = entry_idx
     new_records["entry_price"][r] = entry_price
     new_records["entry_fees"][r] = entry_fees
+    new_records["exit_order_id"][r] = exit_order_id
     new_records["exit_idx"][r] = exit_idx
     new_records["exit_price"][r] = exit_price
     new_records["exit_fees"][r] = exit_fees
@@ -729,9 +781,11 @@ def copy_trade_record_nb(new_records: tp.RecordArray, r: int, trade_record: tp.R
     new_records["id"][r] = r
     new_records["col"][r] = trade_record["col"]
     new_records["size"][r] = trade_record["size"]
+    new_records["entry_order_id"][r] = trade_record["entry_order_id"]
     new_records["entry_idx"][r] = trade_record["entry_idx"]
     new_records["entry_price"][r] = trade_record["entry_price"]
     new_records["entry_fees"][r] = trade_record["entry_fees"]
+    new_records["exit_order_id"][r] = trade_record["exit_order_id"]
     new_records["exit_idx"][r] = trade_record["exit_idx"]
     new_records["exit_price"][r] = trade_record["exit_price"]
     new_records["exit_fees"][r] = trade_record["exit_fees"]
@@ -765,21 +819,29 @@ def get_positions_nb(trade_records: tp.RecordArray, col_map: tp.GroupMap) -> tp.
         >>> col_map = col_map_nb(exit_trade_records['col'], target_shape[1])
         >>> position_records = get_positions_nb(exit_trade_records, col_map)
         >>> pd.DataFrame.from_records(position_records)
-           id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-        0   0    0   1.1          0     1.101818     0.01212         3    3.060000
-        1   1    0   1.0          4     5.050000     0.05050         5    5.940000
-        2   2    0   1.0          5     5.940000     0.05940         5    6.000000
-        3   0    1   1.1          0     5.850000     0.06435         3    3.948182
-        4   1    1   1.0          4     1.980000     0.01980         5    1.010000
-        5   2    1   1.0          5     1.010000     0.01010         5    1.000000
+           id  col  size  entry_order_id  entry_idx  entry_price  entry_fees  \\
+        0   0    0   1.1               0          0     1.101818     0.01212
+        1   1    0   1.0               4          4     5.050000     0.05050
+        2   2    0   1.0               5          5     5.940000     0.05940
+        3   0    1   1.1               0          0     5.850000     0.06435
+        4   1    1   1.0               4          4     1.980000     0.01980
+        5   2    1   1.0               5          5     1.010000     0.01010
 
-           exit_fees      pnl    return  direction  status  parent_id
-        0    0.03366  2.10822  1.739455          0       1          0
-        1    0.05940  0.78010  0.154475          0       1          1
-        2    0.00000 -0.11940 -0.020101          1       0          2
-        3    0.04343  1.98422  0.308348          1       1          0
-        4    0.01010  0.94010  0.474798          1       1          1
-        5    0.00000 -0.02010 -0.019901          0       0          2
+           exit_order_id  exit_idx  exit_price  exit_fees      pnl    return  \\
+        0              3         3    3.060000    0.03366  2.10822  1.739455
+        1              5         5    5.940000    0.05940  0.78010  0.154475
+        2             -1         5    6.000000    0.00000 -0.11940 -0.020101
+        3              3         3    3.948182    0.04343  1.98422  0.308348
+        4              5         5    1.010000    0.01010  0.94010  0.474798
+        5             -1         5    1.000000    0.00000 -0.02010 -0.019901
+
+           direction  status  parent_id
+        0          0       1          0
+        1          0       1          1
+        2          1       0          2
+        3          1       1          0
+        4          1       1          1
+        5          0       0          2
         ```
     """
     col_idxs, col_lens = col_map
@@ -930,6 +992,57 @@ def sqn_reduce_nb(pnl_arr: tp.Array1d, ddof: int = 0) -> float:
     return np.sqrt(count) * mean / std
 
 
+@register_jitted(cache=True)
+def trade_best_worst_price_nb(
+    trade: tp.Record,
+    open: tp.Optional[tp.FlexArray],
+    high: tp.Optional[tp.FlexArray],
+    low: tp.Optional[tp.FlexArray],
+    close: tp.FlexArray,
+    entry_price_open: bool = False,
+    exit_price_close: bool = False,
+    max_duration: tp.Optional[int] = None,
+    flex_2d: bool = False,
+) -> tp.Tuple[float, float]:
+    """Best and worst price during a trade."""
+    from_i = trade["entry_idx"]
+    to_i = trade["exit_idx"]
+    trade_open = trade["status"] == TradeStatus.Open
+    trade_long = trade["direction"] == TradeDirection.Long
+
+    vmin = np.nan
+    vmax = np.nan
+    for i in range(from_i, to_i + 1):
+        if i > from_i or entry_price_open:
+            if open is not None:
+                _open = flex_select_auto_nb(open, i, trade["col"], flex_2d=flex_2d)
+                if np.isnan(vmin) or _open < vmin:
+                    vmin = _open
+                if np.isnan(vmax) or _open > vmax:
+                    vmax = _open
+        if (i > from_i or entry_price_open) and (i < to_i or exit_price_close or trade_open):
+            if low is not None:
+                _low = flex_select_auto_nb(low, i, trade["col"], flex_2d=flex_2d)
+                if np.isnan(vmin) or _low < vmin:
+                    vmin = _low
+            if high is not None:
+                _high = flex_select_auto_nb(high, i, trade["col"], flex_2d=flex_2d)
+                if np.isnan(vmax) or _high > vmax:
+                    vmax = _high
+        if i < to_i or exit_price_close or trade_open:
+            _close = flex_select_auto_nb(close, i, trade["col"], flex_2d=flex_2d)
+            if np.isnan(vmin) or _close < vmin:
+                vmin = _close
+            if np.isnan(vmax) or _close > vmax:
+                vmax = _close
+        if max_duration is not None:
+            if from_i + max_duration == i:
+                break
+    if trade_long:
+        return vmax, vmin
+    return vmin, vmax
+
+
 @register_chunkable(
     size=ch.ArraySizer(arg_query="records", axis=0),
     arg_take_spec=dict(
@@ -940,13 +1053,12 @@ def sqn_reduce_nb(pnl_arr: tp.Array1d, ddof: int = 0) -> float:
         close=None,
         entry_price_open=None,
         exit_price_close=None,
-        best_price=None,
         flex_2d=None,
     ),
     merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def best_worst_price_nb(
+def best_price_nb(
     records: tp.RecordArray,
     open: tp.Optional[tp.FlexArray],
     high: tp.Optional[tp.FlexArray],
@@ -954,54 +1066,83 @@ def best_worst_price_nb(
     close: tp.FlexArray,
     entry_price_open: bool = False,
     exit_price_close: bool = False,
-    best_price: bool = True,
     flex_2d: bool = False,
-) -> tp.RecordArray:
-    """Best or worst price during a trade."""
+) -> tp.Array1d:
+    """Get best price by applying `trade_best_worst_price_nb` on each trade."""
     out = np.empty(len(records), dtype=np.float_)
     for r in prange(len(records)):
         trade = records[r]
-        from_i = trade["entry_idx"]
-        to_i = trade["exit_idx"]
-        trade_open = trade["status"] == TradeStatus.Open
-        trade_long = trade["direction"] == TradeDirection.Long
-
-        vmin = np.nan
-        vmax = np.nan
-        for i in range(from_i, to_i + 1):
-            if i > from_i or entry_price_open:
-                if open is not None:
-                    _open = flex_select_auto_nb(open, i, trade["col"], flex_2d=flex_2d)
-                    if np.isnan(vmin) or _open < vmin:
-                        vmin = _open
-                    if np.isnan(vmax) or _open > vmax:
-                        vmax = _open
-            if (i > from_i or entry_price_open) and (i < to_i or exit_price_close or trade_open):
-                if low is not None:
-                    _low = flex_select_auto_nb(low, i, trade["col"], flex_2d=flex_2d)
-                    if np.isnan(vmin) or _low < vmin:
-                        vmin = _low
-                if high is not None:
-                    _high = flex_select_auto_nb(high, i, trade["col"], flex_2d=flex_2d)
-                    if np.isnan(vmax) or _high > vmax:
-                        vmax = _high
-            if i < to_i or exit_price_close or trade_open:
-                _close = flex_select_auto_nb(close, i, trade["col"], flex_2d=flex_2d)
-                if np.isnan(vmin) or _close < vmin:
-                    vmin = _close
-                if np.isnan(vmax) or _close > vmax:
-                    vmax = _close
-        if best_price:
-            if trade_long:
-                out[r] = vmax
-            else:
-                out[r] = vmin
-        else:
-            if trade_long:
-                out[r] = vmin
-            else:
-                out[r] = vmax
+        out[r] = trade_best_worst_price_nb(
+            trade=trade,
+            open=open,
+            high=high,
+            low=low,
+            close=close,
+            entry_price_open=entry_price_open,
+            exit_price_close=exit_price_close,
+            flex_2d=flex_2d,
+        )[0]
     return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="records", axis=0),
+    arg_take_spec=dict(
+        records=ch.ArraySlicer(axis=0),
+        open=None,
+        high=None,
+        low=None,
+        close=None,
+        entry_price_open=None,
+        exit_price_close=None,
+        flex_2d=None,
+    ),
+    merge_func="concat",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def worst_price_nb(
+    records: tp.RecordArray,
+    open: tp.Optional[tp.FlexArray],
+    high: tp.Optional[tp.FlexArray],
+    low: tp.Optional[tp.FlexArray],
+    close: tp.FlexArray,
+    entry_price_open: bool = False,
+    exit_price_close: bool = False,
+    flex_2d: bool = False,
+) -> tp.Array1d:
+    """Get worst price by applying `trade_best_worst_price_nb` on each trade."""
+    out = np.empty(len(records), dtype=np.float_)
+    for r in prange(len(records)):
+        trade = records[r]
+        out[r] = trade_best_worst_price_nb(
+            trade=trade,
+            open=open,
+            high=high,
+            low=low,
+            close=close,
+            entry_price_open=entry_price_open,
+            exit_price_close=exit_price_close,
+            flex_2d=flex_2d,
+        )[1]
+    return out
+
+
+@register_jitted(cache=True)
+def trade_mfe_nb(
+    size: float,
+    direction: int,
+    entry_price: float,
+    best_price: float,
+    use_returns: bool = False,
+) -> float:
+    """Compute Maximum Favorable Excursion (MFE)."""
+    if direction == TradeDirection.Long:
+        if use_returns:
+            return (best_price - entry_price) / entry_price
+        return (best_price - entry_price) * size
+    if use_returns:
+        return (entry_price - best_price) / best_price
+    return (entry_price - best_price) * size
 
 
 @register_chunkable(
@@ -1022,20 +1163,35 @@ def mfe_nb(
     best_price: tp.Array1d,
     use_returns: bool = False,
 ) -> tp.Array1d:
-    """Compute Maximum Favorable Excursion (MFE)."""
+    """Apply `trade_mfe_nb` on each trade."""
     out = np.empty(size.shape[0], dtype=np.float_)
     for r in prange(size.shape[0]):
-        if direction[r] == TradeDirection.Long:
-            if use_returns:
-                out[r] = (best_price[r] - entry_price[r]) / entry_price[r]
-            else:
-                out[r] = (best_price[r] - entry_price[r]) * size[r]
-        else:
-            if use_returns:
-                out[r] = (entry_price[r] - best_price[r]) / best_price[r]
-            else:
-                out[r] = (entry_price[r] - best_price[r]) * size[r]
+        out[r] = trade_mfe_nb(
+            size=size[r],
+            direction=direction[r],
+            entry_price=entry_price[r],
+            best_price=best_price[r],
+            use_returns=use_returns,
+        )
     return out
+
+
+@register_jitted(cache=True)
+def trade_mae_nb(
+    size: float,
+    direction: int,
+    entry_price: float,
+    worst_price: float,
+    use_returns: bool = False,
+) -> float:
+    """Compute Maximum Adverse Excursion (MAE)."""
+    if direction == TradeDirection.Long:
+        if use_returns:
+            return (worst_price - entry_price) / entry_price
+        return (worst_price - entry_price) * size
+    if use_returns:
+        return (entry_price - worst_price) / worst_price
+    return (entry_price - worst_price) * size
 
 
 @register_chunkable(
@@ -1056,17 +1212,235 @@ def mae_nb(
     worst_price: tp.Array1d,
     use_returns: bool = False,
 ) -> tp.Array1d:
-    """Compute Maximum Adverse Excursion (MAE)."""
+    """Apply `trade_mae_nb` on each trade."""
     out = np.empty(size.shape[0], dtype=np.float_)
     for r in prange(size.shape[0]):
-        if direction[r] == TradeDirection.Long:
-            if use_returns:
-                out[r] = (worst_price[r] - entry_price[r]) / entry_price[r]
+        out[r] = trade_mae_nb(
+            size=size[r],
+            direction=direction[r],
+            entry_price=entry_price[r],
+            worst_price=worst_price[r],
+            use_returns=use_returns,
+        )
+    return out
+
+
+@register_chunkable(
+    size=base_ch.GroupLensSizer(arg_query="col_map"),
+    arg_take_spec=dict(
+        records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
+        col_map=base_ch.GroupMapSlicer(),
+        open=None,
+        high=None,
+        low=None,
+        close=None,
+        volatility=None,
+        entry_price_open=None,
+        exit_price_close=None,
+        max_duration=None,
+        flex_2d=None,
+    ),
+    merge_func="concat",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def edge_ratio_nb(
+    records: tp.RecordArray,
+    col_map: tp.GroupMap,
+    open: tp.Optional[tp.FlexArray],
+    high: tp.Optional[tp.FlexArray],
+    low: tp.Optional[tp.FlexArray],
+    close: tp.FlexArray,
+    volatility: tp.FlexArray,
+    entry_price_open: bool = False,
+    exit_price_close: bool = False,
+    max_duration: tp.Optional[int] = None,
+    flex_2d: bool = False,
+) -> tp.Array1d:
+    """Get edge ratio of each column."""
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+    out = np.full(len(col_lens), np.nan, dtype=np.float_)
+
+    for col in prange(col_lens.shape[0]):
+        col_len = col_lens[col]
+        if col_len == 0:
+            continue
+        col_start_idx = col_start_idxs[col]
+        ridxs = col_idxs[col_start_idx : col_start_idx + col_len]
+
+        norm_mfe_sum = 0.0
+        norm_mfe_cnt = 0
+        norm_mae_sum = 0.0
+        norm_mae_cnt = 0
+        for r in ridxs:
+            trade = records[r]
+            best_price, worst_price = trade_best_worst_price_nb(
+                trade=trade,
+                open=open,
+                high=high,
+                low=low,
+                close=close,
+                entry_price_open=entry_price_open,
+                exit_price_close=exit_price_close,
+                max_duration=max_duration,
+                flex_2d=flex_2d,
+            )
+            mfe = abs(trade_mfe_nb(
+                size=trade["size"],
+                direction=trade["direction"],
+                entry_price=trade["entry_price"],
+                best_price=best_price,
+                use_returns=False,
+            ))
+            mae = abs(trade_mae_nb(
+                size=trade["size"],
+                direction=trade["direction"],
+                entry_price=trade["entry_price"],
+                worst_price=worst_price,
+                use_returns=False,
+            ))
+            _volatility = flex_select_auto_nb(volatility, trade["entry_idx"], trade["col"], flex_2d=flex_2d)
+            if _volatility == 0:
+                norm_mfe = np.nan
+                norm_mae = np.nan
             else:
-                out[r] = (worst_price[r] - entry_price[r]) * size[r]
+                norm_mfe = mfe / _volatility
+                norm_mae = mae / _volatility
+            if not np.isnan(norm_mfe):
+                norm_mfe_sum += norm_mfe
+                norm_mfe_cnt += 1
+            if not np.isnan(norm_mae):
+                norm_mae_sum += norm_mae
+                norm_mae_cnt += 1
+        if norm_mfe_cnt == 0:
+            mean_mfe = np.nan
         else:
-            if use_returns:
-                out[r] = (entry_price[r] - worst_price[r]) / worst_price[r]
+            mean_mfe = norm_mfe_sum / norm_mfe_cnt
+        if norm_mae_cnt == 0:
+            mean_mae = np.nan
+        else:
+            mean_mae = norm_mae_sum / norm_mae_cnt
+        if mean_mae == 0:
+            out[col] = np.nan
+        else:
+            out[col] = mean_mfe / mean_mae
+    return out
+
+
+@register_chunkable(
+    size=base_ch.GroupLensSizer(arg_query="col_map"),
+    arg_take_spec=dict(
+        records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
+        col_map=base_ch.GroupMapSlicer(),
+        open=None,
+        high=None,
+        low=None,
+        close=None,
+        volatility=None,
+        entry_price_open=None,
+        exit_price_close=None,
+        max_duration=None,
+        incl_shorter=None,
+        flex_2d=None,
+    ),
+    merge_func="concat",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def running_edge_ratio_nb(
+    records: tp.RecordArray,
+    col_map: tp.GroupMap,
+    open: tp.Optional[tp.FlexArray],
+    high: tp.Optional[tp.FlexArray],
+    low: tp.Optional[tp.FlexArray],
+    close: tp.FlexArray,
+    volatility: tp.FlexArray,
+    entry_price_open: bool = False,
+    exit_price_close: bool = False,
+    max_duration: tp.Optional[int] = None,
+    incl_shorter: bool = False,
+    flex_2d: bool = False,
+) -> tp.Array2d:
+    """Get running edge ratio of each column."""
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+
+    if max_duration is None:
+        _max_duration = 0
+        for r in range(len(records)):
+            trade = records[r]
+            trade_duration = trade["exit_idx"] - trade["entry_idx"]
+            if trade_duration > _max_duration:
+                _max_duration = trade_duration
+    else:
+        _max_duration = max_duration
+    out = np.full((_max_duration, len(col_lens)), np.nan, dtype=np.float_)
+
+    for col in prange(col_lens.shape[0]):
+        col_len = col_lens[col]
+        if col_len == 0:
+            continue
+        col_start_idx = col_start_idxs[col]
+        ridxs = col_idxs[col_start_idx : col_start_idx + col_len]
+
+        for k in range(_max_duration):
+            norm_mfe_sum = 0.0
+            norm_mfe_cnt = 0
+            norm_mae_sum = 0.0
+            norm_mae_cnt = 0
+            for r in ridxs:
+                trade = records[r]
+                if not incl_shorter:
+                    trade_duration = trade["exit_idx"] - trade["entry_idx"]
+                    if trade_duration < k + 1:
+                        continue
+                best_price, worst_price = trade_best_worst_price_nb(
+                    trade=trade,
+                    open=open,
+                    high=high,
+                    low=low,
+                    close=close,
+                    entry_price_open=entry_price_open,
+                    exit_price_close=exit_price_close,
+                    max_duration=k + 1,
+                    flex_2d=flex_2d,
+                )
+                mfe = abs(trade_mfe_nb(
+                    size=trade["size"],
+                    direction=trade["direction"],
+                    entry_price=trade["entry_price"],
+                    best_price=best_price,
+                    use_returns=False,
+                ))
+                mae = abs(trade_mae_nb(
+                    size=trade["size"],
+                    direction=trade["direction"],
+                    entry_price=trade["entry_price"],
+                    worst_price=worst_price,
+                    use_returns=False,
+                ))
+                _volatility = flex_select_auto_nb(volatility, trade["entry_idx"], trade["col"], flex_2d=flex_2d)
+                if _volatility == 0:
+                    norm_mfe = np.nan
+                    norm_mae = np.nan
+                else:
+                    norm_mfe = mfe / _volatility
+                    norm_mae = mae / _volatility
+                if not np.isnan(norm_mfe):
+                    norm_mfe_sum += norm_mfe
+                    norm_mfe_cnt += 1
+                if not np.isnan(norm_mae):
+                    norm_mae_sum += norm_mae
+                    norm_mae_cnt += 1
+            if norm_mfe_cnt == 0:
+                mean_mfe = np.nan
             else:
-                out[r] = (entry_price[r] - worst_price[r]) * size[r]
+                mean_mfe = norm_mfe_sum / norm_mfe_cnt
+            if norm_mae_cnt == 0:
+                mean_mae = np.nan
+            else:
+                mean_mae = norm_mae_sum / norm_mae_cnt
+            if mean_mae == 0:
+                out[k, col] = np.nan
+            else:
+                out[k, col] = mean_mfe / mean_mae
     return out

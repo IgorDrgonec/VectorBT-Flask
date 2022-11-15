@@ -191,20 +191,45 @@ def ann_args_to_args(ann_args: tp.AnnArgs) -> tp.Tuple[tp.Args, tp.Kwargs]:
 
 def flatten_ann_args(ann_args: tp.AnnArgs) -> tp.FlatAnnArgs:
     """Flatten annotated arguments."""
-    flat_ann_args = []
+    flat_ann_args = {}
     for arg_name, ann_arg in ann_args.items():
         if ann_arg["kind"] == inspect.Parameter.VAR_POSITIONAL:
-            for v in ann_arg["value"]:
-                flat_ann_args.append(dict(name=arg_name, kind=ann_arg["kind"], value=v))
+            for i, v in enumerate(ann_arg["value"]):
+                flat_ann_args[f"{arg_name}_{i}"] = dict(var_name=arg_name, kind=ann_arg["kind"], value=v)
         elif ann_arg["kind"] == inspect.Parameter.VAR_KEYWORD:
             for var_arg_name, var_value in ann_arg["value"].items():
-                flat_ann_args.append(dict(name=var_arg_name, kind=ann_arg["kind"], value=var_value))
+                flat_ann_args[var_arg_name] = dict(var_name=arg_name, kind=ann_arg["kind"], value=var_value)
         else:
-            flat_ann_args.append(dict(name=arg_name, kind=ann_arg["kind"], value=ann_arg["value"]))
+            flat_ann_args[arg_name] = dict(kind=ann_arg["kind"], value=ann_arg["value"])
     return flat_ann_args
 
 
-def match_ann_arg(ann_args: tp.AnnArgs, query: tp.AnnArgQuery) -> tp.Any:
+def unflatten_ann_args(flat_ann_args: tp.FlatAnnArgs) -> tp.AnnArgs:
+    """Unflatten annotated arguments."""
+    ann_args = dict()
+    for arg_name, ann_arg in flat_ann_args.items():
+        ann_arg = dict(ann_arg)
+        if ann_arg["kind"] == inspect.Parameter.VAR_POSITIONAL:
+            var_arg_name = ann_arg.pop("var_name")
+            if var_arg_name not in ann_args:
+                ann_args[var_arg_name] = dict(value=(), kind=ann_arg["kind"])
+            ann_args[var_arg_name]["value"] = ann_args[var_arg_name]["value"] + (ann_arg["value"],)
+        elif ann_arg["kind"] == inspect.Parameter.VAR_KEYWORD:
+            var_arg_name = ann_arg.pop("var_name")
+            if var_arg_name not in ann_args:
+                ann_args[var_arg_name] = dict(value={}, kind=ann_arg["kind"])
+            ann_args[var_arg_name]["value"][arg_name] = ann_arg["value"]
+        else:
+            ann_args[arg_name] = ann_arg
+    return ann_args
+
+
+def match_ann_arg(
+    ann_args: tp.AnnArgs,
+    query: tp.AnnArgQuery,
+    return_name: bool = False,
+    return_index: bool = False,
+) -> tp.Any:
     """Match an argument from annotated arguments.
 
     A query can be an integer indicating the position of the argument, or a string containing the name
@@ -213,39 +238,38 @@ def match_ann_arg(ann_args: tp.AnnArgs, query: tp.AnnArgQuery) -> tp.Any:
     If multiple arguments were matched, returns the first one.
 
     The position can stretch over any variable argument."""
+    if return_name and return_index:
+        raise ValueError("Either return_name or return_index can be provided, not both")
     flat_ann_args = flatten_ann_args(ann_args)
-    if isinstance(query, int):
-        return flat_ann_args[query]["value"]
-    if isinstance(query, str):
-        for arg in flat_ann_args:
-            if query == arg["name"]:
-                return arg["value"]
-        raise KeyError(f"Query '{query}' could not be matched with any argument")
-    if isinstance(query, Regex):
-        for arg in flat_ann_args:
-            if query.matches(arg["name"]):
-                return arg["value"]
-        raise KeyError(f"Query '{query}' could not be matched with any argument")
-    raise TypeError(f"Query of type {type(query)} is not supported")
+    for i, (arg_name, ann_arg) in enumerate(flat_ann_args.items()):
+        if (
+            (isinstance(query, int) and query == i)
+            or (isinstance(query, str) and query == arg_name)
+            or (isinstance(query, Regex) and query.matches(arg_name))
+        ):
+            if return_name:
+                return arg_name
+            if return_index:
+                return i
+            return ann_arg["value"]
+    raise KeyError(f"Query '{query}' could not be matched with any argument")
 
 
 def ignore_flat_ann_args(flat_ann_args: tp.FlatAnnArgs, ignore_args: tp.Iterable[tp.AnnArgQuery]) -> tp.FlatAnnArgs:
     """Ignore flattened annotated arguments."""
-    new_flat_ann_args = []
-    for i, arg in enumerate(flat_ann_args):
+    new_flat_ann_args = {}
+    for i, (arg_name, arg) in enumerate(flat_ann_args.items()):
         arg_matched = False
         for ignore_arg in ignore_args:
-            if isinstance(ignore_arg, int) and ignore_arg == i:
-                arg_matched = True
-                break
-            if isinstance(ignore_arg, str) and ignore_arg == arg["name"]:
-                arg_matched = True
-                break
-            if isinstance(ignore_arg, Regex) and ignore_arg.matches(arg["name"]):
+            if (
+                (isinstance(ignore_arg, int) and ignore_arg == i)
+                or (isinstance(ignore_arg, str) and ignore_arg == arg_name)
+                or (isinstance(ignore_arg, Regex) and ignore_arg.matches(arg_name))
+            ):
                 arg_matched = True
                 break
         if not arg_matched:
-            new_flat_ann_args.append(arg)
+            new_flat_ann_args[arg_name] = arg
     return new_flat_ann_args
 
 
@@ -271,7 +295,7 @@ def hash_args(
     if len(ignore_args) > 0:
         flat_ann_args = ignore_flat_ann_args(flat_ann_args, ignore_args)
     try:
-        return hash(tuple(map(lambda x: (x["name"], x["value"]), flat_ann_args)))
+        return hash(tuple(map(lambda x: (x[0], x[1]["value"]), flat_ann_args.items())))
     except TypeError:
         raise UnhashableArgsError
 

@@ -339,7 +339,7 @@ def map_ranges_to_projections_nb(
     proj_period: tp.Optional[int] = None,
     proj_period_use_index: bool = False,
     incl_end_idx: bool = True,
-    stretch: bool = False,
+    extend: bool = False,
     rebase: bool = True,
     start_value: tp.FlexArray = np.asarray(1.0),
     ffill: bool = False,
@@ -390,7 +390,7 @@ def map_ranges_to_projections_nb(
                         break
             else:
                 r_proj_period = proj_period
-            if stretch:
+            if extend:
                 r_end_idx = r_start_idx + r_proj_period
             else:
                 r_end_idx = min(start_idx_arr[r] + r_duration, r_start_idx + r_proj_period)
@@ -409,7 +409,7 @@ def map_ranges_to_projections_nb(
 
     k = 0
     for r in range(start_idx_arr.shape[0]):
-        if stretch:
+        if extend:
             r_start_idx = index_ranges_temp[r, 0]
             r_end_idx = index_ranges_temp[r, 0] + proj_out.shape[1]
         else:

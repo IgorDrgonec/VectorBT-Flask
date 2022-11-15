@@ -209,7 +209,7 @@ MappingLike = Union[str, Mapping, NamedTuple, EnumMeta, IndexLike]
 
 # Parsing
 AnnArgs = Dict[str, Kwargs]
-FlatAnnArgs = List[Kwargs]
+FlatAnnArgs = Dict[str, Kwargs]
 AnnArgQuery = Union[int, str, Regex]
 
 # Execution

@@ -38,6 +38,8 @@ def clean_labels(labels: tp.Labels) -> tp.Labels:
     Plotly doesn't support multi-indexes."""
     if isinstance(labels, pd.MultiIndex):
         labels = labels.to_flat_index()
+    if isinstance(labels, pd.PeriodIndex):
+        labels = labels.map(str)
     if len(labels) > 0 and isinstance(labels[0], tuple):
         labels = list(map(str, labels))
     return labels
@@ -917,7 +919,7 @@ class Heatmap(Configured, TraceUpdater):
 
     def update(self, data: tp.ArrayLike) -> None:
         with self.fig.batch_update():
-            self.update_trace(trace, data)
+            self.update_trace(self.traces[0], data)
 
 
 class Volume(Configured, TraceUpdater):
@@ -1071,4 +1073,4 @@ class Volume(Configured, TraceUpdater):
 
     def update(self, data: tp.ArrayLike) -> None:
         with self.fig.batch_update():
-            self.update_trace(trace, data)
+            self.update_trace(self.traces[0], data)
