@@ -10200,6 +10200,37 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         """Plot one column/group of trade PnL."""
         return self.trades.regroup(False).plot_pnl(column=column, **kwargs)
 
+    def plot_trade_signals(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        long_entry_trace_kwargs: tp.KwargsLike = None,
+        short_entry_trace_kwargs: tp.KwargsLike = None,
+        long_exit_trace_kwargs: tp.KwargsLike = None,
+        short_exit_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **kwargs,
+    ) -> tp.BaseFigure:
+        """Plot one column/group of trade signals."""
+        fig = self.entry_trades.plot_signals(
+            column=column,
+            long_entry_trace_kwargs=long_entry_trace_kwargs,
+            short_entry_trace_kwargs=short_entry_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+            **kwargs,
+        )
+        fig = self.exit_trades.plot_signals(
+            column=column,
+            plot_ohlc=False,
+            plot_close=False,
+            long_exit_trace_kwargs=long_exit_trace_kwargs,
+            short_exit_trace_kwargs=short_exit_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
+        return fig
+
     def plot_positions(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
         """Plot one column/group of positions."""
         kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
