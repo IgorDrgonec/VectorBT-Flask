@@ -2176,8 +2176,12 @@ class EntryTrades(Trades):
                             mode="markers",
                             marker=dict(
                                 symbol="circle",
-                                color=color,
-                                size=8,
+                                color="rgba(0, 0, 0, 0)",
+                                size=15,
+                                line=dict(
+                                    color=color,
+                                    width=2,
+                                ),
                             ),
                             name=name,
                             customdata=entry_customdata,
@@ -2393,12 +2397,8 @@ class ExitTrades(Trades):
                             mode="markers",
                             marker=dict(
                                 symbol="circle",
-                                color="rgba(0, 0, 0, 0)",
-                                size=15,
-                                line=dict(
-                                    color=color,
-                                    width=2,
-                                ),
+                                color=color,
+                                size=8,
                             ),
                             name=name,
                             customdata=exit_customdata,
@@ -2413,7 +2413,7 @@ class ExitTrades(Trades):
             _plot_exit_markers(
                 direction == TradeDirection.Long,
                 "Long Exit",
-                plotting_cfg["contrast_color_schema"]["red"],
+                plotting_cfg["contrast_color_schema"]["green"],
                 long_exit_trace_kwargs,
             )
 
@@ -2421,7 +2421,7 @@ class ExitTrades(Trades):
             _plot_exit_markers(
                 direction == TradeDirection.Short,
                 "Short Exit",
-                plotting_cfg["contrast_color_schema"]["green"],
+                plotting_cfg["contrast_color_schema"]["red"],
                 short_exit_trace_kwargs,
             )
 
