@@ -191,6 +191,8 @@ __pdoc__[
 
 ranges_shortcut_config = ReadonlyConfig(
     dict(
+        valid=dict(),
+        invalid=dict(),
         first_pd_mask=dict(obj_type="array"),
         last_pd_mask=dict(obj_type="array"),
         ranges_pd_mask=dict(obj_type="array"),
@@ -412,6 +414,20 @@ class Ranges(PriceRecords):
         return self.wrapper.wrap(mask, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     # ############# Stats ############# #
+
+    def get_valid(self: RangesT, **kwargs) -> RangesT:
+        """Get valid ranges.
+
+        A valid range doesn't have the start and end index set to -1."""
+        filter_mask = (self.get_field_arr("start_idx") != -1) & (self.get_field_arr("end_idx") != -1)
+        return self.apply_mask(filter_mask, **kwargs)
+
+    def get_invalid(self: RangesT, **kwargs) -> RangesT:
+        """Get invalid ranges.
+
+        An invalid range has the start and/or end index set to -1."""
+        filter_mask = (self.get_field_arr("start_idx") == -1) | (self.get_field_arr("end_idx") == -1)
+        return self.apply_mask(filter_mask, **kwargs)
 
     def get_first_idx(self, **kwargs):
         """Get the first index in each range."""
@@ -1162,11 +1178,11 @@ class Ranges(PriceRecords):
             )
 
         if self_col.count() > 0:
-            start_idx_arr = self_col.get_field_arr("start_idx")
-            end_idx_arr = self_col.get_field_arr("end_idx")
+            start_idx = self_col.get_map_field_to_index("start_idx", minus_one_to_zero=True)
+            end_idx = self_col.get_map_field_to_index("end_idx")
             for i in range(len(self_col.values)):
-                start_index = self_col.wrapper.index[start_idx_arr[i]]
-                end_index = self_col.wrapper.index[end_idx_arr[i]]
+                start_index = start_idx[i]
+                end_index = end_idx[i]
                 _shape_kwargs = deep_substitute(
                     shape_kwargs,
                     context=dict(
@@ -1352,8 +1368,7 @@ class Ranges(PriceRecords):
 
         if self_col.count() > 0:
             # Extract information
-            id_ = self_col.get_field_arr("id")
-            start_idx = self_col.get_map_field_to_index("start_idx")
+            start_idx = self_col.get_map_field_to_index("start_idx", minus_one_to_zero=True)
             if plotting_ohlc and self_col.open is not None:
                 start_val = self_col.open.loc[start_idx]
             elif close is not None:
@@ -2120,7 +2135,7 @@ class PatternRanges(Ranges):
 
         if self_col.count() > 0:
             # Extract information
-            start_idx = self_col.get_map_field_to_index("start_idx")
+            start_idx = self_col.get_map_field_to_index("start_idx", minus_one_to_zero=True)
             end_idx = self_col.get_map_field_to_index("end_idx")
             status = self_col.get_field_arr("status")
 

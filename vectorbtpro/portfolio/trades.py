@@ -656,12 +656,12 @@ class Trades(Ranges):
 
     def get_winning(self: TradesT, **kwargs) -> TradesT:
         """Get winning trades."""
-        filter_mask = self.values["pnl"] > 0.0
+        filter_mask = self.get_field_arr("pnl") > 0.0
         return self.apply_mask(filter_mask, **kwargs)
 
     def get_losing(self: TradesT, **kwargs) -> TradesT:
         """Get losing trades."""
-        filter_mask = self.values["pnl"] < 0.0
+        filter_mask = self.get_field_arr("pnl") < 0.0
         return self.apply_mask(filter_mask, **kwargs)
 
     def get_winning_streak(self, **kwargs) -> MappedArray:

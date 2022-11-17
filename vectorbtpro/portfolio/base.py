@@ -9912,6 +9912,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             that is an instance of `vectorbtpro.portfolio.trades.Trades`."""
         if "incl_open" in final_kwargs:
             if isinstance(out, Trades) and not final_kwargs["incl_open"]:
+                print("here")
                 out = out.status_closed
         return out
 
@@ -10186,20 +10187,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
     # ############# Plotting ############# #
 
-    def plot_orders(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
-        """Plot one column/group of orders."""
-        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
-        return self.orders.regroup(False).plot(column=column, **kwargs)
-
-    def plot_trades(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
-        """Plot one column/group of trades."""
-        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
-        return self.trades.regroup(False).plot(column=column, **kwargs)
-
-    def plot_trade_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
-        """Plot one column/group of trade PnL."""
-        return self.trades.regroup(False).plot_pnl(column=column, **kwargs)
-
     def plot_trade_signals(
         self,
         column: tp.Optional[tp.Label] = None,
@@ -10221,7 +10208,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         plotting_cfg = settings["plotting"]
 
-        fig = self.entry_trades.plot_signals(
+        entry_trades = self.resolve_shortcut_attr("entry_trades")
+        exit_trades = self.resolve_shortcut_attr("exit_trades")
+        positions = self.resolve_shortcut_attr("positions")
+
+        fig = entry_trades.plot_signals(
             column=column,
             long_entry_trace_kwargs=long_entry_trace_kwargs,
             short_entry_trace_kwargs=short_entry_trace_kwargs,
@@ -10229,7 +10220,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             fig=fig,
             **kwargs,
         )
-        fig = self.exit_trades.plot_signals(
+        fig = exit_trades.plot_signals(
             column=column,
             plot_ohlc=False,
             plot_close=False,
@@ -10244,7 +10235,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             else:
                 plot_positions = None
         if plot_positions is not None:
-            positions = self.positions
             if plot_positions.lower() == "zones":
                 long_shape_kwargs = merge_dicts(
                     dict(fillcolor=plotting_cfg["contrast_color_schema"]["green"]),
@@ -10299,15 +10289,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 fig=fig,
             )
         return fig
-
-    def plot_positions(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
-        """Plot one column/group of positions."""
-        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
-        return self.positions.regroup(False).plot(column=column, **kwargs)
-
-    def plot_position_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
-        """Plot one column/group of position PnL."""
-        return self.positions.regroup(False).plot_pnl(column=column, **kwargs)
 
     def plot_asset_flow(
         self,
@@ -10945,6 +10926,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 yaxis_kwargs=dict(title="Trade PnL"),
                 check_is_not_grouped=True,
                 plot_func="trades.plot_pnl",
+                tags=["portfolio", "trades"],
+            ),
+            trade_signals=dict(
+                title="Trade Signals",
+                yaxis_kwargs=dict(title="Trade Signals"),
+                check_is_not_grouped=True,
+                plot_func="plot_trade_signals",
                 tags=["portfolio", "trades"],
             ),
             asset_flow=dict(
