@@ -148,6 +148,7 @@ from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.params import combine_params, Param
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.parsing import get_func_kwargs
+from vectorbtpro.utils.template import deep_substitute
 
 __pdoc__ = {}
 
@@ -779,8 +780,8 @@ class Ranges(PriceRecords):
             plot_past_period (str, int, or frequency_like): Past period to plot.
 
                 Allows the same options as `proj_period` plus "proj_period" and "current_or_proj_period".
-            plot_ohlc (bool): Whether to plot OHLC.
-            plot_close (bool): Whether to plot close.
+            plot_ohlc (bool or DataFrame): Whether to plot OHLC.
+            plot_close (bool or Series): Whether to plot close.
             plot_projections (bool): See `vectorbtpro.generic.accessors.GenericDFAccessor.plot_projections`.
             plot_bands (bool): See `vectorbtpro.generic.accessors.GenericDFAccessor.plot_projections`.
             plot_lower (bool, str, or callable): See `vectorbtpro.generic.accessors.GenericDFAccessor.plot_projections`.
@@ -805,10 +806,12 @@ class Ranges(PriceRecords):
 
         Usage:
             ```pycon
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+
             >>> price = pd.Series(
             ...     [11, 12, 13, 14, 11, 12, 13, 12, 11, 12],
             ...     index=pd.date_range("2020", periods=10),
-            ...     name='Price'
             ... )
             >>> vbt.Ranges.from_array(
             ...     price >= 12,
@@ -1027,11 +1030,185 @@ class Ranges(PriceRecords):
 
         return fig
 
+    def plot_shapes(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        plot_ohlc: tp.Union[bool, tp.Frame] = True,
+        plot_close: tp.Union[bool, tp.Series] = True,
+        ohlc_type: tp.Union[None, str, tp.BaseTraceType] = None,
+        ohlc_trace_kwargs: tp.KwargsLike = None,
+        close_trace_kwargs: tp.KwargsLike = None,
+        shape_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        xref: str = "x",
+        yref: str = "y",
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:
+        """Plot range shapes.
+
+        Args:
+            column (str): Name of the column to plot.
+            plot_ohlc (bool or DataFrame): Whether to plot OHLC.
+            plot_close (bool or Series): Whether to plot close.
+            ohlc_type: Either 'OHLC', 'Candlestick' or Plotly trace.
+
+                Pass None to use the default.
+            ohlc_trace_kwargs (dict): Keyword arguments passed to `ohlc_type`.
+            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `Ranges.close`.
+            shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for shapes.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
+            xref (str): X coordinate axis.
+            yref (str): Y coordinate axis.
+            fig (Figure or FigureWidget): Figure to add traces to.
+            **layout_kwargs: Keyword arguments for layout.
+
+        Usage:
+            * Plot zones colored by duration:
+
+            ```pycon
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+
+            >>> price = pd.Series(
+            ...     [1, 2, 1, 2, 3, 2, 1, 2, 3],
+            ...     index=pd.date_range("2020", periods=9),
+            ... )
+
+            >>> def get_opacity(self_col, i):
+            ...     real_duration = self_col.get_real_duration().values
+            ...     return real_duration[i] / real_duration.max() * 0.5
+
+            >>> vbt.Ranges.from_array(price >= 2).plot_shapes(
+            ...     shape_kwargs=dict(fillcolor="teal", opacity=vbt.RepFunc(get_opacity))
+            ... )
+            ```
+
+            ![](/assets/images/api/ranges_plot_shapes.svg)
+        """
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("plotly")
+        from vectorbtpro.utils.figure import make_figure, get_domain
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        self_col = self.select_col(column=column, group_by=False)
+
+        if ohlc_trace_kwargs is None:
+            ohlc_trace_kwargs = {}
+        if close_trace_kwargs is None:
+            close_trace_kwargs = {}
+        close_trace_kwargs = merge_dicts(
+            dict(line=dict(color=plotting_cfg["color_schema"]["blue"]), name="Close"),
+            close_trace_kwargs,
+        )
+        if shape_kwargs is None:
+            shape_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
+        if isinstance(plot_ohlc, bool):
+            if (
+                self_col._open is not None
+                and self_col._high is not None
+                and self_col._low is not None
+                and self_col._close is not None
+            ):
+                ohlc = pd.DataFrame(
+                    {
+                        "open": self_col.open,
+                        "high": self_col.high,
+                        "low": self_col.low,
+                        "close": self_col.close,
+                    }
+                )
+            else:
+                ohlc = None
+        else:
+            ohlc = plot_ohlc
+            plot_ohlc = True
+        if isinstance(plot_close, bool):
+            if ohlc is not None:
+                close = ohlc.vbt.ohlcv.close
+            else:
+                close = self_col.close
+        else:
+            close = plot_close
+            plot_close = True
+
+        if fig is None:
+            fig = make_figure()
+        fig.update_layout(**layout_kwargs)
+        x_domain = get_domain(yref, fig)
+        y_domain = get_domain(yref, fig)
+
+        # Plot OHLC/close
+        if plot_ohlc and ohlc is not None:
+            if "opacity" not in ohlc_trace_kwargs:
+                ohlc_trace_kwargs["opacity"] = 0.5
+            fig = ohlc.vbt.ohlcv.plot(
+                ohlc_type=ohlc_type,
+                plot_volume=False,
+                ohlc_trace_kwargs=ohlc_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+        elif plot_close and close is not None:
+            fig = close.vbt.lineplot(
+                trace_kwargs=close_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+
+        if self_col.count() > 0:
+            start_idx_arr = self_col.get_field_arr("start_idx")
+            end_idx_arr = self_col.get_field_arr("end_idx")
+            for i in range(len(self_col.values)):
+                start_index = self_col.wrapper.index[start_idx_arr[i]]
+                end_index = self_col.wrapper.index[end_idx_arr[i]]
+                _shape_kwargs = deep_substitute(
+                    shape_kwargs,
+                    context=dict(
+                        self_col=self_col,
+                        i=i,
+                        record=self_col.values[i],
+                        start_index=start_index,
+                        end_index=end_index,
+                        xref=xref,
+                        yref=yref,
+                        x_domain=x_domain,
+                        y_domain=y_domain,
+                        close=close,
+                        ohlc=ohlc,
+                    ),
+                    sub_id="shape_kwargs",
+                )
+                _shape_kwargs = merge_dicts(
+                    dict(
+                        type="rect",
+                        xref=xref,
+                        yref="paper",
+                        x0=start_index,
+                        y0=y_domain[0],
+                        x1=end_index,
+                        y1=y_domain[1],
+                        fillcolor="gray",
+                        opacity=0.15,
+                        layer="below",
+                        line_width=0,
+                    ),
+                    _shape_kwargs,
+                )
+                fig.add_shape(**_shape_kwargs)
+
+        return fig
+
     def plot(
         self,
         column: tp.Optional[tp.Label] = None,
         top_n: tp.Optional[int] = None,
-        plot_ohlc: bool = True,
+        plot_ohlc: tp.Union[bool, tp.Frame] = True,
         plot_close: tp.Union[bool, tp.Series] = True,
         plot_markers: bool = True,
         plot_zones: bool = True,
@@ -1054,8 +1231,8 @@ class Ranges(PriceRecords):
         Args:
             column (str): Name of the column to plot.
             top_n (int): Filter top N range records by maximum duration.
-            plot_ohlc (bool): Whether to plot OHLC.
-            plot_close (bool): Whether to plot close.
+            plot_ohlc (bool or DataFrame): Whether to plot OHLC.
+            plot_close (bool or Series): Whether to plot close.
             plot_markers (bool): Whether to plot markers.
             plot_zones (bool): Whether to plot zones.
             ohlc_type: Either 'OHLC', 'Candlestick' or Plotly trace.
@@ -1076,10 +1253,12 @@ class Ranges(PriceRecords):
 
         Usage:
             ```pycon
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+
             >>> price = pd.Series(
-            ...     [1, 2, 1, 2, 3, 2, 1, 2],
-            ...     index=pd.date_range("2020", periods=8),
-            ...     name='Price'
+            ...     [1, 2, 1, 2, 3, 2, 1, 2, 3],
+            ...     index=pd.date_range("2020", periods=9),
             ... )
             >>> vbt.Ranges.from_array(price >= 2).plot()
             ```
@@ -1154,17 +1333,9 @@ class Ranges(PriceRecords):
         # Plot OHLC/close
         plotting_ohlc = False
         if plot_ohlc and ohlc is not None:
-            ohlc_df = pd.DataFrame(
-                {
-                    "open": self_col.open,
-                    "high": self_col.high,
-                    "low": self_col.low,
-                    "close": self_col.close,
-                }
-            )
             if "opacity" not in ohlc_trace_kwargs:
                 ohlc_trace_kwargs["opacity"] = 0.5
-            fig = ohlc_df.vbt.ohlcv.plot(
+            fig = ohlc.vbt.ohlcv.plot(
                 ohlc_type=ohlc_type,
                 plot_volume=False,
                 ohlc_trace_kwargs=ohlc_trace_kwargs,
@@ -1246,28 +1417,6 @@ class Ranges(PriceRecords):
                     closed_end_scatter = go.Scatter(**_end_trace_kwargs)
                     fig.add_trace(closed_end_scatter, **add_trace_kwargs)
 
-                if plot_zones:
-                    # Plot closed range zones
-                    for i in range(len(id_[closed_mask])):
-                        fig.add_shape(
-                            **merge_dicts(
-                                dict(
-                                    type="rect",
-                                    xref=xref,
-                                    yref="paper",
-                                    x0=start_idx[closed_mask][i],
-                                    y0=y_domain[0],
-                                    x1=end_idx[closed_mask][i],
-                                    y1=y_domain[1],
-                                    fillcolor="royalblue",
-                                    opacity=0.2,
-                                    layer="below",
-                                    line_width=0,
-                                ),
-                                closed_shape_kwargs,
-                            )
-                        )
-
             open_mask = status == RangeStatus.Open
             if open_mask.any():
                 if plot_markers:
@@ -1297,27 +1446,34 @@ class Ranges(PriceRecords):
                     open_end_scatter = go.Scatter(**_end_trace_kwargs)
                     fig.add_trace(open_end_scatter, **add_trace_kwargs)
 
-                if plot_zones:
-                    # Plot open range zones
-                    for i in range(len(id_[open_mask])):
-                        fig.add_shape(
-                            **merge_dicts(
-                                dict(
-                                    type="rect",
-                                    xref=xref,
-                                    yref="paper",
-                                    x0=start_idx[open_mask][i],
-                                    y0=y_domain[0],
-                                    x1=end_idx[open_mask][i],
-                                    y1=y_domain[1],
-                                    fillcolor="orange",
-                                    opacity=0.2,
-                                    layer="below",
-                                    line_width=0,
-                                ),
-                                open_shape_kwargs,
-                            )
-                        )
+            if plot_zones:
+                # Plot closed range zones
+                self_col.status_closed.plot_shapes(
+                    plot_ohlc=False,
+                    plot_close=False,
+                    shape_kwargs=merge_dicts(
+                        dict(fillcolor=plotting_cfg["contrast_color_schema"]["green"]),
+                        closed_shape_kwargs,
+                    ),
+                    add_trace_kwargs=add_trace_kwargs,
+                    xref=xref,
+                    yref=yref,
+                    fig=fig,
+                )
+
+                # Plot open range zones
+                self_col.status_open.plot_shapes(
+                    plot_ohlc=False,
+                    plot_close=False,
+                    shape_kwargs=merge_dicts(
+                        dict(fillcolor=plotting_cfg["contrast_color_schema"]["orange"]),
+                        open_shape_kwargs,
+                    ),
+                    add_trace_kwargs=add_trace_kwargs,
+                    xref=xref,
+                    yref=yref,
+                    fig=fig,
+                )
 
         if return_close:
             return fig, close

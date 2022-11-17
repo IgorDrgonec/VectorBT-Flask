@@ -324,9 +324,12 @@ class Orders(PriceRecords):
 
         Usage:
             ```pycon
-            >>> price = pd.Series([1., 2., 3., 2., 1.], name='Price')
-            >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
-            >>> size = pd.Series([1., 1., 1., 1., -1.])
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+
+            >>> index = pd.date_range("2020", periods=5)
+            >>> price = pd.Series([1., 2., 3., 2., 1.], index=index)
+            >>> size = pd.Series([1., 1., 1., 1., -1.], index=index)
             >>> orders = vbt.Portfolio.from_orders(price, size).orders
 
             >>> orders.plot()

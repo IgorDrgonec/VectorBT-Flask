@@ -184,7 +184,7 @@ from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
-from vectorbtpro.utils.template import RepEval
+from vectorbtpro.utils.template import RepEval, RepFunc
 
 __pdoc__ = {}
 
@@ -811,8 +811,11 @@ class Drawdowns(Ranges):
 
         Usage:
             ```pycon
-            >>> price = pd.Series([1, 2, 1, 2, 3, 2, 1, 2], name='Price')
-            >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+
+            >>> index = pd.date_range("2020", periods=8)
+            >>> price = pd.Series([1, 2, 1, 2, 3, 2, 1, 2], index=index)
             >>> vbt.Drawdowns.from_price(price, wrapper_kwargs=dict(freq='1 day')).plot()
             ```
 
@@ -997,28 +1000,6 @@ class Drawdowns(Ranges):
                     valley_scatter = go.Scatter(**_valley_trace_kwargs)
                     fig.add_trace(valley_scatter, **add_trace_kwargs)
 
-                if plot_zones:
-                    # Plot drawdown zones
-                    for i in range(len(id_[recovered_mask])):
-                        fig.add_shape(
-                            **merge_dicts(
-                                dict(
-                                    type="rect",
-                                    xref=xref,
-                                    yref="paper",
-                                    x0=peak_idx[recovered_mask][i],
-                                    y0=y_domain[0],
-                                    x1=valley_idx[recovered_mask][i],
-                                    y1=y_domain[1],
-                                    fillcolor="red",
-                                    opacity=0.2,
-                                    layer="below",
-                                    line_width=0,
-                                ),
-                                decline_shape_kwargs,
-                            )
-                        )
-
                 if plot_markers:
                     # Plot recovery markers
                     recovery_customdata, recovery_hovertemplate = self_col.prepare_customdata(
@@ -1052,28 +1033,6 @@ class Drawdowns(Ranges):
                     )
                     recovery_scatter = go.Scatter(**_recovery_trace_kwargs)
                     fig.add_trace(recovery_scatter, **add_trace_kwargs)
-
-                if plot_zones:
-                    # Plot recovery zones
-                    for i in range(len(id_[recovered_mask])):
-                        fig.add_shape(
-                            **merge_dicts(
-                                dict(
-                                    type="rect",
-                                    xref=xref,
-                                    yref="paper",
-                                    x0=valley_idx[recovered_mask][i],
-                                    y0=y_domain[0],
-                                    x1=end_idx[recovered_mask][i],
-                                    y1=y_domain[1],
-                                    fillcolor="green",
-                                    opacity=0.2,
-                                    layer="below",
-                                    line_width=0,
-                                ),
-                                recovery_shape_kwargs,
-                            )
-                        )
 
             active_mask = status == DrawdownStatus.Active
             if active_mask.any():
@@ -1109,27 +1068,60 @@ class Drawdowns(Ranges):
                     active_scatter = go.Scatter(**_active_trace_kwargs)
                     fig.add_trace(active_scatter, **add_trace_kwargs)
 
-                if plot_zones:
-                    # Plot active drawdown zones
-                    for i in range(len(id_[active_mask])):
-                        fig.add_shape(
-                            **merge_dicts(
-                                dict(
-                                    type="rect",
-                                    xref=xref,
-                                    yref="paper",
-                                    x0=peak_idx[active_mask][i],
-                                    y0=y_domain[0],
-                                    x1=end_idx[active_mask][i],
-                                    y1=y_domain[1],
-                                    fillcolor="orange",
-                                    opacity=0.2,
-                                    layer="below",
-                                    line_width=0,
-                                ),
-                                active_shape_kwargs,
-                            )
-                        )
+            if plot_zones:
+                # Plot drawdown zones
+                self_col.status_recovered.plot_shapes(
+                    plot_ohlc=False,
+                    plot_close=False,
+                    shape_kwargs=merge_dicts(
+                        dict(
+                            x0=RepFunc(lambda i: peak_idx[recovered_mask][i]),
+                            x1=RepFunc(lambda i: valley_idx[recovered_mask][i]),
+                            fillcolor=plotting_cfg["contrast_color_schema"]["red"],
+                        ),
+                        decline_shape_kwargs,
+                    ),
+                    add_trace_kwargs=add_trace_kwargs,
+                    xref=xref,
+                    yref=yref,
+                    fig=fig,
+                )
+
+                # Plot recovery zones
+                self_col.status_recovered.plot_shapes(
+                    plot_ohlc=False,
+                    plot_close=False,
+                    shape_kwargs=merge_dicts(
+                        dict(
+                            x0=RepFunc(lambda i: valley_idx[recovered_mask][i]),
+                            x1=RepFunc(lambda i: end_idx[recovered_mask][i]),
+                            fillcolor=plotting_cfg["contrast_color_schema"]["green"],
+                        ),
+                        recovery_shape_kwargs,
+                    ),
+                    add_trace_kwargs=add_trace_kwargs,
+                    xref=xref,
+                    yref=yref,
+                    fig=fig,
+                )
+
+                # Plot active drawdown zones
+                self_col.status_active.plot_shapes(
+                    plot_ohlc=False,
+                    plot_close=False,
+                    shape_kwargs=merge_dicts(
+                        dict(
+                            x0=RepFunc(lambda i: peak_idx[active_mask][i]),
+                            x1=RepFunc(lambda i: end_idx[active_mask][i]),
+                            fillcolor=plotting_cfg["contrast_color_schema"]["orange"],
+                        ),
+                        active_shape_kwargs,
+                    ),
+                    add_trace_kwargs=add_trace_kwargs,
+                    xref=xref,
+                    yref=yref,
+                    fig=fig,
+                )
 
         return fig
 

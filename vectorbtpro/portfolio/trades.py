@@ -480,7 +480,7 @@ Name: group, dtype: object
 `Trades` class has two subplots based on `Trades.plot` and `Trades.plot_pnl`:
 
 ```pycon
->>> pf.trades['a'].plots(settings=dict(plot_zones=False)).show()
+>>> pf.trades['a'].plots()
 ```
 
 ![](/assets/images/api/trades_plots.svg)
@@ -505,7 +505,7 @@ from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils.array_ import min_rel_rescale, max_rel_rescale
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
-from vectorbtpro.utils.template import RepEval
+from vectorbtpro.utils.template import Rep, RepEval, RepFunc
 
 __pdoc__ = {}
 
@@ -1158,9 +1158,12 @@ class Trades(Ranges):
 
         Usage:
             ```pycon
-            >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.])
-            >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
-            >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+
+            >>> index = pd.date_range("2020", periods=7)
+            >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.], index=index)
+            >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5], index=index)
             >>> pf = vbt.Portfolio.from_orders(price, orders)
             >>> pf.trades.plot_pnl()
             ```
@@ -1345,9 +1348,12 @@ class Trades(Ranges):
 
         Usage:
             ```pycon
-            >>> price = pd.Series([1., 2., 3., 4., 5., 6., 5., 3., 2., 1.])
-            >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
-            >>> orders = pd.Series([1., -0.5, 0., -0.5, 2., 0., -0.5, -0.5, 0., -0.5])
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+
+            >>> index = pd.date_range("2020", periods=10)
+            >>> price = pd.Series([1., 2., 3., 4., 5., 6., 5., 3., 2., 1.], index=index)
+            >>> orders = pd.Series([1., -0.5, 0., -0.5, 2., 0., -0.5, -0.5, 0., -0.5], index=index)
             >>> pf = vbt.Portfolio.from_orders(price, orders)
             >>> trades = pf.trades
             >>> trades.plot_against_pnl("MFE")
@@ -1665,13 +1671,12 @@ class Trades(Ranges):
         Usage:
             ```pycon
             >>> import pandas as pd
-            >>> from datetime import datetime, timedelta
             >>> import vectorbtpro as vbt
 
-            >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.], name='Price')
-            >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
-            >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
-            >>> pf = vbt.Portfolio.from_orders(price, orders)
+            >>> index = pd.date_range("2020", periods=7)
+            >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.], index=index)
+            >>> size = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5], index=index)
+            >>> pf = vbt.Portfolio.from_orders(price, size)
             >>> pf.trades.plot()
             ```
 
@@ -1900,51 +1905,43 @@ class Trades(Ranges):
                 )
 
             if plot_zones:
-                profit_mask = pnl > 0.0
-                if np.any(profit_mask):
-                    # Plot profit zones
-                    for i in np.flatnonzero(profit_mask):
-                        fig.add_shape(
-                            **merge_dicts(
-                                dict(
-                                    type="rect",
-                                    xref=xref,
-                                    yref=yref,
-                                    x0=entry_idx[i],
-                                    y0=entry_price[i],
-                                    x1=exit_idx[i],
-                                    y1=exit_price[i],
-                                    fillcolor="green",
-                                    opacity=0.2,
-                                    layer="below",
-                                    line_width=0,
-                                ),
-                                profit_shape_kwargs,
-                            )
-                        )
+                # Plot profit zones
+                self_col.winning.plot_shapes(
+                    plot_ohlc=False,
+                    plot_close=False,
+                    shape_kwargs=merge_dicts(
+                        dict(
+                            yref=Rep("yref"),
+                            y0=RepFunc(lambda record: record["entry_price"]),
+                            y1=RepFunc(lambda record: record["exit_price"]),
+                            fillcolor=plotting_cfg["contrast_color_schema"]["green"],
+                        ),
+                        profit_shape_kwargs,
+                    ),
+                    add_trace_kwargs=add_trace_kwargs,
+                    xref=xref,
+                    yref=yref,
+                    fig=fig,
+                )
 
-                loss_mask = pnl < 0.0
-                if np.any(loss_mask):
-                    # Plot loss zones
-                    for i in np.flatnonzero(loss_mask):
-                        fig.add_shape(
-                            **merge_dicts(
-                                dict(
-                                    type="rect",
-                                    xref=xref,
-                                    yref=yref,
-                                    x0=entry_idx[i],
-                                    y0=entry_price[i],
-                                    x1=exit_idx[i],
-                                    y1=exit_price[i],
-                                    fillcolor="red",
-                                    opacity=0.2,
-                                    layer="below",
-                                    line_width=0,
-                                ),
-                                loss_shape_kwargs,
-                            )
-                        )
+                # Plot loss zones
+                self_col.losing.plot_shapes(
+                    plot_ohlc=False,
+                    plot_close=False,
+                    shape_kwargs=merge_dicts(
+                        dict(
+                            yref=Rep("yref"),
+                            y0=RepFunc(lambda record: record["entry_price"]),
+                            y1=RepFunc(lambda record: record["exit_price"]),
+                            fillcolor=plotting_cfg["contrast_color_schema"]["red"],
+                        ),
+                        loss_shape_kwargs,
+                    ),
+                    add_trace_kwargs=add_trace_kwargs,
+                    xref=xref,
+                    yref=yref,
+                    fig=fig,
+                )
 
         return fig
 
@@ -2067,7 +2064,7 @@ class EntryTrades(Trades):
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs,
     ) -> tp.BaseFigure:
-        """Plot entry trades as signals.
+        """Plot entry trade signals.
 
         Args:
             column (str): Name of the column to plot.
@@ -2083,6 +2080,20 @@ class EntryTrades(Trades):
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
+
+        Usage:
+            ```pycon
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+
+            >>> index = pd.date_range("2020", periods=7)
+            >>> price = pd.Series([1, 2, 3, 2, 3, 4, 3], index=index)
+            >>> orders = pd.Series([1, 0, -1, 0, -1, 2, -2], index=index)
+            >>> pf = vbt.Portfolio.from_orders(price, orders)
+            >>> pf.entry_trades.plot_signals()
+            ```
+
+            ![](/assets/images/api/entry_trades_plot_signals.svg)
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
 
@@ -2288,7 +2299,7 @@ class ExitTrades(Trades):
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs,
     ) -> tp.BaseFigure:
-        """Plot exit trades as signals.
+        """Plot exit trade signals.
 
         Args:
             column (str): Name of the column to plot.
@@ -2304,6 +2315,20 @@ class ExitTrades(Trades):
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
+
+        Usage:
+            ```pycon
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+
+            >>> index = pd.date_range("2020", periods=7)
+            >>> price = pd.Series([1, 2, 3, 2, 3, 4, 3], index=index)
+            >>> orders = pd.Series([1, 0, -1, 0, -1, 2, -2], index=index)
+            >>> pf = vbt.Portfolio.from_orders(price, orders)
+            >>> pf.exit_trades.plot_signals()
+            ```
+
+            ![](/assets/images/api/exit_trades_plot_signals.svg)
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
 

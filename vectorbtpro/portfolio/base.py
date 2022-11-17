@@ -1657,7 +1657,7 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.colors import adjust_opacity
-from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
+from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig, atomic_dict
 from vectorbtpro.utils.datetime_ import freq_to_timedelta64
 from vectorbtpro.utils.decorators import custom_property, cached_property, class_or_instancemethod
 from vectorbtpro.utils.enum_ import map_enum_fields
@@ -10203,15 +10203,24 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     def plot_trade_signals(
         self,
         column: tp.Optional[tp.Label] = None,
+        plot_positions: tp.Union[bool, str] = "zones",
         long_entry_trace_kwargs: tp.KwargsLike = None,
         short_entry_trace_kwargs: tp.KwargsLike = None,
         long_exit_trace_kwargs: tp.KwargsLike = None,
         short_exit_trace_kwargs: tp.KwargsLike = None,
+        long_shape_kwargs: tp.KwargsLike = None,
+        short_shape_kwargs: tp.KwargsLike = None,
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
         **kwargs,
     ) -> tp.BaseFigure:
-        """Plot one column/group of trade signals."""
+        """Plot one column/group of trade signals.
+
+        Markers and shapes are colored by trade direction (green = long, red = short)."""
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
         fig = self.entry_trades.plot_signals(
             column=column,
             long_entry_trace_kwargs=long_entry_trace_kwargs,
@@ -10229,6 +10238,66 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             add_trace_kwargs=add_trace_kwargs,
             fig=fig,
         )
+        if isinstance(plot_positions, bool):
+            if plot_positions:
+                plot_positions = "zones"
+            else:
+                plot_positions = None
+        if plot_positions is not None:
+            positions = self.positions
+            if plot_positions.lower() == "zones":
+                long_shape_kwargs = merge_dicts(
+                    dict(fillcolor=plotting_cfg["contrast_color_schema"]["green"]),
+                    long_shape_kwargs,
+                )
+                short_shape_kwargs = merge_dicts(
+                    dict(fillcolor=plotting_cfg["contrast_color_schema"]["red"]),
+                    short_shape_kwargs,
+                )
+            elif plot_positions.lower() == "lines":
+                base_shape_kwargs = dict(
+                    type="line",
+                    line=dict(dash="dot"),
+                    xref=Rep("xref"),
+                    yref=Rep("yref"),
+                    x0=Rep("start_index"),
+                    x1=Rep("end_index"),
+                    y0=RepFunc(lambda record: record["entry_price"]),
+                    y1=RepFunc(lambda record: record["exit_price"]),
+                    opacity=0.75,
+                )
+                long_shape_kwargs = atomic_dict(merge_dicts(
+                    base_shape_kwargs,
+                    dict(line=dict(color=plotting_cfg["contrast_color_schema"]["green"])),
+                    long_shape_kwargs,
+                ))
+                short_shape_kwargs = atomic_dict(merge_dicts(
+                    base_shape_kwargs,
+                    dict(line=dict(color=plotting_cfg["contrast_color_schema"]["red"])),
+                    short_shape_kwargs,
+                ))
+            else:
+                raise ValueError(f"Invalid option plot_positions='{plot_positions}'")
+            fig = positions.direction_long.plot_shapes(
+                column=column,
+                plot_ohlc=False,
+                plot_close=False,
+                shape_kwargs=long_shape_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                xref=fig.data[-1]["xaxis"] if fig.data[-1]["xaxis"] is not None else "x",
+                yref=fig.data[-1]["yaxis"] if fig.data[-1]["yaxis"] is not None else "y",
+                fig=fig,
+            )
+            fig = positions.direction_short.plot_shapes(
+                column=column,
+                plot_ohlc=False,
+                plot_close=False,
+                shape_kwargs=short_shape_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                xref=fig.data[-1]["xaxis"] if fig.data[-1]["xaxis"] is not None else "x",
+                yref=fig.data[-1]["yaxis"] if fig.data[-1]["yaxis"] is not None else "y",
+                fig=fig,
+            )
         return fig
 
     def plot_positions(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
