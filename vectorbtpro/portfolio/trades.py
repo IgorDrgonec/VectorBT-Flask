@@ -1626,6 +1626,7 @@ class Trades(Ranges):
         plot_close: bool = True,
         plot_markers: bool = True,
         plot_zones: bool = True,
+        plot_by_type: bool = True,
         ohlc_type: tp.Union[None, str, tp.BaseTraceType] = None,
         ohlc_trace_kwargs: tp.KwargsLike = None,
         close_trace_kwargs: tp.KwargsLike = None,
@@ -1650,6 +1651,9 @@ class Trades(Ranges):
             plot_close (bool): Whether to plot close.
             plot_markers (bool): Whether to plot markers.
             plot_zones (bool): Whether to plot zones.
+            plot_by_type (bool): Whether to plot exit trades by type.
+
+                Otherwise, the appearance will be controlled using `exit_trace_kwargs`.
             ohlc_type: Either 'OHLC', 'Candlestick' or Plotly trace.
 
                 Pass None to use the default.
@@ -1817,7 +1821,7 @@ class Trades(Ranges):
                 fig.add_trace(entry_scatter, **add_trace_kwargs)
 
                 # Plot end markers
-                def _plot_end_markers(mask, name, color, kwargs) -> None:
+                def _plot_end_markers(mask, name, color, kwargs, incl_status=False) -> None:
                     if np.any(mask):
                         if self_col.get_field_setting("parent_id", "ignore", False):
                             exit_customdata, exit_hovertemplate = self_col.prepare_customdata(
@@ -1831,6 +1835,7 @@ class Trades(Ranges):
                                     "pnl",
                                     "return",
                                     "direction",
+                                    *(("status",) if incl_status else ()),
                                 ],
                                 append_info=[(duration, "Duration")],
                                 mask=mask,
@@ -1848,6 +1853,7 @@ class Trades(Ranges):
                                     "pnl",
                                     "return",
                                     "direction",
+                                    *(("status",) if incl_status else ()),
                                 ],
                                 append_info=[(duration, "Duration")],
                                 mask=mask,
@@ -1872,37 +1878,47 @@ class Trades(Ranges):
                         scatter = go.Scatter(**_kwargs)
                         fig.add_trace(scatter, **add_trace_kwargs)
 
-                # Plot Exit markers
-                _plot_end_markers(
-                    (status == TradeStatus.Closed) & (pnl == 0.0),
-                    "Exit",
-                    plotting_cfg["contrast_color_schema"]["gray"],
-                    exit_trace_kwargs,
-                )
+                if plot_by_type:
+                    # Plot Exit markers
+                    _plot_end_markers(
+                        (status == TradeStatus.Closed) & (pnl == 0.0),
+                        "Exit",
+                        plotting_cfg["contrast_color_schema"]["gray"],
+                        exit_trace_kwargs,
+                    )
 
-                # Plot Exit - Profit markers
-                _plot_end_markers(
-                    (status == TradeStatus.Closed) & (pnl > 0.0),
-                    "Exit - Profit",
-                    plotting_cfg["contrast_color_schema"]["green"],
-                    exit_profit_trace_kwargs,
-                )
+                    # Plot Exit - Profit markers
+                    _plot_end_markers(
+                        (status == TradeStatus.Closed) & (pnl > 0.0),
+                        "Exit - Profit",
+                        plotting_cfg["contrast_color_schema"]["green"],
+                        exit_profit_trace_kwargs,
+                    )
 
-                # Plot Exit - Loss markers
-                _plot_end_markers(
-                    (status == TradeStatus.Closed) & (pnl < 0.0),
-                    "Exit - Loss",
-                    plotting_cfg["contrast_color_schema"]["red"],
-                    exit_loss_trace_kwargs,
-                )
+                    # Plot Exit - Loss markers
+                    _plot_end_markers(
+                        (status == TradeStatus.Closed) & (pnl < 0.0),
+                        "Exit - Loss",
+                        plotting_cfg["contrast_color_schema"]["red"],
+                        exit_loss_trace_kwargs,
+                    )
 
-                # Plot Active markers
-                _plot_end_markers(
-                    status == TradeStatus.Open,
-                    "Active",
-                    plotting_cfg["contrast_color_schema"]["orange"],
-                    active_trace_kwargs,
-                )
+                    # Plot Active markers
+                    _plot_end_markers(
+                        status == TradeStatus.Open,
+                        "Active",
+                        plotting_cfg["contrast_color_schema"]["orange"],
+                        active_trace_kwargs,
+                    )
+                else:
+                    # Plot Exit markers
+                    _plot_end_markers(
+                        np.full(len(status), True),
+                        "Exit",
+                        plotting_cfg["contrast_color_schema"]["pink"],
+                        exit_trace_kwargs,
+                        incl_status=True,
+                    )
 
             if plot_zones:
                 # Plot profit zones
