@@ -932,7 +932,7 @@ def parameterized(
             execute_kwargs = deep_substitute(execute_kwargs, template_context, sub_id="execute_kwargs")
             results = execute(
                 template_context["funcs_args"],
-                n_calls=template_context["param_configs"],
+                n_calls=len(template_context["param_configs"]),
                 **execute_kwargs,
             )
 

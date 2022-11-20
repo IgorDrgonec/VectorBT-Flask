@@ -9912,7 +9912,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             that is an instance of `vectorbtpro.portfolio.trades.Trades`."""
         if "incl_open" in final_kwargs:
             if isinstance(out, Trades) and not final_kwargs["incl_open"]:
-                print("here")
                 out = out.status_closed
         return out
 
