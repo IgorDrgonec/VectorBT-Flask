@@ -3717,6 +3717,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     def histplot(
         self,
         column: tp.Optional[tp.Label] = None,
+        by_level: tp.Optional[tp.Level] = None,
         trace_names: tp.TraceNames = None,
         group_by: tp.GroupByLike = None,
         return_fig: bool = True,
@@ -3732,6 +3733,15 @@ class GenericAccessor(BaseAccessor, Analyzable):
             ![](/assets/images/api/df_histplot.svg)
         """
         from vectorbtpro.generic.plotting import Histogram
+
+        if by_level is not None:
+            return self.obj.unstack(by_level).vbt.histplot(
+                column=column,
+                trace_names=trace_names,
+                group_by=group_by,
+                return_fig=return_fig,
+                **kwargs,
+            )
 
         if column is not None:
             _self = self.select_col(column=column)
@@ -3752,6 +3762,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     def boxplot(
         self,
         column: tp.Optional[tp.Label] = None,
+        by_level: tp.Optional[tp.Level] = None,
         trace_names: tp.TraceNames = None,
         group_by: tp.GroupByLike = None,
         return_fig: bool = True,
@@ -3767,6 +3778,15 @@ class GenericAccessor(BaseAccessor, Analyzable):
             ![](/assets/images/api/df_boxplot.svg)
         """
         from vectorbtpro.generic.plotting import Box
+
+        if by_level is not None:
+            return self.obj.unstack(by_level).vbt.boxplot(
+                column=column,
+                trace_names=trace_names,
+                group_by=group_by,
+                return_fig=return_fig,
+                **kwargs,
+            )
 
         if column is not None:
             _self = self.select_col(column=column)

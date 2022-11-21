@@ -2,7 +2,7 @@
 
 """Modules for splitting."""
 
-from vectorbtpro.generic.splitting.base import RelRange, GapRange, Takeable, Splitter, SKLSplitter
+from vectorbtpro.generic.splitting.base import FixRange, RelRange, Takeable, Splitter, SKLSplitter
 from vectorbtpro.generic.splitting.decorators import split, cv_split
 from vectorbtpro.utils.module_ import create__all__
 

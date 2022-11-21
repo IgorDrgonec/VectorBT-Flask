@@ -76,19 +76,8 @@ class TestRelRange:
 class TestSplitter:
     def test_from_splits(self):
         np.testing.assert_array_equal(
-            vbt.Splitter.from_splits(index, 0.5).splits_arr, np.array([[slice(0, 15, None)]], dtype=object)
-        )
-        assert_index_equal(
-            vbt.Splitter.from_splits(index, 0.5).wrapper.index,
-            pd.RangeIndex(start=0, stop=1, step=1, name="split"),
-        )
-        assert_index_equal(
-            vbt.Splitter.from_splits(index, 0.5).wrapper.columns,
-            pd.Index(["set_0"], dtype="object", name="set"),
-        )
-        assert vbt.Splitter.from_splits(index, 0.5).wrapper.ndim == 1
-        np.testing.assert_array_equal(
-            vbt.Splitter.from_splits(index, [0.5]).splits_arr, np.array([[slice(0, 15, None)]], dtype=object)
+            vbt.Splitter.from_splits(index, [0.5]).splits_arr,
+            np.array([[slice(0, 15, None), slice(15, 31, None)]], dtype=object),
         )
         assert_index_equal(
             vbt.Splitter.from_splits(index, [0.5]).wrapper.index,
@@ -96,9 +85,9 @@ class TestSplitter:
         )
         assert_index_equal(
             vbt.Splitter.from_splits(index, [0.5]).wrapper.columns,
-            pd.Index(["set_0"], dtype="object", name="set"),
+            pd.Index(["set_0", "set_1"], dtype="object", name="set"),
         )
-        assert vbt.Splitter.from_splits(index, [0.5]).wrapper.ndim == 1
+        assert vbt.Splitter.from_splits(index, [0.5]).wrapper.ndim == 2
         np.testing.assert_array_equal(
             vbt.Splitter.from_splits(index, [[0.5]]).splits_arr, np.array([[slice(0, 15, None)]], dtype=object)
         )
@@ -112,14 +101,20 @@ class TestSplitter:
         )
         assert vbt.Splitter.from_splits(index, [[0.5]]).wrapper.ndim == 2
         np.testing.assert_array_equal(
-            vbt.Splitter.from_splits(index, 0.5, fix_ranges=False).splits_arr, np.array([[0.5]])
+            vbt.Splitter.from_splits(index, [[0.5]], fix_ranges=False).splits_arr,
+            np.array([[vbt.RelRange(length=0.5)]], dtype=object),
+        )
+        assert vbt.Splitter.from_splits(
+            index, [[0.5]], split_range_kwargs=dict(range_format="mask")
+        ).splits_arr.shape == (1, 1)
+        np.testing.assert_array_equal(
+            vbt.Splitter.from_splits(
+                index, [[0.5]], split_range_kwargs=dict(range_format="mask")
+            ).splits_arr[0, 0].range_,
+            np.array([*[True] * 15, *[False] * 16]),
         )
         np.testing.assert_array_equal(
-            vbt.Splitter.from_splits(index, 0.5, split_range_kwargs=dict(range_format="mask")).splits_arr,
-            np.array([[[*[True] * 15, *[False] * 16]]]),
-        )
-        np.testing.assert_array_equal(
-            vbt.Splitter.from_splits(index, [0.5, 1.0]).splits_arr,
+            vbt.Splitter.from_splits(index, [[0.5], [1.0]]).splits_arr,
             np.array([[slice(0, 15, None)], [slice(0, 31, None)]], dtype=object),
         )
         np.testing.assert_array_equal(
@@ -238,7 +233,7 @@ class TestSplitter:
                 split_args=(vbt.Rep("split_idx"),),
                 fix_ranges=False,
             ).splits_arr,
-            np.array([[0.5], [1.0]]),
+            np.array([[vbt.RelRange(length=0.5)], [vbt.RelRange(length=1.0)]]),
         )
 
         def split_func(split_idx):
@@ -1005,7 +1000,6 @@ class TestSplitter:
         ) == slice(5, 31, None)
 
     def test_get_ready_range(self):
-        assert vbt.Splitter.get_ready_range(vbt.GapRange(slice(10, 20)), index=index) == slice(10, 20)
         assert vbt.Splitter.get_ready_range(
             vbt.Rep("range_", context=dict(range_=slice(10, 20))), index=index
         ) == slice(10, 20)
@@ -1039,50 +1033,49 @@ class TestSplitter:
             mask,
         )
 
-        assert vbt.Splitter.get_ready_range(np.array([3, 2, 1], dtype=object), index=index) == slice(1, 4)
+        assert vbt.Splitter.get_ready_range(np.array([3, 2, 1]), index=index) == slice(1, 4)
         np.testing.assert_array_equal(
-            vbt.Splitter.get_ready_range(np.array([3, 2, 1], dtype=object), range_format="indices", index=index),
+            vbt.Splitter.get_ready_range(np.array([3, 2, 1]), range_format="indices", index=index),
             np.array([1, 2, 3]),
         )
         mask = np.full(len(index), False)
         mask[[1, 2, 3]] = True
         np.testing.assert_array_equal(
-            vbt.Splitter.get_ready_range(np.array([3, 2, 1], dtype=object), range_format="mask", index=index),
+            vbt.Splitter.get_ready_range(np.array([3, 2, 1]), range_format="mask", index=index),
             mask,
         )
         assert vbt.Splitter.get_ready_range(
-            np.array([3, 2, 1], dtype=object), range_format="slice", index=index
+            np.array([3, 2, 1]), range_format="slice", index=index
         ) == slice(1, 4)
         assert vbt.Splitter.get_ready_range(
-            np.array([3, 2, 1], dtype=object), range_format="slice_or_indices", index=index
+            np.array([3, 2, 1]), range_format="slice_or_indices", index=index
         ) == slice(1, 4)
         assert vbt.Splitter.get_ready_range(
-            np.array([3, 2, 1], dtype=object), range_format="slice_or_mask", index=index
+            np.array([3, 2, 1]), range_format="slice_or_mask", index=index
         ) == slice(1, 4)
         np.testing.assert_array_equal(
-            vbt.Splitter.get_ready_range(np.array([3, 1], dtype=object), index=index),
+            vbt.Splitter.get_ready_range(np.array([3, 1]), index=index),
             np.array([1, 3]),
         )
         mask = np.full(len(index), False)
         mask[[1, 3]] = True
         np.testing.assert_array_equal(
-            vbt.Splitter.get_ready_range(np.array([3, 1], dtype=object), range_format="mask", index=index),
+            vbt.Splitter.get_ready_range(np.array([3, 1]), range_format="mask", index=index),
             mask,
         )
         with pytest.raises(Exception):
-            vbt.Splitter.get_ready_range(np.array([3, 1], dtype=object), range_format="slice", index=index)
+            vbt.Splitter.get_ready_range(np.array([3, 1]), range_format="slice", index=index)
         np.testing.assert_array_equal(
-            vbt.Splitter.get_ready_range(np.array([3, 1], dtype=object), range_format="slice_or_indices", index=index),
+            vbt.Splitter.get_ready_range(np.array([3, 1]), range_format="slice_or_indices", index=index),
             np.array([1, 3]),
         )
         np.testing.assert_array_equal(
-            vbt.Splitter.get_ready_range(np.array([3, 1], dtype=object), range_format="slice_or_mask", index=index),
+            vbt.Splitter.get_ready_range(np.array([3, 1]), range_format="slice_or_mask", index=index),
             mask,
         )
 
         mask = np.full(len(index), False)
         mask[[1, 2, 3]] = True
-        mask = mask.astype(object)
         assert vbt.Splitter.get_ready_range(mask, index=index) == slice(1, 4)
         np.testing.assert_array_equal(
             vbt.Splitter.get_ready_range(mask, range_format="indices", index=index),
@@ -1097,7 +1090,6 @@ class TestSplitter:
         assert vbt.Splitter.get_ready_range(mask, range_format="slice_or_mask", index=index) == slice(1, 4)
         mask = np.full(len(index), False)
         mask[[1, 3]] = True
-        mask = mask.astype(object)
         np.testing.assert_array_equal(
             vbt.Splitter.get_ready_range(mask, index=index),
             mask.astype(bool),
@@ -1126,11 +1118,11 @@ class TestSplitter:
         with pytest.raises(Exception):
             vbt.Splitter.get_ready_range(np.array([100, 200]), index=index)
         assert vbt.Splitter.get_ready_range(
-            vbt.GapRange(vbt.Rep("range_", context=dict(range_=lambda index: vbt.hslice(10, 20)))),
+            vbt.FixRange(vbt.Rep("range_", context=dict(range_=lambda index: vbt.hslice(10, 20)))),
             index=index,
             return_meta=True,
         ) == {
-            "was_gap": True,
+            "was_fixed": True,
             "was_template": True,
             "was_callable": True,
             "was_relative": False,
@@ -1147,9 +1139,8 @@ class TestSplitter:
         }
         mask = np.full(len(index), False)
         mask[[1, 2, 3]] = True
-        mask = mask.astype(object)
         assert vbt.Splitter.get_ready_range(mask, index=index, return_meta=True) == {
-            "was_gap": False,
+            "was_fixed": False,
             "was_template": False,
             "was_callable": False,
             "was_relative": False,
@@ -1164,8 +1155,8 @@ class TestSplitter:
             "length": 3,
             "range_": slice(1, 4, None),
         }
-        assert vbt.Splitter.get_ready_range(np.array([1, 2, 3], dtype=object), index=index, return_meta=True) == {
-            "was_gap": False,
+        assert vbt.Splitter.get_ready_range(np.array([1, 2, 3]), index=index, return_meta=True) == {
+            "was_fixed": False,
             "was_template": False,
             "was_callable": False,
             "was_relative": False,
@@ -1264,7 +1255,7 @@ class TestSplitter:
             slice(None),
             (
                 vbt.RelRange(length=10, offset_anchor="prev_start", offset=10),
-                vbt.GapRange(vbt.RelRange(length=5)),
+                vbt.RelRange(length=5, is_gap=True),
                 vbt.RelRange(length=5),
             ),
             index=index,
@@ -1360,9 +1351,22 @@ class TestSplitter:
         target_mask[0, 1, slice(7, 19, None)] = True
         target_mask[1, 0, slice(0, 23, None)] = True
         target_mask[1, 1, slice(23, 31, None)] = True
+        assert rel_splitter.to_fixed(split_range_kwargs=dict(range_format="mask")).splits_arr.shape == (2, 2)
         np.testing.assert_array_equal(
-            rel_splitter.to_fixed(split_range_kwargs=dict(range_format="mask")).splits_arr,
-            target_mask,
+            rel_splitter.to_fixed(split_range_kwargs=dict(range_format="mask")).splits_arr[0, 0].range_,
+            target_mask[0, 0],
+        )
+        np.testing.assert_array_equal(
+            rel_splitter.to_fixed(split_range_kwargs=dict(range_format="mask")).splits_arr[0, 1].range_,
+            target_mask[0, 1],
+        )
+        np.testing.assert_array_equal(
+            rel_splitter.to_fixed(split_range_kwargs=dict(range_format="mask")).splits_arr[1, 0].range_,
+            target_mask[1, 0],
+        )
+        np.testing.assert_array_equal(
+            rel_splitter.to_fixed(split_range_kwargs=dict(range_format="mask")).splits_arr[1, 1].range_,
+            target_mask[1, 1],
         )
 
     def test_to_grouped(self):
@@ -2655,14 +2659,16 @@ class TestSplitter:
         )
         assert new_splitter.wrapper.ndim == 2
         np.testing.assert_array_equal(
-            np.array(new_splitter.splits_arr[:, [0]].tolist()),
-            np.asarray(
-                [
-                    [[0, 1, 2, 3, 4, 10, 11, 12, 13, 14]],
-                    [[5, 6, 7, 8, 9, 15, 16, 17, 18, 19]],
-                    [[10, 11, 12, 13, 14, 25, 26, 27, 28, 29]],
-                ]
-            ),
+            new_splitter.splits_arr[0, 0].range_,
+            np.array([0, 1, 2, 3, 4, 10, 11, 12, 13, 14]),
+        )
+        np.testing.assert_array_equal(
+            new_splitter.splits_arr[1, 0].range_,
+            np.array([5, 6, 7, 8, 9, 15, 16, 17, 18, 19]),
+        )
+        np.testing.assert_array_equal(
+            new_splitter.splits_arr[2, 0].range_,
+            np.array([10, 11, 12, 13, 14, 25, 26, 27, 28, 29]),
         )
         np.testing.assert_array_equal(
             new_splitter.splits_arr[:, [1]],
@@ -2694,14 +2700,16 @@ class TestSplitter:
             ),
         )
         np.testing.assert_array_equal(
-            np.array(new_splitter.splits_arr[:, [1]].tolist()),
-            np.asarray(
-                [
-                    [[0, 1, 2, 3, 4, 10, 11, 12, 13, 14]],
-                    [[5, 6, 7, 8, 9, 15, 16, 17, 18, 19]],
-                    [[10, 11, 12, 13, 14, 25, 26, 27, 28, 29]],
-                ]
-            ),
+            new_splitter.splits_arr[0, 1].range_,
+            np.array([0, 1, 2, 3, 4, 10, 11, 12, 13, 14]),
+        )
+        np.testing.assert_array_equal(
+            new_splitter.splits_arr[1, 1].range_,
+            np.array([5, 6, 7, 8, 9, 15, 16, 17, 18, 19]),
+        )
+        np.testing.assert_array_equal(
+            new_splitter.splits_arr[2, 1].range_,
+            np.array([10, 11, 12, 13, 14, 25, 26, 27, 28, 29]),
         )
 
     def test_get_range_bounds(self):

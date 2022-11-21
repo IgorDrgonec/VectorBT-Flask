@@ -19,7 +19,7 @@ from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.datetime_ import try_to_datetime_index
 from vectorbtpro.utils.execution import execute
-from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
+from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.indexing import hslice, PandasIndexer, get_index_ranges
 from vectorbtpro.base.indexes import combine_indexes, stack_indexes
 from vectorbtpro.base.reshaping import to_dict
@@ -39,6 +39,14 @@ __pdoc__ = {}
 
 
 SplitterT = tp.TypeVar("SplitterT", bound="Splitter")
+
+
+@attr.s(frozen=True)
+class FixRange:
+    """Class that represents a fixed range."""
+
+    range_: tp.FixRangeLike = attr.ib()
+    """Range."""
 
 
 @attr.s(frozen=True)
@@ -99,6 +107,9 @@ class RelRange:
     * 'warn': emit a warning if out-of-bounds
     * 'raise": raise an error if out-of-bounds
     """
+
+    is_gap: bool = attr.ib(default=False)
+    """Whether the range acts as a gap."""
 
     def __attrs_post_init__(self):
         object.__setattr__(self, "offset_anchor", self.offset_anchor.lower())
@@ -177,14 +188,6 @@ class RelRange:
         return slice(start, stop)
 
 
-@attr.s(frozen=True)
-class GapRange:
-    """Class that represents a range acting as a gap."""
-
-    range_: tp.RangeLike = attr.ib()
-    """Range."""
-
-
 _DEF = object()
 """Use as a default value for optional arguments in `Takeable`."""
 
@@ -218,7 +221,9 @@ class Splitter(Analyzable):
         cls: tp.Type[SplitterT],
         index: tp.IndexLike,
         splits: tp.Splits,
+        squeeze: bool = False,
         fix_ranges: bool = True,
+        wrap_with_fixrange: bool = False,
         split_range_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
         split_labels: tp.Optional[tp.IndexLike] = None,
@@ -232,55 +237,80 @@ class Splitter(Analyzable):
         To transform relative ranges into the absolute format, enable `fix_ranges`.
         Arguments `split_range_kwargs` are then passed to `Splitter.split_range`.
 
+        Enable `wrap_with_fixrange` to wrap any fixed range with `FixRange`. If the range
+        is an array, it will be wrapped regardless of this argument to avoid building a 3d array.
+
         Labels for splits and sets can be provided via `split_labels` and `set_labels` respectively."""
         index = try_to_datetime_index(index)
         if split_range_kwargs is None:
             split_range_kwargs = {}
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                splits = np.asarray(splits)
-        except Exception as e:
-            splits = np.asarray(splits, dtype=object)
-        if splits.size == 0:
-            raise ValueError("No splits provided")
-        if splits.ndim == 0:
-            splits = splits[None]
-        if splits.ndim == 1:
-            ndim = 1
-            splits = splits[:, None]
-        else:
-            ndim = 2
-        if fix_ranges:
-            new_splits = []
-            for split in splits:
-                new_split = cls.split_range(
+
+        new_splits = []
+        for split in splits:
+            already_fixed = False
+            if cls.is_range_num_relative(split):
+                split = cls.split_range(
                     slice(None),
                     split,
                     template_context=template_context,
                     index=index,
+                    wrap_with_fixrange=False,
                     **split_range_kwargs,
                 )
-                new_splits.append(new_split)
-            splits = new_splits
-            try:
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    splits = np.asarray(splits)
-            except Exception as e:
-                splits = np.asarray(splits, dtype=object)
+                already_fixed = True
+                new_split = split
+                ndim = 2
+            elif cls.is_range_relative(split):
+                new_split = [split]
+                ndim = 1
+            elif not checks.is_sequence(split):
+                new_split = [split]
+                ndim = 1
+            elif isinstance(split, np.ndarray):
+                new_split = [split]
+                ndim = 1
+            else:
+                new_split = split
+                ndim = 2
+            if fix_ranges and not already_fixed:
+                new_split = cls.split_range(
+                    slice(None),
+                    new_split,
+                    template_context=template_context,
+                    index=index,
+                    wrap_with_fixrange=False,
+                    **split_range_kwargs,
+                )
+            _new_split = []
+            for range_ in new_split:
+                if cls.is_range_num_relative(range_):
+                    range_ = RelRange(length=range_)
+                if not isinstance(range_, (FixRange, RelRange)):
+                    if wrap_with_fixrange or checks.is_sequence(range_):
+                        _new_split.append(FixRange(range_))
+                    else:
+                        _new_split.append(range_)
+                else:
+                    _new_split.append(range_)
+            new_splits.append(_new_split)
+        if len(new_splits) == 0:
+            raise ValueError("Must provide at least one range")
+        new_splits_arr = np.asarray(new_splits, dtype=object)
+        if squeeze and new_splits_arr.shape[1] == 1:
+            ndim = 1
+
         if split_labels is None:
-            split_labels = pd.RangeIndex(stop=splits.shape[0], name="split")
+            split_labels = pd.RangeIndex(stop=new_splits_arr.shape[0], name="split")
         if not isinstance(split_labels, pd.Index):
             split_labels = pd.Index(split_labels, name="split")
         if set_labels is None:
-            set_labels = pd.Index(["set_%d" % i for i in range(splits.shape[1])], name="set")
+            set_labels = pd.Index(["set_%d" % i for i in range(new_splits_arr.shape[1])], name="set")
         if not isinstance(set_labels, pd.Index):
             set_labels = pd.Index(set_labels, name="set")
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
         wrapper = ArrayWrapper(index=split_labels, columns=set_labels, ndim=ndim, **wrapper_kwargs)
-        return cls(wrapper, index, splits, **kwargs)
+        return cls(wrapper, index, new_splits_arr, **kwargs)
 
     @classmethod
     def from_split_func(
@@ -1232,8 +1262,8 @@ class Splitter(Analyzable):
         **kwargs,
     ) -> tp.Kwargs:
         """Resolve keyword arguments for initializing `Splitter` after stacking along rows."""
-        if "splits" not in kwargs:
-            kwargs["splits"] = kwargs["wrapper"].row_stack_arrs(
+        if "splits_arr" not in kwargs:
+            kwargs["splits_arr"] = kwargs["wrapper"].row_stack_arrs(
                 *[obj.splits for obj in objs],
                 group_by=False,
                 wrap=False,
@@ -1248,8 +1278,8 @@ class Splitter(Analyzable):
         **kwargs,
     ) -> tp.Kwargs:
         """Resolve keyword arguments for initializing `Splitter` after stacking along columns."""
-        if "splits" not in kwargs:
-            kwargs["splits"] = kwargs["wrapper"].column_stack_arrs(
+        if "splits_arr" not in kwargs:
+            kwargs["splits_arr"] = kwargs["wrapper"].column_stack_arrs(
                 *[obj.splits for obj in objs],
                 reindex_kwargs=reindex_kwargs,
                 group_by=False,
@@ -1317,41 +1347,41 @@ class Splitter(Analyzable):
 
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Analyzable._expected_keys or set()) | {
         "index",
-        "splits",
+        "splits_arr",
     }
 
     def __init__(
         self,
         wrapper: ArrayWrapper,
         index: tp.Index,
-        splits: tp.SplitsArray,
+        splits_arr: tp.SplitsArray,
         **kwargs,
     ) -> None:
         if wrapper.grouper.is_grouped():
             raise ValueError("Splitter cannot be grouped")
         index = try_to_datetime_index(index)
-        if splits.shape[0] != wrapper.shape_2d[0]:
+        if splits_arr.shape[0] != wrapper.shape_2d[0]:
             raise ValueError("Number of splits must match wrapper index")
-        if splits.shape[1] != wrapper.shape_2d[1]:
+        if splits_arr.shape[1] != wrapper.shape_2d[1]:
             raise ValueError("Number of sets must match wrapper columns")
 
         Analyzable.__init__(
             self,
             wrapper,
             index=index,
-            splits=splits,
+            splits_arr=splits_arr,
             **kwargs,
         )
 
         self._index = index
-        self._splits = splits
+        self._splits_arr = splits_arr
 
     def indexing_func_meta(self, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> dict:
         """Perform indexing on `Splitter` and return metadata."""
         if wrapper_meta is None:
             wrapper_meta = self.wrapper.indexing_func_meta(*args, **kwargs)
         if wrapper_meta["rows_changed"] or wrapper_meta["columns_changed"]:
-            new_splits = ArrayWrapper.select_from_flex_array(
+            new_splits_arr = ArrayWrapper.select_from_flex_array(
                 self.splits_arr,
                 row_idxs=wrapper_meta["row_idxs"],
                 col_idxs=wrapper_meta["col_idxs"],
@@ -1359,10 +1389,10 @@ class Splitter(Analyzable):
                 columns_changed=wrapper_meta["columns_changed"],
             )
         else:
-            new_splits = self.splits_arr
+            new_splits_arr = self.splits_arr
         return dict(
             wrapper_meta=wrapper_meta,
-            new_splits=new_splits,
+            new_splits_arr=new_splits_arr,
         )
 
     def indexing_func(self: SplitterT, *args, splitter_meta: tp.DictLike = None, **kwargs) -> SplitterT:
@@ -1371,7 +1401,7 @@ class Splitter(Analyzable):
             splitter_meta = self.indexing_func_meta(*args, **kwargs)
         return self.replace(
             wrapper=splitter_meta["wrapper_meta"]["new_wrapper"],
-            splits=splitter_meta["new_splits"],
+            splits_arr=splitter_meta["new_splits_arr"],
         )
 
     @property
@@ -1385,12 +1415,12 @@ class Splitter(Analyzable):
 
         First axis represents splits. Second axis represents sets. Elements represent ranges.
         Range must be either a slice, a sequence of indices, a mask, or a callable that returns such."""
-        return self._splits
+        return self._splits_arr
 
     @property
     def splits(self) -> tp.Frame:
         """`Splitter.splits_arr` as a DataFrame."""
-        return self.wrapper.wrap(self._splits, group_by=False)
+        return self.wrapper.wrap(self._splits_arr, group_by=False)
 
     @property
     def split_labels(self) -> tp.Index:
@@ -1464,16 +1494,17 @@ class Splitter(Analyzable):
         Keyword arguments `split_range_kwargs` are passed to `Splitter.split_range`."""
         if split_range_kwargs is None:
             split_range_kwargs = {}
-        new_splits = []
+        split_range_kwargs = dict(split_range_kwargs)
+        wrap_with_fixrange = split_range_kwargs.pop("wrap_with_fixrange", None)
+        if isinstance(wrap_with_fixrange, bool) and not wrap_with_fixrange:
+            raise ValueError("Argument wrap_with_fixrange must be True or None")
+        split_range_kwargs["wrap_with_fixrange"] = wrap_with_fixrange
+        new_splits_arr = []
         for split in self.splits_arr:
-            new_splits.append(self.split_range(slice(None), split, **split_range_kwargs))
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                new_splits = np.asarray(new_splits)
-        except Exception as e:
-            new_splits = np.asarray(new_splits, dtype=object)
-        return self.replace(splits=new_splits, **kwargs)
+            new_split = self.split_range(slice(None), split, **split_range_kwargs)
+            new_splits_arr.append(new_split)
+        new_splits_arr = np.asarray(new_splits_arr, dtype=object)
+        return self.replace(splits_arr=new_splits_arr, **kwargs)
 
     def to_grouped(
         self: SplitterT,
@@ -1487,6 +1518,13 @@ class Splitter(Analyzable):
         **kwargs,
     ) -> SplitterT:
         """Merge all ranges within the same group and return a new `Splitter` instance."""
+        if merge_split_kwargs is None:
+            merge_split_kwargs = {}
+        merge_split_kwargs = dict(merge_split_kwargs)
+        wrap_with_fixrange = merge_split_kwargs.pop("wrap_with_fixrange", None)
+        if isinstance(wrap_with_fixrange, bool) and not wrap_with_fixrange:
+            raise ValueError("Argument wrap_with_fixrange must be True or None")
+        merge_split_kwargs["wrap_with_fixrange"] = wrap_with_fixrange
         split_group_by = self.get_split_grouper(split_group_by=split_group_by)
         split_labels = self.get_split_labels(split_group_by=split_group_by)
         set_group_by = self.get_set_grouper(set_group_by=set_group_by)
@@ -1504,9 +1542,9 @@ class Splitter(Analyzable):
         if set_group_by is not None:
             set_labels = set_labels[set_group_indices]
 
-        splits = []
+        new_splits_arr = []
         for i in split_group_indices:
-            splits.append([])
+            new_splits_arr.append([])
             for j in set_group_indices:
                 new_range = self.select_range(
                     split=i,
@@ -1517,26 +1555,27 @@ class Splitter(Analyzable):
                     set_as_indices=True,
                     merge_split_kwargs=merge_split_kwargs,
                 )
-                splits[-1].append(new_range)
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                splits = np.asarray(splits)
-        except Exception as e:
-            splits = np.asarray(splits, dtype=object)
+                new_splits_arr[-1].append(new_range)
+        new_splits_arr = np.asarray(new_splits_arr, dtype=object)
+
         if set_group_by is None or not set_group_by.is_grouped():
             ndim = self.wrapper.ndim
         else:
-            ndim = 1 if splits.shape[1] == 1 else 2
+            ndim = 1 if new_splits_arr.shape[1] == 1 else 2
         wrapper = self.wrapper.replace(index=split_labels, columns=set_labels, ndim=ndim)
-        return self.replace(wrapper=wrapper, splits=splits, **kwargs)
+        return self.replace(wrapper=wrapper, splits_arr=new_splits_arr, **kwargs)
 
     # ############# Ranges ############# #
 
     @classmethod
+    def is_range_num_relative(cls, range_: tp.RangeLike) -> bool:
+        """Return whether a range is numeric-relative."""
+        return isinstance(range_, (int, float, np.number))
+
+    @classmethod
     def is_range_relative(cls, range_: tp.RangeLike) -> bool:
         """Return whether a range is relative."""
-        return isinstance(range_, (int, float, np.number, RelRange))
+        return cls.is_range_num_relative(range_) or isinstance(range_, RelRange)
 
     @class_or_instancemethod
     def get_ready_range(
@@ -1582,7 +1621,7 @@ class Splitter(Analyzable):
             raise ValueError(f"Invalid option range_format='{range_format}'")
 
         meta = dict()
-        meta["was_gap"] = False
+        meta["was_fixed"] = False
         meta["was_template"] = False
         meta["was_callable"] = False
         meta["was_relative"] = False
@@ -1595,8 +1634,8 @@ class Splitter(Analyzable):
         meta["start"] = None
         meta["stop"] = None
         meta["length"] = None
-        if isinstance(range_, GapRange):
-            meta["was_gap"] = True
+        if isinstance(range_, FixRange):
+            meta["was_fixed"] = True
             range_ = range_.range_
         if isinstance(range_, CustomTemplate):
             meta["was_template"] = True
@@ -1615,7 +1654,7 @@ class Splitter(Analyzable):
                     meta["range_"] = range_
                     return meta
                 return range_
-            raise TypeError("Relative ranges must be converted to fixed before indexing")
+            raise TypeError("Relative ranges must be converted to fixed")
         if isinstance(range_, hslice):
             meta["was_hslice"] = True
             range_ = range_.to_slice()
@@ -1645,7 +1684,7 @@ class Splitter(Analyzable):
                 mask[range_] = True
                 range_ = mask
         else:
-            range_ = np.asarray(range_, dtype=np.asarray([range_[0]]).dtype)
+            range_ = np.asarray(range_)
             if range_.dtype == np.bool_:
                 if len(range_) != len(index):
                     raise ValueError("Mask must have the same length as index")
@@ -1723,9 +1762,9 @@ class Splitter(Analyzable):
         allow_zero_len: bool = False,
         range_format: tp.Optional[str] = None,
         wrap_with_template: bool = False,
+        wrap_with_fixrange: tp.Optional[bool] = False,
         template_context: tp.KwargsLike = None,
         index: tp.Optional[tp.IndexLike] = None,
-        **range_split_kwargs,
     ) -> tp.FixSplit:
         """Split a fixed range into a split of multiple fixed ranges.
 
@@ -1733,10 +1772,10 @@ class Splitter(Analyzable):
         of indices, or a mask. This range will then be re-mapped into the index.
 
         Each sub-range in `new_split` can be either a fixed or relative range, that is, an instance
-        of `RelRange` or a number that will be used as a length to create an `RelRange`
-        instance with `**kwargs`. Each sub-range will then be re-mapped into the main range.
-        Argument `new_split` can also be provided as an integer or a float indicating the length;
-        in such a case the second part (or the first one depending on `backwards`) will stretch.
+        of `RelRange` or a number that will be used as a length to create an `RelRange`.
+        Each sub-range will then be re-mapped into the main range. Argument `new_split` can also
+        be provided as an integer or a float indicating the length; in such a case the second part
+        (or the first one depending on `backwards`) will stretch.
 
         New ranges are returned relative to the index and in the same order as passed.
 
@@ -1772,7 +1811,7 @@ class Splitter(Analyzable):
                 range_format = "slice_or_any"
 
         # Prepare target ranges
-        if isinstance(new_split, (int, float, np.number)):
+        if cls_or_self.is_range_num_relative(new_split):
             if new_split < 0:
                 backwards = not backwards
                 new_split = abs(new_split)
@@ -1804,10 +1843,10 @@ class Splitter(Analyzable):
                 return_meta=True,
             )
             new_range = new_range_meta["range_"]
-            new_range_was_gap = new_range_meta["was_gap"]
-            if isinstance(new_range, (int, float, np.number)):
-                new_range = RelRange(length=new_range, **range_split_kwargs)
+            if cls_or_self.is_range_num_relative(new_range):
+                new_range = RelRange(length=new_range)
             if isinstance(new_range, RelRange):
+                new_range_is_gap = new_range.is_gap
                 new_range = new_range.to_slice(
                     range_length,
                     prev_start=range_length - prev_end if backwards else prev_start,
@@ -1815,6 +1854,8 @@ class Splitter(Analyzable):
                 )
                 if backwards:
                     new_range = slice(range_length - new_range.stop, range_length - new_range.start)
+            else:
+                new_range_is_gap = False
 
             # Update previous bounds
             if isinstance(new_range, slice):
@@ -1825,7 +1866,7 @@ class Splitter(Analyzable):
                 prev_end = new_range_meta["stop"]
 
             # Remap new range to index
-            if new_range_was_gap:
+            if new_range_is_gap:
                 continue
             if isinstance(range_, slice) and isinstance(new_range, slice):
                 new_range = slice(
@@ -1847,6 +1888,12 @@ class Splitter(Analyzable):
                 new_range = hslice.from_slice(new_range)
             if wrap_with_template:
                 new_range = Rep("range_", context=dict(range_=new_range))
+            if wrap_with_fixrange is None:
+                _wrap_with_fixrange = checks.is_sequence(new_range)
+            else:
+                _wrap_with_fixrange = False
+            if _wrap_with_fixrange:
+                new_range = FixRange(new_range)
             new_ranges.append(new_range)
 
         if backwards:
@@ -1859,6 +1906,7 @@ class Splitter(Analyzable):
         split: tp.FixSplit,
         range_format: tp.Optional[str] = None,
         wrap_with_template: bool = False,
+        wrap_with_fixrange: tp.Optional[bool] = False,
         template_context: tp.KwargsLike = None,
         index: tp.Optional[tp.IndexLike] = None,
     ) -> tp.FixRangeLike:
@@ -1914,6 +1962,12 @@ class Splitter(Analyzable):
             new_range = hslice.from_slice(new_range)
         if wrap_with_template:
             new_range = Rep("range_", context=dict(range_=new_range))
+        if wrap_with_fixrange is None:
+            _wrap_with_fixrange = checks.is_sequence(new_range)
+        else:
+            _wrap_with_fixrange = False
+        if _wrap_with_fixrange:
+            new_range = FixRange(new_range)
         return new_range
 
     # ############# Taking ############# #
@@ -3102,20 +3156,21 @@ class Splitter(Analyzable):
             wrapper_kwargs = {}
         if init_kwargs is None:
             init_kwargs = {}
+        split_range_kwargs = dict(split_range_kwargs)
+        wrap_with_fixrange = split_range_kwargs.pop("wrap_with_fixrange", None)
+        if isinstance(wrap_with_fixrange, bool) and not wrap_with_fixrange:
+            raise ValueError("Argument wrap_with_fixrange must be True or None")
+        split_range_kwargs["wrap_with_fixrange"] = wrap_with_fixrange
 
-        new_splits = []
+        new_splits_arr = []
         for split in self.splits_arr:
             new_ranges = self.split_range(split[column], new_split, **split_range_kwargs)
-            new_splits.append([*split[:column], *new_ranges, *split[column + 1 :]])
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                new_splits = np.asarray(new_splits)
-        except Exception as e:
-            new_splits = np.asarray(new_splits, dtype=object)
+            new_splits_arr.append([*split[:column], *new_ranges, *split[column + 1 :]])
+        new_splits_arr = np.asarray(new_splits_arr, dtype=object)
+
         if "columns" not in wrapper_kwargs:
             wrapper_kwargs = dict(wrapper_kwargs)
-            n_new_sets = new_splits.shape[1] - self.n_sets + 1
+            n_new_sets = new_splits_arr.shape[1] - self.n_sets + 1
             if new_set_labels is None:
                 old_set_label = self.set_labels[column]
                 if isinstance(old_set_label, str) and len(old_set_label.split("+")) == n_new_sets:
@@ -3129,7 +3184,7 @@ class Splitter(Analyzable):
             new_columns = new_columns.insert(column, new_set_labels)
             wrapper_kwargs["columns"] = new_columns
         new_wrapper = self.wrapper.replace(**wrapper_kwargs)
-        return self.replace(wrapper=new_wrapper, splits=new_splits, **init_kwargs)
+        return self.replace(wrapper=new_wrapper, splits_arr=new_splits_arr, **init_kwargs)
 
     def merge_sets(
         self: SplitterT,
@@ -3165,8 +3220,13 @@ class Splitter(Analyzable):
             wrapper_kwargs = {}
         if init_kwargs is None:
             init_kwargs = {}
+        merge_split_kwargs = dict(merge_split_kwargs)
+        wrap_with_fixrange = merge_split_kwargs.pop("wrap_with_fixrange", None)
+        if isinstance(wrap_with_fixrange, bool) and not wrap_with_fixrange:
+            raise ValueError("Argument wrap_with_fixrange must be True or None")
+        merge_split_kwargs["wrap_with_fixrange"] = wrap_with_fixrange
 
-        new_splits = []
+        new_splits_arr = []
         for split in self.splits_arr:
             split_to_merge = []
             for j, range_ in enumerate(split):
@@ -3184,13 +3244,9 @@ class Splitter(Analyzable):
                     else:
                         if j == columns[0]:
                             new_split.append(new_range)
-            new_splits.append(new_split)
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                new_splits = np.asarray(new_splits)
-        except Exception as e:
-            new_splits = np.asarray(new_splits, dtype=object)
+            new_splits_arr.append(new_split)
+        new_splits_arr = np.asarray(new_splits_arr, dtype=object)
+
         if "columns" not in wrapper_kwargs:
             wrapper_kwargs = dict(wrapper_kwargs)
             if new_set_label is None:
@@ -3233,7 +3289,7 @@ class Splitter(Analyzable):
             if len(wrapper_kwargs["columns"]) == 1:
                 wrapper_kwargs["ndim"] = 1
         new_wrapper = self.wrapper.replace(**wrapper_kwargs)
-        return self.replace(wrapper=new_wrapper, splits=new_splits, **init_kwargs)
+        return self.replace(wrapper=new_wrapper, splits_arr=new_splits_arr, **init_kwargs)
 
     # ############# Bounds ############# #
 
@@ -3450,28 +3506,24 @@ class Splitter(Analyzable):
         First axis represents sets. Second axis represents index.
 
         Keyword arguments `**kwargs` are passed to `Splitter.get_range_mask`."""
-        if split_group_by is None and set_group_by is None and self.splits_arr.dtype == np.bool_:
-            for i in range(self.n_splits):
-                yield self.splits_arr[i]
-        else:
-            split_group_by = self.get_split_grouper(split_group_by=split_group_by)
-            n_splits = self.get_n_splits(split_group_by=split_group_by)
-            set_group_by = self.get_set_grouper(set_group_by=set_group_by)
-            n_sets = self.get_n_sets(set_group_by=set_group_by)
-            for i in range(n_splits):
-                out = np.full((n_sets, len(self.index)), False)
-                for j in range(n_sets):
-                    range_ = self.select_range(
-                        split=i,
-                        set_=j,
-                        split_group_by=split_group_by,
-                        set_group_by=set_group_by,
-                        split_as_indices=True,
-                        set_as_indices=True,
-                        merge_split_kwargs=dict(template_context=template_context),
-                    )
-                    out[j, :] = self.get_range_mask(range_, template_context=template_context, **kwargs)
-                yield out
+        split_group_by = self.get_split_grouper(split_group_by=split_group_by)
+        n_splits = self.get_n_splits(split_group_by=split_group_by)
+        set_group_by = self.get_set_grouper(set_group_by=set_group_by)
+        n_sets = self.get_n_sets(set_group_by=set_group_by)
+        for i in range(n_splits):
+            out = np.full((n_sets, len(self.index)), False)
+            for j in range(n_sets):
+                range_ = self.select_range(
+                    split=i,
+                    set_=j,
+                    split_group_by=split_group_by,
+                    set_group_by=set_group_by,
+                    split_as_indices=True,
+                    set_as_indices=True,
+                    merge_split_kwargs=dict(template_context=template_context),
+                )
+                out[j, :] = self.get_range_mask(range_, template_context=template_context, **kwargs)
+            yield out
 
     @property
     def iter_split_mask_arrs(self) -> tp.Generator[tp.Array2d, None, None]:
@@ -3490,28 +3542,24 @@ class Splitter(Analyzable):
         First axis represents splits. Second axis represents index.
 
         Keyword arguments `**kwargs` are passed to `Splitter.get_range_mask`."""
-        if split_group_by is None and set_group_by is None and self.splits_arr.dtype == np.bool_:
-            for j in range(self.n_sets):
-                yield self.splits_arr[:, j]
-        else:
-            split_group_by = self.get_split_grouper(split_group_by=split_group_by)
-            n_splits = self.get_n_splits(split_group_by=split_group_by)
-            set_group_by = self.get_set_grouper(set_group_by=set_group_by)
-            n_sets = self.get_n_sets(set_group_by=set_group_by)
-            for j in range(n_sets):
-                out = np.full((n_splits, len(self.index)), False)
-                for i in range(n_splits):
-                    range_ = self.select_range(
-                        split=i,
-                        set_=j,
-                        split_group_by=split_group_by,
-                        set_group_by=set_group_by,
-                        split_as_indices=True,
-                        set_as_indices=True,
-                        merge_split_kwargs=dict(template_context=template_context),
-                    )
-                    out[i, :] = self.get_range_mask(range_, template_context=template_context, **kwargs)
-                yield out
+        split_group_by = self.get_split_grouper(split_group_by=split_group_by)
+        n_splits = self.get_n_splits(split_group_by=split_group_by)
+        set_group_by = self.get_set_grouper(set_group_by=set_group_by)
+        n_sets = self.get_n_sets(set_group_by=set_group_by)
+        for j in range(n_sets):
+            out = np.full((n_splits, len(self.index)), False)
+            for i in range(n_splits):
+                range_ = self.select_range(
+                    split=i,
+                    set_=j,
+                    split_group_by=split_group_by,
+                    set_group_by=set_group_by,
+                    split_as_indices=True,
+                    set_as_indices=True,
+                    merge_split_kwargs=dict(template_context=template_context),
+                )
+                out[i, :] = self.get_range_mask(range_, template_context=template_context, **kwargs)
+            yield out
 
     @property
     def iter_set_mask_arrs(self) -> tp.Generator[tp.Array2d, None, None]:
@@ -3578,8 +3626,6 @@ class Splitter(Analyzable):
         First axis represents splits. Second axis represents sets. Third axis represents index.
 
         Keyword arguments `**kwargs` are passed to `Splitter.get_iter_split_mask_arrs`."""
-        if split_group_by is None and set_group_by is None and self.splits_arr.dtype == np.bool_:
-            return self.splits_arr
         return np.array(
             list(
                 self.get_iter_split_mask_arrs(

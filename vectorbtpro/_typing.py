@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from vectorbtpro.base.indexing import hslice
     from vectorbtpro.base.grouping.base import Grouper
     from vectorbtpro.base.resampling.base import Resampler
-    from vectorbtpro.generic.splitting.splitter import RelRange, GapRange
+    from vectorbtpro.generic.splitting.base import FixRange, RelRange
 else:
     Regex = "Regex"
     ExecutionEngine = "ExecutionEngine"
@@ -55,8 +55,8 @@ else:
     hslice = "hslice"
     Grouper = "Grouper"
     Resampler = "Resampler"
+    FixRange = "FixRange"
     RelRange = "RelRange"
-    GapRange = "GapRange"
 
 # Generic types
 T = TypeVar("T")
@@ -240,13 +240,13 @@ ClassWrapper = Callable[[Type[T]], Type[T]]
 FlexClassWrapper = Union[Callable[[Type[T]], Type[T]], Type[T]]
 
 # Splitting
-RelRangeLike = Union[int, float, RelRange, Callable, CustomTemplate, GapRange]
-FixRangeLike = Union[Slice, Sequence[int], Sequence[bool], Callable, CustomTemplate, GapRange]
+FixRangeLike = Union[Slice, Sequence[int], Sequence[bool], Callable, CustomTemplate, FixRange]
+RelRangeLike = Union[int, float, Callable, CustomTemplate, RelRange]
+RangeLike = Union[FixRangeLike, RelRangeLike]
 ReadyRangeLike = Union[slice, Array1d]
-RangeLike = Union[RelRangeLike, FixRangeLike]
 FixSplit = Sequence[FixRangeLike]
 SplitLike = Union[int, float, MaybeSequence[RangeLike]]
-Splits = MaybeSequence[SplitLike]
+Splits = Sequence[SplitLike]
+SplitsArray = Array2d
 SplitsMask = Array3d
-SplitsArray = Union[Array2d, SplitsMask]
 BoundsArray = Array3d
