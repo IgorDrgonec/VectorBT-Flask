@@ -17,7 +17,12 @@ from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.template import CustomTemplate, Rep, RepFunc, deep_substitute
 from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.parsing import get_func_arg_names
-from vectorbtpro.utils.datetime_ import try_to_datetime_index
+from vectorbtpro.utils.datetime_ import (
+    try_to_datetime_index,
+    try_align_to_datetime_index,
+    parse_timedelta,
+    infer_index_freq,
+)
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.indexing import hslice, PandasIndexer, get_index_ranges
@@ -53,7 +58,7 @@ class FixRange:
 class RelRange:
     """Class that represents a relative range."""
 
-    offset: tp.Union[int, float] = attr.ib(default=0)
+    offset: tp.Union[int, float, tp.TimedeltaLike] = attr.ib(default=0)
     """Offset.
     
     Floating values between 0 and 1 are considered relative.
@@ -81,7 +86,7 @@ class RelRange:
     
     Applied only when `RelRange.offset` is a relative number."""
 
-    length: tp.Union[int, float] = attr.ib(default=1.0)
+    length: tp.Union[int, float, tp.TimedeltaLike] = attr.ib(default=1.0)
     """Length.
     
     Floating values between 0 and 1 are considered relative.
@@ -130,47 +135,121 @@ class RelRange:
         total_len: int,
         prev_start: int = 0,
         prev_end: int = 0,
+        index: tp.Optional[tp.IndexLike] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
     ) -> slice:
         """Convert the relative range into a slice."""
-        if self.offset_anchor == "start":
-            offset_anchor = 0
-        elif self.offset_anchor == "end":
-            offset_anchor = total_len
-        elif self.offset_anchor == "prev_start":
-            offset_anchor = prev_start
+        if index is not None:
+            index = try_to_datetime_index(index)
+            freq = infer_index_freq(index, freq=freq, allow_numeric=False)
+        offset_anchor = self.offset_anchor
+        offset = self.offset
+        length = self.length
+        if not isinstance(offset, (int, float, np.number)) or not isinstance(length, (int, float, np.number)):
+            if not isinstance(index, pd.DatetimeIndex):
+                raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
+
+        if offset_anchor == "start":
+            if isinstance(offset, (int, float, np.number)):
+                offset_anchor = 0
+            else:
+                offset_anchor = index[0]
+        elif offset_anchor == "end":
+            if isinstance(offset, (int, float, np.number)):
+                offset_anchor = total_len
+            else:
+                if freq is None:
+                    raise ValueError("Must provide frequency")
+                offset_anchor = index[-1] + freq
+        elif offset_anchor == "prev_start":
+            if isinstance(offset, (int, float, np.number)):
+                offset_anchor = prev_start
+            else:
+                offset_anchor = index[prev_start]
         else:
-            offset_anchor = prev_end
-        if isinstance(self.offset, (float, np.floating)) and 0 <= abs(self.offset) <= 1:
+            if isinstance(offset, (int, float, np.number)):
+                offset_anchor = prev_end
+            else:
+                if prev_end < total_len:
+                    offset_anchor = index[prev_end]
+                else:
+                    if freq is None:
+                        raise ValueError("Must provide frequency")
+                    offset_anchor = index[-1] + freq
+
+        if isinstance(offset, (float, np.floating)) and 0 <= abs(offset) <= 1:
             if self.offset_space == "all":
-                offset = int(self.offset * total_len)
+                offset = int(offset * total_len)
             else:
-                if self.offset < 0:
-                    offset = int((1 + self.offset) * offset_anchor)
+                if offset < 0:
+                    offset = int((1 + offset) * offset_anchor)
                 else:
-                    offset = offset_anchor + int(self.offset * (total_len - offset_anchor))
+                    offset = offset_anchor + int(offset * (total_len - offset_anchor))
         else:
-            if isinstance(self.offset, (float, np.floating)) and not self.offset.is_integer():
-                raise TypeError("Floating number for offset must be between 0 and 1")
-            offset = int(offset_anchor + self.offset)
-        if isinstance(self.length, (float, np.floating)) and 0 <= abs(self.length) <= 1:
+            if isinstance(offset, (float, np.floating)):
+                if not offset.is_integer():
+                    raise TypeError(f"Floating number for offset ({offset}) must be between 0 and 1")
+                offset = offset_anchor + int(offset)
+            elif not isinstance(offset, (int, np.integer)):
+                offset = offset_anchor + parse_timedelta(offset)
+                if index[0] <= offset <= index[-1]:
+                    offset = index.get_indexer([offset], method="ffill")[0]
+                elif offset < index[0]:
+                    if freq is None:
+                        raise ValueError("Must provide frequency")
+                    offset = -int((index[0] - offset) / freq)
+                else:
+                    if freq is None:
+                        raise ValueError("Must provide frequency")
+                    offset = total_len - 1 + int((offset - index[-1]) / freq)
+            else:
+                offset = offset_anchor + offset
+
+        if isinstance(length, (float, np.floating)) and 0 <= abs(length) <= 1:
             if self.length_space == "all":
-                length = int(self.length * total_len)
+                length = int(length * total_len)
             else:
-                if self.length < 0:
+                if length < 0:
                     if offset > prev_end:
-                        length = int(self.length * (offset - prev_end))
+                        length = int(length * (offset - prev_end))
                     else:
-                        length = int(self.length * offset)
+                        length = int(length * offset)
                 else:
-                    length = int(self.length * (total_len - offset))
+                    length = int(length * (total_len - offset))
         else:
-            if isinstance(self.length, (float, np.floating)) and not self.length.is_integer():
-                raise TypeError("Floating number for length must be between 0 and 1")
-            length = int(self.length)
+            if isinstance(length, (float, np.floating)):
+                if not length.is_integer():
+                    raise TypeError(f"Floating number for length ({length}) must be between 0 and 1")
+                length = int(length)
+            elif not isinstance(length, (int, np.integer)):
+                length = parse_timedelta(length)
+
         start = offset
-        stop = start + length
-        if length < 0:
-            start, stop = stop, start
+        if isinstance(length, (int, np.integer)):
+            stop = start + length
+        else:
+            if 0 <= start < total_len:
+                stop = index[start] + length
+            elif start < 0:
+                if freq is None:
+                    raise ValueError("Must provide frequency")
+                stop = index[0] + start * freq + length
+            else:
+                if freq is None:
+                    raise ValueError("Must provide frequency")
+                stop = index[-1] + (start - total_len + 1) * freq + length
+            if stop <= index[-1]:
+                stop = index.get_indexer([stop], method="bfill")[0]
+            else:
+                if freq is None:
+                    raise ValueError("Must provide frequency")
+                stop = total_len - 1 + int((stop - index[-1]) / freq)
+        if isinstance(length, (int, np.integer)):
+            if length < 0:
+                start, stop = stop, start
+        else:
+            if length < pd.Timedelta(0):
+                start, stop = stop, start
         if start < 0:
             if self.out_of_bounds == "warn":
                 warnings.warn(f"Range start ({start}) is out of bounds", stacklevel=2)
@@ -1590,7 +1669,8 @@ class Splitter(Analyzable):
     ) -> tp.Union[tp.RelRangeLike, tp.ReadyRangeLike, dict]:
         """Get a range that can be directly used in array indexing.
 
-        Such a range is either an integer slice, a one-dimensional NumPy array with integer indices,
+        Such a range is either an integer or datetime-like slice (right bound is always exclusive!),
+        a one-dimensional NumPy array with integer indices or datetime-like objects,
         or a one-dimensional NumPy mask of the same length as the index.
 
         Argument `range_format` accepts the following options:
@@ -1628,6 +1708,7 @@ class Splitter(Analyzable):
         meta["was_hslice"] = False
         meta["was_slice"] = False
         meta["was_neg_slice"] = False
+        meta["was_datetime"] = False
         meta["was_mask"] = False
         meta["was_indices"] = False
         meta["is_constant"] = False
@@ -1661,17 +1742,56 @@ class Splitter(Analyzable):
         if isinstance(range_, slice):
             meta["was_slice"] = True
             meta["is_constant"] = True
-            start = range_.start if range_.start is not None else 0
-            stop = range_.stop if range_.stop is not None else len(index)
+            start = range_.start
+            stop = range_.stop
             if range_.step is not None and range_.step > 1:
                 raise ValueError("Step must be either None or 1")
-            if start < 0:
-                if stop > 0:
+            if start is not None and isinstance(start, (int, np.integer)) and start < 0:
+                if stop is not None and isinstance(stop, (int, np.integer)) and stop > 0:
                     raise ValueError("Slices must be either strictly negative or positive")
                 meta["was_neg_slice"] = True
-                start = len(index) + range_.start
-                stop = len(index) + range_.stop
-            range_ = slice(max(start, 0), min(stop, len(index)))
+                start = len(index) + start
+                if stop is not None and isinstance(stop, (int, np.integer)):
+                    stop = len(index) + stop
+            if start is None:
+                start = 0
+            if stop is None:
+                stop = len(index)
+            if not isinstance(start, (int, np.integer)):
+                if not isinstance(index, pd.DatetimeIndex):
+                    raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
+                start = try_align_to_datetime_index([start], index)[0]
+                if not isinstance(start, pd.Timestamp):
+                    raise ValueError(f"Range start ({start}) could not be parsed")
+                meta["was_datetime"] = True
+            if not isinstance(stop, (int, np.integer)):
+                if not isinstance(index, pd.DatetimeIndex):
+                    raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
+                stop = try_align_to_datetime_index([stop], index)[0]
+                if not isinstance(stop, pd.Timestamp):
+                    raise ValueError(f"Range start ({stop}) could not be parsed")
+                meta["was_datetime"] = True
+            if isinstance(start, (int, np.integer)):
+                if start < 0:
+                    start = 0
+            else:
+                if start < index[0]:
+                    start = 0
+                else:
+                    start = index.get_indexer([start], method="bfill")[0]
+                    if start == -1:
+                        raise ValueError(f"Range start ({start}) is out of bounds")
+            if isinstance(stop, (int, np.integer)):
+                if stop > len(index):
+                    stop = len(index)
+            else:
+                if stop > index[-1]:
+                    stop = len(index)
+                else:
+                    stop = index.get_indexer([stop], method="bfill")[0]
+                    if stop == -1:
+                        raise ValueError(f"Range stop ({stop}) is out of bounds")
+            range_ = slice(start, stop)
             meta["start"] = start
             meta["stop"] = stop
             meta["length"] = stop - start
@@ -1685,7 +1805,7 @@ class Splitter(Analyzable):
                 range_ = mask
         else:
             range_ = np.asarray(range_)
-            if range_.dtype == np.bool_:
+            if np.issubdtype(range_.dtype, np.bool_):
                 if len(range_) != len(index):
                     raise ValueError("Mask must have the same length as index")
                 meta["was_mask"] = True
@@ -1713,34 +1833,44 @@ class Splitter(Analyzable):
                     else:
                         range_ = slice(meta["start"], meta["stop"])
             else:
-                meta["was_indices"] = True
-                if len(range_) == 0:
-                    if not allow_zero_len:
-                        raise ValueError("Range has zero length")
-                    meta["is_constant"] = True
-                    meta["start"] = 0
-                    meta["stop"] = 0
-                    meta["length"] = 0
-                else:
-                    range_ = np.sort(range_)
-                    meta["is_constant"] = is_range(range_)
-                    meta["start"] = range_[0]
-                    meta["stop"] = range_[-1] + 1
-                    meta["length"] = len(range_)
-                if range_format.lower() == "mask":
-                    mask = np.full(len(index), False)
-                    mask[range_] = True
-                    range_ = mask
-                elif range_format.lower().startswith("slice"):
-                    if not meta["is_constant"]:
-                        if range_format.lower() == "slice":
-                            raise ValueError("Cannot convert to slice: range is not constant")
-                        if range_format.lower() == "slice_or_mask":
-                            mask = np.full(len(index), False)
-                            mask[range_] = True
-                            range_ = mask
+                if not np.issubdtype(range_.dtype, np.integer):
+                    range_ = try_align_to_datetime_index(range_, index)
+                    if not isinstance(range_, pd.DatetimeIndex):
+                        raise ValueError("Range array could not be parsed")
+                    range_ = index.get_indexer(range_, method=None)
+                    if -1 in range_:
+                        raise ValueError(f"Range array has values that cannot be found in index")
+                if np.issubdtype(range_.dtype, np.integer):
+                    meta["was_indices"] = True
+                    if len(range_) == 0:
+                        if not allow_zero_len:
+                            raise ValueError("Range has zero length")
+                        meta["is_constant"] = True
+                        meta["start"] = 0
+                        meta["stop"] = 0
+                        meta["length"] = 0
                     else:
-                        range_ = slice(meta["start"], meta["stop"])
+                        range_ = np.sort(range_)
+                        meta["is_constant"] = is_range(range_)
+                        meta["start"] = range_[0]
+                        meta["stop"] = range_[-1] + 1
+                        meta["length"] = len(range_)
+                    if range_format.lower() == "mask":
+                        mask = np.full(len(index), False)
+                        mask[range_] = True
+                        range_ = mask
+                    elif range_format.lower().startswith("slice"):
+                        if not meta["is_constant"]:
+                            if range_format.lower() == "slice":
+                                raise ValueError("Cannot convert to slice: range is not constant")
+                            if range_format.lower() == "slice_or_mask":
+                                mask = np.full(len(index), False)
+                                mask[range_] = True
+                                range_ = mask
+                        else:
+                            range_ = slice(meta["start"], meta["stop"])
+                else:
+                    raise TypeError(f"Range array has invalid data type ({range_.dtype})")
         if meta["start"] != meta["stop"]:
             if meta["start"] > meta["stop"]:
                 raise ValueError(f"Range start ({meta['start']}) is higher than range stop ({meta['stop']})")
@@ -1765,6 +1895,7 @@ class Splitter(Analyzable):
         wrap_with_fixrange: tp.Optional[bool] = False,
         template_context: tp.KwargsLike = None,
         index: tp.Optional[tp.IndexLike] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
     ) -> tp.FixSplit:
         """Split a fixed range into a split of multiple fixed ranges.
 
@@ -1851,6 +1982,8 @@ class Splitter(Analyzable):
                     range_length,
                     prev_start=range_length - prev_end if backwards else prev_start,
                     prev_end=range_length - prev_start if backwards else prev_end,
+                    index=index,
+                    freq=freq,
                 )
                 if backwards:
                     new_range = slice(range_length - new_range.stop, range_length - new_range.start)

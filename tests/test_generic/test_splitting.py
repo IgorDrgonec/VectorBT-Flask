@@ -71,6 +71,28 @@ class TestRelRange:
             vbt.RelRange(length_space="hello")
         with pytest.raises(Exception):
             vbt.RelRange(out_of_bounds="hello")
+        assert vbt.RelRange(length=index[5] - index[0]).to_slice(len(index), index=index) \
+               == vbt.RelRange(length=5).to_slice(len(index), index=index)
+        assert vbt.RelRange(offset=1, length=index[5] - index[0]).to_slice(len(index), index=index) \
+               == vbt.RelRange(offset=1, length=5).to_slice(len(index), index=index)
+        assert vbt.RelRange(offset=index[1] - index[0], length=index[5] - index[0]).to_slice(len(index), index=index) \
+               == vbt.RelRange(offset=1, length=5).to_slice(len(index), index=index)
+        assert vbt.RelRange(offset_anchor="end", length=index[0] - index[5]).to_slice(len(index), index=index) \
+               == vbt.RelRange(offset_anchor="end", length=-5).to_slice(len(index), index=index)
+        assert vbt.RelRange(offset="-3 days", length="5 days").to_slice(len(index), index=index) \
+               == vbt.RelRange(offset=-3, length=5).to_slice(len(index), index=index)
+        assert vbt.RelRange(offset="3 days", length="-5 days").to_slice(len(index), index=index) \
+               == vbt.RelRange(offset=3, length=-5).to_slice(len(index), index=index)
+        assert vbt.RelRange(
+            offset="-3 days", offset_anchor="end", length=index[5] - index[0]
+        ).to_slice(len(index), index=index) == vbt.RelRange(
+            offset=-3, offset_anchor="end", length=5
+        ).to_slice(len(index), index=index)
+        assert vbt.RelRange(
+            offset="3 days", offset_anchor="end", length=index[0] - index[5]
+        ).to_slice(len(index), index=index) == vbt.RelRange(
+            offset=3, offset_anchor="end", length=-5
+        ).to_slice(len(index), index=index)
 
 
 class TestSplitter:
@@ -1032,6 +1054,28 @@ class TestSplitter:
             vbt.Splitter.get_ready_range(slice(5, 10), range_format="mask", index=index),
             mask,
         )
+        assert vbt.Splitter.get_ready_range(slice(None, index[4]), index=index) == slice(0, 4)
+        assert vbt.Splitter.get_ready_range(slice(index[1], None), index=index) == slice(1, len(index))
+        assert vbt.Splitter.get_ready_range(slice(1, index[4]), index=index) == slice(1, 4)
+        assert vbt.Splitter.get_ready_range(slice(index[1], 4), index=index) == slice(1, 4)
+        assert vbt.Splitter.get_ready_range(slice(index[1], index[4]), index=index) == slice(1, 4)
+        assert vbt.Splitter.get_ready_range(
+            slice(index[0] - pd.Timedelta(days=1), index[-1] + pd.Timedelta(days=1)), index=index
+        ) == slice(0, len(index))
+        assert vbt.Splitter.get_ready_range(
+            slice(index[1].to_datetime64(), index[4].to_datetime64()), index=index
+        ) == slice(1, 4)
+        assert vbt.Splitter.get_ready_range(
+            slice(str(index[1].to_datetime64()), str(index[4].to_datetime64())), index=index
+        ) == slice(1, 4)
+        with pytest.raises(Exception):
+            vbt.Splitter.get_ready_range(
+                slice("hello", str(index[4].to_datetime64())), index=index
+            )
+        with pytest.raises(Exception):
+            vbt.Splitter.get_ready_range(
+                slice(str(index[1].to_datetime64()), "hello"), index=index
+            )
 
         assert vbt.Splitter.get_ready_range(np.array([3, 2, 1]), index=index) == slice(1, 4)
         np.testing.assert_array_equal(
@@ -1073,6 +1117,11 @@ class TestSplitter:
             vbt.Splitter.get_ready_range(np.array([3, 1]), range_format="slice_or_mask", index=index),
             mask,
         )
+        assert vbt.Splitter.get_ready_range(index[1:3], index=index) == slice(1, 3)
+        assert vbt.Splitter.get_ready_range([index[1], index[2]], index=index) == slice(1, 3)
+        assert vbt.Splitter.get_ready_range([str(index[1]), str(index[2])], index=index) == slice(1, 3)
+        with pytest.raises(Exception):
+            vbt.Splitter.get_ready_range(["hello", "world"], index=index)
 
         mask = np.full(len(index), False)
         mask[[1, 2, 3]] = True
@@ -1129,6 +1178,7 @@ class TestSplitter:
             "was_hslice": True,
             "was_slice": True,
             "was_neg_slice": False,
+            "was_datetime": False,
             "was_mask": False,
             "was_indices": False,
             "is_constant": True,
@@ -1147,6 +1197,7 @@ class TestSplitter:
             "was_hslice": False,
             "was_slice": False,
             "was_neg_slice": False,
+            "was_datetime": False,
             "was_mask": True,
             "was_indices": False,
             "is_constant": True,
@@ -1163,6 +1214,7 @@ class TestSplitter:
             "was_hslice": False,
             "was_slice": False,
             "was_neg_slice": False,
+            "was_datetime": False,
             "was_mask": False,
             "was_indices": True,
             "is_constant": True,

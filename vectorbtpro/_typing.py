@@ -123,7 +123,7 @@ LevelSequence = Sequence[Level]
 MaybeLevelSequence = Union[Level, LevelSequence]
 
 # Datetime
-TimedeltaLike = Union[pd.Timedelta, timedelta, np.timedelta64]
+TimedeltaLike = Union[str, pd.Timedelta, timedelta, np.timedelta64]
 FrequencyLike = Union[str, float, TimedeltaLike, BaseOffset]
 PandasFrequencyLike = Union[str, TimedeltaLike, BaseOffset]
 TimezoneLike = Union[None, str, float, timedelta, tzinfo]

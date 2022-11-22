@@ -96,6 +96,16 @@ def freq_to_timedelta(freq: tp.FrequencyLike) -> pd.Timedelta:
     return td
 
 
+def parse_timedelta(td: tp.TimedeltaLike) -> tp.Union[pd.Timedelta, pd.DateOffset]:
+    """Parse a timedelta-like object into Pandas format."""
+    if isinstance(td, (pd.Timedelta, pd.DateOffset)):
+        return td
+    try:
+        return to_offset(td)
+    finally:
+        return freq_to_timedelta(td)
+
+
 def time_to_timedelta(time: tp.TimeLike) -> pd.Timedelta:
     """Convert a time-like object into `pd.Timedelta`."""
     if isinstance(time, str):
