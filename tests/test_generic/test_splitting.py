@@ -49,13 +49,16 @@ class TestRelRange:
         ) == slice(5, 30)
         assert vbt.RelRange(offset_anchor="prev_end", offset=0.5, offset_space="all").to_slice(
             30, prev_end=10
-        ) == slice(15, 30)
+        ) == slice(25, 30)
         assert vbt.RelRange(length=10).to_slice(30) == slice(0, 10)
         assert vbt.RelRange(length=0.5).to_slice(30) == slice(0, 15)
         assert vbt.RelRange(offset_anchor="prev_end", length=10).to_slice(30, prev_end=10) == slice(10, 20)
         assert vbt.RelRange(offset_anchor="prev_end", length=0.5).to_slice(30, prev_end=10) == slice(10, 20)
         assert vbt.RelRange(offset_anchor="end", length=-0.5).to_slice(30, prev_end=0) == slice(15, 30)
-        assert vbt.RelRange(offset_anchor="end", length=-0.5).to_slice(30, prev_end=10) == slice(20, 30)
+        assert vbt.RelRange(offset_anchor="end", length=-0.5).to_slice(30, prev_end=10) == slice(15, 30)
+        assert vbt.RelRange(offset_anchor="end", length=-0.5, length_space="free_or_prev").to_slice(
+            30, prev_end=10
+        ) == slice(20, 30)
         assert vbt.RelRange(offset_anchor="prev_end", length=-0.5).to_slice(30, prev_end=10) == slice(5, 10)
         assert vbt.RelRange(offset_anchor="prev_end", length=0.5, length_space="all").to_slice(
             30, prev_end=10
@@ -71,28 +74,30 @@ class TestRelRange:
             vbt.RelRange(length_space="hello")
         with pytest.raises(Exception):
             vbt.RelRange(out_of_bounds="hello")
-        assert vbt.RelRange(length=index[5] - index[0]).to_slice(len(index), index=index) \
-               == vbt.RelRange(length=5).to_slice(len(index), index=index)
-        assert vbt.RelRange(offset=1, length=index[5] - index[0]).to_slice(len(index), index=index) \
-               == vbt.RelRange(offset=1, length=5).to_slice(len(index), index=index)
-        assert vbt.RelRange(offset=index[1] - index[0], length=index[5] - index[0]).to_slice(len(index), index=index) \
-               == vbt.RelRange(offset=1, length=5).to_slice(len(index), index=index)
-        assert vbt.RelRange(offset_anchor="end", length=index[0] - index[5]).to_slice(len(index), index=index) \
-               == vbt.RelRange(offset_anchor="end", length=-5).to_slice(len(index), index=index)
-        assert vbt.RelRange(offset="-3 days", length="5 days").to_slice(len(index), index=index) \
-               == vbt.RelRange(offset=-3, length=5).to_slice(len(index), index=index)
-        assert vbt.RelRange(offset="3 days", length="-5 days").to_slice(len(index), index=index) \
-               == vbt.RelRange(offset=3, length=-5).to_slice(len(index), index=index)
-        assert vbt.RelRange(
-            offset="-3 days", offset_anchor="end", length=index[5] - index[0]
-        ).to_slice(len(index), index=index) == vbt.RelRange(
-            offset=-3, offset_anchor="end", length=5
+        assert vbt.RelRange(length=index[5] - index[0]).to_slice(len(index), index=index) == vbt.RelRange(
+            length=5
         ).to_slice(len(index), index=index)
-        assert vbt.RelRange(
-            offset="3 days", offset_anchor="end", length=index[0] - index[5]
-        ).to_slice(len(index), index=index) == vbt.RelRange(
-            offset=3, offset_anchor="end", length=-5
+        assert vbt.RelRange(offset=1, length=index[5] - index[0]).to_slice(len(index), index=index) == vbt.RelRange(
+            offset=1, length=5
         ).to_slice(len(index), index=index)
+        assert vbt.RelRange(offset=index[1] - index[0], length=index[5] - index[0]).to_slice(
+            len(index), index=index
+        ) == vbt.RelRange(offset=1, length=5).to_slice(len(index), index=index)
+        assert vbt.RelRange(offset_anchor="end", length=index[0] - index[5]).to_slice(
+            len(index), index=index
+        ) == vbt.RelRange(offset_anchor="end", length=-5).to_slice(len(index), index=index)
+        assert vbt.RelRange(offset="-3 days", length="5 days").to_slice(len(index), index=index) == vbt.RelRange(
+            offset=-3, length=5
+        ).to_slice(len(index), index=index)
+        assert vbt.RelRange(offset="3 days", length="-5 days").to_slice(len(index), index=index) == vbt.RelRange(
+            offset=3, length=-5
+        ).to_slice(len(index), index=index)
+        assert vbt.RelRange(offset="-3 days", offset_anchor="end", length=index[5] - index[0]).to_slice(
+            len(index), index=index
+        ) == vbt.RelRange(offset=-3, offset_anchor="end", length=5).to_slice(len(index), index=index)
+        assert vbt.RelRange(offset="3 days", offset_anchor="end", length=index[0] - index[5]).to_slice(
+            len(index), index=index
+        ) == vbt.RelRange(offset=3, offset_anchor="end", length=-5).to_slice(len(index), index=index)
 
 
 class TestSplitter:
@@ -130,9 +135,9 @@ class TestSplitter:
             index, [[0.5]], split_range_kwargs=dict(range_format="mask")
         ).splits_arr.shape == (1, 1)
         np.testing.assert_array_equal(
-            vbt.Splitter.from_splits(
-                index, [[0.5]], split_range_kwargs=dict(range_format="mask")
-            ).splits_arr[0, 0].range_,
+            vbt.Splitter.from_splits(index, [[0.5]], split_range_kwargs=dict(range_format="mask"))
+            .splits_arr[0, 0]
+            .range_,
             np.array([*[True] * 15, *[False] * 16]),
         )
         np.testing.assert_array_equal(
@@ -398,6 +403,10 @@ class TestSplitter:
             vbt.Splitter.from_n_rolling(index, 40, length=10).splits_arr,
             np.array([*[[slice(i, i + 10)] for i in range(22)]], dtype=object),
         )
+        np.testing.assert_array_equal(
+            vbt.Splitter.from_n_rolling(index, 5, length="5 days").splits_arr,
+            vbt.Splitter.from_n_rolling(index, 5, length=5).splits_arr,
+        )
 
     def test_from_expanding(self):
         with pytest.raises(Exception):
@@ -514,6 +523,10 @@ class TestSplitter:
             vbt.Splitter.from_n_expanding(index, 40, min_length=10).splits_arr,
             np.array([*[[slice(0, i + 10)] for i in range(22)]], dtype=object),
         )
+        np.testing.assert_array_equal(
+            vbt.Splitter.from_n_expanding(index, 5, min_length="10 days").splits_arr,
+            vbt.Splitter.from_n_expanding(index, 5, min_length=10).splits_arr,
+        )
 
     def test_from_n_random(self):
         with pytest.raises(Exception):
@@ -557,6 +570,19 @@ class TestSplitter:
                     [slice(21, 28, None)],
                     [slice(18, 23, None)],
                     [slice(2, 8, None)],
+                ],
+                dtype=object,
+            ),
+        )
+        np.testing.assert_array_equal(
+            vbt.Splitter.from_n_random(index, 5, 6, split=0.5, seed=seed).splits_arr,
+            np.array(
+                [
+                    [slice(2, 5, None), slice(5, 8, None)],
+                    [slice(20, 23, None), slice(23, 26, None)],
+                    [slice(17, 20, None), slice(20, 23, None)],
+                    [slice(11, 14, None), slice(14, 17, None)],
+                    [slice(11, 14, None), slice(14, 17, None)],
                 ],
                 dtype=object,
             ),
@@ -657,6 +683,58 @@ class TestSplitter:
                 dtype=object,
             ),
         )
+        np.testing.assert_array_equal(
+            vbt.Splitter.from_n_random(index, 5, 5, 10, min_start="2020-01-03", seed=seed).splits_arr,
+            vbt.Splitter.from_n_random(index, 5, 5, 10, min_start=2, seed=seed).splits_arr,
+        )
+        np.testing.assert_array_equal(
+            vbt.Splitter.from_n_random(index, 5, 5, 10, max_end="2020-01-29", seed=seed).splits_arr,
+            vbt.Splitter.from_n_random(index, 5, 5, 10, max_end=28, seed=seed).splits_arr,
+        )
+        np.testing.assert_array_equal(
+            vbt.Splitter.from_n_random(index, 5, "5 days", seed=seed).splits_arr,
+            vbt.Splitter.from_n_random(index, 5, 5, seed=seed).splits_arr,
+        )
+        np.testing.assert_array_equal(
+            vbt.Splitter.from_n_random(index, 5, "5 days", "10 days", seed=seed).splits_arr,
+            vbt.Splitter.from_n_random(index, 5, 5, 10, seed=seed).splits_arr,
+        )
+        np.testing.assert_array_equal(
+            vbt.Splitter.from_n_random(index, 5, "5 days", "10 days", min_start="2020-01-03", seed=seed).splits_arr,
+            vbt.Splitter.from_n_random(index, 5, 5, 10, min_start=2, seed=seed).splits_arr,
+        )
+        np.testing.assert_array_equal(
+            vbt.Splitter.from_n_random(index, 5, "5 days", "10 days", max_end="2020-01-29", seed=seed).splits_arr,
+            vbt.Splitter.from_n_random(index, 5, 5, 10, max_end=28, seed=seed).splits_arr,
+        )
+        with pytest.raises(Exception):
+            vbt.Splitter.from_n_random(index, 5, 1, min_start=index[0] - pd.Timedelta(days=1), seed=seed)
+        np.testing.assert_array_equal(
+            vbt.Splitter.from_n_random(index, 5, 1, min_start=index[0], seed=seed).splits_arr,
+            vbt.Splitter.from_n_random(index, 5, 1, min_start=0, seed=seed).splits_arr,
+        )
+        with pytest.raises(Exception):
+            vbt.Splitter.from_n_random(index, 5, 1, min_start=index[-1] + pd.Timedelta(days=1), seed=seed)
+        np.testing.assert_array_equal(
+            vbt.Splitter.from_n_random(index, 5, 1, min_start=index[-1], seed=seed).splits_arr,
+            vbt.Splitter.from_n_random(index, 5, 1, min_start=len(index) - 1, seed=seed).splits_arr,
+        )
+        with pytest.raises(Exception):
+            vbt.Splitter.from_n_random(index, 5, 1, max_end=index[0], seed=seed)
+        np.testing.assert_array_equal(
+            vbt.Splitter.from_n_random(index, 5, 1, max_end=index[0] + pd.Timedelta(days=1), seed=seed).splits_arr,
+            vbt.Splitter.from_n_random(index, 5, 1, max_end=1, seed=seed).splits_arr,
+        )
+        with pytest.raises(Exception):
+            vbt.Splitter.from_n_random(index, 5, 1, max_end=index[-1] + pd.Timedelta(days=2), seed=seed)
+        np.testing.assert_array_equal(
+            vbt.Splitter.from_n_random(index, 5, 1, max_end=index[-1] + pd.Timedelta(days=1), seed=seed).splits_arr,
+            vbt.Splitter.from_n_random(index, 5, 1, max_end=len(index), seed=seed).splits_arr,
+        )
+        with pytest.raises(Exception):
+            vbt.Splitter.from_n_random(index, 5, "5 days", max_end="2020-01-05", seed=seed)
+        with pytest.raises(Exception):
+            vbt.Splitter.from_n_random(index, 5, "5 days", "4 days", seed=seed)
 
     def test_from_ranges(self):
         np.testing.assert_array_equal(
@@ -707,17 +785,6 @@ class TestSplitter:
                     "2020-01-27/2020-02-02",
                 ],
                 dtype="period[W-SUN]",
-            ),
-        )
-        np.testing.assert_array_equal(
-            vbt.Splitter.from_grouper(index, by="W", min_length=7).splits_arr,
-            np.array(
-                [
-                    [slice(5, 12, None)],
-                    [slice(12, 19, None)],
-                    [slice(19, 26, None)],
-                ],
-                dtype=object,
             ),
         )
         np.testing.assert_array_equal(
@@ -1069,52 +1136,50 @@ class TestSplitter:
             slice(str(index[1].to_datetime64()), str(index[4].to_datetime64())), index=index
         ) == slice(1, 4)
         with pytest.raises(Exception):
-            vbt.Splitter.get_ready_range(
-                slice("hello", str(index[4].to_datetime64())), index=index
-            )
+            vbt.Splitter.get_ready_range(slice("hello", str(index[4].to_datetime64())), index=index)
         with pytest.raises(Exception):
-            vbt.Splitter.get_ready_range(
-                slice(str(index[1].to_datetime64()), "hello"), index=index
-            )
+            vbt.Splitter.get_ready_range(slice(str(index[1].to_datetime64()), "hello"), index=index)
 
-        assert vbt.Splitter.get_ready_range(np.array([3, 2, 1]), index=index) == slice(1, 4)
         np.testing.assert_array_equal(
-            vbt.Splitter.get_ready_range(np.array([3, 2, 1]), range_format="indices", index=index),
+            vbt.Splitter.get_ready_range(np.array([3, 2, 1]), index=index),
+            np.array([3, 2, 1]),
+        )
+        assert vbt.Splitter.get_ready_range(np.array([1, 2, 3]), index=index) == slice(1, 4)
+        np.testing.assert_array_equal(
+            vbt.Splitter.get_ready_range(np.array([1, 2, 3]), range_format="indices", index=index),
             np.array([1, 2, 3]),
         )
         mask = np.full(len(index), False)
         mask[[1, 2, 3]] = True
         np.testing.assert_array_equal(
-            vbt.Splitter.get_ready_range(np.array([3, 2, 1]), range_format="mask", index=index),
+            vbt.Splitter.get_ready_range(np.array([1, 2, 3]), range_format="mask", index=index),
             mask,
         )
-        assert vbt.Splitter.get_ready_range(
-            np.array([3, 2, 1]), range_format="slice", index=index
-        ) == slice(1, 4)
-        assert vbt.Splitter.get_ready_range(
-            np.array([3, 2, 1]), range_format="slice_or_indices", index=index
-        ) == slice(1, 4)
-        assert vbt.Splitter.get_ready_range(
-            np.array([3, 2, 1]), range_format="slice_or_mask", index=index
-        ) == slice(1, 4)
+        assert vbt.Splitter.get_ready_range(np.array([1, 2, 3]), range_format="slice", index=index) == slice(1, 4)
+        assert vbt.Splitter.get_ready_range(np.array([1, 2, 3]), range_format="slice_or_indices", index=index) == slice(
+            1, 4
+        )
+        assert vbt.Splitter.get_ready_range(np.array([1, 2, 3]), range_format="slice_or_mask", index=index) == slice(
+            1, 4
+        )
         np.testing.assert_array_equal(
-            vbt.Splitter.get_ready_range(np.array([3, 1]), index=index),
+            vbt.Splitter.get_ready_range(np.array([1, 3]), index=index),
             np.array([1, 3]),
         )
         mask = np.full(len(index), False)
         mask[[1, 3]] = True
         np.testing.assert_array_equal(
-            vbt.Splitter.get_ready_range(np.array([3, 1]), range_format="mask", index=index),
+            vbt.Splitter.get_ready_range(np.array([1, 3]), range_format="mask", index=index),
             mask,
         )
         with pytest.raises(Exception):
-            vbt.Splitter.get_ready_range(np.array([3, 1]), range_format="slice", index=index)
+            vbt.Splitter.get_ready_range(np.array([1, 3]), range_format="slice", index=index)
         np.testing.assert_array_equal(
-            vbt.Splitter.get_ready_range(np.array([3, 1]), range_format="slice_or_indices", index=index),
+            vbt.Splitter.get_ready_range(np.array([1, 3]), range_format="slice_or_indices", index=index),
             np.array([1, 3]),
         )
         np.testing.assert_array_equal(
-            vbt.Splitter.get_ready_range(np.array([3, 1]), range_format="slice_or_mask", index=index),
+            vbt.Splitter.get_ready_range(np.array([1, 3]), range_format="slice_or_mask", index=index),
             mask,
         )
         assert vbt.Splitter.get_ready_range(index[1:3], index=index) == slice(1, 3)
@@ -1370,7 +1435,9 @@ class TestSplitter:
 
     def test_merge_split(self):
         assert vbt.Splitter.merge_split((slice(10, 20), slice(20, 30)), index=index) == slice(10, 30)
-        assert vbt.Splitter.merge_split((vbt.hslice(10, 20), vbt.hslice(20, 30)), index=index) == vbt.hslice(10, 30)
+        assert vbt.Splitter.merge_split(
+            (vbt.hslice(10, 20), vbt.hslice(20, 30)), wrap_with_hslice=None, index=index
+        ) == vbt.hslice(10, 30)
         assert vbt.Splitter.merge_split((np.array([1, 3]), np.array([2, 4])), index=index) == slice(1, 5)
         mask1 = np.full(len(index), False)
         mask1[10:20] = True
@@ -4047,9 +4114,7 @@ class TestDecorators:
         with pytest.raises(Exception):
             split_f = vbt.split(f, splitter="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)))
             split_f(index, sr, sr, b=sr, c=sr)
-        split_f = vbt.split(
-            f, splitter="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index=index
-        )
+        split_f = vbt.split(f, splitter="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index=index)
         assert split_f(index, sr, sr, b=sr, c=sr) == 155
         split_f = vbt.split(
             f, splitter="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from="index"
@@ -4063,9 +4128,7 @@ class TestDecorators:
             f, splitter="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from="my_args_0"
         )
         assert split_f(index, sr, sr, b=sr, c=sr) == 155
-        split_f = vbt.split(
-            f, splitter="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from=1
-        )
+        split_f = vbt.split(f, splitter="from_single", splitter_kwargs=dict(split=vbt.RelRange(length=5)), index_from=1)
         assert split_f(index, sr, sr, b=sr, c=sr) == 155
         split_f = vbt.split(
             f,

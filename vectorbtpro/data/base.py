@@ -366,6 +366,21 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         """`missing_columns` initially passed to `Data.fetch_symbol`."""
         return self._missing_columns
 
+    @property
+    def index(self) -> tp.Index:
+        """Index."""
+        return self.wrapper.index
+
+    @property
+    def columns(self) -> tp.Index:
+        """Columns."""
+        return self.wrapper.columns
+
+    @property
+    def ndim(self) -> int:
+        """Number of dimensions."""
+        return self.wrapper.ndim
+
     # ############# Pre- and post-processing ############# #
 
     @classmethod

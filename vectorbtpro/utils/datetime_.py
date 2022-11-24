@@ -50,29 +50,43 @@ def split_freq_str(freq: str) -> tp.Optional[tp.Tuple[int, str]]:
         unit = match.group(2)
     if unit in ("S", "sec", "second", "seconds"):
         unit = "s"
-    if unit in ("T", "m", "min", "minute", "minutes"):
+    elif unit in ("T", "m", "min", "minute", "minutes"):
         unit = "t"
-    if unit in ("H", "hour", "hours", "hourly"):
+    elif unit in ("H", "hour", "hours", "hourly"):
         unit = "h"
-    if unit in ("D", "day", "days", "daily"):
+    elif unit in ("D", "day", "days", "daily"):
         unit = "d"
-    if unit in ("w", "wk", "week", "weeks", "weekly"):
+    elif unit in ("w", "wk", "week", "weeks", "weekly"):
         unit = "W"
-    if unit in ("mo", "month", "months", "monthly"):
+    elif unit in ("mo", "month", "months", "monthly"):
         unit = "M"
-    if unit in ("q", "quarter", "quarters", "quarterly"):
+    elif unit in ("q", "quarter", "quarters", "quarterly"):
         unit = "Q"
-    if unit in ("y", "year", "years", "yearly", "annual", "annually"):
+    elif unit in ("y", "year", "years", "yearly", "annual", "annually"):
         unit = "Y"
+    else:
+        return None
     return multiplier, unit
 
 
 def prepare_freq(freq: tp.FrequencyLike) -> tp.FrequencyLike:
-    """Prepare frequency using `split_freq_str`."""
+    """Prepare frequency using `split_freq_str`.
+
+    To include multiple units, separate them with comma."""
     if isinstance(freq, str):
+        if ',' in freq:
+            new_freq = ""
+            for _freq in freq.split(','):
+                split = split_freq_str(_freq)
+                if split is not None:
+                    new_freq += str(split[0]) + str(split[1])
+                else:
+                    return freq
+            return new_freq
         split = split_freq_str(freq)
         if split is not None:
             freq = str(split[0]) + str(split[1])
+        return freq
     return freq
 
 

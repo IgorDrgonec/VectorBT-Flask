@@ -2064,7 +2064,7 @@ PolygonDataT = tp.TypeVar("PolygonDataT", bound="PolygonData")
 class PolygonData(RemoteData):
     """Subclass of `vectorbtpro.data.base.Data` for `polygon-api-client`.
 
-    See https://github.com/polygon-io/client-python" for API.
+    See https://github.com/polygon-io/client-python for API.
 
     See `PolygonData.fetch_symbol` for arguments.
 
