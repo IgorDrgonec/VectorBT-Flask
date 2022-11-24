@@ -875,7 +875,8 @@ class Trades(Ranges):
 
         See `vectorbtpro.portfolio.nb.records.edge_ratio_nb`.
 
-        If `volatility` is None, calculates the 14-period ATR based on the Wilder's moving average."""
+        If `volatility` is None, calculates the 14-period ATR if both high and low are provided,
+        otherwise the 14-period rolling standard deviation."""
         if self._close is None:
             raise ValueError("Must provide close")
 
@@ -883,19 +884,29 @@ class Trades(Ranges):
         func = jit_reg.resolve_option(nb.edge_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         if volatility is None:
-            from vectorbtpro.indicators.nb import atr_nb
-            from vectorbtpro.generic.enums import WType
+            if self._high is not None and self._low is not None:
+                from vectorbtpro.indicators.nb import atr_nb
+                from vectorbtpro.generic.enums import WType
 
-            if self._high is None or self._low is None:
-                raise ValueError("Must provide high and low for ATR calculation")
+                if self._high is None or self._low is None:
+                    raise ValueError("Must provide high and low for ATR calculation")
 
-            volatility = atr_nb(
-                high=to_2d_array(self.high),
-                low=to_2d_array(self.low),
-                close=to_2d_array(self.close),
-                window=14,
-                wtype=WType.Wilder,
-            )[1]
+                volatility = atr_nb(
+                    high=to_2d_array(self.high),
+                    low=to_2d_array(self.low),
+                    close=to_2d_array(self.close),
+                    window=14,
+                    wtype=WType.Wilder,
+                )[1]
+            else:
+                from vectorbtpro.indicators.nb import msd_nb
+                from vectorbtpro.generic.enums import WType
+
+                volatility = msd_nb(
+                    close=to_2d_array(self.close),
+                    window=14,
+                    wtype=WType.Wilder,
+                )
         else:
             volatility = np.asarray(volatility)
         out = func(
@@ -932,7 +943,8 @@ class Trades(Ranges):
 
         See `vectorbtpro.portfolio.nb.records.running_edge_ratio_nb`.
 
-        If `volatility` is None, calculates the 14-period ATR based on the Wilder's moving average."""
+        If `volatility` is None, calculates the 14-period ATR if both high and low are provided,
+        otherwise the 14-period rolling standard deviation."""
         if self._close is None:
             raise ValueError("Must provide close")
 
@@ -940,19 +952,29 @@ class Trades(Ranges):
         func = jit_reg.resolve_option(nb.running_edge_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         if volatility is None:
-            from vectorbtpro.indicators.nb import atr_nb
-            from vectorbtpro.generic.enums import WType
+            if self._high is not None and self._low is not None:
+                from vectorbtpro.indicators.nb import atr_nb
+                from vectorbtpro.generic.enums import WType
 
-            if self._high is None or self._low is None:
-                raise ValueError("Must provide high and low for ATR calculation")
+                if self._high is None or self._low is None:
+                    raise ValueError("Must provide high and low for ATR calculation")
 
-            volatility = atr_nb(
-                high=to_2d_array(self.high),
-                low=to_2d_array(self.low),
-                close=to_2d_array(self.close),
-                window=14,
-                wtype=WType.Wilder,
-            )[1]
+                volatility = atr_nb(
+                    high=to_2d_array(self.high),
+                    low=to_2d_array(self.low),
+                    close=to_2d_array(self.close),
+                    window=14,
+                    wtype=WType.Wilder,
+                )[1]
+            else:
+                from vectorbtpro.indicators.nb import msd_nb
+                from vectorbtpro.generic.enums import WType
+
+                volatility = msd_nb(
+                    close=to_2d_array(self.close),
+                    window=14,
+                    wtype=WType.Wilder,
+                )
         else:
             volatility = np.asarray(volatility)
         out = func(
