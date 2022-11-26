@@ -4,13 +4,13 @@
 
 import attr
 import warnings
-import datetime
 
 import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro._settings import settings
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.array_ import is_range
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
@@ -29,6 +29,7 @@ from vectorbtpro.base.resampling import Resampler
 from vectorbtpro.base.grouping import Grouper
 from vectorbtpro.base.merging import column_stack_merge, resolve_merge_func
 from vectorbtpro.generic.analyzable import Analyzable
+from vectorbtpro.generic.splitting import nb
 
 if tp.TYPE_CHECKING:
     from sklearn.model_selection import BaseCrossValidator as BaseCrossValidatorT
@@ -2092,6 +2093,11 @@ class Splitter(Analyzable):
             else:
                 range_format = "slice_or_any"
 
+        # Substitute template
+        if isinstance(new_split, CustomTemplate):
+            _template_context = merge_dicts(dict(index=index[range_]), template_context)
+            new_split = deep_substitute(new_split, _template_context, sub_id="new_split")
+
         # Prepare target ranges
         if checks.is_number(new_split):
             if new_split < 0:
@@ -3679,8 +3685,11 @@ class Splitter(Analyzable):
         n_splits = self.get_n_splits(split_group_by=split_group_by)
         set_group_by = self.get_set_grouper(set_group_by=set_group_by)
         n_sets = self.get_n_sets(set_group_by=set_group_by)
-        bounds = np.empty((n_splits, n_sets, 2), dtype=dtype)
 
+        try:
+            bounds = np.empty((n_splits, n_sets, 2), dtype=dtype)
+        except TypeError as e:
+            bounds = np.empty((n_splits, n_sets, 2), dtype=object)
         for i in range(n_splits):
             for j in range(n_sets):
                 range_ = self.select_range(
@@ -3703,7 +3712,7 @@ class Splitter(Analyzable):
 
     @property
     def bounds_arr(self) -> tp.BoundsArray:
-        """`GenericAccessor.get_bounds_arr` with default arguments."""
+        """`Splitter.get_bounds_arr` with default arguments."""
         return self.get_bounds_arr()
 
     def get_bounds(
@@ -3729,36 +3738,36 @@ class Splitter(Analyzable):
             set_group_by=set_group_by,
             **kwargs,
         )
-        out = np.moveaxis(bounds_arr, -1, 0).reshape((2, -1))
-        new_index = pd.Index(["start", "end"], name="bound")
+        out = bounds_arr.reshape((-1, 2))
         if index_combine_kwargs is None:
             index_combine_kwargs = {}
-        new_columns = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
+        new_index = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
+        new_columns = pd.Index(["start", "end"], name="bound")
         return pd.DataFrame(out, index=new_index, columns=new_columns)
 
     @property
     def bounds(self) -> tp.Frame:
-        """`GenericAccessor.get_bounds` with default arguments."""
+        """`Splitter.get_bounds` with default arguments."""
         return self.get_bounds()
 
     @property
     def index_bounds(self) -> tp.Frame:
-        """`GenericAccessor.get_bounds` with `index_bounds=True`."""
+        """`Splitter.get_bounds` with `index_bounds=True`."""
         return self.get_bounds(index_bounds=True)
 
     def get_duration(self, **kwargs) -> tp.Series:
         """Get duration."""
-        bounds = self.get_bounds(**kwargs)
-        return (bounds.iloc[1] - bounds.iloc[0]).rename("duration")
+        bounds = self.get_bounds(right_inclusive=False, **kwargs)
+        return (bounds["end"] - bounds["start"]).rename("duration")
 
     @property
     def duration(self) -> tp.Series:
-        """`GenericAccessor.get_duration` with default arguments."""
+        """`Splitter.get_duration` with default arguments."""
         return self.get_duration()
 
     @property
     def index_duration(self) -> tp.Series:
-        """`GenericAccessor.get_duration` with `index_bounds=True`."""
+        """`Splitter.get_duration` with `index_bounds=True`."""
         return self.get_duration(index_bounds=True)
 
     # ############# Masks ############# #
@@ -3822,7 +3831,7 @@ class Splitter(Analyzable):
 
     @property
     def iter_split_mask_arrs(self) -> tp.Generator[tp.Array2d, None, None]:
-        """`GenericAccessor.get_iter_split_mask_arrs` with default arguments."""
+        """`Splitter.get_iter_split_mask_arrs` with default arguments."""
         return self.get_iter_split_mask_arrs()
 
     def get_iter_set_mask_arrs(
@@ -3858,7 +3867,7 @@ class Splitter(Analyzable):
 
     @property
     def iter_set_mask_arrs(self) -> tp.Generator[tp.Array2d, None, None]:
-        """`GenericAccessor.get_iter_set_mask_arrs` with default arguments."""
+        """`Splitter.get_iter_set_mask_arrs` with default arguments."""
         return self.get_iter_set_mask_arrs()
 
     def get_iter_split_masks(
@@ -3882,7 +3891,7 @@ class Splitter(Analyzable):
 
     @property
     def iter_split_masks(self) -> tp.Generator[tp.Frame, None, None]:
-        """`GenericAccessor.get_iter_split_masks` with default arguments."""
+        """`Splitter.get_iter_split_masks` with default arguments."""
         return self.get_iter_split_masks()
 
     def get_iter_set_masks(
@@ -3906,7 +3915,7 @@ class Splitter(Analyzable):
 
     @property
     def iter_set_masks(self) -> tp.Generator[tp.Frame, None, None]:
-        """`GenericAccessor.get_iter_set_masks` with default arguments."""
+        """`Splitter.get_iter_set_masks` with default arguments."""
         return self.get_iter_set_masks()
 
     def get_mask_arr(
@@ -3934,7 +3943,7 @@ class Splitter(Analyzable):
 
     @property
     def mask_arr(self) -> tp.SplitsMask:
-        """`GenericAccessor.get_mask_arr` with default arguments."""
+        """`Splitter.get_mask_arr` with default arguments."""
         return self.get_mask_arr()
 
     def get_mask(
@@ -3963,7 +3972,7 @@ class Splitter(Analyzable):
 
     @property
     def mask(self) -> tp.Frame:
-        """`GenericAccessor.get_mask` with default arguments."""
+        """`Splitter.get_mask` with default arguments."""
         return self.get_mask()
 
     def get_split_coverage(
@@ -3986,25 +3995,25 @@ class Splitter(Analyzable):
         split_group_by = self.get_split_grouper(split_group_by=split_group_by)
         split_labels = self.get_split_labels(split_group_by=split_group_by)
         set_group_by = self.get_set_grouper(set_group_by=set_group_by)
-        mask = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
+        mask_arr = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
         if overlapping:
             if normalize:
-                coverage = (mask.sum(axis=1) > 1).sum(axis=1) / mask.any(axis=1).sum(axis=1)
+                coverage = (mask_arr.sum(axis=1) > 1).sum(axis=1) / mask_arr.any(axis=1).sum(axis=1)
             else:
-                coverage = (mask.sum(axis=1) > 1).sum(axis=1)
+                coverage = (mask_arr.sum(axis=1) > 1).sum(axis=1)
         else:
             if normalize:
                 if relative:
-                    coverage = mask.any(axis=1).sum(axis=1) / mask.any(axis=(0, 1)).sum()
+                    coverage = mask_arr.any(axis=1).sum(axis=1) / mask_arr.any(axis=(0, 1)).sum()
                 else:
-                    coverage = mask.any(axis=1).mean(axis=1)
+                    coverage = mask_arr.any(axis=1).mean(axis=1)
             else:
-                coverage = mask.any(axis=1).sum(axis=1)
+                coverage = mask_arr.any(axis=1).sum(axis=1)
         return pd.Series(coverage, index=split_labels, name="split_coverage")
 
     @property
     def split_coverage(self) -> tp.Series:
-        """`GenericAccessor.get_split_coverage` with default arguments."""
+        """`Splitter.get_split_coverage` with default arguments."""
         return self.get_split_coverage()
 
     def get_set_coverage(
@@ -4027,25 +4036,25 @@ class Splitter(Analyzable):
         split_group_by = self.get_split_grouper(split_group_by=split_group_by)
         set_group_by = self.get_set_grouper(set_group_by=set_group_by)
         set_labels = self.get_set_labels(set_group_by=set_group_by)
-        mask = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
+        mask_arr = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
         if overlapping:
             if normalize:
-                coverage = (mask.sum(axis=0) > 1).sum(axis=1) / mask.any(axis=0).sum(axis=1)
+                coverage = (mask_arr.sum(axis=0) > 1).sum(axis=1) / mask_arr.any(axis=0).sum(axis=1)
             else:
-                coverage = (mask.sum(axis=0) > 1).sum(axis=1)
+                coverage = (mask_arr.sum(axis=0) > 1).sum(axis=1)
         else:
             if normalize:
                 if relative:
-                    coverage = mask.any(axis=0).sum(axis=1) / mask.any(axis=(0, 1)).sum()
+                    coverage = mask_arr.any(axis=0).sum(axis=1) / mask_arr.any(axis=(0, 1)).sum()
                 else:
-                    coverage = mask.any(axis=0).mean(axis=1)
+                    coverage = mask_arr.any(axis=0).mean(axis=1)
             else:
-                coverage = mask.any(axis=0).sum(axis=1)
+                coverage = mask_arr.any(axis=0).sum(axis=1)
         return pd.Series(coverage, index=set_labels, name="set_coverage")
 
     @property
     def set_coverage(self) -> tp.Series:
-        """`GenericAccessor.get_set_coverage` with default arguments."""
+        """`Splitter.get_set_coverage` with default arguments."""
         return self.get_set_coverage()
 
     def get_range_coverage(
@@ -4068,14 +4077,14 @@ class Splitter(Analyzable):
         split_labels = self.get_split_labels(split_group_by=split_group_by)
         set_group_by = self.get_set_grouper(set_group_by=set_group_by)
         set_labels = self.get_set_labels(set_group_by=set_group_by)
-        mask = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
+        mask_arr = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
         if normalize:
             if relative:
-                coverage = (mask.sum(axis=2) / mask.any(axis=1).sum(axis=1)[:, None]).flatten()
+                coverage = (mask_arr.sum(axis=2) / mask_arr.any(axis=1).sum(axis=1)[:, None]).flatten()
             else:
-                coverage = (mask.sum(axis=2) / mask.shape[2]).flatten()
+                coverage = (mask_arr.sum(axis=2) / mask_arr.shape[2]).flatten()
         else:
-            coverage = mask.sum(axis=2).flatten()
+            coverage = mask_arr.sum(axis=2).flatten()
         if index_combine_kwargs is None:
             index_combine_kwargs = {}
         index = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
@@ -4083,7 +4092,7 @@ class Splitter(Analyzable):
 
     @property
     def range_coverage(self) -> tp.Series:
-        """`GenericAccessor.get_range_coverage` with default arguments."""
+        """`Splitter.get_range_coverage` with default arguments."""
         return self.get_range_coverage()
 
     def get_coverage(
@@ -4102,19 +4111,82 @@ class Splitter(Analyzable):
         to the total number of True values.
 
         Keyword arguments `**kwargs` are passed to `Splitter.get_mask_arr`."""
-        mask = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
+        mask_arr = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
         if overlapping:
             if normalize:
-                return (mask.sum(axis=(0, 1)) > 1).sum() / mask.any(axis=(0, 1)).sum()
-            return (mask.sum(axis=(0, 1)) > 1).sum()
+                return (mask_arr.sum(axis=(0, 1)) > 1).sum() / mask_arr.any(axis=(0, 1)).sum()
+            return (mask_arr.sum(axis=(0, 1)) > 1).sum()
         if normalize:
-            return mask.any(axis=(0, 1)).mean()
-        return mask.any(axis=(0, 1)).sum()
+            return mask_arr.any(axis=(0, 1)).mean()
+        return mask_arr.any(axis=(0, 1)).sum()
 
     @property
     def coverage(self) -> float:
-        """`GenericAccessor.get_coverage` with default arguments."""
+        """`Splitter.get_coverage` with default arguments."""
         return self.get_coverage()
+
+    def get_overlap_matrix(
+        self,
+        by: str = "split",
+        normalize: bool = True,
+        split_group_by: tp.AnyGroupByLike = None,
+        set_group_by: tp.AnyGroupByLike = None,
+        jitted: tp.JittedOption = None,
+        index_combine_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.Frame:
+        """Get the overlap between each pair of ranges.
+
+        The argument `by` can be one of 'split', 'set', and 'range'.
+
+        If `normalize` is True, returns the number of True values in each overlap relative
+        to the total number of True values in both ranges.
+
+        Keyword arguments `**kwargs` are passed to `Splitter.get_mask_arr`."""
+        split_group_by = self.get_split_grouper(split_group_by=split_group_by)
+        split_labels = self.get_split_labels(split_group_by=split_group_by)
+        set_group_by = self.get_set_grouper(set_group_by=set_group_by)
+        set_labels = self.get_set_labels(set_group_by=set_group_by)
+        mask_arr = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
+        if by.lower() == "split":
+            if normalize:
+                func = jit_reg.resolve_option(nb.norm_split_overlap_matrix_nb, jitted)
+            else:
+                func = jit_reg.resolve_option(nb.split_overlap_matrix_nb, jitted)
+            index = split_labels
+        elif by.lower() == "set":
+            if normalize:
+                func = jit_reg.resolve_option(nb.norm_set_overlap_matrix_nb, jitted)
+            else:
+                func = jit_reg.resolve_option(nb.set_overlap_matrix_nb, jitted)
+            index = set_labels
+        elif by.lower() == "range":
+            if normalize:
+                func = jit_reg.resolve_option(nb.norm_range_overlap_matrix_nb, jitted)
+            else:
+                func = jit_reg.resolve_option(nb.range_overlap_matrix_nb, jitted)
+            if index_combine_kwargs is None:
+                index_combine_kwargs = {}
+            index = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
+        else:
+            raise ValueError(f"Invalid option by='{by}'")
+        overlap_matrix = func(mask_arr)
+        return pd.DataFrame(overlap_matrix, index=index, columns=index)
+
+    @property
+    def split_overlap_matrix(self) -> tp.Frame:
+        """`Splitter.get_overlap_matrix` with `by="split"`."""
+        return self.get_overlap_matrix(by="split")
+
+    @property
+    def set_overlap_matrix(self) -> tp.Frame:
+        """`Splitter.get_overlap_matrix` with `by="set"`."""
+        return self.get_overlap_matrix(by="set")
+
+    @property
+    def range_overlap_matrix(self) -> tp.Frame:
+        """`Splitter.get_overlap_matrix` with `by="range"`."""
+        return self.get_overlap_matrix(by="range")
 
     # ############# Stats ############# #
 
@@ -4301,6 +4373,7 @@ class Splitter(Analyzable):
                         dict(
                             showscale=False,
                             showlegend=True,
+                            legendgroup=str(set_labels[i]),
                             name=trace_name,
                             colorscale=[color, color],
                             hovertemplate="%{x}<br>Split: %{y}<br>Set: " + trace_name,
@@ -4317,6 +4390,7 @@ class Splitter(Analyzable):
 
     def plot_coverage(
         self,
+        stacked: bool = True,
         split_group_by: tp.AnyGroupByLike = None,
         set_group_by: tp.AnyGroupByLike = None,
         mask_kwargs: tp.KwargsLike = None,
@@ -4328,6 +4402,7 @@ class Splitter(Analyzable):
         """Plot index as rows and sets as lines.
 
         Args:
+            stacked (bool): Whether to plot as an area plot.
             split_group_by (any): Split groups. See `vectorbtpro.base.accessors.BaseIDXAccessor.get_grouper`.
             set_group_by (any): Set groups. See `vectorbtpro.base.accessors.BaseIDXAccessor.get_grouper`.
             mask_kwargs (dict): Keyword arguments passed to `Splitter.get_iter_set_masks`.
@@ -4339,17 +4414,27 @@ class Splitter(Analyzable):
             **layout_kwargs: Keyword arguments for layout.
 
         Usage:
-        ```pycon
-        >>> import vectorbtpro as vbt
-        >>> import pandas as pd
-        >>> from sklearn.model_selection import TimeSeriesSplit
+            * Area plot:
 
-        >>> index = pd.date_range("2020", "2021", freq="D")
-        >>> splitter = vbt.Splitter.from_sklearn(index, TimeSeriesSplit())
-        >>> splitter.plot_coverage()
-        ```
+            ```pycon
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+            >>> from sklearn.model_selection import TimeSeriesSplit
 
-        ![](/assets/images/api/Splitter_coverage.svg)
+            >>> index = pd.date_range("2020", "2021", freq="D")
+            >>> splitter = vbt.Splitter.from_sklearn(index, TimeSeriesSplit())
+            >>> splitter.plot_coverage()
+            ```
+
+            ![](/assets/images/api/Splitter_coverage_area.svg)
+
+            * Line plot:
+
+            ```pycon
+            >>> splitter.plot_coverage(stacked=False)
+            ```
+
+            ![](/assets/images/api/Splitter_coverage_line.svg)
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
 
@@ -4384,6 +4469,8 @@ class Splitter(Analyzable):
                 ):
                     _trace_kwargs = merge_dicts(
                         dict(
+                            stackgroup="coverage" if stacked else None,
+                            legendgroup=str(set_labels[i]),
                             name=str(set_labels[i]),
                             line=dict(color=colorway[i % len(colorway)], shape="hv"),
                         ),
@@ -4419,7 +4506,6 @@ class Splitter(Analyzable):
             plot_coverage=dict(
                 title="Coverage",
                 yaxis_kwargs=dict(title="Count"),
-                trace_kwargs=dict(showlegend=False),
                 plot_func="plot_coverage",
                 tags="splitter",
             ),

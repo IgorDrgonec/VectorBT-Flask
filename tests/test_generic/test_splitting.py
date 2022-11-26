@@ -2891,49 +2891,39 @@ class TestSplitter:
         assert_frame_equal(
             splitter.bounds,
             pd.DataFrame(
-                [[0, 5, 10, 15, 20, 25], [5, 10, 15, 20, 25, 31]],
-                index=pd.Index(["start", "end"], dtype="object", name="bound"),
-                columns=pd.MultiIndex.from_tuples(
+                [[0, 5], [5, 10], [10, 15], [15, 20], [20, 25], [25, 31]],
+                index=pd.MultiIndex.from_tuples(
                     [(0, "set_0"), (0, "set_1"), (1, "set_0"), (1, "set_1"), (2, "set_0"), (2, "set_1")],
                     names=["split", "set"],
                 ),
+                columns=pd.Index(["start", "end"], dtype="object", name="bound"),
             ),
         )
         assert_frame_equal(
             splitter.index_bounds,
             pd.DataFrame(
                 [
-                    [
-                        1577836800000000000,
-                        1578268800000000000,
-                        1578700800000000000,
-                        1579132800000000000,
-                        1579564800000000000,
-                        1579996800000000000,
-                    ],
-                    [
-                        1578268800000000000,
-                        1578700800000000000,
-                        1579132800000000000,
-                        1579564800000000000,
-                        1579996800000000000,
-                        1580515200000000000,
-                    ],
+                    [1577836800000000000, 1578268800000000000],
+                    [1578268800000000000, 1578700800000000000],
+                    [1578700800000000000, 1579132800000000000],
+                    [1579132800000000000, 1579564800000000000],
+                    [1579564800000000000, 1579996800000000000],
+                    [1579996800000000000, 1580515200000000000],
                 ],
                 dtype="datetime64[ns]",
-                index=pd.Index(["start", "end"], dtype="object", name="bound"),
-                columns=pd.MultiIndex.from_tuples(
+                index=pd.MultiIndex.from_tuples(
                     [(0, "set_0"), (0, "set_1"), (1, "set_0"), (1, "set_1"), (2, "set_0"), (2, "set_1")],
                     names=["split", "set"],
                 ),
+                columns=pd.Index(["start", "end"], dtype="object", name="bound"),
             ),
         )
         assert_frame_equal(
             splitter.get_bounds(split_group_by=["a", "b", "a"], set_group_by=["c", "c"], check_constant=False),
             pd.DataFrame(
-                [[0, 10], [31, 20]],
-                index=pd.Index(["start", "end"], dtype="object", name="bound"),
-                columns=pd.MultiIndex.from_tuples([("a", "c"), ("b", "c")], names=["split_group", "set_group"]),
+                [[0, 31], [10, 20]],
+                index=pd.MultiIndex.from_tuples([("a", "c"), ("b", "c")], names=["split_group", "set_group"]),
+                columns=pd.Index(["start", "end"], dtype="object", name="bound"),
             ),
         )
 
@@ -3946,6 +3936,64 @@ class TestSplitter:
         assert splitter.get_coverage(normalize=True, overlapping=False) == 0.8387096774193549
         assert splitter.get_coverage(normalize=False, overlapping=True) == 15
         assert splitter.get_coverage(normalize=True, overlapping=True) == 0.5769230769230769
+
+    def test_get_overlap_matrix(self):
+        splitter = vbt.Splitter.from_splits(
+            index,
+            [
+                [slice(5, 15), slice(10, 20)],
+                [slice(10, 20), slice(15, 25)],
+                [slice(15, 25), slice(20, None)],
+            ],
+        )
+        np.testing.assert_array_equal(
+            splitter.get_overlap_matrix(by="split", normalize=False).values,
+            np.array([[15, 10, 5], [10, 15, 10], [5, 10, 16]]),
+        )
+        np.testing.assert_array_equal(
+            splitter.get_overlap_matrix(by="split").values,
+            np.array(
+                [
+                    [1.0, 0.5, 0.19230769230769232],
+                    [0.5, 1.0, 0.47619047619047616],
+                    [0.19230769230769232, 0.47619047619047616, 1.0],
+                ]
+            ),
+        )
+        np.testing.assert_array_equal(
+            splitter.get_overlap_matrix(by="set", normalize=False).values,
+            np.array([[20, 15], [15, 21]]),
+        )
+        np.testing.assert_array_equal(
+            splitter.get_overlap_matrix(by="set").values,
+            np.array([[1.0, 0.5769230769230769], [0.5769230769230769, 1.0]]),
+        )
+        np.testing.assert_array_equal(
+            splitter.get_overlap_matrix(by="range", normalize=False).values,
+            np.array(
+                [
+                    [10, 5, 5, 0, 0, 0],
+                    [5, 10, 10, 5, 5, 0],
+                    [5, 10, 10, 5, 5, 0],
+                    [0, 5, 5, 10, 10, 5],
+                    [0, 5, 5, 10, 10, 5],
+                    [0, 0, 0, 5, 5, 11],
+                ]
+            ),
+        )
+        np.testing.assert_array_equal(
+            splitter.get_overlap_matrix(by="range").values,
+            np.array(
+                [
+                    [1.0, 0.3333333333333333, 0.3333333333333333, 0.0, 0.0, 0.0],
+                    [0.3333333333333333, 1.0, 1.0, 0.3333333333333333, 0.3333333333333333, 0.0],
+                    [0.3333333333333333, 1.0, 1.0, 0.3333333333333333, 0.3333333333333333, 0.0],
+                    [0.0, 0.3333333333333333, 0.3333333333333333, 1.0, 1.0, 0.3125],
+                    [0.0, 0.3333333333333333, 0.3333333333333333, 1.0, 1.0, 0.3125],
+                    [0.0, 0.0, 0.0, 0.3125, 0.3125, 1.0],
+                ]
+            ),
+        )
 
     def test_stats(self):
         splitter = vbt.Splitter.from_splits(
