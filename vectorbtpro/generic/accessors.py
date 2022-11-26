@@ -12,7 +12,6 @@ Methods can be accessed as follows:
 >>> import numpy as np
 >>> import pandas as pd
 >>> from numba import njit
->>> from datetime import datetime, timedelta
 
 >>> # vectorbtpro.generic.accessors.GenericAccessor.rolling_mean
 >>> pd.Series([1, 2, 3, 4]).vbt.rolling_mean(2)
@@ -38,13 +37,7 @@ Run for the examples below:
 ...     'a': [1, 2, 3, 4, 5],
 ...     'b': [5, 4, 3, 2, 1],
 ...     'c': [1, 2, 3, 2, 1]
-... }, index=pd.Index([
-...     datetime(2020, 1, 1),
-...     datetime(2020, 1, 2),
-...     datetime(2020, 1, 3),
-...     datetime(2020, 1, 4),
-...     datetime(2020, 1, 5)
-... ]))
+... }, index=pd.Index(pd.date_range("2020", periods=5)))
 >>> df
             a  b  c
 2020-01-01  1  5  1
@@ -53,8 +46,7 @@ Run for the examples below:
 2020-01-04  4  2  2
 2020-01-05  5  1  1
 
->>> index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(10)]
->>> sr = pd.Series(np.arange(len(index)), index=index)
+>>> sr = pd.Series(np.arange(10), index=pd.date_range("2020", periods=10))
 >>> sr
 2020-01-01    0
 2020-01-02    1
@@ -1008,7 +1000,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     def rolling_apply(
         cls_or_self,
         window: tp.Optional[tp.FrequencyLike],
-        reduce_func_nb: tp.Union[str, str, tp.ReduceFunc, tp.RangeReduceMetaFunc],
+        reduce_func_nb: tp.Union[str, tp.ReduceFunc, tp.RangeReduceMetaFunc],
         *args,
         minp: tp.Optional[int] = None,
         broadcast_named_args: tp.KwargsLike = None,
@@ -1829,6 +1821,129 @@ class GenericAccessor(BaseAccessor, Analyzable):
             wrap_kwargs,
         )
         return wrapper.wrap_reduced(out, group_by=group_by, **wrap_kwargs)
+
+    @class_or_instancemethod
+    def proximity_apply(
+        cls_or_self,
+        window: int,
+        reduce_func_nb: tp.Union[str, tp.ReduceFunc, tp.ProximityReduceMetaFunc],
+        *args,
+        broadcast_named_args: tp.KwargsLike = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        template_context: tp.Optional[tp.Mapping] = None,
+        jitted: tp.JittedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.Frame:
+        """See `vectorbtpro.generic.nb.apply_reduce.proximity_reduce_nb`.
+
+        For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.proximity_reduce_meta_nb`.
+
+        Usage:
+            * Using regular function:
+
+            ```pycon
+            >>> mean_nb = njit(lambda a: np.nanmean(a))
+
+            >>> df.vbt.proximity_apply(1, mean_nb)
+                          a         b         c
+            2020-01-01  3.0  2.500000  3.000000
+            2020-01-02  3.0  2.666667  3.000000
+            2020-01-03  3.0  2.777778  2.666667
+            2020-01-04  3.0  2.666667  2.000000
+            2020-01-05  3.0  2.500000  1.500000
+            ```
+
+            * Using meta function:
+
+            ```pycon
+            >>> @njit
+            ... def mean_ratio_meta_nb(from_i, to_i, from_col, to_col, a, b):
+            ...     a_mean = np.mean(a[from_i:to_i, from_col:to_col])
+            ...     b_mean = np.mean(b[from_i:to_i, from_col:to_col])
+            ...     return a_mean / b_mean
+
+            >>> vbt.pd_acc.proximity_apply(
+            ...     1,
+            ...     mean_ratio_meta_nb,
+            ...     df.vbt.to_2d_array() - 1,
+            ...     df.vbt.to_2d_array() + 1,
+            ...     wrapper=df.vbt.wrapper,
+            ... )
+                          a         b         c
+            2020-01-01  0.5  0.428571  0.500000
+            2020-01-02  0.5  0.454545  0.500000
+            2020-01-03  0.5  0.470588  0.454545
+            2020-01-04  0.5  0.454545  0.333333
+            2020-01-05  0.5  0.428571  0.200000
+            ```
+
+            * Using templates and broadcasting:
+
+            ```pycon
+            >>> vbt.pd_acc.proximity_apply(
+            ...     1,
+            ...     mean_ratio_meta_nb,
+            ...     vbt.Rep('a'),
+            ...     vbt.Rep('b'),
+            ...     broadcast_named_args=dict(
+            ...         a=pd.Series([1, 2, 3, 4, 5], index=df.index),
+            ...         b=pd.DataFrame([[1, 2, 3]], columns=['a', 'b', 'c'])
+            ...     )
+            ... )
+                               a     b    c
+            2020-01-01  1.000000  0.75  0.6
+            2020-01-02  1.333333  1.00  0.8
+            2020-01-03  2.000000  1.50  1.2
+            2020-01-04  2.666667  2.00  1.6
+            2020-01-05  3.000000  2.25  1.8
+            ```
+        """
+        if broadcast_named_args is None:
+            broadcast_named_args = {}
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
+        if template_context is None:
+            template_context = {}
+
+        if isinstance(cls_or_self, type):
+            if len(broadcast_named_args) > 0:
+                broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
+                if wrapper is not None:
+                    broadcast_named_args = reshaping.broadcast(
+                        broadcast_named_args,
+                        to_shape=wrapper.shape_2d,
+                        **broadcast_kwargs,
+                    )
+                else:
+                    broadcast_named_args, wrapper = reshaping.broadcast(
+                        broadcast_named_args,
+                        return_wrapper=True,
+                        **broadcast_kwargs,
+                    )
+            else:
+                checks.assert_not_none(wrapper)
+        else:
+            if wrapper is None:
+                wrapper = cls_or_self.wrapper
+
+        if isinstance(reduce_func_nb, str):
+            reduce_func_nb = getattr(nb, reduce_func_nb + "_reduce_nb")
+
+        if isinstance(cls_or_self, type):
+            template_context = merge_dicts(
+                broadcast_named_args,
+                dict(wrapper=wrapper, window=window),
+                template_context,
+            )
+            args = deep_substitute(args, template_context, sub_id="args")
+            func = jit_reg.resolve_option(nb.proximity_reduce_meta_nb, jitted)
+            out = func(wrapper.shape_2d, window, reduce_func_nb, *args)
+        else:
+            func = jit_reg.resolve_option(nb.proximity_reduce_nb, jitted)
+            out = func(cls_or_self.to_2d_array(), window, reduce_func_nb, *args)
+
+        return wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
     # ############# Squeezing ############# #
 

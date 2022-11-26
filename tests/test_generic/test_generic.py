@@ -1534,11 +1534,9 @@ class TestAccessors:
         )
         assert_frame_equal(
             df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb),
-            df.groupby(np.asarray([1, 1, 2, 2, 3])).agg({
-                "a": lambda x: mean_nb(x.values),
-                "b": lambda x: mean_nb(x.values),
-                "c": lambda x: mean_nb(x.values)
-            }).rename_axis("group"),  # any clean way to do column-wise grouping in pandas?
+            df.groupby(np.asarray([1, 1, 2, 2, 3]))
+            .agg({"a": lambda x: mean_nb(x.values), "b": lambda x: mean_nb(x.values), "c": lambda x: mean_nb(x.values)})
+            .rename_axis("group"),  # any clean way to do column-wise grouping in pandas?
         )
         assert_frame_equal(
             df.vbt.groupby_apply(df.groupby(np.asarray([1, 1, 2, 2, 3])), mean_nb),
@@ -2622,11 +2620,15 @@ class TestAccessors:
         )
         assert_series_equal(
             df.vbt.reduce(argmax_nb, returns_idx=True, group_by=group_by, flatten=True, order="C"),
-            pd.Series(["2018-01-02", "2018-01-02"], dtype="datetime64[ns]", index=pd.Index(["g1", "g2"], name="group")).rename("reduce"),
+            pd.Series(
+                ["2018-01-02", "2018-01-02"], dtype="datetime64[ns]", index=pd.Index(["g1", "g2"], name="group")
+            ).rename("reduce"),
         )
         assert_series_equal(
             df.vbt.reduce(argmax_nb, returns_idx=True, group_by=group_by, flatten=True, order="F"),
-            pd.Series(["2018-01-04", "2018-01-02"], dtype="datetime64[ns]", index=pd.Index(["g1", "g2"], name="group")).rename("reduce"),
+            pd.Series(
+                ["2018-01-04", "2018-01-02"], dtype="datetime64[ns]", index=pd.Index(["g1", "g2"], name="group")
+            ).rename("reduce"),
         )
         assert_series_equal(
             pd.DataFrame.vbt.reduce(
@@ -3052,6 +3054,88 @@ class TestAccessors:
             ),
         )
 
+    def test_proximity_apply(self):
+        @njit
+        def mean_nb(a):
+            return np.nanmean(a)
+
+        @njit
+        def mean_meta_nb(from_i, to_i, from_col, to_col, a):
+            return np.nanmean(a[from_i:to_i, from_col:to_col])
+
+        assert_series_equal(
+            df["a"].vbt.proximity_apply(1, mean_nb), pd.Series([1.5, 2.0, 3.0, 3.5, 4.0], index=df.index, name="a")
+        )
+        assert_series_equal(
+            df["a"].vbt.proximity_apply(2, mean_nb), pd.Series([2.0, 2.5, 2.5, 3.0, 3.5], index=df.index, name="a")
+        )
+        assert_frame_equal(
+            df.vbt.proximity_apply(1, mean_nb),
+            pd.DataFrame(
+                [
+                    [2.3333333333333335, 2.0, 2.3333333333333335],
+                    [2.6, 2.2857142857142856, 2.5],
+                    [3.0, 2.75, 2.6],
+                    [2.6, 2.2857142857142856, 1.8],
+                    [2.3333333333333335, 2.0, 1.5],
+                ],
+                index=df.index,
+                columns=df.columns,
+            ),
+        )
+        assert_frame_equal(
+            df.vbt.proximity_apply(2, mean_nb),
+            pd.DataFrame(
+                [
+                    [2.2857142857142856, 2.2857142857142856, 2.2857142857142856],
+                    [2.4, 2.4, 2.4],
+                    [2.1666666666666665, 2.1666666666666665, 2.1666666666666665],
+                    [2.4, 2.4, 2.4],
+                    [2.2857142857142856, 2.2857142857142856, 2.2857142857142856],
+                ],
+                index=df.index,
+                columns=df.columns,
+            ),
+        )
+        assert_frame_equal(
+            df.vbt.proximity_apply(1, mean_nb, jitted=dict(parallel=True)),
+            df.vbt.proximity_apply(1, mean_nb, jitted=dict(parallel=False)),
+        )
+        assert_series_equal(
+            pd.Series.vbt.proximity_apply(
+                1,
+                mean_meta_nb,
+                df["a"].vbt.to_2d_array(),
+                wrapper=df["a"].vbt.wrapper,
+            ),
+            df["a"].vbt.proximity_apply(1, mean_nb),
+        )
+        assert_frame_equal(
+            pd.DataFrame.vbt.proximity_apply(
+                1,
+                mean_meta_nb,
+                df.vbt.to_2d_array(),
+                wrapper=df.vbt.wrapper,
+            ),
+            df.vbt.proximity_apply(1, mean_nb),
+        )
+        assert_frame_equal(
+            pd.DataFrame.vbt.proximity_apply(
+                1,
+                mean_meta_nb,
+                df.vbt.to_2d_array(),
+                wrapper=df.vbt.wrapper,
+                jitted=dict(parallel=True),
+            ),
+            pd.DataFrame.vbt.proximity_apply(
+                1,
+                mean_meta_nb,
+                df.vbt.to_2d_array(),
+                wrapper=df.vbt.wrapper,
+                jitted=dict(parallel=False),
+            ),
+        )
+
     def test_squeeze_grouped(self):
         @njit
         def mean_nb(a):
@@ -3142,7 +3226,9 @@ class TestAccessors:
                 template_context=dict(to_2d_array=vbt.base.reshaping.to_2d_array),
                 group_by=group_by,
             ),
-            pd.DataFrame([[5, 4], [7, 5], [9, 6], [11, 7], [13, 8]], index=df.index, columns=pd.Index(["g1", "g2"], name="group")),
+            pd.DataFrame(
+                [[5, 4], [7, 5], [9, 6], [11, 7], [13, 8]], index=df.index, columns=pd.Index(["g1", "g2"], name="group")
+            ),
         )
 
     def test_flatten_grouped(self):
@@ -3211,7 +3297,9 @@ class TestAccessors:
         assert_series_equal(test_func(df.vbt), test_func(df).rename(test_name))
         assert_series_equal(
             test_func(df.vbt, group_by=group_by),
-            pd.Series([test_func(df[["a", "b"]].stack()), test_func(df["c"])], index=pd.Index(["g1", "g2"], name="group")).rename(test_name),
+            pd.Series(
+                [test_func(df[["a", "b"]].stack()), test_func(df["c"])], index=pd.Index(["g1", "g2"], name="group")
+            ).rename(test_name),
         )
         assert_series_equal(test_func(df.vbt, use_jitted=True), test_func(df.vbt, use_jitted=False))
         assert_series_equal(
@@ -3244,7 +3332,9 @@ class TestAccessors:
         flatten2 = pd.Series(df2[["a", "b"]].values.flatten())
         assert_series_equal(
             df.vbt.corr(df2, group_by=group_by),
-            pd.Series([flatten1.vbt.corr(flatten2), df["c"].vbt.corr(df2["c"])], index=pd.Index(["g1", "g2"], name="group")).rename("corr"),
+            pd.Series(
+                [flatten1.vbt.corr(flatten2), df["c"].vbt.corr(df2["c"])], index=pd.Index(["g1", "g2"], name="group")
+            ).rename("corr"),
         )
 
     @pytest.mark.parametrize("test_ddof", [0, 1])
@@ -3320,7 +3410,7 @@ class TestAccessors:
                     "g2": df["c"].describe(percentiles=np.arange(0, 1, 0.1)).values,
                 },
                 index=test_against.index,
-                columns=pd.Index(["g1", "g2"], name="group")
+                columns=pd.Index(["g1", "g2"], name="group"),
             ),
         )
         assert_frame_equal(
