@@ -1837,6 +1837,132 @@ class TestSplitter:
                 ),
             ),
         )
+        new_obj = splitter.take(sr, into="stacked", stack_axis=0)
+        assert_series_equal(
+            new_obj,
+            pd.Series(
+                [
+                    5,
+                    6,
+                    7,
+                    8,
+                    9,
+                    10,
+                    11,
+                    12,
+                    13,
+                    14,
+                    15,
+                    16,
+                    17,
+                    18,
+                    19,
+                    15,
+                    16,
+                    17,
+                    18,
+                    19,
+                    20,
+                    21,
+                    22,
+                    23,
+                    24,
+                    25,
+                    26,
+                    27,
+                    28,
+                    29,
+                    10,
+                    11,
+                    12,
+                    13,
+                    14,
+                    15,
+                    16,
+                    17,
+                    18,
+                    19,
+                    20,
+                    21,
+                    22,
+                    23,
+                    24,
+                    20,
+                    21,
+                    22,
+                    23,
+                    24,
+                    25,
+                    26,
+                    27,
+                    28,
+                    29,
+                    30,
+                ],
+                pd.MultiIndex.from_tuples(
+                    [
+                        (0, "set_0", pd.Timestamp("2020-01-01")),
+                        (0, "set_0", pd.Timestamp("2020-01-02")),
+                        (0, "set_0", pd.Timestamp("2020-01-03")),
+                        (0, "set_0", pd.Timestamp("2020-01-04")),
+                        (0, "set_0", pd.Timestamp("2020-01-05")),
+                        (0, "set_0", pd.Timestamp("2020-01-06")),
+                        (0, "set_0", pd.Timestamp("2020-01-07")),
+                        (0, "set_0", pd.Timestamp("2020-01-08")),
+                        (0, "set_0", pd.Timestamp("2020-01-09")),
+                        (0, "set_0", pd.Timestamp("2020-01-10")),
+                        (0, "set_0", pd.Timestamp("2020-01-11")),
+                        (0, "set_0", pd.Timestamp("2020-01-12")),
+                        (0, "set_0", pd.Timestamp("2020-01-13")),
+                        (0, "set_0", pd.Timestamp("2020-01-14")),
+                        (0, "set_0", pd.Timestamp("2020-01-15")),
+                        (0, "set_1", pd.Timestamp("2020-01-11")),
+                        (0, "set_1", pd.Timestamp("2020-01-12")),
+                        (0, "set_1", pd.Timestamp("2020-01-13")),
+                        (0, "set_1", pd.Timestamp("2020-01-14")),
+                        (0, "set_1", pd.Timestamp("2020-01-15")),
+                        (0, "set_1", pd.Timestamp("2020-01-16")),
+                        (0, "set_1", pd.Timestamp("2020-01-17")),
+                        (0, "set_1", pd.Timestamp("2020-01-18")),
+                        (0, "set_1", pd.Timestamp("2020-01-19")),
+                        (0, "set_1", pd.Timestamp("2020-01-20")),
+                        (0, "set_1", pd.Timestamp("2020-01-21")),
+                        (0, "set_1", pd.Timestamp("2020-01-22")),
+                        (0, "set_1", pd.Timestamp("2020-01-23")),
+                        (0, "set_1", pd.Timestamp("2020-01-24")),
+                        (0, "set_1", pd.Timestamp("2020-01-25")),
+                        (1, "set_0", pd.Timestamp("2020-01-06")),
+                        (1, "set_0", pd.Timestamp("2020-01-07")),
+                        (1, "set_0", pd.Timestamp("2020-01-08")),
+                        (1, "set_0", pd.Timestamp("2020-01-09")),
+                        (1, "set_0", pd.Timestamp("2020-01-10")),
+                        (1, "set_0", pd.Timestamp("2020-01-11")),
+                        (1, "set_0", pd.Timestamp("2020-01-12")),
+                        (1, "set_0", pd.Timestamp("2020-01-13")),
+                        (1, "set_0", pd.Timestamp("2020-01-14")),
+                        (1, "set_0", pd.Timestamp("2020-01-15")),
+                        (1, "set_0", pd.Timestamp("2020-01-16")),
+                        (1, "set_0", pd.Timestamp("2020-01-17")),
+                        (1, "set_0", pd.Timestamp("2020-01-18")),
+                        (1, "set_0", pd.Timestamp("2020-01-19")),
+                        (1, "set_0", pd.Timestamp("2020-01-20")),
+                        (1, "set_1", pd.Timestamp("2020-01-16")),
+                        (1, "set_1", pd.Timestamp("2020-01-17")),
+                        (1, "set_1", pd.Timestamp("2020-01-18")),
+                        (1, "set_1", pd.Timestamp("2020-01-19")),
+                        (1, "set_1", pd.Timestamp("2020-01-20")),
+                        (1, "set_1", pd.Timestamp("2020-01-21")),
+                        (1, "set_1", pd.Timestamp("2020-01-22")),
+                        (1, "set_1", pd.Timestamp("2020-01-23")),
+                        (1, "set_1", pd.Timestamp("2020-01-24")),
+                        (1, "set_1", pd.Timestamp("2020-01-25")),
+                        (1, "set_1", pd.Timestamp("2020-01-26")),
+                    ],
+                    names=["split", "set", None],
+                ),
+            ),
+        )
+
         new_obj = splitter.take(
             sr,
             into="stacked",
@@ -1871,7 +1997,7 @@ class TestSplitter:
             ),
         )
 
-    def test_take_stacked_sets(self):
+    def test_take_stacked_by_split(self):
         sr = pd.Series(np.arange(len(index)), index=index.shift(-5))
         splitter = vbt.Splitter.from_splits(
             index,
@@ -1882,7 +2008,7 @@ class TestSplitter:
         )
         new_obj = splitter.take(
             sr,
-            into="stacked_sets",
+            into="stacked_by_split",
             attach_bounds="target_index",
         )
         assert isinstance(new_obj, pd.Series)
@@ -1964,7 +2090,7 @@ class TestSplitter:
             ),
         )
 
-    def test_take_stacked_splits(self):
+    def test_take_stacked_by_set(self):
         sr = pd.Series(np.arange(len(index)), index=index.shift(-5))
         splitter = vbt.Splitter.from_splits(
             index,
@@ -1975,7 +2101,7 @@ class TestSplitter:
         )
         new_obj = splitter.take(
             sr,
-            into="stacked_splits",
+            into="stacked_by_set",
             attach_bounds="target_index",
         )
         assert isinstance(new_obj, pd.Series)

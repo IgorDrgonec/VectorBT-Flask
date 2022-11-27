@@ -27,7 +27,7 @@ from vectorbtpro.base.reshaping import to_dict
 from vectorbtpro.base.accessors import BaseIDXAccessor
 from vectorbtpro.base.resampling import Resampler
 from vectorbtpro.base.grouping import Grouper
-from vectorbtpro.base.merging import column_stack_merge, resolve_merge_func
+from vectorbtpro.base.merging import row_stack_merge, column_stack_merge, resolve_merge_func
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.splitting import nb
 
@@ -2525,7 +2525,8 @@ class Splitter(Analyzable):
         template_context: tp.KwargsLike = None,
         silence_warnings: bool = False,
         index_combine_kwargs: tp.KwargsLike = None,
-        column_stack_kwargs: tp.KwargsLike = None,
+        stack_axis: int = 1,
+        stack_kwargs: tp.KwargsLike = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
     ) -> tp.Any:
         """Take all ranges from an array-like object and optionally column-stack them.
@@ -2537,8 +2538,8 @@ class Splitter(Analyzable):
         For each index pair, resolves the source range using `Splitter.select_range` and
         `Splitter.get_ready_range`. Then, remaps this range into the object index using
         `Splitter.get_ready_obj_range` and takes the slice from the object using `Splitter.take_range`.
-        Finally, uses `vectorbtpro.base.merging.column_stack_merge` with `column_stack_kwargs`
-        to merge the taken slices.
+        Finally, uses `vectorbtpro.base.merging.column_stack_merge` (`stack_axis=1`) or
+        `vectorbtpro.base.merging.row_stack_merge` (`stack_axis=0`) with `stack_kwargs` to merge the taken slices.
 
         If `attach_bounds` is enabled, measures the bounds of each range and makes it an additional
         level in the final index hierarchy. The argument supports the following options:
@@ -2549,9 +2550,10 @@ class Splitter(Analyzable):
 
         Argument `into` supports the following options:
 
+        * None: Series of range slices
         * 'stacked': Stack all slices into a single object
-        * 'stacked_sets': Stack set slices in each split and return a Series of objects
-        * 'stacked_splits': Stack split slices in each set and return a Series of objects
+        * 'stacked_by_split': Stack set slices in each split and return a Series of objects
+        * 'stacked_by_set': Stack split slices in each set and return a Series of objects
         * 'split_major_meta': Generator with ranges processed lazily in split-major order.
             Returns meta with indices and labels, and the generator.
         * 'set_major_meta': Generator with ranges processed lazily in set-major order.
@@ -2603,9 +2605,8 @@ class Splitter(Analyzable):
             ```pycon
             >>> splitter.take(
             ...     data.close,
-            ...     into="stacked",
-            ...     attach_bounds="index",
-            ...     column_stack_kwargs=dict(reset_index=True)
+            ...     into="reset_stacked",
+            ...     attach_bounds="index"
             ... )
             split                         0                         1  \\
             start 2020-01-01 00:00:00+00:00 2020-06-29 00:00:00+00:00
@@ -2643,8 +2644,10 @@ class Splitter(Analyzable):
                 raise ValueError(f"Invalid option attach_bounds='{attach_bounds}'")
         if index_combine_kwargs is None:
             index_combine_kwargs = {}
-        if column_stack_kwargs is None:
-            column_stack_kwargs = {}
+        if stack_axis not in (0, 1):
+            raise ValueError("Axis for stacking must be either 0 or 1")
+        if stack_kwargs is None:
+            stack_kwargs = {}
 
         split_group_by = self.get_split_grouper(split_group_by=split_group_by)
         split_labels = self.get_split_labels(split_group_by=split_group_by)
@@ -2767,13 +2770,13 @@ class Splitter(Analyzable):
                 keys = _attach_bounds(keys, range_bounds)
             return pd.Series(range_objs, index=keys, dtype=object)
         if isinstance(into, str) and into.lower().startswith("reset_"):
-            column_stack_kwargs["reset_index"] = "from_start"
+            stack_kwargs["reset_index"] = "from_start"
             into = into.lower().replace("reset_", "")
         if isinstance(into, str) and into.lower().startswith("from_start_"):
-            column_stack_kwargs["reset_index"] = "from_start"
+            stack_kwargs["reset_index"] = "from_start"
             into = into.lower().replace("from_start_", "")
         if isinstance(into, str) and into.lower().startswith("from_end_"):
-            column_stack_kwargs["reset_index"] = "from_end"
+            stack_kwargs["reset_index"] = "from_end"
             into = into.lower().replace("from_end_", "")
         if isinstance(into, str) and into.lower() in ("split_major_meta", "set_major_meta"):
             meta = {
@@ -2818,8 +2821,11 @@ class Splitter(Analyzable):
                 keys = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
             if attach_bounds:
                 keys = _attach_bounds(keys, range_bounds)
-            return column_stack_merge(range_objs, keys=keys, **column_stack_kwargs)
-        if isinstance(into, str) and into.lower() == "stacked_sets":
+            _stack_kwargs = merge_dicts(dict(keys=keys), stack_kwargs)
+            if stack_axis == 0:
+                return row_stack_merge(range_objs, **_stack_kwargs)
+            return column_stack_merge(range_objs, **_stack_kwargs)
+        if isinstance(into, str) and into.lower() == "stacked_by_split":
             new_split_objs = []
             for i in split_group_indices:
                 range_objs = []
@@ -2834,11 +2840,15 @@ class Splitter(Analyzable):
                     keys = set_labels
                     if attach_bounds:
                         keys = _attach_bounds(keys, range_bounds)
-                    new_split_objs.append(column_stack_merge(range_objs, keys=keys, **column_stack_kwargs))
+                    _stack_kwargs = merge_dicts(dict(keys=keys), stack_kwargs)
+                    if stack_axis == 0:
+                        new_split_objs.append(row_stack_merge(range_objs, **_stack_kwargs))
+                    else:
+                        new_split_objs.append(column_stack_merge(range_objs, **_stack_kwargs))
             if one_split and squeeze_one_split:
                 return new_split_objs[0]
             return pd.Series(new_split_objs, index=split_labels, dtype=object)
-        if isinstance(into, str) and into.lower() == "stacked_splits":
+        if isinstance(into, str) and into.lower() == "stacked_by_set":
             new_set_objs = []
             for j in set_group_indices:
                 range_objs = []
@@ -2853,7 +2863,11 @@ class Splitter(Analyzable):
                     keys = split_labels
                     if attach_bounds:
                         keys = _attach_bounds(keys, range_bounds)
-                    new_set_objs.append(column_stack_merge(range_objs, keys=keys, **column_stack_kwargs))
+                    _stack_kwargs = merge_dicts(dict(keys=keys), stack_kwargs)
+                    if stack_axis == 0:
+                        new_set_objs.append(row_stack_merge(range_objs, **_stack_kwargs))
+                    else:
+                        new_set_objs.append(column_stack_merge(range_objs, **_stack_kwargs))
             if one_set and squeeze_one_set:
                 return new_set_objs[0]
             return pd.Series(new_set_objs, index=set_labels, dtype=object)
