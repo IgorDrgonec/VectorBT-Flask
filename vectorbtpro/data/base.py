@@ -180,7 +180,6 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 wrapper_kwargs = {}
             kwargs["wrapper"] = ArrayWrapper.column_stack(
                 *[obj.wrapper for obj in objs],
-                union_index=False,
                 **wrapper_kwargs,
             )
 

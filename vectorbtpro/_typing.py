@@ -187,6 +187,7 @@ ReduceGroupedMetaFunc = Callable[[GroupIdxs, int, VarArg()], Scalar]
 ReduceGroupedToArrayFunc = Callable[[Array2d, VarArg()], Array1d]
 ReduceGroupedToArrayMetaFunc = Callable[[GroupIdxs, int, VarArg()], Array1d]
 RangeReduceMetaFunc = Callable[[int, int, int, VarArg()], Scalar]
+ProximityReduceMetaFunc = Callable[[int, int, int, int, VarArg()], Scalar]
 GroupByReduceMetaFunc = Callable[[GroupIdxs, int, int, VarArg()], Scalar]
 GroupSqueezeMetaFunc = Callable[[int, GroupIdxs, int, VarArg()], Scalar]
 

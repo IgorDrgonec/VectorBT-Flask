@@ -1193,7 +1193,7 @@ class TestArrayWrapper:
         assert wrapper_meta["col_idxs"] == 0
         assert wrapper_meta["group_idxs"] == 0
         wrapper_meta = df4_wrapper.indexing_func_meta(lambda x: x.iloc[0, :2])
-        assert wrapper_meta["row_idxs"] == 0
+        assert wrapper_meta["row_idxs"] == slice(0, 1, None)
         assert wrapper_meta["col_idxs"] == slice(0, 2, None)
         assert wrapper_meta["group_idxs"] == slice(0, 2, None)
         wrapper_meta = df4_wrapper.indexing_func_meta(lambda x: x.iloc[:2, 0])
@@ -1216,10 +1216,10 @@ class TestArrayWrapper:
         np.testing.assert_array_equal(wrapper_meta["row_idxs"], np.array([0, 0]))
         np.testing.assert_array_equal(wrapper_meta["col_idxs"], np.array([0, 0]))
         np.testing.assert_array_equal(wrapper_meta["group_idxs"], np.array([0, 0]))
-        with pytest.raises(Exception):
-            df4_wrapper.indexing_func_meta(lambda x: x.iloc[0, 0])
-        with pytest.raises(Exception):
-            df4_wrapper.indexing_func_meta(lambda x: x.iloc[[0], 0])
+        wrapper_meta = df4_wrapper.indexing_func_meta(lambda x: x.iloc[0, 0])
+        assert wrapper_meta["row_idxs"] == slice(0, 1, None)
+        assert wrapper_meta["col_idxs"] == 0
+        assert wrapper_meta["group_idxs"] == 0
 
         # not grouped, column only
         wrapper_meta = df4_wrapper_co.indexing_func_meta(lambda x: x.iloc[0])
@@ -1276,8 +1276,10 @@ class TestArrayWrapper:
         np.testing.assert_array_equal(wrapper_meta["row_idxs"], np.array([0, 0]))
         np.testing.assert_array_equal(wrapper_meta["col_idxs"], np.array([0, 1, 0, 1]))
         np.testing.assert_array_equal(wrapper_meta["group_idxs"], np.array([0, 0]))
-        with pytest.raises(Exception):
-            df4_grouped_wrapper.indexing_func_meta(lambda x: x.iloc[0, :2])
+        wrapper_meta = df4_grouped_wrapper.indexing_func_meta(lambda x: x.iloc[0, :2])
+        assert wrapper_meta["row_idxs"] == slice(0, 1, None)
+        assert wrapper_meta["col_idxs"] == slice(None, None, None)
+        assert wrapper_meta["group_idxs"] == slice(None, None, None)
 
         # grouped, column only
         wrapper_meta = df4_grouped_wrapper_co.indexing_func_meta(lambda x: x.iloc[0])
@@ -1336,9 +1338,9 @@ class TestArrayWrapper:
         assert_index_equal(sr2_wrapper.iloc[:2].index, pd.Index(["x2", "y2"], dtype="object", name="i2"))
         assert_index_equal(sr2_wrapper.iloc[:2].columns, pd.Index(["a2"], dtype="object"))
         assert sr2_wrapper.iloc[:2].ndim == 1
-        assert_index_equal(df4_wrapper.iloc[0, :2].index, pd.Index(["a6", "b6"], dtype="object", name="c6"))
-        assert_index_equal(df4_wrapper.iloc[0, :2].columns, pd.Index(["x6"], dtype="object", name="i6"))
-        assert df4_wrapper.iloc[0, :2].ndim == 1
+        assert_index_equal(df4_wrapper.iloc[0, :2].index, pd.Index(["x6"], dtype="object", name="i6"))
+        assert_index_equal(df4_wrapper.iloc[0, :2].columns, pd.Index(["a6", "b6"], dtype="object", name="c6"))
+        assert df4_wrapper.iloc[0, :2].ndim == 2
         assert_index_equal(df4_wrapper.iloc[:2, 0].index, pd.Index(["x6", "y6"], dtype="object", name="i6"))
         assert_index_equal(df4_wrapper.iloc[:2, 0].columns, pd.Index(["a6"], dtype="object", name="c6"))
         assert df4_wrapper.iloc[:2, 0].ndim == 1

@@ -345,6 +345,7 @@ def column_stack_merge(
                 raise ValueError(f"Invalid index resetting option '{reset_index}'")
             new_objs.append(new_obj)
         objs = new_objs
+        kwargs = merge_dicts(dict(sort=True), kwargs)
     return pd.concat(objs, axis=1, keys=keys, **kwargs)
 
 

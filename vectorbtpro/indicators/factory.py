@@ -963,7 +963,6 @@ class IndicatorBase(Analyzable):
                 wrapper_kwargs = {}
             kwargs["wrapper"] = ArrayWrapper.column_stack(
                 *[obj.wrapper for obj in objs],
-                union_index=False,
                 **wrapper_kwargs,
             )
 
@@ -1930,6 +1929,11 @@ class IndicatorFactory(Configured):
             _param_settings = merge_dicts(param_settings, kwargs.pop("param_settings", {}))
             _in_output_settings = merge_dicts(in_output_settings, kwargs.pop("in_output_settings", {}))
 
+            if isinstance(_hide_params, bool):
+                if not _hide_params:
+                    _hide_params = None
+                else:
+                    _hide_params = param_names
             if _hide_params is None:
                 _hide_params = []
 
@@ -2098,6 +2102,11 @@ Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeli
                 _hide_default = kwargs.pop("hide_default", def_run_kwargs["hide_default"])
                 _param_settings = merge_dicts(param_settings, kwargs.get("param_settings", {}))
 
+                if isinstance(_hide_params, bool):
+                    if not _hide_params:
+                        _hide_params = None
+                    else:
+                        _hide_params = param_names
                 if _hide_params is None:
                     _hide_params = []
                 if _short_names is None:

@@ -1833,9 +1833,9 @@ def unstack_to_df(
         ```
     """
     # Extract series
-    sr: tp.Series = to_1d(get_multiindex_series(arg))
+    sr = to_1d(get_multiindex_series(arg))
 
-    if len(sr.index.levels) > 2:
+    if sr.index.nlevels > 2:
         if index_levels is None:
             raise ValueError("index_levels must be specified")
         if column_levels is None:
