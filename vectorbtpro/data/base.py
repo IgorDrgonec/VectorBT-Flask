@@ -1605,7 +1605,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         `func` can be one of the following:
 
-        * "{name}": Name of a custom indicator or, if not found, the first from the below
+        * "{name}": Name of a custom indicator, signal generator, or label generator
         * "talib_{name}": Name of a TA-Lib indicator
         * "pandas_ta_{name}": Name of a Pandas TA indicator
         * "ta_{name}": Name of a TA indicator
@@ -1624,6 +1624,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         data can be passed instead of `close`."""
         from vectorbtpro.indicators.factory import IndicatorBase, IndicatorFactory
         from vectorbtpro.indicators import custom
+        from vectorbtpro.signals import generators as signal_generators
+        from vectorbtpro.labels import generators as label_generators
         from vectorbtpro.portfolio.base import Portfolio
         from vectorbtpro.utils.opt_packages import check_installed
 
@@ -1645,6 +1647,10 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 return func(_self, *args, **kwargs)
             if hasattr(custom, func.upper()):
                 func = getattr(custom, func.upper())
+            elif hasattr(signal_generators, func.upper()):
+                func = getattr(signal_generators, func.upper())
+            elif hasattr(label_generators, func.upper()):
+                func = getattr(label_generators, func.upper())
             elif func.startswith("talib_"):
                 func = IndicatorFactory.from_talib(func.replace("talib_", ""))
             elif func.startswith("pandas_ta_"):
@@ -1663,9 +1669,13 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 func = IndicatorFactory.from_talib(func)
             elif check_installed("ta") and func.upper() in IndicatorFactory.get_ta_indicators():
                 func = IndicatorFactory.from_ta(func)
-            elif check_installed("pandas_ta") and func.upper() in IndicatorFactory.get_pandas_ta_indicators():
+            elif check_installed("pandas_ta") and func.upper() in IndicatorFactory.get_pandas_ta_indicators(
+                silence_warnings=True
+            ):
                 func = IndicatorFactory.from_pandas_ta(func)
-            elif check_installed("technical") and func.upper() in IndicatorFactory.get_technical_indicators():
+            elif check_installed("technical") and func.upper() in IndicatorFactory.get_technical_indicators(
+                silence_warnings=True
+            ):
                 func = IndicatorFactory.from_technical(func)
             else:
                 raise ValueError(f"Could not find indicator with name '{func}'")

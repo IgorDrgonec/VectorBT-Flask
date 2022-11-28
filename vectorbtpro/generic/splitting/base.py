@@ -2058,7 +2058,10 @@ class Splitter(Analyzable):
         of `RelRange` or a number that will be used as a length to create an `RelRange`.
         Each sub-range will then be re-mapped into the main range. Argument `new_split` can also
         be provided as an integer or a float indicating the length; in such a case the second part
-        (or the first one depending on `backwards`) will stretch.
+        (or the first one depending on `backwards`) will stretch. If `new_split` is a string,
+        the following options are supported:
+
+        * 'by_gap': Split `range_` by gap using `vectorbtpro.generic.splitting.nb.split_range_by_gap_nb`.
 
         New ranges are returned relative to the index and in the same order as passed.
 
@@ -2097,6 +2100,18 @@ class Splitter(Analyzable):
         if isinstance(new_split, CustomTemplate):
             _template_context = merge_dicts(dict(index=index[range_]), template_context)
             new_split = deep_substitute(new_split, _template_context, sub_id="new_split")
+
+        # Split by gap
+        if isinstance(new_split, str):
+            if new_split.lower() == "by_gap":
+                if isinstance(range_, np.ndarray) and np.issubdtype(range_.dtype, np.integer):
+                    range_arr = range_
+                else:
+                    range_arr = np.arange(len(index))[range_]
+                start_idxs, stop_idxs = nb.split_range_by_gap_nb(range_arr)
+                new_split = list(map(lambda x: slice(x[0], x[1]), zip(start_idxs, stop_idxs)))
+            else:
+                raise ValueError(f"Invalid option new_split='{new_split}'")
 
         # Prepare target ranges
         if checks.is_number(new_split):
@@ -2770,12 +2785,18 @@ class Splitter(Analyzable):
                 keys = _attach_bounds(keys, range_bounds)
             return pd.Series(range_objs, index=keys, dtype=object)
         if isinstance(into, str) and into.lower().startswith("reset_"):
+            if stack_axis == 0:
+                raise ValueError("Cannot use reset_index with stack_axis=0")
             stack_kwargs["reset_index"] = "from_start"
             into = into.lower().replace("reset_", "")
         if isinstance(into, str) and into.lower().startswith("from_start_"):
+            if stack_axis == 0:
+                raise ValueError("Cannot use reset_index with stack_axis=0")
             stack_kwargs["reset_index"] = "from_start"
             into = into.lower().replace("from_start_", "")
         if isinstance(into, str) and into.lower().startswith("from_end_"):
+            if stack_axis == 0:
+                raise ValueError("Cannot use reset_index with stack_axis=0")
             stack_kwargs["reset_index"] = "from_end"
             into = into.lower().replace("from_end_", "")
         if isinstance(into, str) and into.lower() in ("split_major_meta", "set_major_meta"):
@@ -3436,6 +3457,82 @@ class Splitter(Analyzable):
             return _wrap_output(results)
         return results
 
+    # ############# Splits ############# #
+
+    def shuffle_splits(
+        self: SplitterT,
+        size: tp.Union[None, str, int] = None,
+        replace: bool = False,
+        p: tp.Optional[tp.Array1d] = None,
+        seed: tp.Optional[int] = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        **init_kwargs,
+    ) -> SplitterT:
+        """Shuffle splits."""
+        if wrapper_kwargs is None:
+            wrapper_kwargs = {}
+        rng = np.random.default_rng(seed=seed)
+        if size is None:
+            size = self.n_splits
+        new_split_indices = rng.choice(np.arange(self.n_splits), size=size, replace=replace, p=p)
+        new_splits_arr = self.splits_arr[new_split_indices]
+        new_index = self.wrapper.index[new_split_indices]
+        if "index" not in wrapper_kwargs:
+            wrapper_kwargs["index"] = new_index
+        new_wrapper = self.wrapper.replace(**wrapper_kwargs)
+        return self.replace(wrapper=new_wrapper, splits_arr=new_splits_arr, **init_kwargs)
+
+    def break_up_splits(
+        self: SplitterT,
+        new_split: tp.SplitLike,
+        sort: bool = False,
+        template_context: tp.KwargsLike = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        init_kwargs: tp.KwargsLike = None,
+        **split_range_kwargs,
+    ) -> SplitterT:
+        """Split each split into multiple splits.
+
+        If there are multiple sets, make sure to merge them into one beforehand.
+
+        Arguments `new_split` and `**split_range_kwargs` are passed to `Splitter.split_range`."""
+        if self.n_sets > 1:
+            raise ValueError("Cannot break up splits with more than one set. Merge sets first.")
+        if wrapper_kwargs is None:
+            wrapper_kwargs = {}
+        if init_kwargs is None:
+            init_kwargs = {}
+        split_range_kwargs = dict(split_range_kwargs)
+        wrap_with_fixrange = split_range_kwargs.pop("wrap_with_fixrange", None)
+        if isinstance(wrap_with_fixrange, bool) and not wrap_with_fixrange:
+            raise ValueError("Argument wrap_with_fixrange must be True or None")
+        split_range_kwargs["wrap_with_fixrange"] = wrap_with_fixrange
+
+        new_splits_arr = []
+        new_index = []
+        range_starts = []
+        for i, split in enumerate(self.splits_arr):
+            new_ranges = self.split_range(split[0], new_split, template_context=template_context, **split_range_kwargs)
+            for j, range_ in enumerate(new_ranges):
+                if sort:
+                    range_starts.append(self.get_range_bounds(range_, template_context=template_context)[0])
+                new_splits_arr.append([range_])
+                if isinstance(self.split_labels, pd.MultiIndex):
+                    new_index.append((*self.split_labels[i], j))
+                else:
+                    new_index.append((self.split_labels[i], j))
+        new_splits_arr = np.asarray(new_splits_arr, dtype=object)
+        new_index = pd.MultiIndex.from_tuples(new_index, names=[*self.split_labels.names, "split_part"])
+        if sort:
+            sorted_indices = np.argsort(range_starts)
+            new_splits_arr = new_splits_arr[sorted_indices]
+            new_index = new_index[sorted_indices]
+
+        if "index" not in wrapper_kwargs:
+            wrapper_kwargs["index"] = new_index
+        new_wrapper = self.wrapper.replace(**wrapper_kwargs)
+        return self.replace(wrapper=new_wrapper, splits_arr=new_splits_arr, **init_kwargs)
+
     # ############# Sets ############# #
 
     def split_set(
@@ -3735,10 +3832,12 @@ class Splitter(Analyzable):
         right_inclusive: bool = False,
         split_group_by: tp.AnyGroupByLike = None,
         set_group_by: tp.AnyGroupByLike = None,
+        squeeze_one_split: bool = True,
+        squeeze_one_set: bool = True,
         index_combine_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.Frame:
-        """Boolean DataFrame where index are bounds and columns are splits stacked together.
+    ) -> tp.SeriesFrame:
+        """Boolean Series/DataFrame where index are bounds and columns are splits stacked together.
 
         Keyword arguments `**kwargs` are passed to `Splitter.get_bounds_arr`."""
         split_group_by = self.get_split_grouper(split_group_by=split_group_by)
@@ -3753,10 +3852,18 @@ class Splitter(Analyzable):
             **kwargs,
         )
         out = bounds_arr.reshape((-1, 2))
+        one_split = len(split_labels) == 1 and squeeze_one_split
+        one_set = len(set_labels) == 1 and squeeze_one_set
+        new_columns = pd.Index(["start", "end"], name="bound")
+        if one_split and one_set:
+            return pd.Series(out[0], index=new_columns)
+        if one_split:
+            return pd.DataFrame(out, index=set_labels, columns=new_columns)
+        if one_set:
+            return pd.DataFrame(out, index=split_labels, columns=new_columns)
         if index_combine_kwargs is None:
             index_combine_kwargs = {}
         new_index = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
-        new_columns = pd.Index(["start", "end"], name="bound")
         return pd.DataFrame(out, index=new_index, columns=new_columns)
 
     @property
@@ -3964,10 +4071,12 @@ class Splitter(Analyzable):
         self,
         split_group_by: tp.AnyGroupByLike = None,
         set_group_by: tp.AnyGroupByLike = None,
+        squeeze_one_split: bool = True,
+        squeeze_one_set: bool = True,
         index_combine_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.Frame:
-        """Boolean DataFrame where index is `Splitter.index` and columns are splits stacked together.
+    ) -> tp.SeriesFrame:
+        """Boolean Series/DataFrame where index is `Splitter.index` and columns are splits stacked together.
 
         Keyword arguments `**kwargs` are passed to `Splitter.get_mask_arr`.
 
@@ -3979,6 +4088,14 @@ class Splitter(Analyzable):
         set_labels = self.get_set_labels(set_group_by=set_group_by)
         mask_arr = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
         out = np.moveaxis(mask_arr, -1, 0).reshape((len(self.index), -1))
+        one_split = len(split_labels) == 1 and squeeze_one_split
+        one_set = len(set_labels) == 1 and squeeze_one_set
+        if one_split and one_set:
+            return pd.Series(out[:, 0], index=self.index)
+        if one_split:
+            return pd.DataFrame(out, index=self.index, columns=set_labels)
+        if one_set:
+            return pd.DataFrame(out, index=self.index, columns=split_labels)
         if index_combine_kwargs is None:
             index_combine_kwargs = {}
         new_columns = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
@@ -3996,8 +4113,9 @@ class Splitter(Analyzable):
         relative: bool = False,
         split_group_by: tp.AnyGroupByLike = None,
         set_group_by: tp.AnyGroupByLike = None,
+        squeeze_one_split: bool = True,
         **kwargs,
-    ) -> tp.Series:
+    ) -> tp.MaybeSeries:
         """Get the coverage of each split mask.
 
         If `overlapping` is True, returns the number of overlapping True values between sets in each split.
@@ -4023,6 +4141,9 @@ class Splitter(Analyzable):
                     coverage = mask_arr.any(axis=1).mean(axis=1)
             else:
                 coverage = mask_arr.any(axis=1).sum(axis=1)
+        one_split = len(split_labels) == 1 and squeeze_one_split
+        if one_split:
+            return coverage[0]
         return pd.Series(coverage, index=split_labels, name="split_coverage")
 
     @property
@@ -4037,8 +4158,9 @@ class Splitter(Analyzable):
         relative: bool = False,
         split_group_by: tp.AnyGroupByLike = None,
         set_group_by: tp.AnyGroupByLike = None,
+        squeeze_one_set: bool = True,
         **kwargs,
-    ) -> tp.Series:
+    ) -> tp.MaybeSeries:
         """Get the coverage of each set mask.
 
         If `overlapping` is True, returns the number of overlapping True values between splits in each set.
@@ -4064,6 +4186,9 @@ class Splitter(Analyzable):
                     coverage = mask_arr.any(axis=0).mean(axis=1)
             else:
                 coverage = mask_arr.any(axis=0).sum(axis=1)
+        one_set = len(set_labels) == 1 and squeeze_one_set
+        if one_set:
+            return coverage[0]
         return pd.Series(coverage, index=set_labels, name="set_coverage")
 
     @property
@@ -4077,9 +4202,11 @@ class Splitter(Analyzable):
         relative: bool = False,
         split_group_by: tp.AnyGroupByLike = None,
         set_group_by: tp.AnyGroupByLike = None,
+        squeeze_one_split: bool = True,
+        squeeze_one_set: bool = True,
         index_combine_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.Series:
+    ) -> tp.MaybeSeries:
         """Get the coverage of each range mask.
 
         If `normalize` is True, returns the number of True values in each range relative to the
@@ -4099,6 +4226,14 @@ class Splitter(Analyzable):
                 coverage = (mask_arr.sum(axis=2) / mask_arr.shape[2]).flatten()
         else:
             coverage = mask_arr.sum(axis=2).flatten()
+        one_split = len(split_labels) == 1 and squeeze_one_split
+        one_set = len(set_labels) == 1 and squeeze_one_set
+        if one_split and one_set:
+            return coverage[0]
+        if one_split:
+            return pd.Series(coverage, index=set_labels, name="range_coverage")
+        if one_set:
+            return pd.Series(coverage, index=split_labels, name="range_coverage")
         if index_combine_kwargs is None:
             index_combine_kwargs = {}
         index = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
@@ -4146,6 +4281,8 @@ class Splitter(Analyzable):
         split_group_by: tp.AnyGroupByLike = None,
         set_group_by: tp.AnyGroupByLike = None,
         jitted: tp.JittedOption = None,
+        squeeze_one_split: bool = True,
+        squeeze_one_set: bool = True,
         index_combine_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.Frame:
@@ -4162,29 +4299,44 @@ class Splitter(Analyzable):
         set_group_by = self.get_set_grouper(set_group_by=set_group_by)
         set_labels = self.get_set_labels(set_group_by=set_group_by)
         mask_arr = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
+        one_split = len(split_labels) == 1 and squeeze_one_split
+        one_set = len(set_labels) == 1 and squeeze_one_set
         if by.lower() == "split":
             if normalize:
                 func = jit_reg.resolve_option(nb.norm_split_overlap_matrix_nb, jitted)
             else:
                 func = jit_reg.resolve_option(nb.split_overlap_matrix_nb, jitted)
+            overlap_matrix = func(mask_arr)
+            if one_split:
+                return overlap_matrix[0, 0]
             index = split_labels
         elif by.lower() == "set":
             if normalize:
                 func = jit_reg.resolve_option(nb.norm_set_overlap_matrix_nb, jitted)
             else:
                 func = jit_reg.resolve_option(nb.set_overlap_matrix_nb, jitted)
+            overlap_matrix = func(mask_arr)
+            if one_set:
+                return overlap_matrix[0, 0]
             index = set_labels
         elif by.lower() == "range":
             if normalize:
                 func = jit_reg.resolve_option(nb.norm_range_overlap_matrix_nb, jitted)
             else:
                 func = jit_reg.resolve_option(nb.range_overlap_matrix_nb, jitted)
-            if index_combine_kwargs is None:
-                index_combine_kwargs = {}
-            index = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
+            overlap_matrix = func(mask_arr)
+            if one_split and one_set:
+                return overlap_matrix[0, 0]
+            if one_split:
+                index = set_labels
+            elif one_set:
+                index = split_labels
+            else:
+                if index_combine_kwargs is None:
+                    index_combine_kwargs = {}
+                index = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
         else:
             raise ValueError(f"Invalid option by='{by}'")
-        overlap_matrix = func(mask_arr)
         return pd.DataFrame(overlap_matrix, index=index, columns=index)
 
     @property

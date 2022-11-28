@@ -112,3 +112,21 @@ def norm_range_overlap_matrix_nb(mask_arr: tp.Array3d) -> tp.Array2d:
             union = (mask_arr[i1, j1] | mask_arr[i2, j2]).sum()
             out[k, l] = intersection / union
     return out
+
+
+@register_jitted(cache=True)
+def split_range_by_gap_nb(range_: tp.Array1d) -> tp.Tuple[tp.Array1d, tp.Array1d]:
+    """Split a range with gaps into start and end indices."""
+    if len(range_) == 0:
+        raise ValueError("Range is empty")
+    start_idxs_out = np.empty(len(range_), dtype=np.int_)
+    stop_idxs_out = np.empty(len(range_), dtype=np.int_)
+    start_idxs_out[0] = 0
+    k = 0
+    for i in range(1, len(range_)):
+        if range_[i] - range_[i - 1] != 1:
+            stop_idxs_out[k] = i
+            k += 1
+            start_idxs_out[k] = i
+    stop_idxs_out[k] = len(range_)
+    return start_idxs_out[:k + 1], stop_idxs_out[:k + 1]

@@ -1432,6 +1432,14 @@ class TestSplitter:
         assert new_split[1] == vbt.hslice(start=5, stop=10, step=None)
         np.testing.assert_array_equal(new_split[2], np.array([10, 12, 14]))
         np.testing.assert_array_equal(new_split[3], np.array([16, 18, 20]))
+        assert vbt.Splitter.split_range(np.array([0, 2, 4, 5, 7, 8, 9, 11]), "by_gap", index=index) == (
+            slice(0, 1, None), slice(2, 3, None), slice(4, 6, None), slice(7, 10, None), slice(11, 12, None)
+        )
+        mask = np.full(len(index), False)
+        mask[[0, 2, 4, 5, 7, 8, 9, 11]] = True
+        assert vbt.Splitter.split_range(mask, "by_gap", index=index) == (
+            slice(0, 1, None), slice(2, 3, None), slice(4, 6, None), slice(7, 10, None), slice(11, 12, None)
+        )
 
     def test_merge_split(self):
         assert vbt.Splitter.merge_split((slice(10, 20), slice(20, 30)), index=index) == slice(10, 30)
@@ -2784,6 +2792,62 @@ class TestSplitter:
             ),
         )
 
+    def test_shuffle_splits(self):
+        splitter = vbt.Splitter.from_splits(index, [slice(0, 10), slice(10, 20), slice(20, 30)]).split_set(0.5)
+        new_splitter = splitter.shuffle_splits(seed=42)
+        np.testing.assert_array_equal(
+            new_splitter.splits_arr,
+            np.array([
+                [slice(20, 25, None), slice(25, 30, None)],
+                [slice(0, 5, None), slice(5, 10, None)],
+                [slice(10, 15, None), slice(15, 20, None)],
+            ], dtype=object)
+        )
+        new_splitter = splitter.shuffle_splits(size=1, seed=42)
+        np.testing.assert_array_equal(
+            new_splitter.splits_arr,
+            np.array([
+                [slice(0, 5, None), slice(5, 10, None)],
+            ], dtype=object)
+        )
+
+    def test_break_up_splits(self):
+        splitter = vbt.Splitter.from_splits(index, [slice(0, 10), slice(10, 20), slice(20, 30)])
+        new_splitter = splitter.split_set(0.5)
+        with pytest.raises(Exception):
+            new_splitter.break_up_splits(0.5)
+        np.testing.assert_array_equal(
+            splitter.break_up_splits(0.5).splits_arr,
+            np.array([
+                [slice(0, 5, None)],
+                [slice(5, 10, None)],
+                [slice(10, 15, None)],
+                [slice(15, 20, None)],
+                [slice(20, 25, None)],
+                [slice(25, 30, None)],
+            ], dtype=object)
+        )
+        assert_index_equal(
+            splitter.break_up_splits(0.5).split_labels,
+            pd.MultiIndex.from_tuples([(0, 0), (0, 1), (1, 0), (1, 1), (2, 0), (2, 1)], names=['split', 'split_part']),
+        )
+        splitter = vbt.Splitter.from_splits(index, [slice(20, 30), slice(10, 20), slice(0, 10)])
+        np.testing.assert_array_equal(
+            splitter.break_up_splits(0.5, sort=True).splits_arr,
+            np.array([
+                [slice(0, 5, None)],
+                [slice(5, 10, None)],
+                [slice(10, 15, None)],
+                [slice(15, 20, None)],
+                [slice(20, 25, None)],
+                [slice(25, 30, None)],
+            ], dtype=object)
+        )
+        assert_index_equal(
+            splitter.break_up_splits(0.5, sort=True).split_labels,
+            pd.MultiIndex.from_tuples([(2, 0), (2, 1), (1, 0), (1, 1), (0, 0), (0, 1)], names=['split', 'split_part']),
+        )
+
     def test_split_set(self):
         splitter = vbt.Splitter.from_splits(index, [slice(0, 10), slice(10, 20), slice(20, 30)])
         new_splitter = splitter.split_set(0.5)
@@ -3045,10 +3109,22 @@ class TestSplitter:
             ),
         )
         assert_frame_equal(
-            splitter.get_bounds(split_group_by=["a", "b", "a"], set_group_by=["c", "c"], check_constant=False),
+            splitter.get_bounds(
+                split_group_by=["a", "b", "a"], set_group_by=["c", "c"], check_constant=False, squeeze_one_set=False
+            ),
             pd.DataFrame(
                 [[0, 31], [10, 20]],
                 index=pd.MultiIndex.from_tuples([("a", "c"), ("b", "c")], names=["split_group", "set_group"]),
+                columns=pd.Index(["start", "end"], dtype="object", name="bound"),
+            ),
+        )
+        assert_frame_equal(
+            splitter.get_bounds(
+                split_group_by=["a", "b", "a"], set_group_by=["c", "c"], check_constant=False
+            ),
+            pd.DataFrame(
+                [[0, 31], [10, 20]],
+                index=pd.Index(["a", "b"], dtype="object", name="split_group"),
                 columns=pd.Index(["start", "end"], dtype="object", name="bound"),
             ),
         )
@@ -3833,7 +3909,7 @@ class TestSplitter:
                     [True, False],
                 ],
                 index=index,
-                columns=pd.MultiIndex.from_tuples([(0, 0), (1, 0)], names=["split_group", "set_group"]),
+                columns=pd.Index([0, 1], dtype='int64', name='split_group'),
             ),
         )
 
@@ -3945,13 +4021,14 @@ class TestSplitter:
             ),
         )
         assert_series_equal(
-            splitter.get_set_coverage(split_group_by=[0, 1, 0], set_group_by=[0, 0]),
+            splitter.get_set_coverage(split_group_by=[0, 1, 0], set_group_by=[0, 0], squeeze_one_set=False),
             pd.Series(
                 [0.8387096774193549],
                 index=pd.Index([0], dtype="int64", name="set_group"),
                 name="set_coverage",
             ),
         )
+        splitter.get_set_coverage(split_group_by=[0, 1, 0], set_group_by=[0, 0]) == 0.8387096774193549
 
     def test_get_range_coverage(self):
         splitter = vbt.Splitter.from_splits(
@@ -4034,7 +4111,7 @@ class TestSplitter:
             ),
         )
         assert_series_equal(
-            splitter.get_range_coverage(split_group_by=[0, 1, 0, 2], set_group_by=[0, 0]),
+            splitter.get_range_coverage(split_group_by=[0, 1, 0, 2], set_group_by=[0, 0], squeeze_one_set=False),
             pd.Series(
                 [0.3225806451612903, 0.16129032258064516, 0.3548387096774194],
                 index=pd.MultiIndex.from_tuples(
@@ -4045,6 +4122,14 @@ class TestSplitter:
                     ],
                     names=["split_group", "set_group"],
                 ),
+                name="range_coverage",
+            ),
+        )
+        assert_series_equal(
+            splitter.get_range_coverage(split_group_by=[0, 1, 0, 2], set_group_by=[0, 0]),
+            pd.Series(
+                [0.3225806451612903, 0.16129032258064516, 0.3548387096774194],
+                index=pd.Index([0, 1, 2], dtype='int64', name='split_group'),
                 name="range_coverage",
             ),
         )

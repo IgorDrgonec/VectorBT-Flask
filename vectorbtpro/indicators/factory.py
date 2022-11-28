@@ -3051,6 +3051,7 @@ Args:
         func: tp.Callable,
         test_input_names: tp.Optional[tp.Sequence[str]] = None,
         test_index_len: int = 100,
+        silence_warnings: bool = False,
         **kwargs,
     ) -> tp.Kwargs:
         """Get the config of a `pandas_ta` indicator."""
@@ -3093,7 +3094,8 @@ Args:
             results = []
             for i, r in enumerate(result):
                 if len(r.index) != len(test_df.index):
-                    warnings.warn(f"Couldn't parse the output at index {i}: mismatching index", stacklevel=2)
+                    if not silence_warnings:
+                        warnings.warn(f"Couldn't parse the output at index {i}: mismatching index", stacklevel=2)
                 else:
                     results.append(r)
             if len(results) > 1:
@@ -3152,7 +3154,7 @@ Args:
         indicators = set()
         for func_name in [_k for k, v in pandas_ta.Category.items() for _k in v]:
             try:
-                cls.parse_pandas_ta_config(getattr(pandas_ta, func_name), **kwargs)
+                cls.parse_pandas_ta_config(getattr(pandas_ta, func_name), silence_warnings=silence_warnings, **kwargs)
                 indicators.add(func_name.upper())
             except Exception as e:
                 if not silence_warnings:

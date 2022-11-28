@@ -16,7 +16,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.indexing import flex_select_auto_nb
 from vectorbtpro.generic import nb as generic_nb
-from vectorbtpro.labels.enums import TrendMode
+from vectorbtpro.labels.enums import TrendLabelMode
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch
@@ -132,7 +132,9 @@ def get_symmetric_down_th_nb(up_th: tp.FlexArray) -> tp.FlexArray:
     merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def local_extrema_nb(close: tp.Array2d, up_th: tp.FlexArray, down_th: tp.FlexArray, flex_2d: bool = False) -> tp.Array2d:
+def local_extrema_nb(
+    close: tp.Array2d, up_th: tp.FlexArray, down_th: tp.FlexArray, flex_2d: bool = False
+) -> tp.Array2d:
     """Get array of local extrema denoted by 1 (peak) or -1 (trough), otherwise 0.
 
     Two adjacent peak and trough points should exceed the given threshold parameters.
@@ -353,17 +355,17 @@ def trend_labels_nb(
     mode: int,
     flex_2d: bool = False,
 ) -> tp.Array2d:
-    """Apply a trend labeling function based on `TrendMode`."""
+    """Apply a trend labeling function based on `TrendLabelMode`."""
     local_extrema = local_extrema_nb(close, up_th, down_th, flex_2d)
-    if mode == TrendMode.Binary:
+    if mode == TrendLabelMode.Binary:
         return bn_trend_labels_nb(close, local_extrema)
-    if mode == TrendMode.BinaryCont:
+    if mode == TrendLabelMode.BinaryCont:
         return bn_cont_trend_labels_nb(close, local_extrema)
-    if mode == TrendMode.BinaryContSat:
+    if mode == TrendLabelMode.BinaryContSat:
         return bn_cont_sat_trend_labels_nb(close, local_extrema, up_th, down_th, flex_2d)
-    if mode == TrendMode.PctChange:
+    if mode == TrendLabelMode.PctChange:
         return pct_trend_labels_nb(close, local_extrema, False)
-    if mode == TrendMode.PctChangeNorm:
+    if mode == TrendLabelMode.PctChangeNorm:
         return pct_trend_labels_nb(close, local_extrema, True)
     raise ValueError("Invalid trend mode")
 
