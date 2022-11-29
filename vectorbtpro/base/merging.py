@@ -369,7 +369,17 @@ def mixed_merge(
 
     outputs = []
     for i, obj_kind in enumerate(zip(*objs)):
-        outputs.append(resolve_merge_func(func_names[i])(
+        func_name = func_names[i]
+        if func_name.lower() == "reset_column_stack":
+            kwargs["reset_index"] = True
+            func_name = "column_stack"
+        elif func_name.lower() == "from_start_column_stack":
+            kwargs["reset_index"] = "from_start"
+            func_name = "column_stack"
+        elif func_name.lower() == "from_end_column_stack":
+            kwargs["reset_index"] = "from_end"
+            func_name = "column_stack"
+        outputs.append(resolve_merge_func(func_name)(
             obj_kind,
             keys=keys,
             wrap=wrap,

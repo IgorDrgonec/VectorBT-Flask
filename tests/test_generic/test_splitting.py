@@ -2022,7 +2022,7 @@ class TestSplitter:
         assert isinstance(new_obj, pd.Series)
         assert_index_equal(new_obj.index, pd.Index([0, 1], dtype="int64", name="split"))
         assert_frame_equal(
-            new_obj[0],
+            new_obj.iloc[0],
             pd.DataFrame(
                 [
                     [5.0, np.nan],
@@ -2062,7 +2062,7 @@ class TestSplitter:
             ),
         )
         assert_frame_equal(
-            new_obj[1],
+            new_obj.iloc[1],
             pd.DataFrame(
                 [
                     [10.0, np.nan],
@@ -2097,6 +2097,38 @@ class TestSplitter:
                 ),
             ),
         )
+        assert_series_equal(
+            splitter.take(
+                sr,
+                into="stacked_by_split",
+                attach_bounds="target_index",
+                split_group_by=True,
+                set_group_by=True
+            ),
+            sr.iloc[5:31],
+        )
+        new_obj = splitter.take(
+            sr,
+            into="stacked_by_split",
+            attach_bounds="target_index",
+            split_group_by=False,
+            set_group_by=True,
+        )
+        assert_index_equal(
+            new_obj.index,
+            pd.MultiIndex.from_tuples([
+                (0, pd.Timestamp('2020-01-01'), pd.Timestamp('2020-01-26')),
+                (1, pd.Timestamp('2020-01-06'), pd.Timestamp('2020-01-27')),
+            ], names=['split', 'start', 'end'])
+        )
+        assert_series_equal(
+            new_obj.iloc[0],
+            pd.Series(sr.iloc[5:30], index=sr.index[5:30]),
+        )
+        assert_series_equal(
+            new_obj.iloc[1],
+            pd.Series(sr.iloc[10:31], index=sr.index[10:31]),
+        )
 
     def test_take_stacked_by_set(self):
         sr = pd.Series(np.arange(len(index)), index=index.shift(-5))
@@ -2115,7 +2147,7 @@ class TestSplitter:
         assert isinstance(new_obj, pd.Series)
         assert_index_equal(new_obj.index, pd.Index(["set_0", "set_1"], dtype="object", name="set"))
         assert_frame_equal(
-            new_obj[0],
+            new_obj.iloc[0],
             pd.DataFrame(
                 [
                     [5.0, np.nan],
@@ -2150,7 +2182,7 @@ class TestSplitter:
             ),
         )
         assert_frame_equal(
-            new_obj[1],
+            new_obj.iloc[1],
             pd.DataFrame(
                 [
                     [15.0, np.nan],
@@ -2179,6 +2211,38 @@ class TestSplitter:
                     names=["split", "start", "end"],
                 ),
             ),
+        )
+        assert_series_equal(
+            splitter.take(
+                sr,
+                into="stacked_by_set",
+                attach_bounds="target_index",
+                split_group_by=True,
+                set_group_by=True
+            ),
+            sr.iloc[5:31],
+        )
+        new_obj = splitter.take(
+            sr,
+            into="stacked_by_set",
+            attach_bounds="target_index",
+            split_group_by=True,
+            set_group_by=False,
+        )
+        assert_index_equal(
+            new_obj.index,
+            pd.MultiIndex.from_tuples([
+                ("set_0", pd.Timestamp('2020-01-01'), pd.Timestamp('2020-01-21')),
+                ("set_1", pd.Timestamp('2020-01-11'), pd.Timestamp('2020-01-27')),
+            ], names=['set', 'start', 'end'])
+        )
+        assert_series_equal(
+            new_obj.iloc[0],
+            pd.Series(sr.iloc[5:25], index=sr.index[5:25]),
+        )
+        assert_series_equal(
+            new_obj.iloc[1],
+            pd.Series(sr.iloc[15:31], index=sr.index[15:31]),
         )
 
     def test_apply(self):
@@ -2465,68 +2529,96 @@ class TestSplitter:
                 ),
             ),
         )
-        assert_frame_equal(
-            splitter.apply(
-                apply_func,
-                vbt.Takeable(sr.values, index=sr.index.shift(-1)),
-                b=vbt.Takeable(sr.values, index=sr.index.shift(-2)),
-                obj_index=sr.index,
-                iteration="split_major",
-                merge_all=False,
-                merge_func="concat",
-            ),
-            pd.DataFrame(
-                [[405, 674], [555, 489]],
-                index=pd.Index([0, 1], dtype="int64", name="split"),
-                columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
-            ),
+        r = splitter.apply(
+            apply_func,
+            vbt.Takeable(sr.values, index=sr.index.shift(-1)),
+            b=vbt.Takeable(sr.values, index=sr.index.shift(-2)),
+            obj_index=sr.index,
+            iteration="split_major",
+            merge_all=False,
+            merge_func="concat",
         )
-        assert_frame_equal(
-            splitter.apply(
-                apply_func,
-                vbt.Takeable(sr.values, index=sr.index.shift(-1)),
-                b=vbt.Takeable(sr.values, index=sr.index.shift(-2)),
-                obj_index=sr.index,
-                iteration="split_wise",
-                merge_all=False,
-                merge_func="concat",
-            ),
-            pd.DataFrame(
-                [[405, 674], [555, 489]],
-                index=pd.Index([0, 1], dtype="int64", name="split"),
-                columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
-            ),
-        )
-        assert_frame_equal(
-            splitter.apply(
-                apply_func,
-                vbt.Takeable(sr.values, index=sr.index.shift(-1)),
-                b=vbt.Takeable(sr.values, index=sr.index.shift(-2)),
-                obj_index=sr.index,
-                iteration="set_major",
-                merge_all=False,
-                merge_func="concat",
-            ),
-            pd.DataFrame(
-                [[405, 555], [674, 489]],
+        assert_series_equal(
+            r.iloc[0],
+            pd.Series(
+                [405, 674],
                 index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
-                columns=pd.Index([0, 1], dtype="int64", name="split"),
             ),
         )
-        assert_frame_equal(
-            splitter.apply(
-                apply_func,
-                vbt.Takeable(sr.values, index=sr.index.shift(-1)),
-                b=vbt.Takeable(sr.values, index=sr.index.shift(-2)),
-                obj_index=sr.index,
-                iteration="set_wise",
-                merge_all=False,
-                merge_func="concat",
-            ),
-            pd.DataFrame(
-                [[405, 555], [674, 489]],
+        assert_series_equal(
+            r.iloc[1],
+            pd.Series(
+                [555, 489],
                 index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
-                columns=pd.Index([0, 1], dtype="int64", name="split"),
+            ),
+        )
+        r = splitter.apply(
+            apply_func,
+            vbt.Takeable(sr.values, index=sr.index.shift(-1)),
+            b=vbt.Takeable(sr.values, index=sr.index.shift(-2)),
+            obj_index=sr.index,
+            iteration="split_wise",
+            merge_all=False,
+            merge_func="concat",
+        )
+        assert_series_equal(
+            r.iloc[0],
+            pd.Series(
+                [405, 674],
+                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+            ),
+        )
+        assert_series_equal(
+            r.iloc[1],
+            pd.Series(
+                [555, 489],
+                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+            ),
+        )
+        r = splitter.apply(
+            apply_func,
+            vbt.Takeable(sr.values, index=sr.index.shift(-1)),
+            b=vbt.Takeable(sr.values, index=sr.index.shift(-2)),
+            obj_index=sr.index,
+            iteration="set_major",
+            merge_all=False,
+            merge_func="concat",
+        )
+        assert_series_equal(
+            r.iloc[0],
+            pd.Series(
+                [405, 555],
+                index=pd.Index([0, 1], dtype="int64", name="split"),
+            ),
+        )
+        assert_series_equal(
+            r.iloc[1],
+            pd.Series(
+                [674, 489],
+                index=pd.Index([0, 1], dtype="int64", name="split"),
+            ),
+        )
+        r = splitter.apply(
+            apply_func,
+            vbt.Takeable(sr.values, index=sr.index.shift(-1)),
+            b=vbt.Takeable(sr.values, index=sr.index.shift(-2)),
+            obj_index=sr.index,
+            iteration="set_wise",
+            merge_all=False,
+            merge_func="concat",
+        )
+        assert_series_equal(
+            r.iloc[0],
+            pd.Series(
+                [405, 555],
+                index=pd.Index([0, 1], dtype="int64", name="split"),
+            ),
+        )
+        assert_series_equal(
+            r.iloc[1],
+            pd.Series(
+                [674, 489],
+                index=pd.Index([0, 1], dtype="int64", name="split"),
             ),
         )
 
@@ -2650,20 +2742,32 @@ class TestSplitter:
             merge_all=False,
             merge_func="concat",
         )
-        assert_frame_equal(
-            r[0],
-            pd.DataFrame(
-                [[195, 345], [270, 255]],
-                index=pd.Index([0, 1], dtype="int64", name="split"),
-                columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+        assert_series_equal(
+            r[0].iloc[0],
+            pd.Series(
+                [195, 345],
+                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
             ),
         )
-        assert_frame_equal(
-            r[1],
-            pd.DataFrame(
-                [[210, 329], [285, 234]],
-                index=pd.Index([0, 1], dtype="int64", name="split"),
-                columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+        assert_series_equal(
+            r[0].iloc[1],
+            pd.Series(
+                [270, 255],
+                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+            ),
+        )
+        assert_series_equal(
+            r[1].iloc[0],
+            pd.Series(
+                [210, 329],
+                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+            ),
+        )
+        assert_series_equal(
+            r[1].iloc[1],
+            pd.Series(
+                [285, 234],
+                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
             ),
         )
         r = splitter.apply(
@@ -2675,20 +2779,32 @@ class TestSplitter:
             merge_all=False,
             merge_func="concat",
         )
-        assert_frame_equal(
-            r[0],
-            pd.DataFrame(
-                [[195, 345], [270, 255]],
-                index=pd.Index([0, 1], dtype="int64", name="split"),
-                columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+        assert_series_equal(
+            r[0].iloc[0],
+            pd.Series(
+                [195, 345],
+                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
             ),
         )
-        assert_frame_equal(
-            r[1],
-            pd.DataFrame(
-                [[210, 329], [285, 234]],
-                index=pd.Index([0, 1], dtype="int64", name="split"),
-                columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+        assert_series_equal(
+            r[0].iloc[1],
+            pd.Series(
+                [270, 255],
+                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+            ),
+        )
+        assert_series_equal(
+            r[1].iloc[0],
+            pd.Series(
+                [210, 329],
+                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+            ),
+        )
+        assert_series_equal(
+            r[1].iloc[1],
+            pd.Series(
+                [285, 234],
+                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
             ),
         )
         r = splitter.apply(
@@ -2700,20 +2816,32 @@ class TestSplitter:
             merge_all=False,
             merge_func="concat",
         )
-        assert_frame_equal(
-            r[0],
-            pd.DataFrame(
-                [[195, 270], [345, 255]],
-                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
-                columns=pd.Index([0, 1], dtype="int64", name="split"),
+        assert_series_equal(
+            r[0].iloc[0],
+            pd.Series(
+                [195, 270],
+                index=pd.Index([0, 1], dtype="int64", name="split"),
             ),
         )
-        assert_frame_equal(
-            r[1],
-            pd.DataFrame(
-                [[210, 285], [329, 234]],
-                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
-                columns=pd.Index([0, 1], dtype="int64", name="split"),
+        assert_series_equal(
+            r[0].iloc[1],
+            pd.Series(
+                [345, 255],
+                index=pd.Index([0, 1], dtype="int64", name="split"),
+            ),
+        )
+        assert_series_equal(
+            r[1].iloc[0],
+            pd.Series(
+                [210, 285],
+                index=pd.Index([0, 1], dtype="int64", name="split"),
+            ),
+        )
+        assert_series_equal(
+            r[1].iloc[1],
+            pd.Series(
+                [329, 234],
+                index=pd.Index([0, 1], dtype="int64", name="split"),
             ),
         )
         r = splitter.apply(
@@ -2724,21 +2852,46 @@ class TestSplitter:
             iteration="set_wise",
             merge_all=False,
             merge_func="concat",
+            attach_bounds="target_index",
         )
-        assert_frame_equal(
-            r[0],
-            pd.DataFrame(
-                [[195, 270], [345, 255]],
-                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
-                columns=pd.Index([0, 1], dtype="int64", name="split"),
+        assert_series_equal(
+            r[0].iloc[0],
+            pd.Series(
+                [195, 270],
+                index=pd.MultiIndex.from_tuples([
+                    (0, pd.Timestamp('2020-01-01'), pd.Timestamp('2020-01-16')),
+                    (1, pd.Timestamp('2020-01-06'), pd.Timestamp('2020-01-21')),
+                ], names=['split', 'start', 'end']),
             ),
         )
-        assert_frame_equal(
-            r[1],
-            pd.DataFrame(
-                [[210, 285], [329, 234]],
-                index=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
-                columns=pd.Index([0, 1], dtype="int64", name="split"),
+        assert_series_equal(
+            r[0].iloc[1],
+            pd.Series(
+                [345, 255],
+                index=pd.MultiIndex.from_tuples([
+                    (0, pd.Timestamp('2020-01-11'), pd.Timestamp('2020-01-26')),
+                    (1, pd.Timestamp('2020-01-16'), pd.Timestamp('2020-01-27')),
+                ], names=['split', 'start', 'end']),
+            ),
+        )
+        assert_series_equal(
+            r[1].iloc[0],
+            pd.Series(
+                [210, 285],
+                index=pd.MultiIndex.from_tuples([
+                    (0, pd.Timestamp('2020-01-01'), pd.Timestamp('2020-01-16')),
+                    (1, pd.Timestamp('2020-01-06'), pd.Timestamp('2020-01-21')),
+                ], names=['split', 'start', 'end']),
+            ),
+        )
+        assert_series_equal(
+            r[1].iloc[1],
+            pd.Series(
+                [329, 234],
+                index=pd.MultiIndex.from_tuples([
+                    (0, pd.Timestamp('2020-01-11'), pd.Timestamp('2020-01-26')),
+                    (1, pd.Timestamp('2020-01-16'), pd.Timestamp('2020-01-27')),
+                ], names=['split', 'start', 'end']),
             ),
         )
         r = splitter.apply(
@@ -2774,21 +2927,114 @@ class TestSplitter:
             obj_index=sr.index,
             iteration="split_major",
             merge_all=False,
+            attach_bounds="target_index",
+            set_group_by=True,
         )
-        assert_frame_equal(
+        assert_series_equal(
             r[0],
-            pd.DataFrame(
-                [[195, 345], [270, 255]],
-                index=pd.Index([0, 1], dtype="int64", name="split"),
-                columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+            pd.Series(
+                [450, 410],
+                index=pd.MultiIndex.from_tuples([
+                    (0, pd.Timestamp('2020-01-01'), pd.Timestamp('2020-01-26')),
+                    (1, pd.Timestamp('2020-01-06'), pd.Timestamp('2020-01-27')),
+                ], names=['split', 'start', 'end']),
+            )
+        )
+        assert_series_equal(
+            r[1],
+            pd.Series(
+                [444, 399],
+                index=pd.MultiIndex.from_tuples([
+                    (0, pd.Timestamp('2020-01-01'), pd.Timestamp('2020-01-26')),
+                    (1, pd.Timestamp('2020-01-06'), pd.Timestamp('2020-01-27')),
+                ], names=['split', 'start', 'end']),
+            )
+        )
+        r = splitter.apply(
+            apply_func,
+            vbt.Takeable(sr.values, index=sr.index.shift(-1)),
+            b=vbt.Takeable(sr.values, index=sr.index.shift(-2)),
+            obj_index=sr.index,
+            iteration="split_major",
+            merge_all=False,
+            attach_bounds="target_index",
+            split_group_by=True,
+        )
+        assert_series_equal(
+            r[0],
+            pd.Series(
+                [310, 345],
+                index=pd.MultiIndex.from_tuples([
+                    ("set_0", pd.Timestamp('2020-01-01'), pd.Timestamp('2020-01-21')),
+                    ("set_1", pd.Timestamp('2020-01-11'), pd.Timestamp('2020-01-27')),
+                ], names=['set', 'start', 'end']),
+            )
+        )
+        assert_series_equal(
+            r[1],
+            pd.Series(
+                [330, 329],
+                index=pd.MultiIndex.from_tuples([
+                    ("set_0", pd.Timestamp('2020-01-01'), pd.Timestamp('2020-01-21')),
+                    ("set_1", pd.Timestamp('2020-01-11'), pd.Timestamp('2020-01-27')),
+                ], names=['set', 'start', 'end']),
+            )
+        )
+        r = splitter.apply(
+            apply_func,
+            vbt.Takeable(sr.values, index=sr.index.shift(-1)),
+            b=vbt.Takeable(sr.values, index=sr.index.shift(-2)),
+            obj_index=sr.index,
+            iteration="split_major",
+            merge_all=False,
+            attach_bounds="target_index",
+        )
+        assert_index_equal(
+            r[0].index,
+            pd.Index([0, 1], dtype="int64", name="split"),
+        )
+        assert_series_equal(
+            r[0].iloc[0],
+            pd.Series(
+                [195, 345],
+                index=pd.MultiIndex.from_tuples([
+                    ('set_0', pd.Timestamp('2020-01-01'), pd.Timestamp('2020-01-16')),
+                    ('set_1', pd.Timestamp('2020-01-11'), pd.Timestamp('2020-01-26')),
+                ],  names=['set', 'start', 'end'])
             ),
         )
-        assert_frame_equal(
-            r[1],
-            pd.DataFrame(
-                [[210, 329], [285, 234]],
-                index=pd.Index([0, 1], dtype="int64", name="split"),
-                columns=pd.Index(["set_0", "set_1"], dtype="object", name="set"),
+        assert_series_equal(
+            r[0].iloc[1],
+            pd.Series(
+                [270, 255],
+                index=pd.MultiIndex.from_tuples([
+                    ('set_0', pd.Timestamp('2020-01-06'), pd.Timestamp('2020-01-21')),
+                    ('set_1', pd.Timestamp('2020-01-16'), pd.Timestamp('2020-01-27')),
+                ], names=['set', 'start', 'end'])
+            ),
+        )
+        assert_index_equal(
+            r[1].index,
+            pd.Index([0, 1], dtype="int64", name="split"),
+        )
+        assert_series_equal(
+            r[1].iloc[0],
+            pd.Series(
+                [210, 329],
+                index=pd.MultiIndex.from_tuples([
+                    ('set_0', pd.Timestamp('2020-01-01'), pd.Timestamp('2020-01-16')),
+                    ('set_1', pd.Timestamp('2020-01-11'), pd.Timestamp('2020-01-26')),
+                ], names=['set', 'start', 'end'])
+            ),
+        )
+        assert_series_equal(
+            r[1].iloc[1],
+            pd.Series(
+                [285, 234],
+                index=pd.MultiIndex.from_tuples([
+                    ('set_0', pd.Timestamp('2020-01-06'), pd.Timestamp('2020-01-21')),
+                    ('set_1', pd.Timestamp('2020-01-16'), pd.Timestamp('2020-01-27')),
+                ], names=['set', 'start', 'end'])
             ),
         )
 
