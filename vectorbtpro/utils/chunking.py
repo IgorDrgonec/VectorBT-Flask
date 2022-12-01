@@ -737,6 +737,7 @@ def chunked(
     return_raw_chunks: bool = False,
     silence_warnings: tp.Optional[bool] = None,
     disable: tp.Optional[bool] = None,
+    forward_kwargs_as: tp.KwargsLike = None,
     **engine_kwargs,
 ) -> tp.Callable:
     """Decorator that chunks the inputs of a function. Engine-agnostic.
@@ -1005,6 +1006,18 @@ def chunked(
             silence_warnings = kwargs.pop("_silence_warnings", wrapper.options["silence_warnings"])
             if silence_warnings is None:
                 silence_warnings = chunking_cfg["silence_warnings"]
+            forward_kwargs_as = merge_dicts(wrapper.options["forward_kwargs_as"], kwargs.pop("_forward_kwargs_as", {}))
+            if len(forward_kwargs_as) > 0:
+                new_kwargs = dict()
+                for k, v in kwargs.items():
+                    if k in forward_kwargs_as:
+                        new_kwargs[forward_kwargs_as.pop(k)] = v
+                    else:
+                        new_kwargs[k] = v
+                kwargs = new_kwargs
+            if len(forward_kwargs_as) > 0:
+                for k, v in forward_kwargs_as.items():
+                    kwargs[v] = locals()[k]
 
             if prepend_chunk_meta:
                 args = (Rep("chunk_meta"), *args)
@@ -1070,6 +1083,7 @@ def chunked(
                 return_raw_chunks=return_raw_chunks,
                 silence_warnings=silence_warnings,
                 disable=disable,
+                forward_kwargs_as=forward_kwargs_as,
             ),
             frozen_keys_=True,
             as_attrs_=True,

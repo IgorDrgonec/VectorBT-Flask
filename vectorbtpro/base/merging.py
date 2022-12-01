@@ -88,6 +88,8 @@ def concat_merge(
             for i, obj in enumerate(objs):
                 _wrap_kwargs = resolve_dict(wrap_kwargs, i)
                 if wrapper is not None:
+                    if "force_1d" not in _wrap_kwargs:
+                        _wrap_kwargs["force_1d"] = True
                     new_objs.append(wrapper.wrap_reduced(obj, **_wrap_kwargs))
                 else:
                     new_objs.append(pd.Series(obj, **_wrap_kwargs))

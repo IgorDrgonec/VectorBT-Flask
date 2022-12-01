@@ -4651,9 +4651,18 @@ class TestDecorators:
 
         sr = pd.Series(np.arange(len(index)), index=index)
         splitter = vbt.Splitter.from_ranges(index, start=[0, 10], end=[10, 20], split=0.5)
-        cv_split_f = vbt.cv_split(f, splitter=splitter, takeable_args=["sr"], selection=lambda x: np.argmin(x))
+        cv_split_f = vbt.cv_split(
+            f,
+            splitter=splitter,
+            takeable_args=["sr"],
+            selection=vbt.RepFunc(lambda grid_results: np.argmin(grid_results)),
+        )
         assert cv_split_f(sr, vbt.Param([0, 1, 2])).values.tolist() == [0, 5, 10, 15]
-        assert cv_split_f(sr, vbt.Param([0, 1, 2]), _selection=lambda x: np.argmax(x)).values.tolist() == [2, 7, 12, 17]
+        assert cv_split_f(
+            sr,
+            vbt.Param([0, 1, 2]),
+            _selection=vbt.RepFunc(lambda grid_results: np.argmax(grid_results)),
+        ).values.tolist() == [2, 7, 12, 17]
         x, y = cv_split_f(sr, vbt.Param([0, 1, 2]), _return_grid=True)
         assert x.values.tolist() == [[0, 1, 2], [0, 1, 2], [10, 11, 12], [10, 11, 12]]
         assert y.values.tolist() == [0, 5, 10, 15]
@@ -4663,14 +4672,18 @@ class TestDecorators:
         assert cv_split_f(
             sr,
             vbt.Param([0, 1, 2]),
-            _selection=vbt.RepFunc(lambda grid_result: np.argmin(grid_result)),
-            _prepend_grid_result=False,
+            _selection=vbt.RepFunc(lambda grid_results: np.argmin(grid_results)),
         ).values.tolist() == [0, 5, 10, 15]
 
         def f2(sr, split_idx, set_idx, i):
             return sr[split_idx + set_idx + i]
 
-        cv_split_f2 = vbt.cv_split(f2, splitter=splitter, takeable_args=["sr"], selection=lambda x: np.argmin(x))
+        cv_split_f2 = vbt.cv_split(
+            f2,
+            splitter=splitter,
+            takeable_args=["sr"],
+            selection=vbt.RepFunc(lambda grid_results: np.argmin(grid_results)),
+        )
         assert cv_split_f2(sr, vbt.Rep("split_idx"), vbt.Rep("set_idx"), vbt.Param([0, 1, 2])).values.tolist() == [
             0,
             6,

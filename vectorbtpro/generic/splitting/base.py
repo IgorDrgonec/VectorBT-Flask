@@ -1052,6 +1052,9 @@ class Splitter(Analyzable):
         if grouper_kwargs is None:
             grouper_kwargs = {}
 
+        if isinstance(by, CustomTemplate):
+            _template_context = merge_dicts(dict(index=index), template_context)
+            by = deep_substitute(by, _template_context, sub_id="by")
         grouper = BaseIDXAccessor(index).get_grouper(by, groupby_kwargs=groupby_kwargs, **grouper_kwargs)
         splits = []
         indices = []
@@ -3370,6 +3373,7 @@ class Splitter(Analyzable):
 
             if merge_func is not None:
                 template_context["funcs_args"] = funcs_args
+                template_context["keys"] = keys
                 if isinstance(merge_func, (str, tuple)):
                     merge_func = resolve_merge_func(merge_func)
                     merge_kwargs = {**dict(keys=keys), **merge_kwargs}
@@ -3428,12 +3432,13 @@ class Splitter(Analyzable):
                 else:
                     _template_context = dict(template_context)
                     _template_context["funcs_args"] = funcs_args
+                    if attach_bounds is not None:
+                        minor_keys_wbounds = _attach_bounds(minor_keys, major_bounds[i])
+                    else:
+                        minor_keys_wbounds = minor_keys
+                    _template_context["keys"] = minor_keys_wbounds
                     if isinstance(merge_func, (str, tuple)):
                         _merge_func = resolve_merge_func(merge_func)
-                        if attach_bounds is not None:
-                            minor_keys_wbounds = _attach_bounds(minor_keys, major_bounds[i])
-                        else:
-                            minor_keys_wbounds = minor_keys
                         _merge_kwargs = {**dict(keys=minor_keys_wbounds), **merge_kwargs}
                     else:
                         _merge_func = merge_func

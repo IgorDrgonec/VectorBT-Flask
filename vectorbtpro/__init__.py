@@ -29,6 +29,10 @@ from vectorbtpro._settings import settings
 from vectorbtpro.accessors import Vbt_Accessor as pd_acc, Vbt_SRAccessor as sr_acc, Vbt_DFAccessor as df_acc
 from vectorbtpro.generic import nb, enums
 from vectorbtpro.portfolio import nb as pf_nb, enums as pf_enums
+from vectorbtpro.returns import nb as ret_nb, enums as ret_enums
+from vectorbtpro.signals import nb as sig_nb, enums as sig_enums
+from vectorbtpro.indicators import nb as ind_nb, enums as ind_enums
+from vectorbtpro.labels import nb as lab_nb, enums as lab_enums
 from vectorbtpro.utils import datetime_ as dt, datetime_nb as dt_nb
 from vectorbtpro.utils.caching import clear_pycache
 
