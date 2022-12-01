@@ -133,7 +133,10 @@ def get_symmetric_down_th_nb(up_th: tp.FlexArray) -> tp.FlexArray:
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def local_extrema_nb(
-    close: tp.Array2d, up_th: tp.FlexArray, down_th: tp.FlexArray, flex_2d: bool = False
+    close: tp.Array2d,
+    up_th: tp.FlexArray,
+    down_th: tp.FlexArray,
+    flex_2d: bool = False,
 ) -> tp.Array2d:
     """Get array of local extrema denoted by 1 (peak) or -1 (trough), otherwise 0.
 

@@ -2042,7 +2042,7 @@ __pdoc__[
     "Order.fees"
 ] = """Fees in percentage of the order value.
 
-Negative trading fees like -0.05 means earning 0.05% per trade instead of paying a fee.
+Negative trading fees like -0.05 mean earning 5% per trade instead of paying a fee.
 
 !!! note
     0.01 = 1%."""
