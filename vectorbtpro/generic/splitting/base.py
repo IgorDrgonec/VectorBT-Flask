@@ -2105,16 +2105,13 @@ class Splitter(Analyzable):
             new_split = deep_substitute(new_split, _template_context, sub_id="new_split")
 
         # Split by gap
-        if isinstance(new_split, str):
-            if new_split.lower() == "by_gap":
-                if isinstance(range_, np.ndarray) and np.issubdtype(range_.dtype, np.integer):
-                    range_arr = range_
-                else:
-                    range_arr = np.arange(len(index))[range_]
-                start_idxs, stop_idxs = nb.split_range_by_gap_nb(range_arr)
-                new_split = list(map(lambda x: slice(x[0], x[1]), zip(start_idxs, stop_idxs)))
+        if isinstance(new_split, str) and new_split.lower() == "by_gap":
+            if isinstance(range_, np.ndarray) and np.issubdtype(range_.dtype, np.integer):
+                range_arr = range_
             else:
-                raise ValueError(f"Invalid option new_split='{new_split}'")
+                range_arr = np.arange(len(index))[range_]
+            start_idxs, stop_idxs = nb.split_range_by_gap_nb(range_arr)
+            new_split = list(map(lambda x: slice(x[0], x[1]), zip(start_idxs, stop_idxs)))
 
         # Prepare target ranges
         if checks.is_number(new_split):

@@ -16,7 +16,7 @@ from vectorbtpro.utils.parsing import (
     match_ann_arg,
 )
 from vectorbtpro.utils.params import parameterized
-from vectorbtpro.utils.template import Rep, deep_substitute
+from vectorbtpro.utils.template import Rep, RepEval, deep_substitute
 from vectorbtpro.generic.splitting.base import Splitter, Takeable
 
 
@@ -245,7 +245,7 @@ def split(
 def cv_split(
     *args,
     parameterized_kwargs: tp.KwargsLike = None,
-    selection: tp.Union[None, tp.MaybeIterable[tp.Hashable]] = None,
+    selection: tp.Union[tp.MaybeIterable[tp.Hashable]] = "max",
     return_grid: tp.Union[bool, str] = False,
     template_context: tp.KwargsLike = None,
     **split_kwargs,
@@ -260,6 +260,8 @@ def cv_split(
     (testing) sets in the same split. If `selection` is a template, it can evaluate the grid results
     (available as `grid_results`) and return the best parameter combination. This parameter combination
     is then executed by each set (including training).
+
+    Argument `selection` also accepts "min" for `np.argmin` and "max" for `np.argmax`.
 
     Keyword arguments `parameterized_kwargs` will be passed to `vectorbtpro.utils.params.parameterized`
     and will have their templates substituted with a context that will also include the split-related context
@@ -282,8 +284,6 @@ def cv_split(
         ...     splitter="from_n_rolling",
         ...     splitter_kwargs=dict(n=3, split=0.5),
         ...     takeable_args=["sr"],
-        ...     parameterized_kwargs=dict(merge_func="concat"),
-        ...     selection=vbt.RepFunc(lambda grid_results: [np.argmax(grid_results)]),
         ...     merge_func="concat",
         ... )
         ... def f(sr, seed):
@@ -348,8 +348,10 @@ def cv_split(
                 wrapper.options["parameterized_kwargs"], kwargs.pop("_parameterized_kwargs", {})
             )
             selection = kwargs.pop("_selection", wrapper.options["selection"])
-            if selection is None:
-                raise ValueError("Must provide selection")
+            if isinstance(selection, str) and selection.lower() == "min":
+                selection = RepEval("[np.argmin(grid_results)]")
+            if isinstance(selection, str) and selection.lower() == "max":
+                selection = RepEval("[np.argmax(grid_results)]")
             return_grid = kwargs.pop("_return_grid", wrapper.options["return_grid"])
             if isinstance(return_grid, bool):
                 if return_grid:
@@ -358,6 +360,8 @@ def cv_split(
                     return_grid = None
             template_context = merge_dicts(wrapper.options["template_context"], kwargs.pop("_template_context", {}))
             split_kwargs = merge_dicts(wrapper.options["split_kwargs"], kwargs.pop("_split_kwargs", {}))
+            if "merge_func" in split_kwargs and "merge_func" not in parameterized_kwargs:
+                parameterized_kwargs["merge_func"] = split_kwargs["merge_func"]
 
             all_grid_results = []
 
