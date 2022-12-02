@@ -2704,14 +2704,14 @@ Other keyword arguments are passed to `{0}.run`.
     # ############# Third party ############# #
 
     @classmethod
-    def get_talib_indicators(cls) -> tp.Set[str]:
+    def get_talib_indicators(cls) -> tp.List[str]:
         """Get all parseable indicators in `talib`."""
         from vectorbtpro.utils.opt_packages import assert_can_import
 
         assert_can_import("talib")
         import talib
 
-        return set(talib.get_functions())
+        return sorted(talib.get_functions())
 
     @classmethod
     def from_talib(cls, func_name: str, factory_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Type[IndicatorBase]:
@@ -3141,7 +3141,7 @@ Args:
         )
 
     @classmethod
-    def get_pandas_ta_indicators(cls, silence_warnings: bool = True, **kwargs) -> tp.Set[str]:
+    def get_pandas_ta_indicators(cls, silence_warnings: bool = True, **kwargs) -> tp.List[str]:
         """Get all parseable indicators in `pandas_ta`.
 
         !!! note
@@ -3159,7 +3159,7 @@ Args:
             except Exception as e:
                 if not silence_warnings:
                     warnings.warn(f"Function {func_name}: " + str(e), stacklevel=2)
-        return indicators
+        return sorted(indicators)
 
     @classmethod
     def from_pandas_ta(
@@ -3311,7 +3311,7 @@ Args:
         return Indicator
 
     @classmethod
-    def get_ta_indicators(cls) -> tp.Set[str]:
+    def get_ta_indicators(cls) -> tp.List[str]:
         """Get all parseable indicators in `ta`."""
         from vectorbtpro.utils.opt_packages import assert_can_import
 
@@ -3330,7 +3330,7 @@ Args:
                     and issubclass(obj, ta.utils.IndicatorMixin)
                 ):
                     indicators.add(obj.__name__)
-        return indicators
+        return sorted(indicators)
 
     @classmethod
     def find_ta_indicator(cls, cls_name: str) -> IndicatorMixinT:
@@ -3594,7 +3594,7 @@ Args:
         )
 
     @classmethod
-    def get_technical_indicators(cls, silence_warnings: bool = True, **kwargs) -> tp.Set[str]:
+    def get_technical_indicators(cls, silence_warnings: bool = True, **kwargs) -> tp.List[str]:
         """Get all parseable indicators in `technical`."""
         from vectorbtpro.utils.opt_packages import assert_can_import
 
@@ -3610,7 +3610,7 @@ Args:
             except Exception as e:
                 if not silence_warnings:
                     warnings.warn(f"Function {func_name}: " + str(e), stacklevel=2)
-        return indicators
+        return sorted(indicators)
 
     @classmethod
     def find_technical_indicator(cls, func_name: str) -> IndicatorMixinT:
@@ -3911,9 +3911,9 @@ Args:
         raise ValueError(f"Unknown technical consensus class '{cls_name}'")
 
     @classmethod
-    def get_techcon_indicators(cls) -> tp.Set[str]:
+    def get_techcon_indicators(cls) -> tp.List[str]:
         """Get all consensus indicators in `technical`."""
-        return {"MACON", "OSCCON", "SUMCON"}
+        return sorted({"MACON", "OSCCON", "SUMCON"})
 
     # ############# Expressions ############# #
 
