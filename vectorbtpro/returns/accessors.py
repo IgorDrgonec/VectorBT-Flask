@@ -737,7 +737,7 @@ class ReturnsAccessor(GenericAccessor):
             ddof = self.defaults["ddof"]
         sharpe_ratio = to_1d_array(self.sharpe_ratio(risk_free=risk_free))
         if var_sharpe is None:
-            var_sharpe = np.var(sharpe_ratio, ddof=ddof)
+            var_sharpe = np.nanvar(sharpe_ratio, ddof=ddof)
         if nb_trials is None:
             nb_trials = self.wrapper.shape_2d[1]
         returns = to_2d_array(self.obj)
