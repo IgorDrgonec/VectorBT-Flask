@@ -6243,7 +6243,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cls: tp.Type[PortfolioT],
         close: tp.Union[tp.ArrayLike, Data],
         direction: tp.Optional[int] = None,
+        at_first_valid_in: tp.Optional[str] = "close",
         close_at_end: tp.Optional[bool] = None,
+        dynamic_mode: bool = False,
         **kwargs,
     ) -> PortfolioT:
         """Simulate portfolio from plain holding using signals.
@@ -6255,7 +6257,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         Usage:
             ```pycon
             >>> close = pd.Series([1, 2, 3, 4, 5])
-            >>> pf = vbt.Portfolio.from_holding(close, base_method='from_signals')
+            >>> pf = vbt.Portfolio.from_holding(close)
             >>> pf.final_value
             500.0
             ```
@@ -6272,10 +6274,53 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if close_at_end is None:
             close_at_end = portfolio_cfg["close_at_end"]
 
+        if dynamic_mode:
+            return cls.from_signals(
+                close,
+                signal_func_nb=nb.holding_enex_signal_func_nb,
+                signal_args=(direction, close_at_end),
+                accumulate=False,
+                **kwargs,
+            )
+
+        def _entries(wrapper, new_objs):
+            flex_2d = wrapper.ndim == 2
+            if at_first_valid_in is None:
+                entries = np.full((wrapper.shape_2d[0], 1), False)
+                entries[0] = True
+                return entries
+            ts = new_objs[at_first_valid_in]
+            if ts.ndim == 0:
+                ts = ts[None]
+            if ts.ndim == 1:
+                if flex_2d:
+                    ts = ts[None]
+                else:
+                    ts = ts[:, None]
+            valid_index = generic_nb.first_valid_index_nb(ts)
+            if (valid_index == -1).all():
+                return np.asarray([False])
+            if (valid_index == 0).all():
+                entries = np.full((wrapper.shape_2d[0], 1), False)
+                entries[0] = True
+                return entries
+            entries = np.full(wrapper.shape_2d, False)
+            entries[valid_index, np.arange(wrapper.shape_2d[1])] = True
+            return entries
+
+        def _exits(wrapper):
+            if close_at_end:
+                exits = np.full((wrapper.shape_2d[0], 1), False)
+                exits[-1] = True
+            else:
+                exits = np.asarray([False])
+            return exits
+
         return cls.from_signals(
             close,
-            signal_func_nb=nb.holding_enex_signal_func_nb,
-            signal_args=(direction, close_at_end),
+            entries=RepFunc(_entries),
+            exits=RepFunc(_exits),
+            direction=direction,
             accumulate=False,
             **kwargs,
         )

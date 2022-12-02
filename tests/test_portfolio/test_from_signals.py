@@ -5540,17 +5540,55 @@ class TestFromSignals:
 
 class TestFromHolding:
     def test_from_holding(self):
+        df = pd.DataFrame([
+            [1, np.nan, np.nan],
+            [2, 5, np.nan],
+            [3, 6, 8],
+            [4, 7, 9],
+        ])
         assert_records_close(
-            vbt.Portfolio.from_holding(price).order_records,
-            vbt.Portfolio.from_signals(price, True, False, accumulate=False).order_records,
+            vbt.Portfolio.from_holding(df[0], dynamic_mode=False).order_records,
+            vbt.Portfolio.from_holding(df[0], dynamic_mode=True).order_records,
         )
-        entries = pd.Series.vbt.signals.empty_like(price)
+        assert_records_close(
+            vbt.Portfolio.from_holding(df[0], dynamic_mode=False, close_at_end=True).order_records,
+            vbt.Portfolio.from_holding(df[0], dynamic_mode=True, close_at_end=True).order_records,
+        )
+        assert_records_close(
+            vbt.Portfolio.from_holding(df[2], dynamic_mode=False, close_at_end=True).order_records,
+            vbt.Portfolio.from_holding(df[2], dynamic_mode=True, close_at_end=True).order_records,
+        )
+        assert_records_close(
+            vbt.Portfolio.from_holding(df, dynamic_mode=False).order_records,
+            vbt.Portfolio.from_holding(df, dynamic_mode=True).order_records,
+        )
+        assert_records_close(
+            vbt.Portfolio.from_holding(df, dynamic_mode=False, close_at_end=True).order_records,
+            vbt.Portfolio.from_holding(df, dynamic_mode=True, close_at_end=True).order_records,
+        )
+        entries = pd.Series.vbt.signals.empty_like(df[0])
         entries.iloc[0] = True
-        exits = pd.Series.vbt.signals.empty_like(price)
+        exits = pd.Series.vbt.signals.empty_like(df[0])
         exits.iloc[-1] = True
         assert_records_close(
-            vbt.Portfolio.from_holding(price, close_at_end=True).order_records,
-            vbt.Portfolio.from_signals(price, entries, exits, accumulate=False).order_records,
+            vbt.Portfolio.from_holding(df[0], at_first_valid_in=None, close_at_end=True).order_records,
+            vbt.Portfolio.from_signals(df[0], entries, exits, accumulate=False).order_records,
+        )
+        entries = pd.Series.vbt.signals.empty_like(df[2])
+        entries.iloc[0] = True
+        exits = pd.Series.vbt.signals.empty_like(df[2])
+        exits.iloc[-1] = True
+        assert_records_close(
+            vbt.Portfolio.from_holding(df[2], at_first_valid_in=None, close_at_end=True).order_records,
+            vbt.Portfolio.from_signals(df[2], entries, exits, accumulate=False).order_records,
+        )
+        entries = pd.DataFrame.vbt.signals.empty_like(df)
+        entries.iloc[0] = True
+        exits = pd.DataFrame.vbt.signals.empty_like(df)
+        exits.iloc[-1] = True
+        assert_records_close(
+            vbt.Portfolio.from_holding(df, at_first_valid_in=None, close_at_end=True).order_records,
+            vbt.Portfolio.from_signals(df, entries, exits, accumulate=False).order_records,
         )
 
 
