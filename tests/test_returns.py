@@ -492,11 +492,19 @@ class TestAccessors:
             ret_acc.rolling_sharpe_ratio(chunked=False),
         )
 
-    def test_deflated_sharpe_ratio(self):
+    def test_sharpe_ratio_std(self):
         assert_series_equal(
-            ret_acc.deflated_sharpe_ratio(),
-            pd.Series([np.nan, np.nan, 0.0], index=rets.columns, name="deflated_sharpe_ratio"),
+            ret_acc.sharpe_ratio_std(),
+            pd.Series([np.nan, np.nan, 0.49885271955248023], index=rets.columns, name="sharpe_ratio_std"),
         )
+
+    def test_prob_sharpe_ratio(self):
+        assert_series_equal(
+            ret_acc.prob_sharpe_ratio(),
+            pd.Series([np.nan, np.nan, 1.0], index=rets.columns, name="prob_sharpe_ratio"),
+        )
+
+    def test_deflated_sharpe_ratio(self):
         assert_series_equal(
             ret_acc.deflated_sharpe_ratio(),
             pd.Series([np.nan, np.nan, 0.0], index=rets.columns, name="deflated_sharpe_ratio"),
