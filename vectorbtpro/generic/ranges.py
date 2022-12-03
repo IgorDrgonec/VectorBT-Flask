@@ -486,6 +486,7 @@ class Ranges(PriceRecords):
         """Get average range duration (as timedelta)."""
         if real:
             duration = self.real_duration
+            duration = duration.replace(mapped_arr=duration.mapped_arr.astype(np.int64))
             wrap_kwargs = merge_dicts(dict(name_or_index="avg_real_duration", dtype="timedelta64[ns]"), wrap_kwargs)
         else:
             duration = self.duration
@@ -504,6 +505,7 @@ class Ranges(PriceRecords):
         """Get maximum range duration (as timedelta)."""
         if real:
             duration = self.real_duration
+            duration = duration.replace(mapped_arr=duration.mapped_arr.astype(np.int64))
             wrap_kwargs = merge_dicts(dict(name_or_index="max_real_duration", dtype="timedelta64[ns]"), wrap_kwargs)
         else:
             duration = self.duration
