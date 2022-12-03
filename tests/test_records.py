@@ -1360,8 +1360,6 @@ class TestMappedArray:
             np.testing.assert_array_equal(ma.loc["y":"z"].idx_arr, np.array([0, 1, 0, 1, 0, 1]))
             assert_index_equal(ma.loc["y":"z"].wrapper.index, ma.wrapper.index[1:])
         with pytest.raises(Exception):
-            ma.loc["y"]
-        with pytest.raises(Exception):
             ma.loc[["x", "z"]]
 
     def test_magic(self):
@@ -2251,8 +2249,6 @@ class TestRecords:
                     dtype=example_dt,
                 ),
             )
-        with pytest.raises(Exception):
-            r.loc["y"]
         with pytest.raises(Exception):
             r.loc[["x", "z"]]
 

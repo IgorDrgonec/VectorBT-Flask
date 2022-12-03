@@ -1054,17 +1054,17 @@ class BaseAccessor(Wrapping):
         """See `vectorbtpro.base.reshaping.make_symmetric`."""
         return reshaping.make_symmetric(self.obj)
 
-    def unstack_to_array(self, **kwargs) -> tp.Array:
+    def unstack_to_array(self, *args, **kwargs) -> tp.Array:
         """See `vectorbtpro.base.reshaping.unstack_to_array`."""
-        return reshaping.unstack_to_array(self.obj, **kwargs)
+        return reshaping.unstack_to_array(self.obj, *args, **kwargs)
 
-    def unstack_to_df(self, **kwargs) -> tp.Frame:
+    def unstack_to_df(self, *args, **kwargs) -> tp.Frame:
         """See `vectorbtpro.base.reshaping.unstack_to_df`."""
-        return reshaping.unstack_to_df(self.obj, **kwargs)
+        return reshaping.unstack_to_df(self.obj, *args, **kwargs)
 
-    def to_dict(self, **kwargs) -> tp.Mapping:
+    def to_dict(self, *args, **kwargs) -> tp.Mapping:
         """See `vectorbtpro.base.reshaping.to_dict`."""
-        return reshaping.to_dict(self.obj, **kwargs)
+        return reshaping.to_dict(self.obj, *args, **kwargs)
 
     # ############# Combining ############# #
 

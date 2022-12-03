@@ -130,7 +130,7 @@ from vectorbtpro.generic.accessors import GenericAccessor, GenericSRAccessor, Ge
 from vectorbtpro.generic.drawdowns import Drawdowns
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
-from vectorbtpro.returns import nb, metrics
+from vectorbtpro.returns import nb
 from vectorbtpro.utils import checks
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, HybridConfig, Config
@@ -671,6 +671,7 @@ class ReturnsAccessor(GenericAccessor):
 
     def sharpe_ratio(
         self,
+        annualized: bool = True,
         risk_free: tp.Optional[float] = None,
         ddof: tp.Optional[int] = None,
         jitted: tp.JittedOption = None,
@@ -684,13 +685,18 @@ class ReturnsAccessor(GenericAccessor):
             ddof = self.defaults["ddof"]
         func = jit_reg.resolve_option(nb.sharpe_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array() - risk_free, self.ann_factor, ddof)
+        if annualized:
+            ann_factor = self.ann_factor
+        else:
+            ann_factor = 1
+        out = func(self.to_2d_array() - risk_free, ann_factor, ddof)
         wrap_kwargs = merge_dicts(dict(name_or_index="sharpe_ratio"), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     def rolling_sharpe_ratio(
         self,
         window: tp.Optional[int] = None,
+        annualized: bool = True,
         minp: tp.Optional[int] = None,
         risk_free: tp.Optional[float] = None,
         ddof: tp.Optional[int] = None,
@@ -711,47 +717,95 @@ class ReturnsAccessor(GenericAccessor):
             ddof = self.defaults["ddof"]
         func = jit_reg.resolve_option(nb.rolling_sharpe_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array() - risk_free, window, self.ann_factor, minp=minp, ddof=ddof)
+        if annualized:
+            ann_factor = self.ann_factor
+        else:
+            ann_factor = 1
+        out = func(self.to_2d_array() - risk_free, window, ann_factor, minp=minp, ddof=ddof)
         return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
-    def deflated_sharpe_ratio(
+    def sharpe_ratio_std(
         self,
         risk_free: tp.Optional[float] = None,
         ddof: tp.Optional[int] = None,
-        var_sharpe: tp.Optional[float] = None,
-        nb_trials: tp.Optional[int] = None,
         bias: bool = True,
         wrap_kwargs: tp.KwargsLike = None,
-    ) -> tp.MaybeSeries:
-        """Deflated Sharpe Ratio (DSR).
+    ):
+        """Standard deviation of the sharpe ratio estimation."""
+        from scipy import stats as scipy_stats
 
-        Expresses the chance that the advertised strategy has a positive Sharpe ratio.
-
-        If `var_sharpe` is None, is calculated based on all columns.
-        If `nb_trials` is None, is set to the number of columns."""
-        from scipy.stats import skew, kurtosis
-
-        if risk_free is None:
-            risk_free = self.defaults["risk_free"]
-        if ddof is None:
-            ddof = self.defaults["ddof"]
-        sharpe_ratio = to_1d_array(self.sharpe_ratio(risk_free=risk_free))
-        if var_sharpe is None:
-            var_sharpe = np.var(sharpe_ratio, ddof=ddof)
-        if nb_trials is None:
-            nb_trials = self.wrapper.shape_2d[1]
         returns = to_2d_array(self.obj)
         nanmask = np.isnan(returns)
         if nanmask.any():
             returns = returns.copy()
             returns[nanmask] = 0.0
-        out = metrics.deflated_sharpe_ratio(
-            est_sharpe=sharpe_ratio / np.sqrt(self.ann_factor),
-            var_sharpe=var_sharpe / self.ann_factor,
-            nb_trials=nb_trials,
-            backtest_horizon=self.wrapper.shape_2d[0],
-            skew=skew(returns, axis=0, bias=bias),
-            kurtosis=kurtosis(returns, axis=0, bias=bias),
+        n = len(returns)
+        skew = scipy_stats.skew(returns, axis=0, bias=bias)
+        kurtosis = scipy_stats.kurtosis(returns, axis=0, bias=bias)
+        sr = to_1d_array(self.sharpe_ratio(annualized=False, risk_free=risk_free, ddof=ddof))
+        out = np.sqrt((1 + (0.5 * sr**2) - (skew * sr) + (((kurtosis - 3) / 4) * sr**2)) / (n - 1))
+        wrap_kwargs = merge_dicts(dict(name_or_index="sharpe_ratio_std"), wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
+
+    def prob_sharpe_ratio(
+        self,
+        bm_returns: tp.Optional[tp.ArrayLike] = None,
+        risk_free: tp.Optional[float] = None,
+        ddof: tp.Optional[int] = None,
+        bias: bool = True,
+        wrap_kwargs: tp.KwargsLike = None,
+    ):
+        """Probabilistic Sharpe Ratio (PSR)."""
+        from scipy import stats as scipy_stats
+
+        if bm_returns is None:
+            bm_returns = self.bm_returns
+        if bm_returns is not None:
+            bm_sr = to_1d_array(
+                self.replace(obj=bm_returns, bm_returns=None).sharpe_ratio(
+                    annualized=False, risk_free=risk_free, ddof=ddof
+                )
+            )
+        else:
+            bm_sr = 0
+        sr = to_1d_array(self.sharpe_ratio(annualized=False, risk_free=risk_free, ddof=ddof))
+        sr_std = to_1d_array(self.sharpe_ratio_std(risk_free=risk_free, ddof=ddof, bias=bias))
+        out = scipy_stats.norm.cdf((sr - bm_sr) / sr_std)
+        wrap_kwargs = merge_dicts(dict(name_or_index="prob_sharpe_ratio"), wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
+
+    def deflated_sharpe_ratio(
+        self,
+        risk_free: tp.Optional[float] = None,
+        ddof: tp.Optional[int] = None,
+        bias: bool = True,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
+        """Deflated Sharpe Ratio (DSR).
+
+        Expresses the chance that the advertised strategy has a positive Sharpe ratio."""
+        from scipy import stats as scipy_stats
+
+        if risk_free is None:
+            risk_free = self.defaults["risk_free"]
+        if ddof is None:
+            ddof = self.defaults["ddof"]
+        sharpe_ratio = to_1d_array(self.sharpe_ratio(annualized=False, risk_free=risk_free, ddof=ddof))
+        var_sharpe = np.nanvar(sharpe_ratio, ddof=ddof)
+        returns = to_2d_array(self.obj)
+        nanmask = np.isnan(returns)
+        if nanmask.any():
+            returns = returns.copy()
+            returns[nanmask] = 0.0
+        skew = scipy_stats.skew(returns, axis=0, bias=bias)
+        kurtosis = scipy_stats.kurtosis(returns, axis=0, bias=bias)
+        SR0 = sharpe_ratio + np.sqrt(var_sharpe) * (
+            (1 - np.euler_gamma) * scipy_stats.norm.ppf(1 - 1 / self.wrapper.shape_2d[1])
+            + np.euler_gamma * scipy_stats.norm.ppf(1 - 1 / (self.wrapper.shape_2d[1] * np.e))
+        )
+        out = scipy_stats.norm.cdf(
+            ((sharpe_ratio - SR0) * np.sqrt(self.wrapper.shape_2d[0] - 1))
+            / np.sqrt(1 - skew * sharpe_ratio + ((kurtosis - 1) / 4) * sharpe_ratio**2)
         )
         wrap_kwargs = merge_dicts(dict(name_or_index="deflated_sharpe_ratio"), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)

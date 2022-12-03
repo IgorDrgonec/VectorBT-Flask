@@ -482,9 +482,8 @@ def parameterized(
     merge_kwargs: tp.KwargsLike = None,
     return_meta: bool = False,
     use_meta: tp.KwargsLike = None,
-    selection: tp.Union[None, tp.MaybeIterable[tp.Hashable], tp.Callable] = None,
-    selection_args: tp.ArgsLike = None,
-    selection_kwargs: tp.KwargsLike = None,
+    selection: tp.Union[None, tp.MaybeIterable[tp.Hashable]] = None,
+    forward_kwargs_as: tp.KwargsLike = None,
     **execute_kwargs,
 ) -> tp.Callable:
     """Decorator that parameterizes a function. Engine-agnostic.
@@ -499,9 +498,8 @@ def parameterized(
     `param_configs` that is optionally passed by the user. User-defined `param_configs` have more priority.
     5. Extracts arguments and keyword arguments from each parameter config and substitutes any templates (lazily)
     6. If `return_meta` is True, returns all the objects generated above as a dictionary
-    7. If `selection` is not None, either executes it with `*selection_args` and `**selection_kwargs`
-    if it's a callable, or translates it into indices that can be mapped to `param_index` and selects
-    them from all the objects generated above
+    7. If `selection` is not None, substitutes it as a template, translates it into indices that
+    can be mapped to `param_index`, and selects them from all the objects generated above
     8. Passes each set of the function and its arguments to `vectorbtpro.utils.execution.execute` for execution
     9. Optionally, post-processes and merges the results by passing them and `**merge_kwargs` to `merge_func`
 
@@ -695,13 +693,22 @@ def parameterized(
             return_meta = kwargs.pop("_return_meta", wrapper.options["return_meta"])
             use_meta = kwargs.pop("_use_meta", wrapper.options["use_meta"])
             selection = kwargs.pop("_selection", wrapper.options["selection"])
-            selection_args = kwargs.pop("_selection_args", wrapper.options["selection_args"])
-            if selection_args is None:
-                selection_args = ()
-            selection_kwargs = merge_dicts(wrapper.options["selection_kwargs"], kwargs.pop("_selection_kwargs", {}))
             execute_kwargs = merge_dicts(
                 params_cfg["execute_kwargs"], wrapper.options["execute_kwargs"], kwargs.pop("_execute_kwargs", {})
             )
+            forward_kwargs_as = merge_dicts(wrapper.options["forward_kwargs_as"], kwargs.pop("_forward_kwargs_as", {}))
+            if len(forward_kwargs_as) > 0:
+                new_kwargs = dict()
+                for k, v in kwargs.items():
+                    if k in forward_kwargs_as:
+                        new_kwargs[forward_kwargs_as.pop(k)] = v
+                    else:
+                        new_kwargs[k] = v
+                kwargs = new_kwargs
+            if len(forward_kwargs_as) > 0:
+                for k, v in forward_kwargs_as.items():
+                    kwargs[v] = locals()[k]
+
             param_configs = kwargs.pop("param_configs", None)
             if param_configs is None:
                 param_configs = []
@@ -877,28 +884,24 @@ def parameterized(
 
             if selection is not None:
                 selection = deep_substitute(selection, template_context, sub_id="selection")
-                if callable(selection):
-                    selection_args = deep_substitute(selection_args, template_context, sub_id="selection_args")
-                    selection_kwargs = deep_substitute(selection_kwargs, template_context, sub_id="selection_kwargs")
-                    selection = selection(*selection_args, **selection_kwargs)
                 found_param = False
                 if checks.is_hashable(selection):
-                    if selection in template_context["param_index"]:
-                        selection = {template_context["param_index"].get_loc(selection)}
+                    if checks.is_int(selection):
+                        selection = {selection}
                         found_param = True
                         template_context["single_param"] = True
-                    elif isinstance(selection, (int, np.integer)):
-                        selection = {selection}
+                    elif selection in template_context["param_index"]:
+                        selection = {template_context["param_index"].get_loc(selection)}
                         found_param = True
                         template_context["single_param"] = True
                 if not found_param:
                     if checks.is_iterable(selection):
                         new_selection = set()
                         for s in selection:
-                            if s in template_context["param_index"]:
-                                new_selection.add(template_context["param_index"].get_loc(s))
-                            elif isinstance(s, (int, np.integer)):
+                            if checks.is_int(s):
                                 new_selection.add(s)
+                            elif s in template_context["param_index"]:
+                                new_selection.add(template_context["param_index"].get_loc(s))
                             else:
                                 raise ValueError(f"Selection {selection} couldn't be matched with parameter index")
                         selection = new_selection
@@ -932,7 +935,7 @@ def parameterized(
             execute_kwargs = deep_substitute(execute_kwargs, template_context, sub_id="execute_kwargs")
             results = execute(
                 template_context["funcs_args"],
-                n_calls=template_context["param_configs"],
+                n_calls=len(template_context["param_configs"]),
                 **execute_kwargs,
             )
 
@@ -964,8 +967,7 @@ def parameterized(
                 return_meta=return_meta,
                 use_meta=use_meta,
                 selection=selection,
-                selection_args=selection_args,
-                selection_kwargs=selection_kwargs,
+                forward_kwargs_as=forward_kwargs_as,
                 execute_kwargs=execute_kwargs,
             ),
             frozen_keys_=True,

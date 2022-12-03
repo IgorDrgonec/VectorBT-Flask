@@ -8,7 +8,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.indicators.configs import flex_elem_param_config
 from vectorbtpro.indicators.factory import IndicatorFactory
 from vectorbtpro.labels import nb
-from vectorbtpro.labels.enums import TrendMode
+from vectorbtpro.labels.enums import TrendLabelMode
 from vectorbtpro.generic import enums as generic_enums
 
 __all__ = ["FMEAN", "FSTD", "FMIN", "FMAX", "FIXLB", "MEANLB", "LEXLB", "TRENDLB", "BOLB"]
@@ -188,12 +188,12 @@ TRENDLB = IndicatorFactory(
         up_th=flex_elem_param_config,
         down_th=flex_elem_param_config,
         mode=dict(
-            dtype=TrendMode,
+            dtype=TrendLabelMode,
             post_index_func=lambda index: index.str.lower(),
         ),
     ),
     pass_flex_2d=True,
-    mode=TrendMode.Binary,
+    mode=TrendLabelMode.Binary,
 )
 
 

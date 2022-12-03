@@ -1012,6 +1012,52 @@ def flatten_uniform_grouped_nb(arr: tp.Array2d, group_map: tp.GroupMap, in_c_ord
     return out
 
 
+# ############# Proximity ############# #
+
+@register_jitted(tags={"can_parallel"})
+def proximity_reduce_nb(
+    arr: tp.Array2d,
+    window: int,
+    reduce_func_nb: tp.ProximityReduceMetaFunc,
+    *args,
+) -> tp.Array2d:
+    """Flatten `window` surrounding rows and columns and reduce them into a single value using `reduce_func_nb`.
+
+    `reduce_func_nb` must accept the array and `*args`. Must return a single value."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for i in prange(arr.shape[0]):
+        for col in range(arr.shape[1]):
+            from_i = max(0, i - window)
+            to_i = min(i + window + 1, arr.shape[0])
+            from_col = max(0, col - window)
+            to_col = min(col + window + 1, arr.shape[1])
+            stride_arr = arr[from_i:to_i, from_col:to_col]
+            out[i, col] = reduce_func_nb(stride_arr.flatten(), *args)
+    return out
+
+
+@register_jitted(tags={"can_parallel"})
+def proximity_reduce_meta_nb(
+    target_shape: tp.Shape,
+    window: int,
+    reduce_func_nb: tp.ReduceFunc,
+    *args,
+) -> tp.Array2d:
+    """Meta version of `proximity_reduce_nb`.
+
+    `reduce_func_nb` must accept the start row index, the end row index, the start column index,
+    the end column index, and `*args`. Must return a single value."""
+    out = np.empty(target_shape, dtype=np.float_)
+    for i in prange(target_shape[0]):
+        for col in range(target_shape[1]):
+            from_i = max(0, i - window)
+            to_i = min(i + window + 1, target_shape[0])
+            from_col = max(0, col - window)
+            to_col = min(col + window + 1, target_shape[1])
+            out[i, col] = reduce_func_nb(from_i, to_i, from_col, to_col, *args)
+    return out
+
+
 # ############# Reducers ############# #
 
 

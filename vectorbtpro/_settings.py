@@ -733,6 +733,8 @@ plotting = ChildDict(
         green="#37B13F",
         red="#EA4335",
         gray="#E2E2E2",
+        purple="#A661D5",
+        pink="#DD59AA"
     ),
     themes=ChildDict(
         light=ChildDict(

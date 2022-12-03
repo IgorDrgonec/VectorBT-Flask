@@ -6,6 +6,7 @@ import attr
 from collections.abc import Hashable, Mapping
 from inspect import signature, getmro
 from keyword import iskeyword
+import datetime
 
 import numpy as np
 import pandas as pd
@@ -17,6 +18,25 @@ from vectorbtpro import _typing as tp
 
 
 # ############# Checks ############# #
+
+def is_int(arg: tp.Any) -> bool:
+    """Check whether the argument is an integer."""
+    return isinstance(arg, (int, np.integer))
+
+
+def is_float(arg: tp.Any) -> bool:
+    """Check whether the argument is a float."""
+    return isinstance(arg, (float, np.floating))
+
+
+def is_number(arg: tp.Any) -> bool:
+    """Check whether the argument is a number."""
+    return is_int(arg) or is_float(arg)
+
+
+def is_td(arg: tp.Any) -> bool:
+    """Check whether the argument is a number."""
+    return isinstance(arg, (str, pd.Timedelta, datetime.timedelta, np.timedelta64))
 
 
 def is_np_array(arg: tp.Any) -> bool:

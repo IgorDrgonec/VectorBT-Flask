@@ -963,7 +963,6 @@ class IndicatorBase(Analyzable):
                 wrapper_kwargs = {}
             kwargs["wrapper"] = ArrayWrapper.column_stack(
                 *[obj.wrapper for obj in objs],
-                union_index=False,
                 **wrapper_kwargs,
             )
 
@@ -1930,6 +1929,11 @@ class IndicatorFactory(Configured):
             _param_settings = merge_dicts(param_settings, kwargs.pop("param_settings", {}))
             _in_output_settings = merge_dicts(in_output_settings, kwargs.pop("in_output_settings", {}))
 
+            if isinstance(_hide_params, bool):
+                if not _hide_params:
+                    _hide_params = None
+                else:
+                    _hide_params = param_names
             if _hide_params is None:
                 _hide_params = []
 
@@ -2098,6 +2102,11 @@ Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeli
                 _hide_default = kwargs.pop("hide_default", def_run_kwargs["hide_default"])
                 _param_settings = merge_dicts(param_settings, kwargs.get("param_settings", {}))
 
+                if isinstance(_hide_params, bool):
+                    if not _hide_params:
+                        _hide_params = None
+                    else:
+                        _hide_params = param_names
                 if _hide_params is None:
                     _hide_params = []
                 if _short_names is None:
@@ -2695,14 +2704,14 @@ Other keyword arguments are passed to `{0}.run`.
     # ############# Third party ############# #
 
     @classmethod
-    def get_talib_indicators(cls) -> tp.Set[str]:
+    def get_talib_indicators(cls) -> tp.List[str]:
         """Get all parseable indicators in `talib`."""
         from vectorbtpro.utils.opt_packages import assert_can_import
 
         assert_can_import("talib")
         import talib
 
-        return set(talib.get_functions())
+        return sorted(talib.get_functions())
 
     @classmethod
     def from_talib(cls, func_name: str, factory_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Type[IndicatorBase]:
@@ -3042,6 +3051,7 @@ Args:
         func: tp.Callable,
         test_input_names: tp.Optional[tp.Sequence[str]] = None,
         test_index_len: int = 100,
+        silence_warnings: bool = False,
         **kwargs,
     ) -> tp.Kwargs:
         """Get the config of a `pandas_ta` indicator."""
@@ -3084,7 +3094,8 @@ Args:
             results = []
             for i, r in enumerate(result):
                 if len(r.index) != len(test_df.index):
-                    warnings.warn(f"Couldn't parse the output at index {i}: mismatching index", stacklevel=2)
+                    if not silence_warnings:
+                        warnings.warn(f"Couldn't parse the output at index {i}: mismatching index", stacklevel=2)
                 else:
                     results.append(r)
             if len(results) > 1:
@@ -3130,7 +3141,7 @@ Args:
         )
 
     @classmethod
-    def get_pandas_ta_indicators(cls, silence_warnings: bool = True, **kwargs) -> tp.Set[str]:
+    def get_pandas_ta_indicators(cls, silence_warnings: bool = True, **kwargs) -> tp.List[str]:
         """Get all parseable indicators in `pandas_ta`.
 
         !!! note
@@ -3143,12 +3154,12 @@ Args:
         indicators = set()
         for func_name in [_k for k, v in pandas_ta.Category.items() for _k in v]:
             try:
-                cls.parse_pandas_ta_config(getattr(pandas_ta, func_name), **kwargs)
+                cls.parse_pandas_ta_config(getattr(pandas_ta, func_name), silence_warnings=silence_warnings, **kwargs)
                 indicators.add(func_name.upper())
             except Exception as e:
                 if not silence_warnings:
                     warnings.warn(f"Function {func_name}: " + str(e), stacklevel=2)
-        return indicators
+        return sorted(indicators)
 
     @classmethod
     def from_pandas_ta(
@@ -3300,7 +3311,7 @@ Args:
         return Indicator
 
     @classmethod
-    def get_ta_indicators(cls) -> tp.Set[str]:
+    def get_ta_indicators(cls) -> tp.List[str]:
         """Get all parseable indicators in `ta`."""
         from vectorbtpro.utils.opt_packages import assert_can_import
 
@@ -3319,7 +3330,7 @@ Args:
                     and issubclass(obj, ta.utils.IndicatorMixin)
                 ):
                     indicators.add(obj.__name__)
-        return indicators
+        return sorted(indicators)
 
     @classmethod
     def find_ta_indicator(cls, cls_name: str) -> IndicatorMixinT:
@@ -3583,7 +3594,7 @@ Args:
         )
 
     @classmethod
-    def get_technical_indicators(cls, silence_warnings: bool = True, **kwargs) -> tp.Set[str]:
+    def get_technical_indicators(cls, silence_warnings: bool = True, **kwargs) -> tp.List[str]:
         """Get all parseable indicators in `technical`."""
         from vectorbtpro.utils.opt_packages import assert_can_import
 
@@ -3599,7 +3610,7 @@ Args:
             except Exception as e:
                 if not silence_warnings:
                     warnings.warn(f"Function {func_name}: " + str(e), stacklevel=2)
-        return indicators
+        return sorted(indicators)
 
     @classmethod
     def find_technical_indicator(cls, func_name: str) -> IndicatorMixinT:
@@ -3900,9 +3911,9 @@ Args:
         raise ValueError(f"Unknown technical consensus class '{cls_name}'")
 
     @classmethod
-    def get_techcon_indicators(cls) -> tp.Set[str]:
+    def get_techcon_indicators(cls) -> tp.List[str]:
         """Get all consensus indicators in `technical`."""
-        return {"MACON", "OSCCON", "SUMCON"}
+        return sorted({"MACON", "OSCCON", "SUMCON"})
 
     # ############# Expressions ############# #
 

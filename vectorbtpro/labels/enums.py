@@ -7,12 +7,12 @@ Defines enums and other schemas for `vectorbtpro.labels`."""
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.formatting import prettify
 
-__all__ = ["TrendMode"]
+__all__ = ["TrendLabelMode"]
 
 __pdoc__ = {}
 
 
-class TrendModeT(tp.NamedTuple):
+class TrendLabelModeT(tp.NamedTuple):
     Binary: int = 0
     BinaryCont: int = 1
     BinaryContSat: int = 2
@@ -20,15 +20,15 @@ class TrendModeT(tp.NamedTuple):
     PctChangeNorm: int = 4
 
 
-TrendMode = TrendModeT()
+TrendLabelMode = TrendLabelModeT()
 """_"""
 
 __pdoc__[
-    "TrendMode"
-] = f"""Trend mode.
+    "TrendLabelMode"
+] = f"""Trend label mode.
 
 ```python
-{prettify(TrendMode)}
+{prettify(TrendLabelMode)}
 ```
 
 Attributes:

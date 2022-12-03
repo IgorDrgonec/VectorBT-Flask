@@ -306,7 +306,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                         if not union_index:
                             raise ValueError(
                                 "Objects to be merged must have the same index. "
-                                "Use index='union' to merge index as well."
+                                "Use union_index=True to merge index as well."
                             )
                         else:
                             if new_index.dtype != wrapper.index.dtype:
@@ -507,6 +507,9 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         Takes into account column grouping.
 
+        Flipping rows and columns is not allowed. If one row is selected, the result will still be
+        a Series when indexing a Series and a DataFrame when indexing a DataFrame.
+
         Set `column_only_select` to True to index the array wrapper as a Series of columns/groups.
         This way, selection of index (axis 0) can be avoided. Set `range_only_select` to True to
         allow selection of rows only using slices. Set `group_select` to True to allow selection of groups.
@@ -590,52 +593,73 @@ class ArrayWrapper(Configured, PandasIndexer):
             new_index = index
             row_idxs = np.arange(len(index))
         else:
-            idx_mapper = pd_indexing_func(
-                i_wrapper.wrap(
-                    np.broadcast_to(np.arange(n_rows)[:, None], (n_rows, n_cols)),
-                    index=index,
-                    columns=columns,
-                )
-            )
+            init_row_mapper_values = np.broadcast_to(np.arange(n_rows)[:, None], (n_rows, n_cols))
+            init_row_mapper = i_wrapper.wrap(init_row_mapper_values, index=index, columns=columns)
+            row_mapper = pd_indexing_func(init_row_mapper)
             if i_wrapper.ndim == 1:
-                if not checks.is_series(idx_mapper):
-                    raise IndexingError("Selection of a scalar is not allowed")
-                row_idxs = idx_mapper.values
-                col_idxs = 0
-            else:
-                col_mapper_values = np.broadcast_to(np.arange(n_cols), (n_rows, n_cols))
-                col_mapper = pd_indexing_func(i_wrapper.wrap(col_mapper_values, index=index, columns=columns))
-                if checks.is_frame(idx_mapper):
-                    row_idxs = idx_mapper.values[:, 0]
-                    col_idxs = col_mapper.values[0]
-                elif checks.is_series(idx_mapper):
-                    one_col = np.all(col_mapper.values == col_mapper.values.item(0))
-                    one_idx = np.all(idx_mapper.values == idx_mapper.values.item(0))
-                    if one_col and one_idx:
-                        # One index and one column selected, multiple times
-                        raise IndexingError("Must select at least two unique indices in one of both axes")
-                    elif one_col:
-                        # One column selected
-                        row_idxs = idx_mapper.values
-                        col_idxs = col_mapper.values[0]
-                    elif one_idx:
-                        # One index selected
-                        row_idxs = idx_mapper.values[0]
-                        col_idxs = col_mapper.values
-                    else:
-                        raise IndexingError
+                if not checks.is_series(row_mapper):
+                    row_idxs = np.array([row_mapper])
+                    new_index = index[row_idxs]
                 else:
-                    raise IndexingError("Selection of a scalar is not allowed")
-            new_index = indexes.get_index(idx_mapper, 0)
-            if not isinstance(row_idxs, np.ndarray):
-                # One index selected
-                new_columns = index[[row_idxs]]
-            elif not isinstance(col_idxs, np.ndarray):
-                # One column selected
-                new_columns = columns[[col_idxs]]
+                    row_idxs = row_mapper.values
+                    new_index = indexes.get_index(row_mapper, 0)
+                col_idxs = 0
+                new_columns = columns
+                new_ndim = 1
             else:
-                new_columns = indexes.get_index(idx_mapper, 1)
-            new_ndim = idx_mapper.ndim
+                init_col_mapper_values = np.broadcast_to(np.arange(n_cols), (n_rows, n_cols))
+                init_col_mapper = i_wrapper.wrap(init_col_mapper_values, index=index, columns=columns)
+                col_mapper = pd_indexing_func(init_col_mapper)
+
+                if checks.is_frame(col_mapper):
+                    # Multiple rows and columns selected
+                    row_idxs = row_mapper.values[:, 0]
+                    col_idxs = col_mapper.values[0]
+                    new_index = indexes.get_index(row_mapper, 0)
+                    new_columns = indexes.get_index(col_mapper, 1)
+                    new_ndim = 2
+                elif checks.is_series(col_mapper):
+                    multi_index = isinstance(index, pd.MultiIndex)
+                    multi_columns = isinstance(columns, pd.MultiIndex)
+                    multi_name = isinstance(col_mapper.name, tuple)
+                    if multi_index and multi_name and col_mapper.name in index:
+                        one_row = True
+                    elif not multi_index and not multi_name and col_mapper.name in index:
+                        one_row = True
+                    else:
+                        one_row = False
+                    if multi_columns and multi_name and col_mapper.name in columns:
+                        one_col = True
+                    elif not multi_columns and not multi_name and col_mapper.name in columns:
+                        one_col = True
+                    else:
+                        one_col = False
+                    if (one_row and one_col) or (not one_row and not one_col):
+                        one_row = np.all(row_mapper.values == row_mapper.values.item(0))
+                        one_col = np.all(col_mapper.values == col_mapper.values.item(0))
+                    if (one_row and one_col) or (not one_row and not one_col):
+                        raise IndexingError("Could not parse indexing operation")
+                    if one_row:
+                        # One row selected
+                        row_idxs = row_mapper.values[[0]]
+                        col_idxs = col_mapper.values
+                        new_index = index[row_idxs]
+                        new_columns = indexes.get_index(col_mapper, 0)
+                        new_ndim = 2
+                    else:
+                        # One column selected
+                        row_idxs = row_mapper.values
+                        col_idxs = col_mapper.values[0]
+                        new_index = indexes.get_index(row_mapper, 0)
+                        new_columns = columns[[col_idxs]]
+                        new_ndim = 1
+                else:
+                    # One row and column selected
+                    row_idxs = np.array([row_mapper])
+                    col_idxs = col_mapper
+                    new_index = index[row_idxs]
+                    new_columns = columns[[col_idxs]]
+                    new_ndim = 1
 
         if _self.grouper.is_grouped():
             # Grouping enabled

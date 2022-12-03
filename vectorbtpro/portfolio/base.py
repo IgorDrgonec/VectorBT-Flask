@@ -1657,7 +1657,7 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.colors import adjust_opacity
-from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
+from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig, atomic_dict
 from vectorbtpro.utils.datetime_ import freq_to_timedelta64
 from vectorbtpro.utils.decorators import custom_property, cached_property, class_or_instancemethod
 from vectorbtpro.utils.enum_ import map_enum_fields
@@ -1748,6 +1748,8 @@ returns_acc_config = ReadonlyConfig(
         "calmar_ratio": dict(),
         "omega_ratio": dict(),
         "sharpe_ratio": dict(),
+        "sharpe_ratio_std": dict(),
+        "prob_sharpe_ratio": dict(),
         "deflated_sharpe_ratio": dict(),
         "downside_risk": dict(),
         "sortino_ratio": dict(),
@@ -1970,6 +1972,8 @@ shortcut_config = ReadonlyConfig(
         "calmar_ratio": dict(obj_type="red_array"),
         "omega_ratio": dict(obj_type="red_array"),
         "sharpe_ratio": dict(obj_type="red_array"),
+        "sharpe_ratio_std": dict(obj_type="red_array"),
+        "prob_sharpe_ratio": dict(obj_type="red_array"),
         "deflated_sharpe_ratio": dict(obj_type="red_array"),
         "downside_risk": dict(obj_type="red_array"),
         "sortino_ratio": dict(obj_type="red_array"),
@@ -6243,7 +6247,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cls: tp.Type[PortfolioT],
         close: tp.Union[tp.ArrayLike, Data],
         direction: tp.Optional[int] = None,
+        at_first_valid_in: tp.Optional[str] = "close",
         close_at_end: tp.Optional[bool] = None,
+        dynamic_mode: bool = False,
         **kwargs,
     ) -> PortfolioT:
         """Simulate portfolio from plain holding using signals.
@@ -6255,7 +6261,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         Usage:
             ```pycon
             >>> close = pd.Series([1, 2, 3, 4, 5])
-            >>> pf = vbt.Portfolio.from_holding(close, base_method='from_signals')
+            >>> pf = vbt.Portfolio.from_holding(close)
             >>> pf.final_value
             500.0
             ```
@@ -6272,10 +6278,53 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if close_at_end is None:
             close_at_end = portfolio_cfg["close_at_end"]
 
+        if dynamic_mode:
+            return cls.from_signals(
+                close,
+                signal_func_nb=nb.holding_enex_signal_func_nb,
+                signal_args=(direction, close_at_end),
+                accumulate=False,
+                **kwargs,
+            )
+
+        def _entries(wrapper, new_objs):
+            flex_2d = wrapper.ndim == 2
+            if at_first_valid_in is None:
+                entries = np.full((wrapper.shape_2d[0], 1), False)
+                entries[0] = True
+                return entries
+            ts = new_objs[at_first_valid_in]
+            if ts.ndim == 0:
+                ts = ts[None]
+            if ts.ndim == 1:
+                if flex_2d:
+                    ts = ts[None]
+                else:
+                    ts = ts[:, None]
+            valid_index = generic_nb.first_valid_index_nb(ts)
+            if (valid_index == -1).all():
+                return np.asarray([False])
+            if (valid_index == 0).all():
+                entries = np.full((wrapper.shape_2d[0], 1), False)
+                entries[0] = True
+                return entries
+            entries = np.full(wrapper.shape_2d, False)
+            entries[valid_index, np.arange(wrapper.shape_2d[1])] = True
+            return entries
+
+        def _exits(wrapper):
+            if close_at_end:
+                exits = np.full((wrapper.shape_2d[0], 1), False)
+                exits[-1] = True
+            else:
+                exits = np.asarray([False])
+            return exits
+
         return cls.from_signals(
             close,
-            signal_func_nb=nb.holding_enex_signal_func_nb,
-            signal_args=(direction, close_at_end),
+            entries=RepFunc(_entries),
+            exits=RepFunc(_exits),
+            direction=direction,
             accumulate=False,
             **kwargs,
         )
@@ -10186,28 +10235,108 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
     # ############# Plotting ############# #
 
-    def plot_orders(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
-        """Plot one column/group of orders."""
-        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
-        return self.orders.regroup(False).plot(column=column, **kwargs)
+    def plot_trade_signals(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        plot_positions: tp.Union[bool, str] = "zones",
+        long_entry_trace_kwargs: tp.KwargsLike = None,
+        short_entry_trace_kwargs: tp.KwargsLike = None,
+        long_exit_trace_kwargs: tp.KwargsLike = None,
+        short_exit_trace_kwargs: tp.KwargsLike = None,
+        long_shape_kwargs: tp.KwargsLike = None,
+        short_shape_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **kwargs,
+    ) -> tp.BaseFigure:
+        """Plot one column/group of trade signals.
 
-    def plot_trades(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
-        """Plot one column/group of trades."""
-        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
-        return self.trades.regroup(False).plot(column=column, **kwargs)
+        Markers and shapes are colored by trade direction (green = long, red = short)."""
+        from vectorbtpro._settings import settings
 
-    def plot_trade_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
-        """Plot one column/group of trade PnL."""
-        return self.trades.regroup(False).plot_pnl(column=column, **kwargs)
+        plotting_cfg = settings["plotting"]
 
-    def plot_positions(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
-        """Plot one column/group of positions."""
-        kwargs = merge_dicts(dict(close_trace_kwargs=dict(name="Close")), kwargs)
-        return self.positions.regroup(False).plot(column=column, **kwargs)
+        entry_trades = self.resolve_shortcut_attr("entry_trades")
+        exit_trades = self.resolve_shortcut_attr("exit_trades")
+        positions = self.resolve_shortcut_attr("positions")
 
-    def plot_position_pnl(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.BaseFigure:
-        """Plot one column/group of position PnL."""
-        return self.positions.regroup(False).plot_pnl(column=column, **kwargs)
+        fig = entry_trades.plot_signals(
+            column=column,
+            long_entry_trace_kwargs=long_entry_trace_kwargs,
+            short_entry_trace_kwargs=short_entry_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+            **kwargs,
+        )
+        fig = exit_trades.plot_signals(
+            column=column,
+            plot_ohlc=False,
+            plot_close=False,
+            long_exit_trace_kwargs=long_exit_trace_kwargs,
+            short_exit_trace_kwargs=short_exit_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+        )
+        if isinstance(plot_positions, bool):
+            if plot_positions:
+                plot_positions = "zones"
+            else:
+                plot_positions = None
+        if plot_positions is not None:
+            if plot_positions.lower() == "zones":
+                long_shape_kwargs = merge_dicts(
+                    dict(fillcolor=plotting_cfg["contrast_color_schema"]["green"]),
+                    long_shape_kwargs,
+                )
+                short_shape_kwargs = merge_dicts(
+                    dict(fillcolor=plotting_cfg["contrast_color_schema"]["red"]),
+                    short_shape_kwargs,
+                )
+            elif plot_positions.lower() == "lines":
+                base_shape_kwargs = dict(
+                    type="line",
+                    line=dict(dash="dot"),
+                    xref=Rep("xref"),
+                    yref=Rep("yref"),
+                    x0=Rep("start_index"),
+                    x1=Rep("end_index"),
+                    y0=RepFunc(lambda record: record["entry_price"]),
+                    y1=RepFunc(lambda record: record["exit_price"]),
+                    opacity=0.75,
+                )
+                long_shape_kwargs = atomic_dict(merge_dicts(
+                    base_shape_kwargs,
+                    dict(line=dict(color=plotting_cfg["contrast_color_schema"]["green"])),
+                    long_shape_kwargs,
+                ))
+                short_shape_kwargs = atomic_dict(merge_dicts(
+                    base_shape_kwargs,
+                    dict(line=dict(color=plotting_cfg["contrast_color_schema"]["red"])),
+                    short_shape_kwargs,
+                ))
+            else:
+                raise ValueError(f"Invalid option plot_positions='{plot_positions}'")
+            fig = positions.direction_long.plot_shapes(
+                column=column,
+                plot_ohlc=False,
+                plot_close=False,
+                shape_kwargs=long_shape_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                xref=fig.data[-1]["xaxis"] if fig.data[-1]["xaxis"] is not None else "x",
+                yref=fig.data[-1]["yaxis"] if fig.data[-1]["yaxis"] is not None else "y",
+                fig=fig,
+            )
+            fig = positions.direction_short.plot_shapes(
+                column=column,
+                plot_ohlc=False,
+                plot_close=False,
+                shape_kwargs=short_shape_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                xref=fig.data[-1]["xaxis"] if fig.data[-1]["xaxis"] is not None else "x",
+                yref=fig.data[-1]["yaxis"] if fig.data[-1]["yaxis"] is not None else "y",
+                fig=fig,
+            )
+        return fig
 
     def plot_asset_flow(
         self,
@@ -10845,6 +10974,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 yaxis_kwargs=dict(title="Trade PnL"),
                 check_is_not_grouped=True,
                 plot_func="trades.plot_pnl",
+                tags=["portfolio", "trades"],
+            ),
+            trade_signals=dict(
+                title="Trade Signals",
+                yaxis_kwargs=dict(title="Trade Signals"),
+                check_is_not_grouped=True,
+                plot_func="plot_trade_signals",
                 tags=["portfolio", "trades"],
             ),
             asset_flow=dict(

@@ -728,7 +728,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
         found_ids = dict()
         unique_idx = 0
         for trace in fig.data:
-            if trace["showlegend"]:
+            if trace["showlegend"] and trace["legendgroup"] is None:
                 if "name" in trace:
                     name = trace["name"]
                 else:
@@ -769,6 +769,15 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                         trace["legendgroup"] = unique_idx
                     found_ids[id] = unique_idx
                     unique_idx += 1
+        if hide_id_labels:
+            legendgroups = set()
+            for trace in fig.data:
+                if trace["legendgroup"] is not None:
+                    if trace["showlegend"]:
+                        if trace["legendgroup"] in legendgroups:
+                            trace["showlegend"] = False
+                        else:
+                            legendgroups.add(trace["legendgroup"])
 
         # Remove all except the last title if sharing the same axis
         if shared_xaxes:

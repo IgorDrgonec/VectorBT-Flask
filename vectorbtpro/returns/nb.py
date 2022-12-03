@@ -266,6 +266,8 @@ def calmar_ratio_1d_nb(
         return np.nan
     annualized_return = annualized_return_1d_nb(rets, ann_factor, period=period, log_returns=log_returns)
     if max_drawdown == 0:
+        if annualized_return == 0:
+            return np.nan
         return np.inf
     return annualized_return / np.abs(max_drawdown)
 
@@ -311,6 +313,8 @@ def omega_ratio_1d_nb(adj_rets: tp.Array1d) -> float:
         elif ret < 0:
             denom -= ret
     if denom == 0:
+        if numer == 0:
+            return np.nan
         return np.inf
     return numer / denom
 
@@ -335,6 +339,8 @@ def sharpe_ratio_1d_nb(adj_rets: tp.Array1d, ann_factor: float, ddof: int = 0) -
     mean = np.nanmean(adj_rets)
     std = generic_nb.nanstd_1d_nb(adj_rets, ddof)
     if std == 0:
+        if mean == 0:
+            return np.nan
         return np.inf
     return mean / std * np.sqrt(ann_factor)
 
@@ -389,6 +395,8 @@ def sortino_ratio_1d_nb(adj_rets: tp.Array1d, ann_factor: float) -> float:
     avg_annualized_return = np.nanmean(adj_rets) * ann_factor
     downside_risk = downside_risk_1d_nb(adj_rets, ann_factor)
     if downside_risk == 0:
+        if avg_annualized_return == 0:
+            return np.nan
         return np.inf
     return avg_annualized_return / downside_risk
 
@@ -413,6 +421,8 @@ def information_ratio_1d_nb(adj_rets: tp.Array1d, ddof: int = 0) -> float:
     mean = np.nanmean(adj_rets)
     std = generic_nb.nanstd_1d_nb(adj_rets, ddof)
     if std == 0:
+        if mean == 0:
+            return np.nan
         return np.inf
     return mean / std
 
@@ -437,6 +447,8 @@ def beta_1d_nb(rets: tp.Array1d, bm_returns: tp.Array1d, ddof: int = 0) -> float
     cov = generic_nb.nancov_1d_nb(rets, bm_returns, ddof=ddof)
     var = generic_nb.nanvar_1d_nb(bm_returns, ddof=ddof)
     if var == 0:
+        if cov == 0:
+            return np.nan
         return np.inf
     return cov / var
 
@@ -508,6 +520,8 @@ def tail_ratio_1d_nb(rets: tp.Array1d) -> float:
     perc_95 = np.abs(np.nanpercentile(rets, 95))
     perc_5 = np.abs(np.nanpercentile(rets, 5))
     if perc_5 == 0:
+        if perc_95 == 0:
+            return np.nan
         return np.inf
     return perc_95 / perc_5
 
@@ -518,6 +532,8 @@ def tail_ratio_noarr_1d_nb(rets: tp.Array1d) -> float:
     perc_95 = np.abs(generic_nb.nanpercentile_noarr_1d_nb(rets, 95))
     perc_5 = np.abs(generic_nb.nanpercentile_noarr_1d_nb(rets, 5))
     if perc_5 == 0:
+        if perc_95 == 0:
+            return np.nan
         return np.inf
     return perc_95 / perc_5
 
@@ -601,6 +617,8 @@ def capture_1d_nb(
     annualized_return1 = annualized_return_1d_nb(rets, ann_factor, period=period, log_returns=log_returns)
     annualized_return2 = annualized_return_1d_nb(bm_returns, ann_factor, period=period, log_returns=log_returns)
     if annualized_return2 == 0:
+        if annualized_return1 == 0:
+            return np.nan
         return np.inf
     return annualized_return1 / annualized_return2
 
@@ -685,6 +703,8 @@ def up_capture_1d_nb(
     annualized_return = _annualized_pos_return(rets)
     annualized_bm_return = _annualized_pos_return(bm_returns)
     if annualized_bm_return == 0:
+        if annualized_return == 0:
+            return np.nan
         return np.inf
     return annualized_return / annualized_bm_return
 
@@ -775,6 +795,8 @@ def down_capture_1d_nb(
     annualized_return = _annualized_neg_return(rets)
     annualized_bm_return = _annualized_neg_return(bm_returns)
     if annualized_bm_return == 0:
+        if annualized_return == 0:
+            return np.nan
         return np.inf
     return annualized_return / annualized_bm_return
 

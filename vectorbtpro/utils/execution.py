@@ -46,8 +46,8 @@ class SequenceEngine(ExecutionEngine):
         show_progress: tp.Optional[bool] = None,
         progress_desc: tp.Optional[tp.Sequence] = None,
         pbar_kwargs: tp.KwargsLike = None,
-        clear_cache: tp.Optional[bool] = None,
-        collect_garbage: tp.Optional[bool] = None,
+        clear_cache: tp.Union[None, bool, int] = None,
+        collect_garbage: tp.Union[None, bool, int] = None,
     ) -> None:
         from vectorbtpro._settings import settings
 
@@ -92,13 +92,17 @@ class SequenceEngine(ExecutionEngine):
         return self._pbar_kwargs
 
     @property
-    def clear_cache(self) -> bool:
-        """Whether to clear vectorbt's cache after each iteration."""
+    def clear_cache(self) -> tp.Union[bool, int]:
+        """Whether to clear vectorbt's cache after each iteration.
+
+        If integer, do it once a number of iterations."""
         return self._clear_cache
 
     @property
-    def collect_garbage(self) -> bool:
-        """Whether to clear garbage after each iteration."""
+    def collect_garbage(self) -> tp.Union[bool, int]:
+        """Whether to clear garbage after each iteration.
+
+        If integer, do it once a number of iterations."""
         return self._collect_garbage
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
@@ -116,9 +120,15 @@ class SequenceEngine(ExecutionEngine):
                         pbar.set_description(str(self.progress_desc[i]))
                 results.append(func(*args, **kwargs))
                 pbar.update(1)
-                if self.clear_cache:
+                if isinstance(self.clear_cache, bool):
+                    if self.clear_cache:
+                        CAQueryDelegator().clear_cache()
+                elif i > 0 and (i + 1) % self.clear_cache == 0:
                     CAQueryDelegator().clear_cache()
-                if self.collect_garbage:
+                if isinstance(self.collect_garbage, bool):
+                    if self.collect_garbage:
+                        gc.collect()
+                elif i > 0 and (i + 1) % self.collect_garbage == 0:
                     gc.collect()
 
         return results

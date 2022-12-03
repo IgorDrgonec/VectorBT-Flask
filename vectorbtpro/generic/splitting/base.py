@@ -10,6 +10,7 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro._settings import settings
+from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.array_ import is_range
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
@@ -17,17 +18,18 @@ from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.template import CustomTemplate, Rep, RepFunc, deep_substitute
 from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.parsing import get_func_arg_names
-from vectorbtpro.utils.datetime_ import try_to_datetime_index
+from vectorbtpro.utils.datetime_ import try_to_datetime_index, try_align_to_datetime_index, parse_timedelta
 from vectorbtpro.utils.execution import execute
-from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
+from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.indexing import hslice, PandasIndexer, get_index_ranges
 from vectorbtpro.base.indexes import combine_indexes, stack_indexes
 from vectorbtpro.base.reshaping import to_dict
 from vectorbtpro.base.accessors import BaseIDXAccessor
 from vectorbtpro.base.resampling import Resampler
 from vectorbtpro.base.grouping import Grouper
-from vectorbtpro.base.merging import column_stack_merge, resolve_merge_func
+from vectorbtpro.base.merging import row_stack_merge, column_stack_merge, resolve_merge_func
 from vectorbtpro.generic.analyzable import Analyzable
+from vectorbtpro.generic.splitting import nb
 
 if tp.TYPE_CHECKING:
     from sklearn.model_selection import BaseCrossValidator as BaseCrossValidatorT
@@ -42,10 +44,18 @@ SplitterT = tp.TypeVar("SplitterT", bound="Splitter")
 
 
 @attr.s(frozen=True)
+class FixRange:
+    """Class that represents a fixed range."""
+
+    range_: tp.FixRangeLike = attr.ib()
+    """Range."""
+
+
+@attr.s(frozen=True)
 class RelRange:
     """Class that represents a relative range."""
 
-    offset: tp.Union[int, float] = attr.ib(default=0)
+    offset: tp.Union[int, float, tp.TimedeltaLike] = attr.ib(default=0)
     """Offset.
     
     Floating values between 0 and 1 are considered relative.
@@ -70,10 +80,11 @@ class RelRange:
 
     * 'all': All space
     * 'free': Remaining space after the offset anchor
+    * 'prev': Length of the previous range
     
     Applied only when `RelRange.offset` is a relative number."""
 
-    length: tp.Union[int, float] = attr.ib(default=1.0)
+    length: tp.Union[int, float, tp.TimedeltaLike] = attr.ib(default=1.0)
     """Length.
     
     Floating values between 0 and 1 are considered relative.
@@ -87,6 +98,8 @@ class RelRange:
     
     * 'all': All space
     * 'free': Remaining space after the offset
+    * 'free_or_prev': Remaining space after the offset or the start/end of the previous range,
+    depending what comes first in the direction of `RelRange.length`
     
     Applied only when `RelRange.length` is a relative number."""
 
@@ -95,23 +108,27 @@ class RelRange:
     
     Supported are
     
-    * 'ignore': ignore if out-of-bounds
-    * 'warn': emit a warning if out-of-bounds
-    * 'raise": raise an error if out-of-bounds
+    * 'keep': Keep out-of-bounds values
+    * 'ignore': Ignore if out-of-bounds
+    * 'warn': Emit a warning if out-of-bounds
+    * 'raise": Raise an error if out-of-bounds
     """
+
+    is_gap: bool = attr.ib(default=False)
+    """Whether the range acts as a gap."""
 
     def __attrs_post_init__(self):
         object.__setattr__(self, "offset_anchor", self.offset_anchor.lower())
         if self.offset_anchor not in ("start", "end", "prev_start", "prev_end", "next_start", "next_end"):
             raise ValueError(f"Invalid option offset_anchor='{self.offset_anchor}'")
         object.__setattr__(self, "offset_space", self.offset_space.lower())
-        if self.offset_space not in ("all", "free"):
+        if self.offset_space not in ("all", "free", "prev"):
             raise ValueError(f"Invalid option offset_space='{self.offset_space}'")
         object.__setattr__(self, "length_space", self.length_space.lower())
-        if self.length_space not in ("all", "free"):
+        if self.length_space not in ("all", "free", "free_or_prev"):
             raise ValueError(f"Invalid option length_space='{self.length_space}'")
         object.__setattr__(self, "out_of_bounds", self.out_of_bounds.lower())
-        if self.out_of_bounds not in ("ignore", "warn", "raise"):
+        if self.out_of_bounds not in ("keep", "ignore", "warn", "raise"):
             raise ValueError(f"Invalid option out_of_bounds='{self.out_of_bounds}'")
 
     def to_slice(
@@ -119,70 +136,150 @@ class RelRange:
         total_len: int,
         prev_start: int = 0,
         prev_end: int = 0,
+        index: tp.Optional[tp.IndexLike] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
     ) -> slice:
         """Convert the relative range into a slice."""
-        if self.offset_anchor == "start":
-            offset_anchor = 0
-        elif self.offset_anchor == "end":
-            offset_anchor = total_len
-        elif self.offset_anchor == "prev_start":
-            offset_anchor = prev_start
+        if index is not None:
+            index = try_to_datetime_index(index)
+            freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
+        offset_anchor = self.offset_anchor
+        offset = self.offset
+        length = self.length
+        if not checks.is_number(offset) or not checks.is_number(length):
+            if not isinstance(index, pd.DatetimeIndex):
+                raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
+
+        if offset_anchor == "start":
+            if checks.is_number(offset):
+                offset_anchor = 0
+            else:
+                offset_anchor = index[0]
+        elif offset_anchor == "end":
+            if checks.is_number(offset):
+                offset_anchor = total_len
+            else:
+                if freq is None:
+                    raise ValueError("Must provide frequency")
+                offset_anchor = index[-1] + freq
+        elif offset_anchor == "prev_start":
+            if checks.is_number(offset):
+                offset_anchor = prev_start
+            else:
+                offset_anchor = index[prev_start]
         else:
-            offset_anchor = prev_end
-        if isinstance(self.offset, (float, np.floating)) and 0 <= abs(self.offset) <= 1:
+            if checks.is_number(offset):
+                offset_anchor = prev_end
+            else:
+                if prev_end < total_len:
+                    offset_anchor = index[prev_end]
+                else:
+                    if freq is None:
+                        raise ValueError("Must provide frequency")
+                    offset_anchor = index[-1] + freq
+
+        if checks.is_float(offset) and 0 <= abs(offset) <= 1:
             if self.offset_space == "all":
-                offset = int(self.offset * total_len)
-            else:
-                if self.offset < 0:
-                    offset = int((1 + self.offset) * offset_anchor)
+                offset = offset_anchor + int(offset * total_len)
+            elif self.offset_space == "free":
+                if offset < 0:
+                    offset = int((1 + offset) * offset_anchor)
                 else:
-                    offset = offset_anchor + int(self.offset * (total_len - offset_anchor))
+                    offset = offset_anchor + int(offset * (total_len - offset_anchor))
+            else:
+                offset = offset_anchor + int(offset * (prev_end - prev_start))
         else:
-            if isinstance(self.offset, (float, np.floating)) and not self.offset.is_integer():
-                raise TypeError("Floating number for offset must be between 0 and 1")
-            offset = int(offset_anchor + self.offset)
-        if isinstance(self.length, (float, np.floating)) and 0 <= abs(self.length) <= 1:
+            if checks.is_float(offset):
+                if not offset.is_integer():
+                    raise TypeError(f"Floating number for offset ({offset}) must be between 0 and 1")
+                offset = offset_anchor + int(offset)
+            elif not checks.is_int(offset):
+                offset = offset_anchor + parse_timedelta(offset)
+                if index[0] <= offset <= index[-1]:
+                    offset = index.get_indexer([offset], method="ffill")[0]
+                elif offset < index[0]:
+                    if freq is None:
+                        raise ValueError("Must provide frequency")
+                    offset = -int((index[0] - offset) / freq)
+                else:
+                    if freq is None:
+                        raise ValueError("Must provide frequency")
+                    offset = total_len - 1 + int((offset - index[-1]) / freq)
+            else:
+                offset = offset_anchor + offset
+
+        if checks.is_float(length) and 0 <= abs(length) <= 1:
             if self.length_space == "all":
-                length = int(self.length * total_len)
-            else:
-                if self.length < 0:
-                    if offset > prev_end:
-                        length = int(self.length * (offset - prev_end))
-                    else:
-                        length = int(self.length * offset)
+                length = int(length * total_len)
+            elif self.length_space == "free":
+                if length < 0:
+                    length = int(length * offset)
                 else:
-                    length = int(self.length * (total_len - offset))
+                    length = int(length * (total_len - offset))
+            else:
+                if length < 0:
+                    if offset > prev_end:
+                        length = int(length * (offset - prev_end))
+                    else:
+                        length = int(length * offset)
+                else:
+                    if offset < prev_start:
+                        length = int(length * (prev_start - offset))
+                    else:
+                        length = int(length * (total_len - offset))
         else:
-            if isinstance(self.length, (float, np.floating)) and not self.length.is_integer():
-                raise TypeError("Floating number for length must be between 0 and 1")
-            length = int(self.length)
+            if checks.is_float(length):
+                if not length.is_integer():
+                    raise TypeError(f"Floating number for length ({length}) must be between 0 and 1")
+                length = int(length)
+            elif not checks.is_int(length):
+                length = parse_timedelta(length)
+
         start = offset
-        stop = start + length
-        if length < 0:
-            start, stop = stop, start
+        if checks.is_int(length):
+            stop = start + length
+        else:
+            if 0 <= start < total_len:
+                stop = index[start] + length
+            elif start < 0:
+                if freq is None:
+                    raise ValueError("Must provide frequency")
+                stop = index[0] + start * freq + length
+            else:
+                if freq is None:
+                    raise ValueError("Must provide frequency")
+                stop = index[-1] + (start - total_len + 1) * freq + length
+            if stop <= index[-1]:
+                stop = index.get_indexer([stop], method="bfill")[0]
+            else:
+                if freq is None:
+                    raise ValueError("Must provide frequency")
+                stop = total_len - 1 + int((stop - index[-1]) / freq)
+        if checks.is_int(length):
+            if length < 0:
+                start, stop = stop, start
+        else:
+            if length < pd.Timedelta(0):
+                start, stop = stop, start
         if start < 0:
-            if self.out_of_bounds == "warn":
+            if self.out_of_bounds == "ignore":
+                start = 0
+            elif self.out_of_bounds == "warn":
                 warnings.warn(f"Range start ({start}) is out of bounds", stacklevel=2)
+                start = 0
             elif self.out_of_bounds == "raise":
                 raise ValueError(f"Range start ({start}) is out of bounds")
-            start = 0
         if stop > total_len:
-            if self.out_of_bounds == "warn":
+            if self.out_of_bounds == "ignore":
+                stop = total_len
+            elif self.out_of_bounds == "warn":
                 warnings.warn(f"Range stop ({stop}) is out of bounds", stacklevel=2)
+                stop = total_len
             elif self.out_of_bounds == "raise":
                 raise ValueError(f"Range stop ({stop}) is out of bounds")
-            stop = total_len
         if stop - start <= 0:
             raise ValueError("Range length is negative or zero")
         return slice(start, stop)
-
-
-@attr.s(frozen=True)
-class GapRange:
-    """Class that represents a range acting as a gap."""
-
-    range_: tp.RangeLike = attr.ib()
-    """Range."""
 
 
 _DEF = object()
@@ -218,8 +315,11 @@ class Splitter(Analyzable):
         cls: tp.Type[SplitterT],
         index: tp.IndexLike,
         splits: tp.Splits,
+        squeeze: bool = False,
         fix_ranges: bool = True,
+        wrap_with_fixrange: bool = False,
         split_range_kwargs: tp.KwargsLike = None,
+        split_check_template: tp.Optional[tp.CustomTemplate] = None,
         template_context: tp.KwargsLike = None,
         split_labels: tp.Optional[tp.IndexLike] = None,
         set_labels: tp.Optional[tp.IndexLike] = None,
@@ -232,206 +332,104 @@ class Splitter(Analyzable):
         To transform relative ranges into the absolute format, enable `fix_ranges`.
         Arguments `split_range_kwargs` are then passed to `Splitter.split_range`.
 
-        Labels for splits and sets can be provided via `split_labels` and `set_labels` respectively."""
+        Enable `wrap_with_fixrange` to wrap any fixed range with `FixRange`. If the range
+        is an array, it will be wrapped regardless of this argument to avoid building a 3d array.
+
+        Pass a template via `split_check_template` to discard splits that do not fulfill certain criteria.
+        The current split will be available as `split`. Should return a boolean (`False` to discard).
+
+        Labels for splits and sets can be provided via `split_labels` and `set_labels` respectively.
+        Both arguments can be provided as templates. The split array will be available as `splits`."""
         index = try_to_datetime_index(index)
         if split_range_kwargs is None:
             split_range_kwargs = {}
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                splits = np.asarray(splits)
-        except Exception as e:
-            splits = np.asarray(splits, dtype=object)
-        if splits.size == 0:
-            raise ValueError("No splits provided")
-        if splits.ndim == 0:
-            splits = splits[None]
-        if splits.ndim == 1:
-            ndim = 1
-            splits = splits[:, None]
-        else:
-            ndim = 2
-        if fix_ranges:
-            new_splits = []
-            for split in splits:
-                new_split = cls.split_range(
+
+        new_splits = []
+        removed_indices = []
+        for i, split in enumerate(splits):
+            already_fixed = False
+            if checks.is_number(split) or checks.is_td(split):
+                split = cls.split_range(
                     slice(None),
                     split,
                     template_context=template_context,
                     index=index,
+                    wrap_with_fixrange=False,
                     **split_range_kwargs,
                 )
-                new_splits.append(new_split)
-            splits = new_splits
-            try:
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    splits = np.asarray(splits)
-            except Exception as e:
-                splits = np.asarray(splits, dtype=object)
-        if split_labels is None:
-            split_labels = pd.RangeIndex(stop=splits.shape[0], name="split")
-        if not isinstance(split_labels, pd.Index):
-            split_labels = pd.Index(split_labels, name="split")
-        if set_labels is None:
-            set_labels = pd.Index(["set_%d" % i for i in range(splits.shape[1])], name="set")
-        if not isinstance(set_labels, pd.Index):
-            set_labels = pd.Index(set_labels, name="set")
-        if wrapper_kwargs is None:
-            wrapper_kwargs = {}
-        wrapper = ArrayWrapper(index=split_labels, columns=set_labels, ndim=ndim, **wrapper_kwargs)
-        return cls(wrapper, index, splits, **kwargs)
-
-    @classmethod
-    def from_split_func(
-        cls: tp.Type[SplitterT],
-        index: tp.IndexLike,
-        split_func: tp.Callable,
-        split_args: tp.ArgsLike = None,
-        split_kwargs: tp.KwargsLike = None,
-        fix_ranges: bool = True,
-        split: tp.Optional[tp.SplitLike] = None,
-        split_range_kwargs: tp.KwargsLike = None,
-        range_bounds_kwargs: tp.KwargsLike = None,
-        template_context: tp.KwargsLike = None,
-        **kwargs,
-    ) -> SplitterT:
-        """Create a new `Splitter` instance from a custom split function.
-
-        In a while-loop, substitutes templates in `split_args` and `split_kwargs` and passes
-        them to `split_func`, which should return either a split (see `new_split` in `Splitter.split_range`,
-        also supports a single range if it's not an iterable) or None to abrupt the while-loop.
-        If `fix_ranges` is True, the returned split is then converted into a fixed split using
-        `Splitter.split_range` and the bounds of its sets are measured using `Splitter.get_range_bounds`.
-
-        Each template substitution has the following information:
-
-        * `split_idx`: Current split index, starting at 0
-        * `splits`: Nested list of splits appended up to this point
-        * `bounds`: Nested list of bounds appended up to this point
-        * Arguments and keyword arguments passed to `Splitter.from_split_func`
-
-        Usage:
-            * Rolling window of 30 elements, 20 for train and 10 for test:
-
-            ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
-
-            >>> index = pd.date_range("2020", "2021", freq="D")
-
-            >>> def split_func(splits, bounds, index):
-            ...     if len(splits) == 0:
-            ...         new_split = (slice(0, 20), slice(20, 30))
-            ...     else:
-            ...         # Previous split, first set, right bound
-            ...         prev_end = bounds[-1][0][1]
-            ...         new_split = (
-            ...             slice(prev_end, prev_end + 20),
-            ...             slice(prev_end + 20, prev_end + 30)
-            ...         )
-            ...     if new_split[-1].stop > len(index):
-            ...         return None
-            ...     return new_split
-
-            >>> splitter = vbt.Splitter.from_split_func(
-            ...     index,
-            ...     split_func,
-            ...     split_args=(
-            ...         vbt.Rep("splits"),
-            ...         vbt.Rep("bounds"),
-            ...         vbt.Rep("index"),
-            ...     ),
-            ...     set_labels=["train", "test"]
-            ... )
-            >>> splitter.plot()
-            ```
-
-            ![](/assets/images/api/from_split_func.svg)
-        """
-        index = try_to_datetime_index(index)
-        if split_range_kwargs is None:
-            split_range_kwargs = {}
-        if range_bounds_kwargs is None:
-            range_bounds_kwargs = {}
-        if split_args is None:
-            split_args = ()
-        if split_kwargs is None:
-            split_kwargs = {}
-
-        splits = []
-        bounds = []
-        split_idx = 0
-        n_sets = None
-        while True:
-            _template_context = merge_dicts(
-                dict(
-                    split_idx=split_idx,
-                    splits=splits,
-                    bounds=bounds,
-                    index=index,
-                    split_args=split_args,
-                    split_kwargs=split_kwargs,
-                    split_range_kwargs=split_range_kwargs,
-                    range_bounds_kwargs=range_bounds_kwargs,
-                    **kwargs,
-                ),
-                template_context,
-            )
-            _split_func = deep_substitute(split_func, _template_context, sub_id="split_func")
-            _split_args = deep_substitute(split_args, _template_context, sub_id="split_args")
-            _split_kwargs = deep_substitute(split_kwargs, _template_context, sub_id="split_kwargs")
-            new_split = _split_func(*_split_args, **_split_kwargs)
-            if new_split is None:
-                break
-            if not checks.is_iterable(new_split):
-                new_split = (new_split,)
-            if fix_ranges or split is not None:
+                already_fixed = True
+                new_split = split
+                ndim = 2
+            elif cls.is_range_relative(split):
+                new_split = [split]
+                ndim = 1
+            elif not checks.is_sequence(split):
+                new_split = [split]
+                ndim = 1
+            elif isinstance(split, np.ndarray):
+                new_split = [split]
+                ndim = 1
+            else:
+                new_split = split
+                ndim = 2
+            if fix_ranges and not already_fixed:
                 new_split = cls.split_range(
                     slice(None),
                     new_split,
-                    template_context=_template_context,
+                    template_context=template_context,
                     index=index,
+                    wrap_with_fixrange=False,
                     **split_range_kwargs,
                 )
-            if split is not None:
-                if len(new_split) > 1:
-                    raise ValueError("Split function must return only one range if split is already provided")
-                new_split = cls.split_range(
-                    new_split[0],
-                    split,
-                    template_context=_template_context,
-                    index=index,
-                    **split_range_kwargs,
-                )
-            if n_sets is None:
-                n_sets = len(new_split)
-            elif n_sets != len(new_split):
-                raise ValueError("All splits must have the same number of sets")
-            splits.append(new_split)
-            if fix_ranges:
-                split_bounds = tuple(
-                    map(
-                        lambda x: cls.get_range_bounds(
-                            x,
-                            template_context=_template_context,
-                            index=index,
-                            **range_bounds_kwargs,
-                        ),
-                        new_split,
-                    )
-                )
-                bounds.append(split_bounds)
-            split_idx += 1
+            _new_split = []
+            for range_ in new_split:
+                if checks.is_number(range_) or checks.is_td(range_):
+                    range_ = RelRange(length=range_)
+                if not isinstance(range_, (FixRange, RelRange)):
+                    if wrap_with_fixrange or checks.is_sequence(range_):
+                        _new_split.append(FixRange(range_))
+                    else:
+                        _new_split.append(range_)
+                else:
+                    _new_split.append(range_)
+            if split_check_template is not None:
+                _template_context = merge_dicts(dict(index=index, i=i, split=_new_split), template_context)
+                split_ok = deep_substitute(split_check_template, _template_context, sub_id="split_check_template")
+                if not split_ok:
+                    removed_indices.append(i)
+                    continue
+            new_splits.append(_new_split)
+        if len(new_splits) == 0:
+            raise ValueError("Must provide at least one range")
+        new_splits_arr = np.asarray(new_splits, dtype=object)
+        if squeeze and new_splits_arr.shape[1] == 1:
+            ndim = 1
 
-        return cls.from_splits(
-            index,
-            splits,
-            fix_ranges=fix_ranges,
-            split_range_kwargs=split_range_kwargs,
-            template_context=template_context,
-            **kwargs,
-        )
+        if split_labels is None:
+            split_labels = pd.RangeIndex(stop=new_splits_arr.shape[0], name="split")
+        else:
+            if isinstance(split_labels, CustomTemplate):
+                _template_context = merge_dicts(dict(index=index, splits_arr=new_splits_arr), template_context)
+                split_labels = deep_substitute(split_labels, _template_context, sub_id=split_labels)
+                if not isinstance(split_labels, pd.Index):
+                    split_labels = pd.Index(split_labels, name="split")
+            else:
+                if not isinstance(split_labels, pd.Index):
+                    split_labels = pd.Index(split_labels, name="split")
+                if len(removed_indices) > 0:
+                    split_labels = split_labels.delete(removed_indices)
+        if set_labels is None:
+            set_labels = pd.Index(["set_%d" % i for i in range(new_splits_arr.shape[1])], name="set")
+        else:
+            if isinstance(split_labels, CustomTemplate):
+                _template_context = merge_dicts(dict(index=index, splits_arr=new_splits_arr), template_context)
+                set_labels = deep_substitute(set_labels, _template_context, sub_id=set_labels)
+            if not isinstance(set_labels, pd.Index):
+                set_labels = pd.Index(set_labels, name="set")
+        if wrapper_kwargs is None:
+            wrapper_kwargs = {}
+        wrapper = ArrayWrapper(index=split_labels, columns=set_labels, ndim=ndim, **wrapper_kwargs)
+        return cls(wrapper, index, new_splits_arr, **kwargs)
 
     @classmethod
     def from_single(
@@ -466,14 +464,16 @@ class Splitter(Analyzable):
     def from_rolling(
         cls: tp.Type[SplitterT],
         index: tp.IndexLike,
-        length: tp.Union[int, float],
-        offset: tp.Union[int, float] = 0,
+        length: tp.Union[int, float, tp.TimedeltaLike],
+        offset: tp.Union[int, float, tp.TimedeltaLike] = 0,
         offset_anchor: str = "prev_end",
         offset_anchor_set: tp.Optional[int] = 0,
+        offset_space: str = "prev",
         split: tp.Optional[tp.SplitLike] = None,
         split_range_kwargs: tp.KwargsLike = None,
         range_bounds_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
         **kwargs,
     ) -> SplitterT:
         """Create a new `Splitter` instance from a rolling range of a fixed length.
@@ -482,21 +482,15 @@ class Splitter(Analyzable):
 
         Args:
             index (index_like): Index.
-            length (int or float): Length of the range to roll over the index.
-
-                Provide it as a float between 0 and 1 to make it relative to the length of the index.
-            offset (int or float): Offset relative to the offset anchor.
-
-                Provide it as a float between 0 and 1 to make it relative to the length of the range.
-            offset_anchor (str): Offset anchor.
-
-                Can be 'prev_start' and 'prev_end' for the left and right bound of the
-                previous range set respectively. By default, it's the right bound.
+            length (int, float, or timedelta_like): See `RelRange.length`.
+            offset (int, float, or timedelta_like): See `RelRange.offset`.
+            offset_anchor (str): See `RelRange.offset_anchor`.
             offset_anchor_set (int): Offset anchor set.
 
                 Selects the set from the previous range to be used as an offset anchor.
                 If None, the whole previous split is considered as a single range.
                 By default, it's the first set.
+            offset_space (str): See `RelRange.offset_space`.
             split (any): Ranges to split the range into.
 
                 If None, will produce the entire range as a single range.
@@ -504,6 +498,9 @@ class Splitter(Analyzable):
             split_range_kwargs (dict): Keyword arguments passed to `Splitter.split_range`.
             range_bounds_kwargs (dict): Keyword arguments passed to `Splitter.get_range_bounds`.
             template_context (dict): Mapping used to substitute templates in ranges.
+            freq (any): Index frequency in case it cannot be parsed from `index`.
+
+                If None, will be parsed using `vectorbtpro.base.accessors.BaseIDXAccessor.get_freq`.
             **kwargs: Keyword arguments passed to the constructor of `Splitter`.
 
         Usage:
@@ -552,20 +549,12 @@ class Splitter(Analyzable):
             ![](/assets/images/api/from_rolling_3.svg)
         """
         index = try_to_datetime_index(index)
-        if isinstance(length, (float, np.floating)) and 0 <= abs(length) <= 1:
-            length = int(len(index) * length)
-        if isinstance(length, (float, np.floating)) and not length.is_integer():
-            raise TypeError("Floating number for length must be between 0 and 1")
-        length = int(length)
-        if length < 1 or length > len(index):
-            raise TypeError(f"Length must be within [{1}, {len(index)}]")
-        if isinstance(offset, (float, np.floating)) and 0 <= abs(offset) <= 1:
-            offset = int(length * offset)
-        if isinstance(offset, (float, np.floating)) and not offset.is_integer():
-            raise TypeError("Floating number for offset must be between 0 and 1")
-        offset = int(offset)
+        freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         if split_range_kwargs is None:
             split_range_kwargs = {}
+        if "freq" not in split_range_kwargs:
+            split_range_kwargs = dict(split_range_kwargs)
+            split_range_kwargs["freq"] = freq
         if range_bounds_kwargs is None:
             range_bounds_kwargs = {}
 
@@ -573,25 +562,27 @@ class Splitter(Analyzable):
         bounds = []
         while True:
             if len(splits) == 0:
-                new_split = slice(0, length)
+                new_split = RelRange(
+                    length=length,
+                    out_of_bounds="keep",
+                ).to_slice(total_len=len(index), index=index, freq=freq)
             else:
-                if isinstance(offset_anchor, str) and offset_anchor.lower() == "prev_start":
-                    if offset_anchor_set is None:
-                        prev_bounds = bounds[-1][0]
-                    else:
-                        prev_bounds = bounds[-1][offset_anchor_set]
-                    start = prev_bounds[0] + offset
-                elif isinstance(offset_anchor, str) and offset_anchor.lower() == "prev_end":
-                    if offset_anchor_set is None:
-                        prev_bounds = bounds[-1][-1]
-                    else:
-                        prev_bounds = bounds[-1][offset_anchor_set]
-                    start = prev_bounds[1] + offset
+                if offset_anchor_set is None:
+                    prev_start, prev_end = bounds[-1][0][0], bounds[-1][-1][1]
                 else:
-                    raise ValueError(f"Invalid option offset_anchor='{offset_anchor}'")
-                new_split = slice(start, start + length)
+                    prev_start, prev_end = bounds[-1][offset_anchor_set]
+                new_split = RelRange(
+                    offset=offset,
+                    offset_anchor=offset_anchor,
+                    offset_space=offset_space,
+                    length=length,
+                    length_space="all",
+                    out_of_bounds="keep",
+                ).to_slice(total_len=len(index), prev_start=prev_start, prev_end=prev_end, index=index, freq=freq)
                 if new_split.start <= bounds[-1][0][0]:
-                    raise ValueError("Infinite loop detected. Provide a non-zero offset.")
+                    raise ValueError("Infinite loop detected. Provide a positive offset.")
+            if new_split.start < 0:
+                raise ValueError("Range start cannot be negative")
             if new_split.stop > len(index):
                 break
             if split is not None:
@@ -632,13 +623,14 @@ class Splitter(Analyzable):
         cls: tp.Type[SplitterT],
         index: tp.IndexLike,
         n: int,
-        length: tp.Union[None, int, float] = None,
+        length: tp.Union[None, int, float, tp.TimedeltaLike] = None,
         split: tp.Optional[tp.SplitLike] = None,
         split_range_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
         **kwargs,
     ) -> SplitterT:
-        """Create a new `Splitter` instance from a number of rolling ranges of a fixed length.
+        """Create a new `Splitter` instance from a number of rolling ranges of the same length.
 
         If `length` is None, splits the index evenly into `n` non-overlapping ranges
         using `Splitter.from_rolling`. Otherwise, picks `n` evenly-spaced, potentially overlapping
@@ -666,16 +658,12 @@ class Splitter(Analyzable):
             ![](/assets/images/api/from_n_rolling.svg)
         """
         index = try_to_datetime_index(index)
-        if length is not None:
-            if isinstance(length, (float, np.floating)) and 0 <= abs(length) <= 1:
-                length = int(len(index) * length)
-            if isinstance(length, (float, np.floating)) and not length.is_integer():
-                raise TypeError("Floating number for length must be between 0 and 1")
-            length = int(length)
-            if length < 1 or length > len(index):
-                raise TypeError(f"Length must be within [{1}, {len(index)}]")
+        freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         if split_range_kwargs is None:
             split_range_kwargs = {}
+        if "freq" not in split_range_kwargs:
+            split_range_kwargs = dict(split_range_kwargs)
+            split_range_kwargs["freq"] = freq
 
         if length is None:
             return cls.from_rolling(
@@ -690,16 +678,35 @@ class Splitter(Analyzable):
                 **kwargs,
             )
 
-        start_rows = np.arange(len(index) - length + 1)
-        end_rows = np.arange(length, len(index) + 1)
-        if n > len(start_rows):
-            n = len(start_rows)
-        rows = np.round(np.linspace(0, len(start_rows) - 1, n)).astype(int)
-        start_rows = start_rows[rows]
-        end_rows = end_rows[rows]
+        if checks.is_float(length):
+            if 0 <= abs(length) <= 1:
+                length = len(index) * length
+            elif not length.is_integer():
+                raise TypeError("Floating number for length must be between 0 and 1")
+            length = int(length)
+        if checks.is_int(length):
+            if length < 1 or length > len(index):
+                raise TypeError(f"Length must be within [{1}, {len(index)}]")
+            offsets = np.arange(len(index))
+            offsets = offsets[offsets + length <= len(index)]
+        else:
+            length = parse_timedelta(length)
+            if freq is None:
+                raise ValueError("Must provide freq")
+            if length < freq or length > index[-1] + freq - index[0]:
+                raise TypeError(f"Length must be within [{freq}, {index[-1] + freq - index[0]}]")
+            offsets = index[index + length <= index[-1] + freq] - index[0]
+        if n > len(offsets):
+            n = len(offsets)
+        rows = np.round(np.linspace(0, len(offsets) - 1, n)).astype(int)
+        offsets = offsets[rows]
+
         splits = []
-        for i in range(len(start_rows)):
-            new_split = slice(start_rows[i], end_rows[i])
+        for offset in offsets:
+            new_split = RelRange(
+                offset=offset,
+                length=length,
+            ).to_slice(len(index), index=index, freq=freq)
             if split is not None:
                 new_split = cls.split_range(
                     new_split,
@@ -709,7 +716,6 @@ class Splitter(Analyzable):
                     **split_range_kwargs,
                 )
             splits.append(new_split)
-
         return cls.from_splits(
             index,
             splits,
@@ -722,12 +728,13 @@ class Splitter(Analyzable):
     def from_expanding(
         cls: tp.Type[SplitterT],
         index: tp.IndexLike,
-        min_length: tp.Union[int, float],
-        offset: tp.Union[int, float],
+        min_length: tp.Union[int, float, tp.TimedeltaLike],
+        offset: tp.Union[int, float, tp.TimedeltaLike],
         split: tp.Optional[tp.SplitLike] = None,
         split_range_kwargs: tp.KwargsLike = None,
         range_bounds_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
         **kwargs,
     ) -> SplitterT:
         """Create a new `Splitter` instance from an expanding range.
@@ -759,33 +766,36 @@ class Splitter(Analyzable):
             ![](/assets/images/api/from_expanding.svg)
         """
         index = try_to_datetime_index(index)
-        if isinstance(min_length, (float, np.floating)) and 0 <= abs(min_length) <= 1:
-            min_length = int(len(index) * min_length)
-        if isinstance(min_length, (float, np.floating)) and not min_length.is_integer():
-            raise TypeError("Floating number for minimum length must be between 0 and 1")
-        min_length = int(min_length)
-        if min_length < 1 or min_length > len(index):
-            raise TypeError(f"Minimum length must be within [{1}, {len(index)}]")
-        if isinstance(offset, (float, np.floating)) and 0 <= abs(offset) <= 1:
-            offset = int(len(index) * offset)
-        if isinstance(offset, (float, np.floating)) and not offset.is_integer():
-            raise TypeError("Floating number for offset must be between 0 and 1")
-        offset = int(offset)
-        if offset < 1 or offset > len(index):
-            raise TypeError(f"Offset must be within [{1}, {len(index)}]")
+        freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         if split_range_kwargs is None:
             split_range_kwargs = {}
         if range_bounds_kwargs is None:
             range_bounds_kwargs = {}
+        if "freq" not in split_range_kwargs:
+            split_range_kwargs = dict(split_range_kwargs)
+            split_range_kwargs["freq"] = freq
 
         splits = []
         bounds = []
         while True:
             if len(splits) == 0:
-                new_split = slice(0, min_length)
+                new_split = RelRange(
+                    length=min_length,
+                    out_of_bounds="keep",
+                ).to_slice(total_len=len(index), index=index, freq=freq)
             else:
-                prev_bound = bounds[-1][-1][1]
-                new_split = slice(0, prev_bound + offset)
+                prev_end = bounds[-1][-1][-1]
+                new_split = RelRange(
+                    offset=offset,
+                    offset_anchor="prev_end",
+                    offset_space="all",
+                    length=-1.0,
+                    out_of_bounds="keep",
+                ).to_slice(total_len=len(index), prev_end=prev_end, index=index, freq=freq)
+                if new_split.stop <= prev_end:
+                    raise ValueError("Infinite loop detected. Provide a positive offset.")
+            if new_split.start < 0:
+                raise ValueError("Range start cannot be negative")
             if new_split.stop > len(index):
                 break
             if split is not None:
@@ -826,10 +836,11 @@ class Splitter(Analyzable):
         cls: tp.Type[SplitterT],
         index: tp.IndexLike,
         n: int,
-        min_length: tp.Union[None, int, float] = None,
+        min_length: tp.Union[None, int, float, tp.TimedeltaLike] = None,
         split: tp.Optional[tp.SplitLike] = None,
         split_range_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
         **kwargs,
     ) -> SplitterT:
         """Create a new `Splitter` instance from a number of expanding ranges.
@@ -859,29 +870,42 @@ class Splitter(Analyzable):
             ![](/assets/images/api/from_n_expanding.svg)
         """
         index = try_to_datetime_index(index)
-        if min_length is not None:
-            if isinstance(min_length, (float, np.floating)) and 0 <= abs(min_length) <= 1:
-                min_length = int(len(index) * min_length)
-            if isinstance(min_length, (float, np.floating)) and not min_length.is_integer():
+        freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
+        if split_range_kwargs is None:
+            split_range_kwargs = {}
+        if "freq" not in split_range_kwargs:
+            split_range_kwargs = dict(split_range_kwargs)
+            split_range_kwargs["freq"] = freq
+
+        if min_length is None:
+            min_length = len(index) // n
+        if checks.is_float(min_length):
+            if 0 <= abs(min_length) <= 1:
+                min_length = len(index) * min_length
+            elif not min_length.is_integer():
                 raise TypeError("Floating number for minimum length must be between 0 and 1")
+        if checks.is_int(min_length):
             min_length = int(min_length)
             if min_length < 1 or min_length > len(index):
                 raise TypeError(f"Minimum length must be within [{1}, {len(index)}]")
+            lengths = np.arange(1, len(index) + 1)
+            lengths = lengths[lengths >= min_length]
         else:
-            min_length = len(index) // n
-        if split_range_kwargs is None:
-            split_range_kwargs = {}
+            min_length = parse_timedelta(min_length)
+            if freq is None:
+                raise ValueError("Must provide freq")
+            if min_length < freq or min_length > index[-1] + freq - index[0]:
+                raise TypeError(f"Minimum length must be within [{freq}, {index[-1] + freq - index[0]}]")
+            lengths = index[1:].append(index[[-1]] + freq) - index[0]
+            lengths = lengths[lengths >= min_length]
+        if n > len(lengths):
+            n = len(lengths)
+        rows = np.round(np.linspace(0, len(lengths) - 1, n)).astype(int)
+        lengths = lengths[rows]
 
-        start_rows = np.full(len(index) - min_length + 1, 0)
-        end_rows = np.arange(min_length, len(index) + 1)
-        if n > len(start_rows):
-            n = len(start_rows)
-        rows = np.round(np.linspace(0, len(start_rows) - 1, n)).astype(int)
-        start_rows = start_rows[rows]
-        end_rows = end_rows[rows]
         splits = []
-        for i in range(len(start_rows)):
-            new_split = slice(start_rows[i], end_rows[i])
+        for length in lengths:
+            new_split = RelRange(length=length).to_slice(len(index), index=index, freq=freq)
             if split is not None:
                 new_split = cls.split_range(
                     new_split,
@@ -891,147 +915,6 @@ class Splitter(Analyzable):
                     **split_range_kwargs,
                 )
             splits.append(new_split)
-
-        return cls.from_splits(
-            index,
-            splits,
-            split_range_kwargs=split_range_kwargs,
-            template_context=template_context,
-            **kwargs,
-        )
-
-    @classmethod
-    def from_n_random(
-        cls: tp.Type[SplitterT],
-        index: tp.IndexLike,
-        n: int,
-        min_length: tp.Union[int, float],
-        max_length: tp.Union[None, int, float] = None,
-        min_start: tp.Union[None, int, float] = None,
-        max_end: tp.Union[None, int, float] = None,
-        length_choice_func: tp.Optional[tp.Callable] = None,
-        start_choice_func: tp.Optional[tp.Callable] = None,
-        length_p_func: tp.Optional[tp.Callable] = None,
-        start_p_func: tp.Optional[tp.Callable] = None,
-        seed: tp.Optional[int] = None,
-        split: tp.Optional[tp.SplitLike] = None,
-        split_range_kwargs: tp.KwargsLike = None,
-        template_context: tp.KwargsLike = None,
-        **kwargs,
-    ) -> SplitterT:
-        """Create a new `Splitter` instance from a number of random ranges.
-
-        Randomly picks the length of a range between `min_length` and `max_length` (including) using
-        `length_choice_func`, which receives an array of possible values and selects one. It defaults to
-        `numpy.random.Generator.choice`. Optional function `length_p_func` takes the same as
-        `length_choice_func` and must return either None or probabilities.
-
-        Randomly picks the start position of a range starting at `min_start` and ending at `max_end`
-        (excluding) minus the chosen length using `start_choice_func`, which receives an array of possible
-        values and selects one. It defaults to `numpy.random.Generator.choice`. Optional function
-        `start_p_func` takes the same as `start_choice_func` and must return either None or probabilities.
-
-        !!! note
-            Each function must take two arguments: the iteration index and the array with possible values.
-
-        For other arguments, see `Splitter.from_rolling`.
-
-        Usage:
-            * Generate 20 random ranges with a length from [40, 100], and split each into 3/4:
-
-            ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
-
-            >>> index = pd.date_range("2020", "2021", freq="D")
-
-            >>> splitter = vbt.Splitter.from_n_random(
-            ...     index,
-            ...     20,
-            ...     min_length=40,
-            ...     max_length=100,
-            ...     split=3/4,
-            ...     set_labels=["train", "test"]
-            ... )
-            >>> splitter.plot()
-            ```
-
-            ![](/assets/images/api/from_n_random.svg)
-        """
-        index = try_to_datetime_index(index)
-        if min_start is None:
-            min_start = 0
-        if min_start is not None:
-            if isinstance(min_start, (float, np.floating)) and 0 <= abs(min_start) <= 1:
-                min_start = int(len(index) * min_start)
-            if isinstance(min_start, (float, np.floating)) and not min_start.is_integer():
-                raise TypeError("Floating number for minimum start position must be between 0 and 1")
-            min_start = int(min_start)
-            if min_start < 0 or min_start > len(index) - 1:
-                raise TypeError(f"Minimum start position must be within [{0}, {len(index) - 1}]")
-        if max_end is None:
-            max_end = len(index)
-        if max_end is not None:
-            if isinstance(max_end, (float, np.floating)) and 0 <= abs(max_end) <= 1:
-                max_end = int(len(index) * max_end)
-            if isinstance(max_end, (float, np.floating)) and not max_end.is_integer():
-                raise TypeError("Floating number for maximum end position must be between 0 and 1")
-            max_end = int(max_end)
-            if max_end < 1 or max_end > len(index):
-                raise TypeError(f"Maximum end position must be within [{1}, {len(index)}]")
-        space_len = max_end - min_start
-        if isinstance(min_length, (float, np.floating)) and 0 <= abs(min_length) <= 1:
-            min_length = int(space_len * min_length)
-        if isinstance(min_length, (float, np.floating)) and not min_length.is_integer():
-            raise TypeError("Floating number for minimum length must be between 0 and 1")
-        min_length = int(min_length)
-        if min_length < 1 or min_length > space_len:
-            raise TypeError(f"Minimum length must be within [{1}, {space_len}]")
-        if max_length is not None:
-            if isinstance(max_length, (float, np.floating)) and 0 <= abs(max_length) <= 1:
-                max_length = int(space_len * max_length)
-            if isinstance(max_length, (float, np.floating)) and not max_length.is_integer():
-                raise TypeError("Floating number for maximum length must be between 0 and 1")
-            max_length = int(max_length)
-            if max_length < 1 or max_length > space_len:
-                raise TypeError(f"Maximum length must be within [{1}, {space_len}]")
-        else:
-            max_length = min_length
-        rng = np.random.default_rng(seed=seed)
-        if length_p_func is None:
-            length_p_func = lambda i, x: None
-        if start_p_func is None:
-            start_p_func = lambda i, x: None
-        if length_choice_func is None:
-            length_choice_func = lambda i, x: rng.choice(x, p=length_p_func(i, x))
-        else:
-            if seed is not None:
-                np.random.seed(seed)
-        if start_choice_func is None:
-            start_choice_func = lambda i, x: rng.choice(x, p=start_p_func(i, x))
-        else:
-            if seed is not None:
-                np.random.seed(seed)
-        if split_range_kwargs is None:
-            split_range_kwargs = {}
-
-        length_space = np.arange(min_length, max_length + 1)
-        index_space = np.arange(len(index))
-        splits = []
-        for i in range(n):
-            length = length_choice_func(i, length_space)
-            start = start_choice_func(i, index_space[min_start : max_end - length + 1])
-            new_split = slice(start, start + length)
-            if split is not None:
-                new_split = cls.split_range(
-                    new_split,
-                    split,
-                    template_context=template_context,
-                    index=index,
-                    **split_range_kwargs,
-                )
-            splits.append(new_split)
-
         return cls.from_splits(
             index,
             splits,
@@ -1121,13 +1004,13 @@ class Splitter(Analyzable):
         cls: tp.Type[SplitterT],
         index: tp.IndexLike,
         by: tp.AnyGroupByLike,
-        min_length: tp.Union[None, int, float] = None,
         groupby_kwargs: tp.KwargsLike = None,
         grouper_kwargs: tp.KwargsLike = None,
         split: tp.Optional[tp.SplitLike] = None,
         split_range_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
         split_labels: tp.Optional[tp.IndexLike] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
         **kwargs,
     ) -> SplitterT:
         """Create a new `Splitter` instance from a grouper.
@@ -1145,31 +1028,37 @@ class Splitter(Analyzable):
 
             >>> index = pd.date_range("2020", "2021", freq="D")
 
-            >>> splitter = vbt.Splitter.from_grouper(index, "M", min_length=28)
+            >>> def is_month_end(index, split):
+            ...     last_range = split[-1]
+            ...     return index[last_range][-1].is_month_end
+
+            >>> splitter = vbt.Splitter.from_grouper(
+            ...     index,
+            ...     "M",
+            ...     split_check_template=vbt.RepFunc(is_month_end)
+            ... )
             >>> splitter.plot()
             ```
 
             ![](/assets/images/api/from_grouper.svg)
         """
-        if min_length is not None:
-            if isinstance(min_length, (float, np.floating)) and 0 <= abs(min_length) <= 1:
-                min_length = int(len(index) * min_length)
-            if isinstance(min_length, (float, np.floating)) and not min_length.is_integer():
-                raise TypeError("Floating number for minimum length must be between 0 and 1")
-            min_length = int(min_length)
-            if min_length < 1 or min_length > len(index):
-                raise TypeError(f"Minimum length must be within [{1}, {len(index)}]")
-        if grouper_kwargs is None:
-            grouper_kwargs = {}
+        index = try_to_datetime_index(index)
+        freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         if split_range_kwargs is None:
             split_range_kwargs = {}
-        index = try_to_datetime_index(index)
+        if "freq" not in split_range_kwargs:
+            split_range_kwargs = dict(split_range_kwargs)
+            split_range_kwargs["freq"] = freq
+        if grouper_kwargs is None:
+            grouper_kwargs = {}
+
+        if isinstance(by, CustomTemplate):
+            _template_context = merge_dicts(dict(index=index), template_context)
+            by = deep_substitute(by, _template_context, sub_id="by")
         grouper = BaseIDXAccessor(index).get_grouper(by, groupby_kwargs=groupby_kwargs, **grouper_kwargs)
         splits = []
         indices = []
         for i, new_split in enumerate(grouper.yield_group_idxs()):
-            if min_length is not None and len(new_split) < min_length:
-                continue
             if split is not None:
                 new_split = cls.split_range(
                     new_split,
@@ -1195,10 +1084,225 @@ class Splitter(Analyzable):
         )
 
     @classmethod
+    def from_n_random(
+        cls: tp.Type[SplitterT],
+        index: tp.IndexLike,
+        n: int,
+        min_length: tp.Union[int, float, tp.TimedeltaLike],
+        max_length: tp.Union[None, int, float, tp.TimedeltaLike] = None,
+        min_start: tp.Union[None, int, float, tp.DatetimeLike] = None,
+        max_end: tp.Union[None, int, float, tp.DatetimeLike] = None,
+        length_choice_func: tp.Optional[tp.Callable] = None,
+        start_choice_func: tp.Optional[tp.Callable] = None,
+        length_p_func: tp.Optional[tp.Callable] = None,
+        start_p_func: tp.Optional[tp.Callable] = None,
+        seed: tp.Optional[int] = None,
+        split: tp.Optional[tp.SplitLike] = None,
+        split_range_kwargs: tp.KwargsLike = None,
+        template_context: tp.KwargsLike = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        **kwargs,
+    ) -> SplitterT:
+        """Create a new `Splitter` instance from a number of random ranges.
+
+        Randomly picks the length of a range between `min_length` and `max_length` (including) using
+        `length_choice_func`, which receives an array of possible values and selects one. It defaults to
+        `numpy.random.Generator.choice`. Optional function `length_p_func` takes the same as
+        `length_choice_func` and must return either None or probabilities.
+
+        Randomly picks the start position of a range starting at `min_start` and ending at `max_end`
+        (excluding) minus the chosen length using `start_choice_func`, which receives an array of possible
+        values and selects one. It defaults to `numpy.random.Generator.choice`. Optional function
+        `start_p_func` takes the same as `start_choice_func` and must return either None or probabilities.
+
+        !!! note
+            Each function must take two arguments: the iteration index and the array with possible values.
+
+        For other arguments, see `Splitter.from_rolling`.
+
+        Usage:
+            * Generate 20 random ranges with a length from [40, 100], and split each into 3/4:
+
+            ```pycon
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+
+            >>> index = pd.date_range("2020", "2021", freq="D")
+
+            >>> splitter = vbt.Splitter.from_n_random(
+            ...     index,
+            ...     20,
+            ...     min_length=40,
+            ...     max_length=100,
+            ...     split=3/4,
+            ...     set_labels=["train", "test"]
+            ... )
+            >>> splitter.plot()
+            ```
+
+            ![](/assets/images/api/from_n_random.svg)
+        """
+        index = try_to_datetime_index(index)
+        freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
+        if split_range_kwargs is None:
+            split_range_kwargs = {}
+        if "freq" not in split_range_kwargs:
+            split_range_kwargs = dict(split_range_kwargs)
+            split_range_kwargs["freq"] = freq
+
+        if min_start is None:
+            min_start = 0
+        if min_start is not None:
+            if checks.is_float(min_start):
+                if 0 <= abs(min_start) <= 1:
+                    min_start = len(index) * min_start
+                elif not min_start.is_integer():
+                    raise TypeError("Floating number for minimum start must be between 0 and 1")
+            if checks.is_float(min_start):
+                min_start = int(min_start)
+            if checks.is_int(min_start):
+                if min_start < 0 or min_start > len(index) - 1:
+                    raise TypeError(f"Minimum start must be within [{0}, {len(index) - 1}]")
+            else:
+                if not isinstance(index, pd.DatetimeIndex):
+                    raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
+                min_start = try_align_to_datetime_index([min_start], index)[0]
+                if not isinstance(min_start, pd.Timestamp):
+                    raise ValueError(f"Minimum start ({min_start}) could not be parsed")
+                if min_start < index[0] or min_start > index[-1]:
+                    raise TypeError(f"Minimum start must be within [{index[0]}, {index[-1]}]")
+                min_start = index.get_indexer([min_start], method="bfill")[0]
+        if max_end is None:
+            max_end = len(index)
+        if checks.is_float(max_end):
+            if 0 <= abs(max_end) <= 1:
+                max_end = len(index) * max_end
+            elif not max_end.is_integer():
+                raise TypeError("Floating number for maximum end must be between 0 and 1")
+        if checks.is_float(max_end):
+            max_end = int(max_end)
+        if checks.is_int(max_end):
+            if max_end < 1 or max_end > len(index):
+                raise TypeError(f"Maximum end must be within [{1}, {len(index)}]")
+        else:
+            if not isinstance(index, pd.DatetimeIndex):
+                raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
+            max_end = try_align_to_datetime_index([max_end], index)[0]
+            if not isinstance(max_end, pd.Timestamp):
+                raise ValueError(f"Maximum end ({max_end}) could not be parsed")
+            if freq is None:
+                raise ValueError("Must provide freq")
+            if max_end < index[0] + freq or max_end > index[-1] + freq:
+                raise TypeError(f"Maximum end must be within [{index[0] + freq}, {index[-1] + freq}]")
+            if max_end > index[-1]:
+                max_end = len(index)
+            else:
+                max_end = index.get_indexer([max_end], method="bfill")[0]
+        space_len = max_end - min_start
+        if not checks.is_number(min_length):
+            index_min_start = index[min_start]
+            if max_end < len(index):
+                index_max_end = index[max_end]
+            else:
+                if freq is None:
+                    raise ValueError("Must provide freq")
+                index_max_end = index[-1] + freq
+            index_space_len = index_max_end - index_min_start
+        else:
+            index_min_start = None
+            index_max_end = None
+            index_space_len = None
+
+        if checks.is_float(min_length):
+            if 0 <= abs(min_length) <= 1:
+                min_length = space_len * min_length
+            elif not min_length.is_integer():
+                raise TypeError("Floating number for minimum length must be between 0 and 1")
+            min_length = int(min_length)
+        if checks.is_int(min_length):
+            if min_length < 1 or min_length > space_len:
+                raise TypeError(f"Minimum length must be within [{1}, {space_len}]")
+        else:
+            min_length = parse_timedelta(min_length)
+            if freq is None:
+                raise ValueError("Must provide freq")
+            if min_length < freq or min_length > index_space_len:
+                raise TypeError(f"Minimum length must be within [{freq}, {index_space_len}]")
+        if max_length is not None:
+            if checks.is_float(max_length):
+                if 0 <= abs(max_length) <= 1:
+                    max_length = space_len * max_length
+                elif not max_length.is_integer():
+                    raise TypeError("Floating number for maximum length must be between 0 and 1")
+                max_length = int(max_length)
+            if checks.is_int(max_length):
+                if max_length < min_length or max_length > space_len:
+                    raise TypeError(f"Maximum length must be within [{min_length}, {space_len}]")
+            else:
+                max_length = parse_timedelta(max_length)
+                if freq is None:
+                    raise ValueError("Must provide freq")
+                if max_length < min_length or max_length > index_space_len:
+                    raise TypeError(f"Maximum length must be within [{min_length}, {index_space_len}]")
+        else:
+            max_length = min_length
+
+        rng = np.random.default_rng(seed=seed)
+        if length_p_func is None:
+            length_p_func = lambda i, x: None
+        if start_p_func is None:
+            start_p_func = lambda i, x: None
+        if length_choice_func is None:
+            length_choice_func = lambda i, x: rng.choice(x, p=length_p_func(i, x))
+        else:
+            if seed is not None:
+                np.random.seed(seed)
+        if start_choice_func is None:
+            start_choice_func = lambda i, x: rng.choice(x, p=start_p_func(i, x))
+        else:
+            if seed is not None:
+                np.random.seed(seed)
+        if checks.is_int(min_length):
+            length_space = np.arange(min_length, max_length + 1)
+        else:
+            if freq is None:
+                raise ValueError("Must provide freq")
+            length_space = np.arange(min_length // freq, max_length // freq + 1) * freq
+        index_space = np.arange(len(index))
+
+        splits = []
+        for i in range(n):
+            length = length_choice_func(i, length_space)
+            if checks.is_int(length):
+                start = start_choice_func(i, index_space[min_start : max_end - length + 1])
+            else:
+                from_dt = index_min_start.to_datetime64()
+                to_dt = index_max_end.to_datetime64() - length
+                start = start_choice_func(i, index_space[(index.values >= from_dt) & (index.values <= to_dt)])
+            new_split = RelRange(offset=start, length=length).to_slice(len(index), index=index, freq=freq)
+            if split is not None:
+                new_split = cls.split_range(
+                    new_split,
+                    split,
+                    template_context=template_context,
+                    index=index,
+                    **split_range_kwargs,
+                )
+            splits.append(new_split)
+
+        return cls.from_splits(
+            index,
+            splits,
+            split_range_kwargs=split_range_kwargs,
+            template_context=template_context,
+            **kwargs,
+        )
+
+    @classmethod
     def from_sklearn(
         cls: tp.Type[SplitterT],
         index: tp.IndexLike,
-        splitter: tp.Union[BaseCrossValidatorT],
+        splitter: BaseCrossValidatorT,
         groups: tp.Optional[tp.ArrayLike] = None,
         split_labels: tp.Optional[tp.IndexLike] = None,
         set_labels: tp.Optional[tp.IndexLike] = None,
@@ -1226,14 +1330,176 @@ class Splitter(Analyzable):
         )
 
     @classmethod
+    def from_split_func(
+        cls: tp.Type[SplitterT],
+        index: tp.IndexLike,
+        split_func: tp.Callable,
+        split_args: tp.ArgsLike = None,
+        split_kwargs: tp.KwargsLike = None,
+        fix_ranges: bool = True,
+        split: tp.Optional[tp.SplitLike] = None,
+        split_range_kwargs: tp.KwargsLike = None,
+        range_bounds_kwargs: tp.KwargsLike = None,
+        template_context: tp.KwargsLike = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        **kwargs,
+    ) -> SplitterT:
+        """Create a new `Splitter` instance from a custom split function.
+
+        In a while-loop, substitutes templates in `split_args` and `split_kwargs` and passes
+        them to `split_func`, which should return either a split (see `new_split` in `Splitter.split_range`,
+        also supports a single range if it's not an iterable) or None to abrupt the while-loop.
+        If `fix_ranges` is True, the returned split is then converted into a fixed split using
+        `Splitter.split_range` and the bounds of its sets are measured using `Splitter.get_range_bounds`.
+
+        Each template substitution has the following information:
+
+        * `split_idx`: Current split index, starting at 0
+        * `splits`: Nested list of splits appended up to this point
+        * `bounds`: Nested list of bounds appended up to this point
+        * `prev_start`: Left bound of the previous split
+        * `prev_end`: Right bound of the previous split
+        * Arguments and keyword arguments passed to `Splitter.from_split_func`
+
+        Usage:
+            * Rolling window of 30 elements, 20 for train and 10 for test:
+
+            ```pycon
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+
+            >>> index = pd.date_range("2020", "2021", freq="D")
+
+            >>> def split_func(splits, bounds, index):
+            ...     if len(splits) == 0:
+            ...         new_split = (slice(0, 20), slice(20, 30))
+            ...     else:
+            ...         # Previous split, first set, right bound
+            ...         prev_end = bounds[-1][0][1]
+            ...         new_split = (
+            ...             slice(prev_end, prev_end + 20),
+            ...             slice(prev_end + 20, prev_end + 30)
+            ...         )
+            ...     if new_split[-1].stop > len(index):
+            ...         return None
+            ...     return new_split
+
+            >>> splitter = vbt.Splitter.from_split_func(
+            ...     index,
+            ...     split_func,
+            ...     split_args=(
+            ...         vbt.Rep("splits"),
+            ...         vbt.Rep("bounds"),
+            ...         vbt.Rep("index"),
+            ...     ),
+            ...     set_labels=["train", "test"]
+            ... )
+            >>> splitter.plot()
+            ```
+
+            ![](/assets/images/api/from_split_func.svg)
+        """
+        index = try_to_datetime_index(index)
+        freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
+        if split_range_kwargs is None:
+            split_range_kwargs = {}
+        if "freq" not in split_range_kwargs:
+            split_range_kwargs = dict(split_range_kwargs)
+            split_range_kwargs["freq"] = freq
+        if range_bounds_kwargs is None:
+            range_bounds_kwargs = {}
+        if split_args is None:
+            split_args = ()
+        if split_kwargs is None:
+            split_kwargs = {}
+
+        splits = []
+        bounds = []
+        split_idx = 0
+        n_sets = None
+        while True:
+            _template_context = merge_dicts(
+                dict(
+                    split_idx=split_idx,
+                    splits=splits,
+                    bounds=bounds,
+                    prev_start=bounds[-1][0][0] if len(bounds) > 0 else None,
+                    prev_end=bounds[-1][-1][1] if len(bounds) > 0 else None,
+                    index=index,
+                    freq=freq,
+                    fix_ranges=fix_ranges,
+                    split_args=split_args,
+                    split_kwargs=split_kwargs,
+                    split_range_kwargs=split_range_kwargs,
+                    range_bounds_kwargs=range_bounds_kwargs,
+                    **kwargs,
+                ),
+                template_context,
+            )
+            _split_func = deep_substitute(split_func, _template_context, sub_id="split_func")
+            _split_args = deep_substitute(split_args, _template_context, sub_id="split_args")
+            _split_kwargs = deep_substitute(split_kwargs, _template_context, sub_id="split_kwargs")
+            new_split = _split_func(*_split_args, **_split_kwargs)
+            if new_split is None:
+                break
+            if not checks.is_iterable(new_split):
+                new_split = (new_split,)
+            if fix_ranges or split is not None:
+                new_split = cls.split_range(
+                    slice(None),
+                    new_split,
+                    template_context=_template_context,
+                    index=index,
+                    **split_range_kwargs,
+                )
+            if split is not None:
+                if len(new_split) > 1:
+                    raise ValueError("Split function must return only one range if split is already provided")
+                new_split = cls.split_range(
+                    new_split[0],
+                    split,
+                    template_context=_template_context,
+                    index=index,
+                    **split_range_kwargs,
+                )
+            if n_sets is None:
+                n_sets = len(new_split)
+            elif n_sets != len(new_split):
+                raise ValueError("All splits must have the same number of sets")
+            splits.append(new_split)
+            if fix_ranges:
+                split_bounds = tuple(
+                    map(
+                        lambda x: cls.get_range_bounds(
+                            x,
+                            template_context=_template_context,
+                            index=index,
+                            **range_bounds_kwargs,
+                        ),
+                        new_split,
+                    )
+                )
+                bounds.append(split_bounds)
+            split_idx += 1
+
+        return cls.from_splits(
+            index,
+            splits,
+            fix_ranges=fix_ranges,
+            split_range_kwargs=split_range_kwargs,
+            template_context=template_context,
+            **kwargs,
+        )
+
+    @classmethod
     def resolve_row_stack_kwargs(
         cls: tp.Type[SplitterT],
         *objs: tp.MaybeTuple[SplitterT],
         **kwargs,
     ) -> tp.Kwargs:
         """Resolve keyword arguments for initializing `Splitter` after stacking along rows."""
-        if "splits" not in kwargs:
-            kwargs["splits"] = kwargs["wrapper"].row_stack_arrs(
+        if "splits_arr" not in kwargs:
+            kwargs["splits_arr"] = kwargs["wrapper"].row_stack_arrs(
                 *[obj.splits for obj in objs],
                 group_by=False,
                 wrap=False,
@@ -1248,8 +1514,8 @@ class Splitter(Analyzable):
         **kwargs,
     ) -> tp.Kwargs:
         """Resolve keyword arguments for initializing `Splitter` after stacking along columns."""
-        if "splits" not in kwargs:
-            kwargs["splits"] = kwargs["wrapper"].column_stack_arrs(
+        if "splits_arr" not in kwargs:
+            kwargs["splits_arr"] = kwargs["wrapper"].column_stack_arrs(
                 *[obj.splits for obj in objs],
                 reindex_kwargs=reindex_kwargs,
                 group_by=False,
@@ -1317,41 +1583,41 @@ class Splitter(Analyzable):
 
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Analyzable._expected_keys or set()) | {
         "index",
-        "splits",
+        "splits_arr",
     }
 
     def __init__(
         self,
         wrapper: ArrayWrapper,
         index: tp.Index,
-        splits: tp.SplitsArray,
+        splits_arr: tp.SplitsArray,
         **kwargs,
     ) -> None:
         if wrapper.grouper.is_grouped():
             raise ValueError("Splitter cannot be grouped")
         index = try_to_datetime_index(index)
-        if splits.shape[0] != wrapper.shape_2d[0]:
+        if splits_arr.shape[0] != wrapper.shape_2d[0]:
             raise ValueError("Number of splits must match wrapper index")
-        if splits.shape[1] != wrapper.shape_2d[1]:
+        if splits_arr.shape[1] != wrapper.shape_2d[1]:
             raise ValueError("Number of sets must match wrapper columns")
 
         Analyzable.__init__(
             self,
             wrapper,
             index=index,
-            splits=splits,
+            splits_arr=splits_arr,
             **kwargs,
         )
 
         self._index = index
-        self._splits = splits
+        self._splits_arr = splits_arr
 
     def indexing_func_meta(self, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> dict:
         """Perform indexing on `Splitter` and return metadata."""
         if wrapper_meta is None:
             wrapper_meta = self.wrapper.indexing_func_meta(*args, **kwargs)
         if wrapper_meta["rows_changed"] or wrapper_meta["columns_changed"]:
-            new_splits = ArrayWrapper.select_from_flex_array(
+            new_splits_arr = ArrayWrapper.select_from_flex_array(
                 self.splits_arr,
                 row_idxs=wrapper_meta["row_idxs"],
                 col_idxs=wrapper_meta["col_idxs"],
@@ -1359,10 +1625,10 @@ class Splitter(Analyzable):
                 columns_changed=wrapper_meta["columns_changed"],
             )
         else:
-            new_splits = self.splits_arr
+            new_splits_arr = self.splits_arr
         return dict(
             wrapper_meta=wrapper_meta,
-            new_splits=new_splits,
+            new_splits_arr=new_splits_arr,
         )
 
     def indexing_func(self: SplitterT, *args, splitter_meta: tp.DictLike = None, **kwargs) -> SplitterT:
@@ -1371,7 +1637,7 @@ class Splitter(Analyzable):
             splitter_meta = self.indexing_func_meta(*args, **kwargs)
         return self.replace(
             wrapper=splitter_meta["wrapper_meta"]["new_wrapper"],
-            splits=splitter_meta["new_splits"],
+            splits_arr=splitter_meta["new_splits_arr"],
         )
 
     @property
@@ -1385,12 +1651,12 @@ class Splitter(Analyzable):
 
         First axis represents splits. Second axis represents sets. Elements represent ranges.
         Range must be either a slice, a sequence of indices, a mask, or a callable that returns such."""
-        return self._splits
+        return self._splits_arr
 
     @property
     def splits(self) -> tp.Frame:
         """`Splitter.splits_arr` as a DataFrame."""
-        return self.wrapper.wrap(self._splits, group_by=False)
+        return self.wrapper.wrap(self._splits_arr, group_by=False)
 
     @property
     def split_labels(self) -> tp.Index:
@@ -1464,16 +1730,17 @@ class Splitter(Analyzable):
         Keyword arguments `split_range_kwargs` are passed to `Splitter.split_range`."""
         if split_range_kwargs is None:
             split_range_kwargs = {}
-        new_splits = []
+        split_range_kwargs = dict(split_range_kwargs)
+        wrap_with_fixrange = split_range_kwargs.pop("wrap_with_fixrange", None)
+        if isinstance(wrap_with_fixrange, bool) and not wrap_with_fixrange:
+            raise ValueError("Argument wrap_with_fixrange must be True or None")
+        split_range_kwargs["wrap_with_fixrange"] = wrap_with_fixrange
+        new_splits_arr = []
         for split in self.splits_arr:
-            new_splits.append(self.split_range(slice(None), split, **split_range_kwargs))
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                new_splits = np.asarray(new_splits)
-        except Exception as e:
-            new_splits = np.asarray(new_splits, dtype=object)
-        return self.replace(splits=new_splits, **kwargs)
+            new_split = self.split_range(slice(None), split, **split_range_kwargs)
+            new_splits_arr.append(new_split)
+        new_splits_arr = np.asarray(new_splits_arr, dtype=object)
+        return self.replace(splits_arr=new_splits_arr, **kwargs)
 
     def to_grouped(
         self: SplitterT,
@@ -1487,6 +1754,13 @@ class Splitter(Analyzable):
         **kwargs,
     ) -> SplitterT:
         """Merge all ranges within the same group and return a new `Splitter` instance."""
+        if merge_split_kwargs is None:
+            merge_split_kwargs = {}
+        merge_split_kwargs = dict(merge_split_kwargs)
+        wrap_with_fixrange = merge_split_kwargs.pop("wrap_with_fixrange", None)
+        if isinstance(wrap_with_fixrange, bool) and not wrap_with_fixrange:
+            raise ValueError("Argument wrap_with_fixrange must be True or None")
+        merge_split_kwargs["wrap_with_fixrange"] = wrap_with_fixrange
         split_group_by = self.get_split_grouper(split_group_by=split_group_by)
         split_labels = self.get_split_labels(split_group_by=split_group_by)
         set_group_by = self.get_set_grouper(set_group_by=set_group_by)
@@ -1499,14 +1773,14 @@ class Splitter(Analyzable):
             split_as_indices=split_as_indices,
             set_as_indices=set_as_indices,
         )
-        if split_group_by is not None:
+        if split is not None:
             split_labels = split_labels[split_group_indices]
-        if set_group_by is not None:
+        if set_ is not None:
             set_labels = set_labels[set_group_indices]
 
-        splits = []
+        new_splits_arr = []
         for i in split_group_indices:
-            splits.append([])
+            new_splits_arr.append([])
             for j in set_group_indices:
                 new_range = self.select_range(
                     split=i,
@@ -1517,26 +1791,22 @@ class Splitter(Analyzable):
                     set_as_indices=True,
                     merge_split_kwargs=merge_split_kwargs,
                 )
-                splits[-1].append(new_range)
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                splits = np.asarray(splits)
-        except Exception as e:
-            splits = np.asarray(splits, dtype=object)
+                new_splits_arr[-1].append(new_range)
+        new_splits_arr = np.asarray(new_splits_arr, dtype=object)
+
         if set_group_by is None or not set_group_by.is_grouped():
             ndim = self.wrapper.ndim
         else:
-            ndim = 1 if splits.shape[1] == 1 else 2
+            ndim = 1 if new_splits_arr.shape[1] == 1 else 2
         wrapper = self.wrapper.replace(index=split_labels, columns=set_labels, ndim=ndim)
-        return self.replace(wrapper=wrapper, splits=splits, **kwargs)
+        return self.replace(wrapper=wrapper, splits_arr=new_splits_arr, **kwargs)
 
     # ############# Ranges ############# #
 
     @classmethod
     def is_range_relative(cls, range_: tp.RangeLike) -> bool:
         """Return whether a range is relative."""
-        return isinstance(range_, (int, float, np.number, RelRange))
+        return checks.is_number(range_) or checks.is_td(range_) or isinstance(range_, RelRange)
 
     @class_or_instancemethod
     def get_ready_range(
@@ -1551,7 +1821,8 @@ class Splitter(Analyzable):
     ) -> tp.Union[tp.RelRangeLike, tp.ReadyRangeLike, dict]:
         """Get a range that can be directly used in array indexing.
 
-        Such a range is either an integer slice, a one-dimensional NumPy array with integer indices,
+        Such a range is either an integer or datetime-like slice (right bound is always exclusive!),
+        a one-dimensional NumPy array with integer indices or datetime-like objects,
         or a one-dimensional NumPy mask of the same length as the index.
 
         Argument `range_format` accepts the following options:
@@ -1582,21 +1853,22 @@ class Splitter(Analyzable):
             raise ValueError(f"Invalid option range_format='{range_format}'")
 
         meta = dict()
-        meta["was_gap"] = False
+        meta["was_fixed"] = False
         meta["was_template"] = False
         meta["was_callable"] = False
         meta["was_relative"] = False
         meta["was_hslice"] = False
         meta["was_slice"] = False
         meta["was_neg_slice"] = False
+        meta["was_datetime"] = False
         meta["was_mask"] = False
         meta["was_indices"] = False
         meta["is_constant"] = False
         meta["start"] = None
         meta["stop"] = None
         meta["length"] = None
-        if isinstance(range_, GapRange):
-            meta["was_gap"] = True
+        if isinstance(range_, FixRange):
+            meta["was_fixed"] = True
             range_ = range_.range_
         if isinstance(range_, CustomTemplate):
             meta["was_template"] = True
@@ -1615,24 +1887,63 @@ class Splitter(Analyzable):
                     meta["range_"] = range_
                     return meta
                 return range_
-            raise TypeError("Relative ranges must be converted to fixed before indexing")
+            raise TypeError("Relative ranges must be converted to fixed")
         if isinstance(range_, hslice):
             meta["was_hslice"] = True
             range_ = range_.to_slice()
         if isinstance(range_, slice):
             meta["was_slice"] = True
             meta["is_constant"] = True
-            start = range_.start if range_.start is not None else 0
-            stop = range_.stop if range_.stop is not None else len(index)
+            start = range_.start
+            stop = range_.stop
             if range_.step is not None and range_.step > 1:
                 raise ValueError("Step must be either None or 1")
-            if start < 0:
-                if stop > 0:
+            if start is not None and checks.is_int(start) and start < 0:
+                if stop is not None and checks.is_int(stop) and stop > 0:
                     raise ValueError("Slices must be either strictly negative or positive")
                 meta["was_neg_slice"] = True
-                start = len(index) + range_.start
-                stop = len(index) + range_.stop
-            range_ = slice(max(start, 0), min(stop, len(index)))
+                start = len(index) + start
+                if stop is not None and checks.is_int(stop):
+                    stop = len(index) + stop
+            if start is None:
+                start = 0
+            if stop is None:
+                stop = len(index)
+            if not checks.is_int(start):
+                if not isinstance(index, pd.DatetimeIndex):
+                    raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
+                start = try_align_to_datetime_index([start], index)[0]
+                if not isinstance(start, pd.Timestamp):
+                    raise ValueError(f"Range start ({start}) could not be parsed")
+                meta["was_datetime"] = True
+            if not checks.is_int(stop):
+                if not isinstance(index, pd.DatetimeIndex):
+                    raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
+                stop = try_align_to_datetime_index([stop], index)[0]
+                if not isinstance(stop, pd.Timestamp):
+                    raise ValueError(f"Range start ({stop}) could not be parsed")
+                meta["was_datetime"] = True
+            if checks.is_int(start):
+                if start < 0:
+                    start = 0
+            else:
+                if start < index[0]:
+                    start = 0
+                else:
+                    start = index.get_indexer([start], method="bfill")[0]
+                    if start == -1:
+                        raise ValueError(f"Range start ({start}) is out of bounds")
+            if checks.is_int(stop):
+                if stop > len(index):
+                    stop = len(index)
+            else:
+                if stop > index[-1]:
+                    stop = len(index)
+                else:
+                    stop = index.get_indexer([stop], method="bfill")[0]
+                    if stop == -1:
+                        raise ValueError(f"Range stop ({stop}) is out of bounds")
+            range_ = slice(start, stop)
             meta["start"] = start
             meta["stop"] = stop
             meta["length"] = stop - start
@@ -1645,8 +1956,8 @@ class Splitter(Analyzable):
                 mask[range_] = True
                 range_ = mask
         else:
-            range_ = np.asarray(range_, dtype=np.asarray([range_[0]]).dtype)
-            if range_.dtype == np.bool_:
+            range_ = np.asarray(range_)
+            if np.issubdtype(range_.dtype, np.bool_):
                 if len(range_) != len(index):
                     raise ValueError("Mask must have the same length as index")
                 meta["was_mask"] = True
@@ -1674,34 +1985,47 @@ class Splitter(Analyzable):
                     else:
                         range_ = slice(meta["start"], meta["stop"])
             else:
-                meta["was_indices"] = True
-                if len(range_) == 0:
-                    if not allow_zero_len:
-                        raise ValueError("Range has zero length")
-                    meta["is_constant"] = True
-                    meta["start"] = 0
-                    meta["stop"] = 0
-                    meta["length"] = 0
-                else:
-                    range_ = np.sort(range_)
-                    meta["is_constant"] = is_range(range_)
-                    meta["start"] = range_[0]
-                    meta["stop"] = range_[-1] + 1
-                    meta["length"] = len(range_)
-                if range_format.lower() == "mask":
-                    mask = np.full(len(index), False)
-                    mask[range_] = True
-                    range_ = mask
-                elif range_format.lower().startswith("slice"):
-                    if not meta["is_constant"]:
-                        if range_format.lower() == "slice":
-                            raise ValueError("Cannot convert to slice: range is not constant")
-                        if range_format.lower() == "slice_or_mask":
-                            mask = np.full(len(index), False)
-                            mask[range_] = True
-                            range_ = mask
+                if not np.issubdtype(range_.dtype, np.integer):
+                    range_ = try_align_to_datetime_index(range_, index)
+                    if not isinstance(range_, pd.DatetimeIndex):
+                        raise ValueError("Range array could not be parsed")
+                    range_ = index.get_indexer(range_, method=None)
+                    if -1 in range_:
+                        raise ValueError(f"Range array has values that cannot be found in index")
+                if np.issubdtype(range_.dtype, np.integer):
+                    meta["was_indices"] = True
+                    if len(range_) == 0:
+                        if not allow_zero_len:
+                            raise ValueError("Range has zero length")
+                        meta["is_constant"] = True
+                        meta["start"] = 0
+                        meta["stop"] = 0
+                        meta["length"] = 0
                     else:
-                        range_ = slice(meta["start"], meta["stop"])
+                        meta["is_constant"] = is_range(range_)
+                        if meta["is_constant"]:
+                            meta["start"] = range_[0]
+                            meta["stop"] = range_[-1] + 1
+                        else:
+                            meta["start"] = np.min(range_)
+                            meta["stop"] = np.max(range_) + 1
+                        meta["length"] = len(range_)
+                    if range_format.lower() == "mask":
+                        mask = np.full(len(index), False)
+                        mask[range_] = True
+                        range_ = mask
+                    elif range_format.lower().startswith("slice"):
+                        if not meta["is_constant"]:
+                            if range_format.lower() == "slice":
+                                raise ValueError("Cannot convert to slice: range is not constant")
+                            if range_format.lower() == "slice_or_mask":
+                                mask = np.full(len(index), False)
+                                mask[range_] = True
+                                range_ = mask
+                        else:
+                            range_ = slice(meta["start"], meta["stop"])
+                else:
+                    raise TypeError(f"Range array has invalid data type ({range_.dtype})")
         if meta["start"] != meta["stop"]:
             if meta["start"] > meta["stop"]:
                 raise ValueError(f"Range start ({meta['start']}) is higher than range stop ({meta['stop']})")
@@ -1723,9 +2047,10 @@ class Splitter(Analyzable):
         allow_zero_len: bool = False,
         range_format: tp.Optional[str] = None,
         wrap_with_template: bool = False,
+        wrap_with_fixrange: tp.Optional[bool] = False,
         template_context: tp.KwargsLike = None,
         index: tp.Optional[tp.IndexLike] = None,
-        **range_split_kwargs,
+        freq: tp.Optional[tp.FrequencyLike] = None,
     ) -> tp.FixSplit:
         """Split a fixed range into a split of multiple fixed ranges.
 
@@ -1733,10 +2058,13 @@ class Splitter(Analyzable):
         of indices, or a mask. This range will then be re-mapped into the index.
 
         Each sub-range in `new_split` can be either a fixed or relative range, that is, an instance
-        of `RelRange` or a number that will be used as a length to create an `RelRange`
-        instance with `**kwargs`. Each sub-range will then be re-mapped into the main range.
-        Argument `new_split` can also be provided as an integer or a float indicating the length;
-        in such a case the second part (or the first one depending on `backwards`) will stretch.
+        of `RelRange` or a number that will be used as a length to create an `RelRange`.
+        Each sub-range will then be re-mapped into the main range. Argument `new_split` can also
+        be provided as an integer or a float indicating the length; in such a case the second part
+        (or the first one depending on `backwards`) will stretch. If `new_split` is a string,
+        the following options are supported:
+
+        * 'by_gap': Split `range_` by gap using `vectorbtpro.generic.splitting.nb.split_range_by_gap_nb`.
 
         New ranges are returned relative to the index and in the same order as passed.
 
@@ -1771,9 +2099,32 @@ class Splitter(Analyzable):
             else:
                 range_format = "slice_or_any"
 
+        # Substitute template
+        if isinstance(new_split, CustomTemplate):
+            _template_context = merge_dicts(dict(index=index[range_]), template_context)
+            new_split = deep_substitute(new_split, _template_context, sub_id="new_split")
+
+        # Split by gap
+        if isinstance(new_split, str) and new_split.lower() == "by_gap":
+            if isinstance(range_, np.ndarray) and np.issubdtype(range_.dtype, np.integer):
+                range_arr = range_
+            else:
+                range_arr = np.arange(len(index))[range_]
+            start_idxs, stop_idxs = nb.split_range_by_gap_nb(range_arr)
+            new_split = list(map(lambda x: slice(x[0], x[1]), zip(start_idxs, stop_idxs)))
+
         # Prepare target ranges
-        if isinstance(new_split, (int, float, np.number)):
+        if checks.is_number(new_split):
             if new_split < 0:
+                backwards = not backwards
+                new_split = abs(new_split)
+            if not backwards:
+                new_split = (new_split, 1.0)
+            else:
+                new_split = (1.0, new_split)
+        elif checks.is_td(new_split):
+            new_split = parse_timedelta(new_split)
+            if new_split < pd.Timedelta(0):
                 backwards = not backwards
                 new_split = abs(new_split)
             if not backwards:
@@ -1804,17 +2155,21 @@ class Splitter(Analyzable):
                 return_meta=True,
             )
             new_range = new_range_meta["range_"]
-            new_range_was_gap = new_range_meta["was_gap"]
-            if isinstance(new_range, (int, float, np.number)):
-                new_range = RelRange(length=new_range, **range_split_kwargs)
+            if checks.is_number(new_range) or checks.is_td(new_range):
+                new_range = RelRange(length=new_range)
             if isinstance(new_range, RelRange):
+                new_range_is_gap = new_range.is_gap
                 new_range = new_range.to_slice(
                     range_length,
                     prev_start=range_length - prev_end if backwards else prev_start,
                     prev_end=range_length - prev_start if backwards else prev_end,
+                    index=index,
+                    freq=freq,
                 )
                 if backwards:
                     new_range = slice(range_length - new_range.stop, range_length - new_range.start)
+            else:
+                new_range_is_gap = False
 
             # Update previous bounds
             if isinstance(new_range, slice):
@@ -1825,7 +2180,7 @@ class Splitter(Analyzable):
                 prev_end = new_range_meta["stop"]
 
             # Remap new range to index
-            if new_range_was_gap:
+            if new_range_is_gap:
                 continue
             if isinstance(range_, slice) and isinstance(new_range, slice):
                 new_range = slice(
@@ -1847,6 +2202,12 @@ class Splitter(Analyzable):
                 new_range = hslice.from_slice(new_range)
             if wrap_with_template:
                 new_range = Rep("range_", context=dict(range_=new_range))
+            if wrap_with_fixrange is None:
+                _wrap_with_fixrange = checks.is_sequence(new_range)
+            else:
+                _wrap_with_fixrange = False
+            if _wrap_with_fixrange:
+                new_range = FixRange(new_range)
             new_ranges.append(new_range)
 
         if backwards:
@@ -1859,6 +2220,8 @@ class Splitter(Analyzable):
         split: tp.FixSplit,
         range_format: tp.Optional[str] = None,
         wrap_with_template: bool = False,
+        wrap_with_fixrange: tp.Optional[bool] = False,
+        wrap_with_hslice: tp.Optional[bool] = False,
         template_context: tp.KwargsLike = None,
         index: tp.Optional[tp.IndexLike] = None,
     ) -> tp.FixRangeLike:
@@ -1911,9 +2274,18 @@ class Splitter(Analyzable):
             index=index,
         )
         if isinstance(new_range, slice) and all_hslices:
-            new_range = hslice.from_slice(new_range)
+            if wrap_with_hslice is None:
+                wrap_with_hslice = True
+            if wrap_with_hslice:
+                new_range = hslice.from_slice(new_range)
         if wrap_with_template:
             new_range = Rep("range_", context=dict(range_=new_range))
+        if wrap_with_fixrange is None:
+            _wrap_with_fixrange = checks.is_sequence(new_range)
+        else:
+            _wrap_with_fixrange = False
+        if _wrap_with_fixrange:
+            new_range = FixRange(new_range)
         return new_range
 
     # ############# Taking ############# #
@@ -1954,7 +2326,7 @@ class Splitter(Analyzable):
                 groups, group_index = split_group_by.get_groups_and_index()
                 mask = None
                 for g in split:
-                    if isinstance(g, (int, np.integer)) and (split_as_indices or not group_index.is_integer()):
+                    if checks.is_int(g) and (split_as_indices or not group_index.is_integer()):
                         i = g
                     else:
                         i = group_index.get_indexer([g])[0]
@@ -1970,7 +2342,7 @@ class Splitter(Analyzable):
             else:
                 split_indices = []
                 for s in split:
-                    if isinstance(s, (int, np.integer)) and (split_as_indices or not self.split_labels.is_integer()):
+                    if checks.is_int(s) and (split_as_indices or not self.split_labels.is_integer()):
                         i = s
                     else:
                         i = self.split_labels.get_indexer([s])[0]
@@ -1989,7 +2361,7 @@ class Splitter(Analyzable):
                 groups, group_index = set_group_by.get_groups_and_index()
                 mask = None
                 for g in set_:
-                    if isinstance(g, (int, np.integer)) and (set_as_indices or not group_index.is_integer()):
+                    if checks.is_int(g) and (set_as_indices or not group_index.is_integer()):
                         i = g
                     else:
                         i = group_index.get_indexer([g])[0]
@@ -2005,7 +2377,7 @@ class Splitter(Analyzable):
             else:
                 set_indices = []
                 for s in set_:
-                    if isinstance(s, (int, np.integer)) and (set_as_indices or not self.set_labels.is_integer()):
+                    if checks.is_int(s) and (set_as_indices or not self.set_labels.is_integer()):
                         i = s
                     else:
                         i = self.set_labels.get_indexer([s])[0]
@@ -2168,7 +2540,8 @@ class Splitter(Analyzable):
         template_context: tp.KwargsLike = None,
         silence_warnings: bool = False,
         index_combine_kwargs: tp.KwargsLike = None,
-        column_stack_kwargs: tp.KwargsLike = None,
+        stack_axis: int = 1,
+        stack_kwargs: tp.KwargsLike = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
     ) -> tp.Any:
         """Take all ranges from an array-like object and optionally column-stack them.
@@ -2180,8 +2553,8 @@ class Splitter(Analyzable):
         For each index pair, resolves the source range using `Splitter.select_range` and
         `Splitter.get_ready_range`. Then, remaps this range into the object index using
         `Splitter.get_ready_obj_range` and takes the slice from the object using `Splitter.take_range`.
-        Finally, uses `vectorbtpro.base.merging.column_stack_merge` with `column_stack_kwargs`
-        to merge the taken slices.
+        Finally, uses `vectorbtpro.base.merging.column_stack_merge` (`stack_axis=1`) or
+        `vectorbtpro.base.merging.row_stack_merge` (`stack_axis=0`) with `stack_kwargs` to merge the taken slices.
 
         If `attach_bounds` is enabled, measures the bounds of each range and makes it an additional
         level in the final index hierarchy. The argument supports the following options:
@@ -2192,9 +2565,10 @@ class Splitter(Analyzable):
 
         Argument `into` supports the following options:
 
+        * None: Series of range slices
         * 'stacked': Stack all slices into a single object
-        * 'stacked_sets': Stack set slices in each split and return a Series of objects
-        * 'stacked_splits': Stack split slices in each set and return a Series of objects
+        * 'stacked_by_split': Stack set slices in each split and return a Series of objects
+        * 'stacked_by_set': Stack split slices in each set and return a Series of objects
         * 'split_major_meta': Generator with ranges processed lazily in split-major order.
             Returns meta with indices and labels, and the generator.
         * 'set_major_meta': Generator with ranges processed lazily in set-major order.
@@ -2246,9 +2620,8 @@ class Splitter(Analyzable):
             ```pycon
             >>> splitter.take(
             ...     data.close,
-            ...     into="stacked",
-            ...     attach_bounds="index",
-            ...     column_stack_kwargs=dict(reset_index=True)
+            ...     into="reset_stacked",
+            ...     attach_bounds="index"
             ... )
             split                         0                         1  \\
             start 2020-01-01 00:00:00+00:00 2020-06-29 00:00:00+00:00
@@ -2286,8 +2659,10 @@ class Splitter(Analyzable):
                 raise ValueError(f"Invalid option attach_bounds='{attach_bounds}'")
         if index_combine_kwargs is None:
             index_combine_kwargs = {}
-        if column_stack_kwargs is None:
-            column_stack_kwargs = {}
+        if stack_axis not in (0, 1):
+            raise ValueError("Axis for stacking must be either 0 or 1")
+        if stack_kwargs is None:
+            stack_kwargs = {}
 
         split_group_by = self.get_split_grouper(split_group_by=split_group_by)
         split_labels = self.get_split_labels(split_group_by=split_group_by)
@@ -2301,12 +2676,14 @@ class Splitter(Analyzable):
             split_as_indices=split_as_indices,
             set_as_indices=set_as_indices,
         )
-        if split_group_by is not None:
+        if split is not None:
             split_labels = split_labels[split_group_indices]
-        if set_group_by is not None:
+        if set_ is not None:
             set_labels = set_labels[set_group_indices]
-        one_split = len(split_labels) == 1 and squeeze_one_split
-        one_set = len(set_labels) == 1 and squeeze_one_set
+        n_splits = len(split_group_indices)
+        n_sets = len(set_group_indices)
+        one_split = n_splits == 1 and squeeze_one_split
+        one_set = n_sets == 1 and squeeze_one_set
         one_range = one_split and one_set
 
         def _get_bounds(range_meta, obj_meta, obj_range_meta):
@@ -2393,8 +2770,8 @@ class Splitter(Analyzable):
         if into is None:
             range_objs = []
             range_bounds = []
-            for i in split_group_indices:
-                for j in set_group_indices:
+            for i in range(n_splits):
+                for j in range(n_sets):
                     range_meta = _get_range_meta(i, j)
                     range_objs.append(range_meta["obj_slice"])
                     range_bounds.append(range_meta["bounds"])
@@ -2406,17 +2783,23 @@ class Splitter(Analyzable):
                 keys = set_labels
             else:
                 keys = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
-            if attach_bounds:
+            if attach_bounds is not None:
                 keys = _attach_bounds(keys, range_bounds)
             return pd.Series(range_objs, index=keys, dtype=object)
         if isinstance(into, str) and into.lower().startswith("reset_"):
-            column_stack_kwargs["reset_index"] = "from_start"
+            if stack_axis == 0:
+                raise ValueError("Cannot use reset_index with stack_axis=0")
+            stack_kwargs["reset_index"] = "from_start"
             into = into.lower().replace("reset_", "")
         if isinstance(into, str) and into.lower().startswith("from_start_"):
-            column_stack_kwargs["reset_index"] = "from_start"
+            if stack_axis == 0:
+                raise ValueError("Cannot use reset_index with stack_axis=0")
+            stack_kwargs["reset_index"] = "from_start"
             into = into.lower().replace("from_start_", "")
         if isinstance(into, str) and into.lower().startswith("from_end_"):
-            column_stack_kwargs["reset_index"] = "from_end"
+            if stack_axis == 0:
+                raise ValueError("Cannot use reset_index with stack_axis=0")
+            stack_kwargs["reset_index"] = "from_end"
             into = into.lower().replace("from_end_", "")
         if isinstance(into, str) and into.lower() in ("split_major_meta", "set_major_meta"):
             meta = {
@@ -2424,30 +2807,32 @@ class Splitter(Analyzable):
                 "set_group_indices": set_group_indices,
                 "split_indices": split_indices,
                 "set_indices": set_indices,
+                "n_splits": n_splits,
+                "n_sets": n_sets,
                 "split_labels": split_labels,
                 "set_labels": set_labels,
             }
             if isinstance(into, str) and into.lower() == "split_major_meta":
 
                 def _get_generator():
-                    for i in split_group_indices:
-                        for j in set_group_indices:
+                    for i in range(n_splits):
+                        for j in range(n_sets):
                             yield _get_range_meta(i, j)
 
                 return meta, _get_generator()
             if isinstance(into, str) and into.lower() == "set_major_meta":
 
                 def _get_generator():
-                    for j in set_group_indices:
-                        for i in split_group_indices:
+                    for j in range(n_sets):
+                        for i in range(n_splits):
                             yield _get_range_meta(i, j)
 
                 return meta, _get_generator()
         if isinstance(into, str) and into.lower() == "stacked":
             range_objs = []
             range_bounds = []
-            for i in split_group_indices:
-                for j in set_group_indices:
+            for i in range(n_splits):
+                for j in range(n_sets):
                     range_meta = _get_range_meta(i, j)
                     range_objs.append(range_meta["obj_slice"])
                     range_bounds.append(range_meta["bounds"])
@@ -2459,46 +2844,67 @@ class Splitter(Analyzable):
                 keys = set_labels
             else:
                 keys = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
-            if attach_bounds:
+            if attach_bounds is not None:
                 keys = _attach_bounds(keys, range_bounds)
-            return column_stack_merge(range_objs, keys=keys, **column_stack_kwargs)
-        if isinstance(into, str) and into.lower() == "stacked_sets":
+            _stack_kwargs = merge_dicts(dict(keys=keys), stack_kwargs)
+            if stack_axis == 0:
+                return row_stack_merge(range_objs, **_stack_kwargs)
+            return column_stack_merge(range_objs, **_stack_kwargs)
+        if isinstance(into, str) and into.lower() == "stacked_by_split":
             new_split_objs = []
-            for i in split_group_indices:
+            one_set_bounds = []
+            for i in range(n_splits):
                 range_objs = []
                 range_bounds = []
-                for j in set_group_indices:
+                for j in range(n_sets):
                     range_meta = _get_range_meta(i, j)
                     range_objs.append(range_meta["obj_slice"])
                     range_bounds.append(range_meta["bounds"])
                 if one_set and squeeze_one_set:
                     new_split_objs.append(range_objs[0])
+                    one_set_bounds.append(range_bounds[0])
                 else:
                     keys = set_labels
-                    if attach_bounds:
+                    if attach_bounds is not None:
                         keys = _attach_bounds(keys, range_bounds)
-                    new_split_objs.append(column_stack_merge(range_objs, keys=keys, **column_stack_kwargs))
+                    _stack_kwargs = merge_dicts(dict(keys=keys), stack_kwargs)
+                    if stack_axis == 0:
+                        new_split_objs.append(row_stack_merge(range_objs, **_stack_kwargs))
+                    else:
+                        new_split_objs.append(column_stack_merge(range_objs, **_stack_kwargs))
             if one_split and squeeze_one_split:
                 return new_split_objs[0]
+            if one_set and squeeze_one_set:
+                if attach_bounds is not None:
+                    return pd.Series(new_split_objs, index=_attach_bounds(split_labels, one_set_bounds), dtype=object)
             return pd.Series(new_split_objs, index=split_labels, dtype=object)
-        if isinstance(into, str) and into.lower() == "stacked_splits":
+        if isinstance(into, str) and into.lower() == "stacked_by_set":
             new_set_objs = []
-            for j in set_group_indices:
+            one_split_bounds = []
+            for j in range(n_sets):
                 range_objs = []
                 range_bounds = []
-                for i in split_group_indices:
+                for i in range(n_splits):
                     range_meta = _get_range_meta(i, j)
                     range_objs.append(range_meta["obj_slice"])
                     range_bounds.append(range_meta["bounds"])
                 if one_split and squeeze_one_split:
                     new_set_objs.append(range_objs[0])
+                    one_split_bounds.append(range_bounds[0])
                 else:
                     keys = split_labels
                     if attach_bounds:
                         keys = _attach_bounds(keys, range_bounds)
-                    new_set_objs.append(column_stack_merge(range_objs, keys=keys, **column_stack_kwargs))
+                    _stack_kwargs = merge_dicts(dict(keys=keys), stack_kwargs)
+                    if stack_axis == 0:
+                        new_set_objs.append(row_stack_merge(range_objs, **_stack_kwargs))
+                    else:
+                        new_set_objs.append(column_stack_merge(range_objs, **_stack_kwargs))
             if one_set and squeeze_one_set:
                 return new_set_objs[0]
+            if one_split and squeeze_one_split:
+                if attach_bounds is not None:
+                    return pd.Series(new_set_objs, index=_attach_bounds(set_labels, one_split_bounds), dtype=object)
             return pd.Series(new_set_objs, index=set_labels, dtype=object)
         raise ValueError(f"Invalid option into='{into}'")
 
@@ -2551,7 +2957,10 @@ class Splitter(Analyzable):
 
         * `split/set_group_indices`: Indices corresponding to the selected row/column groups
         * `split/set_indices`: Indices corresponding to the selected rows/columns
+        * `n_splits/sets`: Number of the selected rows/columns
         * `split/set_labels`: Labels corresponding to the selected row/column groups
+        * `split/set_idx`: Index of the selected row/column
+        * `split/set_label`: Label of the selected row/column
         * `range_`: Selected range ready for indexing (see `Splitter.get_ready_range`)
         * `range_meta`: Various information on the selected range
         * `obj_range_meta`: Various information on the range taken from each takeable argument.
@@ -2679,12 +3088,14 @@ class Splitter(Analyzable):
             split_as_indices=split_as_indices,
             set_as_indices=set_as_indices,
         )
-        if split_group_by is not None:
+        if split is not None:
             split_labels = split_labels[split_group_indices]
-        if set_group_by is not None:
+        if set_ is not None:
             set_labels = set_labels[set_group_indices]
-        one_split = len(split_labels) == 1 and squeeze_one_split
-        one_set = len(set_labels) == 1 and squeeze_one_set
+        n_splits = len(split_group_indices)
+        n_sets = len(set_group_indices)
+        one_split = n_splits == 1 and squeeze_one_split
+        one_set = n_sets == 1 and squeeze_one_set
         one_range = one_split and one_set
         template_context = merge_dicts(
             {
@@ -2694,6 +3105,8 @@ class Splitter(Analyzable):
                 "set_group_indices": set_group_indices,
                 "split_indices": split_indices,
                 "set_indices": set_indices,
+                "n_splits": n_splits,
+                "n_sets": n_sets,
                 "split_labels": split_labels,
                 "set_labels": set_labels,
                 "one_split": one_split,
@@ -2824,7 +3237,7 @@ class Splitter(Analyzable):
 
         def _get_func_args(i, j, _bounds=bounds):
             _template_context = merge_dicts(
-                {"split_idx": i, "set_idx": j},
+                {"split_idx": i, "split_label": split_labels[i], "set_idx": j, "set_label": set_labels[j]},
                 template_context,
             )
             range_meta = _get_range_meta(i, j, _template_context)
@@ -2832,9 +3245,7 @@ class Splitter(Analyzable):
                 dict(range_=range_meta["range_"], range_meta=range_meta),
                 _template_context,
             )
-            obj_meta1, obj_range_meta1, _apply_args = _take_args(
-                apply_args, range_meta["range_"], _template_context
-            )
+            obj_meta1, obj_range_meta1, _apply_args = _take_args(apply_args, range_meta["range_"], _template_context)
             obj_meta2, obj_range_meta2, _apply_kwargs = _take_kwargs(
                 apply_kwargs, range_meta["range_"], _template_context
             )
@@ -2867,23 +3278,21 @@ class Splitter(Analyzable):
         if iteration.lower() == "split_major":
 
             def _get_generator():
-                for i in split_group_indices:
-                    for j in set_group_indices:
+                for i in range(n_splits):
+                    for j in range(n_sets):
                         yield _get_func_args(i, j)
 
             funcs_args = _get_generator()
-            n_calls = len(split_group_indices) * len(set_group_indices)
-            results = execute(funcs_args, n_calls=n_calls, **execute_kwargs)
+            results = execute(funcs_args, n_calls=n_splits * n_sets, **execute_kwargs)
         elif iteration.lower() == "set_major":
 
             def _get_generator():
-                for j in set_group_indices:
-                    for i in split_group_indices:
+                for j in range(n_sets):
+                    for i in range(n_splits):
                         yield _get_func_args(i, j)
 
             funcs_args = _get_generator()
-            n_calls = len(split_group_indices) * len(set_group_indices)
-            results = execute(funcs_args, n_calls=n_calls, **execute_kwargs)
+            results = execute(funcs_args, n_calls=n_splits * n_sets, **execute_kwargs)
         elif iteration.lower() == "split_wise":
 
             def _process_chunk(chunk):
@@ -2893,15 +3302,14 @@ class Splitter(Analyzable):
                 return results
 
             def _get_generator():
-                for i in split_group_indices:
+                for i in range(n_splits):
                     chunk = []
-                    for j in set_group_indices:
+                    for j in range(n_sets):
                         chunk.append(_get_func_args(i, j))
                     yield _process_chunk, (chunk,), {}
 
             funcs_args = _get_generator()
-            n_calls = len(split_group_indices)
-            results = execute(funcs_args, n_calls=n_calls, **execute_kwargs)
+            results = execute(funcs_args, n_calls=n_splits, **execute_kwargs)
         elif iteration.lower() == "set_wise":
 
             def _process_chunk(chunk):
@@ -2911,15 +3319,14 @@ class Splitter(Analyzable):
                 return results
 
             def _get_generator():
-                for j in set_group_indices:
+                for j in range(n_sets):
                     chunk = []
-                    for i in split_group_indices:
+                    for i in range(n_splits):
                         chunk.append(_get_func_args(i, j))
                     yield _process_chunk, (chunk,), {}
 
             funcs_args = _get_generator()
-            n_calls = len(set_group_indices)
-            results = execute(funcs_args, n_calls=n_calls, **execute_kwargs)
+            results = execute(funcs_args, n_calls=n_sets, **execute_kwargs)
         else:
             raise ValueError(f"Invalid option iteration='{iteration}'")
 
@@ -2935,10 +3342,10 @@ class Splitter(Analyzable):
                     keys = set_labels
                 else:
                     keys = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
-                if attach_bounds:
+                if attach_bounds is not None:
                     range_bounds = []
-                    for i in split_group_indices:
-                        for j in set_group_indices:
+                    for i in range(n_splits):
+                        for j in range(n_sets):
                             range_bounds.append(bounds[(i, j)])
                     keys = _attach_bounds(keys, range_bounds)
             else:
@@ -2948,10 +3355,10 @@ class Splitter(Analyzable):
                     keys = set_labels
                 else:
                     keys = combine_indexes((set_labels, split_labels), **index_combine_kwargs)
-                if attach_bounds:
+                if attach_bounds is not None:
                     range_bounds = []
-                    for j in set_group_indices:
-                        for i in split_group_indices:
+                    for j in range(n_sets):
+                        for i in range(n_splits):
                             range_bounds.append(bounds[(i, j)])
                     keys = _attach_bounds(keys, range_bounds)
 
@@ -2963,6 +3370,7 @@ class Splitter(Analyzable):
 
             if merge_func is not None:
                 template_context["funcs_args"] = funcs_args
+                template_context["keys"] = keys
                 if isinstance(merge_func, (str, tuple)):
                     merge_func = resolve_merge_func(merge_func)
                     merge_kwargs = {**dict(keys=keys), **merge_kwargs}
@@ -2976,48 +3384,73 @@ class Splitter(Analyzable):
 
         if iteration.lower() == "split_major":
             new_results = []
-            for i in split_group_indices:
-                new_results.append(results[i * len(set_group_indices) : (i + 1) * len(set_group_indices)])
+            for i in range(n_splits):
+                new_results.append(results[i * n_sets : (i + 1) * n_sets])
             results = new_results
         elif iteration.lower() == "set_major":
             new_results = []
-            for i in set_group_indices:
-                new_results.append(results[i * len(split_group_indices) : (i + 1) * len(split_group_indices)])
+            for i in range(n_sets):
+                new_results.append(results[i * n_splits : (i + 1) * n_splits])
             results = new_results
         if one_range:
             return results[0][0]
+        split_bounds = []
+        if attach_bounds is not None:
+            for i in range(n_splits):
+                split_bounds.append([])
+                for j in range(n_sets):
+                    split_bounds[-1].append(bounds[(i, j)])
+        set_bounds = []
+        if attach_bounds is not None:
+            for j in range(n_sets):
+                set_bounds.append([])
+                for i in range(n_splits):
+                    set_bounds[-1].append(bounds[(i, j)])
         if iteration.lower() in ("split_major", "split_wise"):
             major_keys = split_labels
             minor_keys = set_labels
+            major_bounds = split_bounds
+            minor_bounds = set_bounds
             one_major = one_split
             one_minor = one_set
         else:
             major_keys = set_labels
             minor_keys = split_labels
+            major_bounds = set_bounds
+            minor_bounds = split_bounds
             one_major = one_set
             one_minor = one_split
 
         if merge_func is not None:
             merged_results = []
-            for _results in results:
+            for i, _results in enumerate(results):
                 if one_minor:
                     merged_results.append(_results[0])
                 else:
-                    template_context["funcs_args"] = funcs_args
+                    _template_context = dict(template_context)
+                    _template_context["funcs_args"] = funcs_args
+                    if attach_bounds is not None:
+                        minor_keys_wbounds = _attach_bounds(minor_keys, major_bounds[i])
+                    else:
+                        minor_keys_wbounds = minor_keys
+                    _template_context["keys"] = minor_keys_wbounds
                     if isinstance(merge_func, (str, tuple)):
-                        merge_func = resolve_merge_func(merge_func)
-                        merge_kwargs = {**dict(keys=minor_keys), **merge_kwargs}
-                    merge_kwargs = deep_substitute(merge_kwargs, template_context, sub_id="merge_kwargs")
-                    merged_results.append(merge_func(_results, **merge_kwargs))
+                        _merge_func = resolve_merge_func(merge_func)
+                        _merge_kwargs = {**dict(keys=minor_keys_wbounds), **merge_kwargs}
+                    else:
+                        _merge_func = merge_func
+                        _merge_kwargs = merge_kwargs
+                    _merge_kwargs = deep_substitute(_merge_kwargs, _template_context, sub_id="merge_kwargs")
+                    merged_results.append(_merge_func(_results, **_merge_kwargs))
             if one_major:
                 return merged_results[0]
             if wrap_results:
 
                 def _wrap_output(_results):
                     try:
-                        return pd.DataFrame(_results, index=major_keys)
+                        return pd.Series(_results, index=major_keys)
                     except Exception as e:
-                        return pd.DataFrame(_results, index=major_keys, dtype=object)
+                        return pd.Series(_results, index=major_keys, dtype=object)
 
                 if isinstance(merged_results[0], tuple):
                     return tuple(map(_wrap_output, zip(*merged_results)))
@@ -3032,19 +3465,38 @@ class Splitter(Analyzable):
 
             def _wrap_output(_results):
                 if one_minor:
+                    if attach_bounds is not None:
+                        major_keys_wbounds = _attach_bounds(major_keys, minor_bounds[0])
+                    else:
+                        major_keys_wbounds = major_keys
                     try:
-                        return pd.Series(_results, index=major_keys)
+                        return pd.Series(_results, index=major_keys_wbounds)
                     except Exception as e:
-                        return pd.Series(_results, index=major_keys, dtype=object)
+                        return pd.Series(_results, index=major_keys_wbounds, dtype=object)
                 if one_major:
+                    if attach_bounds is not None:
+                        minor_keys_wbounds = _attach_bounds(minor_keys, major_bounds[0])
+                    else:
+                        minor_keys_wbounds = minor_keys
                     try:
-                        return pd.Series(_results, index=minor_keys)
+                        return pd.Series(_results, index=minor_keys_wbounds)
                     except Exception as e:
-                        return pd.Series(_results, index=minor_keys, dtype=object)
+                        return pd.Series(_results, index=minor_keys_wbounds, dtype=object)
+                new_results = []
+                for i, r in enumerate(_results):
+                    if attach_bounds is not None:
+                        minor_keys_wbounds = _attach_bounds(minor_keys, major_bounds[i])
+                    else:
+                        minor_keys_wbounds = minor_keys
+                    try:
+                        new_r = pd.Series(r, index=minor_keys_wbounds)
+                    except Exception as e:
+                        new_r = pd.Series(r, index=minor_keys_wbounds, dtype=object)
+                    new_results.append(new_r)
                 try:
-                    return pd.DataFrame(_results, index=major_keys, columns=minor_keys)
+                    return pd.Series(new_results, index=major_keys)
                 except Exception as e:
-                    return pd.DataFrame(_results, index=major_keys, columns=minor_keys, dtype=object)
+                    return pd.Series(new_results, index=major_keys, dtype=object)
 
             if one_major or one_minor:
                 if isinstance(results[0], tuple):
@@ -3066,6 +3518,82 @@ class Splitter(Analyzable):
                     return tuple(map(_wrap_output, new_results))
             return _wrap_output(results)
         return results
+
+    # ############# Splits ############# #
+
+    def shuffle_splits(
+        self: SplitterT,
+        size: tp.Union[None, str, int] = None,
+        replace: bool = False,
+        p: tp.Optional[tp.Array1d] = None,
+        seed: tp.Optional[int] = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        **init_kwargs,
+    ) -> SplitterT:
+        """Shuffle splits."""
+        if wrapper_kwargs is None:
+            wrapper_kwargs = {}
+        rng = np.random.default_rng(seed=seed)
+        if size is None:
+            size = self.n_splits
+        new_split_indices = rng.choice(np.arange(self.n_splits), size=size, replace=replace, p=p)
+        new_splits_arr = self.splits_arr[new_split_indices]
+        new_index = self.wrapper.index[new_split_indices]
+        if "index" not in wrapper_kwargs:
+            wrapper_kwargs["index"] = new_index
+        new_wrapper = self.wrapper.replace(**wrapper_kwargs)
+        return self.replace(wrapper=new_wrapper, splits_arr=new_splits_arr, **init_kwargs)
+
+    def break_up_splits(
+        self: SplitterT,
+        new_split: tp.SplitLike,
+        sort: bool = False,
+        template_context: tp.KwargsLike = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        init_kwargs: tp.KwargsLike = None,
+        **split_range_kwargs,
+    ) -> SplitterT:
+        """Split each split into multiple splits.
+
+        If there are multiple sets, make sure to merge them into one beforehand.
+
+        Arguments `new_split` and `**split_range_kwargs` are passed to `Splitter.split_range`."""
+        if self.n_sets > 1:
+            raise ValueError("Cannot break up splits with more than one set. Merge sets first.")
+        if wrapper_kwargs is None:
+            wrapper_kwargs = {}
+        if init_kwargs is None:
+            init_kwargs = {}
+        split_range_kwargs = dict(split_range_kwargs)
+        wrap_with_fixrange = split_range_kwargs.pop("wrap_with_fixrange", None)
+        if isinstance(wrap_with_fixrange, bool) and not wrap_with_fixrange:
+            raise ValueError("Argument wrap_with_fixrange must be True or None")
+        split_range_kwargs["wrap_with_fixrange"] = wrap_with_fixrange
+
+        new_splits_arr = []
+        new_index = []
+        range_starts = []
+        for i, split in enumerate(self.splits_arr):
+            new_ranges = self.split_range(split[0], new_split, template_context=template_context, **split_range_kwargs)
+            for j, range_ in enumerate(new_ranges):
+                if sort:
+                    range_starts.append(self.get_range_bounds(range_, template_context=template_context)[0])
+                new_splits_arr.append([range_])
+                if isinstance(self.split_labels, pd.MultiIndex):
+                    new_index.append((*self.split_labels[i], j))
+                else:
+                    new_index.append((self.split_labels[i], j))
+        new_splits_arr = np.asarray(new_splits_arr, dtype=object)
+        new_index = pd.MultiIndex.from_tuples(new_index, names=[*self.split_labels.names, "split_part"])
+        if sort:
+            sorted_indices = np.argsort(range_starts)
+            new_splits_arr = new_splits_arr[sorted_indices]
+            new_index = new_index[sorted_indices]
+
+        if "index" not in wrapper_kwargs:
+            wrapper_kwargs["index"] = new_index
+        new_wrapper = self.wrapper.replace(**wrapper_kwargs)
+        return self.replace(wrapper=new_wrapper, splits_arr=new_splits_arr, **init_kwargs)
 
     # ############# Sets ############# #
 
@@ -3102,20 +3630,21 @@ class Splitter(Analyzable):
             wrapper_kwargs = {}
         if init_kwargs is None:
             init_kwargs = {}
+        split_range_kwargs = dict(split_range_kwargs)
+        wrap_with_fixrange = split_range_kwargs.pop("wrap_with_fixrange", None)
+        if isinstance(wrap_with_fixrange, bool) and not wrap_with_fixrange:
+            raise ValueError("Argument wrap_with_fixrange must be True or None")
+        split_range_kwargs["wrap_with_fixrange"] = wrap_with_fixrange
 
-        new_splits = []
+        new_splits_arr = []
         for split in self.splits_arr:
             new_ranges = self.split_range(split[column], new_split, **split_range_kwargs)
-            new_splits.append([*split[:column], *new_ranges, *split[column + 1 :]])
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                new_splits = np.asarray(new_splits)
-        except Exception as e:
-            new_splits = np.asarray(new_splits, dtype=object)
+            new_splits_arr.append([*split[:column], *new_ranges, *split[column + 1 :]])
+        new_splits_arr = np.asarray(new_splits_arr, dtype=object)
+
         if "columns" not in wrapper_kwargs:
             wrapper_kwargs = dict(wrapper_kwargs)
-            n_new_sets = new_splits.shape[1] - self.n_sets + 1
+            n_new_sets = new_splits_arr.shape[1] - self.n_sets + 1
             if new_set_labels is None:
                 old_set_label = self.set_labels[column]
                 if isinstance(old_set_label, str) and len(old_set_label.split("+")) == n_new_sets:
@@ -3129,7 +3658,7 @@ class Splitter(Analyzable):
             new_columns = new_columns.insert(column, new_set_labels)
             wrapper_kwargs["columns"] = new_columns
         new_wrapper = self.wrapper.replace(**wrapper_kwargs)
-        return self.replace(wrapper=new_wrapper, splits=new_splits, **init_kwargs)
+        return self.replace(wrapper=new_wrapper, splits_arr=new_splits_arr, **init_kwargs)
 
     def merge_sets(
         self: SplitterT,
@@ -3165,8 +3694,13 @@ class Splitter(Analyzable):
             wrapper_kwargs = {}
         if init_kwargs is None:
             init_kwargs = {}
+        merge_split_kwargs = dict(merge_split_kwargs)
+        wrap_with_fixrange = merge_split_kwargs.pop("wrap_with_fixrange", None)
+        if isinstance(wrap_with_fixrange, bool) and not wrap_with_fixrange:
+            raise ValueError("Argument wrap_with_fixrange must be True or None")
+        merge_split_kwargs["wrap_with_fixrange"] = wrap_with_fixrange
 
-        new_splits = []
+        new_splits_arr = []
         for split in self.splits_arr:
             split_to_merge = []
             for j, range_ in enumerate(split):
@@ -3184,13 +3718,9 @@ class Splitter(Analyzable):
                     else:
                         if j == columns[0]:
                             new_split.append(new_range)
-            new_splits.append(new_split)
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                new_splits = np.asarray(new_splits)
-        except Exception as e:
-            new_splits = np.asarray(new_splits, dtype=object)
+            new_splits_arr.append(new_split)
+        new_splits_arr = np.asarray(new_splits_arr, dtype=object)
+
         if "columns" not in wrapper_kwargs:
             wrapper_kwargs = dict(wrapper_kwargs)
             if new_set_label is None:
@@ -3233,7 +3763,7 @@ class Splitter(Analyzable):
             if len(wrapper_kwargs["columns"]) == 1:
                 wrapper_kwargs["ndim"] = 1
         new_wrapper = self.wrapper.replace(**wrapper_kwargs)
-        return self.replace(wrapper=new_wrapper, splits=new_splits, **init_kwargs)
+        return self.replace(wrapper=new_wrapper, splits_arr=new_splits_arr, **init_kwargs)
 
     # ############# Bounds ############# #
 
@@ -3328,8 +3858,11 @@ class Splitter(Analyzable):
         n_splits = self.get_n_splits(split_group_by=split_group_by)
         set_group_by = self.get_set_grouper(set_group_by=set_group_by)
         n_sets = self.get_n_sets(set_group_by=set_group_by)
-        bounds = np.empty((n_splits, n_sets, 2), dtype=dtype)
 
+        try:
+            bounds = np.empty((n_splits, n_sets, 2), dtype=dtype)
+        except TypeError as e:
+            bounds = np.empty((n_splits, n_sets, 2), dtype=object)
         for i in range(n_splits):
             for j in range(n_sets):
                 range_ = self.select_range(
@@ -3352,7 +3885,7 @@ class Splitter(Analyzable):
 
     @property
     def bounds_arr(self) -> tp.BoundsArray:
-        """`GenericAccessor.get_bounds_arr` with default arguments."""
+        """`Splitter.get_bounds_arr` with default arguments."""
         return self.get_bounds_arr()
 
     def get_bounds(
@@ -3361,10 +3894,12 @@ class Splitter(Analyzable):
         right_inclusive: bool = False,
         split_group_by: tp.AnyGroupByLike = None,
         set_group_by: tp.AnyGroupByLike = None,
+        squeeze_one_split: bool = True,
+        squeeze_one_set: bool = True,
         index_combine_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.Frame:
-        """Boolean DataFrame where index are bounds and columns are splits stacked together.
+    ) -> tp.SeriesFrame:
+        """Boolean Series/DataFrame where index are bounds and columns are splits stacked together.
 
         Keyword arguments `**kwargs` are passed to `Splitter.get_bounds_arr`."""
         split_group_by = self.get_split_grouper(split_group_by=split_group_by)
@@ -3378,36 +3913,44 @@ class Splitter(Analyzable):
             set_group_by=set_group_by,
             **kwargs,
         )
-        out = np.moveaxis(bounds_arr, -1, 0).reshape((2, -1))
-        new_index = pd.Index(["start", "end"], name="bound")
+        out = bounds_arr.reshape((-1, 2))
+        one_split = len(split_labels) == 1 and squeeze_one_split
+        one_set = len(set_labels) == 1 and squeeze_one_set
+        new_columns = pd.Index(["start", "end"], name="bound")
+        if one_split and one_set:
+            return pd.Series(out[0], index=new_columns)
+        if one_split:
+            return pd.DataFrame(out, index=set_labels, columns=new_columns)
+        if one_set:
+            return pd.DataFrame(out, index=split_labels, columns=new_columns)
         if index_combine_kwargs is None:
             index_combine_kwargs = {}
-        new_columns = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
+        new_index = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
         return pd.DataFrame(out, index=new_index, columns=new_columns)
 
     @property
     def bounds(self) -> tp.Frame:
-        """`GenericAccessor.get_bounds` with default arguments."""
+        """`Splitter.get_bounds` with default arguments."""
         return self.get_bounds()
 
     @property
     def index_bounds(self) -> tp.Frame:
-        """`GenericAccessor.get_bounds` with `index_bounds=True`."""
+        """`Splitter.get_bounds` with `index_bounds=True`."""
         return self.get_bounds(index_bounds=True)
 
     def get_duration(self, **kwargs) -> tp.Series:
         """Get duration."""
-        bounds = self.get_bounds(**kwargs)
-        return (bounds.iloc[1] - bounds.iloc[0]).rename("duration")
+        bounds = self.get_bounds(right_inclusive=False, **kwargs)
+        return (bounds["end"] - bounds["start"]).rename("duration")
 
     @property
     def duration(self) -> tp.Series:
-        """`GenericAccessor.get_duration` with default arguments."""
+        """`Splitter.get_duration` with default arguments."""
         return self.get_duration()
 
     @property
     def index_duration(self) -> tp.Series:
-        """`GenericAccessor.get_duration` with `index_bounds=True`."""
+        """`Splitter.get_duration` with `index_bounds=True`."""
         return self.get_duration(index_bounds=True)
 
     # ############# Masks ############# #
@@ -3450,32 +3993,28 @@ class Splitter(Analyzable):
         First axis represents sets. Second axis represents index.
 
         Keyword arguments `**kwargs` are passed to `Splitter.get_range_mask`."""
-        if split_group_by is None and set_group_by is None and self.splits_arr.dtype == np.bool_:
-            for i in range(self.n_splits):
-                yield self.splits_arr[i]
-        else:
-            split_group_by = self.get_split_grouper(split_group_by=split_group_by)
-            n_splits = self.get_n_splits(split_group_by=split_group_by)
-            set_group_by = self.get_set_grouper(set_group_by=set_group_by)
-            n_sets = self.get_n_sets(set_group_by=set_group_by)
-            for i in range(n_splits):
-                out = np.full((n_sets, len(self.index)), False)
-                for j in range(n_sets):
-                    range_ = self.select_range(
-                        split=i,
-                        set_=j,
-                        split_group_by=split_group_by,
-                        set_group_by=set_group_by,
-                        split_as_indices=True,
-                        set_as_indices=True,
-                        merge_split_kwargs=dict(template_context=template_context),
-                    )
-                    out[j, :] = self.get_range_mask(range_, template_context=template_context, **kwargs)
-                yield out
+        split_group_by = self.get_split_grouper(split_group_by=split_group_by)
+        n_splits = self.get_n_splits(split_group_by=split_group_by)
+        set_group_by = self.get_set_grouper(set_group_by=set_group_by)
+        n_sets = self.get_n_sets(set_group_by=set_group_by)
+        for i in range(n_splits):
+            out = np.full((n_sets, len(self.index)), False)
+            for j in range(n_sets):
+                range_ = self.select_range(
+                    split=i,
+                    set_=j,
+                    split_group_by=split_group_by,
+                    set_group_by=set_group_by,
+                    split_as_indices=True,
+                    set_as_indices=True,
+                    merge_split_kwargs=dict(template_context=template_context),
+                )
+                out[j, :] = self.get_range_mask(range_, template_context=template_context, **kwargs)
+            yield out
 
     @property
     def iter_split_mask_arrs(self) -> tp.Generator[tp.Array2d, None, None]:
-        """`GenericAccessor.get_iter_split_mask_arrs` with default arguments."""
+        """`Splitter.get_iter_split_mask_arrs` with default arguments."""
         return self.get_iter_split_mask_arrs()
 
     def get_iter_set_mask_arrs(
@@ -3490,32 +4029,28 @@ class Splitter(Analyzable):
         First axis represents splits. Second axis represents index.
 
         Keyword arguments `**kwargs` are passed to `Splitter.get_range_mask`."""
-        if split_group_by is None and set_group_by is None and self.splits_arr.dtype == np.bool_:
-            for j in range(self.n_sets):
-                yield self.splits_arr[:, j]
-        else:
-            split_group_by = self.get_split_grouper(split_group_by=split_group_by)
-            n_splits = self.get_n_splits(split_group_by=split_group_by)
-            set_group_by = self.get_set_grouper(set_group_by=set_group_by)
-            n_sets = self.get_n_sets(set_group_by=set_group_by)
-            for j in range(n_sets):
-                out = np.full((n_splits, len(self.index)), False)
-                for i in range(n_splits):
-                    range_ = self.select_range(
-                        split=i,
-                        set_=j,
-                        split_group_by=split_group_by,
-                        set_group_by=set_group_by,
-                        split_as_indices=True,
-                        set_as_indices=True,
-                        merge_split_kwargs=dict(template_context=template_context),
-                    )
-                    out[i, :] = self.get_range_mask(range_, template_context=template_context, **kwargs)
-                yield out
+        split_group_by = self.get_split_grouper(split_group_by=split_group_by)
+        n_splits = self.get_n_splits(split_group_by=split_group_by)
+        set_group_by = self.get_set_grouper(set_group_by=set_group_by)
+        n_sets = self.get_n_sets(set_group_by=set_group_by)
+        for j in range(n_sets):
+            out = np.full((n_splits, len(self.index)), False)
+            for i in range(n_splits):
+                range_ = self.select_range(
+                    split=i,
+                    set_=j,
+                    split_group_by=split_group_by,
+                    set_group_by=set_group_by,
+                    split_as_indices=True,
+                    set_as_indices=True,
+                    merge_split_kwargs=dict(template_context=template_context),
+                )
+                out[i, :] = self.get_range_mask(range_, template_context=template_context, **kwargs)
+            yield out
 
     @property
     def iter_set_mask_arrs(self) -> tp.Generator[tp.Array2d, None, None]:
-        """`GenericAccessor.get_iter_set_mask_arrs` with default arguments."""
+        """`Splitter.get_iter_set_mask_arrs` with default arguments."""
         return self.get_iter_set_mask_arrs()
 
     def get_iter_split_masks(
@@ -3539,7 +4074,7 @@ class Splitter(Analyzable):
 
     @property
     def iter_split_masks(self) -> tp.Generator[tp.Frame, None, None]:
-        """`GenericAccessor.get_iter_split_masks` with default arguments."""
+        """`Splitter.get_iter_split_masks` with default arguments."""
         return self.get_iter_split_masks()
 
     def get_iter_set_masks(
@@ -3563,7 +4098,7 @@ class Splitter(Analyzable):
 
     @property
     def iter_set_masks(self) -> tp.Generator[tp.Frame, None, None]:
-        """`GenericAccessor.get_iter_set_masks` with default arguments."""
+        """`Splitter.get_iter_set_masks` with default arguments."""
         return self.get_iter_set_masks()
 
     def get_mask_arr(
@@ -3578,8 +4113,6 @@ class Splitter(Analyzable):
         First axis represents splits. Second axis represents sets. Third axis represents index.
 
         Keyword arguments `**kwargs` are passed to `Splitter.get_iter_split_mask_arrs`."""
-        if split_group_by is None and set_group_by is None and self.splits_arr.dtype == np.bool_:
-            return self.splits_arr
         return np.array(
             list(
                 self.get_iter_split_mask_arrs(
@@ -3593,17 +4126,19 @@ class Splitter(Analyzable):
 
     @property
     def mask_arr(self) -> tp.SplitsMask:
-        """`GenericAccessor.get_mask_arr` with default arguments."""
+        """`Splitter.get_mask_arr` with default arguments."""
         return self.get_mask_arr()
 
     def get_mask(
         self,
         split_group_by: tp.AnyGroupByLike = None,
         set_group_by: tp.AnyGroupByLike = None,
+        squeeze_one_split: bool = True,
+        squeeze_one_set: bool = True,
         index_combine_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.Frame:
-        """Boolean DataFrame where index is `Splitter.index` and columns are splits stacked together.
+    ) -> tp.SeriesFrame:
+        """Boolean Series/DataFrame where index is `Splitter.index` and columns are splits stacked together.
 
         Keyword arguments `**kwargs` are passed to `Splitter.get_mask_arr`.
 
@@ -3615,6 +4150,14 @@ class Splitter(Analyzable):
         set_labels = self.get_set_labels(set_group_by=set_group_by)
         mask_arr = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
         out = np.moveaxis(mask_arr, -1, 0).reshape((len(self.index), -1))
+        one_split = len(split_labels) == 1 and squeeze_one_split
+        one_set = len(set_labels) == 1 and squeeze_one_set
+        if one_split and one_set:
+            return pd.Series(out[:, 0], index=self.index)
+        if one_split:
+            return pd.DataFrame(out, index=self.index, columns=set_labels)
+        if one_set:
+            return pd.DataFrame(out, index=self.index, columns=split_labels)
         if index_combine_kwargs is None:
             index_combine_kwargs = {}
         new_columns = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
@@ -3622,7 +4165,7 @@ class Splitter(Analyzable):
 
     @property
     def mask(self) -> tp.Frame:
-        """`GenericAccessor.get_mask` with default arguments."""
+        """`Splitter.get_mask` with default arguments."""
         return self.get_mask()
 
     def get_split_coverage(
@@ -3632,8 +4175,9 @@ class Splitter(Analyzable):
         relative: bool = False,
         split_group_by: tp.AnyGroupByLike = None,
         set_group_by: tp.AnyGroupByLike = None,
+        squeeze_one_split: bool = True,
         **kwargs,
-    ) -> tp.Series:
+    ) -> tp.MaybeSeries:
         """Get the coverage of each split mask.
 
         If `overlapping` is True, returns the number of overlapping True values between sets in each split.
@@ -3645,25 +4189,28 @@ class Splitter(Analyzable):
         split_group_by = self.get_split_grouper(split_group_by=split_group_by)
         split_labels = self.get_split_labels(split_group_by=split_group_by)
         set_group_by = self.get_set_grouper(set_group_by=set_group_by)
-        mask = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
+        mask_arr = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
         if overlapping:
             if normalize:
-                coverage = (mask.sum(axis=1) > 1).sum(axis=1) / mask.any(axis=1).sum(axis=1)
+                coverage = (mask_arr.sum(axis=1) > 1).sum(axis=1) / mask_arr.any(axis=1).sum(axis=1)
             else:
-                coverage = (mask.sum(axis=1) > 1).sum(axis=1)
+                coverage = (mask_arr.sum(axis=1) > 1).sum(axis=1)
         else:
             if normalize:
                 if relative:
-                    coverage = mask.any(axis=1).sum(axis=1) / mask.any(axis=(0, 1)).sum()
+                    coverage = mask_arr.any(axis=1).sum(axis=1) / mask_arr.any(axis=(0, 1)).sum()
                 else:
-                    coverage = mask.any(axis=1).mean(axis=1)
+                    coverage = mask_arr.any(axis=1).mean(axis=1)
             else:
-                coverage = mask.any(axis=1).sum(axis=1)
+                coverage = mask_arr.any(axis=1).sum(axis=1)
+        one_split = len(split_labels) == 1 and squeeze_one_split
+        if one_split:
+            return coverage[0]
         return pd.Series(coverage, index=split_labels, name="split_coverage")
 
     @property
     def split_coverage(self) -> tp.Series:
-        """`GenericAccessor.get_split_coverage` with default arguments."""
+        """`Splitter.get_split_coverage` with default arguments."""
         return self.get_split_coverage()
 
     def get_set_coverage(
@@ -3673,8 +4220,9 @@ class Splitter(Analyzable):
         relative: bool = False,
         split_group_by: tp.AnyGroupByLike = None,
         set_group_by: tp.AnyGroupByLike = None,
+        squeeze_one_set: bool = True,
         **kwargs,
-    ) -> tp.Series:
+    ) -> tp.MaybeSeries:
         """Get the coverage of each set mask.
 
         If `overlapping` is True, returns the number of overlapping True values between splits in each set.
@@ -3686,25 +4234,28 @@ class Splitter(Analyzable):
         split_group_by = self.get_split_grouper(split_group_by=split_group_by)
         set_group_by = self.get_set_grouper(set_group_by=set_group_by)
         set_labels = self.get_set_labels(set_group_by=set_group_by)
-        mask = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
+        mask_arr = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
         if overlapping:
             if normalize:
-                coverage = (mask.sum(axis=0) > 1).sum(axis=1) / mask.any(axis=0).sum(axis=1)
+                coverage = (mask_arr.sum(axis=0) > 1).sum(axis=1) / mask_arr.any(axis=0).sum(axis=1)
             else:
-                coverage = (mask.sum(axis=0) > 1).sum(axis=1)
+                coverage = (mask_arr.sum(axis=0) > 1).sum(axis=1)
         else:
             if normalize:
                 if relative:
-                    coverage = mask.any(axis=0).sum(axis=1) / mask.any(axis=(0, 1)).sum()
+                    coverage = mask_arr.any(axis=0).sum(axis=1) / mask_arr.any(axis=(0, 1)).sum()
                 else:
-                    coverage = mask.any(axis=0).mean(axis=1)
+                    coverage = mask_arr.any(axis=0).mean(axis=1)
             else:
-                coverage = mask.any(axis=0).sum(axis=1)
+                coverage = mask_arr.any(axis=0).sum(axis=1)
+        one_set = len(set_labels) == 1 and squeeze_one_set
+        if one_set:
+            return coverage[0]
         return pd.Series(coverage, index=set_labels, name="set_coverage")
 
     @property
     def set_coverage(self) -> tp.Series:
-        """`GenericAccessor.get_set_coverage` with default arguments."""
+        """`Splitter.get_set_coverage` with default arguments."""
         return self.get_set_coverage()
 
     def get_range_coverage(
@@ -3713,9 +4264,11 @@ class Splitter(Analyzable):
         relative: bool = False,
         split_group_by: tp.AnyGroupByLike = None,
         set_group_by: tp.AnyGroupByLike = None,
+        squeeze_one_split: bool = True,
+        squeeze_one_set: bool = True,
         index_combine_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.Series:
+    ) -> tp.MaybeSeries:
         """Get the coverage of each range mask.
 
         If `normalize` is True, returns the number of True values in each range relative to the
@@ -3727,14 +4280,22 @@ class Splitter(Analyzable):
         split_labels = self.get_split_labels(split_group_by=split_group_by)
         set_group_by = self.get_set_grouper(set_group_by=set_group_by)
         set_labels = self.get_set_labels(set_group_by=set_group_by)
-        mask = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
+        mask_arr = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
         if normalize:
             if relative:
-                coverage = (mask.sum(axis=2) / mask.any(axis=1).sum(axis=1)[:, None]).flatten()
+                coverage = (mask_arr.sum(axis=2) / mask_arr.any(axis=1).sum(axis=1)[:, None]).flatten()
             else:
-                coverage = (mask.sum(axis=2) / mask.shape[2]).flatten()
+                coverage = (mask_arr.sum(axis=2) / mask_arr.shape[2]).flatten()
         else:
-            coverage = mask.sum(axis=2).flatten()
+            coverage = mask_arr.sum(axis=2).flatten()
+        one_split = len(split_labels) == 1 and squeeze_one_split
+        one_set = len(set_labels) == 1 and squeeze_one_set
+        if one_split and one_set:
+            return coverage[0]
+        if one_split:
+            return pd.Series(coverage, index=set_labels, name="range_coverage")
+        if one_set:
+            return pd.Series(coverage, index=split_labels, name="range_coverage")
         if index_combine_kwargs is None:
             index_combine_kwargs = {}
         index = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
@@ -3742,7 +4303,7 @@ class Splitter(Analyzable):
 
     @property
     def range_coverage(self) -> tp.Series:
-        """`GenericAccessor.get_range_coverage` with default arguments."""
+        """`Splitter.get_range_coverage` with default arguments."""
         return self.get_range_coverage()
 
     def get_coverage(
@@ -3761,19 +4322,99 @@ class Splitter(Analyzable):
         to the total number of True values.
 
         Keyword arguments `**kwargs` are passed to `Splitter.get_mask_arr`."""
-        mask = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
+        mask_arr = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
         if overlapping:
             if normalize:
-                return (mask.sum(axis=(0, 1)) > 1).sum() / mask.any(axis=(0, 1)).sum()
-            return (mask.sum(axis=(0, 1)) > 1).sum()
+                return (mask_arr.sum(axis=(0, 1)) > 1).sum() / mask_arr.any(axis=(0, 1)).sum()
+            return (mask_arr.sum(axis=(0, 1)) > 1).sum()
         if normalize:
-            return mask.any(axis=(0, 1)).mean()
-        return mask.any(axis=(0, 1)).sum()
+            return mask_arr.any(axis=(0, 1)).mean()
+        return mask_arr.any(axis=(0, 1)).sum()
 
     @property
     def coverage(self) -> float:
-        """`GenericAccessor.get_coverage` with default arguments."""
+        """`Splitter.get_coverage` with default arguments."""
         return self.get_coverage()
+
+    def get_overlap_matrix(
+        self,
+        by: str = "split",
+        normalize: bool = True,
+        split_group_by: tp.AnyGroupByLike = None,
+        set_group_by: tp.AnyGroupByLike = None,
+        jitted: tp.JittedOption = None,
+        squeeze_one_split: bool = True,
+        squeeze_one_set: bool = True,
+        index_combine_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.Frame:
+        """Get the overlap between each pair of ranges.
+
+        The argument `by` can be one of 'split', 'set', and 'range'.
+
+        If `normalize` is True, returns the number of True values in each overlap relative
+        to the total number of True values in both ranges.
+
+        Keyword arguments `**kwargs` are passed to `Splitter.get_mask_arr`."""
+        split_group_by = self.get_split_grouper(split_group_by=split_group_by)
+        split_labels = self.get_split_labels(split_group_by=split_group_by)
+        set_group_by = self.get_set_grouper(set_group_by=set_group_by)
+        set_labels = self.get_set_labels(set_group_by=set_group_by)
+        mask_arr = self.get_mask_arr(split_group_by=split_group_by, set_group_by=set_group_by, **kwargs)
+        one_split = len(split_labels) == 1 and squeeze_one_split
+        one_set = len(set_labels) == 1 and squeeze_one_set
+        if by.lower() == "split":
+            if normalize:
+                func = jit_reg.resolve_option(nb.norm_split_overlap_matrix_nb, jitted)
+            else:
+                func = jit_reg.resolve_option(nb.split_overlap_matrix_nb, jitted)
+            overlap_matrix = func(mask_arr)
+            if one_split:
+                return overlap_matrix[0, 0]
+            index = split_labels
+        elif by.lower() == "set":
+            if normalize:
+                func = jit_reg.resolve_option(nb.norm_set_overlap_matrix_nb, jitted)
+            else:
+                func = jit_reg.resolve_option(nb.set_overlap_matrix_nb, jitted)
+            overlap_matrix = func(mask_arr)
+            if one_set:
+                return overlap_matrix[0, 0]
+            index = set_labels
+        elif by.lower() == "range":
+            if normalize:
+                func = jit_reg.resolve_option(nb.norm_range_overlap_matrix_nb, jitted)
+            else:
+                func = jit_reg.resolve_option(nb.range_overlap_matrix_nb, jitted)
+            overlap_matrix = func(mask_arr)
+            if one_split and one_set:
+                return overlap_matrix[0, 0]
+            if one_split:
+                index = set_labels
+            elif one_set:
+                index = split_labels
+            else:
+                if index_combine_kwargs is None:
+                    index_combine_kwargs = {}
+                index = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
+        else:
+            raise ValueError(f"Invalid option by='{by}'")
+        return pd.DataFrame(overlap_matrix, index=index, columns=index)
+
+    @property
+    def split_overlap_matrix(self) -> tp.Frame:
+        """`Splitter.get_overlap_matrix` with `by="split"`."""
+        return self.get_overlap_matrix(by="split")
+
+    @property
+    def set_overlap_matrix(self) -> tp.Frame:
+        """`Splitter.get_overlap_matrix` with `by="set"`."""
+        return self.get_overlap_matrix(by="set")
+
+    @property
+    def range_overlap_matrix(self) -> tp.Frame:
+        """`Splitter.get_overlap_matrix` with `by="range"`."""
+        return self.get_overlap_matrix(by="range")
 
     # ############# Stats ############# #
 
@@ -3945,11 +4586,13 @@ class Splitter(Analyzable):
             if self.get_n_sets(set_group_by=set_group_by) > 0:
                 if mask_kwargs is None:
                     mask_kwargs = {}
-                for i, mask in enumerate(self.get_iter_set_masks(
-                    split_group_by=split_group_by,
-                    set_group_by=set_group_by,
-                    **mask_kwargs,
-                )):
+                for i, mask in enumerate(
+                    self.get_iter_set_masks(
+                        split_group_by=split_group_by,
+                        set_group_by=set_group_by,
+                        **mask_kwargs,
+                    )
+                ):
                     df = mask.vbt.wrapper.fill()
                     df[mask] = i
                     color = adjust_opacity(colorway[i % len(colorway)], 0.8)
@@ -3958,6 +4601,7 @@ class Splitter(Analyzable):
                         dict(
                             showscale=False,
                             showlegend=True,
+                            legendgroup=str(set_labels[i]),
                             name=trace_name,
                             colorscale=[color, color],
                             hovertemplate="%{x}<br>Split: %{y}<br>Set: " + trace_name,
@@ -3974,6 +4618,7 @@ class Splitter(Analyzable):
 
     def plot_coverage(
         self,
+        stacked: bool = True,
         split_group_by: tp.AnyGroupByLike = None,
         set_group_by: tp.AnyGroupByLike = None,
         mask_kwargs: tp.KwargsLike = None,
@@ -3985,6 +4630,7 @@ class Splitter(Analyzable):
         """Plot index as rows and sets as lines.
 
         Args:
+            stacked (bool): Whether to plot as an area plot.
             split_group_by (any): Split groups. See `vectorbtpro.base.accessors.BaseIDXAccessor.get_grouper`.
             set_group_by (any): Set groups. See `vectorbtpro.base.accessors.BaseIDXAccessor.get_grouper`.
             mask_kwargs (dict): Keyword arguments passed to `Splitter.get_iter_set_masks`.
@@ -3996,17 +4642,27 @@ class Splitter(Analyzable):
             **layout_kwargs: Keyword arguments for layout.
 
         Usage:
-        ```pycon
-        >>> import vectorbtpro as vbt
-        >>> import pandas as pd
-        >>> from sklearn.model_selection import TimeSeriesSplit
+            * Area plot:
 
-        >>> index = pd.date_range("2020", "2021", freq="D")
-        >>> splitter = vbt.Splitter.from_sklearn(index, TimeSeriesSplit())
-        >>> splitter.plot_coverage()
-        ```
+            ```pycon
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+            >>> from sklearn.model_selection import TimeSeriesSplit
 
-        ![](/assets/images/api/Splitter_coverage.svg)
+            >>> index = pd.date_range("2020", "2021", freq="D")
+            >>> splitter = vbt.Splitter.from_sklearn(index, TimeSeriesSplit())
+            >>> splitter.plot_coverage()
+            ```
+
+            ![](/assets/images/api/Splitter_coverage_area.svg)
+
+            * Line plot:
+
+            ```pycon
+            >>> splitter.plot_coverage(stacked=False)
+            ```
+
+            ![](/assets/images/api/Splitter_coverage_line.svg)
         """
         from vectorbtpro.utils.opt_packages import assert_can_import
 
@@ -4032,13 +4688,17 @@ class Splitter(Analyzable):
             if self.get_n_sets(set_group_by=set_group_by) > 0:
                 if mask_kwargs is None:
                     mask_kwargs = {}
-                for i, mask in enumerate(self.get_iter_set_masks(
-                    split_group_by=split_group_by,
-                    set_group_by=set_group_by,
-                    **mask_kwargs,
-                )):
+                for i, mask in enumerate(
+                    self.get_iter_set_masks(
+                        split_group_by=split_group_by,
+                        set_group_by=set_group_by,
+                        **mask_kwargs,
+                    )
+                ):
                     _trace_kwargs = merge_dicts(
                         dict(
+                            stackgroup="coverage" if stacked else None,
+                            legendgroup=str(set_labels[i]),
                             name=str(set_labels[i]),
                             line=dict(color=colorway[i % len(colorway)], shape="hv"),
                         ),
@@ -4074,7 +4734,6 @@ class Splitter(Analyzable):
             plot_coverage=dict(
                 title="Coverage",
                 yaxis_kwargs=dict(title="Count"),
-                trace_kwargs=dict(showlegend=False),
                 plot_func="plot_coverage",
                 tags="splitter",
             ),
@@ -4272,5 +4931,6 @@ if settings["importing"]["sklearn"]:
         ) -> tp.Generator[tp.Tuple[tp.Array1d, tp.Array1d], None, None]:
             """Generate indices to split data into training and test set."""
             return self._iter_indices(X=X, y=y, groups=groups)
+
 else:
     SKLSplitter = None

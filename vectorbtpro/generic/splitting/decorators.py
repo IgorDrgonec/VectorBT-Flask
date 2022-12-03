@@ -16,7 +16,7 @@ from vectorbtpro.utils.parsing import (
     match_ann_arg,
 )
 from vectorbtpro.utils.params import parameterized
-from vectorbtpro.utils.template import Rep, deep_substitute
+from vectorbtpro.utils.template import Rep, RepEval, deep_substitute
 from vectorbtpro.generic.splitting.base import Splitter, Takeable
 
 
@@ -29,6 +29,8 @@ def split(
     index_from: tp.Optional[tp.AnnArgQuery] = None,
     takeable_args: tp.Optional[tp.MaybeIterable[tp.AnnArgQuery]] = None,
     template_context: tp.KwargsLike = None,
+    forward_kwargs_as: tp.KwargsLike = None,
+    return_splitter: bool = False,
     **apply_kwargs,
 ) -> tp.Callable:
     """Decorator that splits the inputs of a function.
@@ -147,26 +149,55 @@ def split(
                 takeable_args = {takeable_args}
             template_context = merge_dicts(wrapper.options["template_context"], kwargs.pop("_template_context", {}))
             apply_kwargs = merge_dicts(wrapper.options["apply_kwargs"], kwargs.pop("_apply_kwargs", {}))
+            return_splitter = kwargs.pop("_return_splitter", wrapper.options["return_splitter"])
+            forward_kwargs_as = merge_dicts(wrapper.options["forward_kwargs_as"], kwargs.pop("_forward_kwargs_as", {}))
+            if len(forward_kwargs_as) > 0:
+                new_kwargs = dict()
+                for k, v in kwargs.items():
+                    if k in forward_kwargs_as:
+                        new_kwargs[forward_kwargs_as.pop(k)] = v
+                    else:
+                        new_kwargs[k] = v
+                kwargs = new_kwargs
+            if len(forward_kwargs_as) > 0:
+                for k, v in forward_kwargs_as.items():
+                    kwargs[v] = locals()[k]
+
+            if not isinstance(splitter, splitter_cls) and index is not None:
+                if isinstance(splitter, str):
+                    splitter = getattr(splitter_cls, splitter)
+                splitter = splitter(index, template_context=template_context, **splitter_kwargs)
+                if return_splitter:
+                    return splitter
 
             ann_args = annotate_args(func, args, kwargs)
+            flat_ann_args = flatten_ann_args(ann_args)
+            for k, v in flat_ann_args.items():
+                if isinstance(v["value"], Takeable):
+                    takeable_args.add(k)
+            for takeable_arg in takeable_args:
+                arg_name = match_ann_arg(ann_args, takeable_arg, return_name=True)
+                if not isinstance(flat_ann_args[arg_name]["value"], Takeable):
+                    flat_ann_args[arg_name]["value"] = Takeable(flat_ann_args[arg_name]["value"])
+            new_ann_args = unflatten_ann_args(flat_ann_args)
+            args, kwargs = ann_args_to_args(new_ann_args)
+
             if not isinstance(splitter, splitter_cls):
                 if index is None and index_from is not None:
                     index = splitter_cls.get_obj_index(match_ann_arg(ann_args, index_from))
                 if index is None and len(takeable_args) > 0:
-                    index = splitter_cls.get_obj_index(match_ann_arg(ann_args, list(takeable_args)[0]))
+                    first_takeable = match_ann_arg(ann_args, list(takeable_args)[0])
+                    if isinstance(first_takeable, Takeable):
+                        first_takeable = first_takeable.obj
+                    index = splitter_cls.get_obj_index(first_takeable)
                 if index is None:
                     raise ValueError("Must provide splitter, index, index_from, or takeable_args")
                 if isinstance(splitter, str):
                     splitter = getattr(splitter_cls, splitter)
                 splitter = splitter(index, template_context=template_context, **splitter_kwargs)
-            if len(takeable_args) > 0:
-                flat_ann_args = flatten_ann_args(ann_args)
-                for takeable_arg in takeable_args:
-                    arg_name = match_ann_arg(ann_args, takeable_arg, return_name=True)
-                    if not isinstance(flat_ann_args[arg_name]["value"], Takeable):
-                        flat_ann_args[arg_name]["value"] = Takeable(flat_ann_args[arg_name]["value"])
-                new_ann_args = unflatten_ann_args(flat_ann_args)
-                args, kwargs = ann_args_to_args(new_ann_args)
+            if return_splitter:
+                return splitter
+
             return splitter.apply(
                 func,
                 *args,
@@ -184,6 +215,8 @@ def split(
                 index_from=index_from,
                 takeable_args=takeable_args,
                 template_context=template_context,
+                forward_kwargs_as=forward_kwargs_as,
+                return_splitter=return_splitter,
                 apply_kwargs=apply_kwargs,
             ),
             frozen_keys_=True,
@@ -212,10 +245,7 @@ def split(
 def cv_split(
     *args,
     parameterized_kwargs: tp.KwargsLike = None,
-    selection: tp.Union[None, tp.MaybeIterable[tp.Hashable], tp.Callable] = None,
-    selection_args: tp.ArgsLike = None,
-    selection_kwargs: tp.KwargsLike = None,
-    prepend_grid_result: bool = True,
+    selection: tp.Union[tp.MaybeIterable[tp.Hashable]] = "max",
     return_grid: tp.Union[bool, str] = False,
     template_context: tp.KwargsLike = None,
     **split_kwargs,
@@ -227,9 +257,11 @@ def cv_split(
     this apply function, there is a test whether the current range belongs to the first (training) set.
     If yes, parameterizes the underlying function and runs it on the entire grid of parameters.
     The returned results are then stored in a global list. These results are then read by the other
-    (testing) sets in the same split, and become the first argument in `selection_args` such that
-    if `selection` is a function, it can evaluate the results and return the best parameter combination.
-    This parameter combination is then executed by each set (including training).
+    (testing) sets in the same split. If `selection` is a template, it can evaluate the grid results
+    (available as `grid_results`) and return the best parameter combination. This parameter combination
+    is then executed by each set (including training).
+
+    Argument `selection` also accepts "min" for `np.argmin` and "max" for `np.argmax`.
 
     Keyword arguments `parameterized_kwargs` will be passed to `vectorbtpro.utils.params.parameterized`
     and will have their templates substituted with a context that will also include the split-related context
@@ -252,8 +284,6 @@ def cv_split(
         ...     splitter="from_n_rolling",
         ...     splitter_kwargs=dict(n=3, split=0.5),
         ...     takeable_args=["sr"],
-        ...     parameterized_kwargs=dict(merge_func="concat"),
-        ...     selection=lambda x: [np.argmax(x)],
         ...     merge_func="concat",
         ... )
         ... def f(sr, seed):
@@ -318,13 +348,10 @@ def cv_split(
                 wrapper.options["parameterized_kwargs"], kwargs.pop("_parameterized_kwargs", {})
             )
             selection = kwargs.pop("_selection", wrapper.options["selection"])
-            if selection is None:
-                raise ValueError("Must provide selection")
-            selection_args = kwargs.pop("_selection_args", wrapper.options["selection_args"])
-            if selection_args is None:
-                selection_args = ()
-            selection_kwargs = merge_dicts(wrapper.options["selection_kwargs"], kwargs.pop("_selection_kwargs", {}))
-            prepend_grid_result = kwargs.pop("_prepend_grid_result", wrapper.options["prepend_grid_result"])
+            if isinstance(selection, str) and selection.lower() == "min":
+                selection = RepEval("[np.argmin(grid_results)]")
+            if isinstance(selection, str) and selection.lower() == "max":
+                selection = RepEval("[np.argmax(grid_results)]")
             return_grid = kwargs.pop("_return_grid", wrapper.options["return_grid"])
             if isinstance(return_grid, bool):
                 if return_grid:
@@ -333,42 +360,38 @@ def cv_split(
                     return_grid = None
             template_context = merge_dicts(wrapper.options["template_context"], kwargs.pop("_template_context", {}))
             split_kwargs = merge_dicts(wrapper.options["split_kwargs"], kwargs.pop("_split_kwargs", {}))
+            if "merge_func" in split_kwargs and "merge_func" not in parameterized_kwargs:
+                parameterized_kwargs["merge_func"] = split_kwargs["merge_func"]
 
-            grid_results = []
+            all_grid_results = []
 
             @wraps(func)
             def apply_wrapper(*_args, __template_context=None, **_kwargs):
                 __template_context = dict(__template_context)
-                __template_context["grid_results"] = grid_results
+                __template_context["all_grid_results"] = all_grid_results
                 _parameterized_kwargs = deep_substitute(
                     parameterized_kwargs, __template_context, sub_id="parameterized_kwargs"
                 )
                 parameterized_func = parameterized(func, template_context=__template_context, **_parameterized_kwargs)
                 if __template_context["set_idx"] == 0:
-                    grid_result = parameterized_func(*_args, **_kwargs)
-                    grid_results.append(grid_result)
-                if prepend_grid_result:
-                    _selection_args = (grid_results[-1], *selection_args)
-                else:
-                    _selection_args = selection_args
+                    grid_results = parameterized_func(*_args, **_kwargs)
+                    all_grid_results.append(grid_results)
                 result = parameterized_func(
                     *_args,
                     _selection=selection,
-                    _selection_args=_selection_args,
-                    _selection_kwargs=selection_kwargs,
-                    _template_context=dict(grid_result=grid_results[-1]),
+                    _template_context=dict(grid_results=all_grid_results[-1]),
                     **_kwargs,
                 )
                 if return_grid is not None:
                     if return_grid.lower() == "first":
-                        return grid_results[-1], result
+                        return all_grid_results[-1], result
                     if return_grid.lower() == "all":
-                        grid_result = parameterized_func(
+                        grid_results = parameterized_func(
                             *_args,
-                            _template_context=dict(grid_result=grid_results[-1]),
+                            _template_context=dict(grid_results=all_grid_results[-1]),
                             **_kwargs,
                         )
-                        return grid_result, result
+                        return grid_results, result
                     else:
                         raise ValueError(f"Invalid option return_grid='{return_grid}'")
                 return result
@@ -392,9 +415,6 @@ def cv_split(
             dict(
                 parameterized_kwargs=parameterized_kwargs,
                 selection=selection,
-                selection_args=selection_args,
-                selection_kwargs=selection_kwargs,
-                prepend_grid_result=prepend_grid_result,
                 return_grid=return_grid,
                 template_context=template_context,
                 split_kwargs=split_kwargs,

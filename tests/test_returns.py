@@ -492,11 +492,19 @@ class TestAccessors:
             ret_acc.rolling_sharpe_ratio(chunked=False),
         )
 
-    def test_deflated_sharpe_ratio(self):
+    def test_sharpe_ratio_std(self):
         assert_series_equal(
-            ret_acc.deflated_sharpe_ratio(),
-            pd.Series([np.nan, np.nan, 0.0], index=rets.columns, name="deflated_sharpe_ratio"),
+            ret_acc.sharpe_ratio_std(),
+            pd.Series([np.nan, np.nan, 0.49885271955248023], index=rets.columns, name="sharpe_ratio_std"),
         )
+
+    def test_prob_sharpe_ratio(self):
+        assert_series_equal(
+            ret_acc.prob_sharpe_ratio(),
+            pd.Series([np.nan, np.nan, 1.0], index=rets.columns, name="prob_sharpe_ratio"),
+        )
+
+    def test_deflated_sharpe_ratio(self):
         assert_series_equal(
             ret_acc.deflated_sharpe_ratio(),
             pd.Series([np.nan, np.nan, 0.0], index=rets.columns, name="deflated_sharpe_ratio"),
@@ -602,7 +610,7 @@ class TestAccessors:
                 [
                     [np.nan, np.nan, np.nan],
                     [np.nan, np.nan, np.nan],
-                    [np.inf, -4999.952049730064, 4999.952049730064],
+                    [np.nan, -4999.952049730064, 4999.952049730064],
                     [0.5773502691896257, -5095.1669527186, 1.1547005037375726],
                     [0.8660254018606264, -6123.473107502151, 0.8660253864635988],
                 ],
@@ -670,7 +678,7 @@ class TestAccessors:
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
-                    [-np.inf, -np.inf, np.inf],
+                    [np.nan, -np.nan, np.nan],
                     [0.0, -0.9990625620245503, 1404.3412272567655],
                     [23.37068500428681, -0.9991178949779492, 9.470372618136523e119],
                     [23.18752973476371, -0.9991707078650568, 3.063517449349351e101],
@@ -821,7 +829,7 @@ class TestAccessors:
             ret_acc.rolling_capture(),
             pd.DataFrame(
                 [
-                    [np.inf, np.inf, np.inf],
+                    [np.nan, np.nan, np.nan],
                     [1.0, -0.16388092468864593, -6.101991442261386],
                     [1.0, -0.09158688262758773, -10.918594140453699],
                     [9.232297917748712, -0.06905391446703253, -1.5685627136380502],

@@ -480,7 +480,7 @@ Name: group, dtype: object
 `Trades` class has two subplots based on `Trades.plot` and `Trades.plot_pnl`:
 
 ```pycon
->>> pf.trades['a'].plots(settings=dict(plot_zones=False)).show()
+>>> pf.trades['a'].plots()
 ```
 
 ![](/assets/images/api/trades_plots.svg)
@@ -505,7 +505,7 @@ from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils.array_ import min_rel_rescale, max_rel_rescale
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
-from vectorbtpro.utils.template import RepEval
+from vectorbtpro.utils.template import Rep, RepEval, RepFunc
 
 __pdoc__ = {}
 
@@ -656,12 +656,12 @@ class Trades(Ranges):
 
     def get_winning(self: TradesT, **kwargs) -> TradesT:
         """Get winning trades."""
-        filter_mask = self.values["pnl"] > 0.0
+        filter_mask = self.get_field_arr("pnl") > 0.0
         return self.apply_mask(filter_mask, **kwargs)
 
     def get_losing(self: TradesT, **kwargs) -> TradesT:
         """Get losing trades."""
-        filter_mask = self.values["pnl"] < 0.0
+        filter_mask = self.get_field_arr("pnl") < 0.0
         return self.apply_mask(filter_mask, **kwargs)
 
     def get_winning_streak(self, **kwargs) -> MappedArray:
@@ -772,7 +772,7 @@ class Trades(Ranges):
     def get_best_price(self, entry_price_open: bool = False, exit_price_close: bool = False, **kwargs) -> MappedArray:
         """Get best price.
 
-        See `vectorbtpro.portfolio.nb.records.best_worst_price_nb`."""
+        See `vectorbtpro.portfolio.nb.records.best_price_nb`."""
         return self.apply(
             nb.best_price_nb,
             self._open,
@@ -787,7 +787,7 @@ class Trades(Ranges):
     def get_worst_price(self, entry_price_open: bool = False, exit_price_close: bool = False, **kwargs) -> MappedArray:
         """Get worst price.
 
-        See `vectorbtpro.portfolio.nb.records.best_worst_price_nb`."""
+        See `vectorbtpro.portfolio.nb.records.worst_price_nb`."""
         return self.apply(
             nb.worst_price_nb,
             self._open,
@@ -875,21 +875,38 @@ class Trades(Ranges):
 
         See `vectorbtpro.portfolio.nb.records.edge_ratio_nb`.
 
-        If `volatility` is None, calculates the 14-period ATR based on the Wilder's moving average."""
+        If `volatility` is None, calculates the 14-period ATR if both high and low are provided,
+        otherwise the 14-period rolling standard deviation."""
+        if self._close is None:
+            raise ValueError("Must provide close")
+
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         func = jit_reg.resolve_option(nb.edge_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         if volatility is None:
-            from vectorbtpro.indicators.nb import atr_nb
-            from vectorbtpro.generic.enums import WType
+            if self._high is not None and self._low is not None:
+                from vectorbtpro.indicators.nb import atr_nb
+                from vectorbtpro.generic.enums import WType
 
-            volatility = atr_nb(
-                high=to_2d_array(self.high),
-                low=to_2d_array(self.low),
-                close=to_2d_array(self.close),
-                window=14,
-                wtype=WType.Wilder,
-            )[1]
+                if self._high is None or self._low is None:
+                    raise ValueError("Must provide high and low for ATR calculation")
+
+                volatility = atr_nb(
+                    high=to_2d_array(self.high),
+                    low=to_2d_array(self.low),
+                    close=to_2d_array(self.close),
+                    window=14,
+                    wtype=WType.Wilder,
+                )[1]
+            else:
+                from vectorbtpro.indicators.nb import msd_nb
+                from vectorbtpro.generic.enums import WType
+
+                volatility = msd_nb(
+                    close=to_2d_array(self.close),
+                    window=14,
+                    wtype=WType.Wilder,
+                )
         else:
             volatility = np.asarray(volatility)
         out = func(
@@ -926,21 +943,38 @@ class Trades(Ranges):
 
         See `vectorbtpro.portfolio.nb.records.running_edge_ratio_nb`.
 
-        If `volatility` is None, calculates the 14-period ATR based on the Wilder's moving average."""
+        If `volatility` is None, calculates the 14-period ATR if both high and low are provided,
+        otherwise the 14-period rolling standard deviation."""
+        if self._close is None:
+            raise ValueError("Must provide close")
+
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         func = jit_reg.resolve_option(nb.running_edge_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         if volatility is None:
-            from vectorbtpro.indicators.nb import atr_nb
-            from vectorbtpro.generic.enums import WType
+            if self._high is not None and self._low is not None:
+                from vectorbtpro.indicators.nb import atr_nb
+                from vectorbtpro.generic.enums import WType
 
-            volatility = atr_nb(
-                high=to_2d_array(self.high),
-                low=to_2d_array(self.low),
-                close=to_2d_array(self.close),
-                window=14,
-                wtype=WType.Wilder,
-            )[1]
+                if self._high is None or self._low is None:
+                    raise ValueError("Must provide high and low for ATR calculation")
+
+                volatility = atr_nb(
+                    high=to_2d_array(self.high),
+                    low=to_2d_array(self.low),
+                    close=to_2d_array(self.close),
+                    window=14,
+                    wtype=WType.Wilder,
+                )[1]
+            else:
+                from vectorbtpro.indicators.nb import msd_nb
+                from vectorbtpro.generic.enums import WType
+
+                volatility = msd_nb(
+                    close=to_2d_array(self.close),
+                    window=14,
+                    wtype=WType.Wilder,
+                )
         else:
             volatility = np.asarray(volatility)
         out = func(
@@ -1146,9 +1180,12 @@ class Trades(Ranges):
 
         Usage:
             ```pycon
-            >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.])
-            >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
-            >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+
+            >>> index = pd.date_range("2020", periods=7)
+            >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.], index=index)
+            >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5], index=index)
             >>> pf = vbt.Portfolio.from_orders(price, orders)
             >>> pf.trades.plot_pnl()
             ```
@@ -1215,7 +1252,7 @@ class Trades(Ranges):
             closed_loss_mask = (~open_mask) & loss_mask
             open_mask &= ~neutral_mask
 
-            def _plot_scatter(mask: tp.Array1d, name: tp.TraceName, color: tp.Any, kwargs: tp.Kwargs) -> None:
+            def _plot_scatter(mask, name, color, kwargs):
                 if np.any(mask):
                     if self_col.get_field_setting("parent_id", "ignore", False):
                         customdata, hovertemplate = self_col.prepare_customdata(
@@ -1333,9 +1370,12 @@ class Trades(Ranges):
 
         Usage:
             ```pycon
-            >>> price = pd.Series([1., 2., 3., 4., 5., 6., 5., 3., 2., 1.])
-            >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
-            >>> orders = pd.Series([1., -0.5, 0., -0.5, 2., 0., -0.5, -0.5, 0., -0.5])
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+
+            >>> index = pd.date_range("2020", periods=10)
+            >>> price = pd.Series([1., 2., 3., 4., 5., 6., 5., 3., 2., 1.], index=index)
+            >>> orders = pd.Series([1., -0.5, 0., -0.5, 2., 0., -0.5, -0.5, 0., -0.5], index=index)
             >>> pf = vbt.Portfolio.from_orders(price, orders)
             >>> trades = pf.trades
             >>> trades.plot_against_pnl("MFE")
@@ -1410,7 +1450,7 @@ class Trades(Ranges):
             closed_loss_mask = (~open_mask) & loss_mask
             open_mask &= ~neutral_mask
 
-            def _plot_scatter(mask: tp.Array1d, name: tp.TraceName, color: tp.Any, kwargs: tp.Kwargs) -> None:
+            def _plot_scatter(mask, name, color, kwargs):
                 if np.any(mask):
                     if self_col.get_field_setting("parent_id", "ignore", False):
                         customdata, hovertemplate = self_col.prepare_customdata(
@@ -1570,9 +1610,7 @@ class Trades(Ranges):
             chunked=chunked,
         )
         running_edge_ratio = self.select_col_from_obj(
-            running_edge_ratio,
-            column,
-            wrapper=self.wrapper.regroup(group_by)
+            running_edge_ratio, column, wrapper=self.wrapper.regroup(group_by)
         )
         kwargs = merge_dicts(
             dict(
@@ -1610,6 +1648,7 @@ class Trades(Ranges):
         plot_close: bool = True,
         plot_markers: bool = True,
         plot_zones: bool = True,
+        plot_by_type: bool = True,
         ohlc_type: tp.Union[None, str, tp.BaseTraceType] = None,
         ohlc_trace_kwargs: tp.KwargsLike = None,
         close_trace_kwargs: tp.KwargsLike = None,
@@ -1626,7 +1665,7 @@ class Trades(Ranges):
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs,
     ) -> tp.BaseFigure:
-        """Plot orders.
+        """Plot trades.
 
         Args:
             column (str): Name of the column to plot.
@@ -1634,6 +1673,9 @@ class Trades(Ranges):
             plot_close (bool): Whether to plot close.
             plot_markers (bool): Whether to plot markers.
             plot_zones (bool): Whether to plot zones.
+            plot_by_type (bool): Whether to plot exit trades by type.
+
+                Otherwise, the appearance will be controlled using `exit_trace_kwargs`.
             ohlc_type: Either 'OHLC', 'Candlestick' or Plotly trace.
 
                 Pass None to use the default.
@@ -1655,13 +1697,12 @@ class Trades(Ranges):
         Usage:
             ```pycon
             >>> import pandas as pd
-            >>> from datetime import datetime, timedelta
             >>> import vectorbtpro as vbt
 
-            >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.], name='Price')
-            >>> price.index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(len(price))]
-            >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
-            >>> pf = vbt.Portfolio.from_orders(price, orders)
+            >>> index = pd.date_range("2020", periods=7)
+            >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.], index=index)
+            >>> size = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5], index=index)
+            >>> pf = vbt.Portfolio.from_orders(price, size)
             >>> pf.trades.plot()
             ```
 
@@ -1748,21 +1789,38 @@ class Trades(Ranges):
             pnl = self_col.get_field_arr("pnl")
             status = self_col.get_field_arr("status")
 
-            duration = to_1d_array(self_col.wrapper.arr_to_timedelta(
-                self_col.duration.values,
-                to_pd=True,
-                silence_warnings=True
-            ).astype(str))
+            duration = to_1d_array(
+                self_col.wrapper.arr_to_timedelta(self_col.duration.values, to_pd=True, silence_warnings=True).astype(
+                    str
+                )
+            )
 
             if plot_markers:
                 # Plot Entry markers
                 if self_col.get_field_setting("parent_id", "ignore", False):
                     entry_customdata, entry_hovertemplate = self_col.prepare_customdata(
-                        incl_fields=["id", "entry_idx", "size", "entry_price", "entry_fees", "direction"]
+                        incl_fields=[
+                            "id",
+                            "entry_order_id",
+                            "entry_idx",
+                            "size",
+                            "entry_price",
+                            "entry_fees",
+                            "direction",
+                        ]
                     )
                 else:
                     entry_customdata, entry_hovertemplate = self_col.prepare_customdata(
-                        incl_fields=["id", "parent_id", "entry_idx", "size", "entry_price", "entry_fees", "direction"]
+                        incl_fields=[
+                            "id",
+                            "entry_order_id",
+                            "parent_id",
+                            "entry_idx",
+                            "size",
+                            "entry_price",
+                            "entry_fees",
+                            "direction",
+                        ]
                     )
                 _entry_trace_kwargs = merge_dicts(
                     dict(
@@ -1785,12 +1843,13 @@ class Trades(Ranges):
                 fig.add_trace(entry_scatter, **add_trace_kwargs)
 
                 # Plot end markers
-                def _plot_end_markers(mask: tp.Array1d, name: tp.TraceName, color: tp.Any, kwargs: tp.Kwargs) -> None:
+                def _plot_end_markers(mask, name, color, kwargs, incl_status=False) -> None:
                     if np.any(mask):
                         if self_col.get_field_setting("parent_id", "ignore", False):
                             exit_customdata, exit_hovertemplate = self_col.prepare_customdata(
                                 incl_fields=[
                                     "id",
+                                    "exit_order_id",
                                     "exit_idx",
                                     "size",
                                     "exit_price",
@@ -1798,6 +1857,7 @@ class Trades(Ranges):
                                     "pnl",
                                     "return",
                                     "direction",
+                                    *(("status",) if incl_status else ()),
                                 ],
                                 append_info=[(duration, "Duration")],
                                 mask=mask,
@@ -1806,6 +1866,7 @@ class Trades(Ranges):
                             exit_customdata, exit_hovertemplate = self_col.prepare_customdata(
                                 incl_fields=[
                                     "id",
+                                    "exit_order_id",
                                     "parent_id",
                                     "exit_idx",
                                     "size",
@@ -1814,6 +1875,7 @@ class Trades(Ranges):
                                     "pnl",
                                     "return",
                                     "direction",
+                                    *(("status",) if incl_status else ()),
                                 ],
                                 append_info=[(duration, "Duration")],
                                 mask=mask,
@@ -1838,84 +1900,86 @@ class Trades(Ranges):
                         scatter = go.Scatter(**_kwargs)
                         fig.add_trace(scatter, **add_trace_kwargs)
 
-                # Plot Exit markers
-                _plot_end_markers(
-                    (status == TradeStatus.Closed) & (pnl == 0.0),
-                    "Exit",
-                    plotting_cfg["contrast_color_schema"]["gray"],
-                    exit_trace_kwargs,
-                )
+                if plot_by_type:
+                    # Plot Exit markers
+                    _plot_end_markers(
+                        (status == TradeStatus.Closed) & (pnl == 0.0),
+                        "Exit",
+                        plotting_cfg["contrast_color_schema"]["gray"],
+                        exit_trace_kwargs,
+                    )
 
-                # Plot Exit - Profit markers
-                _plot_end_markers(
-                    (status == TradeStatus.Closed) & (pnl > 0.0),
-                    "Exit - Profit",
-                    plotting_cfg["contrast_color_schema"]["green"],
-                    exit_profit_trace_kwargs,
-                )
+                    # Plot Exit - Profit markers
+                    _plot_end_markers(
+                        (status == TradeStatus.Closed) & (pnl > 0.0),
+                        "Exit - Profit",
+                        plotting_cfg["contrast_color_schema"]["green"],
+                        exit_profit_trace_kwargs,
+                    )
 
-                # Plot Exit - Loss markers
-                _plot_end_markers(
-                    (status == TradeStatus.Closed) & (pnl < 0.0),
-                    "Exit - Loss",
-                    plotting_cfg["contrast_color_schema"]["red"],
-                    exit_loss_trace_kwargs,
-                )
+                    # Plot Exit - Loss markers
+                    _plot_end_markers(
+                        (status == TradeStatus.Closed) & (pnl < 0.0),
+                        "Exit - Loss",
+                        plotting_cfg["contrast_color_schema"]["red"],
+                        exit_loss_trace_kwargs,
+                    )
 
-                # Plot Active markers
-                _plot_end_markers(
-                    status == TradeStatus.Open,
-                    "Active",
-                    plotting_cfg["contrast_color_schema"]["orange"],
-                    active_trace_kwargs,
-                )
+                    # Plot Active markers
+                    _plot_end_markers(
+                        status == TradeStatus.Open,
+                        "Active",
+                        plotting_cfg["contrast_color_schema"]["orange"],
+                        active_trace_kwargs,
+                    )
+                else:
+                    # Plot Exit markers
+                    _plot_end_markers(
+                        np.full(len(status), True),
+                        "Exit",
+                        plotting_cfg["contrast_color_schema"]["pink"],
+                        exit_trace_kwargs,
+                        incl_status=True,
+                    )
 
             if plot_zones:
-                profit_mask = pnl > 0.0
-                if np.any(profit_mask):
-                    # Plot profit zones
-                    for i in np.flatnonzero(profit_mask):
-                        fig.add_shape(
-                            **merge_dicts(
-                                dict(
-                                    type="rect",
-                                    xref=xref,
-                                    yref=yref,
-                                    x0=entry_idx[i],
-                                    y0=entry_price[i],
-                                    x1=exit_idx[i],
-                                    y1=exit_price[i],
-                                    fillcolor="green",
-                                    opacity=0.2,
-                                    layer="below",
-                                    line_width=0,
-                                ),
-                                profit_shape_kwargs,
-                            )
-                        )
+                # Plot profit zones
+                self_col.winning.plot_shapes(
+                    plot_ohlc=False,
+                    plot_close=False,
+                    shape_kwargs=merge_dicts(
+                        dict(
+                            yref=Rep("yref"),
+                            y0=RepFunc(lambda record: record["entry_price"]),
+                            y1=RepFunc(lambda record: record["exit_price"]),
+                            fillcolor=plotting_cfg["contrast_color_schema"]["green"],
+                        ),
+                        profit_shape_kwargs,
+                    ),
+                    add_trace_kwargs=add_trace_kwargs,
+                    xref=xref,
+                    yref=yref,
+                    fig=fig,
+                )
 
-                loss_mask = pnl < 0.0
-                if np.any(loss_mask):
-                    # Plot loss zones
-                    for i in np.flatnonzero(loss_mask):
-                        fig.add_shape(
-                            **merge_dicts(
-                                dict(
-                                    type="rect",
-                                    xref=xref,
-                                    yref=yref,
-                                    x0=entry_idx[i],
-                                    y0=entry_price[i],
-                                    x1=exit_idx[i],
-                                    y1=exit_price[i],
-                                    fillcolor="red",
-                                    opacity=0.2,
-                                    layer="below",
-                                    line_width=0,
-                                ),
-                                loss_shape_kwargs,
-                            )
-                        )
+                # Plot loss zones
+                self_col.losing.plot_shapes(
+                    plot_ohlc=False,
+                    plot_close=False,
+                    shape_kwargs=merge_dicts(
+                        dict(
+                            yref=Rep("yref"),
+                            y0=RepFunc(lambda record: record["entry_price"]),
+                            y1=RepFunc(lambda record: record["exit_price"]),
+                            fillcolor=plotting_cfg["contrast_color_schema"]["red"],
+                        ),
+                        loss_shape_kwargs,
+                    ),
+                    add_trace_kwargs=add_trace_kwargs,
+                    xref=xref,
+                    yref=yref,
+                    fig=fig,
+                )
 
         return fig
 
@@ -2024,6 +2088,177 @@ class EntryTrades(Trades):
             **kwargs,
         )
 
+    def plot_signals(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        plot_ohlc: bool = True,
+        plot_close: bool = True,
+        ohlc_type: tp.Union[None, str, tp.BaseTraceType] = None,
+        ohlc_trace_kwargs: tp.KwargsLike = None,
+        close_trace_kwargs: tp.KwargsLike = None,
+        long_entry_trace_kwargs: tp.KwargsLike = None,
+        short_entry_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:
+        """Plot entry trade signals.
+
+        Args:
+            column (str): Name of the column to plot.
+            plot_ohlc (bool): Whether to plot OHLC.
+            plot_close (bool): Whether to plot close.
+            ohlc_type: Either 'OHLC', 'Candlestick' or Plotly trace.
+
+                Pass None to use the default.
+            ohlc_trace_kwargs (dict): Keyword arguments passed to `ohlc_type`.
+            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `EntryTrades.close`.
+            long_entry_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Long Entry" markers.
+            short_entry_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Short Entry" markers.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
+            fig (Figure or FigureWidget): Figure to add traces to.
+            **layout_kwargs: Keyword arguments for layout.
+
+        Usage:
+            ```pycon
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+
+            >>> index = pd.date_range("2020", periods=7)
+            >>> price = pd.Series([1, 2, 3, 2, 3, 4, 3], index=index)
+            >>> orders = pd.Series([1, 0, -1, 0, -1, 2, -2], index=index)
+            >>> pf = vbt.Portfolio.from_orders(price, orders)
+            >>> pf.entry_trades.plot_signals()
+            ```
+
+            ![](/assets/images/api/entry_trades_plot_signals.svg)
+        """
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("plotly")
+        import plotly.graph_objects as go
+        from vectorbtpro.utils.figure import make_figure
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        self_col = self.select_col(column=column, group_by=False)
+
+        if ohlc_trace_kwargs is None:
+            ohlc_trace_kwargs = {}
+        if close_trace_kwargs is None:
+            close_trace_kwargs = {}
+        close_trace_kwargs = merge_dicts(
+            dict(line=dict(color=plotting_cfg["color_schema"]["blue"]), name="Close"),
+            close_trace_kwargs,
+        )
+        if long_entry_trace_kwargs is None:
+            long_entry_trace_kwargs = {}
+        if short_entry_trace_kwargs is None:
+            short_entry_trace_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
+
+        if fig is None:
+            fig = make_figure()
+        fig.update_layout(**layout_kwargs)
+
+        # Plot close
+        if (
+            plot_ohlc
+            and self_col._open is not None
+            and self_col._high is not None
+            and self_col._low is not None
+            and self_col._close is not None
+        ):
+            ohlc_df = pd.DataFrame(
+                {
+                    "open": self_col.open,
+                    "high": self_col.high,
+                    "low": self_col.low,
+                    "close": self_col.close,
+                }
+            )
+            if "opacity" not in ohlc_trace_kwargs:
+                ohlc_trace_kwargs["opacity"] = 0.5
+            fig = ohlc_df.vbt.ohlcv.plot(
+                ohlc_type=ohlc_type,
+                plot_volume=False,
+                ohlc_trace_kwargs=ohlc_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+        elif plot_close and self_col._close is not None:
+            fig = self_col.close.vbt.lineplot(
+                trace_kwargs=close_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+
+        if self_col.count() > 0:
+            # Extract information
+            entry_idx = self_col.get_map_field_to_index("entry_idx", minus_one_to_zero=True)
+            entry_price = self_col.get_field_arr("entry_price")
+            direction = self_col.get_field_arr("direction")
+
+            def _plot_entry_markers(mask, name, color, kwargs):
+                if np.any(mask):
+                    entry_customdata, entry_hovertemplate = self_col.prepare_customdata(
+                        incl_fields=[
+                            "id",
+                            "entry_order_id",
+                            "parent_id",
+                            "entry_idx",
+                            "size",
+                            "entry_price",
+                            "entry_fees",
+                            "pnl",
+                            "return",
+                            "status",
+                        ],
+                        mask=mask,
+                    )
+                    _kwargs = merge_dicts(
+                        dict(
+                            x=entry_idx[mask],
+                            y=entry_price[mask],
+                            mode="markers",
+                            marker=dict(
+                                symbol="circle",
+                                color="rgba(0, 0, 0, 0)",
+                                size=15,
+                                line=dict(
+                                    color=color,
+                                    width=2,
+                                ),
+                            ),
+                            name=name,
+                            customdata=entry_customdata,
+                            hovertemplate=entry_hovertemplate,
+                        ),
+                        kwargs,
+                    )
+                    scatter = go.Scatter(**_kwargs)
+                    fig.add_trace(scatter, **add_trace_kwargs)
+
+            # Plot Long Entry markers
+            _plot_entry_markers(
+                direction == TradeDirection.Long,
+                "Long Entry",
+                plotting_cfg["contrast_color_schema"]["green"],
+                long_entry_trace_kwargs,
+            )
+
+            # Plot Short Entry markers
+            _plot_entry_markers(
+                direction == TradeDirection.Short,
+                "Short Entry",
+                plotting_cfg["contrast_color_schema"]["red"],
+                short_entry_trace_kwargs,
+            )
+
+        return fig
+
 
 # ############# ExitTrades ############# #
 
@@ -2087,6 +2322,173 @@ class ExitTrades(Trades):
             close=close,
             **kwargs,
         )
+
+    def plot_signals(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        plot_ohlc: bool = True,
+        plot_close: bool = True,
+        ohlc_type: tp.Union[None, str, tp.BaseTraceType] = None,
+        ohlc_trace_kwargs: tp.KwargsLike = None,
+        close_trace_kwargs: tp.KwargsLike = None,
+        long_exit_trace_kwargs: tp.KwargsLike = None,
+        short_exit_trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:
+        """Plot exit trade signals.
+
+        Args:
+            column (str): Name of the column to plot.
+            plot_ohlc (bool): Whether to plot OHLC.
+            plot_close (bool): Whether to plot close.
+            ohlc_type: Either 'OHLC', 'Candlestick' or Plotly trace.
+
+                Pass None to use the default.
+            ohlc_trace_kwargs (dict): Keyword arguments passed to `ohlc_type`.
+            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `ExitTrades.close`.
+            long_exit_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Long Exit" markers.
+            short_exit_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Short Exit" markers.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
+            fig (Figure or FigureWidget): Figure to add traces to.
+            **layout_kwargs: Keyword arguments for layout.
+
+        Usage:
+            ```pycon
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+
+            >>> index = pd.date_range("2020", periods=7)
+            >>> price = pd.Series([1, 2, 3, 2, 3, 4, 3], index=index)
+            >>> orders = pd.Series([1, 0, -1, 0, -1, 2, -2], index=index)
+            >>> pf = vbt.Portfolio.from_orders(price, orders)
+            >>> pf.exit_trades.plot_signals()
+            ```
+
+            ![](/assets/images/api/exit_trades_plot_signals.svg)
+        """
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("plotly")
+        import plotly.graph_objects as go
+        from vectorbtpro.utils.figure import make_figure
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        self_col = self.select_col(column=column, group_by=False)
+
+        if ohlc_trace_kwargs is None:
+            ohlc_trace_kwargs = {}
+        if close_trace_kwargs is None:
+            close_trace_kwargs = {}
+        close_trace_kwargs = merge_dicts(
+            dict(line=dict(color=plotting_cfg["color_schema"]["blue"]), name="Close"),
+            close_trace_kwargs,
+        )
+        if long_exit_trace_kwargs is None:
+            long_exit_trace_kwargs = {}
+        if short_exit_trace_kwargs is None:
+            short_exit_trace_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
+
+        if fig is None:
+            fig = make_figure()
+        fig.update_layout(**layout_kwargs)
+
+        # Plot close
+        if (
+            plot_ohlc
+            and self_col._open is not None
+            and self_col._high is not None
+            and self_col._low is not None
+            and self_col._close is not None
+        ):
+            ohlc_df = pd.DataFrame(
+                {
+                    "open": self_col.open,
+                    "high": self_col.high,
+                    "low": self_col.low,
+                    "close": self_col.close,
+                }
+            )
+            if "opacity" not in ohlc_trace_kwargs:
+                ohlc_trace_kwargs["opacity"] = 0.5
+            fig = ohlc_df.vbt.ohlcv.plot(
+                ohlc_type=ohlc_type,
+                plot_volume=False,
+                ohlc_trace_kwargs=ohlc_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+        elif plot_close and self_col._close is not None:
+            fig = self_col.close.vbt.lineplot(
+                trace_kwargs=close_trace_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+            )
+
+        if self_col.count() > 0:
+            # Extract information
+            exit_idx = self_col.get_map_field_to_index("exit_idx", minus_one_to_zero=True)
+            exit_price = self_col.get_field_arr("exit_price")
+            direction = self_col.get_field_arr("direction")
+
+            def _plot_exit_markers(mask, name, color, kwargs):
+                if np.any(mask):
+                    exit_customdata, exit_hovertemplate = self_col.prepare_customdata(
+                        incl_fields=[
+                            "id",
+                            "exit_order_id",
+                            "parent_id",
+                            "exit_idx",
+                            "size",
+                            "exit_price",
+                            "exit_fees",
+                            "pnl",
+                            "return",
+                            "status",
+                        ],
+                        mask=mask,
+                    )
+                    _kwargs = merge_dicts(
+                        dict(
+                            x=exit_idx[mask],
+                            y=exit_price[mask],
+                            mode="markers",
+                            marker=dict(
+                                symbol="circle",
+                                color=color,
+                                size=8,
+                            ),
+                            name=name,
+                            customdata=exit_customdata,
+                            hovertemplate=exit_hovertemplate,
+                        ),
+                        kwargs,
+                    )
+                    scatter = go.Scatter(**_kwargs)
+                    fig.add_trace(scatter, **add_trace_kwargs)
+
+            # Plot Long Exit markers
+            _plot_exit_markers(
+                direction == TradeDirection.Long,
+                "Long Exit",
+                plotting_cfg["contrast_color_schema"]["green"],
+                long_exit_trace_kwargs,
+            )
+
+            # Plot Short Exit markers
+            _plot_exit_markers(
+                direction == TradeDirection.Short,
+                "Short Exit",
+                plotting_cfg["contrast_color_schema"]["red"],
+                short_exit_trace_kwargs,
+            )
+
+        return fig
 
 
 # ############# Positions ############# #

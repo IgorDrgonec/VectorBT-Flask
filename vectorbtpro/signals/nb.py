@@ -283,7 +283,7 @@ def generate_enex_nb(
 # ############# Random signals ############# #
 
 
-@register_jitted(cache=True)
+@register_jitted
 def rand_place_nb(c: tp.Union[GenEnContext, GenExContext, GenEnExContext], n: tp.FlexArray) -> int:
     """`place_func_nb` to randomly pick `n` values.
 
@@ -301,7 +301,7 @@ def rand_place_nb(c: tp.Union[GenEnContext, GenExContext, GenEnExContext], n: tp
     return last_i
 
 
-@register_jitted(cache=True)
+@register_jitted
 def rand_by_prob_place_nb(
     c: tp.Union[GenEnContext, GenExContext, GenEnExContext],
     prob: tp.FlexArray,
@@ -441,7 +441,7 @@ def rand_enex_apply_nb(
 # ############# Stop signals ############# #
 
 
-@register_jitted(cache=True)
+@register_jitted
 def first_place_nb(c: tp.Union[GenEnContext, GenExContext, GenEnExContext], mask: tp.Array2d) -> int:
     """`place_func_nb` that keeps only the first signal in `mask`."""
     last_i = -1
@@ -453,7 +453,7 @@ def first_place_nb(c: tp.Union[GenEnContext, GenExContext, GenEnExContext], mask
     return last_i
 
 
-@register_jitted(cache=True)
+@register_jitted
 def stop_place_nb(
     c: tp.Union[GenExContext, GenEnExContext],
     entry_ts: tp.FlexArray,
@@ -552,7 +552,7 @@ def stop_place_nb(
     return last_i
 
 
-@register_jitted(cache=True)
+@register_jitted
 def ohlc_stop_place_nb(
     c: tp.Union[GenExContext, GenEnExContext],
     entry_price: tp.FlexArray,
@@ -876,7 +876,7 @@ def rank_nb(
     return out
 
 
-@register_jitted(cache=True)
+@register_jitted
 def sig_pos_rank_nb(c: RankContext, allow_gaps: bool) -> int:
     """`rank_func_nb` that returns the rank of each signal by its position in the partition
     if `allow_gaps` is False, otherwise globally.
@@ -887,7 +887,7 @@ def sig_pos_rank_nb(c: RankContext, allow_gaps: bool) -> int:
     return c.sig_in_part_cnt - 1
 
 
-@register_jitted(cache=True)
+@register_jitted
 def part_pos_rank_nb(c: RankContext) -> int:
     """`rank_func_nb` that returns the rank of each partition by its position in the series.
 

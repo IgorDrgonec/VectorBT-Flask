@@ -176,6 +176,11 @@ def make_figure(
     return Figure(*args, **kwargs)
 
 
-def make_subplots(*args, **kwargs) -> tp.BaseFigure:
+def make_subplots(
+    *args,
+    use_widgets: tp.Optional[bool] = None,
+    use_resampler: tp.Optional[bool] = None,
+    **kwargs,
+) -> tp.BaseFigure:
     """Make Plotly subplots using `make_figure`."""
-    return make_figure(_make_subplots(*args, **kwargs))
+    return make_figure(_make_subplots(*args, **kwargs), use_widgets=use_widgets, use_resampler=use_resampler)

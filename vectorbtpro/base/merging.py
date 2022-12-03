@@ -88,6 +88,8 @@ def concat_merge(
             for i, obj in enumerate(objs):
                 _wrap_kwargs = resolve_dict(wrap_kwargs, i)
                 if wrapper is not None:
+                    if "force_1d" not in _wrap_kwargs:
+                        _wrap_kwargs["force_1d"] = True
                     new_objs.append(wrapper.wrap_reduced(obj, **_wrap_kwargs))
                 else:
                     new_objs.append(pd.Series(obj, **_wrap_kwargs))
@@ -345,6 +347,7 @@ def column_stack_merge(
                 raise ValueError(f"Invalid index resetting option '{reset_index}'")
             new_objs.append(new_obj)
         objs = new_objs
+        kwargs = merge_dicts(dict(sort=True), kwargs)
     return pd.concat(objs, axis=1, keys=keys, **kwargs)
 
 
@@ -368,7 +371,17 @@ def mixed_merge(
 
     outputs = []
     for i, obj_kind in enumerate(zip(*objs)):
-        outputs.append(resolve_merge_func(func_names[i])(
+        func_name = func_names[i]
+        if func_name.lower() == "reset_column_stack":
+            kwargs["reset_index"] = True
+            func_name = "column_stack"
+        elif func_name.lower() == "from_start_column_stack":
+            kwargs["reset_index"] = "from_start"
+            func_name = "column_stack"
+        elif func_name.lower() == "from_end_column_stack":
+            kwargs["reset_index"] = "from_end"
+            func_name = "column_stack"
+        outputs.append(resolve_merge_func(func_name)(
             obj_kind,
             keys=keys,
             wrap=wrap,

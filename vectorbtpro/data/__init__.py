@@ -2,7 +2,7 @@
 
 """Modules for working with data sources."""
 
-from vectorbtpro.data.base import symbol_dict, Data
+from vectorbtpro.data.base import symbol_dict, run_func_dict, Data
 from vectorbtpro.data.custom import *
 from vectorbtpro.data.updater import DataUpdater
 from vectorbtpro.data.saver import DataSaver, CSVDataSaver, HDFDataSaver

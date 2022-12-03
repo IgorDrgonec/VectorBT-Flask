@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from vectorbtpro.base.indexing import hslice
     from vectorbtpro.base.grouping.base import Grouper
     from vectorbtpro.base.resampling.base import Resampler
-    from vectorbtpro.generic.splitting.splitter import RelRange, GapRange
+    from vectorbtpro.generic.splitting.base import FixRange, RelRange
 else:
     Regex = "Regex"
     ExecutionEngine = "ExecutionEngine"
@@ -55,8 +55,8 @@ else:
     hslice = "hslice"
     Grouper = "Grouper"
     Resampler = "Resampler"
+    FixRange = "FixRange"
     RelRange = "RelRange"
-    GapRange = "GapRange"
 
 # Generic types
 T = TypeVar("T")
@@ -123,7 +123,7 @@ LevelSequence = Sequence[Level]
 MaybeLevelSequence = Union[Level, LevelSequence]
 
 # Datetime
-TimedeltaLike = Union[pd.Timedelta, timedelta, np.timedelta64]
+TimedeltaLike = Union[str, pd.Timedelta, timedelta, np.timedelta64]
 FrequencyLike = Union[str, float, TimedeltaLike, BaseOffset]
 PandasFrequencyLike = Union[str, TimedeltaLike, BaseOffset]
 TimezoneLike = Union[None, str, float, timedelta, tzinfo]
@@ -187,6 +187,7 @@ ReduceGroupedMetaFunc = Callable[[GroupIdxs, int, VarArg()], Scalar]
 ReduceGroupedToArrayFunc = Callable[[Array2d, VarArg()], Array1d]
 ReduceGroupedToArrayMetaFunc = Callable[[GroupIdxs, int, VarArg()], Array1d]
 RangeReduceMetaFunc = Callable[[int, int, int, VarArg()], Scalar]
+ProximityReduceMetaFunc = Callable[[int, int, int, int, VarArg()], Scalar]
 GroupByReduceMetaFunc = Callable[[GroupIdxs, int, int, VarArg()], Scalar]
 GroupSqueezeMetaFunc = Callable[[int, GroupIdxs, int, VarArg()], Scalar]
 
@@ -240,13 +241,13 @@ ClassWrapper = Callable[[Type[T]], Type[T]]
 FlexClassWrapper = Union[Callable[[Type[T]], Type[T]], Type[T]]
 
 # Splitting
-RelRangeLike = Union[int, float, RelRange, Callable, CustomTemplate, GapRange]
-FixRangeLike = Union[Slice, Sequence[int], Sequence[bool], Callable, CustomTemplate, GapRange]
+FixRangeLike = Union[Slice, Sequence[int], Sequence[bool], Callable, CustomTemplate, FixRange]
+RelRangeLike = Union[int, float, Callable, CustomTemplate, RelRange]
+RangeLike = Union[FixRangeLike, RelRangeLike]
 ReadyRangeLike = Union[slice, Array1d]
-RangeLike = Union[RelRangeLike, FixRangeLike]
 FixSplit = Sequence[FixRangeLike]
-SplitLike = Union[int, float, MaybeSequence[RangeLike]]
-Splits = MaybeSequence[SplitLike]
+SplitLike = Union[str, int, float, MaybeSequence[RangeLike]]
+Splits = Sequence[SplitLike]
+SplitsArray = Array2d
 SplitsMask = Array3d
-SplitsArray = Union[Array2d, SplitsMask]
 BoundsArray = Array3d

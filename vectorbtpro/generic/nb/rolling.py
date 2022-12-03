@@ -6,7 +6,6 @@ import numpy as np
 from numba import prange
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.generic.enums import *
 from vectorbtpro.generic.nb.base import rank_1d_nb
 from vectorbtpro.generic.nb.patterns import pattern_similarity_nb

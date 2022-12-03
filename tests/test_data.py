@@ -1740,24 +1740,70 @@ class TestData:
             columns=["open", "high", "low", "close", "volume", "some_column"],
             return_numeric=True,
         )
-        pd.testing.assert_frame_equal(data.run("from_holding").open, data.open)
-        pd.testing.assert_frame_equal(data.run("from_holding").high, data.high)
-        pd.testing.assert_frame_equal(data.run("from_holding").low, data.low)
-        pd.testing.assert_frame_equal(data.run("from_holding").close, data.close)
-        pd.testing.assert_frame_equal(data.run("ma", 3).ma, vbt.MA.run(data.close, 3).ma)
-        pd.testing.assert_frame_equal(data.run("talib_sma", 3).real, vbt.talib("SMA").run(data.close, 3).real)
-        pd.testing.assert_frame_equal(data.run("pandas_ta_sma", 3).sma, vbt.pandas_ta("SMA").run(data.close, 3).sma)
-        pd.testing.assert_frame_equal(data.run("wqa101_1").out, vbt.wqa101(1).run(data.close).out)
-        pd.testing.assert_frame_equal(data.run("sma", 3).real, vbt.talib("SMA").run(data.close, 3).real)
-        pd.testing.assert_frame_equal(data.run(lambda open: open), data.open)
-        pd.testing.assert_frame_equal(data.run(lambda x, open: open + x, 100), data.open + 100)
-        pd.testing.assert_frame_equal(data.run(lambda open, x: open + x, 100), data.open + 100)
-        pd.testing.assert_frame_equal(data.run(lambda open, x, y=2: open + x + y, 100, 200), data.open + 100 + 200)
-        pd.testing.assert_frame_equal(data.run(lambda open, x, y=2: open + x + y, x=100, y=200), data.open + 100 + 200)
-        pd.testing.assert_frame_equal(data.run(lambda x, data: data.open + x, 100), data.open + 100)
-        pd.testing.assert_frame_equal(data.run(lambda x, y: x.open + y, 100, pass_as_first=True), data.open + 100)
-        pd.testing.assert_frame_equal(
-            data.run(lambda x, y: x.open + y, 100, rename_args={"x": "data"}), data.open + 100
+        assert_frame_equal(data.run("from_holding").open, data.open)
+        assert_frame_equal(data.run("from_holding").high, data.high)
+        assert_frame_equal(data.run("from_holding").low, data.low)
+        assert_frame_equal(data.run("from_holding").close, data.close)
+        assert_frame_equal(data.run("ma", 3).ma, vbt.MA.run(data.close, 3).ma)
+        assert_frame_equal(data.run("talib_sma", 3).real, vbt.talib("SMA").run(data.close, 3).real)
+        assert_frame_equal(data.run("pandas_ta_sma", 3).sma, vbt.pandas_ta("SMA").run(data.close, 3).sma)
+        assert_frame_equal(data.run("wqa101_1").out, vbt.wqa101(1).run(data.close).out)
+        assert_frame_equal(data.run("sma", 3).real, vbt.talib("SMA").run(data.close, 3).real)
+        assert_frame_equal(data.run(lambda open: open), data.open)
+        assert_frame_equal(data.run(lambda x, open: open + x, 100), data.open + 100)
+        assert_frame_equal(data.run(lambda open, x: open + x, 100), data.open + 100)
+        assert_frame_equal(data.run(lambda open, x, y=2: open + x + y, 100, 200), data.open + 100 + 200)
+        assert_frame_equal(data.run(lambda open, x, y=2: open + x + y, x=100, y=200), data.open + 100 + 200)
+        assert_frame_equal(data.run(lambda x, data: data.open + x, 100), data.open + 100)
+        assert_frame_equal(data.run(lambda x, y: x.open + y, 100, pass_as_first=True), data.open + 100)
+        assert_frame_equal(data.run(lambda x, y: x.open + y, 100, rename_args={"x": "data"}), data.open + 100)
+        assert_frame_equal(
+            data.run(["talib_sma", "talib_ema"], timeperiod=3, hide_params=True),
+            pd.DataFrame(
+                [
+                    [np.nan, np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan, np.nan],
+                    [9.0, 9.0, 9.0, 9.0],
+                    [15.0, 15.0, 15.0, 15.0],
+                    [21.0, 21.0, 21.0, 21.0],
+                ],
+                index=data.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        ("talib_sma_real", "S1"),
+                        ("talib_sma_real", "S2"),
+                        ("talib_ema_real", "S1"),
+                        ("talib_ema_real", "S2"),
+                    ],
+                    names=["output", "symbol"],
+                ),
+            ),
+        )
+        assert_frame_equal(
+            data.run(
+                ["talib_sma", "talib_ema"],
+                timeperiod=vbt.run_func_dict(talib_sma=3, talib_ema=4),
+                hide_params=True,
+            ),
+            pd.DataFrame(
+                [
+                    [np.nan, np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan, np.nan],
+                    [9.0, 9.0, np.nan, np.nan],
+                    [15.0, 15.0, 12.0, 12.0],
+                    [21.0, 21.0, 18.0, 18.0],
+                ],
+                index=data.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        ("talib_sma_real", "S1"),
+                        ("talib_sma_real", "S2"),
+                        ("talib_ema_real", "S1"),
+                        ("talib_ema_real", "S2"),
+                    ],
+                    names=["output", "symbol"],
+                ),
+            ),
         )
 
 
