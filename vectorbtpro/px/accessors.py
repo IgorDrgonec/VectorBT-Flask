@@ -88,7 +88,7 @@ class PXAccessor(BaseAccessor):
         >>> import pandas as pd
         >>> import vectorbtpro as vbt
 
-        >>> pd.Series([1, 2, 3]).vbt.px.bar()
+        >>> pd.Series([1, 2, 3]).vbt.px.bar().show()
         ```
 
         ![](/assets/images/api/px_bar.svg)

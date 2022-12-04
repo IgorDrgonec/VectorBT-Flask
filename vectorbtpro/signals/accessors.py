@@ -2238,7 +2238,7 @@ class SignalsAccessor(GenericAccessor):
 
         Usage:
             ```pycon
-            >>> mask[['a', 'c']].vbt.signals.plot()
+            >>> mask[['a', 'c']].vbt.signals.plot().show()
             ```
 
             ![](/assets/images/api/signals_df_plot.svg)
@@ -2269,7 +2269,7 @@ class SignalsAccessor(GenericAccessor):
             >>> ts = pd.Series([1, 2, 3, 2, 1], index=mask.index)
             >>> fig = ts.vbt.lineplot()
             >>> mask['b'].vbt.signals.plot_as_entries(y=ts, fig=fig)
-            >>> (~mask['b']).vbt.signals.plot_as_exits(y=ts, fig=fig)
+            >>> (~mask['b']).vbt.signals.plot_as_exits(y=ts, fig=fig).show()
             ```
 
             ![](/assets/images/api/signals_plot_as_markers.svg)

@@ -184,7 +184,7 @@ Name: 0, dtype: object
 `GenericAccessor` class has a single subplot based on `GenericAccessor.plot`:
 
 ```pycon
->>> df2.vbt.plots()
+>>> df2.vbt.plots().show()
 ```
 
 ![](/assets/images/api/generic_plots.svg)
@@ -3751,7 +3751,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         Usage:
             ```pycon
-            >>> df.vbt.plot()
+            >>> df.vbt.plot().show()
             ```
 
             ![](/assets/images/api/df_plot.svg)
@@ -3777,7 +3777,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         Usage:
             ```pycon
-            >>> df.vbt.lineplot()
+            >>> df.vbt.lineplot().show()
             ```
 
             ![](/assets/images/api/df_lineplot.svg)
@@ -3789,7 +3789,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         Usage:
             ```pycon
-            >>> df.vbt.scatterplot()
+            >>> df.vbt.scatterplot().show()
             ```
 
             ![](/assets/images/api/df_scatterplot.svg)
@@ -3808,7 +3808,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         Usage:
             ```pycon
-            >>> df.vbt.barplot()
+            >>> df.vbt.barplot().show()
             ```
 
             ![](/assets/images/api/df_barplot.svg)
@@ -3842,7 +3842,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         Usage:
             ```pycon
-            >>> df.vbt.histplot()
+            >>> df.vbt.histplot().show()
             ```
 
             ![](/assets/images/api/df_histplot.svg)
@@ -3887,7 +3887,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         Usage:
             ```pycon
-            >>> df.vbt.boxplot()
+            >>> df.vbt.boxplot().show()
             ```
 
             ![](/assets/images/api/df_boxplot.svg)
@@ -3950,7 +3950,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         Usage:
             ```pycon
-            >>> df['a'].vbt.plot_against(df['b'])
+            >>> df['a'].vbt.plot_against(df['b']).show()
             ```
 
             ![](/assets/images/api/sr_plot_against.svg)
@@ -4095,7 +4095,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         Usage:
             ```pycon
-            >>> df['a'].vbt.overlay_with_heatmap(df['b'])
+            >>> df['a'].vbt.overlay_with_heatmap(df['b']).show()
             ```
 
             ![](/assets/images/api/sr_overlay_with_heatmap.svg)
@@ -4174,7 +4174,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             ...     [np.nan, 1, np.nan],
             ...     [np.nan, np.nan, 2]
             ... ])
-            >>> df.vbt.heatmap()
+            >>> df.vbt.heatmap().show()
             ```
 
             ![](/assets/images/api/df_heatmap.svg)
@@ -4194,7 +4194,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             3  3    2
             dtype: int64
 
-            >>> sr.vbt.heatmap()
+            >>> sr.vbt.heatmap().show()
             ```
 
             ![](/assets/images/api/sr_heatmap.svg)
@@ -4462,7 +4462,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         Usage:
             ```pycon
-            >>> pd.Series(np.random.standard_normal(100)).vbt.qqplot()
+            >>> pd.Series(np.random.standard_normal(100)).vbt.qqplot().show()
             ```
 
             ![](/assets/images/api/sr_qqplot.svg)
@@ -4519,7 +4519,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         Usage:
             ```pycon
             >>> sr = pd.Series([10, 11, 12, 13, 12, 13, 14, 15, 13, 14, 11])
-            >>> sr.vbt.plot_pattern([1, 2, 3, 2, 1])
+            >>> sr.vbt.plot_pattern([1, 2, 3, 2, 1]).show()
             ```
 
             ![](/assets/images/api/sr_plot_pattern.svg)"""
@@ -4889,7 +4889,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
 
         Usage:
             ```pycon
-            >>> df.vbt.areaplot()
+            >>> df.vbt.areaplot().show()
             ```
 
             ![](/assets/images/api/df_areaplot.svg)
@@ -5038,7 +5038,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
             ...     3: [10, 9, 8, 9, 8],
             ...     4: [10, 11, np.nan, np.nan, np.nan],
             ... })
-            >>> df.vbt.plot_projections()
+            >>> df.vbt.plot_projections().show()
             ```
 
             ![](/assets/images/api/df_plot_projections.svg)

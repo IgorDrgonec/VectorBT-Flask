@@ -2771,7 +2771,7 @@ Other keyword arguments are passed to `{0}.run`.
             * To plot an indicator:
 
             ```pycon
-            >>> sma.plot(column=(2, 'a'))
+            >>> sma.plot(column=(2, 'a')).show()
             ```
 
             ![](/assets/images/api/talib_plot.svg)

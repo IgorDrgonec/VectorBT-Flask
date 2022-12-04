@@ -94,7 +94,7 @@ Name: group, dtype: object
 `Orders` class has a single subplot based on `Orders.plot`:
 
 ```pycon
->>> pf.orders['a'].plots()
+>>> pf.orders['a'].plots().show()
 ```
 
 ![](/assets/images/api/orders_plots.svg)
@@ -332,7 +332,7 @@ class Orders(PriceRecords):
             >>> size = pd.Series([1., 1., 1., 1., -1.], index=index)
             >>> orders = vbt.Portfolio.from_orders(price, size).orders
 
-            >>> orders.plot()
+            >>> orders.plot().show()
             ```
 
             ![](/assets/images/api/orders_plot.svg)

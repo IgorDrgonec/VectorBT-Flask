@@ -1622,7 +1622,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         * Indicator: Any indicator class built with the indicator factory
         * Callable: Function to run
         * Iterable: Any of the above (apart from the simulation modes) will be stacked as columns into a DataFrame.
-        Can also be provided as `{lib_name}_all` to compute all indicators of a specific indicator library.
+        Can also be provided as "{lib_name}_all" to compute all indicators of a specific indicator library.
 
         For example, the argument `open` will be substituted by `Data.open`.
 
@@ -1893,7 +1893,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             [=100% "100%"]{: .candystripe}
 
             ```pycon
-            >>> data.plot(column='Close', base=1)
+            >>> data.plot(column='Close', base=1).show()
             ```
 
             * Plot OHLC(V) of one symbol (only if data contains the respective columns):
@@ -1901,7 +1901,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             ![](/assets/images/api/data_plot.svg)
 
             ```pycon
-            >>> data.plot(symbol='BTC-USD')
+            >>> data.plot(symbol='BTC-USD').show()
             ```
 
             ![](/assets/images/api/data_plot_ohlcv.svg)

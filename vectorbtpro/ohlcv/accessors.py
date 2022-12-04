@@ -79,7 +79,7 @@ Name: agg_stats, dtype: object
 `OHLCVDFAccessor` class has a single subplot based on `OHLCVDFAccessor.plot` (without volume):
 
 ```pycon
->>> ohlcv_acc.plots(settings=dict(ohlc_type='candlestick'))
+>>> ohlcv_acc.plots(settings=dict(ohlc_type='candlestick')).show()
 ```
 
 ![](/assets/images/api/ohlcv_plots.svg)
@@ -386,7 +386,7 @@ class OHLCVDFAccessor(GenericDFAccessor):
             ```pycon
             >>> import vectorbtpro as vbt
 
-            >>> vbt.YFData.fetch("BTC-USD").get().vbt.ohlcv.plot()
+            >>> vbt.YFData.fetch("BTC-USD").get().vbt.ohlcv.plot().show()
             ```
 
             [=100% "100%"]{: .candystripe}

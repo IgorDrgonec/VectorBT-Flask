@@ -386,7 +386,7 @@ Name: first, dtype: object
 We can build histograms and boxplots of `MappedArray` directly:
 
 ```pycon
->>> ma.boxplot()
+>>> ma.boxplot().show()
 ```
 
 ![](/assets/images/api/mapped_boxplot.svg)
@@ -394,7 +394,7 @@ We can build histograms and boxplots of `MappedArray` directly:
 To use scatterplots or any other plots that require index, convert to pandas first:
 
 ```pycon
->>> ma.to_pd().vbt.plot()
+>>> ma.to_pd().vbt.plot().show()
 ```
 
 ![](/assets/images/api/mapped_to_pd_plot.svg)

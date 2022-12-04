@@ -163,7 +163,7 @@ Name: group, dtype: object
 `Drawdowns` class has a single subplot based on `Drawdowns.plot`:
 
 ```pycon
->>> drawdowns['a'].plots()
+>>> drawdowns['a'].plots().show()
 ```
 
 ![](/assets/images/api/drawdowns_plots.svg)
@@ -816,7 +816,7 @@ class Drawdowns(Ranges):
 
             >>> index = pd.date_range("2020", periods=8)
             >>> price = pd.Series([1, 2, 1, 2, 3, 2, 1, 2], index=index)
-            >>> vbt.Drawdowns.from_price(price, wrapper_kwargs=dict(freq='1 day')).plot()
+            >>> vbt.Drawdowns.from_price(price, wrapper_kwargs=dict(freq='1 day')).plot().show()
             ```
 
             ![](/assets/images/api/drawdowns_plot.svg)

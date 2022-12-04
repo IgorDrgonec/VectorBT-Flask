@@ -257,7 +257,7 @@ Date
 ...     init_cash='autoalign', fees=0.001, slippage=0.001)
 
 >>> # Visualize portfolio value
->>> pf.value.vbt.plot()
+>>> pf.value.vbt.plot().show()
 ```
 
 ![](/assets/images/api/portfolio_value.svg)
@@ -1472,7 +1472,7 @@ dtype: float64
 Plot a single column of a portfolio:
 
 ```pycon
->>> pf.plot(column=10)
+>>> pf.plot(column=10).show()
 ```
 
 ![](/assets/images/api/portfolio_col_plot.svg)
@@ -1490,7 +1490,7 @@ To plot a single column of a grouped portfolio:
 To plot a single group of a grouped portfolio:
 
 ```pycon
->>> pf_grouped.plot(column='group1')
+>>> pf_grouped.plot(column='group1').show()
 UserWarning: Subplot 'orders' does not support grouped data
 UserWarning: Subplot 'trade_pnl' does not support grouped data
 ```
@@ -1517,7 +1517,7 @@ control their appearance using keyword arguments:
 ...             )
 ...         )
 ...     )
-... )
+... ).show()
 ```
 
 ![](/assets/images/api/portfolio_plot_drawdowns.svg)
@@ -1564,7 +1564,7 @@ Alternatively, you can create a placeholder and overwrite it manually later:
 >>> order_size[10].rename('Order Size').vbt.barplot(
 ...     add_trace_kwargs=dict(row=2, col=1),
 ...     fig=fig
-... )
+... ).show()
 ```
 
 ![](/assets/images/api/portfolio_plot_custom.svg)
@@ -1613,7 +1613,7 @@ You can additionally use templates to make some parameters to depend upon passed
 You can also replace templates across all subplots by using the global template mapping:
 
 ```pycon
->>> pf.plot(subplots, column=10, template_context=dict(window=10))
+>>> pf.plot(subplots, column=10, template_context=dict(window=10)).show()
 ```
 
 ![](/assets/images/api/portfolio_plot_path.svg)
@@ -4227,7 +4227,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ...     fees=0.001, fixed_fees=1., slippage=0.001  # costs
             ... )
 
-            >>> pf.get_asset_value(group_by=False).vbt.plot()
+            >>> pf.get_asset_value(group_by=False).vbt.plot().show()
             ```
 
             ![](/assets/images/api/simulate_nb_example.svg)
@@ -6904,7 +6904,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ...     cash_sharing=True, group_by=True,  # one group with cash sharing
             ... )
 
-            >>> pf.get_asset_value(group_by=False).vbt.plot()
+            >>> pf.get_asset_value(group_by=False).vbt.plot().show()
             ```
 
             ![](/assets/images/api/simulate_nb_example.svg)
@@ -6925,7 +6925,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> # Replace close and group_by in the example above
 
             >>> pf['g1'].get_asset_value(group_by=False).vbt.plot()
-            >>> pf['g2'].get_asset_value(group_by=False).vbt.plot()
+            >>> pf['g2'].get_asset_value(group_by=False).vbt.plot().show()
             ```
 
             ![](/assets/images/api/from_order_func_g1.svg)
@@ -7689,7 +7689,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ... )
 
             >>> asset_value = pf.wrapper.wrap(pf.in_outputs.asset_value_pc, group_by=False)
-            >>> asset_value.vbt.plot()
+            >>> asset_value.vbt.plot().show()
             ```
 
             ![](/assets/images/api/simulate_nb_example.svg)

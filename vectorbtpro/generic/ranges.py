@@ -106,7 +106,7 @@ Name: group, dtype: object
 `Ranges` class has a single subplot based on `Ranges.plot`:
 
 ```pycon
->>> ranges['a'].plots()
+>>> ranges['a'].plots().show()
 ```
 
 ![](/assets/images/api/ranges_plots.svg)
@@ -840,7 +840,7 @@ class Ranges(PriceRecords):
             ...     proj_period=4,
             ...     extend=True,
             ...     plot_past_period=None
-            ... )
+            ... ).show()
             ```
 
             ![](/assets/images/api/ranges_plot_projections.svg)
@@ -1099,7 +1099,7 @@ class Ranges(PriceRecords):
 
             >>> vbt.Ranges.from_array(price >= 2).plot_shapes(
             ...     shape_kwargs=dict(fillcolor="teal", opacity=vbt.RepFunc(get_opacity))
-            ... )
+            ... ).show()
             ```
 
             ![](/assets/images/api/ranges_plot_shapes.svg)
@@ -1278,7 +1278,7 @@ class Ranges(PriceRecords):
             ...     [1, 2, 1, 2, 3, 2, 1, 2, 3],
             ...     index=pd.date_range("2020", periods=9),
             ... )
-            >>> vbt.Ranges.from_array(price >= 2).plot()
+            >>> vbt.Ranges.from_array(price >= 2).plot().show()
             ```
 
             ![](/assets/images/api/ranges_plot.svg)

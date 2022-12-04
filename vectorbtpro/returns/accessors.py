@@ -111,7 +111,7 @@ dtype: object
 `ReturnsAccessor` class has a single subplot based on `ReturnsAccessor.plot_cumulative`:
 
 ```pycon
->>> ret_acc.plots()
+>>> ret_acc.plots().show()
 ```
 
 ![](/assets/images/api/returns_plots.svg)
@@ -1766,7 +1766,7 @@ class ReturnsAccessor(GenericAccessor):
             >>> np.random.seed(0)
             >>> rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
             >>> bm_returns = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
-            >>> rets.vbt.returns.plot_cumulative(bm_returns=bm_returns)
+            >>> rets.vbt.returns.plot_cumulative(bm_returns=bm_returns).show()
             ```
 
             ![](/assets/images/api/plot_cumulative.svg)

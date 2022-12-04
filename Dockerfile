@@ -26,8 +26,8 @@ RUN pip install --quiet --no-cache-dir \
     jupyter lab build --minimize=False
 
 RUN pip install --quiet --no-cache-dir \
-    'numpy==1.21' \
-    'numba==0.55.1' \
+    'numpy==1.23.3' \
+    'numba==0.56.4' \
     'schedule' \
     'requests' \
     'tqdm' \

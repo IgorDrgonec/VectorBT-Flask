@@ -610,7 +610,7 @@ def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:
         plot.__doc__ += """
     Usage:
         ```pycon
-        >>> ohlcstx.iloc[:, 0].plot()
+        >>> ohlcstx.iloc[:, 0].plot().show()
         ```
         
         ![](/assets/images/api/OHLCSTX.svg)

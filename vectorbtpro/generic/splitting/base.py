@@ -513,7 +513,7 @@ class Splitter(Analyzable):
             >>> index = pd.date_range("2020", "2021", freq="D")
 
             >>> splitter = vbt.Splitter.from_rolling(index, 30)
-            >>> splitter.plot()
+            >>> splitter.plot().show()
             ```
 
             ![](/assets/images/api/from_rolling_1.svg)
@@ -527,7 +527,7 @@ class Splitter(Analyzable):
             ...     split=1/2,
             ...     set_labels=["train", "test"]
             ... )
-            >>> splitter.plot()
+            >>> splitter.plot().show()
             ```
 
             ![](/assets/images/api/from_rolling_2.svg)
@@ -543,7 +543,7 @@ class Splitter(Analyzable):
             ...     split=1/2,
             ...     set_labels=["train", "test"]
             ... )
-            >>> splitter.plot()
+            >>> splitter.plot().show()
             ```
 
             ![](/assets/images/api/from_rolling_3.svg)
@@ -652,7 +652,7 @@ class Splitter(Analyzable):
             ...     split=3/4,
             ...     set_labels=["train", "test"]
             ... )
-            >>> splitter.plot()
+            >>> splitter.plot().show()
             ```
 
             ![](/assets/images/api/from_n_rolling.svg)
@@ -760,7 +760,7 @@ class Splitter(Analyzable):
             ...     split=3/4,
             ...     set_labels=["train", "test"]
             ... )
-            >>> splitter.plot()
+            >>> splitter.plot().show()
             ```
 
             ![](/assets/images/api/from_expanding.svg)
@@ -864,7 +864,7 @@ class Splitter(Analyzable):
             ...     split=-50,
             ...     set_labels=["train", "test"]
             ... )
-            >>> splitter.plot()
+            >>> splitter.plot().show()
             ```
 
             ![](/assets/images/api/from_n_expanding.svg)
@@ -949,7 +949,7 @@ class Splitter(Analyzable):
             >>> index = pd.date_range("2020", "2021", freq="D")
 
             >>> splitter = vbt.Splitter.from_ranges(index, every="QS")
-            >>> splitter.plot()
+            >>> splitter.plot().show()
             ```
 
             ![](/assets/images/api/from_ranges_1.svg)
@@ -963,7 +963,7 @@ class Splitter(Analyzable):
             ...     split=(1.0, lambda index: index.month == index.month[-1]),
             ...     split_range_kwargs=dict(backwards=True)
             ... )
-            >>> splitter.plot()
+            >>> splitter.plot().show()
             ```
 
             ![](/assets/images/api/from_ranges_2.svg)
@@ -1037,7 +1037,7 @@ class Splitter(Analyzable):
             ...     "M",
             ...     split_check_template=vbt.RepFunc(is_month_end)
             ... )
-            >>> splitter.plot()
+            >>> splitter.plot().show()
             ```
 
             ![](/assets/images/api/from_grouper.svg)
@@ -1137,7 +1137,7 @@ class Splitter(Analyzable):
             ...     split=3/4,
             ...     set_labels=["train", "test"]
             ... )
-            >>> splitter.plot()
+            >>> splitter.plot().show()
             ```
 
             ![](/assets/images/api/from_n_random.svg)
@@ -1394,7 +1394,7 @@ class Splitter(Analyzable):
             ...     ),
             ...     set_labels=["train", "test"]
             ... )
-            >>> splitter.plot()
+            >>> splitter.plot().show()
             ```
 
             ![](/assets/images/api/from_split_func.svg)
@@ -3049,7 +3049,7 @@ class Splitter(Analyzable):
             ...     iteration="set_wise",
             ...     merge_func="row_stack",
             ...     merge_all=False,
-            ... ).T.vbt.drop_levels("split", axis=0).vbt.plot()
+            ... ).T.vbt.drop_levels("split", axis=0).vbt.plot().show()
             ```
 
             ![](/assets/images/api/Splitter_apply.svg)
@@ -4557,7 +4557,7 @@ class Splitter(Analyzable):
 
         >>> index = pd.date_range("2020", "2021", freq="D")
         >>> splitter = vbt.Splitter.from_sklearn(index, TimeSeriesSplit())
-        >>> splitter.plot()
+        >>> splitter.plot().show()
         ```
 
         ![](/assets/images/api/Splitter.svg)
@@ -4651,7 +4651,7 @@ class Splitter(Analyzable):
 
             >>> index = pd.date_range("2020", "2021", freq="D")
             >>> splitter = vbt.Splitter.from_sklearn(index, TimeSeriesSplit())
-            >>> splitter.plot_coverage()
+            >>> splitter.plot_coverage().show()
             ```
 
             ![](/assets/images/api/Splitter_coverage_area.svg)
@@ -4659,7 +4659,7 @@ class Splitter(Analyzable):
             * Line plot:
 
             ```pycon
-            >>> splitter.plot_coverage(stacked=False)
+            >>> splitter.plot_coverage(stacked=False).show()
             ```
 
             ![](/assets/images/api/Splitter_coverage_line.svg)

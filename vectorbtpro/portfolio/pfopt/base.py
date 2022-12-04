@@ -3224,7 +3224,7 @@ class PortfolioOptimizer(Analyzable):
             ...     every="MS",
             ...     seed=40
             ... )
-            >>> pf_opt.plot()
+            >>> pf_opt.plot().show()
             ```
 
             ![](/assets/images/api/pfopt_plot.svg)
