@@ -382,6 +382,11 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         return self.wrapper.columns
 
     @property
+    def shape(self) -> tp.Shape:
+        """Shape."""
+        return self.wrapper.shape
+
+    @property
     def ndim(self) -> int:
         """Number of dimensions."""
         return self.wrapper.ndim

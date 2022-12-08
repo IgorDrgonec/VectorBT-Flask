@@ -1360,7 +1360,7 @@ class TestChecks:
 
     def test_assert_shape_equal(self):
         checks.assert_shape_equal(0, 1)
-        checks.assert_shape_equal([1, 2, 3], np.asarray([1, 2, 3]))
+        checks.assert_shape_equal([1, 2, 3], np.array([1, 2, 3]))
         checks.assert_shape_equal([1, 2, 3], pd.Series([1, 2, 3]))
         checks.assert_shape_equal(np.zeros((3, 3)), pd.Series([1, 2, 3]), axis=0)
         checks.assert_shape_equal(np.zeros((2, 3)), pd.Series([1, 2, 3]), axis=(1, 0))

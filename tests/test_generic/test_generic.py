@@ -1529,50 +1529,50 @@ class TestAccessors:
             return np.nanmean(x[idxs, col])
 
         assert_series_equal(
-            df["a"].vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb),
-            df["a"].groupby(np.asarray([1, 1, 2, 2, 3])).apply(lambda x: mean_nb(x.values)).rename_axis("group"),
+            df["a"].vbt.groupby_apply(np.array([1, 1, 2, 2, 3]), mean_nb),
+            df["a"].groupby(np.array([1, 1, 2, 2, 3])).apply(lambda x: mean_nb(x.values)).rename_axis("group"),
         )
         assert_frame_equal(
-            df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb),
-            df.groupby(np.asarray([1, 1, 2, 2, 3]))
+            df.vbt.groupby_apply(np.array([1, 1, 2, 2, 3]), mean_nb),
+            df.groupby(np.array([1, 1, 2, 2, 3]))
             .agg({"a": lambda x: mean_nb(x.values), "b": lambda x: mean_nb(x.values), "c": lambda x: mean_nb(x.values)})
             .rename_axis("group"),  # any clean way to do column-wise grouping in pandas?
         )
         assert_frame_equal(
-            df.vbt.groupby_apply(df.groupby(np.asarray([1, 1, 2, 2, 3])), mean_nb),
-            df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb),
+            df.vbt.groupby_apply(df.groupby(np.array([1, 1, 2, 2, 3])), mean_nb),
+            df.vbt.groupby_apply(np.array([1, 1, 2, 2, 3]), mean_nb),
         )
         assert_frame_equal(
-            df.vbt.groupby_apply(vbt.Grouper(df.index, np.asarray([1, 1, 2, 2, 3])), mean_nb),
-            df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb),
+            df.vbt.groupby_apply(vbt.Grouper(df.index, np.array([1, 1, 2, 2, 3])), mean_nb),
+            df.vbt.groupby_apply(np.array([1, 1, 2, 2, 3]), mean_nb),
         )
         assert_frame_equal(
-            df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb, jitted=dict(parallel=True)),
-            df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb, jitted=dict(parallel=False)),
+            df.vbt.groupby_apply(np.array([1, 1, 2, 2, 3]), mean_nb, jitted=dict(parallel=True)),
+            df.vbt.groupby_apply(np.array([1, 1, 2, 2, 3]), mean_nb, jitted=dict(parallel=False)),
         )
         assert_frame_equal(
-            df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb, chunked=True),
-            df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb, chunked=False),
+            df.vbt.groupby_apply(np.array([1, 1, 2, 2, 3]), mean_nb, chunked=True),
+            df.vbt.groupby_apply(np.array([1, 1, 2, 2, 3]), mean_nb, chunked=False),
         )
         assert_frame_equal(
             pd.DataFrame.vbt.groupby_apply(
-                np.asarray([1, 1, 2, 2, 3]),
+                np.array([1, 1, 2, 2, 3]),
                 mean_meta_nb,
                 df.vbt.to_2d_array(),
                 wrapper=df.vbt.wrapper,
             ),
-            df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), mean_nb),
+            df.vbt.groupby_apply(np.array([1, 1, 2, 2, 3]), mean_nb),
         )
         assert_frame_equal(
             pd.DataFrame.vbt.groupby_apply(
-                np.asarray([1, 1, 2, 2, 3]),
+                np.array([1, 1, 2, 2, 3]),
                 mean_meta_nb,
                 df.vbt.to_2d_array(),
                 wrapper=df.vbt.wrapper,
                 jitted=dict(parallel=True),
             ),
             pd.DataFrame.vbt.groupby_apply(
-                np.asarray([1, 1, 2, 2, 3]),
+                np.array([1, 1, 2, 2, 3]),
                 mean_meta_nb,
                 df.vbt.to_2d_array(),
                 wrapper=df.vbt.wrapper,
@@ -1588,14 +1588,14 @@ class TestAccessors:
         )
         assert_frame_equal(
             pd.DataFrame.vbt.groupby_apply(
-                np.asarray([1, 1, 2, 2, 3]),
+                np.array([1, 1, 2, 2, 3]),
                 mean_meta_nb,
                 df.vbt.to_2d_array(),
                 wrapper=df.vbt.wrapper,
                 chunked=chunked,
             ),
             pd.DataFrame.vbt.groupby_apply(
-                np.asarray([1, 1, 2, 2, 3]),
+                np.array([1, 1, 2, 2, 3]),
                 mean_meta_nb,
                 df.vbt.to_2d_array(),
                 wrapper=df.vbt.wrapper,
@@ -2716,7 +2716,7 @@ class TestAccessors:
         )
         assert_frame_equal(
             df.vbt.reduce(min_and_max_nb, returns_array=True, wrap_kwargs=dict(name_or_index=["min", "max"])),
-            df.apply(lambda x: pd.Series(np.asarray([np.nanmin(x), np.nanmax(x)]), index=["min", "max"]), axis=0),
+            df.apply(lambda x: pd.Series(np.array([np.nanmin(x), np.nanmax(x)]), index=["min", "max"]), axis=0),
         )
         assert_frame_equal(
             df.vbt.reduce(min_and_max_nb, returns_array=True, jitted=dict(parallel=True)),
@@ -2898,7 +2898,7 @@ class TestAccessors:
                 returns_array=True,
                 wrap_kwargs=dict(name_or_index=["idxmin", "idxmax"]),
             ),
-            df.apply(lambda x: pd.Series(np.asarray([x.idxmin(), x.idxmax()]), index=["idxmin", "idxmax"]), axis=0),
+            df.apply(lambda x: pd.Series(np.array([x.idxmin(), x.idxmax()]), index=["idxmin", "idxmax"]), axis=0),
         )
         assert_frame_equal(
             df.vbt.reduce(argmin_and_argmax_nb, returns_idx=True, returns_array=True, jitted=dict(parallel=True)),

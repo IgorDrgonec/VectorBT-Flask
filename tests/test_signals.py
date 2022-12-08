@@ -3385,8 +3385,8 @@ class TestGenerators:
             pd.Series(np.array([False, True, False, True, False]), name=(1.0, 1.0)),
         )
         rprobnx = vbt.RPROBNX.run(
-            entry_prob=np.asarray([1.0, 0.0, 1.0, 0.0, 1.0]),
-            exit_prob=np.asarray([0.0, 1.0, 0.0, 1.0, 0.0]),
+            entry_prob=np.array([1.0, 0.0, 1.0, 0.0, 1.0]),
+            exit_prob=np.array([0.0, 1.0, 0.0, 1.0, 0.0]),
             input_shape=(5,),
             seed=seed,
         )
@@ -3454,7 +3454,7 @@ class TestGenerators:
                 columns=pd.MultiIndex.from_tuples([(0.1, "a"), (0.1, "b"), (0.1, "c")], names=["stx_stop", None]),
             ),
         )
-        stx = vbt.STX.run(mask, ts, np.asarray([0.1, 0.1, -0.1, -0.1, -0.1])[:, None])
+        stx = vbt.STX.run(mask, ts, np.array([0.1, 0.1, -0.1, -0.1, -0.1])[:, None])
         assert_frame_equal(
             stx.exits,
             pd.DataFrame(

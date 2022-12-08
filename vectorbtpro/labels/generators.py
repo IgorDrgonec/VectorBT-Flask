@@ -163,7 +163,6 @@ LEXLB = IndicatorFactory(
         up_th=flex_elem_param_config,
         down_th=flex_elem_param_config,
     ),
-    pass_flex_2d=True,
 )
 
 
@@ -192,7 +191,6 @@ TRENDLB = IndicatorFactory(
             post_index_func=lambda index: index.str.lower(),
         ),
     ),
-    pass_flex_2d=True,
     mode=TrendLabelMode.Binary,
 )
 
@@ -218,7 +216,6 @@ BOLB = IndicatorFactory(
         up_th=flex_elem_param_config,
         down_th=flex_elem_param_config,
     ),
-    pass_flex_2d=True,
     kwargs_as_args=["wait"],
     up_th=0.0,
     down_th=0.0,

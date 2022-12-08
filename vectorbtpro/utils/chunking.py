@@ -47,7 +47,7 @@ class ArgGetter:
 class AxisSpecifier:
     """Class with an attribute for specifying an axis."""
 
-    axis: tp.Optional[int] = attr.ib(default=None, validator=[_assert_value_not_none, attr.validators.instance_of(int)])
+    axis: tp.Optional[int] = attr.ib(default=None)
     """Axis of the argument to take from."""
 
 
@@ -108,8 +108,16 @@ class ShapeSizer(ArgSizer, AxisSpecifier):
 
     def get_size(self, ann_args: tp.AnnArgs) -> int:
         arg = self.get_arg(ann_args)
-        if self.axis <= len(arg) - 1:
-            return arg[self.axis]
+        if len(arg) == 0:
+            return 0
+        axis = self.axis
+        if axis is None:
+            if len(arg) == 1:
+                axis = 0
+            else:
+                raise ValueError("Axis is required")
+        if axis <= len(arg) - 1:
+            return arg[axis]
         return 0
 
 
@@ -118,8 +126,16 @@ class ArraySizer(ShapeSizer):
 
     def get_size(self, ann_args: tp.AnnArgs) -> int:
         arg = self.get_arg(ann_args)
-        if self.axis <= len(arg.shape) - 1:
-            return arg.shape[self.axis]
+        if len(arg.shape) == 0:
+            return 0
+        axis = self.axis
+        if axis is None:
+            if len(arg.shape) == 1:
+                axis = 0
+            else:
+                raise ValueError("Axis is required")
+        if axis <= len(arg.shape) - 1:
+            return arg.shape[axis]
         return 0
 
 
@@ -422,15 +438,23 @@ class ShapeSelector(ChunkSelector, AxisSpecifier):
 
     def take(self, obj: tp.Shape, chunk_meta: ChunkMeta, **kwargs) -> tp.Shape:
         checks.assert_instance_of(obj, tuple)
-        if self.axis >= len(obj):
-            raise IndexError(f"Shape is {len(obj)}-dimensional, but {self.axis} were indexed")
-        if chunk_meta.idx >= obj[self.axis]:
-            raise IndexError(f"Index {chunk_meta.idx} is out of bounds for axis {self.axis} with size {obj[self.axis]}")
+        if len(obj) == 0:
+            return ()
+        axis = self.axis
+        if axis is None:
+            if len(obj) == 1:
+                axis = 0
+            else:
+                raise ValueError("Axis is required")
+        if axis >= len(obj):
+            raise IndexError(f"Shape is {len(obj)}-dimensional, but {axis} were indexed")
+        if chunk_meta.idx >= obj[axis]:
+            raise IndexError(f"Index {chunk_meta.idx} is out of bounds for axis {axis} with size {obj[axis]}")
         obj = list(obj)
         if self.keep_dims:
-            obj[self.axis] = 1
+            obj[axis] = 1
         else:
-            del obj[self.axis]
+            del obj[axis]
         return tuple(obj)
 
 
@@ -440,19 +464,27 @@ class ShapeSlicer(ChunkSlicer, AxisSpecifier):
 
     def take(self, obj: tp.Shape, chunk_meta: ChunkMeta, **kwargs) -> tp.Shape:
         checks.assert_instance_of(obj, tuple)
-        if self.axis >= len(obj):
-            raise IndexError(f"Shape is {len(obj)}-dimensional, but {self.axis} were indexed")
+        if len(obj) == 0:
+            return ()
+        axis = self.axis
+        if axis is None:
+            if len(obj) == 1:
+                axis = 0
+            else:
+                raise ValueError("Axis is required")
+        if axis >= len(obj):
+            raise IndexError(f"Shape is {len(obj)}-dimensional, but {axis} were indexed")
         obj = list(obj)
         if chunk_meta.indices is not None:
             indices = np.asarray(chunk_meta.indices)
-            if np.any(indices >= obj[self.axis]):
+            if np.any(indices >= obj[axis]):
                 raise IndexError(f"Positional indexers are out-of-bounds")
-            obj[self.axis] = len(indices)
+            obj[axis] = len(indices)
         else:
-            if chunk_meta.start >= obj[self.axis]:
-                del obj[self.axis]
+            if chunk_meta.start >= obj[axis]:
+                del obj[axis]
             else:
-                obj[self.axis] = min(obj[self.axis], chunk_meta.end) - chunk_meta.start
+                obj[axis] = min(obj[axis], chunk_meta.end) - chunk_meta.start
         return tuple(obj)
 
 
@@ -461,13 +493,21 @@ class ArraySelector(ShapeSelector):
 
     def take(self, obj: tp.AnyArray, chunk_meta: ChunkMeta, **kwargs) -> tp.ArrayLike:
         checks.assert_instance_of(obj, (pd.Series, pd.DataFrame, np.ndarray))
-        if self.axis >= len(obj.shape):
-            raise IndexError(f"Array is {obj.ndim}-dimensional, but {self.axis} were indexed")
+        if len(obj.shape) == 0:
+            return obj
+        axis = self.axis
+        if axis is None:
+            if len(obj.shape) == 1:
+                axis = 0
+            else:
+                raise ValueError("Axis is required")
+        if axis >= len(obj.shape):
+            raise IndexError(f"Array is {obj.ndim}-dimensional, but {axis} were indexed")
         slc = [slice(None)] * len(obj.shape)
         if self.keep_dims:
-            slc[self.axis] = slice(chunk_meta.idx, chunk_meta.idx + 1)
+            slc[axis] = slice(chunk_meta.idx, chunk_meta.idx + 1)
         else:
-            slc[self.axis] = chunk_meta.idx
+            slc[axis] = chunk_meta.idx
         if isinstance(obj, (pd.Series, pd.DataFrame)):
             return obj.iloc[tuple(slc)]
         return obj[tuple(slc)]
@@ -478,13 +518,21 @@ class ArraySlicer(ShapeSlicer):
 
     def take(self, obj: tp.AnyArray, chunk_meta: ChunkMeta, **kwargs) -> tp.AnyArray:
         checks.assert_instance_of(obj, (pd.Series, pd.DataFrame, np.ndarray))
-        if self.axis >= len(obj.shape):
-            raise IndexError(f"Array is {obj.ndim}-dimensional, but {self.axis} were indexed")
+        if len(obj.shape) == 0:
+            return obj
+        axis = self.axis
+        if axis is None:
+            if len(obj.shape) == 1:
+                axis = 0
+            else:
+                raise ValueError("Axis is required")
+        if axis >= len(obj.shape):
+            raise IndexError(f"Array is {obj.ndim}-dimensional, but {axis} were indexed")
         slc = [slice(None)] * len(obj.shape)
         if chunk_meta.indices is not None:
-            slc[self.axis] = np.asarray(chunk_meta.indices)
+            slc[axis] = np.asarray(chunk_meta.indices)
         else:
-            slc[self.axis] = slice(chunk_meta.start, chunk_meta.end)
+            slc[axis] = slice(chunk_meta.start, chunk_meta.end)
         if isinstance(obj, (pd.Series, pd.DataFrame)):
             return obj.iloc[tuple(slc)]
         return obj[tuple(slc)]

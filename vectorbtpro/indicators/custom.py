@@ -1275,7 +1275,7 @@ PATSIM = IndicatorFactory(
 ).with_apply_func(
     generic_nb.rolling_pattern_similarity_nb,
     param_settings=dict(
-        pattern=dict(is_array_like=True),
+        pattern=dict(is_array_like=True, min_one_dim=True),
         interp_mode=dict(
             dtype=generic_enums.InterpMode,
             post_index_func=lambda index: index.str.lower(),
@@ -1292,7 +1292,7 @@ PATSIM = IndicatorFactory(
             dtype=generic_enums.DistanceMeasure,
             post_index_func=lambda index: index.str.lower(),
         ),
-        max_error=dict(is_array_like=True),
+        max_error=dict(is_array_like=True, min_one_dim=True),
         max_error_interp_mode=dict(
             dtype=generic_enums.InterpMode,
             post_index_func=lambda index: index.str.lower(),
@@ -1608,7 +1608,6 @@ PIVOTINFO = IndicatorFactory(
         up_th=flex_elem_param_config,
         down_th=flex_elem_param_config,
     ),
-    pass_flex_2d=True,
 )
 
 
@@ -1870,7 +1869,6 @@ SIGDET = IndicatorFactory(
         down_factor=flex_elem_param_config,
         std_influence=flex_elem_param_config,
     ),
-    pass_flex_2d=True,
     lag=14,
     factor=1.0,
     influence=1.0,

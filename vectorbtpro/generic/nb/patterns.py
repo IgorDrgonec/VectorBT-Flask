@@ -7,71 +7,71 @@ import numpy as np
 from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.generic.enums import RescaleMode, InterpMode, ErrorType, DistanceMeasure
-from vectorbtpro.base.indexing import flex_select_auto_nb
+from vectorbtpro.base.flex_indexing import flex_select_1d_nb
 from vectorbtpro.utils.array_ import rescale_nb
 
 
 @register_jitted(cache=True)
-def linear_interp_nb(arr: tp.FlexArray, i: int, source_size: int, target_size: int) -> float:
+def linear_interp_nb(arr: tp.FlexArray1d, i: int, source_size: int, target_size: int) -> float:
     """Get the value at a specific position in a target size using linear interpolation."""
     if i == 0 or source_size == 1 or target_size == 1:
-        return float(flex_select_auto_nb(arr, 0))
+        return float(flex_select_1d_nb(arr, 0))
     if source_size == target_size:
-        return float(flex_select_auto_nb(arr, i))
+        return float(flex_select_1d_nb(arr, i))
     if i == target_size - 1:
-        return float(flex_select_auto_nb(arr, source_size - 1))
+        return float(flex_select_1d_nb(arr, source_size - 1))
     mapped_i = i / (target_size - 1) * (source_size - 1)
     left_i = int(np.floor(mapped_i))
     right_i = int(np.ceil(mapped_i))
     norm_mapped_i = mapped_i - left_i
-    left_elem = float(flex_select_auto_nb(arr, left_i))
-    right_elem = float(flex_select_auto_nb(arr, right_i))
+    left_elem = float(flex_select_1d_nb(arr, left_i))
+    right_elem = float(flex_select_1d_nb(arr, right_i))
     return left_elem + norm_mapped_i * (right_elem - left_elem)
 
 
 @register_jitted(cache=True)
-def nearest_interp_nb(arr: tp.FlexArray, i: int, source_size: int, target_size: int) -> float:
+def nearest_interp_nb(arr: tp.FlexArray1d, i: int, source_size: int, target_size: int) -> float:
     """Get the value at a specific position in a target size using nearest-neighbor interpolation."""
     if i == 0 or source_size == 1 or target_size == 1:
-        return float(flex_select_auto_nb(arr, 0))
+        return float(flex_select_1d_nb(arr, 0))
     if source_size == target_size:
-        return float(flex_select_auto_nb(arr, i))
+        return float(flex_select_1d_nb(arr, i))
     if i == target_size - 1:
-        return float(flex_select_auto_nb(arr, source_size - 1))
+        return float(flex_select_1d_nb(arr, source_size - 1))
     mapped_i = i / (target_size - 1) * (source_size - 1)
-    return float(flex_select_auto_nb(arr, round(mapped_i)))
+    return float(flex_select_1d_nb(arr, round(mapped_i)))
 
 
 @register_jitted(cache=True)
-def discrete_interp_nb(arr: tp.FlexArray, i: int, source_size: int, target_size: int) -> float:
+def discrete_interp_nb(arr: tp.FlexArray1d, i: int, source_size: int, target_size: int) -> float:
     """Get the value at a specific position in a target size using discrete interpolation."""
     if source_size >= target_size:
         return nearest_interp_nb(arr, i, source_size, target_size)
     if i == 0 or source_size == 1 or target_size == 1:
-        return float(flex_select_auto_nb(arr, 0))
+        return float(flex_select_1d_nb(arr, 0))
     if i == target_size - 1:
-        return float(flex_select_auto_nb(arr, source_size - 1))
+        return float(flex_select_1d_nb(arr, source_size - 1))
     curr_float_mapped_i = i / (target_size - 1) * (source_size - 1)
     curr_remainder = curr_float_mapped_i % 1
     if curr_remainder == 0:
-        return float(flex_select_auto_nb(arr, int(curr_float_mapped_i)))
+        return float(flex_select_1d_nb(arr, int(curr_float_mapped_i)))
     if curr_remainder <= 0.5:
         prev_float_mapped_i = (i - 1) / (target_size - 1) * (source_size - 1)
         if int(curr_float_mapped_i) != int(prev_float_mapped_i):
             prev_remainder = prev_float_mapped_i % 1
             if curr_remainder < 1 - prev_remainder:
-                return float(flex_select_auto_nb(arr, int(np.floor(curr_float_mapped_i))))
+                return float(flex_select_1d_nb(arr, int(np.floor(curr_float_mapped_i))))
         return np.nan
     next_float_mapped_i = (i + 1) / (target_size - 1) * (source_size - 1)
     if int(curr_float_mapped_i) != int(next_float_mapped_i):
         next_remainder = next_float_mapped_i % 1
         if 1 - curr_remainder <= next_remainder:
-            return float(flex_select_auto_nb(arr, int(np.ceil(curr_float_mapped_i))))
+            return float(flex_select_1d_nb(arr, int(np.ceil(curr_float_mapped_i))))
     return np.nan
 
 
 @register_jitted(cache=True)
-def mixed_interp_nb(arr: tp.FlexArray, i: int, source_size: int, target_size: int) -> float:
+def mixed_interp_nb(arr: tp.FlexArray1d, i: int, source_size: int, target_size: int) -> float:
     """Get the value at a specific position in a target size using mixed interpolation.
 
     Mixed interpolation is based on the discrete interpolation, while filling resulting NaN values
@@ -83,7 +83,7 @@ def mixed_interp_nb(arr: tp.FlexArray, i: int, source_size: int, target_size: in
 
 
 @register_jitted(cache=True)
-def interp_nb(arr: tp.FlexArray, i: int, source_size: int, target_size: int, interp_mode: int) -> float:
+def interp_nb(arr: tp.FlexArray1d, i: int, source_size: int, target_size: int, interp_mode: int) -> float:
     """Get the value at a specific position in a target size using an interpolation mode.
 
     See `vectorbtpro.generic.enums.InterpMode`."""
@@ -99,7 +99,7 @@ def interp_nb(arr: tp.FlexArray, i: int, source_size: int, target_size: int, int
 
 
 @register_jitted(cache=True)
-def interp_resize_1d_nb(arr: tp.FlexArray, target_size: int, interp_mode: int) -> tp.Array1d:
+def interp_resize_1d_nb(arr: tp.FlexArray1d, target_size: int, interp_mode: int) -> tp.Array1d:
     """Resize an array using `interp_nb`."""
     out = np.empty(target_size, dtype=np.float_)
     for i in range(target_size):
@@ -119,7 +119,7 @@ def fit_pattern_nb(
     pmax: float = np.nan,
     invert: bool = False,
     error_type: int = ErrorType.Absolute,
-    max_error: tp.FlexArray = np.asarray(np.nan),
+    max_error: tp.FlexArray1d = np.array([np.nan]),
     max_error_interp_mode: tp.Optional[int] = None,
 ) -> tp.Tuple[tp.Array1d, tp.Array1d]:
     """Fit pattern.
@@ -186,7 +186,7 @@ def pattern_similarity_nb(
     invert: bool = False,
     error_type: int = ErrorType.Absolute,
     distance_measure: int = DistanceMeasure.MAE,
-    max_error: tp.FlexArray = np.asarray(np.nan),
+    max_error: tp.FlexArray1d = np.array([np.nan]),
     max_error_interp_mode: tp.Optional[int] = None,
     max_error_as_maxdist: bool = False,
     max_error_strict: bool = False,
@@ -309,7 +309,7 @@ def pattern_similarity_nb(
         if arr.shape[0] == pattern.shape[0]:
             arr_elem = arr[i]
             pattern_elem = pattern[i]
-            _max_error = flex_select_auto_nb(max_error, i)
+            _max_error = flex_select_1d_nb(max_error, i)
         elif arr.shape[0] > pattern.shape[0]:
             arr_elem = arr[i]
             pattern_elem = interp_nb(pattern, i, pattern.shape[0], arr.shape[0], interp_mode)
@@ -317,7 +317,7 @@ def pattern_similarity_nb(
         else:
             arr_elem = interp_nb(arr, i, arr.shape[0], pattern.shape[0], interp_mode)
             pattern_elem = pattern[i]
-            _max_error = flex_select_auto_nb(max_error, i)
+            _max_error = flex_select_1d_nb(max_error, i)
 
         if not np.isnan(arr_elem) and not np.isnan(pattern_elem):
             if invert:

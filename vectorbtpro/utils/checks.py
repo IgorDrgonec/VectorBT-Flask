@@ -432,11 +432,11 @@ def assert_dtype_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> None:
     if isinstance(arg1, pd.DataFrame):
         dtypes1 = arg1.dtypes.to_numpy()
     else:
-        dtypes1 = np.asarray([arg1.dtype])
+        dtypes1 = np.array([arg1.dtype])
     if isinstance(arg2, pd.DataFrame):
         dtypes2 = arg2.dtypes.to_numpy()
     else:
-        dtypes2 = np.asarray([arg2.dtype])
+        dtypes2 = np.array([arg2.dtype])
     if len(dtypes1) == len(dtypes2):
         if (dtypes1 == dtypes2).all():
             return

@@ -7,7 +7,7 @@ from numba import prange
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.base.indexing import flex_select_auto_nb
+from vectorbtpro.base.flex_indexing import flex_select_1d_nb
 from vectorbtpro.generic.enums import *
 from vectorbtpro.generic.nb.base import repartition_nb
 from vectorbtpro.generic.nb.patterns import pattern_similarity_nb
@@ -38,7 +38,7 @@ def get_ranges_nb(arr: tp.Array2d, gap_value: tp.Scalar) -> tp.RecordArray:
         >>> import pandas as pd
         >>> from vectorbtpro.generic.nb import get_ranges_nb
 
-        >>> a = np.asarray([
+        >>> a = np.array([
         ...     [np.nan, np.nan, np.nan, np.nan],
         ...     [     2, np.nan, np.nan, np.nan],
         ...     [     3,      3, np.nan, np.nan],
@@ -341,7 +341,7 @@ def map_ranges_to_projections_nb(
     incl_end_idx: bool = True,
     extend: bool = False,
     rebase: bool = True,
-    start_value: tp.FlexArray = np.asarray(1.0),
+    start_value: tp.FlexArray1d = np.array([1.0]),
     ffill: bool = False,
     remove_empty: bool = False,
 ) -> tp.Tuple[tp.Array1d, tp.Array2d]:
@@ -423,7 +423,7 @@ def map_ranges_to_projections_nb(
             else:
                 if rebase:
                     if i == 0:
-                        _start_value = flex_select_auto_nb(start_value, col_arr[r])
+                        _start_value = flex_select_1d_nb(start_value, col_arr[r])
                         if _start_value == -1:
                             proj_out[k, i] = close[-1, col_arr[r]]
                         else:
@@ -465,7 +465,7 @@ def find_pattern_1d_nb(
     invert: bool = False,
     error_type: int = ErrorType.Absolute,
     distance_measure: int = DistanceMeasure.MAE,
-    max_error: tp.FlexArray = np.asarray(np.nan),
+    max_error: tp.FlexArray1d = np.array([np.nan]),
     max_error_interp_mode: tp.Optional[int] = None,
     max_error_as_maxdist: bool = False,
     max_error_strict: bool = False,
@@ -680,7 +680,7 @@ def find_pattern_nb(
     invert: bool = False,
     error_type: int = ErrorType.Absolute,
     distance_measure: int = DistanceMeasure.MAE,
-    max_error: tp.FlexArray = np.asarray(np.nan),
+    max_error: tp.FlexArray1d = np.array([np.nan]),
     max_error_interp_mode: tp.Optional[int] = None,
     max_error_as_maxdist: bool = False,
     max_error_strict: bool = False,
@@ -824,7 +824,7 @@ def get_drawdowns_nb(
         >>> import pandas as pd
         >>> from vectorbtpro.generic.nb import get_drawdowns_nb
 
-        >>> close = np.asarray([
+        >>> close = np.array([
         ...     [1, 5, 1, 3],
         ...     [2, 4, 2, 2],
         ...     [3, 3, 3, 1],

@@ -17,7 +17,7 @@ from numba import prange
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.base.indexing import flex_select_auto_nb
+from vectorbtpro.base.flex_indexing import flex_select_1d_nb
 from vectorbtpro.generic import nb as generic_nb, enums as generic_enums
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
@@ -65,7 +65,7 @@ def returns_1d_nb(arr: tp.Array1d, init_value: float = np.nan, log_returns: bool
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(
         arr=ch.ArraySlicer(axis=1),
-        init_value=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
+        init_value=base_ch.FlexArraySlicer(),
         log_returns=None,
     ),
     merge_func="column_stack",
@@ -73,13 +73,13 @@ def returns_1d_nb(arr: tp.Array1d, init_value: float = np.nan, log_returns: bool
 @register_jitted(cache=True, tags={"can_parallel"})
 def returns_nb(
     arr: tp.Array2d,
-    init_value: tp.FlexArray = np.asarray(np.nan),
+    init_value: tp.FlexArray1d = np.array([np.nan]),
     log_returns: bool = False,
 ) -> tp.Array2d:
     """2-dim version of `returns_1d_nb`."""
     out = np.empty(arr.shape, dtype=np.float_)
     for col in prange(out.shape[1]):
-        _init_value = flex_select_auto_nb(init_value, 0, col, True)
+        _init_value = flex_select_1d_nb(init_value, col)
         out[:, col] = returns_1d_nb(arr[:, col], init_value=_init_value, log_returns=log_returns)
     return out
 

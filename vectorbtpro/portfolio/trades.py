@@ -492,7 +492,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_1d_array, to_2d_array
+from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast_to
 from vectorbtpro.generic.ranges import Ranges
 from vectorbtpro.generic.enums import range_dt
 from vectorbtpro.portfolio import nb
@@ -865,7 +865,6 @@ class Trades(Ranges):
         entry_price_open: bool = False,
         exit_price_close: bool = False,
         max_duration: tp.Optional[int] = None,
-        flex_2d: bool = False,
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -908,7 +907,7 @@ class Trades(Ranges):
                     wtype=WType.Wilder,
                 )
         else:
-            volatility = np.asarray(volatility)
+            volatility = broadcast_to(volatility, self.wrapper, keep_flex=True)
         out = func(
             self.values,
             col_map,
@@ -920,7 +919,6 @@ class Trades(Ranges):
             entry_price_open=entry_price_open,
             exit_price_close=exit_price_close,
             max_duration=max_duration,
-            flex_2d=flex_2d,
         )
         if wrap_kwargs is None:
             wrap_kwargs = {}
@@ -933,7 +931,6 @@ class Trades(Ranges):
         exit_price_close: bool = False,
         max_duration: tp.Optional[int] = None,
         incl_shorter: bool = False,
-        flex_2d: bool = False,
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -976,7 +973,7 @@ class Trades(Ranges):
                     wtype=WType.Wilder,
                 )
         else:
-            volatility = np.asarray(volatility)
+            volatility = broadcast_to(volatility, self.wrapper, keep_flex=True)
         out = func(
             self.values,
             col_map,
@@ -989,7 +986,6 @@ class Trades(Ranges):
             exit_price_close=exit_price_close,
             max_duration=max_duration,
             incl_shorter=incl_shorter,
-            flex_2d=flex_2d,
         )
         if wrap_kwargs is None:
             wrap_kwargs = {}
@@ -1583,7 +1579,6 @@ class Trades(Ranges):
         exit_price_close: bool = False,
         max_duration: tp.Optional[int] = None,
         incl_shorter: bool = False,
-        flex_2d: bool = False,
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -1604,7 +1599,6 @@ class Trades(Ranges):
             exit_price_close=exit_price_close,
             max_duration=max_duration,
             incl_shorter=incl_shorter,
-            flex_2d=flex_2d,
             group_by=group_by,
             jitted=jitted,
             chunked=chunked,

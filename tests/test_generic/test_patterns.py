@@ -392,7 +392,7 @@ class TestPatterns:
             vbt.nb.pattern_similarity_nb(
                 np.array([3, 1, 2]),
                 np.array([1, 2, 3]),
-                max_error=np.asarray(1.0),
+                max_error=np.array([1.0]),
             )
             == 0.19999999999999996
         )
@@ -400,7 +400,7 @@ class TestPatterns:
             vbt.nb.pattern_similarity_nb(
                 np.array([3, 1, 2]),
                 np.array([1, 2, 3]),
-                max_error=np.asarray(0.5),
+                max_error=np.array([0.5]),
             )
             == 0.0
         )
@@ -408,7 +408,7 @@ class TestPatterns:
             vbt.nb.pattern_similarity_nb(
                 np.array([3, 1, 2]),
                 np.array([1, 2, 3]),
-                max_error=np.asarray([0.5, 0.5, 0.5]),
+                max_error=np.array([0.5, 0.5, 0.5]),
             )
             == 0.0
         )
@@ -416,7 +416,7 @@ class TestPatterns:
             vbt.nb.pattern_similarity_nb(
                 np.array([3, 1, 2]),
                 np.array([1, 2, 3]),
-                max_error=np.asarray(1.0),
+                max_error=np.array([1.0]),
                 max_error_as_maxdist=True,
             )
             == 0.0
@@ -425,7 +425,7 @@ class TestPatterns:
             vbt.nb.pattern_similarity_nb(
                 np.array([3, 1, 2]),
                 np.array([1, 2, 3]),
-                max_error=np.asarray(2.0),
+                max_error=np.array([2.0]),
                 max_error_as_maxdist=True,
             )
             == 0.33333333333333337
@@ -434,7 +434,7 @@ class TestPatterns:
             vbt.nb.pattern_similarity_nb(
                 np.array([3, 1, 2]),
                 np.array([1, 2, 3]),
-                max_error=np.asarray([1.0, 2.0, 3.0]),
+                max_error=np.array([1.0, 2.0, 3.0]),
                 max_error_as_maxdist=True,
             )
             == 0.5
@@ -443,7 +443,7 @@ class TestPatterns:
             vbt.nb.pattern_similarity_nb(
                 np.array([3, 1, 2]),
                 np.array([1, 2, 3]),
-                max_error=np.asarray(2.0),
+                max_error=np.array([2.0]),
                 max_error_strict=True,
             )
         )
@@ -451,7 +451,7 @@ class TestPatterns:
             vbt.nb.pattern_similarity_nb(
                 np.array([3, 1, 2]),
                 np.array([1, 2, 3]),
-                max_error=np.asarray(1.0),
+                max_error=np.array([1.0]),
                 max_error_strict=True,
             )
         )
@@ -503,13 +503,13 @@ class TestPatterns:
             sim = vbt.nb.pattern_similarity_nb(
                 np.asarray(arr),
                 np.array([1, 2, 3, 4, 5]),
-                max_error=np.asarray(2.0),
+                max_error=np.array([2.0]),
             )
             assert (
                 vbt.nb.pattern_similarity_nb(
                     np.asarray(arr),
                     np.array([1, 2, 3, 4, 5]),
-                    max_error=np.asarray(2.0),
+                    max_error=np.array([2.0]),
                     min_similarity=sim,
                 )
                 == sim
@@ -518,7 +518,7 @@ class TestPatterns:
                 vbt.nb.pattern_similarity_nb(
                     np.asarray(arr),
                     np.array([1, 2, 3, 4, 5]),
-                    max_error=np.asarray(2.0),
+                    max_error=np.array([2.0]),
                     min_similarity=sim + 0.1,
                 )
             )
@@ -543,7 +543,7 @@ class TestPatterns:
                 np.array([3, 2, 1]),
                 np.array([1, 2, 3]),
                 rescale_mode=enums.RescaleMode.Rebase,
-                max_error=np.asarray(1.0),
+                max_error=np.array([1.0]),
             )
             == 0.368421052631579
         )
@@ -552,7 +552,7 @@ class TestPatterns:
                 np.array([3, 2, 1]),
                 np.array([1, 2, 3]),
                 rescale_mode=enums.RescaleMode.Rebase,
-                max_error=np.asarray(0.5),
+                max_error=np.array([0.5]),
             )
             == 0.3157894736842105
         )
@@ -561,7 +561,7 @@ class TestPatterns:
                 np.array([3, 2, 1]),
                 np.array([1, 2, 3]),
                 rescale_mode=enums.RescaleMode.Rebase,
-                max_error=np.asarray(1.0),
+                max_error=np.array([1.0]),
                 max_error_as_maxdist=True,
             )
             == 0.33333333333333337
@@ -571,7 +571,7 @@ class TestPatterns:
                 np.array([3, 2, 1]),
                 np.array([1, 2, 3]),
                 rescale_mode=enums.RescaleMode.Rebase,
-                max_error=np.asarray(0.5),
+                max_error=np.array([0.5]),
                 max_error_as_maxdist=True,
             )
             == 0.16666666666666663
@@ -581,7 +581,7 @@ class TestPatterns:
                 np.array([3, 2, 1]),
                 np.array([1, 2, 3]),
                 rescale_mode=enums.RescaleMode.Rebase,
-                max_error=np.asarray(0.5),
+                max_error=np.array([0.5]),
                 max_error_strict=True,
             )
         )
@@ -590,7 +590,7 @@ class TestPatterns:
                 np.array([3, 2, 1]),
                 np.array([1, 2, 3]),
                 rescale_mode=enums.RescaleMode.Rebase,
-                max_error=np.asarray(0.5),
+                max_error=np.array([0.5]),
                 min_similarity=0.31,
             )
             == 0.3157894736842105
@@ -600,7 +600,7 @@ class TestPatterns:
                 np.array([3, 2, 1]),
                 np.array([1, 2, 3]),
                 rescale_mode=enums.RescaleMode.Rebase,
-                max_error=np.asarray(0.5),
+                max_error=np.array([0.5]),
                 min_similarity=0.32,
             )
         )
@@ -617,7 +617,7 @@ class TestPatterns:
                 np.array([3, 2, 1]),
                 np.array([1, 2, 3]),
                 rescale_mode=enums.RescaleMode.Disable,
-                max_error=np.asarray(1.0),
+                max_error=np.array([1.0]),
             )
             == 0.19999999999999996
         )
@@ -626,7 +626,7 @@ class TestPatterns:
                 np.array([3, 2, 1]),
                 np.array([1, 2, 3]),
                 rescale_mode=enums.RescaleMode.Disable,
-                max_error=np.asarray(0.5),
+                max_error=np.array([0.5]),
             )
             == 0.19999999999999996
         )
@@ -635,7 +635,7 @@ class TestPatterns:
                 np.array([3, 2, 1]),
                 np.array([3, 2, 1]),
                 rescale_mode=enums.RescaleMode.Disable,
-                max_error=np.asarray(0.0),
+                max_error=np.array([0.0]),
             )
             == 1.0
         )
@@ -644,7 +644,7 @@ class TestPatterns:
                 np.array([3, 2, 1]),
                 np.array([1, 2, 3]),
                 rescale_mode=enums.RescaleMode.Disable,
-                max_error=np.asarray(1.0),
+                max_error=np.array([1.0]),
                 max_error_as_maxdist=True,
             )
             == 0.33333333333333337
@@ -654,7 +654,7 @@ class TestPatterns:
                 np.array([3, 2, 1]),
                 np.array([1, 2, 3]),
                 rescale_mode=enums.RescaleMode.Disable,
-                max_error=np.asarray(0.5),
+                max_error=np.array([0.5]),
                 max_error_as_maxdist=True,
             )
             == 0.33333333333333337
@@ -664,7 +664,7 @@ class TestPatterns:
                 np.array([3, 2, 1]),
                 np.array([3, 2, 1]),
                 rescale_mode=enums.RescaleMode.Disable,
-                max_error=np.asarray(0.0),
+                max_error=np.array([0.0]),
                 max_error_as_maxdist=True,
             )
             == 1.0
@@ -674,7 +674,7 @@ class TestPatterns:
                 np.array([3, 2, 1]),
                 np.array([3, 2, 2]),
                 rescale_mode=enums.RescaleMode.Disable,
-                max_error=np.asarray(0.0),
+                max_error=np.array([0.0]),
                 max_error_as_maxdist=True,
             )
         )

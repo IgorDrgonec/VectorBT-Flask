@@ -6,7 +6,6 @@ import uuid
 
 import attr
 import numpy as np
-from numba.typed import List
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.chunking import (
@@ -15,6 +14,7 @@ from vectorbtpro.utils.chunking import (
     ChunkMeta,
     ChunkMapper,
     ChunkSlicer,
+    ShapeSlicer,
     ArraySelector,
     ArraySlicer,
 )
@@ -107,24 +107,11 @@ group_idxs_mapper = GroupIdxsMapper(arg_query="group_map")
 
 
 @attr.s(frozen=True)
-class FlexSpecifier:
-    """Class with an attribute for specifying `flex_2d`."""
-
-    flex_2d: tp.Union[bool, tp.AnnArgQuery] = attr.ib(default="flex_2d")
-    """`flex_2d` or the query to match in the arguments."""
-
-    def get_flex_2d(self, ann_args: tp.AnnArgs) -> bool:
-        """Get `flex_2d` from the arguments."""
-        if isinstance(self.flex_2d, bool):
-            return self.flex_2d
-        return match_ann_arg(ann_args, self.flex_2d)
-
-
-@attr.s(frozen=True)
-class FlexArraySelector(ArraySelector, FlexSpecifier):
+class FlexArraySelector(ArraySelector):
     """Class for selecting one element from a NumPy array's axis flexibly based on the chunk index.
 
-    The result is intended to be used together with `vectorbtpro.base.indexing.flex_select_auto_nb`."""
+    The result is intended to be used together with `vectorbtpro.base.flex_indexing.flex_select_1d_nb`
+    and `vectorbtpro.base.flex_indexing.flex_select_nb`."""
 
     def take(
         self,
@@ -133,26 +120,23 @@ class FlexArraySelector(ArraySelector, FlexSpecifier):
         ann_args: tp.Optional[tp.AnnArgs] = None,
         **kwargs,
     ) -> tp.ArrayLike:
-        flex_2d = self.get_flex_2d(ann_args)
         obj = np.asarray(obj)
-        if obj.ndim == 0:
+        if len(obj.shape) == 0:
             return obj
+        axis = self.axis
+        if axis is None:
+            if len(obj.shape) == 1:
+                axis = 0
+            else:
+                raise ValueError("Axis is required")
         if obj.ndim == 1:
             if obj.shape[0] == 1:
-                return obj
-            if self.axis == 1:
-                if flex_2d:
-                    if self.keep_dims:
-                        return obj[chunk_meta.idx : chunk_meta.idx + 1]
-                    return obj[chunk_meta.idx]
-                return obj
-            if flex_2d:
                 return obj
             if self.keep_dims:
                 return obj[chunk_meta.idx : chunk_meta.idx + 1]
             return obj[chunk_meta.idx]
         if obj.ndim == 2:
-            if self.axis == 1:
+            if axis == 1:
                 if obj.shape[1] == 1:
                     return obj
                 if self.keep_dims:
@@ -167,10 +151,11 @@ class FlexArraySelector(ArraySelector, FlexSpecifier):
 
 
 @attr.s(frozen=True)
-class FlexArraySlicer(ArraySlicer, FlexSpecifier):
+class FlexArraySlicer(ArraySlicer):
     """Class for selecting one element from a NumPy array's axis flexibly based on the chunk index.
 
-    The result is intended to be used together with `vectorbtpro.base.indexing.flex_select_auto_nb`."""
+    The result is intended to be used together with `vectorbtpro.base.flex_indexing.flex_select_1d_nb`
+    and `vectorbtpro.base.flex_indexing.flex_select_nb`."""
 
     def take(
         self,
@@ -179,22 +164,21 @@ class FlexArraySlicer(ArraySlicer, FlexSpecifier):
         ann_args: tp.Optional[tp.AnnArgs] = None,
         **kwargs,
     ) -> tp.ArrayLike:
-        flex_2d = self.get_flex_2d(ann_args)
         obj = np.asarray(obj)
-        if obj.ndim == 0:
+        if len(obj.shape) == 0:
             return obj
+        axis = self.axis
+        if axis is None:
+            if len(obj.shape) == 1:
+                axis = 0
+            else:
+                raise ValueError("Axis is required")
         if obj.ndim == 1:
             if obj.shape[0] == 1:
                 return obj
-            if self.axis == 1:
-                if flex_2d:
-                    return obj[chunk_meta.start : chunk_meta.end]
-                return obj
-            if flex_2d:
-                return obj
             return obj[chunk_meta.start : chunk_meta.end]
         if obj.ndim == 2:
-            if self.axis == 1:
+            if axis == 1:
                 if obj.shape[1] == 1:
                     return obj
                 return obj[:, chunk_meta.start : chunk_meta.end]
@@ -202,3 +186,16 @@ class FlexArraySlicer(ArraySlicer, FlexSpecifier):
                 return obj
             return obj[chunk_meta.start : chunk_meta.end, :]
         raise ValueError(f"FlexArraySlicer supports max 2 dimensions, not {obj.ndim}")
+
+
+shape_gl_slicer = ShapeSlicer(axis=1, mapper=group_lens_mapper)
+"""Flexible 2-dim shape slicer along the column axis based on group lengths."""
+
+flex_1d_array_gl_slicer = FlexArraySlicer(mapper=group_lens_mapper)
+"""Flexible 1-dim array slicer along the column axis based on group lengths."""
+
+flex_array_gl_slicer = FlexArraySlicer(axis=1, mapper=group_lens_mapper)
+"""Flexible 2-dim array slicer along the column axis based on group lengths."""
+
+array_gl_slicer = ArraySlicer(axis=1, mapper=group_lens_mapper)
+"""2-dim array slicer along the column axis based on group lengths."""

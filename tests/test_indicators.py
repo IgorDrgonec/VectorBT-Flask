@@ -763,9 +763,9 @@ class TestFactory:
                 names=["custom_p1", "custom_p2", None],
             ),
         )
-        assert_frame_equal(F.with_apply_func(apply_func).run(ts, np.asarray([0, 1]), 2).out, target)
+        assert_frame_equal(F.with_apply_func(apply_func).run(ts, np.array([0, 1]), 2).out, target)
         assert_frame_equal(
-            F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts, np.asarray([0, 1]), 2).out,
+            F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts, np.array([0, 1]), 2).out,
             target,
         )
         target = pd.DataFrame(
@@ -777,25 +777,25 @@ class TestFactory:
             ),
         )
         assert_frame_equal(
-            F.with_apply_func(apply_func).run(ts, np.asarray([0, 1, 2]), 2, per_column=True).out,
+            F.with_apply_func(apply_func).run(ts, np.array([0, 1, 2]), 2, per_column=True).out,
             target,
         )
         assert_frame_equal(
-            F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts, np.asarray([0, 1, 2]), 2, per_column=True).out,
+            F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts, np.array([0, 1, 2]), 2, per_column=True).out,
             target,
         )
         assert_frame_equal(
-            F.with_apply_func(apply_func).run(ts, np.asarray([0, 1, 2]), [2], per_column=True).out,
+            F.with_apply_func(apply_func).run(ts, np.array([0, 1, 2]), [2], per_column=True).out,
             target,
         )
         assert_frame_equal(
-            F.with_apply_func(apply_func).run(ts, np.asarray([0, 1, 2]), np.array([2]), per_column=True).out,
+            F.with_apply_func(apply_func).run(ts, np.array([0, 1, 2]), np.array([2]), per_column=True).out,
             target,
         )
         with pytest.raises(Exception):
-            F.with_apply_func(apply_func).run(ts, np.asarray([0, 1]), 2, per_column=True)
+            F.with_apply_func(apply_func).run(ts, np.array([0, 1]), 2, per_column=True)
         with pytest.raises(Exception):
-            F.with_apply_func(apply_func).run(ts, np.asarray([0, 1, 2, 3]), 2, per_column=True)
+            F.with_apply_func(apply_func).run(ts, np.array([0, 1, 2, 3]), 2, per_column=True)
 
     def test_param_settings(self):
         F = vbt.IndicatorFactory(input_names=["ts"], param_names=["p"], output_names=["out"])
@@ -821,13 +821,13 @@ class TestFactory:
         )
         assert_frame_equal(
             F.with_apply_func(apply_func)
-            .run(ts, np.asarray([0, 1, 2]), param_settings={"p": {"is_array_like": True}})
+            .run(ts, np.array([0, 1, 2]), param_settings={"p": {"is_array_like": True}})
             .out,
             target,
         )
         assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True)
-            .run(ts, np.asarray([0, 1, 2]), param_settings={"p": {"is_array_like": True}})
+            .run(ts, np.array([0, 1, 2]), param_settings={"p": {"is_array_like": True}})
             .out,
             target,
         )
@@ -847,7 +847,7 @@ class TestFactory:
             F.with_apply_func(apply_func)
             .run(
                 ts,
-                np.asarray([0, 1, 2]),
+                np.array([0, 1, 2]),
                 param_settings={"p": {"is_array_like": True, "bc_to_input": 1, "per_column": True}},
             )
             .out,
@@ -857,7 +857,7 @@ class TestFactory:
             F.with_apply_func(apply_func_nb, jitted_loop=True)
             .run(
                 ts,
-                np.asarray([0, 1, 2]),
+                np.array([0, 1, 2]),
                 param_settings={"p": {"is_array_like": True, "bc_to_input": 1, "per_column": True}},
             )
             .out,
@@ -885,13 +885,13 @@ class TestFactory:
         )
         assert_frame_equal(
             F.with_apply_func(apply_func2)
-            .run(ts, np.asarray([0, 1, 2, 3, 4]), param_settings={"p": {"is_array_like": True, "bc_to_input": 0}})
+            .run(ts, np.array([0, 1, 2, 3, 4]), param_settings={"p": {"is_array_like": True, "bc_to_input": 0}})
             .out,
             target,
         )
         assert_frame_equal(
             F.with_apply_func(apply_func2_nb)
-            .run(ts, np.asarray([0, 1, 2, 3, 4]), param_settings={"p": {"is_array_like": True, "bc_to_input": 0}})
+            .run(ts, np.array([0, 1, 2, 3, 4]), param_settings={"p": {"is_array_like": True, "bc_to_input": 0}})
             .out,
             target,
         )

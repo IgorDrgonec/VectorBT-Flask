@@ -910,26 +910,25 @@ class SimulationContext(tp.NamedTuple):
     group_lens: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    init_cash: tp.FlexArray
-    init_position: tp.FlexArray
-    init_price: tp.FlexArray
-    cash_deposits: tp.FlexArray
-    cash_earnings: tp.FlexArray
-    segment_mask: tp.FlexArray
+    init_cash: tp.FlexArray1d
+    init_position: tp.FlexArray1d
+    init_price: tp.FlexArray1d
+    cash_deposits: tp.FlexArray2d
+    cash_earnings: tp.FlexArray2d
+    segment_mask: tp.FlexArray2d
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
-    open: tp.FlexArray
-    high: tp.FlexArray
-    low: tp.FlexArray
-    close: tp.FlexArray
-    bm_close: tp.Optional[tp.FlexArray]
+    open: tp.FlexArray2d
+    high: tp.FlexArray2d
+    low: tp.FlexArray2d
+    close: tp.FlexArray2d
+    bm_close: tp.Optional[tp.FlexArray2d]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
     track_value: bool
-    flex_2d: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
     in_outputs: tp.Optional[tp.NamedTuple]
@@ -986,7 +985,7 @@ Has shape `SimulationContext.target_shape` and each value must exist in the rang
 Can also be None if not provided.
 
 !!! note
-    To use `sort_call_seq_nb`, must be generated using `CallSeqType.Default`.
+    To use `sort_call_seq_1d_nb`, must be generated using `CallSeqType.Default`.
 
     To change the call sequence dynamically, better change `SegmentContext.call_seq_now` in-place.
     
@@ -1005,8 +1004,7 @@ __pdoc__[
     "SimulationContext.init_cash"
 ] = """Initial capital per column (or per group with cash sharing).
 
-Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d=True`, 
-so it can be passed as 1-dim array per column, or as a scalar. 
+Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_1d_nb`.
 
 Must broadcast to shape `(group_lens.shape[0],)` with cash sharing, otherwise `(target_shape[1],)`.
 
@@ -1022,8 +1020,7 @@ __pdoc__[
     "SimulationContext.init_position"
 ] = """Initial position per column.
 
-Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d=True`, 
-so it can be passed as 1-dim array per column, or as a scalar. 
+Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_1d_nb`.
 
 Must broadcast to shape `(target_shape[1],)`.
 
@@ -1034,8 +1031,7 @@ __pdoc__[
     "SimulationContext.init_price"
 ] = """Initial position price per column.
 
-Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d=True`, 
-so it can be passed as 1-dim array per column, or as a scalar. 
+Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_1d_nb`.
 
 Must broadcast to shape `(target_shape[1],)`.
 
@@ -1047,13 +1043,7 @@ __pdoc__[
 ] = """Cash to be deposited/withdrawn per column 
 (or per group with cash sharing).
 
-Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d`, 
-so it can be passed as 
-
-* 2-dim array, 
-* 1-dim array per column (requires `flex_2d=True`), 
-* 1-dim array per row (requires `flex_2d=False`), and
-* a scalar. 
+Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_nb`.
 
 Must broadcast to shape `(target_shape[0], group_lens.shape[0])`.
 
@@ -1067,13 +1057,7 @@ __pdoc__[
     "SimulationContext.cash_earnings"
 ] = """Earnings to be added per column.
 
-Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d`, 
-so it can be passed as 
-
-* 2-dim array, 
-* 1-dim array per column (requires `flex_2d=True`), 
-* 1-dim array per row (requires `flex_2d=False`), and
-* a scalar. 
+Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_nb`.
 
 Must broadcast to shape `SimulationContext.target_shape`.
 
@@ -1093,13 +1077,7 @@ If a segment is inactive, any callback function inside of it will not be execute
 You can still execute the segment's pre- and postprocessing function by enabling 
 `SimulationContext.call_pre_segment` and `SimulationContext.call_post_segment` respectively.
 
-Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d`, 
-so it can be passed as 
-
-* 2-dim array, 
-* 1-dim array per column (requires `flex_2d=True`), 
-* 1-dim array per row (requires `flex_2d=False`), and
-* a scalar. 
+Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_nb`.
 
 Must broadcast to shape `(target_shape[0], group_lens.shape[0])`.
 
@@ -1161,13 +1139,7 @@ Replaces `Order.price` in case it's `np.inf`.
 
 Acts as a boundary - see `PriceArea.close`.
 
-Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d`, 
-so it can be passed as 
-
-* 2-dim array, 
-* 1-dim array per column (requires `flex_2d=True`), 
-* 1-dim array per row (requires `flex_2d=False`), and
-* a scalar. 
+Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_nb`.
 
 Must broadcast to shape `SimulationContext.target_shape`.
 
@@ -1209,16 +1181,6 @@ If False, 'SimulationContext.last_val_price', 'SimulationContext.last_value', an
 You won't be able to use `SizeType.Value`, `SizeType.TargetValue`, and `SizeType.TargetPercent`.
 
 Disable this to make simulation faster for simple use cases."""
-__pdoc__[
-    "SimulationContext.flex_2d"
-] = """Whether the elements in a 1-dim array should be treated per
-column rather than per row.
-
-This flag is set automatically when using `vectorbtpro.portfolio.base.Portfolio.from_order_func` depending upon 
-whether there is any argument that has been broadcast to 2 dimensions.
-
-Has only effect when using flexible indexing, for example, with `vectorbtpro.base.indexing.flex_select_auto_nb`.
-"""
 __pdoc__[
     "SimulationContext.order_records"
 ] = """Order records per column.
@@ -1466,26 +1428,25 @@ class GroupContext(tp.NamedTuple):
     group_lens: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    init_cash: tp.FlexArray
-    init_position: tp.FlexArray
-    init_price: tp.FlexArray
-    cash_deposits: tp.FlexArray
-    cash_earnings: tp.FlexArray
-    segment_mask: tp.FlexArray
+    init_cash: tp.FlexArray1d
+    init_position: tp.FlexArray1d
+    init_price: tp.FlexArray1d
+    cash_deposits: tp.FlexArray2d
+    cash_earnings: tp.FlexArray2d
+    segment_mask: tp.FlexArray2d
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
-    open: tp.FlexArray
-    high: tp.FlexArray
-    low: tp.FlexArray
-    close: tp.FlexArray
-    bm_close: tp.Optional[tp.FlexArray]
+    open: tp.FlexArray2d
+    high: tp.FlexArray2d
+    low: tp.FlexArray2d
+    close: tp.FlexArray2d
+    bm_close: tp.Optional[tp.FlexArray2d]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
     track_value: bool
-    flex_2d: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
     in_outputs: tp.Optional[tp.NamedTuple]
@@ -1564,26 +1525,25 @@ class RowContext(tp.NamedTuple):
     group_lens: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    init_cash: tp.FlexArray
-    init_position: tp.FlexArray
-    init_price: tp.FlexArray
-    cash_deposits: tp.FlexArray
-    cash_earnings: tp.FlexArray
-    segment_mask: tp.FlexArray
+    init_cash: tp.FlexArray1d
+    init_position: tp.FlexArray1d
+    init_price: tp.FlexArray1d
+    cash_deposits: tp.FlexArray2d
+    cash_earnings: tp.FlexArray2d
+    segment_mask: tp.FlexArray2d
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
-    open: tp.FlexArray
-    high: tp.FlexArray
-    low: tp.FlexArray
-    close: tp.FlexArray
-    bm_close: tp.Optional[tp.FlexArray]
+    open: tp.FlexArray2d
+    high: tp.FlexArray2d
+    low: tp.FlexArray2d
+    close: tp.FlexArray2d
+    bm_close: tp.Optional[tp.FlexArray2d]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
     track_value: bool
-    flex_2d: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
     in_outputs: tp.Optional[tp.NamedTuple]
@@ -1626,26 +1586,25 @@ class SegmentContext(tp.NamedTuple):
     group_lens: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    init_cash: tp.FlexArray
-    init_position: tp.FlexArray
-    init_price: tp.FlexArray
-    cash_deposits: tp.FlexArray
-    cash_earnings: tp.FlexArray
-    segment_mask: tp.FlexArray
+    init_cash: tp.FlexArray1d
+    init_position: tp.FlexArray1d
+    init_price: tp.FlexArray1d
+    cash_deposits: tp.FlexArray2d
+    cash_earnings: tp.FlexArray2d
+    segment_mask: tp.FlexArray2d
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
-    open: tp.FlexArray
-    high: tp.FlexArray
-    low: tp.FlexArray
-    close: tp.FlexArray
-    bm_close: tp.Optional[tp.FlexArray]
+    open: tp.FlexArray2d
+    high: tp.FlexArray2d
+    low: tp.FlexArray2d
+    close: tp.FlexArray2d
+    bm_close: tp.Optional[tp.FlexArray2d]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
     track_value: bool
-    flex_2d: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
     in_outputs: tp.Optional[tp.NamedTuple]
@@ -1707,26 +1666,25 @@ class OrderContext(tp.NamedTuple):
     group_lens: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    init_cash: tp.FlexArray
-    init_position: tp.FlexArray
-    init_price: tp.FlexArray
-    cash_deposits: tp.FlexArray
-    cash_earnings: tp.FlexArray
-    segment_mask: tp.FlexArray
+    init_cash: tp.FlexArray1d
+    init_position: tp.FlexArray1d
+    init_price: tp.FlexArray1d
+    cash_deposits: tp.FlexArray2d
+    cash_earnings: tp.FlexArray2d
+    segment_mask: tp.FlexArray2d
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
-    open: tp.FlexArray
-    high: tp.FlexArray
-    low: tp.FlexArray
-    close: tp.FlexArray
-    bm_close: tp.Optional[tp.FlexArray]
+    open: tp.FlexArray2d
+    high: tp.FlexArray2d
+    low: tp.FlexArray2d
+    close: tp.FlexArray2d
+    bm_close: tp.Optional[tp.FlexArray2d]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
     track_value: bool
-    flex_2d: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
     in_outputs: tp.Optional[tp.NamedTuple]
@@ -1802,26 +1760,25 @@ class PostOrderContext(tp.NamedTuple):
     group_lens: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    init_cash: tp.FlexArray
-    init_position: tp.FlexArray
-    init_price: tp.FlexArray
-    cash_deposits: tp.FlexArray
-    cash_earnings: tp.FlexArray
-    segment_mask: tp.FlexArray
+    init_cash: tp.FlexArray1d
+    init_position: tp.FlexArray1d
+    init_price: tp.FlexArray1d
+    cash_deposits: tp.FlexArray2d
+    cash_earnings: tp.FlexArray2d
+    segment_mask: tp.FlexArray2d
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
-    open: tp.FlexArray
-    high: tp.FlexArray
-    low: tp.FlexArray
-    close: tp.FlexArray
-    bm_close: tp.Optional[tp.FlexArray]
+    open: tp.FlexArray2d
+    high: tp.FlexArray2d
+    low: tp.FlexArray2d
+    close: tp.FlexArray2d
+    bm_close: tp.Optional[tp.FlexArray2d]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
     track_value: bool
-    flex_2d: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
     in_outputs: tp.Optional[tp.NamedTuple]
@@ -1917,26 +1874,25 @@ class FlexOrderContext(tp.NamedTuple):
     group_lens: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    init_cash: tp.FlexArray
-    init_position: tp.FlexArray
-    init_price: tp.FlexArray
-    cash_deposits: tp.FlexArray
-    cash_earnings: tp.FlexArray
-    segment_mask: tp.FlexArray
+    init_cash: tp.FlexArray1d
+    init_position: tp.FlexArray1d
+    init_price: tp.FlexArray1d
+    cash_deposits: tp.FlexArray2d
+    cash_earnings: tp.FlexArray2d
+    segment_mask: tp.FlexArray2d
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
-    open: tp.FlexArray
-    high: tp.FlexArray
-    low: tp.FlexArray
-    close: tp.FlexArray
-    bm_close: tp.Optional[tp.FlexArray]
+    open: tp.FlexArray2d
+    high: tp.FlexArray2d
+    low: tp.FlexArray2d
+    close: tp.FlexArray2d
+    bm_close: tp.Optional[tp.FlexArray2d]
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
     track_value: bool
-    flex_2d: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
     in_outputs: tp.Optional[tp.NamedTuple]
@@ -2155,14 +2111,13 @@ class SignalSegmentContext(tp.NamedTuple):
     cash_sharing: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
-    open: tp.FlexArray
-    high: tp.FlexArray
-    low: tp.FlexArray
-    close: tp.FlexArray
-    init_cash: tp.FlexArray
-    init_position: tp.FlexArray
-    init_price: tp.FlexArray
-    flex_2d: bool
+    open: tp.FlexArray2d
+    high: tp.FlexArray2d
+    low: tp.FlexArray2d
+    close: tp.FlexArray2d
+    init_cash: tp.FlexArray1d
+    init_position: tp.FlexArray1d
+    init_price: tp.FlexArray1d
 
     order_records: tp.RecordArray2d
     order_counts: tp.Array1d
@@ -2216,7 +2171,6 @@ __pdoc__["SignalSegmentContext.close"] = "See `SimulationContext.close`."
 __pdoc__["SignalSegmentContext.init_cash"] = "See `SimulationContext.init_cash`."
 __pdoc__["SignalSegmentContext.init_position"] = "See `SimulationContext.init_position`."
 __pdoc__["SignalSegmentContext.init_price"] = "See `SimulationContext.init_price`."
-__pdoc__["SignalSegmentContext.flex_2d"] = "See `SimulationContext.flex_2d`."
 __pdoc__["SignalSegmentContext.order_records"] = "See `SimulationContext.order_records`."
 __pdoc__["SignalSegmentContext.order_counts"] = "See `SimulationContext.order_counts`."
 __pdoc__["SignalSegmentContext.log_records"] = "See `SimulationContext.log_records`."
@@ -2262,14 +2216,13 @@ class SignalContext(tp.NamedTuple):
     cash_sharing: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
-    open: tp.FlexArray
-    high: tp.FlexArray
-    low: tp.FlexArray
-    close: tp.FlexArray
-    init_cash: tp.FlexArray
-    init_position: tp.FlexArray
-    init_price: tp.FlexArray
-    flex_2d: bool
+    open: tp.FlexArray2d
+    high: tp.FlexArray2d
+    low: tp.FlexArray2d
+    close: tp.FlexArray2d
+    init_cash: tp.FlexArray1d
+    init_position: tp.FlexArray1d
+    init_price: tp.FlexArray1d
 
     order_records: tp.RecordArray2d
     order_counts: tp.Array1d

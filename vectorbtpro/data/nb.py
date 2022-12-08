@@ -10,16 +10,16 @@ from numba import prange
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import register_jitted
-from vectorbtpro.base.indexing import flex_select_auto_nb
+from vectorbtpro.base.flex_indexing import flex_select_1d_nb
 
 
 @register_jitted(cache=True, tags={"can_parallel"})
 def generate_random_data_nb(
     shape: tp.Shape,
-    start_value: tp.MaybeFlexArray = 100.0,
-    mean: tp.MaybeFlexArray = 0.0,
-    std: tp.MaybeFlexArray = 0.01,
-    symmetric: tp.MaybeFlexArray = False,
+    start_value: tp.FlexArray1d = np.array([100.0]),
+    mean: tp.FlexArray1d = np.array([0.0]),
+    std: tp.FlexArray1d = np.array([0.01]),
+    symmetric: tp.FlexArray1d = np.array([False]),
 ) -> tp.Array2d:
     """Generate data using cumulative product of returns drawn from normal (Gaussian) distribution.
 
@@ -30,10 +30,10 @@ def generate_random_data_nb(
     out = np.empty(shape, dtype=np.float_)
 
     for col in prange(shape[1]):
-        _start_value = flex_select_auto_nb(np.asarray(start_value), col)
-        _mean = flex_select_auto_nb(np.asarray(mean), col)
-        _std = flex_select_auto_nb(np.asarray(std), col)
-        _symmetric = flex_select_auto_nb(np.asarray(symmetric), col)
+        _start_value = flex_select_1d_nb(start_value, col)
+        _mean = flex_select_1d_nb(mean, col)
+        _std = flex_select_1d_nb(std, col)
+        _symmetric = flex_select_1d_nb(symmetric, col)
 
         for i in range(shape[0]):
             if i == 0:
@@ -51,19 +51,19 @@ def generate_random_data_nb(
 @register_jitted(cache=True, tags={"can_parallel"})
 def generate_gbm_data_nb(
     shape: tp.Shape,
-    start_value: tp.MaybeFlexArray = 100.0,
-    mean: tp.MaybeFlexArray = 0.0,
-    std: tp.MaybeFlexArray = 0.01,
-    dt: tp.MaybeFlexArray = 1.0,
+    start_value: tp.FlexArray1d = np.array([100.0]),
+    mean: tp.FlexArray1d = np.array([0.0]),
+    std: tp.FlexArray1d = np.array([0.01]),
+    dt: tp.FlexArray1d = np.array([1.0]),
 ) -> tp.Array2d:
     """Generate data using Geometric Brownian Motion (GBM)."""
     out = np.empty(shape, dtype=np.float_)
 
     for col in prange(shape[1]):
-        _start_value = flex_select_auto_nb(np.asarray(start_value), col)
-        _mean = flex_select_auto_nb(np.asarray(mean), col)
-        _std = flex_select_auto_nb(np.asarray(std), col)
-        _dt = flex_select_auto_nb(np.asarray(dt), col)
+        _start_value = flex_select_1d_nb(start_value, col)
+        _mean = flex_select_1d_nb(mean, col)
+        _std = flex_select_1d_nb(std, col)
+        _dt = flex_select_1d_nb(dt, col)
 
         for i in range(shape[0]):
             if i == 0:

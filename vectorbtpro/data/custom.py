@@ -25,6 +25,7 @@ from pandas.io.parsers import TextFileReader
 from pandas.io.pytables import TableIterator
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.reshaping import to_1d_array
 from vectorbtpro.data import nb
 from vectorbtpro.data.base import Data, symbol_dict
 from vectorbtpro.generic import nb as generic_nb
@@ -250,7 +251,13 @@ class RandomData(SyntheticData):
             jitted = random_cfg["jitted"]
 
         func = jit_reg.resolve_option(nb.generate_random_data_nb, jitted)
-        out = func((len(index), num_paths), start_value, mean, std, symmetric=symmetric)
+        out = func(
+            (len(index), num_paths),
+            to_1d_array(start_value),
+            to_1d_array(mean),
+            to_1d_array(std),
+            symmetric=to_1d_array(symmetric)
+        )
 
         if out.shape[1] == 1:
             if columns is None:
@@ -369,7 +376,13 @@ class GBMData(RandomData):
             jitted = gbm_cfg["jitted"]
 
         func = jit_reg.resolve_option(nb.generate_gbm_data_nb, jitted)
-        out = func((len(index), num_paths), start_value, mean, std, dt)
+        out = func(
+            (len(index), num_paths),
+            to_1d_array(start_value),
+            to_1d_array(mean),
+            to_1d_array(std),
+            to_1d_array(dt),
+        )
 
         if out.shape[1] == 1:
             if columns is None:

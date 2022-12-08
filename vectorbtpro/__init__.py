@@ -28,6 +28,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro._settings import settings
 from vectorbtpro.accessors import Vbt_Accessor as pd_acc, Vbt_SRAccessor as sr_acc, Vbt_DFAccessor as df_acc
 from vectorbtpro.generic import nb, enums
+from vectorbtpro.records import nb as rec_nb
 from vectorbtpro.portfolio import nb as pf_nb, enums as pf_enums
 from vectorbtpro.returns import nb as ret_nb, enums as ret_enums
 from vectorbtpro.signals import nb as sig_nb, enums as sig_enums

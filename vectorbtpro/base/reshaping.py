@@ -492,8 +492,8 @@ class BCO:
     
     Only makes sure that the array can broadcast to the target shape."""
 
-    min_one_dim: tp.Optional[bool] = attr.ib(default=None)
-    """Whether to convert a constant into a 1-dim array."""
+    min_ndim: tp.Optional[int] = attr.ib(default=None)
+    """Minimum number of dimensions."""
 
     post_func: tp.Optional[tp.Callable] = attr.ib(default=None)
     """Function to post-process the output array."""
@@ -592,7 +592,7 @@ def broadcast(
     to_frame: tp.Optional[bool] = None,
     to_pd: tp.Optional[tp.MaybeMappingSequence[bool]] = None,
     keep_flex: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
-    min_one_dim: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
+    min_ndim: tp.MaybeMappingSequence[tp.Optional[int]] = None,
     post_func: tp.MaybeMappingSequence[tp.Optional[tp.Callable]] = None,
     require_kwargs: tp.MaybeMappingSequence[tp.Optional[tp.Kwargs]] = None,
     reindex_kwargs: tp.MaybeMappingSequence[tp.Optional[tp.Kwargs]] = None,
@@ -645,7 +645,9 @@ def broadcast(
 
             If None, converts only if there is at least one Pandas object among them.
         keep_flex (bool, sequence or mapping): See `BCO.keep_flex`.
-        min_one_dim (bool, sequence or mapping): See `BCO.min_one_dim`.
+        min_ndim (int, sequence or mapping): See `BCO.min_ndim`.
+
+            If None, becomes 2 if `keep_flex` is True, otherwise 1.
         post_func (callable, sequence or mapping): See `BCO.post_func`.
 
             Applied only when `keep_flex` is False.
@@ -1044,9 +1046,9 @@ def broadcast(
         if _keep_flex is None:
             _keep_flex = broadcasting_cfg["keep_flex"]
 
-        _min_one_dim = _resolve_arg(obj, "min_one_dim", min_one_dim, None)
-        if _min_one_dim is None:
-            _min_one_dim = broadcasting_cfg["min_one_dim"]
+        _min_ndim = _resolve_arg(obj, "min_ndim", min_ndim, None)
+        if _min_ndim is None:
+            _min_ndim = broadcasting_cfg["min_ndim"]
 
         _post_func = _resolve_arg(obj, "post_func", post_func, None)
 
@@ -1086,7 +1088,7 @@ def broadcast(
                 value,
                 to_pd=_to_pd,
                 keep_flex=_keep_flex,
-                min_one_dim=_min_one_dim,
+                min_ndim=_min_ndim,
                 post_func=_post_func,
                 require_kwargs=_require_kwargs,
                 reindex_kwargs=_reindex_kwargs,
@@ -1140,7 +1142,7 @@ def broadcast(
                 value,
                 to_pd=_to_pd,
                 keep_flex=_keep_flex,
-                min_one_dim=_min_one_dim,
+                min_ndim=_min_ndim,
                 post_func=_post_func,
                 require_kwargs=_require_kwargs,
                 reindex_kwargs=_reindex_kwargs,
@@ -1270,13 +1272,7 @@ def broadcast(
                 value = value[None]
             elif value.ndim > 1:
                 raise ValueError(f"Product parameter '{k}' cannot be multi-dimensional")
-            param_dct[k] = Param(
-                value,
-                is_tuple=False,
-                is_array_like=False,
-                level=bco_obj.level,
-                keys=bco_obj.keys
-            )
+            param_dct[k] = Param(value, is_tuple=False, is_array_like=False, level=bco_obj.level, keys=bco_obj.keys)
         param_product, param_columns = combine_params(
             param_dct,
             random_subset=random_subset,
@@ -1333,7 +1329,7 @@ def broadcast(
                 columns=new_columns,
             ),
             wrapper_kwargs,
-        )
+        ),
     )
 
     # Perform broadcasting
@@ -1344,6 +1340,7 @@ def broadcast(
             continue
         _keep_flex = bco_instances[k].keep_flex
         _repeat_product = bco_instances[k].repeat_product
+        _min_ndim = bco_instances[k].min_ndim
 
         if k in product_keys:
             # Broadcast parameters
@@ -1361,9 +1358,6 @@ def broadcast(
             # Broadcast regular objects
             old_obj = aligned_objs[k]
             new_obj = ready_objs[k]
-            _min_one_dim = bco_instances[k].min_one_dim
-            if _min_one_dim and new_obj.ndim == 0:
-                new_obj = new_obj[None]
             if _keep_flex:
                 if n_params > 0:
                     if len(to_shape) == 1:
@@ -1380,6 +1374,21 @@ def broadcast(
                     if new_obj.ndim == 1:
                         new_obj = new_obj[:, None]  # product changes is_2d behavior
                     new_obj = np.tile(new_obj, (1, n_params))
+
+        if _min_ndim is None:
+            if _keep_flex:
+                _min_ndim = 2
+            else:
+                _min_ndim = 1
+        if _min_ndim not in (1, 2):
+            raise ValueError("Argument keep_flex must be either 1 or 2")
+        if _min_ndim in (1, 2) and new_obj.ndim == 0:
+            new_obj = new_obj[None]
+        if _min_ndim == 2 and new_obj.ndim == 1:
+            if len(to_shape) == 1 and k not in product_keys:
+                new_obj = new_obj[:, None]
+            else:
+                new_obj = new_obj[None]
 
         aligned_objs2[k] = old_obj
         new_objs[k] = new_obj
@@ -1492,7 +1501,7 @@ def broadcast(
 
 def broadcast_to(
     arg1: tp.ArrayLike,
-    arg2: tp.ArrayLike,
+    arg2: tp.Union[tp.ArrayLike, wrapping.ArrayWrapper],
     to_pd: tp.Optional[bool] = None,
     index_from: tp.Optional[IndexFromLike] = None,
     columns_from: tp.Optional[IndexFromLike] = None,
@@ -1524,16 +1533,37 @@ def broadcast_to(
         ```
     """
     arg1 = to_any_array(arg1)
-    arg2 = to_any_array(arg2)
+    if not isinstance(arg2, wrapping.ArrayWrapper):
+        arg2 = to_any_array(arg2)
     if to_pd is None:
-        to_pd = checks.is_pandas(arg2)
+        if not isinstance(arg2, wrapping.ArrayWrapper):
+            to_pd = checks.is_pandas(arg2)
+        else:
+            to_pd = True
     if to_pd:
         # Take index and columns from arg2
         if index_from is None:
-            index_from = indexes.get_index(arg2, 0)
+            if not isinstance(arg2, wrapping.ArrayWrapper):
+                index_from = indexes.get_index(arg2, 0)
+            else:
+                index_from = arg2.index
         if columns_from is None:
-            columns_from = indexes.get_index(arg2, 1)
-    return broadcast(arg1, to_shape=arg2.shape, to_pd=to_pd, index_from=index_from, columns_from=columns_from, **kwargs)
+            if not isinstance(arg2, wrapping.ArrayWrapper):
+                columns_from = indexes.get_index(arg2, 1)
+            else:
+                columns_from = arg2.columns
+    if not isinstance(arg2, wrapping.ArrayWrapper):
+        to_shape = arg2.shape
+    else:
+        to_shape = arg2.shape
+    return broadcast(
+        arg1,
+        to_shape=to_shape,
+        to_pd=to_pd,
+        index_from=index_from,
+        columns_from=columns_from,
+        **kwargs,
+    )
 
 
 def broadcast_to_array_of(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> tp.Array:

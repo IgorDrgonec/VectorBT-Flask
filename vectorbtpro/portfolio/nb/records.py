@@ -5,6 +5,7 @@
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
+from vectorbtpro.base.flex_indexing import flex_select_nb
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.records import chunking as records_ch
 from vectorbtpro.registries.ch_registry import register_chunkable
@@ -175,8 +176,8 @@ def fill_entry_trades_in_position_nb(
         order_records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         close=ch.ArraySlicer(axis=1),
         col_map=base_ch.GroupMapSlicer(),
-        init_position=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
-        init_price=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
+        init_position=base_ch.FlexArraySlicer(),
+        init_price=base_ch.FlexArraySlicer(),
     ),
     merge_func=records_ch.merge_records,
     merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
@@ -186,8 +187,8 @@ def get_entry_trades_nb(
     order_records: tp.RecordArray,
     close: tp.Array2d,
     col_map: tp.GroupMap,
-    init_position: tp.FlexArray = np.asarray(0.0),
-    init_price: tp.FlexArray = np.asarray(np.nan),
+    init_position: tp.FlexArray1d = np.array([0.0]),
+    init_price: tp.FlexArray1d = np.array([np.nan]),
 ) -> tp.RecordArray:
     """Fill entry trade records by aggregating order records.
 
@@ -197,8 +198,7 @@ def get_entry_trades_nb(
         ```pycon
         >>> import numpy as np
         >>> import pandas as pd
-        >>> from vectorbtpro.records.nb import col_map_nb
-        >>> from vectorbtpro.portfolio.nb import simulate_from_orders_nb, get_entry_trades_nb
+        >>> import vectorbtpro as vbt
 
         >>> close = order_price = np.array([
         ...     [1, 6],
@@ -208,7 +208,7 @@ def get_entry_trades_nb(
         ...     [5, 2],
         ...     [6, 1]
         ... ])
-        >>> size = np.asarray([
+        >>> size = np.array([
         ...     [1, -1],
         ...     [0.1, -0.1],
         ...     [-1, 1],
@@ -220,18 +220,18 @@ def get_entry_trades_nb(
         >>> group_lens = np.full(target_shape[1], 1)
         >>> init_cash = np.full(target_shape[1], 100)
 
-        >>> sim_out = simulate_from_orders_nb(
+        >>> sim_out = vbt.pf_nb.simulate_from_orders_nb(
         ...     target_shape,
         ...     group_lens,
         ...     init_cash=init_cash,
         ...     size=size,
         ...     price=close,
-        ...     fees=np.asarray(0.01),
-        ...     slippage=np.asarray(0.01)
+        ...     fees=np.asarray([[0.01]]),
+        ...     slippage=np.asarray([[0.01]])
         ... )
 
-        >>> col_map = col_map_nb(sim_out.order_records['col'], target_shape[1])
-        >>> entry_trade_records = get_entry_trades_nb(sim_out.order_records, close, col_map)
+        >>> col_map = vbt.rec_nb.col_map_nb(sim_out.order_records['col'], target_shape[1])
+        >>> entry_trade_records = vbt.pf_nb.get_entry_trades_nb(sim_out.order_records, close, col_map)
         >>> pd.DataFrame.from_records(entry_trade_records)
            id  col  size  entry_order_id  entry_idx  entry_price  entry_fees  \\
         0   0    0   1.0               0          0         1.01     0.01010
@@ -271,8 +271,8 @@ def get_entry_trades_nb(
     counts = np.full(len(col_lens), 0, dtype=np.int_)
 
     for col in prange(col_lens.shape[0]):
-        _init_position = float(flex_select_auto_nb(init_position, 0, col, True))
-        _init_price = float(flex_select_auto_nb(init_price, 0, col, True))
+        _init_position = float(flex_select_1d_nb(init_position, col))
+        _init_price = float(flex_select_1d_nb(init_price, col))
         if _init_position != 0:
             # Prepare initial position
             first_c = -1
@@ -467,8 +467,8 @@ def get_entry_trades_nb(
         order_records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
         close=ch.ArraySlicer(axis=1),
         col_map=base_ch.GroupMapSlicer(),
-        init_position=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
-        init_price=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
+        init_position=base_ch.FlexArraySlicer(),
+        init_price=base_ch.FlexArraySlicer(),
     ),
     merge_func=records_ch.merge_records,
     merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
@@ -478,8 +478,8 @@ def get_exit_trades_nb(
     order_records: tp.RecordArray,
     close: tp.Array2d,
     col_map: tp.GroupMap,
-    init_position: tp.FlexArray = np.asarray(0.0),
-    init_price: tp.FlexArray = np.asarray(np.nan),
+    init_position: tp.FlexArray1d = np.array([0.0]),
+    init_price: tp.FlexArray1d = np.array([np.nan]),
 ) -> tp.RecordArray:
     """Fill exit trade records by aggregating order records.
 
@@ -489,9 +489,7 @@ def get_exit_trades_nb(
         * Building upon the example in `get_exit_trades_nb`:
 
         ```pycon
-        >>> from vectorbtpro.portfolio.nb import get_exit_trades_nb
-
-        >>> exit_trade_records = get_exit_trades_nb(sim_out.order_records, close, col_map)
+        >>> exit_trade_records = vbt.pf_nb.get_exit_trades_nb(sim_out.order_records, close, col_map)
         >>> pd.DataFrame.from_records(exit_trade_records)
            id  col  size  entry_order_id  entry_idx  entry_price  entry_fees  \\
         0   0    0   1.0               0          0     1.101818    0.011018
@@ -531,8 +529,8 @@ def get_exit_trades_nb(
     counts = np.full(len(col_lens), 0, dtype=np.int_)
 
     for col in prange(col_lens.shape[0]):
-        _init_position = float(flex_select_auto_nb(init_position, 0, col, True))
-        _init_price = float(flex_select_auto_nb(init_price, 0, col, True))
+        _init_position = float(flex_select_1d_nb(init_position, col))
+        _init_price = float(flex_select_1d_nb(init_price, col))
         if _init_position != 0:
             # Prepare initial position
             in_position = True
@@ -814,10 +812,8 @@ def get_positions_nb(trade_records: tp.RecordArray, col_map: tp.GroupMap) -> tp.
         * Building upon the example in `get_exit_trades_nb`:
 
         ```pycon
-        >>> from vectorbtpro.portfolio.nb import get_positions_nb
-
-        >>> col_map = col_map_nb(exit_trade_records['col'], target_shape[1])
-        >>> position_records = get_positions_nb(exit_trade_records, col_map)
+        >>> col_map = vbt.rec_nb.col_map_nb(exit_trade_records['col'], target_shape[1])
+        >>> position_records = vbt.pf_nb.get_positions_nb(exit_trade_records, col_map)
         >>> pd.DataFrame.from_records(position_records)
            id  col  size  entry_order_id  entry_idx  entry_price  entry_fees  \\
         0   0    0   1.1               0          0     1.101818     0.01212
@@ -995,14 +991,13 @@ def sqn_reduce_nb(pnl_arr: tp.Array1d, ddof: int = 0) -> float:
 @register_jitted(cache=True)
 def trade_best_worst_price_nb(
     trade: tp.Record,
-    open: tp.Optional[tp.FlexArray],
-    high: tp.Optional[tp.FlexArray],
-    low: tp.Optional[tp.FlexArray],
-    close: tp.FlexArray,
+    open: tp.Optional[tp.FlexArray2d],
+    high: tp.Optional[tp.FlexArray2d],
+    low: tp.Optional[tp.FlexArray2d],
+    close: tp.FlexArray2d,
     entry_price_open: bool = False,
     exit_price_close: bool = False,
     max_duration: tp.Optional[int] = None,
-    flex_2d: bool = False,
 ) -> tp.Tuple[float, float]:
     """Best and worst price during a trade."""
     from_i = trade["entry_idx"]
@@ -1015,22 +1010,22 @@ def trade_best_worst_price_nb(
     for i in range(from_i, to_i + 1):
         if i > from_i or entry_price_open:
             if open is not None:
-                _open = flex_select_auto_nb(open, i, trade["col"], flex_2d=flex_2d)
+                _open = flex_select_nb(open, i, trade["col"])
                 if np.isnan(vmin) or _open < vmin:
                     vmin = _open
                 if np.isnan(vmax) or _open > vmax:
                     vmax = _open
         if (i > from_i or entry_price_open) and (i < to_i or exit_price_close or trade_open):
             if low is not None:
-                _low = flex_select_auto_nb(low, i, trade["col"], flex_2d=flex_2d)
+                _low = flex_select_nb(low, i, trade["col"])
                 if np.isnan(vmin) or _low < vmin:
                     vmin = _low
             if high is not None:
-                _high = flex_select_auto_nb(high, i, trade["col"], flex_2d=flex_2d)
+                _high = flex_select_nb(high, i, trade["col"])
                 if np.isnan(vmax) or _high > vmax:
                     vmax = _high
         if i < to_i or exit_price_close or trade_open:
-            _close = flex_select_auto_nb(close, i, trade["col"], flex_2d=flex_2d)
+            _close = flex_select_nb(close, i, trade["col"])
             if np.isnan(vmin) or _close < vmin:
                 vmin = _close
             if np.isnan(vmax) or _close > vmax:
@@ -1053,20 +1048,18 @@ def trade_best_worst_price_nb(
         close=None,
         entry_price_open=None,
         exit_price_close=None,
-        flex_2d=None,
     ),
     merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def best_price_nb(
     records: tp.RecordArray,
-    open: tp.Optional[tp.FlexArray],
-    high: tp.Optional[tp.FlexArray],
-    low: tp.Optional[tp.FlexArray],
-    close: tp.FlexArray,
+    open: tp.Optional[tp.FlexArray2d],
+    high: tp.Optional[tp.FlexArray2d],
+    low: tp.Optional[tp.FlexArray2d],
+    close: tp.FlexArray2d,
     entry_price_open: bool = False,
     exit_price_close: bool = False,
-    flex_2d: bool = False,
 ) -> tp.Array1d:
     """Get best price by applying `trade_best_worst_price_nb` on each trade."""
     out = np.empty(len(records), dtype=np.float_)
@@ -1080,7 +1073,6 @@ def best_price_nb(
             close=close,
             entry_price_open=entry_price_open,
             exit_price_close=exit_price_close,
-            flex_2d=flex_2d,
         )[0]
     return out
 
@@ -1095,20 +1087,18 @@ def best_price_nb(
         close=None,
         entry_price_open=None,
         exit_price_close=None,
-        flex_2d=None,
     ),
     merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def worst_price_nb(
     records: tp.RecordArray,
-    open: tp.Optional[tp.FlexArray],
-    high: tp.Optional[tp.FlexArray],
-    low: tp.Optional[tp.FlexArray],
-    close: tp.FlexArray,
+    open: tp.Optional[tp.FlexArray2d],
+    high: tp.Optional[tp.FlexArray2d],
+    low: tp.Optional[tp.FlexArray2d],
+    close: tp.FlexArray2d,
     entry_price_open: bool = False,
     exit_price_close: bool = False,
-    flex_2d: bool = False,
 ) -> tp.Array1d:
     """Get worst price by applying `trade_best_worst_price_nb` on each trade."""
     out = np.empty(len(records), dtype=np.float_)
@@ -1122,7 +1112,6 @@ def worst_price_nb(
             close=close,
             entry_price_open=entry_price_open,
             exit_price_close=exit_price_close,
-            flex_2d=flex_2d,
         )[1]
     return out
 
@@ -1238,7 +1227,6 @@ def mae_nb(
         entry_price_open=None,
         exit_price_close=None,
         max_duration=None,
-        flex_2d=None,
     ),
     merge_func="concat",
 )
@@ -1246,15 +1234,14 @@ def mae_nb(
 def edge_ratio_nb(
     records: tp.RecordArray,
     col_map: tp.GroupMap,
-    open: tp.Optional[tp.FlexArray],
-    high: tp.Optional[tp.FlexArray],
-    low: tp.Optional[tp.FlexArray],
-    close: tp.FlexArray,
-    volatility: tp.FlexArray,
+    open: tp.Optional[tp.FlexArray2d],
+    high: tp.Optional[tp.FlexArray2d],
+    low: tp.Optional[tp.FlexArray2d],
+    close: tp.FlexArray2d,
+    volatility: tp.FlexArray2d,
     entry_price_open: bool = False,
     exit_price_close: bool = False,
     max_duration: tp.Optional[int] = None,
-    flex_2d: bool = False,
 ) -> tp.Array1d:
     """Get edge ratio of each column."""
     col_idxs, col_lens = col_map
@@ -1283,7 +1270,6 @@ def edge_ratio_nb(
                 entry_price_open=entry_price_open,
                 exit_price_close=exit_price_close,
                 max_duration=max_duration,
-                flex_2d=flex_2d,
             )
             mfe = abs(trade_mfe_nb(
                 size=trade["size"],
@@ -1299,7 +1285,7 @@ def edge_ratio_nb(
                 worst_price=worst_price,
                 use_returns=False,
             ))
-            _volatility = flex_select_auto_nb(volatility, trade["entry_idx"], trade["col"], flex_2d=flex_2d)
+            _volatility = flex_select_nb(volatility, trade["entry_idx"], trade["col"])
             if _volatility == 0:
                 norm_mfe = np.nan
                 norm_mae = np.nan
@@ -1341,7 +1327,6 @@ def edge_ratio_nb(
         exit_price_close=None,
         max_duration=None,
         incl_shorter=None,
-        flex_2d=None,
     ),
     merge_func="concat",
 )
@@ -1349,16 +1334,15 @@ def edge_ratio_nb(
 def running_edge_ratio_nb(
     records: tp.RecordArray,
     col_map: tp.GroupMap,
-    open: tp.Optional[tp.FlexArray],
-    high: tp.Optional[tp.FlexArray],
-    low: tp.Optional[tp.FlexArray],
-    close: tp.FlexArray,
-    volatility: tp.FlexArray,
+    open: tp.Optional[tp.FlexArray2d],
+    high: tp.Optional[tp.FlexArray2d],
+    low: tp.Optional[tp.FlexArray2d],
+    close: tp.FlexArray2d,
+    volatility: tp.FlexArray2d,
     entry_price_open: bool = False,
     exit_price_close: bool = False,
     max_duration: tp.Optional[int] = None,
     incl_shorter: bool = False,
-    flex_2d: bool = False,
 ) -> tp.Array2d:
     """Get running edge ratio of each column."""
     col_idxs, col_lens = col_map
@@ -1402,7 +1386,6 @@ def running_edge_ratio_nb(
                     entry_price_open=entry_price_open,
                     exit_price_close=exit_price_close,
                     max_duration=k + 1,
-                    flex_2d=flex_2d,
                 )
                 mfe = abs(trade_mfe_nb(
                     size=trade["size"],
@@ -1418,7 +1401,7 @@ def running_edge_ratio_nb(
                     worst_price=worst_price,
                     use_returns=False,
                 ))
-                _volatility = flex_select_auto_nb(volatility, trade["entry_idx"], trade["col"], flex_2d=flex_2d)
+                _volatility = flex_select_nb(volatility, trade["entry_idx"], trade["col"])
                 if _volatility == 0:
                     norm_mfe = np.nan
                     norm_mae = np.nan

@@ -93,27 +93,27 @@ class TestFromOrderFunc:
             freq="1h",
             seed=42,
         )
-        pf = vbt.Portfolio.from_order_func(data, order_func_nb, np.asarray(np.inf))
+        pf = vbt.Portfolio.from_order_func(data, order_func_nb, np.array([[np.inf]]))
         assert pf.open is not None
         assert pf.high is not None
         assert pf.low is not None
         assert pf.close is not None
-        pf = vbt.Portfolio.from_order_func(data.get("Close"), order_func_nb, np.asarray(np.inf))
+        pf = vbt.Portfolio.from_order_func(data.get("Close"), order_func_nb, np.array([[np.inf]]))
         assert pf.open is None
         assert pf.high is None
         assert pf.low is None
         assert pf.close is not None
-        pf = vbt.Portfolio.from_order_func(data[["Open", "Close"]], order_func_nb, np.asarray(np.inf))
+        pf = vbt.Portfolio.from_order_func(data[["Open", "Close"]], order_func_nb, np.array([[np.inf]]))
         assert pf.open is not None
         assert pf.high is None
         assert pf.low is None
         assert pf.close is not None
-        pf = vbt.Portfolio.from_order_func(data["Close"], order_func_nb, np.asarray(np.inf))
+        pf = vbt.Portfolio.from_order_func(data["Close"], order_func_nb, np.array([[np.inf]]))
         assert pf.open is None
         assert pf.high is None
         assert pf.low is None
         assert pf.close is not None
-        pf = vbt.Portfolio.from_order_func(data["Close"], order_func_nb, np.asarray(np.inf), open=data.get("Open"))
+        pf = vbt.Portfolio.from_order_func(data["Close"], order_func_nb, np.array([[np.inf]]), open=data.get("Open"))
         assert pf.open is not None
         assert pf.high is None
         assert pf.low is None
@@ -126,7 +126,7 @@ class TestFromOrderFunc:
         pf = vbt.Portfolio.from_order_func(
             price.tolist(),
             order_func,
-            np.asarray(np.inf),
+            np.array([[np.inf]]),
             row_wise=test_row_wise,
             flexible=test_flexible,
         )
@@ -146,7 +146,7 @@ class TestFromOrderFunc:
         pf = vbt.Portfolio.from_order_func(
             price,
             order_func,
-            np.asarray(np.inf),
+            np.array([[np.inf]]),
             row_wise=test_row_wise,
             flexible=test_flexible,
         )
@@ -324,7 +324,7 @@ class TestFromOrderFunc:
         pf = vbt.Portfolio.from_order_func(
             price_wide,
             order_func,
-            np.asarray(np.inf),
+            np.array([[np.inf]]),
             group_by=np.array([0, 0, 1]),
             row_wise=test_row_wise,
             flexible=test_flexible,
@@ -366,7 +366,7 @@ class TestFromOrderFunc:
         pf = vbt.Portfolio.from_order_func(
             price_wide,
             order_func,
-            np.asarray(np.inf),
+            np.array([[np.inf]]),
             group_by=np.array([0, 0, 1]),
             cash_sharing=True,
             row_wise=test_row_wise,
@@ -408,7 +408,7 @@ class TestFromOrderFunc:
         pf = vbt.Portfolio.from_order_func(
             price_wide,
             order_func_nb,
-            np.asarray(np.inf),
+            np.array([[np.inf]]),
             group_by=np.array([0, 0, 1]),
             cash_sharing=True,
             row_wise=test_row_wise,
@@ -438,7 +438,7 @@ class TestFromOrderFunc:
         pf = vbt.Portfolio.from_order_func(
             price_wide,
             order_func_nb,
-            np.asarray(np.inf),
+            np.array([[np.inf]]),
             group_by=np.array([0, 0, 1]),
             cash_sharing=True,
             call_seq="reversed",
@@ -469,7 +469,7 @@ class TestFromOrderFunc:
         pf = vbt.Portfolio.from_order_func(
             price_wide,
             order_func_nb,
-            np.asarray(np.inf),
+            np.array([[np.inf]]),
             group_by=np.array([0, 0, 1]),
             cash_sharing=True,
             call_seq="random",
@@ -502,7 +502,7 @@ class TestFromOrderFunc:
             vbt.Portfolio.from_order_func(
                 price_wide,
                 order_func_nb,
-                np.asarray(np.inf),
+                np.array([[np.inf]]),
                 group_by=np.array([0, 0, 1]),
                 cash_sharing=True,
                 call_seq="auto",
@@ -521,7 +521,7 @@ class TestFromOrderFunc:
             direction = np.full(c.group_len, Direction.Both)
             order_value_out = np.empty(c.group_len, dtype=np.float_)
             c.last_val_price[c.from_col : c.to_col] = c.close[c.i, c.from_col : c.to_col]
-            nb.sort_call_seq_nb(c, order_size, order_size_type, direction, order_value_out)
+            nb.sort_call_seq_1d_nb(c, order_size, order_size_type, direction, order_value_out)
             return order_size, order_size_type, direction
 
         @njit
@@ -552,7 +552,7 @@ class TestFromOrderFunc:
         _ = vbt.Portfolio.from_order_func(
             price_wide,
             order_func_nb,
-            np.asarray(np.inf),
+            np.array([[np.inf]]),
             group_by=np.array([0, 0, 1]),
             cash_sharing=True,
             row_wise=test_row_wise,
@@ -1964,7 +1964,7 @@ class TestFromOrderFunc:
         pf = vbt.Portfolio.from_order_func(
             price_wide,
             order_func,
-            np.asarray(10.0),
+            np.array([[10.0]]),
             row_wise=test_row_wise,
             init_cash=[1.0, 10.0, np.inf],
             flexible=test_flexible,
@@ -1996,7 +1996,7 @@ class TestFromOrderFunc:
         base_pf = vbt.Portfolio.from_order_func(
             price_wide,
             order_func,
-            np.asarray(10.0),
+            np.array([[10.0]]),
             row_wise=test_row_wise,
             init_cash=np.inf,
             flexible=test_flexible,
@@ -2004,7 +2004,7 @@ class TestFromOrderFunc:
         pf = vbt.Portfolio.from_order_func(
             price_wide,
             order_func,
-            np.asarray(10.0),
+            np.array([[10.0]]),
             row_wise=test_row_wise,
             init_cash=InitCashMode.Auto,
             flexible=test_flexible,
@@ -2014,7 +2014,7 @@ class TestFromOrderFunc:
         pf = vbt.Portfolio.from_order_func(
             price_wide,
             order_func,
-            np.asarray(10.0),
+            np.array([[10.0]]),
             row_wise=test_row_wise,
             init_cash=InitCashMode.AutoAlign,
             flexible=test_flexible,
@@ -2978,7 +2978,7 @@ class TestFromOrderFunc:
             vbt.Portfolio.from_order_func(
                 price_wide,
                 order_func,
-                np.asarray(np.inf),
+                np.array([[np.inf]]),
                 row_wise=test_row_wise,
                 flexible=test_flexible,
             ).order_records.shape[0]
@@ -2988,7 +2988,7 @@ class TestFromOrderFunc:
             vbt.Portfolio.from_order_func(
                 price_wide,
                 order_func,
-                np.asarray(np.inf),
+                np.array([[np.inf]]),
                 row_wise=test_row_wise,
                 max_orders=5,
                 flexible=test_flexible,
@@ -2999,7 +2999,7 @@ class TestFromOrderFunc:
             vbt.Portfolio.from_order_func(
                 price_wide,
                 order_func,
-                np.asarray(np.inf),
+                np.array([[np.inf]]),
                 row_wise=test_row_wise,
                 max_orders=0,
                 flexible=test_flexible,
@@ -3010,7 +3010,7 @@ class TestFromOrderFunc:
             vbt.Portfolio.from_order_func(
                 price_wide,
                 order_func,
-                np.asarray(np.inf),
+                np.array([[np.inf]]),
                 row_wise=test_row_wise,
                 max_orders=4,
                 flexible=test_flexible,
@@ -3024,7 +3024,7 @@ class TestFromOrderFunc:
             vbt.Portfolio.from_order_func(
                 price_wide,
                 log_order_func,
-                np.asarray(np.inf),
+                np.array([[np.inf]]),
                 row_wise=test_row_wise,
                 flexible=test_flexible,
             ).log_records.shape[0]
@@ -3034,7 +3034,7 @@ class TestFromOrderFunc:
             vbt.Portfolio.from_order_func(
                 price_wide,
                 log_order_func,
-                np.asarray(np.inf),
+                np.array([[np.inf]]),
                 row_wise=test_row_wise,
                 max_logs=5,
                 flexible=test_flexible,
@@ -3045,7 +3045,7 @@ class TestFromOrderFunc:
             vbt.Portfolio.from_order_func(
                 price_wide,
                 log_order_func,
-                np.asarray(np.inf),
+                np.array([[np.inf]]),
                 row_wise=test_row_wise,
                 max_logs=0,
                 flexible=test_flexible,
@@ -3056,7 +3056,7 @@ class TestFromOrderFunc:
             vbt.Portfolio.from_order_func(
                 price_wide,
                 log_order_func,
-                np.asarray(np.inf),
+                np.array([[np.inf]]),
                 row_wise=test_row_wise,
                 max_logs=4,
                 flexible=test_flexible,
@@ -3124,12 +3124,8 @@ class TestFromOrderFunc:
         price_wide2.iloc[:, 2] *= 1.1
         chunked = dict(
             arg_take_spec=dict(
-                order_args=vbt.ArgsTaker(
-                    vbt.FlexArraySlicer(axis=1, mapper=vbt.GroupLensMapper(arg_query="group_lens")),
-                ),
-                flex_order_args=vbt.ArgsTaker(
-                    vbt.FlexArraySlicer(axis=1, mapper=vbt.GroupLensMapper(arg_query="group_lens")),
-                ),
+                order_args=vbt.ArgsTaker(vbt.flex_array_gl_slicer),
+                flex_order_args=vbt.ArgsTaker(vbt.flex_array_gl_slicer),
             )
         )
         pf = vbt.Portfolio.from_order_func(
@@ -3217,12 +3213,8 @@ class TestFromOrderFunc:
         custom_dtype = np.dtype([("col", np.int_)])
         chunked = dict(
             arg_take_spec=dict(
-                order_args=vbt.ArgsTaker(
-                    vbt.FlexArraySlicer(axis=1, mapper=vbt.GroupLensMapper(arg_query="group_lens")),
-                ),
-                flex_order_args=vbt.ArgsTaker(
-                    vbt.FlexArraySlicer(axis=1, mapper=vbt.GroupLensMapper(arg_query="group_lens")),
-                ),
+                order_args=vbt.ArgsTaker(vbt.flex_array_gl_slicer),
+                flex_order_args=vbt.ArgsTaker(vbt.flex_array_gl_slicer),
                 in_outputs=vbt.ArgsTaker(
                     vbt.ArraySlicer(axis=0, mapper=vbt.GroupLensMapper(arg_query="group_lens")),
                     vbt.ArraySlicer(axis=1),

@@ -116,6 +116,7 @@ def prepare_params(
             else:
                 p_values = apply_mapping(p_values, dtype)
         is_array_like = _param_settings.get("is_array_like", False)
+        min_one_dim = _param_settings.get("min_one_dim", False)
         bc_to_input = _param_settings.get("bc_to_input", False)
         broadcast_kwargs = merge_dicts(
             dict(require_kwargs=dict(requirements="W")),
@@ -131,7 +132,10 @@ def prepare_params(
             ]
         if not bc_to_input:
             if is_array_like:
-                new_p_values = list(map(np.asarray, new_p_values))
+                if min_one_dim:
+                    new_p_values = list(map(reshaping.to_1d_array, new_p_values))
+                else:
+                    new_p_values = list(map(np.asarray, new_p_values))
         else:
             # Broadcast to input or its axis
             if is_tuple:
@@ -280,7 +284,6 @@ def run_pipeline(
     to_2d: bool = True,
     pass_packed: bool = False,
     pass_input_shape: tp.Optional[bool] = None,
-    pass_flex_2d: bool = False,
     pass_wrapper: bool = False,
     level_names: tp.Optional[tp.Sequence[str]] = None,
     hide_levels: tp.Optional[tp.Sequence[tp.Union[str, int]]] = None,
@@ -351,6 +354,8 @@ def run_pipeline(
             * `is_array_like`: If array-like object was passed, it will be considered as a single value.
                 To treat it as multiple values, pack it into a list.
             * `template`: Template to substitute each parameter value with, before broadcasting to input.
+            * `min_one_dim`: Whether to convert any scalar into a one-dimensional array.
+                Works only if `bc_to_input` is False.
             * `bc_to_input`: Whether to broadcast parameter to input size. You can also broadcast
                 parameter to an axis by passing an integer.
             * `broadcast_kwargs`: Keyword arguments passed to `vectorbtpro.base.reshaping.broadcast`.
@@ -384,7 +389,6 @@ def run_pipeline(
         pass_input_shape (bool): Whether to pass `input_shape` to `custom_func` as keyword argument.
 
             Defaults to True if `require_input_shape` is True, otherwise to False.
-        pass_flex_2d (bool): Whether to pass `flex_2d` to `custom_func` as keyword argument.
         pass_wrapper (bool): Whether to pass the input wrapper to `custom_func` as keyword argument.
         level_names (list of str): A list of column level names corresponding to each parameter.
 
@@ -462,6 +466,7 @@ def run_pipeline(
                     "is_tuple",
                     "is_array_like",
                     "template",
+                    "min_one_dim",
                     "bc_to_input",
                     "broadcast_kwargs",
                     "per_column",
@@ -670,10 +675,6 @@ def run_pipeline(
         func_kwargs = dict(kwargs)
         if pass_input_shape:
             func_kwargs["input_shape"] = input_shape_ready
-        if pass_flex_2d:
-            if input_shape is None:
-                raise ValueError("Cannot determine flex_2d without inputs")
-            func_kwargs["flex_2d"] = len(input_shape) == 2
         if pass_wrapper:
             func_kwargs["wrapper"] = wrapper_ready
         if pass_per_column:
@@ -2223,7 +2224,6 @@ Other keyword arguments are passed to `{0}.run`.
         select_params: bool = True,
         pass_packed: bool = False,
         cache_pass_packed: tp.Optional[bool] = None,
-        cache_pass_flex_2d: tp.Optional[bool] = None,
         pass_per_column: bool = False,
         cache_pass_per_column: tp.Optional[bool] = None,
         kwargs_as_args: tp.Optional[tp.Iterable[str]] = None,
@@ -2255,7 +2255,7 @@ Other keyword arguments are passed to `{0}.run`.
             * Your outputs must be arrays of the same shape, data type and data order
 
         !!! note
-            Reserved arguments `flex_2d` and `per_column` (in this order) get passed as positional
+            Reserved arguments such as  `per_column` (in this order) get passed as positional
             arguments if `remove_kwargs` is True, otherwise as keyword arguments.
 
         Args:
@@ -2283,12 +2283,10 @@ Other keyword arguments are passed to `{0}.run`.
                     corresponds to a column. If `takes_1d`, each value gets additionally repeated by
                     the number of columns in the input arrays.
                 * Variable arguments if `var_args` is set to True
-                * `flex_2d` if `pass_flex_2d` is set to True and `flex_2d` not in `kwargs_as_args`
-                    and `remove_kwargs` is set to True
                 * `per_column` if `pass_per_column` is set to True and `per_column` not in
                     `kwargs_as_args` and `remove_kwargs` is set to True
-                * Arguments listed in `kwargs_as_args` passed as positional. Can include `flex_2d` and `per_column`.
-                * Other keyword arguments if `remove_kwargs` is False. Also includes `flex_2d` and `per_column`
+                * Arguments listed in `kwargs_as_args` passed as positional. Can include `takes_1d` and `per_column`.
+                * Other keyword arguments if `remove_kwargs` is False. Also includes `takes_1d` and `per_column`
                     if they must be passed and not in `kwargs_as_args`.
 
                 Can be Numba-compiled (but doesn't have to).
@@ -2309,7 +2307,6 @@ Other keyword arguments are passed to `{0}.run`.
                 If False, prepends the current iteration index to the arguments.
             pass_packed (bool): Whether to pass packed tuples for inputs, in-place outputs, and parameters.
             cache_pass_packed (bool): Overrides `pass_packed` for the caching function.
-            cache_pass_flex_2d (bool): Overrides `pass_flex_2d` (see `run_pipeline`) for the caching function.
             pass_per_column (bool): Whether to pass `per_column`.
             cache_pass_per_column (bool): Overrides `pass_per_column` for the caching function.
             kwargs_as_args (iterable of str): Keyword arguments from `kwargs` dict to pass as
@@ -2479,7 +2476,6 @@ Other keyword arguments are passed to `{0}.run`.
             param_tuple: tp.Tuple[tp.List[tp.Param], ...],
             *_args,
             input_shape: tp.Optional[tp.Shape] = None,
-            flex_2d: tp.Optional[bool] = None,
             per_column: tp.Optional[bool] = None,
             return_cache: bool = False,
             use_cache: tp.Optional[CacheOutputT] = None,
@@ -2488,10 +2484,7 @@ Other keyword arguments are passed to `{0}.run`.
         ) -> tp.Union[None, CacheOutputT, tp.Array2d, tp.List[tp.Array2d]]:
             """Custom function that forwards inputs and parameters to `apply_func`."""
             _cache_pass_packed = cache_pass_packed
-            _cache_pass_flex_2d = cache_pass_flex_2d
             _cache_pass_per_column = cache_pass_per_column
-
-            pass_flex_2d = flex_2d is not None
 
             # Prepend positional arguments
             args_before = ()
@@ -2504,9 +2497,7 @@ Other keyword arguments are passed to `{0}.run`.
             # Append positional arguments
             more_args = ()
             for key in kwargs_as_args:
-                if key == "flex_2d":
-                    value = flex_2d
-                elif key == "per_column":
+                if key == "per_column":
                     value = per_column
                 elif key == "takes_1d":
                     value = per_column
@@ -2553,20 +2544,12 @@ Other keyword arguments are passed to `{0}.run`.
 
                 if _cache_pass_packed is None:
                     _cache_pass_packed = pass_packed
-                if _cache_pass_flex_2d is None:
-                    _cache_pass_flex_2d = pass_flex_2d
                 if _cache_pass_per_column is None and per_column:
                     _cache_pass_per_column = True
                 if _cache_pass_per_column is None:
                     _cache_pass_per_column = pass_per_column
                 cache_more_args = tuple(more_args)
                 cache_kwargs = dict(_kwargs)
-                if _cache_pass_flex_2d:
-                    if "flex_2d" not in kwargs_as_args:
-                        if remove_kwargs:
-                            cache_more_args += (flex_2d,)
-                        else:
-                            cache_kwargs["flex_2d"] = flex_2d
                 if _cache_pass_per_column:
                     if "per_column" not in kwargs_as_args:
                         if remove_kwargs:
@@ -2669,12 +2652,6 @@ Other keyword arguments are passed to `{0}.run`.
             else:
                 _n_params = n_params
 
-            if pass_flex_2d:
-                if "flex_2d" not in kwargs_as_args:
-                    if remove_kwargs:
-                        more_args += (flex_2d,)
-                    else:
-                        _kwargs["flex_2d"] = flex_2d
             if pass_per_column:
                 if "per_column" not in kwargs_as_args:
                     if remove_kwargs:

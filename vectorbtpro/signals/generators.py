@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import Ref
 from vectorbtpro.indicators.configs import flex_col_param_config, flex_elem_param_config
 from vectorbtpro.signals.enums import StopType
 from vectorbtpro.signals.factory import SignalFactory
@@ -104,7 +103,7 @@ setattr(RAND, "__doc__", _RAND.__doc__)
 
 RANDX = SignalFactory(class_name="RANDX", module_name=__name__, short_name="randx", mode="exits").with_place_func(
     exit_place_func=rand_place_nb,
-    exit_settings=dict(pass_kwargs=dict(n=np.asarray([1]))),
+    exit_settings=dict(pass_kwargs=dict(n=np.array([1]))),
     seed=None,
 )
 
@@ -212,11 +211,8 @@ RPROB = SignalFactory(
     param_names=["prob"],
 ).with_place_func(
     entry_place_func=rand_by_prob_place_nb,
-    entry_settings=dict(pass_params=["prob"], pass_kwargs=["pick_first", "flex_2d"]),
-    pass_flex_2d=True,
-    param_settings=dict(
-        prob=flex_elem_param_config,
-    ),
+    entry_settings=dict(pass_params=["prob"], pass_kwargs=["pick_first"]),
+    param_settings=dict(prob=flex_elem_param_config),
     seed=None,
 )
 
@@ -277,8 +273,7 @@ rprobx_config = ReadonlyConfig(
 rprobx_func_config = ReadonlyConfig(
     dict(
         exit_place_func=rand_by_prob_place_nb,
-        exit_settings=dict(pass_params=["prob"], pass_kwargs=["pick_first", "flex_2d"]),
-        pass_flex_2d=True,
+        exit_settings=dict(pass_params=["prob"], pass_kwargs=["pick_first"]),
         param_settings=dict(prob=flex_elem_param_config),
         seed=None,
     )
@@ -326,10 +321,9 @@ RPROBNX = SignalFactory(
     param_names=["entry_prob", "exit_prob"],
 ).with_place_func(
     entry_place_func=rand_by_prob_place_nb,
-    entry_settings=dict(pass_params=["entry_prob"], pass_kwargs=["pick_first", "flex_2d"]),
+    entry_settings=dict(pass_params=["entry_prob"], pass_kwargs=["pick_first"]),
     exit_place_func=rand_by_prob_place_nb,
-    exit_settings=dict(pass_params=["exit_prob"], pass_kwargs=["pick_first", "flex_2d"]),
-    pass_flex_2d=True,
+    exit_settings=dict(pass_params=["exit_prob"], pass_kwargs=["pick_first"]),
     param_settings=dict(entry_prob=flex_elem_param_config, exit_prob=flex_elem_param_config),
     seed=None,
 )
@@ -379,8 +373,8 @@ class _RPROBNX(RPROBNX):
         ```pycon
         >>> import numpy as np
 
-        >>> entry_prob1 = np.asarray([1., 0., 1., 0., 1.])
-        >>> entry_prob2 = np.asarray([0., 1., 0., 1., 0.])
+        >>> entry_prob1 = np.array([1., 0., 1., 0., 1.])
+        >>> entry_prob2 = np.array([0., 1., 0., 1., 0.])
         >>> rprobnx = vbt.RPROBNX.run(
         ...     input_shape=(5,),
         ...     entry_prob=[entry_prob1, entry_prob2],
@@ -434,9 +428,7 @@ stx_func_config = ReadonlyConfig(
             pass_inputs=["entry_ts", "ts", "follow_ts"],
             pass_in_outputs=["stop_ts"],
             pass_params=["stop", "trailing"],
-            pass_kwargs=["flex_2d"],
         ),
-        pass_flex_2d=True,
         param_settings=dict(stop=flex_elem_param_config, trailing=flex_elem_param_config),
         trailing=False,
         ts=np.nan,
@@ -504,9 +496,8 @@ ohlcstx_func_config = ReadonlyConfig(
             pass_inputs=["entry_price", "open", "high", "low", "close"],  # do not pass entries
             pass_in_outputs=["stop_price", "stop_type"],
             pass_params=["sl_stop", "tsl_th", "tsl_stop", "tp_stop", "reverse"],
-            pass_kwargs=["is_entry_open", "flex_2d"],
+            pass_kwargs=["is_entry_open"],
         ),
-        pass_flex_2d=True,
         in_output_settings=dict(stop_price=dict(dtype=np.float_), stop_type=dict(dtype=np.int_)),
         param_settings=dict(
             sl_stop=flex_elem_param_config,

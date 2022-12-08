@@ -14,7 +14,7 @@ from numba import prange
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.base.indexing import flex_select_auto_nb
+from vectorbtpro.base.flex_indexing import flex_select_nb
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.labels.enums import TrendLabelMode
 from vectorbtpro.registries.ch_registry import register_chunkable
@@ -108,7 +108,7 @@ def mean_labels_nb(close: tp.Array2d, window: int, wtype: int, wait: int = 1, ad
 
 
 @register_jitted(cache=True)
-def get_symmetric_up_th_nb(down_th: tp.FlexArray) -> tp.FlexArray:
+def get_symmetric_up_th_nb(down_th: tp.FlexArray2d) -> tp.FlexArray2d:
     """Compute the positive return that is symmetric to a negative one.
 
     For example, 50% down requires 100% to go up to the initial level."""
@@ -116,7 +116,7 @@ def get_symmetric_up_th_nb(down_th: tp.FlexArray) -> tp.FlexArray:
 
 
 @register_jitted(cache=True)
-def get_symmetric_down_th_nb(up_th: tp.FlexArray) -> tp.FlexArray:
+def get_symmetric_down_th_nb(up_th: tp.FlexArray2d) -> tp.FlexArray2d:
     """Compute the negative return that is symmetric to a positive one."""
     return up_th / (1 + up_th)
 
@@ -127,16 +127,14 @@ def get_symmetric_down_th_nb(up_th: tp.FlexArray) -> tp.FlexArray:
         close=ch.ArraySlicer(axis=1),
         up_th=base_ch.FlexArraySlicer(axis=1),
         down_th=base_ch.FlexArraySlicer(axis=1),
-        flex_2d=None,
     ),
     merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def local_extrema_nb(
     close: tp.Array2d,
-    up_th: tp.FlexArray,
-    down_th: tp.FlexArray,
-    flex_2d: bool = False,
+    up_th: tp.FlexArray2d,
+    down_th: tp.FlexArray2d,
 ) -> tp.Array2d:
     """Get array of local extrema denoted by 1 (peak) or -1 (trough), otherwise 0.
 
@@ -154,8 +152,8 @@ def local_extrema_nb(
         direction = 0
 
         for i in range(1, close.shape[0]):
-            _up_th = abs(flex_select_auto_nb(up_th, prev_i, col, flex_2d))
-            _down_th = abs(flex_select_auto_nb(down_th, prev_i, col, flex_2d))
+            _up_th = abs(flex_select_nb(up_th, prev_i, col))
+            _down_th = abs(flex_select_nb(down_th, prev_i, col))
             if _up_th == 0:
                 raise ValueError("Positive threshold cannot be 0")
             if _down_th == 0:
@@ -255,7 +253,6 @@ def bn_cont_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d) -> tp.
         local_extrema=ch.ArraySlicer(axis=1),
         up_th=base_ch.FlexArraySlicer(axis=1),
         down_th=base_ch.FlexArraySlicer(axis=1),
-        flex_2d=None,
     ),
     merge_func="column_stack",
 )
@@ -263,9 +260,8 @@ def bn_cont_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d) -> tp.
 def bn_cont_sat_trend_labels_nb(
     close: tp.Array2d,
     local_extrema: tp.Array2d,
-    up_th: tp.FlexArray,
-    down_th: tp.FlexArray,
-    flex_2d: bool = False,
+    up_th: tp.FlexArray2d,
+    down_th: tp.FlexArray2d,
 ) -> tp.Array2d:
     """Similar to `bn_cont_trend_labels_nb` but sets each close value to 0 or 1
     if the percentage change to the next extremum exceeds the threshold set for this range.
@@ -283,8 +279,8 @@ def bn_cont_sat_trend_labels_nb(
             prev_i = idxs[k - 1]
             next_i = idxs[k]
 
-            _up_th = abs(flex_select_auto_nb(up_th, prev_i, col, flex_2d))
-            _down_th = abs(flex_select_auto_nb(down_th, prev_i, col, flex_2d))
+            _up_th = abs(flex_select_nb(up_th, prev_i, col))
+            _down_th = abs(flex_select_nb(down_th, prev_i, col))
             if _up_th == 0:
                 raise ValueError("Positive threshold cannot be 0")
             if _down_th == 0:
@@ -346,26 +342,24 @@ def pct_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d, normalize:
         up_th=base_ch.FlexArraySlicer(axis=1),
         down_th=base_ch.FlexArraySlicer(axis=1),
         mode=None,
-        flex_2d=None,
     ),
     merge_func="column_stack",
 )
 @register_jitted(cache=True)
 def trend_labels_nb(
     close: tp.Array2d,
-    up_th: tp.FlexArray,
-    down_th: tp.FlexArray,
+    up_th: tp.FlexArray2d,
+    down_th: tp.FlexArray2d,
     mode: int,
-    flex_2d: bool = False,
 ) -> tp.Array2d:
     """Apply a trend labeling function based on `TrendLabelMode`."""
-    local_extrema = local_extrema_nb(close, up_th, down_th, flex_2d)
+    local_extrema = local_extrema_nb(close, up_th, down_th)
     if mode == TrendLabelMode.Binary:
         return bn_trend_labels_nb(close, local_extrema)
     if mode == TrendLabelMode.BinaryCont:
         return bn_cont_trend_labels_nb(close, local_extrema)
     if mode == TrendLabelMode.BinaryContSat:
-        return bn_cont_sat_trend_labels_nb(close, local_extrema, up_th, down_th, flex_2d)
+        return bn_cont_sat_trend_labels_nb(close, local_extrema, up_th, down_th)
     if mode == TrendLabelMode.PctChange:
         return pct_trend_labels_nb(close, local_extrema, False)
     if mode == TrendLabelMode.PctChangeNorm:
@@ -381,7 +375,6 @@ def trend_labels_nb(
         up_th=base_ch.FlexArraySlicer(axis=1),
         down_th=base_ch.FlexArraySlicer(axis=1),
         wait=None,
-        flex_2d=None,
     ),
     merge_func="column_stack",
 )
@@ -389,10 +382,9 @@ def trend_labels_nb(
 def breakout_labels_nb(
     close: tp.Array2d,
     window: int,
-    up_th: tp.FlexArray,
-    down_th: tp.FlexArray,
+    up_th: tp.FlexArray2d,
+    down_th: tp.FlexArray2d,
     wait: int = 1,
-    flex_2d: bool = False,
 ) -> tp.Array2d:
     """For each value, return 1 if any value in the next period is greater than the
     positive threshold (in %), -1 if less than the negative threshold, and 0 otherwise.
@@ -404,8 +396,8 @@ def breakout_labels_nb(
 
     for col in prange(close.shape[1]):
         for i in range(close.shape[0]):
-            _up_th = abs(flex_select_auto_nb(up_th, i, col, flex_2d))
-            _down_th = abs(flex_select_auto_nb(down_th, i, col, flex_2d))
+            _up_th = abs(flex_select_nb(up_th, i, col))
+            _down_th = abs(flex_select_nb(down_th, i, col))
 
             for j in range(i + wait, min(i + window + wait, close.shape[0])):
                 if _up_th > 0 and close[j, col] >= close[i, col] * (1 + _up_th):
