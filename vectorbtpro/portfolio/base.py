@@ -1626,7 +1626,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array, shape_to_2d, BCO
+from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array, to_2d_shape, BCO
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.base.grouping.base import ExceptLevel
@@ -2532,7 +2532,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         if obj_type is None and checks.is_np_array(obj):
             n_cols = wrapper.get_shape_2d(group_by=obj_group_by)[1]
-            if shape_to_2d(objs[0].shape) == wrappers[0].get_shape_2d(group_by=obj_group_by):
+            if to_2d_shape(objs[0].shape) == wrappers[0].get_shape_2d(group_by=obj_group_by):
                 can_stack = True
                 reduced = False
             elif objs[0].shape == (wrappers[0].get_shape_2d(group_by=obj_group_by)[1],):
@@ -3217,7 +3217,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                         return _wrap_2d_grouped(obj)
                     if obj_type == "red_array":
                         return _wrap_1d_grouped(obj)
-                    if shape_to_2d(obj.shape) == wrapper.get_shape_2d():
+                    if to_2d_shape(obj.shape) == wrapper.get_shape_2d():
                         return _wrap_2d_grouped(obj)
                     if obj.shape == (wrapper.get_shape_2d()[1],):
                         return _wrap_1d_grouped(obj)
@@ -3225,7 +3225,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     return _wrap_2d(obj)
                 if obj_type == "red_array":
                     return _wrap_1d(obj)
-                if shape_to_2d(obj.shape) == wrapper.shape_2d:
+                if to_2d_shape(obj.shape) == wrapper.shape_2d:
                     return _wrap_2d(obj)
                 if obj.shape == (wrapper.shape_2d[1],):
                     return _wrap_1d(obj)
@@ -3447,7 +3447,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     return _index_2d_by_group(obj)
                 if obj_type is not None and obj_type == "red_array":
                     return _index_1d_by_group(obj)
-                if shape_to_2d(obj.shape) == wrapper.get_shape_2d():
+                if to_2d_shape(obj.shape) == wrapper.get_shape_2d():
                     return _index_2d_by_group(obj)
                 if obj.shape == (wrapper.get_shape_2d()[1],):
                     return _index_1d_by_group(obj)
@@ -3455,7 +3455,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 return _index_2d_by_col(obj)
             if obj_type is not None and obj_type == "red_array":
                 return _index_1d_by_col(obj)
-            if shape_to_2d(obj.shape) == wrapper.shape_2d:
+            if to_2d_shape(obj.shape) == wrapper.shape_2d:
                 return _index_2d_by_col(obj)
             if obj.shape == (wrapper.shape_2d[1],):
                 return _index_1d_by_col(obj)
@@ -3712,11 +3712,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             is_grouped = wrapper.grouper.is_grouped(group_by=group_by)
             if checks.is_np_array(obj):
                 if is_grouped:
-                    if shape_to_2d(obj.shape) == wrapper.get_shape_2d():
+                    if to_2d_shape(obj.shape) == wrapper.get_shape_2d():
                         return _resample(obj)
                     if obj.shape == (wrapper.get_shape_2d()[1],):
                         return obj
-                if shape_to_2d(obj.shape) == wrapper.shape_2d:
+                if to_2d_shape(obj.shape) == wrapper.shape_2d:
                     return _resample(obj)
                 if obj.shape == (wrapper.shape_2d[1],):
                     return obj
@@ -7191,7 +7191,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if bm_close is not None and not isinstance(bm_close, bool):
             broadcastable_args["bm_close"] = bm_close
         else:
-            broadcastable_args["bm_close"] = None
+            broadcastable_args["bm_close"] = np.nan
         broadcastable_args = {**broadcastable_args, **broadcast_named_args}
         broadcast_kwargs = merge_dicts(
             dict(

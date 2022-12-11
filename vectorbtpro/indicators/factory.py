@@ -489,7 +489,7 @@ def run_pipeline(
         set_seed(seed)
 
     if input_shape is not None:
-        input_shape = reshaping.shape_to_tuple(input_shape)
+        input_shape = reshaping.to_tuple_shape(input_shape)
     if len(inputs) > 0 or len(in_outputs) > 0 or len(broadcast_named_args) > 0:
         # Broadcast inputs, in-outputs, and named args
         # If input_shape is provided, will broadcast all inputs to this shape

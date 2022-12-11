@@ -7,6 +7,7 @@ import numpy as np
 from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.generic.enums import RescaleMode, InterpMode, ErrorType, DistanceMeasure
+from vectorbtpro.base.reshaping import to_1d_array_nb
 from vectorbtpro.base.flex_indexing import flex_select_1d_nb
 from vectorbtpro.utils.array_ import rescale_nb
 
@@ -119,12 +120,14 @@ def fit_pattern_nb(
     pmax: float = np.nan,
     invert: bool = False,
     error_type: int = ErrorType.Absolute,
-    max_error: tp.FlexArray1d = np.array([np.nan]),
+    max_error: tp.FlexArray1dLike = np.nan,
     max_error_interp_mode: tp.Optional[int] = None,
 ) -> tp.Tuple[tp.Array1d, tp.Array1d]:
     """Fit pattern.
 
     Returns the resized and rescaled pattern and max error."""
+    max_error_ = to_1d_array_nb(np.asarray(max_error))
+
     if max_error_interp_mode is None:
         max_error_interp_mode = interp_mode
     fit_pattern = interp_resize_1d_nb(
@@ -133,7 +136,7 @@ def fit_pattern_nb(
         interp_mode,
     )
     fit_max_error = interp_resize_1d_nb(
-        max_error,
+        max_error_,
         len(arr),
         max_error_interp_mode,
     )
@@ -186,7 +189,7 @@ def pattern_similarity_nb(
     invert: bool = False,
     error_type: int = ErrorType.Absolute,
     distance_measure: int = DistanceMeasure.MAE,
-    max_error: tp.FlexArray1d = np.array([np.nan]),
+    max_error: tp.FlexArray1dLike = np.nan,
     max_error_interp_mode: tp.Optional[int] = None,
     max_error_as_maxdist: bool = False,
     max_error_strict: bool = False,
@@ -201,6 +204,8 @@ def pattern_similarity_nb(
     Then, the absolute distance between the actual and expected value is calculated (= error).
     This error is then divided by the maximum error at this position to get a relative value between 0 and 1.
     Finally, all relative errors are added together and subtracted from 1 to get the similarity measure."""
+    max_error_ = to_1d_array_nb(np.asarray(max_error))
+
     if len(arr) == 0:
         return np.nan
     if len(pattern) == 0:
@@ -309,15 +314,15 @@ def pattern_similarity_nb(
         if arr.shape[0] == pattern.shape[0]:
             arr_elem = arr[i]
             pattern_elem = pattern[i]
-            _max_error = flex_select_1d_nb(max_error, i)
+            _max_error = flex_select_1d_nb(max_error_, i)
         elif arr.shape[0] > pattern.shape[0]:
             arr_elem = arr[i]
             pattern_elem = interp_nb(pattern, i, pattern.shape[0], arr.shape[0], interp_mode)
-            _max_error = interp_nb(max_error, i, pattern.shape[0], arr.shape[0], _max_error_interp_mode)
+            _max_error = interp_nb(max_error_, i, pattern.shape[0], arr.shape[0], _max_error_interp_mode)
         else:
             arr_elem = interp_nb(arr, i, arr.shape[0], pattern.shape[0], interp_mode)
             pattern_elem = pattern[i]
-            _max_error = flex_select_1d_nb(max_error, i)
+            _max_error = flex_select_1d_nb(max_error_, i)
 
         if not np.isnan(arr_elem) and not np.isnan(pattern_elem):
             if invert:
@@ -376,7 +381,7 @@ def pattern_similarity_nb(
             maxdistance_sum = maxdistance_sum + maxdist
 
             if not np.isnan(min_similarity):
-                if not max_error_as_maxdist or max_error.size == 1:
+                if not max_error_as_maxdist or max_error_.size == 1:
                     if max_error_as_maxdist:
                         if np.isnan(_max_error):
                             return np.nan

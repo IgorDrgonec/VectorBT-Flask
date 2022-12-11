@@ -3261,17 +3261,13 @@ class TestFromOrderFunc:
 class TestFromDefOrderFunc:
     @pytest.mark.parametrize("test_row_wise", [False, True])
     @pytest.mark.parametrize("test_flexible", [False, True])
-    @pytest.mark.parametrize("test_jitted", [False, True])
-    @pytest.mark.parametrize("test_chunked", [False, True])
-    def test_compare(self, test_row_wise, test_flexible, test_jitted, test_chunked):
+    def test_compare(self, test_row_wise, test_flexible):
         pf = vbt.Portfolio.from_def_order_func(
             price_wide,
             size=[0, 1, np.inf],
             log=True,
             row_wise=test_row_wise,
             flexible=test_flexible,
-            jitted=test_jitted,
-            chunked=test_chunked,
         )
         pf2 = vbt.Portfolio.from_orders(price_wide, size=[0, 1, np.inf], log=True)
         assert_records_close(pf.order_records, pf2.order_records)
@@ -3286,37 +3282,95 @@ class TestFromDefOrderFunc:
             cash_sharing=True,
             row_wise=test_row_wise,
             flexible=test_flexible,
-            jitted=test_jitted,
-            chunked=test_chunked,
         )
         pf2 = vbt.Portfolio.from_orders(price_wide, size=[0, 1, np.inf], log=True, group_by=True, cash_sharing=True)
         assert_records_close(pf.order_records, pf2.order_records)
         assert_records_close(pf.log_records, pf2.log_records)
         assert pf.wrapper == pf2.wrapper
 
-        target_hold_value = pd.DataFrame(
-            {"a": [0.0, 70.0, 30.0, 0.0, 70.0], "b": [30.0, 0.0, 70.0, 30.0, 30.0], "c": [70.0, 30.0, 0.0, 70.0, 0.0]},
-            index=price.index,
+        target_hold_value = pd.DataFrame({
+            "a": [0.0, 70.0, 30.0, 0.0, 70.0],
+            "b": [30.0, 0.0, 70.0, 30.0, 30.0],
+            "c": [70.0, 30.0, 0.0, 70.0, 0.0],
+        }, index=price.index)
+        pf = vbt.Portfolio.from_def_order_func(
+            close=1.0,
+            size=target_hold_value,
+            size_type="targetvalue",
+            group_by=np.array([0, 0, 0]),
+            cash_sharing=True,
+            call_seq="auto",
+            row_wise=test_row_wise,
+            flexible=test_flexible,
         )
-        assert_frame_equal(
-            vbt.Portfolio.from_def_order_func(
-                close=1.0,
-                size=target_hold_value,
-                size_type="targetvalue",
-                group_by=np.array([0, 0, 0]),
-                cash_sharing=True,
-                call_seq="auto",
-            ).get_asset_value(group_by=False),
-            target_hold_value,
+        pf2 = vbt.Portfolio.from_orders(
+            close=1.0,
+            size=target_hold_value,
+            size_type="targetvalue",
+            group_by=np.array([0, 0, 0]),
+            cash_sharing=True,
+            call_seq="auto"
         )
-        assert_frame_equal(
+        assert_records_close(pf.order_records, pf2.order_records)
+        assert_records_close(pf.log_records, pf2.log_records)
+        assert pf.wrapper == pf2.wrapper
+
+        pf = vbt.Portfolio.from_def_order_func(
+            close=1.0,
+            size=target_hold_value / 100,
+            size_type="targetpercent",
+            group_by=np.array([0, 0, 0]),
+            cash_sharing=True,
+            call_seq="auto",
+            row_wise=test_row_wise,
+            flexible=test_flexible,
+        )
+        pf2 = vbt.Portfolio.from_orders(
+            close=1.0,
+            size=target_hold_value / 100,
+            size_type="targetpercent",
+            group_by=np.array([0, 0, 0]),
+            cash_sharing=True,
+            call_seq="auto"
+        )
+        assert_records_close(pf.order_records, pf2.order_records)
+        assert_records_close(pf.log_records, pf2.log_records)
+        assert pf.wrapper == pf2.wrapper
+
+        if not test_row_wise:
+            assert_records_close(
+                vbt.Portfolio.from_def_order_func(
+                    price_wide,
+                    size=[0, 1, np.inf],
+                    log=True,
+                    row_wise=test_row_wise,
+                    flexible=test_flexible,
+                    jitted=dict(parallel=True),
+                ).log_records,
+                vbt.Portfolio.from_def_order_func(
+                    price_wide,
+                    size=[0, 1, np.inf],
+                    log=True,
+                    row_wise=test_row_wise,
+                    flexible=test_flexible,
+                    jitted=dict(parallel=False),
+                ).log_records,
+            )
+        assert_records_close(
             vbt.Portfolio.from_def_order_func(
-                close=1.0,
-                size=target_hold_value / 100,
-                size_type="targetpercent",
-                group_by=np.array([0, 0, 0]),
-                cash_sharing=True,
-                call_seq="auto",
-            ).get_asset_value(group_by=False),
-            target_hold_value,
+                price_wide,
+                size=[0, 1, np.inf],
+                log=True,
+                row_wise=test_row_wise,
+                flexible=test_flexible,
+                chunked=True
+            ).log_records,
+            vbt.Portfolio.from_def_order_func(
+                price_wide,
+                size=[0, 1, np.inf],
+                log=True,
+                row_wise=test_row_wise,
+                flexible=test_flexible,
+                chunked=False
+            ).log_records,
         )

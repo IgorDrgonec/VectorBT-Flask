@@ -5,7 +5,7 @@
 import numpy as np
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.flex_indexing import flex_select_1d_nb
+from vectorbtpro.base.flex_indexing import flex_select_1d_pc_nb
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.portfolio.enums import *
 from vectorbtpro.registries.jit_registry import register_jitted
@@ -1011,11 +1011,11 @@ def prepare_last_cash_nb(
     if cash_sharing:
         last_cash = np.empty(len(group_lens), dtype=np.float_)
         for group in range(len(group_lens)):
-            last_cash[group] = float(flex_select_1d_nb(init_cash, group))
+            last_cash[group] = float(flex_select_1d_pc_nb(init_cash, group))
     else:
         last_cash = np.empty(target_shape[1], dtype=np.float_)
         for col in range(target_shape[1]):
-            last_cash[col] = float(flex_select_1d_nb(init_cash, col))
+            last_cash[col] = float(flex_select_1d_pc_nb(init_cash, col))
     return last_cash
 
 
@@ -1024,7 +1024,7 @@ def prepare_last_position_nb(target_shape: tp.Shape, init_position: tp.FlexArray
     """Prepare `last_position`."""
     last_position = np.empty(target_shape[1], dtype=np.float_)
     for col in range(target_shape[1]):
-        last_position[col] = float(flex_select_1d_nb(init_position, col))
+        last_position[col] = float(flex_select_1d_pc_nb(init_position, col))
     return last_position
 
 
@@ -1034,8 +1034,8 @@ def prepare_last_value_nb(
     group_lens: tp.Array1d,
     cash_sharing: bool,
     init_cash: tp.FlexArray1d,
-    init_position: tp.FlexArray1d = np.array([0.0]),
-    init_price: tp.FlexArray1d = np.array([np.nan]),
+    init_position: tp.FlexArray1d,
+    init_price: tp.FlexArray1d,
 ) -> tp.Array1d:
     """Prepare `last_value`."""
     if cash_sharing:
@@ -1043,20 +1043,20 @@ def prepare_last_value_nb(
         from_col = 0
         for group in range(len(group_lens)):
             to_col = from_col + group_lens[group]
-            _init_cash = float(flex_select_1d_nb(init_cash, group))
+            _init_cash = float(flex_select_1d_pc_nb(init_cash, group))
             last_value[group] = _init_cash
             for col in range(from_col, to_col):
-                _init_position = float(flex_select_1d_nb(init_position, col))
-                _init_price = float(flex_select_1d_nb(init_price, col))
+                _init_position = float(flex_select_1d_pc_nb(init_position, col))
+                _init_price = float(flex_select_1d_pc_nb(init_price, col))
                 if _init_position != 0:
                     last_value[group] += _init_position * _init_price
             from_col = to_col
     else:
         last_value = np.empty(target_shape[1], dtype=np.float_)
         for col in range(target_shape[1]):
-            _init_cash = float(flex_select_1d_nb(init_cash, col))
-            _init_position = float(flex_select_1d_nb(init_position, col))
-            _init_price = float(flex_select_1d_nb(init_price, col))
+            _init_cash = float(flex_select_1d_pc_nb(init_cash, col))
+            _init_position = float(flex_select_1d_pc_nb(init_position, col))
+            _init_price = float(flex_select_1d_pc_nb(init_price, col))
             if _init_position == 0:
                 last_value[col] = _init_cash
             else:
@@ -1067,8 +1067,8 @@ def prepare_last_value_nb(
 @register_jitted(cache=True)
 def prepare_last_pos_record_nb(
     target_shape: tp.Shape,
-    init_position: tp.FlexArray1d = np.array([0.0]),
-    init_price: tp.FlexArray1d = np.array([np.nan]),
+    init_position: tp.FlexArray1d,
+    init_price: tp.FlexArray1d,
     fill_pos_record: bool = True,
 ) -> tp.RecordArray:
     """Prepare `last_pos_record`."""
@@ -1076,8 +1076,8 @@ def prepare_last_pos_record_nb(
     last_pos_record["id"][:] = -1
     if fill_pos_record:
         for col in range(target_shape[1]):
-            _init_position = float(flex_select_1d_nb(init_position, col))
-            _init_price = float(flex_select_1d_nb(init_price, col))
+            _init_position = float(flex_select_1d_pc_nb(init_position, col))
+            _init_price = float(flex_select_1d_pc_nb(init_price, col))
             if _init_position != 0:
                 fill_init_pos_record_nb(last_pos_record[col], col, _init_position, _init_price)
     return last_pos_record

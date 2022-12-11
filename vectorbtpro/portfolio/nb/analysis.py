@@ -5,7 +5,8 @@
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.base.flex_indexing import flex_select_1d_nb, flex_select_nb
+from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
+from vectorbtpro.base.flex_indexing import flex_select_nb
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.records import chunking as records_ch
@@ -60,11 +61,13 @@ def asset_flow_nb(
     order_records: tp.RecordArray,
     col_map: tp.GroupMap,
     direction: int = Direction.Both,
-    init_position: tp.FlexArray1d = np.array([0.0]),
+    init_position: tp.FlexArray1dLike = 0.0,
 ) -> tp.Array2d:
     """Get asset flow series per column.
 
     Returns the total transacted amount of assets at each time step."""
+    init_position_ = to_1d_array_nb(np.asarray(init_position))
+
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
     out = np.full(target_shape, 0.0, dtype=np.float_)
@@ -74,7 +77,7 @@ def asset_flow_nb(
         if col_len == 0:
             continue
         last_id = -1
-        position_now = flex_select_1d_nb(init_position, col)
+        position_now = flex_select_1d_pc_nb(init_position_, col)
 
         for c in range(col_len):
             order_record = order_records[col_idxs[col_start_idxs[col] + c]]
@@ -107,13 +110,15 @@ def asset_flow_nb(
     merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def assets_nb(asset_flow: tp.Array2d, init_position: tp.FlexArray1d = np.array([0.0])) -> tp.Array2d:
+def assets_nb(asset_flow: tp.Array2d, init_position: tp.FlexArray1dLike = 0.0) -> tp.Array2d:
     """Get asset series per column.
 
     Returns the current position at each time step."""
+    init_position_ = to_1d_array_nb(np.asarray(init_position))
+
     out = np.empty_like(asset_flow)
     for col in prange(asset_flow.shape[1]):
-        position_now = flex_select_1d_nb(init_position, col)
+        position_now = flex_select_1d_pc_nb(init_position_, col)
         for i in range(asset_flow.shape[0]):
             flow_value = asset_flow[i, col]
             position_now = add_nb(position_now, flow_value)
@@ -195,16 +200,18 @@ def cash_flow_nb(
     order_records: tp.RecordArray,
     col_map: tp.GroupMap,
     free: bool = False,
-    cash_earnings: tp.FlexArray2d = np.array([[0.0]]),
+    cash_earnings: tp.FlexArray2dLike = 0.0,
 ) -> tp.Array2d:
     """Get (free) cash flow series per column."""
+    cash_earnings_ = to_2d_array_nb(np.asarray(cash_earnings))
+
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
     out = np.empty(target_shape, dtype=np.float_)
 
     for col in prange(target_shape[1]):
         for i in range(target_shape[0]):
-            out[i, col] = flex_select_nb(cash_earnings, i, col)
+            out[i, col] = flex_select_nb(cash_earnings_, i, col)
 
     for col in prange(col_lens.shape[0]):
         col_len = col_lens[col]
@@ -278,18 +285,20 @@ def cash_flow_grouped_nb(cash_flow: tp.Array2d, group_lens: tp.Array1d) -> tp.Ar
 def align_init_cash_nb(
     init_cash_raw: int,
     free_cash_flow: tp.Array2d,
-    cash_deposits: tp.FlexArray2d = np.array([[0.0]]),
+    cash_deposits: tp.FlexArray2dLike = 0.0,
 ) -> tp.Array1d:
     """Align initial cash to the maximum negative free cash flow.
 
     Adds 1 for easier computing returns."""
+    cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
+
     out = np.empty(free_cash_flow.shape[1], dtype=np.float_)
     for col in range(free_cash_flow.shape[1]):
         free_cash = 0.0
         min_req_cash = np.inf
         for i in range(free_cash_flow.shape[0]):
             free_cash = add_nb(free_cash, free_cash_flow[i, col])
-            free_cash = add_nb(free_cash, flex_select_nb(cash_deposits, i, col))
+            free_cash = add_nb(free_cash, flex_select_nb(cash_deposits_, i, col))
             if free_cash < min_req_cash:
                 min_req_cash = free_cash
         if min_req_cash < 0:
@@ -307,14 +316,14 @@ def init_cash_grouped_nb(init_cash_raw: tp.FlexArray1d, group_lens: tp.Array1d, 
     out = np.empty(group_lens.shape, dtype=np.float_)
     if cash_sharing:
         for group in range(len(group_lens)):
-            out[group] = flex_select_1d_nb(init_cash_raw, group)
+            out[group] = flex_select_1d_pc_nb(init_cash_raw, group)
     else:
         from_col = 0
         for group in range(len(group_lens)):
             to_col = from_col + group_lens[group]
             cash_sum = 0.0
             for col in range(from_col, to_col):
-                cash_sum += flex_select_1d_nb(init_cash_raw, col)
+                cash_sum += flex_select_1d_pc_nb(init_cash_raw, col)
             out[group] = cash_sum
             from_col = to_col
     return out
@@ -331,13 +340,13 @@ def init_cash_nb(
     out = np.empty(np.sum(group_lens), dtype=np.float_)
     if not cash_sharing:
         for col in range(out.shape[0]):
-            out[col] = flex_select_1d_nb(init_cash_raw, col)
+            out[col] = flex_select_1d_pc_nb(init_cash_raw, col)
     else:
         from_col = 0
         for group in range(len(group_lens)):
             to_col = from_col + group_lens[group]
             group_len = to_col - from_col
-            _init_cash = flex_select_1d_nb(init_cash_raw, group)
+            _init_cash = flex_select_1d_pc_nb(init_cash_raw, group)
             for col in range(from_col, to_col):
                 if split_shared:
                     out[col] = _init_cash / group_len
@@ -438,17 +447,19 @@ def cash_deposits_nb(
 def cash_nb(
     cash_flow: tp.Array2d,
     init_cash: tp.FlexArray1d,
-    cash_deposits: tp.FlexArray2d = np.array([[0.0]]),
+    cash_deposits: tp.FlexArray2dLike = 0.0,
 ) -> tp.Array2d:
     """Get cash series per column."""
+    cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
+
     out = np.empty_like(cash_flow)
     for col in prange(cash_flow.shape[1]):
         for i in range(cash_flow.shape[0]):
             if i == 0:
-                cash_now = flex_select_1d_nb(init_cash, col)
+                cash_now = flex_select_1d_pc_nb(init_cash, col)
             else:
                 cash_now = out[i - 1, col]
-            cash_now = add_nb(cash_now, flex_select_nb(cash_deposits, i, col))
+            cash_now = add_nb(cash_now, flex_select_nb(cash_deposits_, i, col))
             cash_now = add_nb(cash_now, cash_flow[i, col])
             out[i, col] = cash_now
     return out
@@ -471,17 +482,19 @@ def cash_grouped_nb(
     cash_flow_grouped: tp.Array2d,
     group_lens: tp.Array1d,
     init_cash_grouped: tp.FlexArray1d,
-    cash_deposits_grouped: tp.FlexArray2d = np.array([[0.0]]),
+    cash_deposits_grouped: tp.FlexArray2dLike = 0.0,
 ) -> tp.Array2d:
     """Get cash series per group."""
+    cash_deposits_grouped_ = to_2d_array_nb(np.asarray(cash_deposits_grouped))
+
     check_group_lens_nb(group_lens, target_shape[1])
     out = np.empty_like(cash_flow_grouped)
 
     for group in prange(len(group_lens)):
-        cash_now = flex_select_1d_nb(init_cash_grouped, group)
+        cash_now = flex_select_1d_pc_nb(init_cash_grouped, group)
         for i in range(cash_flow_grouped.shape[0]):
             flow_value = cash_flow_grouped[i, group]
-            cash_now = add_nb(cash_now, flex_select_nb(cash_deposits_grouped, i, group))
+            cash_now = add_nb(cash_now, flex_select_nb(cash_deposits_grouped_, i, group))
             cash_now = add_nb(cash_now, flow_value)
             out[i, group] = cash_now
     return out
@@ -493,14 +506,17 @@ def cash_grouped_nb(
 @register_jitted(cache=True)
 def init_position_value_nb(
     n_cols: int,
-    init_position: tp.FlexArray1d = np.array([0.0]),
-    init_price: tp.FlexArray1d = np.array([np.nan]),
+    init_position: tp.FlexArray1dLike = 0.0,
+    init_price: tp.FlexArray1dLike = np.nan,
 ) -> tp.Array1d:
     """Get initial position value per column."""
+    init_position_ = to_1d_array_nb(np.asarray(init_position))
+    init_price_ = to_1d_array_nb(np.asarray(init_price))
+
     out = np.empty(n_cols, dtype=np.float_)
     for col in range(n_cols):
-        _init_position = float(flex_select_1d_nb(init_position, col))
-        _init_price = float(flex_select_1d_nb(init_price, col))
+        _init_position = float(flex_select_1d_pc_nb(init_position_, col))
+        _init_price = float(flex_select_1d_pc_nb(init_price_, col))
         if _init_position == 0:
             out[col] = 0.0
         else:
@@ -513,7 +529,7 @@ def init_value_nb(init_position_value: tp.Array1d, init_cash: tp.FlexArray1d) ->
     """Get initial value per column."""
     out = np.empty(len(init_position_value), dtype=np.float_)
     for col in range(len(init_position_value)):
-        _init_cash = flex_select_1d_nb(init_cash, col)
+        _init_cash = flex_select_1d_pc_nb(init_cash, col)
         out[col] = _init_cash + init_position_value[col]
     return out
 
@@ -531,7 +547,7 @@ def init_value_grouped_nb(
     from_col = 0
     for group in range(len(group_lens)):
         to_col = from_col + group_lens[group]
-        group_value = flex_select_1d_nb(init_cash_grouped, group)
+        group_value = flex_select_1d_pc_nb(init_cash_grouped, group)
         for col in range(from_col, to_col):
             group_value += init_position_value[col]
         out[group] = group_value
@@ -646,13 +662,17 @@ def total_profit_nb(
     close: tp.Array2d,
     order_records: tp.RecordArray,
     col_map: tp.GroupMap,
-    init_position: tp.FlexArray1d = np.array([0.0]),
-    init_price: tp.FlexArray1d = np.array([np.nan]),
-    cash_earnings: tp.FlexArray2d = np.array([[0.0]]),
+    init_position: tp.FlexArray1dLike = 0.0,
+    init_price: tp.FlexArray1dLike = np.nan,
+    cash_earnings: tp.FlexArray2dLike = 0.0,
 ) -> tp.Array1d:
     """Get total profit per column.
 
     A much faster version than the one based on `value_nb`."""
+    init_position_ = to_1d_array_nb(np.asarray(init_position))
+    init_price_ = to_1d_array_nb(np.asarray(init_price))
+    cash_earnings_ = to_2d_array_nb(np.asarray(cash_earnings))
+
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
     assets = np.full(target_shape[1], 0.0, dtype=np.float_)
@@ -660,14 +680,14 @@ def total_profit_nb(
     zero_mask = np.full(target_shape[1], False, dtype=np.bool_)
 
     for col in prange(target_shape[1]):
-        _init_position = float(flex_select_1d_nb(init_position, col))
-        _init_price = float(flex_select_1d_nb(init_price, col))
+        _init_position = float(flex_select_1d_pc_nb(init_position_, col))
+        _init_price = float(flex_select_1d_pc_nb(init_price_, col))
         if _init_position != 0:
             assets[col] = _init_position
             cash[col] = -_init_position * _init_price
 
         for i in range(target_shape[0]):
-            cash[col] += flex_select_nb(cash_earnings, i, col)
+            cash[col] += flex_select_nb(cash_earnings_, i, col)
 
     for col in prange(col_lens.shape[0]):
         col_len = col_lens[col]
@@ -732,16 +752,18 @@ def total_profit_grouped_nb(total_profit: tp.Array1d, group_lens: tp.Array1d) ->
 def returns_nb(
     value: tp.Array2d,
     init_value: tp.FlexArray1d,
-    cash_deposits: tp.FlexArray2d = np.array([[0.0]]),
+    cash_deposits: tp.FlexArray2dLike = 0.0,
     log_returns: bool = False,
 ) -> tp.Array2d:
     """Get return series per column/group."""
+    cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
+
     out = np.empty(value.shape, dtype=np.float_)
     for col in prange(value.shape[1]):
-        input_value = flex_select_1d_nb(init_value, col)
+        input_value = flex_select_1d_pc_nb(init_value, col)
         for i in range(value.shape[0]):
             output_value = value[i, col]
-            adj_output_value = output_value - flex_select_nb(cash_deposits, i, col)
+            adj_output_value = output_value - flex_select_nb(cash_deposits_, i, col)
             out[i, col] = returns_nb_.get_return_nb(input_value, adj_output_value, log_returns=log_returns)
             input_value = output_value
     return out
@@ -852,16 +874,18 @@ def asset_returns_nb(
 def market_value_nb(
     close: tp.Array2d,
     init_value: tp.FlexArray1d,
-    cash_deposits: tp.FlexArray2d = np.array([[0.0]]),
+    cash_deposits: tp.FlexArray2dLike = 0.0,
 ) -> tp.Array2d:
     """Get market value per column."""
+    cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
+
     out = np.empty_like(close)
     for col in prange(close.shape[1]):
-        curr_value = flex_select_1d_nb(init_value, col)
+        curr_value = flex_select_1d_pc_nb(init_value, col)
         for i in range(close.shape[0]):
             if i > 0:
                 curr_value *= close[i, col] / close[i - 1, col]
-            curr_value += flex_select_nb(cash_deposits, i, col)
+            curr_value += flex_select_nb(cash_deposits_, i, col)
             out[i, col] = curr_value
     return out
 
@@ -881,9 +905,11 @@ def market_value_grouped_nb(
     close: tp.Array2d,
     group_lens: tp.Array1d,
     init_value: tp.FlexArray1d,
-    cash_deposits: tp.FlexArray2d = np.array([[0.0]]),
+    cash_deposits: tp.FlexArray2dLike = 0.0,
 ) -> tp.Array2d:
     """Get market value per group."""
+    cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
+
     check_group_lens_nb(group_lens, close.shape[1])
     out = np.empty((close.shape[0], len(group_lens)), dtype=np.float_)
     temp = np.empty(close.shape[1], dtype=np.float_)
@@ -897,9 +923,9 @@ def market_value_grouped_nb(
         for i in range(close.shape[0]):
             for col in range(from_col, to_col):
                 if i == 0:
-                    temp[col] = flex_select_1d_nb(init_value, col)
+                    temp[col] = flex_select_1d_pc_nb(init_value, col)
                 else:
                     temp[col] *= close[i, col] / close[i - 1, col]
-                temp[col] += flex_select_nb(cash_deposits, i, col)
+                temp[col] += flex_select_nb(cash_deposits_, i, col)
             out[i, group] = np.sum(temp[from_col:to_col])
     return out

@@ -120,6 +120,8 @@ class FlexArraySelector(ArraySelector):
         ann_args: tp.Optional[tp.AnnArgs] = None,
         **kwargs,
     ) -> tp.ArrayLike:
+        if np.isscalar(obj):
+            return obj
         obj = np.asarray(obj)
         if len(obj.shape) == 0:
             return obj
@@ -164,6 +166,8 @@ class FlexArraySlicer(ArraySlicer):
         ann_args: tp.Optional[tp.AnnArgs] = None,
         **kwargs,
     ) -> tp.ArrayLike:
+        if np.isscalar(obj):
+            return obj
         obj = np.asarray(obj)
         if len(obj.shape) == 0:
             return obj

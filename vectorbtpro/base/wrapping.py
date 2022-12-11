@@ -71,7 +71,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         **kwargs,
     ) -> ArrayWrapperT:
         """Derive metadata from shape."""
-        shape = reshaping.shape_to_tuple(shape)
+        shape = reshaping.to_tuple_shape(shape)
         if index is None:
             index = pd.RangeIndex(stop=shape[0])
         if columns is None:

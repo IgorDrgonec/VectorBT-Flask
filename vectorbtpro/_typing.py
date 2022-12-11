@@ -114,6 +114,8 @@ ArrayLike = Union[Scalar, Sequence[Scalar], Sequence[Sequence[Any]], SupportsArr
 IndexLike = Union[range, Sequence[Scalar], SupportsArray]
 FlexArray1d = Array1d
 FlexArray2d = Array2d
+FlexArray1dLike = Union[Scalar, Array1d]
+FlexArray2dLike = Union[Scalar, Array2d]
 
 # Labels
 Label = Hashable

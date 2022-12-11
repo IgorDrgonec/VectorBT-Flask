@@ -5,6 +5,7 @@
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
+from vectorbtpro.base.reshaping import to_1d_array_nb
 from vectorbtpro.base.flex_indexing import flex_select_nb
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.records import chunking as records_ch
@@ -187,8 +188,8 @@ def get_entry_trades_nb(
     order_records: tp.RecordArray,
     close: tp.Array2d,
     col_map: tp.GroupMap,
-    init_position: tp.FlexArray1d = np.array([0.0]),
-    init_price: tp.FlexArray1d = np.array([np.nan]),
+    init_position: tp.FlexArray1dLike = 0.0,
+    init_price: tp.FlexArray1dLike = np.nan,
 ) -> tp.RecordArray:
     """Fill entry trade records by aggregating order records.
 
@@ -264,6 +265,9 @@ def get_entry_trades_nb(
         7          0       0          2
         ```
     """
+    init_position_ = to_1d_array_nb(np.asarray(init_position))
+    init_price_ = to_1d_array_nb(np.asarray(init_price))
+
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
     max_records = np.max(col_lens) + 1
@@ -271,8 +275,8 @@ def get_entry_trades_nb(
     counts = np.full(len(col_lens), 0, dtype=np.int_)
 
     for col in prange(col_lens.shape[0]):
-        _init_position = float(flex_select_1d_nb(init_position, col))
-        _init_price = float(flex_select_1d_nb(init_price, col))
+        _init_position = float(flex_select_1d_pc_nb(init_position_, col))
+        _init_price = float(flex_select_1d_pc_nb(init_price_, col))
         if _init_position != 0:
             # Prepare initial position
             first_c = -1
@@ -478,8 +482,8 @@ def get_exit_trades_nb(
     order_records: tp.RecordArray,
     close: tp.Array2d,
     col_map: tp.GroupMap,
-    init_position: tp.FlexArray1d = np.array([0.0]),
-    init_price: tp.FlexArray1d = np.array([np.nan]),
+    init_position: tp.FlexArray1dLike = 0.0,
+    init_price: tp.FlexArray1dLike = np.nan,
 ) -> tp.RecordArray:
     """Fill exit trade records by aggregating order records.
 
@@ -522,6 +526,9 @@ def get_exit_trades_nb(
         7          0       0          2
         ```
     """
+    init_position_ = to_1d_array_nb(np.asarray(init_position))
+    init_price_ = to_1d_array_nb(np.asarray(init_price))
+
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
     max_records = np.max(col_lens) + 1
@@ -529,8 +536,8 @@ def get_exit_trades_nb(
     counts = np.full(len(col_lens), 0, dtype=np.int_)
 
     for col in prange(col_lens.shape[0]):
-        _init_position = float(flex_select_1d_nb(init_position, col))
-        _init_price = float(flex_select_1d_nb(init_price, col))
+        _init_position = float(flex_select_1d_pc_nb(init_position_, col))
+        _init_price = float(flex_select_1d_pc_nb(init_price_, col))
         if _init_position != 0:
             # Prepare initial position
             in_position = True

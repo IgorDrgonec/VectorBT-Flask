@@ -924,7 +924,7 @@ class SimulationContext(tp.NamedTuple):
     high: tp.FlexArray2d
     low: tp.FlexArray2d
     close: tp.FlexArray2d
-    bm_close: tp.Optional[tp.FlexArray2d]
+    bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
@@ -1004,7 +1004,7 @@ __pdoc__[
     "SimulationContext.init_cash"
 ] = """Initial capital per column (or per group with cash sharing).
 
-Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_1d_nb`.
+Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_1d_pc_nb`.
 
 Must broadcast to shape `(group_lens.shape[0],)` with cash sharing, otherwise `(target_shape[1],)`.
 
@@ -1020,7 +1020,7 @@ __pdoc__[
     "SimulationContext.init_position"
 ] = """Initial position per column.
 
-Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_1d_nb`.
+Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_1d_pc_nb`.
 
 Must broadcast to shape `(target_shape[1],)`.
 
@@ -1031,7 +1031,7 @@ __pdoc__[
     "SimulationContext.init_price"
 ] = """Initial position price per column.
 
-Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_1d_nb`.
+Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_1d_pc_nb`.
 
 Must broadcast to shape `(target_shape[1],)`.
 
@@ -1150,9 +1150,7 @@ __pdoc__[
     "SimulationContext.bm_close"
 ] = """Benchmark closing price at each time step.
 
-Can be None to indicate that the user should use `SimulationContext.close`.
-
-If an array, has the same shape as `SimulationContext.close`."""
+Must broadcast to shape `SimulationContext.target_shape`."""
 __pdoc__[
     "SimulationContext.ffill_val_price"
 ] = """Whether to track valuation price only if it's known.
@@ -1442,7 +1440,7 @@ class GroupContext(tp.NamedTuple):
     high: tp.FlexArray2d
     low: tp.FlexArray2d
     close: tp.FlexArray2d
-    bm_close: tp.Optional[tp.FlexArray2d]
+    bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
@@ -1539,7 +1537,7 @@ class RowContext(tp.NamedTuple):
     high: tp.FlexArray2d
     low: tp.FlexArray2d
     close: tp.FlexArray2d
-    bm_close: tp.Optional[tp.FlexArray2d]
+    bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
@@ -1600,7 +1598,7 @@ class SegmentContext(tp.NamedTuple):
     high: tp.FlexArray2d
     low: tp.FlexArray2d
     close: tp.FlexArray2d
-    bm_close: tp.Optional[tp.FlexArray2d]
+    bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
@@ -1680,7 +1678,7 @@ class OrderContext(tp.NamedTuple):
     high: tp.FlexArray2d
     low: tp.FlexArray2d
     close: tp.FlexArray2d
-    bm_close: tp.Optional[tp.FlexArray2d]
+    bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
@@ -1774,7 +1772,7 @@ class PostOrderContext(tp.NamedTuple):
     high: tp.FlexArray2d
     low: tp.FlexArray2d
     close: tp.FlexArray2d
-    bm_close: tp.Optional[tp.FlexArray2d]
+    bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
@@ -1888,7 +1886,7 @@ class FlexOrderContext(tp.NamedTuple):
     high: tp.FlexArray2d
     low: tp.FlexArray2d
     close: tp.FlexArray2d
-    bm_close: tp.Optional[tp.FlexArray2d]
+    bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool

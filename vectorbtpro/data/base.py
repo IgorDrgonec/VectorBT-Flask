@@ -373,23 +373,31 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
     @property
     def index(self) -> tp.Index:
-        """Index."""
-        return self.wrapper.index
+        """Index.
+
+        Based on the default symbol wrapper."""
+        return self.symbol_wrapper.index
 
     @property
     def columns(self) -> tp.Index:
-        """Columns."""
-        return self.wrapper.columns
+        """Columns.
+
+        Based on the default symbol wrapper."""
+        return self.symbol_wrapper.columns
 
     @property
     def shape(self) -> tp.Shape:
-        """Shape."""
-        return self.wrapper.shape
+        """Shape.
+
+        Based on the default symbol wrapper."""
+        return self.symbol_wrapper.shape
 
     @property
     def ndim(self) -> int:
-        """Number of dimensions."""
-        return self.wrapper.ndim
+        """Number of dimensions.
+
+        Based on the default symbol wrapper."""
+        return self.symbol_wrapper.ndim
 
     # ############# Pre- and post-processing ############# #
 

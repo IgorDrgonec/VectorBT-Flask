@@ -5,6 +5,7 @@
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
+from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.portfolio.nb.iter_ import *
@@ -72,9 +73,9 @@ def sort_call_seq_out_1d_nb(
         if call_seq_out[c] != c:
             raise ValueError("call_seq_out must follow CallSeqType.Default")
         col = ctx.from_col + c
-        _size = flex_select_1d_nb(size, c)
-        _size_type = flex_select_1d_nb(size_type, c)
-        _direction = flex_select_1d_nb(direction, c)
+        _size = flex_select_1d_pc_nb(size, c)
+        _size_type = flex_select_1d_pc_nb(size_type, c)
+        _direction = flex_select_1d_pc_nb(direction, c)
         if ctx.cash_sharing:
             cash_now = ctx.last_cash[ctx.group]
             free_cash_now = ctx.last_free_cash[ctx.group]
@@ -369,12 +370,12 @@ def simulate_nb(
     group_lens: tp.Array1d,
     cash_sharing: bool,
     call_seq: tp.Optional[tp.Array2d] = None,
-    init_cash: tp.FlexArray1d = np.array([100.0]),
-    init_position: tp.FlexArray1d = np.array([0.0]),
-    init_price: tp.FlexArray1d = np.array([np.nan]),
-    cash_deposits: tp.FlexArray2d = np.array([[0.0]]),
-    cash_earnings: tp.FlexArray2d = np.array([[0.0]]),
-    segment_mask: tp.FlexArray2d = np.array([[True]]),
+    init_cash: tp.FlexArray1dLike = 100.0,
+    init_position: tp.FlexArray1dLike = 0.0,
+    init_price: tp.FlexArray1dLike = np.nan,
+    cash_deposits: tp.FlexArray2dLike = 0.0,
+    cash_earnings: tp.FlexArray2dLike = 0.0,
+    segment_mask: tp.FlexArray2dLike = True,
     call_pre_segment: bool = False,
     call_post_segment: bool = False,
     pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
@@ -395,11 +396,11 @@ def simulate_nb(
     post_order_args: tp.Args = (),
     index: tp.Optional[tp.Array1d] = None,
     freq: tp.Optional[int] = None,
-    open: tp.FlexArray2d = np.array([[np.nan]]),
-    high: tp.FlexArray2d = np.array([[np.nan]]),
-    low: tp.FlexArray2d = np.array([[np.nan]]),
-    close: tp.FlexArray2d = np.array([[np.nan]]),
-    bm_close: tp.FlexArray2d = np.array([[np.nan]]),
+    open: tp.FlexArray2dLike = np.nan,
+    high: tp.FlexArray2dLike = np.nan,
+    low: tp.FlexArray2dLike = np.nan,
+    close: tp.FlexArray2dLike = np.nan,
+    bm_close: tp.FlexArray2dLike = np.nan,
     ffill_val_price: bool = True,
     update_value: bool = False,
     fill_pos_record: bool = True,
@@ -728,14 +729,14 @@ def simulate_nb(
         >>> pd.DataFrame.from_records(sim_out.order_records)
            id  col  idx       size     price      fees  side
         0   0    0    0   7.626262  4.375232  1.033367     0
-        1   1    1    0   3.488053  9.565985  1.033367     0
-        2   2    2    0   3.972040  7.595533  1.030170     0
-        3   3    1    2   0.920352  8.786790  1.008087     1
-        4   4    2    2   0.448747  6.403625  1.002874     1
-        5   5    0    2   5.210115  1.524275  1.007942     0
-        6   6    0    4   7.899568  8.483492  1.067016     1
-        7   7    2    4  12.378281  2.639061  1.032667     0
-        8   8    1    4  10.713236  2.913963  1.031218     0
+        1   1    0    2   5.210115  1.524275  1.007942     0
+        2   2    0    4   7.899568  8.483492  1.067016     1
+        3   0    1    0   3.488053  9.565985  1.033367     0
+        4   1    1    2   0.920352  8.786790  1.008087     1
+        5   2    1    4  10.713236  2.913963  1.031218     0
+        6   0    2    0   3.972040  7.595533  1.030170     0
+        7   1    2    2   0.448747  6.403625  1.002874     1
+        8   2    2    4  12.378281  2.639061  1.032667     0
 
         >>> col_map = vbt.rec_nb.col_map_nb(sim_out.order_records['col'], target_shape[1])
         >>> asset_flow = vbt.pf_nb.asset_flow_nb(target_shape, sim_out.order_records, col_map)
@@ -752,21 +753,33 @@ def simulate_nb(
     """
     check_group_lens_nb(group_lens, target_shape[1])
 
+    init_cash_ = to_1d_array_nb(np.asarray(init_cash))
+    init_position_ = to_1d_array_nb(np.asarray(init_position))
+    init_price_ = to_1d_array_nb(np.asarray(init_price))
+    cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
+    cash_earnings_ = to_2d_array_nb(np.asarray(cash_earnings))
+    segment_mask_ = to_2d_array_nb(np.asarray(segment_mask))
+    open_ = to_2d_array_nb(np.asarray(open))
+    high_ = to_2d_array_nb(np.asarray(high))
+    low_ = to_2d_array_nb(np.asarray(low))
+    close_ = to_2d_array_nb(np.asarray(close))
+    bm_close_ = to_2d_array_nb(np.asarray(bm_close))
+
     order_records, log_records = prepare_records_nb(target_shape, max_orders, max_logs)
-    last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash)
-    last_position = prepare_last_position_nb(target_shape, init_position)
+    last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)
+    last_position = prepare_last_position_nb(target_shape, init_position_)
     last_value = prepare_last_value_nb(
         target_shape,
         group_lens,
         cash_sharing,
-        init_cash,
-        init_position=init_position,
-        init_price=init_price,
+        init_cash_,
+        init_position=init_position_,
+        init_price=init_price_,
     )
     last_pos_record = prepare_last_pos_record_nb(
         target_shape,
-        init_position=init_position,
-        init_price=init_price,
+        init_position=init_position_,
+        init_price=init_price_,
         fill_pos_record=fill_pos_record,
     )
 
@@ -790,21 +803,21 @@ def simulate_nb(
         group_lens=group_lens,
         cash_sharing=cash_sharing,
         call_seq=call_seq,
-        init_cash=init_cash,
-        init_position=init_position,
-        init_price=init_price,
-        cash_deposits=cash_deposits,
-        cash_earnings=cash_earnings,
-        segment_mask=segment_mask,
+        init_cash=init_cash_,
+        init_position=init_position_,
+        init_price=init_price_,
+        cash_deposits=cash_deposits_,
+        cash_earnings=cash_earnings_,
+        segment_mask=segment_mask_,
         call_pre_segment=call_pre_segment,
         call_post_segment=call_post_segment,
         index=index,
         freq=freq,
-        open=open,
-        high=high,
-        low=low,
-        close=close,
-        bm_close=bm_close,
+        open=open_,
+        high=high_,
+        low=low_,
+        close=close_,
+        bm_close=bm_close_,
         ffill_val_price=ffill_val_price,
         update_value=update_value,
         fill_pos_record=fill_pos_record,
@@ -836,21 +849,21 @@ def simulate_nb(
             group_lens=group_lens,
             cash_sharing=cash_sharing,
             call_seq=call_seq,
-            init_cash=init_cash,
-            init_position=init_position,
-            init_price=init_price,
-            cash_deposits=cash_deposits,
-            cash_earnings=cash_earnings,
-            segment_mask=segment_mask,
+            init_cash=init_cash_,
+            init_position=init_position_,
+            init_price=init_price_,
+            cash_deposits=cash_deposits_,
+            cash_earnings=cash_earnings_,
+            segment_mask=segment_mask_,
             call_pre_segment=call_pre_segment,
             call_post_segment=call_post_segment,
             index=index,
             freq=freq,
-            open=open,
-            high=high,
-            low=low,
-            close=close,
-            bm_close=bm_close,
+            open=open_,
+            high=high_,
+            low=low_,
+            close=close_,
+            bm_close=bm_close_,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
             fill_pos_record=fill_pos_record,
@@ -886,7 +899,7 @@ def simulate_nb(
             if track_value:
                 # Update valuation price using current open
                 for col in range(from_col, to_col):
-                    _open = flex_select_nb(open, i, col)
+                    _open = flex_select_nb(open_, i, col)
                     if not np.isnan(_open) or not ffill_val_price:
                         last_val_price[col] = _open
 
@@ -914,7 +927,7 @@ def simulate_nb(
                         update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
-            is_segment_active = flex_select_nb(segment_mask, i, group)
+            is_segment_active = flex_select_nb(segment_mask_, i, group)
             if call_pre_segment or is_segment_active:
                 # Call function before the segment
                 pre_seg_ctx = SegmentContext(
@@ -922,21 +935,21 @@ def simulate_nb(
                     group_lens=group_lens,
                     cash_sharing=cash_sharing,
                     call_seq=call_seq,
-                    init_cash=init_cash,
-                    init_position=init_position,
-                    init_price=init_price,
-                    cash_deposits=cash_deposits,
-                    cash_earnings=cash_earnings,
-                    segment_mask=segment_mask,
+                    init_cash=init_cash_,
+                    init_position=init_position_,
+                    init_price=init_price_,
+                    cash_deposits=cash_deposits_,
+                    cash_earnings=cash_earnings_,
+                    segment_mask=segment_mask_,
                     call_pre_segment=call_pre_segment,
                     call_post_segment=call_post_segment,
                     index=index,
                     freq=freq,
-                    open=open,
-                    high=high,
-                    low=low,
-                    close=close,
-                    bm_close=bm_close,
+                    open=open_,
+                    high=high_,
+                    low=low_,
+                    close=close_,
+                    bm_close=bm_close_,
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
@@ -965,13 +978,13 @@ def simulate_nb(
 
             # Add cash
             if cash_sharing:
-                _cash_deposits = flex_select_nb(cash_deposits, i, group)
+                _cash_deposits = flex_select_nb(cash_deposits_, i, group)
                 last_cash[group] += _cash_deposits
                 last_free_cash[group] += _cash_deposits
                 last_cash_deposits[group] = _cash_deposits
             else:
                 for col in range(from_col, to_col):
-                    _cash_deposits = flex_select_nb(cash_deposits, i, col)
+                    _cash_deposits = flex_select_nb(cash_deposits_, i, col)
                     last_cash[col] += _cash_deposits
                     last_free_cash[col] += _cash_deposits
                     last_cash_deposits[col] = _cash_deposits
@@ -1041,21 +1054,21 @@ def simulate_nb(
                         group_lens=group_lens,
                         cash_sharing=cash_sharing,
                         call_seq=call_seq,
-                        init_cash=init_cash,
-                        init_position=init_position,
-                        init_price=init_price,
-                        cash_deposits=cash_deposits,
-                        cash_earnings=cash_earnings,
-                        segment_mask=segment_mask,
+                        init_cash=init_cash_,
+                        init_position=init_position_,
+                        init_price=init_price_,
+                        cash_deposits=cash_deposits_,
+                        cash_earnings=cash_earnings_,
+                        segment_mask=segment_mask_,
                         call_pre_segment=call_pre_segment,
                         call_post_segment=call_post_segment,
                         index=index,
                         freq=freq,
-                        open=open,
-                        high=high,
-                        low=low,
-                        close=close,
-                        bm_close=bm_close,
+                        open=open_,
+                        high=high_,
+                        low=low_,
+                        close=close_,
+                        bm_close=bm_close_,
                         ffill_val_price=ffill_val_price,
                         update_value=update_value,
                         fill_pos_record=fill_pos_record,
@@ -1102,10 +1115,10 @@ def simulate_nb(
 
                     # Process the order
                     price_area = PriceArea(
-                        open=flex_select_nb(open, i, col),
-                        high=flex_select_nb(high, i, col),
-                        low=flex_select_nb(low, i, col),
-                        close=flex_select_nb(close, i, col),
+                        open=flex_select_nb(open_, i, col),
+                        high=flex_select_nb(high_, i, col),
+                        low=flex_select_nb(low_, i, col),
+                        close=flex_select_nb(close_, i, col),
                     )
                     exec_state = ExecState(
                         cash=cash_now,
@@ -1189,21 +1202,21 @@ def simulate_nb(
                         group_lens=group_lens,
                         cash_sharing=cash_sharing,
                         call_seq=call_seq,
-                        init_cash=init_cash,
-                        init_position=init_position,
-                        init_price=init_price,
-                        cash_deposits=cash_deposits,
-                        cash_earnings=cash_earnings,
-                        segment_mask=segment_mask,
+                        init_cash=init_cash_,
+                        init_position=init_position_,
+                        init_price=init_price_,
+                        cash_deposits=cash_deposits_,
+                        cash_earnings=cash_earnings_,
+                        segment_mask=segment_mask_,
                         call_pre_segment=call_pre_segment,
                         call_post_segment=call_post_segment,
                         index=index,
                         freq=freq,
-                        open=open,
-                        high=high,
-                        low=low,
-                        close=close,
-                        bm_close=bm_close,
+                        open=open_,
+                        high=high_,
+                        low=low_,
+                        close=close_,
+                        bm_close=bm_close_,
                         ffill_val_price=ffill_val_price,
                         update_value=update_value,
                         fill_pos_record=fill_pos_record,
@@ -1250,7 +1263,7 @@ def simulate_nb(
             # NOTE: Regardless of segment_mask, we still need to update stats to be accessed by future rows
             # Add earnings in cash
             for col in range(from_col, to_col):
-                _cash_earnings = flex_select_nb(cash_earnings, i, col)
+                _cash_earnings = flex_select_nb(cash_earnings_, i, col)
                 if cash_sharing:
                     last_cash[group] += _cash_earnings
                     last_free_cash[group] += _cash_earnings
@@ -1261,7 +1274,7 @@ def simulate_nb(
             if track_value:
                 # Update valuation price using current close
                 for col in range(from_col, to_col):
-                    _close = flex_select_nb(close, i, col)
+                    _close = flex_select_nb(close_, i, col)
                     if not np.isnan(_close) or not ffill_val_price:
                         last_val_price[col] = _close
 
@@ -1304,21 +1317,21 @@ def simulate_nb(
                     group_lens=group_lens,
                     cash_sharing=cash_sharing,
                     call_seq=call_seq,
-                    init_cash=init_cash,
-                    init_position=init_position,
-                    init_price=init_price,
-                    cash_deposits=cash_deposits,
-                    cash_earnings=cash_earnings,
-                    segment_mask=segment_mask,
+                    init_cash=init_cash_,
+                    init_position=init_position_,
+                    init_price=init_price_,
+                    cash_deposits=cash_deposits_,
+                    cash_earnings=cash_earnings_,
+                    segment_mask=segment_mask_,
                     call_pre_segment=call_pre_segment,
                     call_post_segment=call_post_segment,
                     index=index,
                     freq=freq,
-                    open=open,
-                    high=high,
-                    low=low,
-                    close=close,
-                    bm_close=bm_close,
+                    open=open_,
+                    high=high_,
+                    low=low_,
+                    close=close_,
+                    bm_close=bm_close_,
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
@@ -1351,21 +1364,21 @@ def simulate_nb(
             group_lens=group_lens,
             cash_sharing=cash_sharing,
             call_seq=call_seq,
-            init_cash=init_cash,
-            init_position=init_position,
-            init_price=init_price,
-            cash_deposits=cash_deposits,
-            cash_earnings=cash_earnings,
-            segment_mask=segment_mask,
+            init_cash=init_cash_,
+            init_position=init_position_,
+            init_price=init_price_,
+            cash_deposits=cash_deposits_,
+            cash_earnings=cash_earnings_,
+            segment_mask=segment_mask_,
             call_pre_segment=call_pre_segment,
             call_post_segment=call_post_segment,
             index=index,
             freq=freq,
-            open=open,
-            high=high,
-            low=low,
-            close=close,
-            bm_close=bm_close,
+            open=open_,
+            high=high_,
+            low=low_,
+            close=close_,
+            bm_close=bm_close_,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
             fill_pos_record=fill_pos_record,
@@ -1396,21 +1409,21 @@ def simulate_nb(
         group_lens=group_lens,
         cash_sharing=cash_sharing,
         call_seq=call_seq,
-        init_cash=init_cash,
-        init_position=init_position,
-        init_price=init_price,
-        cash_deposits=cash_deposits,
-        cash_earnings=cash_earnings,
-        segment_mask=segment_mask,
+        init_cash=init_cash_,
+        init_position=init_position_,
+        init_price=init_price_,
+        cash_deposits=cash_deposits_,
+        cash_earnings=cash_earnings_,
+        segment_mask=segment_mask_,
         call_pre_segment=call_pre_segment,
         call_post_segment=call_post_segment,
         index=index,
         freq=freq,
-        open=open,
-        high=high,
-        low=low,
-        close=close,
-        bm_close=bm_close,
+        open=open_,
+        high=high_,
+        low=low_,
+        close=close_,
+        bm_close=bm_close_,
         ffill_val_price=ffill_val_price,
         update_value=update_value,
         fill_pos_record=fill_pos_record,
@@ -1436,8 +1449,8 @@ def simulate_nb(
         order_counts=order_counts,
         log_records=log_records,
         log_counts=log_counts,
-        cash_deposits=cash_deposits,
-        cash_earnings=cash_earnings,
+        cash_deposits=cash_deposits_,
+        cash_earnings=cash_earnings_,
         call_seq=call_seq,
         in_outputs=in_outputs,
     )
@@ -1497,12 +1510,12 @@ def simulate_row_wise_nb(
     group_lens: tp.Array1d,
     cash_sharing: bool,
     call_seq: tp.Optional[tp.Array2d] = None,
-    init_cash: tp.FlexArray1d = np.array([100.0]),
-    init_position: tp.FlexArray1d = np.array([0.0]),
-    init_price: tp.FlexArray1d = np.array([np.nan]),
-    cash_deposits: tp.FlexArray2d = np.array([[0.0]]),
-    cash_earnings: tp.FlexArray2d = np.array([[0.0]]),
-    segment_mask: tp.FlexArray2d = np.array([[True]]),
+    init_cash: tp.FlexArray1dLike = 100.0,
+    init_position: tp.FlexArray1dLike = 0.0,
+    init_price: tp.FlexArray1dLike = np.nan,
+    cash_deposits: tp.FlexArray2dLike = 0.0,
+    cash_earnings: tp.FlexArray2dLike = 0.0,
+    segment_mask: tp.FlexArray2dLike = True,
     call_pre_segment: bool = False,
     call_post_segment: bool = False,
     pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
@@ -1523,11 +1536,11 @@ def simulate_row_wise_nb(
     post_order_args: tp.Args = (),
     index: tp.Optional[tp.Array1d] = None,
     freq: tp.Optional[int] = None,
-    open: tp.FlexArray2d = np.array([[np.nan]]),
-    high: tp.FlexArray2d = np.array([[np.nan]]),
-    low: tp.FlexArray2d = np.array([[np.nan]]),
-    close: tp.FlexArray2d = np.array([[np.nan]]),
-    bm_close: tp.FlexArray2d = np.array([[np.nan]]),
+    open: tp.FlexArray2dLike = np.nan,
+    high: tp.FlexArray2dLike = np.nan,
+    low: tp.FlexArray2dLike = np.nan,
+    close: tp.FlexArray2dLike = np.nan,
+    bm_close: tp.FlexArray2dLike = np.nan,
     ffill_val_price: bool = True,
     update_value: bool = False,
     fill_pos_record: bool = True,
@@ -1643,21 +1656,33 @@ def simulate_row_wise_nb(
     """
     check_group_lens_nb(group_lens, target_shape[1])
 
+    init_cash_ = to_1d_array_nb(np.asarray(init_cash))
+    init_position_ = to_1d_array_nb(np.asarray(init_position))
+    init_price_ = to_1d_array_nb(np.asarray(init_price))
+    cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
+    cash_earnings_ = to_2d_array_nb(np.asarray(cash_earnings))
+    segment_mask_ = to_2d_array_nb(np.asarray(segment_mask))
+    open_ = to_2d_array_nb(np.asarray(open))
+    high_ = to_2d_array_nb(np.asarray(high))
+    low_ = to_2d_array_nb(np.asarray(low))
+    close_ = to_2d_array_nb(np.asarray(close))
+    bm_close_ = to_2d_array_nb(np.asarray(bm_close))
+
     order_records, log_records = prepare_records_nb(target_shape, max_orders, max_logs)
-    last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash)
-    last_position = prepare_last_position_nb(target_shape, init_position)
+    last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)
+    last_position = prepare_last_position_nb(target_shape, init_position_)
     last_value = prepare_last_value_nb(
         target_shape,
         group_lens,
         cash_sharing,
-        init_cash,
-        init_position=init_position,
-        init_price=init_price,
+        init_cash_,
+        init_position=init_position_,
+        init_price=init_price_,
     )
     last_pos_record = prepare_last_pos_record_nb(
         target_shape,
-        init_position=init_position,
-        init_price=init_price,
+        init_position=init_position_,
+        init_price=init_price_,
         fill_pos_record=fill_pos_record,
     )
 
@@ -1681,21 +1706,21 @@ def simulate_row_wise_nb(
         group_lens=group_lens,
         cash_sharing=cash_sharing,
         call_seq=call_seq,
-        init_cash=init_cash,
-        init_position=init_position,
-        init_price=init_price,
-        cash_deposits=cash_deposits,
-        cash_earnings=cash_earnings,
-        segment_mask=segment_mask,
+        init_cash=init_cash_,
+        init_position=init_position_,
+        init_price=init_price_,
+        cash_deposits=cash_deposits_,
+        cash_earnings=cash_earnings_,
+        segment_mask=segment_mask_,
         call_pre_segment=call_pre_segment,
         call_post_segment=call_post_segment,
         index=index,
         freq=freq,
-        open=open,
-        high=high,
-        low=low,
-        close=close,
-        bm_close=bm_close,
+        open=open_,
+        high=high_,
+        low=low_,
+        close=close_,
+        bm_close=bm_close_,
         ffill_val_price=ffill_val_price,
         update_value=update_value,
         fill_pos_record=fill_pos_record,
@@ -1724,21 +1749,21 @@ def simulate_row_wise_nb(
             group_lens=group_lens,
             cash_sharing=cash_sharing,
             call_seq=call_seq,
-            init_cash=init_cash,
-            init_position=init_position,
-            init_price=init_price,
-            cash_deposits=cash_deposits,
-            cash_earnings=cash_earnings,
-            segment_mask=segment_mask,
+            init_cash=init_cash_,
+            init_position=init_position_,
+            init_price=init_price_,
+            cash_deposits=cash_deposits_,
+            cash_earnings=cash_earnings_,
+            segment_mask=segment_mask_,
             call_pre_segment=call_pre_segment,
             call_post_segment=call_post_segment,
             index=index,
             freq=freq,
-            open=open,
-            high=high,
-            low=low,
-            close=close,
-            bm_close=bm_close,
+            open=open_,
+            high=high_,
+            low=low_,
+            close=close_,
+            bm_close=bm_close_,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
             fill_pos_record=fill_pos_record,
@@ -1775,7 +1800,7 @@ def simulate_row_wise_nb(
             if track_value:
                 # Update valuation price using current open
                 for col in range(from_col, to_col):
-                    _open = flex_select_nb(open, i, col)
+                    _open = flex_select_nb(open_, i, col)
                     if not np.isnan(_open) or not ffill_val_price:
                         last_val_price[col] = _open
 
@@ -1803,7 +1828,7 @@ def simulate_row_wise_nb(
                         update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
-            is_segment_active = flex_select_nb(segment_mask, i, group)
+            is_segment_active = flex_select_nb(segment_mask_, i, group)
             if call_pre_segment or is_segment_active:
                 # Call function before the segment
                 pre_seg_ctx = SegmentContext(
@@ -1811,21 +1836,21 @@ def simulate_row_wise_nb(
                     group_lens=group_lens,
                     cash_sharing=cash_sharing,
                     call_seq=call_seq,
-                    init_cash=init_cash,
-                    init_position=init_position,
-                    init_price=init_price,
-                    cash_deposits=cash_deposits,
-                    cash_earnings=cash_earnings,
-                    segment_mask=segment_mask,
+                    init_cash=init_cash_,
+                    init_position=init_position_,
+                    init_price=init_price_,
+                    cash_deposits=cash_deposits_,
+                    cash_earnings=cash_earnings_,
+                    segment_mask=segment_mask_,
                     call_pre_segment=call_pre_segment,
                     call_post_segment=call_post_segment,
                     index=index,
                     freq=freq,
-                    open=open,
-                    high=high,
-                    low=low,
-                    close=close,
-                    bm_close=bm_close,
+                    open=open_,
+                    high=high_,
+                    low=low_,
+                    close=close_,
+                    bm_close=bm_close_,
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
@@ -1854,13 +1879,13 @@ def simulate_row_wise_nb(
 
             # Add cash
             if cash_sharing:
-                _cash_deposits = flex_select_nb(cash_deposits, i, group)
+                _cash_deposits = flex_select_nb(cash_deposits_, i, group)
                 last_cash[group] += _cash_deposits
                 last_free_cash[group] += _cash_deposits
                 last_cash_deposits[group] = _cash_deposits
             else:
                 for col in range(from_col, to_col):
-                    _cash_deposits = flex_select_nb(cash_deposits, i, col)
+                    _cash_deposits = flex_select_nb(cash_deposits_, i, col)
                     last_cash[col] += _cash_deposits
                     last_free_cash[col] += _cash_deposits
                     last_cash_deposits[col] = _cash_deposits
@@ -1930,21 +1955,21 @@ def simulate_row_wise_nb(
                         group_lens=group_lens,
                         cash_sharing=cash_sharing,
                         call_seq=call_seq,
-                        init_cash=init_cash,
-                        init_position=init_position,
-                        init_price=init_price,
-                        cash_deposits=cash_deposits,
-                        cash_earnings=cash_earnings,
-                        segment_mask=segment_mask,
+                        init_cash=init_cash_,
+                        init_position=init_position_,
+                        init_price=init_price_,
+                        cash_deposits=cash_deposits_,
+                        cash_earnings=cash_earnings_,
+                        segment_mask=segment_mask_,
                         call_pre_segment=call_pre_segment,
                         call_post_segment=call_post_segment,
                         index=index,
                         freq=freq,
-                        open=open,
-                        high=high,
-                        low=low,
-                        close=close,
-                        bm_close=bm_close,
+                        open=open_,
+                        high=high_,
+                        low=low_,
+                        close=close_,
+                        bm_close=bm_close_,
                         ffill_val_price=ffill_val_price,
                         update_value=update_value,
                         fill_pos_record=fill_pos_record,
@@ -1991,10 +2016,10 @@ def simulate_row_wise_nb(
 
                     # Process the order
                     price_area = PriceArea(
-                        open=flex_select_nb(open, i, col),
-                        high=flex_select_nb(high, i, col),
-                        low=flex_select_nb(low, i, col),
-                        close=flex_select_nb(close, i, col),
+                        open=flex_select_nb(open_, i, col),
+                        high=flex_select_nb(high_, i, col),
+                        low=flex_select_nb(low_, i, col),
+                        close=flex_select_nb(close_, i, col),
                     )
                     exec_state = ExecState(
                         cash=cash_now,
@@ -2078,21 +2103,21 @@ def simulate_row_wise_nb(
                         group_lens=group_lens,
                         cash_sharing=cash_sharing,
                         call_seq=call_seq,
-                        init_cash=init_cash,
-                        init_position=init_position,
-                        init_price=init_price,
-                        cash_deposits=cash_deposits,
-                        cash_earnings=cash_earnings,
-                        segment_mask=segment_mask,
+                        init_cash=init_cash_,
+                        init_position=init_position_,
+                        init_price=init_price_,
+                        cash_deposits=cash_deposits_,
+                        cash_earnings=cash_earnings_,
+                        segment_mask=segment_mask_,
                         call_pre_segment=call_pre_segment,
                         call_post_segment=call_post_segment,
                         index=index,
                         freq=freq,
-                        open=open,
-                        high=high,
-                        low=low,
-                        close=close,
-                        bm_close=bm_close,
+                        open=open_,
+                        high=high_,
+                        low=low_,
+                        close=close_,
+                        bm_close=bm_close_,
                         ffill_val_price=ffill_val_price,
                         update_value=update_value,
                         fill_pos_record=fill_pos_record,
@@ -2139,7 +2164,7 @@ def simulate_row_wise_nb(
             # NOTE: Regardless of segment_mask, we still need to update stats to be accessed by future rows
             # Add earnings in cash
             for col in range(from_col, to_col):
-                _cash_earnings = flex_select_nb(cash_earnings, i, col)
+                _cash_earnings = flex_select_nb(cash_earnings_, i, col)
                 if cash_sharing:
                     last_cash[group] += _cash_earnings
                     last_free_cash[group] += _cash_earnings
@@ -2150,7 +2175,7 @@ def simulate_row_wise_nb(
             if track_value:
                 # Update valuation price using current close
                 for col in range(from_col, to_col):
-                    _close = flex_select_nb(close, i, col)
+                    _close = flex_select_nb(close_, i, col)
                     if not np.isnan(_close) or not ffill_val_price:
                         last_val_price[col] = _close
 
@@ -2193,21 +2218,21 @@ def simulate_row_wise_nb(
                     group_lens=group_lens,
                     cash_sharing=cash_sharing,
                     call_seq=call_seq,
-                    init_cash=init_cash,
-                    init_position=init_position,
-                    init_price=init_price,
-                    cash_deposits=cash_deposits,
-                    cash_earnings=cash_earnings,
-                    segment_mask=segment_mask,
+                    init_cash=init_cash_,
+                    init_position=init_position_,
+                    init_price=init_price_,
+                    cash_deposits=cash_deposits_,
+                    cash_earnings=cash_earnings_,
+                    segment_mask=segment_mask_,
                     call_pre_segment=call_pre_segment,
                     call_post_segment=call_post_segment,
                     index=index,
                     freq=freq,
-                    open=open,
-                    high=high,
-                    low=low,
-                    close=close,
-                    bm_close=bm_close,
+                    open=open_,
+                    high=high_,
+                    low=low_,
+                    close=close_,
+                    bm_close=bm_close_,
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
@@ -2240,21 +2265,21 @@ def simulate_row_wise_nb(
             group_lens=group_lens,
             cash_sharing=cash_sharing,
             call_seq=call_seq,
-            init_cash=init_cash,
-            init_position=init_position,
-            init_price=init_price,
-            cash_deposits=cash_deposits,
-            cash_earnings=cash_earnings,
-            segment_mask=segment_mask,
+            init_cash=init_cash_,
+            init_position=init_position_,
+            init_price=init_price_,
+            cash_deposits=cash_deposits_,
+            cash_earnings=cash_earnings_,
+            segment_mask=segment_mask_,
             call_pre_segment=call_pre_segment,
             call_post_segment=call_post_segment,
             index=index,
             freq=freq,
-            open=open,
-            high=high,
-            low=low,
-            close=close,
-            bm_close=bm_close,
+            open=open_,
+            high=high_,
+            low=low_,
+            close=close_,
+            bm_close=bm_close_,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
             fill_pos_record=fill_pos_record,
@@ -2282,21 +2307,21 @@ def simulate_row_wise_nb(
         group_lens=group_lens,
         cash_sharing=cash_sharing,
         call_seq=call_seq,
-        init_cash=init_cash,
-        init_position=init_position,
-        init_price=init_price,
-        cash_deposits=cash_deposits,
-        cash_earnings=cash_earnings,
-        segment_mask=segment_mask,
+        init_cash=init_cash_,
+        init_position=init_position_,
+        init_price=init_price_,
+        cash_deposits=cash_deposits_,
+        cash_earnings=cash_earnings_,
+        segment_mask=segment_mask_,
         call_pre_segment=call_pre_segment,
         call_post_segment=call_post_segment,
         index=index,
         freq=freq,
-        open=open,
-        high=high,
-        low=low,
-        close=close,
-        bm_close=bm_close,
+        open=open_,
+        high=high_,
+        low=low_,
+        close=close_,
+        bm_close=bm_close_,
         ffill_val_price=ffill_val_price,
         update_value=update_value,
         fill_pos_record=fill_pos_record,
@@ -2322,8 +2347,8 @@ def simulate_row_wise_nb(
         order_counts=order_counts,
         log_records=log_records,
         log_counts=log_counts,
-        cash_deposits=cash_deposits,
-        cash_earnings=cash_earnings,
+        cash_deposits=cash_deposits_,
+        cash_earnings=cash_earnings_,
         call_seq=call_seq,
         in_outputs=in_outputs,
     )
@@ -2455,12 +2480,12 @@ def flex_simulate_nb(
     target_shape: tp.Shape,
     group_lens: tp.Array1d,
     cash_sharing: bool,
-    init_cash: tp.FlexArray1d = np.array([100.0]),
-    init_position: tp.FlexArray1d = np.array([0.0]),
-    init_price: tp.FlexArray1d = np.array([0.0]),
-    cash_deposits: tp.FlexArray2d = np.array([[0.0]]),
-    cash_earnings: tp.FlexArray2d = np.array([[0.0]]),
-    segment_mask: tp.FlexArray2d = np.array([[True]]),
+    init_cash: tp.FlexArray1dLike = 100.0,
+    init_position: tp.FlexArray1dLike = 0.0,
+    init_price: tp.FlexArray1dLike = np.nan,
+    cash_deposits: tp.FlexArray2dLike = 0.0,
+    cash_earnings: tp.FlexArray2dLike = 0.0,
+    segment_mask: tp.FlexArray2dLike = True,
     call_pre_segment: bool = False,
     call_post_segment: bool = False,
     pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
@@ -2481,11 +2506,11 @@ def flex_simulate_nb(
     post_order_args: tp.Args = (),
     index: tp.Optional[tp.Array1d] = None,
     freq: tp.Optional[int] = None,
-    open: tp.FlexArray2d = np.array([[np.nan]]),
-    high: tp.FlexArray2d = np.array([[np.nan]]),
-    low: tp.FlexArray2d = np.array([[np.nan]]),
-    close: tp.FlexArray2d = np.array([[np.nan]]),
-    bm_close: tp.FlexArray2d = np.array([[np.nan]]),
+    open: tp.FlexArray2dLike = np.nan,
+    high: tp.FlexArray2dLike = np.nan,
+    low: tp.FlexArray2dLike = np.nan,
+    close: tp.FlexArray2dLike = np.nan,
+    bm_close: tp.FlexArray2dLike = np.nan,
     ffill_val_price: bool = True,
     update_value: bool = False,
     fill_pos_record: bool = True,
@@ -2673,24 +2698,35 @@ def flex_simulate_nb(
         after simulation
         ```
     """
-
     check_group_lens_nb(group_lens, target_shape[1])
 
+    init_cash_ = to_1d_array_nb(np.asarray(init_cash))
+    init_position_ = to_1d_array_nb(np.asarray(init_position))
+    init_price_ = to_1d_array_nb(np.asarray(init_price))
+    cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
+    cash_earnings_ = to_2d_array_nb(np.asarray(cash_earnings))
+    segment_mask_ = to_2d_array_nb(np.asarray(segment_mask))
+    open_ = to_2d_array_nb(np.asarray(open))
+    high_ = to_2d_array_nb(np.asarray(high))
+    low_ = to_2d_array_nb(np.asarray(low))
+    close_ = to_2d_array_nb(np.asarray(close))
+    bm_close_ = to_2d_array_nb(np.asarray(bm_close))
+
     order_records, log_records = prepare_records_nb(target_shape, max_orders, max_logs)
-    last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash)
-    last_position = prepare_last_position_nb(target_shape, init_position)
+    last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)
+    last_position = prepare_last_position_nb(target_shape, init_position_)
     last_value = prepare_last_value_nb(
         target_shape,
         group_lens,
         cash_sharing,
-        init_cash,
-        init_position=init_position,
-        init_price=init_price,
+        init_cash_,
+        init_position=init_position_,
+        init_price=init_price_,
     )
     last_pos_record = prepare_last_pos_record_nb(
         target_shape,
-        init_position=init_position,
-        init_price=init_price,
+        init_position=init_position_,
+        init_price=init_price_,
         fill_pos_record=fill_pos_record,
     )
 
@@ -2712,21 +2748,21 @@ def flex_simulate_nb(
         group_lens=group_lens,
         cash_sharing=cash_sharing,
         call_seq=None,
-        init_cash=init_cash,
-        init_position=init_position,
-        init_price=init_price,
-        cash_deposits=cash_deposits,
-        cash_earnings=cash_earnings,
-        segment_mask=segment_mask,
+        init_cash=init_cash_,
+        init_position=init_position_,
+        init_price=init_price_,
+        cash_deposits=cash_deposits_,
+        cash_earnings=cash_earnings_,
+        segment_mask=segment_mask_,
         call_pre_segment=call_pre_segment,
         call_post_segment=call_post_segment,
         index=index,
         freq=freq,
-        open=open,
-        high=high,
-        low=low,
-        close=close,
-        bm_close=bm_close,
+        open=open_,
+        high=high_,
+        low=low_,
+        close=close_,
+        bm_close=bm_close_,
         ffill_val_price=ffill_val_price,
         update_value=update_value,
         fill_pos_record=fill_pos_record,
@@ -2758,21 +2794,21 @@ def flex_simulate_nb(
             group_lens=group_lens,
             cash_sharing=cash_sharing,
             call_seq=None,
-            init_cash=init_cash,
-            init_position=init_position,
-            init_price=init_price,
-            cash_deposits=cash_deposits,
-            cash_earnings=cash_earnings,
-            segment_mask=segment_mask,
+            init_cash=init_cash_,
+            init_position=init_position_,
+            init_price=init_price_,
+            cash_deposits=cash_deposits_,
+            cash_earnings=cash_earnings_,
+            segment_mask=segment_mask_,
             call_pre_segment=call_pre_segment,
             call_post_segment=call_post_segment,
             index=index,
             freq=freq,
-            open=open,
-            high=high,
-            low=low,
-            close=close,
-            bm_close=bm_close,
+            open=open_,
+            high=high_,
+            low=low_,
+            close=close_,
+            bm_close=bm_close_,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
             fill_pos_record=fill_pos_record,
@@ -2802,7 +2838,7 @@ def flex_simulate_nb(
             if track_value:
                 # Update valuation price using current open
                 for col in range(from_col, to_col):
-                    _open = flex_select_nb(open, i, col)
+                    _open = flex_select_nb(open_, i, col)
                     if not np.isnan(_open) or not ffill_val_price:
                         last_val_price[col] = _open
 
@@ -2830,7 +2866,7 @@ def flex_simulate_nb(
                         update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
-            is_segment_active = flex_select_nb(segment_mask, i, group)
+            is_segment_active = flex_select_nb(segment_mask_, i, group)
             if call_pre_segment or is_segment_active:
                 # Call function before the segment
                 pre_seg_ctx = SegmentContext(
@@ -2838,21 +2874,21 @@ def flex_simulate_nb(
                     group_lens=group_lens,
                     cash_sharing=cash_sharing,
                     call_seq=None,
-                    init_cash=init_cash,
-                    init_position=init_position,
-                    init_price=init_price,
-                    cash_deposits=cash_deposits,
-                    cash_earnings=cash_earnings,
-                    segment_mask=segment_mask,
+                    init_cash=init_cash_,
+                    init_position=init_position_,
+                    init_price=init_price_,
+                    cash_deposits=cash_deposits_,
+                    cash_earnings=cash_earnings_,
+                    segment_mask=segment_mask_,
                     call_pre_segment=call_pre_segment,
                     call_post_segment=call_post_segment,
                     index=index,
                     freq=freq,
-                    open=open,
-                    high=high,
-                    low=low,
-                    close=close,
-                    bm_close=bm_close,
+                    open=open_,
+                    high=high_,
+                    low=low_,
+                    close=close_,
+                    bm_close=bm_close_,
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
@@ -2881,13 +2917,13 @@ def flex_simulate_nb(
 
             # Add cash
             if cash_sharing:
-                _cash_deposits = flex_select_nb(cash_deposits, i, group)
+                _cash_deposits = flex_select_nb(cash_deposits_, i, group)
                 last_cash[group] += _cash_deposits
                 last_free_cash[group] += _cash_deposits
                 last_cash_deposits[group] = _cash_deposits
             else:
                 for col in range(from_col, to_col):
-                    _cash_deposits = flex_select_nb(cash_deposits, i, col)
+                    _cash_deposits = flex_select_nb(cash_deposits_, i, col)
                     last_cash[col] += _cash_deposits
                     last_free_cash[col] += _cash_deposits
                     last_cash_deposits[col] = _cash_deposits
@@ -2923,7 +2959,7 @@ def flex_simulate_nb(
                         update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
-            is_segment_active = flex_select_nb(segment_mask, i, group)
+            is_segment_active = flex_select_nb(segment_mask_, i, group)
             if is_segment_active:
 
                 call_idx = -1
@@ -2936,21 +2972,21 @@ def flex_simulate_nb(
                         group_lens=group_lens,
                         cash_sharing=cash_sharing,
                         call_seq=None,
-                        init_cash=init_cash,
-                        init_position=init_position,
-                        init_price=init_price,
-                        cash_deposits=cash_deposits,
-                        cash_earnings=cash_earnings,
-                        segment_mask=segment_mask,
+                        init_cash=init_cash_,
+                        init_position=init_position_,
+                        init_price=init_price_,
+                        cash_deposits=cash_deposits_,
+                        cash_earnings=cash_earnings_,
+                        segment_mask=segment_mask_,
                         call_pre_segment=call_pre_segment,
                         call_post_segment=call_post_segment,
                         index=index,
                         freq=freq,
-                        open=open,
-                        high=high,
-                        low=low,
-                        close=close,
-                        bm_close=bm_close,
+                        open=open_,
+                        high=high_,
+                        low=low_,
+                        close=close_,
+                        bm_close=bm_close_,
                         ffill_val_price=ffill_val_price,
                         update_value=update_value,
                         fill_pos_record=fill_pos_record,
@@ -3010,10 +3046,10 @@ def flex_simulate_nb(
 
                     # Process the order
                     price_area = PriceArea(
-                        open=flex_select_nb(open, i, col),
-                        high=flex_select_nb(high, i, col),
-                        low=flex_select_nb(low, i, col),
-                        close=flex_select_nb(close, i, col),
+                        open=flex_select_nb(open_, i, col),
+                        high=flex_select_nb(high_, i, col),
+                        low=flex_select_nb(low_, i, col),
+                        close=flex_select_nb(close_, i, col),
                     )
                     exec_state = ExecState(
                         cash=cash_now,
@@ -3103,21 +3139,21 @@ def flex_simulate_nb(
                         group_lens=group_lens,
                         cash_sharing=cash_sharing,
                         call_seq=None,
-                        init_cash=init_cash,
-                        init_position=init_position,
-                        init_price=init_price,
-                        cash_deposits=cash_deposits,
-                        cash_earnings=cash_earnings,
-                        segment_mask=segment_mask,
+                        init_cash=init_cash_,
+                        init_position=init_position_,
+                        init_price=init_price_,
+                        cash_deposits=cash_deposits_,
+                        cash_earnings=cash_earnings_,
+                        segment_mask=segment_mask_,
                         call_pre_segment=call_pre_segment,
                         call_post_segment=call_post_segment,
                         index=index,
                         freq=freq,
-                        open=open,
-                        high=high,
-                        low=low,
-                        close=close,
-                        bm_close=bm_close,
+                        open=open_,
+                        high=high_,
+                        low=low_,
+                        close=close_,
+                        bm_close=bm_close_,
                         ffill_val_price=ffill_val_price,
                         update_value=update_value,
                         fill_pos_record=fill_pos_record,
@@ -3164,7 +3200,7 @@ def flex_simulate_nb(
             # NOTE: Regardless of segment_mask, we still need to update stats to be accessed by future rows
             # Add earnings in cash
             for col in range(from_col, to_col):
-                _cash_earnings = flex_select_nb(cash_earnings, i, col)
+                _cash_earnings = flex_select_nb(cash_earnings_, i, col)
                 if cash_sharing:
                     last_cash[group] += _cash_earnings
                     last_free_cash[group] += _cash_earnings
@@ -3175,7 +3211,7 @@ def flex_simulate_nb(
             if track_value:
                 # Update valuation price using current close
                 for col in range(from_col, to_col):
-                    _close = flex_select_nb(close, i, col)
+                    _close = flex_select_nb(close_, i, col)
                     if not np.isnan(_close) or not ffill_val_price:
                         last_val_price[col] = _close
 
@@ -3218,21 +3254,21 @@ def flex_simulate_nb(
                     group_lens=group_lens,
                     cash_sharing=cash_sharing,
                     call_seq=None,
-                    init_cash=init_cash,
-                    init_position=init_position,
-                    init_price=init_price,
-                    cash_deposits=cash_deposits,
-                    cash_earnings=cash_earnings,
-                    segment_mask=segment_mask,
+                    init_cash=init_cash_,
+                    init_position=init_position_,
+                    init_price=init_price_,
+                    cash_deposits=cash_deposits_,
+                    cash_earnings=cash_earnings_,
+                    segment_mask=segment_mask_,
                     call_pre_segment=call_pre_segment,
                     call_post_segment=call_post_segment,
                     index=index,
                     freq=freq,
-                    open=open,
-                    high=high,
-                    low=low,
-                    close=close,
-                    bm_close=bm_close,
+                    open=open_,
+                    high=high_,
+                    low=low_,
+                    close=close_,
+                    bm_close=bm_close_,
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
@@ -3265,21 +3301,21 @@ def flex_simulate_nb(
             group_lens=group_lens,
             cash_sharing=cash_sharing,
             call_seq=None,
-            init_cash=init_cash,
-            init_position=init_position,
-            init_price=init_price,
-            cash_deposits=cash_deposits,
-            cash_earnings=cash_earnings,
-            segment_mask=segment_mask,
+            init_cash=init_cash_,
+            init_position=init_position_,
+            init_price=init_price_,
+            cash_deposits=cash_deposits_,
+            cash_earnings=cash_earnings_,
+            segment_mask=segment_mask_,
             call_pre_segment=call_pre_segment,
             call_post_segment=call_post_segment,
             index=index,
             freq=freq,
-            open=open,
-            high=high,
-            low=low,
-            close=close,
-            bm_close=bm_close,
+            open=open_,
+            high=high_,
+            low=low_,
+            close=close_,
+            bm_close=bm_close_,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
             fill_pos_record=fill_pos_record,
@@ -3310,21 +3346,21 @@ def flex_simulate_nb(
         group_lens=group_lens,
         cash_sharing=cash_sharing,
         call_seq=None,
-        init_cash=init_cash,
-        init_position=init_position,
-        init_price=init_price,
-        cash_deposits=cash_deposits,
-        cash_earnings=cash_earnings,
-        segment_mask=segment_mask,
+        init_cash=init_cash_,
+        init_position=init_position_,
+        init_price=init_price_,
+        cash_deposits=cash_deposits_,
+        cash_earnings=cash_earnings_,
+        segment_mask=segment_mask_,
         call_pre_segment=call_pre_segment,
         call_post_segment=call_post_segment,
         index=index,
         freq=freq,
-        open=open,
-        high=high,
-        low=low,
-        close=close,
-        bm_close=bm_close,
+        open=open_,
+        high=high_,
+        low=low_,
+        close=close_,
+        bm_close=bm_close_,
         ffill_val_price=ffill_val_price,
         update_value=update_value,
         fill_pos_record=fill_pos_record,
@@ -3350,8 +3386,8 @@ def flex_simulate_nb(
         order_counts=order_counts,
         log_records=log_records,
         log_counts=log_counts,
-        cash_deposits=cash_deposits,
-        cash_earnings=cash_earnings,
+        cash_deposits=cash_deposits_,
+        cash_earnings=cash_earnings_,
         call_seq=None,
         in_outputs=in_outputs,
     )
@@ -3409,12 +3445,12 @@ def flex_simulate_row_wise_nb(
     target_shape: tp.Shape,
     group_lens: tp.Array1d,
     cash_sharing: bool,
-    init_cash: tp.FlexArray1d = np.array([100.0]),
-    init_position: tp.FlexArray1d = np.array([0.0]),
-    init_price: tp.FlexArray1d = np.array([np.nan]),
-    cash_deposits: tp.FlexArray2d = np.array([[0.0]]),
-    cash_earnings: tp.FlexArray2d = np.array([[0.0]]),
-    segment_mask: tp.FlexArray2d = np.array([[True]]),
+    init_cash: tp.FlexArray1dLike = 100.0,
+    init_position: tp.FlexArray1dLike = 0.0,
+    init_price: tp.FlexArray1dLike = np.nan,
+    cash_deposits: tp.FlexArray2dLike = 0.0,
+    cash_earnings: tp.FlexArray2dLike = 0.0,
+    segment_mask: tp.FlexArray2dLike = True,
     call_pre_segment: bool = False,
     call_post_segment: bool = False,
     pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
@@ -3435,11 +3471,11 @@ def flex_simulate_row_wise_nb(
     post_order_args: tp.Args = (),
     index: tp.Optional[tp.Array1d] = None,
     freq: tp.Optional[int] = None,
-    open: tp.FlexArray2d = np.array([[np.nan]]),
-    high: tp.FlexArray2d = np.array([[np.nan]]),
-    low: tp.FlexArray2d = np.array([[np.nan]]),
-    close: tp.FlexArray2d = np.array([[np.nan]]),
-    bm_close: tp.FlexArray2d = np.array([[np.nan]]),
+    open: tp.FlexArray2dLike = np.nan,
+    high: tp.FlexArray2dLike = np.nan,
+    low: tp.FlexArray2dLike = np.nan,
+    close: tp.FlexArray2dLike = np.nan,
+    bm_close: tp.FlexArray2dLike = np.nan,
     ffill_val_price: bool = True,
     update_value: bool = False,
     fill_pos_record: bool = True,
@@ -3500,24 +3536,35 @@ def flex_simulate_row_wise_nb(
 
         ![](/assets/images/api/flex_simulate_row_wise_nb.svg)
     """
-
     check_group_lens_nb(group_lens, target_shape[1])
 
+    init_cash_ = to_1d_array_nb(np.asarray(init_cash))
+    init_position_ = to_1d_array_nb(np.asarray(init_position))
+    init_price_ = to_1d_array_nb(np.asarray(init_price))
+    cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
+    cash_earnings_ = to_2d_array_nb(np.asarray(cash_earnings))
+    segment_mask_ = to_2d_array_nb(np.asarray(segment_mask))
+    open_ = to_2d_array_nb(np.asarray(open))
+    high_ = to_2d_array_nb(np.asarray(high))
+    low_ = to_2d_array_nb(np.asarray(low))
+    close_ = to_2d_array_nb(np.asarray(close))
+    bm_close_ = to_2d_array_nb(np.asarray(bm_close))
+
     order_records, log_records = prepare_records_nb(target_shape, max_orders, max_logs)
-    last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash)
-    last_position = prepare_last_position_nb(target_shape, init_position)
+    last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)
+    last_position = prepare_last_position_nb(target_shape, init_position_)
     last_value = prepare_last_value_nb(
         target_shape,
         group_lens,
         cash_sharing,
-        init_cash,
-        init_position=init_position,
-        init_price=init_price,
+        init_cash_,
+        init_position=init_position_,
+        init_price=init_price_,
     )
     last_pos_record = prepare_last_pos_record_nb(
         target_shape,
-        init_position=init_position,
-        init_price=init_price,
+        init_position=init_position_,
+        init_price=init_price_,
         fill_pos_record=fill_pos_record,
     )
 
@@ -3539,21 +3586,21 @@ def flex_simulate_row_wise_nb(
         group_lens=group_lens,
         cash_sharing=cash_sharing,
         call_seq=None,
-        init_cash=init_cash,
-        init_position=init_position,
-        init_price=init_price,
-        cash_deposits=cash_deposits,
-        cash_earnings=cash_earnings,
-        segment_mask=segment_mask,
+        init_cash=init_cash_,
+        init_position=init_position_,
+        init_price=init_price_,
+        cash_deposits=cash_deposits_,
+        cash_earnings=cash_earnings_,
+        segment_mask=segment_mask_,
         call_pre_segment=call_pre_segment,
         call_post_segment=call_post_segment,
         index=index,
         freq=freq,
-        open=open,
-        high=high,
-        low=low,
-        close=close,
-        bm_close=bm_close,
+        open=open_,
+        high=high_,
+        low=low_,
+        close=close_,
+        bm_close=bm_close_,
         ffill_val_price=ffill_val_price,
         update_value=update_value,
         fill_pos_record=fill_pos_record,
@@ -3582,21 +3629,21 @@ def flex_simulate_row_wise_nb(
             group_lens=group_lens,
             cash_sharing=cash_sharing,
             call_seq=None,
-            init_cash=init_cash,
-            init_position=init_position,
-            init_price=init_price,
-            cash_deposits=cash_deposits,
-            cash_earnings=cash_earnings,
-            segment_mask=segment_mask,
+            init_cash=init_cash_,
+            init_position=init_position_,
+            init_price=init_price_,
+            cash_deposits=cash_deposits_,
+            cash_earnings=cash_earnings_,
+            segment_mask=segment_mask_,
             call_pre_segment=call_pre_segment,
             call_post_segment=call_post_segment,
             index=index,
             freq=freq,
-            open=open,
-            high=high,
-            low=low,
-            close=close,
-            bm_close=bm_close,
+            open=open_,
+            high=high_,
+            low=low_,
+            close=close_,
+            bm_close=bm_close_,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
             fill_pos_record=fill_pos_record,
@@ -3626,7 +3673,7 @@ def flex_simulate_row_wise_nb(
             if track_value:
                 # Update valuation price using current open
                 for col in range(from_col, to_col):
-                    _open = flex_select_nb(open, i, col)
+                    _open = flex_select_nb(open_, i, col)
                     if not np.isnan(_open) or not ffill_val_price:
                         last_val_price[col] = _open
 
@@ -3654,7 +3701,7 @@ def flex_simulate_row_wise_nb(
                         update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
-            is_segment_active = flex_select_nb(segment_mask, i, group)
+            is_segment_active = flex_select_nb(segment_mask_, i, group)
             if call_pre_segment or is_segment_active:
                 # Call function before the segment
                 pre_seg_ctx = SegmentContext(
@@ -3662,21 +3709,21 @@ def flex_simulate_row_wise_nb(
                     group_lens=group_lens,
                     cash_sharing=cash_sharing,
                     call_seq=None,
-                    init_cash=init_cash,
-                    init_position=init_position,
-                    init_price=init_price,
-                    cash_deposits=cash_deposits,
-                    cash_earnings=cash_earnings,
-                    segment_mask=segment_mask,
+                    init_cash=init_cash_,
+                    init_position=init_position_,
+                    init_price=init_price_,
+                    cash_deposits=cash_deposits_,
+                    cash_earnings=cash_earnings_,
+                    segment_mask=segment_mask_,
                     call_pre_segment=call_pre_segment,
                     call_post_segment=call_post_segment,
                     index=index,
                     freq=freq,
-                    open=open,
-                    high=high,
-                    low=low,
-                    close=close,
-                    bm_close=bm_close,
+                    open=open_,
+                    high=high_,
+                    low=low_,
+                    close=close_,
+                    bm_close=bm_close_,
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
@@ -3705,13 +3752,13 @@ def flex_simulate_row_wise_nb(
 
             # Add cash
             if cash_sharing:
-                _cash_deposits = flex_select_nb(cash_deposits, i, group)
+                _cash_deposits = flex_select_nb(cash_deposits_, i, group)
                 last_cash[group] += _cash_deposits
                 last_free_cash[group] += _cash_deposits
                 last_cash_deposits[group] = _cash_deposits
             else:
                 for col in range(from_col, to_col):
-                    _cash_deposits = flex_select_nb(cash_deposits, i, col)
+                    _cash_deposits = flex_select_nb(cash_deposits_, i, col)
                     last_cash[col] += _cash_deposits
                     last_free_cash[col] += _cash_deposits
                     last_cash_deposits[col] = _cash_deposits
@@ -3747,7 +3794,7 @@ def flex_simulate_row_wise_nb(
                         update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
-            is_segment_active = flex_select_nb(segment_mask, i, group)
+            is_segment_active = flex_select_nb(segment_mask_, i, group)
             if is_segment_active:
 
                 call_idx = -1
@@ -3760,21 +3807,21 @@ def flex_simulate_row_wise_nb(
                         group_lens=group_lens,
                         cash_sharing=cash_sharing,
                         call_seq=None,
-                        init_cash=init_cash,
-                        init_position=init_position,
-                        init_price=init_price,
-                        cash_deposits=cash_deposits,
-                        cash_earnings=cash_earnings,
-                        segment_mask=segment_mask,
+                        init_cash=init_cash_,
+                        init_position=init_position_,
+                        init_price=init_price_,
+                        cash_deposits=cash_deposits_,
+                        cash_earnings=cash_earnings_,
+                        segment_mask=segment_mask_,
                         call_pre_segment=call_pre_segment,
                         call_post_segment=call_post_segment,
                         index=index,
                         freq=freq,
-                        open=open,
-                        high=high,
-                        low=low,
-                        close=close,
-                        bm_close=bm_close,
+                        open=open_,
+                        high=high_,
+                        low=low_,
+                        close=close_,
+                        bm_close=bm_close_,
                         ffill_val_price=ffill_val_price,
                         update_value=update_value,
                         fill_pos_record=fill_pos_record,
@@ -3834,10 +3881,10 @@ def flex_simulate_row_wise_nb(
 
                     # Process the order
                     price_area = PriceArea(
-                        open=flex_select_nb(open, i, col),
-                        high=flex_select_nb(high, i, col),
-                        low=flex_select_nb(low, i, col),
-                        close=flex_select_nb(close, i, col),
+                        open=flex_select_nb(open_, i, col),
+                        high=flex_select_nb(high_, i, col),
+                        low=flex_select_nb(low_, i, col),
+                        close=flex_select_nb(close_, i, col),
                     )
                     exec_state = ExecState(
                         cash=cash_now,
@@ -3927,21 +3974,21 @@ def flex_simulate_row_wise_nb(
                         group_lens=group_lens,
                         cash_sharing=cash_sharing,
                         call_seq=None,
-                        init_cash=init_cash,
-                        init_position=init_position,
-                        init_price=init_price,
-                        cash_deposits=cash_deposits,
-                        cash_earnings=cash_earnings,
-                        segment_mask=segment_mask,
+                        init_cash=init_cash_,
+                        init_position=init_position_,
+                        init_price=init_price_,
+                        cash_deposits=cash_deposits_,
+                        cash_earnings=cash_earnings_,
+                        segment_mask=segment_mask_,
                         call_pre_segment=call_pre_segment,
                         call_post_segment=call_post_segment,
                         index=index,
                         freq=freq,
-                        open=open,
-                        high=high,
-                        low=low,
-                        close=close,
-                        bm_close=bm_close,
+                        open=open_,
+                        high=high_,
+                        low=low_,
+                        close=close_,
+                        bm_close=bm_close_,
                         ffill_val_price=ffill_val_price,
                         update_value=update_value,
                         fill_pos_record=fill_pos_record,
@@ -3988,7 +4035,7 @@ def flex_simulate_row_wise_nb(
             # NOTE: Regardless of segment_mask, we still need to update stats to be accessed by future rows
             # Add earnings in cash
             for col in range(from_col, to_col):
-                _cash_earnings = flex_select_nb(cash_earnings, i, col)
+                _cash_earnings = flex_select_nb(cash_earnings_, i, col)
                 if cash_sharing:
                     last_cash[group] += _cash_earnings
                     last_free_cash[group] += _cash_earnings
@@ -3999,7 +4046,7 @@ def flex_simulate_row_wise_nb(
             if track_value:
                 # Update valuation price using current close
                 for col in range(from_col, to_col):
-                    _close = flex_select_nb(close, i, col)
+                    _close = flex_select_nb(close_, i, col)
                     if not np.isnan(_close) or not ffill_val_price:
                         last_val_price[col] = _close
 
@@ -4042,21 +4089,21 @@ def flex_simulate_row_wise_nb(
                     group_lens=group_lens,
                     cash_sharing=cash_sharing,
                     call_seq=None,
-                    init_cash=init_cash,
-                    init_position=init_position,
-                    init_price=init_price,
-                    cash_deposits=cash_deposits,
-                    cash_earnings=cash_earnings,
-                    segment_mask=segment_mask,
+                    init_cash=init_cash_,
+                    init_position=init_position_,
+                    init_price=init_price_,
+                    cash_deposits=cash_deposits_,
+                    cash_earnings=cash_earnings_,
+                    segment_mask=segment_mask_,
                     call_pre_segment=call_pre_segment,
                     call_post_segment=call_post_segment,
                     index=index,
                     freq=freq,
-                    open=open,
-                    high=high,
-                    low=low,
-                    close=close,
-                    bm_close=bm_close,
+                    open=open_,
+                    high=high_,
+                    low=low_,
+                    close=close_,
+                    bm_close=bm_close_,
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
                     fill_pos_record=fill_pos_record,
@@ -4089,21 +4136,21 @@ def flex_simulate_row_wise_nb(
             group_lens=group_lens,
             cash_sharing=cash_sharing,
             call_seq=None,
-            init_cash=init_cash,
-            init_position=init_position,
-            init_price=init_price,
-            cash_deposits=cash_deposits,
-            cash_earnings=cash_earnings,
-            segment_mask=segment_mask,
+            init_cash=init_cash_,
+            init_position=init_position_,
+            init_price=init_price_,
+            cash_deposits=cash_deposits_,
+            cash_earnings=cash_earnings_,
+            segment_mask=segment_mask_,
             call_pre_segment=call_pre_segment,
             call_post_segment=call_post_segment,
             index=index,
             freq=freq,
-            open=open,
-            high=high,
-            low=low,
-            close=close,
-            bm_close=bm_close,
+            open=open_,
+            high=high_,
+            low=low_,
+            close=close_,
+            bm_close=bm_close_,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
             fill_pos_record=fill_pos_record,
@@ -4131,21 +4178,21 @@ def flex_simulate_row_wise_nb(
         group_lens=group_lens,
         cash_sharing=cash_sharing,
         call_seq=None,
-        init_cash=init_cash,
-        init_position=init_position,
-        init_price=init_price,
-        cash_deposits=cash_deposits,
-        cash_earnings=cash_earnings,
-        segment_mask=segment_mask,
+        init_cash=init_cash_,
+        init_position=init_position_,
+        init_price=init_price_,
+        cash_deposits=cash_deposits_,
+        cash_earnings=cash_earnings_,
+        segment_mask=segment_mask_,
         call_pre_segment=call_pre_segment,
         call_post_segment=call_post_segment,
         index=index,
         freq=freq,
-        open=open,
-        high=high,
-        low=low,
-        close=close,
-        bm_close=bm_close,
+        open=open_,
+        high=high_,
+        low=low_,
+        close=close_,
+        bm_close=bm_close_,
         ffill_val_price=ffill_val_price,
         update_value=update_value,
         fill_pos_record=fill_pos_record,
@@ -4171,8 +4218,8 @@ def flex_simulate_row_wise_nb(
         order_counts=order_counts,
         log_records=log_records,
         log_counts=log_counts,
-        cash_deposits=cash_deposits,
-        cash_earnings=cash_earnings,
+        cash_deposits=cash_deposits_,
+        cash_earnings=cash_earnings_,
         call_seq=None,
         in_outputs=in_outputs,
     )

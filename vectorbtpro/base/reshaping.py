@@ -10,9 +10,9 @@ import itertools
 
 import numpy as np
 import pandas as pd
-from numpy.lib.stride_tricks import _broadcast_shape
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.base import indexes, wrapping, indexing
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import resolve_dict, merge_dicts
@@ -21,19 +21,34 @@ from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.template import CustomTemplate
 
 
-def shape_to_tuple(shape: tp.ShapeLike) -> tp.Shape:
+def to_tuple_shape(shape: tp.ShapeLike) -> tp.Shape:
     """Convert a shape-like object to a tuple."""
     if isinstance(shape, int):
         return (shape,)
     return tuple(shape)
 
 
-def shape_to_2d(shape: tp.ShapeLike) -> tp.Shape:
+def to_2d_shape(shape: tp.ShapeLike) -> tp.Shape:
     """Convert a shape-like object to a 2-dim shape."""
-    shape = shape_to_tuple(shape)
+    shape = to_tuple_shape(shape)
     if len(shape) == 1:
         return shape[0], 1
     return shape
+
+
+def repeat_shape(shape: tp.ShapeLike, n: int, axis: int = 1) -> tp.Shape:
+    """Repeat shape `n` times along the specified axis."""
+    shape = to_tuple_shape(shape)
+    if len(shape) <= axis:
+        shape = tuple([shape[i] if i < len(shape) else 1 for i in range(axis + 1)])
+    return *shape[:axis], shape[axis] * n, *shape[axis + 1:]
+
+
+def tile_shape(shape: tp.ShapeLike, n: int, axis: int = 1) -> tp.Shape:
+    """Tile shape `n` times along the specified axis.
+
+    Identical to `repeat_shape`. Exists purely for naming consistency."""
+    return repeat_shape(shape, n, axis=axis)
 
 
 def index_to_series(arg: tp.Index) -> tp.Series:
@@ -143,11 +158,47 @@ def to_2d(arg: tp.ArrayLike, raw: bool = False, expand_axis: int = 1) -> tp.AnyA
 to_2d_array = functools.partial(to_2d, raw=True)
 """`to_2d` with `raw` enabled."""
 
-to_per_row_array = functools.partial(to_2d_array, expand_axis=1)
+to_2d_pr_array = functools.partial(to_2d_array, expand_axis=1)
 """`to_2d_array` with `expand_axis=1`."""
 
-to_per_col_array = functools.partial(to_2d_array, expand_axis=0)
+to_2d_pc_array = functools.partial(to_2d_array, expand_axis=0)
 """`to_2d_array` with `expand_axis=0`."""
+
+
+@register_jitted(cache=True)
+def to_1d_array_nb(arg: tp.Array) -> tp.Array1d:
+    """Resize array to one dimension."""
+    if arg.ndim == 0:
+        return np.expand_dims(arg, axis=0)
+    if arg.ndim == 1:
+        return arg
+    if arg.ndim == 2 and arg.shape[1] == 1:
+        return arg[:, 0]
+    raise ValueError("Array cannot be resized to one dimension")
+
+
+@register_jitted(cache=True)
+def to_2d_array_nb(arg: tp.Array, axis: int = 1) -> tp.Array2d:
+    """Resize array to two dimensions."""
+    if arg.ndim == 0:
+        return np.expand_dims(np.expand_dims(arg, axis=0), axis=0)
+    if arg.ndim == 1:
+        return np.expand_dims(arg, axis=axis)
+    if arg.ndim == 2:
+        return arg
+    raise ValueError("Array cannot be resized to two dimensions")
+
+
+@register_jitted(cache=True)
+def to_2d_pr_array_nb(arg: tp.Array) -> tp.Array2d:
+    """`to_2d_array_nb` with `expand_axis=1`."""
+    return to_2d_array_nb(arg, axis=1)
+
+
+@register_jitted(cache=True)
+def to_2d_pc_array_nb(arg: tp.Array) -> tp.Array2d:
+    """`to_2d_array_nb` with `expand_axis=0`."""
+    return to_2d_array_nb(arg, axis=0)
 
 
 def to_dict(arg: tp.ArrayLike, orient: str = "dict") -> dict:
@@ -165,7 +216,7 @@ def repeat(
     raw: bool = False,
     ignore_ranges: tp.Optional[bool] = None,
 ) -> tp.AnyArray:
-    """Repeat each element in `arg` `n` times along the specified axis."""
+    """Repeat `arg` `n` times along the specified axis."""
     arg = to_any_array(arg, raw=raw)
     if axis == 0:
         if checks.is_pandas(arg):
@@ -179,7 +230,7 @@ def repeat(
             return wrapping.ArrayWrapper.from_obj(arg).wrap(np.repeat(arg.values, n, axis=1), columns=new_columns)
         return np.repeat(arg, n, axis=1)
     else:
-        raise ValueError("Only axis 0 and 1 are supported")
+        raise ValueError("Only axes 0 and 1 are supported")
 
 
 def tile(
@@ -189,7 +240,7 @@ def tile(
     raw: bool = False,
     ignore_ranges: tp.Optional[bool] = None,
 ) -> tp.AnyArray:
-    """Repeat the whole `arg` `n` times along the specified axis."""
+    """Tile `arg` `n` times along the specified axis."""
     arg = to_any_array(arg, raw=raw)
     if axis == 0:
         if arg.ndim == 2:
@@ -208,7 +259,7 @@ def tile(
             return wrapping.ArrayWrapper.from_obj(arg).wrap(np.tile(arg.values, (1, n)), columns=new_columns)
         return np.tile(arg, (1, n))
     else:
-        raise ValueError("Only axis 0 and 1 are supported")
+        raise ValueError("Only axes 0 and 1 are supported")
 
 
 def column_stack(*arrs: tp.MaybeSequence[tp.AnyArray]) -> tp.Array2d:
@@ -1215,7 +1266,7 @@ def broadcast(
     # Get final shape
     if to_shape is None:
         try:
-            to_shape = _broadcast_shape(*ready_objs.values())
+            to_shape = np.broadcast_shapes(*map(lambda x: x.shape, ready_objs.values()))
         except ValueError:
             arr_shapes = {}
             for i, k in enumerate(bco_instances):

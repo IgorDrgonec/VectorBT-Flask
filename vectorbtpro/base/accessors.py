@@ -609,7 +609,7 @@ class BaseAccessor(Wrapping):
     @classmethod
     def resolve_shape(cls, shape: tp.ShapeLike) -> tp.Shape:
         """Resolve shape."""
-        shape_2d = reshaping.shape_to_2d(shape)
+        shape_2d = reshaping.to_2d_shape(shape)
         try:
             if cls.is_series() and shape_2d[1] > 1:
                 raise ValueError("Use DataFrame accessor")

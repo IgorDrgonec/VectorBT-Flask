@@ -5292,12 +5292,16 @@ class TestFlexIndexing:
 
         assert flex_indexing.flex_select_1d_nb(arr_1d, 0) == arr_1d[0]
         assert flex_indexing.flex_select_1d_nb(arr_1d, 1) == arr_1d[1]
-        assert (
-            flex_indexing.flex_select_1d_nb(arr_1d, 100, rotate_rows=True)
-            == arr_1d[100 % arr_1d.shape[0]]
-        )
         with pytest.raises(Exception):
             flex_indexing.flex_select_nb(arr_1d, 100)
+        assert (
+            flex_indexing.flex_select_1d_pr_nb(arr_1d, 100, rotate_rows=True)
+            == arr_1d[100 % arr_1d.shape[0]]
+        )
+        assert (
+            flex_indexing.flex_select_1d_pc_nb(arr_1d, 100, rotate_cols=True)
+            == arr_1d[100 % arr_1d.shape[0]]
+        )
         assert flex_indexing.flex_select_nb(arr_2d, 0, 0) == arr_2d[0, 0]
         assert flex_indexing.flex_select_nb(arr_2d, 1, 0) == arr_2d[1, 0]
         assert flex_indexing.flex_select_nb(arr_2d, 0, 1) == arr_2d[0, 1]

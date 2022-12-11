@@ -27,7 +27,7 @@ from numba import prange
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.base.flex_indexing import flex_select_1d_nb, flex_select_nb
+from vectorbtpro.base.flex_indexing import flex_select_1d_pc_nb, flex_select_nb
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.enums import range_dt, RangeStatus
 from vectorbtpro.records import chunking as records_ch
@@ -288,7 +288,7 @@ def rand_place_nb(c: tp.Union[GenEnContext, GenExContext, GenEnExContext], n: tp
     """`place_func_nb` to randomly pick `n` values.
 
     `n` uses flexible indexing."""
-    size = min(c.to_i - c.from_i, flex_select_1d_nb(n, c.col))
+    size = min(c.to_i - c.from_i, flex_select_1d_pc_nb(n, c.col))
     k = 0
     last_i = -1
     while k < size:
@@ -362,7 +362,7 @@ def generate_rand_enex_nb(
             exits[both_idxs[1::2], col] = True
     else:
         for col in prange(target_shape[1]):
-            _n = flex_select_1d_nb(n, col)
+            _n = flex_select_1d_pc_nb(n, col)
             if _n == 1:
                 entry_idx = np.random.randint(0, target_shape[0] - exit_wait)
                 entries[entry_idx, col] = True
@@ -460,7 +460,7 @@ def stop_place_nb(
     follow_ts: tp.FlexArray2d,
     stop_ts_out: tp.Array2d,
     stop: tp.FlexArray2d,
-    trailing: tp.FlexArray2d = np.array([[False]]),
+    trailing: tp.FlexArray2d,
 ) -> int:
     """`place_func_nb` that places an exit signal whenever a threshold is being hit.
 
@@ -560,11 +560,11 @@ def ohlc_stop_place_nb(
     close: tp.FlexArray2d,
     stop_price_out: tp.Array2d,
     stop_type_out: tp.Array2d,
-    sl_stop: tp.FlexArray2d = np.array([[np.nan]]),
-    tsl_th: tp.FlexArray2d = np.array([[np.nan]]),
-    tsl_stop: tp.FlexArray2d = np.array([[np.nan]]),
-    tp_stop: tp.FlexArray2d = np.array([[np.nan]]),
-    reverse: tp.FlexArray2d = np.array([[False]]),
+    sl_stop: tp.FlexArray2d,
+    tsl_th: tp.FlexArray2d,
+    tsl_stop: tp.FlexArray2d,
+    tp_stop: tp.FlexArray2d,
+    reverse: tp.FlexArray2d,
     is_entry_open: bool = False,
 ) -> int:
     """`place_func_nb` that places an exit signal whenever a threshold is being hit using OHLC.
