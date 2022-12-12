@@ -4584,39 +4584,39 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         )
 
         # Check data types
-        checks.assert_subdtype(cs_group_lens, np.integer)
+        checks.assert_subdtype(cs_group_lens, np.integer, arg_name="cs_group_lens")
         if call_seq is not None:
-            checks.assert_subdtype(call_seq, np.integer)
-        checks.assert_subdtype(init_cash, np.number)
-        checks.assert_subdtype(init_position, np.number)
-        checks.assert_subdtype(init_price, np.number)
-        checks.assert_subdtype(cash_deposits, np.number)
-        checks.assert_subdtype(cash_earnings, np.number)
-        checks.assert_subdtype(cash_dividends, np.number)
-        checks.assert_subdtype(broadcasted_args["size"], np.number)
-        checks.assert_subdtype(broadcasted_args["price"], np.number)
-        checks.assert_subdtype(broadcasted_args["size_type"], np.integer)
-        checks.assert_subdtype(broadcasted_args["direction"], np.integer)
-        checks.assert_subdtype(broadcasted_args["fees"], np.number)
-        checks.assert_subdtype(broadcasted_args["fixed_fees"], np.number)
-        checks.assert_subdtype(broadcasted_args["slippage"], np.number)
-        checks.assert_subdtype(broadcasted_args["min_size"], np.number)
-        checks.assert_subdtype(broadcasted_args["max_size"], np.number)
-        checks.assert_subdtype(broadcasted_args["size_granularity"], np.number)
-        checks.assert_subdtype(broadcasted_args["reject_prob"], np.number)
-        checks.assert_subdtype(broadcasted_args["price_area_vio_mode"], np.integer)
-        checks.assert_subdtype(broadcasted_args["lock_cash"], np.bool_)
-        checks.assert_subdtype(broadcasted_args["allow_partial"], np.bool_)
-        checks.assert_subdtype(broadcasted_args["raise_reject"], np.bool_)
-        checks.assert_subdtype(broadcasted_args["log"], np.bool_)
-        checks.assert_subdtype(broadcasted_args["val_price"], np.number)
-        checks.assert_subdtype(broadcasted_args["open"], np.number)
-        checks.assert_subdtype(broadcasted_args["high"], np.number)
-        checks.assert_subdtype(broadcasted_args["low"], np.number)
-        checks.assert_subdtype(broadcasted_args["close"], np.number)
+            checks.assert_subdtype(call_seq, np.integer, arg_name="call_seq")
+        checks.assert_subdtype(init_cash, np.number, arg_name="init_cash")
+        checks.assert_subdtype(init_position, np.number, arg_name="init_position")
+        checks.assert_subdtype(init_price, np.number, arg_name="init_price")
+        checks.assert_subdtype(cash_deposits, np.number, arg_name="cash_deposits")
+        checks.assert_subdtype(cash_earnings, np.number, arg_name="cash_earnings")
+        checks.assert_subdtype(cash_dividends, np.number, arg_name="cash_dividends")
+        checks.assert_subdtype(broadcasted_args["size"], np.number, arg_name="size")
+        checks.assert_subdtype(broadcasted_args["price"], np.number, arg_name="price")
+        checks.assert_subdtype(broadcasted_args["size_type"], np.integer, arg_name="size_type")
+        checks.assert_subdtype(broadcasted_args["direction"], np.integer, arg_name="direction")
+        checks.assert_subdtype(broadcasted_args["fees"], np.number, arg_name="fees")
+        checks.assert_subdtype(broadcasted_args["fixed_fees"], np.number, arg_name="fixed_fees")
+        checks.assert_subdtype(broadcasted_args["slippage"], np.number, arg_name="slippage")
+        checks.assert_subdtype(broadcasted_args["min_size"], np.number, arg_name="min_size")
+        checks.assert_subdtype(broadcasted_args["max_size"], np.number, arg_name="max_size")
+        checks.assert_subdtype(broadcasted_args["size_granularity"], np.number, arg_name="size_granularity")
+        checks.assert_subdtype(broadcasted_args["reject_prob"], np.number, arg_name="reject_prob")
+        checks.assert_subdtype(broadcasted_args["price_area_vio_mode"], np.integer, arg_name="price_area_vio_mode")
+        checks.assert_subdtype(broadcasted_args["lock_cash"], np.bool_, arg_name="lock_cash")
+        checks.assert_subdtype(broadcasted_args["allow_partial"], np.bool_, arg_name="allow_partial")
+        checks.assert_subdtype(broadcasted_args["raise_reject"], np.bool_, arg_name="raise_reject")
+        checks.assert_subdtype(broadcasted_args["log"], np.bool_, arg_name="log")
+        checks.assert_subdtype(broadcasted_args["val_price"], np.number, arg_name="val_price")
+        checks.assert_subdtype(broadcasted_args["open"], np.number, arg_name="open")
+        checks.assert_subdtype(broadcasted_args["high"], np.number, arg_name="high")
+        checks.assert_subdtype(broadcasted_args["low"], np.number, arg_name="low")
+        checks.assert_subdtype(broadcasted_args["close"], np.number, arg_name="close")
         if bm_close is not None and not isinstance(bm_close, bool):
-            checks.assert_subdtype(broadcasted_args["bm_close"], np.number)
-        checks.assert_subdtype(broadcasted_args["from_ago"], np.integer)
+            checks.assert_subdtype(broadcasted_args["bm_close"], np.number, arg_name="bm_close")
+        checks.assert_subdtype(broadcasted_args["from_ago"], np.integer, arg_name="from_ago")
 
         # Remove arguments
         bm_close = broadcasted_args.pop("bm_close", None)
@@ -5964,73 +5964,81 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         # Check data types
         if "entries" in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args["entries"], np.bool_)
+            checks.assert_subdtype(broadcasted_args["entries"], np.bool_, arg_name="entries")
         if "exits" in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args["exits"], np.bool_)
+            checks.assert_subdtype(broadcasted_args["exits"], np.bool_, arg_name="exits")
         if "short_entries" in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args["short_entries"], np.bool_)
+            checks.assert_subdtype(broadcasted_args["short_entries"], np.bool_, arg_name="short_entries")
         if "short_exits" in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args["short_exits"], np.bool_)
+            checks.assert_subdtype(broadcasted_args["short_exits"], np.bool_, arg_name="short_exits")
         if "direction" in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args["direction"], np.integer)
-        checks.assert_subdtype(broadcasted_args["size"], np.number)
-        checks.assert_subdtype(broadcasted_args["price"], np.number)
-        checks.assert_subdtype(broadcasted_args["size_type"], np.integer)
-        checks.assert_subdtype(broadcasted_args["fees"], np.number)
-        checks.assert_subdtype(broadcasted_args["fixed_fees"], np.number)
-        checks.assert_subdtype(broadcasted_args["slippage"], np.number)
-        checks.assert_subdtype(broadcasted_args["min_size"], np.number)
-        checks.assert_subdtype(broadcasted_args["max_size"], np.number)
-        checks.assert_subdtype(broadcasted_args["size_granularity"], np.number)
-        checks.assert_subdtype(broadcasted_args["reject_prob"], np.number)
-        checks.assert_subdtype(broadcasted_args["price_area_vio_mode"], np.integer)
-        checks.assert_subdtype(broadcasted_args["lock_cash"], np.bool_)
-        checks.assert_subdtype(broadcasted_args["allow_partial"], np.bool_)
-        checks.assert_subdtype(broadcasted_args["raise_reject"], np.bool_)
-        checks.assert_subdtype(broadcasted_args["log"], np.bool_)
-        checks.assert_subdtype(broadcasted_args["val_price"], np.number)
-        checks.assert_subdtype(broadcasted_args["accumulate"], (np.integer, np.bool_))
-        checks.assert_subdtype(broadcasted_args["upon_long_conflict"], np.integer)
-        checks.assert_subdtype(broadcasted_args["upon_short_conflict"], np.integer)
-        checks.assert_subdtype(broadcasted_args["upon_dir_conflict"], np.integer)
-        checks.assert_subdtype(broadcasted_args["upon_opposite_entry"], np.integer)
-        checks.assert_subdtype(broadcasted_args["order_type"], np.integer)
-        checks.assert_subdtype(broadcasted_args["limit_delta"], np.number)
-        checks.assert_subdtype(broadcasted_args["limit_tif"], np.integer)
-        checks.assert_subdtype(broadcasted_args["limit_expiry"], np.integer)
-        checks.assert_subdtype(broadcasted_args["limit_reverse"], np.bool_)
-        checks.assert_subdtype(broadcasted_args["upon_adj_limit_conflict"], np.integer)
-        checks.assert_subdtype(broadcasted_args["upon_opp_limit_conflict"], np.integer)
-        checks.assert_subdtype(broadcasted_args["sl_stop"], np.number)
-        checks.assert_subdtype(broadcasted_args["tsl_stop"], np.number)
-        checks.assert_subdtype(broadcasted_args["tsl_th"], np.number)
-        checks.assert_subdtype(broadcasted_args["tp_stop"], np.number)
-        checks.assert_subdtype(broadcasted_args["stop_entry_price"], np.number)
-        checks.assert_subdtype(broadcasted_args["stop_exit_price"], np.number)
-        checks.assert_subdtype(broadcasted_args["stop_exit_type"], np.integer)
-        checks.assert_subdtype(broadcasted_args["stop_order_type"], np.integer)
-        checks.assert_subdtype(broadcasted_args["stop_limit_delta"], np.number)
-        checks.assert_subdtype(broadcasted_args["upon_stop_update"], np.integer)
-        checks.assert_subdtype(broadcasted_args["upon_adj_stop_conflict"], np.integer)
-        checks.assert_subdtype(broadcasted_args["upon_opp_stop_conflict"], np.integer)
-        checks.assert_subdtype(broadcasted_args["delta_format"], np.integer)
-        checks.assert_subdtype(broadcasted_args["time_delta_format"], np.integer)
-        checks.assert_subdtype(broadcasted_args["open"], np.number)
-        checks.assert_subdtype(broadcasted_args["high"], np.number)
-        checks.assert_subdtype(broadcasted_args["low"], np.number)
-        checks.assert_subdtype(broadcasted_args["close"], np.number)
+            checks.assert_subdtype(broadcasted_args["direction"], np.integer, arg_name="direction")
+        checks.assert_subdtype(broadcasted_args["size"], np.number, arg_name="size")
+        checks.assert_subdtype(broadcasted_args["price"], np.number, arg_name="price")
+        checks.assert_subdtype(broadcasted_args["size_type"], np.integer, arg_name="size_type")
+        checks.assert_subdtype(broadcasted_args["fees"], np.number, arg_name="fees")
+        checks.assert_subdtype(broadcasted_args["fixed_fees"], np.number, arg_name="fixed_fees")
+        checks.assert_subdtype(broadcasted_args["slippage"], np.number, arg_name="slippage")
+        checks.assert_subdtype(broadcasted_args["min_size"], np.number, arg_name="min_size")
+        checks.assert_subdtype(broadcasted_args["max_size"], np.number, arg_name="max_size")
+        checks.assert_subdtype(broadcasted_args["size_granularity"], np.number, arg_name="size_granularity")
+        checks.assert_subdtype(broadcasted_args["reject_prob"], np.number, arg_name="reject_prob")
+        checks.assert_subdtype(broadcasted_args["price_area_vio_mode"], np.integer, arg_name="price_area_vio_mode")
+        checks.assert_subdtype(broadcasted_args["lock_cash"], np.bool_, arg_name="lock_cash")
+        checks.assert_subdtype(broadcasted_args["allow_partial"], np.bool_, arg_name="allow_partial")
+        checks.assert_subdtype(broadcasted_args["raise_reject"], np.bool_, arg_name="raise_reject")
+        checks.assert_subdtype(broadcasted_args["log"], np.bool_, arg_name="log")
+        checks.assert_subdtype(broadcasted_args["val_price"], np.number, arg_name="val_price")
+        checks.assert_subdtype(broadcasted_args["accumulate"], (np.integer, np.bool_), arg_name="accumulate")
+        checks.assert_subdtype(broadcasted_args["upon_long_conflict"], np.integer, arg_name="upon_long_conflict")
+        checks.assert_subdtype(broadcasted_args["upon_short_conflict"], np.integer, arg_name="upon_short_conflict")
+        checks.assert_subdtype(broadcasted_args["upon_dir_conflict"], np.integer, arg_name="upon_dir_conflict")
+        checks.assert_subdtype(broadcasted_args["upon_opposite_entry"], np.integer, arg_name="upon_opposite_entry")
+        checks.assert_subdtype(broadcasted_args["order_type"], np.integer, arg_name="order_type")
+        checks.assert_subdtype(broadcasted_args["limit_delta"], np.number, arg_name="limit_delta")
+        checks.assert_subdtype(broadcasted_args["limit_tif"], np.integer, arg_name="limit_tif")
+        checks.assert_subdtype(broadcasted_args["limit_expiry"], np.integer, arg_name="limit_expiry")
+        checks.assert_subdtype(broadcasted_args["limit_reverse"], np.bool_, arg_name="limit_reverse")
+        checks.assert_subdtype(
+            broadcasted_args["upon_adj_limit_conflict"], np.integer, arg_name="upon_adj_limit_conflict"
+        )
+        checks.assert_subdtype(
+            broadcasted_args["upon_opp_limit_conflict"], np.integer, arg_name="upon_opp_limit_conflict"
+        )
+        checks.assert_subdtype(broadcasted_args["sl_stop"], np.number, arg_name="sl_stop")
+        checks.assert_subdtype(broadcasted_args["tsl_stop"], np.number, arg_name="tsl_stop")
+        checks.assert_subdtype(broadcasted_args["tsl_th"], np.number, arg_name="tsl_th")
+        checks.assert_subdtype(broadcasted_args["tp_stop"], np.number, arg_name="tp_stop")
+        checks.assert_subdtype(broadcasted_args["stop_entry_price"], np.number, arg_name="stop_entry_price")
+        checks.assert_subdtype(broadcasted_args["stop_exit_price"], np.number, arg_name="stop_exit_price")
+        checks.assert_subdtype(broadcasted_args["stop_exit_type"], np.integer, arg_name="stop_exit_type")
+        checks.assert_subdtype(broadcasted_args["stop_order_type"], np.integer, arg_name="stop_order_type")
+        checks.assert_subdtype(broadcasted_args["stop_limit_delta"], np.number, arg_name="stop_limit_delta")
+        checks.assert_subdtype(broadcasted_args["upon_stop_update"], np.integer, arg_name="upon_stop_update")
+        checks.assert_subdtype(
+            broadcasted_args["upon_adj_stop_conflict"], np.integer, arg_name="upon_adj_stop_conflict"
+        )
+        checks.assert_subdtype(
+            broadcasted_args["upon_opp_stop_conflict"], np.integer, arg_name="upon_opp_stop_conflict"
+        )
+        checks.assert_subdtype(broadcasted_args["delta_format"], np.integer, arg_name="delta_format")
+        checks.assert_subdtype(broadcasted_args["time_delta_format"], np.integer, arg_name="time_delta_format")
+        checks.assert_subdtype(broadcasted_args["open"], np.number, arg_name="open")
+        checks.assert_subdtype(broadcasted_args["high"], np.number, arg_name="high")
+        checks.assert_subdtype(broadcasted_args["low"], np.number, arg_name="low")
+        checks.assert_subdtype(broadcasted_args["close"], np.number, arg_name="close")
         if bm_close is not None and not isinstance(bm_close, bool):
-            checks.assert_subdtype(broadcasted_args["bm_close"], np.number)
-        checks.assert_subdtype(cs_group_lens, np.integer)
-        checks.assert_subdtype(broadcasted_args["from_ago"], np.integer)
+            checks.assert_subdtype(broadcasted_args["bm_close"], np.number, arg_name="bm_close")
+        checks.assert_subdtype(cs_group_lens, np.integer, arg_name="cs_group_lens")
+        checks.assert_subdtype(broadcasted_args["from_ago"], np.integer, arg_name="from_ago")
         if call_seq is not None:
-            checks.assert_subdtype(call_seq, np.integer)
-        checks.assert_subdtype(init_cash, np.number)
-        checks.assert_subdtype(init_position, np.number)
-        checks.assert_subdtype(init_price, np.number)
-        checks.assert_subdtype(cash_deposits, np.number)
-        checks.assert_subdtype(cash_earnings, np.number)
-        checks.assert_subdtype(cash_dividends, np.number)
+            checks.assert_subdtype(call_seq, np.integer, arg_name="call_seq")
+        checks.assert_subdtype(init_cash, np.number, arg_name="init_cash")
+        checks.assert_subdtype(init_position, np.number, arg_name="init_position")
+        checks.assert_subdtype(init_price, np.number, arg_name="init_price")
+        checks.assert_subdtype(cash_deposits, np.number, arg_name="cash_deposits")
+        checks.assert_subdtype(cash_earnings, np.number, arg_name="cash_earnings")
+        checks.assert_subdtype(cash_dividends, np.number, arg_name="cash_dividends")
 
         # Prepare arguments
         template_context = merge_dicts(
@@ -7265,21 +7273,21 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     call_seq = build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
 
         # Check data types
-        checks.assert_subdtype(cs_group_lens, np.integer)
+        checks.assert_subdtype(cs_group_lens, np.integer, arg_name="cs_group_lens")
         if call_seq is not None:
-            checks.assert_subdtype(call_seq, np.integer)
-        checks.assert_subdtype(init_cash, np.number)
-        checks.assert_subdtype(init_position, np.number)
-        checks.assert_subdtype(init_price, np.number)
-        checks.assert_subdtype(cash_deposits, np.number)
-        checks.assert_subdtype(cash_earnings, np.number)
-        checks.assert_subdtype(segment_mask, np.bool_)
-        checks.assert_subdtype(broadcasted_args["open"], np.number)
-        checks.assert_subdtype(broadcasted_args["high"], np.number)
-        checks.assert_subdtype(broadcasted_args["low"], np.number)
-        checks.assert_subdtype(broadcasted_args["close"], np.number)
+            checks.assert_subdtype(call_seq, np.integer, arg_name="call_seq")
+        checks.assert_subdtype(init_cash, np.number, arg_name="init_cash")
+        checks.assert_subdtype(init_position, np.number, arg_name="init_position")
+        checks.assert_subdtype(init_price, np.number, arg_name="init_price")
+        checks.assert_subdtype(cash_deposits, np.number, arg_name="cash_deposits")
+        checks.assert_subdtype(cash_earnings, np.number, arg_name="cash_earnings")
+        checks.assert_subdtype(segment_mask, np.bool_, arg_name="segment_mask")
+        checks.assert_subdtype(broadcasted_args["open"], np.number, arg_name="open")
+        checks.assert_subdtype(broadcasted_args["high"], np.number, arg_name="high")
+        checks.assert_subdtype(broadcasted_args["low"], np.number, arg_name="low")
+        checks.assert_subdtype(broadcasted_args["close"], np.number, arg_name="close")
         if bm_close is not None and not isinstance(bm_close, bool):
-            checks.assert_subdtype(broadcasted_args["bm_close"], np.number)
+            checks.assert_subdtype(broadcasted_args["bm_close"], np.number, arg_name="bm_close")
 
         # Prepare arguments
         template_context = merge_dicts(
@@ -7772,76 +7780,76 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         # Prepare arguments and pass to from_order_func
 
         def _prepare_size(size):
-            checks.assert_subdtype(size, np.number)
+            checks.assert_subdtype(size, np.number, arg_name="size")
             return size
 
         def _prepare_price(price):
             price = map_enum_fields(price, PriceType, ignore_type=(int, float))
-            checks.assert_subdtype(price, np.number)
+            checks.assert_subdtype(price, np.number, arg_name="price")
             return price
 
         def _prepare_size_type(size_type):
             size_type = map_enum_fields(size_type, SizeType)
-            checks.assert_subdtype(size_type, np.integer)
+            checks.assert_subdtype(size_type, np.integer, arg_name="size_type")
             return size_type
 
         def _prepare_direction(direction):
             direction = map_enum_fields(direction, Direction)
-            checks.assert_subdtype(direction, np.integer)
+            checks.assert_subdtype(direction, np.integer, arg_name="direction")
             return direction
 
         def _prepare_fees(fees):
-            checks.assert_subdtype(fees, np.number)
+            checks.assert_subdtype(fees, np.number, arg_name="fees")
             return fees
 
         def _prepare_fixed_fees(fixed_fees):
-            checks.assert_subdtype(fixed_fees, np.number)
+            checks.assert_subdtype(fixed_fees, np.number, arg_name="fixed_fees")
             return fixed_fees
 
         def _prepare_slippage(slippage):
-            checks.assert_subdtype(slippage, np.number)
+            checks.assert_subdtype(slippage, np.number, arg_name="slippage")
             return slippage
 
         def _prepare_min_size(min_size):
-            checks.assert_subdtype(min_size, np.number)
+            checks.assert_subdtype(min_size, np.number, arg_name="min_size")
             return min_size
 
         def _prepare_max_size(max_size):
-            checks.assert_subdtype(max_size, np.number)
+            checks.assert_subdtype(max_size, np.number, arg_name="max_size")
             return max_size
 
         def _prepare_size_granularity(size_granularity):
-            checks.assert_subdtype(size_granularity, np.number)
+            checks.assert_subdtype(size_granularity, np.number, arg_name="size_granularity")
             return size_granularity
 
         def _prepare_reject_prob(reject_prob):
-            checks.assert_subdtype(reject_prob, np.number)
+            checks.assert_subdtype(reject_prob, np.number, arg_name="reject_prob")
             return reject_prob
 
         def _prepare_price_area_vio_mode(price_area_vio_mode):
             price_area_vio_mode = map_enum_fields(price_area_vio_mode, PriceAreaVioMode)
-            checks.assert_subdtype(price_area_vio_mode, np.integer)
+            checks.assert_subdtype(price_area_vio_mode, np.integer, arg_name="price_area_vio_mode")
             return price_area_vio_mode
 
         def _prepare_lock_cash(lock_cash):
-            checks.assert_subdtype(lock_cash, np.bool_)
+            checks.assert_subdtype(lock_cash, np.bool_, arg_name="lock_cash")
             return lock_cash
 
         def _prepare_allow_partial(allow_partial):
-            checks.assert_subdtype(allow_partial, np.bool_)
+            checks.assert_subdtype(allow_partial, np.bool_, arg_name="allow_partial")
             return allow_partial
 
         def _prepare_raise_reject(raise_reject):
-            checks.assert_subdtype(raise_reject, np.bool_)
+            checks.assert_subdtype(raise_reject, np.bool_, arg_name="raise_reject")
             return raise_reject
 
         def _prepare_log(log):
-            checks.assert_subdtype(log, np.bool_)
+            checks.assert_subdtype(log, np.bool_, arg_name="log")
             return log
 
         def _prepare_val_price(val_price):
             val_price = map_enum_fields(val_price, ValPriceType, ignore_type=(int, float))
-            checks.assert_subdtype(val_price, np.number)
+            checks.assert_subdtype(val_price, np.number, arg_name="val_price")
             return val_price
 
         if flexible:
