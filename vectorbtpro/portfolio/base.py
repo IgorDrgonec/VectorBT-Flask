@@ -1626,7 +1626,16 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast, broadcast_to, to_pd_array, to_2d_shape, BCO
+from vectorbtpro.base.reshaping import (
+    to_1d_array,
+    to_2d_array,
+    broadcast_array_to,
+    broadcast,
+    broadcast_to,
+    to_pd_array,
+    to_2d_shape,
+    BCO,
+)
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.base.grouping.base import ExceptLevel
@@ -2345,7 +2354,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 for i, obj in enumerate(objs):
                     init_cash_obj = obj.get_init_cash(group_by=cs_group_by)
                     init_cash_obj = to_1d_array(init_cash_obj)
-                    init_cash_obj = np.broadcast_to(init_cash_obj, cs_n_cols)
+                    init_cash_obj = broadcast_array_to(init_cash_obj, cs_n_cols)
                     if i > 0 and (init_cash_obj != 0).any():
                         stack_init_cash_objs = True
                     init_cash_objs.append(init_cash_obj)
@@ -2355,7 +2364,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                         for i, obj in enumerate(objs):
                             cash_deposits_obj = obj.get_cash_deposits(group_by=cs_group_by)
                             cash_deposits_obj = to_2d_array(cash_deposits_obj)
-                            cash_deposits_obj = np.broadcast_to(
+                            cash_deposits_obj = broadcast_array_to(
                                 cash_deposits_obj,
                                 (cash_deposits_obj.shape[0], cs_n_cols),
                             )
@@ -2375,7 +2384,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             for i, obj in enumerate(objs):
                 init_position_obj = obj.get_init_position()
                 init_position_obj = to_1d_array(init_position_obj)
-                init_position_obj = np.broadcast_to(init_position_obj, n_cols)
+                init_position_obj = broadcast_array_to(init_position_obj, n_cols)
                 if i > 0 and (init_position_obj != 0).any():
                     stack_init_position_objs = True
                 init_position_objs.append(init_position_obj)
@@ -2392,10 +2401,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             for i, obj in enumerate(objs):
                 init_position_obj = obj.get_init_position()
                 init_position_obj = to_1d_array(init_position_obj)
-                init_position_obj = np.broadcast_to(init_position_obj, n_cols)
+                init_position_obj = broadcast_array_to(init_position_obj, n_cols)
                 init_price_obj = obj.get_init_price()
                 init_price_obj = to_1d_array(init_price_obj)
-                init_price_obj = np.broadcast_to(init_price_obj, n_cols)
+                init_price_obj = broadcast_array_to(init_price_obj, n_cols)
                 if i > 0 and (init_position_obj != 0).any() and not np.isnan(init_price_obj).all():
                     stack_init_price_objs = True
                 init_position_objs.append(init_position_obj)
@@ -4523,9 +4532,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         target_shape_2d = wrapper.shape_2d
 
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
-        init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
-        init_position = np.require(np.broadcast_to(init_position, (target_shape_2d[1],)), dtype=np.float_)
-        init_price = np.require(np.broadcast_to(init_price, (target_shape_2d[1],)), dtype=np.float_)
+        init_cash = np.require(broadcast_array_to(init_cash, len(cs_group_lens)), dtype=np.float_)
+        init_position = np.require(broadcast_array_to(init_position, target_shape_2d[1]), dtype=np.float_)
+        init_price = np.require(broadcast_array_to(init_price, target_shape_2d[1]), dtype=np.float_)
         cash_deposits = broadcast(
             cash_deposits,
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
@@ -5821,9 +5830,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         freq = wrapper.ns_freq
 
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
-        init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
-        init_position = np.require(np.broadcast_to(init_position, (target_shape_2d[1],)), dtype=np.float_)
-        init_price = np.require(np.broadcast_to(init_price, (target_shape_2d[1],)), dtype=np.float_)
+        init_cash = np.require(broadcast_array_to(init_cash, len(cs_group_lens)), dtype=np.float_)
+        init_position = np.require(broadcast_array_to(init_position, target_shape_2d[1]), dtype=np.float_)
+        init_price = np.require(broadcast_array_to(init_price, target_shape_2d[1]), dtype=np.float_)
         cash_deposits = broadcast(
             cash_deposits,
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
@@ -7220,9 +7229,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         freq = wrapper.ns_freq
 
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
-        init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
-        init_position = np.require(np.broadcast_to(init_position, (target_shape_2d[1],)), dtype=np.float_)
-        init_price = np.require(np.broadcast_to(init_price, (target_shape_2d[1],)), dtype=np.float_)
+        init_cash = np.require(broadcast_array_to(init_cash, len(cs_group_lens)), dtype=np.float_)
+        init_position = np.require(broadcast_array_to(init_position, target_shape_2d[1]), dtype=np.float_)
+        init_price = np.require(broadcast_array_to(init_price, target_shape_2d[1]), dtype=np.float_)
         cash_deposits = broadcast(
             cash_deposits,
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
@@ -8404,7 +8413,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             checks.assert_not_none(init_position_raw)
             checks.assert_not_none(wrapper)
 
-        init_position = np.broadcast_to(to_1d_array(init_position_raw), (wrapper.shape_2d[1],))
+        init_position = broadcast_array_to(init_position_raw, wrapper.shape_2d[1])
         wrap_kwargs = merge_dicts(dict(name_or_index="init_position"), wrap_kwargs)
         return wrapper.wrap_reduced(init_position, group_by=False, **wrap_kwargs)
 
@@ -8656,7 +8665,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         cash_earnings_raw = to_2d_array(cash_earnings_raw)
         if wrapper.grouper.is_grouped(group_by=group_by):
-            cash_earnings = np.broadcast_to(cash_earnings_raw, wrapper.shape_2d)
+            cash_earnings = broadcast_array_to(cash_earnings_raw, wrapper.shape_2d)
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
             func = jit_reg.resolve_option(nb.sum_grouped_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
@@ -8664,7 +8673,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         else:
             if keep_flex:
                 return cash_earnings_raw
-            cash_earnings = np.broadcast_to(cash_earnings_raw, wrapper.shape_2d)
+            cash_earnings = broadcast_array_to(cash_earnings_raw, wrapper.shape_2d)
         if keep_flex:
             return cash_earnings
         return wrapper.wrap(cash_earnings, group_by=group_by, **resolve_dict(wrap_kwargs))
@@ -8897,7 +8906,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             checks.assert_not_none(init_price_raw)
             checks.assert_not_none(wrapper)
 
-        init_price = np.broadcast_to(to_1d_array(init_price_raw), (wrapper.shape_2d[1],))
+        init_price = broadcast_array_to(init_price_raw, wrapper.shape_2d[1])
         wrap_kwargs = merge_dicts(dict(name_or_index="init_price"), wrap_kwargs)
         return wrapper.wrap_reduced(init_price, group_by=False, **wrap_kwargs)
 
@@ -10281,16 +10290,20 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     y1=RepFunc(lambda record: record["exit_price"]),
                     opacity=0.75,
                 )
-                long_shape_kwargs = atomic_dict(merge_dicts(
-                    base_shape_kwargs,
-                    dict(line=dict(color=plotting_cfg["contrast_color_schema"]["green"])),
-                    long_shape_kwargs,
-                ))
-                short_shape_kwargs = atomic_dict(merge_dicts(
-                    base_shape_kwargs,
-                    dict(line=dict(color=plotting_cfg["contrast_color_schema"]["red"])),
-                    short_shape_kwargs,
-                ))
+                long_shape_kwargs = atomic_dict(
+                    merge_dicts(
+                        base_shape_kwargs,
+                        dict(line=dict(color=plotting_cfg["contrast_color_schema"]["green"])),
+                        long_shape_kwargs,
+                    )
+                )
+                short_shape_kwargs = atomic_dict(
+                    merge_dicts(
+                        base_shape_kwargs,
+                        dict(line=dict(color=plotting_cfg["contrast_color_schema"]["red"])),
+                        short_shape_kwargs,
+                    )
+                )
             else:
                 raise ValueError(f"Invalid option plot_positions='{plot_positions}'")
             fig = positions.direction_long.plot_shapes(

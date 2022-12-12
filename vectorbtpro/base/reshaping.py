@@ -23,17 +23,36 @@ from vectorbtpro.utils.template import CustomTemplate
 
 def to_tuple_shape(shape: tp.ShapeLike) -> tp.Shape:
     """Convert a shape-like object to a tuple."""
-    if isinstance(shape, int):
-        return (shape,)
+    if checks.is_int(shape):
+        return int(shape),
     return tuple(shape)
 
 
-def to_2d_shape(shape: tp.ShapeLike) -> tp.Shape:
+def to_1d_shape(shape: tp.ShapeLike) -> tp.Shape:
+    """Convert a shape-like object to a 1-dim shape."""
+    shape = to_tuple_shape(shape)
+    if len(shape) == 0:
+        return 1,
+    if len(shape) == 1:
+        return shape
+    if len(shape) == 2 and shape[1] == 1:
+        return shape[0],
+    raise ValueError(f"Cannot reshape a {len(shape)}-dimensional shape to 1 dimension")
+
+
+def to_2d_shape(shape: tp.ShapeLike, expand_axis: int = 1) -> tp.Shape:
     """Convert a shape-like object to a 2-dim shape."""
     shape = to_tuple_shape(shape)
+    if len(shape) == 0:
+        return 1, 1
     if len(shape) == 1:
-        return shape[0], 1
-    return shape
+        if expand_axis == 1:
+            return shape[0], 1
+        else:
+            return shape[0], 0
+    if len(shape) == 2:
+        return shape
+    raise ValueError(f"Cannot reshape a {len(shape)}-dimensional shape to 2 dimensions")
 
 
 def repeat_shape(shape: tp.ShapeLike, n: int, axis: int = 1) -> tp.Shape:
@@ -178,12 +197,12 @@ def to_1d_array_nb(arg: tp.Array) -> tp.Array1d:
 
 
 @register_jitted(cache=True)
-def to_2d_array_nb(arg: tp.Array, axis: int = 1) -> tp.Array2d:
+def to_2d_array_nb(arg: tp.Array, expand_axis: int = 1) -> tp.Array2d:
     """Resize array to two dimensions."""
     if arg.ndim == 0:
         return np.expand_dims(np.expand_dims(arg, axis=0), axis=0)
     if arg.ndim == 1:
-        return np.expand_dims(arg, axis=axis)
+        return np.expand_dims(arg, axis=expand_axis)
     if arg.ndim == 2:
         return arg
     raise ValueError("Array cannot be resized to two dimensions")
@@ -192,13 +211,13 @@ def to_2d_array_nb(arg: tp.Array, axis: int = 1) -> tp.Array2d:
 @register_jitted(cache=True)
 def to_2d_pr_array_nb(arg: tp.Array) -> tp.Array2d:
     """`to_2d_array_nb` with `expand_axis=1`."""
-    return to_2d_array_nb(arg, axis=1)
+    return to_2d_array_nb(arg, expand_axis=1)
 
 
 @register_jitted(cache=True)
 def to_2d_pc_array_nb(arg: tp.Array) -> tp.Array2d:
     """`to_2d_array_nb` with `expand_axis=0`."""
-    return to_2d_array_nb(arg, axis=0)
+    return to_2d_array_nb(arg, expand_axis=0)
 
 
 def to_dict(arg: tp.ArrayLike, orient: str = "dict") -> dict:
@@ -274,6 +293,76 @@ def column_stack(*arrs: tp.MaybeSequence[tp.AnyArray]) -> tp.Array2d:
     if first_arr.ndim == 1 or (first_arr.ndim == 2 and first_arr.shape[1] == 1):
         return np.concatenate(arrs).reshape((len(arrs), len(first_arr))).T
     return np.column_stack(arrs)
+
+
+def broadcast_shapes(*shapes: tp.ArrayLike, expand_axis: tp.Optional[int] = None) -> tp.Tuple[tp.Shape, ...]:
+    """Broadcast multiple shape-like objects using vectorbt's broadcasting rules."""
+    from vectorbtpro._settings import settings
+
+    broadcasting_cfg = settings["broadcasting"]
+
+    if expand_axis is None:
+        expand_axis = broadcasting_cfg["expand_axis"]
+
+    is_2d = False
+    for shape in shapes:
+        shape = to_tuple_shape(shape)
+        if len(shape) == 2:
+            is_2d = True
+            break
+    if is_2d:
+        return tuple(np.broadcast_shapes(*[to_2d_shape(shape, expand_axis=expand_axis) for shape in shapes]))
+    return tuple(np.broadcast_shapes(*[to_1d_shape(shape) for shape in shapes]))
+
+
+def broadcast_array_to(
+    arr: tp.ArrayLike,
+    target_shape: tp.ShapeLike,
+    expand_axis: tp.Optional[int] = None,
+) -> tp.Array:
+    """Broadcast an array-like object to a target shape using vectorbt's broadcasting rules."""
+    from vectorbtpro._settings import settings
+
+    broadcasting_cfg = settings["broadcasting"]
+
+    if expand_axis is None:
+        expand_axis = broadcasting_cfg["expand_axis"]
+
+    arr = np.asarray(arr)
+    target_shape = to_tuple_shape(target_shape)
+    if len(target_shape) not in (1, 2):
+        raise ValueError("Target shape must have either 1 or 2 axes")
+    if len(target_shape) == 2:
+        return np.broadcast_to(to_2d_array(arr, expand_axis=expand_axis), target_shape)
+    return np.broadcast_to(to_1d_array(arr), target_shape)
+
+
+def broadcast_arrays(
+    *arrs: tp.ArrayLike,
+    target_shape: tp.Optional[tp.ShapeLike] = None,
+    expand_axis: tp.Optional[int] = None,
+) -> tp.Tuple[tp.Array, ...]:
+    """Broadcast multiple array-like objects using vectorbt's broadcasting rules.
+
+    Optionally to a target shape."""
+    from vectorbtpro._settings import settings
+
+    broadcasting_cfg = settings["broadcasting"]
+
+    if expand_axis is None:
+        expand_axis = broadcasting_cfg["expand_axis"]
+
+    if target_shape is not None:
+        return tuple(map(lambda x: broadcast_array_to(x, target_shape, expand_axis=expand_axis), arrs))
+    is_2d = False
+    for arr in arrs:
+        arr = np.asarray(arr)
+        if arr.ndim == 2:
+            is_2d = True
+            break
+    if is_2d:
+        return tuple(np.broadcast_arrays(*[to_2d_array(arr, expand_axis=expand_axis) for arr in arrs]))
+    return tuple(np.broadcast_arrays(*[to_1d_array(arr) for arr in arrs]))
 
 
 IndexFromLike = tp.Union[None, str, int, tp.Any]
@@ -546,6 +635,9 @@ class BCO:
     min_ndim: tp.Optional[int] = attr.ib(default=None)
     """Minimum number of dimensions."""
 
+    expand_axis: tp.Optional[int] = attr.ib(default=None)
+    """Axis to expand if the array is 1-dim but the target shape is 2-dim."""
+
     post_func: tp.Optional[tp.Callable] = attr.ib(default=None)
     """Function to post-process the output array."""
 
@@ -644,6 +736,7 @@ def broadcast(
     to_pd: tp.Optional[tp.MaybeMappingSequence[bool]] = None,
     keep_flex: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
     min_ndim: tp.MaybeMappingSequence[tp.Optional[int]] = None,
+    expand_axis: tp.MaybeMappingSequence[tp.Optional[int]] = None,
     post_func: tp.MaybeMappingSequence[tp.Optional[tp.Callable]] = None,
     require_kwargs: tp.MaybeMappingSequence[tp.Optional[tp.Kwargs]] = None,
     reindex_kwargs: tp.MaybeMappingSequence[tp.Optional[tp.Kwargs]] = None,
@@ -664,9 +757,12 @@ def broadcast(
     check_index_names: tp.Optional[bool] = None,
     **index_stack_kwargs,
 ) -> tp.Any:
-    """Bring any array-like object in `args` to the same shape by using NumPy broadcasting.
+    """Bring any array-like object in `args` to the same shape by using NumPy-like broadcasting.
 
     See [Broadcasting](https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html).
+
+    !!! important
+        The major difference to NumPy is that one-dimensional arrays will always broadcast against the row axis!
 
     Can broadcast Pandas objects by broadcasting their index/columns with `broadcast_index`.
 
@@ -699,6 +795,7 @@ def broadcast(
         min_ndim (int, sequence or mapping): See `BCO.min_ndim`.
 
             If None, becomes 2 if `keep_flex` is True, otherwise 1.
+        expand_axis (int, sequence or mapping): See `BCO.expand_axis`.
         post_func (callable, sequence or mapping): See `BCO.post_func`.
 
             Applied only when `keep_flex` is False.
@@ -1101,6 +1198,10 @@ def broadcast(
         if _min_ndim is None:
             _min_ndim = broadcasting_cfg["min_ndim"]
 
+        _expand_axis = _resolve_arg(obj, "expand_axis", expand_axis, None)
+        if _expand_axis is None:
+            _expand_axis = broadcasting_cfg["expand_axis"]
+
         _post_func = _resolve_arg(obj, "post_func", post_func, None)
 
         if isinstance(obj, BCO) and obj.require_kwargs is not None:
@@ -1140,6 +1241,7 @@ def broadcast(
                 to_pd=_to_pd,
                 keep_flex=_keep_flex,
                 min_ndim=_min_ndim,
+                expand_axis=_expand_axis,
                 post_func=_post_func,
                 require_kwargs=_require_kwargs,
                 reindex_kwargs=_reindex_kwargs,
@@ -1194,6 +1296,7 @@ def broadcast(
                 to_pd=_to_pd,
                 keep_flex=_keep_flex,
                 min_ndim=_min_ndim,
+                expand_axis=_expand_axis,
                 post_func=_post_func,
                 require_kwargs=_require_kwargs,
                 reindex_kwargs=_reindex_kwargs,
@@ -1257,16 +1360,20 @@ def broadcast(
     # Convert to NumPy
     ready_objs = {}
     for k, obj in aligned_objs.items():
-        if is_2d and checks.is_series(obj):
-            # Convert all pd.Series objects to pd.DataFrame if we work on 2-dim data
-            ready_objs[k] = obj.values[:, None]
-        else:
-            ready_objs[k] = np.asarray(obj)
+        _expand_axis = bco_instances[k].expand_axis
+
+        new_obj = np.asarray(obj)
+        if is_2d and new_obj.ndim == 1:
+            if isinstance(obj, pd.Series):
+                new_obj = new_obj[:, None]
+            else:
+                new_obj = np.expand_dims(new_obj, _expand_axis)
+        ready_objs[k] = new_obj
 
     # Get final shape
     if to_shape is None:
         try:
-            to_shape = np.broadcast_shapes(*map(lambda x: x.shape, ready_objs.values()))
+            to_shape = broadcast_shapes(*map(lambda x: x.shape, ready_objs.values()))
         except ValueError:
             arr_shapes = {}
             for i, k in enumerate(bco_instances):
@@ -1392,6 +1499,7 @@ def broadcast(
         _keep_flex = bco_instances[k].keep_flex
         _repeat_product = bco_instances[k].repeat_product
         _min_ndim = bco_instances[k].min_ndim
+        _expand_axis = bco_instances[k].expand_axis
 
         if k in product_keys:
             # Broadcast parameters
@@ -1400,9 +1508,9 @@ def broadcast(
                 obj = np.repeat(obj, to_shape_2d[1])
             if not _keep_flex:
                 if _repeat_product:
-                    obj = np.broadcast_to(obj, (to_shape[0], len(obj)))
+                    obj = broadcast_array_to(obj[None], (to_shape[0], len(obj)))
                 else:
-                    obj = np.broadcast_to(obj, (to_shape[0], n_params))
+                    obj = broadcast_array_to(obj[None], (to_shape[0], n_params))
             old_obj = obj
             new_obj = obj
         else:
@@ -1420,7 +1528,7 @@ def broadcast(
                         elif new_obj.ndim == 2 and new_obj.shape[1] > 1:
                             new_obj = np.tile(new_obj, (1, n_params))
             else:
-                new_obj = np.broadcast_to(new_obj, to_shape)
+                new_obj = broadcast_array_to(new_obj, to_shape)
                 if n_params > 0:
                     if new_obj.ndim == 1:
                         new_obj = new_obj[:, None]  # product changes is_2d behavior
@@ -1436,10 +1544,13 @@ def broadcast(
         if _min_ndim in (1, 2) and new_obj.ndim == 0:
             new_obj = new_obj[None]
         if _min_ndim == 2 and new_obj.ndim == 1:
-            if len(to_shape) == 1 and k not in product_keys:
-                new_obj = new_obj[:, None]
-            else:
+            if k in product_keys:
                 new_obj = new_obj[None]
+            else:
+                if len(to_shape) == 1:
+                    new_obj = new_obj[:, None]
+                else:
+                    new_obj = np.expand_dims(new_obj, _expand_axis)
 
         aligned_objs2[k] = old_obj
         new_objs[k] = new_obj
@@ -1552,13 +1663,16 @@ def broadcast(
 
 def broadcast_to(
     arg1: tp.ArrayLike,
-    arg2: tp.Union[tp.ArrayLike, wrapping.ArrayWrapper],
+    arg2: tp.Union[tp.ArrayLike, tp.ShapeLike, wrapping.ArrayWrapper],
     to_pd: tp.Optional[bool] = None,
     index_from: tp.Optional[IndexFromLike] = None,
     columns_from: tp.Optional[IndexFromLike] = None,
     **kwargs,
 ) -> tp.Any:
     """Broadcast `arg1` to `arg2`.
+
+    Argument `arg2` can be a shape, an instance of `vectorbtpro.base.wrapping.ArrayWrapper`,
+    or any array-like object.
 
     Pass None to `index_from`/`columns_from` to use index/columns of the second argument.
 
@@ -1583,29 +1697,27 @@ def broadcast_to(
         array([4, 5, 6])
         ```
     """
-    arg1 = to_any_array(arg1)
-    if not isinstance(arg2, wrapping.ArrayWrapper):
-        arg2 = to_any_array(arg2)
-    if to_pd is None:
-        if not isinstance(arg2, wrapping.ArrayWrapper):
-            to_pd = checks.is_pandas(arg2)
-        else:
-            to_pd = True
-    if to_pd:
-        # Take index and columns from arg2
+    if checks.is_int(arg2) or isinstance(arg2, tuple):
+        arg2 = to_tuple_shape(arg2)
+    if isinstance(arg2, tuple):
+        to_shape = arg2
+    elif isinstance(arg2, wrapping.ArrayWrapper):
+        to_pd = True
         if index_from is None:
-            if not isinstance(arg2, wrapping.ArrayWrapper):
-                index_from = indexes.get_index(arg2, 0)
-            else:
-                index_from = arg2.index
+            index_from = arg2.index
         if columns_from is None:
-            if not isinstance(arg2, wrapping.ArrayWrapper):
-                columns_from = indexes.get_index(arg2, 1)
-            else:
-                columns_from = arg2.columns
-    if not isinstance(arg2, wrapping.ArrayWrapper):
+            columns_from = arg2.columns
         to_shape = arg2.shape
     else:
+        arg2 = to_any_array(arg2)
+        if to_pd is None:
+            to_pd = checks.is_pandas(arg2)
+        if to_pd:
+            # Take index and columns from arg2
+            if index_from is None:
+                index_from = indexes.get_index(arg2, 0)
+            if columns_from is None:
+                columns_from = indexes.get_index(arg2, 1)
         to_shape = arg2.shape
     return broadcast(
         arg1,
@@ -1667,8 +1779,8 @@ def broadcast_to_axis_of(
         require_kwargs = {}
     arg2 = to_any_array(arg2)
     if arg2.ndim < axis + 1:
-        return np.broadcast_to(arg1, (1,))[0]  # to a single number
-    arg1 = np.broadcast_to(arg1, (arg2.shape[axis],))
+        return broadcast_array_to(arg1, (1,))[0]  # to a single number
+    arg1 = broadcast_array_to(arg1, (arg2.shape[axis],))
     arg1 = np.require(arg1, **require_kwargs)
     return arg1
 

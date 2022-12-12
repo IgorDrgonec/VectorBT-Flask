@@ -674,7 +674,7 @@ def simulate_nb(
         >>> cash_sharing = True
         >>> segment_mask = np.array([True, False, True, False, True])[:, None]
         >>> price = close = np.random.uniform(1, 10, size=target_shape)
-        >>> size = np.array([[1 / target_shape[1]]])  # (flexible) arrays must be 2-dim
+        >>> size = np.array([[1 / target_shape[1]]])  # custom flexible arrays must be 2-dim
         >>> size_type = np.array([[vbt.pf_enums.SizeType.TargetPercent]])
         >>> direction = np.array([[vbt.pf_enums.Direction.LongOnly]])
         >>> fees = np.array([[0.001]])
@@ -2642,7 +2642,7 @@ def flex_simulate_nb(
         >>> cash_sharing = True
         >>> segment_mask = np.array([True, False, True, False, True])[:, None]
         >>> price = close = np.random.uniform(1, 10, size=target_shape)
-        >>> size = np.array([[1 / target_shape[1]]])  # (flexible) arrays must be 2-dim
+        >>> size = np.array([[1 / target_shape[1]]])  # custom flexible arrays must be 2-dim
         >>> size_type = np.array([[vbt.pf_enums.SizeType.TargetPercent]])
         >>> direction = np.array([[vbt.pf_enums.Direction.LongOnly]])
         >>> fees = np.array([[0.001]])

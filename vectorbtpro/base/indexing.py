@@ -229,8 +229,11 @@ def indexing_on_mapper(
     checks.assert_instance_of(mapper, pd.Series)
     checks.assert_instance_of(ref_obj, (pd.Series, pd.DataFrame))
 
-    df_range_mapper = broadcast_to(np.arange(len(mapper.index)), ref_obj)
-    loced_range_mapper = pd_indexing_func(df_range_mapper)
+    if isinstance(ref_obj, pd.Series):
+        range_mapper = broadcast_to(0, ref_obj)
+    else:
+        range_mapper = broadcast_to(np.arange(len(mapper.index))[None], ref_obj)
+    loced_range_mapper = pd_indexing_func(range_mapper)
     new_mapper = mapper.iloc[loced_range_mapper.values[0]]
     if checks.is_frame(loced_range_mapper):
         return pd.Series(new_mapper.values, index=loced_range_mapper.columns, name=mapper.name)
@@ -1307,11 +1310,6 @@ def get_indices(
                 raise ValueError(f"{indexer}: Range start index couldn't be matched")
             elif indices.stop == -1:
                 raise ValueError(f"{indexer}: Range end index couldn't be matched")
-        if isinstance(indices, tuple):
-            if len(indices) not in (2, 3):
-                raise TypeError(f"Range tuples must consist of two or three arrays, not {len(indices)}")
-            if -1 in indices[0] or -1 in indices[1]:
-                raise ValueError(f"{indexer}: Some indices couldn't be matched")
         if isinstance(indices, np.ndarray):
             if -1 in indices:
                 raise ValueError(f"{indexer}: Some indices couldn't be matched")

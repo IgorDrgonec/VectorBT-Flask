@@ -257,7 +257,7 @@ class BaseIDXAccessor(Configured):
             try:
                 by = to_offset(prepare_freq(by))
                 if by.n == 1:
-                    return Grouper(index=self.obj, group_by=self.obj.to_period(by), **kwargs)
+                    return Grouper(index=self.obj, group_by=self.obj.tz_localize(None).to_period(by), **kwargs)
             except Exception as e:
                 pass
             try:

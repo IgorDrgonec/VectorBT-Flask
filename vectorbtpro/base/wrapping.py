@@ -593,7 +593,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             new_index = index
             row_idxs = np.arange(len(index))
         else:
-            init_row_mapper_values = np.broadcast_to(np.arange(n_rows)[:, None], (n_rows, n_cols))
+            init_row_mapper_values = reshaping.broadcast_array_to(np.arange(n_rows)[:, None], (n_rows, n_cols))
             init_row_mapper = i_wrapper.wrap(init_row_mapper_values, index=index, columns=columns)
             row_mapper = pd_indexing_func(init_row_mapper)
             if i_wrapper.ndim == 1:
@@ -607,7 +607,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                 new_columns = columns
                 new_ndim = 1
             else:
-                init_col_mapper_values = np.broadcast_to(np.arange(n_cols), (n_rows, n_cols))
+                init_col_mapper_values = reshaping.broadcast_array_to(np.arange(n_cols)[None], (n_rows, n_cols))
                 init_col_mapper = i_wrapper.wrap(init_col_mapper_values, index=index, columns=columns)
                 col_mapper = pd_indexing_func(init_col_mapper)
 
@@ -1121,9 +1121,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             if shape_2d != target_shape_2d:
                 if isinstance(orig_arr, (pd.Series, pd.DataFrame)):
                     arr = reshaping.align_pd_arrays(orig_arr, to_index=index, to_columns=columns).values
-                if isinstance(orig_arr, pd.Series) and arr.ndim == 1:
-                    arr = arr[:, None]
-                arr = np.broadcast_to(arr, target_shape_2d)
+                arr = reshaping.broadcast_array_to(arr, target_shape_2d)
             arr = reshaping.soft_to_ndim(arr, self.ndim)
             if min_precision is not None:
                 arr = cast_to_min_precision(
@@ -1705,33 +1703,20 @@ class ArrayWrapper(Configured, PandasIndexer):
             if use_row_indices and use_col_indices:
 
                 def _set_op(x, y=row_indices, z=col_indices, v=set_v):
-                    if isinstance(y, tuple):
-                        if np.isscalar(z):
-                            v = np.broadcast_to(v, (len(y[0]),))
-                        else:
-                            if isinstance(z, slice):
-                                z = np.arange(x.shape[1])[z]
-                            v = np.broadcast_to(v, (len(y[0]), len(z)))
-                        for j in range(len(y[0])):
-                            if len(y) == 2:
-                                x[y[0][j] : y[1][j], z] = v[j]
-                            else:
-                                x[y[0][j] : y[1][j] : y[2][j], z] = v[j]
+                    if np.isscalar(y) or np.isscalar(z):
+                        x[y, z] = v
                     else:
-                        if np.isscalar(y) or np.isscalar(z):
-                            x[y, z] = v
+                        if isinstance(y, slice):
+                            y = np.arange(x.shape[1])[y]
+                        if isinstance(z, slice):
+                            z = np.arange(x.shape[1])[z]
+                        _y = np.repeat(y, len(z))
+                        _z = np.tile(z, len(y))
+                        if np.isscalar(v):
+                            x[_y, _z] = v
                         else:
-                            if isinstance(y, slice):
-                                y = np.arange(x.shape[1])[y]
-                            if isinstance(z, slice):
-                                z = np.arange(x.shape[1])[z]
-                            _y = np.repeat(y, len(z))
-                            _z = np.tile(z, len(y))
-                            if np.isscalar(v):
-                                x[_y, _z] = v
-                            else:
-                                v = np.broadcast_to(v, (len(y), len(z)))
-                                x[_y, _z] = v.flatten()
+                            v = reshaping.broadcast_array_to(v, (len(y), len(z)))
+                            x[_y, _z] = v.flatten()
 
                 set_ops.append(_set_op)
                 changed_rows = True
@@ -1753,22 +1738,11 @@ class ArrayWrapper(Configured, PandasIndexer):
             else:
 
                 def _set_op(x, y=row_indices, v=set_v):
-                    if isinstance(y, tuple):
-                        if x.ndim == 2:
-                            v = np.broadcast_to(v, (len(y[0]), x.shape[1]))
-                        else:
-                            v = np.broadcast_to(v, (len(y[0]),))
-                        for j in range(len(y[0])):
-                            if len(y) == 2:
-                                x[y[0][j] : y[1][j]] = v[j]
-                            else:
-                                x[y[0][j] : y[1][j] : y[2][j]] = v[j]
-                    else:
-                        if x.ndim == 2:
-                            if not np.isscalar(y):
-                                if v.ndim == 1 and v.size > 1:
-                                    v = v[:, None]
-                        x[y] = v
+                    if x.ndim == 2:
+                        if not np.isscalar(y):
+                            if v.ndim == 1 and v.size > 1:
+                                v = v[:, None]
+                    x[y] = v
 
                 set_ops.append(_set_op)
                 if use_row_indices:

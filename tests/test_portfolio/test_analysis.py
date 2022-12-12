@@ -68,7 +68,7 @@ bm_close_na = pd.DataFrame(
     index=price.index,
 )
 init_position = [1.0, -1.0, 0.0]
-directions = ["longonly", "shortonly", "both"]
+directions = [["longonly", "shortonly", "both"]]
 group_by = pd.Index(["first", "first", "second"], name="group")
 
 pf_kwargs = dict(
@@ -786,7 +786,7 @@ class TestPortfolio:
         pf_kwargs1["bm_close"] = pf_kwargs1["bm_close"]["a"]
         pf_kwargs1["cash_deposits"] = pf_kwargs1["cash_deposits"]["a"]
         pf_kwargs1["cash_earnings"] = pf_kwargs1["cash_deposits"].shift(1).fillna(0) // 5
-        pf_kwargs1["direction"] = pf_kwargs1["direction"][0]
+        pf_kwargs1["direction"] = pf_kwargs1["direction"][0][0]
         pf_kwargs1["init_position"] = pf_kwargs1["init_position"][0]
         pf_kwargs1["init_price"] = pf_kwargs1["init_price"][0]
         pf_kwargs1["init_cash"] = "auto"

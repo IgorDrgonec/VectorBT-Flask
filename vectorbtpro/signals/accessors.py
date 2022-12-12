@@ -664,7 +664,7 @@ class SignalsAccessor(GenericAccessor):
         if seed is not None:
             set_seed_nb(seed)
         if n is not None:
-            n = np.broadcast_to(n, (shape_2d[1],))
+            n = reshaping.broadcast_array_to(n, shape_2d[1])
             chunked = ch.specialize_chunked_option(
                 chunked,
                 arg_take_spec=dict(args=ch.ArgsTaker(base_ch.FlexArraySlicer())),
@@ -678,7 +678,7 @@ class SignalsAccessor(GenericAccessor):
                 **kwargs,
             )
         if prob is not None:
-            prob = reshaping.to_2d_array(np.broadcast_to(prob, shape))
+            prob = reshaping.to_2d_array(reshaping.broadcast_array_to(prob, shape))
             chunked = ch.specialize_chunked_option(
                 chunked,
                 arg_take_spec=dict(args=ch.ArgsTaker(base_ch.FlexArraySlicer(axis=1), None, None)),
@@ -782,7 +782,7 @@ class SignalsAccessor(GenericAccessor):
         if seed is not None:
             set_seed_nb(seed)
         if n is not None:
-            n = np.broadcast_to(n, (shape_2d[1],))
+            n = reshaping.broadcast_array_to(n, shape_2d[1])
             func = jit_reg.resolve_option(nb.generate_rand_enex_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             entries, exits = func(shape_2d, n, entry_wait, exit_wait)
@@ -792,8 +792,8 @@ class SignalsAccessor(GenericAccessor):
                 wrap_kwargs = resolve_dict(wrap_kwargs)
             return wrapper.wrap(entries, **wrap_kwargs), wrapper.wrap(exits, **wrap_kwargs)
         elif entry_prob is not None and exit_prob is not None:
-            entry_prob = reshaping.to_2d_array(np.broadcast_to(entry_prob, shape))
-            exit_prob = reshaping.to_2d_array(np.broadcast_to(exit_prob, shape))
+            entry_prob = reshaping.to_2d_array(reshaping.broadcast_array_to(entry_prob, shape))
+            exit_prob = reshaping.to_2d_array(reshaping.broadcast_array_to(exit_prob, shape))
             chunked = ch.specialize_chunked_option(
                 chunked,
                 arg_take_spec=dict(
@@ -892,7 +892,7 @@ class SignalsAccessor(GenericAccessor):
                 wrap_kwargs=wrap_kwargs,
                 **kwargs,
             )
-        n = np.broadcast_to(1, (self.wrapper.shape_2d[1],))
+        n = reshaping.broadcast_array_to(1, self.wrapper.shape_2d[1])
         chunked = ch.specialize_chunked_option(
             chunked,
             arg_take_spec=dict(args=ch.ArgsTaker(base_ch.FlexArraySlicer())),

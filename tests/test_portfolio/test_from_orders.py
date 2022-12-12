@@ -2172,7 +2172,7 @@ class TestFromOrders:
         pf = from_orders_both(
             close=price_wide2,
             init_cash=[100, 200, 300],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             log=True,
             jitted=dict(parallel=True),
@@ -2180,7 +2180,7 @@ class TestFromOrders:
         pf2 = from_orders_both(
             close=price_wide2,
             init_cash=[100, 200, 300],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             log=True,
             jitted=dict(parallel=False),
@@ -2190,7 +2190,7 @@ class TestFromOrders:
         pf = from_orders_both(
             close=price_wide2,
             init_cash=[100, 200],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             cash_sharing=True,
             log=True,
@@ -2199,7 +2199,7 @@ class TestFromOrders:
         pf2 = from_orders_both(
             close=price_wide2,
             init_cash=[100, 200],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             cash_sharing=True,
             log=True,
@@ -2215,7 +2215,7 @@ class TestFromOrders:
         pf = from_orders_both(
             close=price_wide2,
             init_cash=[100, 200, 300],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             log=True,
             chunked=True,
@@ -2223,7 +2223,7 @@ class TestFromOrders:
         pf2 = from_orders_both(
             close=price_wide2,
             init_cash=[100, 200, 300],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             log=True,
             chunked=False,
@@ -2233,7 +2233,7 @@ class TestFromOrders:
         pf = from_orders_both(
             close=price_wide2,
             init_cash=[100, 200],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             cash_sharing=True,
             log=True,
@@ -2242,7 +2242,7 @@ class TestFromOrders:
         pf2 = from_orders_both(
             close=price_wide2,
             init_cash=[100, 200],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             cash_sharing=True,
             log=True,

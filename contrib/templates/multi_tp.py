@@ -58,9 +58,9 @@ def signal_func_nb(c, my_c):
 
     if position_now == 0:
         if is_long_entry or is_short_entry:
-            my_c.size[0] = user_size
-            my_c.size_type[0] = user_size_type
-            my_c.accumulate[0] = False
+            my_c.size[0, c.col] = user_size
+            my_c.size_type[0, c.col] = user_size_type
+            my_c.accumulate[0, c.col] = False
             if is_long_entry:
                 return True, False, False, False
             if is_short_entry:
@@ -68,9 +68,9 @@ def signal_func_nb(c, my_c):
 
     if position_now > 0:
         if is_long_exit or is_short_entry:
-            my_c.size[0] = user_size
-            my_c.size_type[0] = user_size_type
-            my_c.accumulate[0] = False
+            my_c.size[0, c.col] = user_size
+            my_c.size_type[0, c.col] = user_size_type
+            my_c.accumulate[0, c.col] = False
             if is_long_exit:
                 return False, True, False, False
             if is_short_entry:
@@ -78,9 +78,9 @@ def signal_func_nb(c, my_c):
 
     if position_now < 0:
         if is_short_exit or is_long_entry:
-            my_c.size[0] = user_size
-            my_c.size_type[0] = user_size_type
-            my_c.accumulate[0] = False
+            my_c.size[0, c.col] = user_size
+            my_c.size_type[0, c.col] = user_size_type
+            my_c.accumulate[0, c.col] = False
             if is_short_exit:
                 return False, False, False, True
             if is_long_entry:
@@ -102,9 +102,9 @@ def signal_func_nb(c, my_c):
             stop=my_c.tp_stops[my_c.temp_active_tp[0]],
             exit_type=vbt.pf_enums.StopExitType.CloseReduce,
         )
-        my_c.size[0] = my_c.tp_pcts[my_c.temp_active_tp[0]] * abs(position_now)
-        my_c.size_type[0] = vbt.pf_enums.SizeType.Amount
-        my_c.accumulate[0] = True
+        my_c.size[0, c.col] = my_c.tp_pcts[my_c.temp_active_tp[0]] * abs(position_now)
+        my_c.size_type[0, c.col] = vbt.pf_enums.SizeType.Amount
+        my_c.accumulate[0, c.col] = True
 
     if last_order.idx == c.i - 1:
         if last_order.stop_type == -1:
@@ -154,9 +154,9 @@ def multi_tp_from_signals(
         data,
         signal_func_nb=signal_func_nb,
         signal_args=(my_c,),
-        size=np.full(1, np.nan),
-        size_type=np.full(1, -1),
-        accumulate=np.full(1, False),
+        size=vbt.RepEval("np.full((1, wrapper.shape_2d[1]), np.nan)"),
+        size_type=vbt.RepEval("np.full((1, wrapper.shape_2d[1]), -1)"),
+        accumulate=vbt.RepEval("np.full((1, wrapper.shape_2d[1]), False)"),
         broadcast_named_args=dict(
             long_entries=long_entries,
             long_exits=long_exits,

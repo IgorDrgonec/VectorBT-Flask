@@ -413,6 +413,7 @@ broadcasting = ChildDict(
     keep_wrap_default=False,
     keep_flex=False,
     min_ndim=None,
+    expand_axis=1,
     index_to_product=True,
     repeat_product=True,
     keys_from_sr_index=True,

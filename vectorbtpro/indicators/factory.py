@@ -47,7 +47,7 @@ from numba.typed import List
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping, combining
 from vectorbtpro.base.indexing import build_param_indexer
-from vectorbtpro.base.reshaping import Default, resolve_ref, column_stack
+from vectorbtpro.base.reshaping import broadcast_array_to, broadcast_arrays, Default, resolve_ref, column_stack
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import BaseAccessor
@@ -218,7 +218,7 @@ def build_columns(
             if _per_column:
                 param_index = None
                 for p in p_values:
-                    bc_param = np.broadcast_to(p, (len(input_columns),))
+                    bc_param = broadcast_array_to(p, len(input_columns))
                     _param_index = indexes.index_from_values(bc_param, single_value=False, name=level_name)
                     if param_index is None:
                         param_index = _param_index
@@ -4432,7 +4432,7 @@ Args:
                                 if k in input_names:
                                     inputs[k] = __kwargs.pop(k)
 
-                        bc_inputs = tuple(np.broadcast_arrays(*inputs.values()))
+                        bc_inputs = broadcast_arrays(*inputs.values())
                         if bc_inputs[0].ndim == 1:
                             return _talib_ind.apply_func(bc_inputs, (), other_args, wrapper=wrapper, **__kwargs)
                         outputs = []

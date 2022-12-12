@@ -4803,7 +4803,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         if max_error_interp_mode is None:
             max_error_interp_mode = interp_mode
         pattern = reshaping.to_1d_array(pattern)
-        max_error = np.broadcast_to(max_error, (len(pattern),))
+        max_error = reshaping.broadcast_array_to(max_error, len(pattern))
 
         func = jit_reg.resolve_option(nb.fit_pattern_nb, jitted)
         fit_pattern, fit_max_error = func(
@@ -4838,8 +4838,8 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         func = jit_reg.resolve_option(nb.to_renko_1d_nb, jitted)
         arr_out, idx_out, uptrend_out = func(
             self.to_1d_array(),
-            np.broadcast_to(brick_size, (self.wrapper.shape[0],)),
-            relative=np.broadcast_to(relative, (self.wrapper.shape[0],)),
+            reshaping.broadcast_array_to(brick_size, self.wrapper.shape[0]),
+            relative=reshaping.broadcast_array_to(relative, self.wrapper.shape[0]),
             start_value=start_value,
             max_out_len=max_out_len,
         )

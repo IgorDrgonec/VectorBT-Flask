@@ -124,7 +124,7 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.accessors import register_vbt_accessor, register_df_vbt_accessor, register_sr_vbt_accessor
-from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast_to
+from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast_array_to, broadcast_to
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
 from vectorbtpro.generic.drawdowns import Drawdowns
@@ -173,7 +173,7 @@ class ReturnsAccessor(GenericAccessor):
         if not checks.is_any_array(value):
             value = np.asarray(value)
         value_2d = to_2d_array(value)
-        init_value = np.broadcast_to(init_value, value_2d.shape[1])
+        init_value = broadcast_array_to(init_value, value_2d.shape[1])
 
         func = jit_reg.resolve_option(nb.returns_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)

@@ -87,10 +87,10 @@ def uniform_summing_to_one_nb(n: int) -> tp.Array1d:
 
 
 def rescale(
-    arr: tp.MaybeArray[float],
+    arr: tp.MaybeArray,
     from_range: tp.Tuple[float, float],
     to_range: tp.Tuple[float, float],
-) -> tp.MaybeArray[float]:
+) -> tp.MaybeArray:
     """Renormalize `arr` from one range to another."""
     from_min, from_max = from_range
     to_min, to_max = to_range
@@ -101,10 +101,10 @@ def rescale(
 
 @register_jitted(cache=True)
 def rescale_nb(
-    arr: tp.MaybeArray[float],
+    arr: tp.MaybeArray,
     from_range: tp.Tuple[float, float],
     to_range: tp.Tuple[float, float],
-) -> tp.MaybeArray[float]:
+) -> tp.MaybeArray:
     """Numba-compiled version of `rescale`."""
     from_min, from_max = from_range
     to_min, to_max = to_range

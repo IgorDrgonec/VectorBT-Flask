@@ -181,7 +181,7 @@ class TestFromOrderFunc:
             price_wide,
             order_func,
             vbt.Rep("size"),
-            broadcast_named_args=dict(size=[0, 1, np.inf]),
+            broadcast_named_args=dict(size=[[0, 1, np.inf]]),
             row_wise=test_row_wise,
             flexible=test_flexible,
             jitted=test_jitted,
@@ -3072,7 +3072,7 @@ class TestFromOrderFunc:
             price_wide2,
             order_func,
             vbt.Rep("size"),
-            broadcast_named_args=dict(size=[0, 1, np.inf]),
+            broadcast_named_args=dict(size=[[0, 1, np.inf]]),
             group_by=group_by,
             row_wise=False,
             flexible=test_flexible,
@@ -3082,7 +3082,7 @@ class TestFromOrderFunc:
             price_wide2,
             order_func,
             vbt.Rep("size"),
-            broadcast_named_args=dict(size=[0, 1, np.inf]),
+            broadcast_named_args=dict(size=[[0, 1, np.inf]]),
             group_by=group_by,
             row_wise=False,
             flexible=test_flexible,
@@ -3094,7 +3094,7 @@ class TestFromOrderFunc:
             price_wide2,
             order_func,
             vbt.Rep("size"),
-            broadcast_named_args=dict(size=[0, 1, np.inf]),
+            broadcast_named_args=dict(size=[[0, 1, np.inf]]),
             group_by=group_by,
             cash_sharing=True,
             row_wise=False,
@@ -3105,7 +3105,7 @@ class TestFromOrderFunc:
             price_wide2,
             order_func,
             vbt.Rep("size"),
-            broadcast_named_args=dict(size=[0, 1, np.inf]),
+            broadcast_named_args=dict(size=[[0, 1, np.inf]]),
             group_by=group_by,
             cash_sharing=True,
             row_wise=False,
@@ -3132,7 +3132,7 @@ class TestFromOrderFunc:
             price_wide2,
             order_func,
             vbt.Rep("size"),
-            broadcast_named_args=dict(size=[0, 1, np.inf]),
+            broadcast_named_args=dict(size=[[0, 1, np.inf]]),
             group_by=group_by,
             row_wise=test_row_wise,
             flexible=test_flexible,
@@ -3142,7 +3142,7 @@ class TestFromOrderFunc:
             price_wide2,
             order_func,
             vbt.Rep("size"),
-            broadcast_named_args=dict(size=[0, 1, np.inf]),
+            broadcast_named_args=dict(size=[[0, 1, np.inf]]),
             group_by=group_by,
             row_wise=test_row_wise,
             flexible=test_flexible,
@@ -3158,7 +3158,7 @@ class TestFromOrderFunc:
             price_wide2,
             order_func,
             vbt.Rep("size"),
-            broadcast_named_args=dict(size=[0, 1, np.inf]),
+            broadcast_named_args=dict(size=[[0, 1, np.inf]]),
             group_by=group_by,
             cash_sharing=True,
             row_wise=test_row_wise,
@@ -3169,7 +3169,7 @@ class TestFromOrderFunc:
             price_wide2,
             order_func,
             vbt.Rep("size"),
-            broadcast_named_args=dict(size=[0, 1, np.inf]),
+            broadcast_named_args=dict(size=[[0, 1, np.inf]]),
             group_by=group_by,
             cash_sharing=True,
             row_wise=test_row_wise,
@@ -3233,7 +3233,7 @@ class TestFromOrderFunc:
             order_func,
             vbt.Rep("size"),
             post_sim_func_nb=post_sim_func_nb,
-            broadcast_named_args=dict(size=[0, 1, np.inf]),
+            broadcast_named_args=dict(size=[[0, 1, np.inf]]),
             in_outputs=in_outputs,
             template_context=dict(custom_dtype=custom_dtype),
             group_by=group_by,
@@ -3264,26 +3264,26 @@ class TestFromDefOrderFunc:
     def test_compare(self, test_row_wise, test_flexible):
         pf = vbt.Portfolio.from_def_order_func(
             price_wide,
-            size=[0, 1, np.inf],
+            size=[[0, 1, np.inf]],
             log=True,
             row_wise=test_row_wise,
             flexible=test_flexible,
         )
-        pf2 = vbt.Portfolio.from_orders(price_wide, size=[0, 1, np.inf], log=True)
+        pf2 = vbt.Portfolio.from_orders(price_wide, size=[[0, 1, np.inf]], log=True)
         assert_records_close(pf.order_records, pf2.order_records)
         assert_records_close(pf.log_records, pf2.log_records)
         assert pf.wrapper == pf2.wrapper
 
         pf = vbt.Portfolio.from_def_order_func(
             price_wide,
-            size=[0, 1, np.inf],
+            size=[[0, 1, np.inf]],
             log=True,
             group_by=True,
             cash_sharing=True,
             row_wise=test_row_wise,
             flexible=test_flexible,
         )
-        pf2 = vbt.Portfolio.from_orders(price_wide, size=[0, 1, np.inf], log=True, group_by=True, cash_sharing=True)
+        pf2 = vbt.Portfolio.from_orders(price_wide, size=[[0, 1, np.inf]], log=True, group_by=True, cash_sharing=True)
         assert_records_close(pf.order_records, pf2.order_records)
         assert_records_close(pf.log_records, pf2.log_records)
         assert pf.wrapper == pf2.wrapper
@@ -3341,7 +3341,7 @@ class TestFromDefOrderFunc:
             assert_records_close(
                 vbt.Portfolio.from_def_order_func(
                     price_wide,
-                    size=[0, 1, np.inf],
+                    size=[[0, 1, np.inf]],
                     log=True,
                     row_wise=test_row_wise,
                     flexible=test_flexible,
@@ -3349,7 +3349,7 @@ class TestFromDefOrderFunc:
                 ).log_records,
                 vbt.Portfolio.from_def_order_func(
                     price_wide,
-                    size=[0, 1, np.inf],
+                    size=[[0, 1, np.inf]],
                     log=True,
                     row_wise=test_row_wise,
                     flexible=test_flexible,
@@ -3359,7 +3359,7 @@ class TestFromDefOrderFunc:
         assert_records_close(
             vbt.Portfolio.from_def_order_func(
                 price_wide,
-                size=[0, 1, np.inf],
+                size=[[0, 1, np.inf]],
                 log=True,
                 row_wise=test_row_wise,
                 flexible=test_flexible,
@@ -3367,7 +3367,7 @@ class TestFromDefOrderFunc:
             ).log_records,
             vbt.Portfolio.from_def_order_func(
                 price_wide,
-                size=[0, 1, np.inf],
+                size=[[0, 1, np.inf]],
                 log=True,
                 row_wise=test_row_wise,
                 flexible=test_flexible,
