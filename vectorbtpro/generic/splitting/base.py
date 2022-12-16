@@ -469,6 +469,7 @@ class Splitter(Analyzable):
         offset_anchor: str = "prev_end",
         offset_anchor_set: tp.Optional[int] = 0,
         offset_space: str = "prev",
+        backwards: tp.Union[bool, str] = False,
         split: tp.Optional[tp.SplitLike] = None,
         split_range_kwargs: tp.KwargsLike = None,
         range_bounds_kwargs: tp.KwargsLike = None,
@@ -491,6 +492,9 @@ class Splitter(Analyzable):
                 If None, the whole previous split is considered as a single range.
                 By default, it's the first set.
             offset_space (str): See `RelRange.offset_space`.
+            backwards (bool or str): Whether to roll backwards.
+
+                If 'sorted', will roll backwards and sort the resulting splits by the start index.
             split (any): Ranges to split the range into.
 
                 If None, will produce the entire range as a single range.
@@ -550,6 +554,14 @@ class Splitter(Analyzable):
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
+        if isinstance(backwards, str):
+            if backwards.lower() == "sorted":
+                sort_backwards = True
+            else:
+                raise ValueError(f"Invalid option backwards='{backwards}'")
+            backwards = True
+        else:
+            sort_backwards = False
         if split_range_kwargs is None:
             split_range_kwargs = {}
         if "freq" not in split_range_kwargs:
@@ -563,7 +575,8 @@ class Splitter(Analyzable):
         while True:
             if len(splits) == 0:
                 new_split = RelRange(
-                    length=length,
+                    length=-length if backwards else length,
+                    offset_anchor="end" if backwards else "start",
                     out_of_bounds="keep",
                 ).to_slice(total_len=len(index), index=index, freq=freq)
             else:
@@ -575,16 +588,26 @@ class Splitter(Analyzable):
                     offset=offset,
                     offset_anchor=offset_anchor,
                     offset_space=offset_space,
-                    length=length,
+                    length=-length if backwards else length,
                     length_space="all",
                     out_of_bounds="keep",
                 ).to_slice(total_len=len(index), prev_start=prev_start, prev_end=prev_end, index=index, freq=freq)
-                if new_split.start <= bounds[-1][0][0]:
-                    raise ValueError("Infinite loop detected. Provide a positive offset.")
-            if new_split.start < 0:
-                raise ValueError("Range start cannot be negative")
-            if new_split.stop > len(index):
-                break
+                if backwards:
+                    if new_split.stop >= bounds[-1][-1][1]:
+                        raise ValueError("Infinite loop detected. Provide a positive offset.")
+                else:
+                    if new_split.start <= bounds[-1][0][0]:
+                        raise ValueError("Infinite loop detected. Provide a positive offset.")
+            if backwards:
+                if new_split.stop > len(index):
+                    raise ValueError("Range stop cannot exceed index length")
+                if new_split.start <= 0:
+                    break
+            else:
+                if new_split.start < 0:
+                    raise ValueError("Range start cannot be negative")
+                if new_split.stop >= len(index):
+                    break
             if split is not None:
                 new_split = cls.split_range(
                     new_split,
@@ -612,7 +635,7 @@ class Splitter(Analyzable):
 
         return cls.from_splits(
             index,
-            splits,
+            splits[::-1] if sort_backwards else splits,
             split_range_kwargs=split_range_kwargs,
             template_context=template_context,
             **kwargs,
