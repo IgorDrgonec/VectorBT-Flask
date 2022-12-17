@@ -250,15 +250,18 @@ def map_bounds_to_source_ranges_nb(
                     from_j = j
                 to_j = j + 1
 
-        if from_j == -1:
-            if skip_minus_one:
-                continue
-            range_starts_out[i] = -1
-            range_ends_out[i] = -1
+        if skip_minus_one:
+            if from_j != -1:
+                range_starts_out[k] = from_j
+                range_ends_out[k] = to_j
+                k += 1
         else:
-            range_starts_out[i] = from_j
-            range_ends_out[i] = to_j
-            k += 1
+            if from_j == -1:
+                range_starts_out[i] = -1
+                range_ends_out[i] = -1
+            else:
+                range_starts_out[i] = from_j
+                range_ends_out[i] = to_j
 
     if skip_minus_one:
         return range_starts_out[:k], range_ends_out[:k]

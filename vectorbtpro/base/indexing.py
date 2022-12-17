@@ -1272,7 +1272,7 @@ def get_index_ranges(
             range_ends = range_ends[valid_mask]
 
     if np.any(range_starts >= range_ends):
-        raise ValueError("Some start indices are higher than end indices")
+        raise ValueError("Some start indices are equal to or higher than end indices")
 
     return range_starts, range_ends
 
