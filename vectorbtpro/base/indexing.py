@@ -9,12 +9,11 @@ import numpy as np
 import pandas as pd
 from pandas.tseries.frequencies import to_offset
 
-from vectorbtpro._settings import settings
 from vectorbtpro import _typing as tp
-from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.template import CustomTemplate
 from vectorbtpro.utils.datetime_ import (
+    to_tzaware_datetime,
     try_to_datetime_index,
     try_align_to_datetime_index,
     time_to_timedelta,
@@ -731,7 +730,7 @@ def get_index_points(
     if every is not None:
         start_used = True
         end_used = True
-        if isinstance(every, (int, np.integer)):
+        if checks.is_int(every):
             if start is None:
                 start = 0
             if end is None:
@@ -741,13 +740,13 @@ def get_index_points(
         else:
             if start is None:
                 start = 0
-            if isinstance(start, (int, np.integer)):
+            if checks.is_int(start):
                 start_date = index[start]
             else:
                 start_date = start
             if end is None:
                 end = len(index) - 1
-            if isinstance(end, (int, np.integer)):
+            if checks.is_int(end):
                 end_date = index[end]
             else:
                 end_date = end
@@ -765,7 +764,7 @@ def get_index_points(
     if kind is None:
         if on is None:
             if start is not None:
-                if isinstance(start, (int, np.integer)):
+                if checks.is_int(start):
                     kind = "indices"
                 else:
                     kind = "labels"
@@ -819,11 +818,11 @@ def get_index_points(
         index_points = np.asarray(on)
 
     if start is not None and not start_used:
-        if not isinstance(start, (int, np.integer)):
+        if not checks.is_int(start):
             start = index.get_indexer([start], method="bfill").item(0)
         index_points = index_points[index_points >= start]
     if end is not None and not end_used:
-        if not isinstance(end, (int, np.integer)):
+        if not checks.is_int(end):
             end = index.get_indexer([end], method="ffill").item(0)
             index_points = index_points[index_points <= end]
         else:
@@ -1038,25 +1037,35 @@ def get_index_ranges(
                [ 7, 14]])
         ```
     """
-    import dateparser
     from vectorbtpro.base.indexes import repeat_index
     from vectorbtpro.base.resampling.base import Resampler
 
-    if start is not None and isinstance(start, str):
-        try:
-            start = pd.Timestamp(start, tz=index.tzinfo)
-        except Exception as e:
-            start = dateparser.parse(start)
-            if index.tzinfo is not None:
-                start = start.replace(tzinfo=index.tzinfo)
-    if end is not None and isinstance(end, str):
-        try:
-            end = pd.Timestamp(end, tz=index.tzinfo)
-        except Exception as e:
-            end = dateparser.parse(end)
-            if index.tzinfo is not None:
-                end = end.replace(tzinfo=index.tzinfo)
-    if lookback_period is not None and not isinstance(lookback_period, (int, np.integer)):
+    index = try_to_datetime_index(index)
+    if isinstance(index, pd.DatetimeIndex):
+        if start is not None:
+            start = try_align_to_datetime_index(start, index)
+            if isinstance(start, pd.DatetimeIndex):
+                start = start.tz_localize(None)
+        if end is not None:
+            end = try_align_to_datetime_index(end, index)
+            if isinstance(end, pd.DatetimeIndex):
+                end = end.tz_localize(None)
+        naive_index = index.tz_localize(None)
+    else:
+        if start is not None:
+            if not isinstance(start, pd.Index):
+                try:
+                    start = pd.Index(start)
+                except Exception as e:
+                    start = pd.Index([start])
+        if end is not None:
+            if not isinstance(end, pd.Index):
+                try:
+                    end = pd.Index(end)
+                except Exception as e:
+                    end = pd.Index([end])
+        naive_index = index
+    if lookback_period is not None and not checks.is_int(lookback_period):
         try:
             lookback_period = to_offset(lookback_period)
         except Exception as e:
@@ -1076,19 +1085,19 @@ def get_index_ranges(
                 closed_start = True
             if start_time is not None and end_time is None:
                 end_time = time(0, 0, 0, 0)
-                if add_end_delta is None:
-                    add_end_delta = pd.Timedelta(days=1)
-                else:
-                    add_end_delta += pd.Timedelta(days=1)
                 closed_end = False
         if start_time is not None and end_time is not None and not fixed_start:
             split_every = False
 
-        if isinstance(every, (int, np.integer)):
+        if checks.is_int(every):
             if start is None:
                 start = 0
+            else:
+                start = start[0]
             if end is None:
-                end = len(index)
+                end = len(naive_index)
+            else:
+                end = end[-1]
             if closed_end:
                 end -= 1
             if lookback_period is None:
@@ -1109,14 +1118,18 @@ def get_index_ranges(
         else:
             if start is None:
                 start = 0
-            if isinstance(start, (int, np.integer)):
-                start_date = index[start]
+            else:
+                start = start[0]
+            if checks.is_int(start):
+                start_date = naive_index[start]
             else:
                 start_date = start
             if end is None:
-                end = len(index) - 1
-            if isinstance(end, (int, np.integer)):
-                end_date = index[end]
+                end = len(naive_index) - 1
+            else:
+                end = end[-1]
+            if checks.is_int(end):
+                end_date = naive_index[end]
             else:
                 end_date = end
             if lookback_period is None:
@@ -1124,7 +1137,6 @@ def get_index_ranges(
                     start_date,
                     end_date,
                     freq=every,
-                    tz=index.tzinfo,
                     normalize=normalize_every,
                 )
                 if exact_start and new_index[0] > start_date:
@@ -1138,13 +1150,12 @@ def get_index_ranges(
                         start = new_index[:-1]
                     end = new_index[1:]
             else:
-                if isinstance(lookback_period, (int, np.integer)):
-                    lookback_period *= infer_index_freq(index, freq=index_freq)
+                if checks.is_int(lookback_period):
+                    lookback_period *= infer_index_freq(naive_index, freq=index_freq)
                 end = pd.date_range(
                     start_date + lookback_period,
                     end_date,
                     freq=every,
-                    tz=index.tzinfo,
                     normalize=normalize_every,
                 )
                 start = end - lookback_period
@@ -1156,37 +1167,33 @@ def get_index_ranges(
             kind = "indices"
         else:
             if start is not None:
-                start = try_to_datetime_index(start)
                 ref_index = start
             if end is not None:
-                end = try_to_datetime_index(end)
                 ref_index = end
             if ref_index.is_integer():
                 kind = "indices"
-            elif isinstance(ref_index, pd.DatetimeIndex) and isinstance(index, pd.DatetimeIndex):
+            elif isinstance(ref_index, pd.DatetimeIndex) and isinstance(naive_index, pd.DatetimeIndex):
                 kind = "bounds"
             else:
                 kind = "labels"
     checks.assert_in(kind, ("indices", "labels", "bounds"))
     if end is None:
         if kind.lower() in ("labels", "bounds"):
-            end = index[-1]
+            end = pd.Index([naive_index[-1]])
         else:
-            end = len(index)
-    end = try_to_datetime_index(end)
+            end = pd.Index([len(naive_index)])
     if start is not None and lookback_period is not None:
         raise ValueError("Cannot use start and lookback_period together")
     if start is None:
         if lookback_period is None:
             if kind.lower() in ("labels", "bounds"):
-                start = index[0]
+                start = pd.Index([naive_index[0]])
             else:
-                start = 0
+                start = pd.Index([0])
         else:
-            if isinstance(lookback_period, (int, np.integer)) and not end.is_integer():
-                lookback_period *= infer_index_freq(index, freq=index_freq)
+            if checks.is_int(lookback_period) and not end.is_integer():
+                lookback_period *= infer_index_freq(naive_index, freq=index_freq)
             start = end - lookback_period
-    start = try_to_datetime_index(start)
     if len(start) == 1 and len(end) > 1:
         start = repeat_index(start, len(end))
     elif len(start) > 1 and len(end) == 1:
@@ -1201,10 +1208,15 @@ def get_index_ranges(
             add_start_delta = add_start_time_delta
         else:
             add_start_delta += add_start_time_delta
+    else:
+        add_start_time_delta = None
     if end_time is not None:
         checks.assert_instance_of(end, pd.DatetimeIndex)
         end = end.floor("D")
         add_end_time_delta = time_to_timedelta(end_time)
+        if add_start_time_delta is not None:
+            if add_end_time_delta < add_start_delta:
+                add_end_time_delta += pd.Timedelta(days=1)
         if add_end_delta is None:
             add_end_delta = add_end_time_delta
         else:
@@ -1229,7 +1241,7 @@ def get_index_ranges(
 
     if kind.lower() == "bounds":
         range_starts, range_ends = Resampler.map_bounds_to_source_ranges(
-            source_index=index.values,
+            source_index=naive_index.values,
             target_lbound_index=start.values,
             target_rbound_index=end.values,
             closed_lbound=closed_start,
@@ -1238,11 +1250,9 @@ def get_index_ranges(
             jitted=jitted,
         )
     elif kind.lower() == "labels":
-        start = try_align_to_datetime_index(start, index)
-        end = try_align_to_datetime_index(end, index)
         range_starts = np.empty(len(start), dtype=np.int_)
         range_ends = np.empty(len(end), dtype=np.int_)
-        range_index = pd.Series(np.arange(len(index)), index=index)
+        range_index = pd.Series(np.arange(len(naive_index)), index=naive_index)
         for i in range(len(range_starts)):
             selected_range = range_index[start[i]:end[i]]
             if len(selected_range) > 0 and not closed_start and selected_range.index[0] == start[i]:
@@ -1261,9 +1271,9 @@ def get_index_ranges(
             range_ends = range_ends[valid_mask]
     else:
         if not closed_start:
-            start += 1
+            start = start + 1
         if closed_end:
-            end += 1
+            end = end + 1
         range_starts = np.asarray(start)
         range_ends = np.asarray(end)
         if skip_minus_one:
@@ -1313,12 +1323,12 @@ def get_indices(
         if isinstance(indices, np.ndarray):
             if -1 in indices:
                 raise ValueError(f"{indexer}: Some indices couldn't be matched")
-        if isinstance(indices, (int, np.integer)):
+        if checks.is_int(indices):
             if indices == -1:
                 raise ValueError(f"{indexer}: Index couldn't be matched")
 
     def _prepare_template_indices(indices):
-        if not isinstance(indices, (slice, hslice, int, np.integer)):
+        if not isinstance(indices, (slice, hslice)) and not checks.is_int(indices):
             indices = np.asarray(indices)
             if indices.ndim == 2:
                 indices = tuple(indices[:, col] for col in range(indices.shape[1]))
@@ -1339,9 +1349,9 @@ def get_indices(
                 not isinstance(index, pd.MultiIndex) and (not index.is_integer() or checks.is_default_index(index))
             ) or (isinstance(index, pd.MultiIndex) and not all(lvl.is_integer() for lvl in index.levels)):
                 if isinstance(value, (slice, hslice)):
-                    if isinstance(value.start, (int, np.integer)) or isinstance(value.stop, (int, np.integer)):
+                    if checks.is_int(value.start) or checks.is_int(value.stop):
                         is_labels = False
-                elif isinstance(value, (int, np.integer)):
+                elif checks.is_int(value):
                     is_labels = False
                 elif checks.is_sequence(value) and not np.isscalar(value):
                     if not checks.is_sequence(value[0]) or np.isscalar(value[0]):
@@ -1412,9 +1422,9 @@ def get_indices(
                 and (not columns.is_integer() or checks.is_default_index(columns))
             ) or (isinstance(columns, pd.MultiIndex) and not all(lvl.is_integer() for lvl in columns.levels)):
                 if isinstance(value, (slice, hslice)):
-                    if isinstance(value.start, (int, np.integer)) or isinstance(value.stop, (int, np.integer)):
+                    if checks.is_int(value.start) or checks.is_int(value.stop):
                         is_labels = False
-                elif isinstance(value, (int, np.integer)):
+                elif checks.is_int(value):
                     is_labels = False
                 elif checks.is_sequence(value) and not np.isscalar(value):
                     if not checks.is_sequence(value[0]) or np.isscalar(value[0]):
@@ -1422,7 +1432,7 @@ def get_indices(
                             is_labels = False
         if not is_labels:
             col_indices = value
-            if not isinstance(col_indices, (int, np.integer)) and not isinstance(col_indices, (slice, hslice)):
+            if not checks.is_int(col_indices) and not isinstance(col_indices, (slice, hslice)):
                 col_indices = np.asarray(col_indices)
             if isinstance(col_indices, (slice, hslice)):
                 col_indices = slice(col_indices.start, col_indices.stop, col_indices.step)

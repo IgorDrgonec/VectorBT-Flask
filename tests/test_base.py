@@ -4794,6 +4794,19 @@ class TestIndexing:
             np.column_stack(indexing.get_index_ranges(index, start_time="12:00", end_time="15:00")),
             np.array([[4, 5], [12, 13]]),
         )
+        np.testing.assert_array_equal(
+            np.column_stack(indexing.get_index_ranges(index, end_time="15:00")),
+            np.array([[0, 5], [8, 13], [16, 17]]),
+        )
+        assert len(np.column_stack(indexing.get_index_ranges(index, start_time="15:00", end_time="15:00"))) == 0
+        np.testing.assert_array_equal(
+            np.column_stack(indexing.get_index_ranges(index, start_time="15:00", end_time="15:01")),
+            np.array([[5, 6], [13, 14]], dtype=np.int_),
+        )
+        np.testing.assert_array_equal(
+            np.column_stack(indexing.get_index_ranges(index, start_time="15:00", end_time="14:59")),
+            np.array([[5, 13], [13, 17]], dtype=np.int_),
+        )
 
         np.testing.assert_array_equal(
             np.column_stack(

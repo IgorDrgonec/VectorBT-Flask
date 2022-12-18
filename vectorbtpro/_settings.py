@@ -494,7 +494,7 @@ _settings["resampling"] = resampling
 
 datetime = ChildDict(
     naive_tz=get_local_tz(),
-    to_py_timezone=True,
+    to_fixed_offset=True,
     parse_index=False,
 )
 """_"""
