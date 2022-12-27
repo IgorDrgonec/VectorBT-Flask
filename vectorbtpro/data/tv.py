@@ -53,21 +53,14 @@ class TVClient:
         self,
         username: tp.Optional[str] = None,
         password: tp.Optional[str] = None,
-        pro_data: bool = True,
     ) -> None:
         """Client for TradingView."""
-        self._pro_data = pro_data
         self._token = self.auth(username, password)
         if self._token is None:
             self._token = "unauthorized_user_token"
         self._ws = None
         self._session = self.generate_session()
         self._chart_session = self.generate_chart_session()
-
-    @property
-    def pro_data(self) -> bool:
-        """Whether to use pro data."""
-        return self._pro_data
 
     @property
     def token(self) -> tp.Optional[str]:
@@ -115,11 +108,11 @@ class TVClient:
         random_string = "".join(random.choice(letters) for _ in range(stringLength))
         return "cs_" + random_string
 
-    def create_connection(self) -> None:
+    def create_connection(self, pro_data: bool = True) -> None:
         """Create a websocket connection."""
         from websocket import create_connection
 
-        if self.pro_data:
+        if pro_data:
             self._ws = create_connection(PRO_WS_URL, headers=json.dumps({"Origin": ORIGIN_URL}), timeout=WS_TIMEOUT)
         else:
             self._ws = create_connection(WS_URL, headers=json.dumps({"Origin": ORIGIN_URL}), timeout=WS_TIMEOUT)
@@ -195,24 +188,16 @@ class TVClient:
         symbol: str,
         exchange: str = "NSE",
         interval: Interval = Interval.in_daily,
-        n_bars: int = 20000,
         fut_contract: tp.Optional[int] = None,
         extended_session: bool = False,
+        pro_data: bool = True,
+        limit: int = 20000,
     ) -> pd.DataFrame:
-        """Get historical data.
-
-        Args:
-            symbol (str): Symbol.
-            exchange (str): Exchange, not required if symbol is in format EXCHANGE:SYMBOL. Defaults to None.
-            interval (str): Chart interval. See `Interval`.
-            n_bars (int): Number of bars to download.
-            fut_contract (int): None for cash (default), 1 for continuous current contract in front,
-                2 for continuous next contract in front.
-            extended_session (bool): Whether to use an extended session."""
+        """Get historical data."""
         symbol = self.format_symbol(symbol=symbol, exchange=exchange, fut_contract=fut_contract)
         interval = interval.value
 
-        self.create_connection()
+        self.create_connection(pro_data=pro_data)
         self.send_message("set_auth_token", [self.token])
         self.send_message("chart_create_session", [self.chart_session, ""])
         self.send_message("quote_create_session", [self.session])
@@ -259,7 +244,7 @@ class TVClient:
                 + "}",
             ],
         )
-        self.send_message("create_series", [self.chart_session, "s1", "s1", "symbol_1", interval, n_bars])
+        self.send_message("create_series", [self.chart_session, "s1", "s1", "symbol_1", interval, limit])
         self.send_message("switch_timezone", [self.chart_session, "exchange"])
 
         raw_data = ""

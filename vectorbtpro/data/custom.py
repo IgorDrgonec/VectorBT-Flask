@@ -3046,9 +3046,10 @@ class TVData(RemoteData):
         client_config: tp.KwargsLike = None,
         exchange: tp.Optional[str] = None,
         timeframe: tp.Optional[str] = None,
-        limit: tp.Optional[int] = None,
         fut_contract: tp.Optional[int] = None,
         extended_session: tp.Optional[bool] = None,
+        pro_data: tp.Optional[bool] = None,
+        limit: tp.Optional[int] = None,
     ) -> tp.Frame:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from TradingView.
 
@@ -3068,10 +3069,11 @@ class TVData(RemoteData):
             timeframe (str): Timeframe.
 
                 Allows human-readable strings such as "15 minutes".
-            limit (int): The maximum number of returned items.
             fut_contract (int): None for cash, 1 for continuous current contract in front,
                 2 for continuous next contract in front.
             extended_session (bool): Regular session if False, extended session if True.
+            pro_data (bool): Whether to use pro data.
+            limit (int): The maximum number of returned items.
 
         For defaults, see `custom.tv` in `vectorbtpro._settings.data`.
         """
@@ -3086,12 +3088,14 @@ class TVData(RemoteData):
             exchange = tv_cfg["exchange"]
         if timeframe is None:
             timeframe = tv_cfg["timeframe"]
-        if limit is None:
-            limit = tv_cfg["limit"]
         if fut_contract is None:
             fut_contract = tv_cfg["fut_contract"]
         if extended_session is None:
             extended_session = tv_cfg["extended_session"]
+        if pro_data is None:
+            pro_data = tv_cfg["pro_data"]
+        if limit is None:
+            limit = tv_cfg["limit"]
 
         if not isinstance(timeframe, str):
             raise ValueError(f"Invalid timeframe '{timeframe}'")
@@ -3122,9 +3126,10 @@ class TVData(RemoteData):
             symbol=symbol,
             exchange=exchange,
             interval=interval,
-            n_bars=limit,
             fut_contract=fut_contract,
             extended_session=extended_session,
+            pro_data=pro_data,
+            limit=limit,
         )
         df.rename(
             columns={
