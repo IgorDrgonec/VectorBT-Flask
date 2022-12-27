@@ -28,6 +28,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array
 from vectorbtpro.data import nb
 from vectorbtpro.data.base import Data, symbol_dict
+from vectorbtpro.data.tv import TVClient
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
@@ -69,12 +70,6 @@ try:
     from polygon import RESTClient as PolygonClientT
 except ImportError:
     PolygonClientT = tp.Any
-try:
-    if not tp.TYPE_CHECKING:
-        raise ImportError
-    from tvDatafeed import TvDatafeed as TvDatafeedT
-except ImportError:
-    TvDatafeedT = tp.Any
 
 __all__ = [
     "CustomData",
@@ -2974,9 +2969,7 @@ TVDataT = tp.TypeVar("TVDataT", bound="TVData")
 
 
 class TVData(RemoteData):
-    """Subclass of `vectorbtpro.data.base.Data` for `tvdatafeed`.
-
-    See https://github.com/StreamAlpha/tvdatafeed for API.
+    """Subclass of `vectorbtpro.data.base.Data` for `vectorbtpro.data.tv.TVClient`.
 
     See `NDLData.fetch_symbol` for arguments.
 
@@ -3026,16 +3019,11 @@ class TVData(RemoteData):
         return set(map(lambda x: x["exchange"] + ":" + x["symbol"], all_symbols))
 
     @classmethod
-    def resolve_client(cls, client: tp.Optional[TvDatafeedT] = None, **client_config) -> TvDatafeedT:
+    def resolve_client(cls, client: tp.Optional[TVClient] = None, **client_config) -> TVClient:
         """Resolve the client.
 
-        If provided, must be of the type `tvDatafeed.main.TvDatafeed`.
+        If provided, must be of the type `vectorbtpro.base.tv.TVClient`.
         Otherwise, will be created using `client_config`."""
-        from vectorbtpro.utils.opt_packages import assert_can_import
-
-        assert_can_import("tvDatafeed")
-        from tvDatafeed import TvDatafeed
-
         tv_cfg = cls.get_settings(key_id="custom")
 
         if client is None:
@@ -3045,7 +3033,7 @@ class TVData(RemoteData):
         has_client_config = len(client_config) > 0
         client_config = merge_dicts(tv_cfg["client_config"], client_config)
         if client is None:
-            client = TvDatafeed(**client_config)
+            client = TVClient(**client_config)
         elif has_client_config:
             raise ValueError("Cannot apply client_config on already created client")
         return client
@@ -3054,7 +3042,7 @@ class TVData(RemoteData):
     def fetch_symbol(
         cls,
         symbol: str,
-        client: tp.Optional[TvDatafeedT] = None,
+        client: tp.Optional[TVClient] = None,
         client_config: tp.KwargsLike = None,
         exchange: tp.Optional[str] = None,
         timeframe: tp.Optional[str] = None,
@@ -3068,7 +3056,7 @@ class TVData(RemoteData):
             symbol (str): Symbol.
 
                 Symbol must be in the `EXCHANGE:SYMBOL` format if `exchange` is None.
-            client (tvDatafeed.main.TvDatafeed): Client.
+            client (vectorbtpro.data.tv.TVClient): Client.
 
                 See `TVData.resolve_client`.
             client_config (dict): Client config.
@@ -3087,10 +3075,7 @@ class TVData(RemoteData):
 
         For defaults, see `custom.tv` in `vectorbtpro._settings.data`.
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
-
-        assert_can_import("tvDatafeed")
-        from tvDatafeed import Interval
+        from vectorbtpro.data.tv import Interval
 
         tv_cfg = cls.get_settings(key_id="custom")
 

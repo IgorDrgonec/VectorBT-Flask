@@ -64,6 +64,7 @@ setup(
         "mypy_extensions",
         "humanize",
         "attrs>=21.1.0",
+        "websocket-client",
     ],
     extras_require=get_extra_requires("extra-requirements.txt"),
     classifiers=[

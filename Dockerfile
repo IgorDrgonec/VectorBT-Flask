@@ -44,7 +44,6 @@ RUN pip install --quiet --no-cache-dir \
     'ccxt>=1.89.14' \
     'polygon-api-client>=1.0.0' \
     'nasdaq-data-link' \
-    'tvdatafeed>=2.1.0' \
     'ta' \
     'pandas_ta' \
     'TA-Lib==0.4.21' \
