@@ -10,9 +10,15 @@ import string
 import pandas as pd
 import requests
 import json
-from websocket import create_connection, WebSocket
 
 from vectorbtpro import _typing as tp
+
+try:
+    if not tp.TYPE_CHECKING:
+        raise ImportError
+    from websocket import WebSocket as WebSocketT
+except ImportError:
+    WebSocketT = tp.Any
 
 
 class Interval(enum.Enum):
@@ -38,6 +44,7 @@ SEARCH_URL = (
 ORIGIN_URL = "https://data.tradingview.com"
 REFERER_URL = "https://www.tradingview.com"
 WS_URL = "wss://data.tradingview.com/socket.io/websocket"
+PRO_WS_URL = "wss://prodata.tradingview.com/socket.io/websocket"
 WS_TIMEOUT = 5
 
 
@@ -46,8 +53,10 @@ class TVClient:
         self,
         username: tp.Optional[str] = None,
         password: tp.Optional[str] = None,
+        pro_data: bool = True,
     ) -> None:
         """Client for TradingView."""
+        self._pro_data = pro_data
         self._token = self.auth(username, password)
         if self._token is None:
             self._token = "unauthorized_user_token"
@@ -56,12 +65,17 @@ class TVClient:
         self._chart_session = self.generate_chart_session()
 
     @property
+    def pro_data(self) -> bool:
+        """Whether to use pro data."""
+        return self._pro_data
+
+    @property
     def token(self) -> tp.Optional[str]:
         """Token."""
         return self._token
 
     @property
-    def ws(self) -> WebSocket:
+    def ws(self) -> WebSocketT:
         """Instance of `websocket.Websocket`."""
         return self._ws
 
@@ -103,7 +117,12 @@ class TVClient:
 
     def create_connection(self) -> None:
         """Create a websocket connection."""
-        self._ws = create_connection(WS_URL, headers=json.dumps({"Origin": ORIGIN_URL}), timeout=WS_TIMEOUT)
+        from websocket import create_connection
+
+        if self.pro_data:
+            self._ws = create_connection(PRO_WS_URL, headers=json.dumps({"Origin": ORIGIN_URL}), timeout=WS_TIMEOUT)
+        else:
+            self._ws = create_connection(WS_URL, headers=json.dumps({"Origin": ORIGIN_URL}), timeout=WS_TIMEOUT)
 
     @staticmethod
     def filter_raw_message(text) -> tp.Tuple[str, str]:
@@ -176,7 +195,7 @@ class TVClient:
         symbol: str,
         exchange: str = "NSE",
         interval: Interval = Interval.in_daily,
-        n_bars: int = 5000,
+        n_bars: int = 20000,
         fut_contract: tp.Optional[int] = None,
         extended_session: bool = False,
     ) -> pd.DataFrame:
@@ -186,7 +205,7 @@ class TVClient:
             symbol (str): Symbol.
             exchange (str): Exchange, not required if symbol is in format EXCHANGE:SYMBOL. Defaults to None.
             interval (str): Chart interval. See `Interval`.
-            n_bars (int): Number of bars to download, max 5000.
+            n_bars (int): Number of bars to download.
             fut_contract (int): None for cash (default), 1 for continuous current contract in front,
                 2 for continuous next contract in front.
             extended_session (bool): Whether to use an extended session."""
