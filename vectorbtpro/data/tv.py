@@ -53,17 +53,18 @@ class TVClient:
         self,
         username: tp.Optional[str] = None,
         password: tp.Optional[str] = None,
+        token: tp.Optional[str] = None,
     ) -> None:
         """Client for TradingView."""
-        self._token = self.auth(username, password)
-        if self._token is None:
-            self._token = "unauthorized_user_token"
+        if token is None:
+            token = self.auth(username, password)
+        self._token = token
         self._ws = None
         self._session = self.generate_session()
         self._chart_session = self.generate_chart_session()
 
     @property
-    def token(self) -> tp.Optional[str]:
+    def token(self) -> str:
         """Token."""
         return self._token
 
@@ -82,14 +83,14 @@ class TVClient:
         """Chart session."""
         return self._chart_session
 
-    def auth(self, username: tp.Optional[str] = None, password: tp.Optional[str] = None) -> tp.Optional[str]:
+    def auth(self, username: tp.Optional[str] = None, password: tp.Optional[str] = None) -> str:
         """Authenticate."""
-        if username is None or password is None:
-            token = None
-        else:
+        if username is not None and password is not None:
             data = {"username": username, "password": password, "remember": "on"}
             response = requests.post(url=SIGNIN_URL, data=data, headers={"Referer": REFERER_URL})
             token = response.json()["user"]["auth_token"]
+        else:
+            token = "unauthorized_user_token"
         return token
 
     @staticmethod

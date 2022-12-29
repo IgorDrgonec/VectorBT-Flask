@@ -684,6 +684,7 @@ data = ChildDict(
             client_config=dict(
                 username=None,
                 password=None,
+                token=None,
             ),
             exchange=None,
             timeframe="D",
