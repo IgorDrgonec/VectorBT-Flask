@@ -4241,7 +4241,7 @@ Args:
                                     k_prefixed = prefix + "_" + k
                                 if k in run_kwargs:
                                     if k_prefixed in found_defaults:
-                                        if found_defaults[k_prefixed] is not run_kwargs[k]:
+                                        if not checks.is_deep_equal(found_defaults[k_prefixed], run_kwargs[k]):
                                             remove_defaults.add(k_prefixed)
                                     else:
                                         found_defaults[k_prefixed] = run_kwargs[k]
