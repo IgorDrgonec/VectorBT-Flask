@@ -10,6 +10,8 @@ from vectorbtpro.registries.jit_registry import register_jitted
 _use_tol = settings["math"]["use_tol"]
 _rel_tol = settings["math"]["rel_tol"]
 _abs_tol = settings["math"]["abs_tol"]
+_use_round = settings["math"]["use_round"]
+_decimals = settings["math"]["decimals"]
 
 
 @register_jitted(cache=True)
@@ -80,3 +82,11 @@ def add_nb(a: float, b: float, use_tol: bool = _use_tol, rel_tol: float = _rel_t
     if use_tol and is_addition_zero_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
         return 0.0
     return a + b
+
+
+@register_jitted(cache=True)
+def round_nb(a: float, use_round: bool = _use_round, decimals: int = _decimals) -> float:
+    """Round a float to a number of decimals."""
+    if use_round:
+        return round(a, decimals)
+    return a

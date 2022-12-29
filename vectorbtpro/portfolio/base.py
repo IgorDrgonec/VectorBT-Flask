@@ -1934,6 +1934,10 @@ shortcut_config = ReadonlyConfig(
             resample_kwargs=dict(wrap_kwargs=dict(fillna=0.0)),
         ),
         "cash": dict(),
+        "position": dict(method_name="get_assets", group_by_aware=False),
+        "debt": dict(method_name=None, group_by_aware=False),
+        "locked_cash": dict(method_name=None, group_by_aware=False),
+        "shorted_cash": dict(method_name=None, group_by_aware=False),
         "free_cash": dict(method_name="get_cash", method_kwargs=dict(free=True)),
         "init_price": dict(obj_type="red_array", group_by_aware=False),
         "init_position_value": dict(obj_type="red_array", group_by_aware=False),
@@ -2999,9 +3003,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
     _in_output_config: tp.ClassVar[Config] = HybridConfig(
         dict(
-            returns=dict(
-                grouping="cash_sharing",
-            ),
+            cash=dict(grouping="cash_sharing"),
+            position=dict(grouping="columns"),
+            debt=dict(grouping="columns"),
+            locked_cash=dict(grouping="columns"),
+            shorted_cash=dict(grouping="columns"),
+            free_cash=dict(grouping="cash_sharing"),
+            returns=dict(grouping="cash_sharing"),
         )
     )
 
@@ -3899,9 +3907,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         min_size: tp.Optional[tp.ArrayLike] = None,
         max_size: tp.Optional[tp.ArrayLike] = None,
         size_granularity: tp.Optional[tp.ArrayLike] = None,
+        leverage: tp.Optional[tp.ArrayLike] = None,
+        leverage_mode: tp.Optional[tp.ArrayLike] = None,
         reject_prob: tp.Optional[tp.ArrayLike] = None,
         price_area_vio_mode: tp.Optional[tp.ArrayLike] = None,
-        lock_cash: tp.Optional[tp.ArrayLike] = None,
         allow_partial: tp.Optional[tp.ArrayLike] = None,
         raise_reject: tp.Optional[tp.ArrayLike] = None,
         log: tp.Optional[tp.ArrayLike] = None,
@@ -3921,6 +3930,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         attach_call_seq: tp.Optional[bool] = None,
         ffill_val_price: tp.Optional[bool] = None,
         update_value: tp.Optional[bool] = None,
+        fill_state: tp.Optional[bool] = None,
         fill_returns: tp.Optional[bool] = None,
         max_orders: tp.Optional[int] = None,
         max_logs: tp.Optional[int] = None,
@@ -3973,12 +3983,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Will be partially filled if exceeded.
             size_granularity (float or array_like): Granularity of the size.
                 See `vectorbtpro.portfolio.enums.Order.size_granularity`. Will broadcast.
+            leverage (float or array_like): Leverage.
+                See `vectorbtpro.portfolio.enums.Order.leverage`. Will broadcast.
+            leverage_mode (LeverageMode or array_like): Leverage mode.
+                See `vectorbtpro.portfolio.enums.Order.leverage_mode`. Will broadcast.
             reject_prob (float or array_like): Order rejection probability.
                 See `vectorbtpro.portfolio.enums.Order.reject_prob`. Will broadcast.
             price_area_vio_mode (PriceAreaVioMode or array_like): See `vectorbtpro.portfolio.enums.PriceAreaVioMode`.
                 Will broadcast.
-            lock_cash (bool or array_like): Whether to lock cash when shorting.
-                See `vectorbtpro.portfolio.enums.Order.lock_cash`. Will broadcast.
             allow_partial (bool or array_like): Whether to allow partial fills.
                 See `vectorbtpro.portfolio.enums.Order.allow_partial`. Will broadcast.
 
@@ -4105,6 +4117,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
                 Otherwise, unknown `close` will lead to NaN in valuation price at the next timestamp.
             update_value (bool): Whether to update group value after each filled order.
+            fill_state (bool): Whether to fill state.
+
+                The arrays will be avaiable as `cash`, `position`, `debt`, `locked_cash`,
+                `shorted_cash`, and `free_cash` in in-outputs.
             fill_returns (bool): Whether to fill returns.
 
                 The array will be avaiable as `returns` in in-outputs.
@@ -4383,12 +4399,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             max_size = portfolio_cfg["max_size"]
         if size_granularity is None:
             size_granularity = portfolio_cfg["size_granularity"]
+        if leverage is None:
+            leverage = portfolio_cfg["leverage"]
+        if leverage_mode is None:
+            leverage_mode = portfolio_cfg["leverage_mode"]
         if reject_prob is None:
             reject_prob = portfolio_cfg["reject_prob"]
         if price_area_vio_mode is None:
             price_area_vio_mode = portfolio_cfg["price_area_vio_mode"]
-        if lock_cash is None:
-            lock_cash = portfolio_cfg["lock_cash"]
         if allow_partial is None:
             allow_partial = portfolio_cfg["allow_partial"]
         if raise_reject is None:
@@ -4437,6 +4455,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ffill_val_price = portfolio_cfg["ffill_val_price"]
         if update_value is None:
             update_value = portfolio_cfg["update_value"]
+        if fill_state is None:
+            fill_state = portfolio_cfg["fill_state"]
         if fill_returns is None:
             fill_returns = portfolio_cfg["fill_returns"]
         if skipna is None:
@@ -4469,9 +4489,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             min_size=min_size,
             max_size=max_size,
             size_granularity=size_granularity,
+            leverage=leverage,
+            leverage_mode=leverage_mode,
             reject_prob=reject_prob,
             price_area_vio_mode=price_area_vio_mode,
-            lock_cash=lock_cash,
             allow_partial=allow_partial,
             raise_reject=raise_reject,
             log=log,
@@ -4503,9 +4524,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     min_size=dict(fill_value=np.nan),
                     max_size=dict(fill_value=np.nan),
                     size_granularity=dict(fill_value=np.nan),
+                    leverage=dict(fill_value=1.0),
+                    leverage_mode=dict(fill_value=LeverageMode.Lazy),
                     reject_prob=dict(fill_value=0.0),
                     price_area_vio_mode=dict(fill_value=PriceAreaVioMode.Ignore),
-                    lock_cash=dict(fill_value=False),
                     allow_partial=dict(fill_value=True),
                     raise_reject=dict(fill_value=False),
                     log=dict(fill_value=False),
@@ -4573,6 +4595,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         broadcasted_args["price"] = map_enum_fields(broadcasted_args["price"], PriceType, ignore_type=(int, float))
         broadcasted_args["size_type"] = map_enum_fields(broadcasted_args["size_type"], SizeType)
         broadcasted_args["direction"] = map_enum_fields(broadcasted_args["direction"], Direction)
+        broadcasted_args["leverage_mode"] = map_enum_fields(broadcasted_args["leverage_mode"], LeverageMode)
         broadcasted_args["price_area_vio_mode"] = map_enum_fields(
             broadcasted_args["price_area_vio_mode"],
             PriceAreaVioMode,
@@ -4603,9 +4626,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(broadcasted_args["min_size"], np.number, arg_name="min_size")
         checks.assert_subdtype(broadcasted_args["max_size"], np.number, arg_name="max_size")
         checks.assert_subdtype(broadcasted_args["size_granularity"], np.number, arg_name="size_granularity")
+        checks.assert_subdtype(broadcasted_args["leverage"], np.number, arg_name="leverage")
+        checks.assert_subdtype(broadcasted_args["leverage_mode"], np.integer, arg_name="leverage_mode")
         checks.assert_subdtype(broadcasted_args["reject_prob"], np.number, arg_name="reject_prob")
         checks.assert_subdtype(broadcasted_args["price_area_vio_mode"], np.integer, arg_name="price_area_vio_mode")
-        checks.assert_subdtype(broadcasted_args["lock_cash"], np.bool_, arg_name="lock_cash")
         checks.assert_subdtype(broadcasted_args["allow_partial"], np.bool_, arg_name="allow_partial")
         checks.assert_subdtype(broadcasted_args["raise_reject"], np.bool_, arg_name="raise_reject")
         checks.assert_subdtype(broadcasted_args["log"], np.bool_, arg_name="log")
@@ -4638,6 +4662,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             auto_call_seq=auto_call_seq,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
+            fill_state=fill_state,
             fill_returns=fill_returns,
             max_orders=max_orders,
             max_logs=max_logs,
@@ -4689,9 +4714,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         min_size: tp.Optional[tp.ArrayLike] = None,
         max_size: tp.Optional[tp.ArrayLike] = None,
         size_granularity: tp.Optional[tp.ArrayLike] = None,
+        leverage: tp.Optional[tp.ArrayLike] = None,
+        leverage_mode: tp.Optional[tp.ArrayLike] = None,
         reject_prob: tp.Optional[tp.ArrayLike] = None,
         price_area_vio_mode: tp.Optional[tp.ArrayLike] = None,
-        lock_cash: tp.Optional[tp.ArrayLike] = None,
         allow_partial: tp.Optional[tp.ArrayLike] = None,
         raise_reject: tp.Optional[tp.ArrayLike] = None,
         log: tp.Optional[tp.ArrayLike] = None,
@@ -4738,6 +4764,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         attach_call_seq: tp.Optional[bool] = None,
         ffill_val_price: tp.Optional[bool] = None,
         update_value: tp.Optional[bool] = None,
+        fill_state: tp.Optional[bool] = None,
         fill_returns: tp.Optional[bool] = None,
         max_orders: tp.Optional[int] = None,
         max_logs: tp.Optional[int] = None,
@@ -4829,9 +4856,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Will be partially filled if exceeded. You might not be able to properly close
                 the position if accumulation is enabled and `max_size` is too low.
             size_granularity (float or array_like): See `Portfolio.from_orders`.
+            leverage (float or array_like): See `Portfolio.from_orders`.
+            leverage_mode (LeverageMode or array_like): See `Portfolio.from_orders`.
             reject_prob (float or array_like): See `Portfolio.from_orders`.
             price_area_vio_mode (PriceAreaVioMode or array_like): See `Portfolio.from_orders`.
-            lock_cash (bool or array_like): See `Portfolio.from_orders`.
             allow_partial (bool or array_like): See `Portfolio.from_orders`.
             raise_reject (bool or array_like): See `Portfolio.from_orders`.
             log (bool or array_like): See `Portfolio.from_orders`.
@@ -4976,6 +5004,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             attach_call_seq (bool): See `Portfolio.from_orders`.
             ffill_val_price (bool): See `Portfolio.from_orders`.
             update_value (bool): See `Portfolio.from_orders`.
+            fill_state (bool): See `Portfolio.from_orders`.
             fill_returns (bool): See `Portfolio.from_orders`.
             max_orders (int): See `Portfolio.from_orders`.
             max_logs (int): See `Portfolio.from_orders`.
@@ -5543,12 +5572,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             max_size = portfolio_cfg["max_size"]
         if size_granularity is None:
             size_granularity = portfolio_cfg["size_granularity"]
+        if leverage is None:
+            leverage = portfolio_cfg["leverage"]
+        if leverage_mode is None:
+            leverage_mode = portfolio_cfg["leverage_mode"]
         if reject_prob is None:
             reject_prob = portfolio_cfg["reject_prob"]
         if price_area_vio_mode is None:
             price_area_vio_mode = portfolio_cfg["price_area_vio_mode"]
-        if lock_cash is None:
-            lock_cash = portfolio_cfg["lock_cash"]
         if allow_partial is None:
             allow_partial = portfolio_cfg["allow_partial"]
         if raise_reject is None:
@@ -5659,6 +5690,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ffill_val_price = portfolio_cfg["ffill_val_price"]
         if update_value is None:
             update_value = portfolio_cfg["update_value"]
+        if fill_state is None:
+            fill_state = portfolio_cfg["fill_state"]
         if fill_returns is None:
             fill_returns = portfolio_cfg["fill_returns"]
         if seed is None:
@@ -5666,6 +5699,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if seed is not None:
             set_seed(seed)
         if flexible_mode:
+            if fill_state:
+                raise ValueError("Argument fill_state cannot be used in flexible mode")
             if fill_returns:
                 raise ValueError("Argument fill_returns cannot be used in flexible mode")
             if in_outputs is not None and not checks.is_namedtuple(in_outputs):
@@ -5699,9 +5734,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             min_size=min_size,
             max_size=max_size,
             size_granularity=size_granularity,
+            leverage=leverage,
+            leverage_mode=leverage_mode,
             reject_prob=reject_prob,
             price_area_vio_mode=price_area_vio_mode,
-            lock_cash=lock_cash,
             allow_partial=allow_partial,
             raise_reject=raise_reject,
             log=log,
@@ -5773,9 +5809,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     min_size=dict(fill_value=np.nan),
                     max_size=dict(fill_value=np.nan),
                     size_granularity=dict(fill_value=np.nan),
+                    leverage=dict(fill_value=1.0),
+                    leverage_mode=dict(fill_value=LeverageMode.Lazy),
                     reject_prob=dict(fill_value=0.0),
                     price_area_vio_mode=dict(fill_value=PriceAreaVioMode.Ignore),
-                    lock_cash=dict(fill_value=False),
                     allow_partial=dict(fill_value=True),
                     raise_reject=dict(fill_value=False),
                     log=dict(fill_value=False),
@@ -5875,6 +5912,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             broadcasted_args["direction"] = map_enum_fields(broadcasted_args["direction"], Direction)
         broadcasted_args["price"] = map_enum_fields(broadcasted_args["price"], PriceType, ignore_type=(int, float))
         broadcasted_args["size_type"] = map_enum_fields(broadcasted_args["size_type"], SizeType)
+        broadcasted_args["leverage_mode"] = map_enum_fields(broadcasted_args["leverage_mode"], LeverageMode)
         broadcasted_args["price_area_vio_mode"] = map_enum_fields(
             broadcasted_args["price_area_vio_mode"],
             PriceAreaVioMode,
@@ -5982,9 +6020,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(broadcasted_args["min_size"], np.number, arg_name="min_size")
         checks.assert_subdtype(broadcasted_args["max_size"], np.number, arg_name="max_size")
         checks.assert_subdtype(broadcasted_args["size_granularity"], np.number, arg_name="size_granularity")
+        checks.assert_subdtype(broadcasted_args["leverage"], np.number, arg_name="leverage")
+        checks.assert_subdtype(broadcasted_args["leverage_mode"], np.integer, arg_name="leverage_mode")
         checks.assert_subdtype(broadcasted_args["reject_prob"], np.number, arg_name="reject_prob")
         checks.assert_subdtype(broadcasted_args["price_area_vio_mode"], np.integer, arg_name="price_area_vio_mode")
-        checks.assert_subdtype(broadcasted_args["lock_cash"], np.bool_, arg_name="lock_cash")
         checks.assert_subdtype(broadcasted_args["allow_partial"], np.bool_, arg_name="allow_partial")
         checks.assert_subdtype(broadcasted_args["raise_reject"], np.bool_, arg_name="raise_reject")
         checks.assert_subdtype(broadcasted_args["log"], np.bool_, arg_name="log")
@@ -6062,6 +6101,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 auto_call_seq=auto_call_seq,
                 ffill_val_price=ffill_val_price,
                 update_value=update_value,
+                fill_state=fill_state,
                 fill_returns=fill_returns,
                 max_orders=max_orders,
                 max_logs=max_logs,
@@ -6218,6 +6258,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 auto_call_seq=auto_call_seq,
                 ffill_val_price=ffill_val_price,
                 update_value=update_value,
+                fill_state=fill_state,
                 fill_returns=fill_returns,
                 max_orders=max_orders,
                 max_logs=max_logs,
@@ -7579,9 +7620,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         min_size: tp.Optional[tp.ArrayLike] = None,
         max_size: tp.Optional[tp.ArrayLike] = None,
         size_granularity: tp.Optional[tp.ArrayLike] = None,
+        leverage: tp.Optional[tp.ArrayLike] = None,
+        leverage_mode: tp.Optional[tp.ArrayLike] = None,
         reject_prob: tp.Optional[tp.ArrayLike] = None,
         price_area_vio_mode: tp.Optional[tp.ArrayLike] = None,
-        lock_cash: tp.Optional[tp.ArrayLike] = None,
         allow_partial: tp.Optional[tp.ArrayLike] = None,
         raise_reject: tp.Optional[tp.ArrayLike] = None,
         log: tp.Optional[tp.ArrayLike] = None,
@@ -7704,12 +7746,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             max_size = portfolio_cfg["max_size"]
         if size_granularity is None:
             size_granularity = portfolio_cfg["size_granularity"]
+        if leverage is None:
+            leverage = portfolio_cfg["leverage"]
+        if leverage_mode is None:
+            leverage_mode = portfolio_cfg["leverage_mode"]
         if reject_prob is None:
             reject_prob = portfolio_cfg["reject_prob"]
         if price_area_vio_mode is None:
             price_area_vio_mode = portfolio_cfg["price_area_vio_mode"]
-        if lock_cash is None:
-            lock_cash = portfolio_cfg["lock_cash"]
         if allow_partial is None:
             allow_partial = portfolio_cfg["allow_partial"]
         if raise_reject is None:
@@ -7741,9 +7785,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 min_size=min_size,
                 max_size=max_size,
                 size_granularity=size_granularity,
+                leverage=leverage,
+                leverage_mode=leverage_mode,
                 reject_prob=reject_prob,
                 price_area_vio_mode=price_area_vio_mode,
-                lock_cash=lock_cash,
                 allow_partial=allow_partial,
                 raise_reject=raise_reject,
                 log=log,
@@ -7765,9 +7810,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     min_size=dict(fill_value=np.nan),
                     max_size=dict(fill_value=np.nan),
                     size_granularity=dict(fill_value=np.nan),
+                    leverage=dict(fill_value=1.0),
+                    leverage_mode=dict(fill_value=LeverageMode.Lazy),
                     reject_prob=dict(fill_value=0.0),
                     price_area_vio_mode=dict(fill_value=PriceAreaVioMode.Ignore),
-                    lock_cash=dict(fill_value=False),
                     allow_partial=dict(fill_value=True),
                     raise_reject=dict(fill_value=False),
                     log=dict(fill_value=False),
@@ -7831,9 +7877,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             checks.assert_subdtype(price_area_vio_mode, np.integer, arg_name="price_area_vio_mode")
             return price_area_vio_mode
 
-        def _prepare_lock_cash(lock_cash):
-            checks.assert_subdtype(lock_cash, np.bool_, arg_name="lock_cash")
-            return lock_cash
+        def _prepare_leverage(leverage):
+            checks.assert_subdtype(leverage, np.number, arg_name="leverage")
+            return leverage
+
+        def _prepare_leverage_mode(leverage_mode):
+            leverage_mode = map_enum_fields(leverage_mode, LeverageMode)
+            checks.assert_subdtype(leverage_mode, np.integer, arg_name="leverage_mode")
+            return leverage_mode
 
         def _prepare_allow_partial(allow_partial):
             checks.assert_subdtype(allow_partial, np.bool_, arg_name="allow_partial")
@@ -7873,9 +7924,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             RepFunc(_prepare_min_size),
             RepFunc(_prepare_max_size),
             RepFunc(_prepare_size_granularity),
+            RepFunc(_prepare_leverage),
+            RepFunc(_prepare_leverage_mode),
             RepFunc(_prepare_reject_prob),
             RepFunc(_prepare_price_area_vio_mode),
-            RepFunc(_prepare_lock_cash),
             RepFunc(_prepare_allow_partial),
             RepFunc(_prepare_raise_reject),
             RepFunc(_prepare_log),

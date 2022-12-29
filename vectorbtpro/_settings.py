@@ -219,6 +219,8 @@ math = ChildDict(
     use_tol=True,
     rel_tol=1e-9,  # 1,000,000,000 == 1,000,000,001
     abs_tol=1e-12,  # 0.000000000001 == 0.000000000002
+    use_round=True,
+    decimals=12,  # 0.0000000000004 -> 0.0, # 0.0000000000006 -> 0.000000000001
 )
 """_"""
 
@@ -1270,6 +1272,7 @@ portfolio = ChildDict(
     call_post_segment=False,
     ffill_val_price=True,
     update_value=False,
+    fill_state=False,
     fill_returns=False,
     fill_pos_record=True,
     track_value=True,

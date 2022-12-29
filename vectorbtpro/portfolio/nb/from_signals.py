@@ -655,9 +655,10 @@ def is_stop_active_nb(stop_info: tp.Record) -> bool:
         min_size=base_ch.flex_array_gl_slicer,
         max_size=base_ch.flex_array_gl_slicer,
         size_granularity=base_ch.flex_array_gl_slicer,
+        leverage=base_ch.flex_array_gl_slicer,
+        leverage_mode=base_ch.flex_array_gl_slicer,
         reject_prob=base_ch.flex_array_gl_slicer,
         price_area_vio_mode=base_ch.flex_array_gl_slicer,
-        lock_cash=base_ch.flex_array_gl_slicer,
         allow_partial=base_ch.flex_array_gl_slicer,
         raise_reject=base_ch.flex_array_gl_slicer,
         log=base_ch.flex_array_gl_slicer,
@@ -694,6 +695,7 @@ def is_stop_active_nb(stop_info: tp.Record) -> bool:
         auto_call_seq=None,
         ffill_val_price=None,
         update_value=None,
+        fill_state=None,
         fill_returns=None,
         max_orders=None,
         max_logs=None,
@@ -729,9 +731,10 @@ def simulate_from_signals_nb(
     min_size: tp.FlexArray2dLike = np.nan,
     max_size: tp.FlexArray2dLike = np.nan,
     size_granularity: tp.FlexArray2dLike = np.nan,
+    leverage: tp.FlexArray2dLike = 1.0,
+    leverage_mode: tp.FlexArray2dLike = LeverageMode.Lazy,
     reject_prob: tp.FlexArray2dLike = 0.0,
     price_area_vio_mode: tp.FlexArray2dLike = PriceAreaVioMode.Ignore,
-    lock_cash: tp.FlexArray2dLike = False,
     allow_partial: tp.FlexArray2dLike = True,
     raise_reject: tp.FlexArray2dLike = False,
     log: tp.FlexArray2dLike = False,
@@ -768,6 +771,7 @@ def simulate_from_signals_nb(
     auto_call_seq: bool = False,
     ffill_val_price: bool = True,
     update_value: bool = False,
+    fill_state: bool = False,
     fill_returns: bool = False,
     max_orders: tp.Optional[int] = None,
     max_logs: tp.Optional[int] = 0,
@@ -807,9 +811,10 @@ def simulate_from_signals_nb(
     min_size_ = to_2d_array_nb(np.asarray(min_size))
     max_size_ = to_2d_array_nb(np.asarray(max_size))
     size_granularity_ = to_2d_array_nb(np.asarray(size_granularity))
+    leverage_ = to_2d_array_nb(np.asarray(leverage))
+    leverage_mode_ = to_2d_array_nb(np.asarray(leverage_mode))
     reject_prob_ = to_2d_array_nb(np.asarray(reject_prob))
     price_area_vio_mode_ = to_2d_array_nb(np.asarray(price_area_vio_mode))
-    lock_cash_ = to_2d_array_nb(np.asarray(lock_cash))
     allow_partial_ = to_2d_array_nb(np.asarray(allow_partial))
     raise_reject_ = to_2d_array_nb(np.asarray(raise_reject))
     log_ = to_2d_array_nb(np.asarray(log))
@@ -874,6 +879,8 @@ def simulate_from_signals_nb(
     last_cash_deposits = np.full_like(last_cash, 0.0)
     last_val_price = np.full_like(last_position, np.nan)
     last_debt = np.full(target_shape[1], 0.0, dtype=np.float_)
+    last_locked_cash = np.full(target_shape[1], 0.0, dtype=np.float_)
+    last_shorted_cash = np.full(target_shape[1], 0.0, dtype=np.float_)
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
@@ -887,11 +894,33 @@ def simulate_from_signals_nb(
         cash_earnings_out = np.full(target_shape, 0.0, dtype=np.float_)
     else:
         cash_earnings_out = np.full((1, 1), 0.0, dtype=np.float_)
-    if fill_returns:
-        returns_out = np.empty((target_shape[0], len(group_lens)), dtype=np.float_)
+    if fill_state:
+        cash = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
+        position = np.full(target_shape, np.nan, dtype=np.float_)
+        debt = np.full(target_shape, np.nan, dtype=np.float_)
+        locked_cash = np.full(target_shape, np.nan, dtype=np.float_)
+        shorted_cash = np.full(target_shape, np.nan, dtype=np.float_)
+        free_cash = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
     else:
-        returns_out = np.empty((0, 0), dtype=np.float_)
-    in_outputs = FSInOutputs(returns=returns_out)
+        cash = np.full((0, 0), np.nan, dtype=np.float_)
+        position = np.full((0, 0), np.nan, dtype=np.float_)
+        debt = np.full((0, 0), np.nan, dtype=np.float_)
+        locked_cash = np.full((0, 0), np.nan, dtype=np.float_)
+        shorted_cash = np.full((0, 0), np.nan, dtype=np.float_)
+        free_cash = np.full((0, 0), np.nan, dtype=np.float_)
+    if fill_returns:
+        returns = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
+    else:
+        returns = np.full((0, 0), np.nan, dtype=np.float_)
+    in_outputs = FOInOutputs(
+        cash=cash,
+        position=position,
+        debt=debt,
+        locked_cash=locked_cash,
+        shorted_cash=shorted_cash,
+        free_cash=free_cash,
+        returns=returns,
+    )
 
     last_limit_info = np.empty(target_shape[1], dtype=limit_info_dt)
     last_limit_info["signal_idx"][:] = -1
@@ -1823,6 +1852,8 @@ def simulate_from_signals_nb(
                                 cash=last_cash[group] if cash_sharing else last_cash[col],
                                 position=last_position[col],
                                 debt=last_debt[col],
+                                locked_cash=last_locked_cash[col],
+                                shorted_cash=last_shorted_cash[col],
                                 free_cash=last_free_cash[group] if cash_sharing else last_free_cash[col],
                                 val_price=last_val_price[col],
                                 value=last_value[group] if cash_sharing else last_value[col],
@@ -1860,6 +1891,8 @@ def simulate_from_signals_nb(
                     # Get current values per column
                     position_now = last_position[col]
                     debt_now = last_debt[col]
+                    locked_cash_now = last_locked_cash[col]
+                    shorted_cash_now = last_shorted_cash[col]
                     val_price_now = last_val_price[col]
                     cash_now = last_cash[group]
                     free_cash_now = last_free_cash[group]
@@ -1883,9 +1916,10 @@ def simulate_from_signals_nb(
                         min_size=flex_select_nb(min_size_, _i, col),
                         max_size=flex_select_nb(max_size_, _i, col),
                         size_granularity=flex_select_nb(size_granularity_, _i, col),
+                        leverage=flex_select_nb(leverage_, _i, col),
+                        leverage_mode=flex_select_nb(leverage_mode_, _i, col),
                         reject_prob=flex_select_nb(reject_prob_, _i, col),
                         price_area_vio_mode=flex_select_nb(price_area_vio_mode_, _i, col),
-                        lock_cash=flex_select_nb(lock_cash_, _i, col),
                         allow_partial=flex_select_nb(allow_partial_, _i, col),
                         raise_reject=flex_select_nb(raise_reject_, _i, col),
                         log=flex_select_nb(log_, _i, col),
@@ -1902,6 +1936,8 @@ def simulate_from_signals_nb(
                         cash=cash_now,
                         position=position_now,
                         debt=debt_now,
+                        locked_cash=locked_cash_now,
+                        shorted_cash=shorted_cash_now,
                         free_cash=free_cash_now,
                         val_price=val_price_now,
                         value=value_now,
@@ -1932,6 +1968,8 @@ def simulate_from_signals_nb(
                     cash_now = new_exec_state.cash
                     position_now = new_exec_state.position
                     debt_now = new_exec_state.debt
+                    locked_cash_now = new_exec_state.locked_cash
+                    shorted_cash_now = new_exec_state.shorted_cash
                     free_cash_now = new_exec_state.free_cash
                     val_price_now = new_exec_state.val_price
                     value_now = new_exec_state.value
@@ -2112,6 +2150,8 @@ def simulate_from_signals_nb(
                     # Now becomes last
                     last_position[col] = position_now
                     last_debt[col] = debt_now
+                    last_locked_cash[col] = locked_cash_now
+                    last_shorted_cash[col] = shorted_cash_now
                     if not np.isnan(val_price_now) or not ffill_val_price:
                         last_val_price[col] = val_price_now
                     last_cash[group] = cash_now
@@ -2134,6 +2174,13 @@ def simulate_from_signals_nb(
                 last_free_cash[group] += _cash_earnings
                 if track_cash_earnings:
                     cash_earnings_out[i, col] += _cash_earnings
+                if fill_state:
+                    position[i, col] = last_position[col]
+                    debt[i, col] = last_debt[col]
+                    locked_cash[i, col] = last_locked_cash[col]
+                    shorted_cash[i, col] = last_shorted_cash[col]
+                    cash[i, group] = last_cash[group]
+                    free_cash[i, group] = last_free_cash[group]
 
             # Update value and return
             group_value = last_cash[group]
@@ -2381,9 +2428,10 @@ PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
         min_size=base_ch.flex_array_gl_slicer,
         max_size=base_ch.flex_array_gl_slicer,
         size_granularity=base_ch.flex_array_gl_slicer,
+        leverage=base_ch.flex_array_gl_slicer,
+        leverage_mode=base_ch.flex_array_gl_slicer,
         reject_prob=base_ch.flex_array_gl_slicer,
         price_area_vio_mode=base_ch.flex_array_gl_slicer,
-        lock_cash=base_ch.flex_array_gl_slicer,
         allow_partial=base_ch.flex_array_gl_slicer,
         raise_reject=base_ch.flex_array_gl_slicer,
         log=base_ch.flex_array_gl_slicer,
@@ -2456,9 +2504,10 @@ def simulate_from_signal_func_nb(
     min_size: tp.FlexArray2dLike = np.nan,
     max_size: tp.FlexArray2dLike = np.nan,
     size_granularity: tp.FlexArray2dLike = np.nan,
+    leverage: tp.FlexArray2dLike = 1.0,
+    leverage_mode: tp.FlexArray2dLike = LeverageMode.Lazy,
     reject_prob: tp.FlexArray2dLike = 0.0,
     price_area_vio_mode: tp.FlexArray2dLike = PriceAreaVioMode.Ignore,
-    lock_cash: tp.FlexArray2dLike = False,
     allow_partial: tp.FlexArray2dLike = True,
     raise_reject: tp.FlexArray2dLike = False,
     log: tp.FlexArray2dLike = False,
@@ -2537,9 +2586,10 @@ def simulate_from_signal_func_nb(
     min_size_ = to_2d_array_nb(np.asarray(min_size))
     max_size_ = to_2d_array_nb(np.asarray(max_size))
     size_granularity_ = to_2d_array_nb(np.asarray(size_granularity))
+    leverage_ = to_2d_array_nb(np.asarray(leverage))
+    leverage_mode_ = to_2d_array_nb(np.asarray(leverage_mode))
     reject_prob_ = to_2d_array_nb(np.asarray(reject_prob))
     price_area_vio_mode_ = to_2d_array_nb(np.asarray(price_area_vio_mode))
-    lock_cash_ = to_2d_array_nb(np.asarray(lock_cash))
     allow_partial_ = to_2d_array_nb(np.asarray(allow_partial))
     raise_reject_ = to_2d_array_nb(np.asarray(raise_reject))
     log_ = to_2d_array_nb(np.asarray(log))
@@ -2604,6 +2654,8 @@ def simulate_from_signal_func_nb(
     last_cash_deposits = np.full_like(last_cash, 0.0)
     last_val_price = np.full_like(last_position, np.nan)
     last_debt = np.full(target_shape[1], 0.0, dtype=np.float_)
+    last_locked_cash = np.full(target_shape[1], 0.0, dtype=np.float_)
+    last_shorted_cash = np.full(target_shape[1], 0.0, dtype=np.float_)
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
@@ -2769,6 +2821,8 @@ def simulate_from_signal_func_nb(
                     last_cash=last_cash,
                     last_position=last_position,
                     last_debt=last_debt,
+                    last_locked_cash=last_locked_cash,
+                    last_shorted_cash=last_shorted_cash,
                     last_free_cash=last_free_cash,
                     last_val_price=last_val_price,
                     last_value=last_value,
@@ -3669,6 +3723,8 @@ def simulate_from_signal_func_nb(
                                 cash=last_cash[group] if cash_sharing else last_cash[col],
                                 position=last_position[col],
                                 debt=last_debt[col],
+                                locked_cash=last_locked_cash[col],
+                                shorted_cash=last_shorted_cash[col],
                                 free_cash=last_free_cash[group] if cash_sharing else last_free_cash[col],
                                 val_price=last_val_price[col],
                                 value=last_value[group] if cash_sharing else last_value[col],
@@ -3706,6 +3762,8 @@ def simulate_from_signal_func_nb(
                     # Get current values per column
                     position_now = last_position[col]
                     debt_now = last_debt[col]
+                    locked_cash_now = last_locked_cash[col]
+                    shorted_cash_now = last_shorted_cash[col]
                     val_price_now = last_val_price[col]
                     cash_now = last_cash[group] if cash_sharing else last_cash[col]
                     free_cash_now = last_free_cash[group] if cash_sharing else last_free_cash[col]
@@ -3729,9 +3787,10 @@ def simulate_from_signal_func_nb(
                         min_size=flex_select_nb(min_size_, _i, col),
                         max_size=flex_select_nb(max_size_, _i, col),
                         size_granularity=flex_select_nb(size_granularity_, _i, col),
+                        leverage=flex_select_nb(leverage_, _i, col),
+                        leverage_mode=flex_select_nb(leverage_mode_, _i, col),
                         reject_prob=flex_select_nb(reject_prob_, _i, col),
                         price_area_vio_mode=flex_select_nb(price_area_vio_mode_, _i, col),
-                        lock_cash=flex_select_nb(lock_cash_, _i, col),
                         allow_partial=flex_select_nb(allow_partial_, _i, col),
                         raise_reject=flex_select_nb(raise_reject_, _i, col),
                         log=flex_select_nb(log_, _i, col),
@@ -3748,6 +3807,8 @@ def simulate_from_signal_func_nb(
                         cash=cash_now,
                         position=position_now,
                         debt=debt_now,
+                        locked_cash=locked_cash_now,
+                        shorted_cash=shorted_cash_now,
                         free_cash=free_cash_now,
                         val_price=val_price_now,
                         value=value_now,
@@ -3778,6 +3839,8 @@ def simulate_from_signal_func_nb(
                     cash_now = new_exec_state.cash
                     position_now = new_exec_state.position
                     debt_now = new_exec_state.debt
+                    locked_cash_now = new_exec_state.locked_cash
+                    shorted_cash_now = new_exec_state.shorted_cash
                     free_cash_now = new_exec_state.free_cash
                     val_price_now = new_exec_state.val_price
                     value_now = new_exec_state.value
@@ -3958,6 +4021,8 @@ def simulate_from_signal_func_nb(
                     # Now becomes last
                     last_position[col] = position_now
                     last_debt[col] = debt_now
+                    last_locked_cash[col] = locked_cash_now
+                    last_shorted_cash[col] = shorted_cash_now
                     if not np.isnan(val_price_now) or not ffill_val_price:
                         last_val_price[col] = val_price_now
                     if cash_sharing:
@@ -4042,6 +4107,8 @@ def simulate_from_signal_func_nb(
                 last_cash=last_cash,
                 last_position=last_position,
                 last_debt=last_debt,
+                last_locked_cash=last_locked_cash,
+                last_shorted_cash=last_shorted_cash,
                 last_free_cash=last_free_cash,
                 last_val_price=last_val_price,
                 last_value=last_value,
