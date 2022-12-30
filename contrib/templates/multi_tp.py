@@ -14,6 +14,7 @@ pf = multi_tp_from_signals(
     long_entries=entries,
     long_exits=exits
 )
+pf.plot()
 ```
 """
 

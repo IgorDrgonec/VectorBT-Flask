@@ -1748,7 +1748,7 @@ class IndicatorFactory(Configured):
         require_input_shape: bool = False,
         param_settings: tp.KwargsLike = None,
         in_output_settings: tp.KwargsLike = None,
-        hide_params: tp.Optional[tp.Sequence[str]] = None,
+        hide_params: tp.Union[None, bool, tp.Sequence[str]] = None,
         hide_default: bool = True,
         var_args: bool = False,
         keyword_only_args: bool = False,
@@ -1783,7 +1783,8 @@ class IndicatorFactory(Configured):
                 See `run_pipeline` for keys.
 
                 Can be overwritten by any run method.
-            hide_params (list of str): Parameter names to hide column levels for.
+            hide_params (bool or list of str): Parameter names to hide column levels for,
+                or whether to hide all parameters.
 
                 Can be overwritten by any run method.
             hide_default (bool): Whether to hide column levels of parameters with default value.
@@ -2069,7 +2070,7 @@ class IndicatorFactory(Configured):
         run_docstring = """Run `{0}` indicator.
 {1}
 
-Pass a list of parameter names as `hide_params` to hide their column levels.
+Pass a list of parameter names as `hide_params` to hide their column levels, or True to hide all.
 Set `hide_default` to False to show the column levels of the parameters with a default value.
 
 Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.""".format(
@@ -2739,7 +2740,7 @@ Other keyword arguments are passed to `{0}.run`.
                 * Parameters: `timeperiod`
                 * Outputs: `real`
 
-                Pass a list of parameter names as `hide_params` to hide their column levels.
+                Pass a list of parameter names as `hide_params` to hide their column levels, or True to hide all.
                 Set `hide_default` to False to show the column levels of the parameters with a default value.
 
                 Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
@@ -3194,7 +3195,7 @@ Args:
                 * Parameters: `length`, `talib`, `offset`
                 * Outputs: `sma`
 
-                Pass a list of parameter names as `hide_params` to hide their column levels.
+                Pass a list of parameter names as `hide_params` to hide their column levels, or True to hide all.
                 Set `hide_default` to False to show the column levels of the parameters with a default value.
 
                 Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
@@ -3411,7 +3412,7 @@ Args:
                 * Parameters: `window`, `fillna`
                 * Outputs: `sma_indicator`
 
-                Pass a list of parameter names as `hide_params` to hide their column levels.
+                Pass a list of parameter names as `hide_params` to hide their column levels, or True to hide all.
                 Set `hide_default` to False to show the column levels of the parameters with a default value.
 
                 Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
@@ -3658,7 +3659,7 @@ Args:
                 * Parameters: `window`, `min_periods`
                 * Outputs: `rolling_mean`
 
-                Pass a list of parameter names as `hide_params` to hide their column levels.
+                Pass a list of parameter names as `hide_params` to hide their column levels, or True to hide all.
                 Set `hide_default` to False to show the column levels of the parameters with a default value.
 
                 Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
@@ -4528,7 +4529,7 @@ Args:
                 * Inputs: `close`
                 * Outputs: `out`
 
-                Pass a list of parameter names as `hide_params` to hide their column levels.
+                Pass a list of parameter names as `hide_params` to hide their column levels, or True to hide all.
                 Set `hide_default` to False to show the column levels of the parameters with a default value.
 
                 Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.

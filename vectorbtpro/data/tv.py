@@ -193,7 +193,8 @@ class TVClient:
         extended_session: bool = False,
         pro_data: bool = True,
         limit: int = 20000,
-    ) -> pd.DataFrame:
+        return_raw: bool = False,
+    ) -> tp.Union[str, tp.Frame]:
         """Get historical data."""
         symbol = self.format_symbol(symbol=symbol, exchange=exchange, fut_contract=fut_contract)
         interval = interval.value
@@ -257,6 +258,8 @@ class TVClient:
                 break
             if "series_completed" in result:
                 break
+        if return_raw:
+            return raw_data
         return self.convert_raw_data(raw_data, symbol)
 
     @staticmethod
