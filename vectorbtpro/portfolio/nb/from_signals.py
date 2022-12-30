@@ -268,15 +268,16 @@ def signal_to_size_nb(
                 order_size = -size
             else:
                 # Reverse the position
-                order_size = -abs_position_now
                 if not np.isnan(size):
                     if size_type == SizeType.Percent:
-                        raise ValueError("SizeType.Percent does not support position reversal")
-                    if size_type == SizeType.Value:
-                        order_size -= size / val_price_now
+                        order_size = -size
                     else:
-                        order_size -= size
-                size_type = SizeType.Amount
+                        order_size = -abs_position_now
+                        if size_type == SizeType.Value:
+                            order_size -= size / val_price_now
+                        else:
+                            order_size -= size
+                        size_type = SizeType.Amount
         elif is_long_exit:
             direction = Direction.LongOnly
             if accumulate == AccumulationMode.Both or accumulate == AccumulationMode.RemoveOnly:
@@ -299,15 +300,16 @@ def signal_to_size_nb(
                 order_size = size
             else:
                 # Reverse the position
-                order_size = abs_position_now
                 if not np.isnan(size):
                     if size_type == SizeType.Percent:
-                        raise ValueError("SizeType.Percent does not support position reversal")
-                    if size_type == SizeType.Value:
-                        order_size += size / val_price_now
+                        order_size = size
                     else:
-                        order_size += size
-                size_type = SizeType.Amount
+                        order_size = abs_position_now
+                        if size_type == SizeType.Value:
+                            order_size += size / val_price_now
+                        else:
+                            order_size += size
+                        size_type = SizeType.Amount
         elif is_short_exit:
             direction = Direction.ShortOnly
             if accumulate == AccumulationMode.Both or accumulate == AccumulationMode.RemoveOnly:

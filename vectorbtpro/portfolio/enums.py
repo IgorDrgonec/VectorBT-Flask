@@ -555,15 +555,11 @@ Attributes:
     Percent: Percentage of available resources to use in either direction (not to be confused with 
         the percentage of position value!) where 0.01 means 1%
     
-        * When long buying, it's a percentage of the leveraged `ExecState.free_cash`
-        * When long selling, it's a percentage of `ExecState.position`
-        * When short selling, it's a percentage of the leveraged `ExecState.free_cash`
-        * When short buying, it's a percentage of `ExecState.free_cash` and `ExecState.shorted_cash`
-        * When reversing, it's a percentage of the maximum from the operations above
-        
-        !!! note
-            Takes into account fees and slippage to find the limit.
-            In reality, slippage and fees are not known beforehand.
+        * When long buying, the percentage of `ExecState.free_cash`
+        * When long selling, the percentage of `ExecState.position`
+        * When short selling, the percentage of `ExecState.free_cash`
+        * When short buying, the percentage of `ExecState.free_cash` and `ExecState.shorted_cash`
+        * When reversing, the percentage is getting applied on the final position
     Percent100: `SizeType.Percent` where 1.0 means 1%.
     ValuePercent: Percentage of total value.
     

@@ -342,8 +342,16 @@ class TestFromSignals:
         )
 
     def test_percent(self):
-        with pytest.raises(Exception):
-            from_signals_both(size=0.5, size_type="percent")
+        assert_records_close(
+            from_signals_both(size=0.5, size_type="percent").order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 0, 50.0, 1.0, 0.0, 0, 0, -1),
+                    (1, 0, 3, 3, 3, 81.25, 4.0, 0.0, 1, 0, -1),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
         assert_records_close(
             from_signals_both(size=0.5, size_type="percent", upon_opposite_entry="close").order_records,
             np.array(
