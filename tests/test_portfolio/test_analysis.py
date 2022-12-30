@@ -1688,7 +1688,7 @@ class TestPortfolio:
             low=pf_grouped.low.values,
             close=pf_grouped.close.values,
             cash_flow=pf_grouped.cash_flow.values,
-            cash=pf_grouped.cash.values,
+            cash_pg=pf_grouped.cash.values,
             bm_returns=pf_grouped.bm_returns.values,
             orders=pf_grouped.orders.values,
             logs=pf_grouped.logs.values,

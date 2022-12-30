@@ -95,7 +95,10 @@ def cum_returns_1d_nb(rets: tp.Array1d, start_value: float = 0.0, log_returns: b
         cumsum = 0
         for i in range(rets.shape[0]):
             if not np.isnan(rets[i]):
-                cumsum += rets[i]
+                if cumsum < 0:
+                    cumsum -= rets[i]
+                else:
+                    cumsum += rets[i]
             if start_value == 0:
                 out[i] = cumsum
             else:
@@ -104,7 +107,10 @@ def cum_returns_1d_nb(rets: tp.Array1d, start_value: float = 0.0, log_returns: b
         cumprod = 1
         for i in range(rets.shape[0]):
             if not np.isnan(rets[i]):
-                cumprod *= rets[i] + 1
+                if cumprod < 0:
+                    cumprod *= 1 - rets[i]
+                else:
+                    cumprod *= 1 + rets[i]
             if start_value == 0:
                 out[i] = cumprod - 1
             else:
