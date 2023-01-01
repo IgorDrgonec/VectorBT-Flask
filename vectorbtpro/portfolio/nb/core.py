@@ -67,12 +67,12 @@ def long_buy_nb(
 ) -> tp.Tuple[AccountState, OrderResult]:
     """Open or increase a long position."""
     # Get cash limit
-    cash_limit = account_state.free_cash * leverage
-    if cash_limit <= 0:
-        return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoCash)
-
+    cash_limit = account_state.free_cash
     if not np.isnan(percent):
         cash_limit = cash_limit * percent
+    if cash_limit <= 0:
+        return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoCash)
+    cash_limit = cash_limit * leverage
 
     # Adjust for max size
     if not np.isnan(max_size) and size > max_size:
@@ -142,7 +142,7 @@ def long_buy_nb(
     new_cash = add_nb(account_state.cash, -req_cash)
     new_position = add_nb(account_state.position, final_size)
     if leverage_mode == LeverageMode.Lazy:
-        debt_diff = max(add_nb(req_cash, -account_state.free_cash), 0)
+        debt_diff = max(add_nb(req_cash, -account_state.free_cash), 0.0)
         if debt_diff > 0:
             new_debt = account_state.debt + debt_diff
             new_locked_cash = account_state.locked_cash + account_state.free_cash
@@ -311,11 +311,12 @@ def short_sell_nb(
 ) -> tp.Tuple[AccountState, OrderResult]:
     """Open or increase a short position."""
     # Get cash limit
-    cash_limit = account_state.free_cash * leverage
+    cash_limit = account_state.free_cash
     if not np.isnan(percent):
         cash_limit = cash_limit * percent
     if cash_limit <= 0:
         return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoCash)
+    cash_limit = cash_limit * leverage
 
     # Get price adjusted with slippage
     adj_price = price * (1 - slippage)
@@ -424,7 +425,7 @@ def short_buy_nb(
         return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoOpenPosition)
 
     # Get cash limit
-    cash_limit = max(account_state.free_cash, 0) + account_state.shorted_cash
+    cash_limit = account_state.free_cash + account_state.shorted_cash
     if cash_limit <= 0:
         return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoCash)
 
@@ -504,14 +505,15 @@ def short_buy_nb(
         new_shorted_cash = 0.0
         new_free_cash = add_nb(account_state.free_cash, -req_cash)
     else:
-        avg_entry_price = account_state.debt / abs(account_state.position)
-        entry_value = final_size * avg_entry_price
-        avg_lev = account_state.debt / account_state.locked_cash
-        new_debt = add_nb(account_state.debt, -entry_value)
-        new_locked_cash = account_state.locked_cash * new_debt / account_state.debt
-        free_cash_diff = add_nb(entry_value * (avg_lev + 1) / avg_lev, -req_cash)
-        new_shorted_cash = max(add_nb(account_state.shorted_cash, -req_cash - max(free_cash_diff, 0)), 0)
-        new_free_cash = add_nb(account_state.free_cash, free_cash_diff)
+        size_fraction = final_size / abs(account_state.position)
+        new_pos_fraction = abs(new_position) / abs(account_state.position)
+        released_debt = size_fraction * account_state.debt
+        released_cash = size_fraction * account_state.locked_cash
+        new_debt = new_pos_fraction * account_state.debt
+        new_locked_cash = new_pos_fraction * account_state.locked_cash
+        pnl = released_debt - req_cash
+        new_shorted_cash = add_nb(account_state.shorted_cash, -released_debt - released_cash)
+        new_free_cash = add_nb(account_state.free_cash, released_cash + pnl)
     new_account_state = AccountState(
         cash=new_cash,
         position=new_position,
@@ -620,11 +622,11 @@ def buy_nb(
     if new_size <= 0:
         return new_account_state1, new_order_result1
     if not np.isnan(min_size):
-        min_size2 = max(min_size - abs(account_state.position), 0)
+        min_size2 = max(min_size - abs(account_state.position), 0.0)
     else:
         min_size2 = np.nan
     if not np.isnan(max_size):
-        max_size2 = max(max_size - abs(account_state.position), 0)
+        max_size2 = max(max_size - abs(account_state.position), 0.0)
     else:
         max_size2 = np.nan
     new_account_state2, new_order_result2 = long_buy_nb(
@@ -746,11 +748,11 @@ def sell_nb(
     if new_size <= 0:
         return new_account_state1, new_order_result1
     if not np.isnan(min_size):
-        min_size2 = max(min_size - account_state.position, 0)
+        min_size2 = max(min_size - account_state.position, 0.0)
     else:
         min_size2 = np.nan
     if not np.isnan(max_size):
-        max_size2 = max(max_size - account_state.position, 0)
+        max_size2 = max(max_size - account_state.position, 0.0)
     else:
         max_size2 = np.nan
     new_account_state2, new_order_result2 = short_sell_nb(
@@ -1440,7 +1442,7 @@ def approx_order_value_nb(
         size /= 100
         size_type = SizeType.ValuePercent
     if size_type == SizeType.ValuePercent:
-        return size * max(exec_state.value, 0)
+        return size * max(exec_state.value, 0.0)
     if size_type == SizeType.TargetAmount:
         return size * exec_state.val_price - asset_value_now
     if size_type == SizeType.TargetValue:
@@ -1449,25 +1451,25 @@ def approx_order_value_nb(
         size /= 100
         size_type = SizeType.TargetPercent
     if size_type == SizeType.TargetPercent:
-        return size * max(exec_state.value, 0) - asset_value_now
+        return size * max(exec_state.value, 0.0) - asset_value_now
     if size_type == SizeType.Percent100:
         size /= 100
         size_type = SizeType.Percent
     if size_type == SizeType.Percent:
         if size >= 0:
             if exec_state.position <= 0 and direction == Direction.ShortOnly:
-                return size * (max(exec_state.free_cash, 0) + exec_state.shorted_cash)
+                return size * (exec_state.free_cash + exec_state.shorted_cash)
             elif exec_state.position < 0:
-                return 2 * size * (max(exec_state.free_cash, 0) + exec_state.shorted_cash)
+                return 2 * size * (exec_state.free_cash + exec_state.shorted_cash)
             else:
-                return size * max(exec_state.free_cash, 0)
+                return size * exec_state.free_cash
         else:
             if exec_state.position >= 0 and direction == Direction.LongOnly:
                 return size * asset_value_now
             elif exec_state.position > 0:
                 return 2 * size * asset_value_now
             else:
-                return size * max(exec_state.free_cash, 0)
+                return size * exec_state.free_cash
     return np.nan
 
 

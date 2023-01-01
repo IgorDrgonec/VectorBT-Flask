@@ -8756,7 +8756,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         because an operation always costs money.
 
         !!! note
-            Does not include cash deposits, but includes earnings."""
+            Does not include cash deposits, but includes earnings.
+
+        !!! warning
+            Using `free` yields the same result as during the simulation only when there's no leverage
+            and the initial margin requirement is 50%, that is, when `leverage=1`. For anything else,
+            prefill the state instead of reconstructing it!"""
         if not isinstance(cls_or_self, type):
             if orders is None:
                 orders = cls_or_self.orders

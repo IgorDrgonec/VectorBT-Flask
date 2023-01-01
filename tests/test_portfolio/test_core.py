@@ -2496,7 +2496,7 @@ def test_calculations():
         position=-4.0,
         debt=40.0,
         locked_cash=40.0,
-        shorted_cash=0.0,
+        shorted_cash=30.0,
         free_cash=-30.0,
         val_price=10.0,
         value=100.0,

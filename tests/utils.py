@@ -35,7 +35,10 @@ def assert_frame_equal(x, y):
 
 def assert_records_close(x, y):
     for field in x.dtype.names:
-        np.testing.assert_allclose(x[field], y[field], rtol=1e-06, atol=0)
+        try:
+            np.testing.assert_allclose(x[field], y[field], rtol=1e-06, atol=0)
+        except AssertionError as e:
+            raise Exception(field) from e
 
 
 def chunk_meta_equal(x, y):

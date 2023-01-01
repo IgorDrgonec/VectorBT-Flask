@@ -1104,7 +1104,7 @@ class TestFromOrders:
         )
         np.testing.assert_array_equal(
             pf.asset_flow.values,
-            np.array([[-25.0, -25.0], [0.946034702480149, 0.47544358396235664]]),
+            np.array([[-25.0, -25.0], [0.946034702480149, 0.008559442318505028]]),
         )
         pf = from_orders_both(size=order_size_one * 1000)
         assert_records_close(
