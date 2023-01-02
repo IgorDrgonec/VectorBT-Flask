@@ -262,3 +262,14 @@ def format_func(func: tp.Callable, incl_doc: bool = True, **kwargs) -> str:
         func_name,
         format_signature(inspect.signature(func), **kwargs),
     )
+
+
+def pprint(*args, **kwargs) -> None:
+    """Print the output of `prettify`."""
+    print(prettify(*args, **kwargs))
+
+
+def phelp(*args, **kwargs) -> None:
+    """Print the output of `format_func`."""
+    print(format_func(*args, **kwargs))
+

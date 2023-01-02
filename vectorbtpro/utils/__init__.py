@@ -46,7 +46,7 @@ from vectorbtpro.utils.decorators import (
     cached_method,
 )
 from vectorbtpro.utils.execution import SequenceEngine, ThreadPoolEngine, DaskEngine, RayEngine, execute
-from vectorbtpro.utils.formatting import prettify, format_func
+from vectorbtpro.utils.formatting import prettify, format_func, pprint, phelp
 from vectorbtpro.utils.image_ import save_animation
 from vectorbtpro.utils.jitting import jitted
 from vectorbtpro.utils.params import generate_param_combs, Param, parameterized
