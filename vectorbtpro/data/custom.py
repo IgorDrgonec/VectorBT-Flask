@@ -1478,15 +1478,20 @@ class CCXTData(RemoteData):
         fetch_func: tp.Callable,
         start: tp.DatetimeLike = 0,
         end: tp.DatetimeLike = "now UTC",
-    ) -> tp.Optional[pd.Timestamp]:
+        for_internal_use: bool = False,
+    ) -> tp.Union[None, int, pd.Timestamp]:
         """Find the earliest date using binary search."""
         if start is not None:
             start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
             fetched_data = fetch_func(start_ts, 1)
+            if for_internal_use and len(fetched_data) > 0:
+                return start_ts
         else:
             fetched_data = []
         if len(fetched_data) == 0 and start != 0:
             fetched_data = fetch_func(0, 1)
+            if for_internal_use and len(fetched_data) > 0:
+                return 0
         if len(fetched_data) == 0:
             if start is not None:
                 start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
@@ -1516,11 +1521,14 @@ class CCXTData(RemoteData):
         return None
 
     @classmethod
-    def find_earliest_date(cls, symbol: str, **kwargs) -> tp.Optional[pd.Timestamp]:
+    def find_earliest_date(cls, symbol: str, for_internal_use: bool = False, **kwargs) -> tp.Optional[pd.Timestamp]:
         """Find the earliest date using binary search.
 
         See `CCXTData.fetch_symbol` for arguments."""
-        return cls._find_earliest_date(*cls.fetch_symbol(symbol, return_fetch_method=True, **kwargs))
+        return cls._find_earliest_date(
+            *cls.fetch_symbol(symbol, return_fetch_method=True, **kwargs),
+            for_internal_use=for_internal_use,
+        )
 
     @classmethod
     def fetch_symbol(
@@ -1670,7 +1678,7 @@ class CCXTData(RemoteData):
 
         # Establish the timestamps
         if find_earliest_date and start is not None:
-            start = cls._find_earliest_date(_fetch, start, end)
+            start = cls._find_earliest_date(_fetch, start, end, for_internal_use=True)
         if start is not None:
             start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
         else:
