@@ -44,7 +44,6 @@ def test_invalid_state():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -58,7 +57,6 @@ def test_invalid_state():
                 position=np.inf,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -72,7 +70,6 @@ def test_invalid_state():
                 position=np.nan,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -86,7 +83,6 @@ def test_invalid_state():
                 position=100.0,
                 debt=np.nan,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -100,7 +96,6 @@ def test_invalid_state():
                 position=100.0,
                 debt=-10.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -114,7 +109,6 @@ def test_invalid_state():
                 position=100.0,
                 debt=0.0,
                 locked_cash=np.nan,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -128,7 +122,6 @@ def test_invalid_state():
                 position=100.0,
                 debt=0.0,
                 locked_cash=-10.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -142,35 +135,6 @@ def test_invalid_state():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=np.nan,
-                free_cash=100.0,
-                val_price=10.0,
-                value=1100.0,
-            ),
-            nb.order_nb(10, 10),
-        )
-    with pytest.raises(Exception):
-        nb.execute_order_nb(
-            ExecState(
-                cash=100.0,
-                position=100.0,
-                debt=0.0,
-                locked_cash=0.0,
-                shorted_cash=-10.0,
-                free_cash=100.0,
-                val_price=10.0,
-                value=1100.0,
-            ),
-            nb.order_nb(10, 10),
-        )
-    with pytest.raises(Exception):
-        nb.execute_order_nb(
-            ExecState(
-                cash=100.0,
-                position=100.0,
-                debt=0.0,
-                locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=np.nan,
                 val_price=10.0,
                 value=1100.0,
@@ -187,7 +151,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -201,7 +164,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -215,7 +177,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -229,7 +190,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -243,7 +203,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -257,7 +216,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -271,7 +229,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -285,7 +242,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -299,7 +255,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -313,7 +268,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -327,7 +281,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -341,7 +294,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -355,7 +307,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -369,7 +320,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -383,7 +333,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -397,7 +346,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -411,7 +359,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -425,7 +372,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -439,7 +385,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -453,7 +398,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -467,7 +411,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -481,7 +424,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -495,7 +437,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -509,7 +450,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
@@ -523,20 +463,18 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=1100.0,
             ),
             nb.order_nb(10, 10, reject_prob=2),
         )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=100.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=np.nan,
@@ -551,7 +489,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=10.0,
                 value=np.nan,
@@ -569,13 +506,12 @@ def test_invalid_order():
             status_info=3,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=100.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=-10.0,
@@ -587,7 +523,6 @@ def test_invalid_order():
         position=100.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=100.0,
         val_price=10.0,
         value=-10.0,
@@ -610,7 +545,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=np.inf,
                 value=1100.0,
@@ -624,20 +558,18 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=-10.0,
                 value=1100,
             ),
             nb.order_nb(10, 10, size_type=SizeType.Value),
         )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=100.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=np.nan,
             value=1100.0,
@@ -652,7 +584,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=np.nan,
                 value=1100.0,
@@ -666,7 +597,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=np.inf,
                 value=1100.0,
@@ -680,20 +610,18 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=-10.0,
                 value=1100,
             ),
             nb.order_nb(10, 10, size_type=SizeType.TargetValue),
         )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=100.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=np.nan,
             value=1100.0,
@@ -708,7 +636,6 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=100.0,
                 val_price=np.nan,
                 value=1100.0,
@@ -726,13 +653,12 @@ def test_invalid_order():
             status_info=2,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=-10.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=1100.0,
@@ -744,7 +670,6 @@ def test_invalid_order():
         position=-20.0,
         debt=100.0,
         locked_cash=100.0,
-        shorted_cash=200.0,
         free_cash=0.0,
         val_price=10.0,
         value=1100.0,
@@ -760,13 +685,12 @@ def test_invalid_order():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=-10.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=1100.0,
@@ -778,7 +702,6 @@ def test_invalid_order():
         position=-20.0,
         debt=100.0,
         locked_cash=100.0,
-        shorted_cash=200.0,
         free_cash=0.0,
         val_price=10.0,
         value=1100.0,
@@ -794,13 +717,12 @@ def test_invalid_order():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=10.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=1100.0,
@@ -812,7 +734,6 @@ def test_invalid_order():
         position=10.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=100.0,
         val_price=10.0,
         value=1100.0,
@@ -828,13 +749,12 @@ def test_invalid_order():
             status_info=5,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=100.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=1100.0,
@@ -846,7 +766,6 @@ def test_invalid_order():
         position=100.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=100.0,
         val_price=10.0,
         value=1100.0,
@@ -862,13 +781,12 @@ def test_invalid_order():
             status_info=8,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=100.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=1100.0,
@@ -880,7 +798,6 @@ def test_invalid_order():
         position=100.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=100.0,
         val_price=10.0,
         value=1100.0,
@@ -896,13 +813,12 @@ def test_invalid_order():
             status_info=9,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=0.0,
             position=100.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=0.0,
             val_price=10.0,
             value=1100.0,
@@ -914,7 +830,6 @@ def test_invalid_order():
         position=100.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=0.0,
         val_price=10.0,
         value=1100.0,
@@ -930,13 +845,12 @@ def test_invalid_order():
             status_info=6,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=0.0,
             position=100.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=0.0,
             val_price=10.0,
             value=1100.0,
@@ -948,7 +862,6 @@ def test_invalid_order():
         position=100.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=0.0,
         val_price=10.0,
         value=1100.0,
@@ -971,7 +884,6 @@ def test_invalid_order():
                 position=100,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=np.inf,
                 val_price=np.nan,
                 value=1100.0,
@@ -985,20 +897,18 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=np.inf,
                 val_price=10.0,
                 value=1100.0,
             ),
             nb.order_nb(np.inf, 10, direction=Direction.Both),
         )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=1100.0,
@@ -1010,7 +920,6 @@ def test_invalid_order():
         position=0.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=100.0,
         val_price=10.0,
         value=1100.0,
@@ -1026,13 +935,12 @@ def test_invalid_order():
             status_info=7,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=np.inf,
             position=-100.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=np.inf,
             val_price=10.0,
             value=1100.0,
@@ -1044,7 +952,6 @@ def test_invalid_order():
         position=0.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=np.inf,
         val_price=10.0,
         value=1100.0,
@@ -1067,20 +974,18 @@ def test_invalid_order():
                 position=100.0,
                 debt=0.0,
                 locked_cash=0.0,
-                shorted_cash=0.0,
                 free_cash=np.inf,
                 val_price=10.0,
                 value=1100.0,
             ),
             nb.order_nb(-np.inf, 10, direction=Direction.Both),
         )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=1100.0,
@@ -1092,7 +997,6 @@ def test_invalid_order():
         position=0.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=100.0,
         val_price=10.0,
         value=1100.0,
@@ -1108,13 +1012,12 @@ def test_invalid_order():
             status_info=7,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=100.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=1100.0,
@@ -1126,7 +1029,6 @@ def test_invalid_order():
         position=100.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=100.0,
         val_price=10.0,
         value=1100.0,
@@ -1142,13 +1044,12 @@ def test_invalid_order():
             status_info=10,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=100.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=1100.0,
@@ -1160,7 +1061,6 @@ def test_invalid_order():
         position=100.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=100.0,
         val_price=10.0,
         value=1100.0,
@@ -1176,13 +1076,12 @@ def test_invalid_order():
             status_info=11,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=100.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=1100.0,
@@ -1194,7 +1093,6 @@ def test_invalid_order():
         position=100.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=100.0,
         val_price=10.0,
         value=1100.0,
@@ -1210,13 +1108,12 @@ def test_invalid_order():
             status_info=12,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=100.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=1100.0,
@@ -1228,7 +1125,6 @@ def test_invalid_order():
         position=100.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=100.0,
         val_price=10.0,
         value=1100.0,
@@ -1244,13 +1140,12 @@ def test_invalid_order():
             status_info=11,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=100.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=1100.0,
@@ -1262,7 +1157,6 @@ def test_invalid_order():
         position=100.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=100.0,
         val_price=10.0,
         value=1100.0,
@@ -1278,13 +1172,12 @@ def test_invalid_order():
             status_info=12,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=100.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=1100.0,
@@ -1296,7 +1189,6 @@ def test_invalid_order():
         position=100.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=100.0,
         val_price=10.0,
         value=1100.0,
@@ -1315,13 +1207,12 @@ def test_invalid_order():
 
 
 def test_calculations():
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -1333,7 +1224,6 @@ def test_calculations():
         position=8.18181818181818,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -1349,13 +1239,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -1367,7 +1256,6 @@ def test_calculations():
         position=8.18181818181818,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -1383,13 +1271,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -1401,7 +1288,6 @@ def test_calculations():
         position=-10.0,
         debt=90.0,
         locked_cash=90.0,
-        shorted_cash=180.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -1417,13 +1303,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -1435,7 +1320,6 @@ def test_calculations():
         position=-10.0,
         debt=90.0,
         locked_cash=90.0,
-        shorted_cash=180.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -1451,13 +1335,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -1469,7 +1352,6 @@ def test_calculations():
         position=-100.0,
         debt=900.0,
         locked_cash=9.0,
-        shorted_cash=909.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -1485,13 +1367,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -1503,7 +1384,6 @@ def test_calculations():
         position=10.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=2.0,
         val_price=10.0,
         value=100.0,
@@ -1519,13 +1399,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -1537,7 +1416,6 @@ def test_calculations():
         position=10.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=99.0,
         val_price=10.0,
         value=100.0,
@@ -1553,13 +1431,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=10.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -1571,7 +1448,6 @@ def test_calculations():
         position=0.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=99.0,
         val_price=10.0,
         value=100.0,
@@ -1588,13 +1464,12 @@ def test_calculations():
         ),
     )
 
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -1606,7 +1481,6 @@ def test_calculations():
         position=10.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -1622,13 +1496,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -1640,7 +1513,6 @@ def test_calculations():
         position=-10.0,
         debt=100.0,
         locked_cash=100.0,
-        shorted_cash=200.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -1657,13 +1529,12 @@ def test_calculations():
         ),
     )
 
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -1675,7 +1546,6 @@ def test_calculations():
         position=10.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -1691,13 +1561,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -1709,7 +1578,6 @@ def test_calculations():
         position=-10.0,
         debt=100.0,
         locked_cash=100.0,
-        shorted_cash=200.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -1726,13 +1594,12 @@ def test_calculations():
         ),
     )
 
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -1744,7 +1611,6 @@ def test_calculations():
         position=10.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -1760,13 +1626,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -1778,7 +1643,6 @@ def test_calculations():
         position=-10.0,
         debt=100.0,
         locked_cash=100.0,
-        shorted_cash=200.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -1795,13 +1659,12 @@ def test_calculations():
         ),
     )
 
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -1813,7 +1676,6 @@ def test_calculations():
         position=10.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -1829,13 +1691,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -1847,7 +1708,6 @@ def test_calculations():
         position=-10.0,
         debt=100.0,
         locked_cash=100.0,
-        shorted_cash=200.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -1864,13 +1724,12 @@ def test_calculations():
         ),
     )
 
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=50.0,
             position=5.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=50.0,
             val_price=10.0,
             value=100.0,
@@ -1882,7 +1741,6 @@ def test_calculations():
         position=10.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -1898,13 +1756,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=50.0,
             position=5.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=50.0,
             val_price=10.0,
             value=100.0,
@@ -1916,7 +1773,6 @@ def test_calculations():
         position=7.5,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=25.0,
         val_price=10.0,
         value=100.0,
@@ -1932,13 +1788,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=50.0,
             position=5.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=50.0,
             val_price=10.0,
             value=100.0,
@@ -1950,7 +1805,6 @@ def test_calculations():
         position=-5.0,
         debt=50.0,
         locked_cash=50.0,
-        shorted_cash=100.0,
         free_cash=50.0,
         val_price=10.0,
         value=100.0,
@@ -1966,13 +1820,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=50.0,
             position=5.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=50.0,
             val_price=10.0,
             value=100.0,
@@ -1984,7 +1837,6 @@ def test_calculations():
         position=-10.0,
         debt=100.0,
         locked_cash=100.0,
-        shorted_cash=200.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -2000,13 +1852,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=50.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=50.0,
             val_price=10.0,
             value=100.0,
@@ -2018,7 +1869,6 @@ def test_calculations():
         position=5.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -2034,13 +1884,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=50.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=50.0,
             val_price=10.0,
             value=100.0,
@@ -2052,7 +1901,6 @@ def test_calculations():
         position=2.5,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=25.0,
         val_price=10.0,
         value=100.0,
@@ -2068,13 +1916,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=50.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=50.0,
             val_price=10.0,
             value=100.0,
@@ -2086,7 +1933,6 @@ def test_calculations():
         position=-2.5,
         debt=25.0,
         locked_cash=25.0,
-        shorted_cash=50.0,
         free_cash=25.0,
         val_price=10.0,
         value=100.0,
@@ -2102,13 +1948,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=50.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=50.0,
             val_price=10.0,
             value=100.0,
@@ -2120,7 +1965,6 @@ def test_calculations():
         position=-5.0,
         debt=50.0,
         locked_cash=50.0,
-        shorted_cash=100.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -2136,13 +1980,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=50.0,
             position=-5.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=50.0,
             val_price=10.0,
             value=100.0,
@@ -2154,7 +1997,6 @@ def test_calculations():
         position=0.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -2170,13 +2012,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=50.0,
             position=-5.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=50.0,
             val_price=10.0,
             value=100.0,
@@ -2188,7 +2029,6 @@ def test_calculations():
         position=0.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -2204,13 +2044,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=50.0,
             position=-5.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=50.0,
             val_price=10.0,
             value=100.0,
@@ -2222,7 +2061,6 @@ def test_calculations():
         position=-7.5,
         debt=25.0,
         locked_cash=25.0,
-        shorted_cash=50.0,
         free_cash=25.0,
         val_price=10.0,
         value=100.0,
@@ -2238,13 +2076,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=50.0,
             position=-5.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=50.0,
             val_price=10.0,
             value=100.0,
@@ -2256,7 +2093,6 @@ def test_calculations():
         position=-10.0,
         debt=50.0,
         locked_cash=50.0,
-        shorted_cash=100.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -2273,13 +2109,12 @@ def test_calculations():
         ),
     )
 
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -2291,7 +2126,6 @@ def test_calculations():
         position=10.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -2307,13 +2141,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=-5.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -2325,7 +2158,6 @@ def test_calculations():
         position=5.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -2341,13 +2173,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -2359,7 +2190,6 @@ def test_calculations():
         position=-10.0,
         debt=100.0,
         locked_cash=100.0,
-        shorted_cash=200.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -2375,13 +2205,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=150.0,
             position=-5.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=150.0,
             val_price=10.0,
             value=100.0,
@@ -2393,7 +2222,6 @@ def test_calculations():
         position=-20.0,
         debt=150.0,
         locked_cash=150.0,
-        shorted_cash=300.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -2410,13 +2238,12 @@ def test_calculations():
         ),
     )
 
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=100.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=50.0,
             val_price=10.0,
             value=100.0,
@@ -2428,7 +2255,6 @@ def test_calculations():
         position=5.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -2444,13 +2270,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=1000.0,
             position=-5.0,
             debt=50.0,
             locked_cash=50.0,
-            shorted_cash=100.0,
             free_cash=50.0,
             val_price=10.0,
             value=100.0,
@@ -2462,7 +2287,6 @@ def test_calculations():
         position=3.5714285714285716,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -2478,13 +2302,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
-            cash=100.0,
+            cash=150.0,
             position=-5.0,
             debt=50.0,
             locked_cash=50.0,
-            shorted_cash=50.0,
             free_cash=50.0,
             val_price=10.0,
             value=100.0,
@@ -2493,18 +2316,17 @@ def test_calculations():
     )
     assert account_state == ExecState(
         cash=0.0,
-        position=-4.0,
-        debt=40.0,
-        locked_cash=40.0,
-        shorted_cash=30.0,
-        free_cash=-30.0,
+        position=-3.5,
+        debt=35.0,
+        locked_cash=35.0,
+        free_cash=-70.0,
         val_price=10.0,
         value=100.0,
     )
     assert_same_tuple(
         order_result,
         OrderResult(
-            size=1.0,
+            size=1.5,
             price=100.0,
             fees=0.0,
             side=0,
@@ -2513,13 +2335,12 @@ def test_calculations():
         ),
     )
 
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=0.0,
             position=10.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=-50.0,
             val_price=10.0,
             value=100.0,
@@ -2531,7 +2352,6 @@ def test_calculations():
         position=-5.0,
         debt=50.0,
         locked_cash=50.0,
-        shorted_cash=100.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,
@@ -2547,13 +2367,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=0.0,
             position=1.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=-50.0,
             val_price=10.0,
             value=100.0,
@@ -2565,7 +2384,6 @@ def test_calculations():
         position=0.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=-40.0,
         val_price=10.0,
         value=100.0,
@@ -2581,13 +2399,12 @@ def test_calculations():
             status_info=-1,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=0.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=-100.0,
             val_price=10.0,
             value=100.0,
@@ -2599,7 +2416,6 @@ def test_calculations():
         position=0.0,
         debt=0.0,
         locked_cash=0.0,
-        shorted_cash=0.0,
         free_cash=-100.0,
         val_price=10.0,
         value=100.0,
@@ -2615,13 +2431,12 @@ def test_calculations():
             status_info=6,
         ),
     )
-    account_state, order_result = nb.execute_order_nb(
+    order_result, account_state = nb.execute_order_nb(
         ExecState(
             cash=0.0,
             position=0.0,
             debt=0.0,
             locked_cash=0.0,
-            shorted_cash=0.0,
             free_cash=100.0,
             val_price=10.0,
             value=100.0,
@@ -2633,7 +2448,6 @@ def test_calculations():
         position=-10.0,
         debt=90.0,
         locked_cash=90.0,
-        shorted_cash=180.0,
         free_cash=0.0,
         val_price=10.0,
         value=100.0,

@@ -558,7 +558,7 @@ Attributes:
         * When long buying, the percentage of `ExecState.free_cash`
         * When long selling, the percentage of `ExecState.position`
         * When short selling, the percentage of `ExecState.free_cash`
-        * When short buying, the percentage of `ExecState.free_cash` and `ExecState.shorted_cash`
+        * When short buying, the percentage of `ExecState.free_cash`, `ExecState.debt`, and `ExecState.locked_cash`
         * When reversing, the percentage is getting applied on the final position
     Percent100: `SizeType.Percent` where 1.0 means 1%.
     ValuePercent: Percentage of total value.
@@ -869,7 +869,6 @@ class AccountState(tp.NamedTuple):
     position: float
     debt: float
     locked_cash: float
-    shorted_cash: float
     free_cash: float
 
 
@@ -886,9 +885,6 @@ Per column."""
 __pdoc__["AccountState.locked_cash"] = """Locked cash.
 
 Per column."""
-__pdoc__["AccountState.shorted_cash"] = """Shorted cash.
-
-Per column."""
 __pdoc__["AccountState.free_cash"] = """Free cash. 
 
 Per group."""
@@ -899,7 +895,6 @@ class ExecState(tp.NamedTuple):
     position: float
     debt: float
     locked_cash: float
-    shorted_cash: float
     free_cash: float
     val_price: float
     value: float
@@ -910,7 +905,6 @@ __pdoc__["ExecState.cash"] = "See `AccountState.cash`."
 __pdoc__["ExecState.position"] = "See `AccountState.position`."
 __pdoc__["ExecState.debt"] = "See `AccountState.debt`."
 __pdoc__["ExecState.locked_cash"] = "See `AccountState.locked_cash`."
-__pdoc__["ExecState.shorted_cash"] = "See `AccountState.shorted_cash`."
 __pdoc__["ExecState.free_cash"] = "See `AccountState.free_cash`."
 __pdoc__["ExecState.val_price"] = "Valuation price in the current column."
 __pdoc__["ExecState.value"] = "Value in the current column (or group with cash sharing)."
@@ -973,7 +967,6 @@ class SimulationContext(tp.NamedTuple):
     last_position: tp.Array1d
     last_debt: tp.Array1d
     last_locked_cash: tp.Array1d
-    last_shorted_cash: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
@@ -1303,17 +1296,6 @@ Gets updated right after `order_func_nb`.
     Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
 """
 __pdoc__[
-    "SimulationContext.last_shorted_cash"
-] = """Latest acquired cash from shorting per column.
-
-Has shape `(target_shape[1],)`. 
-
-Gets updated right after `order_func_nb`.
-
-!!! note
-    Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
-"""
-__pdoc__[
     "SimulationContext.last_free_cash"
 ] = """Latest free cash per column (or per group with cash sharing).
 
@@ -1511,7 +1493,6 @@ class GroupContext(tp.NamedTuple):
     last_position: tp.Array1d
     last_debt: tp.Array1d
     last_locked_cash: tp.Array1d
-    last_shorted_cash: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
@@ -1610,7 +1591,6 @@ class RowContext(tp.NamedTuple):
     last_position: tp.Array1d
     last_debt: tp.Array1d
     last_locked_cash: tp.Array1d
-    last_shorted_cash: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
@@ -1673,7 +1653,6 @@ class SegmentContext(tp.NamedTuple):
     last_position: tp.Array1d
     last_debt: tp.Array1d
     last_locked_cash: tp.Array1d
-    last_shorted_cash: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
@@ -1755,7 +1734,6 @@ class OrderContext(tp.NamedTuple):
     last_position: tp.Array1d
     last_debt: tp.Array1d
     last_locked_cash: tp.Array1d
-    last_shorted_cash: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
@@ -1775,7 +1753,6 @@ class OrderContext(tp.NamedTuple):
     position_now: float
     debt_now: float
     locked_cash_now: float
-    shorted_cash_now: float
     free_cash_now: float
     val_price_now: float
     value_now: float
@@ -1816,7 +1793,6 @@ __pdoc__["OrderContext.cash_now"] = "`SimulationContext.last_cash` for the curre
 __pdoc__["OrderContext.position_now"] = "`SimulationContext.last_position` for the current column."
 __pdoc__["OrderContext.debt_now"] = "`SimulationContext.last_debt` for the current column."
 __pdoc__["OrderContext.locked_cash_now"] = "`SimulationContext.last_locked_cash` for the current column."
-__pdoc__["OrderContext.shorted_cash_now"] = "`SimulationContext.last_shorted_cash` for the current column."
 __pdoc__["OrderContext.free_cash_now"] = "`SimulationContext.last_free_cash` for the current column/group."
 __pdoc__["OrderContext.val_price_now"] = "`SimulationContext.last_val_price` for the current column."
 __pdoc__["OrderContext.value_now"] = "`SimulationContext.last_value` for the current column/group."
@@ -1855,7 +1831,6 @@ class PostOrderContext(tp.NamedTuple):
     last_position: tp.Array1d
     last_debt: tp.Array1d
     last_locked_cash: tp.Array1d
-    last_shorted_cash: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
@@ -1875,7 +1850,6 @@ class PostOrderContext(tp.NamedTuple):
     position_before: float
     debt_before: float
     locked_cash_before: float
-    shorted_cash_before: float
     free_cash_before: float
     val_price_before: float
     value_before: float
@@ -1884,7 +1858,6 @@ class PostOrderContext(tp.NamedTuple):
     position_now: float
     debt_now: float
     locked_cash_now: float
-    shorted_cash_now: float
     free_cash_now: float
     val_price_now: float
     value_now: float
@@ -1915,7 +1888,6 @@ __pdoc__["PostOrderContext.cash_before"] = "`OrderContext.cash_now` before execu
 __pdoc__["PostOrderContext.position_before"] = "`OrderContext.position_now` before execution."
 __pdoc__["PostOrderContext.debt_before"] = "`OrderContext.debt_now` before execution."
 __pdoc__["PostOrderContext.locked_cash_before"] = "`OrderContext.locked_cash_now` before execution."
-__pdoc__["PostOrderContext.shorted_cash_before"] = "`OrderContext.shorted_cash_now` before execution."
 __pdoc__["PostOrderContext.free_cash_before"] = "`OrderContext.free_cash_now` before execution."
 __pdoc__["PostOrderContext.val_price_before"] = "`OrderContext.val_price_now` before execution."
 __pdoc__["PostOrderContext.value_before"] = "`OrderContext.value_now` before execution."
@@ -1929,7 +1901,6 @@ __pdoc__["PostOrderContext.cash_now"] = "`OrderContext.cash_now` after execution
 __pdoc__["PostOrderContext.position_now"] = "`OrderContext.position_now` after execution."
 __pdoc__["PostOrderContext.debt_now"] = "`OrderContext.debt_now` after execution."
 __pdoc__["PostOrderContext.locked_cash_now"] = "`OrderContext.locked_cash_now` after execution."
-__pdoc__["PostOrderContext.shorted_cash_now"] = "`OrderContext.shorted_cash_now` after execution."
 __pdoc__["PostOrderContext.free_cash_now"] = "`OrderContext.free_cash_now` after execution."
 __pdoc__[
     "PostOrderContext.val_price_now"
@@ -1979,7 +1950,6 @@ class FlexOrderContext(tp.NamedTuple):
     last_position: tp.Array1d
     last_debt: tp.Array1d
     last_locked_cash: tp.Array1d
-    last_shorted_cash: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
@@ -2212,7 +2182,6 @@ class SignalSegmentContext(tp.NamedTuple):
     last_position: tp.Array1d
     last_debt: tp.Array1d
     last_locked_cash: tp.Array1d
-    last_shorted_cash: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
@@ -2319,7 +2288,6 @@ class SignalContext(tp.NamedTuple):
     last_position: tp.Array1d
     last_debt: tp.Array1d
     last_locked_cash: tp.Array1d
-    last_shorted_cash: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
@@ -2360,7 +2328,6 @@ class FOInOutputs(tp.NamedTuple):
     position: tp.Array2d
     debt: tp.Array2d
     locked_cash: tp.Array2d
-    shorted_cash: tp.Array2d
     free_cash: tp.Array2d
     returns: tp.Array2d
 
@@ -2387,11 +2354,6 @@ __pdoc__[
 
 Gets filled if `fill_state` is True, otherwise has the shape `(0, 0)`."""
 __pdoc__[
-    "FOInOutputs.shorted_cash"
-] = """See `AccountState.shorted_cash`.
-
-Gets filled if `fill_state` is True, otherwise has the shape `(0, 0)`."""
-__pdoc__[
     "FOInOutputs.free_cash"
 ] = """See `AccountState.free_cash`.
 
@@ -2408,7 +2370,6 @@ class FSInOutputs(tp.NamedTuple):
     position: tp.Array2d
     debt: tp.Array2d
     locked_cash: tp.Array2d
-    shorted_cash: tp.Array2d
     free_cash: tp.Array2d
     returns: tp.Array2d
 
@@ -2418,7 +2379,6 @@ __pdoc__["FSInOutputs.cash"] = "See `FOInOutputs.cash`."
 __pdoc__["FSInOutputs.position"] = "See `FOInOutputs.position`."
 __pdoc__["FSInOutputs.debt"] = "See `FOInOutputs.debt`."
 __pdoc__["FSInOutputs.locked_cash"] = "See `FOInOutputs.locked_cash`."
-__pdoc__["FSInOutputs.shorted_cash"] = "See `FOInOutputs.shorted_cash`."
 __pdoc__["FSInOutputs.free_cash"] = "See `FOInOutputs.free_cash`."
 __pdoc__["FSInOutputs.returns"] = "See `FOInOutputs.returns`."
 
@@ -2518,7 +2478,6 @@ _log_fields = [
     ("exec_state_position", np.float_),
     ("exec_state_debt", np.float_),
     ("exec_state_locked_cash", np.float_),
-    ("exec_state_shorted_cash", np.float_),
     ("exec_state_free_cash", np.float_),
     ("exec_state_val_price", np.float_),
     ("exec_state_value", np.float_),
@@ -2539,20 +2498,19 @@ _log_fields = [
     ("req_allow_partial", np.bool_),
     ("req_raise_reject", np.bool_),
     ("req_log", np.bool_),
-    ("new_exec_state_cash", np.float_),
-    ("new_exec_state_position", np.float_),
-    ("new_exec_state_debt", np.float_),
-    ("new_exec_state_locked_cash", np.float_),
-    ("new_exec_state_shorted_cash", np.float_),
-    ("new_exec_state_free_cash", np.float_),
-    ("new_exec_state_val_price", np.float_),
-    ("new_exec_state_value", np.float_),
     ("res_size", np.float_),
     ("res_price", np.float_),
     ("res_fees", np.float_),
     ("res_side", np.int_),
     ("res_status", np.int_),
     ("res_status_info", np.int_),
+    ("new_exec_state_cash", np.float_),
+    ("new_exec_state_position", np.float_),
+    ("new_exec_state_debt", np.float_),
+    ("new_exec_state_locked_cash", np.float_),
+    ("new_exec_state_free_cash", np.float_),
+    ("new_exec_state_val_price", np.float_),
+    ("new_exec_state_value", np.float_),
     ("order_id", np.int_),
 ]
 

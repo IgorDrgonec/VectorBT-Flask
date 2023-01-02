@@ -188,7 +188,6 @@ def simulate_from_orders_nb(
         raise ValueError("Cannot skip NaN and forward-fill valuation price simultaneously")
     last_debt = np.full(target_shape[1], 0.0, dtype=np.float_)
     last_locked_cash = np.full(target_shape[1], 0.0, dtype=np.float_)
-    last_shorted_cash = np.full(target_shape[1], 0.0, dtype=np.float_)
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
     order_counts = np.full(target_shape[1], 0, dtype=np.int_)
@@ -213,14 +212,12 @@ def simulate_from_orders_nb(
         position = np.full(target_shape, np.nan, dtype=np.float_)
         debt = np.full(target_shape, np.nan, dtype=np.float_)
         locked_cash = np.full(target_shape, np.nan, dtype=np.float_)
-        shorted_cash = np.full(target_shape, np.nan, dtype=np.float_)
         free_cash = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
     else:
         cash = np.full((0, 0), np.nan, dtype=np.float_)
         position = np.full((0, 0), np.nan, dtype=np.float_)
         debt = np.full((0, 0), np.nan, dtype=np.float_)
         locked_cash = np.full((0, 0), np.nan, dtype=np.float_)
-        shorted_cash = np.full((0, 0), np.nan, dtype=np.float_)
         free_cash = np.full((0, 0), np.nan, dtype=np.float_)
     if fill_returns:
         returns = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
@@ -231,7 +228,6 @@ def simulate_from_orders_nb(
         position=position,
         debt=debt,
         locked_cash=locked_cash,
-        shorted_cash=shorted_cash,
         free_cash=free_cash,
         returns=returns,
     )
@@ -326,7 +322,6 @@ def simulate_from_orders_nb(
                             position=last_position[col],
                             debt=last_debt[col],
                             locked_cash=last_locked_cash[col],
-                            shorted_cash=last_shorted_cash[col],
                             free_cash=free_cash_now,
                             val_price=last_val_price[col],
                             value=value_now,
@@ -360,7 +355,6 @@ def simulate_from_orders_nb(
                 position_now = last_position[col]
                 debt_now = last_debt[col]
                 locked_cash_now = last_locked_cash[col]
-                shorted_cash_now = last_shorted_cash[col]
                 val_price_now = last_val_price[col]
                 if not cash_sharing:
                     value_now = cash_now
@@ -403,12 +397,11 @@ def simulate_from_orders_nb(
                     position=position_now,
                     debt=debt_now,
                     locked_cash=locked_cash_now,
-                    shorted_cash=shorted_cash_now,
                     free_cash=free_cash_now,
                     val_price=val_price_now,
                     value=value_now,
                 )
-                new_exec_state, order_result = process_order_nb(
+                order_result, new_exec_state = process_order_nb(
                     group=group,
                     col=col,
                     i=i,
@@ -427,7 +420,6 @@ def simulate_from_orders_nb(
                 position_now = new_exec_state.position
                 debt_now = new_exec_state.debt
                 locked_cash_now = new_exec_state.locked_cash
-                shorted_cash_now = new_exec_state.shorted_cash
                 free_cash_now = new_exec_state.free_cash
                 val_price_now = new_exec_state.val_price
                 value_now = new_exec_state.value
@@ -436,7 +428,6 @@ def simulate_from_orders_nb(
                 last_position[col] = position_now
                 last_debt[col] = debt_now
                 last_locked_cash[col] = locked_cash_now
-                last_shorted_cash[col] = shorted_cash_now
                 if not np.isnan(val_price_now) or not ffill_val_price:
                     last_val_price[col] = val_price_now
 
@@ -460,7 +451,6 @@ def simulate_from_orders_nb(
                     position[i, col] = last_position[col]
                     debt[i, col] = last_debt[col]
                     locked_cash[i, col] = last_locked_cash[col]
-                    shorted_cash[i, col] = last_shorted_cash[col]
                     if not cash_sharing:
                         cash[i, col] = cash_now
                         free_cash[i, col] = free_cash_now

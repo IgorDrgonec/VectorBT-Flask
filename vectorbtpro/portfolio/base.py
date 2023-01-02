@@ -1937,7 +1937,6 @@ shortcut_config = ReadonlyConfig(
         "position": dict(method_name="get_assets", group_by_aware=False),
         "debt": dict(method_name=None, group_by_aware=False),
         "locked_cash": dict(method_name=None, group_by_aware=False),
-        "shorted_cash": dict(method_name=None, group_by_aware=False),
         "free_cash": dict(method_name="get_cash", method_kwargs=dict(free=True)),
         "init_price": dict(obj_type="red_array", group_by_aware=False),
         "init_position_value": dict(obj_type="red_array", group_by_aware=False),
@@ -3007,7 +3006,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             position=dict(grouping="columns"),
             debt=dict(grouping="columns"),
             locked_cash=dict(grouping="columns"),
-            shorted_cash=dict(grouping="columns"),
             free_cash=dict(grouping="cash_sharing"),
             returns=dict(grouping="cash_sharing"),
         )
@@ -4119,8 +4117,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             update_value (bool): Whether to update group value after each filled order.
             fill_state (bool): Whether to fill state.
 
-                The arrays will be avaiable as `cash`, `position`, `debt`, `locked_cash`,
-                `shorted_cash`, and `free_cash` in in-outputs.
+                The arrays will be avaiable as `cash`, `position`, `debt`, `locked_cash`, and `free_cash` in in-outputs.
             fill_returns (bool): Whether to fill returns.
 
                 The array will be avaiable as `returns` in in-outputs.

@@ -64,20 +64,20 @@ def long_buy_nb(
     percent: float = np.nan,
     price_area: PriceArea = NoPriceArea,
     is_closing_price: bool = False,
-) -> tp.Tuple[AccountState, OrderResult]:
+) -> tp.Tuple[OrderResult, AccountState]:
     """Open or increase a long position."""
     # Get cash limit
     cash_limit = account_state.free_cash
     if not np.isnan(percent):
         cash_limit = cash_limit * percent
     if cash_limit <= 0:
-        return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoCash)
+        return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoCash), account_state
     cash_limit = cash_limit * leverage
 
     # Adjust for max size
     if not np.isnan(max_size) and size > max_size:
         if not allow_partial:
-            return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.MaxSizeExceeded)
+            return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.MaxSizeExceeded), account_state
 
         size = max_size
     if np.isinf(size) and np.isinf(cash_limit):
@@ -111,7 +111,7 @@ def long_buy_nb(
         # to spend 100$ (cash_limit) in total
         max_req_cash = add_nb(cash_limit, -fixed_fees) / (1 + fees)
         if max_req_cash <= 0:
-            return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.CantCoverFees)
+            return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.CantCoverFees), account_state
 
         max_acq_size = max_req_cash / adj_price
 
@@ -128,15 +128,25 @@ def long_buy_nb(
 
     # Check against size of zero
     if is_close_nb(final_size, 0):
-        return account_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.SizeZero)
+        return order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.SizeZero), account_state
 
     # Check against minimum size
     if not np.isnan(min_size) and is_less_nb(final_size, min_size):
-        return account_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.MinSizeNotReached)
+        return order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.MinSizeNotReached), account_state
 
     # Check against partial fill (np.inf doesn't count)
     if np.isfinite(size) and is_less_nb(final_size, size) and not allow_partial:
-        return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.PartialFill)
+        return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.PartialFill), account_state
+
+    # Create a filled order
+    order_result = OrderResult(
+        final_size,
+        adj_price,
+        fees_paid,
+        OrderSide.Buy,
+        OrderStatus.Filled,
+        -1,
+    )
 
     # Update the current account state
     new_cash = add_nb(account_state.cash, -req_cash)
@@ -163,26 +173,14 @@ def long_buy_nb(
             new_debt = account_state.debt
             new_locked_cash = account_state.locked_cash
             new_free_cash = add_nb(account_state.free_cash, -req_cash)
-    new_shorted_cash = account_state.shorted_cash
     new_account_state = AccountState(
         cash=new_cash,
         position=new_position,
         debt=new_debt,
         locked_cash=new_locked_cash,
-        shorted_cash=new_shorted_cash,
         free_cash=new_free_cash,
     )
-
-    # Create a filled order
-    order_result = OrderResult(
-        final_size,
-        adj_price,
-        fees_paid,
-        OrderSide.Buy,
-        OrderStatus.Filled,
-        -1,
-    )
-    return new_account_state, order_result
+    return order_result, new_account_state
 
 
 @register_jitted(cache=True)
@@ -201,11 +199,11 @@ def long_sell_nb(
     percent: float = np.nan,
     price_area: PriceArea = NoPriceArea,
     is_closing_price: bool = False,
-) -> tp.Tuple[AccountState, OrderResult]:
+) -> tp.Tuple[OrderResult, AccountState]:
     """Decrease or close a long position."""
     # Check for open position
     if account_state.position == 0:
-        return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoOpenPosition)
+        return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoOpenPosition), account_state
 
     # Get size limit
     size_limit = min(account_state.position, size)
@@ -215,7 +213,7 @@ def long_sell_nb(
     # Adjust for max size
     if not np.isnan(max_size) and size_limit > max_size:
         if not allow_partial:
-            return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.MaxSizeExceeded)
+            return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.MaxSizeExceeded), account_state
 
         size_limit = max_size
 
@@ -225,15 +223,15 @@ def long_sell_nb(
 
     # Check against size of zero
     if is_close_nb(size_limit, 0):
-        return account_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.SizeZero)
+        return order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.SizeZero), account_state
 
     # Check against minimum size
     if not np.isnan(min_size) and is_less_nb(size_limit, min_size):
-        return account_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.MinSizeNotReached)
+        return order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.MinSizeNotReached), account_state
 
     # Check against partial fill
     if np.isfinite(size) and is_less_nb(size_limit, size) and not allow_partial:  # np.inf doesn't count
-        return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.PartialFill)
+        return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.PartialFill), account_state
 
     # Get price adjusted with slippage
     adj_price = price * (1 - slippage)
@@ -248,7 +246,17 @@ def long_sell_nb(
     # Get final cash by subtracting costs
     final_acq_cash = add_nb(acq_cash, -fees_paid)
     if final_acq_cash < 0 and is_less_nb(account_state.free_cash, -final_acq_cash):
-        return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.CantCoverFees)
+        return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.CantCoverFees), account_state
+
+    # Create a filled order
+    order_result = OrderResult(
+        size_limit,
+        adj_price,
+        fees_paid,
+        OrderSide.Sell,
+        OrderStatus.Filled,
+        -1,
+    )
 
     # Update the current account state
     new_cash = account_state.cash + final_acq_cash
@@ -269,26 +277,14 @@ def long_sell_nb(
         new_debt = account_state.debt
         new_locked_cash = account_state.locked_cash
         new_free_cash = account_state.free_cash + final_acq_cash
-    new_shorted_cash = account_state.shorted_cash
     new_account_state = AccountState(
         cash=new_cash,
         position=new_position,
         debt=new_debt,
         locked_cash=new_locked_cash,
-        shorted_cash=new_shorted_cash,
         free_cash=new_free_cash,
     )
-
-    # Create a filled order
-    order_result = OrderResult(
-        size_limit,
-        adj_price,
-        fees_paid,
-        OrderSide.Sell,
-        OrderStatus.Filled,
-        -1,
-    )
-    return new_account_state, order_result
+    return order_result, new_account_state
 
 
 @register_jitted(cache=True)
@@ -308,14 +304,14 @@ def short_sell_nb(
     percent: float = np.nan,
     price_area: PriceArea = NoPriceArea,
     is_closing_price: bool = False,
-) -> tp.Tuple[AccountState, OrderResult]:
+) -> tp.Tuple[OrderResult, AccountState]:
     """Open or increase a short position."""
     # Get cash limit
     cash_limit = account_state.free_cash
     if not np.isnan(percent):
         cash_limit = cash_limit * percent
     if cash_limit <= 0:
-        return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoCash)
+        return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoCash), account_state
     cash_limit = cash_limit * leverage
 
     # Get price adjusted with slippage
@@ -330,12 +326,12 @@ def short_sell_nb(
         max_size_limit = add_nb(cash_limit, -fixed_fees) / (adj_price * (1 + fees))
     size_limit = min(size, max_size_limit)
     if size_limit <= 0:
-        return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.CantCoverFees)
+        return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.CantCoverFees), account_state
 
     # Adjust for max size
     if not np.isnan(max_size) and size_limit > max_size:
         if not allow_partial:
-            return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.MaxSizeExceeded)
+            return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.MaxSizeExceeded), account_state
 
         size_limit = max_size
     if np.isinf(size_limit):
@@ -347,15 +343,15 @@ def short_sell_nb(
 
     # Check against size of zero
     if is_close_nb(size_limit, 0):
-        return account_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.SizeZero)
+        return order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.SizeZero), account_state
 
     # Check against minimum size
     if not np.isnan(min_size) and is_less_nb(size_limit, min_size):
-        return account_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.MinSizeNotReached)
+        return order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.MinSizeNotReached), account_state
 
     # Check against partial fill
     if np.isfinite(size) and is_less_nb(size_limit, size) and not allow_partial:  # np.inf doesn't count
-        return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.PartialFill)
+        return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.PartialFill), account_state
 
     # Get acquired cash
     order_value = size_limit * adj_price
@@ -366,7 +362,17 @@ def short_sell_nb(
     # Get final cash by subtracting costs
     final_acq_cash = add_nb(order_value, -fees_paid)
     if final_acq_cash < 0:
-        return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.CantCoverFees)
+        return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.CantCoverFees), account_state
+
+    # Create a filled order
+    order_result = OrderResult(
+        size_limit,
+        adj_price,
+        fees_paid,
+        OrderSide.Sell,
+        OrderStatus.Filled,
+        -1,
+    )
 
     # Update the current account state
     new_cash = account_state.cash + final_acq_cash
@@ -379,27 +385,15 @@ def short_sell_nb(
     else:
         leverage_ = float(leverage)
     new_locked_cash = account_state.locked_cash + order_value / leverage_
-    new_shorted_cash = account_state.shorted_cash + order_value + order_value / leverage_
     new_free_cash = add_nb(account_state.free_cash, -order_value / leverage_ - fees_paid)
     new_account_state = AccountState(
         cash=new_cash,
         position=new_position,
         debt=new_debt,
         locked_cash=new_locked_cash,
-        shorted_cash=new_shorted_cash,
         free_cash=new_free_cash,
     )
-
-    # Create a filled order
-    order_result = OrderResult(
-        size_limit,
-        adj_price,
-        fees_paid,
-        OrderSide.Sell,
-        OrderStatus.Filled,
-        -1,
-    )
-    return new_account_state, order_result
+    return order_result, new_account_state
 
 
 @register_jitted(cache=True)
@@ -418,16 +412,16 @@ def short_buy_nb(
     percent: float = np.nan,
     price_area: PriceArea = NoPriceArea,
     is_closing_price: bool = False,
-) -> tp.Tuple[AccountState, OrderResult]:
+) -> tp.Tuple[OrderResult, AccountState]:
     """Decrease or close a short position."""
     # Check for open position
     if account_state.position == 0:
-        return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoOpenPosition)
+        return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoOpenPosition), account_state
 
     # Get cash limit
-    cash_limit = account_state.free_cash + account_state.shorted_cash
+    cash_limit = account_state.free_cash + account_state.debt + account_state.locked_cash
     if cash_limit <= 0:
-        return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoCash)
+        return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.NoCash), account_state
 
     # Get size limit
     size_limit = min(abs(account_state.position), size)
@@ -437,7 +431,7 @@ def short_buy_nb(
     # Adjust for max size
     if not np.isnan(max_size) and size_limit > max_size:
         if not allow_partial:
-            return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.MaxSizeExceeded)
+            return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.MaxSizeExceeded), account_state
 
         size_limit = max_size
 
@@ -469,7 +463,7 @@ def short_buy_nb(
         # to spend 100$ (cash_limit) in total
         max_req_cash = add_nb(cash_limit, -fixed_fees) / (1 + fees)
         if max_req_cash <= 0:
-            return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.CantCoverFees)
+            return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.CantCoverFees), account_state
 
         max_acq_size = max_req_cash / adj_price
 
@@ -486,42 +480,15 @@ def short_buy_nb(
 
     # Check size of zero
     if is_close_nb(final_size, 0):
-        return account_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.SizeZero)
+        return order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.SizeZero), account_state
 
     # Check against minimum size
     if not np.isnan(min_size) and is_less_nb(final_size, min_size):
-        return account_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.MinSizeNotReached)
+        return order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.MinSizeNotReached), account_state
 
     # Check against partial fill (np.inf doesn't count)
     if np.isfinite(size_limit) and is_less_nb(final_size, size_limit) and not allow_partial:
-        return account_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.PartialFill)
-
-    # Update the current account state
-    new_cash = add_nb(account_state.cash, -req_cash)
-    new_position = add_nb(account_state.position, final_size)
-    if account_state.debt == 0:
-        new_debt = 0.0
-        new_locked_cash = 0.0
-        new_shorted_cash = 0.0
-        new_free_cash = add_nb(account_state.free_cash, -req_cash)
-    else:
-        size_fraction = final_size / abs(account_state.position)
-        new_pos_fraction = abs(new_position) / abs(account_state.position)
-        released_debt = size_fraction * account_state.debt
-        released_cash = size_fraction * account_state.locked_cash
-        new_debt = new_pos_fraction * account_state.debt
-        new_locked_cash = new_pos_fraction * account_state.locked_cash
-        pnl = released_debt - req_cash
-        new_shorted_cash = add_nb(account_state.shorted_cash, -released_debt - released_cash)
-        new_free_cash = add_nb(account_state.free_cash, released_cash + pnl)
-    new_account_state = AccountState(
-        cash=new_cash,
-        position=new_position,
-        debt=new_debt,
-        locked_cash=new_locked_cash,
-        shorted_cash=new_shorted_cash,
-        free_cash=new_free_cash,
-    )
+        return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.PartialFill), account_state
 
     # Create a filled order
     order_result = OrderResult(
@@ -532,7 +499,25 @@ def short_buy_nb(
         OrderStatus.Filled,
         -1,
     )
-    return new_account_state, order_result
+
+    # Update the current account state
+    new_cash = add_nb(account_state.cash, -req_cash)
+    new_position = add_nb(account_state.position, final_size)
+    new_pos_fraction = abs(new_position) / abs(account_state.position)
+    new_debt = new_pos_fraction * account_state.debt
+    new_locked_cash = new_pos_fraction * account_state.locked_cash
+    size_fraction = final_size / abs(account_state.position)
+    released_debt = size_fraction * account_state.debt
+    released_cash = size_fraction * account_state.locked_cash
+    new_free_cash = add_nb(account_state.free_cash, released_cash + released_debt - req_cash)
+    new_account_state = AccountState(
+        cash=new_cash,
+        position=new_position,
+        debt=new_debt,
+        locked_cash=new_locked_cash,
+        free_cash=new_free_cash,
+    )
+    return order_result, new_account_state
 
 
 @register_jitted(cache=True)
@@ -554,7 +539,7 @@ def buy_nb(
     percent: float = np.nan,
     price_area: PriceArea = NoPriceArea,
     is_closing_price: bool = False,
-) -> tp.Tuple[AccountState, OrderResult]:
+) -> tp.Tuple[OrderResult, AccountState]:
     """Buy."""
     if account_state.position <= 0 and direction == Direction.ShortOnly:
         return short_buy_nb(
@@ -600,7 +585,7 @@ def buy_nb(
         max_size1 = min(max_size, abs(account_state.position))
     else:
         max_size1 = np.nan
-    new_account_state1, new_order_result1 = short_buy_nb(
+    new_order_result1, new_account_state1 = short_buy_nb(
         account_state=account_state,
         size=size,
         price=price,
@@ -617,10 +602,10 @@ def buy_nb(
         is_closing_price=is_closing_price,
     )
     if new_order_result1.status != OrderStatus.Filled:
-        return account_state, new_order_result1
+        return new_order_result1, account_state
     new_size = add_nb(size, -abs(account_state.position))
     if new_size <= 0:
-        return new_account_state1, new_order_result1
+        return new_order_result1, new_account_state1
     if not np.isnan(min_size):
         min_size2 = max(min_size - abs(account_state.position), 0.0)
     else:
@@ -629,7 +614,7 @@ def buy_nb(
         max_size2 = max(max_size - abs(account_state.position), 0.0)
     else:
         max_size2 = np.nan
-    new_account_state2, new_order_result2 = long_buy_nb(
+    new_order_result2, new_account_state2 = long_buy_nb(
         account_state=new_account_state1,
         size=new_size,
         price=price,
@@ -648,10 +633,10 @@ def buy_nb(
     if new_order_result2.status != OrderStatus.Filled:
         if allow_partial or np.isinf(new_size):
             if new_order_result2.status_info == OrderStatusInfo.SizeZero:
-                return new_account_state1, new_order_result1
+                return new_order_result1, new_account_state1
             if new_order_result2.status_info == OrderStatusInfo.NoCash:
-                return new_account_state1, new_order_result1
-        return account_state, new_order_result2
+                return new_order_result1, new_account_state1
+        return new_order_result2, account_state
     new_order_result = OrderResult(
         new_order_result1.size + new_order_result2.size,
         new_order_result2.price,
@@ -660,7 +645,7 @@ def buy_nb(
         new_order_result2.status,
         new_order_result2.status_info,
     )
-    return new_account_state2, new_order_result
+    return new_order_result, new_account_state2
 
 
 @register_jitted(cache=True)
@@ -681,7 +666,7 @@ def sell_nb(
     percent: float = np.nan,
     price_area: PriceArea = NoPriceArea,
     is_closing_price: bool = False,
-) -> tp.Tuple[AccountState, OrderResult]:
+) -> tp.Tuple[OrderResult, AccountState]:
     """Sell."""
     if account_state.position >= 0 and direction == Direction.LongOnly:
         return long_sell_nb(
@@ -726,7 +711,7 @@ def sell_nb(
         max_size1 = min(max_size, account_state.position)
     else:
         max_size1 = np.nan
-    new_account_state1, new_order_result1 = long_sell_nb(
+    new_order_result1, new_account_state1 = long_sell_nb(
         account_state=account_state,
         size=size,
         price=price,
@@ -743,10 +728,10 @@ def sell_nb(
         is_closing_price=is_closing_price,
     )
     if new_order_result1.status != OrderStatus.Filled:
-        return account_state, new_order_result1
+        return new_order_result1, account_state
     new_size = add_nb(size, -abs(account_state.position))
     if new_size <= 0:
-        return new_account_state1, new_order_result1
+        return new_order_result1, new_account_state1
     if not np.isnan(min_size):
         min_size2 = max(min_size - account_state.position, 0.0)
     else:
@@ -755,7 +740,7 @@ def sell_nb(
         max_size2 = max(max_size - account_state.position, 0.0)
     else:
         max_size2 = np.nan
-    new_account_state2, new_order_result2 = short_sell_nb(
+    new_order_result2, new_account_state2 = short_sell_nb(
         account_state=new_account_state1,
         size=new_size,
         price=price,
@@ -774,10 +759,10 @@ def sell_nb(
     if new_order_result2.status != OrderStatus.Filled:
         if allow_partial or np.isinf(new_size):
             if new_order_result2.status_info == OrderStatusInfo.SizeZero:
-                return new_account_state1, new_order_result1
+                return new_order_result1, new_account_state1
             if new_order_result2.status_info == OrderStatusInfo.NoCash:
-                return new_account_state1, new_order_result1
-        return account_state, new_order_result2
+                return new_order_result1, new_account_state1
+        return new_order_result2, account_state
     new_order_result = OrderResult(
         new_order_result1.size + new_order_result2.size,
         new_order_result2.price,
@@ -786,7 +771,7 @@ def sell_nb(
         new_order_result2.status,
         new_order_result2.status_info,
     )
-    return new_account_state2, new_order_result
+    return new_order_result, new_account_state2
 
 
 @register_jitted(cache=True)
@@ -883,7 +868,7 @@ def execute_order_nb(
     order: Order,
     price_area: PriceArea = NoPriceArea,
     update_value: bool = False,
-) -> tp.Tuple[ExecState, OrderResult]:
+) -> tp.Tuple[OrderResult, ExecState]:
     """Execute an order given the current state.
 
     Args:
@@ -909,9 +894,6 @@ def execute_order_nb(
     locked_cash = float(exec_state.locked_cash)
     if is_close_nb(locked_cash, 0):
         locked_cash = 0.0
-    shorted_cash = float(exec_state.shorted_cash)
-    if is_close_nb(shorted_cash, 0):
-        shorted_cash = 0.0
     free_cash = float(exec_state.free_cash)
     if is_close_nb(free_cash, 0):
         free_cash = 0.0
@@ -928,7 +910,6 @@ def execute_order_nb(
         position=position,
         debt=debt,
         locked_cash=locked_cash,
-        shorted_cash=shorted_cash,
         free_cash=free_cash,
     )
 
@@ -954,9 +935,9 @@ def execute_order_nb(
 
     # Ignore order if size or price is nan
     if np.isnan(order.size):
-        return exec_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.SizeNaN)
+        return order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.SizeNaN), exec_state
     if np.isnan(order_price):
-        return exec_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.PriceNaN)
+        return order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.PriceNaN), exec_state
 
     # Check account state
     if np.isnan(cash):
@@ -967,8 +948,6 @@ def execute_order_nb(
         raise ValueError("exec_state.debt must be finite and 0 or greater")
     if not np.isfinite(locked_cash) or locked_cash < 0:
         raise ValueError("exec_state.locked_cash must be finite and 0 or greater")
-    if not np.isfinite(shorted_cash) or shorted_cash < 0:
-        raise ValueError("exec_state.shorted_cash must be finite and 0 or greater")
     if np.isnan(free_cash):
         raise ValueError("exec_state.free_cash cannot be NaN")
 
@@ -1015,7 +994,7 @@ def execute_order_nb(
         if np.isinf(val_price) or val_price <= 0:
             raise ValueError("val_price_now must be finite and greater than 0")
         if np.isnan(val_price):
-            return exec_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.ValPriceNaN)
+            return order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.ValPriceNaN), exec_state
         if (
             order_size_type == SizeType.ValuePercent100
             or order_size_type == SizeType.ValuePercent
@@ -1023,9 +1002,9 @@ def execute_order_nb(
             or order_size_type == SizeType.TargetPercent
         ):
             if np.isnan(value):
-                return exec_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.ValueNaN)
+                return order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.ValueNaN), exec_state
             if value <= 0:
-                return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.ValueZeroNeg)
+                return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.ValueZeroNeg), exec_state
 
     order_size, percent = resolve_size_nb(
         size=order_size,
@@ -1044,7 +1023,7 @@ def execute_order_nb(
             as_requirement=True,
         )
         if is_less_nb(percent, min_percent):
-            return exec_state, order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.MinSizeNotReached)
+            return order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.MinSizeNotReached), exec_state
     if not np.isnan(max_order_size):
         max_order_size, max_percent = resolve_size_nb(
             size=max_order_size,
@@ -1058,7 +1037,7 @@ def execute_order_nb(
             percent = max_percent
 
     if order_size >= 0:
-        new_account_state, order_result = buy_nb(
+        order_result, new_account_state = buy_nb(
             account_state=account_state,
             size=order_size,
             price=order_price,
@@ -1078,7 +1057,7 @@ def execute_order_nb(
             is_closing_price=is_closing_price,
         )
     else:
-        new_account_state, order_result = sell_nb(
+        order_result, new_account_state = sell_nb(
             account_state=account_state,
             size=-order_size,
             price=order_price,
@@ -1099,7 +1078,7 @@ def execute_order_nb(
 
     if order.reject_prob > 0:
         if np.random.uniform(0, 1) < order.reject_prob:
-            return exec_state, order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.RandomEvent)
+            return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.RandomEvent), exec_state
 
     if order_result.status == OrderStatus.Rejected and order.raise_reject:
         raise_rejected_order_nb(order_result)
@@ -1124,13 +1103,12 @@ def execute_order_nb(
         position=new_account_state.position,
         debt=new_account_state.debt,
         locked_cash=new_account_state.locked_cash,
-        shorted_cash=new_account_state.shorted_cash,
         free_cash=new_account_state.free_cash,
         val_price=new_val_price,
         value=new_value,
     )
 
-    return new_exec_state, order_result
+    return order_result, new_exec_state
 
 
 @register_jitted(cache=True)
@@ -1143,8 +1121,8 @@ def fill_log_record_nb(
     price_area: PriceArea,
     exec_state: ExecState,
     order: Order,
-    new_exec_state: ExecState,
     order_result: OrderResult,
+    new_exec_state: ExecState,
     order_id: int,
 ) -> None:
     """Fill a log record."""
@@ -1161,7 +1139,6 @@ def fill_log_record_nb(
     records["exec_state_position"][r, col] = exec_state.position
     records["exec_state_debt"][r, col] = exec_state.debt
     records["exec_state_locked_cash"][r, col] = exec_state.locked_cash
-    records["exec_state_shorted_cash"][r, col] = exec_state.shorted_cash
     records["exec_state_free_cash"][r, col] = exec_state.free_cash
     records["exec_state_val_price"][r, col] = exec_state.val_price
     records["exec_state_value"][r, col] = exec_state.value
@@ -1182,20 +1159,19 @@ def fill_log_record_nb(
     records["req_allow_partial"][r, col] = order.allow_partial
     records["req_raise_reject"][r, col] = order.raise_reject
     records["req_log"][r, col] = order.log
-    records["new_exec_state_cash"][r, col] = new_exec_state.cash
-    records["new_exec_state_position"][r, col] = new_exec_state.position
-    records["new_exec_state_debt"][r, col] = new_exec_state.debt
-    records["new_exec_state_locked_cash"][r, col] = new_exec_state.locked_cash
-    records["new_exec_state_shorted_cash"][r, col] = new_exec_state.shorted_cash
-    records["new_exec_state_free_cash"][r, col] = new_exec_state.free_cash
-    records["new_exec_state_val_price"][r, col] = new_exec_state.val_price
-    records["new_exec_state_value"][r, col] = new_exec_state.value
     records["res_size"][r, col] = order_result.size
     records["res_price"][r, col] = order_result.price
     records["res_fees"][r, col] = order_result.fees
     records["res_side"][r, col] = order_result.side
     records["res_status"][r, col] = order_result.status
     records["res_status_info"][r, col] = order_result.status_info
+    records["new_exec_state_cash"][r, col] = new_exec_state.cash
+    records["new_exec_state_position"][r, col] = new_exec_state.position
+    records["new_exec_state_debt"][r, col] = new_exec_state.debt
+    records["new_exec_state_locked_cash"][r, col] = new_exec_state.locked_cash
+    records["new_exec_state_free_cash"][r, col] = new_exec_state.free_cash
+    records["new_exec_state_val_price"][r, col] = new_exec_state.val_price
+    records["new_exec_state_value"][r, col] = new_exec_state.value
     records["order_id"][r, col] = order_id
 
 
@@ -1258,11 +1234,11 @@ def process_order_nb(
     order_counts: tp.Optional[tp.Array1d] = None,
     log_records: tp.Optional[tp.RecordArray2d] = None,
     log_counts: tp.Optional[tp.Array1d] = None,
-) -> tp.Tuple[ExecState, OrderResult]:
+) -> tp.Tuple[OrderResult, ExecState]:
     """Process an order by executing it, saving relevant information to the logs, and returning a new state."""
 
     # Execute the order
-    new_exec_state, order_result = execute_order_nb(
+    order_result, new_exec_state = execute_order_nb(
         exec_state=exec_state,
         order=order,
         price_area=price_area,
@@ -1292,13 +1268,13 @@ def process_order_nb(
                 price_area,
                 exec_state,
                 order,
-                new_exec_state,
                 order_result,
+                new_exec_state,
                 order_counts[col] - 1 if order_counts is not None and is_filled else -1,
             )
             log_counts[col] += 1
 
-    return new_exec_state, order_result
+    return order_result, new_exec_state
 
 
 @register_jitted(cache=True)
@@ -1458,18 +1434,18 @@ def approx_order_value_nb(
     if size_type == SizeType.Percent:
         if size >= 0:
             if exec_state.position <= 0 and direction == Direction.ShortOnly:
-                return size * (exec_state.free_cash + exec_state.shorted_cash)
+                return size * max(exec_state.free_cash + exec_state.debt + exec_state.locked_cash, 0.0)
             elif exec_state.position < 0:
-                return 2 * size * (exec_state.free_cash + exec_state.shorted_cash)
+                return 2 * size * max(exec_state.free_cash + exec_state.debt + exec_state.locked_cash, 0.0)
             else:
-                return size * exec_state.free_cash
+                return size * max(exec_state.free_cash, 0.0)
         else:
             if exec_state.position >= 0 and direction == Direction.LongOnly:
                 return size * asset_value_now
             elif exec_state.position > 0:
                 return 2 * size * asset_value_now
             else:
-                return size * exec_state.free_cash
+                return size * max(exec_state.free_cash, 0.0)
     return np.nan
 
 

@@ -87,7 +87,6 @@ def sort_call_seq_out_1d_nb(
             position=ctx.last_position[col],
             debt=ctx.last_debt[col],
             locked_cash=ctx.last_locked_cash[col],
-            shorted_cash=ctx.last_shorted_cash[col],
             free_cash=free_cash_now,
             val_price=ctx.last_val_price[col],
             value=group_value_now,
@@ -154,7 +153,6 @@ def sort_call_seq_out_nb(
             position=ctx.last_position[col],
             debt=ctx.last_debt[col],
             locked_cash=ctx.last_locked_cash[col],
-            shorted_cash=ctx.last_shorted_cash[col],
             free_cash=free_cash_now,
             val_price=ctx.last_val_price[col],
             value=group_value_now,
@@ -196,7 +194,6 @@ def try_order_nb(ctx: OrderContext, order: Order) -> tp.Tuple[ExecState, OrderRe
         position=ctx.position_now,
         debt=ctx.debt_now,
         locked_cash=ctx.locked_cash_now,
-        shorted_cash=ctx.shorted_cash_now,
         free_cash=ctx.free_cash_now,
         val_price=ctx.val_price_now,
         value=ctx.value_now,
@@ -795,7 +792,6 @@ def simulate_nb(
     last_val_price = np.full_like(last_position, np.nan)
     last_debt = np.full_like(last_position, 0.0)
     last_locked_cash = np.full_like(last_position, 0.0)
-    last_shorted_cash = np.full_like(last_position, 0.0)
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
@@ -839,7 +835,6 @@ def simulate_nb(
         last_position=last_position,
         last_debt=last_debt,
         last_locked_cash=last_locked_cash,
-        last_shorted_cash=last_shorted_cash,
         last_free_cash=last_free_cash,
         last_val_price=last_val_price,
         last_value=last_value,
@@ -887,7 +882,6 @@ def simulate_nb(
             last_position=last_position,
             last_debt=last_debt,
             last_locked_cash=last_locked_cash,
-            last_shorted_cash=last_shorted_cash,
             last_free_cash=last_free_cash,
             last_val_price=last_val_price,
             last_value=last_value,
@@ -975,7 +969,6 @@ def simulate_nb(
                     last_position=last_position,
                     last_debt=last_debt,
                     last_locked_cash=last_locked_cash,
-                    last_shorted_cash=last_shorted_cash,
                     last_free_cash=last_free_cash,
                     last_val_price=last_val_price,
                     last_value=last_value,
@@ -1050,7 +1043,6 @@ def simulate_nb(
                     position_now = last_position[col]
                     debt_now = last_debt[col]
                     locked_cash_now = last_locked_cash[col]
-                    shorted_cash_now = last_shorted_cash[col]
                     val_price_now = last_val_price[col]
                     pos_record_now = last_pos_record[col]
                     if cash_sharing:
@@ -1098,7 +1090,6 @@ def simulate_nb(
                         last_position=last_position,
                         last_debt=last_debt,
                         last_locked_cash=last_locked_cash,
-                        last_shorted_cash=last_shorted_cash,
                         last_free_cash=last_free_cash,
                         last_val_price=last_val_price,
                         last_value=last_value,
@@ -1118,7 +1109,6 @@ def simulate_nb(
                         position_now=position_now,
                         debt_now=debt_now,
                         locked_cash_now=locked_cash_now,
-                        shorted_cash_now=shorted_cash_now,
                         free_cash_now=free_cash_now,
                         val_price_now=val_price_now,
                         value_now=value_now,
@@ -1147,12 +1137,11 @@ def simulate_nb(
                         position=position_now,
                         debt=debt_now,
                         locked_cash=locked_cash_now,
-                        shorted_cash=shorted_cash_now,
                         free_cash=free_cash_now,
                         val_price=val_price_now,
                         value=value_now,
                     )
-                    new_exec_state, order_result = process_order_nb(
+                    order_result, new_exec_state = process_order_nb(
                         group=group,
                         col=col,
                         i=i,
@@ -1171,7 +1160,6 @@ def simulate_nb(
                     position_now = new_exec_state.position
                     debt_now = new_exec_state.debt
                     locked_cash_now = new_exec_state.locked_cash
-                    shorted_cash_now = new_exec_state.shorted_cash
                     free_cash_now = new_exec_state.free_cash
 
                     if track_value:
@@ -1189,7 +1177,6 @@ def simulate_nb(
                     last_position[col] = position_now
                     last_debt[col] = debt_now
                     last_locked_cash[col] = locked_cash_now
-                    last_shorted_cash[col] = shorted_cash_now
                     if cash_sharing:
                         last_cash[group] = cash_now
                         last_free_cash[group] = free_cash_now
@@ -1256,7 +1243,6 @@ def simulate_nb(
                         last_position=last_position,
                         last_debt=last_debt,
                         last_locked_cash=last_locked_cash,
-                        last_shorted_cash=last_shorted_cash,
                         last_free_cash=last_free_cash,
                         last_val_price=last_val_price,
                         last_value=last_value,
@@ -1276,7 +1262,6 @@ def simulate_nb(
                         position_before=exec_state.position,
                         debt_before=exec_state.debt,
                         locked_cash_before=exec_state.locked_cash,
-                        shorted_cash_before=exec_state.shorted_cash,
                         free_cash_before=exec_state.free_cash,
                         val_price_before=exec_state.val_price,
                         value_before=exec_state.value,
@@ -1285,7 +1270,6 @@ def simulate_nb(
                         position_now=position_now,
                         debt_now=debt_now,
                         locked_cash_now=locked_cash_now,
-                        shorted_cash_now=shorted_cash_now,
                         free_cash_now=free_cash_now,
                         val_price_now=val_price_now,
                         value_now=value_now,
@@ -1377,7 +1361,6 @@ def simulate_nb(
                     last_position=last_position,
                     last_debt=last_debt,
                     last_locked_cash=last_locked_cash,
-                    last_shorted_cash=last_shorted_cash,
                     last_free_cash=last_free_cash,
                     last_val_price=last_val_price,
                     last_value=last_value,
@@ -1426,7 +1409,6 @@ def simulate_nb(
             last_position=last_position,
             last_debt=last_debt,
             last_locked_cash=last_locked_cash,
-            last_shorted_cash=last_shorted_cash,
             last_free_cash=last_free_cash,
             last_val_price=last_val_price,
             last_value=last_value,
@@ -1473,7 +1455,6 @@ def simulate_nb(
         last_position=last_position,
         last_debt=last_debt,
         last_locked_cash=last_locked_cash,
-        last_shorted_cash=last_shorted_cash,
         last_free_cash=last_free_cash,
         last_val_price=last_val_price,
         last_value=last_value,
@@ -1730,7 +1711,6 @@ def simulate_row_wise_nb(
     last_val_price = np.full_like(last_position, np.nan)
     last_debt = np.full_like(last_position, 0.0)
     last_locked_cash = np.full_like(last_position, 0.0)
-    last_shorted_cash = np.full_like(last_position, 0.0)
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
@@ -1774,7 +1754,6 @@ def simulate_row_wise_nb(
         last_position=last_position,
         last_debt=last_debt,
         last_locked_cash=last_locked_cash,
-        last_shorted_cash=last_shorted_cash,
         last_free_cash=last_free_cash,
         last_val_price=last_val_price,
         last_value=last_value,
@@ -1819,7 +1798,6 @@ def simulate_row_wise_nb(
             last_position=last_position,
             last_debt=last_debt,
             last_locked_cash=last_locked_cash,
-            last_shorted_cash=last_shorted_cash,
             last_free_cash=last_free_cash,
             last_val_price=last_val_price,
             last_value=last_value,
@@ -1908,7 +1886,6 @@ def simulate_row_wise_nb(
                     last_position=last_position,
                     last_debt=last_debt,
                     last_locked_cash=last_locked_cash,
-                    last_shorted_cash=last_shorted_cash,
                     last_free_cash=last_free_cash,
                     last_val_price=last_val_price,
                     last_value=last_value,
@@ -1983,7 +1960,6 @@ def simulate_row_wise_nb(
                     position_now = last_position[col]
                     debt_now = last_debt[col]
                     locked_cash_now = last_locked_cash[col]
-                    shorted_cash_now = last_shorted_cash[col]
                     val_price_now = last_val_price[col]
                     pos_record_now = last_pos_record[col]
                     if cash_sharing:
@@ -2031,7 +2007,6 @@ def simulate_row_wise_nb(
                         last_position=last_position,
                         last_debt=last_debt,
                         last_locked_cash=last_locked_cash,
-                        last_shorted_cash=last_shorted_cash,
                         last_free_cash=last_free_cash,
                         last_val_price=last_val_price,
                         last_value=last_value,
@@ -2051,7 +2026,6 @@ def simulate_row_wise_nb(
                         position_now=position_now,
                         debt_now=debt_now,
                         locked_cash_now=locked_cash_now,
-                        shorted_cash_now=shorted_cash_now,
                         free_cash_now=free_cash_now,
                         val_price_now=val_price_now,
                         value_now=value_now,
@@ -2080,12 +2054,11 @@ def simulate_row_wise_nb(
                         position=position_now,
                         debt=debt_now,
                         locked_cash=locked_cash_now,
-                        shorted_cash=shorted_cash_now,
                         free_cash=free_cash_now,
                         val_price=val_price_now,
                         value=value_now,
                     )
-                    new_exec_state, order_result = process_order_nb(
+                    order_result, new_exec_state = process_order_nb(
                         group=group,
                         col=col,
                         i=i,
@@ -2104,7 +2077,6 @@ def simulate_row_wise_nb(
                     position_now = new_exec_state.position
                     debt_now = new_exec_state.debt
                     locked_cash_now = new_exec_state.locked_cash
-                    shorted_cash_now = new_exec_state.shorted_cash
                     free_cash_now = new_exec_state.free_cash
 
                     if track_value:
@@ -2122,7 +2094,6 @@ def simulate_row_wise_nb(
                     last_position[col] = position_now
                     last_debt[col] = debt_now
                     last_locked_cash[col] = locked_cash_now
-                    last_shorted_cash[col] = shorted_cash_now
                     if cash_sharing:
                         last_cash[group] = cash_now
                         last_free_cash[group] = free_cash_now
@@ -2189,7 +2160,6 @@ def simulate_row_wise_nb(
                         last_position=last_position,
                         last_debt=last_debt,
                         last_locked_cash=last_locked_cash,
-                        last_shorted_cash=last_shorted_cash,
                         last_free_cash=last_free_cash,
                         last_val_price=last_val_price,
                         last_value=last_value,
@@ -2209,7 +2179,6 @@ def simulate_row_wise_nb(
                         position_before=exec_state.position,
                         debt_before=exec_state.debt,
                         locked_cash_before=exec_state.locked_cash,
-                        shorted_cash_before=exec_state.shorted_cash,
                         free_cash_before=exec_state.free_cash,
                         val_price_before=exec_state.val_price,
                         value_before=exec_state.value,
@@ -2218,7 +2187,6 @@ def simulate_row_wise_nb(
                         position_now=position_now,
                         debt_now=debt_now,
                         locked_cash_now=locked_cash_now,
-                        shorted_cash_now=shorted_cash_now,
                         free_cash_now=free_cash_now,
                         val_price_now=val_price_now,
                         value_now=value_now,
@@ -2310,7 +2278,6 @@ def simulate_row_wise_nb(
                     last_position=last_position,
                     last_debt=last_debt,
                     last_locked_cash=last_locked_cash,
-                    last_shorted_cash=last_shorted_cash,
                     last_free_cash=last_free_cash,
                     last_val_price=last_val_price,
                     last_value=last_value,
@@ -2359,7 +2326,6 @@ def simulate_row_wise_nb(
             last_position=last_position,
             last_debt=last_debt,
             last_locked_cash=last_locked_cash,
-            last_shorted_cash=last_shorted_cash,
             last_free_cash=last_free_cash,
             last_val_price=last_val_price,
             last_value=last_value,
@@ -2403,7 +2369,6 @@ def simulate_row_wise_nb(
         last_position=last_position,
         last_debt=last_debt,
         last_locked_cash=last_locked_cash,
-        last_shorted_cash=last_shorted_cash,
         last_free_cash=last_free_cash,
         last_val_price=last_val_price,
         last_value=last_value,
@@ -2808,7 +2773,6 @@ def flex_simulate_nb(
     last_val_price = np.full_like(last_position, np.nan)
     last_debt = np.full_like(last_position, 0.0)
     last_locked_cash = np.full_like(last_position, 0.0)
-    last_shorted_cash = np.full_like(last_position, 0.0)
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
@@ -2850,7 +2814,6 @@ def flex_simulate_nb(
         last_position=last_position,
         last_debt=last_debt,
         last_locked_cash=last_locked_cash,
-        last_shorted_cash=last_shorted_cash,
         last_free_cash=last_free_cash,
         last_val_price=last_val_price,
         last_value=last_value,
@@ -2898,7 +2861,6 @@ def flex_simulate_nb(
             last_position=last_position,
             last_debt=last_debt,
             last_locked_cash=last_locked_cash,
-            last_shorted_cash=last_shorted_cash,
             last_free_cash=last_free_cash,
             last_val_price=last_val_price,
             last_value=last_value,
@@ -2980,7 +2942,6 @@ def flex_simulate_nb(
                     last_position=last_position,
                     last_debt=last_debt,
                     last_locked_cash=last_locked_cash,
-                    last_shorted_cash=last_shorted_cash,
                     last_free_cash=last_free_cash,
                     last_val_price=last_val_price,
                     last_value=last_value,
@@ -3080,7 +3041,6 @@ def flex_simulate_nb(
                         last_position=last_position,
                         last_debt=last_debt,
                         last_locked_cash=last_locked_cash,
-                        last_shorted_cash=last_shorted_cash,
                         last_free_cash=last_free_cash,
                         last_val_price=last_val_price,
                         last_value=last_value,
@@ -3114,7 +3074,6 @@ def flex_simulate_nb(
                     position_now = last_position[col]
                     debt_now = last_debt[col]
                     locked_cash_now = last_locked_cash[col]
-                    shorted_cash_now = last_shorted_cash[col]
                     val_price_now = last_val_price[col]
                     pos_record_now = last_pos_record[col]
                     if cash_sharing:
@@ -3142,12 +3101,11 @@ def flex_simulate_nb(
                         position=position_now,
                         debt=debt_now,
                         locked_cash=locked_cash_now,
-                        shorted_cash=shorted_cash_now,
                         free_cash=free_cash_now,
                         val_price=val_price_now,
                         value=value_now,
                     )
-                    new_exec_state, order_result = process_order_nb(
+                    order_result, new_exec_state = process_order_nb(
                         group=group,
                         col=col,
                         i=i,
@@ -3166,7 +3124,6 @@ def flex_simulate_nb(
                     position_now = new_exec_state.position
                     debt_now = new_exec_state.debt
                     locked_cash_now = new_exec_state.locked_cash
-                    shorted_cash_now = new_exec_state.shorted_cash
                     free_cash_now = new_exec_state.free_cash
 
                     if track_value:
@@ -3184,7 +3141,6 @@ def flex_simulate_nb(
                     last_position[col] = position_now
                     last_debt[col] = debt_now
                     last_locked_cash[col] = locked_cash_now
-                    last_shorted_cash[col] = shorted_cash_now
                     if not np.isnan(val_price_now) or not ffill_val_price:
                         last_val_price[col] = val_price_now
                     if cash_sharing:
@@ -3257,7 +3213,6 @@ def flex_simulate_nb(
                         last_position=last_position,
                         last_debt=last_debt,
                         last_locked_cash=last_locked_cash,
-                        last_shorted_cash=last_shorted_cash,
                         last_free_cash=last_free_cash,
                         last_val_price=last_val_price,
                         last_value=last_value,
@@ -3277,7 +3232,6 @@ def flex_simulate_nb(
                         position_before=exec_state.position,
                         debt_before=exec_state.debt,
                         locked_cash_before=exec_state.locked_cash,
-                        shorted_cash_before=exec_state.shorted_cash,
                         free_cash_before=exec_state.free_cash,
                         val_price_before=exec_state.val_price,
                         value_before=exec_state.value,
@@ -3286,7 +3240,6 @@ def flex_simulate_nb(
                         position_now=position_now,
                         debt_now=debt_now,
                         locked_cash_now=locked_cash_now,
-                        shorted_cash_now=shorted_cash_now,
                         free_cash_now=free_cash_now,
                         val_price_now=val_price_now,
                         value_now=value_now,
@@ -3378,7 +3331,6 @@ def flex_simulate_nb(
                     last_position=last_position,
                     last_debt=last_debt,
                     last_locked_cash=last_locked_cash,
-                    last_shorted_cash=last_shorted_cash,
                     last_free_cash=last_free_cash,
                     last_val_price=last_val_price,
                     last_value=last_value,
@@ -3427,7 +3379,6 @@ def flex_simulate_nb(
             last_position=last_position,
             last_debt=last_debt,
             last_locked_cash=last_locked_cash,
-            last_shorted_cash=last_shorted_cash,
             last_free_cash=last_free_cash,
             last_val_price=last_val_price,
             last_value=last_value,
@@ -3474,7 +3425,6 @@ def flex_simulate_nb(
         last_position=last_position,
         last_debt=last_debt,
         last_locked_cash=last_locked_cash,
-        last_shorted_cash=last_shorted_cash,
         last_free_cash=last_free_cash,
         last_val_price=last_val_price,
         last_value=last_value,
@@ -3676,7 +3626,6 @@ def flex_simulate_row_wise_nb(
     last_val_price = np.full_like(last_position, np.nan)
     last_debt = np.full_like(last_position, 0.0)
     last_locked_cash = np.full_like(last_position, 0.0)
-    last_shorted_cash = np.full_like(last_position, 0.0)
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
@@ -3718,7 +3667,6 @@ def flex_simulate_row_wise_nb(
         last_position=last_position,
         last_debt=last_debt,
         last_locked_cash=last_locked_cash,
-        last_shorted_cash=last_shorted_cash,
         last_free_cash=last_free_cash,
         last_val_price=last_val_price,
         last_value=last_value,
@@ -3763,7 +3711,6 @@ def flex_simulate_row_wise_nb(
             last_position=last_position,
             last_debt=last_debt,
             last_locked_cash=last_locked_cash,
-            last_shorted_cash=last_shorted_cash,
             last_free_cash=last_free_cash,
             last_val_price=last_val_price,
             last_value=last_value,
@@ -3845,7 +3792,6 @@ def flex_simulate_row_wise_nb(
                     last_position=last_position,
                     last_debt=last_debt,
                     last_locked_cash=last_locked_cash,
-                    last_shorted_cash=last_shorted_cash,
                     last_free_cash=last_free_cash,
                     last_val_price=last_val_price,
                     last_value=last_value,
@@ -3945,7 +3891,6 @@ def flex_simulate_row_wise_nb(
                         last_position=last_position,
                         last_debt=last_debt,
                         last_locked_cash=last_locked_cash,
-                        last_shorted_cash=last_shorted_cash,
                         last_free_cash=last_free_cash,
                         last_val_price=last_val_price,
                         last_value=last_value,
@@ -3979,7 +3924,6 @@ def flex_simulate_row_wise_nb(
                     position_now = last_position[col]
                     debt_now = last_debt[col]
                     locked_cash_now = last_locked_cash[col]
-                    shorted_cash_now = last_shorted_cash[col]
                     val_price_now = last_val_price[col]
                     pos_record_now = last_pos_record[col]
                     if cash_sharing:
@@ -4007,12 +3951,11 @@ def flex_simulate_row_wise_nb(
                         position=position_now,
                         debt=debt_now,
                         locked_cash=locked_cash_now,
-                        shorted_cash=shorted_cash_now,
                         free_cash=free_cash_now,
                         val_price=val_price_now,
                         value=value_now,
                     )
-                    new_exec_state, order_result = process_order_nb(
+                    order_result, new_exec_state = process_order_nb(
                         group=group,
                         col=col,
                         i=i,
@@ -4031,7 +3974,6 @@ def flex_simulate_row_wise_nb(
                     position_now = new_exec_state.position
                     debt_now = new_exec_state.debt
                     locked_cash_now = new_exec_state.locked_cash
-                    shorted_cash_now = new_exec_state.shorted_cash
                     free_cash_now = new_exec_state.free_cash
 
                     if track_value:
@@ -4049,7 +3991,6 @@ def flex_simulate_row_wise_nb(
                     last_position[col] = position_now
                     last_debt[col] = debt_now
                     last_locked_cash[col] = locked_cash_now
-                    last_shorted_cash[col] = shorted_cash_now
                     if not np.isnan(val_price_now) or not ffill_val_price:
                         last_val_price[col] = val_price_now
                     if cash_sharing:
@@ -4122,7 +4063,6 @@ def flex_simulate_row_wise_nb(
                         last_position=last_position,
                         last_debt=last_debt,
                         last_locked_cash=last_locked_cash,
-                        last_shorted_cash=last_shorted_cash,
                         last_free_cash=last_free_cash,
                         last_val_price=last_val_price,
                         last_value=last_value,
@@ -4142,7 +4082,6 @@ def flex_simulate_row_wise_nb(
                         position_before=exec_state.position,
                         debt_before=exec_state.debt,
                         locked_cash_before=exec_state.locked_cash,
-                        shorted_cash_before=exec_state.shorted_cash,
                         free_cash_before=exec_state.free_cash,
                         val_price_before=exec_state.val_price,
                         value_before=exec_state.value,
@@ -4151,7 +4090,6 @@ def flex_simulate_row_wise_nb(
                         position_now=position_now,
                         debt_now=debt_now,
                         locked_cash_now=locked_cash_now,
-                        shorted_cash_now=shorted_cash_now,
                         free_cash_now=free_cash_now,
                         val_price_now=val_price_now,
                         value_now=value_now,
@@ -4243,7 +4181,6 @@ def flex_simulate_row_wise_nb(
                     last_position=last_position,
                     last_debt=last_debt,
                     last_locked_cash=last_locked_cash,
-                    last_shorted_cash=last_shorted_cash,
                     last_free_cash=last_free_cash,
                     last_val_price=last_val_price,
                     last_value=last_value,
@@ -4292,7 +4229,6 @@ def flex_simulate_row_wise_nb(
             last_position=last_position,
             last_debt=last_debt,
             last_locked_cash=last_locked_cash,
-            last_shorted_cash=last_shorted_cash,
             last_free_cash=last_free_cash,
             last_val_price=last_val_price,
             last_value=last_value,
@@ -4336,7 +4272,6 @@ def flex_simulate_row_wise_nb(
         last_position=last_position,
         last_debt=last_debt,
         last_locked_cash=last_locked_cash,
-        last_shorted_cash=last_shorted_cash,
         last_free_cash=last_free_cash,
         last_val_price=last_val_price,
         last_value=last_value,
