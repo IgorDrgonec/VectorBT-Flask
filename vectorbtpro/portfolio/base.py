@@ -9284,7 +9284,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     chunked=chunked,
                 )
             if value is None:
-                value = cls_or_self.resolve_shortcut_attr("value", group_by=group_by, jitted=jitted, chunked=chunked)
+                value = cls_or_self.resolve_shortcut_attr(
+                    "value",
+                    group_by=group_by,
+                    jitted=jitted,
+                    chunked=chunked,
+                )
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
@@ -9292,8 +9297,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             checks.assert_not_none(value)
             checks.assert_not_none(wrapper)
 
-        if not wrapper.grouper.is_grouped(group_by=group_by):
-            raise ValueError("Portfolio must be grouped. Provide group_by.")
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
         func = jit_reg.resolve_option(nb.allocations_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
