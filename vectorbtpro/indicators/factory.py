@@ -53,7 +53,6 @@ from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import BaseAccessor
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.indicators.expr import expr_func_config, expr_res_func_config, wqa101_expr_config
-from vectorbtpro.registries.ca_registry import is_cacheable
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.array_ import build_nan_mask, squeeze_nan, unsqueeze_nan
@@ -1243,8 +1242,7 @@ class IndicatorFactory(Configured):
             output_names (list of str): List with output names.
             output_flags (dict): Dictionary of in-place and regular output flags.
             lazy_outputs (dict): Dictionary with user-defined functions that will be
-                bound to the indicator class and wrapped with `vectorbtpro.utils.decorators.cacheable_property`
-                if not already wrapped.
+                bound to the indicator class and wrapped with `property` if not already wrapped.
             attr_settings (dict): Dictionary with attribute settings.
 
                 Attributes can be `input_names`, `in_output_names`, `output_names`, and `lazy_outputs`.
@@ -1255,6 +1253,8 @@ class IndicatorFactory(Configured):
                     Set to None to disable. Default is `np.float_`. Can be set to instance of
                     `collections.namedtuple` acting as enumerated type, or any other mapping;
                     It will then create a property with suffix `readable` that contains data in a string format.
+                * `enum_unkval`: Value to be considered as unknown. Applies to enumerated data types only.
+                * `make_cacheable`: Whether to make the property cacheable. Applies to inputs only.
             metrics (dict): Metrics supported by `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats`.
 
                 If dict, will be converted to `vectorbtpro.utils.config.Config`.
@@ -1349,7 +1349,13 @@ class IndicatorFactory(Configured):
         checks.assert_instance_of(attr_settings, dict)
         all_attr_names = input_names + all_output_names + list(lazy_outputs.keys())
         if len(attr_settings) > 0:
-            checks.assert_dict_valid(attr_settings, all_attr_names)
+            checks.assert_dict_valid(
+                attr_settings,
+                [
+                    all_attr_names,
+                    ["dtype", "enum_unkval", "make_cacheable"],
+                ]
+            )
 
         # Set up class
         ParamIndexer = build_param_indexer(
@@ -1378,6 +1384,8 @@ class IndicatorFactory(Configured):
             setattr(Indicator, f"{param_name}_list", property(param_list_prop))
 
         for input_name in input_names:
+            _attr_settings = attr_settings.get(input_name, {})
+            make_cacheable = _attr_settings.get("make_cacheable", False)
 
             def input_prop(self, _input_name: str = input_name) -> tp.SeriesFrame:
                 """Input array."""
@@ -1388,7 +1396,10 @@ class IndicatorFactory(Configured):
                 return self.wrapper.wrap(old_input[:, input_mapper])
 
             input_prop.__name__ = input_name
-            setattr(Indicator, input_name, cacheable_property(input_prop))
+            if make_cacheable:
+                setattr(Indicator, input_name, cacheable_property(input_prop))
+            else:
+                setattr(Indicator, input_name, property(input_prop))
 
         for output_name in all_output_names:
 
@@ -1453,8 +1464,8 @@ class IndicatorFactory(Configured):
             if prop.__doc__ is None:
                 prop.__doc__ = f"""Custom property."""
             prop.__name__ = prop_name
-            if not is_cacheable(prop):
-                prop = cacheable_property(prop)
+            if not isinstance(prop, property):
+                prop = property(prop)
             setattr(Indicator, prop_name, prop)
 
         # Add comparison & combination methods for all inputs, outputs, and user-defined properties
@@ -1505,7 +1516,6 @@ class IndicatorFactory(Configured):
 
         for attr_name in all_attr_names:
             _attr_settings = attr_settings.get(attr_name, {})
-            checks.assert_dict_valid(_attr_settings, ["dtype", "enum_unkval"])
             dtype = _attr_settings.get("dtype", np.float_)
             enum_unkval = _attr_settings.get("enum_unkval", -1)
 
