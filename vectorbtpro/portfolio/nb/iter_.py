@@ -1,6 +1,6 @@
 # Copyright (c) 2022 Oleg Polakow. All rights reserved.
 
-"""Numba-compiled functions for iterative portfolio modeling."""
+"""Numba-compiled functions for iterative portfolio simulation."""
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.flex_indexing import flex_select_nb

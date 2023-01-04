@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Core Numba-compiled functions for portfolio modeling."""
+"""Core Numba-compiled functions for portfolio simulation."""
 
 import numpy as np
 
@@ -261,22 +261,12 @@ def long_sell_nb(
     # Update the current account state
     new_cash = account_state.cash + final_acq_cash
     new_position = add_nb(account_state.position, -size_limit)
-    if account_state.debt > 0:
-        total_alloc = account_state.debt + account_state.locked_cash
-        avg_entry_price = total_alloc / abs(account_state.position)
-        entry_value = size_limit * avg_entry_price
-        debt_ratio = account_state.debt / (account_state.locked_cash + account_state.debt)
-        debt_part = entry_value * debt_ratio
-        locked_cash_ratio = account_state.locked_cash / (account_state.locked_cash + account_state.debt)
-        locked_cash_part = entry_value * locked_cash_ratio
-        pnl = add_nb(final_acq_cash, -entry_value)
-        new_debt = add_nb(account_state.debt, -debt_part)
-        new_locked_cash = add_nb(account_state.locked_cash, -locked_cash_part)
-        new_free_cash = add_nb(account_state.free_cash + locked_cash_part, pnl)
-    else:
-        new_debt = account_state.debt
-        new_locked_cash = account_state.locked_cash
-        new_free_cash = account_state.free_cash + final_acq_cash
+    new_pos_fraction = abs(new_position) / abs(account_state.position)
+    new_debt = new_pos_fraction * account_state.debt
+    new_locked_cash = new_pos_fraction * account_state.locked_cash
+    size_fraction = size_limit / account_state.position
+    released_debt = size_fraction * account_state.debt
+    new_free_cash = add_nb(account_state.free_cash, final_acq_cash - released_debt)
     new_account_state = AccountState(
         cash=new_cash,
         position=new_position,

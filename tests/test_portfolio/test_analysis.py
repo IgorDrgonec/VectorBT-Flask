@@ -5460,12 +5460,48 @@ class TestPortfolio:
         assert_frame_equal(pf.get_value(chunked=True), pf.get_value(chunked=False))
 
     def test_allocations(self):
-        with pytest.raises(Exception):
-            pf.get_allocations()
-        with pytest.raises(Exception):
-            pf.get_allocations(direction="longonly")
-        with pytest.raises(Exception):
-            pf.get_allocations(direction="shortonly")
+        assert_frame_equal(
+            pf.get_allocations(),
+            pd.DataFrame(
+                [
+                    [0.0196078431372549, -0.010101010101010102, 0.010012024441354066],
+                    [0.021590645676110087, -0.022472823716428926, 0.021830620581035857],
+                    [0.0014790253499028883, -0.01111694919382411, 0.002949383274126105],
+                    [0.0, -0.020451154513687394, 0.0],
+                    [0.024675782427111933, -0.05144337771456415, 0.0]
+                ],
+                index=close_na.index,
+                columns=close_na.columns,
+            )
+        )
+        assert_frame_equal(
+            pf.get_allocations(direction="longonly"),
+            pd.DataFrame(
+                [
+                    [0.0196078431372549, 0.0, 0.010012024441354066],
+                    [0.021590645676110087, 0.0, 0.021830620581035857],
+                    [0.0014790253499028883, 0.0, 0.002949383274126105],
+                    [0.0, 0.0, 0.0],
+                    [0.024675782427111933, 0.0, 0.0],
+                ],
+                index=close_na.index,
+                columns=close_na.columns,
+            )
+        )
+        assert_frame_equal(
+            pf.get_allocations(direction="shortonly"),
+            pd.DataFrame(
+                [
+                    [0.0, 0.010101010101010102, 0.0],
+                    [0.0, 0.022472823716428926, 0.0],
+                    [0.0, 0.01111694919382411, 0.0],
+                    [0.0, 0.020451154513687394, 0.0],
+                    [0.0, 0.05144337771456415, 0.0],
+                ],
+                index=close_na.index,
+                columns=close_na.columns,
+            )
+        )
         assert_frame_equal(
             pf_grouped.allocations,
             pd.DataFrame(

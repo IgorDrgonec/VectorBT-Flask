@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Numba-compiled functions for portfolio modeling based on signals."""
+"""Numba-compiled functions for portfolio simulation based on signals."""
 
 from numba import prange
 

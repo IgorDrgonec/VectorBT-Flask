@@ -1,8 +1,8 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Base class for modeling portfolio and measuring its performance.
+"""Base class for simulating a portfolio and measuring its performance.
 
-Provides the class `vectorbtpro.portfolio.base.Portfolio` for modeling portfolio performance
+Provides the class `vectorbtpro.portfolio.base.Portfolio` for simulating a portfolio
 and calculating various risk and performance metrics. It uses Numba-compiled
 functions from `vectorbtpro.portfolio.nb` for most computations and record classes based on
 `vectorbtpro.records.base.Records` for evaluating events such as orders, logs, trades, positions, and drawdowns.
@@ -2042,7 +2042,7 @@ class MetaPortfolio(type(Analyzable), type(PortfolioWithInOutputs)):
 @attach_shortcut_properties(shortcut_config)
 @attach_returns_acc_methods(returns_acc_config)
 class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
-    """Class for modeling portfolio and measuring its performance.
+    """Class for simulating a portfolio and measuring its performance.
 
     Args:
         wrapper (ArrayWrapper): Array wrapper.
@@ -2842,8 +2842,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         return cls(**kwargs)
 
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Analyzable._expected_keys or set()) | {
-        "close",
         "order_records",
+        "close",
         "open",
         "high",
         "low",
@@ -2872,8 +2872,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     def __init__(
         self,
         wrapper: ArrayWrapper,
-        close: tp.ArrayLike,
         order_records: tp.RecordArray,
+        *,
+        close: tp.ArrayLike,
         open: tp.Optional[tp.ArrayLike] = None,
         high: tp.Optional[tp.ArrayLike] = None,
         low: tp.Optional[tp.ArrayLike] = None,
@@ -2890,13 +2891,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         bm_close: tp.Optional[tp.ArrayLike] = None,
         fillna_close: tp.Optional[bool] = None,
         trades_type: tp.Optional[tp.Union[str, int]] = None,
-        orders_cls: type = Orders,
-        logs_cls: type = Logs,
-        trades_cls: type = Trades,
-        entry_trades_cls: type = EntryTrades,
-        exit_trades_cls: type = ExitTrades,
-        positions_cls: type = Positions,
-        drawdowns_cls: type = Drawdowns,
+        orders_cls: tp.Optional[type] = None,
+        logs_cls: tp.Optional[type] = None,
+        trades_cls: tp.Optional[type] = None,
+        entry_trades_cls: tp.Optional[type] = None,
+        exit_trades_cls: tp.Optional[type] = None,
+        positions_cls: tp.Optional[type] = None,
+        drawdowns_cls: tp.Optional[type] = None,
         **kwargs,
     ) -> None:
 
@@ -2910,11 +2911,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         Analyzable.__init__(
             self,
             wrapper,
-            close=close,
             order_records=order_records,
             open=open,
             high=high,
             low=low,
+            close=close,
             log_records=log_records,
             cash_sharing=cash_sharing,
             init_cash=init_cash,
@@ -3656,11 +3657,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         return self.replace(
             wrapper=wrapper_meta["new_wrapper"],
-            close=new_close,
             order_records=new_order_records,
             open=new_open,
             high=new_high,
             low=new_low,
+            close=new_close,
             log_records=new_log_records,
             init_cash=new_init_cash,
             init_position=new_init_position,
@@ -3877,11 +3878,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         return self.replace(
             wrapper=new_wrapper,
-            close=new_close,
             order_records=new_order_records,
             open=new_open,
             high=new_high,
             low=new_low,
+            close=new_close,
             log_records=new_log_records,
             cash_deposits=new_cash_deposits,
             cash_earnings=new_cash_earnings,
@@ -4669,11 +4670,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         # Create an instance
         return cls(
             wrapper,
-            broadcasted_args["close"],
             sim_out.order_records,
             open=broadcasted_args["open"] if not open_none else None,
             high=broadcasted_args["high"] if not high_none else None,
             low=broadcasted_args["low"] if not low_none else None,
+            close=broadcasted_args["close"],
             log_records=sim_out.log_records,
             cash_sharing=cash_sharing,
             init_cash=init_cash if init_cash_mode is None else init_cash_mode,
@@ -6267,11 +6268,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             kwargs["orders_cls"] = FSOrders
         return cls(
             wrapper,
-            broadcasted_args["close"],
             sim_out.order_records,
             open=broadcasted_args["open"] if not open_none else None,
             high=broadcasted_args["high"] if not high_none else None,
             low=broadcasted_args["low"] if not low_none else None,
+            close=broadcasted_args["close"],
             log_records=sim_out.log_records,
             cash_sharing=cash_sharing,
             init_cash=init_cash if init_cash_mode is None else init_cash_mode,
@@ -7585,11 +7586,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             bm_close = broadcasted_args["bm_close"]
         return cls(
             wrapper,
-            broadcasted_args["close"],
             sim_out.order_records,
             open=broadcasted_args["open"] if not open_none else None,
             high=broadcasted_args["high"] if not high_none else None,
             low=broadcasted_args["low"] if not low_none else None,
+            close=broadcasted_args["close"],
             log_records=sim_out.log_records,
             cash_sharing=cash_sharing,
             init_cash=init_cash if init_cash_mode is None else init_cash_mode,
@@ -8007,36 +8008,50 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @property
     def orders_cls(self) -> type:
         """Class for wrapping order records."""
+        if self._orders_cls is None:
+            return Orders
         return self._orders_cls
 
     @property
     def logs_cls(self) -> type:
         """Class for wrapping log records."""
+        if self._logs_cls is None:
+            return Logs
         return self._logs_cls
 
     @property
     def trades_cls(self) -> type:
         """Class for wrapping trade records."""
+        if self._trades_cls is None:
+            return Trades
         return self._trades_cls
 
     @property
     def entry_trades_cls(self) -> type:
         """Class for wrapping entry trade records."""
+        if self._entry_trades_cls is None:
+            return EntryTrades
         return self._entry_trades_cls
 
     @property
     def exit_trades_cls(self) -> type:
         """Class for wrapping exit trade records."""
+        if self._exit_trades_cls is None:
+            return ExitTrades
         return self._exit_trades_cls
 
     @property
     def positions_cls(self) -> type:
         """Class for wrapping position records."""
+        if self._positions_cls is None:
+            return Positions
         return self._positions_cls
 
     @property
     def drawdowns_cls(self) -> type:
         """Class for wrapping drawdown records."""
+        if self._drawdowns_cls is None:
+            return Drawdowns
         return self._drawdowns_cls
 
     @custom_property(group_by_aware=False)

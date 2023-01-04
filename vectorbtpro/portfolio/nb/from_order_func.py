@@ -1,6 +1,6 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Numba-compiled functions for portfolio modeling based on an order function."""
+"""Numba-compiled functions for portfolio simulation based on an order function."""
 
 from numba import prange
 
