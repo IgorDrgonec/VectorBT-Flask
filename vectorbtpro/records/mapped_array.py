@@ -1041,13 +1041,14 @@ class MappedArray(Analyzable):
 
     def reduce_segments(
         self: MappedArrayT,
-        segment_arr: tp.Union[tp.MaybeTuple[tp.Array1d]],
-        reduce_func_nb: tp.ReduceFunc,
+        segment_arr: tp.Union[str, tp.MaybeTuple[tp.Array1d]],
+        reduce_func_nb: tp.Union[str, tp.ReduceFunc],
         *args,
         idx_arr: tp.Optional[tp.Array1d] = None,
         group_by: tp.GroupByLike = None,
         apply_per_group: bool = False,
         dtype: tp.Optional[tp.DTypeLike] = None,
+        jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         **kwargs,
     ) -> MappedArrayT:
@@ -1056,6 +1057,10 @@ class MappedArray(Analyzable):
         `segment_arr` must be an array of integers increasing per column, each indicating a segment.
         It must have the same length as the mapped array. You can also pass a list of such arrays.
         In this case, each unique combination of values will be considered a single segment.
+        Can also pass the string "idx" to use the index array.
+
+        `reduce_func_nb` can be a string denoting the suffix of a reducing function
+        from `vectorbtpro.generic.nb`. For example, "sum" will refer to "sum_reduce_nb".
 
         !!! warning
             Each segment or combination of segments in `segment_arr` is assumed to be coherent and non-repeating.
@@ -1075,11 +1080,19 @@ class MappedArray(Analyzable):
                 raise ValueError("Must pass idx_arr")
             idx_arr = self.idx_arr
         col_map = self.col_mapper.get_col_map(group_by=group_by if apply_per_group else False)
+        if isinstance(segment_arr, str):
+            if segment_arr.lower() == "idx":
+                segment_arr = idx_arr
+            else:
+                raise ValueError(f"Invalid option segment_arr='{segment_arr}'")
         if isinstance(segment_arr, tuple):
             stacked_segment_arr = np.column_stack(segment_arr)
             segment_arr = index_repeating_rows_nb(stacked_segment_arr)
+        if isinstance(reduce_func_nb, str):
+            reduce_func_nb = getattr(generic_nb, reduce_func_nb + "_reduce_nb")
 
-        func = ch_reg.resolve_option(nb.reduce_mapped_segments_nb, chunked)
+        func = jit_reg.resolve_option(nb.reduce_mapped_segments_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         new_mapped_arr, new_col_arr, new_idx_arr, new_id_arr = func(
             self.values,
             idx_arr,
@@ -1652,6 +1665,9 @@ class MappedArray(Analyzable):
     def to_pd(
         self,
         idx_arr: tp.Optional[tp.Array1d] = None,
+        reduce_func_nb: tp.Union[None, str, tp.ReduceFunc] = None,
+        reduce_args: tp.ArgsLike = None,
+        dtype: tp.Optional[tp.DTypeLike] = None,
         ignore_index: bool = False,
         repeat_index: bool = False,
         fill_value: float = np.nan,
@@ -1659,10 +1675,14 @@ class MappedArray(Analyzable):
         mapping_kwargs: tp.KwargsLike = None,
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
         silence_warnings: bool = False,
     ) -> tp.SeriesFrame:
         """Unstack mapped array to a Series/DataFrame.
+
+        If `reduce_func_nb` is not None, will use it to reduce conflicting index segments
+        using `MappedArray.reduce_segments`.
 
         * If `ignore_index`, will ignore the index and place values on top of each other in every column/group.
             See `vectorbtpro.records.nb.ignore_unstack_mapped_nb`.
@@ -1697,9 +1717,9 @@ class MappedArray(Analyzable):
                 raise ValueError("Must pass idx_arr")
             idx_arr = self.idx_arr
         has_conflicts = self.has_conflicts(idx_arr=idx_arr, group_by=group_by)
-        col_arr = self.col_mapper.get_col_arr(group_by=group_by)
-        target_shape = self.wrapper.get_shape_2d(group_by=group_by)
         if has_conflicts and repeat_index:
+            col_arr = self.col_mapper.get_col_arr(group_by=group_by)
+            target_shape = self.wrapper.get_shape_2d(group_by=group_by)
             func = jit_reg.resolve_option(nb.mapped_coverage_map_nb, jitted)
             coverage_map = func(col_arr, idx_arr, target_shape)
             repeat_cnt_arr = np.max(coverage_map, axis=1)
@@ -1712,16 +1732,37 @@ class MappedArray(Analyzable):
             wrap_kwargs = merge_dicts(dict(index=unstacked_index), wrap_kwargs)
             return self.wrapper.wrap(out, group_by=group_by, **wrap_kwargs)
         else:
-            if has_conflicts and not silence_warnings:
-                warnings.warn(
-                    "Multiple values are pointing to the same position. Only the latest value is used.",
-                    stacklevel=2,
-                )
+            if has_conflicts:
+                if reduce_func_nb is not None:
+                    if reduce_args is None:
+                        reduce_args = ()
+                    self_ = self.reduce_segments(
+                        "idx",
+                        reduce_func_nb,
+                        *reduce_args,
+                        idx_arr=idx_arr,
+                        group_by=group_by,
+                        dtype=dtype,
+                        jitted=jitted,
+                        chunked=chunked,
+                    )
+                    idx_arr = self_.idx_arr
+                else:
+                    if not silence_warnings:
+                        warnings.warn(
+                            "Multiple values are pointing to the same position. Only the latest value is used.",
+                            stacklevel=2,
+                        )
+                    self_ = self
+            else:
+                self_ = self
+            col_arr = self_.col_mapper.get_col_arr(group_by=group_by)
+            target_shape = self_.wrapper.get_shape_2d(group_by=group_by)
             func = jit_reg.resolve_option(nb.unstack_mapped_nb, jitted)
-            out = func(self.values, col_arr, idx_arr, target_shape, fill_value)
-            mapping = self.resolve_mapping(mapping)
+            out = func(self_.values, col_arr, idx_arr, target_shape, fill_value)
+            mapping = self_.resolve_mapping(mapping)
             out = apply_mapping(out, mapping, **resolve_dict(mapping_kwargs))
-            return self.wrapper.wrap(out, group_by=group_by, **resolve_dict(wrap_kwargs))
+            return self_.wrapper.wrap(out, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     # ############# Masking ############# #
 

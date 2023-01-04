@@ -1622,6 +1622,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
         * `vectorbtpro.generic.nb.apply_reduce.reduce_to_array_meta_nb` if not grouped and `returns_array` is True
         * `vectorbtpro.generic.nb.apply_reduce.reduce_meta_nb` if not grouped and `returns_array` is False
 
+        `reduce_func_nb` can be a string denoting the suffix of a reducing function
+        from `vectorbtpro.generic.nb`. For example, "sum" will refer to "sum_reduce_nb".
+
         Usage:
             * Using regular function:
 
