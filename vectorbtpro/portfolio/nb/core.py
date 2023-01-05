@@ -1125,13 +1125,13 @@ def fill_log_record_nb(
     records["price_area_high"][r, col] = price_area.high
     records["price_area_low"][r, col] = price_area.low
     records["price_area_close"][r, col] = price_area.close
-    records["exec_state_cash"][r, col] = exec_state.cash
-    records["exec_state_position"][r, col] = exec_state.position
-    records["exec_state_debt"][r, col] = exec_state.debt
-    records["exec_state_locked_cash"][r, col] = exec_state.locked_cash
-    records["exec_state_free_cash"][r, col] = exec_state.free_cash
-    records["exec_state_val_price"][r, col] = exec_state.val_price
-    records["exec_state_value"][r, col] = exec_state.value
+    records["st0_cash"][r, col] = exec_state.cash
+    records["st0_position"][r, col] = exec_state.position
+    records["st0_debt"][r, col] = exec_state.debt
+    records["st0_locked_cash"][r, col] = exec_state.locked_cash
+    records["st0_free_cash"][r, col] = exec_state.free_cash
+    records["st0_val_price"][r, col] = exec_state.val_price
+    records["st0_value"][r, col] = exec_state.value
     records["req_size"][r, col] = order.size
     records["req_price"][r, col] = order.price
     records["req_size_type"][r, col] = order.size_type
@@ -1155,13 +1155,13 @@ def fill_log_record_nb(
     records["res_side"][r, col] = order_result.side
     records["res_status"][r, col] = order_result.status
     records["res_status_info"][r, col] = order_result.status_info
-    records["new_exec_state_cash"][r, col] = new_exec_state.cash
-    records["new_exec_state_position"][r, col] = new_exec_state.position
-    records["new_exec_state_debt"][r, col] = new_exec_state.debt
-    records["new_exec_state_locked_cash"][r, col] = new_exec_state.locked_cash
-    records["new_exec_state_free_cash"][r, col] = new_exec_state.free_cash
-    records["new_exec_state_val_price"][r, col] = new_exec_state.val_price
-    records["new_exec_state_value"][r, col] = new_exec_state.value
+    records["st1_cash"][r, col] = new_exec_state.cash
+    records["st1_position"][r, col] = new_exec_state.position
+    records["st1_debt"][r, col] = new_exec_state.debt
+    records["st1_locked_cash"][r, col] = new_exec_state.locked_cash
+    records["st1_free_cash"][r, col] = new_exec_state.free_cash
+    records["st1_val_price"][r, col] = new_exec_state.val_price
+    records["st1_value"][r, col] = new_exec_state.value
     records["order_id"][r, col] = order_id
 
 
