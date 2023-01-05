@@ -821,8 +821,18 @@ def get_asset_return_nb(
 ) -> float:
     """Get asset return from the input and output asset value, and the cash flow."""
     if is_close_nb(input_asset_value, 0):
-        return returns_nb_.get_return_nb(-output_asset_value, cash_flow, log_returns=log_returns)
-    return returns_nb_.get_return_nb(input_asset_value, output_asset_value + cash_flow, log_returns=log_returns)
+        input_value = -output_asset_value
+        output_value = cash_flow
+    else:
+        input_value = input_asset_value
+        output_value = output_asset_value + cash_flow
+    if input_value < 0 and output_value < 0:
+        return_value = -returns_nb_.get_return_nb(-input_value, -output_value, log_returns=False)
+    else:
+        return_value = returns_nb_.get_return_nb(input_value, output_value, log_returns=False)
+    if log_returns:
+        return np.log1p(return_value)
+    return return_value
 
 
 @register_chunkable(

@@ -5939,7 +5939,7 @@ class TestPortfolio:
         assert_frame_equal(pf_shared.get_asset_returns(group_by=False), result)
         assert_frame_equal(
             pf.get_asset_returns(log_returns=True),
-            np.log(result + 1),
+            np.log1p(result),
         )
         assert_frame_equal(
             pf.get_asset_returns(daily_returns=True),

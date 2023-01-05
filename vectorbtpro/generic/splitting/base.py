@@ -599,14 +599,14 @@ class Splitter(Analyzable):
                     if new_split.start <= bounds[-1][0][0]:
                         raise ValueError("Infinite loop detected. Provide a positive offset.")
             if backwards:
+                if new_split.start < 0:
+                    break
                 if new_split.stop > len(index):
                     raise ValueError("Range stop cannot exceed index length")
-                if new_split.start <= 0:
-                    break
             else:
                 if new_split.start < 0:
                     raise ValueError("Range start cannot be negative")
-                if new_split.stop >= len(index):
+                if new_split.stop > len(index):
                     break
             if split is not None:
                 new_split = cls.split_range(

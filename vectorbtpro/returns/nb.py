@@ -37,13 +37,9 @@ def get_return_nb(input_value: float, output_value: float, log_returns: bool = F
         if output_value == 0:
             return 0.0
         return np.inf * np.sign(output_value)
-    if log_returns and input_value > 0 and output_value > 0:
-        return add_nb(np.log(output_value), -np.log(input_value))
     return_value = add_nb(output_value, -input_value) / input_value
-    if input_value < 0:
-        return_value *= -1
     if log_returns:
-        return np.log(return_value + 1)
+        return np.log1p(return_value)
     return return_value
 
 
@@ -95,10 +91,7 @@ def cum_returns_1d_nb(rets: tp.Array1d, start_value: float = 0.0, log_returns: b
         cumsum = 0
         for i in range(rets.shape[0]):
             if not np.isnan(rets[i]):
-                if cumsum < 0:
-                    cumsum -= rets[i]
-                else:
-                    cumsum += rets[i]
+                cumsum += rets[i]
             if start_value == 0:
                 out[i] = cumsum
             else:
@@ -107,10 +100,7 @@ def cum_returns_1d_nb(rets: tp.Array1d, start_value: float = 0.0, log_returns: b
         cumprod = 1
         for i in range(rets.shape[0]):
             if not np.isnan(rets[i]):
-                if cumprod < 0:
-                    cumprod *= 1 - rets[i]
-                else:
-                    cumprod *= 1 + rets[i]
+                cumprod *= 1 + rets[i]
             if start_value == 0:
                 out[i] = cumprod - 1
             else:
@@ -147,7 +137,7 @@ def cum_returns_final_1d_nb(rets: tp.Array1d, start_value: float = 0.0, log_retu
         cumprod = 1
         for i in range(rets.shape[0]):
             if not np.isnan(rets[i]):
-                cumprod *= rets[i] + 1
+                cumprod *= 1 + rets[i]
         if start_value == 0:
             return cumprod - 1
         return cumprod * start_value
