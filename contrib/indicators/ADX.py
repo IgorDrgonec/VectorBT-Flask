@@ -2,6 +2,7 @@ from numba import njit
 import numpy as np
 import vectorbtpro as vbt
 from vectorbtpro import _typing as tp
+from vectorbtpro.generic import nb as generic_nb, enums as generic_enums
 from numba import prange
 
 @njit(cache=True, nogil=True)
@@ -37,10 +38,16 @@ def adx_nb(high: tp.Array2d, low: tp.Array2d, close: tp.Array2d, window: int = 1
 
 ADX = vbt.IF(
     input_names=["high", "low", "close"],
+    param_names=["window", "wtype"],
     output_names=["adx"],
 ).with_apply_func(
     adx_nb,
-    kwargs_as_args=["window", "wtype"],
+    param_settings=dict(
+        wtype=dict(
+            dtype=generic_enums.WType,
+            post_index_func=lambda index: index.str.lower(),
+        )
+    ),
     window=14,
-    wtype=3
+    wtype="wilder",
 )
