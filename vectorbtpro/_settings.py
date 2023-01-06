@@ -1419,7 +1419,7 @@ messaging = ChildDict(
     telegram=Config(
         token=None,
         use_context=True,
-        persistence="telegram_bot.pickle",
+        persistence=True,
         defaults=Config(),
         drop_pending_updates=True,
     ),
