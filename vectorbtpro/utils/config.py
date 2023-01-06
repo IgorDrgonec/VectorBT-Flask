@@ -13,6 +13,7 @@ from vectorbtpro.utils.caching import Cacheable
 from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.formatting import Prettified, prettify_dict, prettify_inited
 from vectorbtpro.utils.pickling import Pickleable
+from vectorbtpro.utils.parsing import parse_class_path
 
 
 def resolve_dict(dct: tp.DictLikeSequence, i: tp.Optional[int] = None) -> dict:
@@ -244,9 +245,13 @@ PickleableDictT = tp.TypeVar("PickleableDictT", bound="PickleableDict")
 class PickleableDict(Pickleable, dict):
     """Dict that may contain values of type `Pickleable`."""
 
-    def dumps(self, **kwargs) -> bytes:
-        """Pickle to bytes."""
+    def dumps(self, pickle_classes: tp.Optional[bool] = None, **kwargs) -> bytes:
+        """Pickle to bytes.
+
+        If `pickle_classes` is False, stores the path to the class (if can be parsed, otherwise
+        throws an error) and then uses `vectorbtpro.utils.parsing.parse_class_path` when unpickling."""
         from vectorbtpro.utils.opt_packages import warn_cannot_import
+        from vectorbtpro._settings import settings
 
         warn_cannot_import("dill")
         try:
@@ -254,10 +259,31 @@ class PickleableDict(Pickleable, dict):
         except ImportError:
             import pickle
 
+        pickling_cfg = settings["pickling"]
+
+        if pickle_classes is None:
+            pickle_classes = pickling_cfg["pickle_classes"]
+
         dct = {}
         for k, v in self.items():
             if isinstance(v, Pickleable):
-                dct[k] = DumpTuple(cls=type(v), dumps=v.dumps(**kwargs))
+                class_path = type(v).__module__ + "." + type(v).__name__
+                must_be_pickled = parse_class_path(class_path) is None
+                if pickle_classes is not None:
+                    if pickle_classes:
+                        pickle_class = True
+                    else:
+                        if must_be_pickled:
+                            raise ValueError(
+                                f"Class '{class_path}' must be pickled. Set pickle_classes to True or None."
+                            )
+                        pickle_class = False
+                else:
+                    pickle_class = must_be_pickled
+                if pickle_class:
+                    dct[k] = DumpTuple(cls=type(v), dumps=v.dumps(pickle_classes=pickle_classes, **kwargs))
+                else:
+                    dct[k] = DumpTuple(cls=class_path, dumps=v.dumps(pickle_classes=pickle_classes, **kwargs))
             else:
                 dct[k] = v
         return pickle.dumps(dct, **kwargs)
@@ -283,7 +309,15 @@ class PickleableDict(Pickleable, dict):
         config = pickle.loads(dumps, **kwargs)
         for k, v in config.items():
             if isinstance(v, DumpTuple):
-                config[k] = v.cls.loads(v.dumps, **kwargs)
+                if isinstance(v.cls, str):
+                    v_cls = parse_class_path(v.cls)
+                    if v_cls is None:
+                        raise ValueError(f"Couldn't parse class '{v.cls}'")
+                else:
+                    v_cls = v.cls
+                if not issubclass(v_cls, Pickleable):
+                    raise TypeError(f"Class '{v.cls}' must be a subclass of Pickleable")
+                config[k] = v_cls.loads(v.dumps, **kwargs)
         if init_kwargs is None:
             init_kwargs = {}
         return cls(**{**config, **init_kwargs})
@@ -700,7 +734,7 @@ class Config(PickleableDict, Prettified):
         reset_dct_ = copy_dict(dict(self), **reset_dct_copy_kwargs)
         self.__dict__["_reset_dct_"] = reset_dct_
 
-    def dumps(self, dump_reset_dct: bool = False, **kwargs) -> bytes:
+    def dumps(self, pickle_classes: tp.Optional[bool] = None, dump_reset_dct: bool = False, **kwargs) -> bytes:
         """Pickle to bytes."""
         from vectorbtpro.utils.opt_packages import warn_cannot_import
 
@@ -711,12 +745,12 @@ class Config(PickleableDict, Prettified):
             import pickle
 
         if dump_reset_dct:
-            reset_dct_ = PickleableDict(self.reset_dct_).dumps(**kwargs)
+            reset_dct_ = PickleableDict(self.reset_dct_).dumps(pickle_classes=pickle_classes, **kwargs)
         else:
             reset_dct_ = None
         return pickle.dumps(
             dict(
-                dct=PickleableDict(self).dumps(**kwargs),
+                dct=PickleableDict(self).dumps(pickle_classes=pickle_classes, **kwargs),
                 copy_kwargs_=self.copy_kwargs_,
                 reset_dct_=reset_dct_,
                 reset_dct_copy_kwargs_=self.reset_dct_copy_kwargs_,
@@ -1002,7 +1036,7 @@ class Configured(Cacheable, Pickleable, Prettified):
         See `Configured.replace`."""
         return self.replace(copy_mode_=copy_mode, nested_=nested, cls_=cls)
 
-    def dumps(self, **kwargs) -> bytes:
+    def dumps(self, pickle_classes: tp.Optional[bool] = None, **kwargs) -> bytes:
         """Pickle to bytes."""
         from vectorbtpro.utils.opt_packages import warn_cannot_import
 
@@ -1012,9 +1046,9 @@ class Configured(Cacheable, Pickleable, Prettified):
         except ImportError:
             import pickle
 
-        config_dumps = self.config.dumps(**kwargs)
+        config_dumps = self.config.dumps(pickle_classes=pickle_classes, **kwargs)
         attr_dct = PickleableDict({attr: getattr(self, attr) for attr in self.get_writeable_attrs()})
-        attr_dct_dumps = attr_dct.dumps(**kwargs)
+        attr_dct_dumps = attr_dct.dumps(pickle_classes=pickle_classes, **kwargs)
         return pickle.dumps((config_dumps, attr_dct_dumps), **kwargs)
 
     @classmethod

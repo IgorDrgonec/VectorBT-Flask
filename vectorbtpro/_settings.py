@@ -367,6 +367,21 @@ ${config_doc}
 
 _settings["template"] = template
 
+pickling = ChildDict(
+    pickle_classes=None,
+)
+"""_"""
+
+__pdoc__["pickling"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.utils.pickling`.
+
+```python
+${config_doc}
+```"""
+)
+
+_settings["pickling"] = pickling
+
 config = Config(dict())
 """_"""
 

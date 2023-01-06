@@ -3780,7 +3780,7 @@ Args:
         factory_kwargs = merge_dicts(
             dict(
                 class_name="CON",
-                module_name=__name__,
+                module_name=__name__ + ".custom_techcon",
                 short_name=None,
                 input_names=["open", "high", "low", "close", "volume"],
                 param_names=["smooth"],
@@ -3877,7 +3877,7 @@ Args:
 
             return IndicatorFactory.from_custom_techcon(
                 MovingAverageConsensus,
-                factory_kwargs=dict(class_name="MACON"),
+                factory_kwargs=dict(module_name=__name__ + ".techcon", class_name="MACON"),
                 **kwargs,
             )
         if cls_name.lower() in ("OSCCON".lower(), "OscillatorConsensus".lower()):
@@ -3885,7 +3885,7 @@ Args:
 
             return IndicatorFactory.from_custom_techcon(
                 OscillatorConsensus,
-                factory_kwargs=dict(class_name="OSCCON"),
+                factory_kwargs=dict(module_name=__name__ + ".techcon", class_name="OSCCON"),
                 **kwargs,
             )
         if cls_name.lower() in ("SUMCON".lower(), "SummaryConsensus".lower()):
@@ -3893,7 +3893,7 @@ Args:
 
             return IndicatorFactory.from_custom_techcon(
                 SummaryConsensus,
-                factory_kwargs=dict(class_name="SUMCON"),
+                factory_kwargs=dict(module_name=__name__ + ".techcon", class_name="SUMCON"),
                 **kwargs,
             )
         raise ValueError(f"Unknown technical consensus class '{cls_name}'")

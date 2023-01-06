@@ -9,8 +9,8 @@ import sys
 import io
 import contextlib
 import warnings
-
 import attr
+import importlib
 
 from vectorbtpro import _typing as tp
 
@@ -358,3 +358,41 @@ def warn_stdout(func: tp.Callable) -> tp.Callable:
         return out
 
     return wrapper
+
+
+def parse_class_path(path: str) -> tp.Optional[tp.Type]:
+    """Parse path to a vectorbt class."""
+    try:
+        path_parts = path.split(".")
+        module_path = ".".join(path_parts[:-1])
+        class_name = path_parts[-1]
+        if module_path == "vectorbtpro.indicators.factory.talib":
+            import vectorbtpro as vbt
+
+            return vbt.talib(class_name)
+        if module_path == "vectorbtpro.indicators.factory.pandas_ta":
+            import vectorbtpro as vbt
+
+            return vbt.pandas_ta(class_name)
+        if module_path == "vectorbtpro.indicators.factory.ta":
+            import vectorbtpro as vbt
+
+            return vbt.ta(class_name)
+        if module_path == "vectorbtpro.indicators.factory.wqa101":
+            import vectorbtpro as vbt
+
+            return vbt.wqa101(int(class_name.replace("WQA", "")))
+        if module_path == "vectorbtpro.indicators.factory.technical":
+            import vectorbtpro as vbt
+
+            return vbt.technical(class_name)
+        if module_path == "vectorbtpro.indicators.factory.techcon":
+            import vectorbtpro as vbt
+
+            return vbt.techcon(class_name)
+        module = importlib.import_module(module_path)
+        if hasattr(module, class_name):
+            return getattr(module, class_name)
+    except Exception as e:
+        pass
+    return None
