@@ -516,10 +516,6 @@ else:
 
             telegram_cfg = dict(settings["messaging"]["telegram"])
             telegram_cfg = merge_dicts(telegram_cfg, kwargs)
-            if telegram_cfg.pop("post_init", None) is not None:
-                raise ValueError("Please use TelegramBot.post_init_callback")
-            if telegram_cfg.pop("post_shutdown", None) is not None:
-                raise ValueError("Please use TelegramBot.post_shutdown_callback")
 
             builder = ApplicationBuilder()
 
@@ -643,13 +639,13 @@ else:
             log_msg = '"%s" as GIPHY %s' % (text, gif_url)
             await self.send_to_all("animation", gif_url, *args, log_msg=log_msg, **kwargs)
 
-        async def post_init_callback(self) -> None:
-            """Callback once the application has been initialized."""
+        async def post_start_callback(self) -> None:
+            """Callback after the application is started."""
             await self.send_message_to_all("I'm back to life!")
 
-        async def post_shutdown_callback(self) -> None:
-            """Callback once the application has been shutdown."""
-            pass
+        async def pre_stop_callback(self) -> None:
+            """Callback before the application is shutdown."""
+            await self.send_message_to_all("Bye!")
 
         @property
         def start_message(self) -> str:
@@ -708,13 +704,16 @@ else:
             """Event loop."""
             return self._loop
 
-        def _start(
+        def start(
             self,
-            new_loop: bool = False,
             close_loop: bool = True,
             stop_signals: tp.Sequence[int] = BaseRequest.DEFAULT_NONE,
             **kwargs,
         ) -> None:
+            """Start the bot.
+
+            `**kwargs` override settings under `telegram` in `vectorbtpro._settings.messaging` and only those
+            keys that can be found in `telegram.ext._updater.Updater.start_polling` are passed."""
             from vectorbtpro._settings import settings
 
             telegram_cfg = settings["messaging"]["telegram"]
@@ -737,13 +736,10 @@ else:
 
             # Run the Bot
             updater_coroutine = self.application.updater.start_polling(**polling_kwargs)
-            if new_loop:
-                self._loop = asyncio.new_event_loop()
-            else:
-                # Calling get_event_loop() should still be okay even in py3.10+ as long as there is a
-                # running event loop or we are in the main thread, which are the intended use cases.
-                # See the docs of get_event_loop() and get_running_loop() for more info
-                self._loop = asyncio.get_event_loop()
+            # Calling get_event_loop() should still be okay even in py3.10+ as long as there is a
+            # running event loop or we are in the main thread, which are the intended use cases.
+            # See the docs of get_event_loop() and get_running_loop() for more info
+            self._loop = asyncio.get_event_loop()
 
             if stop_signals is BaseRequest.DEFAULT_NONE and platform.system() != "Windows":
                 stop_signals = (signal.SIGINT, signal.SIGTERM, signal.SIGABRT)
@@ -752,7 +748,7 @@ else:
                 raise SystemExit
 
             try:
-                if not new_loop and stop_signals is not BaseRequest.DEFAULT_NONE:
+                if stop_signals is not BaseRequest.DEFAULT_NONE:
                     for sig in stop_signals or []:
                         self.loop.add_signal_handler(sig, _raise_system_exit)
             except NotImplementedError as exc:
@@ -765,9 +761,11 @@ else:
 
             try:
                 self.loop.run_until_complete(self.application.initialize())
-                self.loop.run_until_complete(self.post_init_callback())
+                if self.application.post_init is not None:
+                    self.loop.run_until_complete(self.application.post_init(self.application))
                 self.loop.run_until_complete(updater_coroutine)  # one of updater.start_webhook/polling
                 self.loop.run_until_complete(self.application.start())
+                self.loop.run_until_complete(self.post_start_callback())
                 self.loop.run_forever()
             except (KeyboardInterrupt, SystemExit):
                 pass
@@ -779,28 +777,19 @@ else:
                 # We arrive here either by catching the exceptions above or if the loop gets stopped
                 self.stop(close_loop=close_loop)
 
-        def start(self, in_background: bool = False, **kwargs) -> None:
-            """Start the bot.
-
-            `**kwargs` override settings under `telegram` in `vectorbtpro._settings.messaging` and only those
-            keys that can be found in `telegram.ext._updater.Updater.start_polling` are passed."""
-            if in_background:
-                kwargs["new_loop"] = True
-                threading.Thread(target=self._start, kwargs=kwargs, daemon=True).start()
-            else:
-                self._start(**kwargs)
-
         def stop(self, close_loop: bool = True) -> None:
             """Stop the bot."""
             if self.loop is None:
                 raise RuntimeError("There is no event loop running this Application")
             try:
+                self.loop.run_until_complete(self.pre_stop_callback())
                 if self.application.updater.running:
                     self.loop.run_until_complete(self.application.updater.stop())
                 if self.application.running:
                     self.loop.run_until_complete(self.application.stop())
                 self.loop.run_until_complete(self.application.shutdown())
-                self.loop.run_until_complete(self.post_shutdown_callback())
+                if self.application.post_shutdown is not None:
+                    self.loop.run_until_complete(self.application.post_shutdown(self.application))
             finally:
                 if close_loop and not self.loop.is_running():
                     self.loop.close()
