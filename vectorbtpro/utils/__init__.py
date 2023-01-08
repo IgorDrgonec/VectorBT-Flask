@@ -29,6 +29,7 @@ from vectorbtpro.utils.chunking import (
 from vectorbtpro.utils.config import (
     atomic_dict,
     merge_dicts,
+    PickleableDict,
     ChildDict,
     Config,
     FrozenConfig,
@@ -58,6 +59,7 @@ from vectorbtpro.utils.template import Sub, Rep, RepEval, RepFunc, deep_substitu
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.module_ import create__all__
 from vectorbtpro.utils.opt_packages import check_installed
+from vectorbtpro.utils.pickling import dumps, loads, save, load, PRecState, PRecInfo, Pickleable
 from vectorbtpro._settings import settings
 
 __blacklist__ = []

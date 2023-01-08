@@ -33,7 +33,8 @@ def dicts_equal(dct1, dct2):
 class TestSettings:
     def test_save_and_load(self, tmp_path):
         vbt.settings.set_theme("seaborn")
-        vbt.settings.save(tmp_path / "settings", dump_reset_dct=True)
+        dict.__setattr__(vbt.settings, "_pickle_reset_dct_", True)
+        vbt.settings.save(tmp_path / "settings")
         new_settings = vbt.settings.load(tmp_path / "settings")
         dicts_equal(vbt.settings, new_settings)
         dicts_equal(vbt.settings.__dict__, new_settings.__dict__)

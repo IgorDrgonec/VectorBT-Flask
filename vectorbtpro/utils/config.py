@@ -4,7 +4,6 @@
 
 import warnings
 import inspect
-from collections import namedtuple
 from copy import copy, deepcopy
 
 from vectorbtpro import _typing as tp
@@ -12,8 +11,7 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.caching import Cacheable
 from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.formatting import Prettified, prettify_dict, prettify_inited
-from vectorbtpro.utils.pickling import Pickleable
-from vectorbtpro.utils.parsing import parse_class_path
+from vectorbtpro.utils.pickling import Pickleable, PRecState
 
 
 def resolve_dict(dct: tp.DictLikeSequence, i: tp.Optional[int] = None) -> dict:
@@ -237,90 +235,11 @@ def merge_dicts(
 
 _RaiseKeyError = object()
 
-DumpTuple = namedtuple("DumpTuple", ("cls", "dumps"))
-
 PickleableDictT = tp.TypeVar("PickleableDictT", bound="PickleableDict")
 
 
 class PickleableDict(Pickleable, dict):
     """Dict that may contain values of type `Pickleable`."""
-
-    def dumps(self, pickle_classes: tp.Optional[bool] = None, **kwargs) -> bytes:
-        """Pickle to bytes.
-
-        If `pickle_classes` is False, stores the path to the class (if can be parsed, otherwise
-        throws an error) and then uses `vectorbtpro.utils.parsing.parse_class_path` when unpickling."""
-        from vectorbtpro.utils.opt_packages import warn_cannot_import
-        from vectorbtpro._settings import settings
-
-        warn_cannot_import("dill")
-        try:
-            import dill as pickle
-        except ImportError:
-            import pickle
-
-        pickling_cfg = settings["pickling"]
-
-        if pickle_classes is None:
-            pickle_classes = pickling_cfg["pickle_classes"]
-
-        dct = {}
-        for k, v in self.items():
-            if isinstance(v, Pickleable):
-                class_path = type(v).__module__ + "." + type(v).__name__
-                must_be_pickled = parse_class_path(class_path) is None
-                if pickle_classes is not None:
-                    if pickle_classes:
-                        pickle_class = True
-                    else:
-                        if must_be_pickled:
-                            raise ValueError(
-                                f"Class '{class_path}' must be pickled. Set pickle_classes to True or None."
-                            )
-                        pickle_class = False
-                else:
-                    pickle_class = must_be_pickled
-                if pickle_class:
-                    dct[k] = DumpTuple(cls=type(v), dumps=v.dumps(pickle_classes=pickle_classes, **kwargs))
-                else:
-                    dct[k] = DumpTuple(cls=class_path, dumps=v.dumps(pickle_classes=pickle_classes, **kwargs))
-            else:
-                dct[k] = v
-        return pickle.dumps(dct, **kwargs)
-
-    @classmethod
-    def loads(
-        cls: tp.Type[PickleableDictT],
-        dumps: bytes,
-        init_kwargs: tp.KwargsLike = None,
-        **kwargs,
-    ) -> PickleableDictT:
-        """Unpickle from bytes.
-
-        Use `init_kwargs` to change the initialization arguments."""
-        from vectorbtpro.utils.opt_packages import warn_cannot_import
-
-        warn_cannot_import("dill")
-        try:
-            import dill as pickle
-        except ImportError:
-            import pickle
-
-        config = pickle.loads(dumps, **kwargs)
-        for k, v in config.items():
-            if isinstance(v, DumpTuple):
-                if isinstance(v.cls, str):
-                    v_cls = parse_class_path(v.cls)
-                    if v_cls is None:
-                        raise ValueError(f"Couldn't parse class '{v.cls}'")
-                else:
-                    v_cls = v.cls
-                if not issubclass(v_cls, Pickleable):
-                    raise TypeError(f"Class '{v.cls}' must be a subclass of Pickleable")
-                config[k] = v_cls.loads(v.dumps, **kwargs)
-        if init_kwargs is None:
-            init_kwargs = {}
-        return cls(**{**config, **init_kwargs})
 
     def load_update(self, path: tp.Optional[tp.PathLike] = None, clear: bool = False, **kwargs) -> None:
         """Load dumps from a file and update this instance in-place."""
@@ -355,6 +274,7 @@ class Config(PickleableDict, Prettified):
         reset_dct_copy_kwargs_ (dict): Keyword arguments that override `copy_kwargs_` for `reset_dct_`.
 
             Copy mode defaults to 'none' if `readonly_` is True, else to 'hybrid'.
+        pickle_reset_dct_ (bool): Whether to pickle `reset_dct_`.
         frozen_keys_ (bool): Whether to deny updates to the keys of the config.
 
             Defaults to False.
@@ -395,6 +315,7 @@ class Config(PickleableDict, Prettified):
         copy_kwargs_: tp.KwargsLike = None,
         reset_dct_: tp.DictLike = None,
         reset_dct_copy_kwargs_: tp.KwargsLike = None,
+        pickle_reset_dct_: tp.Optional[bool] = None,
         frozen_keys_: tp.Optional[bool] = None,
         readonly_: tp.Optional[bool] = None,
         nested_: tp.Optional[bool] = None,
@@ -435,6 +356,7 @@ class Config(PickleableDict, Prettified):
             return default
 
         reset_dct_ = _resolve_param("reset_dct_", reset_dct_, None)
+        pickle_reset_dct_ = _resolve_param("pickle_reset_dct_", pickle_reset_dct_, False)
         frozen_keys_ = _resolve_param("frozen_keys_", frozen_keys_, False)
         readonly_ = _resolve_param("readonly_", readonly_, False)
         nested_ = _resolve_param("nested_", nested_, True)
@@ -466,6 +388,7 @@ class Config(PickleableDict, Prettified):
                         v,
                         copy_kwargs_=copy_kwargs_,
                         reset_dct_copy_kwargs_=reset_dct_copy_kwargs_,
+                        pickle_reset_dct_=pickle_reset_dct_,
                         frozen_keys_=frozen_keys_,
                         readonly_=readonly_,
                         nested_=nested_,
@@ -483,6 +406,7 @@ class Config(PickleableDict, Prettified):
         self._copy_kwargs_ = copy_kwargs_
         self._reset_dct_ = reset_dct_
         self._reset_dct_copy_kwargs_ = reset_dct_copy_kwargs_
+        self._pickle_reset_dct_ = pickle_reset_dct_
         self._frozen_keys_ = frozen_keys_
         self._readonly_ = readonly_
         self._nested_ = nested_
@@ -508,8 +432,13 @@ class Config(PickleableDict, Prettified):
 
     @property
     def reset_dct_copy_kwargs_(self) -> tp.Kwargs:
-        """Parameters for copying `reset_dct_`."""
+        """Parameters for copying `Config.reset_dct_`."""
         return self._reset_dct_copy_kwargs_
+
+    @property
+    def pickle_reset_dct_(self) -> bool:
+        """Whether to pickle `Config.reset_dct_`."""
+        return self._pickle_reset_dct_
 
     @property
     def frozen_keys_(self) -> bool:
@@ -734,71 +663,6 @@ class Config(PickleableDict, Prettified):
         reset_dct_ = copy_dict(dict(self), **reset_dct_copy_kwargs)
         self.__dict__["_reset_dct_"] = reset_dct_
 
-    def dumps(self, pickle_classes: tp.Optional[bool] = None, dump_reset_dct: bool = False, **kwargs) -> bytes:
-        """Pickle to bytes."""
-        from vectorbtpro.utils.opt_packages import warn_cannot_import
-
-        warn_cannot_import("dill")
-        try:
-            import dill as pickle
-        except ImportError:
-            import pickle
-
-        if dump_reset_dct:
-            reset_dct_ = PickleableDict(self.reset_dct_).dumps(pickle_classes=pickle_classes, **kwargs)
-        else:
-            reset_dct_ = None
-        return pickle.dumps(
-            dict(
-                dct=PickleableDict(self).dumps(pickle_classes=pickle_classes, **kwargs),
-                copy_kwargs_=self.copy_kwargs_,
-                reset_dct_=reset_dct_,
-                reset_dct_copy_kwargs_=self.reset_dct_copy_kwargs_,
-                frozen_keys_=self.frozen_keys_,
-                readonly_=self.readonly_,
-                nested_=self.nested_,
-                convert_children_=self.convert_children_,
-                as_attrs_=self.as_attrs_,
-            ),
-            **kwargs,
-        )
-
-    @classmethod
-    def loads(cls: tp.Type[ConfigT], dumps: bytes, init_kwargs: tp.KwargsLike = None, **kwargs) -> ConfigT:
-        """Unpickle from bytes."""
-        from vectorbtpro.utils.opt_packages import warn_cannot_import
-
-        warn_cannot_import("dill")
-        try:
-            import dill as pickle
-        except ImportError:
-            import pickle
-
-        obj = pickle.loads(dumps, **kwargs)
-        if obj["reset_dct_"] is not None:
-            reset_dct_ = PickleableDict.loads(obj["reset_dct_"], **kwargs)
-        else:
-            reset_dct_ = None
-        dct = PickleableDict.loads(obj["dct"], **kwargs)
-        config = {
-            "copy_kwargs_": obj["copy_kwargs_"],
-            "reset_dct_": reset_dct_,
-            "reset_dct_copy_kwargs_": obj["reset_dct_copy_kwargs_"],
-            "frozen_keys_": obj["frozen_keys_"],
-            "readonly_": obj["readonly_"],
-            "nested_": obj["nested_"],
-            "convert_children_": obj["convert_children_"],
-            "as_attrs_": obj["as_attrs_"],
-        }
-        if init_kwargs is None:
-            init_kwargs = {}
-        for k, v in init_kwargs.items():
-            if k in config:
-                config[k] = v
-            else:
-                dct[k] = v
-        return cls(dct, **{**config, **init_kwargs})
-
     def load_update(
         self,
         path: tp.Optional[tp.PathLike] = None,
@@ -835,6 +699,7 @@ class Config(PickleableDict, Prettified):
                     copy_kwargs_=self.copy_kwargs_,
                     reset_dct_=self.reset_dct_,
                     reset_dct_copy_kwargs_=self.reset_dct_copy_kwargs_,
+                    pickle_reset_dct_=self.pickle_reset_dct_,
                     frozen_keys_=self.frozen_keys_,
                     readonly_=self.readonly_,
                     nested_=self.nested_,
@@ -858,6 +723,26 @@ class Config(PickleableDict, Prettified):
 
     def __eq__(self, other: tp.Any) -> bool:
         return checks.is_deep_equal(dict(self), dict(other))
+
+    @property
+    def prec_state(self) -> tp.Optional[PRecState]:
+        init_args = (dict(self),)
+        if self._pickle_reset_dct_:
+            reset_dct_ = self.reset_dct_
+        else:
+            reset_dct_ = None
+        init_kwargs = dict(
+            copy_kwargs_=self.copy_kwargs_,
+            reset_dct_=reset_dct_,
+            reset_dct_copy_kwargs_=self.reset_dct_copy_kwargs_,
+            pickle_reset_dct_=self.pickle_reset_dct_,
+            frozen_keys_=self.frozen_keys_,
+            readonly_=self.readonly_,
+            nested_=self.nested_,
+            convert_children_=self.convert_children_,
+            as_attrs_=self.as_attrs_,
+        )
+        return PRecState(init_args=init_args, init_kwargs=init_kwargs)
 
 
 class AtomicConfig(Config, atomic_dict):
@@ -1036,42 +921,6 @@ class Configured(Cacheable, Pickleable, Prettified):
         See `Configured.replace`."""
         return self.replace(copy_mode_=copy_mode, nested_=nested, cls_=cls)
 
-    def dumps(self, pickle_classes: tp.Optional[bool] = None, **kwargs) -> bytes:
-        """Pickle to bytes."""
-        from vectorbtpro.utils.opt_packages import warn_cannot_import
-
-        warn_cannot_import("dill")
-        try:
-            import dill as pickle
-        except ImportError:
-            import pickle
-
-        config_dumps = self.config.dumps(pickle_classes=pickle_classes, **kwargs)
-        attr_dct = PickleableDict({attr: getattr(self, attr) for attr in self.get_writeable_attrs()})
-        attr_dct_dumps = attr_dct.dumps(pickle_classes=pickle_classes, **kwargs)
-        return pickle.dumps((config_dumps, attr_dct_dumps), **kwargs)
-
-    @classmethod
-    def loads(cls: tp.Type[ConfiguredT], dumps: bytes, init_kwargs: tp.KwargsLike = None, **kwargs) -> ConfiguredT:
-        """Unpickle from bytes."""
-        from vectorbtpro.utils.opt_packages import warn_cannot_import
-
-        warn_cannot_import("dill")
-        try:
-            import dill as pickle
-        except ImportError:
-            import pickle
-
-        config_dumps, attr_dct_dumps = pickle.loads(dumps, **kwargs)
-        config = Config.loads(config_dumps, **kwargs)
-        attr_dct = PickleableDict.loads(attr_dct_dumps, **kwargs)
-        if init_kwargs is None:
-            init_kwargs = {}
-        new_instance = cls(**{**config, **init_kwargs})
-        for attr, obj in attr_dct.items():
-            setattr(new_instance, attr, obj)
-        return new_instance
-
     def __eq__(self, other: tp.Any) -> bool:
         """Objects are equal if their configs and writeable attributes are equal."""
         if type(self) != type(other):
@@ -1164,3 +1013,11 @@ class Configured(Cacheable, Pickleable, Prettified):
             type(self).__name__,
             self.config.prettify(**kwargs)[len(type(self.config).__name__) + 1 : -1],
         )
+
+    @property
+    def prec_state(self) -> tp.Optional[PRecState]:
+        if self._writeable_attrs is not None:
+            attr_dct = {k: getattr(self, k) for k in self._writeable_attrs}
+        else:
+            attr_dct = {}
+        return PRecState(init_kwargs=dict(self.config), attr_dct=attr_dct)

@@ -139,6 +139,8 @@ class TestFactory:
             return ts * p + a + b
 
         I = F.with_apply_func(apply_func, var_args=True)
+        I._prec_id = 123456789
+        vbt.PRecInfo(I._prec_id, I).register()
         indicator = I.run(ts, [0, 1], 10, b=100)
         assert I.loads(indicator.dumps()) == indicator
         indicator.save(tmp_path / "indicator")
@@ -2321,6 +2323,7 @@ class TestFactory:
             "_p2_loc",
             "_p2_mapper",
             "_param_names",
+            "_prec_id",
             "_run",
             "_run_combs",
             "_setting_keys",
@@ -2387,6 +2390,7 @@ class TestFactory:
             "plots_defaults",
             "post_resolve_attr",
             "pre_resolve_attr",
+            "prec_state",
             "prettify",
             "range_only_select",
             "regroup",

@@ -4490,7 +4490,7 @@ Args:
         return factory.with_apply_func(apply_func, pass_packed=True, pass_wrapper=True, **kwargs)
 
     @classmethod
-    def from_wqa101(cls, alpha_idx: int, **kwargs) -> tp.Type[IndicatorBase]:
+    def from_wqa101(cls, alpha_idx: tp.Union[str, int], **kwargs) -> tp.Type[IndicatorBase]:
         """Build an indicator class from one of the WorldQuant's 101 alpha expressions.
 
         See `vectorbtpro.indicators.expr.wqa101_expr_config`.
@@ -4545,6 +4545,8 @@ Args:
                 Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
             ```
         """
+        if isinstance(alpha_idx, str):
+            alpha_idx = int(alpha_idx.upper().replace("WQA", ""))
         return cls.from_expr(
             wqa101_expr_config[alpha_idx],
             factory_kwargs=dict(class_name="WQA%d" % alpha_idx, module_name=__name__ + ".wqa101"),

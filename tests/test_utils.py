@@ -832,13 +832,14 @@ class TestConfig:
             copy_kwargs_=dict(copy_mode="deep", nested=True),
             reset_dct_=dict(b=0),
             reset_dct_copy_kwargs_=dict(copy_mode="deep", nested=True),
+            pickle_reset_dct_=True,
             frozen_keys_=True,
             readonly_=True,
             nested_=True,
             convert_children_=True,
             as_attrs_=True,
         )
-        cfg.save(tmp_path / "config", dump_reset_dct=True)
+        cfg.save(tmp_path / "config")
         new_cfg = config.Config.load(tmp_path / "config")
         assert new_cfg == deepcopy(cfg)
         assert new_cfg.__dict__ == deepcopy(cfg).__dict__
@@ -849,6 +850,7 @@ class TestConfig:
             copy_kwargs_=dict(copy_mode="deep", nested=True),
             reset_dct_=dict(b=0),
             reset_dct_copy_kwargs_=dict(copy_mode="deep", nested=True),
+            pickle_reset_dct_=True,
             frozen_keys_=True,
             readonly_=True,
             nested_=True,
@@ -860,19 +862,21 @@ class TestConfig:
             copy_kwargs_=dict(copy_mode="shallow", nested=False),
             reset_dct_=dict(b=1),
             reset_dct_copy_kwargs_=dict(copy_mode="shallow", nested=False),
+            pickle_reset_dct_=False,
             frozen_keys_=False,
             readonly_=False,
             nested_=False,
             convert_children_=False,
             as_attrs_=False,
         )
-        cfg1.save(tmp_path / "config", dump_reset_dct=True)
+        cfg1.save(tmp_path / "config")
         cfg2.load_update(tmp_path / "config", clear=True)
         assert cfg2 == deepcopy(cfg1)
         assert cfg2.__dict__ == cfg1.__dict__
 
     def test_configured(self, tmp_path):
         class H(config.Configured):
+            _prec_id = 123456789
             _writeable_attrs = {"my_attr", "my_cfg"}
 
             def __init__(self, a, b=2, **kwargs):
@@ -892,6 +896,8 @@ class TestConfig:
         assert H(np.array([1, 2, 3])) != H(np.array([1, 2, 4]))
         assert H(None) == H(None)
         assert H(None) != H(10.0)
+
+        vbt.PRecInfo(H._prec_id, H).register()
 
         h = H(1)
         h.my_attr = 200
