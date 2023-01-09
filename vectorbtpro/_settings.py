@@ -90,8 +90,6 @@ import json
 import os
 import pkgutil
 
-import numpy as np
-
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import ChildDict, Config, FrozenConfig
 from vectorbtpro.utils.datetime_ import get_local_tz, get_utc_tz
@@ -1225,16 +1223,16 @@ _settings["logs"] = logs
 
 portfolio = ChildDict(
     # Orders
-    size=np.inf,
+    size=float("inf"),
     size_type="amount",
     direction="both",
     price="close",
     fees=0.0,
     fixed_fees=0.0,
     slippage=0.0,
-    min_size=np.nan,
-    max_size=np.nan,
-    size_granularity=np.nan,
+    min_size=float("nan"),
+    max_size=float("nan"),
+    size_granularity=float("nan"),
     leverage=1.0,
     leverage_mode="lazy",
     reject_prob=0.0,
@@ -1252,20 +1250,20 @@ portfolio = ChildDict(
     upon_opposite_entry="reversereduce",
     order_type="market",
     limit_reverse=False,
-    limit_delta=np.nan,
+    limit_delta=float("nan"),
     limit_tif=-1,
     limit_expiry=-1,
     upon_adj_limit_conflict="keepignore",
     upon_opp_limit_conflict="cancelexecute",
     use_stops=None,
-    sl_stop=np.nan,
-    tsl_th=np.nan,
-    tsl_stop=np.nan,
-    tp_stop=np.nan,
+    sl_stop=float("nan"),
+    tsl_th=float("nan"),
+    tsl_stop=float("nan"),
+    tp_stop=float("nan"),
     stop_entry_price="close",
     stop_exit_price="stop",
     stop_order_type="market",
-    stop_limit_delta=np.nan,
+    stop_limit_delta=float("nan"),
     stop_exit_type="close",
     upon_stop_update="override",
     upon_adj_stop_conflict="keepexecute",
@@ -1279,7 +1277,7 @@ portfolio = ChildDict(
     val_price="price",
     init_cash=100.0,
     init_position=0.0,
-    init_price=np.nan,
+    init_price=float("nan"),
     cash_deposits=0.0,
     cash_earnings=0.0,
     cash_dividends=0.0,

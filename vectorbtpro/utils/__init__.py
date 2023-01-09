@@ -29,7 +29,7 @@ from vectorbtpro.utils.chunking import (
 from vectorbtpro.utils.config import (
     atomic_dict,
     merge_dicts,
-    PickleableDict,
+    PDict,
     ChildDict,
     Config,
     FrozenConfig,

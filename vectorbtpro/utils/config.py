@@ -2,16 +2,24 @@
 
 """Utilities for configuration."""
 
+import ast
 import warnings
 import inspect
 from copy import copy, deepcopy
+from pathlib import Path
+from collections import defaultdict
+
+import numpy as np
+import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.caching import Cacheable
 from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.formatting import Prettified, prettify_dict, prettify_inited
-from vectorbtpro.utils.pickling import Pickleable, PRecState
+from vectorbtpro.utils.pickling import Pickleable, PRecState, dumps, loads
+from vectorbtpro.utils.eval_ import multiline_eval
+from vectorbtpro.utils.path_ import check_mkdir
 
 
 def resolve_dict(dct: tp.DictLikeSequence, i: tp.Optional[int] = None) -> dict:
@@ -235,17 +243,213 @@ def merge_dicts(
 
 _RaiseKeyError = object()
 
-PickleableDictT = tp.TypeVar("PickleableDictT", bound="PickleableDict")
+PDictT = tp.TypeVar("PDictT", bound="PDict")
 
 
-class PickleableDict(Pickleable, dict):
-    """Dict that may contain values of type `Pickleable`."""
+class PDict(Pickleable, dict):
+    """Pickleable dict."""
 
     def load_update(self, path: tp.Optional[tp.PathLike] = None, clear: bool = False, **kwargs) -> None:
         """Load dumps from a file and update this instance in-place."""
         if clear:
             self.clear()
         self.update(self.load(path=path, **kwargs))
+
+    def save_to_config(
+        self,
+        path: tp.Optional[tp.PathLike] = None,
+        prepend_section: tp.Union[None, bool, str] = None,
+        hide_section: tp.Optional[bool] = None,
+        mkdir_kwargs: tp.KwargsLike = None,
+    ) -> None:
+        """Save dictionary to a file using `configparser`.
+
+        Saves in a format that is guaranteed to be parsed using `PDict.load_from_config`.
+        Otherwise, an error will be thrown. If any object cannot be represented using a string,
+        uses `vectorbtpro.utils.pickling.dumps` to convert it into bytes."""
+        import configparser
+        from io import StringIO
+
+        if path is None:
+            path = type(self).__name__
+        if path.suffix == "":
+            path = path.with_suffix(".ini")
+        if mkdir_kwargs is None:
+            mkdir_kwargs = {}
+        check_mkdir(path.parent, **mkdir_kwargs)
+        path = Path(path)
+
+        parser = configparser.RawConfigParser()
+        if prepend_section is None:
+            prepend_section = False
+            for k, v in self.items():
+                if not isinstance(v, dict):
+                    prepend_section = True
+                    break
+            if hide_section is None and prepend_section:
+                hide_section = True
+        if prepend_section is not None and isinstance(prepend_section, bool):
+            if prepend_section:
+                prepend_section = "section"
+            else:
+                prepend_section = None
+        if prepend_section is not None:
+            dct = {prepend_section: dict(self)}
+        else:
+            dct = dict(self)
+        for k, v in dct.items():
+            parser.add_section(k)
+            for k2, v2 in v.items():
+                if isinstance(v2, str):
+                    parser.set(k, k2, v2)
+                else:
+                    try:
+                        ast.literal_eval(repr(v2))
+                        parser.set(k, k2, repr(v2))
+                    except Exception as e:
+                        try:
+                            float(repr(v2))
+                            parser.set(k, k2, repr(v2))
+                        except Exception as e:
+                            parser.set(k, k2, "!" + repr(dumps(v2)))
+        with StringIO() as f:
+            parser.write(f)
+            dct_str = f.getvalue()
+            if hide_section is not None and hide_section:
+                if len(dct) > 1:
+                    raise ValueError("Cannot hide multiple sections")
+                dct_str = "\n".join(dct_str.split("\n")[1:])
+        with open(path, "w") as f:
+            f.write(dct_str)
+
+    @classmethod
+    def load_from_config(
+        cls: tp.Type[PDictT],
+        path: tp.Optional[tp.PathLike] = None,
+        prepend_section: tp.Union[None, bool, str] = None,
+        select_section: tp.Union[None, bool, str] = None,
+        parse_literals: bool = True,
+        unpickle_bytes: bool = True,
+        run_code: bool = True,
+        code_context: tp.KwargsLike = None,
+    ) -> PDictT:
+        """Load dictionary from a file using `configparser`.
+
+        Can parse configs without sections.
+
+        If `parse_literals` is True, will detect any Python literals and containers such as `True` and `[]`.
+        Will also understand "nan" and "inf".
+
+        If `unpickle_bytes` is True, will unpickle any byte stream prepended with `!`, such as
+        "!b'\x80\x04\x95\t\x00\x00\x00\x00\x00\x00\x00K\x01K\x02K\x03\x87\x94.'" for `(1, 2, 3)`.
+
+        If `run_code` is True, will run any Python code prepended with `!`. Will use the context
+        `code_context` together with already defined `np` (NumPy) and `pd` (Pandas).
+
+        !!! warning
+            Unpickling byte streams and running code has important security implications. Don't attempt
+            to parse configs coming from untrusted sources as those can contain malicious code!
+
+        Usage:
+            * Parse `test.ini`:
+
+            ```plaintext
+            string = hello world
+            boolean = False
+            int = 100
+            float = 1e-10
+            nan = nan
+            inf = inf
+            numpy = !np.array([1, 2, 3])
+            pandas = !pd.Series([1, 2, 3])
+            multiline_code = !import math; math.floor(1.5)
+            sub_dict = !dict(sub_dict2=dict(some="value"))
+            ```
+
+            ```pycon
+            >>> import vectorbtpro as vbt
+            >>> vbt.PDict.load_from_config("test.ini")
+            {'boolean': False,
+             'int': 100,
+             'float': 1e-10,
+             'nan': nan,
+             'inf': inf,
+             'numpy': array([1, 2, 3]),
+             'pandas': 0    1
+             1    2
+             2    3
+             dtype: int64,
+             'multiline_code': 1,
+             'sub_dict': {'sub_dict2': {'some': 'value'}}}
+            ```
+        """
+        import configparser
+
+        if path is None:
+            path = cls.__name__
+        path = Path(path)
+        if path.suffix == "" and not path.exists():
+            if path.with_suffix(".ini").exists():
+                path = path.with_suffix(".ini")
+            elif path.with_suffix(".config").exists():
+                path = path.with_suffix(".config")
+            elif path.with_suffix(".cfg").exists():
+                path = path.with_suffix(".cfg")
+
+        parser = configparser.RawConfigParser()
+        with open(path) as f:
+            if prepend_section is not None and isinstance(prepend_section, bool):
+                if prepend_section:
+                    prepend_section = "section"
+                else:
+                    prepend_section = None
+            if prepend_section is not None:
+                string = f"[{prepend_section}]\n" + f.read()
+            else:
+                string = f.read()
+        try:
+            parser.read_string(string)
+        except configparser.MissingSectionHeaderError as e:
+            select_section = True
+            parser.read_string("[section]" + string)
+        dct = {sect: dict(parser.items(sect)) for sect in parser.sections()}
+        if select_section is not None and isinstance(select_section, bool):
+            if select_section:
+                if len(dct) == 1:
+                    select_section = list(dct.keys())[0]
+                elif len(dct) == 0:
+                    raise ValueError("No sections to select")
+                else:
+                    raise ValueError("Please provide a section to select")
+            else:
+                select_section = None
+        if parse_literals or run_code:
+            new_dct = defaultdict(dict)
+            code_context = merge_dicts(dict(np=np, pd=pd, nan=np.nan, inf=np.inf), code_context)
+            for k, v in dct.items():
+                for k2, v2 in v.items():
+                    v2 = v2.strip()
+                    if unpickle_bytes and (
+                        (v2.startswith("!b'") and v2.endswith("'")) or (v2.startswith('!b"') and v2.endswith('"'))
+                    ):
+                        new_dct[k][k2] = loads(eval("bytes(" + v2.lstrip("!") + ")"))
+                    elif run_code and v2.startswith("!"):
+                        new_dct[k][k2] = multiline_eval(v2.lstrip("!"), context=code_context)
+                    else:
+                        if parse_literals:
+                            try:
+                                new_dct[k][k2] = ast.literal_eval(v2)
+                            except Exception as e:
+                                try:
+                                    new_dct[k][k2] = float(v2)
+                                except Exception as e:
+                                    new_dct[k][k2] = v2
+                        else:
+                            new_dct[k][k2] = v2
+            dct = new_dct
+        if select_section is not None:
+            dct = dct[select_section]
+        return cls(dct)
 
 
 class ChildDict(dict):
@@ -257,7 +461,7 @@ class ChildDict(dict):
 ConfigT = tp.TypeVar("ConfigT", bound="Config")
 
 
-class Config(PickleableDict, Prettified):
+class Config(PDict, Prettified):
     """Extends pickleable dict with config features such as nested updates, freezing, and resetting.
 
     Args:
