@@ -1037,20 +1037,22 @@ class YFData(RemoteData):
             timeframe = str(multiplier) + unit
 
         df = yf.Ticker(symbol).history(period=period, start=start, end=end, interval=timeframe, **history_kwargs)
-        if start is not None:
-            if df.index.tzinfo is None:
-                if df.index[0] < start.astimezone(get_utc_tz()).replace(tzinfo=None):
-                    df = df[df.index >= start.astimezone(get_utc_tz()).replace(tzinfo=None)]
-            else:
-                if df.index[0] < start.astimezone(df.index.tzinfo):
-                    df = df[df.index >= start.astimezone(df.index.tzinfo)]
-        if end is not None:
-            if df.index.tzinfo is None:
-                if df.index[-1] >= end.astimezone(get_utc_tz()).replace(tzinfo=None):
-                    df = df[df.index < end.astimezone(get_utc_tz()).replace(tzinfo=None)]
-            else:
-                if df.index[-1] >= end.astimezone(df.index.tzinfo):
-                    df = df[df.index < end.astimezone(df.index.tzinfo)]
+
+        if not df.empty:
+            if start is not None:
+                if df.index.tzinfo is None:
+                    if df.index[0] < start.astimezone(get_utc_tz()).replace(tzinfo=None):
+                        df = df[df.index >= start.astimezone(get_utc_tz()).replace(tzinfo=None)]
+                else:
+                    if df.index[0] < start.astimezone(df.index.tzinfo):
+                        df = df[df.index >= start.astimezone(df.index.tzinfo)]
+            if end is not None:
+                if df.index.tzinfo is None:
+                    if df.index[-1] >= end.astimezone(get_utc_tz()).replace(tzinfo=None):
+                        df = df[df.index < end.astimezone(get_utc_tz()).replace(tzinfo=None)]
+                else:
+                    if df.index[-1] >= end.astimezone(df.index.tzinfo):
+                        df = df[df.index < end.astimezone(df.index.tzinfo)]
         return df
 
 
@@ -2055,20 +2057,21 @@ class AlpacaData(RemoteData):
         if "VWAP" in df.columns:
             df["VWAP"] = df["VWAP"].astype(float)
 
-        if start is not None:
-            if df.index.tzinfo is None:
-                if df.index[0] < start.replace(tzinfo=None):
-                    df = df[df.index >= start.replace(tzinfo=None)]
-            else:
-                if df.index[0] < start.astimezone(df.index.tzinfo):
-                    df = df[df.index >= start.astimezone(df.index.tzinfo)]
-        if end is not None:
-            if df.index.tzinfo is None:
-                if df.index[-1] >= end.replace(tzinfo=None):
-                    df = df[df.index < end.replace(tzinfo=None)]
-            else:
-                if df.index[-1] >= end.astimezone(df.index.tzinfo):
-                    df = df[df.index < end.astimezone(df.index.tzinfo)]
+        if not df.empty:
+            if start is not None:
+                if df.index.tzinfo is None:
+                    if df.index[0] < start.replace(tzinfo=None):
+                        df = df[df.index >= start.replace(tzinfo=None)]
+                else:
+                    if df.index[0] < start.astimezone(df.index.tzinfo):
+                        df = df[df.index >= start.astimezone(df.index.tzinfo)]
+            if end is not None:
+                if df.index.tzinfo is None:
+                    if df.index[-1] >= end.replace(tzinfo=None):
+                        df = df[df.index < end.replace(tzinfo=None)]
+                else:
+                    if df.index[-1] >= end.astimezone(df.index.tzinfo):
+                        df = df[df.index < end.astimezone(df.index.tzinfo)]
         return df
 
 
@@ -2816,7 +2819,7 @@ class AlphaVantageData(RemoteData):
             new_c = new_c[0].title() + new_c[1:]
             new_columns.append(new_c)
         df = df.rename(columns=dict(zip(df.columns, new_columns)))
-        if df.index[0] > df.index[1]:
+        if not df.empty and df.index[0] > df.index[1]:
             df = df.iloc[::-1]
 
         return df
@@ -2956,20 +2959,21 @@ class NDLData(RemoteData):
             new_columns.append(new_c)
         df = df.rename(columns=dict(zip(df.columns, new_columns)))
 
-        if start is not None:
-            if df.index.tzinfo is None:
-                if df.index[0] < start.replace(tzinfo=None):
-                    df = df[df.index >= start.replace(tzinfo=None)]
-            else:
-                if df.index[0] < start.astimezone(df.index.tzinfo):
-                    df = df[df.index >= start.astimezone(df.index.tzinfo)]
-        if end is not None:
-            if df.index.tzinfo is None:
-                if df.index[-1] >= end.replace(tzinfo=None):
-                    df = df[df.index < end.replace(tzinfo=None)]
-            else:
-                if df.index[-1] >= end.astimezone(df.index.tzinfo):
-                    df = df[df.index < end.astimezone(df.index.tzinfo)]
+        if not df.empty:
+            if start is not None:
+                if df.index.tzinfo is None:
+                    if df.index[0] < start.replace(tzinfo=None):
+                        df = df[df.index >= start.replace(tzinfo=None)]
+                else:
+                    if df.index[0] < start.astimezone(df.index.tzinfo):
+                        df = df[df.index >= start.astimezone(df.index.tzinfo)]
+            if end is not None:
+                if df.index.tzinfo is None:
+                    if df.index[-1] >= end.replace(tzinfo=None):
+                        df = df[df.index < end.replace(tzinfo=None)]
+                else:
+                    if df.index[-1] >= end.astimezone(df.index.tzinfo):
+                        df = df[df.index < end.astimezone(df.index.tzinfo)]
         return df
 
 
