@@ -17,6 +17,15 @@ import numba
 from vectorbtpro import _typing as tp
 
 
+class Comparable:
+    def equals(self, other: tp.Any) -> bool:
+        """Check two objects for equality."""
+        raise NotImplementedError
+
+    def __eq__(self, other: tp.Any) -> bool:
+        return self.equals(other)
+
+
 # ############# Checks ############# #
 
 def is_int(arg: tp.Any) -> bool:
@@ -223,6 +232,8 @@ def is_deep_equal(arg1: tp.Any, arg2: tp.Any, check_exact: bool = False, **kwarg
     try:
         if id(arg1) == id(arg2):
             return True
+        if isinstance(arg1, Comparable):
+            return arg1.equals(arg2)
         if type(arg1) != type(arg2):
             return False
         if attr.has(type(arg1)):
@@ -243,28 +254,27 @@ def is_deep_equal(arg1: tp.Any, arg2: tp.Any, check_exact: bool = False, **kwarg
                 if check_exact:
                     return False
                 _check_array(np.testing.assert_allclose)
+        elif isinstance(arg1, (tuple, list)):
+            for i in range(len(arg1)):
+                safe_assert(is_deep_equal(arg1[i], arg2[i], check_exact=check_exact, **kwargs))
+        elif isinstance(arg1, dict):
+            for k in arg1.keys():
+                safe_assert(is_deep_equal(arg1[k], arg2[k], check_exact=check_exact, **kwargs))
         else:
-            if isinstance(arg1, (tuple, list)):
-                for i in range(len(arg1)):
-                    safe_assert(is_deep_equal(arg1[i], arg2[i], check_exact=check_exact, **kwargs))
-            elif isinstance(arg1, dict):
-                for k in arg1.keys():
-                    safe_assert(is_deep_equal(arg1[k], arg2[k], check_exact=check_exact, **kwargs))
-            else:
-                try:
-                    if arg1 == arg2:
-                        return True
-                except:
-                    pass
-                try:
-                    import dill
+            try:
+                if arg1 == arg2:
+                    return True
+            except:
+                pass
+            try:
+                import dill
 
-                    _kwargs = _select_kwargs(dill.dumps, kwargs)
-                    if dill.dumps(arg1, **_kwargs) == dill.dumps(arg2, **_kwargs):
-                        return True
-                except:
-                    pass
-                return False
+                _kwargs = _select_kwargs(dill.dumps, kwargs)
+                if dill.dumps(arg1, **_kwargs) == dill.dumps(arg2, **_kwargs):
+                    return True
+            except:
+                pass
+            return False
     except:
         return False
     return True

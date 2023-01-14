@@ -60,7 +60,7 @@ class CustomTemplate:
         """Resolve `CustomTemplate.context`.
 
         Merges `context` in `vectorbtpro._settings.template`, `CustomTemplate.context`, and `context`.
-        Automatically appends `sub_id`, `np` (NumPy), `pd` (Pandas), and `vbt` (vectorbt)."""
+        Automatically appends `sub_id`, `np` (NumPy), `pd` (Pandas), and `vbt` (vectorbtpro)."""
         from vectorbtpro._settings import settings
 
         template_cfg = settings["template"]

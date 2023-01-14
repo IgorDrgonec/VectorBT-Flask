@@ -1265,6 +1265,8 @@ class TestPortfolio:
         assert vbt.Portfolio.loads(pf2.dumps()) == pf2
         pf2.save(tmp_path / "pf")
         assert vbt.Portfolio.load(tmp_path / "pf") == pf2
+        pf2.save(tmp_path / "pf", file_format="ini")
+        assert vbt.Portfolio.load(tmp_path / "pf", file_format="ini") == pf2
 
     def test_wrapper(self):
         assert_index_equal(pf.wrapper.index, close_na.index)

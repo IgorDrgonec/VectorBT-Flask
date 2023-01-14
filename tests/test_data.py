@@ -1,12 +1,12 @@
 import os
 from datetime import datetime, timedelta, timezone
 
-import pandas as pd
 import pytest
 
 import vectorbtpro as vbt
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.datetime_ import to_timezone
+from vectorbtpro.utils.checks import is_deep_equal
 
 from tests.utils import *
 
@@ -225,7 +225,11 @@ class TestData:
         data = MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
         assert MyData.loads(data.dumps()) == data
         data.save(tmp_path / "data")
-        assert MyData.load(tmp_path / "data") == data
+        new_data = MyData.load(tmp_path / "data")
+        assert new_data == data
+        data.save(tmp_path / "data", file_format="ini")
+        new_data = MyData.load(tmp_path / "data", file_format="ini")
+        assert new_data == data
 
     def test_fetch(self):
         assert_series_equal(
@@ -1081,7 +1085,7 @@ class TestData:
             column_mask=column_mask,
             missing_index="drop",
             missing_columns="drop",
-        ).last_index == {0: index[4], 1: index[3]}
+        ).last_index == vbt.symbol_dict({0: index[4], 1: index[3]})
         assert MyData.fetch(
             [0, 1],
             shape=(5, 3),
@@ -1089,7 +1093,12 @@ class TestData:
             column_mask=column_mask,
             missing_index="drop",
             missing_columns="drop",
-        ).update(n=3, index_mask=update_index_mask2).last_index == {0: updated_index[4], 1: updated_index[5]}
+        ).update(n=3, index_mask=update_index_mask2).last_index == vbt.symbol_dict(
+            {
+                0: updated_index[4],
+                1: updated_index[5],
+            }
+        )
         assert MyData.fetch(
             [0, 1],
             shape=(5, 3),
@@ -1097,10 +1106,12 @@ class TestData:
             column_mask=column_mask,
             missing_index="drop",
             missing_columns="drop",
-        ).update(n=3, index_mask=update_index_mask2, concat=False).last_index == {
-            0: updated_index[4],
-            1: updated_index[5],
-        }
+        ).update(n=3, index_mask=update_index_mask2, concat=False).last_index == vbt.symbol_dict(
+            {
+                0: updated_index[4],
+                1: updated_index[5],
+            }
+        )
         assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3)).update(n=2, return_none=vbt.symbol_dict({0: True, 1: False})).data[0],
             pd.DataFrame(

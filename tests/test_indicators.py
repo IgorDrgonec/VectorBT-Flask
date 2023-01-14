@@ -139,12 +139,14 @@ class TestFactory:
             return ts * p + a + b
 
         I = F.with_apply_func(apply_func, var_args=True)
-        I._prec_id = 123456789
-        vbt.PRecInfo(I._prec_id, I).register()
+        I._rec_id = "123456789"
+        vbt.RecInfo(I._rec_id, I).register()
         indicator = I.run(ts, [0, 1], 10, b=100)
         assert I.loads(indicator.dumps()) == indicator
         indicator.save(tmp_path / "indicator")
         assert I.load(tmp_path / "indicator") == indicator
+        indicator.save(tmp_path / "indicator", file_format="ini")
+        assert I.load(tmp_path / "indicator", file_format="ini") == indicator
 
     def test_with_custom_func(self):
         F = vbt.IndicatorFactory(input_names=["ts"], param_names=["p"], output_names=["out"])
@@ -2323,7 +2325,7 @@ class TestFactory:
             "_p2_loc",
             "_p2_mapper",
             "_param_names",
-            "_prec_id",
+            "_rec_id",
             "_run",
             "_run_combs",
             "_setting_keys",
@@ -2344,8 +2346,13 @@ class TestFactory:
             "config",
             "copy",
             "custom_func",
+            "decode_config_node",
+            "decode_from_config",
             "deep_getattr",
             "dumps",
+            "encode_config_node",
+            "encode_to_config",
+            "equals",
             "file_exists",
             "get_ca_setup",
             "get_settings",
@@ -2390,15 +2397,16 @@ class TestFactory:
             "plots_defaults",
             "post_resolve_attr",
             "pre_resolve_attr",
-            "prec_state",
             "prettify",
             "range_only_select",
+            "rec_state",
             "regroup",
             "replace",
             "resample",
             "reset_settings",
             "resolve_attr",
             "resolve_column_stack_kwargs",
+            "resolve_file_path",
             "resolve_row_stack_kwargs",
             "resolve_self",
             "resolve_shortcut_attr",

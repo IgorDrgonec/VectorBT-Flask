@@ -1194,6 +1194,8 @@ class TestArrayWrapper:
         assert vbt.ArrayWrapper.loads(sr2_grouped_wrapper_co.dumps()) == sr2_grouped_wrapper_co
         sr2_grouped_wrapper_co.save(tmp_path / "sr2_grouped_wrapper_co")
         assert vbt.ArrayWrapper.load(tmp_path / "sr2_grouped_wrapper_co") == sr2_grouped_wrapper_co
+        sr2_grouped_wrapper_co.save(tmp_path / "sr2_grouped_wrapper_co", file_format="ini")
+        assert vbt.ArrayWrapper.load(tmp_path / "sr2_grouped_wrapper_co", file_format="ini") == sr2_grouped_wrapper_co
 
     def test_indexing_func_meta(self):
         # not grouped
@@ -6141,20 +6143,6 @@ class TestAccessors:
         assert_frame_equal(
             df5.vbt.stack_index(df5.columns.get_level_values(0)).vbt.drop_duplicate_levels(),
             df5,
-        )
-
-    def test_sort_index(self):
-        assert_series_equal(
-            pd.Series([3, 2, 1], index=["c", "b", "a"], name="test").vbt.sort_index(),
-            pd.Series([1, 2, 3], index=["a", "b", "c"], name="test"),
-        )
-        assert_frame_equal(
-            pd.DataFrame([[3, 2, 1]], columns=["c", "b", "a"]).vbt.sort_index(),
-            pd.DataFrame([[1, 2, 3]], columns=["a", "b", "c"]),
-        )
-        assert_frame_equal(
-            pd.DataFrame([3, 2, 1], index=["c", "b", "a"]).vbt.sort_index(axis=0),
-            pd.DataFrame([1, 2, 3], index=["a", "b", "c"]),
         )
 
     def test_set(self):

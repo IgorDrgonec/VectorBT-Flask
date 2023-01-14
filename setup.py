@@ -65,6 +65,7 @@ setup(
         "humanize",
         "attrs>=21.1.0",
         "websocket-client",
+        "graphlib_backport; python_version < '3.9'",
     ],
     extras_require=get_extra_requires("extra-requirements.txt"),
     classifiers=[

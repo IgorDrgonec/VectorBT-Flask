@@ -680,7 +680,7 @@ concatenates their total returns:
 ...         fast_windows=vbt.ChunkSlicer(),
 ...         slow_windows=vbt.ChunkSlicer()
 ...     ),
-...     merge_func=lambda x: pd.concat(x).vbt.sort_index()
+...     merge_func=lambda x: pd.concat(x).sort_index()
 ... )
 ... def pipeline(price, fast_windows, slow_windows):
 ...     fast_ma = vbt.MA.run(price, fast_windows, short_name='fast')

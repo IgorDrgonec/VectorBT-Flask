@@ -970,8 +970,10 @@ def parameterized(
                 forward_kwargs_as=forward_kwargs_as,
                 execute_kwargs=execute_kwargs,
             ),
-            frozen_keys_=True,
-            as_attrs_=True,
+            options_=dict(
+                frozen_keys=True,
+                as_attrs=True,
+            )
         )
         signature = inspect.signature(wrapper)
         lists_var_kwargs = False

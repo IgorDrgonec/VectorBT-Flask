@@ -32,17 +32,18 @@ from vectorbtpro.utils.parsing import get_func_arg_names, extend_args
 from vectorbtpro.utils.path_ import check_mkdir
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.template import RepEval
+from vectorbtpro.utils.pickling import pdict
 
 __pdoc__ = {}
 
 
-class symbol_dict(dict):
+class symbol_dict(pdict):
     """Dict that contains symbols as keys."""
 
     pass
 
 
-class run_func_dict(dict):
+class run_func_dict(pdict):
     """Dict that contains function names as keys for `Data.run`."""
 
     pass

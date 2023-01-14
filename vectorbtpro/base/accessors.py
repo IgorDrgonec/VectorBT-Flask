@@ -762,23 +762,6 @@ class BaseAccessor(Wrapping):
 
         return self.apply_on_index(apply_func, axis=axis, copy_data=copy_data)
 
-    def sort_index(self, axis: tp.Optional[int] = None, **kwargs) -> tp.SeriesFrame:
-        """Sort index/column by their values."""
-        if axis is None:
-            axis = 0 if self.is_series() else 1
-        if self.is_series() and axis == 1:
-            raise TypeError("Axis 1 is not supported in Series")
-        checks.assert_in(axis, (0, 1))
-
-        if axis == 1:
-            obj_index = self.wrapper.columns
-        else:
-            obj_index = self.wrapper.index
-        _, indexer = obj_index.sort_values(return_indexer=True, **kwargs)
-        if axis == 1:
-            return self.obj.iloc[:, indexer]
-        return self.obj.iloc[indexer]
-
     # ############# Getting ############# #
 
     def ago(self, delta: tp.FrequencyLike, **kwargs) -> tp.SeriesFrame:

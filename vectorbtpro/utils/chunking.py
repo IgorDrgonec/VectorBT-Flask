@@ -1133,8 +1133,10 @@ def chunked(
                 disable=disable,
                 forward_kwargs_as=forward_kwargs_as,
             ),
-            frozen_keys_=True,
-            as_attrs_=True,
+            options_=dict(
+                frozen_keys=True,
+                as_attrs=True,
+            )
         )
 
         if prepend_chunk_meta:

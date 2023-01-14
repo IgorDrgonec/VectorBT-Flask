@@ -1609,7 +1609,7 @@ class IndicatorFactory(Configured):
         # Prepare stats
         if metrics is not None:
             if not isinstance(metrics, Config):
-                metrics = Config(metrics, copy_kwargs_=dict(copy_mode="deep"))
+                metrics = Config(metrics, options_=dict(copy_kwargs=dict(copy_mode="deep")))
             setattr(Indicator, "_metrics", metrics.copy())
 
         if stats_defaults is not None:
@@ -1629,7 +1629,7 @@ class IndicatorFactory(Configured):
         # Prepare plots
         if subplots is not None:
             if not isinstance(subplots, Config):
-                subplots = Config(subplots, copy_kwargs_=dict(copy_mode="deep"))
+                subplots = Config(subplots, options_=dict(copy_kwargs=dict(copy_mode="deep")))
             setattr(Indicator, "_subplots", subplots.copy())
 
         if plots_defaults is not None:

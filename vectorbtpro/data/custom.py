@@ -2436,6 +2436,8 @@ AlphaVantageDataT = tp.TypeVar("AlphaVantageDataT", bound="AlphaVantageData")
 class AlphaVantageData(RemoteData):
     """Subclass of `vectorbtpro.data.base.Data` for `alpha_vantage`.
 
+    See https://www.alphavantage.co/documentation/ for API.
+
     Instead of using https://github.com/RomelTorres/alpha_vantage package, which is stale and has
     many issues, this class parses the API documentation with `AlphaVantageData.parse_api_meta` using
     `BeautifulSoup4` and builds the API query based on this metadata. It then uses
@@ -2467,12 +2469,12 @@ class AlphaVantageData(RemoteData):
         ```pycon
         >>> data = vbt.AlphaVantageData.fetch(
         ...     "GOOGL",
-        ...     timeframe="1 day"
+        ...     timeframe="1 day",  # premium?
         ... )
 
         >>> data = vbt.AlphaVantageData.fetch(
         ...     "BTC_USD",
-        ...     timeframe="30 minutes",
+        ...     timeframe="30 minutes",  # premium?
         ...     category="digital-currency",
         ...     outputsize="full"
         ... )
@@ -2485,7 +2487,7 @@ class AlphaVantageData(RemoteData):
         >>> data = vbt.AlphaVantageData.fetch(
         ...     "IBM",
         ...     category="technical-indicators",
-        ...     function="STOCH",
+        ...     function="STOCHRSI",
         ...     params=dict(fastkperiod=14)
         ... )
         ```

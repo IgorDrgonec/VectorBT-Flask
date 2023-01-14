@@ -284,6 +284,8 @@ class TestMappedArray:
         assert vbt.MappedArray.loads(mapped_array.dumps()) == mapped_array
         mapped_array.save(tmp_path / "mapped_array")
         assert vbt.MappedArray.load(tmp_path / "mapped_array") == mapped_array
+        mapped_array.save(tmp_path / "mapped_array", file_format="ini")
+        assert vbt.MappedArray.load(tmp_path / "mapped_array", file_format="ini") == mapped_array
 
     def test_mapped_arr(self):
         np.testing.assert_array_equal(mapped_array["a"].values, np.array([10.0, 11.0, 12.0]))
@@ -1857,6 +1859,8 @@ class TestRecords:
         assert vbt.Records.loads(records.dumps()) == records
         records.save(tmp_path / "records")
         assert vbt.Records.load(tmp_path / "records") == records
+        records.save(tmp_path / "records", file_format="ini")
+        assert vbt.Records.load(tmp_path / "records", file_format="ini") == records
 
     def test_field_config(self):
         records2 = vbt.records.Records(wrapper, records_arr)

@@ -219,8 +219,10 @@ def split(
                 return_splitter=return_splitter,
                 apply_kwargs=apply_kwargs,
             ),
-            frozen_keys_=True,
-            as_attrs_=True,
+            options_=dict(
+                frozen_keys=True,
+                as_attrs=True,
+            )
         )
         signature = inspect.signature(wrapper)
         lists_var_kwargs = False
@@ -419,8 +421,10 @@ def cv_split(
                 template_context=template_context,
                 split_kwargs=split_kwargs,
             ),
-            frozen_keys_=True,
-            as_attrs_=True,
+            options_=dict(
+                frozen_keys=True,
+                as_attrs=True,
+            )
         )
         signature = inspect.signature(wrapper)
         lists_var_kwargs = False

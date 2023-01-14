@@ -19,6 +19,7 @@ from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.random_ import set_seed_nb
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.params import Param, combine_params, find_params_in_obj, param_product_to_objs
+from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.base.indexes import combine_indexes, stack_indexes, select_levels
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.reshaping import to_pd_array, to_1d_array, to_2d_array, to_dict
@@ -70,7 +71,7 @@ __pdoc__ = {}
 # ############# PyPortfolioOpt ############# #
 
 
-class pfopt_func_dict(dict):
+class pfopt_func_dict(pdict):
     """Dict that contains optimization functions as keys.
 
     Keys can be functions themselves, their names, or `_def` for the default value."""

@@ -13,13 +13,13 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.template import CustomTemplate
 from vectorbtpro.utils.datetime_ import (
-    to_tzaware_datetime,
     try_to_datetime_index,
     try_align_to_datetime_index,
     time_to_timedelta,
     infer_index_freq,
     prepare_freq,
 )
+from vectorbtpro.utils.pickling import pdict
 
 
 class IndexingError(Exception):
@@ -1287,7 +1287,7 @@ def get_index_ranges(
     return range_starts, range_ends
 
 
-class index_dict(dict):
+class index_dict(pdict):
     """Dict that contains indexer objects as keys.
 
     Each indexer object must be hashable. To make a slice hashable, use `hslice`."""

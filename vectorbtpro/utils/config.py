@@ -2,24 +2,16 @@
 
 """Utilities for configuration."""
 
-import ast
 import warnings
 import inspect
 from copy import copy, deepcopy
-from pathlib import Path
-from collections import defaultdict
-
-import numpy as np
-import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils import checks
+from vectorbtpro.utils.checks import Comparable, is_deep_equal, assert_in, assert_instance_of
 from vectorbtpro.utils.caching import Cacheable
 from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.formatting import Prettified, prettify_dict, prettify_inited
-from vectorbtpro.utils.pickling import Pickleable, PRecState, dumps, loads
-from vectorbtpro.utils.eval_ import multiline_eval
-from vectorbtpro.utils.path_ import check_mkdir
+from vectorbtpro.utils.pickling import RecState, Pickleable, pdict
 
 
 def resolve_dict(dct: tp.DictLikeSequence, i: tp.Optional[int] = None) -> dict:
@@ -36,7 +28,7 @@ def resolve_dict(dct: tp.DictLikeSequence, i: tp.Optional[int] = None) -> dict:
     raise ValueError("Cannot resolve dict")
 
 
-class atomic_dict(dict):
+class atomic_dict(pdict):
     """Dict that behaves like a single value when merging."""
 
     pass
@@ -49,11 +41,16 @@ OutConfigLikeT = tp.Union[dict, "ConfigT"]
 def convert_to_dict(dct: InConfigLikeT, nested: bool = True) -> dict:
     """Convert any config to `dict`.
 
-    Set `nested` to True to convert all child dicts in recursive manner."""
+    Set `nested` to True to convert all child dicts in recursive manner.
+
+    If a config is an instance of `AtomicConfig`, will convert it to `atomic_dict`."""
     if dct is None:
         dct = {}
     if isinstance(dct, Config):
-        dct = dict(dct)
+        if isinstance(dct, AtomicConfig):
+            dct = atomic_dict(dct)
+        else:
+            dct = dict(dct)
     else:
         dct = type(dct)(dct)
     if not nested:
@@ -147,8 +144,8 @@ def update_dict(
         return
     if y is None:
         return
-    checks.assert_instance_of(x, dict)
-    checks.assert_instance_of(y, dict)
+    assert_instance_of(x, dict)
+    assert_instance_of(y, dict)
 
     for k, v in y.items():
         if nested and k in x and isinstance(x[k], dict) and isinstance(v, dict) and not isinstance(v, atomic_dict):
@@ -241,268 +238,65 @@ def merge_dicts(
     return x
 
 
-_RaiseKeyError = object()
-
-PDictT = tp.TypeVar("PDictT", bound="PDict")
-
-
-class PDict(Pickleable, dict):
-    """Pickleable dict."""
-
-    def load_update(self, path: tp.Optional[tp.PathLike] = None, clear: bool = False, **kwargs) -> None:
-        """Load dumps from a file and update this instance in-place."""
-        if clear:
-            self.clear()
-        self.update(self.load(path=path, **kwargs))
-
-    def save_to_config(
-        self,
-        path: tp.Optional[tp.PathLike] = None,
-        prepend_section: tp.Union[None, bool, str] = None,
-        hide_section: tp.Optional[bool] = None,
-        mkdir_kwargs: tp.KwargsLike = None,
-    ) -> None:
-        """Save dictionary to a file using `configparser`.
-
-        Saves in a format that is guaranteed to be parsed using `PDict.load_from_config`.
-        Otherwise, an error will be thrown. If any object cannot be represented using a string,
-        uses `vectorbtpro.utils.pickling.dumps` to convert it into bytes."""
-        import configparser
-        from io import StringIO
-
-        if path is None:
-            path = type(self).__name__
-        if path.suffix == "":
-            path = path.with_suffix(".ini")
-        if mkdir_kwargs is None:
-            mkdir_kwargs = {}
-        check_mkdir(path.parent, **mkdir_kwargs)
-        path = Path(path)
-
-        parser = configparser.RawConfigParser()
-        if prepend_section is None:
-            prepend_section = False
-            for k, v in self.items():
-                if not isinstance(v, dict):
-                    prepend_section = True
-                    break
-            if hide_section is None and prepend_section:
-                hide_section = True
-        if prepend_section is not None and isinstance(prepend_section, bool):
-            if prepend_section:
-                prepend_section = "section"
-            else:
-                prepend_section = None
-        if prepend_section is not None:
-            dct = {prepend_section: dict(self)}
-        else:
-            dct = dict(self)
-        for k, v in dct.items():
-            parser.add_section(k)
-            for k2, v2 in v.items():
-                if isinstance(v2, str):
-                    parser.set(k, k2, v2)
-                else:
-                    try:
-                        ast.literal_eval(repr(v2))
-                        parser.set(k, k2, repr(v2))
-                    except Exception as e:
-                        try:
-                            float(repr(v2))
-                            parser.set(k, k2, repr(v2))
-                        except Exception as e:
-                            parser.set(k, k2, "!" + repr(dumps(v2)))
-        with StringIO() as f:
-            parser.write(f)
-            dct_str = f.getvalue()
-            if hide_section is not None and hide_section:
-                if len(dct) > 1:
-                    raise ValueError("Cannot hide multiple sections")
-                dct_str = "\n".join(dct_str.split("\n")[1:])
-        with open(path, "w") as f:
-            f.write(dct_str)
-
-    @classmethod
-    def load_from_config(
-        cls: tp.Type[PDictT],
-        path: tp.Optional[tp.PathLike] = None,
-        prepend_section: tp.Union[None, bool, str] = None,
-        select_section: tp.Union[None, bool, str] = None,
-        parse_literals: bool = True,
-        unpickle_bytes: bool = True,
-        run_code: bool = True,
-        code_context: tp.KwargsLike = None,
-    ) -> PDictT:
-        """Load dictionary from a file using `configparser`.
-
-        Can parse configs without sections.
-
-        If `parse_literals` is True, will detect any Python literals and containers such as `True` and `[]`.
-        Will also understand "nan" and "inf".
-
-        If `unpickle_bytes` is True, will unpickle any byte stream prepended with `!`, such as
-        "!b'\x80\x04\x95\t\x00\x00\x00\x00\x00\x00\x00K\x01K\x02K\x03\x87\x94.'" for `(1, 2, 3)`.
-
-        If `run_code` is True, will run any Python code prepended with `!`. Will use the context
-        `code_context` together with already defined `np` (NumPy) and `pd` (Pandas).
-
-        !!! warning
-            Unpickling byte streams and running code has important security implications. Don't attempt
-            to parse configs coming from untrusted sources as those can contain malicious code!
-
-        Usage:
-            * Parse `test.ini`:
-
-            ```plaintext
-            string = hello world
-            boolean = False
-            int = 100
-            float = 1e-10
-            nan = nan
-            inf = inf
-            numpy = !np.array([1, 2, 3])
-            pandas = !pd.Series([1, 2, 3])
-            multiline_code = !import math; math.floor(1.5)
-            sub_dict = !dict(sub_dict2=dict(some="value"))
-            ```
-
-            ```pycon
-            >>> import vectorbtpro as vbt
-            >>> vbt.PDict.load_from_config("test.ini")
-            {'boolean': False,
-             'int': 100,
-             'float': 1e-10,
-             'nan': nan,
-             'inf': inf,
-             'numpy': array([1, 2, 3]),
-             'pandas': 0    1
-             1    2
-             2    3
-             dtype: int64,
-             'multiline_code': 1,
-             'sub_dict': {'sub_dict2': {'some': 'value'}}}
-            ```
-        """
-        import configparser
-
-        if path is None:
-            path = cls.__name__
-        path = Path(path)
-        if path.suffix == "" and not path.exists():
-            if path.with_suffix(".ini").exists():
-                path = path.with_suffix(".ini")
-            elif path.with_suffix(".config").exists():
-                path = path.with_suffix(".config")
-            elif path.with_suffix(".cfg").exists():
-                path = path.with_suffix(".cfg")
-
-        parser = configparser.RawConfigParser()
-        with open(path) as f:
-            if prepend_section is not None and isinstance(prepend_section, bool):
-                if prepend_section:
-                    prepend_section = "section"
-                else:
-                    prepend_section = None
-            if prepend_section is not None:
-                string = f"[{prepend_section}]\n" + f.read()
-            else:
-                string = f.read()
-        try:
-            parser.read_string(string)
-        except configparser.MissingSectionHeaderError as e:
-            select_section = True
-            parser.read_string("[section]" + string)
-        dct = {sect: dict(parser.items(sect)) for sect in parser.sections()}
-        if select_section is not None and isinstance(select_section, bool):
-            if select_section:
-                if len(dct) == 1:
-                    select_section = list(dct.keys())[0]
-                elif len(dct) == 0:
-                    raise ValueError("No sections to select")
-                else:
-                    raise ValueError("Please provide a section to select")
-            else:
-                select_section = None
-        if parse_literals or run_code:
-            new_dct = defaultdict(dict)
-            code_context = merge_dicts(dict(np=np, pd=pd, nan=np.nan, inf=np.inf), code_context)
-            for k, v in dct.items():
-                for k2, v2 in v.items():
-                    v2 = v2.strip()
-                    if unpickle_bytes and (
-                        (v2.startswith("!b'") and v2.endswith("'")) or (v2.startswith('!b"') and v2.endswith('"'))
-                    ):
-                        new_dct[k][k2] = loads(eval("bytes(" + v2.lstrip("!") + ")"))
-                    elif run_code and v2.startswith("!"):
-                        new_dct[k][k2] = multiline_eval(v2.lstrip("!"), context=code_context)
-                    else:
-                        if parse_literals:
-                            try:
-                                new_dct[k][k2] = ast.literal_eval(v2)
-                            except Exception as e:
-                                try:
-                                    new_dct[k][k2] = float(v2)
-                                except Exception as e:
-                                    new_dct[k][k2] = v2
-                        else:
-                            new_dct[k][k2] = v2
-            dct = new_dct
-        if select_section is not None:
-            dct = dct[select_section]
-        return cls(dct)
-
-
-class ChildDict(dict):
+class child_dict(pdict):
     """Subclass of `dict` acting as a child dict."""
 
     pass
 
 
+_RaiseKeyError = object()
+
+
 ConfigT = tp.TypeVar("ConfigT", bound="Config")
 
 
-class Config(PDict, Prettified):
+class Config(pdict):
     """Extends pickleable dict with config features such as nested updates, freezing, and resetting.
 
     Args:
         *args: Arguments to construct the dict from.
-        copy_kwargs_ (dict): Keyword arguments passed to `copy_dict` for copying main dict and `reset_dct_`.
+        options_ (dict): Config options (see below).
+        **kwargs: Keyword arguments to construct the dict from.
+
+    Options can have the following keys:
+
+    Attributes:
+        copy_kwargs (dict): Keyword arguments passed to `copy_dict` for copying main dict and `reset_dct`.
 
             Copy mode defaults to 'none'.
-        reset_dct_ (dict): Dict to fall back to in case of resetting.
+        reset_dct (dict): Dict to fall back to in case of resetting.
 
-            Defaults to None. If None, copies main dict using `reset_dct_copy_kwargs_`.
+            Defaults to None. If None, copies main dict using `reset_dct_copy_kwargs`.
 
             !!! note
-                Defaults to main dict in case it's None and `readonly_` is True.
-        reset_dct_copy_kwargs_ (dict): Keyword arguments that override `copy_kwargs_` for `reset_dct_`.
+                Defaults to main dict in case it's None and `readonly` is True.
+        reset_dct_copy_kwargs (dict): Keyword arguments that override `copy_kwargs` for `reset_dct`.
 
-            Copy mode defaults to 'none' if `readonly_` is True, else to 'hybrid'.
-        pickle_reset_dct_ (bool): Whether to pickle `reset_dct_`.
-        frozen_keys_ (bool): Whether to deny updates to the keys of the config.
-
-            Defaults to False.
-        readonly_ (bool): Whether to deny updates to the keys and values of the config.
+            Copy mode defaults to 'none' if `readonly` is True, else to 'hybrid'.
+        pickle_reset_dct (bool): Whether to pickle `reset_dct`.
+        frozen_keys (bool): Whether to deny updates to the keys of the config.
 
             Defaults to False.
-        nested_ (bool): Whether to do operations recursively on each child dict.
+        readonly (bool): Whether to deny updates to the keys and values of the config.
+
+            Defaults to False.
+        nested (bool): Whether to do operations recursively on each child dict.
 
             Such operations include copy, update, and merge.
             Disable to treat each child dict as a single value. Defaults to True.
-        convert_children_ (bool or type): Whether to convert child dicts of type `ChildDict` to configs
+        convert_children (bool or type): Whether to convert child dicts of type `child_dict` to configs
             with the same configuration.
 
             This will trigger a waterfall reaction across all child dicts. Won't convert dicts that
             are already configs. Apart from boolean, you can set it to any subclass of `Config` to use
-            it for construction. Requires `nested_` to be True. Defaults to False.
-        as_attrs_ (bool): Whether to enable accessing dict keys via the dot notation.
+            it for construction. Requires `nested` to be True. Defaults to False.
+        as_attrs (bool): Whether to enable accessing dict keys via the dot notation.
 
             Enables autocompletion (but only during runtime!). Raises error in case of naming conflicts.
-            Defaults to True if `frozen_keys_` or `readonly_`, otherwise False.
+            Defaults to True if `frozen_keys` or `readonly`, otherwise False.
 
             To make nested dictionaries also accessible via the dot notation, wrap
-            them with `ChildDict` and set `convert_children_` and `nested_` to True.
-        **kwargs: Keyword arguments to construct the dict from.
+            them with `child_dict` and set `convert_children` and `nested` to True.
 
     Defaults can be overridden with settings under `vectorbtpro._settings.config`.
 
@@ -513,26 +307,13 @@ class Config(PDict, Prettified):
         All arguments are applied only once during initialization.
     """
 
-    def __init__(
-        self,
-        *args,
-        copy_kwargs_: tp.KwargsLike = None,
-        reset_dct_: tp.DictLike = None,
-        reset_dct_copy_kwargs_: tp.KwargsLike = None,
-        pickle_reset_dct_: tp.Optional[bool] = None,
-        frozen_keys_: tp.Optional[bool] = None,
-        readonly_: tp.Optional[bool] = None,
-        nested_: tp.Optional[bool] = None,
-        convert_children_: tp.Optional[tp.Union[bool, tp.Type["Config"]]] = None,
-        as_attrs_: tp.Optional[bool] = None,
-        **kwargs,
-    ) -> None:
+    def __init__(self, *args, options_: tp.KwargsLike = None, **kwargs) -> None:
         try:
             from vectorbtpro._settings import settings
 
-            config_cfg = settings["config"]
+            options_cfg = settings["config"]["options"]
         except ImportError:
-            config_cfg = {}
+            options_cfg = {}
 
         # Build dict
         if len(args) > 0 and isinstance(args[0], Config):
@@ -540,148 +321,129 @@ class Config(PDict, Prettified):
         else:
             cfg = None
         dct = dict(*args, **kwargs)
+        if "options_" in dct:
+            raise ValueError("options_ is an argument reserved for configs")
+        if options_ is None:
+            options_ = dict()
+        else:
+            options_ = dict(options_)
 
-        # Resolve params
-        def _resolve_param(pname: str, p: tp.Any, default: tp.Any, merge: bool = False) -> tp.Any:
-            cfg_default = config_cfg.get(pname, None)
+        # Resolve settings
+        def _resolve_setting(pname: str, default: tp.Any, merge: bool = False) -> tp.Any:
+            cfg_default = options_cfg.get(pname, None)
             if cfg is None:
                 dct_p = None
             else:
-                dct_p = getattr(cfg, pname)
+                dct_p = cfg.get_option(pname)
+            option = options_.pop(pname, None)
 
             if merge and isinstance(default, dict):
-                return merge_dicts(default, cfg_default, dct_p, p)
-            if p is not None:
-                return p
+                return merge_dicts(default, cfg_default, dct_p, option)
+            if option is not None:
+                return option
             if dct_p is not None:
                 return dct_p
             if cfg_default is not None:
                 return cfg_default
             return default
 
-        reset_dct_ = _resolve_param("reset_dct_", reset_dct_, None)
-        pickle_reset_dct_ = _resolve_param("pickle_reset_dct_", pickle_reset_dct_, False)
-        frozen_keys_ = _resolve_param("frozen_keys_", frozen_keys_, False)
-        readonly_ = _resolve_param("readonly_", readonly_, False)
-        nested_ = _resolve_param("nested_", nested_, True)
-        convert_children_ = _resolve_param("convert_children_", convert_children_, False)
-        as_attrs_ = _resolve_param("as_attrs_", as_attrs_, False)
-        reset_dct_copy_kwargs_ = merge_dicts(copy_kwargs_, reset_dct_copy_kwargs_)
-        copy_kwargs_ = _resolve_param("copy_kwargs_", copy_kwargs_, dict(copy_mode="none", nested=nested_), merge=True)
-        reset_dct_copy_kwargs_ = _resolve_param(
-            "reset_dct_copy_kwargs_",
-            reset_dct_copy_kwargs_,
-            dict(copy_mode="none" if readonly_ else "hybrid", nested=nested_),
+        options_["reset_dct_copy_kwargs"] = merge_dicts(
+            options_.get("copy_kwargs", None),
+            options_.get("reset_dct_copy_kwargs", None),
+        )
+        reset_dct = _resolve_setting("reset_dct", None)
+        pickle_reset_dct = _resolve_setting("pickle_reset_dct", False)
+        frozen_keys = _resolve_setting("frozen_keys", False)
+        readonly = _resolve_setting("readonly", False)
+        nested = _resolve_setting("nested", True)
+        convert_children = _resolve_setting("convert_children", False)
+        as_attrs = _resolve_setting("as_attrs", False)
+        copy_kwargs = _resolve_setting(
+            "copy_kwargs",
+            dict(copy_mode="none", nested=nested),
             merge=True,
         )
+        reset_dct_copy_kwargs = _resolve_setting(
+            "reset_dct_copy_kwargs",
+            dict(copy_mode="none" if readonly else "hybrid", nested=nested),
+            merge=True,
+        )
+        if len(options_) > 0:
+            raise ValueError(f"Unexpected config options: {options_}")
 
         # Copy dict
-        dct = copy_dict(dict(dct), **copy_kwargs_)
+        dct = copy_dict(dict(dct), **copy_kwargs)
 
         # Convert child dicts
-        if convert_children_ and nested_:
+        if convert_children and nested:
             for k, v in dct.items():
-                if isinstance(v, ChildDict):
-                    if isinstance(convert_children_, bool):
+                if isinstance(v, child_dict):
+                    if isinstance(convert_children, bool):
                         config_cls = type(self)
-                    elif issubclass(convert_children_, Config):
-                        config_cls = convert_children_
+                    elif issubclass(convert_children, Config):
+                        config_cls = convert_children
                     else:
-                        raise TypeError("convert_children_ must be either boolean or a subclass of Config")
+                        raise TypeError("Option 'convert_children' must be either boolean or a subclass of Config")
                     dct[k] = config_cls(
                         v,
-                        copy_kwargs_=copy_kwargs_,
-                        reset_dct_copy_kwargs_=reset_dct_copy_kwargs_,
-                        pickle_reset_dct_=pickle_reset_dct_,
-                        frozen_keys_=frozen_keys_,
-                        readonly_=readonly_,
-                        nested_=nested_,
-                        convert_children_=convert_children_,
-                        as_attrs_=as_attrs_,
+                        options_=dict(
+                            copy_kwargs=copy_kwargs,
+                            reset_dct=None,
+                            reset_dct_copy_kwargs=reset_dct_copy_kwargs,
+                            pickle_reset_dct=pickle_reset_dct,
+                            frozen_keys=frozen_keys,
+                            readonly=readonly,
+                            nested=nested,
+                            convert_children=convert_children,
+                            as_attrs=as_attrs,
+                        )
                     )
 
         # Copy initial config
-        if reset_dct_ is None:
-            reset_dct_ = dct
-        reset_dct_ = copy_dict(dict(reset_dct_), **reset_dct_copy_kwargs_)
+        if reset_dct is None:
+            reset_dct = dct
+        reset_dct = copy_dict(dict(reset_dct), **reset_dct_copy_kwargs)
 
         dict.__init__(self, dct)
 
-        self._copy_kwargs_ = copy_kwargs_
-        self._reset_dct_ = reset_dct_
-        self._reset_dct_copy_kwargs_ = reset_dct_copy_kwargs_
-        self._pickle_reset_dct_ = pickle_reset_dct_
-        self._frozen_keys_ = frozen_keys_
-        self._readonly_ = readonly_
-        self._nested_ = nested_
-        self._convert_children_ = convert_children_
-        self._as_attrs_ = as_attrs_
+        self._options_ = dict(
+            copy_kwargs=copy_kwargs,
+            reset_dct=reset_dct,
+            reset_dct_copy_kwargs=reset_dct_copy_kwargs,
+            pickle_reset_dct=pickle_reset_dct,
+            frozen_keys=frozen_keys,
+            readonly=readonly,
+            nested=nested,
+            convert_children=convert_children,
+            as_attrs=as_attrs,
+        )
 
         # Set keys as attributes for autocomplete
-        if as_attrs_:
+        if as_attrs:
             self_dir = set(self.__dir__())
             for k, v in self.items():
                 if k in self_dir:
-                    raise ValueError(f"Key '{k}' shadows an attribute of the config. Disable as_attrs_.")
+                    raise ValueError(f"Key '{k}' shadows an attribute of the config. Disable option 'as_attrs'.")
 
     @property
-    def copy_kwargs_(self) -> tp.Kwargs:
-        """Parameters for copying main dict."""
-        return self._copy_kwargs_
+    def options_(self) -> dict:
+        """Config options."""
+        return self._options_
 
-    @property
-    def reset_dct_(self) -> dict:
-        """Dict to fall back to in case of resetting."""
-        return self._reset_dct_
+    def get_option(self, k: str) -> tp.Any:
+        """Get an option."""
+        return self._options_[k]
 
-    @property
-    def reset_dct_copy_kwargs_(self) -> tp.Kwargs:
-        """Parameters for copying `Config.reset_dct_`."""
-        return self._reset_dct_copy_kwargs_
-
-    @property
-    def pickle_reset_dct_(self) -> bool:
-        """Whether to pickle `Config.reset_dct_`."""
-        return self._pickle_reset_dct_
-
-    @property
-    def frozen_keys_(self) -> bool:
-        """Whether to deny updates to the keys and values of the config."""
-        return self._frozen_keys_
-
-    @property
-    def readonly_(self) -> bool:
-        """Whether to deny any updates to the config."""
-        return self._readonly_
-
-    @property
-    def nested_(self) -> bool:
-        """Whether to do operations recursively on each child dict."""
-        return self._nested_
-
-    @property
-    def convert_children_(self) -> tp.Union[bool, tp.Type["Config"]]:
-        """Whether to convert child dicts of type `ChildDict` to configs with the same configuration."""
-        return self._convert_children_
-
-    @property
-    def as_attrs_(self) -> bool:
-        """Whether to enable accessing dict keys via dot notation."""
-        return self._as_attrs_
-
-    def _safe_getattr(self, k: str, v: tp.Any) -> bool:
-        """Get an attribute without triggering `Config.__getattr__`."""
-        try:
-            return object.__getattribute__(self, k)
-        except AttributeError:
-            return v
+    def set_option(self, k: str, v: tp.Any) -> None:
+        """Set an option."""
+        self._options_[k] = v
 
     def __getattr__(self, k: str) -> tp.Any:
         try:
-            _as_attrs_ = object.__getattribute__(self, "_as_attrs_")
+            as_attrs = object.__getattribute__(self, "_options_")["as_attrs"]
         except AttributeError:
             return object.__getattribute__(self, k)
-        if _as_attrs_:
+        if as_attrs:
             try:
                 return self.__getitem__(k)
             except KeyError:
@@ -690,42 +452,42 @@ class Config(PDict, Prettified):
 
     def __setattr__(self, k: str, v: tp.Any, force: bool = False) -> None:
         try:
-            _as_attrs_ = object.__getattribute__(self, "_as_attrs_")
+            as_attrs = object.__getattribute__(self, "_options_")["as_attrs"]
         except AttributeError:
             return object.__setattr__(self, k, v)
-        if _as_attrs_:
+        if as_attrs:
             return self.__setitem__(k, v, force=force)
         return object.__setattr__(self, k, v)
 
     def __delattr__(self, k: str, force: bool = False) -> None:
         try:
-            _as_attrs_ = object.__getattribute__(self, "_as_attrs_")
+            as_attrs = object.__getattribute__(self, "_options_")["as_attrs"]
         except AttributeError:
             return object.__delattr__(self, k)
-        if _as_attrs_:
+        if as_attrs:
             return self.__delitem__(k, force=force)
         return object.__delattr__(self, k)
 
     def __setitem__(self, k: str, v: tp.Any, force: bool = False) -> None:
-        if not force and self._safe_getattr("readonly_", False):
+        if not force and self.get_option("readonly"):
             raise TypeError("Config is read-only")
-        if not force and self._safe_getattr("frozen_keys_", False):
+        if not force and self.get_option("frozen_keys"):
             if k not in self:
                 raise KeyError(f"Config keys are frozen: key '{k}' not found")
         dict.__setitem__(self, k, v)
 
     def __delitem__(self, k: str, force: bool = False) -> None:
-        if not force and self._safe_getattr("readonly_", False):
+        if not force and self.get_option("readonly"):
             raise TypeError("Config is read-only")
-        if not force and self._safe_getattr("frozen_keys_", False):
+        if not force and self.get_option("frozen_keys"):
             raise KeyError(f"Config keys are frozen")
         dict.__delitem__(self, k)
 
     def pop(self, k: str, v: tp.Any = _RaiseKeyError, force: bool = False) -> tp.Any:
         """Remove and return the pair by the key."""
-        if not force and self._safe_getattr("readonly_", False):
+        if not force and self.get_option("readonly"):
             raise TypeError("Config is read-only")
-        if not force and self._safe_getattr("frozen_keys_", False):
+        if not force and self.get_option("frozen_keys"):
             raise KeyError(f"Config keys are frozen")
         if v is _RaiseKeyError:
             result = dict.pop(self, k)
@@ -735,18 +497,18 @@ class Config(PDict, Prettified):
 
     def popitem(self, force: bool = False) -> tp.Tuple[tp.Any, tp.Any]:
         """Remove and return some pair."""
-        if not force and self._safe_getattr("readonly_", False):
+        if not force and self.get_option("readonly"):
             raise TypeError("Config is read-only")
-        if not force and self._safe_getattr("frozen_keys_", False):
+        if not force and self.get_option("frozen_keys"):
             raise KeyError(f"Config keys are frozen")
         result = dict.popitem(self)
         return result
 
     def clear(self, force: bool = False) -> None:
         """Remove all items."""
-        if not force and self._safe_getattr("readonly_", False):
+        if not force and self.get_option("readonly"):
             raise TypeError("Config is read-only")
-        if not force and self._safe_getattr("frozen_keys_", False):
+        if not force and self.get_option("frozen_keys"):
             raise KeyError(f"Config keys are frozen")
         dict.clear(self)
 
@@ -756,18 +518,18 @@ class Config(PDict, Prettified):
         See `update_dict`."""
         other = dict(*args, **kwargs)
         if nested is None:
-            nested = self.nested_
+            nested = self.get_option("nested")
         update_dict(self, other, nested=nested, force=force)
 
     def __copy__(self: ConfigT) -> ConfigT:
         """Shallow operation, primarily used by `copy.copy`.
 
-        Does not take into account copy parameters."""
+        Does not take into account copy settings."""
         cls = type(self)
         self_copy = cls.__new__(cls)
         for k, v in self.__dict__.items():
             if k not in self_copy:  # otherwise copies dict keys twice
-                self_copy.__dict__[k] = v
+                self_copy.__dict__[k] = copy(v)
         self_copy.clear(force=True)
         self_copy.update(copy(dict(self)), nested=False, force=True)
         return self_copy
@@ -775,7 +537,7 @@ class Config(PDict, Prettified):
     def __deepcopy__(self: ConfigT, memo: tp.DictLike = None) -> ConfigT:
         """Deep operation, primarily used by `copy.deepcopy`.
 
-        Does not take into account copy parameters."""
+        Does not take into account copy settings."""
         if memo is None:
             memo = {}
         cls = type(self)
@@ -798,13 +560,13 @@ class Config(PDict, Prettified):
 
         By default, copies in the same way as during the initialization."""
         if copy_mode is None:
-            copy_mode = self.copy_kwargs_["copy_mode"]
-            reset_dct_copy_mode = self.reset_dct_copy_kwargs_["copy_mode"]
+            copy_mode = self.get_option("copy_kwargs")["copy_mode"]
+            reset_dct_copy_mode = self.get_option("reset_dct_copy_kwargs")["copy_mode"]
         else:
             reset_dct_copy_mode = copy_mode
         if nested is None:
-            nested = self.copy_kwargs_["nested"]
-            reset_dct_nested = self.reset_dct_copy_kwargs_["nested"]
+            nested = self.get_option("copy_kwargs")["nested"]
+            reset_dct_nested = self.get_option("reset_dct_copy_kwargs")["nested"]
         else:
             reset_dct_nested = nested
         reset_dct_copy_kwargs = resolve_dict(reset_dct_copy_kwargs)
@@ -816,13 +578,14 @@ class Config(PDict, Prettified):
                 reset_dct_nested = reset_dct_copy_kwargs["nested"]
 
         self_copy = self.__copy__()
-
-        reset_dct_ = copy_dict(dict(self.reset_dct_), copy_mode=reset_dct_copy_mode, nested=reset_dct_nested)
-        self.__dict__["_reset_dct_"] = reset_dct_
-
-        dct = copy_dict(dict(self), copy_mode=copy_mode, nested=nested)
+        reset_dct = copy_dict(
+            dict(self_copy.get_option("reset_dct")),
+            copy_mode=reset_dct_copy_mode,
+            nested=reset_dct_nested,
+        )
+        self_copy.set_option("reset_dct", reset_dct)
+        dct = copy_dict(dict(self_copy), copy_mode=copy_mode, nested=nested)
         self_copy.update(dct, nested=False, force=True)
-
         return self_copy
 
     def merge_with(
@@ -838,7 +601,7 @@ class Config(PDict, Prettified):
         if copy_mode is None:
             copy_mode = "shallow"
         if nested is None:
-            nested = self.nested_
+            nested = self.get_option("nested")
         return merge_dicts(self, other, copy_mode=copy_mode, nested=nested, **kwargs)
 
     def to_dict(self, nested: tp.Optional[bool] = None) -> dict:
@@ -848,71 +611,57 @@ class Config(PDict, Prettified):
     def reset(self, force: bool = False, **reset_dct_copy_kwargs) -> None:
         """Clears the config and updates it with the initial config.
 
-        `reset_dct_copy_kwargs` override `Config.reset_dct_copy_kwargs_`."""
-        if not force and self._safe_getattr("readonly_", False):
+        `reset_dct_copy_kwargs` override `reset_dct_copy_kwargs`."""
+        if not force and self.get_option("readonly"):
             raise TypeError("Config is read-only")
-        reset_dct_copy_kwargs = merge_dicts(self.reset_dct_copy_kwargs_, reset_dct_copy_kwargs)
-        reset_dct_ = copy_dict(dict(self.reset_dct_), **reset_dct_copy_kwargs)
+        reset_dct_copy_kwargs = merge_dicts(self.get_option("reset_dct_copy_kwargs"), reset_dct_copy_kwargs)
+        reset_dct = copy_dict(dict(self.get_option("reset_dct")), **reset_dct_copy_kwargs)
         self.clear(force=True)
-        self.update(self.reset_dct_, nested=False, force=True)
-        self.__dict__["_reset_dct_"] = reset_dct_
+        self.update(self.get_option("reset_dct"), nested=False, force=True)
+        self.set_option("reset_dct", reset_dct)
 
     def make_checkpoint(self, force: bool = False, **reset_dct_copy_kwargs) -> None:
-        """Replace `reset_dct_` by the current state.
+        """Replace `reset_dct` by the current state.
 
-        `reset_dct_copy_kwargs` override `Config.reset_dct_copy_kwargs_`."""
-        if not force and self._safe_getattr("readonly_", False):
+        `reset_dct_copy_kwargs` override `reset_dct_copy_kwargs`."""
+        if not force and self.get_option("readonly"):
             raise TypeError("Config is read-only")
-        reset_dct_copy_kwargs = merge_dicts(self.reset_dct_copy_kwargs_, reset_dct_copy_kwargs)
-        reset_dct_ = copy_dict(dict(self), **reset_dct_copy_kwargs)
-        self.__dict__["_reset_dct_"] = reset_dct_
+        reset_dct_copy_kwargs = merge_dicts(self.get_option("reset_dct_copy_kwargs"), reset_dct_copy_kwargs)
+        reset_dct = copy_dict(dict(self), **reset_dct_copy_kwargs)
+        self.set_option("reset_dct", reset_dct)
 
     def load_update(
         self,
         path: tp.Optional[tp.PathLike] = None,
         clear: bool = False,
+        update_options: bool = False,
         nested: tp.Optional[bool] = None,
         **kwargs,
     ) -> None:
-        """Load dumps from a file and update this instance in-place.
-
-        !!! note
-            Updates both the config properties and dictionary."""
+        """Load dumps from a file and update this instance in-place."""
         loaded = self.load(path=path, **kwargs)
         if clear:
             self.clear(force=True)
-            self.__dict__.clear()
-        self.__dict__.update(loaded.__dict__)
+            if update_options:
+                self.__dict__.clear()
         if nested is None:
-            nested = self.nested_
+            nested = self.get_option("nested")
         self.update(loaded, nested=nested, force=True)
+        if update_options:
+            self.__dict__.update(loaded.__dict__)
 
     def prettify(
         self,
-        with_params: bool = False,
+        with_options: bool = False,
         replace: tp.DictLike = None,
         path: str = None,
         htchar: str = "    ",
         lfchar: str = "\n",
         indent: int = 0,
     ) -> str:
-        if with_params:
-            dct = {
-                **dict(self),
-                **dict(
-                    copy_kwargs_=self.copy_kwargs_,
-                    reset_dct_=self.reset_dct_,
-                    reset_dct_copy_kwargs_=self.reset_dct_copy_kwargs_,
-                    pickle_reset_dct_=self.pickle_reset_dct_,
-                    frozen_keys_=self.frozen_keys_,
-                    readonly_=self.readonly_,
-                    nested_=self.nested_,
-                    convert_children_=self.convert_children_,
-                    as_attrs_=self.as_attrs_,
-                ),
-            }
-        else:
-            dct = dict(self)
+        dct = dict(self)
+        if with_options:
+            dct["options_"] = self.options_
         if all([isinstance(k, str) and k.isidentifier() for k in dct]):
             return prettify_inited(
                 type(self),
@@ -925,28 +674,20 @@ class Config(PDict, Prettified):
             )
         return prettify_dict(self, replace=replace, path=path, htchar=htchar, lfchar=lfchar, indent=indent)
 
-    def __eq__(self, other: tp.Any) -> bool:
-        return checks.is_deep_equal(dict(self), dict(other))
+    def equals(self, other: tp.Any, check_types: bool = True, check_options: bool = False) -> bool:
+        if check_types and type(self) != type(other):
+            return False
+        if check_options and not is_deep_equal(self.options_, other.options_):
+            return False
+        return is_deep_equal(dict(self), dict(other))
 
     @property
-    def prec_state(self) -> tp.Optional[PRecState]:
-        init_args = (dict(self),)
-        if self._pickle_reset_dct_:
-            reset_dct_ = self.reset_dct_
-        else:
-            reset_dct_ = None
-        init_kwargs = dict(
-            copy_kwargs_=self.copy_kwargs_,
-            reset_dct_=reset_dct_,
-            reset_dct_copy_kwargs_=self.reset_dct_copy_kwargs_,
-            pickle_reset_dct_=self.pickle_reset_dct_,
-            frozen_keys_=self.frozen_keys_,
-            readonly_=self.readonly_,
-            nested_=self.nested_,
-            convert_children_=self.convert_children_,
-            as_attrs_=self.as_attrs_,
-        )
-        return PRecState(init_args=init_args, init_kwargs=init_kwargs)
+    def rec_state(self) -> tp.Optional[RecState]:
+        init_kwargs = dict(self)
+        init_kwargs["options_"] = dict(self.options_)
+        if not self.get_option("pickle_reset_dct"):
+            init_kwargs["options_"]["reset_dct"] = None
+        return RecState(init_kwargs=init_kwargs)
 
 
 class AtomicConfig(Config, atomic_dict):
@@ -956,63 +697,58 @@ class AtomicConfig(Config, atomic_dict):
 
 
 class FrozenConfig(Config):
-    """`Config` with `frozen_keys_` flag set to True."""
+    """`Config` with `frozen_keys` flag set to True."""
 
     def __init__(
         self,
         *args,
         **kwargs,
     ) -> None:
-        if "frozen_keys_" in kwargs:
-            del kwargs["frozen_keys_"]
-        Config.__init__(
-            self,
-            *args,
-            frozen_keys_=True,
-            **kwargs,
-        )
+        options_ = kwargs.pop("options_", None)
+        if options_ is None:
+            options_ = {}
+        options_["frozen_keys"] = True
+        Config.__init__(self, *args, options_=options_, **kwargs)
 
 
 class ReadonlyConfig(Config):
-    """`Config` with `readonly_` flag set to True."""
+    """`Config` with `readonly` flag set to True."""
 
     def __init__(
         self,
         *args,
         **kwargs,
     ) -> None:
-        if "readonly_" in kwargs:
-            del kwargs["readonly_"]
-        Config.__init__(
-            self,
-            *args,
-            readonly_=True,
-            **kwargs,
-        )
+        options_ = kwargs.pop("options_", None)
+        if options_ is None:
+            options_ = {}
+        options_["readonly"] = True
+        Config.__init__(self, *args, options_=options_, **kwargs)
 
 
 class HybridConfig(Config):
-    """`Config` with `copy_kwargs_` set to `copy_mode='hybrid'`."""
+    """`Config` with `copy_kwargs` set to `copy_mode='hybrid'`."""
 
     def __init__(
         self,
         *args,
         **kwargs,
     ) -> None:
-        copy_kwargs_ = kwargs.pop("copy_kwargs_", dict())
-        copy_kwargs_["copy_mode"] = "hybrid"
-        Config.__init__(
-            self,
-            *args,
-            copy_kwargs_=copy_kwargs_,
-            **kwargs,
-        )
+        options_ = kwargs.pop("options_", None)
+        if options_ is None:
+            options_ = {}
+        copy_kwargs = options_.pop("copy_kwargs", None)
+        if copy_kwargs is None:
+            copy_kwargs = {}
+        copy_kwargs["copy_mode"] = "hybrid"
+        options_["copy_kwargs"] = copy_kwargs
+        Config.__init__(self, *args, options_=options_, **kwargs)
 
 
 ConfiguredT = tp.TypeVar("ConfiguredT", bound="Configured")
 
 
-class Configured(Cacheable, Pickleable, Prettified):
+class Configured(Cacheable, Comparable, Pickleable, Prettified):
     """Class with an initialization config.
 
     All subclasses of `Configured` are initialized using `Config`, which makes it easier to pickle.
@@ -1053,13 +789,13 @@ class Configured(Cacheable, Pickleable, Prettified):
                 check_expected_keys_ = "raise"
             keys_diff = list(set(config.keys()).difference(self._expected_keys))
             if len(keys_diff) > 0:
-                checks.assert_in(check_expected_keys_, ("warn", "raise"))
+                assert_in(check_expected_keys_, ("warn", "raise"))
                 if check_expected_keys_ == "warn":
                     warnings.warn(f"{type(self).__name__} doesn't expect arguments {keys_diff}", stacklevel=2)
                 else:
                     raise ValueError(f"{type(self).__name__} doesn't expect arguments {keys_diff}")
 
-        self._config = Config(**merge_dicts(configured_cfg["config"], config))
+        self._config = Config(config, options_=configured_cfg["config"]["options"])
 
         Cacheable.__init__(self)
 
@@ -1125,16 +861,23 @@ class Configured(Cacheable, Pickleable, Prettified):
         See `Configured.replace`."""
         return self.replace(copy_mode_=copy_mode, nested_=nested, cls_=cls)
 
-    def __eq__(self, other: tp.Any) -> bool:
-        """Objects are equal if their configs and writeable attributes are equal."""
-        if type(self) != type(other):
+    def equals(
+        self,
+        other: tp.Any,
+        check_types: bool = True,
+        check_attrs: bool = True,
+        check_options: bool = False,
+    ) -> bool:
+        """Check two objects for equality."""
+        if check_types and type(self) != type(other):
             return False
-        if self.get_writeable_attrs() != other.get_writeable_attrs():
-            return False
-        for attr in self.get_writeable_attrs():
-            if not checks.is_deep_equal(getattr(self, attr), getattr(other, attr)):
+        if check_attrs:
+            if self.get_writeable_attrs() != other.get_writeable_attrs():
                 return False
-        return self.config == other.config
+            for attr in self.get_writeable_attrs():
+                if not is_deep_equal(getattr(self, attr), getattr(other, attr)):
+                    return False
+        return self.config.equals(other.config, check_types=check_types, check_options=check_options)
 
     def update_config(self, *args, **kwargs) -> None:
         """Force-update the config."""
@@ -1219,9 +962,9 @@ class Configured(Cacheable, Pickleable, Prettified):
         )
 
     @property
-    def prec_state(self) -> tp.Optional[PRecState]:
+    def rec_state(self) -> tp.Optional[RecState]:
         if self._writeable_attrs is not None:
             attr_dct = {k: getattr(self, k) for k in self._writeable_attrs}
         else:
             attr_dct = {}
-        return PRecState(init_kwargs=dict(self.config), attr_dct=attr_dct)
+        return RecState(init_kwargs=dict(self.config), attr_dct=attr_dct)
