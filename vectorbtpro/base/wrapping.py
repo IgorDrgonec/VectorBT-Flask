@@ -1069,7 +1069,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         2) Fills NaN (optional)
         3) Wraps using index, columns, and dtype (optional)
         4) Converts to index (optional)
-        5) Converts to timedelta using `ArrayWrapper.to_timedelta` (optional)"""
+        5) Converts to timedelta using `ArrayWrapper.arr_to_timedelta` (optional)"""
         from vectorbtpro._settings import settings
 
         wrapping_cfg = settings["wrapping"]
