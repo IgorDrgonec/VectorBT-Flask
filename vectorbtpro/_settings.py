@@ -1615,17 +1615,3 @@ except ImportError:
     pass
 
 settings.make_checkpoint()
-
-settings.substitute_sub_config_docs(
-    __pdoc__,
-    prettify_kwargs=dict(
-        plotting=dict(
-            replace={
-                "settings.plotting.themes.light.template": "Template('templates/light.json')",
-                "settings.plotting.themes.dark.template": "Template('templates/dark.json')",
-                "settings.plotting.themes.seaborn.template": "Template('templates/seaborn.json')",
-            },
-            path="settings.plotting",
-        )
-    ),
-)
