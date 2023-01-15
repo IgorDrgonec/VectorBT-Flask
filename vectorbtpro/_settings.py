@@ -122,6 +122,7 @@ import pkgutil
 
 import numpy as np
 
+from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import child_dict, Config, FrozenConfig
 from vectorbtpro.utils.datetime_ import get_local_tz, get_utc_tz
@@ -1576,8 +1577,10 @@ class SettingsConfig(Config):
         """Reset to default theme."""
         self.set_theme(self["plotting"]["default_theme"])
 
-    def substitute_sub_config_docs(self, __pdoc__: dict, prettify_kwargs) -> None:
+    def substitute_sub_config_docs(self, __pdoc__: dict, prettify_kwargs: tp.KwargsLike = None) -> None:
         """Substitute templates in sub-config docs."""
+        if prettify_kwargs is None:
+            prettify_kwargs = {}
         for k, v in __pdoc__.items():
             if k in self:
                 config_doc = self[k].prettify(**prettify_kwargs.get(k, {}))
@@ -1615,3 +1618,5 @@ except ImportError:
     pass
 
 settings.make_checkpoint()
+
+settings.substitute_sub_config_docs(__pdoc__)
