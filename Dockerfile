@@ -25,6 +25,9 @@ RUN pip install --quiet --no-cache-dir \
     'kaleido' && \
     jupyter lab build --minimize=False
 
+RUN pip install --quiet --no-cache-dir 'pybind11'
+RUN pip install --quiet --no-cache-dir --ignore-installed 'llvmlite'
+
 RUN pip install --quiet --no-cache-dir \
     'numpy==1.23.3' \
     'numba==0.56.4' \
