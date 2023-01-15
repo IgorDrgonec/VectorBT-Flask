@@ -16,7 +16,7 @@ import numpy as np
 from numba import prange
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.indexing import flex_select_auto_nb
+from vectorbtpro.base.flex_indexing import flex_select_nb
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.generic import nb as generic_nb, enums as generic_enums
 from vectorbtpro.registries.ch_registry import register_chunkable
@@ -533,7 +533,6 @@ def vwap_nb(
         low=ch.ArraySlicer(axis=1),
         up_th=base_ch.FlexArraySlicer(axis=1),
         down_th=base_ch.FlexArraySlicer(axis=1),
-        flex_2d=None,
     ),
     merge_func="column_stack",
 )
@@ -541,9 +540,8 @@ def vwap_nb(
 def pivot_info_nb(
     high: tp.Array2d,
     low: tp.Array2d,
-    up_th: tp.FlexArray,
-    down_th: tp.FlexArray,
-    flex_2d: bool = False,
+    up_th: tp.FlexArray2d,
+    down_th: tp.FlexArray2d,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d, tp.Array2d, tp.Array2d]:
     """Apply function for `vectorbtpro.indicators.custom.PIVOTINFO`."""
     conf_pivot = np.empty(high.shape, dtype=np.int_)
@@ -564,8 +562,8 @@ def pivot_info_nb(
             if not np.isnan(high[i, col]) and not np.isnan(low[i, col]):
                 if first_valid == -1:
                     first_valid = i
-                _up_th = 1 + abs(flex_select_auto_nb(up_th, i, col, flex_2d))
-                _down_th = 1 - abs(flex_select_auto_nb(down_th, i, col, flex_2d))
+                _up_th = 1 + abs(flex_select_nb(up_th, i, col))
+                _down_th = 1 - abs(flex_select_nb(down_th, i, col))
 
                 if _last_pivot == Pivot.Valley:
                     if not np.isnan(_last_value) and not np.isnan(_up_th) and high[i, col] >= _last_value * _up_th:
@@ -888,7 +886,6 @@ def supertrend_nb(
         influence=base_ch.FlexArraySlicer(axis=1),
         down_factor=base_ch.FlexArraySlicer(axis=1),
         std_influence=base_ch.FlexArraySlicer(axis=1),
-        flex_2d=None,
     ),
     merge_func="column_stack",
 )
@@ -896,11 +893,10 @@ def supertrend_nb(
 def signal_detection_nb(
     close: tp.Array2d,
     lag: int,
-    factor: tp.FlexArray,
-    influence: tp.FlexArray,
-    down_factor: tp.Optional[tp.FlexArray] = None,
-    std_influence: tp.Optional[tp.FlexArray] = None,
-    flex_2d: bool = False,
+    factor: tp.FlexArray2d,
+    influence: tp.FlexArray2d,
+    down_factor: tp.Optional[tp.FlexArray2d] = None,
+    std_influence: tp.Optional[tp.FlexArray2d] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d, tp.Array2d]:
     """Apply function for `vectorbtpro.indicators.custom.SIGDET`."""
     signal = np.full(close.shape, 0, dtype=np.int_)
@@ -920,16 +916,16 @@ def signal_detection_nb(
         std_filter[lag - 1, col] = np.nanstd(close[:lag, col])
 
         for i in range(lag, close.shape[0]):
-            _factor = abs(flex_select_auto_nb(factor, i, col, flex_2d))
+            _factor = abs(flex_select_nb(factor, i, col))
             if down_factor is None:
                 _down_factor = _factor
             else:
-                _down_factor = abs(flex_select_auto_nb(down_factor, i, col, flex_2d))
-            _influence = abs(flex_select_auto_nb(influence, i, col, flex_2d))
+                _down_factor = abs(flex_select_nb(down_factor, i, col))
+            _influence = abs(flex_select_nb(influence, i, col))
             if std_influence is None:
                 _std_influence = _influence
             else:
-                _std_influence = abs(flex_select_auto_nb(std_influence, i, col, flex_2d))
+                _std_influence = abs(flex_select_nb(std_influence, i, col))
 
             up_crossed = close[i, col] - mean_filter[i - 1, col] >= _factor * std_filter[i - 1, col]
             down_crossed = close[i, col] - mean_filter[i - 1, col] <= -_down_factor * std_filter[i - 1, col]

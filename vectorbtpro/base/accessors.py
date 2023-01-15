@@ -257,7 +257,7 @@ class BaseIDXAccessor(Configured):
             try:
                 by = to_offset(prepare_freq(by))
                 if by.n == 1:
-                    return Grouper(index=self.obj, group_by=self.obj.to_period(by), **kwargs)
+                    return Grouper(index=self.obj, group_by=self.obj.tz_localize(None).to_period(by), **kwargs)
             except Exception as e:
                 pass
             try:
@@ -609,7 +609,7 @@ class BaseAccessor(Wrapping):
     @classmethod
     def resolve_shape(cls, shape: tp.ShapeLike) -> tp.Shape:
         """Resolve shape."""
-        shape_2d = reshaping.shape_to_2d(shape)
+        shape_2d = reshaping.to_2d_shape(shape)
         try:
             if cls.is_series() and shape_2d[1] > 1:
                 raise ValueError("Use DataFrame accessor")
@@ -761,23 +761,6 @@ class BaseAccessor(Wrapping):
             return indexes.drop_duplicate_levels(obj_index, keep=keep)
 
         return self.apply_on_index(apply_func, axis=axis, copy_data=copy_data)
-
-    def sort_index(self, axis: tp.Optional[int] = None, **kwargs) -> tp.SeriesFrame:
-        """Sort index/column by their values."""
-        if axis is None:
-            axis = 0 if self.is_series() else 1
-        if self.is_series() and axis == 1:
-            raise TypeError("Axis 1 is not supported in Series")
-        checks.assert_in(axis, (0, 1))
-
-        if axis == 1:
-            obj_index = self.wrapper.columns
-        else:
-            obj_index = self.wrapper.index
-        _, indexer = obj_index.sort_values(return_indexer=True, **kwargs)
-        if axis == 1:
-            return self.obj.iloc[:, indexer]
-        return self.obj.iloc[indexer]
 
     # ############# Getting ############# #
 

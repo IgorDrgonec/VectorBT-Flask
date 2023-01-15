@@ -152,6 +152,16 @@ class PriceRecords(Records):
             close=close,
             **kwargs,
         )
+
+        if open is not None:
+            open = to_2d_array(open)
+        if high is not None:
+            high = to_2d_array(high)
+        if low is not None:
+            low = to_2d_array(low)
+        if close is not None:
+            close = to_2d_array(close)
+
         self._open = open
         self._high = high
         self._low = low

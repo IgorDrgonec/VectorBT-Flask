@@ -1,10 +1,12 @@
 # Copyright (c) 2021 Oleg Polakow. All rights reserved.
 
-"""Numba-compiled functions for portfolio modeling based on orders."""
+"""Numba-compiled functions for portfolio simulation based on orders."""
 
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
+from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
+from vectorbtpro.base.flex_indexing import flex_select_nb
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.registries.ch_registry import register_chunkable
@@ -16,45 +18,46 @@ from vectorbtpro.utils.array_ import insert_argsort_nb
 @register_chunkable(
     size=ch.ArraySizer(arg_query="group_lens", axis=0),
     arg_take_spec=dict(
-        target_shape=ch.ShapeSlicer(axis=1, mapper=base_ch.group_lens_mapper),
+        target_shape=base_ch.shape_gl_slicer,
         group_lens=ch.ArraySlicer(axis=0),
-        open=portfolio_ch.flex_array_gl_slicer,
-        high=portfolio_ch.flex_array_gl_slicer,
-        low=portfolio_ch.flex_array_gl_slicer,
-        close=portfolio_ch.flex_array_gl_slicer,
-        init_cash=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
-        init_position=portfolio_ch.flex_1d_array_gl_slicer,
-        init_price=portfolio_ch.flex_1d_array_gl_slicer,
+        open=base_ch.flex_array_gl_slicer,
+        high=base_ch.flex_array_gl_slicer,
+        low=base_ch.flex_array_gl_slicer,
+        close=base_ch.flex_array_gl_slicer,
+        init_cash=base_ch.FlexArraySlicer(),
+        init_position=base_ch.flex_1d_array_gl_slicer,
+        init_price=base_ch.flex_1d_array_gl_slicer,
         cash_deposits=base_ch.FlexArraySlicer(axis=1),
-        cash_earnings=base_ch.FlexArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
-        cash_dividends=base_ch.FlexArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
-        size=portfolio_ch.flex_array_gl_slicer,
-        price=portfolio_ch.flex_array_gl_slicer,
-        size_type=portfolio_ch.flex_array_gl_slicer,
-        direction=portfolio_ch.flex_array_gl_slicer,
-        fees=portfolio_ch.flex_array_gl_slicer,
-        fixed_fees=portfolio_ch.flex_array_gl_slicer,
-        slippage=portfolio_ch.flex_array_gl_slicer,
-        min_size=portfolio_ch.flex_array_gl_slicer,
-        max_size=portfolio_ch.flex_array_gl_slicer,
-        size_granularity=portfolio_ch.flex_array_gl_slicer,
-        reject_prob=portfolio_ch.flex_array_gl_slicer,
-        price_area_vio_mode=portfolio_ch.flex_array_gl_slicer,
-        lock_cash=portfolio_ch.flex_array_gl_slicer,
-        allow_partial=portfolio_ch.flex_array_gl_slicer,
-        raise_reject=portfolio_ch.flex_array_gl_slicer,
-        log=portfolio_ch.flex_array_gl_slicer,
-        val_price=portfolio_ch.flex_array_gl_slicer,
-        from_ago=portfolio_ch.flex_array_gl_slicer,
-        call_seq=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
+        cash_earnings=base_ch.flex_array_gl_slicer,
+        cash_dividends=base_ch.flex_array_gl_slicer,
+        size=base_ch.flex_array_gl_slicer,
+        price=base_ch.flex_array_gl_slicer,
+        size_type=base_ch.flex_array_gl_slicer,
+        direction=base_ch.flex_array_gl_slicer,
+        fees=base_ch.flex_array_gl_slicer,
+        fixed_fees=base_ch.flex_array_gl_slicer,
+        slippage=base_ch.flex_array_gl_slicer,
+        min_size=base_ch.flex_array_gl_slicer,
+        max_size=base_ch.flex_array_gl_slicer,
+        size_granularity=base_ch.flex_array_gl_slicer,
+        leverage=base_ch.flex_array_gl_slicer,
+        leverage_mode=base_ch.flex_array_gl_slicer,
+        reject_prob=base_ch.flex_array_gl_slicer,
+        price_area_vio_mode=base_ch.flex_array_gl_slicer,
+        allow_partial=base_ch.flex_array_gl_slicer,
+        raise_reject=base_ch.flex_array_gl_slicer,
+        log=base_ch.flex_array_gl_slicer,
+        val_price=base_ch.flex_array_gl_slicer,
+        from_ago=base_ch.flex_array_gl_slicer,
+        call_seq=base_ch.array_gl_slicer,
         auto_call_seq=None,
         ffill_val_price=None,
         update_value=None,
+        fill_state=None,
         fill_returns=None,
         max_orders=None,
         max_logs=None,
         skipna=None,
-        flex_2d=None,
     ),
     **portfolio_ch.merge_sim_outs_config
 )
@@ -62,43 +65,44 @@ from vectorbtpro.utils.array_ import insert_argsort_nb
 def simulate_from_orders_nb(
     target_shape: tp.Shape,
     group_lens: tp.Array1d,
-    open: tp.FlexArray = np.asarray(np.nan),
-    high: tp.FlexArray = np.asarray(np.nan),
-    low: tp.FlexArray = np.asarray(np.nan),
-    close: tp.FlexArray = np.asarray(np.nan),
-    init_cash: tp.FlexArray = np.asarray(100.0),
-    init_position: tp.FlexArray = np.asarray(0.0),
-    init_price: tp.FlexArray = np.asarray(np.nan),
-    cash_deposits: tp.FlexArray = np.asarray(0.0),
-    cash_earnings: tp.FlexArray = np.asarray(0.0),
-    cash_dividends: tp.FlexArray = np.asarray(0.0),
-    size: tp.FlexArray = np.asarray(np.inf),
-    price: tp.FlexArray = np.asarray(np.inf),
-    size_type: tp.FlexArray = np.asarray(SizeType.Amount),
-    direction: tp.FlexArray = np.asarray(Direction.Both),
-    fees: tp.FlexArray = np.asarray(0.0),
-    fixed_fees: tp.FlexArray = np.asarray(0.0),
-    slippage: tp.FlexArray = np.asarray(0.0),
-    min_size: tp.FlexArray = np.asarray(np.nan),
-    max_size: tp.FlexArray = np.asarray(np.nan),
-    size_granularity: tp.FlexArray = np.asarray(np.nan),
-    reject_prob: tp.FlexArray = np.asarray(0.0),
-    price_area_vio_mode: tp.FlexArray = np.asarray(PriceAreaVioMode.Ignore),
-    lock_cash: tp.FlexArray = np.asarray(False),
-    allow_partial: tp.FlexArray = np.asarray(True),
-    raise_reject: tp.FlexArray = np.asarray(False),
-    log: tp.FlexArray = np.asarray(False),
-    val_price: tp.FlexArray = np.asarray(np.inf),
-    from_ago: tp.FlexArray = np.asarray(0),
+    open: tp.FlexArray2dLike = np.nan,
+    high: tp.FlexArray2dLike = np.nan,
+    low: tp.FlexArray2dLike = np.nan,
+    close: tp.FlexArray2dLike = np.nan,
+    init_cash: tp.FlexArray1dLike = 100.0,
+    init_position: tp.FlexArray1dLike = 0.0,
+    init_price: tp.FlexArray1dLike = np.nan,
+    cash_deposits: tp.FlexArray2dLike = 0.0,
+    cash_earnings: tp.FlexArray2dLike = 0.0,
+    cash_dividends: tp.FlexArray2dLike = 0.0,
+    size: tp.FlexArray2dLike = np.inf,
+    price: tp.FlexArray2dLike = np.inf,
+    size_type: tp.FlexArray2dLike = SizeType.Amount,
+    direction: tp.FlexArray2dLike = Direction.Both,
+    fees: tp.FlexArray2dLike = 0.0,
+    fixed_fees: tp.FlexArray2dLike = 0.0,
+    slippage: tp.FlexArray2dLike = 0.0,
+    min_size: tp.FlexArray2dLike = np.nan,
+    max_size: tp.FlexArray2dLike = np.nan,
+    size_granularity: tp.FlexArray2dLike = np.nan,
+    leverage: tp.FlexArray2dLike = 1.0,
+    leverage_mode: tp.FlexArray2dLike = LeverageMode.Lazy,
+    reject_prob: tp.FlexArray2dLike = 0.0,
+    price_area_vio_mode: tp.FlexArray2dLike = PriceAreaVioMode.Ignore,
+    allow_partial: tp.FlexArray2dLike = True,
+    raise_reject: tp.FlexArray2dLike = False,
+    log: tp.FlexArray2dLike = False,
+    val_price: tp.FlexArray2dLike = np.inf,
+    from_ago: tp.FlexArray2dLike = 0,
     call_seq: tp.Optional[tp.Array2d] = None,
     auto_call_seq: bool = False,
     ffill_val_price: bool = True,
     update_value: bool = False,
+    fill_state: bool = False,
     fill_returns: bool = False,
     max_orders: tp.Optional[int] = None,
     max_logs: tp.Optional[int] = 0,
     skipna: bool = False,
-    flex_2d: bool = False,
 ) -> SimulationOutput:
     """Creates on order out of each element.
 
@@ -137,34 +141,65 @@ def simulate_from_orders_nb(
     check_group_lens_nb(group_lens, target_shape[1])
     cash_sharing = is_grouped_nb(group_lens)
 
+    open_ = to_2d_array_nb(np.asarray(open))
+    high_ = to_2d_array_nb(np.asarray(high))
+    low_ = to_2d_array_nb(np.asarray(low))
+    close_ = to_2d_array_nb(np.asarray(close))
+    init_cash_ = to_1d_array_nb(np.asarray(init_cash))
+    init_position_ = to_1d_array_nb(np.asarray(init_position))
+    init_price_ = to_1d_array_nb(np.asarray(init_price))
+    cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
+    cash_earnings_ = to_2d_array_nb(np.asarray(cash_earnings))
+    cash_dividends_ = to_2d_array_nb(np.asarray(cash_dividends))
+    size_ = to_2d_array_nb(np.asarray(size))
+    price_ = to_2d_array_nb(np.asarray(price))
+    size_type_ = to_2d_array_nb(np.asarray(size_type))
+    direction_ = to_2d_array_nb(np.asarray(direction))
+    fees_ = to_2d_array_nb(np.asarray(fees))
+    fixed_fees_ = to_2d_array_nb(np.asarray(fixed_fees))
+    slippage_ = to_2d_array_nb(np.asarray(slippage))
+    min_size_ = to_2d_array_nb(np.asarray(min_size))
+    max_size_ = to_2d_array_nb(np.asarray(max_size))
+    size_granularity_ = to_2d_array_nb(np.asarray(size_granularity))
+    leverage_ = to_2d_array_nb(np.asarray(leverage))
+    leverage_mode_ = to_2d_array_nb(np.asarray(leverage_mode))
+    reject_prob_ = to_2d_array_nb(np.asarray(reject_prob))
+    price_area_vio_mode_ = to_2d_array_nb(np.asarray(price_area_vio_mode))
+    allow_partial_ = to_2d_array_nb(np.asarray(allow_partial))
+    raise_reject_ = to_2d_array_nb(np.asarray(raise_reject))
+    log_ = to_2d_array_nb(np.asarray(log))
+    val_price_ = to_2d_array_nb(np.asarray(val_price))
+    from_ago_ = to_2d_array_nb(np.asarray(from_ago))
+
     order_records, log_records = prepare_records_nb(target_shape, max_orders, max_logs)
-    last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash)
-    last_position = prepare_last_position_nb(target_shape, init_position)
+    last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)
+    last_position = prepare_last_position_nb(target_shape, init_position_)
     last_value = prepare_last_value_nb(
         target_shape,
         group_lens,
         cash_sharing,
-        init_cash,
-        init_position=init_position,
-        init_price=init_price,
+        init_cash_,
+        init_position=init_position_,
+        init_price=init_price_,
     )
 
     last_val_price = np.full_like(last_position, np.nan)
     if ffill_val_price and skipna:
         raise ValueError("Cannot skip NaN and forward-fill valuation price simultaneously")
     last_debt = np.full(target_shape[1], 0.0, dtype=np.float_)
+    last_locked_cash = np.full(target_shape[1], 0.0, dtype=np.float_)
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
     order_counts = np.full(target_shape[1], 0, dtype=np.int_)
     log_counts = np.full(target_shape[1], 0, dtype=np.int_)
-    track_cash_deposits = np.any(cash_deposits)
+    track_cash_deposits = np.any(cash_deposits_)
     if track_cash_deposits:
         if skipna:
             raise ValueError("Cannot skip NaN and track cash deposits simultaneously")
         cash_deposits_out = np.full((target_shape[0], len(group_lens)), 0.0, dtype=np.float_)
     else:
         cash_deposits_out = np.full((1, 1), 0.0, dtype=np.float_)
-    track_cash_earnings = np.any(cash_earnings) or np.any(cash_dividends)
+    track_cash_earnings = np.any(cash_earnings_) or np.any(cash_dividends_)
     if track_cash_earnings:
         if skipna:
             raise ValueError("Cannot skip NaN and track cash earnings simultaneously")
@@ -172,13 +207,30 @@ def simulate_from_orders_nb(
     else:
         cash_earnings_out = np.full((1, 1), 0.0, dtype=np.float_)
 
-    if fill_returns:
-        if skipna:
-            raise ValueError("Cannot skip NaN and fill returns simultaneously")
-        returns = np.empty((target_shape[0], len(group_lens)), dtype=np.float_)
+    if fill_state:
+        cash = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
+        position = np.full(target_shape, np.nan, dtype=np.float_)
+        debt = np.full(target_shape, np.nan, dtype=np.float_)
+        locked_cash = np.full(target_shape, np.nan, dtype=np.float_)
+        free_cash = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
     else:
-        returns = np.empty((0, 0), dtype=np.float_)
-    in_outputs = FSInOutputs(returns=returns)
+        cash = np.full((0, 0), np.nan, dtype=np.float_)
+        position = np.full((0, 0), np.nan, dtype=np.float_)
+        debt = np.full((0, 0), np.nan, dtype=np.float_)
+        locked_cash = np.full((0, 0), np.nan, dtype=np.float_)
+        free_cash = np.full((0, 0), np.nan, dtype=np.float_)
+    if fill_returns:
+        returns = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
+    else:
+        returns = np.full((0, 0), np.nan, dtype=np.float_)
+    in_outputs = FOInOutputs(
+        cash=cash,
+        position=position,
+        debt=debt,
+        locked_cash=locked_cash,
+        free_cash=free_cash,
+        returns=returns,
+    )
 
     temp_call_seq = np.empty(target_shape[1], dtype=np.int_)
     temp_order_value = np.empty(target_shape[1], dtype=np.float_)
@@ -198,17 +250,17 @@ def simulate_from_orders_nb(
                 skip = True
                 for c in range(group_len):
                     col = from_col + c
-                    _i = i - abs(flex_select_auto_nb(from_ago, i, col, flex_2d))
+                    _i = i - abs(flex_select_nb(from_ago_, i, col))
                     if _i < 0:
                         continue
-                    if not np.isnan(flex_select_auto_nb(size, _i, col, flex_2d)):
+                    if not np.isnan(flex_select_nb(size_, _i, col)):
                         skip = False
                         break
                 if skip:
                     continue
 
             # Add cash
-            _cash_deposits = flex_select_auto_nb(cash_deposits, i, group, flex_2d)
+            _cash_deposits = flex_select_nb(cash_deposits_, i, group)
             if _cash_deposits < 0:
                 _cash_deposits = max(_cash_deposits, -cash_now)
             cash_now += _cash_deposits
@@ -220,22 +272,22 @@ def simulate_from_orders_nb(
                 col = from_col + c
 
                 # Update valuation price using current open
-                _open = flex_select_auto_nb(open, i, col, flex_2d)
+                _open = flex_select_nb(open_, i, col)
                 if not np.isnan(_open) or not ffill_val_price:
                     last_val_price[col] = _open
 
                 # Resolve valuation price
-                _val_price = flex_select_auto_nb(val_price, i, col, flex_2d)
+                _val_price = flex_select_nb(val_price_, i, col)
                 if np.isinf(_val_price):
                     if _val_price > 0:
-                        _i = i - abs(flex_select_auto_nb(from_ago, i, col, flex_2d))
+                        _i = i - abs(flex_select_nb(from_ago_, i, col))
                         if _i < 0:
                             _price = np.nan
                         else:
-                            _price = flex_select_auto_nb(price, _i, col, flex_2d)
+                            _price = flex_select_nb(price_, _i, col)
                         if np.isinf(_price):
                             if _price > 0:
-                                _price = flex_select_auto_nb(close, i, col, flex_2d)
+                                _price = flex_select_nb(close_, i, col)
                             else:
                                 _price = _open
                         _val_price = _price
@@ -246,7 +298,7 @@ def simulate_from_orders_nb(
 
             # Calculate group value and rearrange if cash sharing is enabled
             if cash_sharing:
-                # Same as get_group_value_ctx_nb but with flexible indexing
+                # Same as get_ctx_group_value_nb but with flexible indexing
                 value_now = cash_now
                 for c in range(group_len):
                     col = from_col + c
@@ -269,19 +321,20 @@ def simulate_from_orders_nb(
                             cash=cash_now,
                             position=last_position[col],
                             debt=last_debt[col],
+                            locked_cash=last_locked_cash[col],
                             free_cash=free_cash_now,
                             val_price=last_val_price[col],
                             value=value_now,
                         )
-                        _i = i - abs(flex_select_auto_nb(from_ago, i, col, flex_2d))
+                        _i = i - abs(flex_select_nb(from_ago_, i, col))
                         if _i < 0:
                             temp_order_value[c] = 0.0
                         else:
                             temp_order_value[c] = approx_order_value_nb(
                                 exec_state,
-                                flex_select_auto_nb(size, _i, col, flex_2d),
-                                flex_select_auto_nb(size_type, _i, col, flex_2d),
-                                flex_select_auto_nb(direction, _i, col, flex_2d),
+                                flex_select_nb(size_, _i, col),
+                                flex_select_nb(size_type_, _i, col),
+                                flex_select_nb(direction_, _i, col),
                             )
                         if call_seq_now[c] != c:
                             raise ValueError("Call sequence must follow CallSeqType.Default")
@@ -301,6 +354,7 @@ def simulate_from_orders_nb(
                 # Get current values per column
                 position_now = last_position[col]
                 debt_now = last_debt[col]
+                locked_cash_now = last_locked_cash[col]
                 val_price_now = last_val_price[col]
                 if not cash_sharing:
                     value_now = cash_now
@@ -308,44 +362,46 @@ def simulate_from_orders_nb(
                         value_now += position_now * val_price_now
 
                 # Generate the next order
-                _i = i - abs(flex_select_auto_nb(from_ago, i, col, flex_2d))
+                _i = i - abs(flex_select_nb(from_ago_, i, col))
                 if _i < 0:
                     continue
                 order = order_nb(
-                    size=flex_select_auto_nb(size, _i, col, flex_2d),
-                    price=flex_select_auto_nb(price, _i, col, flex_2d),
-                    size_type=flex_select_auto_nb(size_type, _i, col, flex_2d),
-                    direction=flex_select_auto_nb(direction, _i, col, flex_2d),
-                    fees=flex_select_auto_nb(fees, _i, col, flex_2d),
-                    fixed_fees=flex_select_auto_nb(fixed_fees, _i, col, flex_2d),
-                    slippage=flex_select_auto_nb(slippage, _i, col, flex_2d),
-                    min_size=flex_select_auto_nb(min_size, _i, col, flex_2d),
-                    max_size=flex_select_auto_nb(max_size, _i, col, flex_2d),
-                    size_granularity=flex_select_auto_nb(size_granularity, _i, col, flex_2d),
-                    reject_prob=flex_select_auto_nb(reject_prob, _i, col, flex_2d),
-                    price_area_vio_mode=flex_select_auto_nb(price_area_vio_mode, _i, col, flex_2d),
-                    lock_cash=flex_select_auto_nb(lock_cash, _i, col, flex_2d),
-                    allow_partial=flex_select_auto_nb(allow_partial, _i, col, flex_2d),
-                    raise_reject=flex_select_auto_nb(raise_reject, _i, col, flex_2d),
-                    log=flex_select_auto_nb(log, _i, col, flex_2d),
+                    size=flex_select_nb(size_, _i, col),
+                    price=flex_select_nb(price_, _i, col),
+                    size_type=flex_select_nb(size_type_, _i, col),
+                    direction=flex_select_nb(direction_, _i, col),
+                    fees=flex_select_nb(fees_, _i, col),
+                    fixed_fees=flex_select_nb(fixed_fees_, _i, col),
+                    slippage=flex_select_nb(slippage_, _i, col),
+                    min_size=flex_select_nb(min_size_, _i, col),
+                    max_size=flex_select_nb(max_size_, _i, col),
+                    size_granularity=flex_select_nb(size_granularity_, _i, col),
+                    leverage=flex_select_nb(leverage_, _i, col),
+                    leverage_mode=flex_select_nb(leverage_mode_, _i, col),
+                    reject_prob=flex_select_nb(reject_prob_, _i, col),
+                    price_area_vio_mode=flex_select_nb(price_area_vio_mode_, _i, col),
+                    allow_partial=flex_select_nb(allow_partial_, _i, col),
+                    raise_reject=flex_select_nb(raise_reject_, _i, col),
+                    log=flex_select_nb(log_, _i, col),
                 )
 
                 # Process the order
                 price_area = PriceArea(
-                    open=flex_select_auto_nb(open, i, col, flex_2d),
-                    high=flex_select_auto_nb(high, i, col, flex_2d),
-                    low=flex_select_auto_nb(low, i, col, flex_2d),
-                    close=flex_select_auto_nb(close, i, col, flex_2d),
+                    open=flex_select_nb(open_, i, col),
+                    high=flex_select_nb(high_, i, col),
+                    low=flex_select_nb(low_, i, col),
+                    close=flex_select_nb(close_, i, col),
                 )
                 exec_state = ExecState(
                     cash=cash_now,
                     position=position_now,
                     debt=debt_now,
+                    locked_cash=locked_cash_now,
                     free_cash=free_cash_now,
                     val_price=val_price_now,
                     value=value_now,
                 )
-                new_exec_state, order_result = process_order_nb(
+                order_result, new_exec_state = process_order_nb(
                     group=group,
                     col=col,
                     i=i,
@@ -363,6 +419,7 @@ def simulate_from_orders_nb(
                 cash_now = new_exec_state.cash
                 position_now = new_exec_state.position
                 debt_now = new_exec_state.debt
+                locked_cash_now = new_exec_state.locked_cash
                 free_cash_now = new_exec_state.free_cash
                 val_price_now = new_exec_state.val_price
                 value_now = new_exec_state.value
@@ -370,18 +427,19 @@ def simulate_from_orders_nb(
                 # Now becomes last
                 last_position[col] = position_now
                 last_debt[col] = debt_now
+                last_locked_cash[col] = locked_cash_now
                 if not np.isnan(val_price_now) or not ffill_val_price:
                     last_val_price[col] = val_price_now
 
             group_value = cash_now
             for col in range(from_col, to_col):
                 # Update valuation price using current close
-                _close = flex_select_auto_nb(close, i, col, flex_2d)
+                _close = flex_select_nb(close_, i, col)
                 if not np.isnan(_close) or not ffill_val_price:
                     last_val_price[col] = _close
 
-                _cash_earnings = flex_select_auto_nb(cash_earnings, i, col, flex_2d)
-                _cash_dividends = flex_select_auto_nb(cash_dividends, i, col, flex_2d)
+                _cash_earnings = flex_select_nb(cash_earnings_, i, col)
+                _cash_dividends = flex_select_nb(cash_dividends_, i, col)
                 _cash_earnings += _cash_dividends * last_position[col]
                 if _cash_earnings < 0:
                     _cash_earnings = max(_cash_earnings, -cash_now)
@@ -389,6 +447,13 @@ def simulate_from_orders_nb(
                 free_cash_now += _cash_earnings
                 if track_cash_earnings:
                     cash_earnings_out[i, col] += _cash_earnings
+                if fill_state:
+                    position[i, col] = last_position[col]
+                    debt[i, col] = last_debt[col]
+                    locked_cash[i, col] = last_locked_cash[col]
+                    if not cash_sharing:
+                        cash[i, col] = cash_now
+                        free_cash[i, col] = free_cash_now
 
                 # Update previous value, current value, and return
                 if fill_returns:
@@ -407,14 +472,19 @@ def simulate_from_orders_nb(
                         prev_close_value[col] = last_value[col]
                         in_outputs.returns[i, group] = last_return[col]
 
-            if fill_returns and cash_sharing:
-                last_value[group] = group_value
-                last_return[group] = get_return_nb(
-                    prev_close_value[group],
-                    last_value[group] - _cash_deposits,
-                )
-                prev_close_value[group] = last_value[group]
-                in_outputs.returns[i, group] = last_return[group]
+            # Fill group state and returns
+            if cash_sharing:
+                if fill_state:
+                    cash[i, group] = cash_now
+                    free_cash[i, group] = free_cash_now
+                if fill_returns:
+                    last_value[group] = group_value
+                    last_return[group] = get_return_nb(
+                        prev_close_value[group],
+                        last_value[group] - _cash_deposits,
+                    )
+                    prev_close_value[group] = last_value[group]
+                    in_outputs.returns[i, group] = last_return[group]
 
     return prepare_simout_nb(
         order_records=order_records,

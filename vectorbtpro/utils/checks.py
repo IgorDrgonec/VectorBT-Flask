@@ -17,6 +17,15 @@ import numba
 from vectorbtpro import _typing as tp
 
 
+class Comparable:
+    def equals(self, other: tp.Any) -> bool:
+        """Check two objects for equality."""
+        raise NotImplementedError
+
+    def __eq__(self, other: tp.Any) -> bool:
+        return self.equals(other)
+
+
 # ############# Checks ############# #
 
 def is_int(arg: tp.Any) -> bool:
@@ -223,6 +232,8 @@ def is_deep_equal(arg1: tp.Any, arg2: tp.Any, check_exact: bool = False, **kwarg
     try:
         if id(arg1) == id(arg2):
             return True
+        if isinstance(arg1, Comparable):
+            return arg1.equals(arg2)
         if type(arg1) != type(arg2):
             return False
         if attr.has(type(arg1)):
@@ -243,28 +254,27 @@ def is_deep_equal(arg1: tp.Any, arg2: tp.Any, check_exact: bool = False, **kwarg
                 if check_exact:
                     return False
                 _check_array(np.testing.assert_allclose)
+        elif isinstance(arg1, (tuple, list)):
+            for i in range(len(arg1)):
+                safe_assert(is_deep_equal(arg1[i], arg2[i], check_exact=check_exact, **kwargs))
+        elif isinstance(arg1, dict):
+            for k in arg1.keys():
+                safe_assert(is_deep_equal(arg1[k], arg2[k], check_exact=check_exact, **kwargs))
         else:
-            if isinstance(arg1, (tuple, list)):
-                for i in range(len(arg1)):
-                    safe_assert(is_deep_equal(arg1[i], arg2[i], check_exact=check_exact, **kwargs))
-            elif isinstance(arg1, dict):
-                for k in arg1.keys():
-                    safe_assert(is_deep_equal(arg1[k], arg2[k], check_exact=check_exact, **kwargs))
-            else:
-                try:
-                    if arg1 == arg2:
-                        return True
-                except:
-                    pass
-                try:
-                    import dill
+            try:
+                if arg1 == arg2:
+                    return True
+            except:
+                pass
+            try:
+                import dill
 
-                    _kwargs = _select_kwargs(dill.dumps, kwargs)
-                    if dill.dumps(arg1, **_kwargs) == dill.dumps(arg2, **_kwargs):
-                        return True
-                except:
-                    pass
-                return False
+                _kwargs = _select_kwargs(dill.dumps, kwargs)
+                if dill.dumps(arg1, **_kwargs) == dill.dumps(arg2, **_kwargs):
+                    return True
+            except:
+                pass
+            return False
     except:
         return False
     return True
@@ -404,25 +414,29 @@ def assert_dtype(arg: tp.ArrayLike, dtype: tp.MaybeTuple[tp.DTypeLike]) -> None:
                 raise AssertionError(f"Data type must be {dtype}, not {arg.dtype}")
 
 
-def assert_subdtype(arg: tp.ArrayLike, dtype: tp.MaybeTuple[tp.DTypeLike]) -> None:
+def assert_subdtype(arg: tp.ArrayLike, dtype: tp.MaybeTuple[tp.DTypeLike], arg_name: tp.Optional[str] = None) -> None:
     """Raise exception if the argument is not a sub data type of `dtype`."""
+    if arg_name is None:
+        x = ""
+    else:
+        x = f" of '{arg_name}'"
     arg = _to_any_array(arg)
     if isinstance(dtype, tuple):
         if isinstance(arg, pd.DataFrame):
             for i, col_dtype in enumerate(arg.dtypes):
                 if not any([np.issubdtype(col_dtype, _dtype) for _dtype in dtype]):
-                    raise AssertionError(f"Data type of column {i} must be one of {dtype}, not {col_dtype}")
+                    raise AssertionError(f"Data type{x} (column {i}) must be one of {dtype}, not {col_dtype}")
         else:
             if not any([np.issubdtype(arg.dtype, _dtype) for _dtype in dtype]):
-                raise AssertionError(f"Data type must be one of {dtype}, not {arg.dtype}")
+                raise AssertionError(f"Data type{x} must be one of {dtype}, not {arg.dtype}")
     else:
         if isinstance(arg, pd.DataFrame):
             for i, col_dtype in enumerate(arg.dtypes):
                 if not np.issubdtype(col_dtype, dtype):
-                    raise AssertionError(f"Data type of column {i} must be {dtype}, not {col_dtype}")
+                    raise AssertionError(f"Data type{x} (column {i}) must be {dtype}, not {col_dtype}")
         else:
             if not np.issubdtype(arg.dtype, dtype):
-                raise AssertionError(f"Data type must be {dtype}, not {arg.dtype}")
+                raise AssertionError(f"Data type{x} must be {dtype}, not {arg.dtype}")
 
 
 def assert_dtype_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> None:
@@ -432,11 +446,11 @@ def assert_dtype_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> None:
     if isinstance(arg1, pd.DataFrame):
         dtypes1 = arg1.dtypes.to_numpy()
     else:
-        dtypes1 = np.asarray([arg1.dtype])
+        dtypes1 = np.array([arg1.dtype])
     if isinstance(arg2, pd.DataFrame):
         dtypes2 = arg2.dtypes.to_numpy()
     else:
-        dtypes2 = np.asarray([arg2.dtype])
+        dtypes2 = np.array([arg2.dtype])
     if len(dtypes1) == len(dtypes2):
         if (dtypes1 == dtypes2).all():
             return

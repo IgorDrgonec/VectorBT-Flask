@@ -367,9 +367,11 @@ class Resampler(Configured):
         silence_warnings: tp.Optional[bool] = None,
     ) -> tp.Array1d:
         """See `vectorbtpro.base.resampling.nb.resample_source_mask_nb`."""
+        from vectorbtpro.base.reshaping import broadcast_array_to
+
         if silence_warnings is None:
             silence_warnings = self.silence_warnings
-        source_mask = np.broadcast_to(source_mask, (len(self.source_index),))
+        source_mask = broadcast_array_to(source_mask, len(self.source_index))
         source_freq = self.source_freq
         if source_freq is not None:
             if not isinstance(source_freq, (int, float)):

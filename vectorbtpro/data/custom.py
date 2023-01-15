@@ -25,8 +25,10 @@ from pandas.io.parsers import TextFileReader
 from pandas.io.pytables import TableIterator
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.reshaping import to_1d_array
 from vectorbtpro.data import nb
 from vectorbtpro.data.base import Data, symbol_dict
+from vectorbtpro.data.tv import TVClient
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
@@ -68,12 +70,6 @@ try:
     from polygon import RESTClient as PolygonClientT
 except ImportError:
     PolygonClientT = tp.Any
-try:
-    if not tp.TYPE_CHECKING:
-        raise ImportError
-    from tvDatafeed import TvDatafeed as TvDatafeedT
-except ImportError:
-    TvDatafeedT = tp.Any
 
 __all__ = [
     "CustomData",
@@ -250,7 +246,13 @@ class RandomData(SyntheticData):
             jitted = random_cfg["jitted"]
 
         func = jit_reg.resolve_option(nb.generate_random_data_nb, jitted)
-        out = func((len(index), num_paths), start_value, mean, std, symmetric=symmetric)
+        out = func(
+            (len(index), num_paths),
+            to_1d_array(start_value),
+            to_1d_array(mean),
+            to_1d_array(std),
+            symmetric=to_1d_array(symmetric)
+        )
 
         if out.shape[1] == 1:
             if columns is None:
@@ -369,7 +371,13 @@ class GBMData(RandomData):
             jitted = gbm_cfg["jitted"]
 
         func = jit_reg.resolve_option(nb.generate_gbm_data_nb, jitted)
-        out = func((len(index), num_paths), start_value, mean, std, dt)
+        out = func(
+            (len(index), num_paths),
+            to_1d_array(start_value),
+            to_1d_array(mean),
+            to_1d_array(std),
+            to_1d_array(dt),
+        )
 
         if out.shape[1] == 1:
             if columns is None:
@@ -1029,20 +1037,22 @@ class YFData(RemoteData):
             timeframe = str(multiplier) + unit
 
         df = yf.Ticker(symbol).history(period=period, start=start, end=end, interval=timeframe, **history_kwargs)
-        if start is not None:
-            if df.index.tzinfo is None:
-                if df.index[0] < start.astimezone(get_utc_tz()).replace(tzinfo=None):
-                    df = df[df.index >= start.astimezone(get_utc_tz()).replace(tzinfo=None)]
-            else:
-                if df.index[0] < start.astimezone(df.index.tzinfo):
-                    df = df[df.index >= start.astimezone(df.index.tzinfo)]
-        if end is not None:
-            if df.index.tzinfo is None:
-                if df.index[-1] >= end.astimezone(get_utc_tz()).replace(tzinfo=None):
-                    df = df[df.index < end.astimezone(get_utc_tz()).replace(tzinfo=None)]
-            else:
-                if df.index[-1] >= end.astimezone(df.index.tzinfo):
-                    df = df[df.index < end.astimezone(df.index.tzinfo)]
+
+        if not df.empty:
+            if start is not None:
+                if df.index.tzinfo is None:
+                    if df.index[0] < start.astimezone(get_utc_tz()).replace(tzinfo=None):
+                        df = df[df.index >= start.astimezone(get_utc_tz()).replace(tzinfo=None)]
+                else:
+                    if df.index[0] < start.astimezone(df.index.tzinfo):
+                        df = df[df.index >= start.astimezone(df.index.tzinfo)]
+            if end is not None:
+                if df.index.tzinfo is None:
+                    if df.index[-1] >= end.astimezone(get_utc_tz()).replace(tzinfo=None):
+                        df = df[df.index < end.astimezone(get_utc_tz()).replace(tzinfo=None)]
+                else:
+                    if df.index[-1] >= end.astimezone(df.index.tzinfo):
+                        df = df[df.index < end.astimezone(df.index.tzinfo)]
         return df
 
 
@@ -1470,15 +1480,20 @@ class CCXTData(RemoteData):
         fetch_func: tp.Callable,
         start: tp.DatetimeLike = 0,
         end: tp.DatetimeLike = "now UTC",
-    ) -> tp.Optional[pd.Timestamp]:
+        for_internal_use: bool = False,
+    ) -> tp.Union[None, int, pd.Timestamp]:
         """Find the earliest date using binary search."""
         if start is not None:
             start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
             fetched_data = fetch_func(start_ts, 1)
+            if for_internal_use and len(fetched_data) > 0:
+                return start_ts
         else:
             fetched_data = []
         if len(fetched_data) == 0 and start != 0:
             fetched_data = fetch_func(0, 1)
+            if for_internal_use and len(fetched_data) > 0:
+                return 0
         if len(fetched_data) == 0:
             if start is not None:
                 start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
@@ -1508,11 +1523,14 @@ class CCXTData(RemoteData):
         return None
 
     @classmethod
-    def find_earliest_date(cls, symbol: str, **kwargs) -> tp.Optional[pd.Timestamp]:
+    def find_earliest_date(cls, symbol: str, for_internal_use: bool = False, **kwargs) -> tp.Optional[pd.Timestamp]:
         """Find the earliest date using binary search.
 
         See `CCXTData.fetch_symbol` for arguments."""
-        return cls._find_earliest_date(*cls.fetch_symbol(symbol, return_fetch_method=True, **kwargs))
+        return cls._find_earliest_date(
+            *cls.fetch_symbol(symbol, return_fetch_method=True, **kwargs),
+            for_internal_use=for_internal_use,
+        )
 
     @classmethod
     def fetch_symbol(
@@ -1662,7 +1680,7 @@ class CCXTData(RemoteData):
 
         # Establish the timestamps
         if find_earliest_date and start is not None:
-            start = cls._find_earliest_date(_fetch, start, end)
+            start = cls._find_earliest_date(_fetch, start, end, for_internal_use=True)
         if start is not None:
             start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
         else:
@@ -2039,20 +2057,21 @@ class AlpacaData(RemoteData):
         if "VWAP" in df.columns:
             df["VWAP"] = df["VWAP"].astype(float)
 
-        if start is not None:
-            if df.index.tzinfo is None:
-                if df.index[0] < start.replace(tzinfo=None):
-                    df = df[df.index >= start.replace(tzinfo=None)]
-            else:
-                if df.index[0] < start.astimezone(df.index.tzinfo):
-                    df = df[df.index >= start.astimezone(df.index.tzinfo)]
-        if end is not None:
-            if df.index.tzinfo is None:
-                if df.index[-1] >= end.replace(tzinfo=None):
-                    df = df[df.index < end.replace(tzinfo=None)]
-            else:
-                if df.index[-1] >= end.astimezone(df.index.tzinfo):
-                    df = df[df.index < end.astimezone(df.index.tzinfo)]
+        if not df.empty:
+            if start is not None:
+                if df.index.tzinfo is None:
+                    if df.index[0] < start.replace(tzinfo=None):
+                        df = df[df.index >= start.replace(tzinfo=None)]
+                else:
+                    if df.index[0] < start.astimezone(df.index.tzinfo):
+                        df = df[df.index >= start.astimezone(df.index.tzinfo)]
+            if end is not None:
+                if df.index.tzinfo is None:
+                    if df.index[-1] >= end.replace(tzinfo=None):
+                        df = df[df.index < end.replace(tzinfo=None)]
+                else:
+                    if df.index[-1] >= end.astimezone(df.index.tzinfo):
+                        df = df[df.index < end.astimezone(df.index.tzinfo)]
         return df
 
 
@@ -2417,6 +2436,8 @@ AlphaVantageDataT = tp.TypeVar("AlphaVantageDataT", bound="AlphaVantageData")
 class AlphaVantageData(RemoteData):
     """Subclass of `vectorbtpro.data.base.Data` for `alpha_vantage`.
 
+    See https://www.alphavantage.co/documentation/ for API.
+
     Instead of using https://github.com/RomelTorres/alpha_vantage package, which is stale and has
     many issues, this class parses the API documentation with `AlphaVantageData.parse_api_meta` using
     `BeautifulSoup4` and builds the API query based on this metadata. It then uses
@@ -2448,12 +2469,12 @@ class AlphaVantageData(RemoteData):
         ```pycon
         >>> data = vbt.AlphaVantageData.fetch(
         ...     "GOOGL",
-        ...     timeframe="1 day"
+        ...     timeframe="1 day",  # premium?
         ... )
 
         >>> data = vbt.AlphaVantageData.fetch(
         ...     "BTC_USD",
-        ...     timeframe="30 minutes",
+        ...     timeframe="30 minutes",  # premium?
         ...     category="digital-currency",
         ...     outputsize="full"
         ... )
@@ -2466,7 +2487,7 @@ class AlphaVantageData(RemoteData):
         >>> data = vbt.AlphaVantageData.fetch(
         ...     "IBM",
         ...     category="technical-indicators",
-        ...     function="STOCH",
+        ...     function="STOCHRSI",
         ...     params=dict(fastkperiod=14)
         ... )
         ```
@@ -2800,7 +2821,7 @@ class AlphaVantageData(RemoteData):
             new_c = new_c[0].title() + new_c[1:]
             new_columns.append(new_c)
         df = df.rename(columns=dict(zip(df.columns, new_columns)))
-        if df.index[0] > df.index[1]:
+        if not df.empty and df.index[0] > df.index[1]:
             df = df.iloc[::-1]
 
         return df
@@ -2940,20 +2961,21 @@ class NDLData(RemoteData):
             new_columns.append(new_c)
         df = df.rename(columns=dict(zip(df.columns, new_columns)))
 
-        if start is not None:
-            if df.index.tzinfo is None:
-                if df.index[0] < start.replace(tzinfo=None):
-                    df = df[df.index >= start.replace(tzinfo=None)]
-            else:
-                if df.index[0] < start.astimezone(df.index.tzinfo):
-                    df = df[df.index >= start.astimezone(df.index.tzinfo)]
-        if end is not None:
-            if df.index.tzinfo is None:
-                if df.index[-1] >= end.replace(tzinfo=None):
-                    df = df[df.index < end.replace(tzinfo=None)]
-            else:
-                if df.index[-1] >= end.astimezone(df.index.tzinfo):
-                    df = df[df.index < end.astimezone(df.index.tzinfo)]
+        if not df.empty:
+            if start is not None:
+                if df.index.tzinfo is None:
+                    if df.index[0] < start.replace(tzinfo=None):
+                        df = df[df.index >= start.replace(tzinfo=None)]
+                else:
+                    if df.index[0] < start.astimezone(df.index.tzinfo):
+                        df = df[df.index >= start.astimezone(df.index.tzinfo)]
+            if end is not None:
+                if df.index.tzinfo is None:
+                    if df.index[-1] >= end.replace(tzinfo=None):
+                        df = df[df.index < end.replace(tzinfo=None)]
+                else:
+                    if df.index[-1] >= end.astimezone(df.index.tzinfo):
+                        df = df[df.index < end.astimezone(df.index.tzinfo)]
         return df
 
 
@@ -2961,11 +2983,15 @@ TVDataT = tp.TypeVar("TVDataT", bound="TVData")
 
 
 class TVData(RemoteData):
-    """Subclass of `vectorbtpro.data.base.Data` for `tvdatafeed`.
+    """Subclass of `vectorbtpro.data.base.Data` for `vectorbtpro.data.tv.TVClient`.
 
-    See https://github.com/StreamAlpha/tvdatafeed for API.
+    See `TVData.fetch_symbol` for arguments.
 
-    See `NDLData.fetch_symbol` for arguments.
+    !!! note
+        If you're getting the error "Please confirm that you are not a robot by clicking the captcha box."
+        when attempting to authenticate, use `token` instead of `username` and `password`. To get the
+        token: in a browser, sign in to TradingView and inspect authentication token in the response data
+        (for example by using Chrome Developer Tools).
 
     Usage:
         * Set up the credentials globally (optional):
@@ -3013,16 +3039,11 @@ class TVData(RemoteData):
         return set(map(lambda x: x["exchange"] + ":" + x["symbol"], all_symbols))
 
     @classmethod
-    def resolve_client(cls, client: tp.Optional[TvDatafeedT] = None, **client_config) -> TvDatafeedT:
+    def resolve_client(cls, client: tp.Optional[TVClient] = None, **client_config) -> TVClient:
         """Resolve the client.
 
-        If provided, must be of the type `tvDatafeed.main.TvDatafeed`.
+        If provided, must be of the type `vectorbtpro.base.tv.TVClient`.
         Otherwise, will be created using `client_config`."""
-        from vectorbtpro.utils.opt_packages import assert_can_import
-
-        assert_can_import("tvDatafeed")
-        from tvDatafeed import TvDatafeed
-
         tv_cfg = cls.get_settings(key_id="custom")
 
         if client is None:
@@ -3032,7 +3053,7 @@ class TVData(RemoteData):
         has_client_config = len(client_config) > 0
         client_config = merge_dicts(tv_cfg["client_config"], client_config)
         if client is None:
-            client = TvDatafeed(**client_config)
+            client = TVClient(**client_config)
         elif has_client_config:
             raise ValueError("Cannot apply client_config on already created client")
         return client
@@ -3041,13 +3062,14 @@ class TVData(RemoteData):
     def fetch_symbol(
         cls,
         symbol: str,
-        client: tp.Optional[TvDatafeedT] = None,
+        client: tp.Optional[TVClient] = None,
         client_config: tp.KwargsLike = None,
         exchange: tp.Optional[str] = None,
         timeframe: tp.Optional[str] = None,
-        limit: tp.Optional[int] = None,
         fut_contract: tp.Optional[int] = None,
         extended_session: tp.Optional[bool] = None,
+        pro_data: tp.Optional[bool] = None,
+        limit: tp.Optional[int] = None,
     ) -> tp.Frame:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from TradingView.
 
@@ -3055,7 +3077,7 @@ class TVData(RemoteData):
             symbol (str): Symbol.
 
                 Symbol must be in the `EXCHANGE:SYMBOL` format if `exchange` is None.
-            client (tvDatafeed.main.TvDatafeed): Client.
+            client (vectorbtpro.data.tv.TVClient): Client.
 
                 See `TVData.resolve_client`.
             client_config (dict): Client config.
@@ -3067,17 +3089,15 @@ class TVData(RemoteData):
             timeframe (str): Timeframe.
 
                 Allows human-readable strings such as "15 minutes".
-            limit (int): The maximum number of returned items.
             fut_contract (int): None for cash, 1 for continuous current contract in front,
                 2 for continuous next contract in front.
             extended_session (bool): Regular session if False, extended session if True.
+            pro_data (bool): Whether to use pro data.
+            limit (int): The maximum number of returned items.
 
         For defaults, see `custom.tv` in `vectorbtpro._settings.data`.
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
-
-        assert_can_import("tvDatafeed")
-        from tvDatafeed import Interval
+        from vectorbtpro.data.tv import Interval
 
         tv_cfg = cls.get_settings(key_id="custom")
 
@@ -3088,12 +3108,14 @@ class TVData(RemoteData):
             exchange = tv_cfg["exchange"]
         if timeframe is None:
             timeframe = tv_cfg["timeframe"]
-        if limit is None:
-            limit = tv_cfg["limit"]
         if fut_contract is None:
             fut_contract = tv_cfg["fut_contract"]
         if extended_session is None:
             extended_session = tv_cfg["extended_session"]
+        if pro_data is None:
+            pro_data = tv_cfg["pro_data"]
+        if limit is None:
+            limit = tv_cfg["limit"]
 
         if not isinstance(timeframe, str):
             raise ValueError(f"Invalid timeframe '{timeframe}'")
@@ -3124,9 +3146,10 @@ class TVData(RemoteData):
             symbol=symbol,
             exchange=exchange,
             interval=interval,
-            n_bars=limit,
             fut_contract=fut_contract,
             extended_session=extended_session,
+            pro_data=pro_data,
+            limit=limit,
         )
         df.rename(
             columns={

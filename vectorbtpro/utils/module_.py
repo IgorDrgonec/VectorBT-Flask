@@ -99,3 +99,20 @@ def search_package_for_funcs(
             pass
     return results
 
+
+def find_class(path: str) -> tp.Optional[tp.Type]:
+    """Find the class by its path."""
+    try:
+        path_parts = path.split(".")
+        module_path = ".".join(path_parts[:-1])
+        class_name = path_parts[-1]
+        if module_path.startswith("vectorbtpro.indicators.factory"):
+            import vectorbtpro as vbt
+
+            return getattr(vbt, path_parts[-2])(class_name)
+        module = importlib.import_module(module_path)
+        if hasattr(module, class_name):
+            return getattr(module, class_name)
+    except Exception as e:
+        pass
+    return None

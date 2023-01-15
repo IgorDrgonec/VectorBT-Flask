@@ -480,7 +480,7 @@ Name: group, dtype: object
 `Trades` class has two subplots based on `Trades.plot` and `Trades.plot_pnl`:
 
 ```pycon
->>> pf.trades['a'].plots()
+>>> pf.trades['a'].plots().show()
 ```
 
 ![](/assets/images/api/trades_plots.svg)
@@ -492,7 +492,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_1d_array, to_2d_array
+from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast_to
 from vectorbtpro.generic.ranges import Ranges
 from vectorbtpro.generic.enums import range_dt
 from vectorbtpro.portfolio import nb
@@ -865,7 +865,6 @@ class Trades(Ranges):
         entry_price_open: bool = False,
         exit_price_close: bool = False,
         max_duration: tp.Optional[int] = None,
-        flex_2d: bool = False,
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -908,7 +907,7 @@ class Trades(Ranges):
                     wtype=WType.Wilder,
                 )
         else:
-            volatility = np.asarray(volatility)
+            volatility = broadcast_to(volatility, self.wrapper, keep_flex=True)
         out = func(
             self.values,
             col_map,
@@ -920,7 +919,6 @@ class Trades(Ranges):
             entry_price_open=entry_price_open,
             exit_price_close=exit_price_close,
             max_duration=max_duration,
-            flex_2d=flex_2d,
         )
         if wrap_kwargs is None:
             wrap_kwargs = {}
@@ -933,7 +931,6 @@ class Trades(Ranges):
         exit_price_close: bool = False,
         max_duration: tp.Optional[int] = None,
         incl_shorter: bool = False,
-        flex_2d: bool = False,
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -976,7 +973,7 @@ class Trades(Ranges):
                     wtype=WType.Wilder,
                 )
         else:
-            volatility = np.asarray(volatility)
+            volatility = broadcast_to(volatility, self.wrapper, keep_flex=True)
         out = func(
             self.values,
             col_map,
@@ -989,7 +986,6 @@ class Trades(Ranges):
             exit_price_close=exit_price_close,
             max_duration=max_duration,
             incl_shorter=incl_shorter,
-            flex_2d=flex_2d,
         )
         if wrap_kwargs is None:
             wrap_kwargs = {}
@@ -1187,7 +1183,7 @@ class Trades(Ranges):
             >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.], index=index)
             >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5], index=index)
             >>> pf = vbt.Portfolio.from_orders(price, orders)
-            >>> pf.trades.plot_pnl()
+            >>> pf.trades.plot_pnl().show()
             ```
 
             ![](/assets/images/api/trades_plot_pnl.svg)
@@ -1378,7 +1374,7 @@ class Trades(Ranges):
             >>> orders = pd.Series([1., -0.5, 0., -0.5, 2., 0., -0.5, -0.5, 0., -0.5], index=index)
             >>> pf = vbt.Portfolio.from_orders(price, orders)
             >>> trades = pf.trades
-            >>> trades.plot_against_pnl("MFE")
+            >>> trades.plot_against_pnl("MFE").show()
             ```
 
             ![](/assets/images/api/trades_plot_against_pnl.svg)
@@ -1583,7 +1579,6 @@ class Trades(Ranges):
         exit_price_close: bool = False,
         max_duration: tp.Optional[int] = None,
         incl_shorter: bool = False,
-        flex_2d: bool = False,
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -1604,7 +1599,6 @@ class Trades(Ranges):
             exit_price_close=exit_price_close,
             max_duration=max_duration,
             incl_shorter=incl_shorter,
-            flex_2d=flex_2d,
             group_by=group_by,
             jitted=jitted,
             chunked=chunked,
@@ -1703,7 +1697,7 @@ class Trades(Ranges):
             >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.], index=index)
             >>> size = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5], index=index)
             >>> pf = vbt.Portfolio.from_orders(price, size)
-            >>> pf.trades.plot()
+            >>> pf.trades.plot().show()
             ```
 
             ![](/assets/images/api/trades_plot.svg)
@@ -2128,7 +2122,7 @@ class EntryTrades(Trades):
             >>> price = pd.Series([1, 2, 3, 2, 3, 4, 3], index=index)
             >>> orders = pd.Series([1, 0, -1, 0, -1, 2, -2], index=index)
             >>> pf = vbt.Portfolio.from_orders(price, orders)
-            >>> pf.entry_trades.plot_signals()
+            >>> pf.entry_trades.plot_signals().show()
             ```
 
             ![](/assets/images/api/entry_trades_plot_signals.svg)
@@ -2363,7 +2357,7 @@ class ExitTrades(Trades):
             >>> price = pd.Series([1, 2, 3, 2, 3, 4, 3], index=index)
             >>> orders = pd.Series([1, 0, -1, 0, -1, 2, -2], index=index)
             >>> pf = vbt.Portfolio.from_orders(price, orders)
-            >>> pf.exit_trades.plot_signals()
+            >>> pf.exit_trades.plot_signals().show()
             ```
 
             ![](/assets/images/api/exit_trades_plot_signals.svg)

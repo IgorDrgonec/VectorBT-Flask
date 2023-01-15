@@ -108,7 +108,7 @@ class Gauge(Configured, TraceUpdater):
             ...     value_range=(1, 3),
             ...     label='My Gauge'
             ... )
-            >>> gauge.fig
+            >>> gauge.fig.show()
             ```
 
             ![](/assets/images/api/Gauge.svg)
@@ -236,7 +236,7 @@ class Bar(Configured, TraceUpdater):
             ...     trace_names=['a', 'b'],
             ...     x_labels=['x', 'y']
             ... )
-            >>> bar.fig
+            >>> bar.fig.show()
             ```
 
             ![](/assets/images/api/Bar.svg)
@@ -349,7 +349,7 @@ class Scatter(Configured, TraceUpdater):
             ...     trace_names=['a', 'b'],
             ...     x_labels=['x', 'y']
             ... )
-            >>> scatter.fig
+            >>> scatter.fig.show()
             ```
 
             ![](/assets/images/api/Scatter.svg)
@@ -495,7 +495,7 @@ class Histogram(Configured, TraceUpdater):
             ...     data=[[1, 2], [3, 4], [2, 1]],
             ...     trace_names=['a', 'b']
             ... )
-            >>> hist.fig
+            >>> hist.fig.show()
             ```
 
             ![](/assets/images/api/Histogram.svg)
@@ -660,7 +660,7 @@ class Box(Configured, TraceUpdater):
             ...     data=[[1, 2], [3, 4], [2, 1]],
             ...     trace_names=['a', 'b']
             ... )
-            >>> box.fig
+            >>> box.fig.show()
             ```
 
             ![](/assets/images/api/Box.svg)
@@ -832,7 +832,7 @@ class Heatmap(Configured, TraceUpdater):
             ...     x_labels=['a', 'b'],
             ...     y_labels=['x', 'y']
             ... )
-            >>> heatmap.fig
+            >>> heatmap.fig.show()
             ```
 
             ![](/assets/images/api/Heatmap.svg)
@@ -967,7 +967,7 @@ class Volume(Configured, TraceUpdater):
             ...     y_labels=['d', 'e', 'f'],
             ...     z_labels=['g', 'h', 'i']
             ... )
-            >>> volume.fig
+            >>> volume.fig.show()
             ```
 
             ![](/assets/images/api/Volume.svg)

@@ -773,7 +773,7 @@ class TestAccessors:
         assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
                 (5, 3),
-                prob=[0.0, 0.5, 1.0],
+                prob=[[0.0, 0.5, 1.0]],
                 seed=seed,
                 wrap_kwargs=dict(index=mask.index, columns=mask.columns),
             ),
@@ -796,7 +796,7 @@ class TestAccessors:
         assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
                 (5, 3),
-                prob=[0.0, 0.5, 1.0],
+                prob=[[0.0, 0.5, 1.0]],
                 pick_first=True,
                 seed=seed,
                 wrap_kwargs=dict(index=mask.index, columns=mask.columns),
@@ -818,7 +818,7 @@ class TestAccessors:
         assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random(
                 (5, 3),
-                prob=[0.0, 0.5, 1.0],
+                prob=[[0.0, 0.5, 1.0]],
                 pick_first=True,
                 seed=seed,
                 wrap_kwargs=dict(index=mask.index, columns=mask.columns),
@@ -826,7 +826,7 @@ class TestAccessors:
             ),
             pd.DataFrame.vbt.signals.generate_random(
                 (5, 3),
-                prob=[0.0, 0.5, 1.0],
+                prob=[[0.0, 0.5, 1.0]],
                 pick_first=True,
                 seed=seed,
                 wrap_kwargs=dict(index=mask.index, columns=mask.columns),
@@ -1057,8 +1057,8 @@ class TestAccessors:
         )
         en, ex = pd.DataFrame.vbt.signals.generate_random_both(
             (5, 3),
-            entry_prob=[0.0, 0.5, 1.0],
-            exit_prob=[0.0, 0.5, 1.0],
+            entry_prob=[[0.0, 0.5, 1.0]],
+            exit_prob=[[0.0, 0.5, 1.0]],
             seed=seed,
             wrap_kwargs=dict(index=mask.index, columns=mask.columns),
         )
@@ -1096,8 +1096,8 @@ class TestAccessors:
         )
         en2, ex2 = pd.DataFrame.vbt.signals.generate_random_both(
             (5, 3),
-            entry_prob=[0.0, 0.5, 1.0],
-            exit_prob=[0.0, 0.5, 1.0],
+            entry_prob=[[0.0, 0.5, 1.0]],
+            exit_prob=[[0.0, 0.5, 1.0]],
             seed=seed,
             wrap_kwargs=dict(index=mask.index, columns=mask.columns),
             chunked=True,
@@ -1292,7 +1292,7 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
-            mask.vbt.signals.generate_random_exits(prob=[0.0, 0.5, 1.0], seed=seed),
+            mask.vbt.signals.generate_random_exits(prob=[[0.0, 0.5, 1.0]], seed=seed),
             pd.DataFrame(
                 np.array(
                     [
@@ -1308,8 +1308,8 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
-            mask.vbt.signals.generate_random_exits(prob=[0.0, 0.5, 1.0], seed=seed, chunked=True),
-            mask.vbt.signals.generate_random_exits(prob=[0.0, 0.5, 1.0], seed=seed, chunked=False),
+            mask.vbt.signals.generate_random_exits(prob=[[0.0, 0.5, 1.0]], seed=seed, chunked=True),
+            mask.vbt.signals.generate_random_exits(prob=[[0.0, 0.5, 1.0]], seed=seed, chunked=False),
         )
         assert_frame_equal(
             mask.vbt.signals.generate_random_exits(prob=1.0, wait=0, seed=seed),
@@ -1379,14 +1379,14 @@ class TestAccessors:
         assert_frame_equal(
             e.vbt.signals.generate_stop_exits(
                 t.vbt.tile(3),
-                stop=[np.nan, -0.5, -1.0],
+                stop=[[np.nan, -0.5, -1.0]],
                 trailing=True,
                 chain=True,
                 chunked=True,
             )[0],
             e.vbt.signals.generate_stop_exits(
                 t.vbt.tile(3),
-                stop=[np.nan, -0.5, -1.0],
+                stop=[[np.nan, -0.5, -1.0]],
                 trailing=True,
                 chain=True,
                 chunked=False,
@@ -1395,14 +1395,14 @@ class TestAccessors:
         assert_frame_equal(
             e.vbt.signals.generate_stop_exits(
                 t.vbt.tile(3),
-                stop=[np.nan, -0.5, -1.0],
+                stop=[[np.nan, -0.5, -1.0]],
                 trailing=True,
                 chain=True,
                 chunked=True,
             )[1],
             e.vbt.signals.generate_stop_exits(
                 t.vbt.tile(3),
-                stop=[np.nan, -0.5, -1.0],
+                stop=[[np.nan, -0.5, -1.0]],
                 trailing=True,
                 chain=True,
                 chunked=False,
@@ -1659,8 +1659,8 @@ class TestAccessors:
             ),
         )
         ex, stop_price, stop_type = _test_ohlc_stop_exits(
-            tsl_stop=[np.nan, 0.1, 0.2],
-            tp_stop=[np.nan, 0.1, 0.2],
+            tsl_stop=[[np.nan, 0.1, 0.2]],
+            tp_stop=[[np.nan, 0.1, 0.2]],
         )
         assert_frame_equal(
             ex,
@@ -1703,16 +1703,16 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
-            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], tp_stop=[np.nan, 0.1, 0.2], chunked=True)[0],
-            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], tp_stop=[np.nan, 0.1, 0.2], chunked=False)[0],
+            _test_ohlc_stop_exits(tsl_stop=[[np.nan, 0.1, 0.2]], tp_stop=[[np.nan, 0.1, 0.2]], chunked=True)[0],
+            _test_ohlc_stop_exits(tsl_stop=[[np.nan, 0.1, 0.2]], tp_stop=[[np.nan, 0.1, 0.2]], chunked=False)[0],
         )
         assert_frame_equal(
-            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], tp_stop=[np.nan, 0.1, 0.2], chunked=True)[1],
-            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], tp_stop=[np.nan, 0.1, 0.2], chunked=False)[1],
+            _test_ohlc_stop_exits(tsl_stop=[[np.nan, 0.1, 0.2]], tp_stop=[[np.nan, 0.1, 0.2]], chunked=True)[1],
+            _test_ohlc_stop_exits(tsl_stop=[[np.nan, 0.1, 0.2]], tp_stop=[[np.nan, 0.1, 0.2]], chunked=False)[1],
         )
         assert_frame_equal(
-            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], tp_stop=[np.nan, 0.1, 0.2], chunked=True)[2],
-            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], tp_stop=[np.nan, 0.1, 0.2], chunked=False)[2],
+            _test_ohlc_stop_exits(tsl_stop=[[np.nan, 0.1, 0.2]], tp_stop=[[np.nan, 0.1, 0.2]], chunked=True)[2],
+            _test_ohlc_stop_exits(tsl_stop=[[np.nan, 0.1, 0.2]], tp_stop=[[np.nan, 0.1, 0.2]], chunked=False)[2],
         )
         ex, stop_price, stop_type = _test_ohlc_stop_exits(tsl_stop=0.1, tp_stop=0.1, exit_wait=0)
         assert_frame_equal(
@@ -1813,46 +1813,58 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
-            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], chain=True, tp_stop=[np.nan, 0.1, 0.2], chunked=True,)[
-                0
-            ][0],
-            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], chain=True, tp_stop=[np.nan, 0.1, 0.2], chunked=False,)[
-                0
-            ][0],
-        )
-        assert_frame_equal(
-            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], chain=True, tp_stop=[np.nan, 0.1, 0.2], chunked=True,)[
-                0
-            ][0],
-            _test_ohlc_stop_exits(tsl_stop=[np.nan, 0.1, 0.2], chain=True, tp_stop=[np.nan, 0.1, 0.2], chunked=False,)[
-                0
-            ][0],
+            _test_ohlc_stop_exits(
+                tsl_stop=[[np.nan, 0.1, 0.2]],
+                chain=True,
+                tp_stop=[[np.nan, 0.1, 0.2]],
+                chunked=True,
+            )[0][0],
+            _test_ohlc_stop_exits(
+                tsl_stop=[[np.nan, 0.1, 0.2]],
+                chain=True,
+                tp_stop=[[np.nan, 0.1, 0.2]],
+                chunked=False,
+            )[0][0],
         )
         assert_frame_equal(
             _test_ohlc_stop_exits(
-                tsl_stop=[np.nan, 0.1, 0.2],
+                tsl_stop=[[np.nan, 0.1, 0.2]],
                 chain=True,
-                tp_stop=[np.nan, 0.1, 0.2],
+                tp_stop=[[np.nan, 0.1, 0.2]],
+                chunked=True,
+            )[0][0],
+            _test_ohlc_stop_exits(
+                tsl_stop=[[np.nan, 0.1, 0.2]],
+                chain=True,
+                tp_stop=[[np.nan, 0.1, 0.2]],
+                chunked=False,
+            )[0][0],
+        )
+        assert_frame_equal(
+            _test_ohlc_stop_exits(
+                tsl_stop=[[np.nan, 0.1, 0.2]],
+                chain=True,
+                tp_stop=[[np.nan, 0.1, 0.2]],
                 chunked=True,
             )[1],
             _test_ohlc_stop_exits(
-                tsl_stop=[np.nan, 0.1, 0.2],
+                tsl_stop=[[np.nan, 0.1, 0.2]],
                 chain=True,
-                tp_stop=[np.nan, 0.1, 0.2],
+                tp_stop=[[np.nan, 0.1, 0.2]],
                 chunked=False,
             )[1],
         )
         assert_frame_equal(
             _test_ohlc_stop_exits(
-                tsl_stop=[np.nan, 0.1, 0.2],
+                tsl_stop=[[np.nan, 0.1, 0.2]],
                 chain=True,
-                tp_stop=[np.nan, 0.1, 0.2],
+                tp_stop=[[np.nan, 0.1, 0.2]],
                 chunked=True,
             )[2],
             _test_ohlc_stop_exits(
-                tsl_stop=[np.nan, 0.1, 0.2],
+                tsl_stop=[[np.nan, 0.1, 0.2]],
                 chain=True,
-                tp_stop=[np.nan, 0.1, 0.2],
+                tp_stop=[[np.nan, 0.1, 0.2]],
                 chunked=False,
             )[2],
         )
@@ -1862,9 +1874,10 @@ class TestAccessors:
         assert_records_close(ranges.values, np.array([(0, 0, 0, 3, 1), (0, 1, 1, 4, 1)], dtype=range_dt))
         assert ranges.wrapper == mask.vbt.wrapper
         ranges = mask.vbt.signals.between_ranges(incl_open=True)
-        assert_records_close(ranges.values, np.array([
-            (0, 0, 0, 3, 1), (1, 0, 3, 4, 0), (0, 1, 1, 4, 1), (0, 2, 2, 4, 0)
-        ], dtype=range_dt))
+        assert_records_close(
+            ranges.values,
+            np.array([(0, 0, 0, 3, 1), (1, 0, 3, 4, 0), (0, 1, 1, 4, 1), (0, 2, 2, 4, 0)], dtype=range_dt),
+        )
         assert ranges.wrapper == mask.vbt.wrapper
 
         mask2 = pd.DataFrame(
@@ -3261,7 +3274,7 @@ class TestGenerators:
                 columns=pd.Index([0, 0.5, 1], dtype="float64", name="rprob_prob"),
             ),
         )
-        rprob = vbt.RPROB.run(prob=[np.array([0, 0.25]), np.array([0.75, 1])], input_shape=(5, 2), seed=seed)
+        rprob = vbt.RPROB.run(prob=[np.array([[0, 0.25]]), np.array([[0.75, 1]])], input_shape=(5, 2), seed=seed)
         assert_frame_equal(
             rprob.entries,
             pd.DataFrame(
@@ -3385,8 +3398,8 @@ class TestGenerators:
             pd.Series(np.array([False, True, False, True, False]), name=(1.0, 1.0)),
         )
         rprobnx = vbt.RPROBNX.run(
-            entry_prob=np.asarray([1.0, 0.0, 1.0, 0.0, 1.0]),
-            exit_prob=np.asarray([0.0, 1.0, 0.0, 1.0, 0.0]),
+            entry_prob=np.array([1.0, 0.0, 1.0, 0.0, 1.0]),
+            exit_prob=np.array([0.0, 1.0, 0.0, 1.0, 0.0]),
             input_shape=(5,),
             seed=seed,
         )
@@ -3454,7 +3467,7 @@ class TestGenerators:
                 columns=pd.MultiIndex.from_tuples([(0.1, "a"), (0.1, "b"), (0.1, "c")], names=["stx_stop", None]),
             ),
         )
-        stx = vbt.STX.run(mask, ts, np.asarray([0.1, 0.1, -0.1, -0.1, -0.1])[:, None])
+        stx = vbt.STX.run(mask, ts, np.array([0.1, 0.1, -0.1, -0.1, -0.1])[:, None])
         assert_frame_equal(
             stx.exits,
             pd.DataFrame(

@@ -1,7 +1,7 @@
 """Numba-compiled functions for working with portfolio.
 
 Provides an arsenal of Numba-compiled functions that are used for portfolio
-modeling, such as generating and filling orders. These only accept NumPy arrays and
+simulation, such as generating and filling orders. These only accept NumPy arrays and
 other Numba-compatible types.
 
 !!! note

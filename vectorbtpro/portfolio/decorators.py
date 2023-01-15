@@ -106,7 +106,7 @@ def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
 
             def new_prop(
                 self,
-                _method_name: str = method_name,
+                _method_name: tp.Optional[str] = method_name,
                 _target_name: str = target_name,
                 _use_in_outputs: bool = use_in_outputs,
                 _method_kwargs: tp.Kwargs = method_kwargs,
@@ -120,6 +120,8 @@ def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
                     except AttributeError:
                         pass
 
+                if _method_name is None:
+                    raise ValueError(f"Field '{_target_name}' must be prefilled")
                 return getattr(self, _method_name)(**_method_kwargs)
 
             new_prop.__name__ = target_name

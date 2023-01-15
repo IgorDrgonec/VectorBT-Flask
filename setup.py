@@ -47,7 +47,7 @@ setup(
     license="LICENSE.md",
     data_files=[("", ["LICENSE.md"])],
     install_requires=[
-        "numpy>=1.17.0",
+        "numpy>=1.20.0",
         "pandas",
         "numba>=0.53.1; python_version < '3.10'",
         "numba>=0.56.0; python_version >= '3.10'",
@@ -64,6 +64,8 @@ setup(
         "mypy_extensions",
         "humanize",
         "attrs>=21.1.0",
+        "websocket-client",
+        "graphlib_backport; python_version < '3.9'",
     ],
     extras_require=get_extra_requires("extra-requirements.txt"),
     classifiers=[

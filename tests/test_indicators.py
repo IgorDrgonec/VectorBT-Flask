@@ -139,10 +139,14 @@ class TestFactory:
             return ts * p + a + b
 
         I = F.with_apply_func(apply_func, var_args=True)
+        I._rec_id = "123456789"
+        vbt.RecInfo(I._rec_id, I).register()
         indicator = I.run(ts, [0, 1], 10, b=100)
         assert I.loads(indicator.dumps()) == indicator
         indicator.save(tmp_path / "indicator")
         assert I.load(tmp_path / "indicator") == indicator
+        indicator.save(tmp_path / "indicator", file_format="ini")
+        assert I.load(tmp_path / "indicator", file_format="ini") == indicator
 
     def test_with_custom_func(self):
         F = vbt.IndicatorFactory(input_names=["ts"], param_names=["p"], output_names=["out"])
@@ -763,9 +767,9 @@ class TestFactory:
                 names=["custom_p1", "custom_p2", None],
             ),
         )
-        assert_frame_equal(F.with_apply_func(apply_func).run(ts, np.asarray([0, 1]), 2).out, target)
+        assert_frame_equal(F.with_apply_func(apply_func).run(ts, np.array([0, 1]), 2).out, target)
         assert_frame_equal(
-            F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts, np.asarray([0, 1]), 2).out,
+            F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts, np.array([0, 1]), 2).out,
             target,
         )
         target = pd.DataFrame(
@@ -777,25 +781,25 @@ class TestFactory:
             ),
         )
         assert_frame_equal(
-            F.with_apply_func(apply_func).run(ts, np.asarray([0, 1, 2]), 2, per_column=True).out,
+            F.with_apply_func(apply_func).run(ts, np.array([0, 1, 2]), 2, per_column=True).out,
             target,
         )
         assert_frame_equal(
-            F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts, np.asarray([0, 1, 2]), 2, per_column=True).out,
+            F.with_apply_func(apply_func_nb, jitted_loop=True).run(ts, np.array([0, 1, 2]), 2, per_column=True).out,
             target,
         )
         assert_frame_equal(
-            F.with_apply_func(apply_func).run(ts, np.asarray([0, 1, 2]), [2], per_column=True).out,
+            F.with_apply_func(apply_func).run(ts, np.array([0, 1, 2]), [2], per_column=True).out,
             target,
         )
         assert_frame_equal(
-            F.with_apply_func(apply_func).run(ts, np.asarray([0, 1, 2]), np.array([2]), per_column=True).out,
+            F.with_apply_func(apply_func).run(ts, np.array([0, 1, 2]), np.array([2]), per_column=True).out,
             target,
         )
         with pytest.raises(Exception):
-            F.with_apply_func(apply_func).run(ts, np.asarray([0, 1]), 2, per_column=True)
+            F.with_apply_func(apply_func).run(ts, np.array([0, 1]), 2, per_column=True)
         with pytest.raises(Exception):
-            F.with_apply_func(apply_func).run(ts, np.asarray([0, 1, 2, 3]), 2, per_column=True)
+            F.with_apply_func(apply_func).run(ts, np.array([0, 1, 2, 3]), 2, per_column=True)
 
     def test_param_settings(self):
         F = vbt.IndicatorFactory(input_names=["ts"], param_names=["p"], output_names=["out"])
@@ -821,13 +825,13 @@ class TestFactory:
         )
         assert_frame_equal(
             F.with_apply_func(apply_func)
-            .run(ts, np.asarray([0, 1, 2]), param_settings={"p": {"is_array_like": True}})
+            .run(ts, np.array([0, 1, 2]), param_settings={"p": {"is_array_like": True}})
             .out,
             target,
         )
         assert_frame_equal(
             F.with_apply_func(apply_func_nb, jitted_loop=True)
-            .run(ts, np.asarray([0, 1, 2]), param_settings={"p": {"is_array_like": True}})
+            .run(ts, np.array([0, 1, 2]), param_settings={"p": {"is_array_like": True}})
             .out,
             target,
         )
@@ -847,7 +851,7 @@ class TestFactory:
             F.with_apply_func(apply_func)
             .run(
                 ts,
-                np.asarray([0, 1, 2]),
+                np.array([0, 1, 2]),
                 param_settings={"p": {"is_array_like": True, "bc_to_input": 1, "per_column": True}},
             )
             .out,
@@ -857,7 +861,7 @@ class TestFactory:
             F.with_apply_func(apply_func_nb, jitted_loop=True)
             .run(
                 ts,
-                np.asarray([0, 1, 2]),
+                np.array([0, 1, 2]),
                 param_settings={"p": {"is_array_like": True, "bc_to_input": 1, "per_column": True}},
             )
             .out,
@@ -885,13 +889,13 @@ class TestFactory:
         )
         assert_frame_equal(
             F.with_apply_func(apply_func2)
-            .run(ts, np.asarray([0, 1, 2, 3, 4]), param_settings={"p": {"is_array_like": True, "bc_to_input": 0}})
+            .run(ts, np.array([0, 1, 2, 3, 4]), param_settings={"p": {"is_array_like": True, "bc_to_input": 0}})
             .out,
             target,
         )
         assert_frame_equal(
             F.with_apply_func(apply_func2_nb)
-            .run(ts, np.asarray([0, 1, 2, 3, 4]), param_settings={"p": {"is_array_like": True, "bc_to_input": 0}})
+            .run(ts, np.array([0, 1, 2, 3, 4]), param_settings={"p": {"is_array_like": True, "bc_to_input": 0}})
             .out,
             target,
         )
@@ -2321,6 +2325,7 @@ class TestFactory:
             "_p2_loc",
             "_p2_mapper",
             "_param_names",
+            "_rec_id",
             "_run",
             "_run_combs",
             "_setting_keys",
@@ -2341,8 +2346,13 @@ class TestFactory:
             "config",
             "copy",
             "custom_func",
+            "decode_config",
+            "decode_config_node",
             "deep_getattr",
             "dumps",
+            "encode_config",
+            "encode_config_node",
+            "equals",
             "file_exists",
             "get_ca_setup",
             "get_settings",
@@ -2389,12 +2399,14 @@ class TestFactory:
             "pre_resolve_attr",
             "prettify",
             "range_only_select",
+            "rec_state",
             "regroup",
             "replace",
             "resample",
             "reset_settings",
             "resolve_attr",
             "resolve_column_stack_kwargs",
+            "resolve_file_path",
             "resolve_row_stack_kwargs",
             "resolve_self",
             "resolve_shortcut_attr",

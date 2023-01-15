@@ -27,7 +27,7 @@ from numba import prange
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.base.indexing import flex_select_auto_nb
+from vectorbtpro.base.flex_indexing import flex_select_1d_pc_nb, flex_select_nb
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.enums import range_dt, RangeStatus
 from vectorbtpro.records import chunking as records_ch
@@ -284,11 +284,11 @@ def generate_enex_nb(
 
 
 @register_jitted
-def rand_place_nb(c: tp.Union[GenEnContext, GenExContext, GenEnExContext], n: tp.FlexArray) -> int:
+def rand_place_nb(c: tp.Union[GenEnContext, GenExContext, GenEnExContext], n: tp.FlexArray1d) -> int:
     """`place_func_nb` to randomly pick `n` values.
 
     `n` uses flexible indexing."""
-    size = min(c.to_i - c.from_i, flex_select_auto_nb(n, 0, c.col, True))
+    size = min(c.to_i - c.from_i, flex_select_1d_pc_nb(n, c.col))
     k = 0
     last_i = -1
     while k < size:
@@ -304,16 +304,15 @@ def rand_place_nb(c: tp.Union[GenEnContext, GenExContext, GenEnExContext], n: tp
 @register_jitted
 def rand_by_prob_place_nb(
     c: tp.Union[GenEnContext, GenExContext, GenEnExContext],
-    prob: tp.FlexArray,
+    prob: tp.FlexArray2d,
     pick_first: bool,
-    flex_2d: bool,
 ) -> int:
     """`place_func_nb` to randomly place signals with probability `prob`.
 
     `prob` uses flexible indexing."""
     last_i = -1
     for i in range(c.from_i, c.to_i):
-        if np.random.uniform(0, 1) < flex_select_auto_nb(prob, i, c.col, flex_2d):
+        if np.random.uniform(0, 1) < flex_select_nb(prob, i, c.col):
             c.out[i - c.from_i] = True
             last_i = i - c.from_i
             if pick_first:
@@ -325,7 +324,7 @@ def rand_by_prob_place_nb(
     size=ch.ShapeSizer(arg_query="target_shape", axis=1),
     arg_take_spec=dict(
         target_shape=ch.ShapeSlicer(axis=1),
-        n=base_ch.FlexArraySlicer(axis=1, flex_2d=True),
+        n=base_ch.FlexArraySlicer(),
         entry_wait=None,
         exit_wait=None,
     ),
@@ -334,7 +333,7 @@ def rand_by_prob_place_nb(
 @register_jitted(tags={"can_parallel"})
 def generate_rand_enex_nb(
     target_shape: tp.Shape,
-    n: tp.FlexArray,
+    n: tp.FlexArray1d,
     entry_wait: int,
     exit_wait: int,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
@@ -363,7 +362,7 @@ def generate_rand_enex_nb(
             exits[both_idxs[1::2], col] = True
     else:
         for col in prange(target_shape[1]):
-            _n = flex_select_auto_nb(n, 0, col, True)
+            _n = flex_select_1d_pc_nb(n, col)
             if _n == 1:
                 entry_idx = np.random.randint(0, target_shape[0] - exit_wait)
                 entries[entry_idx, col] = True
@@ -430,7 +429,7 @@ def generate_rand_enex_nb(
 
 def rand_enex_apply_nb(
     target_shape: tp.Shape,
-    n: tp.FlexArray,
+    n: tp.FlexArray1d,
     entry_wait: int,
     exit_wait: int,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
@@ -456,13 +455,12 @@ def first_place_nb(c: tp.Union[GenEnContext, GenExContext, GenEnExContext], mask
 @register_jitted
 def stop_place_nb(
     c: tp.Union[GenExContext, GenEnExContext],
-    entry_ts: tp.FlexArray,
-    ts: tp.FlexArray,
-    follow_ts: tp.FlexArray,
+    entry_ts: tp.FlexArray2d,
+    ts: tp.FlexArray2d,
+    follow_ts: tp.FlexArray2d,
     stop_ts_out: tp.Array2d,
-    stop: tp.FlexArray,
-    trailing: tp.FlexArray = np.asarray(False),
-    flex_2d: bool = np.asarray(False),
+    stop: tp.FlexArray2d,
+    trailing: tp.FlexArray2d,
 ) -> int:
     """`place_func_nb` that places an exit signal whenever a threshold is being hit.
 
@@ -492,22 +490,22 @@ def stop_place_nb(
         trailing (array of bool): Whether the stop is trailing.
 
             Utilizes flexible indexing. Set an element to False to disable it.
-        flex_2d (bool): Whether flexible 1-dim arrays are considered per column in 2-dim regime."""
+    """
     if c.wait > 1:
         raise ValueError("Wait must be either 0 or 1")
     init_i = c.from_i - c.wait
-    init_entry_ts = flex_select_auto_nb(entry_ts, init_i, c.col, flex_2d)
-    init_stop = flex_select_auto_nb(stop, init_i, c.col, flex_2d)
+    init_entry_ts = flex_select_nb(entry_ts, init_i, c.col)
+    init_stop = flex_select_nb(stop, init_i, c.col)
     if init_stop == 0:
         init_stop = np.nan
-    init_trailing = flex_select_auto_nb(trailing, init_i, c.col, flex_2d)
+    init_trailing = flex_select_nb(trailing, init_i, c.col)
     max_high = min_low = init_entry_ts
 
     last_i = -1
     for i in range(c.from_i, c.to_i):
-        curr_entry_ts = flex_select_auto_nb(entry_ts, i, c.col, flex_2d)
-        curr_ts = flex_select_auto_nb(ts, i, c.col, flex_2d)
-        curr_follow_ts = flex_select_auto_nb(follow_ts, i, c.col, flex_2d)
+        curr_entry_ts = flex_select_nb(entry_ts, i, c.col)
+        curr_ts = flex_select_nb(ts, i, c.col)
+        curr_follow_ts = flex_select_nb(follow_ts, i, c.col)
         if np.isnan(curr_ts):
             curr_ts = curr_entry_ts
         if np.isnan(curr_follow_ts):
@@ -555,20 +553,19 @@ def stop_place_nb(
 @register_jitted
 def ohlc_stop_place_nb(
     c: tp.Union[GenExContext, GenEnExContext],
-    entry_price: tp.FlexArray,
-    open: tp.FlexArray,
-    high: tp.FlexArray,
-    low: tp.FlexArray,
-    close: tp.FlexArray,
+    entry_price: tp.FlexArray2d,
+    open: tp.FlexArray2d,
+    high: tp.FlexArray2d,
+    low: tp.FlexArray2d,
+    close: tp.FlexArray2d,
     stop_price_out: tp.Array2d,
     stop_type_out: tp.Array2d,
-    sl_stop: tp.FlexArray = np.asarray(np.nan),
-    tsl_th: tp.FlexArray = np.asarray(np.nan),
-    tsl_stop: tp.FlexArray = np.asarray(np.nan),
-    tp_stop: tp.FlexArray = np.asarray(np.nan),
-    reverse: tp.FlexArray = np.asarray(False),
+    sl_stop: tp.FlexArray2d,
+    tsl_th: tp.FlexArray2d,
+    tsl_stop: tp.FlexArray2d,
+    tp_stop: tp.FlexArray2d,
+    reverse: tp.FlexArray2d,
     is_entry_open: bool = False,
-    flex_2d: bool = False,
 ) -> int:
     """`place_func_nb` that places an exit signal whenever a threshold is being hit using OHLC.
 
@@ -619,27 +616,26 @@ def ohlc_stop_place_nb(
         is_entry_open (bool): Whether entry price comes right at or before open.
 
             If True, uses high and low of the entry bar. Otherwise, uses only close.
-        flex_2d (bool): Whether flexible 1-dim arrays are considered per column in 2-dim regime.
     """
     if c.wait > 1:
         raise ValueError("Wait must be either 0 or 1")
     init_i = c.from_i - c.wait
-    init_entry_price = flex_select_auto_nb(entry_price, init_i, c.col, flex_2d)
-    init_sl_stop = abs(flex_select_auto_nb(sl_stop, init_i, c.col, flex_2d))
-    init_tp_stop = abs(flex_select_auto_nb(tp_stop, init_i, c.col, flex_2d))
-    init_tsl_th = abs(flex_select_auto_nb(tsl_th, init_i, c.col, flex_2d))
-    init_tsl_stop = abs(flex_select_auto_nb(tsl_stop, init_i, c.col, flex_2d))
-    init_reverse = flex_select_auto_nb(reverse, init_i, c.col, flex_2d)
+    init_entry_price = flex_select_nb(entry_price, init_i, c.col)
+    init_sl_stop = abs(flex_select_nb(sl_stop, init_i, c.col))
+    init_tp_stop = abs(flex_select_nb(tp_stop, init_i, c.col))
+    init_tsl_th = abs(flex_select_nb(tsl_th, init_i, c.col))
+    init_tsl_stop = abs(flex_select_nb(tsl_stop, init_i, c.col))
+    init_reverse = flex_select_nb(reverse, init_i, c.col)
     last_high = last_low = init_entry_price
 
     last_i = -1
     for i in range(c.from_i - c.wait, c.to_i):
         # Resolve current bar
-        _entry_price = flex_select_auto_nb(entry_price, i, c.col, flex_2d)
-        _open = flex_select_auto_nb(open, i, c.col, flex_2d)
-        _high = flex_select_auto_nb(high, i, c.col, flex_2d)
-        _low = flex_select_auto_nb(low, i, c.col, flex_2d)
-        _close = flex_select_auto_nb(close, i, c.col, flex_2d)
+        _entry_price = flex_select_nb(entry_price, i, c.col)
+        _open = flex_select_nb(open, i, c.col)
+        _high = flex_select_nb(high, i, c.col)
+        _low = flex_select_nb(low, i, c.col)
+        _close = flex_select_nb(close, i, c.col)
         if np.isnan(_open) and not np.isnan(_entry_price) and is_entry_open:
             _open = _entry_price
         if np.isnan(_close) and not np.isnan(_entry_price) and not is_entry_open:
@@ -1236,7 +1232,7 @@ def norm_avg_index_nb(mask: tp.Array2d) -> tp.Array1d:
 @register_chunkable(
     size=ch.ArraySizer(arg_query="group_lens", axis=0),
     arg_take_spec=dict(
-        mask=ch.ArraySlicer(axis=1, mapper=base_ch.group_lens_mapper),
+        mask=base_ch.array_gl_slicer,
         group_lens=ch.ArraySlicer(axis=0),
     ),
     merge_func="concat",

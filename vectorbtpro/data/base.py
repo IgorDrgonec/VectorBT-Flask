@@ -32,17 +32,18 @@ from vectorbtpro.utils.parsing import get_func_arg_names, extend_args
 from vectorbtpro.utils.path_ import check_mkdir
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.template import RepEval
+from vectorbtpro.utils.pickling import pdict
 
 __pdoc__ = {}
 
 
-class symbol_dict(dict):
+class symbol_dict(pdict):
     """Dict that contains symbols as keys."""
 
     pass
 
 
-class run_func_dict(dict):
+class run_func_dict(pdict):
     """Dict that contains function names as keys for `Data.run`."""
 
     pass
@@ -373,18 +374,31 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
     @property
     def index(self) -> tp.Index:
-        """Index."""
-        return self.wrapper.index
+        """Index.
+
+        Based on the default symbol wrapper."""
+        return self.symbol_wrapper.index
 
     @property
     def columns(self) -> tp.Index:
-        """Columns."""
-        return self.wrapper.columns
+        """Columns.
+
+        Based on the default symbol wrapper."""
+        return self.symbol_wrapper.columns
+
+    @property
+    def shape(self) -> tp.Shape:
+        """Shape.
+
+        Based on the default symbol wrapper."""
+        return self.symbol_wrapper.shape
 
     @property
     def ndim(self) -> int:
-        """Number of dimensions."""
-        return self.wrapper.ndim
+        """Number of dimensions.
+
+        Based on the default symbol wrapper."""
+        return self.symbol_wrapper.ndim
 
     # ############# Pre- and post-processing ############# #
 
@@ -1622,7 +1636,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         * Indicator: Any indicator class built with the indicator factory
         * Callable: Function to run
         * Iterable: Any of the above (apart from the simulation modes) will be stacked as columns into a DataFrame.
-        Can also be provided as `{lib_name}_all` to compute all indicators of a specific indicator library.
+        Can also be provided as "{lib_name}_all" to compute all indicators of a specific indicator library.
 
         For example, the argument `open` will be substituted by `Data.open`.
 
@@ -1893,7 +1907,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             [=100% "100%"]{: .candystripe}
 
             ```pycon
-            >>> data.plot(column='Close', base=1)
+            >>> data.plot(column='Close', base=1).show()
             ```
 
             * Plot OHLC(V) of one symbol (only if data contains the respective columns):
@@ -1901,7 +1915,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             ![](/assets/images/api/data_plot.svg)
 
             ```pycon
-            >>> data.plot(symbol='BTC-USD')
+            >>> data.plot(symbol='BTC-USD').show()
             ```
 
             ![](/assets/images/api/data_plot_ohlcv.svg)

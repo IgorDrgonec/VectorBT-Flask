@@ -9,7 +9,8 @@ from numba.np.numpy_support import as_dtype
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.base.indexing import flex_select_auto_nb
+from vectorbtpro.base.reshaping import to_1d_array_nb
+from vectorbtpro.base.flex_indexing import flex_select_1d_nb
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch
@@ -1183,12 +1184,15 @@ def demean_nb(arr: tp.Array2d, group_map: tp.GroupMap) -> tp.Array2d:
 @register_jitted(cache=True)
 def to_renko_1d_nb(
     arr: tp.Array1d,
-    brick_size: tp.FlexArray,
-    relative: tp.FlexArray = np.asarray(False),
+    brick_size: tp.FlexArray1dLike,
+    relative: tp.FlexArray1dLike = False,
     start_value: tp.Optional[float] = None,
     max_out_len: tp.Optional[int] = None
 ) -> tp.Tuple[tp.Array1d, tp.Array1d, tp.Array1d]:
     """Convert to Renko format."""
+    brick_size_ = to_1d_array_nb(np.asarray(brick_size))
+    relative_ = to_1d_array_nb(np.asarray(relative))
+
     if max_out_len is None:
         out_n = arr.shape[0]
     else:
@@ -1201,8 +1205,8 @@ def to_renko_1d_nb(
     trend = 0
 
     for i in range(arr.shape[0]):
-        _brick_size = abs(flex_select_auto_nb(brick_size, i, 0, False))
-        _relative = flex_select_auto_nb(relative, i, 0, False)
+        _brick_size = abs(flex_select_1d_nb(brick_size, i))
+        _relative = flex_select_1d_nb(relative_, i)
         curr_value = arr[i]
         if np.isnan(curr_value):
             continue

@@ -25,9 +25,12 @@ RUN pip install --quiet --no-cache-dir \
     'kaleido' && \
     jupyter lab build --minimize=False
 
+RUN pip install --quiet --no-cache-dir 'pybind11'
+RUN pip install --quiet --no-cache-dir --ignore-installed 'llvmlite'
+
 RUN pip install --quiet --no-cache-dir \
-    'numpy==1.21' \
-    'numba==0.55.1' \
+    'numpy==1.23.3' \
+    'numba==0.56.4' \
     'schedule' \
     'requests' \
     'tqdm' \
@@ -44,7 +47,6 @@ RUN pip install --quiet --no-cache-dir \
     'ccxt>=1.89.14' \
     'polygon-api-client>=1.0.0' \
     'nasdaq-data-link' \
-    'tvdatafeed>=2.1.0' \
     'ta' \
     'pandas_ta' \
     'TA-Lib==0.4.21' \

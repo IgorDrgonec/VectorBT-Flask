@@ -28,6 +28,7 @@ __all__ = [
     "StopUpdateMode",
     "SizeType",
     "Direction",
+    "LeverageMode",
     "PriceAreaVioMode",
     "OrderStatus",
     "OrderStatusInfo",
@@ -550,36 +551,32 @@ Attributes:
     Amount: Amount of assets to trade.
     Value: Asset value to trade.
     
-        Gets converted into `SizeType.Amount` using `OrderContext.val_price_now`.
+        Gets converted into `SizeType.Amount` using `ExecState.val_price`.
     Percent: Percentage of available resources to use in either direction (not to be confused with 
         the percentage of position value!) where 0.01 means 1%
     
-        * When buying, it's the percentage of `OrderContext.cash_now`. 
-        * When selling, it's the percentage of `OrderContext.position_now`.
-        * When short selling, it's the percentage of `OrderContext.free_cash_now`.
-        * When selling and short selling (i.e. reversing position), it's the percentage of 
-        `OrderContext.position_now` and `OrderContext.free_cash_now`.
-        
-        !!! note
-            Takes into account fees and slippage to find the limit.
-            In reality, slippage and fees are not known beforehand.
+        * When long buying, the percentage of `ExecState.free_cash`
+        * When long selling, the percentage of `ExecState.position`
+        * When short selling, the percentage of `ExecState.free_cash`
+        * When short buying, the percentage of `ExecState.free_cash`, `ExecState.debt`, and `ExecState.locked_cash`
+        * When reversing, the percentage is getting applied on the final position
     Percent100: `SizeType.Percent` where 1.0 means 1%.
     ValuePercent: Percentage of total value.
     
-        Uses `OrderContext.value_now` to get the current total value.
+        Uses `ExecState.value` to get the current total value.
         Gets converted into `SizeType.Value`.
     ValuePercent100: `SizeType.ValuePercent` where 1.0 means 1%.
     TargetAmount: Target amount of assets to hold (= target position).
     
-        Uses `OrderContext.position_now` to get the current position.
+        Uses `ExecState.position` to get the current position.
         Gets converted into `SizeType.Amount`.
     TargetValue: Target asset value. 
 
-        Uses `OrderContext.val_price_now` to get the current asset value. 
+        Uses `ExecState.val_price` to get the current asset value. 
         Gets converted into `SizeType.TargetAmount`.
     TargetPercent: Target percentage of total value. 
 
-        Uses `OrderContext.value_now` to get the current total value.
+        Uses `ExecState.value_now` to get the current total value.
         Gets converted into `SizeType.TargetValue`.
     TargetPercent100: `SizeType.TargetPercent` where 1.0 means 1%.
 """
@@ -606,6 +603,28 @@ Attributes:
     LongOnly: Only long positions.
     ShortOnly: Only short positions.
     Both: Both long and short positions.
+"""
+
+
+class LeverageModeT(tp.NamedTuple):
+    Lazy: int = 0
+    Eager: int = 1
+
+
+LeverageMode = LeverageModeT()
+"""_"""
+
+__pdoc__[
+    "LeverageMode"
+] = f"""Leverage mode.
+
+```python
+{prettify(LeverageMode)}
+```
+
+Attributes:
+    Lazy: Applies leverage only if free cash has been exhausted.
+    Eager: Applies leverage to each order.
 """
 
 
@@ -664,14 +683,13 @@ class OrderStatusInfoT(tp.NamedTuple):
     ValueNaN: int = 3
     ValueZeroNeg: int = 4
     SizeZero: int = 5
-    NoCashShort: int = 6
-    NoCashLong: int = 7
-    NoOpenPosition: int = 8
-    MaxSizeExceeded: int = 9
-    RandomEvent: int = 10
-    CantCoverFees: int = 11
-    MinSizeNotReached: int = 12
-    PartialFill: int = 13
+    NoCash: int = 6
+    NoOpenPosition: int = 7
+    MaxSizeExceeded: int = 8
+    RandomEvent: int = 9
+    CantCoverFees: int = 10
+    MinSizeNotReached: int = 11
+    PartialFill: int = 12
 
 
 OrderStatusInfo = OrderStatusInfoT()
@@ -693,8 +711,7 @@ status_info_desc = [
     "Asset/group value is NaN",
     "Asset/group value is zero or negative",
     "Size is zero",
-    "Not enough cash to short",
-    "Not enough cash to long",
+    "Not enough cash",
     "No open position to reduce/close",
     "Size is greater than maximum allowed",
     "Random event happened",
@@ -851,20 +868,33 @@ class AccountState(tp.NamedTuple):
     cash: float
     position: float
     debt: float
+    locked_cash: float
     free_cash: float
 
 
 __pdoc__["AccountState"] = "State of the account."
-__pdoc__["AccountState.cash"] = "Cash in the current column (or group with cash sharing)."
-__pdoc__["AccountState.position"] = "Position in the current column."
-__pdoc__["AccountState.debt"] = "Debt from shorting in the current column."
-__pdoc__["AccountState.free_cash"] = "Free cash in the current column (or group with cash sharing)."
+__pdoc__["AccountState.cash"] = """Cash. 
+
+Per group."""
+__pdoc__["AccountState.position"] = """Position. 
+
+Per column."""
+__pdoc__["AccountState.debt"] = """Debt. 
+
+Per column."""
+__pdoc__["AccountState.locked_cash"] = """Locked cash.
+
+Per column."""
+__pdoc__["AccountState.free_cash"] = """Free cash. 
+
+Per group."""
 
 
 class ExecState(tp.NamedTuple):
     cash: float
     position: float
     debt: float
+    locked_cash: float
     free_cash: float
     val_price: float
     value: float
@@ -874,6 +904,7 @@ __pdoc__["ExecState"] = "State before or after order execution."
 __pdoc__["ExecState.cash"] = "See `AccountState.cash`."
 __pdoc__["ExecState.position"] = "See `AccountState.position`."
 __pdoc__["ExecState.debt"] = "See `AccountState.debt`."
+__pdoc__["ExecState.locked_cash"] = "See `AccountState.locked_cash`."
 __pdoc__["ExecState.free_cash"] = "See `AccountState.free_cash`."
 __pdoc__["ExecState.val_price"] = "Valuation price in the current column."
 __pdoc__["ExecState.value"] = "Value in the current column (or group with cash sharing)."
@@ -910,32 +941,32 @@ class SimulationContext(tp.NamedTuple):
     group_lens: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    init_cash: tp.FlexArray
-    init_position: tp.FlexArray
-    init_price: tp.FlexArray
-    cash_deposits: tp.FlexArray
-    cash_earnings: tp.FlexArray
-    segment_mask: tp.FlexArray
+    init_cash: tp.FlexArray1d
+    init_position: tp.FlexArray1d
+    init_price: tp.FlexArray1d
+    cash_deposits: tp.FlexArray2d
+    cash_earnings: tp.FlexArray2d
+    segment_mask: tp.FlexArray2d
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
-    open: tp.FlexArray
-    high: tp.FlexArray
-    low: tp.FlexArray
-    close: tp.FlexArray
-    bm_close: tp.Optional[tp.FlexArray]
+    open: tp.FlexArray2d
+    high: tp.FlexArray2d
+    low: tp.FlexArray2d
+    close: tp.FlexArray2d
+    bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
     track_value: bool
-    flex_2d: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
     in_outputs: tp.Optional[tp.NamedTuple]
     last_cash: tp.Array1d
     last_position: tp.Array1d
     last_debt: tp.Array1d
+    last_locked_cash: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
@@ -986,7 +1017,7 @@ Has shape `SimulationContext.target_shape` and each value must exist in the rang
 Can also be None if not provided.
 
 !!! note
-    To use `sort_call_seq_nb`, must be generated using `CallSeqType.Default`.
+    To use `sort_call_seq_1d_nb`, must be generated using `CallSeqType.Default`.
 
     To change the call sequence dynamically, better change `SegmentContext.call_seq_now` in-place.
     
@@ -1005,8 +1036,7 @@ __pdoc__[
     "SimulationContext.init_cash"
 ] = """Initial capital per column (or per group with cash sharing).
 
-Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d=True`, 
-so it can be passed as 1-dim array per column, or as a scalar. 
+Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_1d_pc_nb`.
 
 Must broadcast to shape `(group_lens.shape[0],)` with cash sharing, otherwise `(target_shape[1],)`.
 
@@ -1022,8 +1052,7 @@ __pdoc__[
     "SimulationContext.init_position"
 ] = """Initial position per column.
 
-Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d=True`, 
-so it can be passed as 1-dim array per column, or as a scalar. 
+Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_1d_pc_nb`.
 
 Must broadcast to shape `(target_shape[1],)`.
 
@@ -1034,8 +1063,7 @@ __pdoc__[
     "SimulationContext.init_price"
 ] = """Initial position price per column.
 
-Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d=True`, 
-so it can be passed as 1-dim array per column, or as a scalar. 
+Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_1d_pc_nb`.
 
 Must broadcast to shape `(target_shape[1],)`.
 
@@ -1047,13 +1075,7 @@ __pdoc__[
 ] = """Cash to be deposited/withdrawn per column 
 (or per group with cash sharing).
 
-Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d`, 
-so it can be passed as 
-
-* 2-dim array, 
-* 1-dim array per column (requires `flex_2d=True`), 
-* 1-dim array per row (requires `flex_2d=False`), and
-* a scalar. 
+Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_nb`.
 
 Must broadcast to shape `(target_shape[0], group_lens.shape[0])`.
 
@@ -1067,13 +1089,7 @@ __pdoc__[
     "SimulationContext.cash_earnings"
 ] = """Earnings to be added per column.
 
-Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d`, 
-so it can be passed as 
-
-* 2-dim array, 
-* 1-dim array per column (requires `flex_2d=True`), 
-* 1-dim array per row (requires `flex_2d=False`), and
-* a scalar. 
+Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_nb`.
 
 Must broadcast to shape `SimulationContext.target_shape`.
 
@@ -1093,13 +1109,7 @@ If a segment is inactive, any callback function inside of it will not be execute
 You can still execute the segment's pre- and postprocessing function by enabling 
 `SimulationContext.call_pre_segment` and `SimulationContext.call_post_segment` respectively.
 
-Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d`, 
-so it can be passed as 
-
-* 2-dim array, 
-* 1-dim array per column (requires `flex_2d=True`), 
-* 1-dim array per row (requires `flex_2d=False`), and
-* a scalar. 
+Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_nb`.
 
 Must broadcast to shape `(target_shape[0], group_lens.shape[0])`.
 
@@ -1161,13 +1171,7 @@ Replaces `Order.price` in case it's `np.inf`.
 
 Acts as a boundary - see `PriceArea.close`.
 
-Utilizes flexible indexing using `vectorbtpro.base.indexing.flex_select_auto_nb` and `flex_2d`, 
-so it can be passed as 
-
-* 2-dim array, 
-* 1-dim array per column (requires `flex_2d=True`), 
-* 1-dim array per row (requires `flex_2d=False`), and
-* a scalar. 
+Utilizes flexible indexing using `vectorbtpro.base.flex_indexing.flex_select_nb`.
 
 Must broadcast to shape `SimulationContext.target_shape`.
 
@@ -1178,9 +1182,7 @@ __pdoc__[
     "SimulationContext.bm_close"
 ] = """Benchmark closing price at each time step.
 
-Can be None to indicate that the user should use `SimulationContext.close`.
-
-If an array, has the same shape as `SimulationContext.close`."""
+Must broadcast to shape `SimulationContext.target_shape`."""
 __pdoc__[
     "SimulationContext.ffill_val_price"
 ] = """Whether to track valuation price only if it's known.
@@ -1209,16 +1211,6 @@ If False, 'SimulationContext.last_val_price', 'SimulationContext.last_value', an
 You won't be able to use `SizeType.Value`, `SizeType.TargetValue`, and `SizeType.TargetPercent`.
 
 Disable this to make simulation faster for simple use cases."""
-__pdoc__[
-    "SimulationContext.flex_2d"
-] = """Whether the elements in a 1-dim array should be treated per
-column rather than per row.
-
-This flag is set automatically when using `vectorbtpro.portfolio.base.Portfolio.from_order_func` depending upon 
-whether there is any argument that has been broadcast to 2 dimensions.
-
-Has only effect when using flexible indexing, for example, with `vectorbtpro.base.indexing.flex_select_auto_nb`.
-"""
 __pdoc__[
     "SimulationContext.order_records"
 ] = """Order records per column.
@@ -1283,9 +1275,18 @@ Gets updated right after `order_func_nb`.
 """
 __pdoc__[
     "SimulationContext.last_debt"
-] = """Latest debt from shorting per column.
+] = """Latest debt from leverage or shorting per column.
 
-Debt is the total value from shorting that hasn't been covered yet. Used to update `OrderContext.free_cash_now`.
+Has shape `(target_shape[1],)`. 
+
+Gets updated right after `order_func_nb`.
+
+!!! note
+    Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
+"""
+__pdoc__[
+    "SimulationContext.last_locked_cash"
+] = """Latest locked cash from leverage or shorting per column.
 
 Has shape `(target_shape[1],)`. 
 
@@ -1466,32 +1467,32 @@ class GroupContext(tp.NamedTuple):
     group_lens: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    init_cash: tp.FlexArray
-    init_position: tp.FlexArray
-    init_price: tp.FlexArray
-    cash_deposits: tp.FlexArray
-    cash_earnings: tp.FlexArray
-    segment_mask: tp.FlexArray
+    init_cash: tp.FlexArray1d
+    init_position: tp.FlexArray1d
+    init_price: tp.FlexArray1d
+    cash_deposits: tp.FlexArray2d
+    cash_earnings: tp.FlexArray2d
+    segment_mask: tp.FlexArray2d
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
-    open: tp.FlexArray
-    high: tp.FlexArray
-    low: tp.FlexArray
-    close: tp.FlexArray
-    bm_close: tp.Optional[tp.FlexArray]
+    open: tp.FlexArray2d
+    high: tp.FlexArray2d
+    low: tp.FlexArray2d
+    close: tp.FlexArray2d
+    bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
     track_value: bool
-    flex_2d: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
     in_outputs: tp.Optional[tp.NamedTuple]
     last_cash: tp.Array1d
     last_position: tp.Array1d
     last_debt: tp.Array1d
+    last_locked_cash: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
@@ -1564,32 +1565,32 @@ class RowContext(tp.NamedTuple):
     group_lens: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    init_cash: tp.FlexArray
-    init_position: tp.FlexArray
-    init_price: tp.FlexArray
-    cash_deposits: tp.FlexArray
-    cash_earnings: tp.FlexArray
-    segment_mask: tp.FlexArray
+    init_cash: tp.FlexArray1d
+    init_position: tp.FlexArray1d
+    init_price: tp.FlexArray1d
+    cash_deposits: tp.FlexArray2d
+    cash_earnings: tp.FlexArray2d
+    segment_mask: tp.FlexArray2d
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
-    open: tp.FlexArray
-    high: tp.FlexArray
-    low: tp.FlexArray
-    close: tp.FlexArray
-    bm_close: tp.Optional[tp.FlexArray]
+    open: tp.FlexArray2d
+    high: tp.FlexArray2d
+    low: tp.FlexArray2d
+    close: tp.FlexArray2d
+    bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
     track_value: bool
-    flex_2d: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
     in_outputs: tp.Optional[tp.NamedTuple]
     last_cash: tp.Array1d
     last_position: tp.Array1d
     last_debt: tp.Array1d
+    last_locked_cash: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
@@ -1626,32 +1627,32 @@ class SegmentContext(tp.NamedTuple):
     group_lens: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    init_cash: tp.FlexArray
-    init_position: tp.FlexArray
-    init_price: tp.FlexArray
-    cash_deposits: tp.FlexArray
-    cash_earnings: tp.FlexArray
-    segment_mask: tp.FlexArray
+    init_cash: tp.FlexArray1d
+    init_position: tp.FlexArray1d
+    init_price: tp.FlexArray1d
+    cash_deposits: tp.FlexArray2d
+    cash_earnings: tp.FlexArray2d
+    segment_mask: tp.FlexArray2d
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
-    open: tp.FlexArray
-    high: tp.FlexArray
-    low: tp.FlexArray
-    close: tp.FlexArray
-    bm_close: tp.Optional[tp.FlexArray]
+    open: tp.FlexArray2d
+    high: tp.FlexArray2d
+    low: tp.FlexArray2d
+    close: tp.FlexArray2d
+    bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
     track_value: bool
-    flex_2d: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
     in_outputs: tp.Optional[tp.NamedTuple]
     last_cash: tp.Array1d
     last_position: tp.Array1d
     last_debt: tp.Array1d
+    last_locked_cash: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
@@ -1707,32 +1708,32 @@ class OrderContext(tp.NamedTuple):
     group_lens: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    init_cash: tp.FlexArray
-    init_position: tp.FlexArray
-    init_price: tp.FlexArray
-    cash_deposits: tp.FlexArray
-    cash_earnings: tp.FlexArray
-    segment_mask: tp.FlexArray
+    init_cash: tp.FlexArray1d
+    init_position: tp.FlexArray1d
+    init_price: tp.FlexArray1d
+    cash_deposits: tp.FlexArray2d
+    cash_earnings: tp.FlexArray2d
+    segment_mask: tp.FlexArray2d
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
-    open: tp.FlexArray
-    high: tp.FlexArray
-    low: tp.FlexArray
-    close: tp.FlexArray
-    bm_close: tp.Optional[tp.FlexArray]
+    open: tp.FlexArray2d
+    high: tp.FlexArray2d
+    low: tp.FlexArray2d
+    close: tp.FlexArray2d
+    bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
     track_value: bool
-    flex_2d: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
     in_outputs: tp.Optional[tp.NamedTuple]
     last_cash: tp.Array1d
     last_position: tp.Array1d
     last_debt: tp.Array1d
+    last_locked_cash: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
@@ -1751,6 +1752,7 @@ class OrderContext(tp.NamedTuple):
     cash_now: float
     position_now: float
     debt_now: float
+    locked_cash_now: float
     free_cash_now: float
     val_price_now: float
     value_now: float
@@ -1790,6 +1792,7 @@ Has range `[0, group_len)`.
 __pdoc__["OrderContext.cash_now"] = "`SimulationContext.last_cash` for the current column/group."
 __pdoc__["OrderContext.position_now"] = "`SimulationContext.last_position` for the current column."
 __pdoc__["OrderContext.debt_now"] = "`SimulationContext.last_debt` for the current column."
+__pdoc__["OrderContext.locked_cash_now"] = "`SimulationContext.last_locked_cash` for the current column."
 __pdoc__["OrderContext.free_cash_now"] = "`SimulationContext.last_free_cash` for the current column/group."
 __pdoc__["OrderContext.val_price_now"] = "`SimulationContext.last_val_price` for the current column."
 __pdoc__["OrderContext.value_now"] = "`SimulationContext.last_value` for the current column/group."
@@ -1802,32 +1805,32 @@ class PostOrderContext(tp.NamedTuple):
     group_lens: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    init_cash: tp.FlexArray
-    init_position: tp.FlexArray
-    init_price: tp.FlexArray
-    cash_deposits: tp.FlexArray
-    cash_earnings: tp.FlexArray
-    segment_mask: tp.FlexArray
+    init_cash: tp.FlexArray1d
+    init_position: tp.FlexArray1d
+    init_price: tp.FlexArray1d
+    cash_deposits: tp.FlexArray2d
+    cash_earnings: tp.FlexArray2d
+    segment_mask: tp.FlexArray2d
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
-    open: tp.FlexArray
-    high: tp.FlexArray
-    low: tp.FlexArray
-    close: tp.FlexArray
-    bm_close: tp.Optional[tp.FlexArray]
+    open: tp.FlexArray2d
+    high: tp.FlexArray2d
+    low: tp.FlexArray2d
+    close: tp.FlexArray2d
+    bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
     track_value: bool
-    flex_2d: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
     in_outputs: tp.Optional[tp.NamedTuple]
     last_cash: tp.Array1d
     last_position: tp.Array1d
     last_debt: tp.Array1d
+    last_locked_cash: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
@@ -1846,6 +1849,7 @@ class PostOrderContext(tp.NamedTuple):
     cash_before: float
     position_before: float
     debt_before: float
+    locked_cash_before: float
     free_cash_before: float
     val_price_before: float
     value_before: float
@@ -1853,6 +1857,7 @@ class PostOrderContext(tp.NamedTuple):
     cash_now: float
     position_now: float
     debt_now: float
+    locked_cash_now: float
     free_cash_now: float
     val_price_now: float
     value_now: float
@@ -1882,6 +1887,7 @@ for field in PostOrderContext._fields:
 __pdoc__["PostOrderContext.cash_before"] = "`OrderContext.cash_now` before execution."
 __pdoc__["PostOrderContext.position_before"] = "`OrderContext.position_now` before execution."
 __pdoc__["PostOrderContext.debt_before"] = "`OrderContext.debt_now` before execution."
+__pdoc__["PostOrderContext.locked_cash_before"] = "`OrderContext.locked_cash_now` before execution."
 __pdoc__["PostOrderContext.free_cash_before"] = "`OrderContext.free_cash_now` before execution."
 __pdoc__["PostOrderContext.val_price_before"] = "`OrderContext.val_price_now` before execution."
 __pdoc__["PostOrderContext.value_before"] = "`OrderContext.value_now` before execution."
@@ -1894,6 +1900,7 @@ Can be used to check whether the order has been filled, ignored, or rejected.
 __pdoc__["PostOrderContext.cash_now"] = "`OrderContext.cash_now` after execution."
 __pdoc__["PostOrderContext.position_now"] = "`OrderContext.position_now` after execution."
 __pdoc__["PostOrderContext.debt_now"] = "`OrderContext.debt_now` after execution."
+__pdoc__["PostOrderContext.locked_cash_now"] = "`OrderContext.locked_cash_now` after execution."
 __pdoc__["PostOrderContext.free_cash_now"] = "`OrderContext.free_cash_now` after execution."
 __pdoc__[
     "PostOrderContext.val_price_now"
@@ -1917,32 +1924,32 @@ class FlexOrderContext(tp.NamedTuple):
     group_lens: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Optional[tp.Array2d]
-    init_cash: tp.FlexArray
-    init_position: tp.FlexArray
-    init_price: tp.FlexArray
-    cash_deposits: tp.FlexArray
-    cash_earnings: tp.FlexArray
-    segment_mask: tp.FlexArray
+    init_cash: tp.FlexArray1d
+    init_position: tp.FlexArray1d
+    init_price: tp.FlexArray1d
+    cash_deposits: tp.FlexArray2d
+    cash_earnings: tp.FlexArray2d
+    segment_mask: tp.FlexArray2d
     call_pre_segment: bool
     call_post_segment: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
-    open: tp.FlexArray
-    high: tp.FlexArray
-    low: tp.FlexArray
-    close: tp.FlexArray
-    bm_close: tp.Optional[tp.FlexArray]
+    open: tp.FlexArray2d
+    high: tp.FlexArray2d
+    low: tp.FlexArray2d
+    close: tp.FlexArray2d
+    bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
     fill_pos_record: bool
     track_value: bool
-    flex_2d: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
     in_outputs: tp.Optional[tp.NamedTuple]
     last_cash: tp.Array1d
     last_position: tp.Array1d
     last_debt: tp.Array1d
+    last_locked_cash: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
@@ -1990,9 +1997,10 @@ class Order(tp.NamedTuple):
     min_size: float = np.nan
     max_size: float = np.nan
     size_granularity: float = np.nan
+    leverage: float = 1.0
+    leverage_mode: int = LeverageMode.Lazy
     reject_prob: float = 0.0
     price_area_vio_mode: int = PriceAreaVioMode.Ignore
-    lock_cash: bool = False
     allow_partial: bool = True
     raise_reject: bool = False
     log: bool = False
@@ -2014,7 +2022,6 @@ Behavior depends upon `Order.size_type` and `Order.direction`.
 For any fixed size:
 
 * Set to any number to buy/sell some fixed amount or value.
-    Longs are limited by the current cash balance, while shorts are only limited if `Order.lock_cash`.
 * Set to `np.inf` to buy for all cash, or `-np.inf` to sell for all free cash.
     If `Order.direction` is not `Direction.Both`, `-np.inf` will close the position.
 * Set to `np.nan` or 0 to skip.
@@ -2078,18 +2085,14 @@ Placing an order of 12.5 shares (in any direction) will order exactly 12.0 share
 
 !!! note
     The filled size remains a floating number."""
+__pdoc__["Order.leverage"] = "Leverage."
+__pdoc__["Order.leverage_mode"] = "See `LeverageMode`."
 __pdoc__[
     "Order.reject_prob"
 ] = """Probability of rejecting this order to simulate a random rejection event.
 
 Not everything goes smoothly in real life. Use random rejections to test your order management for robustness."""
 __pdoc__["Order.price_area_vio_mode"] = "See `PriceAreaVioMode`."
-__pdoc__[
-    "Order.lock_cash"
-] = """Whether to lock cash when shorting. 
-
-If enabled, prevents `free_cash` from turning negative when buying or short selling.
-A negative `free_cash` means one column used collateral of another column, which is generally undesired."""
 __pdoc__[
     "Order.allow_partial"
 ] = """Whether to allow partial fill.
@@ -2119,9 +2122,10 @@ NoOrder = Order(
     min_size=np.nan,
     max_size=np.nan,
     size_granularity=np.nan,
+    leverage=1.0,
+    leverage_mode=LeverageMode.Lazy,
     reject_prob=np.nan,
     price_area_vio_mode=-1,
-    lock_cash=False,
     allow_partial=False,
     raise_reject=False,
     log=False,
@@ -2155,14 +2159,13 @@ class SignalSegmentContext(tp.NamedTuple):
     cash_sharing: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
-    open: tp.FlexArray
-    high: tp.FlexArray
-    low: tp.FlexArray
-    close: tp.FlexArray
-    init_cash: tp.FlexArray
-    init_position: tp.FlexArray
-    init_price: tp.FlexArray
-    flex_2d: bool
+    open: tp.FlexArray2d
+    high: tp.FlexArray2d
+    low: tp.FlexArray2d
+    close: tp.FlexArray2d
+    init_cash: tp.FlexArray1d
+    init_position: tp.FlexArray1d
+    init_price: tp.FlexArray1d
 
     order_records: tp.RecordArray2d
     order_counts: tp.Array1d
@@ -2178,6 +2181,7 @@ class SignalSegmentContext(tp.NamedTuple):
     last_cash: tp.Array1d
     last_position: tp.Array1d
     last_debt: tp.Array1d
+    last_locked_cash: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
@@ -2216,7 +2220,6 @@ __pdoc__["SignalSegmentContext.close"] = "See `SimulationContext.close`."
 __pdoc__["SignalSegmentContext.init_cash"] = "See `SimulationContext.init_cash`."
 __pdoc__["SignalSegmentContext.init_position"] = "See `SimulationContext.init_position`."
 __pdoc__["SignalSegmentContext.init_price"] = "See `SimulationContext.init_price`."
-__pdoc__["SignalSegmentContext.flex_2d"] = "See `SimulationContext.flex_2d`."
 __pdoc__["SignalSegmentContext.order_records"] = "See `SimulationContext.order_records`."
 __pdoc__["SignalSegmentContext.order_counts"] = "See `SimulationContext.order_counts`."
 __pdoc__["SignalSegmentContext.log_records"] = "See `SimulationContext.log_records`."
@@ -2262,14 +2265,13 @@ class SignalContext(tp.NamedTuple):
     cash_sharing: bool
     index: tp.Optional[tp.Array1d]
     freq: tp.Optional[int]
-    open: tp.FlexArray
-    high: tp.FlexArray
-    low: tp.FlexArray
-    close: tp.FlexArray
-    init_cash: tp.FlexArray
-    init_position: tp.FlexArray
-    init_price: tp.FlexArray
-    flex_2d: bool
+    open: tp.FlexArray2d
+    high: tp.FlexArray2d
+    low: tp.FlexArray2d
+    close: tp.FlexArray2d
+    init_cash: tp.FlexArray1d
+    init_position: tp.FlexArray1d
+    init_price: tp.FlexArray1d
 
     order_records: tp.RecordArray2d
     order_counts: tp.Array1d
@@ -2285,6 +2287,7 @@ class SignalContext(tp.NamedTuple):
     last_cash: tp.Array1d
     last_position: tp.Array1d
     last_debt: tp.Array1d
+    last_locked_cash: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
@@ -2320,28 +2323,64 @@ __pdoc__["SignalContext.col"] = "See `OrderContext.col`."
 # ############# In-outputs ############# #
 
 
-class FSInOutputs(tp.NamedTuple):
-    returns: tp.Optional[tp.Array2d]
-
-
-__pdoc__["FSInOutputs"] = "A named tuple representing the in-outputs for simulation based on signals."
-__pdoc__[
-    "FSInOutputs.returns"
-] = """Returns.
-
-Gets filled if `fill_returns` is True, otherwise has the shape `(0, 0)`."""
-
-
 class FOInOutputs(tp.NamedTuple):
-    returns: tp.Optional[tp.Array2d]
+    cash: tp.Array2d
+    position: tp.Array2d
+    debt: tp.Array2d
+    locked_cash: tp.Array2d
+    free_cash: tp.Array2d
+    returns: tp.Array2d
 
 
 __pdoc__["FOInOutputs"] = "A named tuple representing the in-outputs for simulation based on orders."
+__pdoc__[
+    "FOInOutputs.cash"
+] = """See `AccountState.cash`.
+
+Gets filled if `fill_state` is True, otherwise has the shape `(0, 0)`."""
+__pdoc__[
+    "FOInOutputs.position"
+] = """See `AccountState.position`.
+
+Gets filled if `fill_state` is True, otherwise has the shape `(0, 0)`."""
+__pdoc__[
+    "FOInOutputs.debt"
+] = """See `AccountState.debt`.
+
+Gets filled if `fill_state` is True, otherwise has the shape `(0, 0)`."""
+__pdoc__[
+    "FOInOutputs.locked_cash"
+] = """See `AccountState.locked_cash`.
+
+Gets filled if `fill_state` is True, otherwise has the shape `(0, 0)`."""
+__pdoc__[
+    "FOInOutputs.free_cash"
+] = """See `AccountState.free_cash`.
+
+Gets filled if `fill_state` is True, otherwise has the shape `(0, 0)`."""
 __pdoc__[
     "FOInOutputs.returns"
 ] = """Returns.
 
 Gets filled if `fill_returns` is True, otherwise has the shape `(0, 0)`."""
+
+
+class FSInOutputs(tp.NamedTuple):
+    cash: tp.Array2d
+    position: tp.Array2d
+    debt: tp.Array2d
+    locked_cash: tp.Array2d
+    free_cash: tp.Array2d
+    returns: tp.Array2d
+
+
+__pdoc__["FSInOutputs"] = "A named tuple representing the in-outputs for simulation based on signals."
+__pdoc__["FSInOutputs.cash"] = "See `FOInOutputs.cash`."
+__pdoc__["FSInOutputs.position"] = "See `FOInOutputs.position`."
+__pdoc__["FSInOutputs.debt"] = "See `FOInOutputs.debt`."
+__pdoc__["FSInOutputs.locked_cash"] = "See `FOInOutputs.locked_cash`."
+__pdoc__["FSInOutputs.free_cash"] = "See `FOInOutputs.free_cash`."
+__pdoc__["FSInOutputs.returns"] = "See `FOInOutputs.returns`."
 
 # ############# Records ############# #
 
@@ -2435,12 +2474,13 @@ _log_fields = [
     ("price_area_high", np.float_),
     ("price_area_low", np.float_),
     ("price_area_close", np.float_),
-    ("exec_state_cash", np.float_),
-    ("exec_state_position", np.float_),
-    ("exec_state_debt", np.float_),
-    ("exec_state_free_cash", np.float_),
-    ("exec_state_val_price", np.float_),
-    ("exec_state_value", np.float_),
+    ("st0_cash", np.float_),
+    ("st0_position", np.float_),
+    ("st0_debt", np.float_),
+    ("st0_locked_cash", np.float_),
+    ("st0_free_cash", np.float_),
+    ("st0_val_price", np.float_),
+    ("st0_value", np.float_),
     ("req_size", np.float_),
     ("req_price", np.float_),
     ("req_size_type", np.int_),
@@ -2451,24 +2491,26 @@ _log_fields = [
     ("req_min_size", np.float_),
     ("req_max_size", np.float_),
     ("req_size_granularity", np.float_),
+    ("req_leverage", np.float_),
+    ("req_leverage_mode", np.int_),
     ("req_reject_prob", np.float_),
     ("req_price_area_vio_mode", np.int_),
-    ("req_lock_cash", np.bool_),
     ("req_allow_partial", np.bool_),
     ("req_raise_reject", np.bool_),
     ("req_log", np.bool_),
-    ("new_exec_state_cash", np.float_),
-    ("new_exec_state_position", np.float_),
-    ("new_exec_state_debt", np.float_),
-    ("new_exec_state_free_cash", np.float_),
-    ("new_exec_state_val_price", np.float_),
-    ("new_exec_state_value", np.float_),
     ("res_size", np.float_),
     ("res_price", np.float_),
     ("res_fees", np.float_),
     ("res_side", np.int_),
     ("res_status", np.int_),
     ("res_status_info", np.int_),
+    ("st1_cash", np.float_),
+    ("st1_position", np.float_),
+    ("st1_debt", np.float_),
+    ("st1_locked_cash", np.float_),
+    ("st1_free_cash", np.float_),
+    ("st1_val_price", np.float_),
+    ("st1_value", np.float_),
     ("order_id", np.int_),
 ]
 

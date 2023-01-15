@@ -47,13 +47,12 @@ from numba.typed import List
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping, combining
 from vectorbtpro.base.indexing import build_param_indexer
-from vectorbtpro.base.reshaping import Default, resolve_ref, column_stack
+from vectorbtpro.base.reshaping import broadcast_array_to, broadcast_arrays, Default, resolve_ref, column_stack
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import BaseAccessor
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.indicators.expr import expr_func_config, expr_res_func_config, wqa101_expr_config
-from vectorbtpro.registries.ca_registry import is_cacheable
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.array_ import build_nan_mask, squeeze_nan, unsqueeze_nan
@@ -116,6 +115,7 @@ def prepare_params(
             else:
                 p_values = apply_mapping(p_values, dtype)
         is_array_like = _param_settings.get("is_array_like", False)
+        min_one_dim = _param_settings.get("min_one_dim", False)
         bc_to_input = _param_settings.get("bc_to_input", False)
         broadcast_kwargs = merge_dicts(
             dict(require_kwargs=dict(requirements="W")),
@@ -131,7 +131,10 @@ def prepare_params(
             ]
         if not bc_to_input:
             if is_array_like:
-                new_p_values = list(map(np.asarray, new_p_values))
+                if min_one_dim:
+                    new_p_values = list(map(reshaping.to_1d_array, new_p_values))
+                else:
+                    new_p_values = list(map(np.asarray, new_p_values))
         else:
             # Broadcast to input or its axis
             if is_tuple:
@@ -214,7 +217,7 @@ def build_columns(
             if _per_column:
                 param_index = None
                 for p in p_values:
-                    bc_param = np.broadcast_to(p, (len(input_columns),))
+                    bc_param = broadcast_array_to(p, len(input_columns))
                     _param_index = indexes.index_from_values(bc_param, single_value=False, name=level_name)
                     if param_index is None:
                         param_index = _param_index
@@ -280,7 +283,6 @@ def run_pipeline(
     to_2d: bool = True,
     pass_packed: bool = False,
     pass_input_shape: tp.Optional[bool] = None,
-    pass_flex_2d: bool = False,
     pass_wrapper: bool = False,
     level_names: tp.Optional[tp.Sequence[str]] = None,
     hide_levels: tp.Optional[tp.Sequence[tp.Union[str, int]]] = None,
@@ -351,6 +353,8 @@ def run_pipeline(
             * `is_array_like`: If array-like object was passed, it will be considered as a single value.
                 To treat it as multiple values, pack it into a list.
             * `template`: Template to substitute each parameter value with, before broadcasting to input.
+            * `min_one_dim`: Whether to convert any scalar into a one-dimensional array.
+                Works only if `bc_to_input` is False.
             * `bc_to_input`: Whether to broadcast parameter to input size. You can also broadcast
                 parameter to an axis by passing an integer.
             * `broadcast_kwargs`: Keyword arguments passed to `vectorbtpro.base.reshaping.broadcast`.
@@ -384,7 +388,6 @@ def run_pipeline(
         pass_input_shape (bool): Whether to pass `input_shape` to `custom_func` as keyword argument.
 
             Defaults to True if `require_input_shape` is True, otherwise to False.
-        pass_flex_2d (bool): Whether to pass `flex_2d` to `custom_func` as keyword argument.
         pass_wrapper (bool): Whether to pass the input wrapper to `custom_func` as keyword argument.
         level_names (list of str): A list of column level names corresponding to each parameter.
 
@@ -462,6 +465,7 @@ def run_pipeline(
                     "is_tuple",
                     "is_array_like",
                     "template",
+                    "min_one_dim",
                     "bc_to_input",
                     "broadcast_kwargs",
                     "per_column",
@@ -484,7 +488,7 @@ def run_pipeline(
         set_seed(seed)
 
     if input_shape is not None:
-        input_shape = reshaping.shape_to_tuple(input_shape)
+        input_shape = reshaping.to_tuple_shape(input_shape)
     if len(inputs) > 0 or len(in_outputs) > 0 or len(broadcast_named_args) > 0:
         # Broadcast inputs, in-outputs, and named args
         # If input_shape is provided, will broadcast all inputs to this shape
@@ -670,10 +674,6 @@ def run_pipeline(
         func_kwargs = dict(kwargs)
         if pass_input_shape:
             func_kwargs["input_shape"] = input_shape_ready
-        if pass_flex_2d:
-            if input_shape is None:
-                raise ValueError("Cannot determine flex_2d without inputs")
-            func_kwargs["flex_2d"] = len(input_shape) == 2
         if pass_wrapper:
             func_kwargs["wrapper"] = wrapper_ready
         if pass_per_column:
@@ -1242,8 +1242,7 @@ class IndicatorFactory(Configured):
             output_names (list of str): List with output names.
             output_flags (dict): Dictionary of in-place and regular output flags.
             lazy_outputs (dict): Dictionary with user-defined functions that will be
-                bound to the indicator class and wrapped with `vectorbtpro.utils.decorators.cacheable_property`
-                if not already wrapped.
+                bound to the indicator class and wrapped with `property` if not already wrapped.
             attr_settings (dict): Dictionary with attribute settings.
 
                 Attributes can be `input_names`, `in_output_names`, `output_names`, and `lazy_outputs`.
@@ -1254,6 +1253,8 @@ class IndicatorFactory(Configured):
                     Set to None to disable. Default is `np.float_`. Can be set to instance of
                     `collections.namedtuple` acting as enumerated type, or any other mapping;
                     It will then create a property with suffix `readable` that contains data in a string format.
+                * `enum_unkval`: Value to be considered as unknown. Applies to enumerated data types only.
+                * `make_cacheable`: Whether to make the property cacheable. Applies to inputs only.
             metrics (dict): Metrics supported by `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats`.
 
                 If dict, will be converted to `vectorbtpro.utils.config.Config`.
@@ -1348,7 +1349,13 @@ class IndicatorFactory(Configured):
         checks.assert_instance_of(attr_settings, dict)
         all_attr_names = input_names + all_output_names + list(lazy_outputs.keys())
         if len(attr_settings) > 0:
-            checks.assert_dict_valid(attr_settings, all_attr_names)
+            checks.assert_dict_valid(
+                attr_settings,
+                [
+                    all_attr_names,
+                    ["dtype", "enum_unkval", "make_cacheable"],
+                ]
+            )
 
         # Set up class
         ParamIndexer = build_param_indexer(
@@ -1377,6 +1384,8 @@ class IndicatorFactory(Configured):
             setattr(Indicator, f"{param_name}_list", property(param_list_prop))
 
         for input_name in input_names:
+            _attr_settings = attr_settings.get(input_name, {})
+            make_cacheable = _attr_settings.get("make_cacheable", False)
 
             def input_prop(self, _input_name: str = input_name) -> tp.SeriesFrame:
                 """Input array."""
@@ -1387,7 +1396,10 @@ class IndicatorFactory(Configured):
                 return self.wrapper.wrap(old_input[:, input_mapper])
 
             input_prop.__name__ = input_name
-            setattr(Indicator, input_name, cacheable_property(input_prop))
+            if make_cacheable:
+                setattr(Indicator, input_name, cacheable_property(input_prop))
+            else:
+                setattr(Indicator, input_name, property(input_prop))
 
         for output_name in all_output_names:
 
@@ -1452,8 +1464,8 @@ class IndicatorFactory(Configured):
             if prop.__doc__ is None:
                 prop.__doc__ = f"""Custom property."""
             prop.__name__ = prop_name
-            if not is_cacheable(prop):
-                prop = cacheable_property(prop)
+            if not isinstance(prop, property):
+                prop = property(prop)
             setattr(Indicator, prop_name, prop)
 
         # Add comparison & combination methods for all inputs, outputs, and user-defined properties
@@ -1504,7 +1516,6 @@ class IndicatorFactory(Configured):
 
         for attr_name in all_attr_names:
             _attr_settings = attr_settings.get(attr_name, {})
-            checks.assert_dict_valid(_attr_settings, ["dtype", "enum_unkval"])
             dtype = _attr_settings.get("dtype", np.float_)
             enum_unkval = _attr_settings.get("enum_unkval", -1)
 
@@ -1598,7 +1609,7 @@ class IndicatorFactory(Configured):
         # Prepare stats
         if metrics is not None:
             if not isinstance(metrics, Config):
-                metrics = Config(metrics, copy_kwargs_=dict(copy_mode="deep"))
+                metrics = Config(metrics, options_=dict(copy_kwargs=dict(copy_mode="deep")))
             setattr(Indicator, "_metrics", metrics.copy())
 
         if stats_defaults is not None:
@@ -1618,7 +1629,7 @@ class IndicatorFactory(Configured):
         # Prepare plots
         if subplots is not None:
             if not isinstance(subplots, Config):
-                subplots = Config(subplots, copy_kwargs_=dict(copy_mode="deep"))
+                subplots = Config(subplots, options_=dict(copy_kwargs=dict(copy_mode="deep")))
             setattr(Indicator, "_subplots", subplots.copy())
 
         if plots_defaults is not None:
@@ -1747,7 +1758,7 @@ class IndicatorFactory(Configured):
         require_input_shape: bool = False,
         param_settings: tp.KwargsLike = None,
         in_output_settings: tp.KwargsLike = None,
-        hide_params: tp.Optional[tp.Sequence[str]] = None,
+        hide_params: tp.Union[None, bool, tp.Sequence[str]] = None,
         hide_default: bool = True,
         var_args: bool = False,
         keyword_only_args: bool = False,
@@ -1782,7 +1793,8 @@ class IndicatorFactory(Configured):
                 See `run_pipeline` for keys.
 
                 Can be overwritten by any run method.
-            hide_params (list of str): Parameter names to hide column levels for.
+            hide_params (bool or list of str): Parameter names to hide column levels for,
+                or whether to hide all parameters.
 
                 Can be overwritten by any run method.
             hide_default (bool): Whether to hide column levels of parameters with default value.
@@ -2068,7 +2080,7 @@ class IndicatorFactory(Configured):
         run_docstring = """Run `{0}` indicator.
 {1}
 
-Pass a list of parameter names as `hide_params` to hide their column levels.
+Pass a list of parameter names as `hide_params` to hide their column levels, or True to hide all.
 Set `hide_default` to False to show the column levels of the parameters with a default value.
 
 Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.""".format(
@@ -2223,7 +2235,6 @@ Other keyword arguments are passed to `{0}.run`.
         select_params: bool = True,
         pass_packed: bool = False,
         cache_pass_packed: tp.Optional[bool] = None,
-        cache_pass_flex_2d: tp.Optional[bool] = None,
         pass_per_column: bool = False,
         cache_pass_per_column: tp.Optional[bool] = None,
         kwargs_as_args: tp.Optional[tp.Iterable[str]] = None,
@@ -2255,7 +2266,7 @@ Other keyword arguments are passed to `{0}.run`.
             * Your outputs must be arrays of the same shape, data type and data order
 
         !!! note
-            Reserved arguments `flex_2d` and `per_column` (in this order) get passed as positional
+            Reserved arguments such as  `per_column` (in this order) get passed as positional
             arguments if `remove_kwargs` is True, otherwise as keyword arguments.
 
         Args:
@@ -2283,12 +2294,10 @@ Other keyword arguments are passed to `{0}.run`.
                     corresponds to a column. If `takes_1d`, each value gets additionally repeated by
                     the number of columns in the input arrays.
                 * Variable arguments if `var_args` is set to True
-                * `flex_2d` if `pass_flex_2d` is set to True and `flex_2d` not in `kwargs_as_args`
-                    and `remove_kwargs` is set to True
                 * `per_column` if `pass_per_column` is set to True and `per_column` not in
                     `kwargs_as_args` and `remove_kwargs` is set to True
-                * Arguments listed in `kwargs_as_args` passed as positional. Can include `flex_2d` and `per_column`.
-                * Other keyword arguments if `remove_kwargs` is False. Also includes `flex_2d` and `per_column`
+                * Arguments listed in `kwargs_as_args` passed as positional. Can include `takes_1d` and `per_column`.
+                * Other keyword arguments if `remove_kwargs` is False. Also includes `takes_1d` and `per_column`
                     if they must be passed and not in `kwargs_as_args`.
 
                 Can be Numba-compiled (but doesn't have to).
@@ -2309,7 +2318,6 @@ Other keyword arguments are passed to `{0}.run`.
                 If False, prepends the current iteration index to the arguments.
             pass_packed (bool): Whether to pass packed tuples for inputs, in-place outputs, and parameters.
             cache_pass_packed (bool): Overrides `pass_packed` for the caching function.
-            cache_pass_flex_2d (bool): Overrides `pass_flex_2d` (see `run_pipeline`) for the caching function.
             pass_per_column (bool): Whether to pass `per_column`.
             cache_pass_per_column (bool): Overrides `pass_per_column` for the caching function.
             kwargs_as_args (iterable of str): Keyword arguments from `kwargs` dict to pass as
@@ -2479,7 +2487,6 @@ Other keyword arguments are passed to `{0}.run`.
             param_tuple: tp.Tuple[tp.List[tp.Param], ...],
             *_args,
             input_shape: tp.Optional[tp.Shape] = None,
-            flex_2d: tp.Optional[bool] = None,
             per_column: tp.Optional[bool] = None,
             return_cache: bool = False,
             use_cache: tp.Optional[CacheOutputT] = None,
@@ -2488,10 +2495,7 @@ Other keyword arguments are passed to `{0}.run`.
         ) -> tp.Union[None, CacheOutputT, tp.Array2d, tp.List[tp.Array2d]]:
             """Custom function that forwards inputs and parameters to `apply_func`."""
             _cache_pass_packed = cache_pass_packed
-            _cache_pass_flex_2d = cache_pass_flex_2d
             _cache_pass_per_column = cache_pass_per_column
-
-            pass_flex_2d = flex_2d is not None
 
             # Prepend positional arguments
             args_before = ()
@@ -2504,9 +2508,7 @@ Other keyword arguments are passed to `{0}.run`.
             # Append positional arguments
             more_args = ()
             for key in kwargs_as_args:
-                if key == "flex_2d":
-                    value = flex_2d
-                elif key == "per_column":
+                if key == "per_column":
                     value = per_column
                 elif key == "takes_1d":
                     value = per_column
@@ -2553,20 +2555,12 @@ Other keyword arguments are passed to `{0}.run`.
 
                 if _cache_pass_packed is None:
                     _cache_pass_packed = pass_packed
-                if _cache_pass_flex_2d is None:
-                    _cache_pass_flex_2d = pass_flex_2d
                 if _cache_pass_per_column is None and per_column:
                     _cache_pass_per_column = True
                 if _cache_pass_per_column is None:
                     _cache_pass_per_column = pass_per_column
                 cache_more_args = tuple(more_args)
                 cache_kwargs = dict(_kwargs)
-                if _cache_pass_flex_2d:
-                    if "flex_2d" not in kwargs_as_args:
-                        if remove_kwargs:
-                            cache_more_args += (flex_2d,)
-                        else:
-                            cache_kwargs["flex_2d"] = flex_2d
                 if _cache_pass_per_column:
                     if "per_column" not in kwargs_as_args:
                         if remove_kwargs:
@@ -2669,12 +2663,6 @@ Other keyword arguments are passed to `{0}.run`.
             else:
                 _n_params = n_params
 
-            if pass_flex_2d:
-                if "flex_2d" not in kwargs_as_args:
-                    if remove_kwargs:
-                        more_args += (flex_2d,)
-                    else:
-                        _kwargs["flex_2d"] = flex_2d
             if pass_per_column:
                 if "per_column" not in kwargs_as_args:
                     if remove_kwargs:
@@ -2762,7 +2750,7 @@ Other keyword arguments are passed to `{0}.run`.
                 * Parameters: `timeperiod`
                 * Outputs: `real`
 
-                Pass a list of parameter names as `hide_params` to hide their column levels.
+                Pass a list of parameter names as `hide_params` to hide their column levels, or True to hide all.
                 Set `hide_default` to False to show the column levels of the parameters with a default value.
 
                 Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
@@ -2771,7 +2759,7 @@ Other keyword arguments are passed to `{0}.run`.
             * To plot an indicator:
 
             ```pycon
-            >>> sma.plot(column=(2, 'a'))
+            >>> sma.plot(column=(2, 'a')).show()
             ```
 
             ![](/assets/images/api/talib_plot.svg)
@@ -3217,7 +3205,7 @@ Args:
                 * Parameters: `length`, `talib`, `offset`
                 * Outputs: `sma`
 
-                Pass a list of parameter names as `hide_params` to hide their column levels.
+                Pass a list of parameter names as `hide_params` to hide their column levels, or True to hide all.
                 Set `hide_default` to False to show the column levels of the parameters with a default value.
 
                 Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
@@ -3434,7 +3422,7 @@ Args:
                 * Parameters: `window`, `fillna`
                 * Outputs: `sma_indicator`
 
-                Pass a list of parameter names as `hide_params` to hide their column levels.
+                Pass a list of parameter names as `hide_params` to hide their column levels, or True to hide all.
                 Set `hide_default` to False to show the column levels of the parameters with a default value.
 
                 Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
@@ -3681,7 +3669,7 @@ Args:
                 * Parameters: `window`, `min_periods`
                 * Outputs: `rolling_mean`
 
-                Pass a list of parameter names as `hide_params` to hide their column levels.
+                Pass a list of parameter names as `hide_params` to hide their column levels, or True to hide all.
                 Set `hide_default` to False to show the column levels of the parameters with a default value.
 
                 Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
@@ -3792,7 +3780,7 @@ Args:
         factory_kwargs = merge_dicts(
             dict(
                 class_name="CON",
-                module_name=__name__,
+                module_name=__name__ + ".custom_techcon",
                 short_name=None,
                 input_names=["open", "high", "low", "close", "volume"],
                 param_names=["smooth"],
@@ -3889,7 +3877,7 @@ Args:
 
             return IndicatorFactory.from_custom_techcon(
                 MovingAverageConsensus,
-                factory_kwargs=dict(class_name="MACON"),
+                factory_kwargs=dict(module_name=__name__ + ".techcon", class_name="MACON"),
                 **kwargs,
             )
         if cls_name.lower() in ("OSCCON".lower(), "OscillatorConsensus".lower()):
@@ -3897,7 +3885,7 @@ Args:
 
             return IndicatorFactory.from_custom_techcon(
                 OscillatorConsensus,
-                factory_kwargs=dict(class_name="OSCCON"),
+                factory_kwargs=dict(module_name=__name__ + ".techcon", class_name="OSCCON"),
                 **kwargs,
             )
         if cls_name.lower() in ("SUMCON".lower(), "SummaryConsensus".lower()):
@@ -3905,7 +3893,7 @@ Args:
 
             return IndicatorFactory.from_custom_techcon(
                 SummaryConsensus,
-                factory_kwargs=dict(class_name="SUMCON"),
+                factory_kwargs=dict(module_name=__name__ + ".techcon", class_name="SUMCON"),
                 **kwargs,
             )
         raise ValueError(f"Unknown technical consensus class '{cls_name}'")
@@ -4264,7 +4252,7 @@ Args:
                                     k_prefixed = prefix + "_" + k
                                 if k in run_kwargs:
                                     if k_prefixed in found_defaults:
-                                        if found_defaults[k_prefixed] is not run_kwargs[k]:
+                                        if not checks.is_deep_equal(found_defaults[k_prefixed], run_kwargs[k]):
                                             remove_defaults.add(k_prefixed)
                                     else:
                                         found_defaults[k_prefixed] = run_kwargs[k]
@@ -4455,7 +4443,7 @@ Args:
                                 if k in input_names:
                                     inputs[k] = __kwargs.pop(k)
 
-                        bc_inputs = tuple(np.broadcast_arrays(*inputs.values()))
+                        bc_inputs = broadcast_arrays(*inputs.values())
                         if bc_inputs[0].ndim == 1:
                             return _talib_ind.apply_func(bc_inputs, (), other_args, wrapper=wrapper, **__kwargs)
                         outputs = []
@@ -4502,7 +4490,7 @@ Args:
         return factory.with_apply_func(apply_func, pass_packed=True, pass_wrapper=True, **kwargs)
 
     @classmethod
-    def from_wqa101(cls, alpha_idx: int, **kwargs) -> tp.Type[IndicatorBase]:
+    def from_wqa101(cls, alpha_idx: tp.Union[str, int], **kwargs) -> tp.Type[IndicatorBase]:
         """Build an indicator class from one of the WorldQuant's 101 alpha expressions.
 
         See `vectorbtpro.indicators.expr.wqa101_expr_config`.
@@ -4551,12 +4539,14 @@ Args:
                 * Inputs: `close`
                 * Outputs: `out`
 
-                Pass a list of parameter names as `hide_params` to hide their column levels.
+                Pass a list of parameter names as `hide_params` to hide their column levels, or True to hide all.
                 Set `hide_default` to False to show the column levels of the parameters with a default value.
 
                 Other keyword arguments are passed to `vectorbtpro.indicators.factory.run_pipeline`.
             ```
         """
+        if isinstance(alpha_idx, str):
+            alpha_idx = int(alpha_idx.upper().replace("WQA", ""))
         return cls.from_expr(
             wqa101_expr_config[alpha_idx],
             factory_kwargs=dict(class_name="WQA%d" % alpha_idx, module_name=__name__ + ".wqa101"),

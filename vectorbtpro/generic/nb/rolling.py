@@ -6,6 +6,7 @@ import numpy as np
 from numba import prange
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.base.reshaping import to_1d_array_nb
 from vectorbtpro.generic.enums import *
 from vectorbtpro.generic.nb.base import rank_1d_nb
 from vectorbtpro.generic.nb.patterns import pattern_similarity_nb
@@ -1659,7 +1660,7 @@ def rolling_pattern_similarity_1d_nb(
     invert: bool = False,
     error_type: int = ErrorType.Absolute,
     distance_measure: int = DistanceMeasure.MAE,
-    max_error: tp.FlexArray = np.asarray(np.nan),
+    max_error: tp.FlexArray1dLike = np.nan,
     max_error_interp_mode: tp.Optional[int] = None,
     max_error_as_maxdist: bool = False,
     max_error_strict: bool = False,
@@ -1671,6 +1672,8 @@ def rolling_pattern_similarity_1d_nb(
     """Compute rolling pattern similarity.
 
     Uses `vectorbtpro.generic.nb.patterns.pattern_similarity_nb`."""
+    max_error_ = to_1d_array_nb(np.asarray(max_error))
+
     if window is None:
         window = pattern.shape[0]
     if max_window is None:
@@ -1734,7 +1737,7 @@ def rolling_pattern_similarity_1d_nb(
                         invert=invert,
                         error_type=error_type,
                         distance_measure=distance_measure,
-                        max_error=max_error,
+                        max_error=max_error_,
                         max_error_interp_mode=max_error_interp_mode,
                         max_error_as_maxdist=max_error_as_maxdist,
                         max_error_strict=max_error_strict,
@@ -1799,7 +1802,7 @@ def rolling_pattern_similarity_nb(
     invert: bool = False,
     error_type: int = ErrorType.Absolute,
     distance_measure: int = DistanceMeasure.MAE,
-    max_error: tp.FlexArray = np.asarray(np.nan),
+    max_error: tp.FlexArray1dLike = np.nan,
     max_error_interp_mode: tp.Optional[int] = None,
     max_error_as_maxdist: bool = False,
     max_error_strict: bool = False,
@@ -1809,6 +1812,8 @@ def rolling_pattern_similarity_nb(
     minp: tp.Optional[int] = None,
 ) -> tp.Array2d:
     """2-dim version of `rolling_pattern_similarity_1d_nb`."""
+    max_error_ = to_1d_array_nb(np.asarray(max_error))
+
     if window is None:
         window = pattern.shape[0]
     if max_window is None:
@@ -1831,7 +1836,7 @@ def rolling_pattern_similarity_nb(
             invert=invert,
             error_type=error_type,
             distance_measure=distance_measure,
-            max_error=max_error,
+            max_error=max_error_,
             max_error_interp_mode=max_error_interp_mode,
             max_error_as_maxdist=max_error_as_maxdist,
             max_error_strict=max_error_strict,

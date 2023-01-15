@@ -56,7 +56,7 @@ Date
 
 [185 rows x 5 columns]
 
->>> ohlcv.vbt.ohlcv.plot()
+>>> ohlcv.vbt.ohlcv.plot().show()
 ```
 
 ![](/assets/images/api/custom_price.svg)"""
@@ -153,7 +153,7 @@ class _MA(MA):
 
         Usage:
             ```pycon
-            >>> vbt.MA.run(ohlcv['Close']).plot()
+            >>> vbt.MA.run(ohlcv['Close']).plot().show()
             ```
 
             ![](/assets/images/api/MA.svg)
@@ -254,7 +254,7 @@ class _MSD(MSD):
 
         Usage:
             ```pycon
-            >>> vbt.MSD.run(ohlcv['Close']).plot()
+            >>> vbt.MSD.run(ohlcv['Close']).plot().show()
             ```
 
             ![](/assets/images/api/MSD.svg)
@@ -358,7 +358,7 @@ class _BBANDS(BBANDS):
 
         Usage:
             ```pycon
-            >>> vbt.BBANDS.run(ohlcv['Close']).plot()
+            >>> vbt.BBANDS.run(ohlcv['Close']).plot().show()
             ```
 
             ![](/assets/images/api/BBANDS.svg)
@@ -495,7 +495,7 @@ class _RSI(RSI):
 
         Usage:
             ```pycon
-            >>> vbt.RSI.run(ohlcv['Close']).plot()
+            >>> vbt.RSI.run(ohlcv['Close']).plot().show()
             ```
 
             ![](/assets/images/api/RSI.svg)
@@ -621,7 +621,7 @@ class _STOCH(STOCH):
 
         Usage:
             ```pycon
-            >>> vbt.STOCH.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot()
+            >>> vbt.STOCH.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot().show()
             ```
 
             ![](/assets/images/api/STOCH.svg)
@@ -772,7 +772,7 @@ class _MACD(MACD):
 
         Usage:
             ```pycon
-            >>> vbt.MACD.run(ohlcv['Close']).plot()
+            >>> vbt.MACD.run(ohlcv['Close']).plot().show()
             ```
 
             ![](/assets/images/api/MACD.svg)
@@ -906,7 +906,7 @@ class _ATR(ATR):
 
         Usage:
             ```pycon
-            >>> vbt.ATR.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot()
+            >>> vbt.ATR.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot().show()
             ```
 
             ![](/assets/images/api/ATR.svg)
@@ -991,7 +991,7 @@ class _OBV(OBV):
 
         Usage:
             ```py
-            >>> vbt.OBV.run(ohlcv['Close'], ohlcv['Volume']).plot()
+            >>> vbt.OBV.run(ohlcv['Close'], ohlcv['Volume']).plot().show()
             ```
 
             ![](/assets/images/api/OBV.svg)
@@ -1083,7 +1083,7 @@ class _OLS(OLS):
 
         Usage:
             ```pycon
-            >>> vbt.OLS.run(np.arange(len(ohlcv)), ohlcv['Close']).plot()
+            >>> vbt.OLS.run(np.arange(len(ohlcv)), ohlcv['Close']).plot().show()
             ```
 
             ![](/assets/images/api/OLS.svg)
@@ -1181,7 +1181,7 @@ class _OLSS(OLSS):
 
         Usage:
             ```pycon
-            >>> vbt.OLSS.run(np.arange(len(ohlcv)), ohlcv['Close']).plot()
+            >>> vbt.OLSS.run(np.arange(len(ohlcv)), ohlcv['Close']).plot().show()
             ```
 
             ![](/assets/images/api/OLSS.svg)
@@ -1275,7 +1275,7 @@ PATSIM = IndicatorFactory(
 ).with_apply_func(
     generic_nb.rolling_pattern_similarity_nb,
     param_settings=dict(
-        pattern=dict(is_array_like=True),
+        pattern=dict(is_array_like=True, min_one_dim=True),
         interp_mode=dict(
             dtype=generic_enums.InterpMode,
             post_index_func=lambda index: index.str.lower(),
@@ -1292,7 +1292,7 @@ PATSIM = IndicatorFactory(
             dtype=generic_enums.DistanceMeasure,
             post_index_func=lambda index: index.str.lower(),
         ),
-        max_error=dict(is_array_like=True),
+        max_error=dict(is_array_like=True, min_one_dim=True),
         max_error_interp_mode=dict(
             dtype=generic_enums.InterpMode,
             post_index_func=lambda index: index.str.lower(),
@@ -1345,7 +1345,7 @@ class _PATSIM(PATSIM):
 
         Usage:
             ```pycon
-            >>> vbt.PATSIM.run(ohlcv['Close'], np.array([1, 2, 3, 2, 1]), 30).plot()
+            >>> vbt.PATSIM.run(ohlcv['Close'], np.array([1, 2, 3, 2, 1]), 30).plot().show()
             ```
 
             ![](/assets/images/api/PATSIM.svg)
@@ -1397,7 +1397,7 @@ class _PATSIM(PATSIM):
 
         Usage:
             ```pycon
-            >>> vbt.PATSIM.run(ohlcv['Close'], np.array([1, 2, 3, 2, 1]), 30).overlay_with_heatmap()
+            >>> vbt.PATSIM.run(ohlcv['Close'], np.array([1, 2, 3, 2, 1]), 30).overlay_with_heatmap().show()
             ```
 
             ![](/assets/images/api/PATSIM_heatmap.svg)
@@ -1508,7 +1508,7 @@ class _VWAP(VWAP):
             ...    ohlcv['Close'],
             ...    ohlcv['Volume'],
             ...    anchor="W"
-            ... ).plot()
+            ... ).plot().show()
             ```
 
             ![](/assets/images/api/VWAP.svg)
@@ -1608,7 +1608,6 @@ PIVOTINFO = IndicatorFactory(
         up_th=flex_elem_param_config,
         down_th=flex_elem_param_config,
     ),
-    pass_flex_2d=True,
 )
 
 
@@ -1647,7 +1646,7 @@ class _PIVOTINFO(PIVOTINFO):
         Usage:
             ```pycon
             >>> fig = ohlcv.vbt.ohlcv.plot()
-            >>> vbt.PIVOTINFO.run(ohlcv['High'], ohlcv['Low'], 0.1, 0.1).plot(fig=fig)
+            >>> vbt.PIVOTINFO.run(ohlcv['High'], ohlcv['Low'], 0.1, 0.1).plot(fig=fig).show()
             ```
 
             ![](/assets/images/api/PIVOTINFO.svg)
@@ -1709,7 +1708,7 @@ class _PIVOTINFO(PIVOTINFO):
         Usage:
             ```pycon
             >>> fig = ohlcv.vbt.ohlcv.plot()
-            >>> vbt.PIVOTINFO.run(ohlcv['High'], ohlcv['Low'], 0.1, 0.1).plot_zigzag(fig=fig)
+            >>> vbt.PIVOTINFO.run(ohlcv['High'], ohlcv['Low'], 0.1, 0.1).plot_zigzag(fig=fig).show()
             ```
 
             ![](/assets/images/api/PIVOTINFO_zigzag.svg)
@@ -1793,7 +1792,7 @@ class _SUPERTREND(SUPERTREND):
 
         Usage:
             ```pycon
-            >>> vbt.SUPERTREND.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot()
+            >>> vbt.SUPERTREND.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot().show()
             ```
 
             ![](/assets/images/api/SUPERTREND.svg)
@@ -1870,7 +1869,6 @@ SIGDET = IndicatorFactory(
         down_factor=flex_elem_param_config,
         std_influence=flex_elem_param_config,
     ),
-    pass_flex_2d=True,
     lag=14,
     factor=1.0,
     influence=1.0,
@@ -1903,7 +1901,7 @@ class _SIGDET(SIGDET):
 
         Usage:
             ```pycon
-            >>> vbt.SIGDET.run(ohlcv['Close']).plot()
+            >>> vbt.SIGDET.run(ohlcv['Close']).plot().show()
             ```
 
             ![](/assets/images/api/SIGDET.svg)
@@ -1952,7 +1950,7 @@ class _SIGDET(SIGDET):
 
         Usage:
             ```pycon
-            >>> vbt.SIGDET.run(ohlcv['Close']).plot_bands()
+            >>> vbt.SIGDET.run(ohlcv['Close']).plot_bands().show()
             ```
 
             ![](/assets/images/api/SIGDET_plot_bands.svg)

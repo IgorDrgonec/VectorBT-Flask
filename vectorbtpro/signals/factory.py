@@ -293,8 +293,6 @@ class SignalFactory(IndicatorFactory):
                 * `temp_idx_arr`: Empty integer array used to temporarily store indices.
                     Default is an automatically generated array of shape `input_shape[0]`.
                     You can also pass `temp_idx_arr1`, `temp_idx_arr2`, etc. to generate multiple.
-                * `flex_2d`: Whether flexible 1-dim arrays are considered per column in 2-dim regime.
-                    Default is provided by the pipeline if `pass_flex_2d` is True.
             pass_cache (bool): Whether to pass cache from `cache_func` to the placement function.
 
                 Defaults to False. Cache is passed unpacked.
@@ -428,7 +426,7 @@ class SignalFactory(IndicatorFactory):
 
             >>> # Define exit placement function
             >>> @njit
-            ... def rand_exit_place_nb(c, rand_type, prob1, prob2, flex_2d):
+            ... def rand_exit_place_nb(c, rand_type, prob1, prob2):
             ...     for out_i in range(len(c.out)):
             ...         if np.random.uniform(0, 1) < prob1:
             ...             c.out[out_i] = True
@@ -452,14 +450,12 @@ class SignalFactory(IndicatorFactory):
             ...     exit_place_func=rand_exit_place_nb,
             ...     exit_settings=dict(
             ...         pass_in_outputs=['rand_type'],
-            ...         pass_params=['prob1', 'prob2'],
-            ...         pass_kwargs=['flex_2d']
+            ...         pass_params=['prob1', 'prob2']
             ...     ),
             ...     param_settings=dict(
             ...         prob1=flex_elem_param_config,  # param per frame/row/col/element
             ...         prob2=flex_elem_param_config
             ...     ),
-            ...     pass_flex_2d=True,
             ...     rand_type=-1  # fill with this value
             ... )
 
@@ -688,7 +684,6 @@ class SignalFactory(IndicatorFactory):
             param_list: tp.List[tp.List[tp.Param]],
             *args,
             input_shape: tp.Optional[tp.Shape] = None,
-            flex_2d: tp.Optional[bool] = None,
             entry_args: tp.Optional[tp.Args] = None,
             exit_args: tp.Optional[tp.Args] = None,
             cache_args: tp.Optional[tp.Args] = None,
@@ -749,7 +744,6 @@ class SignalFactory(IndicatorFactory):
                 until_next=True,
                 skip_until_exit=False,
                 pick_first=mode != FactoryMode.Entries,
-                flex_2d=flex_2d,
             )
             entry_kwargs = merge_dicts(kwargs_defaults, entry_kwargs)
             exit_kwargs = merge_dicts(kwargs_defaults, exit_kwargs)

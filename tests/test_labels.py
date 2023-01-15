@@ -19,8 +19,8 @@ close_ts = pd.DataFrame(
     ),
 )
 
-up_ths = [np.array([1, 1 / 2]), np.array([2, 1 / 2]), np.array([3, 1 / 2])]
-down_ths = [np.array([1 / 2, 1 / 3]), np.array([1 / 2, 2 / 3]), np.array([1 / 2, 3 / 4])]
+up_ths = [np.array([[1, 1 / 2]]), np.array([[2, 1 / 2]]), np.array([[3, 1 / 2]])]
+down_ths = [np.array([[1 / 2, 1 / 3]]), np.array([[1 / 2, 2 / 3]]), np.array([[1 / 2, 3 / 4]])]
 
 
 # ############# Global ############# #

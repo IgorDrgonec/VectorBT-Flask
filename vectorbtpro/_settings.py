@@ -16,7 +16,7 @@ Here are the main properties of the `settings` config:
     Each sub-config may consist of other sub-configs.
 * It has frozen keys - you cannot add other sub-configs or remove the existing ones, but you can modify them.
 * Each sub-config can either inherit the properties of the parent one by being an instance of
-    `vectorbtpro.utils.config.ChildDict` or overwrite them by being an instance of
+    `vectorbtpro.utils.config.child_dict` or overwrite them by being an instance of
     `vectorbtpro.utils.config.Config` or a regular `dict`. The main reason for defining an own config
     is to allow adding new keys (e.g., 'plotting.layout').
 
@@ -52,13 +52,18 @@ Since this is only visible when looking at the source code, the advice is to alw
     every time `vectorbtpro.base.wrapping.ArrayWrapper.freq` is called. On the other hand, changing
     'portfolio.fillna_close' has only effect on `vectorbtpro.portfolio.base.Portfolio` instances created
     in the future, not the existing ones, because the value is resolved upon the object's construction.
-    Last but not least, some settings are only accessed when importing the package for the first time,
+    Moreover, some settings are only accessed when importing the package for the first time,
     such as 'jitting.jit_decorator'. In any case, make sure to check whether the update actually took place.
 
 ## Saving and loading
 
-Like any other class subclassing `vectorbtpro.utils.config.Config`, we can save settings to the disk,
-load it back, and replace in-place:
+Like any other class subclassing `vectorbtpro.utils.config.Config`, we can persist settings to the disk,
+load it back, and replace in-place. There are several ways of how to update the settings.
+
+### Binary file
+
+Pickling will dump the entire settings object into a byte stream and save as a binary file.
+Supported file extensions are "pickle" (default) and "pkl".
 
 ```pycon
 >>> vbt.settings.save('my_settings')
@@ -71,19 +76,44 @@ True
 False
 ```
 
-Bonus: You can do the same with any sub-config inside `settings`!
+!!! note
+    Argument `clear=True` will replace the entire settings object. Disable it to apply
+    only a subset of settings (default).
+
+### Config file
+
+We can also encode the settings object into a config and save as a text file that can be edited
+easily. Supported file extensions are "config" (default), "cfg", and "ini".
+
+```pycon
+>>> vbt.settings.save('my_settings', file_format="config")
+>>> vbt.settings['caching']['disable'] = True
+>>> vbt.settings['caching']['disable']
+True
+
+>>> vbt.settings.load_update('my_settings', file_format="config", clear=True)  # replace in-place
+>>> vbt.settings['caching']['disable']
+False
+```
+
+### On import
 
 Some settings (such as Numba-related ones) are applied only on import, so changing them during the runtime
-will have no effect. In this case, change the settings, save them to the disk, and create an environment
-variable that holds the path to the file - vectorbt will load it before any other module.
-
-The following environment variables are supported:
-
-* "VBT_SETTINGS_PATH": Path to the settings file. Will replace the current settings.
-* "VBT_SETTINGS_OVERRIDE_PATH": Path to the settings file. Will override the current settings.
+will have no effect. In this case, change the settings, save them to the disk, and then either
+rename the file to "vbt" (with extension) and place it in the working directory for it to be
+recognized automatically, or create an environment variable "VBT_SETTINGS_PATH" that holds the full path
+to the file - vectorbt will load it before any other module. You can also change the recognized file
+name using an environment variable "VBT_SETTINGS_NAME", which defaults to "vbt".
 
 !!! note
-    The environment variable must be set before importing vectorbtpro.
+    Environment variables must be set before importing vectorbtpro.
+
+For example, to set the default theme to dark, create the following "vbt.ini" file:
+
+```ini
+[plotting]
+default_theme = dark
+```
 """
 
 import json
@@ -93,7 +123,7 @@ import pkgutil
 import numpy as np
 
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.config import ChildDict, Config, FrozenConfig
+from vectorbtpro.utils.config import child_dict, Config, FrozenConfig
 from vectorbtpro.utils.datetime_ import get_local_tz, get_utc_tz
 from vectorbtpro.utils.execution import SequenceEngine, ThreadPoolEngine, ProcessPoolEngine, DaskEngine, RayEngine
 from vectorbtpro.utils.jitting import NumPyJitter, NumbaJitter
@@ -105,7 +135,7 @@ __pdoc__: dict = {}
 
 _settings = {}
 
-importing = ChildDict(
+importing = child_dict(
     plotly=True,
     telegram=True,
     quantstats=True,
@@ -125,7 +155,7 @@ ${config_doc}
 
 _settings["importing"] = importing
 
-caching = ChildDict(
+caching = child_dict(
     disable=False,
     disable_whitelist=False,
     disable_machinery=False,
@@ -152,7 +182,7 @@ ${config_doc}
 
 _settings["caching"] = caching
 
-jitting = ChildDict(
+jitting = child_dict(
     disable=False,
     disable_wrapping=False,
     disable_resolution=False,
@@ -197,7 +227,7 @@ ${config_doc}
 
 _settings["jitting"] = jitting
 
-numba = ChildDict(
+numba = child_dict(
     parallel=None,
     silence_warnings=False,
     check_func_type=True,
@@ -215,10 +245,12 @@ ${config_doc}
 
 _settings["numba"] = numba
 
-math = ChildDict(
+math = child_dict(
     use_tol=True,
     rel_tol=1e-9,  # 1,000,000,000 == 1,000,000,001
     abs_tol=1e-12,  # 0.000000000001 == 0.000000000002
+    use_round=True,
+    decimals=12,  # 0.0000000000004 -> 0.0, # 0.0000000000006 -> 0.000000000001
 )
 """_"""
 
@@ -235,7 +267,7 @@ ${config_doc}
 
 _settings["math"] = math
 
-execution = ChildDict(
+execution = child_dict(
     show_progress=True,
     pbar_kwargs=Config(),
     engines=Config(
@@ -291,7 +323,7 @@ ${config_doc}
 
 _settings["execution"] = execution
 
-chunking = ChildDict(
+chunking = child_dict(
     disable=False,
     disable_wrapping=False,
     option=False,
@@ -322,7 +354,7 @@ ${config_doc}
 
 _settings["chunking"] = chunking
 
-params = ChildDict(
+params = child_dict(
     search_except_types=None,
     search_max_len=None,
     search_max_depth=None,
@@ -346,7 +378,7 @@ ${config_doc}
 
 _settings["params"] = params
 
-template = ChildDict(
+template = child_dict(
     strict=True,
     except_types=(list, set, frozenset),
     max_len=None,
@@ -365,7 +397,24 @@ ${config_doc}
 
 _settings["template"] = template
 
-config = Config(dict())
+pickling = child_dict(
+    pickle_classes=None,
+)
+"""_"""
+
+__pdoc__["pickling"] = Sub(
+    """Sub-config with settings applied to `vectorbtpro.utils.pickling`.
+
+```python
+${config_doc}
+```"""
+)
+
+_settings["pickling"] = pickling
+
+config = child_dict(
+    options=Config(),
+)
 """_"""
 
 __pdoc__["config"] = Sub(
@@ -378,12 +427,12 @@ ${config_doc}
 
 _settings["config"] = config
 
-configured = ChildDict(
+configured = child_dict(
     check_expected_keys_=True,
-    config=Config(
-        dict(
-            readonly_=True,
-            nested_=False,
+    config=child_dict(
+        options=dict(
+            readonly=True,
+            nested=False,
         )
     ),
 )
@@ -399,7 +448,7 @@ ${config_doc}
 
 _settings["configured"] = configured
 
-broadcasting = ChildDict(
+broadcasting = child_dict(
     align_index=True,
     align_columns=True,
     index_from="strict",
@@ -412,7 +461,8 @@ broadcasting = ChildDict(
     ignore_ranges=True,
     keep_wrap_default=False,
     keep_flex=False,
-    min_one_dim=True,
+    min_ndim=None,
+    expand_axis=1,
     index_to_product=True,
     repeat_product=True,
     keys_from_sr_index=True,
@@ -429,7 +479,7 @@ ${config_doc}
 
 _settings["broadcasting"] = broadcasting
 
-indexing = ChildDict(
+indexing = child_dict(
     rotate_rows=False,
     rotate_cols=False,
 )
@@ -448,7 +498,7 @@ ${config_doc}
 
 _settings["indexing"] = indexing
 
-wrapping = ChildDict(
+wrapping = child_dict(
     column_only_select=False,
     range_only_select=False,
     group_select=True,
@@ -476,7 +526,7 @@ When enabling `max_precision` and running your code for the first time, make sur
 
 _settings["wrapping"] = wrapping
 
-resampling = ChildDict(
+resampling = child_dict(
     silence_warnings=False,
 )
 """_"""
@@ -491,9 +541,9 @@ ${config_doc}
 
 _settings["resampling"] = resampling
 
-datetime = ChildDict(
+datetime = child_dict(
     naive_tz=get_local_tz(),
-    to_py_timezone=True,
+    to_fixed_offset=True,
     parse_index=False,
 )
 """_"""
@@ -508,7 +558,7 @@ ${config_doc}
 
 _settings["datetime"] = datetime
 
-data = ChildDict(
+data = child_dict(
     show_progress=True,
     pbar_kwargs=Config(),
     tz_localize=get_utc_tz(),
@@ -681,12 +731,14 @@ data = ChildDict(
             client_config=dict(
                 username=None,
                 password=None,
+                token=None,
             ),
             exchange=None,
             timeframe="D",
-            limit=10000,
             fut_contract=None,
             extended_session=False,
+            pro_data=True,
+            limit=20000,
         ),
     ),
     stats=Config(),
@@ -715,7 +767,7 @@ Alpaca:
 
 _settings["data"] = data
 
-plotting = ChildDict(
+plotting = child_dict(
     use_widgets=True,
     use_resampler=False,
     show_kwargs=Config(),
@@ -736,8 +788,8 @@ plotting = ChildDict(
         purple="#A661D5",
         pink="#DD59AA"
     ),
-    themes=ChildDict(
-        light=ChildDict(
+    themes=child_dict(
+        light=child_dict(
             color_schema=Config(
                 blue="#1f77b4",
                 orange="#ff7f0e",
@@ -750,9 +802,9 @@ plotting = ChildDict(
                 yellow="#bcbd22",
                 cyan="#17becf",
             ),
-            template=None,
+            path="__name__/templates/light.json",
         ),
-        dark=ChildDict(
+        dark=child_dict(
             color_schema=Config(
                 blue="#1f77b4",
                 orange="#ff7f0e",
@@ -765,9 +817,9 @@ plotting = ChildDict(
                 yellow="#bcbd22",
                 cyan="#17becf",
             ),
-            template=None,
+            path="__name__/templates/dark.json",
         ),
-        seaborn=ChildDict(
+        seaborn=child_dict(
             color_schema=Config(
                 blue="rgb(76,114,176)",
                 orange="rgb(221,132,82)",
@@ -780,9 +832,10 @@ plotting = ChildDict(
                 yellow="rgb(147,120,96)",
                 cyan="rgb(196,78,82)",
             ),
-            template=None,
+            path="__name__/templates/seaborn.json",
         ),
     ),
+    default_theme="light",
     layout=Config(
         width=700,
         height=350,
@@ -816,7 +869,7 @@ ${config_doc}
 
 _settings["plotting"] = plotting
 
-stats_builder = ChildDict(
+stats_builder = child_dict(
     metrics="all",
     tags="all",
     dropna=False,
@@ -853,7 +906,7 @@ ${config_doc}
 
 _settings["stats_builder"] = stats_builder
 
-plots_builder = ChildDict(
+plots_builder = child_dict(
     subplots="all",
     tags="all",
     silence_warnings=False,
@@ -900,7 +953,7 @@ ${config_doc}
 
 _settings["plots_builder"] = plots_builder
 
-generic = ChildDict(
+generic = child_dict(
     use_jitted=False,
     stats=Config(
         filters=dict(
@@ -930,7 +983,7 @@ ${config_doc}
 
 _settings["generic"] = generic
 
-ranges = ChildDict(
+ranges = child_dict(
     stats=Config(),
     plots=Config(),
 )
@@ -946,7 +999,7 @@ ${config_doc}
 
 _settings["ranges"] = ranges
 
-splitter = ChildDict(
+splitter = child_dict(
     stats=Config(
         settings=dict(normalize=True),
         filters=dict(
@@ -974,7 +1027,7 @@ ${config_doc}
 
 _settings["splitter"] = splitter
 
-drawdowns = ChildDict(
+drawdowns = child_dict(
     stats=Config(
         settings=dict(
             incl_active=False,
@@ -994,9 +1047,9 @@ ${config_doc}
 
 _settings["drawdowns"] = drawdowns
 
-ohlcv = ChildDict(
+ohlcv = child_dict(
     ohlc_type="candlestick",
-    column_names=ChildDict(
+    column_names=child_dict(
         open="Open",
         high="High",
         low="Low",
@@ -1018,7 +1071,7 @@ ${config_doc}
 
 _settings["ohlcv"] = ohlcv
 
-signals = ChildDict(
+signals = child_dict(
     stats=Config(
         filters=dict(
             silent_has_other=dict(
@@ -1045,7 +1098,7 @@ ${config_doc}
 
 _settings["signals"] = signals
 
-returns = ChildDict(
+returns = child_dict(
     year_freq="365 days",
     bm_returns=None,
     defaults=Config(
@@ -1091,7 +1144,7 @@ ${config_doc}
 
 _settings["returns"] = returns
 
-qs_adapter = ChildDict(
+qs_adapter = child_dict(
     defaults=Config(),
 )
 """_"""
@@ -1106,7 +1159,7 @@ ${config_doc}
 
 _settings["qs_adapter"] = qs_adapter
 
-records = ChildDict(
+records = child_dict(
     stats=Config(),
     plots=Config(),
 )
@@ -1122,7 +1175,7 @@ ${config_doc}
 
 _settings["records"] = records
 
-mapped_array = ChildDict(
+mapped_array = child_dict(
     stats=Config(
         filters=dict(
             has_mapping=dict(
@@ -1151,7 +1204,7 @@ ${config_doc}
 
 _settings["mapped_array"] = mapped_array
 
-orders = ChildDict(
+orders = child_dict(
     stats=Config(),
     plots=Config(),
 )
@@ -1167,7 +1220,7 @@ ${config_doc}
 
 _settings["orders"] = orders
 
-trades = ChildDict(
+trades = child_dict(
     stats=Config(
         settings=dict(
             incl_open=False,
@@ -1188,7 +1241,7 @@ ${config_doc}
 
 _settings["trades"] = trades
 
-logs = ChildDict(
+logs = child_dict(
     stats=Config(),
 )
 """_"""
@@ -1203,7 +1256,7 @@ ${config_doc}
 
 _settings["logs"] = logs
 
-portfolio = ChildDict(
+portfolio = child_dict(
     # Orders
     size=np.inf,
     size_type="amount",
@@ -1212,12 +1265,13 @@ portfolio = ChildDict(
     fees=0.0,
     fixed_fees=0.0,
     slippage=0.0,
-    reject_prob=0.0,
     min_size=np.nan,
     max_size=np.nan,
     size_granularity=np.nan,
+    leverage=1.0,
+    leverage_mode="lazy",
+    reject_prob=0.0,
     price_area_vio_mode="ignore",
-    lock_cash=False,
     allow_partial=True,
     raise_reject=False,
     log=False,
@@ -1267,6 +1321,7 @@ portfolio = ChildDict(
     call_post_segment=False,
     ffill_val_price=True,
     update_value=False,
+    fill_state=False,
     fill_returns=False,
     fill_pos_record=True,
     track_value=True,
@@ -1336,7 +1391,7 @@ ${config_doc}
 
 _settings["portfolio"] = portfolio
 
-pfopt = ChildDict(
+pfopt = child_dict(
     pypfopt=Config(
         target="max_sharpe",
         target_is_convex=True,
@@ -1408,15 +1463,15 @@ ${config_doc}
 
 _settings["pfopt"] = pfopt
 
-messaging = ChildDict(
+messaging = child_dict(
     telegram=Config(
         token=None,
         use_context=True,
-        persistence="telegram_bot.pickle",
+        persistence=True,
         defaults=Config(),
         drop_pending_updates=True,
     ),
-    giphy=ChildDict(
+    giphy=child_dict(
         api_key=None,
         weirdness=5,
     ),
@@ -1446,7 +1501,7 @@ GIPHY:
 
 _settings["messaging"] = messaging
 
-pbar = ChildDict(
+pbar = child_dict(
     disable=False,
     type="tqdm_auto",
     kwargs=Config(),
@@ -1463,8 +1518,8 @@ ${config_doc}
 
 _settings["pbar"] = pbar
 
-path = ChildDict(
-    mkdir=ChildDict(
+path = child_dict(
+    mkdir=child_dict(
         mkdir=False,
         mode=0o777,
         parents=True,
@@ -1490,18 +1545,21 @@ _settings["path"] = path
 class SettingsConfig(Config):
     """Extends `vectorbtpro.utils.config.Config` for global settings."""
 
-    def load_json_templates(self) -> None:
-        """Load templates from JSON files."""
-        for template_name in ["light", "dark", "seaborn"]:
-            template = Config(json.loads(pkgutil.get_data(__name__, f"templates/{template_name}.json")))
-            self["plotting"]["themes"][template_name]["template"] = template
-
     def register_template(self, theme: str) -> None:
         """Register template of a theme."""
         import plotly.io as pio
         import plotly.graph_objects as go
 
-        pio.templates["vbt_" + theme] = go.layout.Template(self["plotting"]["themes"][theme]["template"])
+        template_path = self["plotting"]["themes"][theme]["path"]
+        if template_path is None:
+            raise ValueError(f"Must provide template path for the theme '{theme}'")
+        if template_path.startswith("__name__/"):
+            template_path = template_path.replace("__name__/", "")
+            template = Config(json.loads(pkgutil.get_data(__name__, template_path)))
+        else:
+            with open(template_path, "r") as f:
+                template = Config(json.load(f))
+        pio.templates["vbt_" + theme] = go.layout.Template(template)
 
     def register_templates(self) -> None:
         """Register templates of all themes."""
@@ -1516,7 +1574,7 @@ class SettingsConfig(Config):
 
     def reset_theme(self) -> None:
         """Reset to default theme."""
-        self.set_theme("light")
+        self.set_theme(self["plotting"]["default_theme"])
 
     def substitute_sub_config_docs(self, __pdoc__: dict, prettify_kwargs) -> None:
         """Substitute templates in sub-config docs."""
@@ -1532,28 +1590,26 @@ class SettingsConfig(Config):
 
 settings = SettingsConfig(
     _settings,
-    reset_dct_copy_kwargs_=dict(copy_mode="deep"),
-    frozen_keys_=True,
-    convert_children_=Config,
-    as_attrs_=True,
+    options_=dict(
+        reset_dct_copy_kwargs=dict(copy_mode="deep"),
+        frozen_keys=True,
+        convert_children=Config,
+        as_attrs=True,
+    )
 )
 """Global settings config.
 
 Combines all sub-configs defined in this module."""
 
-try:
-    settings.load_json_templates()
-    settings.reset_theme()
-except ImportError:
-    pass
-
+settings_name = os.environ.get("VBT_SETTINGS_NAME", "vbt")
 if "VBT_SETTINGS_PATH" in os.environ:
-    settings.load_update(os.environ["VBT_SETTINGS_PATH"], clear=True)
-
-if "VBT_SETTINGS_OVERRIDE_PATH" in os.environ:
-    settings.load_update(os.environ["VBT_SETTINGS_OVERRIDE_PATH"], clear=False)
+    if len(os.environ["VBT_SETTINGS_PATH"]) > 0:
+        settings.load_update(os.environ["VBT_SETTINGS_PATH"])
+elif settings.file_exists(settings_name):
+    settings.load_update(settings_name)
 
 try:
+    settings.reset_theme()
     settings.register_templates()
 except ImportError:
     pass

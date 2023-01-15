@@ -160,6 +160,8 @@ def attach_qs_methods(cls: tp.Type[tp.T], replace_signature: bool = True) -> tp.
                     )
                     if returns.name is None:
                         returns = returns.rename("Strategy")
+                    else:
+                        returns = returns.rename(str(returns.name))
                     null_mask = returns.isnull()
                     if "benchmark" in pass_kwargs:
                         benchmark = pass_kwargs["benchmark"]
@@ -170,6 +172,8 @@ def attach_qs_methods(cls: tp.Type[tp.T], replace_signature: bool = True) -> tp.
                         )
                         if benchmark.name is None:
                             benchmark = benchmark.rename("Benchmark")
+                        else:
+                            benchmark = benchmark.rename(str(benchmark.name))
                         bm_null_mask = benchmark.isnull()
                         null_mask = null_mask | bm_null_mask
                         benchmark = benchmark.loc[~null_mask]

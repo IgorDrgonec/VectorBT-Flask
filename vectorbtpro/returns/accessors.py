@@ -111,7 +111,7 @@ dtype: object
 `ReturnsAccessor` class has a single subplot based on `ReturnsAccessor.plot_cumulative`:
 
 ```pycon
->>> ret_acc.plots()
+>>> ret_acc.plots().show()
 ```
 
 ![](/assets/images/api/returns_plots.svg)
@@ -124,7 +124,7 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.accessors import register_vbt_accessor, register_df_vbt_accessor, register_sr_vbt_accessor
-from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast, broadcast_to
+from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast_array_to, broadcast_to
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
 from vectorbtpro.generic.drawdowns import Drawdowns
@@ -162,21 +162,18 @@ class ReturnsAccessor(GenericAccessor):
         value: tp.SeriesFrame,
         init_value: tp.MaybeSeries = np.nan,
         log_returns: bool = False,
-        broadcast_kwargs: tp.KwargsLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> ReturnsAccessorT:
         """Returns a new `ReturnsAccessor` instance with returns calculated from `value`."""
-        if broadcast_kwargs is None:
-            broadcast_kwargs = {}
         if wrap_kwargs is None:
             wrap_kwargs = {}
         if not checks.is_any_array(value):
             value = np.asarray(value)
         value_2d = to_2d_array(value)
-        init_value = broadcast(init_value, to_shape=value_2d.shape[1], **broadcast_kwargs)
+        init_value = broadcast_array_to(init_value, value_2d.shape[1])
 
         func = jit_reg.resolve_option(nb.returns_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1766,7 +1763,7 @@ class ReturnsAccessor(GenericAccessor):
             >>> np.random.seed(0)
             >>> rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
             >>> bm_returns = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
-            >>> rets.vbt.returns.plot_cumulative(bm_returns=bm_returns)
+            >>> rets.vbt.returns.plot_cumulative(bm_returns=bm_returns).show()
             ```
 
             ![](/assets/images/api/plot_cumulative.svg)

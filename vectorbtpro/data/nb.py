@@ -10,16 +10,17 @@ from numba import prange
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import register_jitted
-from vectorbtpro.base.indexing import flex_select_auto_nb
+from vectorbtpro.base.reshaping import to_1d_array_nb
+from vectorbtpro.base.flex_indexing import flex_select_1d_pc_nb
 
 
 @register_jitted(cache=True, tags={"can_parallel"})
 def generate_random_data_nb(
     shape: tp.Shape,
-    start_value: tp.MaybeFlexArray = 100.0,
-    mean: tp.MaybeFlexArray = 0.0,
-    std: tp.MaybeFlexArray = 0.01,
-    symmetric: tp.MaybeFlexArray = False,
+    start_value: tp.FlexArray1dLike = 100.0,
+    mean: tp.FlexArray1dLike = 0.0,
+    std: tp.FlexArray1dLike = 0.01,
+    symmetric: tp.FlexArray1dLike = False,
 ) -> tp.Array2d:
     """Generate data using cumulative product of returns drawn from normal (Gaussian) distribution.
 
@@ -27,13 +28,18 @@ def generate_random_data_nb(
     Otherwise, the majority of generated paths will go downward.
 
     Each argument can be provided per column thanks to flexible indexing."""
+    start_value_ = to_1d_array_nb(np.asarray(start_value))
+    mean_ = to_1d_array_nb(np.asarray(mean))
+    std_ = to_1d_array_nb(np.asarray(std))
+    symmetric_ = to_1d_array_nb(np.asarray(symmetric))
+
     out = np.empty(shape, dtype=np.float_)
 
     for col in prange(shape[1]):
-        _start_value = flex_select_auto_nb(np.asarray(start_value), col)
-        _mean = flex_select_auto_nb(np.asarray(mean), col)
-        _std = flex_select_auto_nb(np.asarray(std), col)
-        _symmetric = flex_select_auto_nb(np.asarray(symmetric), col)
+        _start_value = flex_select_1d_pc_nb(start_value_, col)
+        _mean = flex_select_1d_pc_nb(mean_, col)
+        _std = flex_select_1d_pc_nb(std_, col)
+        _symmetric = flex_select_1d_pc_nb(symmetric_, col)
 
         for i in range(shape[0]):
             if i == 0:
@@ -51,19 +57,24 @@ def generate_random_data_nb(
 @register_jitted(cache=True, tags={"can_parallel"})
 def generate_gbm_data_nb(
     shape: tp.Shape,
-    start_value: tp.MaybeFlexArray = 100.0,
-    mean: tp.MaybeFlexArray = 0.0,
-    std: tp.MaybeFlexArray = 0.01,
-    dt: tp.MaybeFlexArray = 1.0,
+    start_value: tp.FlexArray1dLike = 100.0,
+    mean: tp.FlexArray1dLike = 0.0,
+    std: tp.FlexArray1dLike = 0.01,
+    dt: tp.FlexArray1dLike = 1.0,
 ) -> tp.Array2d:
     """Generate data using Geometric Brownian Motion (GBM)."""
+    start_value_ = to_1d_array_nb(np.asarray(start_value))
+    mean_ = to_1d_array_nb(np.asarray(mean))
+    std_ = to_1d_array_nb(np.asarray(std))
+    dt_ = to_1d_array_nb(np.asarray(dt))
+
     out = np.empty(shape, dtype=np.float_)
 
     for col in prange(shape[1]):
-        _start_value = flex_select_auto_nb(np.asarray(start_value), col)
-        _mean = flex_select_auto_nb(np.asarray(mean), col)
-        _std = flex_select_auto_nb(np.asarray(std), col)
-        _dt = flex_select_auto_nb(np.asarray(dt), col)
+        _start_value = flex_select_1d_pc_nb(start_value_, col)
+        _mean = flex_select_1d_pc_nb(mean_, col)
+        _std = flex_select_1d_pc_nb(std_, col)
+        _dt = flex_select_1d_pc_nb(dt_, col)
 
         for i in range(shape[0]):
             if i == 0:

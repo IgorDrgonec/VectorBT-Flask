@@ -342,8 +342,16 @@ class TestFromSignals:
         )
 
     def test_percent(self):
-        with pytest.raises(Exception):
-            from_signals_both(size=0.5, size_type="percent")
+        assert_records_close(
+            from_signals_both(size=0.5, size_type="percent").order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 0, 50.0, 1.0, 0.0, 0, 0, -1),
+                    (1, 0, 3, 3, 3, 81.25, 4.0, 0.0, 1, 0, -1),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
         assert_records_close(
             from_signals_both(size=0.5, size_type="percent", upon_opposite_entry="close").order_records,
             np.array(
@@ -1199,8 +1207,7 @@ class TestFromSignals:
             np.array(
                 [
                     (0, 0, 0, 0, 0, 100.0, 1.0, 0.0, 0, 0, -1),
-                    (1, 0, 3, 3, 3, 1100.0, 4.0, 0.0, 1, 0, -1),
-                    (0, 1, 3, 3, 3, 1000.0, 4.0, 0.0, 1, 0, -1),
+                    (1, 0, 3, 3, 3, 200.0, 4.0, 0.0, 1, 0, -1),
                 ],
                 dtype=fs_order_dt,
             ),
@@ -1216,9 +1223,8 @@ class TestFromSignals:
             from_signals_shortonly(size=1000, allow_partial=[[True, False]]).order_records,
             np.array(
                 [
-                    (0, 0, 0, 0, 0, 1000.0, 1.0, 0.0, 1, 0, -1),
-                    (1, 0, 3, 3, 3, 275.0, 4.0, 0.0, 0, 0, -1),
-                    (0, 1, 0, 0, 0, 1000.0, 1.0, 0.0, 1, 0, -1),
+                    (0, 0, 0, 0, 0, 100.0, 1.0, 0.0, 1, 0, -1),
+                    (1, 0, 3, 3, 3, 50.0, 4.0, 0.0, 0, 0, -1),
                 ],
                 dtype=fs_order_dt,
             ),
@@ -1263,7 +1269,7 @@ class TestFromSignals:
         assert_records_close(
             from_signals_both(size=1000, allow_partial=True, raise_reject=True).order_records,
             np.array(
-                [(0, 0, 0, 0, 0, 100.0, 1.0, 0.0, 0, 0, -1), (1, 0, 3, 3, 3, 1100.0, 4.0, 0.0, 1, 0, -1)],
+                [(0, 0, 0, 0, 0, 100.0, 1.0, 0.0, 0, 0, -1), (1, 0, 3, 3, 3, 200.0, 4.0, 0.0, 1, 0, -1)],
                 dtype=fs_order_dt,
             ),
         )
@@ -1300,6 +1306,7 @@ class TestFromSignals:
                         100.0,
                         0.0,
                         0.0,
+                        0.0,
                         100.0,
                         1.0,
                         100.0,
@@ -1313,24 +1320,26 @@ class TestFromSignals:
                         np.nan,
                         np.nan,
                         np.nan,
+                        1.0,
+                        0,
                         0.0,
                         0,
-                        False,
                         True,
                         False,
                         True,
-                        0.0,
-                        100.0,
-                        0.0,
-                        0.0,
-                        1.0,
-                        100.0,
                         100.0,
                         1.0,
                         0.0,
                         0,
                         0,
                         -1,
+                        0.0,
+                        100.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0,
+                        100.0,
                         0,
                     ),
                     (
@@ -1346,6 +1355,7 @@ class TestFromSignals:
                         100.0,
                         0.0,
                         0.0,
+                        0.0,
                         4.0,
                         300.0,
                         -np.inf,
@@ -1358,24 +1368,26 @@ class TestFromSignals:
                         np.nan,
                         np.nan,
                         np.nan,
+                        1.0,
+                        0,
                         0.0,
                         0,
-                        False,
                         True,
                         False,
                         True,
-                        800.0,
-                        -100.0,
-                        400.0,
-                        0.0,
-                        4.0,
-                        300.0,
                         200.0,
                         4.0,
                         0.0,
                         1,
                         0,
                         -1,
+                        800.0,
+                        -100.0,
+                        400.0,
+                        400.0,
+                        0.0,
+                        4.0,
+                        300.0,
                         1,
                     ),
                 ],
@@ -1482,7 +1494,7 @@ class TestFromSignals:
                     (2, 5, 2, 2, 2, 1.0, 3.0, 0.0, 1, 0, -1),
                     (0, 6, 0, 0, 0, 1.0, 1.0, 0.0, 0, 0, -1),
                     (1, 6, 1, 1, 1, 1.0, 2.0, 0.0, 1, 0, -1),
-                    (2, 6, 2, 2, 2, 1.0, 3.0, 0.0, 0, 0, -1)
+                    (2, 6, 2, 2, 2, 1.0, 3.0, 0.0, 0, 0, -1),
                 ],
                 dtype=fs_order_dt,
             ),
@@ -1686,7 +1698,6 @@ class TestFromSignals:
             from_signals_both(close=price_wide, size=1.0, init_cash=[0.0, 1.0, 100.0]).order_records,
             np.array(
                 [
-                    (0, 0, 3, 3, 3, 1.0, 4.0, 0.0, 1, 0, -1),
                     (0, 1, 0, 0, 0, 1.0, 1.0, 0.0, 0, 0, -1),
                     (1, 1, 3, 3, 3, 2.0, 4.0, 0.0, 1, 0, -1),
                     (0, 2, 0, 0, 0, 1.0, 1.0, 0.0, 0, 0, -1),
@@ -1711,8 +1722,6 @@ class TestFromSignals:
             from_signals_shortonly(close=price_wide, size=1.0, init_cash=[0.0, 1.0, 100.0]).order_records,
             np.array(
                 [
-                    (0, 0, 0, 0, 0, 1.0, 1.0, 0.0, 1, 0, -1),
-                    (1, 0, 3, 3, 3, 0.25, 4.0, 0.0, 0, 0, -1),
                     (0, 1, 0, 0, 0, 1.0, 1.0, 0.0, 1, 0, -1),
                     (1, 1, 3, 3, 3, 0.5, 4.0, 0.0, 0, 0, -1),
                     (0, 2, 0, 0, 0, 1.0, 1.0, 0.0, 1, 0, -1),
@@ -1756,10 +1765,7 @@ class TestFromSignals:
                 dtype=fs_order_dt,
             ),
         )
-        assert_index_equal(
-            pf.wrapper.grouper.group_by,
-            pd.Index([0, 0, 1], dtype="int64", name="group")
-        )
+        assert_index_equal(pf.wrapper.grouper.group_by, pd.Index([0, 0, 1], dtype="int64", name="group"))
         assert_series_equal(
             pf.init_cash,
             pd.Series([200.0, 100.0], index=pd.Index([0, 1], dtype="int64")).rename("init_cash").rename_axis("group"),
@@ -1927,11 +1933,6 @@ class TestFromSignals:
             pf.order_records,
             np.array(
                 [
-                    (0, 0, 2, 2, 2, 200.0, 1.0, 0.0, 0, 0, -1),
-                    (1, 0, 3, 3, 3, 200.0, 1.0, 0.0, 1, 0, -1),
-                    (0, 1, 1, 1, 1, 200.0, 1.0, 0.0, 0, 0, -1),
-                    (1, 1, 2, 2, 2, 200.0, 1.0, 0.0, 1, 0, -1),
-                    (2, 1, 4, 4, 4, 200.0, 1.0, 0.0, 0, 0, -1),
                     (0, 2, 0, 0, 0, 100.0, 1.0, 0.0, 0, 0, -1),
                     (1, 2, 1, 1, 1, 200.0, 1.0, 0.0, 1, 0, -1),
                     (2, 2, 3, 3, 3, 200.0, 1.0, 0.0, 0, 0, -1),
@@ -5361,7 +5362,7 @@ class TestFromSignals:
             entries=entries2,
             exits=exits2,
             init_cash=[100, 200, 300],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             log=True,
             jitted=dict(parallel=True),
@@ -5371,7 +5372,7 @@ class TestFromSignals:
             entries=entries2,
             exits=exits2,
             init_cash=[100, 200, 300],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             log=True,
             jitted=dict(parallel=False),
@@ -5383,7 +5384,7 @@ class TestFromSignals:
             entries=entries2,
             exits=exits2,
             init_cash=[100, 200],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             cash_sharing=True,
             log=True,
@@ -5394,7 +5395,7 @@ class TestFromSignals:
             entries=entries2,
             exits=exits2,
             init_cash=[100, 200],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             cash_sharing=True,
             log=True,
@@ -5416,7 +5417,7 @@ class TestFromSignals:
             entries=entries2,
             exits=exits2,
             init_cash=[100, 200, 300],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             log=True,
             chunked=True,
@@ -5426,7 +5427,7 @@ class TestFromSignals:
             entries=entries2,
             exits=exits2,
             init_cash=[100, 200, 300],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             log=True,
             chunked=False,
@@ -5438,7 +5439,7 @@ class TestFromSignals:
             entries=entries2,
             exits=exits2,
             init_cash=[100, 200],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             cash_sharing=True,
             log=True,
@@ -5449,7 +5450,7 @@ class TestFromSignals:
             entries=entries2,
             exits=exits2,
             init_cash=[100, 200],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             cash_sharing=True,
             log=True,
@@ -5540,12 +5541,14 @@ class TestFromSignals:
 
 class TestFromHolding:
     def test_from_holding(self):
-        df = pd.DataFrame([
-            [1, np.nan, np.nan],
-            [2, 5, np.nan],
-            [3, 6, 8],
-            [4, 7, 9],
-        ])
+        df = pd.DataFrame(
+            [
+                [1, np.nan, np.nan],
+                [2, 5, np.nan],
+                [3, 6, 8],
+                [4, 7, 9],
+            ]
+        )
         assert_records_close(
             vbt.Portfolio.from_holding(df[0], dynamic_mode=False).order_records,
             vbt.Portfolio.from_holding(df[0], dynamic_mode=True).order_records,

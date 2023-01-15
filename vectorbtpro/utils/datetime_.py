@@ -280,12 +280,12 @@ def is_tz_aware(dt: tp.SupportsTZInfo) -> bool:
     return tz.utcoffset(datetime.now()) is not None
 
 
-def to_timezone(tz: tp.TimezoneLike, to_py_timezone: tp.Optional[bool] = None, **kwargs) -> tzinfo:
+def to_timezone(tz: tp.TimezoneLike, to_fixed_offset: tp.Optional[bool] = None, **kwargs) -> tzinfo:
     """Parse the timezone.
 
     Strings are parsed by `zoneinfo` and `dateparser`, while integers and floats are treated as hour offsets.
 
-    If `to_py_timezone` is set to True, will convert to `datetime.timezone`. See global settings.
+    If `to_fixed_offset` is set to True, will convert to `datetime.timezone`. See global settings.
 
     `**kwargs` are passed to `dateparser.parse`."""
     import dateparser
@@ -295,8 +295,8 @@ def to_timezone(tz: tp.TimezoneLike, to_py_timezone: tp.Optional[bool] = None, *
 
     if tz is None:
         return get_local_tz()
-    if to_py_timezone is None:
-        to_py_timezone = datetime_cfg["to_py_timezone"]
+    if to_fixed_offset is None:
+        to_fixed_offset = datetime_cfg["to_fixed_offset"]
 
     if isinstance(tz, str):
         try:
@@ -310,7 +310,7 @@ def to_timezone(tz: tp.TimezoneLike, to_py_timezone: tp.Optional[bool] = None, *
     if isinstance(tz, timedelta):
         tz = timezone(tz)
     if isinstance(tz, tzinfo):
-        if to_py_timezone:
+        if to_fixed_offset:
             return timezone(tz.utcoffset(datetime.now()))
         return tz
     raise TypeError("Couldn't parse the timezone")

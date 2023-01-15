@@ -922,6 +922,8 @@ class TestSplitter:
         assert vbt.Splitter.loads(splitter.dumps()) == splitter
         splitter.save(tmp_path / "splitter")
         assert vbt.Splitter.load(tmp_path / "splitter") == splitter
+        splitter.save(tmp_path / "splitter", file_format="ini")
+        assert vbt.Splitter.load(tmp_path / "splitter", file_format="ini") == splitter
 
     def test_indexing(self):
         splitter = vbt.Splitter.from_splits(

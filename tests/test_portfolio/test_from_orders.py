@@ -1079,75 +1079,46 @@ class TestFromOrders:
             ),
         )
 
-    def test_lock_cash(self):
+    def test_cash_locking(self):
         pf = vbt.Portfolio.from_orders(
             pd.Series([1, 1]),
             pd.DataFrame([[-25, -25], [np.inf, np.inf]]),
             group_by=True,
             cash_sharing=True,
-            lock_cash=False,
-            fees=0.01,
-            fixed_fees=1.0,
-            slippage=0.01,
-        )
-        np.testing.assert_array_equal(pf.asset_flow.values, np.array([[-25.0, -25.0], [143.12812469365747, 0.0]]))
-        pf = vbt.Portfolio.from_orders(
-            pd.Series([1, 1]),
-            pd.DataFrame([[-25, -25], [np.inf, np.inf]]),
-            group_by=True,
-            cash_sharing=True,
-            lock_cash=True,
             fees=0.01,
             fixed_fees=1.0,
             slippage=0.01,
         )
         np.testing.assert_array_equal(
             pf.asset_flow.values,
-            np.array([[-25.0, -25.0], [94.6034702480149, 47.54435839623566]]),
+            np.array([[-25.0, -25.0], [94.6034702480149, 47.544358396235666]]),
         )
         pf = vbt.Portfolio.from_orders(
             pd.Series([1, 100]),
             pd.DataFrame([[-25, -25], [np.inf, np.inf]]),
             group_by=True,
             cash_sharing=True,
-            lock_cash=False,
             fees=0.01,
             fixed_fees=1.0,
             slippage=0.01,
         )
-        np.testing.assert_array_equal(pf.asset_flow.values, np.array([[-25.0, -25.0], [1.4312812469365748, 0.0]]))
-        pf = vbt.Portfolio.from_orders(
-            pd.Series([1, 100]),
-            pd.DataFrame([[-25, -25], [np.inf, np.inf]]),
-            group_by=True,
-            cash_sharing=True,
-            lock_cash=True,
-            fees=0.01,
-            fixed_fees=1.0,
-            slippage=0.01,
+        np.testing.assert_array_equal(
+            pf.asset_flow.values,
+            np.array([[-25.0, -25.0], [0.946034702480149, 0.008559442318505028]]),
         )
-        np.testing.assert_array_equal(pf.asset_flow.values, np.array([[-25.0, -25.0], [0.4699090272918124, 0.0]]))
-        pf = from_orders_both(size=order_size_one * 1000, lock_cash=[[False, True]])
+        pf = from_orders_both(size=order_size_one * 1000)
         assert_records_close(
             pf.order_records,
             np.array(
                 [
                     (0, 0, 0, 100.0, 1.0, 0.0, 0),
-                    (1, 0, 1, 1000.0, 2.0, 0.0, 1),
-                    (2, 0, 3, 500.0, 4.0, 0.0, 0),
-                    (3, 0, 4, 1000.0, 5.0, 0.0, 1),
-                    (0, 1, 0, 100.0, 1.0, 0.0, 0),
-                    (1, 1, 1, 200.0, 2.0, 0.0, 1),
-                    (2, 1, 3, 100.0, 4.0, 0.0, 0),
+                    (1, 0, 1, 200.0, 2.0, 0.0, 1),
+                    (2, 0, 3, 100.0, 4.0, 0.0, 0),
                 ],
                 dtype=order_dt,
             ),
         )
-        np.testing.assert_array_equal(
-            pf.get_cash(free=True).values,
-            np.array([[0.0, 0.0], [-1600.0, 0.0], [-1600.0, 0.0], [-1600.0, 0.0], [-6600.0, 0.0]]),
-        )
-        pf = from_orders_longonly(size=order_size_one * 1000, lock_cash=[[False, True]])
+        pf = from_orders_longonly(size=order_size_one * 1000)
         assert_records_close(
             pf.order_records,
             np.array(
@@ -1156,36 +1127,131 @@ class TestFromOrders:
                     (1, 0, 1, 100.0, 2.0, 0.0, 1),
                     (2, 0, 3, 50.0, 4.0, 0.0, 0),
                     (3, 0, 4, 50.0, 5.0, 0.0, 1),
-                    (0, 1, 0, 100.0, 1.0, 0.0, 0),
-                    (1, 1, 1, 100.0, 2.0, 0.0, 1),
-                    (2, 1, 3, 50.0, 4.0, 0.0, 0),
-                    (3, 1, 4, 50.0, 5.0, 0.0, 1),
                 ],
                 dtype=order_dt,
             ),
         )
-        np.testing.assert_array_equal(
-            pf.get_cash(free=True).values,
-            np.array([[0.0, 0.0], [200.0, 200.0], [200.0, 200.0], [0.0, 0.0], [250.0, 250.0]]),
-        )
-        pf = from_orders_shortonly(size=order_size_one * 1000, lock_cash=[[False, True]])
+        pf = from_orders_shortonly(size=order_size_one * 1000)
         assert_records_close(
             pf.order_records,
             np.array(
                 [
-                    (0, 0, 0, 1000.0, 1.0, 0.0, 1),
-                    (1, 0, 1, 550.0, 2.0, 0.0, 0),
-                    (2, 0, 3, 1000.0, 4.0, 0.0, 1),
-                    (3, 0, 4, 800.0, 5.0, 0.0, 0),
-                    (0, 1, 0, 100.0, 1.0, 0.0, 1),
-                    (1, 1, 1, 100.0, 2.0, 0.0, 0),
+                    (0, 0, 0, 100.0, 1.0, 0.0, 1),
+                    (1, 0, 1, 100.0, 2.0, 0.0, 0),
                 ],
                 dtype=order_dt,
             ),
         )
-        np.testing.assert_array_equal(
-            pf.get_cash(free=True).values,
-            np.array([[-900.0, 0.0], [-900.0, 0.0], [-900.0, 0.0], [-4900.0, 0.0], [-3989.6551724137926, 0.0]]),
+
+    def test_leverage(self):
+        pf = from_orders_longonly(
+            close=[[1, 1], [2, 2]],
+            size=[300, -300],
+            group_by=True,
+            cash_sharing=True,
+            leverage=1,
+        )
+        assert_records_close(
+            pf.order_records,
+            np.array(
+                [
+                    (0, 0, 0, 100.0, 1.0, 0.0, 0),
+                    (1, 0, 1, 100.0, 2.0, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        pf = from_orders_longonly(
+            close=[[1, 1], [2, 2]],
+            size=[300, -300],
+            group_by=True,
+            cash_sharing=True,
+            leverage=2,
+        )
+        assert_records_close(
+            pf.order_records,
+            np.array(
+                [
+                    (0, 0, 0, 200.0, 1.0, 0.0, 0),
+                    (1, 0, 1, 200.0, 2.0, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        pf = from_orders_longonly(
+            close=[[1, 1], [2, 2]],
+            size=[200, -200],
+            group_by=True,
+            cash_sharing=True,
+            leverage=3,
+            leverage_mode="eager",
+        )
+        assert_records_close(
+            pf.order_records,
+            np.array(
+                [
+                    (0, 0, 0, 200.0, 1.0, 0.0, 0),
+                    (1, 0, 1, 200.0, 2.0, 0.0, 1),
+                    (0, 1, 0, 100.0, 1.0, 0.0, 0),
+                    (1, 1, 1, 100.0, 2.0, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        pf = from_orders_longonly(
+            close=[[1, 1], [2, 2]],
+            size=[[50, 200], [-50, -200]],
+            group_by=True,
+            cash_sharing=True,
+            leverage=2,
+        )
+        assert_records_close(
+            pf.order_records,
+            np.array(
+                [
+                    (0, 0, 0, 50.0, 1.0, 0.0, 0),
+                    (1, 0, 1, 50.0, 2.0, 0.0, 1),
+                    (0, 1, 0, 100.0, 1.0, 0.0, 0),
+                    (1, 1, 1, 100.0, 2.0, 0.0, 1),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        pf = from_orders_longonly(
+            close=[[1, 1], [2, 1]],
+            size=[[200, 0], [-200, np.inf]],
+            group_by=True,
+            cash_sharing=True,
+            leverage=2,
+        )
+        assert_records_close(
+            pf.order_records,
+            np.array(
+                [
+                    (0, 0, 0, 200.0, 1.0, 0.0, 0),
+                    (1, 0, 1, 200.0, 2.0, 0.0, 1),
+                    (0, 1, 1, 600.0, 1.0, 0.0, 0),
+                ],
+                dtype=order_dt,
+            ),
+        )
+        pf = from_orders_longonly(
+            close=[[1, 1], [0.75, 1]],
+            size=[[200, 0], [-200, np.inf]],
+            group_by=True,
+            cash_sharing=True,
+            leverage=2,
+        )
+        assert_records_close(
+            pf.order_records,
+            np.array(
+                [
+                    (0, 0, 0, 200.0, 1.0, 0.0, 0),
+                    (1, 0, 1, 200.0, 0.75, 0.0, 1),
+                    (0, 1, 1, 100.0, 1.0, 0.0, 0),
+                ],
+                dtype=order_dt,
+            ),
         )
 
     def test_allow_partial(self):
@@ -1194,11 +1260,8 @@ class TestFromOrders:
             np.array(
                 [
                     (0, 0, 0, 100.0, 1.0, 0.0, 0),
-                    (1, 0, 1, 1000.0, 2.0, 0.0, 1),
-                    (2, 0, 3, 500.0, 4.0, 0.0, 0),
-                    (3, 0, 4, 1000.0, 5.0, 0.0, 1),
-                    (0, 1, 1, 1000.0, 2.0, 0.0, 1),
-                    (1, 1, 4, 1000.0, 5.0, 0.0, 1),
+                    (1, 0, 1, 200.0, 2.0, 0.0, 1),
+                    (2, 0, 3, 100.0, 4.0, 0.0, 0),
                 ],
                 dtype=order_dt,
             ),
@@ -1219,13 +1282,8 @@ class TestFromOrders:
             from_orders_shortonly(size=order_size_one * 1000, allow_partial=[[True, False]]).order_records,
             np.array(
                 [
-                    (0, 0, 0, 1000.0, 1.0, 0.0, 1),
-                    (1, 0, 1, 550.0, 2.0, 0.0, 0),
-                    (2, 0, 3, 1000.0, 4.0, 0.0, 1),
-                    (3, 0, 4, 800.0, 5.0, 0.0, 0),
-                    (0, 1, 0, 1000.0, 1.0, 0.0, 1),
-                    (1, 1, 3, 1000.0, 4.0, 0.0, 1),
-                    (2, 1, 4, 1000.0, 5.0, 0.0, 0),
+                    (0, 0, 0, 100.0, 1.0, 0.0, 1),
+                    (1, 0, 1, 100.0, 2.0, 0.0, 0),
                 ],
                 dtype=order_dt,
             ),
@@ -1274,18 +1332,8 @@ class TestFromOrders:
         )
 
     def test_raise_reject(self):
-        assert_records_close(
-            from_orders_both(size=order_size_one * 1000, allow_partial=True, raise_reject=True).order_records,
-            np.array(
-                [
-                    (0, 0, 0, 100.0, 1.0, 0.0, 0),
-                    (1, 0, 1, 1000.0, 2.0, 0.0, 1),
-                    (2, 0, 3, 500.0, 4.0, 0.0, 0),
-                    (3, 0, 4, 1000.0, 5.0, 0.0, 1),
-                ],
-                dtype=order_dt,
-            ),
-        )
+        with pytest.raises(Exception):
+            from_orders_both(size=order_size_one * 1000, allow_partial=True, raise_reject=True)
         assert_records_close(
             from_orders_longonly(size=order_size_one * 1000, allow_partial=True, raise_reject=True).order_records,
             np.array(
@@ -1298,24 +1346,14 @@ class TestFromOrders:
                 dtype=order_dt,
             ),
         )
-        assert_records_close(
-            from_orders_shortonly(size=order_size_one * 1000, allow_partial=True, raise_reject=True).order_records,
-            np.array(
-                [
-                    (0, 0, 0, 1000.0, 1.0, 0.0, 1),
-                    (1, 0, 1, 550.0, 2.0, 0.0, 0),
-                    (2, 0, 3, 1000.0, 4.0, 0.0, 1),
-                    (3, 0, 4, 800.0, 5.0, 0.0, 0),
-                ],
-                dtype=order_dt,
-            ),
-        )
         with pytest.raises(Exception):
-            from_orders_both(size=order_size_one * 1000, allow_partial=False, raise_reject=True).order_records
+            from_orders_shortonly(size=order_size_one * 1000, allow_partial=True, raise_reject=True)
         with pytest.raises(Exception):
-            from_orders_longonly(size=order_size_one * 1000, allow_partial=False, raise_reject=True).order_records
+            from_orders_both(size=order_size_one * 1000, allow_partial=False, raise_reject=True)
         with pytest.raises(Exception):
-            from_orders_shortonly(size=order_size_one * 1000, allow_partial=False, raise_reject=True).order_records
+            from_orders_longonly(size=order_size_one * 1000, allow_partial=False, raise_reject=True)
+        with pytest.raises(Exception):
+            from_orders_shortonly(size=order_size_one * 1000, allow_partial=False, raise_reject=True)
 
     def test_log(self):
         assert_records_close(
@@ -1334,6 +1372,7 @@ class TestFromOrders:
                         100.0,
                         0.0,
                         0.0,
+                        0.0,
                         100.0,
                         1.0,
                         100.0,
@@ -1347,24 +1386,26 @@ class TestFromOrders:
                         np.nan,
                         np.nan,
                         np.nan,
+                        1.0,
+                        0,
                         0.0,
                         0,
-                        False,
                         True,
                         False,
                         True,
-                        0.0,
-                        100.0,
-                        0.0,
-                        0.0,
-                        1.0,
-                        100.0,
                         100.0,
                         1.0,
                         0.0,
                         0,
                         0,
                         -1,
+                        0.0,
+                        100.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0,
+                        100.0,
                         0,
                     ),
                     (
@@ -1378,6 +1419,7 @@ class TestFromOrders:
                         2.0,
                         0.0,
                         100.0,
+                        0.0,
                         0.0,
                         0.0,
                         2.0,
@@ -1392,24 +1434,26 @@ class TestFromOrders:
                         np.nan,
                         np.nan,
                         np.nan,
+                        1.0,
+                        0,
                         0.0,
                         0,
-                        False,
                         True,
                         False,
                         True,
-                        400.0,
-                        -100.0,
-                        200.0,
-                        0.0,
-                        2.0,
-                        200.0,
                         200.0,
                         2.0,
                         0.0,
                         1,
                         0,
                         -1,
+                        400.0,
+                        -100.0,
+                        200.0,
+                        200.0,
+                        0.0,
+                        2.0,
+                        200.0,
                         1,
                     ),
                     (
@@ -1424,6 +1468,7 @@ class TestFromOrders:
                         400.0,
                         -100.0,
                         200.0,
+                        200.0,
                         0.0,
                         3.0,
                         100.0,
@@ -1437,24 +1482,26 @@ class TestFromOrders:
                         np.nan,
                         np.nan,
                         np.nan,
+                        1.0,
+                        0,
                         0.0,
                         0,
-                        False,
                         True,
                         False,
                         True,
-                        400.0,
-                        -100.0,
-                        200.0,
-                        0.0,
-                        3.0,
-                        100.0,
                         np.nan,
                         np.nan,
                         np.nan,
                         -1,
                         1,
                         0,
+                        400.0,
+                        -100.0,
+                        200.0,
+                        200.0,
+                        0.0,
+                        3.0,
+                        100.0,
                         -1,
                     ),
                     (
@@ -1469,6 +1516,7 @@ class TestFromOrders:
                         400.0,
                         -100.0,
                         200.0,
+                        200.0,
                         0.0,
                         4.0,
                         0.0,
@@ -1482,24 +1530,26 @@ class TestFromOrders:
                         np.nan,
                         np.nan,
                         np.nan,
+                        1.0,
+                        0,
                         0.0,
                         0,
-                        False,
                         True,
                         False,
                         True,
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                        4.0,
-                        0.0,
                         100.0,
                         4.0,
                         0.0,
                         0,
                         0,
                         -1,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        4.0,
+                        0.0,
                         2,
                     ),
                     (
@@ -1515,6 +1565,7 @@ class TestFromOrders:
                         0.0,
                         0.0,
                         0.0,
+                        0.0,
                         5.0,
                         0.0,
                         -np.inf,
@@ -1527,24 +1578,26 @@ class TestFromOrders:
                         np.nan,
                         np.nan,
                         np.nan,
+                        1.0,
+                        0,
                         0.0,
                         0,
-                        False,
                         True,
                         False,
                         True,
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                        5.0,
-                        0.0,
                         np.nan,
                         np.nan,
                         np.nan,
                         -1,
                         2,
                         6,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        5.0,
+                        0.0,
                         -1,
                     ),
                 ],
@@ -1707,11 +1760,6 @@ class TestFromOrders:
             pf.order_records,
             np.array(
                 [
-                    (0, 0, 2, 200.0, 1.0, 0.0, 0),
-                    (1, 0, 3, 200.0, 1.0, 0.0, 1),
-                    (0, 1, 1, 200.0, 1.0, 0.0, 0),
-                    (1, 1, 2, 200.0, 1.0, 0.0, 1),
-                    (2, 1, 4, 200.0, 1.0, 0.0, 0),
                     (0, 2, 0, 100.0, 1.0, 0.0, 0),
                     (1, 2, 1, 200.0, 1.0, 0.0, 1),
                     (2, 2, 3, 200.0, 1.0, 0.0, 0),
@@ -2172,7 +2220,7 @@ class TestFromOrders:
         pf = from_orders_both(
             close=price_wide2,
             init_cash=[100, 200, 300],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             log=True,
             jitted=dict(parallel=True),
@@ -2180,7 +2228,7 @@ class TestFromOrders:
         pf2 = from_orders_both(
             close=price_wide2,
             init_cash=[100, 200, 300],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             log=True,
             jitted=dict(parallel=False),
@@ -2190,7 +2238,7 @@ class TestFromOrders:
         pf = from_orders_both(
             close=price_wide2,
             init_cash=[100, 200],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             cash_sharing=True,
             log=True,
@@ -2199,7 +2247,7 @@ class TestFromOrders:
         pf2 = from_orders_both(
             close=price_wide2,
             init_cash=[100, 200],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             cash_sharing=True,
             log=True,
@@ -2215,7 +2263,7 @@ class TestFromOrders:
         pf = from_orders_both(
             close=price_wide2,
             init_cash=[100, 200, 300],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             log=True,
             chunked=True,
@@ -2223,7 +2271,7 @@ class TestFromOrders:
         pf2 = from_orders_both(
             close=price_wide2,
             init_cash=[100, 200, 300],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             log=True,
             chunked=False,
@@ -2233,7 +2281,7 @@ class TestFromOrders:
         pf = from_orders_both(
             close=price_wide2,
             init_cash=[100, 200],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             cash_sharing=True,
             log=True,
@@ -2242,7 +2290,7 @@ class TestFromOrders:
         pf2 = from_orders_both(
             close=price_wide2,
             init_cash=[100, 200],
-            size=[1, 2, 3],
+            size=[[1, 2, 3]],
             group_by=np.array([0, 0, 1]),
             cash_sharing=True,
             log=True,

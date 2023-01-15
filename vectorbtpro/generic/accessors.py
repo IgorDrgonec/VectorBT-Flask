@@ -184,7 +184,7 @@ Name: 0, dtype: object
 `GenericAccessor` class has a single subplot based on `GenericAccessor.plot`:
 
 ```pycon
->>> df2.vbt.plots()
+>>> df2.vbt.plots().show()
 ```
 
 ![](/assets/images/api/generic_plots.svg)
@@ -841,7 +841,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
-                broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
+                broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
                 if wrapper is not None:
                     broadcast_named_args = reshaping.broadcast(
                         broadcast_named_args,
@@ -959,7 +959,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
-                broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
+                broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
                 if wrapper is not None:
                     broadcast_named_args = reshaping.broadcast(
                         broadcast_named_args,
@@ -1098,7 +1098,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
-                broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
+                broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
                 if wrapper is not None:
                     broadcast_named_args = reshaping.broadcast(
                         broadcast_named_args,
@@ -1254,7 +1254,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
-                broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
+                broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
                 if wrapper is not None:
                     broadcast_named_args = reshaping.broadcast(
                         broadcast_named_args,
@@ -1379,7 +1379,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
-                broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
+                broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
                 if wrapper is not None:
                     broadcast_named_args = reshaping.broadcast(
                         broadcast_named_args,
@@ -1535,7 +1535,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             reduce_args = ()
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
-                broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
+                broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
                 if wrapper is not None:
                     broadcast_named_args = reshaping.broadcast(
                         broadcast_named_args,
@@ -1621,6 +1621,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
         * `vectorbtpro.generic.nb.apply_reduce.reduce_grouped_meta_nb` if grouped and `returns_array` is False
         * `vectorbtpro.generic.nb.apply_reduce.reduce_to_array_meta_nb` if not grouped and `returns_array` is True
         * `vectorbtpro.generic.nb.apply_reduce.reduce_meta_nb` if not grouped and `returns_array` is False
+
+        `reduce_func_nb` can be a string denoting the suffix of a reducing function
+        from `vectorbtpro.generic.nb`. For example, "sum" will refer to "sum_reduce_nb".
 
         Usage:
             * Using regular function:
@@ -1734,7 +1737,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
-                broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
+                broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
                 if wrapper is not None:
                     broadcast_named_args = reshaping.broadcast(
                         broadcast_named_args,
@@ -1908,7 +1911,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
-                broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
+                broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
                 if wrapper is not None:
                     broadcast_named_args = reshaping.broadcast(
                         broadcast_named_args,
@@ -2036,7 +2039,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
-                broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
+                broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
                 if wrapper is not None:
                     broadcast_named_args = reshaping.broadcast(
                         broadcast_named_args,
@@ -2454,7 +2457,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
-                broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
+                broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
                 if wrapper is not None:
                     broadcast_named_args = reshaping.broadcast(
                         broadcast_named_args,
@@ -2622,7 +2625,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         if isinstance(cls_or_self, type):
             if len(broadcast_named_args) > 0:
-                broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
+                broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
                 if wrapper is not None:
                     broadcast_named_args = reshaping.broadcast(
                         broadcast_named_args,
@@ -3751,7 +3754,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         Usage:
             ```pycon
-            >>> df.vbt.plot()
+            >>> df.vbt.plot().show()
             ```
 
             ![](/assets/images/api/df_plot.svg)
@@ -3777,7 +3780,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         Usage:
             ```pycon
-            >>> df.vbt.lineplot()
+            >>> df.vbt.lineplot().show()
             ```
 
             ![](/assets/images/api/df_lineplot.svg)
@@ -3789,7 +3792,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         Usage:
             ```pycon
-            >>> df.vbt.scatterplot()
+            >>> df.vbt.scatterplot().show()
             ```
 
             ![](/assets/images/api/df_scatterplot.svg)
@@ -3808,7 +3811,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         Usage:
             ```pycon
-            >>> df.vbt.barplot()
+            >>> df.vbt.barplot().show()
             ```
 
             ![](/assets/images/api/df_barplot.svg)
@@ -3842,7 +3845,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         Usage:
             ```pycon
-            >>> df.vbt.histplot()
+            >>> df.vbt.histplot().show()
             ```
 
             ![](/assets/images/api/df_histplot.svg)
@@ -3887,7 +3890,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         Usage:
             ```pycon
-            >>> df.vbt.boxplot()
+            >>> df.vbt.boxplot().show()
             ```
 
             ![](/assets/images/api/df_boxplot.svg)
@@ -3950,7 +3953,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         Usage:
             ```pycon
-            >>> df['a'].vbt.plot_against(df['b'])
+            >>> df['a'].vbt.plot_against(df['b']).show()
             ```
 
             ![](/assets/images/api/sr_plot_against.svg)
@@ -4095,7 +4098,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         Usage:
             ```pycon
-            >>> df['a'].vbt.overlay_with_heatmap(df['b'])
+            >>> df['a'].vbt.overlay_with_heatmap(df['b']).show()
             ```
 
             ![](/assets/images/api/sr_overlay_with_heatmap.svg)
@@ -4174,7 +4177,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             ...     [np.nan, 1, np.nan],
             ...     [np.nan, np.nan, 2]
             ... ])
-            >>> df.vbt.heatmap()
+            >>> df.vbt.heatmap().show()
             ```
 
             ![](/assets/images/api/df_heatmap.svg)
@@ -4194,7 +4197,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             3  3    2
             dtype: int64
 
-            >>> sr.vbt.heatmap()
+            >>> sr.vbt.heatmap().show()
             ```
 
             ![](/assets/images/api/sr_heatmap.svg)
@@ -4462,7 +4465,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         Usage:
             ```pycon
-            >>> pd.Series(np.random.standard_normal(100)).vbt.qqplot()
+            >>> pd.Series(np.random.standard_normal(100)).vbt.qqplot().show()
             ```
 
             ![](/assets/images/api/sr_qqplot.svg)
@@ -4485,6 +4488,103 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 )
             )
 
+        return fig
+
+    def areaplot(
+        self,
+        line_shape: str = "spline",
+        trace_kwargs: tp.KwargsLikeSequence = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:
+        """Plot stacked area.
+
+        Args:
+            line_shape (str): Line shape.
+            trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
+            fig (Figure or FigureWidget): Figure to add traces to.
+            **layout_kwargs: Keyword arguments for layout.
+
+        Usage:
+            ```pycon
+            >>> df.vbt.areaplot().show()
+            ```
+
+            ![](/assets/images/api/df_areaplot.svg)
+        """
+        from vectorbtpro.utils.opt_packages import assert_can_import
+
+        assert_can_import("plotly")
+        from vectorbtpro.utils.figure import make_figure
+        import plotly.express as px
+
+        if fig is None:
+            fig = make_figure()
+        fig.update_layout(**layout_kwargs)
+
+        if fig.layout.colorway is not None:
+            colorway = fig.layout.colorway
+        else:
+            colorway = fig.layout.template.layout.colorway
+        if len(self.wrapper.columns) > len(colorway):
+            colorway = px.colors.qualitative.Alphabet
+
+        pos_mask = self.obj.values > 0
+        pos_mask_any = pos_mask.any()
+        neg_mask = self.obj.values < 0
+        neg_mask_any = neg_mask.any()
+        pos_showlegend = False
+        neg_showlegend = False
+        if pos_mask_any:
+            pos_showlegend = True
+        elif neg_mask_any:
+            neg_showlegend = True
+        if pos_mask_any:
+            pos_df = self.obj.copy()
+            pos_df[neg_mask] = 0.0
+            fig = pos_df.vbt.lineplot(
+                trace_kwargs=[
+                    merge_dicts(
+                        dict(
+                            legendgroup="pfopt_" + str(c),
+                            stackgroup="one",
+                            line=dict(width=0, shape=line_shape),
+                            fillcolor=adjust_opacity(colorway[c % len(colorway)], 0.8),
+                            showlegend=pos_showlegend,
+                        ),
+                        resolve_dict(trace_kwargs, i=c),
+                    )
+                    for c in range(len(self.wrapper.columns))
+                ],
+                add_trace_kwargs=add_trace_kwargs,
+                use_gl=False,
+                fig=fig,
+                **layout_kwargs,
+            )
+        if neg_mask_any:
+            neg_df = self.obj.copy()
+            neg_df[pos_mask] = 0.0
+            fig = neg_df.vbt.lineplot(
+                trace_kwargs=[
+                    merge_dicts(
+                        dict(
+                            legendgroup="pfopt_" + str(c),
+                            stackgroup="two",
+                            line=dict(width=0, shape=line_shape),
+                            fillcolor=adjust_opacity(colorway[c % len(colorway)], 0.8),
+                            showlegend=neg_showlegend,
+                        ),
+                        resolve_dict(trace_kwargs, i=c),
+                    )
+                    for c in range(len(self.wrapper.columns))
+                ],
+                add_trace_kwargs=add_trace_kwargs,
+                use_gl=False,
+                fig=fig,
+                **layout_kwargs,
+            )
         return fig
 
     def plot_pattern(
@@ -4519,7 +4619,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         Usage:
             ```pycon
             >>> sr = pd.Series([10, 11, 12, 13, 12, 13, 14, 15, 13, 14, 11])
-            >>> sr.vbt.plot_pattern([1, 2, 3, 2, 1])
+            >>> sr.vbt.plot_pattern([1, 2, 3, 2, 1]).show()
             ```
 
             ![](/assets/images/api/sr_plot_pattern.svg)"""
@@ -4803,7 +4903,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         if max_error_interp_mode is None:
             max_error_interp_mode = interp_mode
         pattern = reshaping.to_1d_array(pattern)
-        max_error = np.broadcast_to(max_error, (len(pattern),))
+        max_error = reshaping.broadcast_array_to(max_error, len(pattern))
 
         func = jit_reg.resolve_option(nb.fit_pattern_nb, jitted)
         fit_pattern, fit_max_error = func(
@@ -4838,8 +4938,8 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         func = jit_reg.resolve_option(nb.to_renko_1d_nb, jitted)
         arr_out, idx_out, uptrend_out = func(
             self.to_1d_array(),
-            np.broadcast_to(brick_size, (self.wrapper.shape[0],)),
-            relative=np.broadcast_to(relative, (self.wrapper.shape[0],)),
+            reshaping.broadcast_array_to(brick_size, self.wrapper.shape[0]),
+            relative=reshaping.broadcast_array_to(relative, self.wrapper.shape[0]),
             start_value=start_value,
             max_out_len=max_out_len,
         )
@@ -4869,103 +4969,6 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
     ) -> None:
         BaseDFAccessor.__init__(self, wrapper, obj=obj, **kwargs)
         GenericAccessor.__init__(self, wrapper, obj=obj, mapping=mapping, **kwargs)
-
-    def areaplot(
-        self,
-        line_shape: str = "spline",
-        trace_kwargs: tp.KwargsLikeSequence = None,
-        add_trace_kwargs: tp.KwargsLike = None,
-        fig: tp.Optional[tp.BaseFigure] = None,
-        **layout_kwargs,
-    ) -> tp.BaseFigure:
-        """Plot stacked area.
-
-        Args:
-            line_shape (str): Line shape.
-            trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
-            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
-            fig (Figure or FigureWidget): Figure to add traces to.
-            **layout_kwargs: Keyword arguments for layout.
-
-        Usage:
-            ```pycon
-            >>> df.vbt.areaplot()
-            ```
-
-            ![](/assets/images/api/df_areaplot.svg)
-        """
-        from vectorbtpro.utils.opt_packages import assert_can_import
-
-        assert_can_import("plotly")
-        from vectorbtpro.utils.figure import make_figure
-        import plotly.express as px
-
-        if fig is None:
-            fig = make_figure()
-        fig.update_layout(**layout_kwargs)
-
-        if fig.layout.colorway is not None:
-            colorway = fig.layout.colorway
-        else:
-            colorway = fig.layout.template.layout.colorway
-        if len(self.wrapper.columns) > len(colorway):
-            colorway = px.colors.qualitative.Alphabet
-
-        pos_mask = self.obj.values > 0
-        pos_mask_any = pos_mask.any()
-        neg_mask = self.obj.values < 0
-        neg_mask_any = neg_mask.any()
-        pos_showlegend = False
-        neg_showlegend = False
-        if pos_mask_any:
-            pos_showlegend = True
-        elif neg_mask_any:
-            neg_showlegend = True
-        if pos_mask_any:
-            pos_df = self.obj.copy()
-            pos_df[neg_mask] = 0.0
-            fig = pos_df.vbt.lineplot(
-                trace_kwargs=[
-                    merge_dicts(
-                        dict(
-                            legendgroup="pfopt_" + str(c),
-                            stackgroup="one",
-                            line=dict(width=0, shape=line_shape),
-                            fillcolor=adjust_opacity(colorway[c % len(colorway)], 0.8),
-                            showlegend=pos_showlegend,
-                        ),
-                        resolve_dict(trace_kwargs, i=c),
-                    )
-                    for c in range(len(self.wrapper.columns))
-                ],
-                add_trace_kwargs=add_trace_kwargs,
-                use_gl=False,
-                fig=fig,
-                **layout_kwargs,
-            )
-        if neg_mask_any:
-            neg_df = self.obj.copy()
-            neg_df[pos_mask] = 0.0
-            fig = neg_df.vbt.lineplot(
-                trace_kwargs=[
-                    merge_dicts(
-                        dict(
-                            legendgroup="pfopt_" + str(c),
-                            stackgroup="two",
-                            line=dict(width=0, shape=line_shape),
-                            fillcolor=adjust_opacity(colorway[c % len(colorway)], 0.8),
-                            showlegend=neg_showlegend,
-                        ),
-                        resolve_dict(trace_kwargs, i=c),
-                    )
-                    for c in range(len(self.wrapper.columns))
-                ],
-                add_trace_kwargs=add_trace_kwargs,
-                use_gl=False,
-                fig=fig,
-                **layout_kwargs,
-            )
-        return fig
 
     def plot_projections(
         self,
@@ -5038,7 +5041,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
             ...     3: [10, 9, 8, 9, 8],
             ...     4: [10, 11, np.nan, np.nan, np.nan],
             ... })
-            >>> df.vbt.plot_projections()
+            >>> df.vbt.plot_projections().show()
             ```
 
             ![](/assets/images/api/df_plot_projections.svg)

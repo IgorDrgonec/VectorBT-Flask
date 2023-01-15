@@ -11,13 +11,16 @@ from vectorbtpro.base.chunking import (
     GroupIdxsMapper,
     FlexArraySelector,
     FlexArraySlicer,
+    shape_gl_slicer,
+    flex_1d_array_gl_slicer,
+    flex_array_gl_slicer,
+    array_gl_slicer,
 )
 from vectorbtpro.base.grouping import *
 from vectorbtpro.base.resampling import *
 from vectorbtpro.base.indexes import repeat_index, tile_index, stack_indexes, combine_indexes
 from vectorbtpro.base.indexing import (
     PandasIndexer,
-    flex_select_auto_nb,
     hslice,
     RowIdx,
     ColIdx,
@@ -28,11 +31,30 @@ from vectorbtpro.base.indexing import (
     get_index_points,
     get_index_ranges,
 )
+from vectorbtpro.base.flex_indexing import (
+    flex_select_1d_nb,
+    flex_select_1d_pr_nb,
+    flex_select_1d_pc_nb,
+    flex_select_nb,
+)
 from vectorbtpro.base.reshaping import (
+    to_1d_shape,
+    to_2d_shape,
+    repeat_shape,
+    tile_shape,
     to_1d_array,
     to_2d_array,
-    to_per_row_array,
-    to_per_col_array,
+    to_2d_pr_array,
+    to_2d_pc_array,
+    to_1d_array_nb,
+    to_2d_array_nb,
+    to_2d_pr_array_nb,
+    to_2d_pc_array_nb,
+    broadcast_shapes,
+    broadcast_array_to,
+    broadcast_arrays,
+    repeat,
+    tile,
     BCO,
     Default,
     Ref,

@@ -316,7 +316,11 @@ class SignalsAccessor(GenericAccessor):
 
         shape_2d = cls.resolve_shape(shape)
         if len(broadcast_named_args) > 0:
-            broadcast_named_args = reshaping.broadcast(broadcast_named_args, to_shape=shape_2d, **broadcast_kwargs)
+            broadcast_named_args = reshaping.broadcast(
+                broadcast_named_args,
+                to_shape=shape_2d,
+                **broadcast_kwargs
+            )
         template_context = merge_dicts(broadcast_named_args, dict(shape=shape, shape_2d=shape_2d), template_context)
         args = deep_substitute(args, template_context, sub_id="args")
         func = jit_reg.resolve_option(nb.generate_nb, jitted)
@@ -436,7 +440,11 @@ class SignalsAccessor(GenericAccessor):
 
         shape_2d = cls.resolve_shape(shape)
         if len(broadcast_named_args) > 0:
-            broadcast_named_args = reshaping.broadcast(broadcast_named_args, to_shape=shape_2d, **broadcast_kwargs)
+            broadcast_named_args = reshaping.broadcast(
+                broadcast_named_args,
+                to_shape=shape_2d,
+                **broadcast_kwargs,
+            )
         template_context = merge_dicts(
             broadcast_named_args,
             dict(
@@ -510,7 +518,7 @@ class SignalsAccessor(GenericAccessor):
         obj = self.obj
         if len(broadcast_named_args) > 0:
             broadcast_named_args = {"obj": obj, **broadcast_named_args}
-            broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
+            broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
             broadcast_named_args, wrapper = reshaping.broadcast(
                 broadcast_named_args,
                 return_wrapper=True,
@@ -549,6 +557,8 @@ class SignalsAccessor(GenericAccessor):
 
         If one array passed, see `SignalsAccessor.first`. If two arrays passed, entries and exits,
         see `vectorbtpro.signals.nb.clean_enex_nb`."""
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
         if wrap_kwargs is None:
             wrap_kwargs = {}
         if not isinstance(cls_or_self, type):
@@ -559,16 +569,21 @@ class SignalsAccessor(GenericAccessor):
                 obj = ArrayWrapper.from_obj(obj).wrap(obj)
             return obj.vbt.signals.first(wrap_kwargs=wrap_kwargs, jitted=jitted, chunked=chunked)
         if len(args) == 2:
-            if broadcast_kwargs is None:
-                broadcast_kwargs = {}
+            broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
             broadcasted_args, wrapper = reshaping.broadcast(
-                dict(entries=args[0], exits=args[1]), return_wrapper=True, **broadcast_kwargs
+                dict(entries=args[0], exits=args[1]),
+                return_wrapper=True,
+                **broadcast_kwargs,
             )
-            entries = reshaping.to_2d_array(broadcasted_args["entries"])
-            exits = reshaping.to_2d_array(broadcasted_args["exits"])
             func = jit_reg.resolve_option(nb.clean_enex_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
-            entries_out, exits_out = func(entries, exits, force_first, keep_conflicts, reverse_order)
+            entries_out, exits_out = func(
+                broadcasted_args["entries"],
+                broadcasted_args["exits"],
+                force_first,
+                keep_conflicts,
+                reverse_order
+            )
             return (
                 wrapper.wrap(entries_out, group_by=False, **wrap_kwargs),
                 wrapper.wrap(exits_out, group_by=False, **wrap_kwargs),
@@ -649,10 +664,10 @@ class SignalsAccessor(GenericAccessor):
         if seed is not None:
             set_seed_nb(seed)
         if n is not None:
-            n = np.broadcast_to(n, (shape_2d[1],))
+            n = reshaping.broadcast_array_to(n, shape_2d[1])
             chunked = ch.specialize_chunked_option(
                 chunked,
-                arg_take_spec=dict(args=ch.ArgsTaker(base_ch.FlexArraySlicer(axis=1, flex_2d=True))),
+                arg_take_spec=dict(args=ch.ArgsTaker(base_ch.FlexArraySlicer())),
             )
             return cls.generate(
                 shape,
@@ -663,18 +678,16 @@ class SignalsAccessor(GenericAccessor):
                 **kwargs,
             )
         if prob is not None:
-            prob = np.broadcast_to(prob, shape)
-            flex_2d = isinstance(shape, tuple) and len(shape) > 1
+            prob = reshaping.to_2d_array(reshaping.broadcast_array_to(prob, shape))
             chunked = ch.specialize_chunked_option(
                 chunked,
-                arg_take_spec=dict(args=ch.ArgsTaker(base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d), None, None)),
+                arg_take_spec=dict(args=ch.ArgsTaker(base_ch.FlexArraySlicer(axis=1), None, None)),
             )
             return cls.generate(
                 shape,
                 jit_reg.resolve_option(nb.rand_by_prob_place_nb, jitted),
                 prob,
                 pick_first,
-                flex_2d,
                 jitted=jitted,
                 chunked=chunked,
                 **kwargs,
@@ -769,7 +782,7 @@ class SignalsAccessor(GenericAccessor):
         if seed is not None:
             set_seed_nb(seed)
         if n is not None:
-            n = np.broadcast_to(n, (shape_2d[1],))
+            n = reshaping.broadcast_array_to(n, shape_2d[1])
             func = jit_reg.resolve_option(nb.generate_rand_enex_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             entries, exits = func(shape_2d, n, entry_wait, exit_wait)
@@ -779,22 +792,21 @@ class SignalsAccessor(GenericAccessor):
                 wrap_kwargs = resolve_dict(wrap_kwargs)
             return wrapper.wrap(entries, **wrap_kwargs), wrapper.wrap(exits, **wrap_kwargs)
         elif entry_prob is not None and exit_prob is not None:
-            entry_prob = np.broadcast_to(entry_prob, shape)
-            exit_prob = np.broadcast_to(exit_prob, shape)
-            flex_2d = isinstance(shape, tuple) and len(shape) > 1
+            entry_prob = reshaping.to_2d_array(reshaping.broadcast_array_to(entry_prob, shape))
+            exit_prob = reshaping.to_2d_array(reshaping.broadcast_array_to(exit_prob, shape))
             chunked = ch.specialize_chunked_option(
                 chunked,
                 arg_take_spec=dict(
-                    entry_args=ch.ArgsTaker(base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d), None, None),
-                    exit_args=ch.ArgsTaker(base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d), None, None),
+                    entry_args=ch.ArgsTaker(base_ch.FlexArraySlicer(axis=1), None, None),
+                    exit_args=ch.ArgsTaker(base_ch.FlexArraySlicer(axis=1), None, None),
                 ),
             )
             return cls.generate_both(
                 shape,
                 entry_place_func_nb=jit_reg.resolve_option(nb.rand_by_prob_place_nb, jitted),
-                entry_args=(entry_prob, entry_pick_first, flex_2d),
+                entry_args=(entry_prob, entry_pick_first),
                 exit_place_func_nb=jit_reg.resolve_option(nb.rand_by_prob_place_nb, jitted),
-                exit_args=(exit_prob, exit_pick_first, flex_2d),
+                exit_args=(exit_prob, exit_pick_first),
                 entry_wait=entry_wait,
                 exit_wait=exit_wait,
                 jitted=jitted,
@@ -851,25 +863,27 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05  False  False   True
             ```
         """
-        if broadcast_kwargs is None:
-            broadcast_kwargs = {}
         if seed is not None:
             set_seed_nb(seed)
         if prob is not None:
-            broadcast_kwargs = merge_dicts(dict(keep_flex=dict(obj=False, prob=True)), broadcast_kwargs)
-            broadcasted_args = reshaping.broadcast(dict(obj=self.obj, prob=prob), **broadcast_kwargs)
+            broadcast_kwargs = merge_dicts(
+                dict(keep_flex=dict(obj=False, prob=True)),
+                broadcast_kwargs,
+            )
+            broadcasted_args = reshaping.broadcast(
+                dict(obj=self.obj, prob=prob),
+                **broadcast_kwargs,
+            )
             obj = broadcasted_args["obj"]
             prob = broadcasted_args["prob"]
-            flex_2d = obj.ndim == 2
             chunked = ch.specialize_chunked_option(
                 chunked,
-                arg_take_spec=dict(args=ch.ArgsTaker(base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d), None, None)),
+                arg_take_spec=dict(args=ch.ArgsTaker(base_ch.FlexArraySlicer(axis=1), None, None)),
             )
             return obj.vbt.signals.generate_exits(
                 jit_reg.resolve_option(nb.rand_by_prob_place_nb, jitted),
                 prob,
                 True,
-                flex_2d,
                 wait=wait,
                 until_next=until_next,
                 skip_until_exit=skip_until_exit,
@@ -878,10 +892,10 @@ class SignalsAccessor(GenericAccessor):
                 wrap_kwargs=wrap_kwargs,
                 **kwargs,
             )
-        n = np.broadcast_to(1, (self.wrapper.shape_2d[1],))
+        n = reshaping.broadcast_array_to(1, self.wrapper.shape_2d[1])
         chunked = ch.specialize_chunked_option(
             chunked,
-            arg_take_spec=dict(args=ch.ArgsTaker(base_ch.FlexArraySlicer(axis=1, flex_2d=True))),
+            arg_take_spec=dict(args=ch.ArgsTaker(base_ch.FlexArraySlicer())),
         )
         return self.generate_exits(
             jit_reg.resolve_option(nb.rand_place_nb, jitted),
@@ -978,8 +992,6 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05  False  False  False  False  False  False
             ```
         """
-        if broadcast_kwargs is None:
-            broadcast_kwargs = {}
         if wrap_kwargs is None:
             wrap_kwargs = {}
         entries = self.obj
@@ -1008,7 +1020,6 @@ class SignalsAccessor(GenericAccessor):
         )
         broadcasted_args = reshaping.broadcast(broadcastable_args, **broadcast_kwargs)
         entries = broadcasted_args["entries"]
-        flex_2d = entries.ndim == 2
         stop_ts = broadcasted_args["stop_ts"]
         if stop_ts is None:
             stop_ts = np.empty_like(entries, dtype=np.float_)
@@ -1026,12 +1037,12 @@ class SignalsAccessor(GenericAccessor):
                 arg_take_spec=dict(
                     entry_args=ch.ArgsTaker(ch.ArraySlicer(axis=1)),
                     exit_args=ch.ArgsTaker(
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
                         None,
                     ),
                 ),
@@ -1049,7 +1060,6 @@ class SignalsAccessor(GenericAccessor):
                     stop_ts,
                     broadcasted_args["stop"],
                     broadcasted_args["trailing"],
-                    flex_2d,
                 ),
                 entry_wait=entry_wait,
                 exit_wait=exit_wait,
@@ -1064,12 +1074,12 @@ class SignalsAccessor(GenericAccessor):
                 chunked,
                 arg_take_spec=dict(
                     args=ch.ArgsTaker(
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
                         None,
                     )
                 ),
@@ -1085,7 +1095,6 @@ class SignalsAccessor(GenericAccessor):
                 stop_ts,
                 broadcasted_args["stop"],
                 broadcasted_args["trailing"],
-                flex_2d,
                 wait=exit_wait,
                 until_next=until_next,
                 skip_until_exit=skip_until_exit,
@@ -1310,8 +1319,6 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05  False  False  False
             ```
         """
-        if broadcast_kwargs is None:
-            broadcast_kwargs = {}
         if wrap_kwargs is None:
             wrap_kwargs = {}
         entries = self.obj
@@ -1347,7 +1354,6 @@ class SignalsAccessor(GenericAccessor):
         )
         broadcasted_args = reshaping.broadcast(broadcastable_args, **broadcast_kwargs)
         entries = broadcasted_args["entries"]
-        flex_2d = entries.ndim == 2
         stop_price = broadcasted_args["stop_price"]
         if stop_price is None:
             stop_price = np.empty_like(entries, dtype=np.float_)
@@ -1369,19 +1375,19 @@ class SignalsAccessor(GenericAccessor):
                 arg_take_spec=dict(
                     entry_args=ch.ArgsTaker(ch.ArraySlicer(axis=1)),
                     exit_args=ch.ArgsTaker(
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
                         ch.ArraySlicer(axis=1),
                         ch.ArraySlicer(axis=1),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
                         None,
                         None,
                     ),
@@ -1406,7 +1412,6 @@ class SignalsAccessor(GenericAccessor):
                     broadcasted_args["tp_stop"],
                     broadcasted_args["reverse"],
                     is_entry_open,
-                    flex_2d,
                 ),
                 entry_wait=entry_wait,
                 exit_wait=exit_wait,
@@ -1426,19 +1431,19 @@ class SignalsAccessor(GenericAccessor):
                 chunked,
                 arg_take_spec=dict(
                     args=ch.ArgsTaker(
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
                         ch.ArraySlicer(axis=1),
                         ch.ArraySlicer(axis=1),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
-                        base_ch.FlexArraySlicer(axis=1, flex_2d=flex_2d),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
+                        base_ch.FlexArraySlicer(axis=1),
                         None,
                         None,
                     )
@@ -1459,7 +1464,6 @@ class SignalsAccessor(GenericAccessor):
                 broadcasted_args["tp_stop"],
                 broadcasted_args["reverse"],
                 is_entry_open,
-                flex_2d,
                 wait=exit_wait,
                 until_next=until_next,
                 skip_until_exit=skip_until_exit,
@@ -1510,7 +1514,7 @@ class SignalsAccessor(GenericAccessor):
         else:
             broadcast_named_args = {"obj": self.obj, **broadcast_named_args}
         if len(broadcast_named_args) > 1:
-            broadcast_kwargs = merge_dicts(dict(to_pd=False, post_func=reshaping.to_2d_array), broadcast_kwargs)
+            broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
             broadcast_named_args, wrapper = reshaping.broadcast(
                 broadcast_named_args,
                 return_wrapper=True,
@@ -1886,7 +1890,6 @@ class SignalsAccessor(GenericAccessor):
         """
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-
         if other is None:
             # One input array
             func = jit_reg.resolve_option(nb.between_ranges_nb, jitted)
@@ -1896,7 +1899,10 @@ class SignalsAccessor(GenericAccessor):
             to_attach = self.obj
         else:
             # Two input arrays
-            broadcasted_args = reshaping.broadcast(dict(obj=self.obj, other=other), **broadcast_kwargs)
+            broadcasted_args = reshaping.broadcast(
+                dict(obj=self.obj, other=other),
+                **broadcast_kwargs
+            )
             obj = broadcasted_args["obj"]
             other = broadcasted_args["other"]
             func = jit_reg.resolve_option(nb.between_two_ranges_nb, jitted)
@@ -2238,7 +2244,7 @@ class SignalsAccessor(GenericAccessor):
 
         Usage:
             ```pycon
-            >>> mask[['a', 'c']].vbt.signals.plot()
+            >>> mask[['a', 'c']].vbt.signals.plot().show()
             ```
 
             ![](/assets/images/api/signals_df_plot.svg)
@@ -2269,7 +2275,7 @@ class SignalsAccessor(GenericAccessor):
             >>> ts = pd.Series([1, 2, 3, 2, 1], index=mask.index)
             >>> fig = ts.vbt.lineplot()
             >>> mask['b'].vbt.signals.plot_as_entries(y=ts, fig=fig)
-            >>> (~mask['b']).vbt.signals.plot_as_exits(y=ts, fig=fig)
+            >>> (~mask['b']).vbt.signals.plot_as_exits(y=ts, fig=fig).show()
             ```
 
             ![](/assets/images/api/signals_plot_as_markers.svg)

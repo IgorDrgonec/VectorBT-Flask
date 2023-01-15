@@ -9,7 +9,6 @@ import sys
 import io
 import contextlib
 import warnings
-
 import attr
 
 from vectorbtpro import _typing as tp

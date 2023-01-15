@@ -101,10 +101,10 @@ Record = np.void
 RecordArray = np.ndarray
 RecordArray2d = np.ndarray
 RecArray = np.recarray
-MaybeArray = Union[T, Array]
+MaybeArray = Union[Scalar, Array]
 MaybeIndexArray = Union[int, Array1d, slice, Tuple[Array1d, Array1d]]
 SeriesFrame = Union[Series, Frame]
-MaybeSeries = Union[T, Series]
+MaybeSeries = Union[Scalar, Series]
 MaybeSeriesFrame = Union[T, Series, Frame]
 PandasArray = Union[Index, Series, Frame]
 AnyArray = Union[Array, PandasArray]
@@ -112,8 +112,10 @@ AnyArray1d = Union[Array1d, Index, Series]
 AnyArray2d = Union[Array2d, Frame]
 ArrayLike = Union[Scalar, Sequence[Scalar], Sequence[Sequence[Any]], SupportsArray]
 IndexLike = Union[range, Sequence[Scalar], SupportsArray]
-FlexArray = Array
-MaybeFlexArray = Union[Scalar, FlexArray]
+FlexArray1d = Array1d
+FlexArray2d = Array2d
+FlexArray1dLike = Union[Scalar, Array1d, Array2d]
+FlexArray2dLike = Union[Scalar, Array1d, Array2d]
 
 # Labels
 Label = Hashable
