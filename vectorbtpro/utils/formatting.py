@@ -4,6 +4,7 @@
 
 import attr
 import inspect
+
 import numpy as np
 
 from vectorbtpro import _typing as tp

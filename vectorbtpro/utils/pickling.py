@@ -188,7 +188,7 @@ class Pickleable:
         """Decode a config node."""
         return value
 
-    def encode_to_config(
+    def encode_config(
         self,
         unpack_objects: bool = True,
         compress_unpacked: bool = True,
@@ -198,22 +198,22 @@ class Pickleable:
         parser_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> str:
-        """Encode the instance to a config.
+        """Encode the instance to a config string.
 
         Based on `Pickleable.rec_state`. Raises an error if None.
 
-        Encodes to a format that is guaranteed to be parsed using `Pickleable.decode_from_config`.
+        Encodes to a format that is guaranteed to be parsed using `Pickleable.decode_config`.
         Otherwise, an error will be thrown. If any object cannot be represented using a string,
         uses `dumps` to convert it to a byte stream.
 
         When `unpack_objects` is True and an object is an instance of `Pickleable`, saves its
-        reconstruction state to a separate section rather than the byte stream. Appends "@" and
+        reconstruction state to a separate section rather than the byte stream. Appends `@` and
         class name to the section name. If `compress_unpacked` is True, will hide keys in
-        `RecState` that have empty values. Keys in `RecState` will be appended with "~" to avoid
+        `RecState` that have empty values. Keys in `RecState` will be appended with `~` to avoid
         collision with user-defined keys having the same name.
 
         If `use_refs` is True, out of unhashable objects sharing the same id, only the first one
-        will be defined while others will store the reference ("&" + key path) to the first one.
+        will be defined while others will store the reference (`&` + key path) to the first one.
 
         !!! note
             The initial order of keys can be preserved only by using references.
@@ -316,27 +316,33 @@ class Pickleable:
             for k2, v2 in v.items():
                 v2 = self.encode_config_node(k2, v2, **kwargs)
                 if isinstance(v2, str):
-                    if (k2 == "_" and v2 == "_") or v2.startswith("&"):
-                        parser.set(k, k2, v2)
-                    else:
-                        parser.set(k, k2, repr(v2))
+                    if not (k2 == "_" and v2 == "_") and not v2.startswith("&"):
+                        v2 = repr(v2)
                 else:
-                    try:
-                        ast.literal_eval(repr(v2))
-                        parser.set(k, k2, repr(v2))
-                    except Exception as e:
+                    if isinstance(v2, float) and np.isnan(v2):
+                        v2 = "np.nan"
+                    elif isinstance(v2, float) and np.isposinf(v2):
+                        v2 = "np.inf"
+                    elif isinstance(v2, float) and np.isneginf(v2):
+                        v2 = "-np.inf"
+                    else:
                         try:
-                            float(repr(v2))
-                            parser.set(k, k2, repr(v2))
+                            ast.literal_eval(repr(v2))
+                            v2 = repr(v2)
                         except Exception as e:
-                            parser.set(k, k2, "!vbt.loads(" + repr(dumps(v2)) + ")")
+                            try:
+                                float(repr(v2))
+                                v2 = repr(v2)
+                            except Exception as e:
+                                v2 = "!vbt.loads(" + repr(dumps(v2)) + ")"
+                parser.set(k, k2, v2)
         with StringIO() as f:
             parser.write(f)
             str_ = f.getvalue()
         return str_
 
     @classmethod
-    def decode_from_config(
+    def decode_config(
         cls: tp.Type[PickleableT],
         str_: str,
         parse_literals: bool = True,
@@ -347,33 +353,97 @@ class Pickleable:
         parser_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> PickleableT:
-        """Decode an instance from a config.
+        """Decode an instance from a config string.
 
         Can parse configs without sections. Sections can also become sub-dicts if their names use
-        the dot notation. For example, section "a.b" will become a sub-dict of the section "a"
-        and section "a.b.c" will become a sub-dict of the section "a.b". You don't have to define
-        the section "a" explicitly, it will automatically become the outermost key.
+        the dot notation. For example, section `a.b` will become a sub-dict of the section `a`
+        and section `a.b.c` will become a sub-dict of the section `a.b`. You don't have to define
+        the section `a` explicitly, it will automatically become the outermost key.
 
-        If a section contains only one pair "_ = _", it will become an empty dict.
+        If a section contains only one pair `_ = _`, it will become an empty dict.
 
         If `parse_literals` is True, will detect any Python literals and containers such as `True` and `[]`.
-        Will also understand "nan" and "inf".
+        Will also understand `np.nan`, `np.inf`, and `-np.inf`.
 
-        If `run_code` is True, will run any Python code prepended with "!". Will use the context
+        If `run_code` is True, will run any Python code prepended with `!`. Will use the context
         `code_context` together with already defined `np` (NumPy), `pd` (Pandas), and `vbt` (vectorbtpro).
 
         !!! warning
             Unpickling byte streams and running code has important security implications. Don't attempt
             to parse configs coming from untrusted sources as those can contain malicious code!
 
-        If `pack_objects` is True, will look for class paths prepended with "@" in section names,
+        If `pack_objects` is True, will look for class paths prepended with `@` in section names,
         construct an instance of `RecState` (any other keyword arguments will be included to `init_kwargs`),
         and finally use `reconstruct` to reconstruct the unpacked object.
 
-        If `use_refs` is True, will substitute references prepended with "&" for actual objects.
+        If `use_refs` is True, will substitute references prepended with `&` for actual objects.
         Constructs a DAG using [graphlib](https://docs.python.org/3/library/graphlib.html).
 
-        Other keyword arguments are forwarded to `Pickleable.decode_config_node`."""
+        Other keyword arguments are forwarded to `Pickleable.decode_config_node`.
+
+        Usage:
+            * File `types.ini`:
+
+            ```ini
+            string = 'hello world'
+            boolean = False
+            int = 123
+            float = 123.45
+            exp_float = 1e-10
+            nan = np.nan
+            inf = np.inf
+            numpy = !np.array([1, 2, 3])
+            pandas = !pd.Series([1, 2, 3])
+            expression = !dict(sub_dict2=dict(some="value"))
+            mult_expression = !import math; math.floor(1.5)
+            ```
+
+            ```pycon
+            >>> import vectorbtpro as vbt
+
+            >>> vbt.pprint(vbt.pdict.load("types.ini"))
+            pdict(
+                string='hello world',
+                boolean=False,
+                int=123,
+                float=123.45,
+                exp_float=1e-10,
+                nan=np.nan,
+                inf=np.inf,
+                numpy=<numpy.ndarray object at 0x7fe1bf84f690 of shape (3,)>,
+                pandas=<pandas.core.series.Series object at 0x7fe1c9a997f0 of shape (3,)>,
+                expression=dict(
+                    sub_dict2=dict(
+                        some='value'
+                    )
+                ),
+                mult_expression=1
+            )
+            ```
+
+            * File `refs.ini`:
+
+            ```ini
+            [top]
+            sr = &top.sr
+
+            [top.sr @pandas.Series]
+            data = [10756.12, 10876.76, 11764.33]
+            index = &top.sr.index
+            name = 'Open time'
+
+            [top.sr.index @pandas.DatetimeIndex]
+            data = ["2023-01-01", "2023-01-02", "2023-01-03"]
+            ```
+
+            ```pycon
+            >>> vbt.pdict.load("refs.ini")["sr"]
+            2023-01-01    10756.12
+            2023-01-02    10876.76
+            2023-01-03    11764.33
+            Name: Open time, dtype: float64
+            ```
+        """
         import configparser
         from graphlib import TopologicalSorter
 
@@ -386,18 +456,23 @@ class Pickleable:
             parser.read_string(str_)
         except configparser.MissingSectionHeaderError as e:
             parser.read_string("[top]\n" + str_)
-        dct = {sect: dict(parser.items(sect)) for sect in parser.sections()}
-        new_dct = {}
-        for k, v in dct.items():
-            if k.split("@")[0].split(".")[0].strip() != "top":
-                k = "top." + k
-            new_dct[k] = v
-        dct = new_dct
 
         def _get_path(k):
             if "@" in k:
                 return k.split("@")[0].strip()
             return k
+
+        dct = {}
+        has_top_section = False
+        for k in parser.sections():
+            v = dict(parser.items(k))
+            if _get_path(k) == "top":
+                has_top_section = True
+            elif not _get_path(k).startswith("top."):
+                k = "top." + k
+            dct[k] = v
+        if not has_top_section:
+            dct = {"top": {"_": "_"}, **dct}
 
         def _get_class(k):
             if "@" in k:
@@ -437,24 +512,27 @@ class Pickleable:
                         ref_node = _get_ref_node(v2[1:])
                         ref_edges.add((k, (k, k2)))
                         ref_edges.add(((k, k2), ref_node))
-                        new_dct[k][k2] = v2
                     elif run_code and v2.startswith("!"):
-                        new_dct[k][k2] = multiline_eval(v2.lstrip("!"), context=code_context)
+                        v2 = multiline_eval(v2.lstrip("!"), context=code_context)
                     else:
                         if (v2.startswith("'") and v2.endswith("'")) or (v2.startswith('"') and v2.endswith('"')):
-                            new_dct[k][k2] = v2[1:-1]
+                            v2 = v2[1:-1]
                         elif parse_literals:
-                            try:
-                                new_dct[k][k2] = ast.literal_eval(v2)
-                            except Exception as e:
+                            if v2 == "np.nan":
+                                v2 = np.nan
+                            elif v2 == "np.inf":
+                                v2 = np.inf
+                            elif v2 == "-np.inf":
+                                v2 = -np.inf
+                            else:
                                 try:
-                                    new_dct[k][k2] = float(v2)
+                                    v2 = ast.literal_eval(v2)
                                 except Exception as e:
-                                    new_dct[k][k2] = v2
-                        else:
-                            new_dct[k][k2] = v2
-                else:
-                    new_dct[k][k2] = v2
+                                    try:
+                                        v2 = float(v2)
+                                    except Exception as e:
+                                        pass
+                new_dct[k][k2] = v2
         dct = new_dct
 
         # Build DAG
@@ -494,7 +572,14 @@ class Pickleable:
                             if isinstance(k2, tuple):
                                 section_dct[k2[1]] = resolved_nodes[k2]
                             else:
-                                section_dct[k2[len(k) + 1:]] = resolved_nodes[k2]
+                                _k2 = k2[len(k) + 1:]
+                                last_k = _k2.split(".")[-1]
+                                d = section_dct
+                                for s in _k2.split(".")[:-1]:
+                                    if s not in d:
+                                        d[s] = dict()
+                                    d = d[s]
+                                d[last_k] = resolved_nodes[k2]
                     if class_map.get(k, None) is not None and (pack_objects or k == "top"):
                         section_cls = class_map[k]
                         init_args = section_dct.pop("init_args~", ())
@@ -609,7 +694,7 @@ class Pickleable:
             with open(path, "wb") as f:
                 f.write(bytes_)
         elif path.suffix in (".config", ".cfg", ".ini"):
-            str_ = self.encode_to_config(**kwargs)
+            str_ = self.encode_config(**kwargs)
             check_mkdir(path.parent, **mkdir_kwargs)
             with open(path, "w") as f:
                 f.write(str_)
@@ -634,7 +719,7 @@ class Pickleable:
         elif path.suffix in (".config", ".cfg", ".ini"):
             with open(path, "r") as f:
                 str_ = f.read()
-            return cls.decode_from_config(str_, **kwargs)
+            return cls.decode_config(str_, **kwargs)
         else:
             raise ValueError(f"Invalid file extension '{path.suffix}'")
 
