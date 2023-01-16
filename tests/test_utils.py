@@ -2656,7 +2656,7 @@ class TestPickling:
         d2 = dict(acc1=acc1, acc2=acc2)
         d3 = d2
         d4 = dict(a=dict(b=dict(d3=d3)))
-        pdict = pickling.pdict(hello="world", d1=d1, d2=d2, d3=d3, d4=d4)
+        pdict = pickling.pdict(hello="world", cls=vbt.ArrayWrapper, d1=d1, d2=d2, d3=d3, d4=d4)
         pdict.save(tmp_path / "pdict")
         assert pickling.pdict.load(tmp_path / "pdict") == pdict
         pdict.save(tmp_path / "pdict", rec_state_only=True)
@@ -2667,6 +2667,8 @@ class TestPickling:
         assert pickling.pdict.load(tmp_path / "pdict", file_format="ini") == pdict
         pdict.save(tmp_path / "pdict", file_format="ini", use_refs=False)
         assert pickling.pdict.load(tmp_path / "pdict", file_format="ini", use_refs=False) == pdict
+        pdict.save(tmp_path / "pdict", file_format="ini", use_class_ids=False)
+        assert pickling.pdict.load(tmp_path / "pdict", file_format="ini", use_class_ids=False) == pdict
 
 
 # ############# chunking ############# #

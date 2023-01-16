@@ -113,15 +113,46 @@ rec_info_registry = {}
 Populate with the required information if any instance cannot be unpickled."""
 
 
+def to_class_id(obj: tp.Any) -> tp.Optional[str]:
+    """Get the class id from a class.
+
+    If the object is an instance or a subclass of `Pickleable` and `Pickleable._rec_id` is not None,
+    uses the reconstruction id. Otherwise, returns the path to the class definition
+    with `vectorbtpro.utils.module_.find_class`."""
+    if isinstance(obj, type):
+        cls = obj
+    else:
+        cls = type(obj)
+    if issubclass(cls, Pickleable):
+        if cls._rec_id is not None:
+            if not isinstance(cls._rec_id, str):
+                raise TypeError(f"Reconstructing id of class {cls} must be a string")
+            return cls._rec_id
+    class_path = cls.__module__ + "." + cls.__name__
+    if find_class(class_path) is not None:
+        return class_path
+    return None
+
+
+def from_class_id(class_id: str) -> tp.Optional[tp.Type]:
+    """Get the class from a class id."""
+    if class_id in rec_info_registry:
+        return rec_info_registry[class_id].cls
+    cls = find_class(class_id)
+    if cls is not None:
+        return cls
+    raise ValueError(f"Please register an instance of RecInfo for '{class_id}'")
+
+
 def reconstruct(cls: tp.Union[tp.Hashable, tp.Type], rec_state: RecState) -> object:
     """Reconstruct an instance using a class and a reconstruction state."""
     found_rec = False
     if not isinstance(cls, type):
-        cls_id = cls
-        if cls_id in rec_info_registry:
+        class_id = cls
+        if class_id in rec_info_registry:
             found_rec = True
-            cls = rec_info_registry[cls_id].cls
-            modify_state = rec_info_registry[cls_id].modify_state
+            cls = rec_info_registry[class_id].cls
+            modify_state = rec_info_registry[class_id].modify_state
             if modify_state is not None:
                 rec_state = modify_state(rec_state)
     if not isinstance(cls, type):
@@ -193,6 +224,7 @@ class Pickleable:
         unpack_objects: bool = True,
         compress_unpacked: bool = True,
         use_refs: bool = True,
+        use_class_ids: bool = True,
         nested: bool = True,
         to_dict: bool = False,
         parser_kwargs: tp.KwargsLike = None,
@@ -217,6 +249,9 @@ class Pickleable:
 
         !!! note
             The initial order of keys can be preserved only by using references.
+
+        If `use_class_ids` is True, substitutes any class defined as a value by its id instead of
+        pickling its definition. If `to_class_id` returns None, will pickle the definition.
 
         If the instance is nested, set `nested` to True to represent each sub-dict as a section.
 
@@ -280,15 +315,9 @@ class Pickleable:
                     i += 1
             else:
                 if (unpack_objects or k == "top") and isinstance(v, Pickleable):
-                    if v._rec_id is not None:
-                        if not isinstance(v._rec_id, str):
-                            raise TypeError("Reconstructing id must be a string")
-                        class_ = v._rec_id
-                    else:
-                        class_ = type(v).__module__ + "." + type(v).__name__
-                        found_class = find_class(class_)
-                        if found_class is None:
-                            raise ValueError(f"Class '{class_}' cannot be found. Set reconstruction id.")
+                    class_id = to_class_id(v)
+                    if class_id is None:
+                        raise ValueError(f"Class {type(v)} cannot be found. Set reconstruction id.")
                     rec_state = v.rec_state
                     if rec_state is None:
                         if parent_k is None:
@@ -301,7 +330,7 @@ class Pickleable:
                         new_v = new_v["init_kwargs"]
                     else:
                         new_v = {k + "~": v for k, v in new_v.items()}
-                    stack.insert(0, (parent_k, k + " @" + class_, new_v))
+                    stack.insert(0, (parent_k, k + " @" + class_id, new_v))
                 else:
                     if parent_k is None:
                         dct[k] = v
@@ -318,23 +347,26 @@ class Pickleable:
                 if isinstance(v2, str):
                     if not (k2 == "_" and v2 == "_") and not v2.startswith("&"):
                         v2 = repr(v2)
+                elif use_class_ids and isinstance(v2, type):
+                    class_id = to_class_id(v2)
+                    if class_id is not None:
+                        v2 = "@" + class_id
+                elif isinstance(v2, float) and np.isnan(v2):
+                    v2 = "np.nan"
+                elif isinstance(v2, float) and np.isposinf(v2):
+                    v2 = "np.inf"
+                elif isinstance(v2, float) and np.isneginf(v2):
+                    v2 = "-np.inf"
                 else:
-                    if isinstance(v2, float) and np.isnan(v2):
-                        v2 = "np.nan"
-                    elif isinstance(v2, float) and np.isposinf(v2):
-                        v2 = "np.inf"
-                    elif isinstance(v2, float) and np.isneginf(v2):
-                        v2 = "-np.inf"
-                    else:
+                    try:
+                        ast.literal_eval(repr(v2))
+                        v2 = repr(v2)
+                    except Exception as e:
                         try:
-                            ast.literal_eval(repr(v2))
+                            float(repr(v2))
                             v2 = repr(v2)
                         except Exception as e:
-                            try:
-                                float(repr(v2))
-                                v2 = repr(v2)
-                            except Exception as e:
-                                v2 = "!vbt.loads(" + repr(dumps(v2)) + ")"
+                            v2 = "!vbt.loads(" + repr(dumps(v2)) + ")"
                 parser.set(k, k2, v2)
         with StringIO() as f:
             parser.write(f)
@@ -349,6 +381,7 @@ class Pickleable:
         run_code: bool = True,
         pack_objects: bool = True,
         use_refs: bool = True,
+        use_class_ids: bool = True,
         code_context: tp.KwargsLike = None,
         parser_kwargs: tp.KwargsLike = None,
         **kwargs,
@@ -378,6 +411,9 @@ class Pickleable:
 
         If `use_refs` is True, will substitute references prepended with `&` for actual objects.
         Constructs a DAG using [graphlib](https://docs.python.org/3/library/graphlib.html).
+
+        If `use_class_ids` is True, will substitute any class ids prepended with `@` with the
+        corresponding class.
 
         Other keyword arguments are forwarded to `Pickleable.decode_config_node`.
 
@@ -512,6 +548,8 @@ class Pickleable:
                         ref_node = _get_ref_node(v2[1:])
                         ref_edges.add((k, (k, k2)))
                         ref_edges.add(((k, k2), ref_node))
+                    elif use_class_ids and v2.startswith("@"):
+                        v2 = from_class_id(v2[1:])
                     elif run_code and v2.startswith("!"):
                         v2 = multiline_eval(v2.lstrip("!"), context=code_context)
                     else:
@@ -741,14 +779,11 @@ class Pickleable:
         rec_state = self.rec_state
         if rec_state is None:
             return object.__reduce__(self)
-        if self._rec_id is None:
-            class_path = type(self).__module__ + "." + type(self).__name__
-            if find_class(class_path) is not None:
-                cls = class_path
-            else:
-                cls = type(self)
+        class_id = to_class_id(self)
+        if class_id is None:
+            cls = type(self)
         else:
-            cls = self._rec_id
+            cls = class_id
         return reconstruct, (cls, rec_state)
 
 
