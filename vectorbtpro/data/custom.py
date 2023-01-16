@@ -3042,7 +3042,7 @@ class TVData(RemoteData):
     def resolve_client(cls, client: tp.Optional[TVClient] = None, **client_config) -> TVClient:
         """Resolve the client.
 
-        If provided, must be of the type `vectorbtpro.base.tv.TVClient`.
+        If provided, must be of the type `vectorbtpro.data.tv.TVClient`.
         Otherwise, will be created using `client_config`."""
         tv_cfg = cls.get_settings(key_id="custom")
 
