@@ -288,6 +288,8 @@ class Pickleable:
         id_objs = dict()
         while stack:
             parent_k, k, v = stack.pop(0)
+            if not isinstance(k, str):
+                raise TypeError("Dictionary keys must be strings")
             if parent_k is not None and use_refs and _is_referable(k):
                 if id(v) in id_paths:
                     v = "&" + id_paths[id(v)]
