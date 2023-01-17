@@ -727,7 +727,9 @@ def pypfopt_optimize(
                         solver=target_solver,
                         initial_guess=target_initial_guess,
                     )
-        except (OptimizationError, SolverError) as e:
+        except (OptimizationError, SolverError, ValueError) as e:
+            if isinstance(e, ValueError) and "expected return exceeding the risk-free rate" not in str(e):
+                raise e
             if ignore_opt_errors:
                 warnings.warn(str(e), stacklevel=2)
                 return {}
