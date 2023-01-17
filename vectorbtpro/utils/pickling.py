@@ -508,7 +508,13 @@ class Pickleable:
                 has_top_section = True
             elif not _get_path(k).startswith("top."):
                 k = "top." + k
-            dct[k] = v
+            new_v = {}
+            for k2, v2 in v.items():
+                if use_refs and v2.startswith("&") and not v2[1:].startswith("top."):
+                    new_v[k2] = "&top." + v2[1:]
+                else:
+                    new_v[k2] = v2
+            dct[k] = new_v
         if not has_top_section:
             dct = {"top": {"_": "_"}, **dct}
 
