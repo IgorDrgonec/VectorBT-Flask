@@ -249,10 +249,13 @@ def format_func(func: tp.Callable, incl_doc: bool = True, **kwargs) -> str:
     if inspect.isclass(func):
         func_name = func.__name__ + ".__init__"
         func = func.__init__
-    elif inspect.ismethod(func):
-        func_name = func.__self__.__name__ + "." + func.__name__
+    elif inspect.ismethod(func) and hasattr(func, "__self__"):
+        if isinstance(func.__self__, type):
+            func_name = func.__self__.__name__ + "." + func.__name__
+        else:
+            func_name = type(func.__self__).__name__ + "." + func.__name__
     else:
-        func_name = func.__name__
+        func_name = func.__qualname__
     if incl_doc and func.__doc__ is not None:
         return "{}{}:\n{}".format(
             func_name,
