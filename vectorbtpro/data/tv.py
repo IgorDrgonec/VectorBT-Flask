@@ -153,7 +153,7 @@ class TVClient:
         volume_data = True
         for xi in x:
             xi = re.split("\[|:|,|\]", xi)
-            ts = datetime.datetime.fromtimestamp(float(xi[4]))
+            ts = datetime.datetime.utcfromtimestamp(float(xi[4]))
             row = [ts]
             for i in range(5, 10):
                 # skip converting volume data if does not exists
