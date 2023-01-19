@@ -87,7 +87,7 @@ __all__ = [
     "CCXTData",
     "AlpacaData",
     "PolygonData",
-    "AlphaVantageData",
+    "AVData",
     "NDLData",
     "TVData",
 ]
@@ -2430,28 +2430,28 @@ class PolygonData(RemoteData):
 
 PolygonData.override_column_config_doc(__pdoc__)
 
-AlphaVantageDataT = tp.TypeVar("AlphaVantageDataT", bound="AlphaVantageData")
+AVDataT = tp.TypeVar("AVDataT", bound="AVData")
 
 
-class AlphaVantageData(RemoteData):
+class AVData(RemoteData):
     """Subclass of `vectorbtpro.data.base.Data` for `alpha_vantage`.
 
     See https://www.alphavantage.co/documentation/ for API.
 
     Instead of using https://github.com/RomelTorres/alpha_vantage package, which is stale and has
-    many issues, this class parses the API documentation with `AlphaVantageData.parse_api_meta` using
+    many issues, this class parses the API documentation with `AVData.parse_api_meta` using
     `BeautifulSoup4` and builds the API query based on this metadata. It then uses
     [pandas.read_csv](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html) to collect
     and format the CSV data.
 
     This approach is the most flexible we can get since we can instantly react to Alpha Vantage's changes
     in the API. If the data provider changes its API documentation, you can always adapt the parsing
-    procedure by overriding `AlphaVantageData.parse_api_meta`.
+    procedure by overriding `AVData.parse_api_meta`.
 
     If parser still fails, you can disable parsing entirely and specify all information manually
     by setting `function` and disabling `match_params`
 
-    See `AlphaVantageData.fetch_symbol` for arguments.
+    See `AVData.fetch_symbol` for arguments.
 
     Usage:
         * Set up the API key globally (optional):
@@ -2459,7 +2459,7 @@ class AlphaVantageData(RemoteData):
         ```pycon
         >>> import vectorbtpro as vbt
 
-        >>> vbt.AlphaVantageData.set_custom_settings(
+        >>> vbt.AVData.set_custom_settings(
         ...     apikey="YOUR_KEY"
         ... )
         ```
@@ -2467,24 +2467,24 @@ class AlphaVantageData(RemoteData):
         * Fetch data:
 
         ```pycon
-        >>> data = vbt.AlphaVantageData.fetch(
+        >>> data = vbt.AVData.fetch(
         ...     "GOOGL",
         ...     timeframe="1 day",  # premium?
         ... )
 
-        >>> data = vbt.AlphaVantageData.fetch(
+        >>> data = vbt.AVData.fetch(
         ...     "BTC_USD",
         ...     timeframe="30 minutes",  # premium?
         ...     category="digital-currency",
         ...     outputsize="full"
         ... )
 
-        >>> data = vbt.AlphaVantageData.fetch(
+        >>> data = vbt.AVData.fetch(
         ...     "REAL_GDP",
         ...     category="economic-indicators"
         ... )
 
-        >>> data = vbt.AlphaVantageData.fetch(
+        >>> data = vbt.AVData.fetch(
         ...     "IBM",
         ...     category="technical-indicators",
         ...     function="STOCHRSI",
@@ -2590,7 +2590,7 @@ class AlphaVantageData(RemoteData):
             apikey (str): API key.
             api_meta (dict): API meta.
 
-                If None, will use `AlphaVantageData.parse_api_meta` if `function` is not provided
+                If None, will use `AVData.parse_api_meta` if `function` is not provided
                 or `match_params` is True.
             category (str): API category of your choice.
 
@@ -2610,7 +2610,7 @@ class AlphaVantageData(RemoteData):
                 `adjusted`, and `extended`. Required for technical indicators, economic indicators,
                 and fundamental data.
 
-                See the keys in sub-dictionaries returned by `AlphaVantageData.parse_api_meta`.
+                See the keys in sub-dictionaries returned by `AVData.parse_api_meta`.
             timeframe (str): Timeframe.
 
                 Allows human-readable strings such as "15 minutes".
