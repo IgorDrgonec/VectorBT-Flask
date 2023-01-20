@@ -3966,7 +3966,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
                 See `vectorbtpro.portfolio.enums.Order.price`. Can be also provided as
                 `vectorbtpro.portfolio.enums.PriceType`. Options `PriceType.NextOpen` and `PriceType.NextClose`
-                are only applicable as single values, that is, they cannot be used inside arrays.
+                are only applicable per column, that is, they cannot be used inside full arrays.
                 In addition, they require the argument `from_ago` to be None.
             fees (float or array_like): Fees in percentage of the order value.
                 See `vectorbtpro.portfolio.enums.Order.fees`. Will broadcast.
@@ -4372,17 +4372,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             direction = portfolio_cfg["direction"]
         if price is None:
             price = portfolio_cfg["price"]
-        if isinstance(price, str):
-            price = map_enum_fields(price, PriceType)
-        if isinstance(price, (int, float)):
-            if price in (-1, -2):
-                if from_ago is not None:
-                    raise ValueError("Price of next open/close and from_ago cannot be used simultaneously")
-                if price == -1:
-                    price = -np.inf
-                if price == -2:
-                    price = np.inf
-                from_ago = 1
         if size is None:
             size = portfolio_cfg["size"]
         if fees is None:
@@ -4438,6 +4427,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             group_by = True
         if from_ago is None:
             from_ago = portfolio_cfg["from_ago"]
+        if from_ago is None:
+            from_ago = 0
+            from_ago_none = True
+        else:
+            from_ago_none = False
         if call_seq is None:
             call_seq = portfolio_cfg["call_seq"]
         auto_call_seq = False
@@ -4639,6 +4633,22 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if bm_close is not None and not isinstance(bm_close, bool):
             checks.assert_subdtype(broadcasted_args["bm_close"], np.number, arg_name="bm_close")
         checks.assert_subdtype(broadcasted_args["from_ago"], np.integer, arg_name="from_ago")
+
+        # Prepare price
+        if from_ago_none:
+            price = broadcasted_args["price"]
+            if price.size == 1 or price.shape[0] == 1:
+                next_open_mask = price == PriceType.NextOpen
+                next_close_mask = price == PriceType.NextClose
+                if next_open_mask.any() or next_close_mask.any():
+                    price = price.astype(np.float_)
+                    price[next_open_mask] = PriceType.Open
+                    price[next_close_mask] = PriceType.Close
+                    from_ago = np.full(price.shape, 0, dtype=np.int_)
+                    from_ago[next_open_mask] = 1
+                    from_ago[next_close_mask] = 1
+                    broadcasted_args["price"] = price
+                    broadcasted_args["from_ago"] = from_ago
 
         # Remove arguments
         bm_close = broadcasted_args.pop("bm_close", None)
@@ -5547,17 +5557,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             size_type = portfolio_cfg["size_type"]
         if price is None:
             price = portfolio_cfg["price"]
-        if isinstance(price, str):
-            price = map_enum_fields(price, PriceType)
-        if isinstance(price, (int, float)):
-            if price in (-1, -2):
-                if from_ago is not None:
-                    raise ValueError("Price of next open/close and from_ago cannot be used simultaneously")
-                if price == -1:
-                    price = -np.inf
-                if price == -2:
-                    price = np.inf
-                from_ago = 1
         if fees is None:
             fees = portfolio_cfg["fees"]
         if fixed_fees is None:
@@ -5673,6 +5672,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             group_by = True
         if from_ago is None:
             from_ago = portfolio_cfg["from_ago"]
+        if from_ago is None:
+            from_ago = 0
+            from_ago_none = True
+        else:
+            from_ago_none = False
         if call_seq is None:
             call_seq = portfolio_cfg["call_seq"]
         auto_call_seq = False
@@ -6076,6 +6080,22 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(cash_deposits, np.number, arg_name="cash_deposits")
         checks.assert_subdtype(cash_earnings, np.number, arg_name="cash_earnings")
         checks.assert_subdtype(cash_dividends, np.number, arg_name="cash_dividends")
+
+        # Prepare price
+        if from_ago_none:
+            price = broadcasted_args["price"]
+            if price.size == 1 or price.shape[0] == 1:
+                next_open_mask = price == PriceType.NextOpen
+                next_close_mask = price == PriceType.NextClose
+                if next_open_mask.any() or next_close_mask.any():
+                    price = price.astype(np.float_)
+                    price[next_open_mask] = PriceType.Open
+                    price[next_close_mask] = PriceType.Close
+                    from_ago = np.full(price.shape, 0, dtype=np.int_)
+                    from_ago[next_open_mask] = 1
+                    from_ago[next_close_mask] = 1
+                    broadcasted_args["price"] = price
+                    broadcasted_args["from_ago"] = from_ago
 
         # Prepare arguments
         template_context = merge_dicts(

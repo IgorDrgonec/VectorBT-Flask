@@ -1335,7 +1335,7 @@ portfolio = child_dict(
     ),
     template_context=Config(),
     keep_inout_raw=True,
-    from_ago=0,
+    from_ago=None,
     call_seq=None,
     attach_call_seq=False,
     bm_close=None,

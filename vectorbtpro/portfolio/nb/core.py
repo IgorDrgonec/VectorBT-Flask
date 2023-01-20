@@ -922,6 +922,10 @@ def execute_order_nb(
             is_closing_price = True
         else:
             order_price = price_area.open
+    elif order_price == PriceType.NextOpen:
+        raise ValueError("Next open must be handled higher in the stack")
+    elif order_price == PriceType.NextClose:
+        raise ValueError("Next close must be handled higher in the stack")
 
     # Ignore order if size or price is nan
     if np.isnan(order.size):
