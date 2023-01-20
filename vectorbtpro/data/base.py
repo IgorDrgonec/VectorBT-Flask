@@ -1616,6 +1616,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         on_symbols: tp.Union[None, tp.Symbol, tp.Symbols] = None,
         pass_as_first: bool = False,
         rename_args: tp.DictLike = None,
+        unpack: tp.Union[bool, str] = False,
         silence_warnings: bool = False,
         **kwargs,
     ) -> tp.Any:
@@ -1645,6 +1646,10 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         Use `rename_args` to rename arguments. For example, in `vectorbtpro.portfolio.base.Portfolio`,
         data can be passed instead of `close`.
+
+        Set `unpack` to True to return the actual output arrays of the indicator instance.
+        If there's only one output, it will be returned as-is. If multiple, a tuple will be returned.
+        Set `unpack` to 'dict' to return a dictionary instead.
 
         Any argument in `*args` and `**kwargs` can be wrapped with `run_func_dict` to specify
         the value per function name or index when `func` is an iterable."""
@@ -1799,7 +1804,18 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                     if column_idx != -1:
                         with_kwargs[real_arg_name] = _self.get_column(column_idx)
         new_args, new_kwargs = extend_args(func, args, kwargs, **with_kwargs)
-        return func(*new_args, **new_kwargs)
+        out = func(*new_args, **new_kwargs)
+        if isinstance(out, IndicatorBase):
+            if isinstance(unpack, bool):
+                if unpack:
+                    out = tuple([getattr(out, name) for name in out.output_names])
+                    if len(out) == 1:
+                        out = out[0]
+            elif isinstance(unpack, str) and unpack.lower() == "dict":
+                out = {name: getattr(out, name) for name in out.output_names}
+            else:
+                raise ValueError(f"Invalid option unpack='{unpack}'")
+        return out
 
     # ############# Stats ############# #
 
