@@ -2990,8 +2990,7 @@ class TVData(RemoteData):
     !!! note
         If you're getting the error "Please confirm that you are not a robot by clicking the captcha box."
         when attempting to authenticate, use `token` instead of `username` and `password`. To get the
-        token: in a browser, sign in to TradingView and inspect authentication token in the response data
-        (for example by using Chrome Developer Tools).
+        token, see [this issue](https://github.com/StreamAlpha/tvdatafeed/issues/96).
 
     Usage:
         * Set up the credentials globally (optional):

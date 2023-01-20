@@ -2113,6 +2113,10 @@ class PatternRanges(Ranges):
             fig (Figure or FigureWidget): Figure to add traces to.
             **kwargs: Keyword arguments passed to `Ranges.plot`.
         """
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
         self_col = self.select_col(column=column, group_by=False)
         if top_n is not None:
             self_col = self_col.apply_mask(self_col.duration.top_n_mask(top_n))
@@ -2125,9 +2129,19 @@ class PatternRanges(Ranges):
         if upper_max_error_trace_kwargs is None:
             upper_max_error_trace_kwargs = {}
 
+        open_shape_kwargs = merge_dicts(
+            dict(fillcolor=plotting_cfg["contrast_color_schema"]["blue"]),
+            kwargs.pop("open_shape_kwargs", None),
+        )
+        closed_shape_kwargs = merge_dicts(
+            dict(fillcolor=plotting_cfg["contrast_color_schema"]["blue"]),
+            kwargs.pop("closed_shape_kwargs", None),
+        )
         fig, close = Ranges.plot(
             self_col,
             return_close=True,
+            open_shape_kwargs=open_shape_kwargs,
+            closed_shape_kwargs=closed_shape_kwargs,
             add_trace_kwargs=add_trace_kwargs,
             xref=xref,
             yref=yref,

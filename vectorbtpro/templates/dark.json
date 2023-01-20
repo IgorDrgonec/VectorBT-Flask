@@ -337,7 +337,7 @@
       {
         "marker": {
           "line": {
-            "color": "#2f3e4e"
+            "color": "#343545"
           }
         },
         "type": "scatter"
@@ -419,7 +419,7 @@
       {
         "marker": {
           "line": {
-            "color": "#2f3e4e"
+            "color": "#343545"
           }
         },
         "type": "scattergl"
@@ -479,16 +479,16 @@
       {
         "aaxis": {
           "endlinecolor": "#A2B1C6",
-          "gridcolor": "#323b56",
-          "linecolor": "#323b56",
-          "minorgridcolor": "#323b56",
+          "gridcolor": "#343545",
+          "linecolor": "#343545",
+          "minorgridcolor": "#343545",
           "startlinecolor": "#A2B1C6"
         },
         "baxis": {
           "endlinecolor": "#A2B1C6",
-          "gridcolor": "#323b56",
-          "linecolor": "#323b56",
-          "minorgridcolor": "#323b56",
+          "gridcolor": "#343545",
+          "linecolor": "#343545",
+          "minorgridcolor": "#343545",
           "startlinecolor": "#A2B1C6"
         },
         "type": "carpet"
@@ -498,7 +498,7 @@
       {
         "cells": {
           "fill": {
-            "color": "#323b56"
+            "color": "#343545"
           },
           "line": {
             "color": "#21222c"
@@ -558,31 +558,31 @@
     "polar": {
       "bgcolor": "#21222c",
       "angularaxis": {
-        "gridcolor": "#323b56",
-        "linecolor": "#323b56",
+        "gridcolor": "#343545",
+        "linecolor": "#343545",
         "ticks": ""
       },
       "radialaxis": {
-        "gridcolor": "#323b56",
-        "linecolor": "#323b56",
+        "gridcolor": "#343545",
+        "linecolor": "#343545",
         "ticks": ""
       }
     },
     "ternary": {
       "bgcolor": "#21222c",
       "aaxis": {
-        "gridcolor": "#323b56",
-        "linecolor": "#323b56",
+        "gridcolor": "#343545",
+        "linecolor": "#343545",
         "ticks": ""
       },
       "baxis": {
-        "gridcolor": "#323b56",
-        "linecolor": "#323b56",
+        "gridcolor": "#343545",
+        "linecolor": "#343545",
         "ticks": ""
       },
       "caxis": {
-        "gridcolor": "#323b56",
-        "linecolor": "#323b56",
+        "gridcolor": "#343545",
+        "linecolor": "#343545",
         "ticks": ""
       }
     },
@@ -725,32 +725,32 @@
       ]
     },
     "xaxis": {
-      "gridcolor": "#2f3e4e",
-      "linecolor": "#323b56",
+      "gridcolor": "#343545",
+      "linecolor": "#343545",
       "ticks": "",
       "title": {
         "standoff": 15
       },
-      "zerolinecolor": "#2f3e4e",
+      "zerolinecolor": "#343545",
       "automargin": true,
       "zerolinewidth": 2
     },
     "yaxis": {
-      "gridcolor": "#2f3e4e",
-      "linecolor": "#323b56",
+      "gridcolor": "#343545",
+      "linecolor": "#343545",
       "ticks": "",
       "title": {
         "standoff": 15
       },
-      "zerolinecolor": "#2f3e4e",
+      "zerolinecolor": "#343545",
       "automargin": true,
       "zerolinewidth": 2
     },
     "scene": {
       "xaxis": {
         "backgroundcolor": "#21222c",
-        "gridcolor": "#323b56",
-        "linecolor": "#323b56",
+        "gridcolor": "#343545",
+        "linecolor": "#343545",
         "showbackground": true,
         "ticks": "",
         "zerolinecolor": "#aec0d6",
@@ -758,8 +758,8 @@
       },
       "yaxis": {
         "backgroundcolor": "#21222c",
-        "gridcolor": "#323b56",
-        "linecolor": "#323b56",
+        "gridcolor": "#343545",
+        "linecolor": "#343545",
         "showbackground": true,
         "ticks": "",
         "zerolinecolor": "#aec0d6",
@@ -767,8 +767,8 @@
       },
       "zaxis": {
         "backgroundcolor": "#21222c",
-        "gridcolor": "#323b56",
-        "linecolor": "#323b56",
+        "gridcolor": "#343545",
+        "linecolor": "#343545",
         "showbackground": true,
         "ticks": "",
         "zerolinecolor": "#aec0d6",
@@ -788,7 +788,7 @@
     "geo": {
       "bgcolor": "#21222c",
       "landcolor": "#21222c",
-      "subunitcolor": "#323b56",
+      "subunitcolor": "#343545",
       "showland": true,
       "showlakes": true,
       "lakecolor": "#21222c"
@@ -797,7 +797,7 @@
       "x": 0.05
     },
     "updatemenudefaults": {
-      "bgcolor": "#323b56",
+      "bgcolor": "#343545",
       "borderwidth": 0
     },
     "sliderdefaults": {
