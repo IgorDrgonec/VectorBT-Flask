@@ -3933,7 +3933,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         fill_returns: tp.Optional[bool] = None,
         max_orders: tp.Optional[int] = None,
         max_logs: tp.Optional[int] = None,
-        skipna: tp.Optional[bool] = None,
         seed: tp.Optional[int] = None,
         group_by: tp.GroupByLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
@@ -4130,10 +4129,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Defaults to the maximum number of True values across all columns of the log array.
 
                 Set to a lower number if you run out of memory, and to 0 to not fill.
-            skipna (bool): Whether to skip the rows where the size of all columns is NaN.
-
-                Cannot work together with cash deposits, cash earnings, filling returns, and
-                forward-filling the valuation price.
             seed (int): Seed to be set for both `call_seq` and at the beginning of the simulation.
             group_by (any): Group columns. See `vectorbtpro.base.grouping.base.Grouper`.
             broadcast_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.reshaping.broadcast`.
@@ -4451,8 +4446,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             fill_state = portfolio_cfg["fill_state"]
         if fill_returns is None:
             fill_returns = portfolio_cfg["fill_returns"]
-        if skipna is None:
-            skipna = portfolio_cfg["skipna"]
         if seed is None:
             seed = portfolio_cfg["seed"]
         if seed is not None:
@@ -4674,7 +4667,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             fill_returns=fill_returns,
             max_orders=max_orders,
             max_logs=max_logs,
-            skipna=skipna,
         )
 
         # Create an instance

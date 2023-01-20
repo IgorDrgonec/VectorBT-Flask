@@ -102,7 +102,6 @@ def simulate_from_orders_nb(
     fill_returns: bool = False,
     max_orders: tp.Optional[int] = None,
     max_logs: tp.Optional[int] = 0,
-    skipna: bool = False,
 ) -> SimulationOutput:
     """Creates on order out of each element.
 
@@ -184,8 +183,6 @@ def simulate_from_orders_nb(
     )
 
     last_val_price = np.full_like(last_position, np.nan)
-    if ffill_val_price and skipna:
-        raise ValueError("Cannot skip NaN and forward-fill valuation price simultaneously")
     last_debt = np.full(target_shape[1], 0.0, dtype=np.float_)
     last_locked_cash = np.full(target_shape[1], 0.0, dtype=np.float_)
     prev_close_value = last_value.copy()
@@ -194,15 +191,11 @@ def simulate_from_orders_nb(
     log_counts = np.full(target_shape[1], 0, dtype=np.int_)
     track_cash_deposits = np.any(cash_deposits_)
     if track_cash_deposits:
-        if skipna:
-            raise ValueError("Cannot skip NaN and track cash deposits simultaneously")
         cash_deposits_out = np.full((target_shape[0], len(group_lens)), 0.0, dtype=np.float_)
     else:
         cash_deposits_out = np.full((1, 1), 0.0, dtype=np.float_)
     track_cash_earnings = np.any(cash_earnings_) or np.any(cash_dividends_)
     if track_cash_earnings:
-        if skipna:
-            raise ValueError("Cannot skip NaN and track cash earnings simultaneously")
         cash_earnings_out = np.full(target_shape, 0.0, dtype=np.float_)
     else:
         cash_earnings_out = np.full((1, 1), 0.0, dtype=np.float_)
@@ -246,18 +239,28 @@ def simulate_from_orders_nb(
         free_cash_now = cash_now
 
         for i in range(target_shape[0]):
-            if skipna:
-                skip = True
+            skip = not ffill_val_price and not fill_state and not fill_returns
+            if skip:
+                if flex_select_nb(cash_deposits_, i, group) != 0:
+                    skip = False
+            if skip:
                 for c in range(group_len):
                     col = from_col + c
+                    if flex_select_nb(cash_earnings_, i, col) != 0:
+                        skip = False
+                        break
+                    if flex_select_nb(cash_dividends_, i, col) != 0:
+                        skip = False
+                        break
                     _i = i - abs(flex_select_nb(from_ago_, i, col))
                     if _i < 0:
                         continue
                     if not np.isnan(flex_select_nb(size_, _i, col)):
-                        skip = False
-                        break
-                if skip:
-                    continue
+                        if not np.isnan(flex_select_nb(price_, _i, col)):
+                            skip = False
+                            break
+            if skip:
+                continue
 
             # Add cash
             _cash_deposits = flex_select_nb(cash_deposits_, i, group)
