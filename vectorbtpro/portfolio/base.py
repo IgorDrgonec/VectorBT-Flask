@@ -1669,7 +1669,7 @@ from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.mapping import to_mapping
 from vectorbtpro.utils.parsing import get_func_kwargs, get_func_arg_names
 from vectorbtpro.utils.random_ import set_seed
-from vectorbtpro.utils.template import Rep, RepEval, RepFunc, deep_substitute
+from vectorbtpro.utils.template import CustomTemplate, Rep, RepEval, RepFunc, deep_substitute
 from vectorbtpro.utils.chunking import ArgsTaker
 
 try:
@@ -3290,7 +3290,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             field_aliases = {field, *field_aliases}
             found_attr = True
         else:
-            obj_type = None
+            obj_type = "array"
             group_by_aware = True
             wrap_func = None
             wrap_kwargs = None
@@ -4495,6 +4495,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         broadcast_kwargs = merge_dicts(
             dict(
+                to_pd=False,
                 keep_flex=True,
                 reindex_kwargs=dict(
                     cash_earnings=dict(fill_value=0.0),
@@ -4545,6 +4546,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cash_deposits = broadcast(
             cash_deposits,
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
+            to_pd=False,
             keep_flex=True,
             reindex_kwargs=dict(fill_value=0.0),
             require_kwargs=require_kwargs,
@@ -5697,7 +5699,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 raise ValueError("Argument fill_state cannot be used in flexible mode")
             if fill_returns:
                 raise ValueError("Argument fill_returns cannot be used in flexible mode")
-            if in_outputs is not None and not checks.is_namedtuple(in_outputs):
+            if (
+                in_outputs is not None
+                and not isinstance(in_outputs, CustomTemplate)
+                and not checks.is_namedtuple(in_outputs)
+            ):
                 in_outputs = to_mapping(in_outputs)
                 in_outputs = namedtuple("InOutputs", in_outputs)(**in_outputs)
         else:
@@ -5785,6 +5791,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         broadcastable_args = {**broadcastable_args, **broadcast_named_args}
         broadcast_kwargs = merge_dicts(
             dict(
+                to_pd=False,
                 keep_flex=True,
                 reindex_kwargs=dict(
                     cash_earnings=dict(fill_value=0.0),
@@ -5867,6 +5874,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cash_deposits = broadcast(
             cash_deposits,
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
+            to_pd=False,
             keep_flex=True,
             reindex_kwargs=dict(fill_value=0.0),
             require_kwargs=require_kwargs,
@@ -6500,15 +6508,20 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cls: tp.Type[PortfolioT],
         close: tp.Union[tp.ArrayLike, Data],
         optimizer: PortfolioOptimizer,
+        pf_method: str = "from_orders",
         squeeze_groups: bool = True,
         dropna: tp.Optional[str] = None,
         fill_value: tp.Scalar = np.nan,
         size_type: tp.ArrayLike = "targetpercent",
         direction: tp.Optional[tp.ArrayLike] = None,
+        adjust_func_nb: nb.AdjustFuncT = nb.no_adjust_func_nb,
+        adjust_args: tp.Args = (),
         cash_sharing: tp.Optional[bool] = True,
         call_seq: tp.Optional[tp.ArrayLike] = "auto",
         group_by: tp.GroupByLike = None,
-        silence_warnings: bool = False,
+        broadcast_named_args: tp.KwargsLike = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        chunked: tp.ChunkedOption = None,
         **kwargs,
     ) -> PortfolioT:
         """Build portfolio from an optimizer of type `vectorbtpro.portfolio.pfopt.base.PortfolioOptimizer`.
@@ -6563,6 +6576,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             else:
                 direction = "shortonly"
                 size = size.abs()
+
         if group_by is None:
 
             def _substitute_group_by(index):
@@ -6576,16 +6590,93 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 return optimizer.wrapper.grouper.group_by
 
             group_by = RepFunc(_substitute_group_by)
-        return cls.from_orders(
-            close,
-            size=size,
-            size_type=size_type,
-            direction=direction,
-            cash_sharing=cash_sharing,
-            call_seq=call_seq,
-            group_by=group_by,
-            **kwargs,
-        )
+
+        if pf_method.lower() == "from_orders":
+            return cls.from_orders(
+                close,
+                size=size,
+                size_type=size_type,
+                direction=direction,
+                cash_sharing=cash_sharing,
+                call_seq=call_seq,
+                group_by=group_by,
+                broadcast_kwargs=broadcast_kwargs,
+                chunked=chunked,
+                **kwargs,
+            )
+        elif pf_method.lower() == "from_signals":
+            if broadcast_named_args is None:
+                broadcast_named_args = {}
+            broadcast_named_args = merge_dicts(dict(direction=direction), broadcast_named_args)
+            broadcast_kwargs = merge_dicts(
+                dict(
+                    keep_flex=dict(
+                        size_type=False,
+                        direction=False,
+                        min_size=False,
+                        max_size=False,
+                        _def=True,
+                    ),
+                    require_kwargs=dict(
+                        size_type=dict(requirements="O"),
+                        direction=dict(requirements="O"),
+                        min_size=dict(requirements="O"),
+                        max_size=dict(requirements="O"),
+                    ),
+                    reindex_kwargs=dict(direction=dict(fill_value=Direction.Both))
+                ),
+                broadcast_kwargs,
+            )
+
+            def _prepare_direction(direction):
+                direction = map_enum_fields(direction, Direction)
+                checks.assert_subdtype(direction, np.integer, arg_name="direction")
+                return direction
+
+            arg_take_spec = dict(
+                signal_args=ch.ArgsTaker(
+                    base_ch.flex_array_gl_slicer,
+                    base_ch.flex_array_gl_slicer,
+                    base_ch.flex_array_gl_slicer,
+                    base_ch.flex_array_gl_slicer,
+                    base_ch.flex_array_gl_slicer,
+                    base_ch.flex_array_gl_slicer,
+                    base_ch.flex_array_gl_slicer,
+                    base_ch.flex_array_gl_slicer,
+                    None,
+                    ArgsTaker(),
+                )
+            )
+            chunked = ch.specialize_chunked_option(chunked, arg_take_spec=arg_take_spec)
+
+            return cls.from_signals(
+                close,
+                signal_func_nb=nb.order_signal_func_nb,
+                signal_args=(
+                    Rep("size"),
+                    Rep("price"),
+                    Rep("size_type"),
+                    RepFunc(_prepare_direction),
+                    Rep("min_size"),
+                    Rep("max_size"),
+                    Rep("val_price"),
+                    Rep("from_ago"),
+                    adjust_func_nb,
+                    adjust_args,
+                ),
+                size=size,
+                size_type=size_type,
+                accumulate=True,
+                cash_sharing=cash_sharing,
+                call_seq=call_seq,
+                group_by=group_by,
+                broadcast_named_args=broadcast_named_args,
+                broadcast_kwargs=broadcast_kwargs,
+                chunked=chunked,
+                **kwargs,
+            )
+        else:
+            raise ValueError(f"Invalid option pf_method='{pf_method}'")
 
     @classmethod
     def from_order_func(
@@ -7235,7 +7326,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             seed = portfolio_cfg["seed"]
         if seed is not None:
             set_seed(seed)
-        if in_outputs is not None and not checks.is_namedtuple(in_outputs):
+        if (
+            in_outputs is not None
+            and not isinstance(in_outputs, CustomTemplate)
+            and not checks.is_namedtuple(in_outputs)
+        ):
             in_outputs = to_mapping(in_outputs)
             in_outputs = namedtuple("InOutputs", in_outputs)(**in_outputs)
         if group_by is None:
@@ -7263,6 +7358,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         broadcastable_args = {**broadcastable_args, **broadcast_named_args}
         broadcast_kwargs = merge_dicts(
             dict(
+                to_pd=False,
                 keep_flex=True,
                 reindex_kwargs=dict(
                     cash_earnings=dict(fill_value=0.0),
@@ -7294,6 +7390,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cash_deposits = broadcast(
             cash_deposits,
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
+            to_pd=False,
             keep_flex=keep_inout_raw,
             reindex_kwargs=dict(fill_value=0.0),
             require_kwargs=require_kwargs,
@@ -7310,6 +7407,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             segment_mask = broadcast(
                 segment_mask,
                 to_shape=(target_shape_2d[0], len(group_lens)),
+                to_pd=False,
                 keep_flex=keep_inout_raw,
                 reindex_kwargs=dict(fill_value=False),
                 require_kwargs=require_kwargs,

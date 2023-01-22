@@ -907,7 +907,7 @@ class Trades(Ranges):
                     wtype=WType.Wilder,
                 )
         else:
-            volatility = broadcast_to(volatility, self.wrapper, keep_flex=True)
+            volatility = broadcast_to(volatility, self.wrapper, to_pd=False, keep_flex=True)
         out = func(
             self.values,
             col_map,
@@ -973,7 +973,7 @@ class Trades(Ranges):
                     wtype=WType.Wilder,
                 )
         else:
-            volatility = broadcast_to(volatility, self.wrapper, keep_flex=True)
+            volatility = broadcast_to(volatility, self.wrapper, to_pd=False, keep_flex=True)
         out = func(
             self.values,
             col_map,

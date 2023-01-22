@@ -2115,6 +2115,16 @@ class TestPortfolio:
             allocations.values[4][5:10],
             pf_opt.allocations.values[3],
         )
+        assert_frame_equal(
+            vbt.Portfolio.from_optimizer(prices, pf_opt, pf_method="from_orders", val_price=-np.inf)
+            .get_asset_value(group_by=False)
+            .vbt
+            / pf.value,
+            vbt.Portfolio.from_optimizer(prices, pf_opt, pf_method="from_signals", val_price=-np.inf)
+            .get_asset_value(group_by=False)
+            .vbt
+            / pf.value,
+        )
         pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum() / prices.iloc[index_slice].sum().sum(),
@@ -2130,6 +2140,16 @@ class TestPortfolio:
         np.testing.assert_allclose(
             allocations.values[3][5:10],
             pf_opt.allocations.values[1],
+        )
+        assert_frame_equal(
+            vbt.Portfolio.from_optimizer(prices, pf_opt, pf_method="from_orders", val_price=-np.inf)
+            .get_asset_value(group_by=False)
+            .vbt
+            / pf.value,
+            vbt.Portfolio.from_optimizer(prices, pf_opt, pf_method="from_signals", val_price=-np.inf)
+            .get_asset_value(group_by=False)
+            .vbt
+            / pf.value,
         )
         pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
@@ -2147,6 +2167,16 @@ class TestPortfolio:
             allocations.values[3][5:10],
             pf_opt.allocations.values[1],
         )
+        assert_frame_equal(
+            vbt.Portfolio.from_optimizer(prices, pf_opt, pf_method="from_orders", init_cash="auto", size_type="amount")
+            .get_asset_value(group_by=False)
+            .vbt
+            / pf.value,
+            vbt.Portfolio.from_optimizer(prices, pf_opt, pf_method="from_signals", init_cash="auto", size_type="amount")
+            .get_asset_value(group_by=False)
+            .vbt
+            / pf.value,
+        )
         pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: -prices.iloc[index_slice].sum() / prices.iloc[index_slice].sum().sum(),
@@ -2162,4 +2192,14 @@ class TestPortfolio:
         np.testing.assert_allclose(
             allocations.values[3][5:10],
             pf_opt.allocations.values[1],
+        )
+        assert_frame_equal(
+            vbt.Portfolio.from_optimizer(prices, pf_opt, pf_method="from_orders", val_price=-np.inf)
+            .get_asset_value(group_by=False)
+            .vbt
+            / pf.value,
+            vbt.Portfolio.from_optimizer(prices, pf_opt, pf_method="from_signals", val_price=-np.inf)
+            .get_asset_value(group_by=False)
+            .vbt
+            / pf.value,
         )

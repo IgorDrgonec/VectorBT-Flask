@@ -1016,7 +1016,7 @@ def execute_order_nb(
             value=value,
             as_requirement=True,
         )
-        if is_less_nb(percent, min_percent):
+        if not np.isnan(percent) and not np.isnan(min_percent) and is_less_nb(percent, min_percent):
             return order_not_filled_nb(OrderStatus.Ignored, OrderStatusInfo.MinSizeNotReached), exec_state
     if not np.isnan(max_order_size):
         max_order_size, max_percent = resolve_size_nb(
@@ -1027,7 +1027,7 @@ def execute_order_nb(
             value=value,
             as_requirement=True,
         )
-        if is_less_nb(max_percent, percent):
+        if not np.isnan(percent) and not np.isnan(max_percent) and is_less_nb(max_percent, percent):
             percent = max_percent
 
     if order_size >= 0:

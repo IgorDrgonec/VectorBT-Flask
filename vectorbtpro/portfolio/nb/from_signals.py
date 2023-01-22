@@ -4259,3 +4259,97 @@ def dir_to_ls_signals_nb(
                 short_entries_out[i, col] = is_exit
                 short_exits_out[i, col] = False
     return long_entries_out, long_exits_out, short_entries_out, short_exits_out
+
+
+@register_jitted
+def order_signal_func_nb(
+    c: SignalContext,
+    size: tp.FlexArray2d,
+    price: tp.FlexArray2d,
+    size_type: tp.FlexArray2d,
+    direction: tp.FlexArray2d,
+    min_size: tp.FlexArray2d,
+    max_size: tp.FlexArray2d,
+    val_price: tp.FlexArray2d,
+    from_ago: tp.FlexArray2d,
+    adjust_func_nb: AdjustFuncT = no_adjust_func_nb,
+    adjust_args: tp.Args = (),
+) -> tp.Tuple[bool, bool, bool, bool]:
+    """Resolve direction-aware signals out of orders.
+
+    You must ensure that `size`, `size_type`, `min_size`, and `max_size` are writeable non-flexible arrays
+    and accumulation is enabled."""
+    adjust_func_nb(c, *adjust_args)
+
+    _i = c.i - abs(flex_select_nb(from_ago, c.i, c.col))
+    if _i < 0:
+        return False, False, False, False
+    order_size = float(flex_select_nb(size, _i, c.col))
+    if np.isnan(order_size):
+        return False, False, False, False
+    order_size_type = int(flex_select_nb(size_type, _i, c.col))
+    order_direction = int(flex_select_nb(direction, _i, c.col))
+    min_order_size = float(flex_select_nb(min_size, _i, c.col))
+    max_order_size = float(flex_select_nb(max_size, _i, c.col))
+    order_size = get_diraware_size_nb(order_size, order_direction)
+
+    if (
+        order_size_type == SizeType.TargetAmount
+        or order_size_type == SizeType.TargetValue
+        or order_size_type == SizeType.TargetPercent
+        or order_size_type == SizeType.TargetPercent100
+    ):
+        order_price = flex_select_nb(price, _i, c.col)
+        order_val_price = flex_select_nb(val_price, c.i, c.col)
+        if np.isinf(order_val_price) and order_val_price > 0:
+            if np.isinf(order_price) and order_price > 0:
+                order_val_price = flex_select_nb(c.close, c.i, c.col)
+            elif np.isinf(order_price) and order_price < 0:
+                order_val_price = flex_select_nb(c.open, c.i, c.col)
+            else:
+                order_val_price = order_price
+        elif np.isnan(order_val_price) or (np.isinf(order_val_price) and order_val_price < 0):
+            order_val_price = c.last_val_price[c.col]
+        order_size, _ = resolve_size_nb(
+            size=order_size,
+            size_type=order_size_type,
+            position=c.last_position[c.col],
+            val_price=order_val_price,
+            value=c.last_value[c.group] if c.cash_sharing else c.last_value[c.col],
+        )
+        if not np.isnan(min_order_size):
+            min_order_size, _ = resolve_size_nb(
+                size=min_order_size,
+                size_type=order_size_type,
+                position=c.last_position[c.col],
+                val_price=order_val_price,
+                value=c.last_value[c.group] if c.cash_sharing else c.last_value[c.col],
+                as_requirement=True,
+            )
+        if not np.isnan(max_order_size):
+            max_order_size, _ = resolve_size_nb(
+                size=max_order_size,
+                size_type=order_size_type,
+                position=c.last_position[c.col],
+                val_price=order_val_price,
+                value=c.last_value[c.group] if c.cash_sharing else c.last_value[c.col],
+                as_requirement=True,
+            )
+        order_size_type = SizeType.Amount
+
+        size[_i, c.col] = abs(order_size)
+        size_type[_i, c.col] = order_size_type
+        min_size[_i, c.col] = min_order_size
+        max_size[_i, c.col] = max_order_size
+    else:
+        size[_i, c.col] = abs(order_size)
+
+    if order_size > 0:
+        if c.last_position[c.col] < 0 and order_direction == Direction.ShortOnly:
+            return False, False, False, True
+        return True, False, False, False
+    if order_size < 0:
+        if c.last_position[c.col] > 0 and order_direction == Direction.LongOnly:
+            return False, True, False, False
+        return False, False, True, False
+    return False, False, False, False
