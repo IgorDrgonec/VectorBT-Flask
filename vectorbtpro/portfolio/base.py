@@ -4543,6 +4543,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         init_cash = np.require(broadcast_array_to(init_cash, len(cs_group_lens)), dtype=np.float_)
         init_position = np.require(broadcast_array_to(init_position, target_shape_2d[1]), dtype=np.float_)
         init_price = np.require(broadcast_array_to(init_price, target_shape_2d[1]), dtype=np.float_)
+        if (((init_position > 0) | (init_position < 0)) & np.isnan(init_price)).any():
+            warnings.warn(f"Initial position has undefined price. Set init_price.", stacklevel=2)
         cash_deposits = broadcast(
             cash_deposits,
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
@@ -5871,6 +5873,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         init_cash = np.require(broadcast_array_to(init_cash, len(cs_group_lens)), dtype=np.float_)
         init_position = np.require(broadcast_array_to(init_position, target_shape_2d[1]), dtype=np.float_)
         init_price = np.require(broadcast_array_to(init_price, target_shape_2d[1]), dtype=np.float_)
+        if (((init_position > 0) | (init_position < 0)) & np.isnan(init_price)).any():
+            warnings.warn(f"Initial position has undefined price. Set init_price.", stacklevel=2)
         cash_deposits = broadcast(
             cash_deposits,
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
@@ -7387,6 +7391,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         init_cash = np.require(broadcast_array_to(init_cash, len(cs_group_lens)), dtype=np.float_)
         init_position = np.require(broadcast_array_to(init_position, target_shape_2d[1]), dtype=np.float_)
         init_price = np.require(broadcast_array_to(init_price, target_shape_2d[1]), dtype=np.float_)
+        if (((init_position > 0) | (init_position < 0)) & np.isnan(init_price)).any():
+            warnings.warn(f"Initial position has undefined price. Set init_price.", stacklevel=2)
         cash_deposits = broadcast(
             cash_deposits,
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
