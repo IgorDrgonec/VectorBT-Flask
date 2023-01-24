@@ -3560,7 +3560,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
     def to_returns(self, **kwargs) -> tp.SeriesFrame:
         """Get returns of this object."""
-        return self.obj.vbt.returns.from_value(self.obj, **kwargs).obj
+        from vectorbtpro.returns.accessors import ReturnsAccessor
+
+        return ReturnsAccessor.from_value(self._obj, wrapper=self.wrapper, return_values=True, **kwargs)
 
     # ############# Patterns ############# #
 

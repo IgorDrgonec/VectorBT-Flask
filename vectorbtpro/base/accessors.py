@@ -538,7 +538,10 @@ class BaseAccessor(Wrapping):
         obj: tp.Optional[tp.ArrayLike] = None,
         **kwargs,
     ) -> None:
-        wrapper_kwargs, kwargs = ArrayWrapper.extract_init_kwargs(**kwargs)
+        if len(kwargs) > 0:
+            wrapper_kwargs, kwargs = ArrayWrapper.extract_init_kwargs(**kwargs)
+        else:
+            wrapper_kwargs, kwargs = {}, {}
         if not isinstance(wrapper, ArrayWrapper):
             if obj is not None:
                 raise ValueError("Must either provide wrapper and object, or only object")
@@ -586,6 +589,13 @@ class BaseAccessor(Wrapping):
     @property
     def obj(self) -> tp.SeriesFrame:
         """Pandas object."""
+        if isinstance(self._obj, (pd.Series, pd.DataFrame)):
+            if self._obj.shape == self.wrapper.shape:
+                if self._obj.index is self.wrapper.index:
+                    if isinstance(self._obj, pd.Series) and self._obj.name == self.wrapper.name:
+                        return self._obj
+                    if isinstance(self._obj, pd.DataFrame) and self._obj.columns is self.wrapper.columns:
+                        return self._obj
         return self.wrapper.wrap(self._obj, group_by=False)
 
     @class_or_instanceproperty
