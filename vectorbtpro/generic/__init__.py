@@ -11,7 +11,7 @@ from vectorbtpro.generic.enums import *
 from vectorbtpro.generic.ranges import Ranges, PatternRanges, PSC
 from vectorbtpro.generic.splitting import *
 from vectorbtpro.utils.module_ import create__all__
-from vectorbtpro.utils.opt_packages import check_installed
+from vectorbtpro.utils.module_ import check_installed
 from vectorbtpro._settings import settings
 
 __blacklist__ = []

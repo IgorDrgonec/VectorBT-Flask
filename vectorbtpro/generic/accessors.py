@@ -4516,7 +4516,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
             ![](/assets/images/api/df_areaplot.svg)
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         from vectorbtpro.utils.figure import make_figure
@@ -4626,7 +4626,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
             ![](/assets/images/api/sr_plot_pattern.svg)"""
         from vectorbtpro.utils.figure import make_figure
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         from vectorbtpro._settings import settings

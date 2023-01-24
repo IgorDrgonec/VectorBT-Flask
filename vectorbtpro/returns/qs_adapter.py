@@ -97,7 +97,7 @@ We can still override any argument by overriding its default or by passing it di
 ```
 """
 
-from vectorbtpro.utils.opt_packages import assert_can_import
+from vectorbtpro.utils.module_ import assert_can_import
 
 assert_can_import("quantstats")
 

@@ -845,7 +845,7 @@ class Ranges(PriceRecords):
 
             ![](/assets/images/api/ranges_plot_projections.svg)
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         from vectorbtpro.utils.figure import make_figure
@@ -1104,7 +1104,7 @@ class Ranges(PriceRecords):
 
             ![](/assets/images/api/ranges_plot_shapes.svg)
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         from vectorbtpro.utils.figure import make_figure, get_domain
@@ -1283,7 +1283,7 @@ class Ranges(PriceRecords):
 
             ![](/assets/images/api/ranges_plot.svg)
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         import plotly.graph_objects as go

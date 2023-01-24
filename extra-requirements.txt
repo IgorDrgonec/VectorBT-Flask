@@ -11,15 +11,16 @@ tables:                     data
 polygon-api-client>=1.0.0:  data
 beautifulsoup4:             data
 nasdaq-data-link:           data
+TA-Lib:                     ta, base
 ta:                         ta
 pandas_ta:                  ta
 technical:                  ta
-TA-Lib:                     ta, base
 Bottleneck:                 compute
 numexpr:                    compute, base
 hyperopt:                   optimize
-ray>=1.4.1:                 distribute
+pathos:                     distribute, base
 dask:                       distribute, base
+ray>=1.4.1:                 distribute
 matplotlib>=3.2.0:          plot, base
 plotly>=5.0.0:              plot, base
 ipywidgets>=7.0.0:          plot, base

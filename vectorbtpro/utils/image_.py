@@ -62,7 +62,7 @@ def save_animation(
         to_image_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.to_image`.
         **kwargs: Keyword arguments passed to `plot_func`.
     """
-    from vectorbtpro.utils.opt_packages import assert_can_import
+    from vectorbtpro.utils.module_ import assert_can_import
 
     assert_can_import("plotly")
     import plotly.graph_objects as go

@@ -10,7 +10,7 @@ on using Plotly, see [Getting Started with Plotly in Python](https://plotly.com/
 !!! warning
     Errors related to plotting in Jupyter environment usually appear in the logs, not under the cell."""
 
-from vectorbtpro.utils.opt_packages import assert_can_import
+from vectorbtpro.utils.module_ import assert_can_import
 
 assert_can_import("plotly")
 

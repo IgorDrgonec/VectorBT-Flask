@@ -1538,7 +1538,7 @@ class BaseAccessor(Wrapping):
             vars_by_name[var_names[i]] = np.asarray(obj)
         if use_numexpr is None:
             if objs[0].size >= 100000:
-                from vectorbtpro.utils.opt_packages import warn_cannot_import
+                from vectorbtpro.utils.module_ import warn_cannot_import
 
                 warn_cannot_import("numexpr")
                 try:
@@ -1550,7 +1550,7 @@ class BaseAccessor(Wrapping):
             else:
                 use_numexpr = False
         if use_numexpr:
-            from vectorbtpro.utils.opt_packages import assert_can_import
+            from vectorbtpro.utils.module_ import assert_can_import
 
             assert_can_import("numexpr")
             import numexpr

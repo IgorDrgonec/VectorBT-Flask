@@ -135,7 +135,7 @@ def resolve_pypfopt_func_kwargs(
 
         Functions `market_implied_prior_returns` and `BlackLittermanModel.bl_weights` take `risk_aversion`,
         which is different from arguments with the same name in other functions. To set it, pass `delta`."""
-    from vectorbtpro.utils.opt_packages import assert_can_import
+    from vectorbtpro.utils.module_ import assert_can_import
 
     assert_can_import("pypfopt")
 
@@ -338,7 +338,7 @@ def resolve_pypfopt_expected_returns(
     * 'bl_returns': `pypfopt.black_litterman.BlackLittermanModel.bl_returns`
 
     Any function is resolved using `resolve_pypfopt_func_call`."""
-    from vectorbtpro.utils.opt_packages import assert_can_import
+    from vectorbtpro.utils.module_ import assert_can_import
 
     assert_can_import("pypfopt")
 
@@ -395,7 +395,7 @@ def resolve_pypfopt_cov_matrix(
         with 'oracle_approximating' as shrinkage factor
 
     Any function is resolved using `resolve_pypfopt_func_call`."""
-    from vectorbtpro.utils.opt_packages import assert_can_import
+    from vectorbtpro.utils.module_ import assert_can_import
 
     assert_can_import("pypfopt")
 
@@ -460,7 +460,7 @@ def resolve_pypfopt_optimizer(
     * 'cla': `pypfopt.cla.CLA`
 
     Any function is resolved using `resolve_pypfopt_func_call`."""
-    from vectorbtpro.utils.opt_packages import assert_can_import
+    from vectorbtpro.utils.module_ import assert_can_import
 
     assert_can_import("pypfopt")
     from pypfopt.base_optimizer import BaseOptimizer
@@ -642,7 +642,7 @@ def pypfopt_optimize(
         {'MSFT': 0.24595, 'AMZN': 0.23047, 'KO': 0.25862, 'MA': 0.26496}
         ```
     """
-    from vectorbtpro.utils.opt_packages import assert_can_import
+    from vectorbtpro.utils.module_ import assert_can_import
 
     assert_can_import("pypfopt")
     from pypfopt.exceptions import OptimizationError
@@ -1250,7 +1250,7 @@ def riskfolio_optimize(
          'MA': 0.41248601983467814}
         ```
     """
-    from vectorbtpro.utils.opt_packages import assert_can_import
+    from vectorbtpro.utils.module_ import assert_can_import
 
     assert_can_import("riskfolio")
     import riskfolio as rp
@@ -2327,7 +2327,7 @@ class PortfolioOptimizer(Analyzable):
         `universal.algo.Algo`, instance of `universal.algo.Algo`, or instance of `universal.result.AlgoResult`.
 
         Extracts allocation points using `vectorbtpro.portfolio.pfopt.nb.get_alloc_points_nb`."""
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("universal")
         from universal.algo import Algo
@@ -3232,7 +3232,7 @@ class PortfolioOptimizer(Analyzable):
 
             ![](/assets/images/api/pfopt_plot.svg)
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         from vectorbtpro.utils.figure import make_figure

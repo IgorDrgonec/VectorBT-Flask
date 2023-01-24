@@ -1188,7 +1188,7 @@ class Trades(Ranges):
 
             ![](/assets/images/api/trades_plot_pnl.svg)
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         import plotly.graph_objects as go
@@ -1379,7 +1379,7 @@ class Trades(Ranges):
 
             ![](/assets/images/api/trades_plot_against_pnl.svg)
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         import plotly.graph_objects as go
@@ -1702,7 +1702,7 @@ class Trades(Ranges):
 
             ![](/assets/images/api/trades_plot.svg)
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         import plotly.graph_objects as go
@@ -2127,7 +2127,7 @@ class EntryTrades(Trades):
 
             ![](/assets/images/api/entry_trades_plot_signals.svg)
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         import plotly.graph_objects as go
@@ -2362,7 +2362,7 @@ class ExitTrades(Trades):
 
             ![](/assets/images/api/exit_trades_plot_signals.svg)
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         import plotly.graph_objects as go

@@ -1658,7 +1658,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         from vectorbtpro.signals import generators as signal_generators
         from vectorbtpro.labels import generators as label_generators
         from vectorbtpro.portfolio.base import Portfolio
-        from vectorbtpro.utils.opt_packages import check_installed
+        from vectorbtpro.utils.module_ import check_installed
 
         _self = self
         if on_indices is not None:

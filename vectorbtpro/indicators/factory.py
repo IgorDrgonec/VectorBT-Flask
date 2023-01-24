@@ -2694,7 +2694,7 @@ Other keyword arguments are passed to `{0}.run`.
     @classmethod
     def get_talib_indicators(cls) -> tp.List[str]:
         """Get all parseable indicators in `talib`."""
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("talib")
         import talib
@@ -2764,7 +2764,7 @@ Other keyword arguments are passed to `{0}.run`.
 
             ![](/assets/images/api/talib_plot.svg)
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("talib")
         import talib
@@ -3134,7 +3134,7 @@ Args:
 
         !!! note
             Returns only the indicators that have been successfully parsed."""
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("pandas_ta")
         import pandas_ta
@@ -3243,7 +3243,7 @@ Args:
                 pd.Series: New feature generated.
             ```
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("pandas_ta")
         import pandas_ta
@@ -3301,7 +3301,7 @@ Args:
     @classmethod
     def get_ta_indicators(cls) -> tp.List[str]:
         """Get all parseable indicators in `ta`."""
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("ta")
         import ta
@@ -3323,7 +3323,7 @@ Args:
     @classmethod
     def find_ta_indicator(cls, cls_name: str) -> IndicatorMixinT:
         """Get `ta` indicator class by its name."""
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("ta")
         import ta
@@ -3440,7 +3440,7 @@ Args:
                     fillna(bool): if True, fill nan values.
             ```
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("ta")
 
@@ -3584,7 +3584,7 @@ Args:
     @classmethod
     def get_technical_indicators(cls, silence_warnings: bool = True, **kwargs) -> tp.List[str]:
         """Get all parseable indicators in `technical`."""
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("technical")
         import technical
@@ -3603,7 +3603,7 @@ Args:
     @classmethod
     def find_technical_indicator(cls, func_name: str) -> IndicatorMixinT:
         """Get `technical` indicator function by its name."""
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("technical")
         import technical
@@ -3738,7 +3738,7 @@ Args:
         `technical.consensus.consensus.Consensus`.
 
         Requires Technical library: https://github.com/freqtrade/technical"""
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("technical")
         from technical.consensus.consensus import Consensus
@@ -3868,7 +3868,7 @@ Args:
 
         Supported are case-insensitive values `MACON` (or `MovingAverageConsensus`),
         `OSCCON` (or `OscillatorConsensus`), and `SUMCON` (or `SummaryConsensus`)."""
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("technical")
 
@@ -4420,7 +4420,7 @@ Args:
                 elif var_name.startswith("__p_"):
                     var = merged_context[var_name[4:]]
                 elif var_name.startswith("__talib_"):
-                    from vectorbtpro.utils.opt_packages import assert_can_import
+                    from vectorbtpro.utils.module_ import assert_can_import
 
                     assert_can_import("talib")
                     import talib

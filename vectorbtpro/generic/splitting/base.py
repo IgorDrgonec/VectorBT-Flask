@@ -4585,7 +4585,7 @@ class Splitter(Analyzable):
 
         ![](/assets/images/api/Splitter.svg)
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         from vectorbtpro.utils.figure import make_figure
@@ -4687,7 +4687,7 @@ class Splitter(Analyzable):
 
             ![](/assets/images/api/Splitter_coverage_line.svg)
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         from vectorbtpro.utils.figure import make_figure

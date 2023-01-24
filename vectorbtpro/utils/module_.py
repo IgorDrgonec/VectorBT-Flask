@@ -2,13 +2,16 @@
 
 """Utilities for modules."""
 
+import warnings
 import importlib
+import importlib.util
 import inspect
 import pkgutil
 import sys
 from types import ModuleType, FunctionType
 
 from vectorbtpro import _typing as tp
+from vectorbtpro._opt_deps import opt_dep_config
 
 
 def is_from_module(obj: tp.Any, module: ModuleType) -> bool:
@@ -116,3 +119,34 @@ def find_class(path: str) -> tp.Optional[tp.Type]:
     except Exception as e:
         pass
     return None
+
+
+def check_installed(pkg_name: str) -> bool:
+    """Check if a package is installed."""
+    return importlib.util.find_spec(pkg_name) is not None
+
+
+def get_installed_overview() -> tp.Dict[str, bool]:
+    """Get an overview of installed packages in `opt_dep_config`."""
+    return {pkg_name: check_installed(pkg_name) for pkg_name in opt_dep_config.keys()}
+
+
+def assert_can_import(pkg_name: str) -> None:
+    """Assert that the package can be imported. Must be listed in `opt_dep_config`."""
+    if pkg_name not in opt_dep_config:
+        raise KeyError(f"Package '{pkg_name}' not found in opt_dep_config")
+    if not check_installed(pkg_name):
+        raise ImportError(
+            f"Please install {opt_dep_config[pkg_name]['name']}: {opt_dep_config[pkg_name]['link']}"
+        )
+
+
+def warn_cannot_import(pkg_name: str) -> None:
+    """Warn if the package is cannot be imported. Must be listed in `opt_dep_config`."""
+    if pkg_name not in opt_dep_config:
+        raise KeyError(f"Package '{pkg_name}' not found in opt_dep_config")
+    if not check_installed(pkg_name):
+        warnings.warn(
+            f"Consider installing {opt_dep_config[pkg_name]['name']}: {opt_dep_config[pkg_name]['link']}",
+            stacklevel=2,
+        )

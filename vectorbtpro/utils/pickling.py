@@ -13,7 +13,6 @@ import pandas as pd
 import vectorbtpro as vbt
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.path_ import check_mkdir
-from vectorbtpro.utils.module_ import find_class
 from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.checks import Comparable, is_hashable, is_deep_equal
 from vectorbtpro.utils.formatting import Prettified, prettify_dict
@@ -23,7 +22,7 @@ PickleableT = tp.TypeVar("PickleableT", bound="Pickleable")
 
 def dumps(obj: tp.Any, **kwargs) -> bytes:
     """Pickle an object to a byte stream."""
-    from vectorbtpro.utils.opt_packages import warn_cannot_import
+    from vectorbtpro.utils.module_ import warn_cannot_import
 
     warn_cannot_import("dill")
     try:
@@ -36,7 +35,7 @@ def dumps(obj: tp.Any, **kwargs) -> bytes:
 
 def loads(bytes_: bytes, **kwargs) -> tp.Any:
     """Unpickle an object from a byte stream."""
-    from vectorbtpro.utils.opt_packages import warn_cannot_import
+    from vectorbtpro.utils.module_ import warn_cannot_import
 
     warn_cannot_import("dill")
     try:
@@ -119,6 +118,8 @@ def to_class_id(obj: tp.Any) -> tp.Optional[str]:
     If the object is an instance or a subclass of `Pickleable` and `Pickleable._rec_id` is not None,
     uses the reconstruction id. Otherwise, returns the path to the class definition
     with `vectorbtpro.utils.module_.find_class`."""
+    from vectorbtpro.utils.module_ import find_class
+
     if isinstance(obj, type):
         cls = obj
     else:
@@ -136,6 +137,8 @@ def to_class_id(obj: tp.Any) -> tp.Optional[str]:
 
 def from_class_id(class_id: str) -> tp.Optional[tp.Type]:
     """Get the class from a class id."""
+    from vectorbtpro.utils.module_ import find_class
+
     if class_id in rec_info_registry:
         return rec_info_registry[class_id].cls
     cls = find_class(class_id)
@@ -146,6 +149,8 @@ def from_class_id(class_id: str) -> tp.Optional[tp.Type]:
 
 def reconstruct(cls: tp.Union[tp.Hashable, tp.Type], rec_state: RecState) -> object:
     """Reconstruct an instance using a class and a reconstruction state."""
+    from vectorbtpro.utils.module_ import find_class
+
     found_rec = False
     if not isinstance(cls, type):
         class_id = cls

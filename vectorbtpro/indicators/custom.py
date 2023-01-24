@@ -777,7 +777,7 @@ class _MACD(MACD):
 
             ![](/assets/images/api/MACD.svg)
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
         from vectorbtpro._settings import settings
 
         plotting_cfg = settings["plotting"]

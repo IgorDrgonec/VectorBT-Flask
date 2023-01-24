@@ -45,7 +45,15 @@ from vectorbtpro.utils.decorators import (
     cacheable_method,
     cached_method,
 )
-from vectorbtpro.utils.execution import SequenceEngine, ThreadPoolEngine, DaskEngine, RayEngine, execute
+from vectorbtpro.utils.execution import (
+    SerialEngine,
+    ThreadPoolEngine,
+    ProcessPoolEngine,
+    PathosEngine,
+    DaskEngine,
+    RayEngine,
+    execute,
+)
 from vectorbtpro.utils.formatting import prettify, format_func, pprint, phelp
 from vectorbtpro.utils.image_ import save_animation
 from vectorbtpro.utils.jitting import jitted
@@ -57,7 +65,7 @@ from vectorbtpro.utils.schedule_ import AsyncJob, AsyncScheduler, CancelledError
 from vectorbtpro.utils.template import Sub, Rep, RepEval, RepFunc, deep_substitute
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.module_ import create__all__
-from vectorbtpro.utils.opt_packages import check_installed
+from vectorbtpro.utils.module_ import check_installed
 from vectorbtpro.utils.pickling import dumps, loads, save, load, RecState, RecInfo, Pickleable, pdict
 from vectorbtpro._settings import settings
 

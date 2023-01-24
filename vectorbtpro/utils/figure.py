@@ -2,7 +2,7 @@
 
 """Utilities for constructing and displaying figures."""
 
-from vectorbtpro.utils.opt_packages import assert_can_import
+from vectorbtpro.utils.module_ import assert_can_import
 
 assert_can_import("plotly")
 

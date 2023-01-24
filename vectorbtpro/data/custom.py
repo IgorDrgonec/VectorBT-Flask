@@ -1003,7 +1003,7 @@ class YFData(RemoteData):
             how they want, add noise, return missing data points (see volume in the example below), etc.
             It's only used in vectorbt for demonstration purposes.
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("yfinance")
         import yfinance as yf
@@ -1129,7 +1129,7 @@ class BinanceData(RemoteData):
 
         If provided, must be of the type `binance.client.Client`.
         Otherwise, will be created using `client_config`."""
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("binance")
         from binance.client import Client
@@ -1219,7 +1219,7 @@ class BinanceData(RemoteData):
 
         For defaults, see `custom.binance` in `vectorbtpro._settings.data`.
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("binance")
         from binance.enums import HistoricalKlinesType
@@ -1443,7 +1443,7 @@ class CCXTData(RemoteData):
 
         If provided, must be of the type `ccxt.base.exchange.Exchange`.
         Otherwise, will be created using `exchange_config`."""
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("ccxt")
         import ccxt
@@ -1586,7 +1586,7 @@ class CCXTData(RemoteData):
         For defaults, see `custom.ccxt` in `vectorbtpro._settings.data`.
         Global settings can be provided per exchange id using the `exchanges` dictionary.
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("ccxt")
         import ccxt
@@ -1819,7 +1819,7 @@ class AlpacaData(RemoteData):
             If you get an authorization error, make sure that you either enable or disable
             the `paper` flag in `client_config` depending upon the account whose credentials you used.
             By default, the credentials are assumed to be of a live trading account (`paper=False`)."""
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("alpaca")
         from alpaca.trading.client import TradingClient
@@ -1871,7 +1871,7 @@ class AlpacaData(RemoteData):
         If provided, must be of the type `alpaca.data.historical.CryptoHistoricalDataClient`
         for `client_type="crypto"` and `alpaca.data.historical.StockHistoricalDataClient` for
         `client_type="stocks"`. Otherwise, will be created using `client_config`."""
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("alpaca")
         from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
@@ -1949,7 +1949,7 @@ class AlpacaData(RemoteData):
         For defaults, see `custom.alpaca` in `vectorbtpro._settings.data`.
         Global settings can be provided per exchange id using the `exchanges` dictionary.
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("alpaca")
         from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
@@ -2146,7 +2146,7 @@ class PolygonData(RemoteData):
 
         If provided, must be of the type `polygon.rest.RESTClient`.
         Otherwise, will be created using `client_config`."""
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("polygon")
         from polygon import RESTClient
@@ -2517,7 +2517,7 @@ class AVData(RemoteData):
         """Parse API metadata from the documentation at https://www.alphavantage.co/documentation
 
         Cached class method. To avoid re-parsing the same metadata in different runtimes, save it manually."""
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("bs4")
 
@@ -2900,7 +2900,7 @@ class NDLData(RemoteData):
 
         For defaults, see `custom.ndl` in `vectorbtpro._settings.data`.
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("nasdaqdatalink")
 

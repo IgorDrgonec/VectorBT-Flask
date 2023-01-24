@@ -2,6 +2,7 @@
 
 """Engines for executing functions."""
 
+import time
 import multiprocessing
 import concurrent.futures
 import gc
@@ -36,10 +37,10 @@ class ExecutionEngine(Configured):
         raise NotImplementedError
 
 
-class SequenceEngine(ExecutionEngine):
+class SerialEngine(ExecutionEngine):
     """Class for executing functions sequentially.
 
-    For defaults, see `engines.sequence` in `vectorbtpro._settings.execution`."""
+    For defaults, see `engines.serial` in `vectorbtpro._settings.execution`."""
 
     def __init__(
         self,
@@ -51,15 +52,15 @@ class SequenceEngine(ExecutionEngine):
     ) -> None:
         from vectorbtpro._settings import settings
 
-        sequence_cfg = settings["execution"]["engines"]["sequence"]
+        serial_cfg = settings["execution"]["engines"]["serial"]
 
         if show_progress is None:
-            show_progress = sequence_cfg["show_progress"]
-        pbar_kwargs = merge_dicts(pbar_kwargs, sequence_cfg["pbar_kwargs"])
+            show_progress = serial_cfg["show_progress"]
+        pbar_kwargs = merge_dicts(pbar_kwargs, serial_cfg["pbar_kwargs"])
         if clear_cache is None:
-            clear_cache = sequence_cfg["clear_cache"]
+            clear_cache = serial_cfg["clear_cache"]
         if collect_garbage is None:
-            collect_garbage = sequence_cfg["collect_garbage"]
+            collect_garbage = serial_cfg["collect_garbage"]
 
         self._show_progress = show_progress
         self._progress_desc = progress_desc
@@ -157,16 +158,13 @@ class ThreadPoolEngine(ExecutionEngine):
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         with concurrent.futures.ThreadPoolExecutor(**self.init_kwargs) as executor:
-            futures = {executor.submit(func, *args, **kwargs): i for i, (func, args, kwargs) in enumerate(funcs_args)}
+            futures = {
+                executor.submit(func, *args, **kwargs): i for i, (func, args, kwargs) in enumerate(funcs_args)
+            }
             results = [None] * len(futures)
             for fut in concurrent.futures.as_completed(futures):
                 results[futures[fut]] = fut.result()
             return results
-
-
-def _process_chunk(chunk):
-    """Process a chunk."""
-    return [func(*args, **kwargs) for func, args, kwargs in chunk]
 
 
 class ProcessPoolEngine(ExecutionEngine):
@@ -193,13 +191,87 @@ class ProcessPoolEngine(ExecutionEngine):
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         with concurrent.futures.ProcessPoolExecutor(**self.init_kwargs) as executor:
             futures = {
-                executor.submit(func, *args, **kwargs): i
-                for i, (func, args, kwargs) in enumerate(funcs_args)
+                executor.submit(func, *args, **kwargs): i for i, (func, args, kwargs) in enumerate(funcs_args)
             }
             results = [None] * len(futures)
             for fut in concurrent.futures.as_completed(futures):
                 results[futures[fut]] = fut.result()
             return results
+
+
+def pass_kwargs_as_args(func, args, kwargs):
+    """Helper function for `pathos.pools.ParallelPool`."""
+    return func(*args, **kwargs)
+
+
+class PathosEngine(ExecutionEngine):
+    """Class for executing functions using `pathos`.
+
+    For defaults, see `engines.pathos` in `vectorbtpro._settings.execution`."""
+
+    def __init__(
+        self,
+        pool_type: tp.Optional[str] = None,
+        sleep: tp.Optional[int] = None,
+        init_kwargs: tp.KwargsLike = None,
+    ) -> None:
+        from vectorbtpro._settings import settings
+
+        pathos_cfg = settings["execution"]["engines"]["pathos"]
+
+        if pool_type is None:
+            pool_type = pathos_cfg["pool_type"]
+        if sleep is None:
+            sleep = pathos_cfg["sleep"]
+        init_kwargs = merge_dicts(init_kwargs, pathos_cfg["init_kwargs"])
+
+        self._pool_type = pool_type
+        self._sleep = sleep
+        self._init_kwargs = init_kwargs
+
+        ExecutionEngine.__init__(self, init_kwargs=init_kwargs)
+
+    @property
+    def pool_type(self) -> str:
+        """Pool type."""
+        return self._pool_type
+
+    @property
+    def sleep(self) -> tp.Optional[int]:
+        """Seconds to sleep."""
+        return self._sleep
+
+    @property
+    def init_kwargs(self) -> tp.Kwargs:
+        """Keyword arguments used to initialize the pool."""
+        return self._init_kwargs
+
+    def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("pathos")
+
+        if self.pool_type.lower() in ("thread", "threadpool"):
+            from pathos.pools import ThreadPool as Pool
+        elif self.pool_type.lower() in ("process", "processpool"):
+            from pathos.pools import ProcessPool as Pool
+        elif self.pool_type.lower() in ("parallel", "parallelpool"):
+            from pathos.pools import ParallelPool as Pool
+
+            funcs_args = [(pass_kwargs_as_args, x, {}) for x in funcs_args]
+        else:
+            raise ValueError(f"Invalid option pool_type='{self.pool_type}'")
+
+        with Pool(**self.init_kwargs) as pool:
+            futures = [pool.apipe(func, *args, **kwargs) for (func, args, kwargs) in funcs_args]
+            tasks = set(futures)
+            while tasks:
+                ready_tasks = {task for task in tasks if task.ready()}
+                if ready_tasks:
+                    tasks -= ready_tasks
+                if self.sleep is not None:
+                    time.sleep(self.sleep)
+            return [f.get() for f in futures]
 
 
 class DaskEngine(ExecutionEngine):
@@ -228,7 +300,7 @@ class DaskEngine(ExecutionEngine):
         return self._compute_kwargs
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("dask")
         import dask
@@ -332,7 +404,7 @@ class RayEngine(ExecutionEngine):
         and invoking the remote decorator on each function using Ray.
 
         If `reuse_refs` is True, will generate one reference per unique object id."""
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("ray")
         import ray
@@ -395,7 +467,7 @@ class RayEngine(ExecutionEngine):
         return funcs_args_refs
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("ray")
         import ray
@@ -422,7 +494,7 @@ class RayEngine(ExecutionEngine):
 
 def execute(
     funcs_args: tp.FuncsArgs,
-    engine: tp.EngineLike = SequenceEngine,
+    engine: tp.EngineLike = SerialEngine,
     n_calls: tp.Optional[int] = None,
     n_chunks: tp.Optional[int] = None,
     chunk_len: tp.Optional[tp.Union[str, int]] = None,

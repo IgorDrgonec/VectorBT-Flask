@@ -41,6 +41,12 @@ from vectorbtpro.utils import (
 
 from tests.utils import *
 
+pathos_available = True
+try:
+    import pathos
+except:
+    pathos_available = False
+
 dask_available = True
 try:
     import dask
@@ -2530,9 +2536,9 @@ class TestExecution:
             (execute_func, (10, 11, 12), dict(b=13, c=14)),
         ]
         assert execution.execute(funcs_args, show_progress=True) == [10, 35, 60]
-        assert execution.execute(funcs_args, engine="sequence", show_progress=True) == [10, 35, 60]
-        assert execution.execute(funcs_args, engine=execution.SequenceEngine, show_progress=True) == [10, 35, 60]
-        assert execution.execute(funcs_args, engine=execution.SequenceEngine(show_progress=True)) == [10, 35, 60]
+        assert execution.execute(funcs_args, engine="serial", show_progress=True) == [10, 35, 60]
+        assert execution.execute(funcs_args, engine=execution.SerialEngine, show_progress=True) == [10, 35, 60]
+        assert execution.execute(funcs_args, engine=execution.SerialEngine(show_progress=True)) == [10, 35, 60]
         assert execution.execute(
             funcs_args,
             engine=lambda funcs_args, my_arg: [func(*args, **kwargs) * my_arg for func, args, kwargs in funcs_args],
@@ -2546,6 +2552,10 @@ class TestExecution:
             assert execution.execute(funcs_args, engine="ray") == [10, 35, 60]
         assert execution.execute(funcs_args, engine="threadpool") == [10, 35, 60]
         assert execution.execute(funcs_args, engine="processpool") == [10, 35, 60]
+        if pathos_available:
+            assert execution.execute(funcs_args, engine="pathos", pool_type="thread") == [10, 35, 60]
+            assert execution.execute(funcs_args, engine="pathos", pool_type="process") == [10, 35, 60]
+            assert execution.execute(funcs_args, engine="pathos", pool_type="parallel") == [10, 35, 60]
 
     def test_execute_chunks(self):
         def f(a, *args, b=None, **kwargs):

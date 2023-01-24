@@ -12,7 +12,7 @@ from vectorbtpro._settings import settings
 
 __blacklist__ = []
 
-from vectorbtpro.utils.opt_packages import check_installed
+from vectorbtpro.utils.module_ import check_installed
 
 if not check_installed("quantstats") or not settings["importing"]["quantstats"]:
     __blacklist__.append("qs_adapter")

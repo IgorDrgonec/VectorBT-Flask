@@ -126,7 +126,14 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import child_dict, Config, FrozenConfig
 from vectorbtpro.utils.datetime_ import get_local_tz, get_utc_tz
-from vectorbtpro.utils.execution import SequenceEngine, ThreadPoolEngine, ProcessPoolEngine, DaskEngine, RayEngine
+from vectorbtpro.utils.execution import (
+    SerialEngine,
+    ThreadPoolEngine,
+    ProcessPoolEngine,
+    PathosEngine,
+    DaskEngine,
+    RayEngine
+)
 from vectorbtpro.utils.jitting import NumPyJitter, NumbaJitter
 from vectorbtpro.utils.template import Sub, RepEval, deep_substitute
 
@@ -272,8 +279,8 @@ execution = child_dict(
     show_progress=True,
     pbar_kwargs=Config(),
     engines=Config(
-        sequence=FrozenConfig(
-            cls=SequenceEngine,
+        serial=FrozenConfig(
+            cls=SerialEngine,
             show_progress=False,
             pbar_kwargs=Config(),
             clear_cache=False,
@@ -289,6 +296,14 @@ execution = child_dict(
         ),
         processpool=FrozenConfig(
             cls=ProcessPoolEngine,
+            init_kwargs=Config(),
+            n_chunks=None,
+            chunk_len=None,
+        ),
+        pathos=FrozenConfig(
+            cls=PathosEngine,
+            pool_type="process",
+            sleep=0.001,
             init_kwargs=Config(),
             n_chunks=None,
             chunk_len=None,
@@ -328,7 +343,7 @@ chunking = child_dict(
     disable=False,
     disable_wrapping=False,
     option=False,
-    engine="sequence",
+    engine="serial",
     n_chunks=None,
     min_size=None,
     chunk_len=None,
