@@ -817,7 +817,11 @@ def resolve_riskfolio_func_kwargs(
     return select_pfopt_func_kwargs(riskfolio_func, matched_kwargs)
 
 
-def resolve_asset_classes(asset_classes: tp.Union[None, tp.Frame, tp.Sequence], columns: tp.Index) -> tp.Frame:
+def resolve_asset_classes(
+    asset_classes: tp.Union[None, tp.Frame, tp.Sequence],
+    columns: tp.Index,
+    col_indices: tp.Optional[tp.Sequence[int]] = None,
+) -> tp.Frame:
     """Resolve asset classes for Riskfolio-Lib.
 
     Supports the following formats:
@@ -826,8 +830,8 @@ def resolve_asset_classes(asset_classes: tp.Union[None, tp.Frame, tp.Sequence], 
     * Index: Each level in the index must be a different asset class set
     * Nested dict: Each sub-dict must be a different asset class set
     * Sequence of strings or ints: Matches them against level names in the columns.
-        If the columns have a single level, or some level names were not found, uses the sequence
-        directly as one class asset set named 'Class'.
+    If the columns have a single level, or some level names were not found, uses the sequence
+    directly as one class asset set named 'Class'.
     * Sequence of dicts: Each dict becomes a row in the new DataFrame
     * DataFrame where the first column is the asset list and the next columns are the
     different asset’s classes sets (this is the target format accepted by Riskfolio-Lib).
@@ -857,6 +861,8 @@ def resolve_asset_classes(asset_classes: tp.Union[None, tp.Frame, tp.Sequence], 
             assets = columns.get_level_values(-1)
         else:
             assets = columns
+        if col_indices is not None and len(col_indices) > 0:
+            asset_classes = asset_classes.iloc[col_indices]
         asset_classes.insert(loc=0, column="Assets", value=assets)
     return asset_classes
 
@@ -1308,13 +1314,15 @@ def riskfolio_optimize(
             warnings.simplefilter("ignore")
 
         # Prepare returns
-        returns = prepare_returns(
+        new_returns = prepare_returns(
             returns,
             nan_to_zero=nan_to_zero,
             dropna_rows=dropna_rows,
             dropna_cols=dropna_cols,
             dropna_any=dropna_any,
         )
+        col_indices = [i for i, c in enumerate(returns.columns) if c in new_returns.columns]
+        returns = new_returns
         if returns.size == 0:
             return {}
 
@@ -1457,7 +1465,7 @@ def riskfolio_optimize(
                 else:
                     raise ValueError("Constraints method is required")
             if constraints_method.lower() in ("assets", "assets_constraints"):
-                asset_classes = resolve_asset_classes(asset_classes, returns.columns)
+                asset_classes = resolve_asset_classes(asset_classes, returns.columns, col_indices)
                 kwargs["asset_classes"] = asset_classes
                 unused_arg_names.add("asset_classes")
                 constraints = resolve_assets_constraints(constraints)
@@ -1497,7 +1505,7 @@ def riskfolio_optimize(
                 )
                 port.ainequality, port.binequality = warn_stdout(rp.factors_constraints)(**matched_kwargs)
             elif constraints_method.lower() in ("hrp", "hrp_constraints"):
-                asset_classes = resolve_asset_classes(asset_classes, returns.columns)
+                asset_classes = resolve_asset_classes(asset_classes, returns.columns, col_indices)
                 kwargs["asset_classes"] = asset_classes
                 unused_arg_names.add("asset_classes")
                 constraints = resolve_hrp_constraints(constraints)
@@ -1521,7 +1529,7 @@ def riskfolio_optimize(
                 else:
                     views_method = "assets"
             if views_method.lower() in ("assets", "assets_views"):
-                asset_classes = resolve_asset_classes(asset_classes, returns.columns)
+                asset_classes = resolve_asset_classes(asset_classes, returns.columns, col_indices)
                 kwargs["asset_classes"] = asset_classes
                 unused_arg_names.add("asset_classes")
                 views = resolve_assets_views(views)

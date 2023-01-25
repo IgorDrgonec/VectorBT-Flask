@@ -896,6 +896,27 @@ class TestPyPortfolioOpt:
                 "D": 0.4860571855320755,
                 "E": 0.0007859696662543658,
             }
+            longer_returns.iloc[:, 2] = np.nan
+            assert pfopt.riskfolio_optimize(
+                longer_returns,
+                pre_opt=True,
+                pre_opt_as_w=True,
+                model="BL",
+                asset_classes=["C1", "C1", "C2", "C2", "C3"],
+                views=[
+                    dict(Type="Classes", Set="Class", Position="C1", Sign="<=", Return=0.2),
+                    dict(Type="Classes", Set="Class", Position="C2", Sign="<=", Return=0.3),
+                ],
+                freq="1d",
+                year_freq="252d",
+                delta=None,
+                eq=True,
+            ) == {
+               "A": 0.021150803146091784,
+               "B": 0.5705920585309042,
+               "D": 0.40819158602138167,
+               "E": 6.55523016224704e-05
+           }
 
 
 # ############# PortfolioOptimizer ############# #
