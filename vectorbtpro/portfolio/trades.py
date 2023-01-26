@@ -776,7 +776,7 @@ class Trades(Ranges):
             **kwargs,
         )
 
-    def get_best_price(self, entry_price_open: bool = False, exit_price_close: bool = True, **kwargs) -> MappedArray:
+    def get_best_price(self, entry_price_open: bool = False, exit_price_close: bool = False, **kwargs) -> MappedArray:
         """Get best price.
 
         See `vectorbtpro.portfolio.nb.records.best_price_nb`."""
@@ -791,7 +791,7 @@ class Trades(Ranges):
             **kwargs,
         )
 
-    def get_worst_price(self, entry_price_open: bool = False, exit_price_close: bool = True, **kwargs) -> MappedArray:
+    def get_worst_price(self, entry_price_open: bool = False, exit_price_close: bool = False, **kwargs) -> MappedArray:
         """Get worst price.
 
         See `vectorbtpro.portfolio.nb.records.worst_price_nb`."""
@@ -809,7 +809,7 @@ class Trades(Ranges):
     def get_mfe(
         self,
         entry_price_open: bool = False,
-        exit_price_close: bool = True,
+        exit_price_close: bool = False,
         use_returns: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -839,7 +839,7 @@ class Trades(Ranges):
     def get_mae(
         self,
         entry_price_open: bool = False,
-        exit_price_close: bool = True,
+        exit_price_close: bool = False,
         use_returns: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -870,7 +870,7 @@ class Trades(Ranges):
         self,
         volatility: tp.Optional[tp.ArrayLike] = None,
         entry_price_open: bool = False,
-        exit_price_close: bool = True,
+        exit_price_close: bool = False,
         max_duration: tp.Optional[int] = None,
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
@@ -935,7 +935,7 @@ class Trades(Ranges):
         self,
         volatility: tp.Optional[tp.ArrayLike] = None,
         entry_price_open: bool = False,
-        exit_price_close: bool = True,
+        exit_price_close: bool = False,
         max_duration: tp.Optional[int] = None,
         incl_shorter: bool = False,
         group_by: tp.GroupByLike = None,
@@ -1583,7 +1583,7 @@ class Trades(Ranges):
         column: tp.Optional[tp.Label] = None,
         volatility: tp.Optional[tp.ArrayLike] = None,
         entry_price_open: bool = False,
-        exit_price_close: bool = True,
+        exit_price_close: bool = False,
         max_duration: tp.Optional[int] = None,
         incl_shorter: bool = False,
         group_by: tp.GroupByLike = None,
