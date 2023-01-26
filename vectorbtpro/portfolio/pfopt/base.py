@@ -3330,3 +3330,5 @@ PortfolioOptimizer.override_subplots_doc(__pdoc__)
 
 PO = PortfolioOptimizer
 """Shortcut for `PortfolioOptimizer`."""
+
+__pdoc__["PO"] = False

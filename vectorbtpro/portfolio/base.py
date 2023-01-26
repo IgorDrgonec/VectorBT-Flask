@@ -11290,3 +11290,5 @@ __pdoc__["Portfolio.plot"] = "See `vectorbtpro.generic.plots_builder.PlotsBuilde
 
 PF = Portfolio
 """Shortcut for `Portfolio`."""
+
+__pdoc__["PF"] = False

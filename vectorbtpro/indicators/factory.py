@@ -82,6 +82,8 @@ __climb__ = [
     "techcon",
 ]
 
+__pdoc__ = {}
+
 try:
     if not tp.TYPE_CHECKING:
         raise ImportError
@@ -4568,6 +4570,8 @@ Args:
 
 IF = IndicatorFactory
 """Shortcut for `IndicatorFactory`."""
+
+__pdoc__["IF"] = False
 
 
 def talib(*args, **kwargs) -> tp.Type[IndicatorBase]:

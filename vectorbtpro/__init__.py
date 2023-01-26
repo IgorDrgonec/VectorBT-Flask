@@ -19,8 +19,7 @@ warnings.filterwarnings(
 if settings["importing"]["recursive_import"]:
     from vectorbtpro.utils.module_ import check_installed
 
-    def recursive_import(package):
-        """Import all submodules of a module, recursively, including subpackages."""
+    def _recursive_import(package):
         if isinstance(package, str):
             package = importlib.import_module(package)
         if not hasattr(package, "__climb__"):
@@ -39,7 +38,7 @@ if settings["importing"]["recursive_import"]:
             if relative_name in blacklist:
                 continue
             if is_pkg:
-                module = recursive_import(mod_name)
+                module = _recursive_import(mod_name)
             else:
                 module = importlib.import_module(mod_name)
             if not hasattr(module, "__climb__"):
@@ -54,7 +53,7 @@ if settings["importing"]["recursive_import"]:
                     package.__climb__.append(k)
         return package
 
-    recursive_import(__name__)
+    _recursive_import(__name__)
 
     from vectorbtpro.generic import nb, enums
     from vectorbtpro.indicators import nb as ind_nb, enums as ind_enums
