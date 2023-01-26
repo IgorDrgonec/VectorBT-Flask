@@ -86,7 +86,6 @@ __climb__ = [
     "ATR",
     "OBV",
     "OLS",
-    "OLSS",
     "PATSIM",
     "VWAP",
     "PIVOTINFO",
@@ -1036,7 +1035,7 @@ OLS = IndicatorFactory(
     short_name="ols",
     input_names=["x", "y"],
     param_names=["window"],
-    output_names=["slope", "intercept"],
+    output_names=["slope", "intercept", "zscore"],
     lazy_outputs=dict(
         pred=lambda self: self.wrapper.wrap(self.intercept.values + self.slope.values * self.x.values),
         error=lambda self: self.wrapper.wrap(self.y.values - self.pred.values),
@@ -1046,14 +1045,16 @@ OLS = IndicatorFactory(
     nb.ols_nb,
     cache_func=nb.ols_cache_nb,
     cache_pass_per_column=True,
-    kwargs_as_args=["minp"],
+    kwargs_as_args=["with_zscore", "ddof", "minp"],
     window=14,
+    with_zscore=True,
+    ddof=0,
     minp=None,
 )
 
 
 class _OLS(OLS):
-    """Ordinary least squares (OLS).
+    """Rolling Ordinary Least Squares (OLS).
 
     The indicator can be used to detect changes in the behavior of the stocks against the market or each other.
 
@@ -1126,36 +1127,7 @@ class _OLS(OLS):
 
         return fig
 
-
-setattr(OLS, "__doc__", _OLS.__doc__)
-setattr(OLS, "plot", _OLS.plot)
-
-
-# ############# OLSS ############# #
-
-
-OLSS = IndicatorFactory(
-    class_name="OLSS",
-    module_name=__name__,
-    short_name="ols",
-    input_names=["x", "y"],
-    param_names=["window"],
-    output_names=["spread", "zscore"],
-).with_apply_func(
-    nb.ols_spread_nb,
-    cache_func=nb.ols_spread_cache_nb,
-    cache_pass_per_column=True,
-    kwargs_as_args=["ddof", "minp"],
-    window=14,
-    ddof=0,
-    minp=None,
-)
-
-
-class _OLSS(OLSS):
-    """Spread of OLS."""
-
-    def plot(
+    def plot_zscore(
         self,
         column: tp.Optional[tp.Label] = None,
         alpha: float = 0.05,
@@ -1165,14 +1137,14 @@ class _OLSS(OLSS):
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
     ) -> tp.BaseFigure:
-        """Plot `OLSS.zscore` with confidence intervals.
+        """Plot `OLS.zscore` with confidence intervals.
 
         Args:
             column (str): Name of the column to plot.
             alpha (float): The alpha level for the confidence interval.
 
                 The default alpha = .05 returns a 95% confidence interval.
-            zscore_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `OLSS.zscore`.
+            zscore_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `OLS.zscore`.
             add_shape_kwargs (dict): Keyword arguments passed to `fig.add_shape`
                 when adding the range between both confidence intervals.
             add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
@@ -1181,10 +1153,10 @@ class _OLSS(OLSS):
 
         Usage:
             ```pycon
-            >>> vbt.OLSS.run(np.arange(len(ohlcv)), ohlcv['Close']).plot().show()
+            >>> vbt.OLS.run(np.arange(len(ohlcv)), ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/OLSS.svg)
+            ![](/assets/images/api/OLS_zscore.svg)
         """
         import scipy.stats as st
         from vectorbtpro.utils.figure import make_figure
@@ -1236,8 +1208,9 @@ class _OLSS(OLSS):
         return fig
 
 
-setattr(OLSS, "__doc__", _OLSS.__doc__)
-setattr(OLSS, "plot", _OLSS.plot)
+setattr(OLS, "__doc__", _OLS.__doc__)
+setattr(OLS, "plot", _OLS.plot)
+setattr(OLS, "plot", _OLS.plot_zscore)
 
 
 # ############# PATSIM ############# #
