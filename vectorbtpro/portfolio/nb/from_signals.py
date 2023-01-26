@@ -516,7 +516,7 @@ def check_stop_hit_nb(
     low: float,
     close: float,
     is_position_long: bool,
-    stop_price: float,
+    init_price: float,
     stop: float,
     delta_format: int = DeltaFormat.Percent,
     hit_below: bool = True,
@@ -538,18 +538,18 @@ def check_stop_hit_nb(
         stop /= 100
     if (is_position_long and hit_below) or (not is_position_long and not hit_below):
         if delta_format == DeltaFormat.Absolute:
-            stop_price = stop_price - abs(stop)
+            stop_price = init_price - abs(stop)
         else:
-            stop_price = stop_price * (1 - abs(stop))
+            stop_price = init_price * (1 - abs(stop))
         if can_use_ohlc and check_open and open <= stop_price:
             return open, True, True
         if close <= stop_price or (can_use_ohlc and low <= stop_price):
             return stop_price, False, True
         return stop_price, False, False
     if delta_format == DeltaFormat.Absolute:
-        stop_price = stop_price + abs(stop)
+        stop_price = init_price + abs(stop)
     else:
-        stop_price = stop_price * (1 + abs(stop))
+        stop_price = init_price * (1 + abs(stop))
     if can_use_ohlc and check_open and open >= stop_price:
         return open, True, True
     if close >= stop_price or (can_use_ohlc and high >= stop_price):
@@ -1209,7 +1209,7 @@ def simulate_from_signals_nb(
                             low=_low,
                             close=_close,
                             is_position_long=last_position[col] > 0,
-                            stop_price=last_sl_info["init_price"][col],
+                            init_price=last_sl_info["init_price"][col],
                             stop=last_sl_info["stop"][col],
                             delta_format=last_sl_info["delta_format"][col],
                             hit_below=True,
@@ -1252,7 +1252,7 @@ def simulate_from_signals_nb(
                                 low=_low,
                                 close=_close,
                                 is_position_long=last_position[col] > 0,
-                                stop_price=last_tsl_info["peak_price"][col],
+                                init_price=last_tsl_info["peak_price"][col],
                                 stop=last_tsl_info["stop"][col],
                                 delta_format=last_tsl_info["delta_format"][col],
                                 hit_below=True,
@@ -1286,7 +1286,7 @@ def simulate_from_signals_nb(
                                     low=_low,
                                     close=_close,
                                     is_position_long=last_position[col] > 0,
-                                    stop_price=last_tsl_info["peak_price"][col],
+                                    init_price=last_tsl_info["peak_price"][col],
                                     stop=last_tsl_info["stop"][col],
                                     delta_format=last_tsl_info["delta_format"][col],
                                     hit_below=True,
@@ -1313,7 +1313,7 @@ def simulate_from_signals_nb(
                             low=_low,
                             close=_close,
                             is_position_long=last_position[col] > 0,
-                            stop_price=last_tp_info["init_price"][col],
+                            init_price=last_tp_info["init_price"][col],
                             stop=last_tp_info["stop"][col],
                             delta_format=last_tp_info["delta_format"][col],
                             hit_below=False,
@@ -3072,7 +3072,7 @@ def simulate_from_signal_func_nb(
                             low=_low,
                             close=_close,
                             is_position_long=last_position[col] > 0,
-                            stop_price=last_sl_info["init_price"][col],
+                            init_price=last_sl_info["init_price"][col],
                             stop=last_sl_info["stop"][col],
                             delta_format=last_sl_info["delta_format"][col],
                             hit_below=True,
@@ -3115,7 +3115,7 @@ def simulate_from_signal_func_nb(
                                 low=_low,
                                 close=_close,
                                 is_position_long=last_position[col] > 0,
-                                stop_price=last_tsl_info["peak_price"][col],
+                                init_price=last_tsl_info["peak_price"][col],
                                 stop=last_tsl_info["stop"][col],
                                 delta_format=last_tsl_info["delta_format"][col],
                                 hit_below=True,
@@ -3149,7 +3149,7 @@ def simulate_from_signal_func_nb(
                                     low=_low,
                                     close=_close,
                                     is_position_long=last_position[col] > 0,
-                                    stop_price=last_tsl_info["peak_price"][col],
+                                    init_price=last_tsl_info["peak_price"][col],
                                     stop=last_tsl_info["stop"][col],
                                     delta_format=last_tsl_info["delta_format"][col],
                                     hit_below=True,
@@ -3176,7 +3176,7 @@ def simulate_from_signal_func_nb(
                             low=_low,
                             close=_close,
                             is_position_long=last_position[col] > 0,
-                            stop_price=last_tp_info["init_price"][col],
+                            init_price=last_tp_info["init_price"][col],
                             stop=last_tp_info["stop"][col],
                             delta_format=last_tp_info["delta_format"][col],
                             hit_below=False,
