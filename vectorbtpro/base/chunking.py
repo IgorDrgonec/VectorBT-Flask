@@ -18,7 +18,21 @@ from vectorbtpro.utils.chunking import (
     ArraySelector,
     ArraySlicer,
 )
-from vectorbtpro.utils.parsing import match_ann_arg, Regex
+from vectorbtpro.utils.parsing import Regex
+
+__climb__ = [
+    "GroupLensSizer",
+    "GroupLensSlicer",
+    "GroupLensMapper",
+    "GroupMapSlicer",
+    "GroupIdxsMapper",
+    "FlexArraySelector",
+    "FlexArraySlicer",
+    "shape_gl_slicer",
+    "flex_1d_array_gl_slicer",
+    "flex_array_gl_slicer",
+    "array_gl_slicer",
+]
 
 
 class GroupLensSizer(ArgSizer):

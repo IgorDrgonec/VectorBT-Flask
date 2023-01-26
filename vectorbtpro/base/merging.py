@@ -13,6 +13,12 @@ from vectorbtpro.utils.config import resolve_dict, merge_dicts
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.base.reshaping import column_stack
 
+__climb__ = [
+    "concat_merge",
+    "row_stack_merge",
+    "column_stack_merge",
+]
+
 
 def concat_merge(
     *objs,

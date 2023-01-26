@@ -20,6 +20,10 @@ try:
 except ImportError:
     WebSocketT = tp.Any
 
+__climb__ = [
+    "TVClient",
+]
+
 
 class Interval(enum.Enum):
     in_1_minute = "1"

@@ -3,7 +3,6 @@
 """Class decorators for records."""
 
 import keyword
-import re
 from functools import partial
 
 from vectorbtpro import _typing as tp

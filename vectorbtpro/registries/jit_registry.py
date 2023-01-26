@@ -368,6 +368,11 @@ from vectorbtpro.utils.jitting import (
 )
 from vectorbtpro.utils.template import RepEval, deep_substitute, CustomTemplate
 
+__climb__ = [
+    "jit_reg",
+    "register_jitted",
+]
+
 
 def get_func_full_name(func: tp.Callable) -> str:
     """Get full name of the func to be used as task id."""

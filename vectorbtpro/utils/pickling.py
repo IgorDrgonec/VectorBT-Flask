@@ -19,6 +19,17 @@ from vectorbtpro.utils.formatting import Prettified, prettify_dict
 
 PickleableT = tp.TypeVar("PickleableT", bound="Pickleable")
 
+__climb__ = [
+    "dumps",
+    "loads",
+    "save",
+    "load",
+    "RecState",
+    "RecInfo",
+    "Pickleable",
+    "pdict",
+]
+
 
 def dumps(obj: tp.Any, **kwargs) -> bytes:
     """Pickle an object to a byte stream."""

@@ -18,7 +18,7 @@ from vectorbtpro.signals.nb import (
 )
 from vectorbtpro.utils.config import ReadonlyConfig, merge_dicts
 
-__all__ = [
+__climb__ = [
     "RAND",
     "RANDX",
     "RANDNX",

@@ -30,6 +30,11 @@ else:
     BaseIDXAccessorT = tp.Any
     SplitterT = tp.Any
 
+__climb__ = [
+    "ArrayWrapper",
+    "Wrapping",
+]
+
 ArrayWrapperT = tp.TypeVar("ArrayWrapperT", bound="ArrayWrapper")
 
 

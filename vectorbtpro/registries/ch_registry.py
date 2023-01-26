@@ -11,6 +11,11 @@ from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.hashing import Hashable
 from vectorbtpro.utils.template import RepEval
 
+__climb__ = [
+    "ch_reg",
+    "register_chunkable",
+]
+
 
 @attr.s(frozen=True, eq=False)
 class ChunkedSetup(Hashable):

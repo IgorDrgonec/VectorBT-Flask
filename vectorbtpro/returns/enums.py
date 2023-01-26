@@ -4,7 +4,10 @@
 
 from vectorbtpro import _typing as tp
 
-__all__ = ["RollSharpeAIS", "RollSharpeAOS"]
+__pdoc__all__ = [
+    "RollSharpeAIS",
+    "RollSharpeAOS",
+]
 
 __pdoc__ = {}
 

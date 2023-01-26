@@ -12,6 +12,10 @@ from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.decorators import cachedproperty
 from vectorbtpro.utils.parsing import get_func_arg_names
 
+__climb__ = [
+    "deep_getattr",
+]
+
 
 def get_dict_attr(obj: tp.Union[object, type], attr: str) -> tp.Any:
     """Get attribute without invoking the attribute lookup machinery."""

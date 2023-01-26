@@ -9,7 +9,7 @@ import numpy as np
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.formatting import prettify
 
-__all__ = [
+__pdoc__all__ = [
     "RejectedOrderError",
     "PriceType",
     "ValPriceType",
@@ -875,7 +875,7 @@ class AccountState(tp.NamedTuple):
 __pdoc__["AccountState"] = "State of the account."
 __pdoc__["AccountState.cash"] = """Cash. 
 
-Per group."""
+Per group with cash sharing, otherwise per column."""
 __pdoc__["AccountState.position"] = """Position. 
 
 Per column."""
@@ -887,7 +887,7 @@ __pdoc__["AccountState.locked_cash"] = """Locked cash.
 Per column."""
 __pdoc__["AccountState.free_cash"] = """Free cash. 
 
-Per group."""
+Per group with cash sharing, otherwise per column."""
 
 
 class ExecState(tp.NamedTuple):

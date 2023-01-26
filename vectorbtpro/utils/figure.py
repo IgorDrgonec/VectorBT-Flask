@@ -12,6 +12,13 @@ from plotly.subplots import make_subplots as _make_subplots
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import merge_dicts
 
+__climb__ = [
+    "Figure",
+    "FigureWidget",
+    "make_figure",
+    "make_subplots",
+]
+
 
 def get_domain(ref: str, fig: tp.BaseFigure) -> tp.Tuple[int, int]:
     """Get domain of a coordinate axis."""

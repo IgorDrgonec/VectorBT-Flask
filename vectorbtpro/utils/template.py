@@ -17,6 +17,14 @@ from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.hashing import Hashable
 from vectorbtpro.utils.parsing import get_func_arg_names
 
+__climb__ = [
+    "Sub",
+    "Rep",
+    "RepEval",
+    "RepFunc",
+    "deep_substitute",
+]
+
 
 @attr.s(frozen=True)
 class CustomTemplate:

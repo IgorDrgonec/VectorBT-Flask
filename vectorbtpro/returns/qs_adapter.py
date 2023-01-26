@@ -111,6 +111,10 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, Configured
 from vectorbtpro.utils.parsing import get_func_arg_names
 
+__climb__ = [
+    "QSAdapter",
+]
+
 
 def attach_qs_methods(cls: tp.Type[tp.T], replace_signature: bool = True) -> tp.Type[tp.T]:
     """Class decorator to attach quantstats methods."""

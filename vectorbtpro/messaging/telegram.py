@@ -14,6 +14,10 @@ from vectorbtpro.utils.config import merge_dicts, Configured
 from vectorbtpro.utils.parsing import get_func_kwargs
 from vectorbtpro.utils.requests_ import text_to_giphy_url
 
+__climb__ = [
+    "TelegramBot",
+]
+
 logger = logging.getLogger(__name__)
 
 

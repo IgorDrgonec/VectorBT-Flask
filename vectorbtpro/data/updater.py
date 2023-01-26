@@ -9,6 +9,10 @@ from vectorbtpro.data.base import Data
 from vectorbtpro.utils.config import Configured, merge_dicts
 from vectorbtpro.utils.schedule_ import ScheduleManager
 
+__climb__ = [
+    "DataUpdater",
+]
+
 logger = logging.getLogger(__name__)
 
 

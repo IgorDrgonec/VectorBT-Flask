@@ -7,6 +7,15 @@ from threading import RLock
 
 from vectorbtpro import _typing as tp
 
+__climb__ = [
+    "cacheable_property",
+    "cached_property",
+    "cacheable",
+    "cached",
+    "cacheable_method",
+    "cached_method",
+]
+
 
 # ############# Generic ############# #
 

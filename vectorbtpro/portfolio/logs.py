@@ -102,6 +102,10 @@ from vectorbtpro.portfolio.enums import (
 from vectorbtpro.records.decorators import attach_fields, override_field_config
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
 
+__climb__ = [
+    "Logs",
+]
+
 __pdoc__ = {}
 
 logs_field_config = ReadonlyConfig(

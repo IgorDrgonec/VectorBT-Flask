@@ -16,6 +16,13 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import jit_reg, register_jitted
 from vectorbtpro.utils import checks
 
+__climb__ = [
+    "repeat_index",
+    "tile_index",
+    "stack_indexes",
+    "combine_indexes",
+]
+
 
 def to_any_index(index_like: tp.IndexLike) -> tp.Index:
     """Convert any index-like object to an index.

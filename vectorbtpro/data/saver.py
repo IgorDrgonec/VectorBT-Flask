@@ -9,6 +9,12 @@ from vectorbtpro.data.base import Data
 from vectorbtpro.data.updater import DataUpdater
 from vectorbtpro.utils.config import merge_dicts
 
+__climb__ = [
+    "DataSaver",
+    "CSVDataSaver",
+    "HDFDataSaver",
+]
+
 logger = logging.getLogger(__name__)
 
 

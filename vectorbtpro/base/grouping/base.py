@@ -23,6 +23,11 @@ from vectorbtpro.utils.decorators import cached_method
 from vectorbtpro.utils.template import CustomTemplate
 from vectorbtpro.base.grouping import nb
 
+__climb__ = [
+    "Grouper",
+    "ExceptLevel",
+]
+
 GroupByT = tp.Union[None, bool, tp.Index]
 
 

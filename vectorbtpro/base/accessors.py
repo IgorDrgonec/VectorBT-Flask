@@ -25,6 +25,12 @@ from vectorbtpro.utils.parsing import get_expr_var_names, get_context_vars
 from vectorbtpro.utils.template import deep_substitute
 from vectorbtpro.utils.datetime_ import freq_to_timedelta, infer_index_freq, freq_to_timedelta64, prepare_freq
 
+__climb__ = [
+    "BaseAccessor",
+    "BaseSRAccessor",
+    "BaseDFAccessor"
+]
+
 
 class BaseIDXAccessor(Configured):
     """Accessor on top of Index.

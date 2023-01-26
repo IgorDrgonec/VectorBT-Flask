@@ -4,6 +4,11 @@
 
 from vectorbtpro.utils.config import ReadonlyConfig
 
+__climb__ = [
+    "flex_col_param_config",
+    "flex_elem_param_config",
+]
+
 flex_elem_param_config = ReadonlyConfig(
     dict(
         is_array_like=True,

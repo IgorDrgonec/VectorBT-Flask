@@ -25,8 +25,8 @@ from vectorbtpro.base.indexing import hslice, PandasIndexer, get_index_ranges
 from vectorbtpro.base.indexes import combine_indexes, stack_indexes
 from vectorbtpro.base.reshaping import to_dict
 from vectorbtpro.base.accessors import BaseIDXAccessor
-from vectorbtpro.base.resampling import Resampler
-from vectorbtpro.base.grouping import Grouper
+from vectorbtpro.base.resampling.base import Resampler
+from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.merging import row_stack_merge, column_stack_merge, resolve_merge_func
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.splitting import nb
@@ -36,6 +36,13 @@ if tp.TYPE_CHECKING:
 else:
     BaseCrossValidatorT = tp.Any
 
+__climb__ = [
+    "FixRange",
+    "RelRange",
+    "Takeable",
+    "Splitter",
+    "SKLSplitter",
+]
 
 __pdoc__ = {}
 

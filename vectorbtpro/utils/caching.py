@@ -5,6 +5,11 @@
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.decorators import class_or_instancemethod
 
+__climb__ = [
+    "clear_pycache",
+    "Cacheable",
+]
+
 
 def delete_dir(p):
     """Delete directory with files."""

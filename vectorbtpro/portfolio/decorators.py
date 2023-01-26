@@ -4,7 +4,7 @@
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.config import Config, merge_dicts, resolve_dict
+from vectorbtpro.utils.config import Config, resolve_dict
 from vectorbtpro.utils.decorators import cacheable_property, cached_property
 from vectorbtpro.utils.parsing import get_func_arg_names
 

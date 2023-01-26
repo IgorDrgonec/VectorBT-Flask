@@ -9,6 +9,11 @@ from vectorbtpro.generic.ranges import Ranges
 from vectorbtpro.records.decorators import override_field_config
 from vectorbtpro.portfolio.enums import alloc_range_dt, alloc_point_dt
 
+__climb__ = [
+    "AllocRanges",
+    "AllocPoints",
+]
+
 __pdoc__ = {}
 
 # ############# AllocRanges ############# #

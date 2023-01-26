@@ -13,6 +13,10 @@ import attr
 
 from vectorbtpro import _typing as tp
 
+__climb__ = [
+    "Regex",
+]
+
 
 @attr.s(frozen=True)
 class Regex:

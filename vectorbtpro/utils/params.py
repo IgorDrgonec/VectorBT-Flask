@@ -21,6 +21,12 @@ from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.template import deep_substitute
 from vectorbtpro.utils.parsing import annotate_args, ann_args_to_args
 
+__climb__ = [
+    "generate_param_combs",
+    "Param",
+    "parameterized",
+]
+
 
 def to_typed_list(lst: list) -> List:
     """Cast Python list to typed list.

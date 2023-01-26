@@ -34,6 +34,12 @@ from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.template import RepEval
 from vectorbtpro.utils.pickling import pdict
 
+__climb__ = [
+    "symbol_dict",
+    "run_func_dict",
+    "Data"
+]
+
 __pdoc__ = {}
 
 

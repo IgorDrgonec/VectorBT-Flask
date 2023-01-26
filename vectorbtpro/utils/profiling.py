@@ -10,6 +10,11 @@ import humanize
 
 from vectorbtpro import _typing as tp
 
+__climb__ = [
+    "Timer",
+    "MemTracer",
+]
+
 TimerT = tp.TypeVar("TimerT", bound="Timer")
 
 

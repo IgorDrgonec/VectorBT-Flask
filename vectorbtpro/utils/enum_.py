@@ -8,6 +8,10 @@ Their values start with 0, while -1 means there is no value."""
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.mapping import to_mapping, apply_mapping
 
+__climb__ = [
+    "map_enum_fields",
+]
+
 
 def map_enum_fields(
     field: tp.Any,

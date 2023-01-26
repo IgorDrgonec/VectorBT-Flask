@@ -24,6 +24,12 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.figure import make_figure
 
+__climb__ = [
+    "PXAccessor",
+    "PXSRAccessor",
+    "PXDFAccessor",
+]
+
 
 def attach_px_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
     """Class decorator to attach Plotly Express methods."""

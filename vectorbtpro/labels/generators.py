@@ -11,7 +11,17 @@ from vectorbtpro.labels import nb
 from vectorbtpro.labels.enums import TrendLabelMode
 from vectorbtpro.generic import enums as generic_enums
 
-__all__ = ["FMEAN", "FSTD", "FMIN", "FMAX", "FIXLB", "MEANLB", "LEXLB", "TRENDLB", "BOLB"]
+__climb__ = [
+    "FMEAN",
+    "FSTD",
+    "FMIN",
+    "FMAX",
+    "FIXLB",
+    "MEANLB",
+    "LEXLB",
+    "TRENDLB",
+    "BOLB",
+]
 
 # ############# Look-ahead indicators ############# #
 

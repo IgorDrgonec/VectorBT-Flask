@@ -23,6 +23,10 @@ from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.params import to_typed_list
 
+__climb__ = [
+    "SignalFactory",
+]
+
 
 class SignalFactory(IndicatorFactory):
     """A factory for building signal generators.

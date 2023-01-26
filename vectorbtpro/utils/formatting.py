@@ -9,6 +9,13 @@ import numpy as np
 
 from vectorbtpro import _typing as tp
 
+__climb__ = [
+    "prettify",
+    "format_func",
+    "pprint",
+    "phelp",
+]
+
 
 class Prettified:
     """Abstract class that can be prettified."""

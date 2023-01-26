@@ -2,8 +2,6 @@
 
 """Class for mapping column arrays."""
 
-from collections import defaultdict
-
 import numpy as np
 
 from vectorbtpro import _typing as tp
@@ -14,6 +12,10 @@ from vectorbtpro.records import nb
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.decorators import cached_property, cached_method
+
+__climb__ = [
+    "ColumnMapper",
+]
 
 
 ColumnMapperT = tp.TypeVar("ColumnMapperT", bound="ColumnMapper")

@@ -123,7 +123,7 @@ import pkgutil
 import numpy as np
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils import checks
+from vectorbtpro.utils.checks import is_instance_of
 from vectorbtpro.utils.config import child_dict, Config, FrozenConfig
 from vectorbtpro.utils.datetime_ import get_local_tz, get_utc_tz
 from vectorbtpro.utils.execution import (
@@ -144,6 +144,7 @@ __pdoc__: dict = {}
 _settings = {}
 
 importing = child_dict(
+    recursive_import=True,
     plotly=True,
     telegram=True,
     quantstats=True,
@@ -152,9 +153,15 @@ importing = child_dict(
 """_"""
 
 __pdoc__["importing"] = Sub(
-    """Sub-config with settings applied on import.
+    """Sub-config with settings applied on importing.
     
-Disabling these options will make vectorbt load faster.
+Disabling these options will make vectorbt load faster, but will limit the flexibility of accessing
+various features of the package.
+    
+!!! note
+    If `recursive_import` is False, you won't be able to access most important modules and objects 
+    such as via `vbt.Portfolio`, only by explicitly importing them such as via 
+    `from vectorbtpro.portfolio.base import Portfolio`.
 
 ```python
 ${config_doc}
@@ -1454,14 +1461,14 @@ pfopt = child_dict(
     stats=Config(
         filters=dict(
             alloc_ranges=dict(
-                filter_func=lambda self, metric_settings: checks.is_instance_of(self.alloc_records, "AllocRanges"),
+                filter_func=lambda self, metric_settings: is_instance_of(self.alloc_records, "AllocRanges"),
             )
         )
     ),
     plots=Config(
         filters=dict(
             alloc_ranges=dict(
-                filter_func=lambda self, metric_settings: checks.is_instance_of(self.alloc_records, "AllocRanges"),
+                filter_func=lambda self, metric_settings: is_instance_of(self.alloc_records, "AllocRanges"),
             )
         )
     ),

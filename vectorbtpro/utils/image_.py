@@ -8,6 +8,10 @@ import numpy as np
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.pbar import get_pbar
 
+__climb__ = [
+    "save_animation",
+]
+
 
 def hstack_image_arrays(a: tp.Array3d, b: tp.Array3d) -> tp.Array3d:
     """Stack NumPy images horizontally."""

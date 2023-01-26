@@ -46,36 +46,6 @@ def list_module_keys(
     ]
 
 
-def import_submodules(package: tp.Union[str, ModuleType]) -> tp.Dict[str, ModuleType]:
-    """Import all submodules of a module, recursively, including subpackages.
-
-    If package defines `__blacklist__`, does not import modules that match names from this list."""
-    if isinstance(package, str):
-        package = importlib.import_module(package)
-    blacklist = []
-    if hasattr(package, "__blacklist__"):
-        blacklist = package.__blacklist__
-    results = {}
-    for _, name, is_pkg in pkgutil.walk_packages(package.__path__, package.__name__ + "."):
-        if ".".join(name.split(".")[:-1]) != package.__name__:
-            continue
-        if name.split(".")[-1] in blacklist:
-            continue
-        results[name] = importlib.import_module(name)
-        if is_pkg:
-            results.update(import_submodules(name))
-    return results
-
-
-def create__all__(module_name: str) -> tp.List[str]:
-    """Create `__all__` for a module."""
-    return [
-        name
-        for name, obj in inspect.getmembers(sys.modules[module_name])
-        if not inspect.ismodule(obj) and not name.startswith("__") and name != "create__all__"
-    ]
-
-
 def search_package_for_funcs(
     package: tp.Union[str, ModuleType],
     blacklist: tp.Optional[tp.Sequence[str]] = None,

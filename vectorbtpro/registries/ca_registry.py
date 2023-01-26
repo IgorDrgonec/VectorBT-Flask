@@ -421,6 +421,13 @@ from vectorbtpro.utils.hashing import Hashable
 from vectorbtpro.utils.parsing import Regex, hash_args, UnhashableArgsError
 from vectorbtpro.utils.profiling import Timer
 
+__climb__ = [
+    "ca_reg",
+    "CAQuery",
+    "CAQueryDelegator",
+    "clear_cache",
+]
+
 __pdoc__ = {}
 
 _GARBAGE = object()

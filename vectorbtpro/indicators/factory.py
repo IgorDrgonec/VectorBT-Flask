@@ -70,6 +70,18 @@ from vectorbtpro.utils.template import has_templates, deep_substitute
 from vectorbtpro.utils.datetime_ import freq_to_timedelta64, infer_index_freq
 from vectorbtpro.utils.module_ import search_package_for_funcs
 
+__climb__ = [
+    "IndicatorBase",
+    "IndicatorFactory",
+    "IF",
+    "talib",
+    "pandas_ta",
+    "ta",
+    "wqa101",
+    "technical",
+    "techcon",
+]
+
 try:
     if not tp.TYPE_CHECKING:
         raise ImportError
@@ -4552,3 +4564,37 @@ Args:
             factory_kwargs=dict(class_name="WQA%d" % alpha_idx, module_name=__name__ + ".wqa101"),
             **kwargs,
         )
+
+
+IF = IndicatorFactory
+"""Shortcut for `IndicatorFactory`."""
+
+
+def talib(*args, **kwargs) -> tp.Type[IndicatorBase]:
+    """Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory.from_talib`."""
+    return IndicatorFactory.from_talib(*args, **kwargs)
+
+
+def pandas_ta(*args, **kwargs) -> tp.Type[IndicatorBase]:
+    """Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory.from_pandas_ta`."""
+    return IndicatorFactory.from_pandas_ta(*args, **kwargs)
+
+
+def ta(*args, **kwargs) -> tp.Type[IndicatorBase]:
+    """Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory.from_ta`."""
+    return IndicatorFactory.from_ta(*args, **kwargs)
+
+
+def wqa101(*args, **kwargs) -> tp.Type[IndicatorBase]:
+    """Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory.from_wqa101`."""
+    return IndicatorFactory.from_wqa101(*args, **kwargs)
+
+
+def technical(*args, **kwargs) -> tp.Type[IndicatorBase]:
+    """Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory.from_technical`."""
+    return IndicatorFactory.from_technical(*args, **kwargs)
+
+
+def techcon(*args, **kwargs) -> tp.Type[IndicatorBase]:
+    """Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory.from_techcon`."""
+    return IndicatorFactory.from_techcon(*args, **kwargs)

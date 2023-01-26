@@ -7,6 +7,10 @@ from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic.plots_builder import PlotsBuilderMixin
 from vectorbtpro.generic.stats_builder import StatsBuilderMixin
 
+__climb__ = [
+    "Analyzable",
+]
+
 
 class MetaAnalyzable(type(StatsBuilderMixin), type(PlotsBuilderMixin)):
     pass

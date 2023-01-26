@@ -29,7 +29,16 @@ from vectorbtpro.utils.colors import map_value_to_cmap
 from vectorbtpro.utils.config import Configured, resolve_dict, merge_dicts
 from vectorbtpro.utils.figure import make_figure
 
-__all__ = ["clean_labels", "TraceUpdater", "Gauge", "Bar", "Scatter", "Histogram", "Box", "Heatmap", "Volume"]
+__climb__ = [
+    "TraceUpdater",
+    "Gauge",
+    "Bar",
+    "Scatter",
+    "Histogram",
+    "Box",
+    "Heatmap",
+    "Volume",
+]
 
 
 def clean_labels(labels: tp.Labels) -> tp.Labels:
@@ -408,6 +417,7 @@ class Scatter(Configured, TraceUpdater):
                 scatter_obj = go.Scatter
             try:
                 from plotly_resampler.aggregation import AbstractFigureAggregator
+
                 if isinstance(fig, AbstractFigureAggregator):
                     use_resampler = True
                 else:

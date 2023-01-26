@@ -21,6 +21,19 @@ from vectorbtpro.utils.datetime_ import (
 )
 from vectorbtpro.utils.pickling import pdict
 
+__climb__ = [
+    "PandasIndexer",
+    "hslice",
+    "RowIdx",
+    "ColIdx",
+    "RowPoints",
+    "RowRanges",
+    "ElemIdx",
+    "index_dict",
+    "get_index_points",
+    "get_index_ranges",
+]
+
 
 class IndexingError(Exception):
     """Exception raised when an indexing error has occurred."""

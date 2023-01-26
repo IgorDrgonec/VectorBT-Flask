@@ -507,6 +507,13 @@ from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.template import Rep, RepEval, RepFunc
 
+__climb__ = [
+    "Trades",
+    "EntryTrades",
+    "ExitTrades",
+    "Positions",
+]
+
 __pdoc__ = {}
 
 # ############# Trades ############# #

@@ -137,6 +137,12 @@ from vectorbtpro.utils.config import resolve_dict, merge_dicts, HybridConfig, Co
 from vectorbtpro.utils.datetime_ import freq_to_timedelta, PandasDatetimeIndex
 from vectorbtpro.utils.decorators import class_or_instanceproperty
 
+__climb__ = [
+    "ReturnsAccessor",
+    "ReturnsSRAccessor",
+    "ReturnsDFAccessor",
+]
+
 __pdoc__ = {}
 
 ReturnsAccessorT = tp.TypeVar("ReturnsAccessorT", bound="ReturnsAccessor")

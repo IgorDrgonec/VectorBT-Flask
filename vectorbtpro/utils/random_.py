@@ -8,6 +8,10 @@ import numpy as np
 
 from vectorbtpro.registries.jit_registry import register_jitted
 
+__climb__ = [
+    "set_seed",
+]
+
 
 @register_jitted(cache=True)
 def set_seed_nb(seed: int) -> None:

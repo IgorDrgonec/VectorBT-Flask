@@ -16,6 +16,10 @@ from vectorbtpro.base.resampling import nb
 from vectorbtpro.base.indexes import repeat_index
 from vectorbtpro.registries.jit_registry import jit_reg
 
+__climb__ = [
+    "Resampler",
+]
+
 
 ResamplerT = tp.TypeVar("ResamplerT", bound="Resampler")
 

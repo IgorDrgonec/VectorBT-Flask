@@ -76,7 +76,7 @@ from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.template import RepFunc
 
-__all__ = [
+__climb__ = [
     "MA",
     "MSD",
     "BBANDS",

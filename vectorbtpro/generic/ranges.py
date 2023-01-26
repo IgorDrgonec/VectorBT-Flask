@@ -150,6 +150,12 @@ from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.parsing import get_func_kwargs
 from vectorbtpro.utils.template import deep_substitute
 
+__climb__ = [
+    "Ranges",
+    "PatternRanges",
+    "PSC",
+]
+
 __pdoc__ = {}
 
 # ############# Ranges ############# #

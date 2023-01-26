@@ -186,6 +186,10 @@ from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.template import RepEval, RepFunc
 
+__climb__ = [
+    "Drawdowns",
+]
+
 __pdoc__ = {}
 
 dd_field_config = ReadonlyConfig(

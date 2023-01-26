@@ -14,6 +14,13 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.datetime_ import tzaware_to_naive_time
 
+__climb__ = [
+    "AsyncJob",
+    "AsyncScheduler",
+    "CancelledError",
+    "ScheduleManager",
+]
+
 logger = logging.getLogger(__name__)
 
 

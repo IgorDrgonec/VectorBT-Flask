@@ -247,6 +247,12 @@ except ImportError:
     nanargmax = np.nanargmax
     nanargmin = np.nanargmin
 
+__climb__ = [
+    "GenericAccessor",
+    "GenericSRAccessor",
+    "GenericDFAccessor",
+]
+
 __pdoc__ = {}
 
 GenericAccessorT = tp.TypeVar("GenericAccessorT", bound="GenericAccessor")

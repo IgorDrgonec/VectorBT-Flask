@@ -116,6 +116,11 @@ from vectorbtpro.signals.enums import StopType
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
 
+__climb__ = [
+    "Orders",
+    "FSOrders",
+]
+
 __pdoc__ = {}
 
 orders_field_config = ReadonlyConfig(

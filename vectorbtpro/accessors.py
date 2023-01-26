@@ -54,6 +54,12 @@ from vectorbtpro.base.accessors import BaseIDXAccessor
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
 
+__climb__ = [
+    "Vbt_Accessor",
+    "Vbt_SRAccessor",
+    "Vbt_DFAccessor",
+]
+
 ParentAccessorT = tp.TypeVar("ParentAccessorT", bound=object)
 AccessorT = tp.TypeVar("AccessorT", bound=object)
 

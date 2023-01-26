@@ -9,7 +9,7 @@ import numpy as np
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.formatting import prettify
 
-__all__ = [
+__pdoc__all__ = [
     "BarZone",
     "WType",
     "RangeStatus",

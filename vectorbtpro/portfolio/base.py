@@ -1679,6 +1679,11 @@ try:
 except ImportError:
     QSAdapterT = tp.Any
 
+__climb__ = [
+    "Portfolio",
+    "PF",
+]
+
 __pdoc__ = {}
 
 
@@ -11282,3 +11287,6 @@ Portfolio.override_metrics_doc(__pdoc__)
 Portfolio.override_subplots_doc(__pdoc__)
 
 __pdoc__["Portfolio.plot"] = "See `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots`."
+
+PF = Portfolio
+"""Shortcut for `Portfolio`."""

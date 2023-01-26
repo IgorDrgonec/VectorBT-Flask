@@ -23,6 +23,16 @@ except ImportError:
     RemoteFunctionT = tp.Any
     ObjectRefT = tp.Any
 
+__climb__ = [
+    "SerialEngine",
+    "ThreadPoolEngine",
+    "ProcessPoolEngine",
+    "PathosEngine",
+    "DaskEngine",
+    "RayEngine",
+    "execute",
+]
+
 
 class ExecutionEngine(Configured):
     """Abstract class for executing functions."""

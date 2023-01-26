@@ -5,7 +5,12 @@
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.formatting import prettify
 
-__all__ = ["Pivot", "TrendMode", "SuperTrendAIS", "SuperTrendAOS"]
+__pdoc__all__ = [
+    "Pivot",
+    "TrendMode",
+    "SuperTrendAIS",
+    "SuperTrendAOS",
+]
 
 __pdoc__ = {}
 

@@ -20,6 +20,31 @@ from vectorbtpro.utils.params import combine_params, Param
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.template import CustomTemplate
 
+__climb__ = [
+    "to_1d_shape",
+    "to_2d_shape",
+    "repeat_shape",
+    "tile_shape",
+    "to_1d_array",
+    "to_2d_array",
+    "to_2d_pr_array",
+    "to_2d_pc_array",
+    "to_1d_array_nb",
+    "to_2d_array_nb",
+    "to_2d_pr_array_nb",
+    "to_2d_pc_array_nb",
+    "broadcast_shapes",
+    "broadcast_array_to",
+    "broadcast_arrays",
+    "repeat",
+    "tile",
+    "BCO",
+    "Default",
+    "Ref",
+    "broadcast",
+    "broadcast_to",
+]
+
 
 def to_tuple_shape(shape: tp.ShapeLike) -> tp.Shape:
     """Convert a shape-like object to a tuple."""

@@ -212,6 +212,12 @@ from vectorbtpro.utils.decorators import class_or_instancemethod, class_or_insta
 from vectorbtpro.utils.random_ import set_seed_nb
 from vectorbtpro.utils.template import RepEval, deep_substitute
 
+__climb__ = [
+    "SignalsAccessor",
+    "SignalsSRAccessor",
+    "SignalsDFAccessor",
+]
+
 __pdoc__ = {}
 
 

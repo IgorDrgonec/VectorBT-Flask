@@ -2,15 +2,16 @@
 
 """Base class for working with records that can make use of OHLC data."""
 
-import numpy as np
-import pandas as pd
-
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb
 from vectorbtpro.records.base import Records
 from vectorbtpro.utils import checks
+
+__climb__ = [
+    "PriceRecords",
+]
 
 PriceRecordsT = tp.TypeVar("PriceRecordsT", bound="PriceRecords")
 

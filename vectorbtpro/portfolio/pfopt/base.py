@@ -64,6 +64,13 @@ except ImportError as e:
     AlgoT = tp.Any
     AlgoResultT = tp.Any
 
+__climb__ = [
+    "pfopt_func_dict",
+    "pypfopt_optimize",
+    "riskfolio_optimize",
+    "PortfolioOptimizer",
+    "PO",
+]
 
 __pdoc__ = {}
 
@@ -3320,3 +3327,6 @@ class PortfolioOptimizer(Analyzable):
 
 PortfolioOptimizer.override_metrics_doc(__pdoc__)
 PortfolioOptimizer.override_subplots_doc(__pdoc__)
+
+PO = PortfolioOptimizer
+"""Shortcut for `PortfolioOptimizer`."""

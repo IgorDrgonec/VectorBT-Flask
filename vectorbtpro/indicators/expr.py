@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.grouping import Grouper
+from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.generic.nb import (
     fshift_nb,
     diff_nb,
