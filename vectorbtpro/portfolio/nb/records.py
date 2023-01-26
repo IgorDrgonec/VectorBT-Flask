@@ -1003,7 +1003,7 @@ def trade_best_worst_price_nb(
     low: tp.Optional[tp.FlexArray2d],
     close: tp.FlexArray2d,
     entry_price_open: bool = False,
-    exit_price_close: bool = False,
+    exit_price_close: bool = True,
     max_duration: tp.Optional[int] = None,
 ) -> tp.Tuple[float, float]:
     """Best and worst price during a trade."""
@@ -1066,7 +1066,7 @@ def best_price_nb(
     low: tp.Optional[tp.FlexArray2d],
     close: tp.FlexArray2d,
     entry_price_open: bool = False,
-    exit_price_close: bool = False,
+    exit_price_close: bool = True,
 ) -> tp.Array1d:
     """Get best price by applying `trade_best_worst_price_nb` on each trade."""
     out = np.empty(len(records), dtype=np.float_)
@@ -1105,7 +1105,7 @@ def worst_price_nb(
     low: tp.Optional[tp.FlexArray2d],
     close: tp.FlexArray2d,
     entry_price_open: bool = False,
-    exit_price_close: bool = False,
+    exit_price_close: bool = True,
 ) -> tp.Array1d:
     """Get worst price by applying `trade_best_worst_price_nb` on each trade."""
     out = np.empty(len(records), dtype=np.float_)
@@ -1247,7 +1247,7 @@ def edge_ratio_nb(
     close: tp.FlexArray2d,
     volatility: tp.FlexArray2d,
     entry_price_open: bool = False,
-    exit_price_close: bool = False,
+    exit_price_close: bool = True,
     max_duration: tp.Optional[int] = None,
 ) -> tp.Array1d:
     """Get edge ratio of each column."""
@@ -1347,7 +1347,7 @@ def running_edge_ratio_nb(
     close: tp.FlexArray2d,
     volatility: tp.FlexArray2d,
     entry_price_open: bool = False,
-    exit_price_close: bool = False,
+    exit_price_close: bool = True,
     max_duration: tp.Optional[int] = None,
     incl_shorter: bool = False,
 ) -> tp.Array2d:
