@@ -1210,7 +1210,7 @@ class _OLS(OLS):
 
 setattr(OLS, "__doc__", _OLS.__doc__)
 setattr(OLS, "plot", _OLS.plot)
-setattr(OLS, "plot", _OLS.plot_zscore)
+setattr(OLS, "plot_zscore", _OLS.plot_zscore)
 
 
 # ############# PATSIM ############# #

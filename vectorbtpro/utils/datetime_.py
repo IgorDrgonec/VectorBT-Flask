@@ -344,7 +344,10 @@ def to_tzaware_datetime(
         else:
             dt = datetime.fromtimestamp(dt_like, timezone.utc)
     elif isinstance(dt_like, str):
-        dt = dateparser.parse(dt_like, **kwargs)
+        try:
+            dt = pd.to_datetime(dt_like)
+        except Exception as e:
+            dt = dateparser.parse(dt_like, **kwargs)
     elif isinstance(dt_like, pd.Timestamp):
         dt = dt_like.to_pydatetime()
     elif isinstance(dt_like, np.datetime64):
