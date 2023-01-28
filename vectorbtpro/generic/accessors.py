@@ -221,7 +221,7 @@ from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, Readonly
 from vectorbtpro.utils.decorators import class_or_instancemethod, class_or_instanceproperty
 from vectorbtpro.utils.mapping import apply_mapping, to_mapping
 from vectorbtpro.utils.template import deep_substitute
-from vectorbtpro.utils.datetime_ import freq_to_timedelta64, try_to_datetime_index
+from vectorbtpro.utils.datetime_ import freq_to_timedelta, freq_to_timedelta64, try_to_datetime_index
 from vectorbtpro.utils.colors import adjust_opacity, map_value_to_cmap
 from vectorbtpro.utils.enum_ import map_enum_fields
 
@@ -370,6 +370,43 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """See `vectorbtpro.utils.mapping.apply_mapping`."""
         mapping = self.resolve_mapping(mapping)
         return apply_mapping(self.obj, mapping, **kwargs)
+
+    # ############# Shifting ############# #
+
+    def ago(
+        self,
+        n: tp.Union[int, tp.FrequencyLike],
+        fill_value: tp.Scalar = np.nan,
+        get_indexer_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """For each value, get the value `n` periods ago."""
+        if checks.is_int(n):
+            return self.fshift(n, fill_value=fill_value, **kwargs)
+        if get_indexer_kwargs is None:
+            get_indexer_kwargs = {}
+        n = freq_to_timedelta(n)
+        indices = self.wrapper.index.get_indexer(self.wrapper.index - n, **get_indexer_kwargs)
+        new_obj = self.wrapper.fill(fill_value=fill_value)
+        found_mask = indices != -1
+        new_obj.iloc[np.flatnonzero(found_mask)] = self.obj.iloc[indices[found_mask]]
+        return new_obj
+
+    def any_ago(self, n: tp.Union[int, tp.FrequencyLike], **kwargs) -> tp.SeriesFrame:
+        """For each value, check whether any value within a window of `n` last periods is True."""
+        wrap_kwargs = kwargs.pop("wrap_kwargs", {})
+        wrap_kwargs = merge_dicts(dict(fillna=False, dtype=bool), wrap_kwargs)
+        if checks.is_int(n):
+            return self.rolling_any(n, wrap_kwargs=wrap_kwargs, **kwargs)
+        return self.rolling_apply(n, "any", wrap_kwargs=wrap_kwargs, **kwargs)
+
+    def all_ago(self, n: tp.Union[int, tp.FrequencyLike], **kwargs) -> tp.SeriesFrame:
+        """For each value, check whether all values within a window of `n` last periods are True."""
+        wrap_kwargs = kwargs.pop("wrap_kwargs", {})
+        wrap_kwargs = merge_dicts(dict(fillna=False, dtype=bool), wrap_kwargs)
+        if checks.is_int(n):
+            return self.rolling_all(n, wrap_kwargs=wrap_kwargs, **kwargs)
+        return self.rolling_apply(n, "all", wrap_kwargs=wrap_kwargs, **kwargs)
 
     # ############# Rolling ############# #
 
