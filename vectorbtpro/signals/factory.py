@@ -568,6 +568,8 @@ class SignalFactory(IndicatorFactory):
         if mode == FactoryMode.Entries:
             _0 = "i"
             _0 += ", shape"
+            _0 += ", only_once"
+            _0 += ", entry_wait"
             if len(entry_input_names) > 0:
                 _0 += ", " + ", ".join(entry_input_names)
             if len(entry_in_output_names) > 0:
@@ -576,6 +578,8 @@ class SignalFactory(IndicatorFactory):
                 _0 += ", " + ", ".join(entry_param_names)
             _0 += ", entry_args"
             _1 = "shape"
+            _1 += ", only_once"
+            _1 += ", entry_wait"
             _1 += ", entry_place_func"
             if len(entry_input_names) > 0:
                 _1 += ", " + ", ".join(entry_input_names)
@@ -744,6 +748,7 @@ class SignalFactory(IndicatorFactory):
 
             kwargs_defaults = dict(
                 input_shape=input_shape,
+                only_once=mode == FactoryMode.Entries,
                 wait=1,
                 until_next=True,
                 skip_until_exit=False,
@@ -752,6 +757,7 @@ class SignalFactory(IndicatorFactory):
             entry_kwargs = merge_dicts(kwargs_defaults, entry_kwargs)
             exit_kwargs = merge_dicts(kwargs_defaults, exit_kwargs)
             cache_kwargs = merge_dicts(kwargs_defaults, cache_kwargs)
+            only_once = entry_kwargs["only_once"]
             entry_wait = entry_kwargs["wait"]
             exit_wait = exit_kwargs["wait"]
             until_next = exit_kwargs["until_next"]
@@ -853,6 +859,8 @@ class SignalFactory(IndicatorFactory):
                     n_params,
                     apply_func,
                     input_shape,
+                    only_once,
+                    entry_wait,
                     *entry_input_list,
                     *_entry_in_output_list,
                     *_entry_param_list,

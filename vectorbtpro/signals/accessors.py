@@ -249,14 +249,6 @@ class SignalsAccessor(GenericAccessor):
 
     # ############# Overriding ############# #
 
-    def bshift(self, *args, fill_value: bool = False, **kwargs) -> tp.SeriesFrame:
-        """`vectorbtpro.generic.accessors.GenericAccessor.bshift` with `fill_value=False`."""
-        return GenericAccessor.bshift(self, *args, fill_value=fill_value, **kwargs)
-
-    def fshift(self, *args, fill_value: bool = False, **kwargs) -> tp.SeriesFrame:
-        """`vectorbtpro.generic.accessors.GenericAccessor.fshift` with `fill_value=False`."""
-        return GenericAccessor.fshift(self, *args, fill_value=fill_value, **kwargs)
-
     @classmethod
     def empty(cls, *args, fill_value: bool = False, **kwargs) -> tp.SeriesFrame:
         """`vectorbtpro.base.accessors.BaseAccessor.empty` with `fill_value=False`."""
@@ -267,6 +259,9 @@ class SignalsAccessor(GenericAccessor):
         """`vectorbtpro.base.accessors.BaseAccessor.empty_like` with `fill_value=False`."""
         return GenericAccessor.empty_like(*args, fill_value=fill_value, dtype=np.bool_, **kwargs)
 
+    bshift = partialmethod(GenericAccessor.bshift, fill_value=False)
+    fshift = partialmethod(GenericAccessor.fshift, fill_value=False)
+    ago = partialmethod(GenericAccessor.ago, fill_value=False)
     latest_at_index = partialmethod(GenericAccessor.latest_at_index, nan_value=False)
 
     # ############# Generation ############# #
@@ -277,6 +272,8 @@ class SignalsAccessor(GenericAccessor):
         shape: tp.ShapeLike,
         place_func_nb: tp.PlaceFunc,
         *args,
+        only_once: bool = True,
+        wait: int = 1,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
         template_context: tp.Optional[tp.Mapping] = None,
@@ -327,11 +324,15 @@ class SignalsAccessor(GenericAccessor):
                 to_shape=shape_2d,
                 **broadcast_kwargs
             )
-        template_context = merge_dicts(broadcast_named_args, dict(shape=shape, shape_2d=shape_2d), template_context)
+        template_context = merge_dicts(
+            broadcast_named_args,
+            dict(shape=shape, shape_2d=shape_2d, wait=wait),
+            template_context,
+        )
         args = deep_substitute(args, template_context, sub_id="args")
         func = jit_reg.resolve_option(nb.generate_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        result = func(shape_2d, place_func_nb, *args)
+        result = func(shape_2d, only_once, wait, place_func_nb, *args)
 
         if wrapper is None:
             wrapper = ArrayWrapper.from_shape(shape_2d, ndim=cls.ndim)
