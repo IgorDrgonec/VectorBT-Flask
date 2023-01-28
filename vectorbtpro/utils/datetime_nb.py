@@ -184,51 +184,59 @@ def day_changed_nb(ts1: int, ts2: int) -> bool:
 
 
 @register_jitted(cache=True)
-def weekday_from_days_nb(days: int) -> int:
+def weekday_from_days_nb(days: int, zero_start: bool = True) -> int:
     """Get the weekday from the total number of days.
 
-    Weekdays are ranging from 1 (Monday) to 7 (Sunday)."""
+    Weekdays are ranging from 0 (Monday) to 6 (Sunday)."""
     c_weekday = (days + 4) % 7 if days >= -4 else (days + 5) % 7 + 6
     if c_weekday == 0:
-        return 7
+        c_weekday = 7
+    if zero_start:
+        c_weekday = c_weekday - 1
     return c_weekday
 
 
 @register_jitted(cache=True)
-def weekday_nb(ts: int) -> int:
+def weekday_nb(ts: int, zero_start: bool = True) -> int:
     """Get the weekday.
 
-    Weekdays are ranging from 1 (Monday) to 7 (Sunday)."""
-    return weekday_from_days_nb(days_nb(ts))
+    Weekdays are ranging from 0 (Monday) to 6 (Sunday)."""
+    return weekday_from_days_nb(days_nb(ts), zero_start=zero_start)
 
 
 @register_jitted(cache=True)
-def weekday_diff_nb(weekday1: int, weekday2: int) -> int:
+def weekday_diff_nb(weekday1: int, weekday2: int, zero_start: bool = True) -> int:
     """Get the difference in days between two weekdays."""
-    if weekday1 > 7 or weekday1 < 1:
-        raise ValueError("Weekday must be in [1, 7]")
-    if weekday2 > 7 or weekday2 < 1:
-        raise ValueError("Weekday must be in [1, 7]")
+    if zero_start:
+        if weekday1 > 6 or weekday1 < 0:
+            raise ValueError("Weekday must be in [0, 6]")
+        if weekday2 > 6 or weekday2 < 0:
+            raise ValueError("Weekday must be in [0, 6]")
+    else:
+        if weekday1 > 7 or weekday1 < 1:
+            raise ValueError("Weekday must be in [1, 7]")
+        if weekday2 > 7 or weekday2 < 1:
+            raise ValueError("Weekday must be in [1, 7]")
     weekday_diff = weekday1 - weekday2
-    if weekday_diff < 0:
+    if weekday_diff <= 0:
         weekday_diff += 7
     return weekday_diff
 
 
 @register_jitted(cache=True)
-def past_weekday_nb(ts: int, weekday: int) -> int:
+def past_weekday_nb(ts: int, weekday: int, zero_start: bool = True) -> int:
     """Get the timestamp of a weekday in the past."""
-    this_weekday = weekday_nb(ts)
-    weekday_diff = weekday_diff_nb(this_weekday, weekday)
-    return ts - weekday_diff * d_ns
+    this_weekday = weekday_nb(ts, zero_start=zero_start)
+    weekday_diff = weekday_diff_nb(this_weekday, weekday, zero_start=zero_start)
+    return midnight_nb(ts) - weekday_diff * d_ns
 
 
 @register_jitted(cache=True)
-def future_weekday_nb(ts: int, weekday: int) -> int:
+def future_weekday_nb(ts: int, weekday: int, zero_start: bool = True) -> int:
     """Get the timestamp of a weekday in the future."""
-    this_weekday = weekday_nb(ts)
-    weekday_diff = weekday_diff_nb(weekday, this_weekday)
-    return ts + weekday_diff * d_ns
+    this_weekday = weekday_nb(ts, zero_start=zero_start)
+    weekday_diff = weekday_diff_nb(weekday, this_weekday, zero_start=zero_start)
+    return midnight_nb(ts) + weekday_diff * d_ns
 
 
 @register_jitted(cache=True)
