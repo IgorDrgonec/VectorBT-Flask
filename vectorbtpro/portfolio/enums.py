@@ -354,6 +354,7 @@ class DeltaFormatT(tp.NamedTuple):
     Absolute: int = 0
     Percent: int = 1
     Percent100: int = 2
+    Target: int = 3
 
 
 DeltaFormat = DeltaFormatT()
@@ -367,12 +368,13 @@ __pdoc__[
 {prettify(DeltaFormat)}
 ```
 
-In which format a delta value is provided?
+In which format a delta is provided?
 
 Attributes:
-    Absolute: Absolute terms
-    Percent: Percentage terms where 0.01 means 1%
-    Percent100: Percentage terms where 1.0 means 1%
+    Absolute: Absolute format
+    Percent: Percentage format where 0.01 means 1%
+    Percent100: Percentage format where 1.0 means 1%
+    Target: Target format
 """
 
 
@@ -392,13 +394,13 @@ __pdoc__[
 {prettify(TimeDeltaFormat)}
 ```
 
-In which format a time delta value is provided?
+In which format a time delta is provided?
 
 Attributes:
-    Rows: Row terms where 1 means one row (simulation step) has passed. 
+    Rows: Row format where 1 means one row (simulation step) has passed. 
     
         Doesn't require the index to be provided.
-    Index: Index terms where 1 means one value in index has passed. 
+    Index: Index format where 1 means one value in index has passed. 
     
         If index is datetime-like, 1 means one nanosecond.
     
