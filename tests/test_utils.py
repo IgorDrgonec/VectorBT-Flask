@@ -2145,16 +2145,6 @@ class TestDatetime:
             datetime_.to_timezone("+05")
 
     def test_to_tzaware_datetime(self):
-        assert datetime_.to_tzaware_datetime(0.5) == _datetime(
-            1970,
-            1,
-            1,
-            0,
-            0,
-            0,
-            500000,
-            tzinfo=datetime_.get_utc_tz(),
-        )
         assert datetime_.to_tzaware_datetime(0) == _datetime(1970, 1, 1, 0, 0, 0, 0, tzinfo=datetime_.get_utc_tz())
         assert datetime_.to_tzaware_datetime(pd.Timestamp("2020-01-01").value) == _datetime(2020, 1, 1).replace(
             tzinfo=datetime_.get_utc_tz()

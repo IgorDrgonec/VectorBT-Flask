@@ -20,31 +20,36 @@ import re
 import requests
 import urllib.parse
 
+import numpy as np
 import pandas as pd
 from pandas.io.parsers import TextFileReader
 from pandas.io.pytables import TableIterator
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_1d_array
+from vectorbtpro.base.reshaping import to_1d_array, broadcast_array_to
 from vectorbtpro.data import nb
 from vectorbtpro.data.base import Data, symbol_dict
 from vectorbtpro.data.tv import TVClient
 from vectorbtpro.generic import nb as generic_nb
+from vectorbtpro.ohlcv import nb as ohlcv_nb
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.datetime_ import (
     get_utc_tz,
     get_local_tz,
+    to_datetime,
     to_tzaware_datetime,
     datetime_to_ms,
     split_freq_str,
     prepare_freq,
+    to_timezone,
 )
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.parsing import glob2re, get_func_arg_names
+from vectorbtpro.utils.template import deep_substitute
 
 try:
     if not tp.TYPE_CHECKING:
@@ -148,32 +153,50 @@ class SyntheticData(CustomData):
         symbol: tp.Symbol,
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
+        periods: tp.Optional[int] = None,
         freq: tp.Union[None, str, pd.DateOffset] = None,
-        date_range_kwargs: tp.KwargsLike = None,
+        tz: tp.Optional[tp.TimezoneLike] = None,
+        normalize: tp.Optional[bool] = None,
+        inclusive: tp.Optional[str] = None,
         **kwargs,
     ) -> tp.SeriesFrame:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to generate a symbol.
 
-        Generates datetime index and passes it to `SyntheticData.generate_symbol` to fill
-        the Series/DataFrame with generated data.
+        Generates datetime index using `pd.date_range` and passes it to `SyntheticData.generate_symbol`
+        to fill the Series/DataFrame with generated data.
 
         For defaults, see `custom.synthetic` in `vectorbtpro._settings.data`."""
         synthetic_cfg = cls.get_settings(key_id="custom")
 
         if start is None:
             start = synthetic_cfg["start"]
+        if start is not None:
+            start = to_datetime(start)
         if end is None:
             end = synthetic_cfg["end"]
+        if end is not None:
+            end = to_datetime(end)
         if freq is None:
             freq = synthetic_cfg["freq"]
-        freq = prepare_freq(freq)
-        date_range_kwargs = merge_dicts(synthetic_cfg["date_range_kwargs"], date_range_kwargs)
+        if freq is not None:
+            freq = prepare_freq(freq)
+        if tz is None:
+            tz = synthetic_cfg["tz"]
+        if tz is not None:
+            tz = to_timezone(tz)
+        if normalize is None:
+            normalize = synthetic_cfg["normalize"]
+        if inclusive is None:
+            inclusive = synthetic_cfg["inclusive"]
 
         index = pd.date_range(
-            start=to_tzaware_datetime(start, tz=get_utc_tz()),
-            end=to_tzaware_datetime(end, tz=get_utc_tz()),
+            start=start,
+            end=end,
+            periods=periods,
             freq=freq,
-            **date_range_kwargs,
+            tz=tz,
+            normalize=normalize,
+            inclusive=inclusive,
         )
         if len(index) == 0:
             raise ValueError("Date range is empty")
@@ -196,21 +219,23 @@ class RandomData(SyntheticData):
         cls,
         symbol: tp.Symbol,
         index: tp.Index,
-        num_paths: tp.Optional[int] = None,
+        columns: tp.Union[tp.Hashable, tp.IndexLike] = None,
         start_value: tp.Optional[float] = None,
         mean: tp.Optional[float] = None,
         std: tp.Optional[float] = None,
         symmetric: tp.Optional[bool] = None,
         seed: tp.Optional[int] = None,
         jitted: tp.JittedOption = None,
-        columns: tp.Optional[tp.IndexLike] = None,
+        **kwargs,
     ) -> tp.SeriesFrame:
         """Generate a symbol.
 
         Args:
             symbol (str): Symbol.
             index (pd.Index): Pandas index.
-            num_paths (int): Number of generated paths (columns in our case).
+            columns (hashable or index_like): Column labels.
+
+                Provide a single value (hashable) to make a Series.
             start_value (float): Value at time 0.
 
                 Does not appear as the first value in the output data.
@@ -219,7 +244,6 @@ class RandomData(SyntheticData):
             symmetric (bool): Whether to diminish negative returns and make them symmetric to positive ones.
             seed (int): Set seed to make output deterministic.
             jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
-            columns (index_like): Column labels.
 
         For defaults, see `custom.random` in `vectorbtpro._settings.data`.
 
@@ -228,8 +252,13 @@ class RandomData(SyntheticData):
         """
         random_cfg = cls.get_settings(key_id="custom")
 
-        if num_paths is None:
-            num_paths = random_cfg["num_paths"]
+        if checks.is_hashable(columns):
+            columns = [columns]
+            make_series = True
+        else:
+            make_series = False
+        if not isinstance(columns, pd.Index):
+            columns = pd.Index(columns)
         if start_value is None:
             start_value = random_cfg["start_value"]
         if mean is None:
@@ -242,30 +271,18 @@ class RandomData(SyntheticData):
             seed = random_cfg["seed"]
         if seed is not None:
             set_seed(seed)
-        if jitted is None:
-            jitted = random_cfg["jitted"]
 
         func = jit_reg.resolve_option(nb.generate_random_data_nb, jitted)
         out = func(
-            (len(index), num_paths),
-            to_1d_array(start_value),
-            to_1d_array(mean),
-            to_1d_array(std),
+            (len(index), len(columns)),
+            start_value=to_1d_array(start_value),
+            mean=to_1d_array(mean),
+            std=to_1d_array(std),
             symmetric=to_1d_array(symmetric)
         )
-
-        if out.shape[1] == 1:
-            if columns is None:
-                out = pd.Series(out[:, 0], index=index)
-            else:
-                if not isinstance(columns, pd.Index):
-                    columns = pd.index(columns)
-                out = pd.Series(out[:, 0], index=index, name=columns[0])
-        else:
-            if columns is None:
-                columns = pd.RangeIndex(stop=out.shape[1], name="path")
-            out = pd.DataFrame(out, index=index, columns=columns)
-        return out
+        if make_series:
+            return pd.Series(out[:, 0], index=index, name=columns[0])
+        return pd.DataFrame(out, index=index, columns=columns)
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
@@ -278,28 +295,80 @@ class RandomData(SyntheticData):
 
 
 class RandomOHLCData(RandomData):
-    """`RandomData` resampled to OHLC."""
+    """`RandomData` for data generated using `vectorbtpro.data.nb.generate_random_data_1d_nb`
+    and then resampled using `vectorbtpro.ohlcv.nb.ohlc_every_1d_nb`."""
 
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.random_ohlc")
 
     @classmethod
     def generate_symbol(
         cls,
-        *args,
-        ohlc_freq: tp.Optional[tp.FrequencyLike] = None,
+        symbol: tp.Symbol,
+        index: tp.Index,
+        n_ticks: tp.Optional[tp.ArrayLike] = None,
+        start_value: tp.Optional[float] = None,
+        mean: tp.Optional[float] = None,
+        std: tp.Optional[float] = None,
+        symmetric: tp.Optional[bool] = None,
+        seed: tp.Optional[int] = None,
+        jitted: tp.JittedOption = None,
+        template_context: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.SeriesFrame:
-        """Generate a symbol."""
+        """Generate a symbol.
+
+        Args:
+            symbol (str): Symbol.
+            index (pd.Index): Pandas index.
+            n_ticks (int or array_like): Number of ticks per bar.
+
+                Flexible argument. Can be a template with a context containing `symbol` and `index`.
+            start_value (float): Value at time 0.
+
+                Does not appear as the first value in the output data.
+            mean (float): Drift, or mean of the percentage change.
+            std (float): Standard deviation of the percentage change.
+            symmetric (bool): Whether to diminish negative returns and make them symmetric to positive ones.
+            seed (int): Set seed to make output deterministic.
+            jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
+            template_context (dict): Template context.
+
+        For defaults, see `custom.random_ohlc` in `vectorbtpro._settings.data`.
+
+        !!! note
+            When setting a seed, remember to pass a seed per symbol using `vectorbtpro.data.base.symbol_dict`.
+        """
         random_ohlc_cfg = cls.get_settings(key_id="custom")
 
-        if ohlc_freq is None:
-            ohlc_freq = random_ohlc_cfg["ohlc_freq"]
-        ohlc_freq = prepare_freq(ohlc_freq)
+        if n_ticks is None:
+            n_ticks = random_ohlc_cfg["n_ticks"]
+        template_context = merge_dicts(dict(symbol=symbol, index=index), template_context)
+        n_ticks = deep_substitute(n_ticks, template_context, sub_id="n_ticks")
+        n_ticks = broadcast_array_to(n_ticks, len(index))
+        if start_value is None:
+            start_value = random_ohlc_cfg["start_value"]
+        if mean is None:
+            mean = random_ohlc_cfg["mean"]
+        if std is None:
+            std = random_ohlc_cfg["std"]
+        if symmetric is None:
+            symmetric = random_ohlc_cfg["symmetric"]
+        if seed is None:
+            seed = random_ohlc_cfg["seed"]
+        if seed is not None:
+            set_seed(seed)
 
-        out = RandomData.generate_symbol(*args, num_paths=1, **kwargs)
-        out = out.resample(ohlc_freq).ohlc()
-        out = out.rename(columns={"open": "Open", "high": "High", "low": "Low", "close": "Close"})
-        return out
+        func = jit_reg.resolve_option(nb.generate_random_data_1d_nb, jitted)
+        ticks = func(
+            np.sum(n_ticks),
+            start_value=start_value,
+            mean=mean,
+            std=std,
+            symmetric=symmetric
+        )
+        func = jit_reg.resolve_option(ohlcv_nb.ohlc_every_1d_nb, jitted)
+        out = func(ticks, n_ticks)
+        return pd.DataFrame(out, index=index, columns=["Open", "High", "Low", "Close"])
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
@@ -311,8 +380,8 @@ class RandomOHLCData(RandomData):
         return self.fetch_symbol(symbol, start_value=start_value, **kwargs)
 
 
-class GBMData(RandomData):
-    """`RandomData` for data generated using `vectorbtpro.data.nb.generate_gbm_data_nb`."""
+class GBMData(SyntheticData):
+    """`SyntheticData` for data generated using `vectorbtpro.data.nb.generate_gbm_data_nb`."""
 
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.gbm")
 
@@ -321,21 +390,23 @@ class GBMData(RandomData):
         cls,
         symbol: tp.Symbol,
         index: tp.Index,
-        num_paths: tp.Optional[int] = None,
+        columns: tp.Union[tp.Hashable, tp.IndexLike] = None,
         start_value: tp.Optional[float] = None,
         mean: tp.Optional[float] = None,
         std: tp.Optional[float] = None,
         dt: tp.Optional[float] = None,
         seed: tp.Optional[int] = None,
         jitted: tp.JittedOption = None,
-        columns: tp.Optional[tp.IndexLike] = None,
+        **kwargs,
     ) -> tp.SeriesFrame:
         """Generate a symbol.
 
         Args:
             symbol (str): Symbol.
             index (pd.Index): Pandas index.
-            num_paths (int): Number of generated paths (columns in our case).
+            columns (hashable or index_like): Column labels.
+
+                Provide a single value (hashable) to make a Series.
             start_value (float): Value at time 0.
 
                 Does not appear as the first value in the output data.
@@ -344,7 +415,6 @@ class GBMData(RandomData):
             dt (float): Time change (one period of time).
             seed (int): Set seed to make output deterministic.
             jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
-            columns (index_like): Column labels.
 
         For defaults, see `custom.gbm` in `vectorbtpro._settings.data`.
 
@@ -353,8 +423,13 @@ class GBMData(RandomData):
         """
         gbm_cfg = cls.get_settings(key_id="custom")
 
-        if num_paths is None:
-            num_paths = gbm_cfg["num_paths"]
+        if checks.is_hashable(columns):
+            columns = [columns]
+            make_series = True
+        else:
+            make_series = False
+        if not isinstance(columns, pd.Index):
+            columns = pd.Index(columns)
         if start_value is None:
             start_value = gbm_cfg["start_value"]
         if mean is None:
@@ -367,55 +442,95 @@ class GBMData(RandomData):
             seed = gbm_cfg["seed"]
         if seed is not None:
             set_seed(seed)
-        if jitted is None:
-            jitted = gbm_cfg["jitted"]
 
         func = jit_reg.resolve_option(nb.generate_gbm_data_nb, jitted)
         out = func(
-            (len(index), num_paths),
-            to_1d_array(start_value),
-            to_1d_array(mean),
-            to_1d_array(std),
-            to_1d_array(dt),
+            (len(index), len(columns)),
+            start_value=to_1d_array(start_value),
+            mean=to_1d_array(mean),
+            std=to_1d_array(std),
+            dt=to_1d_array(dt),
         )
-
-        if out.shape[1] == 1:
-            if columns is None:
-                out = pd.Series(out[:, 0], index=index)
-            else:
-                if not isinstance(columns, pd.Index):
-                    columns = pd.index(columns)
-                out = pd.Series(out[:, 0], index=index, name=columns[0])
-        else:
-            if columns is None:
-                columns = pd.RangeIndex(stop=out.shape[1], name="path")
-            out = pd.DataFrame(out, index=index, columns=columns)
-        return out
+        if make_series:
+            return pd.Series(out[:, 0], index=index, name=columns[0])
+        return pd.DataFrame(out, index=index, columns=columns)
 
 
 class GBMOHLCData(GBMData):
-    """`GBMData` resampled to OHLC."""
+    """`GBMData` for data generated using `vectorbtpro.data.nb.generate_gbm_data_1d_nb`
+    and then resampled using `vectorbtpro.ohlcv.nb.ohlc_every_1d_nb`."""
 
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.gbm_ohlc")
 
     @classmethod
     def generate_symbol(
         cls,
-        *args,
-        ohlc_freq: tp.Optional[tp.FrequencyLike] = None,
+        symbol: tp.Symbol,
+        index: tp.Index,
+        n_ticks: tp.Optional[tp.ArrayLike] = None,
+        start_value: tp.Optional[float] = None,
+        mean: tp.Optional[float] = None,
+        std: tp.Optional[float] = None,
+        dt: tp.Optional[float] = None,
+        seed: tp.Optional[int] = None,
+        jitted: tp.JittedOption = None,
+        template_context: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.SeriesFrame:
-        """Generate a symbol."""
-        gbm_ohlc_cfg = cls.get_settings(key_id="custom")
+        """Generate a symbol.
 
-        if ohlc_freq is None:
-            ohlc_freq = gbm_ohlc_cfg["ohlc_freq"]
-        ohlc_freq = prepare_freq(ohlc_freq)
+        Args:
+            symbol (str): Symbol.
+            index (pd.Index): Pandas index.
+            n_ticks (int or array_like): Number of ticks per bar.
 
-        out = GBMData.generate_symbol(*args, num_paths=1, **kwargs)
-        out = out.resample(ohlc_freq).ohlc()
-        out = out.rename(columns={"open": "Open", "high": "High", "low": "Low", "close": "Close"})
-        return out
+                Flexible argument. Can be a template with a context containing `symbol` and `index`.
+            start_value (float): Value at time 0.
+
+                Does not appear as the first value in the output data.
+            mean (float): Drift, or mean of the percentage change.
+            std (float): Standard deviation of the percentage change.
+            dt (float): Time change (one period of time).
+            seed (int): Set seed to make output deterministic.
+            jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
+            template_context (dict): Template context.
+
+        For defaults, see `custom.gbm` in `vectorbtpro._settings.data`.
+
+        !!! note
+            When setting a seed, remember to pass a seed per symbol using `vectorbtpro.data.base.symbol_dict`.
+        """
+        gbm_cfg = cls.get_settings(key_id="custom")
+
+        if n_ticks is None:
+            n_ticks = gbm_cfg["n_ticks"]
+        template_context = merge_dicts(dict(symbol=symbol, index=index), template_context)
+        n_ticks = deep_substitute(n_ticks, template_context, sub_id="n_ticks")
+        n_ticks = broadcast_array_to(n_ticks, len(index))
+        if start_value is None:
+            start_value = gbm_cfg["start_value"]
+        if mean is None:
+            mean = gbm_cfg["mean"]
+        if std is None:
+            std = gbm_cfg["std"]
+        if dt is None:
+            dt = gbm_cfg["dt"]
+        if seed is None:
+            seed = gbm_cfg["seed"]
+        if seed is not None:
+            set_seed(seed)
+
+        func = jit_reg.resolve_option(nb.generate_gbm_data_1d_nb, jitted)
+        ticks = func(
+            np.sum(n_ticks),
+            start_value=start_value,
+            mean=mean,
+            std=std,
+            dt=dt,
+        )
+        func = jit_reg.resolve_option(ohlcv_nb.ohlc_every_1d_nb, jitted)
+        out = func(ticks, n_ticks)
+        return pd.DataFrame(out, index=index, columns=["Open", "High", "Low", "Close"])
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)

@@ -596,31 +596,31 @@ data = child_dict(
             start=0,
             end="now",
             freq=None,
-            date_range_kwargs=dict(),
+            tz=None,
+            normalize=False,
+            inclusive="left",
         ),
         random=FrozenConfig(
-            num_paths=1,
             start_value=100.0,
             mean=0.0,
             std=0.01,
             symmetric=False,
             seed=None,
-            jitted=None,
         ),
         random_ohlc=FrozenConfig(
-            ohlc_freq=None,
+            std=0.001,
+            n_ticks=50,
         ),
         gbm=FrozenConfig(
-            num_paths=1,
             start_value=100.0,
             mean=0.0,
             std=0.01,
             dt=1.0,
             seed=None,
-            jitted=None,
         ),
         gbm_ohlc=FrozenConfig(
-            ohlc_freq=None,
+            std=0.001,
+            n_ticks=50,
         ),
         # Local
         local=FrozenConfig(

@@ -87,10 +87,10 @@ class TestFromOrderFunc:
     def test_data(self):
         data = vbt.RandomOHLCData.fetch(
             [0, 1],
-            ohlc_freq="1d",
             start="2020-01-01",
             end="2020-02-01",
-            freq="1h",
+            tick_freq="1h",
+            freq="1d",
             seed=42,
         )
         pf = vbt.Portfolio.from_order_func(data, order_func_nb, np.array([[np.inf]]))

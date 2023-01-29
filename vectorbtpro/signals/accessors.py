@@ -17,11 +17,11 @@ Methods can be accessed as follows:
 
 >>> # vectorbtpro.signals.accessors.SignalsAccessor.pos_rank
 >>> pd.Series([False, True, True, True, False]).vbt.signals.pos_rank()
-0    0
-1    1
-2    2
-3    3
-4    0
+0   -1
+1    0
+2    1
+3    2
+4   -1
 dtype: int64
 ```
 
@@ -64,28 +64,25 @@ Run for the examples below:
 
 ```pycon
 >>> mask.vbt.signals.stats(column='a')
-Start                       2020-01-01 00:00:00
-End                         2020-01-05 00:00:00
-Period                          5 days 00:00:00
-Total                                         1
-Rate [%]                                     20
-First Index                 2020-01-01 00:00:00
-Last Index                  2020-01-01 00:00:00
-Norm Avg Index [-1, 1]                       -1
-Distance: Min                               NaT
-Distance: Max                               NaT
-Distance: Mean                              NaT
-Distance: Std                               NaT
-Total Partitions                              1
-Partition Rate [%]                          100
-Partition Length: Min           1 days 00:00:00
-Partition Length: Max           1 days 00:00:00
-Partition Length: Mean          1 days 00:00:00
-Partition Length: Std                       NaT
-Partition Distance: Min                     NaT
-Partition Distance: Max                     NaT
-Partition Distance: Mean                    NaT
-Partition Distance: Std                     NaT
+Start                         2020-01-01 00:00:00
+End                           2020-01-05 00:00:00
+Period                            5 days 00:00:00
+Total                                           1
+Rate [%]                                     20.0
+First Index                   2020-01-01 00:00:00
+Last Index                    2020-01-01 00:00:00
+Norm Avg Index [-1, 1]                       -1.0
+Distance: Min                                 NaT
+Distance: Median                              NaT
+Distance: Max                                 NaT
+Total Partitions                                1
+Partition Rate [%]                          100.0
+Partition Length: Min             1 days 00:00:00
+Partition Length: Median          1 days 00:00:00
+Partition Length: Max             1 days 00:00:00
+Partition Distance: Min                       NaT
+Partition Distance: Median                    NaT
+Partition Distance: Max                       NaT
 Name: a, dtype: object
 ```
 
@@ -93,30 +90,28 @@ We can pass another signal array to compare this array with:
 
 ```pycon
 >>> mask.vbt.signals.stats(column='a', settings=dict(other=mask['b']))
-Start                       2020-01-01 00:00:00
-End                         2020-01-05 00:00:00
-Period                          5 days 00:00:00
-Total                                         1
-Rate [%]                                     20
-Total Overlapping                             1
-Overlapping Rate [%]                    33.3333
-First Index                 2020-01-01 00:00:00
-Last Index                  2020-01-01 00:00:00
-Norm Avg Index [-1, 1]                       -1
-Distance -> Other: Min          0 days 00:00:00
-Distance -> Other: Max          0 days 00:00:00
-Distance -> Other: Mean         0 days 00:00:00
-Distance -> Other: Std                      NaT
-Total Partitions                              1
-Partition Rate [%]                          100
-Partition Length: Min           1 days 00:00:00
-Partition Length: Max           1 days 00:00:00
-Partition Length: Mean          1 days 00:00:00
-Partition Length: Std                       NaT
-Partition Distance: Min                     NaT
-Partition Distance: Max                     NaT
-Partition Distance: Mean                    NaT
-Partition Distance: Std                     NaT
+
+Start                         2020-01-01 00:00:00
+End                           2020-01-05 00:00:00
+Period                            5 days 00:00:00
+Total                                           1
+Rate [%]                                     20.0
+Total Overlapping                               1
+Overlapping Rate [%]                    33.333333
+First Index                   2020-01-01 00:00:00
+Last Index                    2020-01-01 00:00:00
+Norm Avg Index [-1, 1]                       -1.0
+Distance -> Other: Min            0 days 00:00:00
+Distance -> Other: Median         2 days 00:00:00
+Distance -> Other: Max            4 days 00:00:00
+Total Partitions                                1
+Partition Rate [%]                          100.0
+Partition Length: Min             1 days 00:00:00
+Partition Length: Median          1 days 00:00:00
+Partition Length: Max             1 days 00:00:00
+Partition Distance: Min                       NaT
+Partition Distance: Median                    NaT
+Partition Distance: Max                       NaT
 Name: a, dtype: object
 ```
 
@@ -124,28 +119,25 @@ We can also return duration as a floating number rather than a timedelta:
 
 ```pycon
 >>> mask.vbt.signals.stats(column='a', settings=dict(to_timedelta=False))
-Start                       2020-01-01 00:00:00
-End                         2020-01-05 00:00:00
-Period                                        5
-Total                                         1
-Rate [%]                                     20
-First Index                 2020-01-01 00:00:00
-Last Index                  2020-01-01 00:00:00
-Norm Avg Index [-1, 1]                       -1
-Distance: Min                               NaN
-Distance: Max                               NaN
-Distance: Mean                              NaN
-Distance: Std                               NaN
-Total Partitions                              1
-Partition Rate [%]                          100
-Partition Length: Min                         1
-Partition Length: Max                         1
-Partition Length: Mean                        1
-Partition Length: Std                       NaN
-Partition Distance: Min                     NaN
-Partition Distance: Max                     NaN
-Partition Distance: Mean                    NaN
-Partition Distance: Std                     NaN
+Start                         2020-01-01 00:00:00
+End                           2020-01-05 00:00:00
+Period                                          5
+Total                                           1
+Rate [%]                                     20.0
+First Index                   2020-01-01 00:00:00
+Last Index                    2020-01-01 00:00:00
+Norm Avg Index [-1, 1]                       -1.0
+Distance: Min                                 NaN
+Distance: Median                              NaN
+Distance: Max                                 NaN
+Total Partitions                                1
+Partition Rate [%]                          100.0
+Partition Length: Min                         1.0
+Partition Length: Median                      1.0
+Partition Length: Max                         1.0
+Partition Distance: Min                       NaN
+Partition Distance: Median                    NaN
+Partition Distance: Max                       NaN
 Name: a, dtype: object
 ```
 
@@ -153,28 +145,25 @@ Name: a, dtype: object
 
 ```pycon
 >>> mask.vbt.signals.stats(column=0, group_by=[0, 0, 1])
-Start                       2020-01-01 00:00:00
-End                         2020-01-05 00:00:00
-Period                          5 days 00:00:00
-Total                                         4
-Rate [%]                                     40
-First Index                 2020-01-01 00:00:00
-Last Index                  2020-01-05 00:00:00
-Norm Avg Index [-1, 1]                    -0.25
-Distance: Min                   2 days 00:00:00
-Distance: Max                   2 days 00:00:00
-Distance: Mean                  2 days 00:00:00
-Distance: Std                   0 days 00:00:00
-Total Partitions                              4
-Partition Rate [%]                          100
-Partition Length: Min           1 days 00:00:00
-Partition Length: Max           1 days 00:00:00
-Partition Length: Mean          1 days 00:00:00
-Partition Length: Std           0 days 00:00:00
-Partition Distance: Min         2 days 00:00:00
-Partition Distance: Max         2 days 00:00:00
-Partition Distance: Mean        2 days 00:00:00
-Partition Distance: Std         0 days 00:00:00
+Start                         2020-01-01 00:00:00
+End                           2020-01-05 00:00:00
+Period                            5 days 00:00:00
+Total                                           4
+Rate [%]                                     40.0
+First Index                   2020-01-01 00:00:00
+Last Index                    2020-01-05 00:00:00
+Norm Avg Index [-1, 1]                      -0.25
+Distance: Min                     2 days 00:00:00
+Distance: Median                  2 days 00:00:00
+Distance: Max                     2 days 00:00:00
+Total Partitions                                4
+Partition Rate [%]                          100.0
+Partition Length: Min             1 days 00:00:00
+Partition Length: Median          1 days 00:00:00
+Partition Length: Max             1 days 00:00:00
+Partition Distance: Min           2 days 00:00:00
+Partition Distance: Median        2 days 00:00:00
+Partition Distance: Max           2 days 00:00:00
 Name: 0, dtype: object
 ```
 

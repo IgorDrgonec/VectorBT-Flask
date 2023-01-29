@@ -2082,7 +2082,7 @@ class TestCustom:
 
     def test_random_data(self):
         assert_series_equal(
-            vbt.RandomData.fetch(start="2021-01-01 UTC", end="2021-01-05 UTC", seed=42).get(),
+            vbt.RandomData.fetch(start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42).get(),
             pd.Series(
                 [100.49671415301123, 100.35776307348756, 101.00776880200878, 102.54614727815496, 102.3060320136544],
                 index=pd.DatetimeIndex(
@@ -2099,7 +2099,7 @@ class TestCustom:
             ),
         )
         assert_series_equal(
-            vbt.RandomData.fetch(start="2021-01-01 UTC", end="2021-01-05 UTC", symmetric=True, seed=42).get(),
+            vbt.RandomData.fetch(start="2021-01-01 UTC", end="2021-01-06 UTC", symmetric=True, seed=42).get(),
             pd.Series(
                 [100.49671415301123, 100.35795492796039, 101.00796189910105, 102.54634331617359, 102.30678851828695],
                 index=pd.DatetimeIndex(
@@ -2116,7 +2116,9 @@ class TestCustom:
             ),
         )
         assert_frame_equal(
-            vbt.RandomData.fetch(num_paths=2, start="2021-01-01 UTC", end="2021-01-05 UTC", seed=42).get(),
+            vbt.RandomData.fetch(
+                columns=pd.Index([0, 1], name="path"), start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42
+            ).get(),
             pd.DataFrame(
                 [
                     [100.49671415301123, 99.7658630430508],
@@ -2140,7 +2142,7 @@ class TestCustom:
             ),
         )
         assert_frame_equal(
-            vbt.RandomData.fetch([0, 1], start="2021-01-01 UTC", end="2021-01-05 UTC", seed=42).get(),
+            vbt.RandomData.fetch([0, 1], start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42).get(),
             pd.DataFrame(
                 [
                     [100.49671415301123, 100.49671415301123],
@@ -2168,24 +2170,28 @@ class TestCustom:
         assert_frame_equal(
             vbt.RandomOHLCData.fetch(
                 start="2021-01-01 UTC",
-                end="2021-01-05 UTC",
-                ohlc_freq="2D",
+                end="2021-01-06 UTC",
                 seed=42,
+                n_ticks=10,
             ).get(),
             pd.DataFrame(
                 [
-                    [100.49671415301123, 100.49671415301123, 100.35776307348756, 100.35776307348756],
-                    [101.00776880200878, 102.54614727815496, 101.00776880200878, 102.54614727815496],
-                    [102.3060320136544, 102.3060320136544, 102.3060320136544, 102.3060320136544],
+                    [100.04967141530112, 100.4487295660908, 100.03583811740049, 100.4487295660908],
+                    [100.40217984758935, 100.40217984758935, 99.65708696443218, 99.65708696443218],
+                    [99.8031492512559, 99.8031492512559, 99.43592824293678, 99.43592824293678],
+                    [99.37609698741984, 99.56016916393129, 99.10790499793339, 99.12741550259568],
+                    [99.20061778610567, 99.21761762546865, 98.8767232135222, 98.8767232135222],
                 ],
                 index=pd.DatetimeIndex(
                     [
                         datetime(2021, 1, 1),
+                        datetime(2021, 1, 2),
                         datetime(2021, 1, 3),
+                        datetime(2021, 1, 4),
                         datetime(2021, 1, 5),
                     ],
                     dtype="datetime64[ns, UTC]",
-                    freq="2D",
+                    freq="1D",
                 ),
                 columns=pd.Index(["Open", "High", "Low", "Close"], dtype="object"),
             ),
@@ -2193,7 +2199,7 @@ class TestCustom:
 
     def test_gbm_data(self):
         assert_series_equal(
-            vbt.GBMData.fetch(start="2021-01-01 UTC", end="2021-01-05 UTC", seed=42).get(),
+            vbt.GBMData.fetch(start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42).get(),
             pd.Series(
                 [100.49292505095792, 100.34905764408163, 100.99606643427086, 102.54091282498935, 102.29597577584751],
                 index=pd.DatetimeIndex(
@@ -2210,7 +2216,9 @@ class TestCustom:
             ),
         )
         assert_frame_equal(
-            vbt.GBMData.fetch(num_paths=2, start="2021-01-01 UTC", end="2021-01-05 UTC", seed=42).get(),
+            vbt.GBMData.fetch(
+                columns=pd.Index([0, 1], name="path"), start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42
+            ).get(),
             pd.DataFrame(
                 [
                     [100.49292505095792, 99.76114874768454],
@@ -2234,7 +2242,7 @@ class TestCustom:
             ),
         )
         assert_frame_equal(
-            vbt.GBMData.fetch([0, 1], start="2021-01-01 UTC", end="2021-01-05 UTC", seed=42).get(),
+            vbt.GBMData.fetch([0, 1], start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42).get(),
             pd.DataFrame(
                 [
                     [100.49292505095792, 100.49292505095792],
@@ -2262,24 +2270,28 @@ class TestCustom:
         assert_frame_equal(
             vbt.GBMOHLCData.fetch(
                 start="2021-01-01 UTC",
-                end="2021-01-05 UTC",
-                ohlc_freq="2D",
+                end="2021-01-06 UTC",
                 seed=42,
+                n_ticks=10,
             ).get(),
             pd.DataFrame(
                 [
-                    [100.49292505095792, 100.49292505095792, 100.34905764408163, 100.34905764408163],
-                    [100.99606643427086, 102.54091282498935, 100.99606643427086, 102.54091282498935],
-                    [102.29597577584751, 102.29597577584751, 102.29597577584751, 102.29597577584751],
+                    [100.04963372876203, 100.44856416230552, 100.03575137446511, 100.44856416230552],
+                    [100.40197510375286, 100.40197510375286, 99.6569924965322, 99.6569924965322],
+                    [99.80311183354723, 99.80311183354723, 99.4356577399506, 99.4356577399506],
+                    [99.37579495605948, 99.55998737434406, 99.10782027760916, 99.12728312249477],
+                    [99.20046274334108, 99.2174144041126, 98.87648952724908, 98.87648952724908],
                 ],
                 index=pd.DatetimeIndex(
                     [
                         datetime(2021, 1, 1),
+                        datetime(2021, 1, 2),
                         datetime(2021, 1, 3),
+                        datetime(2021, 1, 4),
                         datetime(2021, 1, 5),
                     ],
                     dtype="datetime64[ns, UTC]",
-                    freq="2D",
+                    freq="1D",
                 ),
                 columns=pd.Index(["Open", "High", "Low", "Close"], dtype="object"),
             ),

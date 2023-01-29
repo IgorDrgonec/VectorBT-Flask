@@ -316,6 +316,27 @@ def to_timezone(tz: tp.TimezoneLike, to_fixed_offset: tp.Optional[bool] = None, 
     raise TypeError("Couldn't parse the timezone")
 
 
+def to_datetime(dt_like: tp.DatetimeLike, **kwargs) -> datetime:
+    """Parse the datetime as a `datetime.datetime`.
+
+    See [dateparser docs](http://dateparser.readthedocs.io/en/latest/) for valid string formats and `**kwargs`."""
+    if isinstance(dt_like, pd.Timestamp):
+        return dt_like
+    if isinstance(dt_like, (int, float)):
+        return pd.to_datetime(dt_like, utc=True).to_pydatetime()
+    if isinstance(dt_like, str):
+        try:
+            return pd.to_datetime(dt_like, **kwargs).to_pydatetime()
+        except Exception as e:
+            import dateparser
+
+            dt = dateparser.parse(dt_like, **kwargs)
+            if is_tz_aware(dt):
+                dt = dt.replace(tzinfo=to_timezone(dt.tzinfo, to_fixed_offset=True))
+            return dt
+    return pd.to_datetime(dt_like, **kwargs).to_pydatetime()
+
+
 def to_tzaware_datetime(
     dt_like: tp.DatetimeLike,
     naive_tz: tp.Optional[tp.TimezoneLike] = None,
@@ -324,36 +345,18 @@ def to_tzaware_datetime(
 ) -> datetime:
     """Parse the datetime as a timezone-aware `datetime.datetime`.
 
-    See [dateparser docs](http://dateparser.readthedocs.io/en/latest/) for valid string formats and `**kwargs`.
+    Uses `to_datetime`.
 
     Raw timestamps are localized to UTC, while naive datetime is localized to `naive_tz`.
     Set `naive_tz` to None to use the default value defined under `vectorbtpro._settings.datetime`.
     To explicitly convert the datetime to a timezone, use `tz` (uses `to_timezone`)."""
-    import dateparser
     from vectorbtpro._settings import settings
 
     datetime_cfg = settings["datetime"]
 
     if naive_tz is None:
         naive_tz = datetime_cfg["naive_tz"]
-    if isinstance(dt_like, float):
-        dt = datetime.fromtimestamp(dt_like, timezone.utc)
-    elif isinstance(dt_like, int):
-        if len(str(dt_like)) > 10:
-            dt = datetime.fromtimestamp(dt_like / 10 ** (len(str(dt_like)) - 10), timezone.utc)
-        else:
-            dt = datetime.fromtimestamp(dt_like, timezone.utc)
-    elif isinstance(dt_like, str):
-        try:
-            dt = pd.to_datetime(dt_like)
-        except Exception as e:
-            dt = dateparser.parse(dt_like, **kwargs)
-    elif isinstance(dt_like, pd.Timestamp):
-        dt = dt_like.to_pydatetime()
-    elif isinstance(dt_like, np.datetime64):
-        dt = datetime.combine(dt_like.astype(datetime), time())
-    else:
-        dt = dt_like
+    dt = to_datetime(dt_like, **kwargs)
 
     if dt is None:
         raise ValueError("Couldn't parse the datetime")
