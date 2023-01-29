@@ -44,6 +44,18 @@ def check_adj_price_nb(
 
 
 @register_jitted(cache=True)
+def approx_long_buy_value_nb(val_price: float, size: float) -> float:
+    """Approximate value of a long-buy operation.
+
+    Positive value means spending (for sorting reasons)."""
+    if size == 0:
+        return 0.0
+    order_value = abs(size) * val_price
+    add_free_cash = -order_value
+    return -add_free_cash
+
+
+@register_jitted(cache=True)
 def long_buy_nb(
     account_state: AccountState,
     size: float,
@@ -181,6 +193,21 @@ def long_buy_nb(
 
 
 @register_jitted(cache=True)
+def approx_long_sell_value_nb(position: float, debt: float, val_price: float, size: float) -> float:
+    """Approximate value of a long-sell operation.
+
+    Positive value means spending (for sorting reasons)."""
+    if size == 0 or position == 0:
+        return 0.0
+    size_limit = min(position, abs(size))
+    order_value = size_limit * val_price
+    size_fraction = size_limit / position
+    released_debt = size_fraction * debt
+    add_free_cash = order_value - released_debt
+    return -add_free_cash
+
+
+@register_jitted(cache=True)
 def long_sell_nb(
     account_state: AccountState,
     size: float,
@@ -272,6 +299,18 @@ def long_sell_nb(
         free_cash=new_free_cash,
     )
     return order_result, new_account_state
+
+
+@register_jitted(cache=True)
+def approx_short_sell_value_nb(val_price: float, size: float) -> float:
+    """Approximate value of a short-sell operation.
+
+    Positive value means spending (for sorting reasons)."""
+    if size == 0:
+        return 0.0
+    order_value = abs(size) * val_price
+    add_free_cash = -order_value
+    return -add_free_cash
 
 
 @register_jitted(cache=True)
@@ -381,6 +420,22 @@ def short_sell_nb(
         free_cash=new_free_cash,
     )
     return order_result, new_account_state
+
+
+@register_jitted(cache=True)
+def approx_short_buy_value_nb(position: float, debt: float, locked_cash: float, val_price: float, size: float) -> float:
+    """Approximate value of a short-buy operation.
+
+    Positive value means spending (for sorting reasons)."""
+    if size == 0 or position == 0:
+        return 0.0
+    size_limit = min(abs(position), abs(size))
+    order_value = size_limit * val_price
+    size_fraction = size_limit / abs(position)
+    released_debt = size_fraction * debt
+    released_cash = size_fraction * locked_cash
+    add_free_cash = released_cash + released_debt - order_value
+    return -add_free_cash
 
 
 @register_jitted(cache=True)
@@ -505,6 +560,30 @@ def short_buy_nb(
         free_cash=new_free_cash,
     )
     return order_result, new_account_state
+
+
+@register_jitted(cache=True)
+def approx_buy_value_nb(
+    position: float,
+    debt: float,
+    locked_cash: float,
+    val_price: float,
+    size: float,
+    direction: int,
+) -> float:
+    """Approximate value of a buy operation.
+
+    Positive value means spending (for sorting reasons)."""
+    if position <= 0 and direction == Direction.ShortOnly:
+        return approx_short_buy_value_nb(position, debt, locked_cash, val_price, size)
+    if position >= 0:
+        return approx_long_buy_value_nb(val_price, size)
+    value1 = approx_short_buy_value_nb(position, debt, locked_cash, val_price, size)
+    new_size = add_nb(size, -abs(position))
+    if new_size <= 0:
+        return value1
+    value2 = approx_long_buy_value_nb(val_price, new_size)
+    return value1 + value2
 
 
 @register_jitted(cache=True)
@@ -633,6 +712,29 @@ def buy_nb(
         new_order_result2.status_info,
     )
     return new_order_result, new_account_state2
+
+
+@register_jitted(cache=True)
+def approx_sell_value_nb(
+    position: float,
+    debt: float,
+    val_price: float,
+    size: float,
+    direction: int,
+) -> float:
+    """Approximate value of a sell operation.
+
+    Positive value means spending (for sorting reasons)."""
+    if position >= 0 and direction == Direction.LongOnly:
+        return approx_long_sell_value_nb(position, debt, val_price, size)
+    if position <= 0:
+        return approx_short_sell_value_nb(val_price, size)
+    value1 = approx_long_sell_value_nb(position, debt, val_price, size)
+    new_size = add_nb(size, -abs(position))
+    if new_size <= 0:
+        return value1
+    value2 = approx_short_sell_value_nb(val_price, new_size)
+    return value1 + value2
 
 
 @register_jitted(cache=True)
@@ -847,6 +949,46 @@ def resolve_size_nb(
     if as_requirement:
         size = abs(size)
     return size, percent
+
+
+@register_jitted(cache=True)
+def approx_order_value_nb(
+    exec_state: ExecState,
+    size: float,
+    size_type: int = SizeType.Amount,
+    direction: int = Direction.Both,
+) -> float:
+    """Approximate the value of an order.
+
+    Assumes that cash is infinite.
+
+    Positive value means spending (for sorting reasons)."""
+    size = get_diraware_size_nb(float(size), direction)
+    amount_size, _ = resolve_size_nb(
+        size,
+        size_type,
+        exec_state.position,
+        exec_state.val_price,
+        exec_state.value,
+    )
+    if amount_size >= 0:
+        order_value = approx_buy_value_nb(
+            exec_state.position,
+            exec_state.debt,
+            exec_state.locked_cash,
+            exec_state.val_price,
+            abs(amount_size),
+            direction,
+        )
+    else:
+        order_value = approx_sell_value_nb(
+            exec_state.position,
+            exec_state.debt,
+            exec_state.val_price,
+            abs(amount_size),
+            direction,
+        )
+    return order_value
 
 
 @register_jitted(cache=True)
@@ -1227,7 +1369,6 @@ def process_order_nb(
     log_counts: tp.Optional[tp.Array1d] = None,
 ) -> tp.Tuple[OrderResult, ExecState]:
     """Process an order by executing it, saving relevant information to the logs, and returning a new state."""
-
     # Execute the order
     order_result, new_exec_state = execute_order_nb(
         exec_state=exec_state,
@@ -1388,56 +1529,6 @@ def get_group_value_nb(
         if last_position[col] != 0:
             group_value += last_position[col] * last_val_price[col]
     return group_value
-
-
-@register_jitted(cache=True)
-def approx_order_value_nb(
-    exec_state: ExecState,
-    size: float,
-    size_type: int,
-    direction: int,
-) -> float:
-    """Approximate the value of an order for sorting."""
-    if direction == Direction.ShortOnly:
-        size *= -1
-    asset_value_now = exec_state.position * exec_state.val_price
-    if size_type == SizeType.Amount:
-        return size * exec_state.val_price
-    if size_type == SizeType.Value:
-        return size
-    if size_type == SizeType.ValuePercent100:
-        size /= 100
-        size_type = SizeType.ValuePercent
-    if size_type == SizeType.ValuePercent:
-        return size * max(exec_state.value, 0.0)
-    if size_type == SizeType.TargetAmount:
-        return size * exec_state.val_price - asset_value_now
-    if size_type == SizeType.TargetValue:
-        return size - asset_value_now
-    if size_type == SizeType.TargetPercent100:
-        size /= 100
-        size_type = SizeType.TargetPercent
-    if size_type == SizeType.TargetPercent:
-        return size * max(exec_state.value, 0.0) - asset_value_now
-    if size_type == SizeType.Percent100:
-        size /= 100
-        size_type = SizeType.Percent
-    if size_type == SizeType.Percent:
-        if size >= 0:
-            if exec_state.position <= 0 and direction == Direction.ShortOnly:
-                return size * max(exec_state.free_cash + exec_state.debt + exec_state.locked_cash, 0.0)
-            elif exec_state.position < 0:
-                return 2 * size * max(exec_state.free_cash + exec_state.debt + exec_state.locked_cash, 0.0)
-            else:
-                return size * max(exec_state.free_cash, 0.0)
-        else:
-            if exec_state.position >= 0 and direction == Direction.LongOnly:
-                return size * asset_value_now
-            elif exec_state.position > 0:
-                return 2 * size * asset_value_now
-            else:
-                return size * max(exec_state.free_cash, 0.0)
-    return np.nan
 
 
 @register_jitted(cache=True)

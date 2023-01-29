@@ -69,7 +69,7 @@ __climb__ = [
     "pypfopt_optimize",
     "riskfolio_optimize",
     "PortfolioOptimizer",
-    "PO",
+    "PFO",
 ]
 
 __pdoc__ = {}
@@ -3328,7 +3328,7 @@ class PortfolioOptimizer(Analyzable):
 PortfolioOptimizer.override_metrics_doc(__pdoc__)
 PortfolioOptimizer.override_subplots_doc(__pdoc__)
 
-PO = PortfolioOptimizer
+PFO = PortfolioOptimizer
 """Shortcut for `PortfolioOptimizer`."""
 
-__pdoc__["PO"] = False
+__pdoc__["PFO"] = False

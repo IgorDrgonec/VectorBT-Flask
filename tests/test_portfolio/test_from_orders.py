@@ -1770,7 +1770,7 @@ class TestFromOrders:
         )
         np.testing.assert_array_equal(
             pf.call_seq.values,
-            np.array([[0, 1, 2], [2, 0, 1], [1, 2, 0], [0, 1, 2], [2, 0, 1]]),
+            np.array([[0, 1, 2], [0, 1, 2], [2, 0, 1], [1, 0, 2], [0, 1, 2]]),
         )
         pf = from_orders_longonly(**kwargs)
         assert_records_close(
@@ -1801,16 +1801,20 @@ class TestFromOrders:
                 [
                     (0, 0, 2, 100.0, 1.0, 0.0, 1),
                     (1, 0, 3, 100.0, 1.0, 0.0, 0),
-                    (0, 1, 4, 100.0, 1.0, 0.0, 1),
+                    (0, 1, 1, 100.0, 1.0, 0.0, 1),
+                    (1, 1, 2, 100.0, 1.0, 0.0, 0),
+                    (2, 1, 4, 100.0, 1.0, 0.0, 1),
                     (0, 2, 0, 100.0, 1.0, 0.0, 1),
                     (1, 2, 1, 100.0, 1.0, 0.0, 0),
+                    (2, 2, 3, 100.0, 1.0, 0.0, 1),
+                    (3, 2, 4, 100.0, 1.0, 0.0, 0),
                 ],
                 dtype=order_dt,
             ),
         )
         np.testing.assert_array_equal(
             pf.call_seq.values,
-            np.array([[2, 0, 1], [1, 0, 2], [0, 2, 1], [2, 1, 0], [1, 0, 2]]),
+            np.array([[0, 1, 2], [2, 0, 1], [1, 2, 0], [0, 1, 2], [2, 0, 1]]),
         )
         _ = from_orders_both(attach_call_seq=False, **kwargs)
         _ = from_orders_longonly(attach_call_seq=False, **kwargs)
