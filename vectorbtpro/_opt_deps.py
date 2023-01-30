@@ -4,6 +4,8 @@
 
 from vectorbtpro.utils.config import ReadonlyConfig
 
+__all__ = []
+
 __pdoc__ = {}
 
 opt_dep_config = ReadonlyConfig(

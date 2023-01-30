@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for random number generation."""
 
@@ -8,7 +8,7 @@ import numpy as np
 
 from vectorbtpro.registries.jit_registry import register_jitted
 
-__climb__ = [
+__all__ = [
     "set_seed",
 ]
 

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Class decorators for generic accessors."""
 
@@ -10,6 +10,8 @@ from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, Config
 from vectorbtpro.utils.parsing import get_func_arg_names
+
+__all__ = []
 
 
 def attach_nb_methods(config: Config) -> tp.ClassWrapper:

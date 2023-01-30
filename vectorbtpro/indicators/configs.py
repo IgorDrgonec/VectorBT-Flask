@@ -1,10 +1,10 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Configs for custom indicators."""
 
 from vectorbtpro.utils.config import ReadonlyConfig
 
-__climb__ = [
+__all__ = [
     "flex_col_param_config",
     "flex_elem_param_config",
 ]

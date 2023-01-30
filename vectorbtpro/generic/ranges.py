@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base class for working with range records.
 
@@ -150,7 +150,7 @@ from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.parsing import get_func_kwargs
 from vectorbtpro.utils.template import deep_substitute
 
-__climb__ = [
+__all__ = [
     "Ranges",
     "PatternRanges",
     "PSC",

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Custom pandas accessors for returns.
 
@@ -137,7 +137,7 @@ from vectorbtpro.utils.config import resolve_dict, merge_dicts, HybridConfig, Co
 from vectorbtpro.utils.datetime_ import freq_to_timedelta, PandasDatetimeIndex
 from vectorbtpro.utils.decorators import class_or_instanceproperty
 
-__climb__ = [
+__all__ = [
     "ReturnsAccessor",
     "ReturnsSRAccessor",
     "ReturnsDFAccessor",

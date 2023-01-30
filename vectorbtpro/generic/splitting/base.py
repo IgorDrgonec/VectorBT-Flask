@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base class for splitting."""
 
@@ -36,7 +36,7 @@ if tp.TYPE_CHECKING:
 else:
     BaseCrossValidatorT = tp.Any
 
-__climb__ = [
+__all__ = [
     "FixRange",
     "RelRange",
     "Takeable",

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for working with parameters."""
 
@@ -21,7 +21,7 @@ from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.template import deep_substitute
 from vectorbtpro.utils.parsing import annotate_args, ann_args_to_args
 
-__climb__ = [
+__all__ = [
     "generate_param_combs",
     "Param",
     "parameterized",

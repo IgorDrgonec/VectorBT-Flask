@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Client for TradingView."""
 
@@ -20,7 +20,7 @@ try:
 except ImportError:
     WebSocketT = tp.Any
 
-__climb__ = [
+__all__ = [
     "TVClient",
 ]
 

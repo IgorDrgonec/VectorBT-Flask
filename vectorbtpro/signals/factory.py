@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Factory for building signal generators.
 
@@ -23,7 +23,7 @@ from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.params import to_typed_list
 
-__climb__ = [
+__all__ = [
     "SignalFactory",
 ]
 

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Global registry for jittables.
 
@@ -368,7 +368,7 @@ from vectorbtpro.utils.jitting import (
 )
 from vectorbtpro.utils.template import RepEval, deep_substitute, CustomTemplate
 
-__climb__ = [
+__all__ = [
     "jit_reg",
     "register_jitted",
 ]

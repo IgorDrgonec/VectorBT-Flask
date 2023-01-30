@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for pickling."""
 
@@ -19,7 +19,7 @@ from vectorbtpro.utils.formatting import Prettified, prettify_dict
 
 PickleableT = tp.TypeVar("PickleableT", bound="Pickleable")
 
-__climb__ = [
+__all__ = [
     "dumps",
     "loads",
     "save",

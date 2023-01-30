@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Custom signal generators built with the signal factory."""
 
@@ -18,7 +18,7 @@ from vectorbtpro.signals.nb import (
 )
 from vectorbtpro.utils.config import ReadonlyConfig, merge_dicts
 
-__climb__ = [
+__all__ = [
     "RAND",
     "RANDX",
     "RANDNX",

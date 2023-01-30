@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for configuration."""
 
@@ -13,7 +13,7 @@ from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.formatting import Prettified, prettify_dict, prettify_inited
 from vectorbtpro.utils.pickling import RecState, Pickleable, pdict
 
-__climb__ = [
+__all__ = [
     "atomic_dict",
     "merge_dicts",
     "child_dict",

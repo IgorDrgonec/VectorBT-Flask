@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for constructing and displaying figures."""
 
@@ -12,7 +12,7 @@ from plotly.subplots import make_subplots as _make_subplots
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import merge_dicts
 
-__climb__ = [
+__all__ = [
     "Figure",
     "FigureWidget",
     "make_figure",

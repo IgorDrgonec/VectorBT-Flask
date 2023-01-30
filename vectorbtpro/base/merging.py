@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Functions for merging arrays."""
 
@@ -13,7 +13,7 @@ from vectorbtpro.utils.config import resolve_dict, merge_dicts
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.base.reshaping import column_stack
 
-__climb__ = [
+__all__ = [
     "concat_merge",
     "row_stack_merge",
     "column_stack_merge",

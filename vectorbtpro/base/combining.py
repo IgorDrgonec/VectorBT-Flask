@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Functions for combining arrays.
 
@@ -15,6 +15,8 @@ from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.base.reshaping import column_stack
+
+__all__ = []
 
 
 @register_jitted

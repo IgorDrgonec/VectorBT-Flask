@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Extensions for chunking of base operations."""
 
@@ -20,7 +20,7 @@ from vectorbtpro.utils.chunking import (
 )
 from vectorbtpro.utils.parsing import Regex
 
-__climb__ = [
+__all__ = [
     "GroupLensSizer",
     "GroupLensSlicer",
     "GroupLensMapper",

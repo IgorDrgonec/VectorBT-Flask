@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Plotly Express pandas accessors.
 
@@ -24,7 +24,7 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.figure import make_figure
 
-__climb__ = [
+__all__ = [
     "PXAccessor",
     "PXSRAccessor",
     "PXDFAccessor",

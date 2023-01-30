@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Classes for wrapping NumPy arrays into Series/DataFrames."""
 
@@ -30,7 +30,7 @@ else:
     BaseIDXAccessorT = tp.Any
     SplitterT = tp.Any
 
-__climb__ = [
+__all__ = [
     "ArrayWrapper",
     "Wrapping",
 ]

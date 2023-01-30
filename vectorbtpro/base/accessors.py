@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Custom pandas accessors for base operations with pandas objects."""
 
@@ -25,7 +25,7 @@ from vectorbtpro.utils.parsing import get_expr_var_names, get_context_vars
 from vectorbtpro.utils.template import deep_substitute
 from vectorbtpro.utils.datetime_ import infer_index_freq, freq_to_timedelta64, prepare_freq
 
-__climb__ = [
+__all__ = [
     "BaseAccessor",
     "BaseSRAccessor",
     "BaseDFAccessor"

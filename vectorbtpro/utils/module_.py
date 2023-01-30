@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for modules."""
 
@@ -12,6 +12,8 @@ from types import ModuleType, FunctionType
 
 from vectorbtpro import _typing as tp
 from vectorbtpro._opt_deps import opt_dep_config
+
+__all__ = []
 
 
 def is_from_module(obj: tp.Any, module: ModuleType) -> bool:

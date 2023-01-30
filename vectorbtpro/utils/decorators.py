@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Class and function decorators."""
 
@@ -7,7 +7,7 @@ from threading import RLock
 
 from vectorbtpro import _typing as tp
 
-__climb__ = [
+__all__ = [
     "cacheable_property",
     "cached_property",
     "cacheable",

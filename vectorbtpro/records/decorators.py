@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Class decorators for records."""
 
@@ -11,6 +11,8 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import cacheable_property, cached_property
 from vectorbtpro.utils.mapping import to_mapping
+
+__all__ = []
 
 
 def override_field_config(*args, merge_configs: bool = True) -> tp.FlexClassWrapper:

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Root pandas accessors of vectorbtpro.
 
@@ -54,7 +54,7 @@ from vectorbtpro.base.accessors import BaseIDXAccessor
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
 
-__climb__ = [
+__all__ = [
     "Vbt_Accessor",
     "Vbt_SRAccessor",
     "Vbt_DFAccessor",

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Extensions for chunking of portfolio."""
 
@@ -11,6 +11,8 @@ from vectorbtpro.records.chunking import merge_records
 from vectorbtpro.utils.chunking import ChunkMeta, ArraySlicer
 from vectorbtpro.utils.config import ReadonlyConfig
 from vectorbtpro.utils.template import Rep
+
+__all__ = []
 
 
 def get_init_cash_slicer(ann_args: tp.AnnArgs) -> ArraySlicer:

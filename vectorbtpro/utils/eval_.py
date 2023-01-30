@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for evaluation and compilation."""
 
@@ -6,6 +6,8 @@ import ast
 import inspect
 
 from vectorbtpro import _typing as tp
+
+__all__ = []
 
 
 def multiline_eval(expr: str, context: tp.KwargsLike = None) -> tp.Any:

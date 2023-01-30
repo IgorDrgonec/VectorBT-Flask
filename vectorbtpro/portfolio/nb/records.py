@@ -1,7 +1,7 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for portfolio records."""
-import numpy as np
+
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch

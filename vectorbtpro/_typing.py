@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """General types used across vectorbtpro."""
 
@@ -57,6 +57,8 @@ else:
     Resampler = "Resampler"
     FixRange = "FixRange"
     RelRange = "RelRange"
+
+__all__ = []
 
 # Generic types
 T = TypeVar("T")

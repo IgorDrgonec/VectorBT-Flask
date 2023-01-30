@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for returns.
 
@@ -25,6 +25,8 @@ from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.returns.enums import RollSharpeAIS, RollSharpeAOS
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.math_ import add_nb
+
+__all__ = []
 
 
 # ############# Metrics ############# #

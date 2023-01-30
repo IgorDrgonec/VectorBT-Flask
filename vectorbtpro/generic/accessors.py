@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Custom pandas accessors for generic data.
 
@@ -247,7 +247,7 @@ except ImportError:
     nanargmax = np.nanargmax
     nanargmin = np.nanargmin
 
-__climb__ = [
+__all__ = [
     "GenericAccessor",
     "GenericSRAccessor",
     "GenericDFAccessor",

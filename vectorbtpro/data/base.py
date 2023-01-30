@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base class for working with data sources.
 
@@ -34,7 +34,7 @@ from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.template import RepEval
 from vectorbtpro.utils.pickling import pdict
 
-__climb__ = [
+__all__ = [
     "symbol_dict",
     "run_func_dict",
     "Data"

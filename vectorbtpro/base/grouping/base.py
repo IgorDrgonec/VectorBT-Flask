@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base classes and functions for grouping.
 
@@ -23,7 +23,7 @@ from vectorbtpro.utils.decorators import cached_method
 from vectorbtpro.utils.template import CustomTemplate
 from vectorbtpro.base.grouping import nb
 
-__climb__ = [
+__all__ = [
     "Grouper",
     "ExceptLevel",
 ]

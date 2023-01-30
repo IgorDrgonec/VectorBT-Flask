@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Functions for reshaping arrays.
 
@@ -20,7 +20,7 @@ from vectorbtpro.utils.params import combine_params, Param
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.template import CustomTemplate
 
-__climb__ = [
+__all__ = [
     "to_1d_shape",
     "to_2d_shape",
     "repeat_shape",

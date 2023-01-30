@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Custom pandas accessors for OHLC(V) data.
 
@@ -96,7 +96,7 @@ from vectorbtpro.generic.accessors import GenericAccessor, GenericDFAccessor
 from vectorbtpro.generic.drawdowns import Drawdowns
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 
-__climb__ = [
+__all__ = [
     "OHLCVDFAccessor",
 ]
 

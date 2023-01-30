@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Named tuples and enumerated types for portfolio.
 
@@ -9,7 +9,7 @@ import numpy as np
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.formatting import prettify
 
-__pdoc__all__ = [
+__pdoc__all__ = __all__ = [
     "RejectedOrderError",
     "PriceType",
     "ValPriceType",

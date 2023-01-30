@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for images."""
 
@@ -8,7 +8,7 @@ import numpy as np
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.pbar import get_pbar
 
-__climb__ = [
+__all__ = [
     "save_animation",
 ]
 

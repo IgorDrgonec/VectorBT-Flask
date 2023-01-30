@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base class for working with records.
 
@@ -434,7 +434,7 @@ from vectorbtpro.utils.decorators import cached_method, class_or_instancemethod
 from vectorbtpro.utils.random_ import set_seed_nb
 from vectorbtpro.utils.template import Sub
 
-__climb__ = [
+__all__ = [
     "Records",
 ]
 

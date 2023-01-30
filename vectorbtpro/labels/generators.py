@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Basic look-ahead indicators and label generators.
 
@@ -11,7 +11,7 @@ from vectorbtpro.labels import nb
 from vectorbtpro.labels.enums import TrendLabelMode
 from vectorbtpro.generic import enums as generic_enums
 
-__climb__ = [
+__all__ = [
     "FMEAN",
     "FSTD",
     "FMIN",

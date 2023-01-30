@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Global registry for cacheables.
 
@@ -421,7 +421,7 @@ from vectorbtpro.utils.hashing import Hashable
 from vectorbtpro.utils.parsing import Regex, hash_args, UnhashableArgsError
 from vectorbtpro.utils.profiling import Timer
 
-__climb__ = [
+__all__ = [
     "ca_reg",
     "CAQuery",
     "CAQueryDelegator",

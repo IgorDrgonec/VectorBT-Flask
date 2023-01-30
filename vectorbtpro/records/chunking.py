@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Extensions for chunking records and mapped arrays."""
 
@@ -8,6 +8,8 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base.chunking import GroupLensMapper, GroupIdxsMapper
 from vectorbtpro.utils.chunking import ChunkMeta, ChunkMapper
 from vectorbtpro.utils.parsing import Regex
+
+__all__ = []
 
 col_lens_mapper = GroupLensMapper(arg_query=Regex(r"(col_lens|col_map)"))
 """Default instance of `vectorbtpro.base.chunking.GroupLensMapper` for per-column lengths."""

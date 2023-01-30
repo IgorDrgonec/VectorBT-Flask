@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Classes for scheduling data saves."""
 
@@ -9,7 +9,7 @@ from vectorbtpro.data.base import Data
 from vectorbtpro.data.updater import DataUpdater
 from vectorbtpro.utils.config import merge_dicts
 
-__climb__ = [
+__all__ = [
     "DataSaver",
     "CSVDataSaver",
     "HDFDataSaver",

@@ -1,7 +1,10 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Core Numba-compiled functions for portfolio simulation."""
 
+import numpy as np
+
+from vectorbtpro import _typing as tp
 from vectorbtpro.base.flex_indexing import flex_select_1d_pc_nb
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.portfolio.enums import *

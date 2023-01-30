@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for generic data.
 
@@ -27,3 +27,5 @@ from vectorbtpro.generic.nb.iter_ import *
 from vectorbtpro.generic.nb.patterns import *
 from vectorbtpro.generic.nb.records import *
 from vectorbtpro.generic.nb.rolling import *
+
+__all__ = []

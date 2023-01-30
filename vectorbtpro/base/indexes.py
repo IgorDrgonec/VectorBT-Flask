@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Functions for working with indexes: index and columns.
 
@@ -16,7 +16,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import jit_reg, register_jitted
 from vectorbtpro.utils import checks
 
-__climb__ = [
+__all__ = [
     "repeat_index",
     "tile_index",
     "stack_indexes",

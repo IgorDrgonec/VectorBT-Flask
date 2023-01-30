@@ -1,11 +1,33 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 import importlib
 import pkgutil
+import typing
+
+if typing.TYPE_CHECKING:
+    from vectorbtpro.base import *
+    from vectorbtpro.data import *
+    from vectorbtpro.generic import *
+    from vectorbtpro.indicators import *
+    from vectorbtpro.labels import *
+    from vectorbtpro.messaging import *
+    from vectorbtpro.ohlcv import *
+    from vectorbtpro.portfolio import *
+    from vectorbtpro.px import *
+    from vectorbtpro.records import *
+    from vectorbtpro.registries import *
+    from vectorbtpro.returns import *
+    from vectorbtpro.signals import *
+    from vectorbtpro.utils import *
+    from vectorbtpro._opt_deps import *
+    from vectorbtpro._settings import *
+    from vectorbtpro._typing import *
+    from vectorbtpro._version import *
+    from vectorbtpro.accessors import *
 
 from vectorbtpro import _typing as tp
 from vectorbtpro._settings import settings
-from vectorbtpro._version import __version__
+from vectorbtpro._version import __version__ as version
 
 # Silence warnings
 import warnings
@@ -22,10 +44,10 @@ if settings["importing"]["recursive_import"]:
     def _recursive_import(package):
         if isinstance(package, str):
             package = importlib.import_module(package)
-        if not hasattr(package, "__climb__"):
-            package.__climb__ = []
-        if not hasattr(package, "__dont_climb_from__"):
-            package.__dont_climb_from__ = []
+        if not hasattr(package, "__all__"):
+            package.__all__ = []
+        if not hasattr(package, "__exclude_from__all__"):
+            package.__exclude_from__all__ = []
         if not hasattr(package, "__import_if_installed__"):
             package.__import_if_installed__ = {}
         blacklist = []
@@ -41,16 +63,14 @@ if settings["importing"]["recursive_import"]:
                 module = _recursive_import(mod_name)
             else:
                 module = importlib.import_module(mod_name)
-            if not hasattr(module, "__climb__"):
-                module.__climb__ = []
-            if relative_name not in package.__dont_climb_from__:
-                for k in module.__climb__:
+            if hasattr(module, "__all__") and relative_name not in package.__exclude_from__all__:
+                for k in module.__all__:
                     if hasattr(package, k) and getattr(package, k) is not getattr(module, k):
                         raise ValueError(
                             f"Attempt to override '{k}' in '{package.__name__}' via climbing from '{mod_name}'"
                         )
                     setattr(package, k, getattr(module, k))
-                    package.__climb__.append(k)
+                    package.__all__.append(k)
         return package
 
     _recursive_import(__name__)

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Math utilities."""
 
@@ -6,6 +6,8 @@ import numpy as np
 
 from vectorbtpro._settings import settings
 from vectorbtpro.registries.jit_registry import register_jitted
+
+__all__ = []
 
 _use_tol = settings["math"]["use_tol"]
 _rel_tol = settings["math"]["rel_tol"]

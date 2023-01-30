@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for formatting."""
 
@@ -9,7 +9,7 @@ import numpy as np
 
 from vectorbtpro import _typing as tp
 
-__climb__ = [
+__all__ = [
     "prettify",
     "format_func",
     "pprint",

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Classes and functions for indexing."""
 
@@ -21,7 +21,7 @@ from vectorbtpro.utils.datetime_ import (
 )
 from vectorbtpro.utils.pickling import pdict
 
-__climb__ = [
+__all__ = [
     "PandasIndexer",
     "hslice",
     "RowIdx",

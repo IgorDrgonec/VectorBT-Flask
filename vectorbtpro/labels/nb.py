@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for label generation.
 
@@ -20,6 +20,8 @@ from vectorbtpro.labels.enums import TrendLabelMode
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch
+
+__all__ = []
 
 
 @register_chunkable(

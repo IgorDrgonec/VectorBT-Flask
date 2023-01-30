@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Class for mapping column arrays."""
 
@@ -13,7 +13,7 @@ from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.decorators import cached_property, cached_method
 
-__climb__ = [
+__all__ = [
     "ColumnMapper",
 ]
 

@@ -1,9 +1,11 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Generic Numba-compiled functions for rolling and expanding windows."""
 
+import numpy as np
 from numba import prange
 
+from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array_nb
 from vectorbtpro.generic.enums import *
 from vectorbtpro.generic.nb.base import rank_1d_nb

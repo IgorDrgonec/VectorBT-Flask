@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Global settings of vectorbtpro.
 
@@ -136,6 +136,10 @@ from vectorbtpro.utils.execution import (
 )
 from vectorbtpro.utils.jitting import NumPyJitter, NumbaJitter
 from vectorbtpro.utils.template import Sub, RepEval, deep_substitute
+
+__all__ = [
+    "settings",
+]
 
 __pdoc__: dict = {}
 

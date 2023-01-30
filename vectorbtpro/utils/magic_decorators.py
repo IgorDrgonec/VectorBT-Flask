@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Class decorators for attaching magic methods."""
 
@@ -6,6 +6,8 @@ import numpy as np
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import Config, ReadonlyConfig
+
+__all__ = []
 
 __pdoc__ = {}
 

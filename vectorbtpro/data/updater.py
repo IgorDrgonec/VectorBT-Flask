@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Classes for scheduling data updates."""
 
@@ -9,7 +9,7 @@ from vectorbtpro.data.base import Data
 from vectorbtpro.utils.config import Configured, merge_dicts
 from vectorbtpro.utils.schedule_ import ScheduleManager
 
-__climb__ = [
+__all__ = [
     "DataUpdater",
 ]
 

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for jitting."""
 
@@ -7,7 +7,7 @@ from numba import jit as nb_jit, generated_jit as nb_generated_jit
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import merge_dicts, Configured
 
-__climb__ = [
+__all__ = [
     "jitted",
 ]
 

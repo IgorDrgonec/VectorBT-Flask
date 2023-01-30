@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for working with dates and time."""
 
@@ -16,6 +16,7 @@ except ImportError:
 
 from vectorbtpro import _typing as tp
 
+__all__ = []
 
 PandasDatetimeIndex = (pd.DatetimeIndex, pd.PeriodIndex)
 

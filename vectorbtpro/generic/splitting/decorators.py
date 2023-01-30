@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Decorators for splitting."""
 
@@ -19,7 +19,7 @@ from vectorbtpro.utils.params import parameterized
 from vectorbtpro.utils.template import Rep, RepEval, deep_substitute
 from vectorbtpro.generic.splitting.base import Splitter, Takeable
 
-__climb__ = [
+__all__ = [
     "split",
     "cv_split",
 ]

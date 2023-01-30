@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base class for simulating a portfolio and measuring its performance.
 
@@ -1679,7 +1679,7 @@ try:
 except ImportError:
     QSAdapterT = tp.Any
 
-__climb__ = [
+__all__ = [
     "Portfolio",
     "PF",
 ]

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Mixin for building plots out of subplots."""
 
@@ -15,6 +15,8 @@ from vectorbtpro.utils.config import Config, HybridConfig, merge_dicts
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.tagging import match_tags
 from vectorbtpro.utils.template import deep_substitute, CustomTemplate
+
+__all__ = []
 
 
 class MetaPlotsBuilderMixin(type):

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base plotting functions.
 
@@ -29,7 +29,7 @@ from vectorbtpro.utils.colors import map_value_to_cmap
 from vectorbtpro.utils.config import Configured, resolve_dict, merge_dicts
 from vectorbtpro.utils.figure import make_figure
 
-__climb__ = [
+__all__ = [
     "TraceUpdater",
     "Gauge",
     "Bar",

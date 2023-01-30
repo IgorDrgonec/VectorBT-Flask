@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base class for working with order records.
 
@@ -116,7 +116,7 @@ from vectorbtpro.signals.enums import StopType
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
 
-__climb__ = [
+__all__ = [
     "Orders",
     "FSOrders",
 ]

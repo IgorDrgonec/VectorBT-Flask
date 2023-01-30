@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base functions and classes for portfolio optimization."""
 
@@ -64,7 +64,7 @@ except ImportError as e:
     AlgoT = tp.Any
     AlgoResultT = tp.Any
 
-__climb__ = [
+__all__ = [
     "pfopt_func_dict",
     "pypfopt_optimize",
     "riskfolio_optimize",

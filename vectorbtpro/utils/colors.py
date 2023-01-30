@@ -1,10 +1,12 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for working with colors."""
 
 import numpy as np
 
 from vectorbtpro import _typing as tp
+
+__all__ = []
 
 
 def map_value_to_cmap(

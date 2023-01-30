@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for portfolio optimization."""
 
@@ -10,6 +10,8 @@ from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.portfolio.enums import Direction
+
+__all__ = []
 
 
 @register_jitted(cache=True)

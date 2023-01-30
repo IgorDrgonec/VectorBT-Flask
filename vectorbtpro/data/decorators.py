@@ -1,10 +1,12 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Class decorators for data."""
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import copy_dict
+
+__all__ = []
 
 
 def attach_symbol_dict_methods(target_names: tp.Iterable[str]) -> tp.ClassWrapper:

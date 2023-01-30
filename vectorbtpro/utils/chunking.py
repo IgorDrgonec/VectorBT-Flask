@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for chunking."""
 
@@ -19,7 +19,7 @@ from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.parsing import annotate_args, match_ann_arg, get_func_arg_names, Regex
 from vectorbtpro.utils.template import deep_substitute, Rep
 
-__climb__ = [
+__all__ = [
     "ChunkMeta",
     "ArgChunkMeta",
     "LenChunkMeta",

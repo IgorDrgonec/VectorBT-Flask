@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base classes and functions for resampling."""
 
@@ -16,7 +16,7 @@ from vectorbtpro.base.resampling import nb
 from vectorbtpro.base.indexes import repeat_index
 from vectorbtpro.registries.jit_registry import jit_reg
 
-__climb__ = [
+__all__ = [
     "Resampler",
 ]
 

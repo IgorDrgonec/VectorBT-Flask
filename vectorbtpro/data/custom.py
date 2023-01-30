@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Custom data source classes.
 
@@ -76,7 +76,7 @@ try:
 except ImportError:
     PolygonClientT = tp.Any
 
-__climb__ = [
+__all__ = [
     "CustomData",
     "SyntheticData",
     "RandomData",

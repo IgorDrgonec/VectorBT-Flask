@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for working with arrays."""
 
@@ -6,6 +6,8 @@ import numpy as np
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import register_jitted
+
+__all__ = []
 
 
 def is_sorted(arr: tp.Array1d) -> bool:

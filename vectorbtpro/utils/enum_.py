@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Enum utilities.
 
@@ -8,7 +8,7 @@ Their values start with 0, while -1 means there is no value."""
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.mapping import to_mapping, apply_mapping
 
-__climb__ = [
+__all__ = [
     "map_enum_fields",
 ]
 

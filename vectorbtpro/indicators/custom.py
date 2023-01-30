@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Custom indicators built with the indicator factory.
 
@@ -76,7 +76,7 @@ from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.template import RepFunc
 
-__climb__ = [
+__all__ = [
     "MA",
     "MSD",
     "BBANDS",

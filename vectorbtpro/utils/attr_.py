@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for working with class/instance attributes."""
 
@@ -12,7 +12,7 @@ from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.decorators import cachedproperty
 from vectorbtpro.utils.parsing import get_func_arg_names
 
-__climb__ = [
+__all__ = [
     "deep_getattr",
 ]
 

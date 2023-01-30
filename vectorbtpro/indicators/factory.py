@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Factory for building indicators.
 
@@ -70,7 +70,7 @@ from vectorbtpro.utils.template import has_templates, deep_substitute
 from vectorbtpro.utils.datetime_ import freq_to_timedelta64, infer_index_freq
 from vectorbtpro.utils.module_ import search_package_for_funcs
 
-__climb__ = [
+__all__ = [
     "IndicatorBase",
     "IndicatorFactory",
     "IF",

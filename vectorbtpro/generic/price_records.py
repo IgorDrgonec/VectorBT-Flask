@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base class for working with records that can make use of OHLC data."""
 
@@ -9,7 +9,7 @@ from vectorbtpro.generic import nb
 from vectorbtpro.records.base import Records
 from vectorbtpro.utils import checks
 
-__climb__ = [
+__all__ = [
     "PriceRecords",
 ]
 
