@@ -5353,7 +5353,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ...     close,
             ...     entries=pd.Series([True, True, True, False, False]),
             ...     exits=pd.Series([False, False, True, True, True]),
-            ...     direction=vbt.BCO(Direction, product=True))
+            ...     direction=vbt.Param(Direction))
             >>> pf.asset_flow
             direction  LongOnly  ShortOnly   Both
             0             100.0     -100.0  100.0

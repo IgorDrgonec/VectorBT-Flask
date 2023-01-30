@@ -210,6 +210,7 @@ def combine_params(
     max_idx = 0
     conditions = {}
     names = {}
+
     for k, p in param_dct.items():
         names[k] = p.name
         if p.condition is not None:
@@ -226,29 +227,50 @@ def combine_params(
         if level > max_idx:
             max_idx = level
 
-        value = p.value
+        keys_name = None
+        p_name = p.name
+        sr_name = None
+        index_name = None
+
         keys = p.keys
+        if keys is not None:
+            if not isinstance(keys, pd.Index):
+                keys = pd.Index(keys)
+            keys_name = keys.name
+
+        value = p.value
         if isinstance(value, dict):
             if keys is None:
-                keys = list(value.keys())
+                keys = pd.Index(value.keys())
             value = list(value.values())
         elif isinstance(value, pd.Index):
             if keys is None:
                 keys = value
+            index_name = keys.name
             value = value.tolist()
+        elif isinstance(value, pd.Series):
+            if not checks.is_default_index(value.index):
+                if keys is None:
+                    keys = value.index
+                index_name = value.index.name
+            sr_name = value.name
+            value = value.values.tolist()
+
         values = params_to_list(value, is_tuple=p.is_tuple, is_array_like=p.is_array_like)
         level_values[level][k] = values
-        if p.name is None:
-            index_name = k
-        else:
-            index_name = p.name
+        if keys_name is None:
+            if p_name is not None:
+                keys_name = p_name
+            elif sr_name is not None:
+                keys_name = sr_name
+            elif index_name is not None:
+                keys_name = index_name
+            else:
+                keys_name = k
         if keys is None:
-            keys = indexes.index_from_values(values, name=index_name)
+            keys = indexes.index_from_values(values, name=keys_name)
         else:
-            if not isinstance(keys, pd.Index):
-                keys = pd.Index(keys, name=index_name)
-            elif keys.name is None:
-                keys = keys.rename(index_name)
+            keys = keys.rename(keys_name)
         product_indexes[k] = keys
         curr_idx += 1
 

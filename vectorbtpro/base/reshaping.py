@@ -672,39 +672,10 @@ class BCO:
     reindex_kwargs: tp.Optional[tp.Kwargs] = attr.ib(default=None)
     """Keyword arguments passed to `pd.DataFrame.reindex`."""
 
-    index_to_product: tp.Optional[bool] = attr.ib(default=None)
-    """Whether to set `BCO.product` to True if `BCO.value` is an index."""
+    index_to_param: tp.Optional[bool] = attr.ib(default=None)
+    """Whether to create an instance of `vectorbtpro.utils.params.Param` if `BCO.value` is an index."""
 
-    product: tp.Optional[bool] = attr.ib(default=None)
-    """Build a Cartesian product of parameter combinations in `BCO.value` and other objects.
-    
-    Treats `BCO.value` as a parameter holding a sequence of scalar values, one per entire shape.
-    
-    If None, becomes True if `BCO.value` is an index and `BCO.index_to_product` is True, 
-    otherwise False.
-    
-    Uses `vectorbtpro.utils.params.combine_params`."""
-
-    level: tp.Optional[int] = attr.ib(default=None)
-    """Level of the product the parameter takes part in.
-    
-    Parameters in the same product broadcast but are not combined together, 
-    and appear in the column hierarchy next to each other.
-    
-    Product index can be used to order column levels: the higher the level, 
-    the lower the column level. Column levels with the same level appear in the same 
-    order as the parameters were passed to `broadcast`."""
-
-    keys: tp.Optional[tp.IndexLike] = attr.ib(default=None)
-    """Keys acting as a column level if `BCO.product` is True.
-
-    If None, becomes the index of `BCO.value` if `BCO.value` is a Series and 
-    `keys_from_sr_index` is True, otherwise the values of `BCO.value`."""
-
-    keys_from_sr_index: tp.Optional[bool] = attr.ib(default=None)
-    """Whether to set `BCO.keys` to the index of `BCO.value` if `BCO.value` is a Series."""
-
-    repeat_product: tp.Optional[bool] = attr.ib(default=None)
+    repeat_param: tp.Optional[bool] = attr.ib(default=None)
     """Whether to repeat every parameter value to match the number of columns in regular arrays."""
 
 
@@ -765,12 +736,8 @@ def broadcast(
     post_func: tp.MaybeMappingSequence[tp.Optional[tp.Callable]] = None,
     require_kwargs: tp.MaybeMappingSequence[tp.Optional[tp.Kwargs]] = None,
     reindex_kwargs: tp.MaybeMappingSequence[tp.Optional[tp.Kwargs]] = None,
-    index_to_product: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
-    product: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
-    level: tp.MaybeMappingSequence[tp.Optional[int]] = None,
-    keys: tp.MaybeMappingSequence[tp.Optional[tp.IndexLike]] = None,
-    keys_from_sr_index: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
-    repeat_product: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
+    index_to_param: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
+    repeat_param: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
     tile: tp.Union[None, int, tp.IndexLike] = None,
     random_subset: tp.Optional[int] = None,
     seed: tp.Optional[int] = None,
@@ -832,14 +799,10 @@ def broadcast(
 
             This key will be merged with any argument-specific dict. If the mapping contains all keys in
             `pd.DataFrame.reindex`, it will be applied on all objects.
-        index_to_product (bool, sequence or mapping): See `BCO.index_to_product`.
-        product (bool, sequence or mapping): See `BCO.product`.
-        level (int, sequence or mapping): See `BCO.level`.
-        keys (index_like, sequence or mapping): See `BCO.keys`.
-        keys_from_sr_index (bool, sequence or mapping): See `BCO.keys_from_sr_index`.
-        repeat_product (bool, sequence or mapping): See `BCO.repeat_product`.
+        index_to_param (bool, sequence or mapping): See `BCO.index_to_param`.
+        repeat_param (bool, sequence or mapping): See `BCO.repeat_param`.
         tile (int or index_like): Tile the final object by the number of times or index.
-        random_subset (int): Select a random subset of product parameter values.
+        random_subset (int): Select a random subset of parameter values.
 
             Seed can be set using NumPy before calling this function.
         seed (int): Set seed to make output deterministic.
@@ -876,12 +839,14 @@ def broadcast(
         >>> df = pd.DataFrame(
         ...     [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
         ...     index=pd.Index(['x2', 'y2', 'z2']),
-        ...     columns=pd.Index(['a2', 'b2', 'c2']))
+        ...     columns=pd.Index(['a2', 'b2', 'c2']),
+        ... )
 
         >>> for i in vbt.broadcast(
         ...     v, a, sr, df,
         ...     index_from='keep',
         ...     columns_from='keep',
+        ...     align_index=False
         ... ): print(i)
            0  1  2
         0  0  0  0
@@ -907,7 +872,8 @@ def broadcast(
         >>> for i in vbt.broadcast(
         ...     v, a, sr, df,
         ...     index_from=2,
-        ...     columns_from=3
+        ...     columns_from=3,
+        ...     align_index=False
         ... ): print(i)
            a2  b2  c2
         x   0   0   0
@@ -933,7 +899,8 @@ def broadcast(
         >>> for i in vbt.broadcast(
         ...     v, a, sr, df,
         ...     index_from='stack',
-        ...     columns_from='stack'
+        ...     columns_from='stack',
+        ...     align_index=False
         ... ): print(i)
               a2  b2  c2
         x x2   0   0   0
@@ -959,7 +926,8 @@ def broadcast(
         >>> for i in vbt.broadcast(
         ...     v, a, sr, df,
         ...     index_from=['a', 'b', 'c'],
-        ...     columns_from=['d', 'e', 'f']
+        ...     columns_from=['d', 'e', 'f'],
+        ...     align_index=False
         ... ): print(i)
            d  e  f
         a  0  0  0
@@ -984,7 +952,8 @@ def broadcast(
         ```pycon
         >>> vbt.broadcast(
         ...     dict(v=v, a=a, sr=sr, df=df),
-        ...     index_from='stack'
+        ...     index_from='stack',
+        ...     align_index=False
         ... )
         {'v':       a2  b2  c2
               x x2   0   0   0
@@ -1011,7 +980,8 @@ def broadcast(
         ...     dict(v=v, a=a, sr=sr, df=df),
         ...     index_from='stack',
         ...     keep_flex=dict(_def=True, df=False),
-        ...     require_kwargs=dict(df=dict(dtype=float))
+        ...     require_kwargs=dict(df=dict(dtype=float)),
+        ...     align_index=False
         ... )
         {'v': array([0]),
          'a': array([1, 2, 3]),
@@ -1031,7 +1001,8 @@ def broadcast(
         >>> vbt.broadcast(
         ...     dict(v=v, a=a, sr=sr, df=df_bco),
         ...     index_from='stack',
-        ...     keep_flex=True
+        ...     keep_flex=True,
+        ...     align_index=False
         ... )
         {'v': array([0]),
          'a': array([1, 2, 3]),
@@ -1048,11 +1019,12 @@ def broadcast(
 
         ```pycon
         >>> df_bco = vbt.BCO(df, keep_flex=False, require_kwargs=dict(dtype=float))
-        >>> p_bco = vbt.BCO(pd.Series([1, 2, 3], name='my_p'), product=True)
+        >>> p_bco = vbt.BCO(pd.Param([1, 2, 3], name='my_p'))
         >>> vbt.broadcast(
         ...     dict(v=v, a=a, sr=sr, df=df_bco, p=p_bco),
         ...     index_from='stack',
-        ...     keep_flex=True
+        ...     keep_flex=True,
+        ...     align_index=False
         ... )
         {'v': array([0]),
          'a': array([1, 2, 3, 1, 2, 3, 1, 2, 3]),
@@ -1074,9 +1046,9 @@ def broadcast(
         ```pycon
         >>> vbt.broadcast(
         ...     dict(
-        ...         a=vbt.BCO([1, 2, 3], product=True),
-        ...         b=vbt.BCO(['x', 'y'], product=True),
-        ...         c=vbt.BCO([False, True], product=True)
+        ...         a=vbt.Param([1, 2, 3]),
+        ...         b=vbt.Param(['x', 'y']),
+        ...         c=vbt.Param([False, True])
         ...     )
         ... )
         {'a': array([[1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3]]),
@@ -1087,7 +1059,6 @@ def broadcast(
         * Or the same using `pd.Index`:
 
         ```pycon
-        >>> # or the same globally
         >>> vbt.broadcast(
         ...     dict(
         ...         a=pd.Index([1, 2, 3]),
@@ -1105,10 +1076,10 @@ def broadcast(
         ```pycon
         >>> vbt.broadcast(
         ...     dict(
-        ...         a=vbt.BCO(pd.Index([1, 2, 3]), level=0),
-        ...         b=vbt.BCO(pd.Index(['x', 'y']), level=1),
-        ...         d=vbt.BCO(pd.Index([100., 200., 300.]), level=0),
-        ...         c=vbt.BCO(pd.Index([False, True]), level=1)
+        ...         a=vbt.Param([1, 2, 3], level=0),
+        ...         b=vbt.Param(['x', 'y'], level=1),
+        ...         d=vbt.Param([100., 200., 300.], level=0),
+        ...         c=vbt.Param([False, True], level=1)
         ...     )
         ... )
         {'a': array([[1, 1, 2, 2, 3, 3]]),
@@ -1126,11 +1097,12 @@ def broadcast(
         ...         b=pd.Index(['x', 'y']),
         ...         c=pd.Index([False, True])
         ...     ),
-        ...     random_subset=5
+        ...     random_subset=5,
+        ...     seed=42
         ... )
-        {'a': array([[1, 1, 2, 2, 3]]),
-         'b': array([['x', 'y', 'x', 'x', 'x']], dtype='<U1'),
-         'c': array([[False, False, False,  True,  True]])}
+        {'a': array([[1, 2, 3, 3, 3]]),
+         'b': array([['x', 'x', 'x', 'x', 'y']], dtype='<U1'),
+         'c': array([[False,  True, False,  True, False]])}
         ```
     """
     # Get defaults
@@ -1181,7 +1153,7 @@ def broadcast(
     # Build BCO instances
     none_keys = set()
     default_keys = set()
-    product_keys = set()
+    param_keys = set()
     special_keys = set()
     bco_instances = {}
     pool = dict(zip(all_keys, objs))
@@ -1193,13 +1165,6 @@ def broadcast(
             default_keys.add(k)
         if isinstance(obj, Ref):
             obj = resolve_ref(pool, k)
-        if isinstance(obj, Param):
-            obj = BCO(
-                value=obj.value,
-                product=True,
-                level=obj.level,
-                keys=obj.keys,
-            )
         if isinstance(obj, BCO):
             value = obj.value
         else:
@@ -1259,79 +1224,35 @@ def broadcast(
         else:
             _reindex_kwargs = merge_dicts(reindex_kwargs, _reindex_kwargs)
 
-        if isinstance(value, indexing.index_dict) or isinstance(value, CustomTemplate):
+        _index_to_param = _resolve_arg(obj, "index_to_param", index_to_param, None)
+        if _index_to_param is None:
+            _index_to_param = broadcasting_cfg["index_to_param"]
+
+        _repeat_param = _resolve_arg(obj, "repeat_param", repeat_param, None)
+        if _repeat_param is None:
+            _repeat_param = broadcasting_cfg["repeat_param"]
+
+        if _index_to_param and isinstance(value, pd.Index):
+            value = Param(value)
+        if isinstance(value, Param):
+            param_keys.add(k)
+        elif isinstance(value, indexing.index_dict) or isinstance(value, CustomTemplate):
             special_keys.add(k)
-            bco_instances[k] = BCO(
-                value,
-                to_pd=_to_pd,
-                keep_flex=_keep_flex,
-                min_ndim=_min_ndim,
-                expand_axis=_expand_axis,
-                post_func=_post_func,
-                require_kwargs=_require_kwargs,
-                reindex_kwargs=_reindex_kwargs,
-                index_to_product=None,
-                product=None,
-                level=None,
-                repeat_product=None,
-                keys_from_sr_index=None,
-                keys=None,
-            )
         else:
-            value_is_index = checks.is_index(value)
             value = to_any_array(value)
 
-            _index_to_product = _resolve_arg(obj, "index_to_product", index_to_product, None)
-            if _index_to_product is None:
-                _index_to_product = broadcasting_cfg["index_to_product"]
-
-            _product = _resolve_arg(obj, "product", product, None)
-            if _product is None:
-                _product = _index_to_product and value_is_index
-            if _product:
-                product_keys.add(k)
-
-            _level = _resolve_arg(obj, "level", level, None)
-
-            _repeat_product = _resolve_arg(obj, "repeat_product", repeat_product, None)
-            if _repeat_product is None:
-                _repeat_product = broadcasting_cfg["repeat_product"]
-
-            _keys_from_sr_index = _resolve_arg(obj, "keys_from_sr_index", keys_from_sr_index, None)
-            if _keys_from_sr_index is None:
-                _keys_from_sr_index = broadcasting_cfg["keys_from_sr_index"]
-
-            _keys = _resolve_arg(obj, "keys", keys, None)
-            if _product:
-                if _keys is None:
-                    if _keys_from_sr_index and checks.is_series(value) and not checks.is_default_index(value.index):
-                        _keys = value.index
-                    else:
-                        _keys = value
-                if _keys is not None:
-                    _keys = indexes.to_any_index(_keys)
-                    if not checks.is_multi_index(_keys):
-                        if _keys.name is None and hasattr(value, "name"):
-                            _keys = _keys.rename(value.name)
-                        if _keys.name is None:
-                            _keys = _keys.rename(k)
-
-            bco_instances[k] = BCO(
-                value,
-                to_pd=_to_pd,
-                keep_flex=_keep_flex,
-                min_ndim=_min_ndim,
-                expand_axis=_expand_axis,
-                post_func=_post_func,
-                require_kwargs=_require_kwargs,
-                reindex_kwargs=_reindex_kwargs,
-                index_to_product=_index_to_product,
-                product=_product,
-                level=_level,
-                repeat_product=_repeat_product,
-                keys_from_sr_index=_keys_from_sr_index,
-                keys=_keys,
-            )
+        bco_instances[k] = BCO(
+            value,
+            to_pd=_to_pd,
+            keep_flex=_keep_flex,
+            min_ndim=_min_ndim,
+            expand_axis=_expand_axis,
+            post_func=_post_func,
+            require_kwargs=_require_kwargs,
+            reindex_kwargs=_reindex_kwargs,
+            index_to_param=_index_to_param,
+            repeat_param=_repeat_param,
+        )
 
     # Check whether we should broadcast Pandas metadata and work on 2-dim data
     is_pd = False
@@ -1340,7 +1261,7 @@ def broadcast(
     old_objs = {}
     obj_reindex_kwargs = {}
     for k, bco_obj in bco_instances.items():
-        if k in none_keys or k in product_keys or k in special_keys:
+        if k in none_keys or k in param_keys or k in special_keys:
             continue
 
         obj = bco_obj.value
@@ -1402,7 +1323,7 @@ def broadcast(
         except ValueError:
             arr_shapes = {}
             for i, k in enumerate(bco_instances):
-                if k in none_keys or k in product_keys or k in special_keys:
+                if k in none_keys or k in param_keys or k in special_keys:
                     continue
 
                 if len(ready_objs[k].shape) > 0:
@@ -1444,18 +1365,13 @@ def broadcast(
     param_product = None
     param_columns = None
     n_params = 0
-    if len(product_keys) > 0:
+    if len(param_keys) > 0:
         # Combine parameters
         param_dct = {}
         for k, bco_obj in bco_instances.items():
-            if k not in product_keys:
+            if k not in param_keys:
                 continue
-            value = np.asarray(bco_obj.value)
-            if value.ndim == 0:
-                value = value[None]
-            elif value.ndim > 1:
-                raise ValueError(f"Product parameter '{k}' cannot be multi-dimensional")
-            param_dct[k] = Param(value, is_tuple=False, is_array_like=False, level=bco_obj.level, keys=bco_obj.keys)
+            param_dct[k] = bco_obj.value
         param_product, param_columns = combine_params(
             param_dct,
             random_subset=random_subset,
@@ -1522,17 +1438,17 @@ def broadcast(
         if k in none_keys or k in special_keys:
             continue
         _keep_flex = bco_instances[k].keep_flex
-        _repeat_product = bco_instances[k].repeat_product
+        _repeat_param = bco_instances[k].repeat_param
         _min_ndim = bco_instances[k].min_ndim
         _expand_axis = bco_instances[k].expand_axis
 
-        if k in product_keys:
+        if k in param_keys:
             # Broadcast parameters
             obj = param_product[k]
-            if _repeat_product:
+            if _repeat_param:
                 obj = np.repeat(obj, to_shape_2d[1])
             if not _keep_flex:
-                if _repeat_product:
+                if _repeat_param:
                     obj = broadcast_array_to(obj[None], (to_shape[0], len(obj)))
                 else:
                     obj = broadcast_array_to(obj[None], (to_shape[0], n_params))
@@ -1569,7 +1485,7 @@ def broadcast(
         if _min_ndim in (1, 2) and new_obj.ndim == 0:
             new_obj = new_obj[None]
         if _min_ndim == 2 and new_obj.ndim == 1:
-            if k in product_keys:
+            if k in param_keys:
                 new_obj = new_obj[None]
             else:
                 if len(to_shape) == 1:
@@ -1628,14 +1544,14 @@ def broadcast(
             continue
         new_obj = new_objs2[k]
         _keep_flex = bco_instances[k].keep_flex
-        _repeat_product = bco_instances[k].repeat_product
+        _repeat_param = bco_instances[k].repeat_param
 
         if not _keep_flex:
             # Wrap array
             _is_pd = bco_instances[k].to_pd
             if _is_pd is None:
                 _is_pd = is_pd
-            if k in product_keys and not _repeat_product:
+            if k in param_keys and not _repeat_param:
                 new_obj = wrap_broadcasted(
                     new_obj,
                     old_obj=aligned_objs2[k] if k not in special_keys else None,

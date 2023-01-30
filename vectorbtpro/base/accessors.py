@@ -430,7 +430,7 @@ class BaseAccessor(Wrapping):
         * The same using the broadcasting mechanism:
 
         ```pycon
-        >>> df.vbt > vbt.BCO(np.arange(3), name='threshold', product=True)
+        >>> df.vbt > vbt.Param(np.arange(3), name='threshold')
         threshold     0                  1                  2
                      a2    b2    c2     a2    b2    c2     a2     b2    c2
         x2         True  True  True  False  True  True  False  False  True
