@@ -67,7 +67,7 @@ if settings["importing"]["recursive_import"]:
                 for k in module.__all__:
                     if hasattr(package, k) and getattr(package, k) is not getattr(module, k):
                         raise ValueError(
-                            f"Attempt to override '{k}' in '{package.__name__}' via climbing from '{mod_name}'"
+                            f"Attempt to override '{k}' in '{package.__name__}' from '{mod_name}'"
                         )
                     setattr(package, k, getattr(module, k))
                     package.__all__.append(k)

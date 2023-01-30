@@ -2243,7 +2243,7 @@ class SignalsAccessor(GenericAccessor):
             >>> mask[['a', 'c']].vbt.signals.plot().show()
             ```
 
-            ![](/assets/images/api/signals_df_plot.svg)
+            ![](/assets/images/api/signals_df_plot.svg){: .iimg }
         """
         if column is not None:
             _self = self.select_col(column=column)
@@ -2274,7 +2274,7 @@ class SignalsAccessor(GenericAccessor):
             >>> (~mask['b']).vbt.signals.plot_as_exits(y=ts, fig=fig).show()
             ```
 
-            ![](/assets/images/api/signals_plot_as_markers.svg)
+            ![](/assets/images/api/signals_plot_as_markers.svg){: .iimg }
         """
         from vectorbtpro._settings import settings
 

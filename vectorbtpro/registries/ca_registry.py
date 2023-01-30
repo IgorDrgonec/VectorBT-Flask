@@ -167,7 +167,7 @@ To account for this, vectorbt provides us with a set of setups that both are sta
 and can delegate various operations to their child setups, all the way down to `CARunSetup`.
 The setup hierarchy follows the inheritance hierarchy in OOP:
 
-![](/assets/images/api/setup_hierarchy.svg)
+![](/assets/images/api/setup_hierarchy.svg){: .iimg }
 
 For example, calling `B.get_ca_setup().disable_caching()` would disable caching for each current
 and future subclass and instance of `B`, but it won't disable caching for `A` or any other superclass of `B`.
@@ -186,7 +186,7 @@ inherit the state from the setup that has been updated more recently.
 
 Here is another illustration of how operations are propagated from parents to children:
 
-![](/assets/images/api/setup_propagation.svg)
+![](/assets/images/api/setup_propagation.svg){: .iimg }
 
 The diagram above depicts the following setup hierarchy:
 

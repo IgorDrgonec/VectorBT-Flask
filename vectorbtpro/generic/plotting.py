@@ -120,7 +120,7 @@ class Gauge(Configured, TraceUpdater):
             >>> gauge.fig.show()
             ```
 
-            ![](/assets/images/api/Gauge.svg)
+            ![](/assets/images/api/Gauge.svg){: .iimg }
         """
         Configured.__init__(
             self,
@@ -248,7 +248,7 @@ class Bar(Configured, TraceUpdater):
             >>> bar.fig.show()
             ```
 
-            ![](/assets/images/api/Bar.svg)
+            ![](/assets/images/api/Bar.svg){: .iimg }
         """
         Configured.__init__(
             self,
@@ -361,7 +361,7 @@ class Scatter(Configured, TraceUpdater):
             >>> scatter.fig.show()
             ```
 
-            ![](/assets/images/api/Scatter.svg)
+            ![](/assets/images/api/Scatter.svg){: .iimg }
         """
         Configured.__init__(
             self,
@@ -508,7 +508,7 @@ class Histogram(Configured, TraceUpdater):
             >>> hist.fig.show()
             ```
 
-            ![](/assets/images/api/Histogram.svg)
+            ![](/assets/images/api/Histogram.svg){: .iimg }
         """
         Configured.__init__(
             self,
@@ -673,7 +673,7 @@ class Box(Configured, TraceUpdater):
             >>> box.fig.show()
             ```
 
-            ![](/assets/images/api/Box.svg)
+            ![](/assets/images/api/Box.svg){: .iimg }
         """
         Configured.__init__(
             self,
@@ -845,7 +845,7 @@ class Heatmap(Configured, TraceUpdater):
             >>> heatmap.fig.show()
             ```
 
-            ![](/assets/images/api/Heatmap.svg)
+            ![](/assets/images/api/Heatmap.svg){: .iimg }
         """
         Configured.__init__(
             self,
@@ -980,7 +980,7 @@ class Volume(Configured, TraceUpdater):
             >>> volume.fig.show()
             ```
 
-            ![](/assets/images/api/Volume.svg)
+            ![](/assets/images/api/Volume.svg){: .iimg }
         """
         Configured.__init__(
             self,

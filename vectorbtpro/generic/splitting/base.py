@@ -527,7 +527,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_rolling_1.svg)
+            ![](/assets/images/api/from_rolling_1.svg){: .iimg }
 
             * Divide a range into ranges, each split into 1/2:
 
@@ -541,7 +541,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_rolling_2.svg)
+            ![](/assets/images/api/from_rolling_2.svg){: .iimg }
 
             * Make the ranges above non-overlapping by using the right bound of the last
             set as an offset anchor:
@@ -557,7 +557,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_rolling_3.svg)
+            ![](/assets/images/api/from_rolling_3.svg){: .iimg }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -685,7 +685,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_n_rolling.svg)
+            ![](/assets/images/api/from_n_rolling.svg){: .iimg }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -793,7 +793,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_expanding.svg)
+            ![](/assets/images/api/from_expanding.svg){: .iimg }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -897,7 +897,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_n_expanding.svg)
+            ![](/assets/images/api/from_n_expanding.svg){: .iimg }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -982,7 +982,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_ranges_1.svg)
+            ![](/assets/images/api/from_ranges_1.svg){: .iimg }
 
             * In addition to the above, reserve the last month for testing purposes:
 
@@ -996,7 +996,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_ranges_2.svg)
+            ![](/assets/images/api/from_ranges_2.svg){: .iimg }
         """
         index = try_to_datetime_index(index)
         if split_range_kwargs is None:
@@ -1070,7 +1070,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_grouper.svg)
+            ![](/assets/images/api/from_grouper.svg){: .iimg }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -1170,7 +1170,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_n_random.svg)
+            ![](/assets/images/api/from_n_random.svg){: .iimg }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -1427,7 +1427,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_split_func.svg)
+            ![](/assets/images/api/from_split_func.svg){: .iimg }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -3082,7 +3082,7 @@ class Splitter(Analyzable):
             ... ).T.vbt.drop_levels("split", axis=0).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/Splitter_apply.svg)
+            ![](/assets/images/api/Splitter_apply.svg){: .iimg }
         """
         if isinstance(attach_bounds, bool):
             if attach_bounds:
@@ -4590,7 +4590,7 @@ class Splitter(Analyzable):
         >>> splitter.plot().show()
         ```
 
-        ![](/assets/images/api/Splitter.svg)
+        ![](/assets/images/api/Splitter.svg){: .iimg }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -4684,7 +4684,7 @@ class Splitter(Analyzable):
             >>> splitter.plot_coverage().show()
             ```
 
-            ![](/assets/images/api/Splitter_coverage_area.svg)
+            ![](/assets/images/api/Splitter_coverage_area.svg){: .iimg }
 
             * Line plot:
 
@@ -4692,7 +4692,7 @@ class Splitter(Analyzable):
             >>> splitter.plot_coverage(stacked=False).show()
             ```
 
-            ![](/assets/images/api/Splitter_coverage_line.svg)
+            ![](/assets/images/api/Splitter_coverage_line.svg){: .iimg }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 

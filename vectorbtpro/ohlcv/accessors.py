@@ -82,7 +82,7 @@ Name: agg_stats, dtype: object
 >>> ohlcv_acc.plots(settings=dict(ohlc_type='candlestick')).show()
 ```
 
-![](/assets/images/api/ohlcv_plots.svg)
+![](/assets/images/api/ohlcv_plots.svg){: .iimg }
 """
 
 import numpy as np
@@ -386,7 +386,7 @@ class OHLCVDFAccessor(GenericDFAccessor):
 
             [=100% "100%"]{: .candystripe}
 
-            ![](/assets/images/api/ohlcv_plot.svg)
+            ![](/assets/images/api/ohlcv_plot.svg){: .iimg }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 

@@ -1934,13 +1934,13 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
             * Plot OHLC(V) of one symbol (only if data contains the respective columns):
 
-            ![](/assets/images/api/data_plot.svg)
+            ![](/assets/images/api/data_plot.svg){: .iimg }
 
             ```pycon
             >>> data.plot(symbol='BTC-USD').show()
             ```
 
-            ![](/assets/images/api/data_plot_ohlcv.svg)
+            ![](/assets/images/api/data_plot_ohlcv.svg){: .iimg }
         """
         if column is None:
             first_data = self.data[self.symbols[0]]
