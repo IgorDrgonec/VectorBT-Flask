@@ -2301,7 +2301,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                     except ValueError as e:
                         source_freq = None
             if source_freq is None:
-                if not silence_warnings:
+                if not resampler.silence_warnings:
                     warnings.warn("Using right bound of source index without frequency. Set source_freq.", stacklevel=2)
         if not use_target_rbound:
             target_freq = None
@@ -2314,7 +2314,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                     except ValueError as e:
                         target_freq = None
             if target_freq is None:
-                if not silence_warnings:
+                if not resampler.silence_warnings:
                     warnings.warn("Using right bound of target index without frequency. Set target_freq.", stacklevel=2)
         if nan_value is None:
             if self.mapping is not None:

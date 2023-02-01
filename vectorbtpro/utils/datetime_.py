@@ -36,7 +36,7 @@ def split_freq_str(freq: str) -> tp.Optional[tp.Tuple[int, str]]:
     * "Q" for quarter
     * "Y" for year"""
     freq = "".join(freq.strip().split())
-    match = re.match(r"^(\d*)\s*(\w+)$", freq)
+    match = re.match(r"^(\d*)\s*([a-zA-Z-]+)$", freq)
     if match.group(1) == "" and match.group(2).isnumeric():
         raise ValueError("Frequency must contain unit")
     if not match:
