@@ -679,8 +679,8 @@ data = child_dict(
             exchange_config=dict(
                 enableRateLimit=True,
             ),
-            start=0,
-            end="now UTC",
+            start=None,
+            end=None,
             timeframe="1d",
             tz=None,
             find_earliest_date=True,

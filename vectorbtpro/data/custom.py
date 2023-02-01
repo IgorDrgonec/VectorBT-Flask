@@ -1859,6 +1859,8 @@ class CCXTData(RemoteData):
                     if not len(next_data):
                         break
                     data += next_data
+                    if start_ts is None:
+                        start_ts = next_data[0][0]
                     pbar.set_description(
                         "{} - {}".format(
                             _ts_to_str(start_ts),
@@ -2526,6 +2528,8 @@ class PolygonData(RemoteData):
                     if not len(next_data):
                         break
                     data += next_data
+                    if start_ts is None:
+                        start_ts = next_data[0]["t"]
                     pbar.set_description(
                         "{} - {}".format(
                             _ts_to_str(start_ts),

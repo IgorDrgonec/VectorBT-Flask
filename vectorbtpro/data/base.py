@@ -313,10 +313,17 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 kwargs["data"] = new_data
         return Analyzable.replace(self, **kwargs)
 
-    def indexing_func(self: DataT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> DataT:
+    def indexing_func(self: DataT, *args, **kwargs) -> DataT:
         """Perform indexing on `Data`."""
-        new_wrapper = pd_indexing_func(self.wrapper)
-        new_data = {s: pd_indexing_func(obj) for s, obj in self.data.items()}
+        wrapper_meta = self.wrapper.indexing_func_meta(*args, **kwargs)
+        new_wrapper = wrapper_meta["new_wrapper"]
+        new_data = {}
+        for k, v in self.data.items():
+            if wrapper_meta["rows_changed"]:
+                v = v.iloc[wrapper_meta["row_idxs"]]
+            if wrapper_meta["columns_changed"]:
+                v = v.iloc[:, wrapper_meta["col_idxs"]]
+            new_data[k] = v
         new_last_index = dict()
         for s, obj in self.data.items():
             if s in self.last_index:

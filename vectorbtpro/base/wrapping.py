@@ -572,9 +572,13 @@ class ArrayWrapper(Configured, PandasIndexer):
                 return arr, True
             if isinstance(arr, np.integer):
                 arr = arr.item()
-            if isinstance(arr, int) and not return_scalars:
-                arr = np.array([arr])
-            return arr, True
+            columns_changed = True
+            if isinstance(arr, int):
+                if arr == 0 and n == 1:
+                    columns_changed = False
+                if not return_scalars:
+                    arr = np.array([arr])
+            return arr, columns_changed
 
         if column_only_select:
             if i_wrapper.ndim == 1:

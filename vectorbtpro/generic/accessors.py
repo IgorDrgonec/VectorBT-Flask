@@ -1037,6 +1037,16 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         return wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
+    @class_or_instancemethod
+    def row_apply(self, *args, **kwargs) -> tp.SeriesFrame:
+        """`GenericAccessor.apply_along_axis` with `axis=0`."""
+        return self.apply_along_axis(*args, axis=0, **kwargs)
+
+    @class_or_instancemethod
+    def column_apply(self, *args, **kwargs) -> tp.SeriesFrame:
+        """`GenericAccessor.apply_along_axis` with `axis=1`."""
+        return self.apply_along_axis(*args, axis=1, **kwargs)
+
     # ############# Reducing ############# #
 
     @class_or_instancemethod
