@@ -1553,7 +1553,7 @@ class MappedArray(Analyzable):
         checks.assert_in(axis, (-1, 0, 1))
 
         mapping = self.resolve_mapping(mapping)
-        mapped_codes, mapped_uniques = pd.factorize(self.values, sort=False, na_sentinel=None)
+        mapped_codes, mapped_uniques = pd.factorize(self.values, sort=False, use_na_sentinel=False)
         if axis == 0:
             if idx_arr is None:
                 idx_arr = self.idx_arr

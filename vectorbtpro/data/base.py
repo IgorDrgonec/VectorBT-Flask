@@ -726,6 +726,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         """Fetch a symbol.
 
         Can also return a dictionary that will be accessible in `Data.returned_kwargs`.
+        If there are keyword arguments `tz_localize`, `tz_convert`, or `freq` in this dict,
+        will pop them and use them to override global settings.
 
         This is an abstract method - override it to define custom logic."""
         raise NotImplementedError
@@ -810,6 +812,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                         new_symbol_classes[symbol] = _symbol_classes
                 symbol_classes = new_symbol_classes
         show_symbol_progress = show_progress
+        wrapper_kwargs = merge_dicts(data_cfg["wrapper_kwargs"], wrapper_kwargs)
         if show_symbol_progress is None:
             show_symbol_progress = data_cfg["show_progress"]
         if show_progress is None:
@@ -863,6 +866,12 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                             _data = out
                             _returned_kwargs = {}
                         _data = to_any_array(_data)
+                        if tz_localize is None:
+                            tz_localize = _returned_kwargs.pop("tz_localize", None)
+                        if tz_convert is None:
+                            tz_convert = _returned_kwargs.pop("tz_convert", None)
+                        if wrapper_kwargs.get("freq", None) is None:
+                            wrapper_kwargs["freq"] = _returned_kwargs.pop("freq", None)
                         if _data.size == 0:
                             if not silence_warnings:
                                 warnings.warn(

@@ -154,12 +154,12 @@ class SyntheticData(CustomData):
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         periods: tp.Optional[int] = None,
-        freq: tp.Union[None, str, pd.DateOffset] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
         tz: tp.Optional[tp.TimezoneLike] = None,
         normalize: tp.Optional[bool] = None,
         inclusive: tp.Optional[str] = None,
         **kwargs,
-    ) -> tp.SeriesFrame:
+    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to generate a symbol.
 
         Generates datetime index using `pd.date_range` and passes it to `SyntheticData.generate_symbol`
@@ -200,7 +200,7 @@ class SyntheticData(CustomData):
         )
         if len(index) == 0:
             raise ValueError("Date range is empty")
-        return cls.generate_symbol(symbol, index, **kwargs)
+        return cls.generate_symbol(symbol, index, **kwargs), dict(tz_localize=get_utc_tz(), tz_convert=tz, freq=freq)
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
@@ -721,7 +721,7 @@ class CSVData(LocalData):
         squeeze: tp.Optional[bool] = None,
         chunk_func: tp.Optional[tp.Callable] = None,
         **read_csv_kwargs,
-    ) -> tp.Tuple[tp.SeriesFrame, dict]:
+    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to load a CSV file.
 
         If `path` is None, uses `symbol` as the path to the CSV file.
@@ -943,7 +943,7 @@ class HDFData(LocalData):
         end_row: tp.Optional[int] = None,
         chunk_func: tp.Optional[tp.Callable] = None,
         **read_hdf_kwargs,
-    ) -> tp.Tuple[tp.SeriesFrame, dict]:
+    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to load an HDF object.
 
         If `path` is None, uses `symbol` as the path to the HDF file.
@@ -1006,7 +1006,7 @@ class RemoteData(CustomData):
 
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.remote")
 
-    def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
+    def update_symbol(self, symbol: str, **kwargs) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
         fetch_kwargs["start"] = self.last_index[symbol]
         kwargs = merge_dicts(fetch_kwargs, kwargs)
@@ -1091,8 +1091,9 @@ class YFData(RemoteData):
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
+        tz: tp.Optional[tp.TimezoneLike] = None,
         **history_kwargs,
-    ) -> tp.Frame:
+    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Yahoo Finance.
 
         Args:
@@ -1107,6 +1108,9 @@ class YFData(RemoteData):
             timeframe (str): Timeframe.
 
                 Allows human-readable strings such as "15 minutes".
+            tz (any): Timezone.
+
+                See `vectorbtpro.utils.datetime_.to_timezone`.
             **history_kwargs: Keyword arguments passed to `yfinance.base.TickerBase.history`.
 
         For defaults, see `custom.yf` in `vectorbtpro._settings.data`.
@@ -1133,13 +1137,16 @@ class YFData(RemoteData):
             end = yf_cfg["end"]
         if timeframe is None:
             timeframe = yf_cfg["timeframe"]
+        if tz is None:
+            tz = yf_cfg["tz"]
         history_kwargs = merge_dicts(yf_cfg["history_kwargs"], history_kwargs)
 
         # yfinance still uses mktime, which assumes that the passed date is in local time
         if start is not None:
-            start = to_tzaware_datetime(start, tz=get_local_tz())
+            start = to_tzaware_datetime(start, naive_tz=tz, tz=get_local_tz())
         if end is not None:
-            end = to_tzaware_datetime(end, tz=get_local_tz())
+            end = to_tzaware_datetime(end, naive_tz=tz, tz=get_local_tz())
+        freq = prepare_freq(timeframe)
         split = split_freq_str(timeframe)
         if split is not None:
             multiplier, unit = split
@@ -1168,7 +1175,7 @@ class YFData(RemoteData):
                 else:
                     if df.index[-1] >= end.astimezone(df.index.tzinfo):
                         df = df[df.index < end.astimezone(df.index.tzinfo)]
-        return df
+        return df, dict(tz_localize=get_utc_tz(), tz_convert=tz, freq=freq)
 
 
 YFData.override_column_config_doc(__pdoc__)
@@ -1295,6 +1302,7 @@ class BinanceData(RemoteData):
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
+        tz: tp.Optional[tp.TimezoneLike] = None,
         klines_type: tp.Union[None, int, str] = None,
         limit: tp.Optional[int] = None,
         delay: tp.Optional[float] = None,
@@ -1302,7 +1310,7 @@ class BinanceData(RemoteData):
         pbar_kwargs: tp.KwargsLike = None,
         silence_warnings: tp.Optional[bool] = None,
         **get_klines_kwargs,
-    ) -> tp.Frame:
+    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Binance.
 
         Args:
@@ -1322,6 +1330,9 @@ class BinanceData(RemoteData):
             timeframe (str): Timeframe.
 
                 Allows human-readable strings such as "15 minutes".
+            tz (any): Timezone.
+
+                See `vectorbtpro.utils.datetime_.to_timezone`.
             klines_type (int or str): Kline type.
 
                 See `binance.enums.HistoricalKlinesType`. Supports strings.
@@ -1350,6 +1361,8 @@ class BinanceData(RemoteData):
             end = binance_cfg["end"]
         if timeframe is None:
             timeframe = binance_cfg["timeframe"]
+        if tz is None:
+            tz = binance_cfg["tz"]
         if klines_type is None:
             klines_type = binance_cfg["klines_type"]
         if isinstance(klines_type, str):
@@ -1368,6 +1381,7 @@ class BinanceData(RemoteData):
         get_klines_kwargs = merge_dicts(binance_cfg["get_klines_kwargs"], get_klines_kwargs)
 
         # Prepare parameters
+        freq = prepare_freq(timeframe)
         split = split_freq_str(timeframe)
         if split is not None:
             multiplier, unit = split
@@ -1377,14 +1391,14 @@ class BinanceData(RemoteData):
                 unit = "w"
             timeframe = str(multiplier) + unit
         if start is not None:
-            start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
+            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz=get_utc_tz()))
             first_valid_ts = client._get_earliest_valid_timestamp(symbol, timeframe, klines_type)
             start_ts = max(start_ts, first_valid_ts)
         else:
             start_ts = None
         prev_end_ts = None
         if end is not None:
-            end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
+            end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz=get_utc_tz()))
         else:
             end_ts = None
 
@@ -1480,7 +1494,7 @@ class BinanceData(RemoteData):
         del df["Close time"]
         del df["Ignore"]
 
-        return df
+        return df, dict(tz_localize=get_utc_tz(), tz_convert=tz, freq=freq)
 
 
 BinanceData.override_column_config_doc(__pdoc__)
@@ -1595,30 +1609,31 @@ class CCXTData(RemoteData):
         fetch_func: tp.Callable,
         start: tp.DatetimeLike = 0,
         end: tp.DatetimeLike = "now UTC",
+        tz: tp.Optional[tp.TimezoneLike] = None,
         for_internal_use: bool = False,
-    ) -> tp.Union[None, int, pd.Timestamp]:
+    ) -> tp.Optional[pd.Timestamp]:
         """Find the earliest date using binary search."""
         if start is not None:
-            start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
+            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz=get_utc_tz()))
             fetched_data = fetch_func(start_ts, 1)
             if for_internal_use and len(fetched_data) > 0:
-                return start_ts
+                return pd.Timestamp(start_ts, unit="ms", tz="utc")
         else:
             fetched_data = []
         if len(fetched_data) == 0 and start != 0:
             fetched_data = fetch_func(0, 1)
             if for_internal_use and len(fetched_data) > 0:
-                return 0
+                return pd.Timestamp(0, unit="ms", tz="utc")
         if len(fetched_data) == 0:
             if start is not None:
-                start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
+                start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz=get_utc_tz()))
             else:
-                start_ts = datetime_to_ms(to_tzaware_datetime(0, tz=get_utc_tz()))
+                start_ts = datetime_to_ms(to_tzaware_datetime(0, naive_tz=tz, tz=get_utc_tz()))
             start_ts = start_ts - start_ts % 86400000
             if end is not None:
-                end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
+                end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz=get_utc_tz()))
             else:
-                end_ts = datetime_to_ms(to_tzaware_datetime("now UTC", tz=get_utc_tz()))
+                end_ts = datetime_to_ms(to_tzaware_datetime("now UTC", naive_tz=tz, tz=get_utc_tz()))
             end_ts = end_ts - end_ts % 86400000 + 86400000
             start_time = start_ts
             end_time = end_ts
@@ -1643,7 +1658,7 @@ class CCXTData(RemoteData):
 
         See `CCXTData.fetch_symbol` for arguments."""
         return cls._find_earliest_date(
-            *cls.fetch_symbol(symbol, return_fetch_method=True, **kwargs),
+            **cls.fetch_symbol(symbol, return_fetch_method=True, **kwargs),
             for_internal_use=for_internal_use,
         )
 
@@ -1656,6 +1671,7 @@ class CCXTData(RemoteData):
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
+        tz: tp.Optional[tp.TimezoneLike] = None,
         find_earliest_date: tp.Optional[bool] = None,
         limit: tp.Optional[int] = None,
         delay: tp.Optional[float] = None,
@@ -1665,7 +1681,7 @@ class CCXTData(RemoteData):
         pbar_kwargs: tp.KwargsLike = None,
         silence_warnings: tp.Optional[bool] = None,
         return_fetch_method: bool = False,
-    ) -> tp.Union[tp.Frame, tp.Tuple[tp.Callable, int, int]]:
+    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from CCXT.
 
         Args:
@@ -1685,6 +1701,9 @@ class CCXTData(RemoteData):
             timeframe (str): Timeframe.
 
                 Allows human-readable strings such as "15 minutes".
+            tz (any): Timezone.
+
+                See `vectorbtpro.utils.datetime_.to_timezone`.
             find_earliest_date (bool): Whether to find the earliest date using `CCXTData.find_earliest_date`.
             limit (int): The maximum number of returned items.
             delay (float): Time to sleep after each request (in milliseconds).
@@ -1719,6 +1738,8 @@ class CCXTData(RemoteData):
             end = ccxt_cfg["exchanges"].get(exchange_name, {}).get("end", ccxt_cfg["end"])
         if timeframe is None:
             timeframe = ccxt_cfg["exchanges"].get(exchange_name, {}).get("timeframe", ccxt_cfg["timeframe"])
+        if tz is None:
+            tz = ccxt_cfg["exchanges"].get(exchange_name, {}).get("tz", ccxt_cfg["tz"])
         if find_earliest_date is None:
             find_earliest_date = (
                 ccxt_cfg["exchanges"].get(exchange_name, {}).get("find_earliest_date", ccxt_cfg["find_earliest_date"])
@@ -1751,6 +1772,7 @@ class CCXTData(RemoteData):
             if not silence_warnings:
                 warnings.warn("Using emulated OHLCV candles", stacklevel=2)
 
+        freq = prepare_freq(timeframe)
         split = split_freq_str(timeframe)
         if split is not None:
             multiplier, unit = split
@@ -1791,17 +1813,17 @@ class CCXTData(RemoteData):
             )
 
         if return_fetch_method:
-            return _fetch, start, end
+            return dict(fetch_func=_fetch, start=start, end=end, tz=tz)
 
         # Establish the timestamps
         if find_earliest_date and start is not None:
-            start = cls._find_earliest_date(_fetch, start, end, for_internal_use=True)
+            start = cls._find_earliest_date(_fetch, start=start, end=end, tz=tz, for_internal_use=True)
         if start is not None:
-            start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
+            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz=get_utc_tz()))
         else:
             start_ts = None
         if end is not None:
-            end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
+            end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz=get_utc_tz()))
         else:
             end_ts = None
         prev_end_ts = None
@@ -1871,7 +1893,7 @@ class CCXTData(RemoteData):
         if "Volume" in df.columns:
             df["Volume"] = df["Volume"].astype(float)
 
-        return df
+        return df, dict(tz_localize=get_utc_tz(), tz_convert=tz, freq=freq)
 
 
 AlpacaDataT = tp.TypeVar("AlpacaDataT", bound="AlpacaData")
@@ -2026,10 +2048,11 @@ class AlpacaData(RemoteData):
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
+        tz: tp.Optional[tp.TimezoneLike] = None,
         adjustment: tp.Optional[str] = None,
         feed: tp.Optional[str] = None,
         limit: tp.Optional[int] = None,
-    ) -> tp.Frame:
+    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Alpaca.
 
         Args:
@@ -2052,6 +2075,9 @@ class AlpacaData(RemoteData):
             timeframe (str): Timeframe.
 
                 Allows human-readable strings such as "15 minutes".
+            tz (any): Timezone.
+
+                See `vectorbtpro.utils.datetime_.to_timezone`.
             adjustment (str): Specifies the corporate action adjustment for the returned bars.
 
                 Options are: "raw", "split", "dividend" or "all". Default is "raw".
@@ -2082,6 +2108,8 @@ class AlpacaData(RemoteData):
             end = alpaca_cfg["end"]
         if timeframe is None:
             timeframe = alpaca_cfg["timeframe"]
+        if tz is None:
+            tz = alpaca_cfg["tz"]
         if adjustment is None:
             adjustment = alpaca_cfg["adjustment"]
         if feed is None:
@@ -2089,6 +2117,7 @@ class AlpacaData(RemoteData):
         if limit is None:
             limit = alpaca_cfg["limit"]
 
+        freq = prepare_freq(timeframe)
         split = split_freq_str(timeframe)
         if split is not None:
             multiplier, unit = split
@@ -2109,12 +2138,12 @@ class AlpacaData(RemoteData):
         timeframe = TimeFrame(multiplier, unit)
 
         if start is not None:
-            start = to_tzaware_datetime(start, tz=get_utc_tz())
+            start = to_tzaware_datetime(start, naive_tz=tz, tz=get_utc_tz())
             start_str = start.replace(tzinfo=None).isoformat("T")
         else:
             start_str = None
         if end is not None:
-            end = to_tzaware_datetime(end, tz=get_utc_tz())
+            end = to_tzaware_datetime(end, naive_tz=tz, tz=get_utc_tz())
             end_str = end.replace(tzinfo=None).isoformat("T")
         else:
             end_str = None
@@ -2187,7 +2216,7 @@ class AlpacaData(RemoteData):
                 else:
                     if df.index[-1] >= end.astimezone(df.index.tzinfo):
                         df = df[df.index < end.astimezone(df.index.tzinfo)]
-        return df
+        return df, dict(tz_localize=get_utc_tz(), tz_convert=tz, freq=freq)
 
 
 AlpacaData.override_column_config_doc(__pdoc__)
@@ -2289,6 +2318,7 @@ class PolygonData(RemoteData):
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
+        tz: tp.Optional[tp.TimezoneLike] = None,
         adjusted: tp.Optional[bool] = None,
         limit: tp.Optional[int] = None,
         params: tp.KwargsLike = None,
@@ -2297,7 +2327,7 @@ class PolygonData(RemoteData):
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
         silence_warnings: tp.Optional[bool] = None,
-    ) -> tp.Frame:
+    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Polygon.
 
         Args:
@@ -2323,6 +2353,9 @@ class PolygonData(RemoteData):
             timeframe (str): Timeframe.
 
                 Allows human-readable strings such as "15 minutes".
+            tz (any): Timezone.
+
+                See `vectorbtpro.utils.datetime_.to_timezone`.
             adjusted (str): Whether the results are adjusted for splits.
 
                 By default, results are adjusted.
@@ -2354,6 +2387,8 @@ class PolygonData(RemoteData):
             end = polygon_cfg["end"]
         if timeframe is None:
             timeframe = polygon_cfg["timeframe"]
+        if tz is None:
+            tz = polygon_cfg["tz"]
         if adjusted is None:
             adjusted = polygon_cfg["adjusted"]
         if limit is None:
@@ -2370,6 +2405,7 @@ class PolygonData(RemoteData):
             silence_warnings = polygon_cfg["silence_warnings"]
 
         # Resolve the timeframe
+        freq = prepare_freq(timeframe)
         if not isinstance(timeframe, str):
             raise ValueError(f"Invalid timeframe '{timeframe}'")
         split = split_freq_str(timeframe)
@@ -2393,11 +2429,11 @@ class PolygonData(RemoteData):
 
         # Establish the timestamps
         if start is not None:
-            start_ts = datetime_to_ms(to_tzaware_datetime(start, tz=get_utc_tz()))
+            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz=get_utc_tz()))
         else:
             start_ts = None
         if end is not None:
-            end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
+            end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz=get_utc_tz()))
         else:
             end_ts = None
         prev_end_ts = None
@@ -2540,7 +2576,7 @@ class PolygonData(RemoteData):
         if "VWAP" in df.columns:
             df["VWAP"] = df["VWAP"].astype(float)
 
-        return df
+        return df, dict(tz_localize=get_utc_tz(), tz_convert=tz, freq=freq)
 
 
 PolygonData.override_column_config_doc(__pdoc__)
@@ -2680,6 +2716,7 @@ class AVData(RemoteData):
         category: tp.Optional[str] = None,
         function: tp.Optional[str] = None,
         timeframe: tp.Optional[str] = None,
+        tz: tp.Optional[tp.TimezoneLike] = None,
         adjusted: tp.Optional[bool] = None,
         extended: tp.Optional[bool] = None,
         slice: tp.Optional[str] = None,
@@ -2690,7 +2727,7 @@ class AVData(RemoteData):
         params: tp.KwargsLike = None,
         read_csv_kwargs: tp.KwargsLike = None,
         silence_warnings: tp.Optional[bool] = None,
-    ) -> tp.Frame:
+    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Alpha Vantage.
 
         See https://www.alphavantage.co/documentation/ for API endpoints and their parameters.
@@ -2732,6 +2769,9 @@ class AVData(RemoteData):
 
                 For time series, forex, and crypto, looks for interval type in the function's name.
                 Defaults to "60min" if extended, otherwise to "daily".
+            tz (any): Timezone.
+
+                See `vectorbtpro.utils.datetime_.to_timezone`.
             adjusted (bool): Whether to return time series adjusted by historical split and dividend events.
             extended (bool): Whether to return historical intraday time series for the trailing 2 years.
             slice (str): Slice of the trailing 2 years.
@@ -2764,6 +2804,8 @@ class AVData(RemoteData):
             function = alpha_vantage_cfg["function"]
         if timeframe is None:
             timeframe = alpha_vantage_cfg["timeframe"]
+        if tz is None:
+            tz = alpha_vantage_cfg["tz"]
         if adjusted is None:
             adjusted = alpha_vantage_cfg["adjusted"]
         if extended is None:
@@ -2792,6 +2834,7 @@ class AVData(RemoteData):
                 raise ValueError("Can't fetch/parse the API documentation. Specify function and disable match_params.")
 
         # Resolve the timeframe
+        freq = prepare_freq(timeframe)
         interval = None
         interval_type = None
         if timeframe is not None:
@@ -2939,9 +2982,9 @@ class AVData(RemoteData):
         if not df.empty and df.index[0] > df.index[1]:
             df = df.iloc[::-1]
 
-        return df
+        return df, dict(tz_localize=get_utc_tz(), tz_convert=tz, freq=freq)
 
-    def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
+    def update_symbol(self, symbol: str, **kwargs) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         raise NotImplementedError
 
 
@@ -2986,11 +3029,12 @@ class NDLData(RemoteData):
         api_key: tp.Optional[str] = None,
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
+        tz: tp.Optional[tp.TimezoneLike] = None,
         column_indices: tp.Optional[tp.MaybeIterable[int]] = None,
         collapse: tp.Optional[str] = None,
         transform: tp.Optional[str] = None,
         **params,
-    ) -> tp.Frame:
+    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Nasdaq Data Link.
 
         Args:
@@ -3002,6 +3046,9 @@ class NDLData(RemoteData):
             end (any): Retrieve data rows up to and including the specified end date.
 
                 See `vectorbtpro.utils.datetime_.to_tzaware_datetime`.
+            tz (any): Timezone.
+
+                See `vectorbtpro.utils.datetime_.to_timezone`.
             column_indices (int or iterable): Request one or more specific columns.
 
                 Column 0 is the date column and is always returned. Data begins at column 1.
@@ -3029,6 +3076,8 @@ class NDLData(RemoteData):
             start = ndl_cfg["start"]
         if end is None:
             end = ndl_cfg["end"]
+        if tz is None:
+            tz = ndl_cfg["tz"]
         if column_indices is None:
             column_indices = ndl_cfg["column_indices"]
         if column_indices is not None:
@@ -3046,12 +3095,12 @@ class NDLData(RemoteData):
 
         # Establish the timestamps
         if start is not None:
-            start = to_tzaware_datetime(start, tz=get_utc_tz())
+            start = to_tzaware_datetime(start, naive_tz=tz, tz=get_utc_tz())
             start_date = pd.Timestamp(start).isoformat()
         else:
             start_date = None
         if end is not None:
-            end = to_tzaware_datetime(end, tz=get_utc_tz())
+            end = to_tzaware_datetime(end, naive_tz=tz, tz=get_utc_tz())
             end_date = pd.Timestamp(end).isoformat()
         else:
             end_date = None
@@ -3091,7 +3140,7 @@ class NDLData(RemoteData):
                 else:
                     if df.index[-1] >= end.astimezone(df.index.tzinfo):
                         df = df[df.index < end.astimezone(df.index.tzinfo)]
-        return df
+        return df, dict(tz_localize=get_utc_tz(), tz_convert=tz)
 
 
 TVDataT = tp.TypeVar("TVDataT", bound="TVData")
@@ -3180,11 +3229,12 @@ class TVData(RemoteData):
         client_config: tp.KwargsLike = None,
         exchange: tp.Optional[str] = None,
         timeframe: tp.Optional[str] = None,
+        tz: tp.Optional[tp.TimezoneLike] = None,
         fut_contract: tp.Optional[int] = None,
         extended_session: tp.Optional[bool] = None,
         pro_data: tp.Optional[bool] = None,
         limit: tp.Optional[int] = None,
-    ) -> tp.Frame:
+    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from TradingView.
 
         Args:
@@ -3203,6 +3253,9 @@ class TVData(RemoteData):
             timeframe (str): Timeframe.
 
                 Allows human-readable strings such as "15 minutes".
+            tz (any): Timezone.
+
+                See `vectorbtpro.utils.datetime_.to_timezone`.
             fut_contract (int): None for cash, 1 for continuous current contract in front,
                 2 for continuous next contract in front.
             extended_session (bool): Regular session if False, extended session if True.
@@ -3222,6 +3275,8 @@ class TVData(RemoteData):
             exchange = tv_cfg["exchange"]
         if timeframe is None:
             timeframe = tv_cfg["timeframe"]
+        if tz is None:
+            tz = tv_cfg["tz"]
         if fut_contract is None:
             fut_contract = tv_cfg["fut_contract"]
         if extended_session is None:
@@ -3231,6 +3286,7 @@ class TVData(RemoteData):
         if limit is None:
             limit = tv_cfg["limit"]
 
+        freq = prepare_freq(timeframe)
         if not isinstance(timeframe, str):
             raise ValueError(f"Invalid timeframe '{timeframe}'")
         split = split_freq_str(timeframe)
@@ -3290,7 +3346,7 @@ class TVData(RemoteData):
         if "Volume" in df.columns:
             df["Volume"] = df["Volume"].astype(float)
 
-        return df
+        return df, dict(tz_localize=get_utc_tz(), tz_convert=tz, freq=freq)
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)

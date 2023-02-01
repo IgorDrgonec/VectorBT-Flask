@@ -31,6 +31,7 @@ RUN pip install --quiet --no-cache-dir --ignore-installed 'llvmlite'
 RUN pip install --quiet --no-cache-dir \
     'numpy==1.23.3' \
     'numba==0.56.4' \
+    'pandas>=1.5.0' \
     'schedule' \
     'requests' \
     'tqdm' \

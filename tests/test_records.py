@@ -1228,8 +1228,8 @@ class TestMappedArray:
         assert_frame_equal(
             mapped_array2.value_counts(sort_uniques=False),
             pd.DataFrame(
-                np.array([[2, 1, 0, 0], [1, 0, 1, 0], [0, 1, 1, 0], [0, 0, 1, 0], [0, 1, 0, 0]]),
-                index=pd.Index([4.0, 3.0, 2.0, 1.0, None], dtype="float64"),
+                np.array([[2, 1, 0, 0], [1, 0, 1, 0], [0, 1, 1, 0], [0, 1, 0, 0], [0, 0, 1, 0]]),
+                index=pd.Index([4.0, 3.0, 2.0, None, 1.0], dtype="float64"),
                 columns=wrapper.columns,
             ),
         )

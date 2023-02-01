@@ -2133,12 +2133,14 @@ class TestDatetime:
         assert datetime_.is_tz_aware(pd.Timestamp("2020-01-01", tz=datetime_.get_utc_tz()))
 
     def test_to_timezone(self):
-        assert datetime_.to_timezone("UTC") == _timezone.utc
-        assert isinstance(datetime_.to_timezone("Europe/Berlin"), _timezone)
-        assert datetime_.to_timezone("Europe/Berlin", to_fixed_offset=False) == zoneinfo.ZoneInfo("Europe/Berlin")
+        assert datetime_.to_timezone("UTC") == zoneinfo.ZoneInfo("UTC")
+        assert datetime_.to_timezone("UTC", to_fixed_offset=True) == _timezone.utc
+        assert isinstance(datetime_.to_timezone("Europe/Berlin"), zoneinfo.ZoneInfo)
+        assert isinstance(datetime_.to_timezone("Europe/Berlin", to_fixed_offset=True), _timezone)
         assert datetime_.to_timezone("+0500") == _timezone(_timedelta(hours=5))
         assert datetime_.to_timezone(_timezone(_timedelta(hours=1))) == _timezone(_timedelta(hours=1))
-        assert isinstance(datetime_.to_timezone(zoneinfo.ZoneInfo("Europe/Berlin")), _timezone)
+        assert isinstance(datetime_.to_timezone(zoneinfo.ZoneInfo("Europe/Berlin")), zoneinfo.ZoneInfo)
+        assert isinstance(datetime_.to_timezone(zoneinfo.ZoneInfo("Europe/Berlin"), to_fixed_offset=True), _timezone)
         assert datetime_.to_timezone(1) == _timezone(_timedelta(hours=1))
         assert datetime_.to_timezone(0.5) == _timezone(_timedelta(hours=0.5))
         with pytest.raises(Exception):
@@ -2146,9 +2148,9 @@ class TestDatetime:
 
     def test_to_tzaware_datetime(self):
         assert datetime_.to_tzaware_datetime(0) == _datetime(1970, 1, 1, 0, 0, 0, 0, tzinfo=datetime_.get_utc_tz())
-        assert datetime_.to_tzaware_datetime(pd.Timestamp("2020-01-01").value) == _datetime(2020, 1, 1).replace(
-            tzinfo=datetime_.get_utc_tz()
-        )
+        assert datetime_.to_tzaware_datetime(pd.Timestamp("2020-01-01").value, unit="ns") == _datetime(
+            2020, 1, 1
+        ).replace(tzinfo=datetime_.get_utc_tz())
         assert datetime_.to_tzaware_datetime("2020-01-01") == _datetime(2020, 1, 1).replace(
             tzinfo=datetime_.get_local_tz()
         )

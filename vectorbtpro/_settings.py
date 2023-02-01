@@ -569,8 +569,9 @@ _settings["resampling"] = resampling
 
 datetime = child_dict(
     naive_tz=get_local_tz(),
-    to_fixed_offset=True,
+    to_fixed_offset=None,
     parse_index=False,
+    parser_kwargs=Config(),
 )
 """_"""
 
@@ -585,6 +586,7 @@ ${config_doc}
 _settings["datetime"] = datetime
 
 data = child_dict(
+    wrapper_kwargs=Config(),
     show_progress=True,
     pbar_kwargs=Config(),
     tz_localize=get_utc_tz(),
@@ -663,6 +665,7 @@ data = child_dict(
             start=0,
             end="now UTC",
             timeframe="1d",
+            tz=None,
             klines_type="spot",
             limit=1000,
             delay=500,
@@ -679,6 +682,7 @@ data = child_dict(
             start=0,
             end="now UTC",
             timeframe="1d",
+            tz=None,
             find_earliest_date=True,
             limit=1000,
             delay=None,
@@ -701,6 +705,7 @@ data = child_dict(
             start=0,
             end="now UTC",
             timeframe="1d",
+            tz=None,
             adjustment="raw",
             feed=None,
             limit=None,
@@ -713,6 +718,7 @@ data = child_dict(
             start=0,
             end="now UTC",
             timeframe="1d",
+            tz=None,
             adjusted=True,
             limit=50000,
             params=dict(),
@@ -728,6 +734,7 @@ data = child_dict(
             category=None,
             function=None,
             timeframe=None,
+            tz=None,
             adjusted=False,
             extended=False,
             slice="year1month1",
@@ -747,6 +754,7 @@ data = child_dict(
             api_key=None,
             start=None,
             end=None,
+            tz=None,
             column_indices=None,
             collapse=None,
             transform=None,
@@ -761,6 +769,7 @@ data = child_dict(
             ),
             exchange=None,
             timeframe="D",
+            tz=None,
             fut_contract=None,
             extended_session=False,
             pro_data=True,
