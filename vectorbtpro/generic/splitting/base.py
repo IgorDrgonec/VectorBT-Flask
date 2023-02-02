@@ -355,7 +355,7 @@ class Splitter(Analyzable):
         removed_indices = []
         for i, split in enumerate(splits):
             already_fixed = False
-            if checks.is_number(split) or checks.is_td(split):
+            if checks.is_number(split) or checks.is_td_like(split):
                 split = cls.split_range(
                     slice(None),
                     split,
@@ -390,7 +390,7 @@ class Splitter(Analyzable):
                 )
             _new_split = []
             for range_ in new_split:
-                if checks.is_number(range_) or checks.is_td(range_):
+                if checks.is_number(range_) or checks.is_td_like(range_):
                     range_ = RelRange(length=range_)
                 if not isinstance(range_, (FixRange, RelRange)):
                     if wrap_with_fixrange or checks.is_sequence(range_):
@@ -1836,7 +1836,7 @@ class Splitter(Analyzable):
     @classmethod
     def is_range_relative(cls, range_: tp.RangeLike) -> bool:
         """Return whether a range is relative."""
-        return checks.is_number(range_) or checks.is_td(range_) or isinstance(range_, RelRange)
+        return checks.is_number(range_) or checks.is_td_like(range_) or isinstance(range_, RelRange)
 
     @class_or_instancemethod
     def get_ready_range(
@@ -2152,7 +2152,7 @@ class Splitter(Analyzable):
                 new_split = (new_split, 1.0)
             else:
                 new_split = (1.0, new_split)
-        elif checks.is_td(new_split):
+        elif checks.is_td_like(new_split):
             new_split = parse_timedelta(new_split)
             if new_split < pd.Timedelta(0):
                 backwards = not backwards
@@ -2185,7 +2185,7 @@ class Splitter(Analyzable):
                 return_meta=True,
             )
             new_range = new_range_meta["range_"]
-            if checks.is_number(new_range) or checks.is_td(new_range):
+            if checks.is_number(new_range) or checks.is_td_like(new_range):
                 new_range = RelRange(length=new_range)
             if isinstance(new_range, RelRange):
                 new_range_is_gap = new_range.is_gap

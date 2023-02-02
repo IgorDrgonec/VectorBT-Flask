@@ -221,7 +221,7 @@ from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, Readonly
 from vectorbtpro.utils.decorators import class_or_instancemethod, class_or_instanceproperty
 from vectorbtpro.utils.mapping import apply_mapping, to_mapping
 from vectorbtpro.utils.template import deep_substitute
-from vectorbtpro.utils.datetime_ import freq_to_timedelta, freq_to_timedelta64, try_to_datetime_index
+from vectorbtpro.utils.datetime_ import freq_to_timedelta, freq_to_timedelta64, try_to_datetime_index, parse_timedelta
 from vectorbtpro.utils.colors import adjust_opacity, map_value_to_cmap
 from vectorbtpro.utils.enum_ import map_enum_fields
 
@@ -1353,6 +1353,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         reduce_func_nb: tp.Union[str, tp.ReduceFunc, tp.GroupByReduceMetaFunc, tp.RangeReduceMetaFunc],
         *args,
         use_groupby_apply: bool = False,
+        freq: tp.Optional[tp.FrequencyLike] = None,
         resample_kwargs: tp.KwargsLike = None,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
@@ -1485,7 +1486,12 @@ class GenericAccessor(BaseAccessor, Analyzable):
             return resampled_obj
 
         if not isinstance(rule, Resampler):
-            rule = wrapper.get_resampler(rule, resample_kwargs=resample_kwargs, return_pd_resampler=False)
+            rule = wrapper.get_resampler(
+                rule,
+                freq=freq,
+                resample_kwargs=resample_kwargs,
+                return_pd_resampler=False,
+            )
         return cls_or_self.resample_to_index(
             rule,
             reduce_func_nb,
@@ -2201,9 +2207,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
     def latest_at_index(
         self,
-        target_index: tp.Union[Resampler, tp.IndexLike],
-        source_freq: tp.Union[None, bool, tp.FrequencyLike] = None,
-        target_freq: tp.Union[None, bool, tp.FrequencyLike] = None,
+        index: tp.AnyRuleLike,
+        freq: tp.Union[None, bool, tp.FrequencyLike] = None,
         nan_value: tp.Optional[tp.Scalar] = None,
         ffill: bool = True,
         source_rbound: tp.Union[bool, str, tp.IndexLike] = False,
@@ -2215,7 +2220,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     ) -> tp.MaybeSeriesFrame:
         """See `vectorbtpro.generic.nb.base.latest_at_index_nb`.
 
-        `target_index` can be either an instance of `vectorbtpro.base.resampling.base.Resampler`,
+        `index` can be either an instance of `vectorbtpro.base.resampling.base.Resampler`,
         or any index-like object.
 
         Gives the same results as `df.resample(closed='right', label='right').last().ffill()`
@@ -2257,24 +2262,22 @@ class GenericAccessor(BaseAccessor, Analyzable):
             Freq: H, Length: 97, dtype: float64
             ```
         """
-        from vectorbtpro._settings import settings
-
-        resampling_cfg = settings["resampling"]
-
-        if silence_warnings is None:
-            silence_warnings = resampling_cfg["silence_warnings"]
-
-        target_index_str = isinstance(target_index, str)
-        if not isinstance(target_index, Resampler):
-            resampler = Resampler(
-                self.wrapper.index,
-                target_index,
-                source_freq=source_freq,
-                target_freq=target_freq,
-                silence_warnings=silence_warnings,
-            )
-        else:
-            resampler = target_index
+        resampler = self.wrapper.get_resampler(
+            index,
+            freq=freq,
+            return_pd_resampler=False,
+            silence_warnings=silence_warnings,
+        )
+        one_index = False
+        if len(resampler.target_index) == 1 and checks.is_dt_like(index):
+            if isinstance(index, str):
+                try:
+                    parse_timedelta(index)
+                    one_index = False
+                except Exception as e:
+                    one_index = True
+            else:
+                one_index = True
         if isinstance(source_rbound, bool):
             use_source_rbound = source_rbound
         else:
@@ -2288,10 +2291,10 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 resampler = resampler.replace(source_index=source_rbound)
         if isinstance(target_rbound, bool):
             use_target_rbound = target_rbound
-            target_index = resampler.target_index
+            index = resampler.target_index
         else:
             use_target_rbound = False
-            target_index = resampler.target_index
+            index = resampler.target_index
             if isinstance(target_rbound, str):
                 if target_rbound == "pandas":
                     resampler = resampler.replace(target_index=resampler.target_rbound_index)
@@ -2303,29 +2306,11 @@ class GenericAccessor(BaseAccessor, Analyzable):
         if not use_source_rbound:
             source_freq = None
         else:
-            source_freq = resampler.source_freq
-            if source_freq is not None:
-                if not isinstance(source_freq, (int, float)):
-                    try:
-                        source_freq = freq_to_timedelta64(source_freq)
-                    except ValueError as e:
-                        source_freq = None
-            if source_freq is None:
-                if not resampler.silence_warnings:
-                    warnings.warn("Using right bound of source index without frequency. Set source_freq.", stacklevel=2)
+            source_freq = resampler.get_np_source_freq()
         if not use_target_rbound:
             target_freq = None
         else:
-            target_freq = resampler.target_freq
-            if target_freq is not None:
-                if not isinstance(target_freq, (int, float)):
-                    try:
-                        target_freq = freq_to_timedelta64(target_freq)
-                    except ValueError as e:
-                        target_freq = None
-            if target_freq is None:
-                if not resampler.silence_warnings:
-                    warnings.warn("Using right bound of target index without frequency. Set target_freq.", stacklevel=2)
+            target_freq = resampler.get_np_target_freq()
         if nan_value is None:
             if self.mapping is not None:
                 nan_value = -1
@@ -2345,56 +2330,32 @@ class GenericAccessor(BaseAccessor, Analyzable):
             nan_value=nan_value,
             ffill=ffill,
         )
-        wrap_kwargs = merge_dicts(dict(index=target_index), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(index=index), wrap_kwargs)
         out = self.wrapper.wrap(out, group_by=False, **wrap_kwargs)
-        if target_index_str:
+        if one_index:
             return out.iloc[0]
         return out
 
-    def resample_opening(
-        self,
-        rule: tp.Union[Resampler, tp.PandasResampler],
-        resample_kwargs: tp.KwargsLike = None,
-        **kwargs,
-    ) -> tp.MaybeSeriesFrame:
+    def resample_opening(self, *args, **kwargs) -> tp.MaybeSeriesFrame:
         """`GenericAccessor.latest_at_index` but creating a resampler and using the left bound
         of the source and target index."""
-        if not isinstance(rule, Resampler):
-            rule = self.wrapper.get_resampler(rule, resample_kwargs=resample_kwargs, return_pd_resampler=False)
-        return self.latest_at_index(
-            rule,
-            source_rbound=False,
-            target_rbound=False,
-            **kwargs,
-        )
+        return self.latest_at_index(*args, source_rbound=False, target_rbound=False, **kwargs)
 
-    def resample_closing(
-        self,
-        rule: tp.Union[Resampler, tp.PandasResampler],
-        resample_kwargs: tp.KwargsLike = None,
-        **kwargs,
-    ) -> tp.MaybeSeriesFrame:
+    def resample_closing(self, *args, **kwargs) -> tp.MaybeSeriesFrame:
         """`GenericAccessor.latest_at_index` but creating a resampler and using the right bound
         of the source and target index.
 
         !!! note
             The timestamps in the source and target index should denote the open time."""
-        if not isinstance(rule, Resampler):
-            rule = self.wrapper.get_resampler(rule, resample_kwargs=resample_kwargs, return_pd_resampler=False)
-        return self.latest_at_index(
-            rule,
-            source_rbound=True,
-            target_rbound=True,
-            **kwargs,
-        )
+        return self.latest_at_index(*args, source_rbound=True, target_rbound=True, **kwargs)
 
     @class_or_instancemethod
     def resample_to_index(
         cls_or_self,
-        target_index: tp.Union[Resampler, tp.IndexLike],
+        index: tp.AnyRuleLike,
         reduce_func_nb: tp.Union[str, tp.ReduceFunc, tp.RangeReduceMetaFunc],
         *args,
-        target_freq: tp.Union[None, bool, tp.FrequencyLike] = None,
+        freq: tp.Union[None, bool, tp.FrequencyLike] = None,
         before: bool = False,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
@@ -2526,27 +2487,18 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 checks.assert_not_none(wrapper)
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
-            target_index = deep_substitute(target_index, template_context, sub_id="target_index")
+            index = deep_substitute(index, template_context, sub_id="index")
         else:
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
 
-        if not isinstance(target_index, Resampler):
-            resampler = Resampler(
-                wrapper.index,
-                target_index,
-                target_freq=target_freq,
-                silence_warnings=silence_warnings,
-            )
-        else:
-            resampler = target_index
-            if target_freq is not None:
-                resampler = resampler.replace(target_freq=target_freq)
-        index_ranges = resampler.map_index_to_source_ranges(
-            before=before,
-            jitted=jitted,
+        resampler = wrapper.get_resampler(
+            index,
+            freq=freq,
+            return_pd_resampler=False,
             silence_warnings=silence_warnings,
         )
+        index_ranges = resampler.map_index_to_source_ranges(before=before, jitted=jitted)
 
         if isinstance(cls_or_self, type):
             template_context = merge_dicts(

@@ -654,6 +654,7 @@ data = child_dict(
             start=None,
             end=None,
             timeframe="1d",
+            tz=None,
             history_kwargs=dict(),
         ),
         binance=FrozenConfig(

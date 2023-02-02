@@ -1252,19 +1252,19 @@ class TestData:
     def test_symbol_wrapper(self):
         assert_index_equal(
             MyData.fetch(0, shape=(5,), columns="feat0").symbol_wrapper.columns,
-            pd.Int64Index([0], dtype="int64", name="symbol"),
+            pd.Index([0], dtype="int64", name="symbol"),
         )
         assert_index_equal(
             MyData.fetch([0], shape=(5,), columns="feat0").symbol_wrapper.columns,
-            pd.Int64Index([0], dtype="int64", name="symbol"),
+            pd.Index([0], dtype="int64", name="symbol"),
         )
         assert_index_equal(
             MyData.fetch([0, 1], shape=(5,), columns="feat0").symbol_wrapper.columns,
-            pd.Int64Index([0, 1], dtype="int64", name="symbol"),
+            pd.Index([0, 1], dtype="int64", name="symbol"),
         )
         assert_index_equal(
             MyData.fetch([0, 1, 2], shape=(5,), columns="feat0").get_symbol_wrapper(symbols=[0, 2]).columns,
-            pd.Int64Index([0, 2], dtype="int64", name="symbol"),
+            pd.Index([0, 2], dtype="int64", name="symbol"),
         )
         assert_index_equal(
             MyData.fetch(0, symbol_classes="C1", shape=(5,), columns="feat0").symbol_wrapper.columns,

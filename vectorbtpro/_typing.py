@@ -127,15 +127,14 @@ LevelSequence = Sequence[Level]
 MaybeLevelSequence = Union[Level, LevelSequence]
 
 # Datetime
-TimedeltaLike = Union[str, pd.Timedelta, timedelta, np.timedelta64]
-FrequencyLike = Union[str, float, TimedeltaLike, BaseOffset]
-PandasFrequencyLike = Union[str, TimedeltaLike, BaseOffset]
-TimezoneLike = Union[None, str, float, timedelta, tzinfo]
-DatetimeLike = Union[str, float, pd.Timestamp, np.datetime64, datetime]
+DatetimeLike = Union[str, int, float, pd.Timestamp, np.datetime64, datetime]
+TimedeltaLike = Union[str, int, float, pd.Timedelta, np.timedelta64, timedelta]
+FrequencyLike = Union[TimedeltaLike, BaseOffset]
+TimezoneLike = Union[None, str, int, float, timedelta, tzinfo]
 TimeLike = Union[str, time]
 PandasFrequency = Union[pd.Timedelta, pd.DateOffset]
 PandasDatetimeIndex = Union[pd.DatetimeIndex, pd.PeriodIndex]
-AnyFrequency = Union[None, int, float, pd.Timedelta, pd.DateOffset]
+AnyPandasFrequency = Union[None, int, float, PandasFrequency]
 
 
 class SupportsTZInfo(Protocol):
@@ -147,10 +146,10 @@ Slice = Union[slice, hslice]
 PandasIndexingFunc = Callable[[SeriesFrame], MaybeSeriesFrame]
 
 # Grouping
-PandasGroupByLike = Union[PandasGroupBy, PandasResampler, PandasFrequencyLike]
+PandasGroupByLike = Union[PandasGroupBy, PandasResampler, FrequencyLike]
 GroupByLike = Union[None, bool, MaybeLevelSequence, IndexLike, CustomTemplate]
 AnyGroupByLike = Union[Grouper, PandasGroupByLike, GroupByLike]
-AnyRuleLike = Union[Resampler, PandasResampler, PandasFrequencyLike]
+AnyRuleLike = Union[Resampler, PandasResampler, FrequencyLike, IndexLike]
 GroupIdxs = Array1d
 GroupLens = Array1d
 GroupMap = Tuple[GroupIdxs, GroupLens]

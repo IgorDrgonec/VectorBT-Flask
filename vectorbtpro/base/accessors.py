@@ -23,7 +23,7 @@ from vectorbtpro.utils.decorators import class_or_instanceproperty, class_or_ins
 from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, attach_unary_magic_methods
 from vectorbtpro.utils.parsing import get_expr_var_names, get_context_vars
 from vectorbtpro.utils.template import deep_substitute
-from vectorbtpro.utils.datetime_ import infer_index_freq, freq_to_timedelta64, prepare_freq
+from vectorbtpro.utils.datetime_ import infer_index_freq, freq_to_timedelta64, parse_timedelta, try_to_datetime_index
 
 __all__ = [
     "BaseAccessor",
@@ -261,13 +261,13 @@ class BaseIDXAccessor(Configured):
             pass
         if isinstance(self.obj, pd.DatetimeIndex):
             try:
-                by = to_offset(prepare_freq(by))
+                by = to_offset(parse_timedelta(by))
                 if by.n == 1:
                     return Grouper(index=self.obj, group_by=self.obj.tz_localize(None).to_period(by), **kwargs)
             except Exception as e:
                 pass
             try:
-                pd_group_by = pd.Series(index=self.obj, dtype=object).resample(prepare_freq(by), **groupby_kwargs)
+                pd_group_by = pd.Series(index=self.obj, dtype=object).resample(parse_timedelta(by), **groupby_kwargs)
                 return Grouper.from_pd_group_by(pd_group_by, **kwargs)
             except Exception as e:
                 pass
@@ -277,25 +277,46 @@ class BaseIDXAccessor(Configured):
     def get_resampler(
         self,
         rule: tp.AnyRuleLike,
+        freq: tp.Optional[tp.FrequencyLike] = None,
         resample_kwargs: tp.KwargsLike = None,
         return_pd_resampler: bool = False,
+        silence_warnings: tp.Optional[bool] = None,
     ) -> tp.Union[Resampler, tp.PandasResampler]:
         """Get an index resampler of type `vectorbtpro.base.resampling.base.Resampler`."""
-        if not isinstance(rule, Resampler):
-            if not isinstance(rule, PandasResampler):
+        if checks.is_td_like(rule):
+            try:
+                rule = parse_timedelta(rule)
+                is_td = True
+            except Exception as e:
+                is_td = False
+            if is_td:
                 resample_kwargs = merge_dicts(
                     dict(closed="left", label="left"),
                     resample_kwargs,
                 )
-                rule = pd.Series(index=self.obj, dtype=object).resample(
-                    prepare_freq(rule), **resolve_dict(resample_kwargs)
-                )
+                rule = pd.Series(index=self.obj, dtype=object).resample(rule, **resolve_dict(resample_kwargs))
+        if isinstance(rule, PandasResampler):
             if return_pd_resampler:
                 return rule
-            rule = Resampler.from_pd_resampler(rule)
+            if silence_warnings is None:
+                silence_warnings = True
+            rule = Resampler.from_pd_resampler(rule, source_freq=self.freq, silence_warnings=silence_warnings)
         if return_pd_resampler:
             raise TypeError("Cannot convert Resampler to Pandas Resampler")
-        return rule
+        if checks.is_dt_like(rule) or checks.is_iterable(rule):
+            rule = try_to_datetime_index(rule)
+            rule = Resampler(
+                source_index=self.obj,
+                target_index=rule,
+                source_freq=self.freq,
+                target_freq=freq,
+                silence_warnings=silence_warnings,
+            )
+        if isinstance(rule, Resampler):
+            if freq is not None:
+                rule = rule.replace(target_freq=freq)
+            return rule
+        raise ValueError(f"Cannot build Resampler from {rule}")
 
     # ############# Points and ranges ############# #
 

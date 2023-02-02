@@ -1923,15 +1923,15 @@ class TestParams:
         assert fp(1, 2, 3, b=4, c=5) == (1, (2, 3), 4, {"c": 5})
 
         assert fp(vbt.Param([1]))[0] == [(1, (), 2, {})]
-        assert_index_equal(fp(vbt.Param([1]))[1], pd.Int64Index([1], dtype="int64", name="a"))
+        assert_index_equal(fp(vbt.Param([1]))[1], pd.Index([1], dtype="int64", name="a"))
         assert fp(vbt.Param([1, 2]))[0] == [(1, (), 2, {}), (2, (), 2, {})]
-        assert_index_equal(fp(vbt.Param([1, 2]))[1], pd.Int64Index([1, 2], dtype="int64", name="a"))
+        assert_index_equal(fp(vbt.Param([1, 2]))[1], pd.Index([1, 2], dtype="int64", name="a"))
         assert fp(1, vbt.Param([2, 3]))[0] == [(1, (2,), 2, {}), (1, (3,), 2, {})]
-        assert_index_equal(fp(1, vbt.Param([2, 3]))[1], pd.Int64Index([2, 3], dtype="int64", name="my_args_0"))
+        assert_index_equal(fp(1, vbt.Param([2, 3]))[1], pd.Index([2, 3], dtype="int64", name="my_args_0"))
         assert fp(1, b=vbt.Param([2, 3]))[0] == [(1, (), 2, {}), (1, (), 3, {})]
-        assert_index_equal(fp(1, b=vbt.Param([2, 3]))[1], pd.Int64Index([2, 3], dtype="int64", name="b"))
+        assert_index_equal(fp(1, b=vbt.Param([2, 3]))[1], pd.Index([2, 3], dtype="int64", name="b"))
         assert fp(1, c=vbt.Param([2, 3]))[0] == [(1, (), 2, {"c": 2}), (1, (), 2, {"c": 3})]
-        assert_index_equal(fp(1, c=vbt.Param([2, 3]))[1], pd.Int64Index([2, 3], dtype="int64", name="c"))
+        assert_index_equal(fp(1, c=vbt.Param([2, 3]))[1], pd.Index([2, 3], dtype="int64", name="c"))
         kwargs = dict(c=dict(d=(2, dict(e=vbt.Param([3, 4])))), f=(5, vbt.Param([6, 7])))
         assert fp(1, **kwargs)[0] == [
             (1, (), 2, {"c": dict(d=(2, dict(e=3))), "f": (5, 6)}),
@@ -2020,27 +2020,27 @@ class TestParams:
 
         param_configs = [dict(a=1)]
         assert fp(param_configs=param_configs)[0] == [(1, (), 2, {})]
-        assert_index_equal(fp(param_configs=param_configs)[1], pd.Int64Index([0], dtype="int64", name="param_config"))
+        assert_index_equal(fp(param_configs=param_configs)[1], pd.Index([0], dtype="int64", name="param_config"))
         param_configs = [dict(a=1, my_args=(2, 3))]
         assert fp(param_configs=param_configs)[0] == [(1, (2, 3), 2, {})]
-        assert_index_equal(fp(param_configs=param_configs)[1], pd.Int64Index([0], dtype="int64", name="param_config"))
+        assert_index_equal(fp(param_configs=param_configs)[1], pd.Index([0], dtype="int64", name="param_config"))
         param_configs = [dict(a=1, my_args_0=2, my_args_1=3)]
         assert fp(param_configs=param_configs)[0] == [(1, (2, 3), 2, {})]
-        assert_index_equal(fp(param_configs=param_configs)[1], pd.Int64Index([0], dtype="int64", name="param_config"))
+        assert_index_equal(fp(param_configs=param_configs)[1], pd.Index([0], dtype="int64", name="param_config"))
         param_configs = [dict(a=1, b=3)]
         assert fp(param_configs=param_configs)[0] == [(1, (), 3, {})]
-        assert_index_equal(fp(param_configs=param_configs)[1], pd.Int64Index([0], dtype="int64", name="param_config"))
+        assert_index_equal(fp(param_configs=param_configs)[1], pd.Index([0], dtype="int64", name="param_config"))
         param_configs = [dict(a=1, my_kwargs=dict(c=3))]
         assert fp(param_configs=param_configs)[0] == [(1, (), 2, {"c": 3})]
-        assert_index_equal(fp(param_configs=param_configs)[1], pd.Int64Index([0], dtype="int64", name="param_config"))
+        assert_index_equal(fp(param_configs=param_configs)[1], pd.Index([0], dtype="int64", name="param_config"))
         param_configs = [dict(a=1, c=3)]
         assert fp(param_configs=param_configs)[0] == [(1, (), 2, {"c": 3})]
-        assert_index_equal(fp(param_configs=param_configs)[1], pd.Int64Index([0], dtype="int64", name="param_config"))
+        assert_index_equal(fp(param_configs=param_configs)[1], pd.Index([0], dtype="int64", name="param_config"))
         param_configs = [dict(a=2, my_args=(3, 4)), dict(b=5, my_kwargs=dict(c=6))]
         assert fp(1, 1, 1, param_configs=param_configs)[0] == [(2, (3, 4), 2, {}), (1, (1, 1), 5, {"c": 6})]
         assert_index_equal(
             fp(1, 1, 1, param_configs=param_configs)[1],
-            pd.Int64Index([0, 1], dtype="int64", name="param_config"),
+            pd.Index([0, 1], dtype="int64", name="param_config"),
         )
 
         param_configs = [dict(b=3)]
@@ -2049,7 +2049,7 @@ class TestParams:
         ]
         assert_index_equal(
             fp(vbt.Param([2]), param_configs=param_configs)[1],
-            pd.Int64Index([2], dtype="int64", name="a"),
+            pd.Index([2], dtype="int64", name="a"),
         )
         param_configs = [dict(b=3, _name="my_config")]
         assert fp(vbt.Param([2]), param_configs=param_configs)[0] == [

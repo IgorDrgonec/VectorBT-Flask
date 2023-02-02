@@ -152,12 +152,12 @@ class Resampler(Configured):
         return self._target_index
 
     @property
-    def source_freq(self) -> tp.AnyFrequency:
+    def source_freq(self) -> tp.AnyPandasFrequency:
         """Frequency or date offset of the source index."""
         return self._source_freq
 
     @property
-    def target_freq(self) -> tp.AnyFrequency:
+    def target_freq(self) -> tp.AnyPandasFrequency:
         """Frequency or date offset of the target index."""
         return self._target_freq
 
@@ -173,8 +173,50 @@ class Resampler(Configured):
             silence_warnings = resampling_cfg["silence_warnings"]
         return silence_warnings
 
+    def get_np_source_freq(self, silence_warnings: tp.Optional[bool] = None) -> tp.AnyPandasFrequency:
+        """Frequency or date offset of the source index in NumPy format."""
+        if silence_warnings is None:
+            silence_warnings = self.silence_warnings
+
+        warned = False
+        source_freq = self.source_freq
+        if source_freq is not None:
+            if not isinstance(source_freq, (int, float)):
+                try:
+                    source_freq = freq_to_timedelta64(source_freq)
+                except ValueError as e:
+                    if not silence_warnings:
+                        warnings.warn(f"Cannot convert {source_freq} to np.timedelta64. Setting to None.", stacklevel=2)
+                        warned = True
+                    source_freq = None
+        if source_freq is None:
+            if not warned and not silence_warnings:
+                warnings.warn("Using right bound of source index without frequency. Set source_freq.", stacklevel=2)
+        return source_freq
+
+    def get_np_target_freq(self, silence_warnings: tp.Optional[bool] = None) -> tp.AnyPandasFrequency:
+        """Frequency or date offset of the target index in NumPy format."""
+        if silence_warnings is None:
+            silence_warnings = self.silence_warnings
+
+        warned = False
+        target_freq = self.target_freq
+        if target_freq is not None:
+            if not isinstance(target_freq, (int, float)):
+                try:
+                    target_freq = freq_to_timedelta64(target_freq)
+                except ValueError as e:
+                    if not silence_warnings:
+                        warnings.warn(f"Cannot convert {target_freq} to np.timedelta64. Setting to None.", stacklevel=2)
+                        warned = True
+                    target_freq = None
+        if target_freq is None:
+            if not warned and not silence_warnings:
+                warnings.warn("Using right bound of target index without frequency. Set target_freq.", stacklevel=2)
+        return target_freq
+
     @classmethod
-    def get_lbound_index(cls, index: pd.Index, freq: tp.AnyFrequency = None) -> tp.Index:
+    def get_lbound_index(cls, index: pd.Index, freq: tp.AnyPandasFrequency = None) -> tp.Index:
         """Get the left bound of a datetime index.
 
         If `freq` is None, calculates the leftmost bound."""
@@ -186,7 +228,7 @@ class Resampler(Configured):
         return (index[:-1] + pd.Timedelta(1, "ns")).append(min_ts)
 
     @classmethod
-    def get_rbound_index(cls, index: pd.Index, freq: tp.AnyFrequency = None) -> tp.Index:
+    def get_rbound_index(cls, index: pd.Index, freq: tp.AnyPandasFrequency = None) -> tp.Index:
         """Get the right bound of a datetime index.
 
         If `freq` is None, calculates the rightmost bound."""
@@ -226,21 +268,7 @@ class Resampler(Configured):
         silence_warnings: tp.Optional[bool] = None,
     ) -> tp.Union[tp.Array1d, tp.Index]:
         """See `vectorbtpro.base.resampling.nb.map_to_target_index_nb`."""
-        if silence_warnings is None:
-            silence_warnings = self.silence_warnings
-
-        target_freq = self.target_freq
-        if target_freq is not None:
-            if not isinstance(target_freq, (int, float)):
-                try:
-                    target_freq = freq_to_timedelta64(target_freq)
-                except ValueError as e:
-                    if not silence_warnings:
-                        warnings.warn(f"Cannot convert {target_freq} to np.timedelta64. Setting to None.", stacklevel=2)
-                    target_freq = None
-        if target_freq is None:
-            if not silence_warnings:
-                warnings.warn("Using right bound of target index without frequency. Set target_freq.", stacklevel=2)
+        target_freq = self.get_np_target_freq(silence_warnings=silence_warnings)
         func = jit_reg.resolve_option(nb.map_to_target_index_nb, jitted)
         mapped_arr = func(
             self.source_index.values,
@@ -287,21 +315,7 @@ class Resampler(Configured):
 
         If `Resampler.target_freq` is a date offset, sets is to None and gives a warning.
         Raises another warning is `target_freq` is None."""
-        if silence_warnings is None:
-            silence_warnings = self.silence_warnings
-
-        target_freq = self.target_freq
-        if target_freq is not None:
-            if not isinstance(target_freq, (int, float)):
-                try:
-                    target_freq = freq_to_timedelta64(target_freq)
-                except ValueError as e:
-                    if not silence_warnings:
-                        warnings.warn(f"Cannot convert {target_freq} to np.timedelta64. Setting to None.", stacklevel=2)
-                    target_freq = None
-        if target_freq is None:
-            if not silence_warnings:
-                warnings.warn("Using right bound of target index without frequency. Set target_freq.", stacklevel=2)
+        target_freq = self.get_np_target_freq(silence_warnings=silence_warnings)
         func = jit_reg.resolve_option(nb.map_index_to_source_ranges_nb, jitted)
         return func(
             self.source_index.values,
@@ -376,30 +390,8 @@ class Resampler(Configured):
         if silence_warnings is None:
             silence_warnings = self.silence_warnings
         source_mask = broadcast_array_to(source_mask, len(self.source_index))
-        source_freq = self.source_freq
-        if source_freq is not None:
-            if not isinstance(source_freq, (int, float)):
-                try:
-                    source_freq = freq_to_timedelta64(source_freq)
-                except ValueError as e:
-                    if not silence_warnings:
-                        warnings.warn(f"Cannot convert {source_freq} to np.timedelta64. Setting to None.", stacklevel=2)
-                    source_freq = None
-        if source_freq is None:
-            if not silence_warnings:
-                warnings.warn("Using right bound of source index without frequency. Set source_freq.", stacklevel=2)
-        target_freq = self.target_freq
-        if target_freq is not None:
-            if not isinstance(target_freq, (int, float)):
-                try:
-                    target_freq = freq_to_timedelta64(target_freq)
-                except ValueError as e:
-                    if not silence_warnings:
-                        warnings.warn(f"Cannot convert {target_freq} to np.timedelta64. Setting to None.", stacklevel=2)
-                    target_freq = None
-        if target_freq is None:
-            if not silence_warnings:
-                warnings.warn("Using right bound of target index without frequency. Set target_freq.", stacklevel=2)
+        source_freq = self.get_np_source_freq(silence_warnings=silence_warnings)
+        target_freq = self.get_np_target_freq(silence_warnings=silence_warnings)
 
         func = jit_reg.resolve_option(nb.resample_source_mask_nb, jitted)
         return func(

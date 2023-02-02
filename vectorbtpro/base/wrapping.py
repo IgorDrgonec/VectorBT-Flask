@@ -843,7 +843,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         if "index" not in wrapper_kwargs:
             wrapper_kwargs["index"] = _resampler.target_index
         if "freq" not in wrapper_kwargs:
-            wrapper_kwargs["freq"] = infer_index_freq(wrapper_kwargs["index"])
+            wrapper_kwargs["freq"] = infer_index_freq(wrapper_kwargs["index"], freq=_resampler.target_freq)
         new_wrapper = self.replace(**wrapper_kwargs)
         return dict(resampler=resampler, new_wrapper=new_wrapper)
 

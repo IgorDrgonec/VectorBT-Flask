@@ -2,6 +2,7 @@
 
 """Utilities for working with dates and time."""
 
+import warnings
 from datetime import datetime, timezone, timedelta, tzinfo, time
 from dateutil.parser import parse
 
@@ -38,6 +39,7 @@ def split_freq_str(freq: str) -> tp.Optional[tp.Tuple[int, str]]:
     * "M" for month
     * "Q" for quarter
     * "Y" for year"""
+
     freq = "".join(freq.strip().split())
     match = re.match(r"^(\d*)\s*([a-zA-Z-]+)$", freq)
     if match.group(1) == "" and match.group(2).isnumeric():
@@ -120,7 +122,7 @@ def parse_timedelta(td: tp.TimedeltaLike) -> tp.Union[pd.Timedelta, pd.DateOffse
         return td
     try:
         return to_offset(td)
-    finally:
+    except Exception as e:
         return freq_to_timedelta(td)
 
 
@@ -224,23 +226,30 @@ def infer_index_freq(
     """Infer frequency of a datetime index if `freq` is None, otherwise convert `freq`."""
     if freq is None and isinstance(index, pd.DatetimeIndex):
         if index.freqstr is not None:
-            freq = to_offset(index.freqstr)
+            freq = parse_timedelta(index.freqstr)
         elif index.freq is not None:
-            freq = index.freq
+            freq = parse_timedelta(index.freq)
         elif len(index) >= 3:
             freq = pd.infer_freq(index)
             if freq is not None:
-                freq = to_offset(freq)
+                freq = parse_timedelta(freq)
+    if freq is None and detect_via_diff:
+        return (index[1:] - index[:-1]).min()
     if freq is None:
-        if detect_via_diff:
-            return (index[1:] - index[:-1]).min()
         return None
-    if isinstance(freq, pd.Timedelta):
-        return freq
-    if isinstance(freq, pd.DateOffset) and allow_date_offset:
-        return freq
     if checks.is_number(freq) and allow_numeric:
         return freq
+    freq = parse_timedelta(freq)
+    if isinstance(freq, pd.DateOffset):
+        try:
+            td_freq = pd.Timedelta(freq)
+            if to_offset(td_freq) == freq:
+                freq = td_freq
+            else:
+                warnings.warn(f"Ambiguous frequency {freq}", stacklevel=2)
+        except Exception as e:
+            if allow_date_offset:
+                return freq
     return freq_to_timedelta(freq)
 
 

@@ -31,8 +31,8 @@ class Comparable:
 # ############# Checks ############# #
 
 def is_int(arg: tp.Any) -> bool:
-    """Check whether the argument is an integer."""
-    return isinstance(arg, (int, np.integer))
+    """Check whether the argument is an integer (and not a timedelta, for example)."""
+    return isinstance(arg, (int, np.integer)) and not isinstance(arg, np.timedelta64)
 
 
 def is_float(arg: tp.Any) -> bool:
@@ -45,9 +45,14 @@ def is_number(arg: tp.Any) -> bool:
     return is_int(arg) or is_float(arg)
 
 
-def is_td(arg: tp.Any) -> bool:
-    """Check whether the argument is a number."""
-    return isinstance(arg, (str, pd.Timedelta, datetime.timedelta, np.timedelta64))
+def is_td_like(arg: tp.Any) -> bool:
+    """Check whether the argument is a timedelta-like object."""
+    return is_number(arg) or isinstance(arg, (str, pd.Timedelta, datetime.timedelta, np.timedelta64))
+
+
+def is_dt_like(arg: tp.Any) -> bool:
+    """Check whether the argument is a datetime-like object."""
+    return is_number(arg) or isinstance(arg, (str, pd.Timestamp, datetime.datetime, np.datetime64))
 
 
 def is_np_array(arg: tp.Any) -> bool:
