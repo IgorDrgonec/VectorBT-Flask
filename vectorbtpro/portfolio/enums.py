@@ -2331,6 +2331,7 @@ class FOInOutputs(tp.NamedTuple):
     debt: tp.Array2d
     locked_cash: tp.Array2d
     free_cash: tp.Array2d
+    value: tp.Array2d
     returns: tp.Array2d
 
 
@@ -2339,32 +2340,51 @@ __pdoc__[
     "FOInOutputs.cash"
 ] = """See `AccountState.cash`.
 
-Gets filled if `fill_state` is True, otherwise has the shape `(0, 0)`."""
+Follows groups if cash sharing is enabled, otherwise columns.
+
+Gets filled if `save_state` is True, otherwise has the shape `(0, 0)`."""
 __pdoc__[
     "FOInOutputs.position"
 ] = """See `AccountState.position`.
 
-Gets filled if `fill_state` is True, otherwise has the shape `(0, 0)`."""
+Follows columns.
+
+Gets filled if `save_state` is True, otherwise has the shape `(0, 0)`."""
 __pdoc__[
     "FOInOutputs.debt"
 ] = """See `AccountState.debt`.
 
-Gets filled if `fill_state` is True, otherwise has the shape `(0, 0)`."""
+Follows columns.
+
+Gets filled if `save_state` is True, otherwise has the shape `(0, 0)`."""
 __pdoc__[
     "FOInOutputs.locked_cash"
 ] = """See `AccountState.locked_cash`.
 
-Gets filled if `fill_state` is True, otherwise has the shape `(0, 0)`."""
+Follows columns.
+
+Gets filled if `save_state` is True, otherwise has the shape `(0, 0)`."""
 __pdoc__[
     "FOInOutputs.free_cash"
 ] = """See `AccountState.free_cash`.
 
-Gets filled if `fill_state` is True, otherwise has the shape `(0, 0)`."""
+Follows groups if cash sharing is enabled, otherwise columns.
+
+Gets filled if `save_state` is True, otherwise has the shape `(0, 0)`."""
+__pdoc__[
+    "FOInOutputs.value"
+] = """Value.
+
+Follows groups if cash sharing is enabled, otherwise columns.
+
+Gets filled if `fill_value` is True, otherwise has the shape `(0, 0)`."""
 __pdoc__[
     "FOInOutputs.returns"
 ] = """Returns.
 
-Gets filled if `fill_returns` is True, otherwise has the shape `(0, 0)`."""
+Follows groups if cash sharing is enabled, otherwise columns.
+
+Gets filled if `save_returns` is True, otherwise has the shape `(0, 0)`."""
 
 
 class FSInOutputs(tp.NamedTuple):

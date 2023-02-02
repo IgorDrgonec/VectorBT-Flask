@@ -3934,8 +3934,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         attach_call_seq: tp.Optional[bool] = None,
         ffill_val_price: tp.Optional[bool] = None,
         update_value: tp.Optional[bool] = None,
-        fill_state: tp.Optional[bool] = None,
-        fill_returns: tp.Optional[bool] = None,
+        save_state: tp.Optional[bool] = None,
+        save_value: tp.Optional[bool] = None,
+        save_returns: tp.Optional[bool] = None,
         max_orders: tp.Optional[int] = None,
         max_logs: tp.Optional[int] = None,
         seed: tp.Optional[int] = None,
@@ -4120,12 +4121,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
                 Otherwise, unknown `close` will lead to NaN in valuation price at the next timestamp.
             update_value (bool): Whether to update group value after each filled order.
-            fill_state (bool): Whether to fill state.
+            save_state (bool): Whether to save the state.
 
-                The arrays will be avaiable as `cash`, `position`, `debt`, `locked_cash`, and `free_cash` in in-outputs.
-            fill_returns (bool): Whether to fill returns.
+                The arrays will be available as `cash`, `position`, `debt`, `locked_cash`, and `free_cash` in in-outputs.
+            save_value (bool): Whether to save the value.
+            
+                The array will be available as `value` in in-outputs.
+            save_returns (bool): Whether to save the returns.
 
-                The array will be avaiable as `returns` in in-outputs.
+                The array will be available as `returns` in in-outputs.
             max_orders (int): The max number of order records expected to be filled at each column.
                 Defaults to the maximum number of non-NaN values across all columns of the size array.
 
@@ -4447,10 +4451,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ffill_val_price = portfolio_cfg["ffill_val_price"]
         if update_value is None:
             update_value = portfolio_cfg["update_value"]
-        if fill_state is None:
-            fill_state = portfolio_cfg["fill_state"]
-        if fill_returns is None:
-            fill_returns = portfolio_cfg["fill_returns"]
+        if save_state is None:
+            save_state = portfolio_cfg["save_state"]
+        if save_value is None:
+            save_value = portfolio_cfg["save_value"]
+        if save_returns is None:
+            save_returns = portfolio_cfg["save_returns"]
         if seed is None:
             seed = portfolio_cfg["seed"]
         if seed is not None:
@@ -4672,8 +4678,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             auto_call_seq=auto_call_seq,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
-            fill_state=fill_state,
-            fill_returns=fill_returns,
+            save_state=save_state,
+            save_value=save_value,
+            save_returns=save_returns,
             max_orders=max_orders,
             max_logs=max_logs,
         )
@@ -4773,8 +4780,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         attach_call_seq: tp.Optional[bool] = None,
         ffill_val_price: tp.Optional[bool] = None,
         update_value: tp.Optional[bool] = None,
-        fill_state: tp.Optional[bool] = None,
-        fill_returns: tp.Optional[bool] = None,
+        save_state: tp.Optional[bool] = None,
+        save_value: tp.Optional[bool] = None,
+        save_returns: tp.Optional[bool] = None,
         max_orders: tp.Optional[int] = None,
         max_logs: tp.Optional[int] = None,
         in_outputs: tp.Optional[tp.MappingLike] = None,
@@ -5013,8 +5021,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             attach_call_seq (bool): See `Portfolio.from_orders`.
             ffill_val_price (bool): See `Portfolio.from_orders`.
             update_value (bool): See `Portfolio.from_orders`.
-            fill_state (bool): See `Portfolio.from_orders`.
-            fill_returns (bool): See `Portfolio.from_orders`.
+            save_state (bool): See `Portfolio.from_orders`.
+            save_value (bool): See `Portfolio.from_orders`.
+            save_returns (bool): See `Portfolio.from_orders`.
             max_orders (int): See `Portfolio.from_orders`.
             max_logs (int): See `Portfolio.from_orders`.
             in_outputs (mapping_like): Mapping with in-output objects. Only for flexible mode.
@@ -5693,19 +5702,23 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ffill_val_price = portfolio_cfg["ffill_val_price"]
         if update_value is None:
             update_value = portfolio_cfg["update_value"]
-        if fill_state is None:
-            fill_state = portfolio_cfg["fill_state"]
-        if fill_returns is None:
-            fill_returns = portfolio_cfg["fill_returns"]
+        if save_state is None:
+            save_state = portfolio_cfg["save_state"]
+        if save_value is None:
+            save_value = portfolio_cfg["save_value"]
+        if save_returns is None:
+            save_returns = portfolio_cfg["save_returns"]
         if seed is None:
             seed = portfolio_cfg["seed"]
         if seed is not None:
             set_seed(seed)
         if flexible_mode:
-            if fill_state:
-                raise ValueError("Argument fill_state cannot be used in flexible mode")
-            if fill_returns:
-                raise ValueError("Argument fill_returns cannot be used in flexible mode")
+            if save_state:
+                raise ValueError("Argument save_state cannot be used in flexible mode")
+            if save_value:
+                raise ValueError("Argument save_value cannot be used in flexible mode")
+            if save_returns:
+                raise ValueError("Argument save_returns cannot be used in flexible mode")
             if (
                 in_outputs is not None
                 and not isinstance(in_outputs, CustomTemplate)
@@ -6128,8 +6141,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 auto_call_seq=auto_call_seq,
                 ffill_val_price=ffill_val_price,
                 update_value=update_value,
-                fill_state=fill_state,
-                fill_returns=fill_returns,
+                save_state=save_state,
+                save_value=save_value,
+                save_returns=save_returns,
                 max_orders=max_orders,
                 max_logs=max_logs,
                 in_outputs=in_outputs,
@@ -6285,8 +6299,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 auto_call_seq=auto_call_seq,
                 ffill_val_price=ffill_val_price,
                 update_value=update_value,
-                fill_state=fill_state,
-                fill_returns=fill_returns,
+                save_state=save_state,
+                save_value=save_value,
+                save_returns=save_returns,
                 max_orders=max_orders,
                 max_logs=max_logs,
                 **broadcasted_args,

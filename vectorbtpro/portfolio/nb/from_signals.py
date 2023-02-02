@@ -714,8 +714,9 @@ def is_stop_active_nb(stop_info: tp.Record) -> bool:
         auto_call_seq=None,
         ffill_val_price=None,
         update_value=None,
-        fill_state=None,
-        fill_returns=None,
+        save_state=None,
+        save_value=None,
+        save_returns=None,
         max_orders=None,
         max_logs=None,
     ),
@@ -790,8 +791,9 @@ def simulate_from_signals_nb(
     auto_call_seq: bool = False,
     ffill_val_price: bool = True,
     update_value: bool = False,
-    fill_state: bool = False,
-    fill_returns: bool = False,
+    save_state: bool = False,
+    save_value: bool = False,
+    save_returns: bool = False,
     max_orders: tp.Optional[int] = None,
     max_logs: tp.Optional[int] = 0,
 ) -> SimulationOutput:
@@ -912,7 +914,7 @@ def simulate_from_signals_nb(
         cash_earnings_out = np.full(target_shape, 0.0, dtype=np.float_)
     else:
         cash_earnings_out = np.full((1, 1), 0.0, dtype=np.float_)
-    if fill_state:
+    if save_state:
         cash = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
         position = np.full(target_shape, np.nan, dtype=np.float_)
         debt = np.full(target_shape, np.nan, dtype=np.float_)
@@ -924,7 +926,11 @@ def simulate_from_signals_nb(
         debt = np.full((0, 0), np.nan, dtype=np.float_)
         locked_cash = np.full((0, 0), np.nan, dtype=np.float_)
         free_cash = np.full((0, 0), np.nan, dtype=np.float_)
-    if fill_returns:
+    if save_value:
+        value = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
+    else:
+        value = np.full((0, 0), np.nan, dtype=np.float_)
+    if save_returns:
         returns = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
     else:
         returns = np.full((0, 0), np.nan, dtype=np.float_)
@@ -934,6 +940,7 @@ def simulate_from_signals_nb(
         debt=debt,
         locked_cash=locked_cash,
         free_cash=free_cash,
+        value=value,
         returns=returns,
     )
 
@@ -2212,7 +2219,7 @@ def simulate_from_signals_nb(
                 last_free_cash[group] += _cash_earnings
                 if track_cash_earnings:
                     cash_earnings_out[i, col] += _cash_earnings
-                if fill_state:
+                if save_state:
                     position[i, col] = last_position[col]
                     debt[i, col] = last_debt[col]
                     locked_cash[i, col] = last_locked_cash[col]
@@ -2230,7 +2237,9 @@ def simulate_from_signals_nb(
                 output_value=last_value[group] - _cash_deposits,
             )
             prev_close_value[group] = last_value[group]
-            if fill_returns:
+            if save_value:
+                in_outputs.value[i, group] = last_value[group]
+            if save_returns:
                 in_outputs.returns[i, group] = last_return[group]
 
     return prepare_simout_nb(

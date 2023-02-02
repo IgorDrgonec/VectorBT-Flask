@@ -2332,17 +2332,17 @@ class TestFromOrders:
 
     @pytest.mark.parametrize("test_group_by", [False, np.array([0, 0, 1])])
     @pytest.mark.parametrize("test_cash_sharing", [False, True])
-    def test_fill_returns(self, test_group_by, test_cash_sharing):
+    def test_save_returns(self, test_group_by, test_cash_sharing):
         assert_frame_equal(
             from_orders_both(
                 close=price_wide,
-                fill_returns=True,
+                save_returns=True,
                 group_by=test_group_by,
                 cash_sharing=test_cash_sharing,
             ).returns,
             from_orders_both(
                 close=price_wide,
-                fill_returns=False,
+                save_returns=False,
                 group_by=test_group_by,
                 cash_sharing=test_cash_sharing,
             ).returns,
@@ -2350,13 +2350,13 @@ class TestFromOrders:
         assert_frame_equal(
             from_orders_longonly(
                 close=price_wide,
-                fill_returns=True,
+                save_returns=True,
                 group_by=test_group_by,
                 cash_sharing=test_cash_sharing,
             ).returns,
             from_orders_longonly(
                 close=price_wide,
-                fill_returns=False,
+                save_returns=False,
                 group_by=test_group_by,
                 cash_sharing=test_cash_sharing,
             ).returns,
@@ -2364,13 +2364,13 @@ class TestFromOrders:
         assert_frame_equal(
             from_orders_shortonly(
                 close=price_wide,
-                fill_returns=True,
+                save_returns=True,
                 group_by=test_group_by,
                 cash_sharing=test_cash_sharing,
             ).returns,
             from_orders_shortonly(
                 close=price_wide,
-                fill_returns=False,
+                save_returns=False,
                 group_by=test_group_by,
                 cash_sharing=test_cash_sharing,
             ).returns,
