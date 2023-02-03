@@ -1190,6 +1190,10 @@ class BinanceData(RemoteData):
 
     See `BinanceData.fetch_symbol` for arguments.
 
+    !!! note
+        If you are using an exchange from the US, Japan or other TLD then make sure pass `tld="us"`
+        when creating the client.
+
     Usage:
         * Set up the API key globally (optional):
 
@@ -3182,10 +3186,6 @@ class TVData(RemoteData):
         ...     timeframe="1 hour"
         ... )
         ```
-
-        !!! note
-            API is quite unstable. Doesn't return an error if exchange + symbol combination wasn't found.
-            Instead, the download just hangs. If it takes longer than usual, restart the kernel.
     """
 
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.tv")
