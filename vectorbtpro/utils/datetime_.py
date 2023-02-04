@@ -356,7 +356,7 @@ def to_timestamp(
 ) -> pd.Timestamp:
     """Parse the datetime as a `pd.Timestamp`.
 
-    `parser_kwargs` are passed to `pd.to_datetime` while `**kwargs` are passed to `dateparser.parse`.
+    `parser_kwargs` are passed to `pd.Timestamp` while `**kwargs` are passed to `dateparser.parse`.
 
     For defaults, see `vectorbtpro._settings.datetime`."""
     from vectorbtpro._settings import settings
@@ -368,10 +368,10 @@ def to_timestamp(
     if isinstance(dt_like, pd.Timestamp):
         return dt_like
     if checks.is_number(dt_like):
-        return pd.to_datetime(dt_like, utc=True, unit=unit, **kwargs)
+        return pd.Timestamp(dt_like, tz="utc", unit=unit, **kwargs)
     if isinstance(dt_like, str):
         try:
-            return pd.to_datetime(dt_like, **kwargs)
+            return pd.Timestamp(dt_like, **kwargs)
         except Exception as e:
             import dateparser
 
@@ -380,8 +380,8 @@ def to_timestamp(
                 raise ValueError("Couldn't parse the datetime")
             if is_tz_aware(dt):
                 dt = dt.replace(tzinfo=to_timezone(dt.tzinfo, to_fixed_offset=True))
-            return pd.to_datetime(dt, **kwargs)
-    return pd.to_datetime(dt_like, **kwargs)
+            return pd.Timestamp(dt, **kwargs)
+    return pd.Timestamp(dt_like, **kwargs)
 
 
 def to_tzaware_timestamp(
