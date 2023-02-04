@@ -18,6 +18,7 @@ from vectorbtpro.utils.hashing import Hashable
 from vectorbtpro.utils.parsing import get_func_arg_names
 
 __all__ = [
+    "CustomTemplate",
     "Sub",
     "Rep",
     "RepEval",

@@ -206,16 +206,16 @@ class SignalFactory(IndicatorFactory):
 
     def with_place_func(
         self,
-        entry_place_func: tp.Optional[tp.PlaceFunc] = None,
-        exit_place_func: tp.Optional[tp.PlaceFunc] = None,
-        generate_func: tp.Callable = generate_nb,
-        generate_ex_func: tp.Callable = generate_ex_nb,
-        generate_enex_func: tp.Callable = generate_enex_nb,
+        entry_place_func_nb: tp.Optional[tp.PlaceFunc] = None,
+        exit_place_func_nb: tp.Optional[tp.PlaceFunc] = None,
+        generate_func_nb: tp.Callable = generate_nb,
+        generate_ex_func_nb: tp.Callable = generate_ex_nb,
+        generate_enex_func_nb: tp.Callable = generate_enex_nb,
         cache_func: tp.Callable = None,
         entry_settings: tp.KwargsLike = None,
         exit_settings: tp.KwargsLike = None,
         cache_settings: tp.KwargsLike = None,
-        jitted_loop: bool = False,
+        jit_kwargs: tp.KwargsLike = None,
         **kwargs
     ) -> tp.Type[IndicatorBase]:
         """Build signal generator class around entry and exit placement functions.
@@ -227,30 +227,28 @@ class SignalFactory(IndicatorFactory):
         corresponding to chosen signals. See `vectorbtpro.signals.nb.generate_nb`.
 
         Args:
-            entry_place_func (callable): `place_func_nb` that returns indices of entries.
+            entry_place_func_nb (callable): `place_func_nb` that returns indices of entries.
 
                 Defaults to `vectorbtpro.signals.nb.first_place_nb` for `FactoryMode.Chain`.
-            exit_place_func (callable): `place_func_nb` that returns indices of exits.
-            generate_func (callable): Entry generation function.
+            exit_place_func_nb (callable): `place_func_nb` that returns indices of exits.
+            generate_func_nb (callable): Entry generation function.
 
                 Defaults to `vectorbtpro.signals.nb.generate_nb`.
-            generate_ex_func (callable): Exit generation function.
+            generate_ex_func_nb (callable): Exit generation function.
 
                 Defaults to `vectorbtpro.signals.nb.generate_ex_nb`.
-            generate_enex_func (callable): Entry and exit generation function.
+            generate_enex_func_nb (callable): Entry and exit generation function.
 
                 Defaults to `vectorbtpro.signals.nb.generate_enex_nb`.
             cache_func (callable): A caching function to preprocess data beforehand.
 
                 All returned objects will be passed as last arguments to placement functions.
-            entry_settings (dict): Settings dict for `entry_place_func`.
-            exit_settings (dict): Settings dict for `exit_place_func`.
+            entry_settings (dict): Settings dict for `entry_place_func_nb`.
+            exit_settings (dict): Settings dict for `exit_place_func_nb`.
             cache_settings (dict): Settings dict for `cache_func`.
-            jitted_loop (bool): Whether to loop using a jitter.
+            jit_kwargs (dict): Keyword arguments passed to `@njit` decorator of the parameter selection function.
 
-                Parameter selector will be automatically compiled using Numba.
-
-                Set to True when iterating large number of times over small input.
+                By default, has `nogil` set to True.
             **kwargs: Keyword arguments passed to `IndicatorFactory.with_custom_func`.
 
         !!! note
@@ -289,9 +287,9 @@ class SignalFactory(IndicatorFactory):
                 * `wait`: Number of ticks to wait before placing signals.
                     Default is 1.
                 * `until_next`: Whether to place signals up to the next entry signal.
-                    Default is True. Applied in `generate_ex_func` only.
+                    Default is True. Applied in `generate_ex_func_nb` only.
                 * `skip_until_exit`: Whether to skip processing entry signals until the next exit.
-                    Default is False. Applied in `generate_ex_func` only.
+                    Default is False. Applied in `generate_ex_func_nb` only.
                 * `pick_first`: Whether to stop as soon as the first exit signal is found.
                     Default is False with `FactoryMode.Entries`, otherwise is True.
                 * `temp_idx_arr`: Empty integer array used to temporarily store indices.
@@ -305,7 +303,7 @@ class SignalFactory(IndicatorFactory):
 
         Args:
             *args: Must be used instead of `entry_args` with `FactoryMode.Entries` and instead of
-                `exit_args` with `FactoryMode.Exits` and `FactoryMode.Chain` with default `entry_place_func`.
+                `exit_args` with `FactoryMode.Exits` and `FactoryMode.Chain` with default `entry_place_func_nb`.
             entry_args (tuple): Arguments passed to the entry placement function.
             exit_args (tuple): Arguments passed to the exit placement function.
             cache_args (tuple): Arguments passed to the cache function.
@@ -318,7 +316,7 @@ class SignalFactory(IndicatorFactory):
             return_cache (bool): Whether to return only cache.
             use_cache (any): Cache to use.
             **kwargs: Must be used instead of `entry_kwargs` with `FactoryMode.Entries` and instead of
-                `exit_kwargs` with `FactoryMode.Exits` and `FactoryMode.Chain` with default `entry_place_func`.
+                `exit_kwargs` with `FactoryMode.Exits` and `FactoryMode.Chain` with default `entry_place_func_nb`.
 
         For more arguments, see `vectorbtpro.indicators.factory.run_pipeline`.
 
@@ -341,8 +339,8 @@ class SignalFactory(IndicatorFactory):
             ...     return 0
 
             >>> MySignals = vbt.SignalFactory().with_place_func(
-            ...     entry_place_func=entry_place_func_nb,
-            ...     exit_place_func=exit_place_func_nb,
+            ...     entry_place_func_nb=entry_place_func_nb,
+            ...     exit_place_func_nb=exit_place_func_nb,
             ...     entry_kwargs=dict(wait=1),
             ...     exit_kwargs=dict(wait=1)
             ... )
@@ -379,7 +377,7 @@ class SignalFactory(IndicatorFactory):
             ...     mode='chain',
             ...     param_names=['n']
             ... ).with_place_func(
-            ...     exit_place_func=wait_place_nb,
+            ...     exit_place_func_nb=wait_place_nb,
             ...     exit_settings=dict(
             ...         pass_params=['n']
             ...     )
@@ -451,7 +449,7 @@ class SignalFactory(IndicatorFactory):
             ...         rand_type=dict(dtype=RandType)  # creates rand_type_readable
             ...     )
             ... ).with_place_func(
-            ...     exit_place_func=rand_exit_place_nb,
+            ...     exit_place_func_nb=rand_exit_place_nb,
             ...     exit_settings=dict(
             ...         pass_in_outputs=['rand_type'],
             ...         pass_params=['prob1', 'prob2']
@@ -497,9 +495,10 @@ class SignalFactory(IndicatorFactory):
         """
         Indicator = self.Indicator
 
-        setattr(Indicator, "entry_place_func", entry_place_func)
-        setattr(Indicator, "exit_place_func", exit_place_func)
+        setattr(Indicator, "entry_place_func_nb", entry_place_func_nb)
+        setattr(Indicator, "exit_place_func_nb", exit_place_func_nb)
 
+        module_name = self.module_name
         mode = self.mode
         input_names = self.input_names
         param_names = self.param_names
@@ -507,27 +506,27 @@ class SignalFactory(IndicatorFactory):
 
         if mode == FactoryMode.Entries:
             require_input_shape = len(input_names) == 0
-            checks.assert_not_none(entry_place_func)
-            if exit_place_func is not None:
-                raise ValueError("exit_place_func cannot be used with FactoryMode.Entries")
+            checks.assert_not_none(entry_place_func_nb)
+            if exit_place_func_nb is not None:
+                raise ValueError("exit_place_func_nb cannot be used with FactoryMode.Entries")
         elif mode == FactoryMode.Exits:
             require_input_shape = False
-            if entry_place_func is not None:
-                raise ValueError("entry_place_func cannot be used with FactoryMode.Exits")
-            checks.assert_not_none(exit_place_func)
+            if entry_place_func_nb is not None:
+                raise ValueError("entry_place_func_nb cannot be used with FactoryMode.Exits")
+            checks.assert_not_none(exit_place_func_nb)
         elif mode == FactoryMode.Both:
             require_input_shape = len(input_names) == 0
-            checks.assert_not_none(entry_place_func)
-            checks.assert_not_none(exit_place_func)
+            checks.assert_not_none(entry_place_func_nb)
+            checks.assert_not_none(exit_place_func_nb)
         else:
             require_input_shape = False
-            if entry_place_func is None:
-                entry_place_func = first_place_nb
+            if entry_place_func_nb is None:
+                entry_place_func_nb = first_place_nb
             if entry_settings is None:
                 entry_settings = {}
             entry_settings = merge_dicts(dict(pass_inputs=["entries"]), entry_settings)
-            checks.assert_not_none(entry_place_func)
-            checks.assert_not_none(exit_place_func)
+            checks.assert_not_none(entry_place_func_nb)
+            checks.assert_not_none(exit_place_func_nb)
         require_input_shape = kwargs.pop("require_input_shape", require_input_shape)
 
         if entry_settings is None:
@@ -580,7 +579,7 @@ class SignalFactory(IndicatorFactory):
             _1 = "shape"
             _1 += ", only_once"
             _1 += ", entry_wait"
-            _1 += ", entry_place_func"
+            _1 += ", entry_place_func_nb"
             if len(entry_input_names) > 0:
                 _1 += ", " + ", ".join(entry_input_names)
             if len(entry_in_output_names) > 0:
@@ -588,14 +587,8 @@ class SignalFactory(IndicatorFactory):
             if len(entry_param_names) > 0:
                 _1 += ", " + ", ".join(map(lambda x: x + "[i]", entry_param_names))
             _1 += ", *entry_args"
-            func_str = "def apply_func({0}):\n   return generate_func({1})".format(_0, _1)
-            scope = {"generate_func": generate_func, "entry_place_func": entry_place_func}
-            filename = inspect.getfile(lambda: None)
-            code = compile(func_str, filename, "single")
-            exec(code, scope)
-            apply_func = scope["apply_func"]
-            if jitted_loop:
-                apply_func = njit(apply_func)
+            func_str = "def apply_func({0}):\n   return generate_func_nb({1})".format(_0, _1)
+            scope = {"generate_func_nb": generate_func_nb, "entry_place_func_nb": entry_place_func_nb}
 
         elif mode == FactoryMode.Exits:
             _0 = "i"
@@ -614,7 +607,7 @@ class SignalFactory(IndicatorFactory):
             _1 += ", exit_wait"
             _1 += ", until_next"
             _1 += ", skip_until_exit"
-            _1 += ", exit_place_func"
+            _1 += ", exit_place_func_nb"
             if len(exit_input_names) > 0:
                 _1 += ", " + ", ".join(exit_input_names)
             if len(exit_in_output_names) > 0:
@@ -622,14 +615,8 @@ class SignalFactory(IndicatorFactory):
             if len(exit_param_names) > 0:
                 _1 += ", " + ", ".join(map(lambda x: x + "[i]", exit_param_names))
             _1 += ", *exit_args"
-            func_str = "def apply_func({0}):\n   return generate_ex_func({1})".format(_0, _1)
-            scope = {"generate_ex_func": generate_ex_func, "exit_place_func": exit_place_func}
-            filename = inspect.getfile(lambda: None)
-            code = compile(func_str, filename, "single")
-            exec(code, scope)
-            apply_func = scope["apply_func"]
-            if jitted_loop:
-                apply_func = njit(apply_func)
+            func_str = "def apply_func({0}):\n   return generate_ex_func_nb({1})".format(_0, _1)
+            scope = {"generate_ex_func_nb": generate_ex_func_nb, "exit_place_func_nb": exit_place_func_nb}
 
         else:
             _0 = "i"
@@ -653,7 +640,7 @@ class SignalFactory(IndicatorFactory):
             _1 = "shape"
             _1 += ", entry_wait"
             _1 += ", exit_wait"
-            _1 += ", entry_place_func"
+            _1 += ", entry_place_func_nb"
             _1 += ", ("
             if len(entry_input_names) > 0:
                 _1 += ", ".join(map(lambda x: "_entry_" + x, entry_input_names)) + ", "
@@ -662,7 +649,7 @@ class SignalFactory(IndicatorFactory):
             if len(entry_param_names) > 0:
                 _1 += ", ".join(map(lambda x: "_entry_" + x + "[i]", entry_param_names)) + ", "
             _1 += "*entry_args,)"
-            _1 += ", exit_place_func"
+            _1 += ", exit_place_func_nb"
             _1 += ", ("
             if len(exit_input_names) > 0:
                 _1 += ", ".join(map(lambda x: "_exit_" + x, exit_input_names)) + ", "
@@ -671,18 +658,21 @@ class SignalFactory(IndicatorFactory):
             if len(exit_param_names) > 0:
                 _1 += ", ".join(map(lambda x: "_exit_" + x + "[i]", exit_param_names)) + ", "
             _1 += "*exit_args,)"
-            func_str = "def apply_func({0}):\n   return generate_enex_func({1})".format(_0, _1)
+            func_str = "def apply_func({0}):\n   return generate_enex_func_nb({1})".format(_0, _1)
             scope = {
-                "generate_enex_func": generate_enex_func,
-                "entry_place_func": entry_place_func,
-                "exit_place_func": exit_place_func,
+                "generate_enex_func_nb": generate_enex_func_nb,
+                "entry_place_func_nb": entry_place_func_nb,
+                "exit_place_func_nb": exit_place_func_nb,
             }
-            filename = inspect.getfile(lambda: None)
-            code = compile(func_str, filename, "single")
-            exec(code, scope)
-            apply_func = scope["apply_func"]
-            if jitted_loop:
-                apply_func = njit(apply_func)
+
+        filename = inspect.getfile(lambda: None)
+        code = compile(func_str, filename, "single")
+        exec(code, scope)
+        apply_func = scope["apply_func"]
+        if module_name is not None:
+            apply_func.__module__ = module_name
+        jit_kwargs = merge_dicts(dict(nogil=True), jit_kwargs)
+        apply_func = njit(apply_func, **jit_kwargs)
 
         setattr(Indicator, "apply_func", apply_func)
 
@@ -720,7 +710,7 @@ class SignalFactory(IndicatorFactory):
                 if len(entry_args) > 0:
                     raise ValueError("Use *args instead of entry_args with FactoryMode.Entries")
                 entry_args = args
-            elif mode == FactoryMode.Exits or (mode == FactoryMode.Chain and entry_place_func == first_place_nb):
+            elif mode == FactoryMode.Exits or (mode == FactoryMode.Chain and entry_place_func_nb == first_place_nb):
                 if len(exit_args) > 0:
                     raise ValueError("Use *args instead of exit_args with FactoryMode.Exits or FactoryMode.Chain")
                 exit_args = args
@@ -738,7 +728,7 @@ class SignalFactory(IndicatorFactory):
                 if len(entry_kwargs) > 0:
                     raise ValueError("Use **kwargs instead of entry_kwargs with FactoryMode.Entries")
                 entry_kwargs = _kwargs
-            elif mode == FactoryMode.Exits or (mode == FactoryMode.Chain and entry_place_func == first_place_nb):
+            elif mode == FactoryMode.Exits or (mode == FactoryMode.Chain and entry_place_func_nb == first_place_nb):
                 if len(exit_kwargs) > 0:
                     raise ValueError("Use **kwargs instead of exit_kwargs with FactoryMode.Exits or FactoryMode.Chain")
                 exit_kwargs = _kwargs
@@ -848,12 +838,8 @@ class SignalFactory(IndicatorFactory):
 
             # Apply and concatenate
             if mode == FactoryMode.Entries:
-                if jitted_loop:
-                    _entry_in_output_list = list(map(to_typed_list, entry_in_output_list))
-                    _entry_param_list = list(map(to_typed_list, entry_param_list))
-                else:
-                    _entry_in_output_list = entry_in_output_list
-                    _entry_param_list = entry_param_list
+                _entry_in_output_list = list(map(to_typed_list, entry_in_output_list))
+                _entry_param_list = list(map(to_typed_list, entry_param_list))
 
                 return combining.apply_and_concat(
                     n_params,
@@ -866,17 +852,13 @@ class SignalFactory(IndicatorFactory):
                     *_entry_param_list,
                     entry_args + entry_more_args + entry_cache,
                     n_outputs=1,
-                    jitted_loop=jitted_loop,
+                    jitted_loop=True,
                     execute_kwargs=execute_kwargs,
                 )
 
             elif mode == FactoryMode.Exits:
-                if jitted_loop:
-                    _exit_in_output_list = list(map(to_typed_list, exit_in_output_list))
-                    _exit_param_list = list(map(to_typed_list, exit_param_list))
-                else:
-                    _exit_in_output_list = exit_in_output_list
-                    _exit_param_list = exit_param_list
+                _exit_in_output_list = list(map(to_typed_list, exit_in_output_list))
+                _exit_param_list = list(map(to_typed_list, exit_param_list))
 
                 return combining.apply_and_concat(
                     n_params,
@@ -890,21 +872,15 @@ class SignalFactory(IndicatorFactory):
                     *_exit_param_list,
                     exit_args + exit_more_args + exit_cache,
                     n_outputs=1,
-                    jitted_loop=jitted_loop,
+                    jitted_loop=True,
                     execute_kwargs=execute_kwargs,
                 )
 
             else:
-                if jitted_loop:
-                    _entry_in_output_list = list(map(to_typed_list, entry_in_output_list))
-                    _entry_param_list = list(map(to_typed_list, entry_param_list))
-                    _exit_in_output_list = list(map(to_typed_list, exit_in_output_list))
-                    _exit_param_list = list(map(to_typed_list, exit_param_list))
-                else:
-                    _entry_in_output_list = entry_in_output_list
-                    _entry_param_list = entry_param_list
-                    _exit_in_output_list = exit_in_output_list
-                    _exit_param_list = exit_param_list
+                _entry_in_output_list = list(map(to_typed_list, entry_in_output_list))
+                _entry_param_list = list(map(to_typed_list, entry_param_list))
+                _exit_in_output_list = list(map(to_typed_list, exit_in_output_list))
+                _exit_param_list = list(map(to_typed_list, exit_param_list))
 
                 return combining.apply_and_concat(
                     n_params,
@@ -921,7 +897,7 @@ class SignalFactory(IndicatorFactory):
                     *_exit_param_list,
                     exit_args + exit_more_args + exit_cache,
                     n_outputs=2,
-                    jitted_loop=jitted_loop,
+                    jitted_loop=True,
                     execute_kwargs=execute_kwargs,
                 )
 

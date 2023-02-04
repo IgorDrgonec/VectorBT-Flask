@@ -61,25 +61,25 @@ __pdoc__[
 ```
 
 Attributes:
-    Entries: Generate entries only using `generate_func`.
+    Entries: Generate entries only using `generate_func_nb`.
     
         Takes no input signal arrays.
         Produces one output signal array - `entries`.
         
         Such generators often have no suffix.
-    Exits: Generate exits only using `generate_ex_func`.
+    Exits: Generate exits only using `generate_ex_func_nb`.
         
         Takes one input signal array - `entries`.
         Produces one output signal array - `exits`.
         
         Such generators often have suffix 'X'.
-    Both: Generate both entries and exits using `generate_enex_func`.
+    Both: Generate both entries and exits using `generate_enex_func_nb`.
             
         Takes no input signal arrays.
         Produces two output signal arrays - `entries` and `exits`.
         
         Such generators often have suffix 'NX'.
-    Chain: Generate chain of entries and exits using `generate_enex_func`.
+    Chain: Generate chain of entries and exits using `generate_enex_func_nb`.
                 
         Takes one input signal array - `entries`.
         Produces two output signal arrays - `new_entries` and `exits`.

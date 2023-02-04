@@ -2417,7 +2417,6 @@ class TestFactory:
             "save",
             "select_col",
             "select_col_from_obj",
-            "select_params_func",
             "self_aliases",
             "set_settings",
             "short_name",

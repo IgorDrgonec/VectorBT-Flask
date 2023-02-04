@@ -415,8 +415,8 @@ def run_pipeline(
         **kwargs: Keyword arguments passed to the `custom_func`.
 
             Some common arguments include `return_cache` to return cache and `use_cache` to use cache.
-            Those are only applicable to `custom_func` that supports it (`custom_func` created using
-            `IndicatorFactory.with_apply_func` are supported by default).
+            If `use_cache` is False, disables caching completely. Those are only applicable to `custom_func`
+            that supports it (`custom_func` created using `IndicatorFactory.with_apply_func` are supported by default).
 
     Returns:
         Array wrapper, list of inputs (`np.ndarray`), input mapper (`np.ndarray`), list of outputs
@@ -1368,7 +1368,7 @@ class IndicatorFactory(Configured):
                 [
                     all_attr_names,
                     ["dtype", "enum_unkval", "make_cacheable"],
-                ]
+                ],
             )
 
         # Set up class
@@ -2252,10 +2252,7 @@ Other keyword arguments are passed to `{0}.run`.
         pass_per_column: bool = False,
         cache_pass_per_column: tp.Optional[bool] = None,
         kwargs_as_args: tp.Optional[tp.Iterable[str]] = None,
-        jit_select_params: tp.Optional[bool] = None,
         jit_kwargs: tp.KwargsLike = None,
-        jitted_loop: bool = False,
-        remove_kwargs: tp.Optional[bool] = None,
         **kwargs,
     ) -> tp.Union[str, tp.Type[IndicatorBase]]:
         """Build indicator class around a custom apply function.
@@ -2281,7 +2278,7 @@ Other keyword arguments are passed to `{0}.run`.
 
         !!! note
             Reserved arguments such as  `per_column` (in this order) get passed as positional
-            arguments if `remove_kwargs` is True, otherwise as keyword arguments.
+            arguments if `jitted_loop` is True, otherwise as keyword arguments.
 
         Args:
             apply_func (callable): A function that takes inputs, selection of parameters, and
@@ -2309,9 +2306,9 @@ Other keyword arguments are passed to `{0}.run`.
                     the number of columns in the input arrays.
                 * Variable arguments if `var_args` is set to True
                 * `per_column` if `pass_per_column` is set to True and `per_column` not in
-                    `kwargs_as_args` and `remove_kwargs` is set to True
+                    `kwargs_as_args` and `jitted_loop` is set to True
                 * Arguments listed in `kwargs_as_args` passed as positional. Can include `takes_1d` and `per_column`.
-                * Other keyword arguments if `remove_kwargs` is False. Also includes `takes_1d` and `per_column`
+                * Other keyword arguments if `jitted_loop` is False. Also includes `takes_1d` and `per_column`
                     if they must be passed and not in `kwargs_as_args`.
 
                 Can be Numba-compiled (but doesn't have to).
@@ -2341,21 +2338,9 @@ Other keyword arguments are passed to `{0}.run`.
                 variable keyword arguments.
 
                 Defaults to []. Order matters.
-            jit_select_params (bool): Whether to JIT-compile the parameter selection function.
-
-                Defaults to True if `jitted_loop` is True or `apply_func` is Numba-compiled.
             jit_kwargs (dict): Keyword arguments passed to `@njit` decorator of the parameter selection function.
 
                 By default, has `nogil` set to True.
-            jitted_loop (bool): Whether to loop using a jitter.
-
-                Parameter selector will be automatically compiled using Numba.
-
-                Set to True when iterating large number of times over small input,
-                but note that Numba doesn't support variable keyword arguments.
-            remove_kwargs (bool): Whether to remove keyword arguments when selecting parameters.
-
-                If None, becomes True if `jitted_loop` is True.
             **kwargs: Keyword arguments passed to `IndicatorFactory.with_custom_func`, all the way down
                 to `vectorbtpro.base.combining.apply_and_concat`.
 
@@ -2436,64 +2421,56 @@ Other keyword arguments are passed to `{0}.run`.
 
         if kwargs_as_args is None:
             kwargs_as_args = []
-        if jit_select_params is None:
-            jit_select_params = jitted_loop or checks.is_numba_func(apply_func)
-        if remove_kwargs is None:
-            remove_kwargs = jit_select_params
 
-        # Build a function that selects a parameter tuple
-        # Do it here to avoid compilation with Numba every time custom_func is run
-        _0 = "i"
-        _0 += ", args_before"
-        if len(input_names) > 0:
-            _0 += ", " + ", ".join(input_names)
-        if len(in_output_names) > 0:
-            _0 += ", " + ", ".join(in_output_names)
-        if len(param_names) > 0:
-            _0 += ", " + ", ".join(param_names)
-        _0 += ", *args"
-        if not remove_kwargs:
-            _0 += ", **kwargs"
-        if select_params:
-            _1 = "*args_before"
-        else:
-            _1 = "i, *args_before"
-        if pass_packed:
+        if checks.is_numba_func(apply_func):
+            # Build a function that selects a parameter tuple
+            # Do it here to avoid compilation with Numba every time custom_func is run
+            _0 = "i"
+            _0 += ", args_before"
             if len(input_names) > 0:
-                _1 += ", (" + ", ".join(map(lambda x: x + ("[i]" if select_params else ""), input_names)) + ",)"
-            else:
-                _1 += ", ()"
+                _0 += ", " + ", ".join(input_names)
             if len(in_output_names) > 0:
-                _1 += ", (" + ", ".join(map(lambda x: x + ("[i]" if select_params else ""), in_output_names)) + ",)"
-            else:
-                _1 += ", ()"
+                _0 += ", " + ", ".join(in_output_names)
             if len(param_names) > 0:
-                _1 += ", (" + ", ".join(map(lambda x: x + ("[i]" if select_params else ""), param_names)) + ",)"
+                _0 += ", " + ", ".join(param_names)
+            _0 += ", *args"
+            if select_params:
+                _1 = "*args_before"
             else:
-                _1 += ", ()"
-        else:
-            if len(input_names) > 0:
-                _1 += ", " + ", ".join(map(lambda x: x + ("[i]" if select_params else ""), input_names))
-            if len(in_output_names) > 0:
-                _1 += ", " + ", ".join(map(lambda x: x + ("[i]" if select_params else ""), in_output_names))
-            if len(param_names) > 0:
-                _1 += ", " + ", ".join(map(lambda x: x + ("[i]" if select_params else ""), param_names))
-        _1 += ", *args"
-        if not remove_kwargs:
-            _1 += ", **kwargs"
-        func_str = "def select_params_func({0}):\n   return apply_func({1})".format(_0, _1)
-        scope = {"apply_func": apply_func}
-        filename = inspect.getfile(lambda: None)
-        code = compile(func_str, filename, "single")
-        exec(code, scope)
-        select_params_func = scope["select_params_func"]
-        if module_name is not None:
-            select_params_func.__module__ = module_name
-        if jit_select_params:
+                _1 = "i, *args_before"
+            if pass_packed:
+                if len(input_names) > 0:
+                    _1 += ", (" + ", ".join(map(lambda x: x + ("[i]" if select_params else ""), input_names)) + ",)"
+                else:
+                    _1 += ", ()"
+                if len(in_output_names) > 0:
+                    _1 += ", (" + ", ".join(map(lambda x: x + ("[i]" if select_params else ""), in_output_names)) + ",)"
+                else:
+                    _1 += ", ()"
+                if len(param_names) > 0:
+                    _1 += ", (" + ", ".join(map(lambda x: x + ("[i]" if select_params else ""), param_names)) + ",)"
+                else:
+                    _1 += ", ()"
+            else:
+                if len(input_names) > 0:
+                    _1 += ", " + ", ".join(map(lambda x: x + ("[i]" if select_params else ""), input_names))
+                if len(in_output_names) > 0:
+                    _1 += ", " + ", ".join(map(lambda x: x + ("[i]" if select_params else ""), in_output_names))
+                if len(param_names) > 0:
+                    _1 += ", " + ", ".join(map(lambda x: x + ("[i]" if select_params else ""), param_names))
+            _1 += ", *args"
+            func_str = "def param_select_func_nb({0}):\n   return apply_func({1})".format(_0, _1)
+            scope = {"apply_func": apply_func}
+            filename = inspect.getfile(lambda: None)
+            code = compile(func_str, filename, "single")
+            exec(code, scope)
+            param_select_func_nb = scope["param_select_func_nb"]
+            if module_name is not None:
+                param_select_func_nb.__module__ = module_name
             jit_kwargs = merge_dicts(dict(nogil=True), jit_kwargs)
-            select_params_func = njit(select_params_func, **jit_kwargs)
+            param_select_func_nb = njit(param_select_func_nb, **jit_kwargs)
 
-        setattr(Indicator, "select_params_func", select_params_func)
+            setattr(Indicator, "param_select_func_nb", param_select_func_nb)
 
         def custom_func(
             input_tuple: tp.Tuple[tp.AnyArray, ...],
@@ -2503,11 +2480,16 @@ Other keyword arguments are passed to `{0}.run`.
             input_shape: tp.Optional[tp.Shape] = None,
             per_column: tp.Optional[bool] = None,
             return_cache: bool = False,
-            use_cache: tp.Optional[CacheOutputT] = None,
+            use_cache: tp.Union[bool, CacheOutputT] = True,
+            jitted_loop: bool = False,
+            jitted_warmup: bool = False,
             execute_kwargs: tp.KwargsLike = None,
             **_kwargs,
         ) -> tp.Union[None, CacheOutputT, tp.Array2d, tp.List[tp.Array2d]]:
             """Custom function that forwards inputs and parameters to `apply_func`."""
+            if jitted_loop and not checks.is_numba_func(apply_func):
+                raise ValueError("Apply function must be Numba-compiled for jitted_loop=True")
+
             _cache_pass_packed = cache_pass_packed
             _cache_pass_per_column = cache_pass_per_column
 
@@ -2550,58 +2532,61 @@ Other keyword arguments are passed to `{0}.run`.
 
             # Caching
             cache = use_cache
-            if cache is None and cache_func is not None:
-                _input_tuple = input_tuple
-                _in_output_tuple = ()
-                for in_outputs in in_output_tuple:
-                    if checks.is_numba_func(cache_func):
-                        _in_outputs = to_typed_list(in_outputs)
-                    else:
-                        _in_outputs = in_outputs
-                    _in_output_tuple += (_in_outputs,)
-                _param_tuple = ()
-                for params in param_tuple:
-                    if checks.is_numba_func(cache_func):
-                        _params = to_typed_list(params)
-                    else:
-                        _params = params
-                    _param_tuple += (_params,)
-
-                if _cache_pass_packed is None:
-                    _cache_pass_packed = pass_packed
-                if _cache_pass_per_column is None and per_column:
-                    _cache_pass_per_column = True
-                if _cache_pass_per_column is None:
-                    _cache_pass_per_column = pass_per_column
-                cache_more_args = tuple(more_args)
-                cache_kwargs = dict(_kwargs)
-                if _cache_pass_per_column:
-                    if "per_column" not in kwargs_as_args:
-                        if remove_kwargs:
-                            cache_more_args += (per_column,)
+            if isinstance(cache, bool):
+                if cache and cache_func is not None:
+                    _input_tuple = input_tuple
+                    _in_output_tuple = ()
+                    for in_outputs in in_output_tuple:
+                        if checks.is_numba_func(cache_func):
+                            _in_outputs = to_typed_list(in_outputs)
                         else:
-                            cache_kwargs["per_column"] = per_column
+                            _in_outputs = in_outputs
+                        _in_output_tuple += (_in_outputs,)
+                    _param_tuple = ()
+                    for params in param_tuple:
+                        if checks.is_numba_func(cache_func):
+                            _params = to_typed_list(params)
+                        else:
+                            _params = params
+                        _param_tuple += (_params,)
 
-                if _cache_pass_packed:
-                    cache = cache_func(
-                        *args_before,
-                        _input_tuple,
-                        _in_output_tuple,
-                        _param_tuple,
-                        *_args,
-                        *cache_more_args,
-                        **cache_kwargs,
-                    )
+                    if _cache_pass_packed is None:
+                        _cache_pass_packed = pass_packed
+                    if _cache_pass_per_column is None and per_column:
+                        _cache_pass_per_column = True
+                    if _cache_pass_per_column is None:
+                        _cache_pass_per_column = pass_per_column
+                    cache_more_args = tuple(more_args)
+                    cache_kwargs = dict(_kwargs)
+                    if _cache_pass_per_column:
+                        if "per_column" not in kwargs_as_args:
+                            if jitted_loop:
+                                cache_more_args += (per_column,)
+                            else:
+                                cache_kwargs["per_column"] = per_column
+
+                    if _cache_pass_packed:
+                        cache = cache_func(
+                            *args_before,
+                            _input_tuple,
+                            _in_output_tuple,
+                            _param_tuple,
+                            *_args,
+                            *cache_more_args,
+                            **cache_kwargs,
+                        )
+                    else:
+                        cache = cache_func(
+                            *args_before,
+                            *_input_tuple,
+                            *_in_output_tuple,
+                            *_param_tuple,
+                            *_args,
+                            *cache_more_args,
+                            **cache_kwargs,
+                        )
                 else:
-                    cache = cache_func(
-                        *args_before,
-                        *_input_tuple,
-                        *_in_output_tuple,
-                        *_param_tuple,
-                        *_args,
-                        *cache_more_args,
-                        **cache_kwargs,
-                    )
+                    cache = None
             if return_cache:
                 return cache
             if cache is None:
@@ -2611,13 +2596,16 @@ Other keyword arguments are passed to `{0}.run`.
 
             # Prepare inputs
             def _expand_input(input: tp.MaybeList[tp.AnyArray], multiple: bool = False) -> tp.List[tp.AnyArray]:
+                if jitted_loop:
+                    _inputs = List()
+                else:
+                    _inputs = []
                 if per_column:
                     if multiple:
                         _input = input[0]
                     else:
                         _input = input
                     if _input.ndim == 2:
-                        _inputs = []
                         for i in range(_input.shape[1]):
                             if takes_1d:
                                 if isinstance(_input, pd.DataFrame):
@@ -2630,9 +2618,8 @@ Other keyword arguments are passed to `{0}.run`.
                                 else:
                                     _inputs.append(_input[:, i : i + 1])
                     else:
-                        _inputs = [_input]
+                        _inputs.append(_input)
                 else:
-                    _inputs = []
                     for p in range(n_params):
                         if multiple:
                             _input = input[p]
@@ -2646,7 +2633,7 @@ Other keyword arguments are passed to `{0}.run`.
                                 for i in range(_input.shape[1]):
                                     _inputs.append(_input[:, i])
                             else:
-                                _inputs = [_input]
+                                _inputs.append(_input)
                         else:
                             _inputs.append(_input)
                 return _inputs
@@ -2654,14 +2641,10 @@ Other keyword arguments are passed to `{0}.run`.
             _input_tuple = ()
             for input in input_tuple:
                 _inputs = _expand_input(input)
-                if jit_select_params:
-                    _inputs = to_typed_list(_inputs)
                 _input_tuple += (_inputs,)
             _in_output_tuple = ()
             for in_outputs in in_output_tuple:
                 _in_outputs = _expand_input(in_outputs, multiple=True)
-                if jit_select_params:
-                    _in_outputs = to_typed_list(_in_outputs)
                 _in_output_tuple += (_in_outputs,)
             _param_tuple = ()
             for params in param_tuple:
@@ -2669,8 +2652,11 @@ Other keyword arguments are passed to `{0}.run`.
                     _params = [params[p] for p in range(len(params)) for i in range(n_cols)]
                 else:
                     _params = params
-                if jit_select_params:
-                    _params = to_typed_list(_params)
+                if jitted_loop:
+                    if len(_params) > 0 and np.isscalar(_params[0]):
+                        _params = np.asarray(_params)
+                    else:
+                        _params = to_typed_list(_params)
                 _param_tuple += (_params,)
             if takes_1d and not per_column:
                 _n_params = n_params * n_cols
@@ -2679,25 +2665,59 @@ Other keyword arguments are passed to `{0}.run`.
 
             if pass_per_column:
                 if "per_column" not in kwargs_as_args:
-                    if remove_kwargs:
+                    if jitted_loop:
                         more_args += (per_column,)
                     else:
                         _kwargs["per_column"] = per_column
 
             # Apply function and concatenate outputs
-            return combining.apply_and_concat(
-                _n_params,
-                select_params_func,
-                args_before,
-                *_input_tuple,
-                *_in_output_tuple,
-                *_param_tuple,
-                *_args,
-                *more_args,
-                *cache,
-                **_kwargs,
+            if jitted_loop:
+                return combining.apply_and_concat(
+                    _n_params,
+                    param_select_func_nb,
+                    args_before,
+                    *_input_tuple,
+                    *_in_output_tuple,
+                    *_param_tuple,
+                    *_args,
+                    *more_args,
+                    *cache,
+                    **_kwargs,
+                    n_outputs=num_ret_outputs,
+                    jitted_loop=True,
+                    jitted_warmup=jitted_warmup,
+                    execute_kwargs=execute_kwargs,
+                )
+
+            funcs_args = []
+            for i in range(_n_params):
+                if select_params:
+                    _inputs = tuple(_inputs[i] for _inputs in _input_tuple)
+                    _in_outputs = tuple(_in_outputs[i] for _in_outputs in _in_output_tuple)
+                    _params = tuple(_params[i] for _params in _param_tuple)
+                else:
+                    _inputs = _input_tuple
+                    _in_outputs = _in_output_tuple
+                    _params = _param_tuple
+                funcs_args.append(
+                    (
+                        apply_func,
+                        (
+                            *((i,) if not select_params else ()),
+                            *args_before,
+                            *((_inputs,) if pass_packed else _inputs),
+                            *((_in_outputs,) if pass_packed else _in_outputs),
+                            *((_params,) if pass_packed else _params),
+                            *_args,
+                            *more_args,
+                            *cache,
+                        ),
+                        _kwargs,
+                    )
+                )
+            return combining.apply_and_concat_each(
+                funcs_args,
                 n_outputs=num_ret_outputs,
-                jitted_loop=jitted_loop,
                 execute_kwargs=execute_kwargs,
             )
 
@@ -3508,7 +3528,7 @@ Args:
         df = pd.DataFrame(
             np.random.randint(1, 10, size=(test_index_len, 5)),
             index=pd.date_range("2020", periods=test_index_len),
-            columns=["open", "high", "low", "close", "volume"]
+            columns=["open", "high", "low", "close", "volume"],
         )
 
         func_arg_names = get_func_arg_names(func)
@@ -3824,7 +3844,7 @@ Args:
             sell_trace_kwargs: tp.KwargsLike = None,
             add_trace_kwargs: tp.KwargsLike = None,
             fig: tp.Optional[tp.BaseFigure] = None,
-            **layout_kwargs
+            **layout_kwargs,
         ) -> tp.BaseFigure:
             """Plot `MA.ma` against `MA.close`.
 

@@ -124,7 +124,7 @@ import numpy as np
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.checks import is_instance_of
-from vectorbtpro.utils.config import child_dict, Config, FrozenConfig
+from vectorbtpro.utils.config import child_dict, Config
 from vectorbtpro.utils.datetime_ import get_local_tz, get_utc_tz
 from vectorbtpro.utils.execution import (
     SerialEngine,
@@ -209,7 +209,7 @@ jitting = child_dict(
     allow_new=False,
     register_new=False,
     jitters=Config(
-        nb=FrozenConfig(
+        nb=Config(
             cls=NumbaJitter,
             aliases={"numba"},
             options=dict(),
@@ -217,7 +217,7 @@ jitting = child_dict(
             resolve_kwargs=dict(),
             tasks=dict(),
         ),
-        np=FrozenConfig(
+        np=Config(
             cls=NumPyJitter,
             aliases={"numpy"},
             options=dict(),
@@ -287,45 +287,38 @@ ${config_doc}
 _settings["math"] = math
 
 execution = child_dict(
+    n_chunks=None,
+    chunk_len=None,
+    distribute="calls",
     show_progress=True,
     pbar_kwargs=Config(),
     engines=Config(
-        serial=FrozenConfig(
+        serial=Config(
             cls=SerialEngine,
             show_progress=False,
             pbar_kwargs=Config(),
             clear_cache=False,
             collect_garbage=False,
-            n_chunks=None,
-            chunk_len=None,
         ),
-        threadpool=FrozenConfig(
+        threadpool=Config(
             cls=ThreadPoolEngine,
             init_kwargs=Config(),
-            n_chunks=None,
-            chunk_len=None,
         ),
-        processpool=FrozenConfig(
+        processpool=Config(
             cls=ProcessPoolEngine,
             init_kwargs=Config(),
-            n_chunks=None,
-            chunk_len=None,
         ),
-        pathos=FrozenConfig(
+        pathos=Config(
             cls=PathosEngine,
             pool_type="process",
             sleep=0.001,
             init_kwargs=Config(),
-            n_chunks=None,
-            chunk_len=None,
         ),
-        dask=FrozenConfig(
+        dask=Config(
             cls=DaskEngine,
             compute_kwargs=Config(),
-            n_chunks=None,
-            chunk_len=None,
         ),
-        ray=FrozenConfig(
+        ray=Config(
             cls=RayEngine,
             restart=False,
             reuse_refs=True,
@@ -333,8 +326,6 @@ execution = child_dict(
             shutdown=False,
             init_kwargs=Config(),
             remote_kwargs=Config(),
-            n_chunks=None,
-            chunk_len=None,
         ),
     ),
 )
@@ -597,7 +588,7 @@ data = child_dict(
     silence_warnings=False,
     custom=Config(
         # Synthetic
-        synthetic=FrozenConfig(
+        synthetic=Config(
             start=0,
             end="now",
             freq=None,
@@ -605,35 +596,35 @@ data = child_dict(
             normalize=False,
             inclusive="left",
         ),
-        random=FrozenConfig(
+        random=Config(
             start_value=100.0,
             mean=0.0,
             std=0.01,
             symmetric=False,
             seed=None,
         ),
-        random_ohlc=FrozenConfig(
+        random_ohlc=Config(
             std=0.001,
             n_ticks=50,
         ),
-        gbm=FrozenConfig(
+        gbm=Config(
             start_value=100.0,
             mean=0.0,
             std=0.01,
             dt=1.0,
             seed=None,
         ),
-        gbm_ohlc=FrozenConfig(
+        gbm_ohlc=Config(
             std=0.001,
             n_ticks=50,
         ),
         # Local
-        local=FrozenConfig(
+        local=Config(
             match_paths=True,
             match_regex=None,
             sort_paths=True,
         ),
-        csv=FrozenConfig(
+        csv=Config(
             start_row=0,
             end_row=None,
             header=0,
@@ -642,14 +633,14 @@ data = child_dict(
             squeeze=True,
             read_csv_kwargs=dict(),
         ),
-        hdf=FrozenConfig(
+        hdf=Config(
             start_row=0,
             end_row=None,
             read_hdf_kwargs=dict(),
         ),
         # Remote
-        remote=FrozenConfig(),
-        yf=FrozenConfig(
+        remote=Config(),
+        yf=Config(
             period="max",
             start=None,
             end=None,
@@ -657,7 +648,7 @@ data = child_dict(
             tz=None,
             history_kwargs=dict(),
         ),
-        binance=FrozenConfig(
+        binance=Config(
             client=None,
             client_config=dict(
                 api_key=None,
@@ -675,7 +666,7 @@ data = child_dict(
             silence_warnings=False,
             get_klines_kwargs=dict(),
         ),
-        ccxt=FrozenConfig(
+        ccxt=Config(
             exchange="binance",
             exchange_config=dict(
                 enableRateLimit=True,
@@ -694,7 +685,7 @@ data = child_dict(
             exchanges=dict(),
             silence_warnings=False,
         ),
-        alpaca=FrozenConfig(
+        alpaca=Config(
             client=None,
             client_type="stocks",
             client_config=dict(
@@ -711,7 +702,7 @@ data = child_dict(
             feed=None,
             limit=None,
         ),
-        polygon=FrozenConfig(
+        polygon=Config(
             client=None,
             client_config=dict(
                 api_key=None,
@@ -729,7 +720,7 @@ data = child_dict(
             pbar_kwargs=dict(),
             silence_warnings=False,
         ),
-        alpha_vantage=FrozenConfig(
+        alpha_vantage=Config(
             apikey=None,
             api_meta=None,
             category=None,
@@ -751,7 +742,7 @@ data = child_dict(
             params=dict(),
             silence_warnings=False,
         ),
-        ndl=FrozenConfig(
+        ndl=Config(
             api_key=None,
             start=None,
             end=None,
@@ -761,7 +752,7 @@ data = child_dict(
             transform=None,
             params=dict(),
         ),
-        tv=FrozenConfig(
+        tv=Config(
             client=None,
             client_config=dict(
                 username=None,
