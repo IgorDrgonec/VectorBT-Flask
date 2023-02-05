@@ -291,7 +291,7 @@ def convert_naive_time(t: time, tz_out: tp.Optional[tzinfo]) -> time:
     return datetime.combine(datetime.today(), t).astimezone(tz_out).time()
 
 
-def is_tz_aware(dt: tp.SupportsTZInfo) -> bool:
+def is_tz_aware(dt: tp.Union[datetime, pd.Timestamp, pd.DatetimeIndex]) -> bool:
     """Whether datetime is timezone-aware."""
     tz = dt.tzinfo
     if tz is None:
@@ -328,12 +328,15 @@ def to_timezone(
         try:
             tz = zoneinfo.ZoneInfo(tz)
         except zoneinfo.ZoneInfoNotFoundError:
-            dt = dateparser.parse("now %s" % tz, **parser_kwargs)
-            if dt is not None:
-                tz = dt.tzinfo
-                to_fixed_offset = True
+            try:
+                tz = pd.Timestamp("now", tz=tz).tz
+            except Exception as e:
+                dt = dateparser.parse("now %s" % tz, **parser_kwargs)
+                if dt is not None:
+                    tz = dt.tzinfo
+                    to_fixed_offset = True
     if checks.is_number(tz):
-        tz = timezone(timedelta(hours=tz))
+        tz = timezone(timedelta(seconds=tz))
     if isinstance(tz, timedelta):
         tz = timezone(tz)
     if isinstance(tz, tzinfo):
@@ -345,13 +348,15 @@ def to_timezone(
         if to_fixed_offset:
             return timezone(tz.utcoffset(datetime.now()))
         return tz
-    raise TypeError("Couldn't parse the timezone")
+    raise ValueError(f"Could not parse the timezone {tz}")
 
 
 def to_timestamp(
     dt_like: tp.DatetimeLike,
     parser_kwargs: tp.KwargsLike = None,
     unit: str = "ns",
+    tz: tp.Optional[tp.TimezoneLike] = None,
+    to_fixed_offset: tp.Optional[bool] = None,
     **kwargs,
 ) -> pd.Timestamp:
     """Parse the datetime as a `pd.Timestamp`.
@@ -364,24 +369,46 @@ def to_timestamp(
     datetime_cfg = settings["datetime"]
 
     parser_kwargs = merge_dicts(datetime_cfg["parser_kwargs"], parser_kwargs)
+    if tz is not None:
+        tz = to_timezone(tz, to_fixed_offset=to_fixed_offset, parser_kwargs=parser_kwargs)
 
     if isinstance(dt_like, pd.Timestamp):
-        return dt_like
-    if checks.is_number(dt_like):
-        return pd.Timestamp(dt_like, tz="utc", unit=unit, **kwargs)
-    if isinstance(dt_like, str):
+        dt = dt_like
+    elif checks.is_number(dt_like):
+        dt = pd.Timestamp(dt_like, tz="utc", unit=unit, **kwargs)
+    elif isinstance(dt_like, str):
         try:
-            return pd.Timestamp(dt_like, **kwargs)
+            tz = to_timezone(dt_like.split(" ")[-1], to_fixed_offset=to_fixed_offset, parser_kwargs=parser_kwargs)
+            dt_like = " ".join(dt_like.split(" ")[:-1])
+        except Exception as e:
+            pass
+        try:
+            if dt_like.lower() == "now":
+                dt = pd.Timestamp.now(tz=tz)
+            else:
+                dt = pd.Timestamp(dt_like, **kwargs)
         except Exception as e:
             import dateparser
 
+            settings = parser_kwargs.get("settings", {})
+            settings["RELATIVE_BASE"] = settings.get("RELATIVE_BASE", pd.Timestamp.now(tz=tz).to_pydatetime())
+            parser_kwargs["settings"] = settings
             dt = dateparser.parse(dt_like, **parser_kwargs)
-            if dt is None:
-                raise ValueError("Couldn't parse the datetime")
-            if is_tz_aware(dt):
-                dt = dt.replace(tzinfo=to_timezone(dt.tzinfo, to_fixed_offset=True))
-            return pd.Timestamp(dt, **kwargs)
-    return pd.Timestamp(dt_like, **kwargs)
+            if dt is not None:
+                if is_tz_aware(dt):
+                    tz = to_timezone(dt.tzinfo, to_fixed_offset=True, parser_kwargs=parser_kwargs)
+                    dt = dt.replace(tzinfo=tz)
+                dt = pd.Timestamp(dt, **kwargs)
+            else:
+                raise ValueError(f"Could not parse the timestamp {dt_like}")
+    else:
+        dt = pd.Timestamp(dt_like, **kwargs)
+    if tz is not None:
+        if not is_tz_aware(dt):
+            dt = dt.tz_localize(tz)
+        else:
+            dt = dt.tz_convert(tz)
+    return dt
 
 
 def to_tzaware_timestamp(
@@ -406,11 +433,8 @@ def to_tzaware_timestamp(
     if naive_tz is None:
         naive_tz = datetime_cfg["naive_tz"]
 
-    ts = to_timestamp(dt_like, **kwargs)
-    if not is_tz_aware(ts):
-        if naive_tz is not None:
-            ts = ts.tz_localize(to_timezone(naive_tz))
-    else:
+    ts = to_timestamp(dt_like, tz=naive_tz, **kwargs)
+    if is_tz_aware(ts):
         ts = ts.tz_localize(None).tz_localize(to_timezone(ts.tzinfo))
     if tz is not None:
         ts = ts.tz_convert(to_timezone(tz))

@@ -2141,8 +2141,8 @@ class TestDatetime:
         assert datetime_.to_timezone(_timezone(_timedelta(hours=1))) == _timezone(_timedelta(hours=1))
         assert isinstance(datetime_.to_timezone(zoneinfo.ZoneInfo("Europe/Berlin")), zoneinfo.ZoneInfo)
         assert isinstance(datetime_.to_timezone(zoneinfo.ZoneInfo("Europe/Berlin"), to_fixed_offset=True), _timezone)
-        assert datetime_.to_timezone(1) == _timezone(_timedelta(hours=1))
-        assert datetime_.to_timezone(0.5) == _timezone(_timedelta(hours=0.5))
+        assert datetime_.to_timezone(3600) == _timezone(_timedelta(hours=1))
+        assert datetime_.to_timezone(1800) == _timezone(_timedelta(hours=0.5))
         with pytest.raises(Exception):
             datetime_.to_timezone("+05")
 

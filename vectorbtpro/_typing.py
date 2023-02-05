@@ -136,11 +136,6 @@ PandasFrequency = Union[pd.Timedelta, pd.DateOffset]
 PandasDatetimeIndex = Union[pd.DatetimeIndex, pd.PeriodIndex]
 AnyPandasFrequency = Union[None, int, float, PandasFrequency]
 
-
-class SupportsTZInfo(Protocol):
-    tzinfo: tzinfo
-
-
 # Indexing
 Slice = Union[slice, hslice]
 PandasIndexingFunc = Callable[[SeriesFrame], MaybeSeriesFrame]

@@ -1044,17 +1044,14 @@ class YFData(RemoteData):
 
     See `YFData.fetch_symbol` for arguments.
 
-    !!! note
-        Stocks are usually in the timezone "-0400" and cryptocurrencies in UTC.
-
     Usage:
         ```pycon
         >>> import vectorbtpro as vbt
 
         >>> data = vbt.YFData.fetch(
         ...     "BTC-USD",
-        ...     start="2020-01-01 UTC",
-        ...     end="2021-01-01 UTC",
+        ...     start="2020-01-01",
+        ...     end="2021-01-01",
         ...     timeframe="1 day"
         ... )
         ```
@@ -1114,8 +1111,6 @@ class YFData(RemoteData):
             **history_kwargs: Keyword arguments passed to `yfinance.base.TickerBase.history`.
 
         For defaults, see `custom.yf` in `vectorbtpro._settings.data`.
-
-        Stocks are usually in the timezone "+0500" and cryptocurrencies in UTC.
 
         !!! warning
             Data coming from Yahoo is not the most stable data out there. Yahoo may manipulate data
@@ -1213,8 +1208,8 @@ class BinanceData(RemoteData):
         ```pycon
         >>> data = vbt.BinanceData.fetch(
         ...     "BTCUSDT",
-        ...     start="2020-01-01 UTC",
-        ...     end="2021-01-01 UTC",
+        ...     start="2020-01-01",
+        ...     end="2021-01-01",
         ...     timeframe="1 day"
         ... )
         ```
@@ -1408,7 +1403,7 @@ class BinanceData(RemoteData):
 
         def _ts_to_str(ts: tp.Optional[int]) -> str:
             if ts is None:
-                return "None"
+                return "/"
             return str(pd.Timestamp(ts, unit="ms", tz="utc"))
 
         def _filter_func(d: tp.Sequence, _prev_end_ts: tp.Optional[int] = None) -> bool:
@@ -1535,8 +1530,8 @@ class CCXTData(RemoteData):
         >>> data = vbt.CCXTData.fetch(
         ...     "BTCUSDT",
         ...     exchange="binance",
-        ...     start="2020-01-01 UTC",
-        ...     end="2021-01-01 UTC",
+        ...     start="2020-01-01",
+        ...     end="2021-01-01",
         ...     timeframe="1 day"
         ... )
         ```
@@ -1612,7 +1607,7 @@ class CCXTData(RemoteData):
     def _find_earliest_date(
         fetch_func: tp.Callable,
         start: tp.DatetimeLike = 0,
-        end: tp.DatetimeLike = "now UTC",
+        end: tp.DatetimeLike = "now",
         tz: tp.Optional[tp.TimezoneLike] = None,
         for_internal_use: bool = False,
     ) -> tp.Optional[pd.Timestamp]:
@@ -1637,7 +1632,7 @@ class CCXTData(RemoteData):
             if end is not None:
                 end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz=get_utc_tz()))
             else:
-                end_ts = datetime_to_ms(to_tzaware_datetime("now UTC", naive_tz=tz, tz=get_utc_tz()))
+                end_ts = datetime_to_ms(to_tzaware_datetime("now", naive_tz=tz, tz=get_utc_tz()))
             end_ts = end_ts - end_ts % 86400000 + 86400000
             start_time = start_ts
             end_time = end_ts
@@ -1834,7 +1829,7 @@ class CCXTData(RemoteData):
 
         def _ts_to_str(ts: tp.Optional[int]) -> str:
             if ts is None:
-                return "None"
+                return "/"
             return str(pd.Timestamp(ts, unit="ms", tz="utc"))
 
         def _filter_func(d: tp.Sequence, _prev_end_ts: tp.Optional[int] = None) -> bool:
@@ -1931,8 +1926,8 @@ class AlpacaData(RemoteData):
         ```pycon
         >>> data = vbt.AlpacaData.fetch(
         ...     "AAPL",
-        ...     start="2021-01-01 UTC",
-        ...     end="2022-01-01 UTC",
+        ...     start="2021-01-01",
+        ...     end="2022-01-01",
         ...     timeframe="1 day"
         ... )
         ```
@@ -2255,8 +2250,8 @@ class PolygonData(RemoteData):
         ```pycon
         >>> data = vbt.PolygonData.fetch(
         ...     "AAPL",
-        ...     start="2021-01-01 UTC",
-        ...     end="2022-01-01 UTC",
+        ...     start="2021-01-01",
+        ...     end="2022-01-01",
         ...     timeframe="1 day"
         ... )
         ```
@@ -2503,7 +2498,7 @@ class PolygonData(RemoteData):
 
         def _ts_to_str(ts: tp.Optional[int]) -> str:
             if ts is None:
-                return "None"
+                return "/"
             return str(pd.Timestamp(ts, unit="ms", tz="utc"))
 
         def _filter_func(d: tp.Dict, _prev_end_ts: tp.Optional[int] = None) -> bool:
