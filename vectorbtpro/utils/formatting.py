@@ -14,6 +14,7 @@ __all__ = [
     "format_func",
     "pprint",
     "phelp",
+    "pdir",
 ]
 
 
@@ -172,7 +173,7 @@ def prettify(
     if hasattr(obj, "shape") and isinstance(obj.shape, tuple) and len(obj.shape) > 0:
         module = type(obj).__module__
         qualname = type(obj).__qualname__
-        return "<%s.%s object at %s of shape %s>" % (module, qualname, str(hex(id(obj))), obj.shape)
+        return "<%s.%s object at %s with shape %s>" % (module, qualname, str(hex(id(obj))), obj.shape)
     if isinstance(obj, float):
         if np.isnan(obj):
             return "np.nan"
@@ -284,3 +285,9 @@ def phelp(*args, **kwargs) -> None:
     """Print the output of `format_func`."""
     print(format_func(*args, **kwargs))
 
+
+def pdir(*args, **kwargs) -> None:
+    """Print the output of `vectorbtpro.utils.attr_.parse_attrs`."""
+    from vectorbtpro.utils.attr_ import parse_attrs
+
+    print(parse_attrs(*args, **kwargs).to_string())

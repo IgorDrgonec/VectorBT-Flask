@@ -6,6 +6,8 @@ import re
 import inspect
 from collections.abc import Iterable
 
+import pandas as pd
+
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts
@@ -245,3 +247,71 @@ class AttrResolverMixin:
     def deep_getattr(self, *args, **kwargs) -> tp.Any:
         """See `deep_getattr`."""
         return deep_getattr(self, *args, **kwargs)
+
+
+def parse_attrs(obj: tp.Any, own_only: bool = False, sort_by: tp.Optional[str] = None) -> tp.Frame:
+    """Parse attributes of a class, object, or a module, and return a DataFrame with types and paths."""
+    if inspect.isclass(obj) or inspect.ismodule(obj):
+        cls = obj
+    else:
+        cls = type(obj)
+    attr_info = {"type": {}, "path": {}}
+    mro_dirs = []
+    if not inspect.ismodule(cls):
+        for super_cls in inspect.getmro(cls)[1:]:
+            mro_dirs.append(set(dir(super_cls)))
+    for k in dir(cls):
+        if not k.startswith("_"):
+            v = inspect.getattr_static(cls, k)
+            if inspect.ismodule(v):
+                if hasattr(v, "__path__"):
+                    attr_info["type"][k] = "package"
+                elif v.__spec__.origin in (None, "namespace"):
+                    attr_info["type"][k] = "namespace"
+                else:
+                    attr_info["type"][k] = "module"
+            else:
+                attr_info["type"][k] = type(v).__name__
+
+            if inspect.ismodule(cls):
+                k_module = inspect.getmodule(v)
+                if k_module is not None:
+                    attr_info["path"][k] = inspect.getmodule(v).__name__
+                else:
+                    attr_info["path"][k] = "?"
+            else:
+                found_super_cls = False
+                for i, super_cls in enumerate(inspect.getmro(cls)[1:]):
+                    if k in mro_dirs[i]:
+                        v2 = inspect.getattr_static(super_cls, k, None)
+                        if v2 is not None and v == v2:
+                            attr_info["path"][k] = super_cls.__module__ + "." + super_cls.__name__
+                            found_super_cls = True
+                if not found_super_cls:
+                    attr_info["path"][k] = cls.__module__ + "." + cls.__name__
+
+    if own_only:
+        for k, v in list(attr_info["path"].items()):
+            if inspect.ismodule(cls):
+                if not v.startswith(cls.__name__):
+                    del attr_info["type"][k]
+                    del attr_info["path"][k]
+            else:
+                if not v.startswith(cls.__module__ + "." + cls.__name__):
+                    del attr_info["type"][k]
+                    del attr_info["path"][k]
+
+    attr_info = pd.DataFrame(attr_info, dtype=object)
+    if len(attr_info) > 0:
+        attr_info.index.name = "attr"
+        attr_info = attr_info.reset_index()
+        if sort_by is not None:
+            if isinstance(sort_by, str):
+                if sort_by != "attr":
+                    sort_by = [sort_by, "attr"]
+            else:
+                if "attr" not in sort_by:
+                    sort_by = [*sort_by, "attr"]
+            attr_info = attr_info.sort_values(sort_by)
+        attr_info = attr_info.set_index("attr", drop=True)
+    return attr_info
