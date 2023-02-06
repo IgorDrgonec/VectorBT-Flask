@@ -2,6 +2,8 @@
 
 """Custom pandas accessors for base operations with pandas objects."""
 
+import inspect
+import ast
 import warnings
 
 import numpy as np
@@ -24,6 +26,7 @@ from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, atta
 from vectorbtpro.utils.parsing import get_expr_var_names, get_context_vars
 from vectorbtpro.utils.template import deep_substitute
 from vectorbtpro.utils.datetime_ import infer_index_freq, freq_to_timedelta64, parse_timedelta, try_to_datetime_index
+from vectorbtpro.utils.eval_ import multiline_eval
 
 __all__ = [
     "BaseAccessor",
@@ -1487,8 +1490,9 @@ class BaseAccessor(Wrapping):
     @classmethod
     def eval(
         cls,
-        expression: str,
-        use_numexpr: tp.Optional[bool] = None,
+        expr: str,
+        frames_back: int = 1,
+        use_numexpr: bool = False,
         numexpr_kwargs: tp.KwargsLike = None,
         local_dict: tp.Optional[tp.Mapping] = None,
         global_dict: tp.Optional[tp.Mapping] = None,
@@ -1497,37 +1501,16 @@ class BaseAccessor(Wrapping):
     ):
         """Evaluate a simple array expression element-wise using NumExpr or NumPy.
 
-        The only advantage of this method over `pd.eval` is using vectorbt's own broadcasting.
+        If NumExpr is enables, only one-line statements are supported. Otherwise, uses
+        `vectorbtpro.utils.eval_.multiline_eval`.
 
         !!! note
-            All variables will broadcast against each other prior to the evaluation.
+            All required variables will broadcast against each other prior to the evaluation.
 
         Usage:
-            * A bit slower than `pd.eval`:
-
-            ```pycon
-            >>> df = pd.DataFrame(np.full((1000, 1000), 0))
-            >>> sr = pd.Series(np.full(1000, 1))
-            >>> a = np.full(1000, 2)
-
-            >>> %timeit pd.eval('df + sr + a')
-            1.12 ms ± 12.1 µs per loop (mean ± std. dev. of 7 runs, 1000 loops each)
-
-            >>> %timeit vbt.pd_acc.eval('df + sr + a')
-            1.3 ms ± 5.3 µs per loop (mean ± std. dev. of 7 runs, 1000 loops each)
-            ```
-
-            * But broadcasts nicely:
-
             ```pycon
             >>> sr = pd.Series([1, 2, 3], index=['x', 'y', 'z'])
             >>> df = pd.DataFrame([[4, 5, 6]], index=['x', 'y', 'z'], columns=['a', 'b', 'c'])
-            >>> pd.eval('sr + df')
-                a   b   c   x   y   z
-            x NaN NaN NaN NaN NaN NaN
-            y NaN NaN NaN NaN NaN NaN
-            z NaN NaN NaN NaN NaN NaN
-
             >>> vbt.pd_acc.eval('sr + df')
                a  b  c
             x  5  6  7
@@ -1542,35 +1525,36 @@ class BaseAccessor(Wrapping):
         if wrap_kwargs is None:
             wrap_kwargs = {}
 
-        var_names = get_expr_var_names(expression)
-        objs = get_context_vars(var_names, frames_back=1, local_dict=local_dict, global_dict=global_dict)
-        objs = reshaping.broadcast(*objs, **broadcast_kwargs)
-        vars_by_name = {}
-        for i, obj in enumerate(objs):
-            vars_by_name[var_names[i]] = np.asarray(obj)
-        if use_numexpr is None:
-            if objs[0].size >= 100000:
-                from vectorbtpro.utils.module_ import warn_cannot_import
+        expr = inspect.cleandoc(expr)
+        parsed = ast.parse(expr)
+        body_nodes = list(parsed.body)
 
-                warn_cannot_import("numexpr")
-                try:
-                    import numexpr
+        load_vars = set()
+        store_vars = set()
+        for body_node in body_nodes:
+            for child_node in ast.walk(body_node):
+                if type(child_node) is ast.Name:
+                    if isinstance(child_node.ctx, ast.Load):
+                        if child_node.id not in store_vars:
+                            load_vars.add(child_node.id)
+                    if isinstance(child_node.ctx, ast.Store):
+                        store_vars.add(child_node.id)
+        load_vars = list(load_vars)
+        objs = get_context_vars(load_vars, frames_back=frames_back, local_dict=local_dict, global_dict=global_dict)
+        objs = dict(zip(load_vars, objs))
+        objs, wrapper = reshaping.broadcast(objs, return_wrapper=True, **broadcast_kwargs)
+        objs = {k: np.asarray(v) for k, v in objs.items()}
 
-                    use_numexpr = True
-                except ImportError:
-                    use_numexpr = False
-            else:
-                use_numexpr = False
         if use_numexpr:
             from vectorbtpro.utils.module_ import assert_can_import
 
             assert_can_import("numexpr")
             import numexpr
 
-            out = numexpr.evaluate(expression, local_dict=vars_by_name, **numexpr_kwargs)
+            out = numexpr.evaluate(expr, local_dict=objs, **numexpr_kwargs)
         else:
-            out = eval(expression, {}, vars_by_name)
-        return ArrayWrapper.from_obj(objs[0]).wrap(out, **wrap_kwargs)
+            out = multiline_eval(expr, context=objs)
+        return wrapper.wrap(out, **wrap_kwargs)
 
 
 class BaseSRAccessor(BaseAccessor):
