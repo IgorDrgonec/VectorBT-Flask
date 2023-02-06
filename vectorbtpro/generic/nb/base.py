@@ -1099,30 +1099,33 @@ def repartition_nb(arr: tp.Array2d, counts: tp.Array1d) -> tp.Array1d:
 
 
 @register_jitted(cache=True)
-def crossed_above_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d, wait: int = 0) -> tp.Array1d:
-    """Get the crossover of the first array going above the second array."""
+def crossed_above_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d, wait: int = 0, dropna: bool = False) -> tp.Array1d:
+    """Get the crossover of the first array going above the second array.
+
+    If `dropna` is True, produces the same results as if all rows with at least one NaN were dropped."""
     out = np.empty(arr1.shape, dtype=np.bool_)
     was_below = False
-    crossed_ago = -1
+    confirmed = 0
 
     for i in range(arr1.shape[0]):
         if np.isnan(arr1[i]) or np.isnan(arr2[i]):
-            crossed_ago = -1
-            was_below = False
+            if not dropna:
+                was_below = False
+                confirmed = 0
             out[i] = False
         elif arr1[i] > arr2[i]:
             if was_below:
-                crossed_ago += 1
-                out[i] = crossed_ago == wait
+                confirmed += 1
+                out[i] = confirmed == wait + 1
             else:
                 out[i] = False
         elif arr1[i] == arr2[i]:
-            if crossed_ago > -1:
+            if confirmed > 0:
                 was_below = False
-            crossed_ago = -1
+            confirmed = 0
             out[i] = False
-        else:
-            crossed_ago = -1
+        elif arr1[i] < arr2[i]:
+            confirmed = 0
             was_below = True
             out[i] = False
     return out
@@ -1130,15 +1133,20 @@ def crossed_above_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d, wait: int = 0) -> tp
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr1", axis=1),
-    arg_take_spec=dict(arr1=ch.ArraySlicer(axis=1), arr2=ch.ArraySlicer(axis=1), wait=None),
+    arg_take_spec=dict(
+        arr1=ch.ArraySlicer(axis=1),
+        arr2=ch.ArraySlicer(axis=1),
+        wait=None,
+        dropna=None,
+    ),
     merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def crossed_above_nb(arr1: tp.Array2d, arr2: tp.Array2d, wait: int = 0) -> tp.Array2d:
+def crossed_above_nb(arr1: tp.Array2d, arr2: tp.Array2d, wait: int = 0, dropna: bool = False) -> tp.Array2d:
     """2-dim version of `crossed_above_1d_nb`."""
     out = np.empty(arr1.shape, dtype=np.bool_)
     for col in prange(arr1.shape[1]):
-        out[:, col] = crossed_above_1d_nb(arr1[:, col], arr2[:, col], wait=wait)
+        out[:, col] = crossed_above_1d_nb(arr1[:, col], arr2[:, col], wait=wait, dropna=dropna)
     return out
 
 

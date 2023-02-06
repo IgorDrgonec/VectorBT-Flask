@@ -3583,6 +3583,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         self,
         other: tp.SeriesFrame,
         wait: int = 0,
+        dropna: bool = False,
         broadcast_kwargs: tp.KwargsLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -3622,13 +3623,19 @@ class GenericAccessor(BaseAccessor, Analyzable):
         self_obj, other_obj = reshaping.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
         func = jit_reg.resolve_option(nb.crossed_above_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(reshaping.to_2d_array(self_obj), reshaping.to_2d_array(other_obj), wait=wait)
+        out = func(
+            reshaping.to_2d_array(self_obj),
+            reshaping.to_2d_array(other_obj),
+            wait=wait,
+            dropna=dropna,
+        )
         return ArrayWrapper.from_obj(self_obj).wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
     def crossed_below(
         self,
         other: tp.SeriesFrame,
         wait: int = 0,
+        dropna: bool = True,
         broadcast_kwargs: tp.KwargsLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -3640,7 +3647,12 @@ class GenericAccessor(BaseAccessor, Analyzable):
         self_obj, other_obj = reshaping.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
         func = jit_reg.resolve_option(nb.crossed_above_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(reshaping.to_2d_array(other_obj), reshaping.to_2d_array(self_obj), wait=wait)
+        out = func(
+            reshaping.to_2d_array(other_obj),
+            reshaping.to_2d_array(self_obj),
+            wait=wait,
+            dropna=dropna,
+        )
         return ArrayWrapper.from_obj(self_obj).wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
     # ############# Resolution ############# #

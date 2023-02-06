@@ -3654,7 +3654,11 @@ class TestAccessors:
             pd.Series([False, False, True, False, False, False, True]),
         )
         assert_series_equal(
-            sr3.vbt.crossed_above(sr4, wait=1),
+            sr3.vbt.crossed_above(sr4, wait=1, dropna=True),
+            pd.Series([False, False, False, False, True, False, False]),
+        )
+        assert_series_equal(
+            sr3.vbt.crossed_above(sr4, wait=1, dropna=False),
             pd.Series([False, False, False, False, False, False, False]),
         )
         assert_frame_equal(
@@ -3701,7 +3705,11 @@ class TestAccessors:
             pd.Series([False, False, True, False, False, False, True]),
         )
         assert_series_equal(
-            sr3.vbt.crossed_above(sr4, wait=1),
+            sr3.vbt.crossed_above(sr4, wait=1, dropna=True),
+            pd.Series([False, False, False, False, True, False, False]),
+        )
+        assert_series_equal(
+            sr3.vbt.crossed_above(sr4, wait=1, dropna=False),
             pd.Series([False, False, False, False, False, False, False]),
         )
         assert_frame_equal(

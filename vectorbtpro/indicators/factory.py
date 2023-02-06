@@ -1579,12 +1579,22 @@ class IndicatorFactory(Configured):
                     ("equal", np.equal, dict()),
                     (
                         "crossed_above",
-                        lambda x, y, wait=0: jit_reg.resolve(generic_nb.crossed_above_nb)(x, y, wait),
+                        lambda x, y, wait=0, dropna=False: jit_reg.resolve(generic_nb.crossed_above_nb)(
+                            x,
+                            y,
+                            wait=wait,
+                            dropna=dropna,
+                        ),
                         dict(to_2d=True),
                     ),
                     (
                         "crossed_below",
-                        lambda x, y, wait=0: jit_reg.resolve(generic_nb.crossed_above_nb)(y, x, wait),
+                        lambda x, y, wait=0, dropna=False: jit_reg.resolve(generic_nb.crossed_above_nb)(
+                            y,
+                            x,
+                            wait=wait,
+                            dropna=dropna,
+                        ),
                         dict(to_2d=True),
                     ),
                 ]
