@@ -2,16 +2,16 @@
 
 """Optional dependencies."""
 
-from vectorbtpro.utils.config import ReadonlyConfig
+from vectorbtpro.utils.config import HybridConfig
 
 __all__ = []
 
 __pdoc__ = {}
 
-opt_dep_config = ReadonlyConfig(
+opt_dep_config = HybridConfig(
     dict(
         yfinance=dict(name="Yahoo! Finance", link="https://github.com/ranaroussi/yfinance"),
-        binance=dict(name="python-binance", link="https://github.com/sammchardy/python-binance"),
+        binance=dict(name="Python Binance", link="https://github.com/sammchardy/python-binance"),
         ccxt=dict(name="CCXT", link="https://github.com/ccxt/ccxt"),
         ta=dict(name="Technical Analysis Library", link="https://github.com/bukosabino/ta"),
         pandas_ta=dict(name="Pandas TA", link="https://github.com/twopirllc/pandas-ta"),
@@ -26,7 +26,7 @@ opt_dep_config = ReadonlyConfig(
         kaleido=dict(name="Kaleido", link="https://github.com/plotly/Kaleido"),
         telegram=dict(name="Python Telegram Bot", link="https://github.com/python-telegram-bot/python-telegram-bot"),
         quantstats=dict(name="QuantStats", link="https://github.com/ranaroussi/quantstats"),
-        dill=dict(name="dill", link="https://github.com/uqfoundation/dill"),
+        dill=dict(name="Dill", link="https://github.com/uqfoundation/dill"),
         alpaca=dict(name="Python SDK for Alpaca API", link="https://github.com/alpacahq/alpaca-py"),
         polygon=dict(name="Polygon API Client", link="https://github.com/polygon-io/client-python"),
         bs4=dict(name="Beautiful Soup", link="https://www.crummy.com/software/BeautifulSoup/bs4/doc/"),
@@ -37,6 +37,8 @@ opt_dep_config = ReadonlyConfig(
         technical=dict(name="Technical", link="https://github.com/freqtrade/technical"),
         riskfolio=dict(name="Riskfolio-Lib", link="https://github.com/dcajasn/Riskfolio-Lib"),
         pathos=dict(name="Pathos", link="https://github.com/uqfoundation/pathos"),
+        lz4=dict(name="LZ4", link="https://github.com/python-lz4/python-lz4"),
+        blosc=dict(name="Blosc", link="https://github.com/Blosc/python-blosc"),
     )
 )
 """_"""

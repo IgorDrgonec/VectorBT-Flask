@@ -32,6 +32,8 @@ Riskfolio-Lib>=3.3.0:       stats
 universal-portfolios:       stats
 python-telegram-bot>=13.4:  notify
 dill:                       io, base
+lz4:                        io
+blosc:                      io
 pytest:                     test
 pytest-cov:                 test
 codecov:                    test

@@ -56,7 +56,10 @@ RUN pip install --quiet --no-cache-dir \
     'quantstats>=0.0.37' \
     'PyPortfolioOpt>=1.5.1' \
     'Riskfolio-Lib>=3.3.0' \
-    'python-telegram-bot>=13.4'
+    'python-telegram-bot>=13.4' \
+    'dill' \
+    'lz4' \
+    'blosc'
 
 RUN pip install --quiet --no-cache-dir --no-deps 'universal-portfolios'
 RUN pip install --quiet --no-cache-dir 'pandas_datareader'

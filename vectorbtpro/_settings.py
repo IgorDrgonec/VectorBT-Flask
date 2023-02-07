@@ -416,6 +416,21 @@ _settings["template"] = template
 
 pickling = child_dict(
     pickle_classes=None,
+    file_format="pickle",
+    compression=None,
+    extensions=child_dict(
+        serialization=child_dict(
+            pickle={"pickle", "pkl", "p"},
+            config={"config", "cfg", "ini"},
+        ),
+        compression=child_dict(
+            bz2={"bzip2", "bz2", "bz"},
+            gzip={"gzip", "gz"},
+            lzma={"lzma", "xz"},
+            lz4={"lz4"},
+            blosc={"blosc"},
+        ),
+    )
 )
 """_"""
 

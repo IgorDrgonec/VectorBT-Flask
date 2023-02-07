@@ -43,7 +43,6 @@ from vectorbtpro.utils.datetime_ import (
     datetime_to_ms,
     split_freq_str,
     prepare_freq,
-    to_timezone,
 )
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.random_ import set_seed
@@ -170,31 +169,29 @@ class SyntheticData(CustomData):
 
         if start is None:
             start = synthetic_cfg["start"]
-        if start is not None:
-            start = to_datetime(start)
         if end is None:
             end = synthetic_cfg["end"]
-        if end is not None:
-            end = to_datetime(end)
         if freq is None:
             freq = synthetic_cfg["freq"]
         if freq is not None:
             freq = prepare_freq(freq)
         if tz is None:
             tz = synthetic_cfg["tz"]
-        if tz is not None:
-            tz = to_timezone(tz)
         if normalize is None:
             normalize = synthetic_cfg["normalize"]
         if inclusive is None:
             inclusive = synthetic_cfg["inclusive"]
+
+        if start is not None:
+            start = to_datetime(start, tz=tz)
+        if end is not None:
+            end = to_datetime(end, tz=tz)
 
         index = pd.date_range(
             start=start,
             end=end,
             periods=periods,
             freq=freq,
-            tz=tz,
             normalize=normalize,
             inclusive=inclusive,
         )
@@ -1187,7 +1184,7 @@ class BinanceData(RemoteData):
 
     !!! note
         If you are using an exchange from the US, Japan or other TLD then make sure pass `tld="us"`
-        when creating the client.
+        in `client_config` when creating the client.
 
     Usage:
         * Set up the API key globally (optional):

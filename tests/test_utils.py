@@ -2672,9 +2672,28 @@ class TestPickling:
         pdict.save(tmp_path / "pdict", file_format="ini", use_class_ids=False)
         assert pickling.pdict.load(tmp_path / "pdict", file_format="ini", use_class_ids=False) == pdict
 
+    def test_compression(self, tmp_path):
+        vbt.Config(a=0).save(tmp_path)
+        with pytest.raises(Exception):
+            vbt.Config(a=1).save(tmp_path, compression=True)
+        vbt.Config(a=2).save(tmp_path, compression=False)
+        vbt.Config(a=3).save(tmp_path, compression="gzip")
+        vbt.Config(a=4).save(tmp_path, compression="gz")
+        vbt.Config(a=5).save(tmp_path, compression="bz2")
+        assert vbt.Config.load(tmp_path)["a"] == 2
+        assert vbt.Config.load(tmp_path, compression=False)["a"] == 2
+        assert vbt.Config.load(tmp_path, compression="gzip")["a"] == 3
+        assert vbt.Config.load(tmp_path, compression="gz")["a"] == 4
+        assert vbt.Config.load(tmp_path, compression="bz")["a"] == 5
+        (tmp_path / "Config.pickle").unlink()
+        with pytest.raises(Exception):
+            vbt.Config.load(tmp_path)
+        (tmp_path / "Config.pickle.bz2").unlink()
+        with pytest.raises(Exception):
+            vbt.Config.load(tmp_path, compression="bz")
+
 
 # ############# chunking ############# #
-
 
 class TestChunking:
     def test_arg_getter_mixin(self):
