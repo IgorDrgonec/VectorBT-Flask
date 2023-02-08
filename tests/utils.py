@@ -21,16 +21,16 @@ def isclose(a, b, rel_tol=1e-06, abs_tol=0.0):
     return abs(a - b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
 
 
-def assert_index_equal(x, y):
-    pd.testing.assert_index_equal(x, y, rtol=1e-06, atol=0)
+def assert_index_equal(x, y, **kwargs):
+    pd.testing.assert_index_equal(x, y, rtol=1e-06, atol=0, **kwargs)
 
 
-def assert_series_equal(x, y):
-    pd.testing.assert_series_equal(x, y, rtol=1e-06, atol=0)
+def assert_series_equal(x, y, **kwargs):
+    pd.testing.assert_series_equal(x, y, rtol=1e-06, atol=0, **kwargs)
 
 
-def assert_frame_equal(x, y):
-    pd.testing.assert_frame_equal(x, y, rtol=1e-06, atol=0)
+def assert_frame_equal(x, y, **kwargs):
+    pd.testing.assert_frame_equal(x, y, rtol=1e-06, atol=0, **kwargs)
 
 
 def assert_records_close(x, y):

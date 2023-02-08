@@ -4352,6 +4352,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 high = data.high
             if low is None:
                 low = data.low
+            if freq is None:
+                freq = data.freq
         if open is None:
             open_none = True
             open = np.nan
@@ -5519,6 +5521,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 high = data.high
             if low is None:
                 low = data.low
+            if freq is None:
+                freq = data.freq
         if open is None:
             open_none = True
             open = np.nan
@@ -7280,6 +7284,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 high = data.high
             if low is None:
                 low = data.low
+            if freq is None:
+                freq = data.freq
         if open is None:
             open_none = True
             open = np.nan

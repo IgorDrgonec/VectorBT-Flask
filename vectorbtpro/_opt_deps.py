@@ -39,6 +39,7 @@ opt_dep_config = HybridConfig(
         pathos=dict(name="Pathos", link="https://github.com/uqfoundation/pathos"),
         lz4=dict(name="LZ4", link="https://github.com/python-lz4/python-lz4"),
         blosc=dict(name="Blosc", link="https://github.com/Blosc/python-blosc"),
+        tables=dict(name="PyTables", link="https://github.com/PyTables/PyTables"),
     )
 )
 """_"""

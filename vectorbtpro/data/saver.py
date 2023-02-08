@@ -151,7 +151,6 @@ class HDFDataSaver(DataSaver):
         """Save initial data."""
         # In case the method was called by the user
         to_hdf_kwargs = merge_dicts(
-            dict(format="table"),
             self.save_kwargs,
             self.init_save_kwargs,
             to_hdf_kwargs,
@@ -167,7 +166,7 @@ class HDFDataSaver(DataSaver):
         By default, appends new data in a table format."""
         # In case the method was called by the user
         to_hdf_kwargs = merge_dicts(
-            dict(mode="a", format="table", append=True),
+            dict(mode="a", append=True),
             self.save_kwargs,
             to_hdf_kwargs,
         )

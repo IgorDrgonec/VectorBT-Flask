@@ -1831,7 +1831,7 @@ class TestData:
 
 class TestCustom:
     def test_csv_data(self, tmp_path):
-        sr = pd.Series(np.arange(10))
+        sr = pd.Series(np.arange(10), index=pd.date_range("2020", periods=10, tz="utc"))
         sr.to_csv(tmp_path / "temp.csv")
         csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv")
         assert_series_equal(csv_data.get(), sr)
@@ -1844,9 +1844,19 @@ class TestCustom:
         csv_data = vbt.CSVData.fetch(["TEMP"], paths=tmp_path / "temp.csv")
         assert csv_data.symbols[0] == "TEMP"
         assert_series_equal(csv_data.get()["TEMP"], sr.rename("TEMP"))
-        csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", start_row=2, end_row=3)
-        assert_series_equal(csv_data.get(), sr.iloc[2:4])
-        df = pd.DataFrame(np.arange(20).reshape((10, 2)))
+        csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", start="2020-01-03")
+        assert_series_equal(csv_data.get(), sr.iloc[2:], check_freq=False)
+        assert csv_data.returned_kwargs["temp"]["last_row"] == 9
+        csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", end="2020-01-05")
+        assert_series_equal(csv_data.get(), sr.iloc[:4], check_freq=False)
+        assert csv_data.returned_kwargs["temp"]["last_row"] == 3
+        csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", start="2020-01-03", end="2020-01-05")
+        assert_series_equal(csv_data.get(), sr.iloc[2:4], check_freq=False)
+        assert csv_data.returned_kwargs["temp"]["last_row"] == 3
+        csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", start_row=2, end_row=4)
+        assert_series_equal(csv_data.get(), sr.iloc[2:4], check_freq=False)
+        assert csv_data.returned_kwargs["temp"]["last_row"] == 3
+        df = pd.DataFrame(np.arange(20).reshape((10, 2)), index=pd.date_range("2020", periods=10, tz="utc"))
         df.columns = pd.Index(["0", "1"], dtype="object")
         df.to_csv(tmp_path / "temp.csv")
         csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", iterator=True)
@@ -1854,23 +1864,23 @@ class TestCustom:
         csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", chunksize=1)
         assert_frame_equal(csv_data.get(), df)
         csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", chunksize=1, chunk_func=lambda x: list(x)[-1])
-        assert_frame_equal(csv_data.get(), df.iloc[[-1]])
-        df = pd.DataFrame(np.arange(20).reshape((10, 2)))
+        assert_frame_equal(csv_data.get(), df.iloc[[-1]], check_freq=False)
+        df = pd.DataFrame(np.arange(20).reshape((10, 2)), index=pd.date_range("2020", periods=10, tz="utc"))
         df.columns = pd.MultiIndex.from_tuples([("1", "2"), ("3", "4")], names=["a", "b"])
         df.to_csv(tmp_path / "temp.csv")
-        csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", header=[0, 1], start_row=0, end_row=1)
-        assert_frame_equal(csv_data.get(), df.iloc[:2])
-        assert csv_data.returned_kwargs["temp"] == {"last_row": 1}
+        csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", header=[0, 1], start_row=0, end_row=2)
+        assert_frame_equal(csv_data.get(), df.iloc[:2], check_freq=False)
+        assert csv_data.returned_kwargs["temp"]["last_row"] == 1
         csv_data = csv_data.update()
-        assert_frame_equal(csv_data.get(), df.iloc[:2])
-        assert csv_data.returned_kwargs["temp"] == {"last_row": 1}
-        csv_data = csv_data.update(end_row=2)
+        assert_frame_equal(csv_data.get(), df.iloc[:2], check_freq=False)
+        assert csv_data.returned_kwargs["temp"]["last_row"] == 1
+        csv_data = csv_data.update(end_row=3)
         csv_data.get()
-        assert_frame_equal(csv_data.get(), df.iloc[:3])
-        assert csv_data.returned_kwargs["temp"] == {"last_row": 2}
+        assert_frame_equal(csv_data.get(), df.iloc[:3], check_freq=False)
+        assert csv_data.returned_kwargs["temp"]["last_row"] == 2
         csv_data = csv_data.update(end_row=None)
         assert_frame_equal(csv_data.get(), df)
-        assert csv_data.returned_kwargs["temp"] == {"last_row": 9}
+        assert csv_data.returned_kwargs["temp"]["last_row"] == 9
 
         data1 = MyData.fetch(shape=(5,))
         data2 = MyData.fetch(shape=(6,))
@@ -1929,8 +1939,8 @@ class TestCustom:
             vbt.CSVData.fetch(0)
 
     def test_hdf_data(self, tmp_path):
-        sr = pd.Series(np.arange(10))
-        sr.to_hdf(tmp_path / "temp.h5", "s")
+        sr = pd.Series(np.arange(10), index=pd.date_range("2020", periods=10, tz="utc"))
+        sr.to_hdf(tmp_path / "temp.h5", "s", format="table")
         hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "s")
         assert_series_equal(hdf_data.get(), sr)
         hdf_data = vbt.HDFData.fetch("S", paths=tmp_path / "temp.h5" / "s")
@@ -1942,9 +1952,19 @@ class TestCustom:
         hdf_data = vbt.HDFData.fetch(["S"], paths=tmp_path / "temp.h5" / "s")
         assert hdf_data.symbols[0] == "S"
         assert_series_equal(hdf_data.get()["S"], sr.rename("S"))
-        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "s", start_row=2, end_row=3)
-        assert_series_equal(hdf_data.get(), sr.iloc[2:4])
-        df = pd.DataFrame(np.arange(20).reshape((10, 2)))
+        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "s", start="2020-01-03")
+        assert_series_equal(hdf_data.get(), sr.iloc[2:], check_freq=False)
+        assert hdf_data.returned_kwargs["s"]["last_row"] == 9
+        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "s", end="2020-01-05")
+        assert_series_equal(hdf_data.get(), sr.iloc[:4], check_freq=False)
+        assert hdf_data.returned_kwargs["s"]["last_row"] == 3
+        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "s", start="2020-01-03", end="2020-01-05")
+        assert_series_equal(hdf_data.get(), sr.iloc[2:4], check_freq=False)
+        assert hdf_data.returned_kwargs["s"]["last_row"] == 3
+        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "s", start_row=2, end_row=4)
+        assert_series_equal(hdf_data.get(), sr.iloc[2:4], check_freq=False)
+        assert hdf_data.returned_kwargs["s"]["last_row"] == 3
+        df = pd.DataFrame(np.arange(20).reshape((10, 2)), index=pd.date_range("2020", periods=10, tz="utc"))
         df.columns = pd.Index(["0", "1"], dtype="object")
         df.to_hdf(tmp_path / "temp.h5", "df", format="table")
         hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "df", iterator=True)
@@ -1952,23 +1972,23 @@ class TestCustom:
         hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "df", chunksize=1)
         assert_frame_equal(hdf_data.get(), df)
         hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "df", chunksize=1, chunk_func=lambda x: list(x)[-1])
-        assert_frame_equal(hdf_data.get(), df.iloc[[-1]])
-        df = pd.DataFrame(np.arange(20).reshape((10, 2)))
+        assert_frame_equal(hdf_data.get(), df.iloc[[-1]], check_freq=False)
+        df = pd.DataFrame(np.arange(20).reshape((10, 2)), index=pd.date_range("2020", periods=10, tz="utc"))
         df.columns = pd.MultiIndex.from_tuples([("1", "2"), ("3", "4")], names=["a", "b"])
         df.to_hdf(tmp_path / "temp.h5", "df")
-        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "df", header=[0, 1], start_row=0, end_row=1)
-        assert_frame_equal(hdf_data.get(), df.iloc[:2])
-        assert hdf_data.returned_kwargs["df"] == {"last_row": 1}
+        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "df", header=[0, 1], start_row=0, end_row=2)
+        assert_frame_equal(hdf_data.get(), df.iloc[:2], check_freq=False)
+        assert hdf_data.returned_kwargs["df"]["last_row"] == 1
         hdf_data = hdf_data.update()
-        assert_frame_equal(hdf_data.get(), df.iloc[:2])
-        assert hdf_data.returned_kwargs["df"] == {"last_row": 1}
-        hdf_data = hdf_data.update(end_row=2)
+        assert_frame_equal(hdf_data.get(), df.iloc[:2], check_freq=False)
+        assert hdf_data.returned_kwargs["df"]["last_row"] == 1
+        hdf_data = hdf_data.update(end_row=3)
         hdf_data.get()
-        assert_frame_equal(hdf_data.get(), df.iloc[:3])
-        assert hdf_data.returned_kwargs["df"] == {"last_row": 2}
+        assert_frame_equal(hdf_data.get(), df.iloc[:3], check_freq=False)
+        assert hdf_data.returned_kwargs["df"]["last_row"] == 2
         hdf_data = hdf_data.update(end_row=None)
         assert_frame_equal(hdf_data.get(), df)
-        assert hdf_data.returned_kwargs["df"] == {"last_row": 9}
+        assert hdf_data.returned_kwargs["df"]["last_row"] == 9
 
         data1 = MyData.fetch(shape=(5,))
         data2 = MyData.fetch(shape=(6,))

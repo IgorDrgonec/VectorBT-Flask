@@ -46,6 +46,7 @@ RUN pip install --quiet --no-cache-dir \
     'python-binance>=1.0.16' \
     'alpaca-py' \
     'ccxt>=1.89.14' \
+    'tables' \
     'polygon-api-client>=1.0.0' \
     'nasdaq-data-link' \
     'ta' \

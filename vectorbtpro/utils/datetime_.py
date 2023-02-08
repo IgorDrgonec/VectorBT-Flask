@@ -441,6 +441,11 @@ def to_tzaware_timestamp(
     return ts
 
 
+def to_naive_timestamp(dt_like: tp.DatetimeLike, **kwargs) -> pd.Timestamp:
+    """Parse the datetime as a timezone-naive `pd.Timestamp`."""
+    return to_timestamp(dt_like, **kwargs).tz_localize(None)
+
+
 def to_datetime(dt_like: tp.DatetimeLike, **kwargs) -> datetime:
     """Parse the datetime as a `datetime.datetime`.
 
@@ -459,9 +464,13 @@ def to_tzaware_datetime(dt_like: tp.DatetimeLike, **kwargs) -> datetime:
     return to_tzaware_timestamp(dt_like, **kwargs).to_pydatetime()
 
 
-def to_naive_datetime(dt: datetime) -> datetime:
-    """Return the timezone info from a datetime."""
-    return dt.astimezone().replace(tzinfo=None)
+def to_naive_datetime(dt_like: tp.DatetimeLike, **kwargs) -> datetime:
+    """Parse the datetime as a timezone-naive `datetime.datetime`.
+
+    Uses `to_naive_timestamp`."""
+    if "unit" not in kwargs:
+        kwargs["unit"] = "ms"
+    return to_naive_timestamp(dt_like, **kwargs).to_pydatetime()
 
 
 def datetime_to_ms(dt: datetime) -> int:

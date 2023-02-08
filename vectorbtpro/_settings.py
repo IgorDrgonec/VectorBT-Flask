@@ -603,10 +603,10 @@ data = child_dict(
     custom=Config(
         # Synthetic
         synthetic=Config(
-            start=0,
-            end="now",
+            start=None,
+            end=None,
             freq=None,
-            tz="UTC",
+            tz=None,
             normalize=False,
             inclusive="left",
         ),
@@ -639,7 +639,11 @@ data = child_dict(
             sort_paths=True,
         ),
         csv=Config(
-            start_row=0,
+            start=None,
+            end=None,
+            freq=None,
+            tz=None,
+            start_row=None,
             end_row=None,
             header=0,
             index_col=0,
@@ -648,7 +652,11 @@ data = child_dict(
             read_csv_kwargs=dict(),
         ),
         hdf=Config(
-            start_row=0,
+            start=None,
+            end=None,
+            freq=None,
+            tz=None,
+            start_row=None,
             end_row=None,
             read_hdf_kwargs=dict(),
         ),

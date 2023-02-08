@@ -386,18 +386,11 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         return self._missing_columns
 
     @property
-    def index(self) -> tp.Index:
-        """Index.
+    def ndim(self) -> int:
+        """Number of dimensions.
 
         Based on the default symbol wrapper."""
-        return self.symbol_wrapper.index
-
-    @property
-    def columns(self) -> tp.Index:
-        """Columns.
-
-        Based on the default symbol wrapper."""
-        return self.symbol_wrapper.columns
+        return self.symbol_wrapper.ndim
 
     @property
     def shape(self) -> tp.Shape:
@@ -407,11 +400,25 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         return self.symbol_wrapper.shape
 
     @property
-    def ndim(self) -> int:
-        """Number of dimensions.
+    def columns(self) -> tp.Index:
+        """Columns.
 
         Based on the default symbol wrapper."""
-        return self.symbol_wrapper.ndim
+        return self.symbol_wrapper.columns
+
+    @property
+    def index(self) -> tp.Index:
+        """Index.
+
+        Based on the default symbol wrapper."""
+        return self.symbol_wrapper.index
+
+    @property
+    def freq(self) -> tp.Optional[pd.Timedelta]:
+        """Frequency.
+
+        Based on the default symbol wrapper."""
+        return self.symbol_wrapper.freq
 
     # ############# Pre- and post-processing ############# #
 
@@ -1486,6 +1493,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         key: tp.Optional[tp.Union[str, symbol_dict]] = None,
         path_or_buf: tp.Optional[tp.Union[str, symbol_dict]] = None,
         mkdir_kwargs: tp.Union[tp.KwargsLike, symbol_dict] = None,
+        format: str = "table",
         **kwargs,
     ) -> None:
         """Save data into an HDF file.
@@ -1495,6 +1503,10 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         If `file_path` exists, and it's a directory, will create inside it a file named
         after this class. This won't work with directories that do not exist, otherwise
         they could be confused with file names."""
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("tables")
+
         for k, v in self.data.items():
             if path_or_buf is None:
                 if isinstance(file_path, symbol_dict):
@@ -1522,7 +1534,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             else:
                 _key = key
             _kwargs = self.select_symbol_kwargs(k, kwargs)
-            v.to_hdf(path_or_buf=_path_or_buf, key=_key, **_kwargs)
+            v.to_hdf(path_or_buf=_path_or_buf, key=_key, format=format, **_kwargs)
 
     # ############# Transforming ############# #
 

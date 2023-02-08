@@ -22,8 +22,6 @@ import urllib.parse
 
 import numpy as np
 import pandas as pd
-from pandas.io.parsers import TextFileReader
-from pandas.io.pytables import TableIterator
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array, broadcast_array_to
@@ -36,9 +34,9 @@ from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.datetime_ import (
-    get_utc_tz,
-    get_local_tz,
-    to_datetime,
+    to_timestamp,
+    to_tzaware_timestamp,
+    to_naive_timestamp,
     to_tzaware_datetime,
     datetime_to_ms,
     split_freq_str,
@@ -164,6 +162,10 @@ class SyntheticData(CustomData):
         Generates datetime index using `pd.date_range` and passes it to `SyntheticData.generate_symbol`
         to fill the Series/DataFrame with generated data.
 
+        If `start` and `periods` are None, will set `start` to the beginning of the Unix epoch.
+
+        If `end` is `periods` are None, will set `end` to the current time.
+
         For defaults, see `custom.synthetic` in `vectorbtpro._settings.data`."""
         synthetic_cfg = cls.get_settings(key_id="custom")
 
@@ -183,9 +185,23 @@ class SyntheticData(CustomData):
             inclusive = synthetic_cfg["inclusive"]
 
         if start is not None:
-            start = to_datetime(start, tz=tz)
+            start = to_timestamp(start, tz=tz)
         if end is not None:
-            end = to_datetime(end, tz=tz)
+            end = to_timestamp(end, tz=tz)
+        if start is None and periods is None:
+            if tz is not None:
+                start = to_timestamp(0, tz=tz)
+            elif end is not None and end.tzinfo is not None:
+                start = to_timestamp(0, tz=end.tzinfo)
+            else:
+                start = to_naive_timestamp(0)
+        if end is None and periods is None:
+            if tz is not None:
+                end = to_timestamp("now", tz=tz)
+            elif start is not None and start.tzinfo is not None:
+                end = to_timestamp("now", tz=start.tzinfo)
+            else:
+                end = to_naive_timestamp("now")
 
         index = pd.date_range(
             start=start,
@@ -195,9 +211,11 @@ class SyntheticData(CustomData):
             normalize=normalize,
             inclusive=inclusive,
         )
+        if tz is None:
+            tz = index.tzinfo
         if len(index) == 0:
             raise ValueError("Date range is empty")
-        return cls.generate_symbol(symbol, index, **kwargs), dict(tz_localize=get_utc_tz(), tz_convert=tz, freq=freq)
+        return cls.generate_symbol(symbol, index, **kwargs), dict(tz_localize=tz, tz_convert=tz, freq=freq)
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
@@ -275,7 +293,7 @@ class RandomData(SyntheticData):
             start_value=to_1d_array(start_value),
             mean=to_1d_array(mean),
             std=to_1d_array(std),
-            symmetric=to_1d_array(symmetric)
+            symmetric=to_1d_array(symmetric),
         )
         if make_series:
             return pd.Series(out[:, 0], index=index, name=columns[0])
@@ -356,13 +374,7 @@ class RandomOHLCData(RandomData):
             set_seed(seed)
 
         func = jit_reg.resolve_option(nb.generate_random_data_1d_nb, jitted)
-        ticks = func(
-            np.sum(n_ticks),
-            start_value=start_value,
-            mean=mean,
-            std=std,
-            symmetric=symmetric
-        )
+        ticks = func(np.sum(n_ticks), start_value=start_value, mean=mean, std=std, symmetric=symmetric)
         func = jit_reg.resolve_option(ohlcv_nb.ohlc_every_1d_nb, jitted)
         out = func(ticks, n_ticks)
         return pd.DataFrame(out, index=index, columns=["Open", "High", "Low", "Close"])
@@ -710,6 +722,10 @@ class CSVData(LocalData):
         cls,
         symbol: tp.Symbol,
         path: tp.Any = None,
+        start: tp.Optional[tp.DatetimeLike] = None,
+        end: tp.Optional[tp.DatetimeLike] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        tz: tp.Optional[tp.TimezoneLike] = None,
         start_row: tp.Optional[int] = None,
         end_row: tp.Optional[int] = None,
         header: tp.Optional[tp.MaybeSequence[int]] = None,
@@ -721,24 +737,63 @@ class CSVData(LocalData):
     ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to load a CSV file.
 
-        If `path` is None, uses `symbol` as the path to the CSV file.
+        Args:
+            symbol (str): Symbol.
+            path (str): Path.
+
+                If `path` is None, uses `symbol` as the path to the CSV file.
+            start (any): Start datetime.
+
+                Will use the timezone of the object. See `vectorbtpro.utils.datetime_.to_timestamp`.
+            end (any): End datetime.
+
+                Will use the timezone of the object. See `vectorbtpro.utils.datetime_.to_timestamp`.
+            freq (str): Source frequency.
+
+                Allows human-readable strings such as "15 minutes".
+            tz (any): Target timezone.
+
+                See `vectorbtpro.utils.datetime_.to_timezone`.
+            start_row (int): Start row (inclusive).
+
+                Must exclude header rows.
+            end_row (int): End row (exclusive).
+
+                Must exclude header rows.
+            header (int or sequence of int): See `pd.read_csv`.
+            index_col (int): See `pd.read_csv`.
+            parse_dates (bool): See `pd.read_csv`.
+            squeeze (int): Whether to squeeze a DataFrame with one column into a Series.
+            chunk_func (callable): Function to select and concatenate chunks from `TextFileReader`.
+
+                Gets called only if `iterator` or `chunksize` are set.
+            **read_csv_kwargs: Keyword arguments passed to `pd.read_csv`.
 
         `skiprows` and `nrows` will be automatically calculated based on `start_row` and `end_row`.
 
-        !!! note
-            `start_row` and `end_row` must exclude header rows, while `end_row` must include the last row.
-
-        Use `chunk_func` to select and concatenate chunks from `TextFileReader`. Gets called
-        only if `iterator` or `chunksize` are set.
+        When either `start` or `end` is provided, will fetch the entire data first and filter it thereafter.
 
         See https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html for other arguments.
 
-        For defaults, see `custom.csv` in `vectorbtpro._settings.data`.
-        """
+        For defaults, see `custom.csv` in `vectorbtpro._settings.data`."""
+        from pandas.io.parsers import TextFileReader
+
         csv_cfg = cls.get_settings(key_id="custom")
 
+        if start is None:
+            start = csv_cfg["start"]
+        if end is None:
+            end = csv_cfg["end"]
+        if freq is None:
+            freq = csv_cfg["freq"]
+        if freq is not None:
+            freq = prepare_freq(freq)
+        if tz is None:
+            tz = csv_cfg["tz"]
         if start_row is None:
             start_row = csv_cfg["start_row"]
+        if start_row is None:
+            start_row = 0
         if end_row is None:
             end_row = csv_cfg["end_row"]
         if header is None:
@@ -761,7 +816,7 @@ class CSVData(LocalData):
             end_row += header_rows
         skiprows = range(header_rows, start_row)
         if end_row is not None:
-            nrows = end_row - start_row + 1
+            nrows = end_row - start_row
         else:
             nrows = None
 
@@ -799,8 +854,36 @@ class CSVData(LocalData):
             obj = obj.squeeze("columns")
         if isinstance(obj, pd.Series) and obj.name == "0":
             obj.name = None
-        returned_kwargs = dict(last_row=start_row - header_rows + len(obj.index) - 1)
-        return obj, returned_kwargs
+        if isinstance(obj.index, pd.DatetimeIndex) and tz is None:
+            tz = obj.index.tzinfo
+        if start is not None or end is not None:
+            if not isinstance(obj.index, pd.DatetimeIndex):
+                raise TypeError("Cannot filter index that is not DatetimeIndex")
+            if obj.index.tzinfo is not None:
+                if start is not None:
+                    start = to_tzaware_timestamp(start, naive_tz=tz, tz=obj.index.tzinfo)
+                if end is not None:
+                    end = to_tzaware_timestamp(end, naive_tz=tz, tz=obj.index.tzinfo)
+            else:
+                if start is not None:
+                    start = to_naive_timestamp(start, tz=tz)
+                if end is not None:
+                    end = to_naive_timestamp(end, tz=tz)
+            mask = True
+            if start is not None:
+                mask &= obj.index >= start
+            if end is not None:
+                mask &= obj.index < end
+            mask_indices = np.flatnonzero(mask)
+            if len(mask_indices) > 0:
+                obj = obj.iloc[mask_indices[0] : mask_indices[-1] + 1]
+                start_row += mask_indices[0]
+        return obj, dict(
+            last_row=start_row - header_rows + len(obj.index) - 1,
+            tz_localize=tz,
+            tz_convert=tz,
+            freq=freq,
+        )
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Tuple[tp.SeriesFrame, dict]:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
@@ -936,6 +1019,10 @@ class HDFData(LocalData):
         cls,
         symbol: tp.Symbol,
         path: tp.Any = None,
+        start: tp.Optional[tp.DatetimeLike] = None,
+        end: tp.Optional[tp.DatetimeLike] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        tz: tp.Optional[tp.TimezoneLike] = None,
         start_row: tp.Optional[int] = None,
         end_row: tp.Optional[int] = None,
         chunk_func: tp.Optional[tp.Callable] = None,
@@ -943,22 +1030,69 @@ class HDFData(LocalData):
     ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to load an HDF object.
 
-        If `path` is None, uses `symbol` as the path to the HDF file.
+        Args:
+            symbol (str): Symbol.
+            path (str): Path.
 
-        !!! note
-            `end_row` must include the last row.
+                Will be resolved with `HDFData.split_hdf_path`.
 
-        Use `chunk_func` to select and concatenate chunks from `TableIterator`. Gets called
-        only if `iterator` or `chunksize` are set.
+                If `path` is None, uses `symbol` as the path to the HDF file.
+            start (any): Start datetime.
+
+                Will extract the object's index and compare the index to the date.
+                Will use the timezone of the object. See `vectorbtpro.utils.datetime_.to_timestamp`.
+
+                !!! note
+                    Can only be used if the object was saved in the table format!
+            end (any): End datetime.
+
+                Will extract the object's index and compare the index to the date.
+                Will use the timezone of the object. See `vectorbtpro.utils.datetime_.to_timestamp`.
+
+                !!! note
+                    Can only be used if the object was saved in the table format!
+            freq (str): Source frequency.
+
+                Allows human-readable strings such as "15 minutes".
+            tz (any): Target timezone.
+
+                See `vectorbtpro.utils.datetime_.to_timezone`.
+            start_row (int): Start row (inclusive).
+
+                Will use it when querying index as well.
+            end_row (int): End row (exclusive).
+
+                Will use it when querying index as well.
+            chunk_func (callable): Function to select and concatenate chunks from `TableIterator`.
+
+                Gets called only if `iterator` or `chunksize` are set.
+            **read_hdf_kwargs: Keyword arguments passed to `pd.read_hdf`.
 
         See https://pandas.pydata.org/docs/reference/api/pandas.read_hdf.html for other arguments.
 
-        For defaults, see `custom.hdf` in `vectorbtpro._settings.data`.
-        """
+        For defaults, see `custom.hdf` in `vectorbtpro._settings.data`."""
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("tables")
+
+        from pandas.io.pytables import TableIterator
+
         hdf_cfg = cls.get_settings(key_id="custom")
 
+        if start is None:
+            start = hdf_cfg["start"]
+        if end is None:
+            end = hdf_cfg["end"]
+        if freq is None:
+            freq = hdf_cfg["freq"]
+        if freq is not None:
+            freq = prepare_freq(freq)
+        if tz is None:
+            tz = hdf_cfg["tz"]
         if start_row is None:
             start_row = hdf_cfg["start_row"]
+        if start_row is None:
+            start_row = 0
         if end_row is None:
             end_row = hdf_cfg["end_row"]
         read_hdf_kwargs = merge_dicts(hdf_cfg["read_hdf_kwargs"], read_hdf_kwargs)
@@ -967,19 +1101,55 @@ class HDFData(LocalData):
             path = symbol
         path = Path(path)
         file_path, key = cls.split_hdf_path(path)
-        if end_row is not None:
-            stop = end_row + 1
-        else:
-            stop = None
 
-        obj = pd.read_hdf(file_path, key=key, start=start_row, stop=stop, **read_hdf_kwargs)
+        if start is not None or end is not None:
+            hdf_store_arg_names = get_func_arg_names(pd.HDFStore.__init__)
+            hdf_store_kwargs = dict()
+            for k, v in read_hdf_kwargs.items():
+                if k in hdf_store_arg_names:
+                    hdf_store_kwargs[k] = v
+            with pd.HDFStore(str(file_path), mode="r", **hdf_store_kwargs) as store:
+                index = store.select_column(key, "index", start=start_row, stop=end_row)
+            if not isinstance(index, pd.Index):
+                index = pd.Index(index)
+            if not isinstance(index, pd.DatetimeIndex):
+                raise TypeError("Cannot filter index that is not DatetimeIndex")
+            if tz is None:
+                tz = index.tzinfo
+            if index.tzinfo is not None:
+                if start is not None:
+                    start = to_tzaware_timestamp(start, naive_tz=tz, tz=index.tzinfo)
+                if end is not None:
+                    end = to_tzaware_timestamp(end, naive_tz=tz, tz=index.tzinfo)
+            else:
+                if start is not None:
+                    start = to_naive_timestamp(start, tz=tz)
+                if end is not None:
+                    end = to_naive_timestamp(end, tz=tz)
+            mask = True
+            if start is not None:
+                mask &= index >= start
+            if end is not None:
+                mask &= index < end
+            mask_indices = np.flatnonzero(mask)
+            if len(mask_indices) > 0:
+                start_row += mask_indices[0]
+                end_row = start_row + mask_indices[-1] - mask_indices[0] + 1
+
+        obj = pd.read_hdf(file_path, key=key, start=start_row, stop=end_row, **read_hdf_kwargs)
         if isinstance(obj, TableIterator):
             if chunk_func is None:
                 obj = pd.concat(list(obj), axis=0)
             else:
                 obj = chunk_func(obj)
-        returned_kwargs = dict(last_row=start_row + len(obj.index) - 1)
-        return obj, returned_kwargs
+        if isinstance(obj.index, pd.DatetimeIndex) and tz is None:
+            tz = obj.index.tzinfo
+        return obj, dict(
+            last_row=start_row + len(obj.index) - 1,
+            tz_localize=tz,
+            tz_convert=tz,
+            freq=freq,
+        )
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Tuple[tp.SeriesFrame, dict]:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
@@ -1135,9 +1305,9 @@ class YFData(RemoteData):
 
         # yfinance still uses mktime, which assumes that the passed date is in local time
         if start is not None:
-            start = to_tzaware_datetime(start, naive_tz=tz, tz=get_local_tz())
+            start = to_tzaware_datetime(start, naive_tz=tz, tz="tzlocal()")
         if end is not None:
-            end = to_tzaware_datetime(end, naive_tz=tz, tz=get_local_tz())
+            end = to_tzaware_datetime(end, naive_tz=tz, tz="tzlocal()")
         freq = prepare_freq(timeframe)
         split = split_freq_str(timeframe)
         if split is not None:
@@ -1155,19 +1325,19 @@ class YFData(RemoteData):
         if not df.empty:
             if start is not None:
                 if df.index.tzinfo is None:
-                    if df.index[0] < start.astimezone(get_utc_tz()).replace(tzinfo=None):
-                        df = df[df.index >= start.astimezone(get_utc_tz()).replace(tzinfo=None)]
+                    if df.index[0] < start.astimezone("UTC").replace(tzinfo=None):
+                        df = df[df.index >= start.astimezone("UTC").replace(tzinfo=None)]
                 else:
                     if df.index[0] < start.astimezone(df.index.tzinfo):
                         df = df[df.index >= start.astimezone(df.index.tzinfo)]
             if end is not None:
                 if df.index.tzinfo is None:
-                    if df.index[-1] >= end.astimezone(get_utc_tz()).replace(tzinfo=None):
-                        df = df[df.index < end.astimezone(get_utc_tz()).replace(tzinfo=None)]
+                    if df.index[-1] >= end.astimezone("UTC").replace(tzinfo=None):
+                        df = df[df.index < end.astimezone("UTC").replace(tzinfo=None)]
                 else:
                     if df.index[-1] >= end.astimezone(df.index.tzinfo):
                         df = df[df.index < end.astimezone(df.index.tzinfo)]
-        return df, dict(tz_localize=get_utc_tz(), tz_convert=tz, freq=freq)
+        return df, dict(tz_localize="UTC", tz_convert=tz, freq=freq)
 
 
 YFData.override_column_config_doc(__pdoc__)
@@ -1387,14 +1557,14 @@ class BinanceData(RemoteData):
                 unit = "w"
             timeframe = str(multiplier) + unit
         if start is not None:
-            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz=get_utc_tz()))
+            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="UTC"))
             first_valid_ts = client._get_earliest_valid_timestamp(symbol, timeframe, klines_type)
             start_ts = max(start_ts, first_valid_ts)
         else:
             start_ts = None
         prev_end_ts = None
         if end is not None:
-            end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz=get_utc_tz()))
+            end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz="UTC"))
         else:
             end_ts = None
 
@@ -1490,7 +1660,7 @@ class BinanceData(RemoteData):
         del df["Close time"]
         del df["Ignore"]
 
-        return df, dict(tz_localize=get_utc_tz(), tz_convert=tz, freq=freq)
+        return df, dict(tz_localize="UTC", tz_convert=tz, freq=freq)
 
 
 BinanceData.override_column_config_doc(__pdoc__)
@@ -1610,7 +1780,7 @@ class CCXTData(RemoteData):
     ) -> tp.Optional[pd.Timestamp]:
         """Find the earliest date using binary search."""
         if start is not None:
-            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz=get_utc_tz()))
+            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="UTC"))
             fetched_data = fetch_func(start_ts, 1)
             if for_internal_use and len(fetched_data) > 0:
                 return pd.Timestamp(start_ts, unit="ms", tz="utc")
@@ -1622,14 +1792,14 @@ class CCXTData(RemoteData):
                 return pd.Timestamp(0, unit="ms", tz="utc")
         if len(fetched_data) == 0:
             if start is not None:
-                start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz=get_utc_tz()))
+                start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="UTC"))
             else:
-                start_ts = datetime_to_ms(to_tzaware_datetime(0, naive_tz=tz, tz=get_utc_tz()))
+                start_ts = datetime_to_ms(to_tzaware_datetime(0, naive_tz=tz, tz="UTC"))
             start_ts = start_ts - start_ts % 86400000
             if end is not None:
-                end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz=get_utc_tz()))
+                end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz="UTC"))
             else:
-                end_ts = datetime_to_ms(to_tzaware_datetime("now", naive_tz=tz, tz=get_utc_tz()))
+                end_ts = datetime_to_ms(to_tzaware_datetime("now", naive_tz=tz, tz="UTC"))
             end_ts = end_ts - end_ts % 86400000 + 86400000
             start_time = start_ts
             end_time = end_ts
@@ -1815,11 +1985,11 @@ class CCXTData(RemoteData):
         if find_earliest_date and start is not None:
             start = cls._find_earliest_date(_fetch, start=start, end=end, tz=tz, for_internal_use=True)
         if start is not None:
-            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz=get_utc_tz()))
+            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="UTC"))
         else:
             start_ts = None
         if end is not None:
-            end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz=get_utc_tz()))
+            end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz="UTC"))
         else:
             end_ts = None
         prev_end_ts = None
@@ -1891,7 +2061,7 @@ class CCXTData(RemoteData):
         if "Volume" in df.columns:
             df["Volume"] = df["Volume"].astype(float)
 
-        return df, dict(tz_localize=get_utc_tz(), tz_convert=tz, freq=freq)
+        return df, dict(tz_localize="UTC", tz_convert=tz, freq=freq)
 
 
 AlpacaDataT = tp.TypeVar("AlpacaDataT", bound="AlpacaData")
@@ -2136,12 +2306,12 @@ class AlpacaData(RemoteData):
         timeframe = TimeFrame(multiplier, unit)
 
         if start is not None:
-            start = to_tzaware_datetime(start, naive_tz=tz, tz=get_utc_tz())
+            start = to_tzaware_datetime(start, naive_tz=tz, tz="UTC")
             start_str = start.replace(tzinfo=None).isoformat("T")
         else:
             start_str = None
         if end is not None:
-            end = to_tzaware_datetime(end, naive_tz=tz, tz=get_utc_tz())
+            end = to_tzaware_datetime(end, naive_tz=tz, tz="UTC")
             end_str = end.replace(tzinfo=None).isoformat("T")
         else:
             end_str = None
@@ -2214,7 +2384,7 @@ class AlpacaData(RemoteData):
                 else:
                     if df.index[-1] >= end.astimezone(df.index.tzinfo):
                         df = df[df.index < end.astimezone(df.index.tzinfo)]
-        return df, dict(tz_localize=get_utc_tz(), tz_convert=tz, freq=freq)
+        return df, dict(tz_localize="UTC", tz_convert=tz, freq=freq)
 
 
 AlpacaData.override_column_config_doc(__pdoc__)
@@ -2427,11 +2597,11 @@ class PolygonData(RemoteData):
 
         # Establish the timestamps
         if start is not None:
-            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz=get_utc_tz()))
+            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="UTC"))
         else:
             start_ts = None
         if end is not None:
-            end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz=get_utc_tz()))
+            end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz="UTC"))
         else:
             end_ts = None
         prev_end_ts = None
@@ -2576,7 +2746,7 @@ class PolygonData(RemoteData):
         if "VWAP" in df.columns:
             df["VWAP"] = df["VWAP"].astype(float)
 
-        return df, dict(tz_localize=get_utc_tz(), tz_convert=tz, freq=freq)
+        return df, dict(tz_localize="UTC", tz_convert=tz, freq=freq)
 
 
 PolygonData.override_column_config_doc(__pdoc__)
@@ -2982,7 +3152,7 @@ class AVData(RemoteData):
         if not df.empty and df.index[0] > df.index[1]:
             df = df.iloc[::-1]
 
-        return df, dict(tz_localize=get_utc_tz(), tz_convert=tz, freq=freq)
+        return df, dict(tz_localize="UTC", tz_convert=tz, freq=freq)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         raise NotImplementedError
@@ -3095,12 +3265,12 @@ class NDLData(RemoteData):
 
         # Establish the timestamps
         if start is not None:
-            start = to_tzaware_datetime(start, naive_tz=tz, tz=get_utc_tz())
+            start = to_tzaware_datetime(start, naive_tz=tz, tz="UTC")
             start_date = pd.Timestamp(start).isoformat()
         else:
             start_date = None
         if end is not None:
-            end = to_tzaware_datetime(end, naive_tz=tz, tz=get_utc_tz())
+            end = to_tzaware_datetime(end, naive_tz=tz, tz="UTC")
             end_date = pd.Timestamp(end).isoformat()
         else:
             end_date = None
@@ -3140,7 +3310,7 @@ class NDLData(RemoteData):
                 else:
                     if df.index[-1] >= end.astimezone(df.index.tzinfo):
                         df = df[df.index < end.astimezone(df.index.tzinfo)]
-        return df, dict(tz_localize=get_utc_tz(), tz_convert=tz)
+        return df, dict(tz_localize="UTC", tz_convert=tz)
 
 
 TVDataT = tp.TypeVar("TVDataT", bound="TVData")
@@ -3342,7 +3512,7 @@ class TVData(RemoteData):
         if "Volume" in df.columns:
             df["Volume"] = df["Volume"].astype(float)
 
-        return df, dict(tz_localize=get_utc_tz(), tz_convert=tz, freq=freq)
+        return df, dict(tz_localize="UTC", tz_convert=tz, freq=freq)
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
