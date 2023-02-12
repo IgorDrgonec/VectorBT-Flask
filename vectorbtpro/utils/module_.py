@@ -105,20 +105,32 @@ def get_installed_overview() -> tp.Dict[str, bool]:
 
 def assert_can_import(pkg_name: str) -> None:
     """Assert that the package can be imported. Must be listed in `opt_dep_config`."""
+    from importlib.metadata import version as get_version
+
     if pkg_name not in opt_dep_config:
         raise KeyError(f"Package '{pkg_name}' not found in opt_dep_config")
+    dist_name = opt_dep_config[pkg_name].get("dist_name", pkg_name)
+    version = version_str = opt_dep_config[pkg_name].get("version", "")
+    link = opt_dep_config[pkg_name]["link"]
     if not check_installed(pkg_name):
-        raise ImportError(
-            f"Please install {opt_dep_config[pkg_name]['name']}: {opt_dep_config[pkg_name]['link']}"
-        )
+        raise ImportError(f"Please install {dist_name}{version_str} (see {link})")
+    if version != "":
+        actual_version = "(" + get_version(dist_name).replace(".", ",") + ")"
+        if version[0].isdigit():
+            operator = "=="
+        else:
+            operator = version[:2]
+            version = version[2:]
+            version = "(" + version.replace(".", ",") + ")"
+        if not eval(f"{actual_version} {operator} {version}"):
+            raise ImportError(f"Please install {dist_name}{version_str} (see {link})")
 
 
-def warn_cannot_import(pkg_name: str) -> None:
+def warn_cannot_import(pkg_name: str) -> bool:
     """Warn if the package is cannot be imported. Must be listed in `opt_dep_config`."""
-    if pkg_name not in opt_dep_config:
-        raise KeyError(f"Package '{pkg_name}' not found in opt_dep_config")
-    if not check_installed(pkg_name):
-        warnings.warn(
-            f"Consider installing {opt_dep_config[pkg_name]['name']}: {opt_dep_config[pkg_name]['link']}",
-            stacklevel=2,
-        )
+    try:
+        assert_can_import(pkg_name)
+        return False
+    except ImportError as e:
+        warnings.warn(str(e), stacklevel=2)
+        return True

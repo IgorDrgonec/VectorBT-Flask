@@ -45,7 +45,7 @@ from vectorbtpro.utils.datetime_ import (
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.enum_ import map_enum_fields
-from vectorbtpro.utils.parsing import glob2re, get_func_arg_names
+from vectorbtpro.utils.parsing import glob2re, get_func_arg_names, get_func_kwargs
 from vectorbtpro.utils.template import deep_substitute
 
 try:
@@ -215,7 +215,7 @@ class SyntheticData(CustomData):
             tz = index.tzinfo
         if len(index) == 0:
             raise ValueError("Date range is empty")
-        return cls.generate_symbol(symbol, index, **kwargs), dict(tz_localize=tz, tz_convert=tz, freq=freq)
+        return cls.generate_symbol(symbol, index, **kwargs), dict(tz_convert=tz, freq=freq)
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
@@ -724,7 +724,6 @@ class CSVData(LocalData):
         path: tp.Any = None,
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
-        freq: tp.Optional[tp.FrequencyLike] = None,
         tz: tp.Optional[tp.TimezoneLike] = None,
         start_row: tp.Optional[int] = None,
         end_row: tp.Optional[int] = None,
@@ -748,9 +747,6 @@ class CSVData(LocalData):
             end (any): End datetime.
 
                 Will use the timezone of the object. See `vectorbtpro.utils.datetime_.to_timestamp`.
-            freq (str): Source frequency.
-
-                Allows human-readable strings such as "15 minutes".
             tz (any): Target timezone.
 
                 See `vectorbtpro.utils.datetime_.to_timezone`.
@@ -784,10 +780,6 @@ class CSVData(LocalData):
             start = csv_cfg["start"]
         if end is None:
             end = csv_cfg["end"]
-        if freq is None:
-            freq = csv_cfg["freq"]
-        if freq is not None:
-            freq = prepare_freq(freq)
         if tz is None:
             tz = csv_cfg["tz"]
         if start_row is None:
@@ -878,12 +870,7 @@ class CSVData(LocalData):
             if len(mask_indices) > 0:
                 obj = obj.iloc[mask_indices[0] : mask_indices[-1] + 1]
                 start_row += mask_indices[0]
-        return obj, dict(
-            last_row=start_row - header_rows + len(obj.index) - 1,
-            tz_localize=tz,
-            tz_convert=tz,
-            freq=freq,
-        )
+        return obj, dict(last_row=start_row - header_rows + len(obj.index) - 1, tz_convert=tz)
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Tuple[tp.SeriesFrame, dict]:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
@@ -1021,7 +1008,6 @@ class HDFData(LocalData):
         path: tp.Any = None,
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
-        freq: tp.Optional[tp.FrequencyLike] = None,
         tz: tp.Optional[tp.TimezoneLike] = None,
         start_row: tp.Optional[int] = None,
         end_row: tp.Optional[int] = None,
@@ -1051,9 +1037,6 @@ class HDFData(LocalData):
 
                 !!! note
                     Can only be used if the object was saved in the table format!
-            freq (str): Source frequency.
-
-                Allows human-readable strings such as "15 minutes".
             tz (any): Target timezone.
 
                 See `vectorbtpro.utils.datetime_.to_timezone`.
@@ -1083,10 +1066,6 @@ class HDFData(LocalData):
             start = hdf_cfg["start"]
         if end is None:
             end = hdf_cfg["end"]
-        if freq is None:
-            freq = hdf_cfg["freq"]
-        if freq is not None:
-            freq = prepare_freq(freq)
         if tz is None:
             tz = hdf_cfg["tz"]
         if start_row is None:
@@ -1144,12 +1123,7 @@ class HDFData(LocalData):
                 obj = chunk_func(obj)
         if isinstance(obj.index, pd.DatetimeIndex) and tz is None:
             tz = obj.index.tzinfo
-        return obj, dict(
-            last_row=start_row + len(obj.index) - 1,
-            tz_localize=tz,
-            tz_convert=tz,
-            freq=freq,
-        )
+        return obj, dict(last_row=start_row + len(obj.index) - 1, tz_convert=tz)
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Tuple[tp.SeriesFrame, dict]:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
@@ -1198,6 +1172,8 @@ class RemoteData(CustomData):
         Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
         if fetch_kwargs is None:
             fetch_kwargs = {}
+        if len(args) == 0 and "symbols" not in kwargs:
+            args = (cls.__name__ + ".h5",)
         data = HDFData.fetch(*args, **kwargs)
         data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
         data = data.update_fetch_kwargs(**fetch_kwargs)
@@ -1303,11 +1279,19 @@ class YFData(RemoteData):
             tz = yf_cfg["tz"]
         history_kwargs = merge_dicts(yf_cfg["history_kwargs"], history_kwargs)
 
-        # yfinance still uses mktime, which assumes that the passed date is in local time
+        ticker = yf.Ticker(symbol)
+        def_history_kwargs = get_func_kwargs(ticker.history)
+        ticker_tz = ticker._get_ticker_tz(
+            history_kwargs.get("debug", def_history_kwargs["debug"]),
+            history_kwargs.get("proxy", def_history_kwargs["proxy"]),
+            history_kwargs.get("timeout", def_history_kwargs["timeout"]),
+        )
+        if tz is None:
+            tz = ticker_tz
         if start is not None:
-            start = to_tzaware_datetime(start, naive_tz=tz, tz="tzlocal()")
+            start = to_tzaware_datetime(start, naive_tz=tz, tz=ticker_tz)
         if end is not None:
-            end = to_tzaware_datetime(end, naive_tz=tz, tz="tzlocal()")
+            end = to_tzaware_datetime(end, naive_tz=tz, tz=ticker_tz)
         freq = prepare_freq(timeframe)
         split = split_freq_str(timeframe)
         if split is not None:
@@ -1320,24 +1304,18 @@ class YFData(RemoteData):
                 unit = "mo"
             timeframe = str(multiplier) + unit
 
-        df = yf.Ticker(symbol).history(period=period, start=start, end=end, interval=timeframe, **history_kwargs)
+        df = ticker.history(period=period, start=start, end=end, interval=timeframe, **history_kwargs)
+        if isinstance(df.index, pd.DatetimeIndex) and df.index.tzinfo is None:
+            df = df.tz_localize(ticker_tz)
 
         if not df.empty:
             if start is not None:
-                if df.index.tzinfo is None:
-                    if df.index[0] < start.astimezone("UTC").replace(tzinfo=None):
-                        df = df[df.index >= start.astimezone("UTC").replace(tzinfo=None)]
-                else:
-                    if df.index[0] < start.astimezone(df.index.tzinfo):
-                        df = df[df.index >= start.astimezone(df.index.tzinfo)]
+                if df.index[0] < start:
+                    df = df[df.index >= start]
             if end is not None:
-                if df.index.tzinfo is None:
-                    if df.index[-1] >= end.astimezone("UTC").replace(tzinfo=None):
-                        df = df[df.index < end.astimezone("UTC").replace(tzinfo=None)]
-                else:
-                    if df.index[-1] >= end.astimezone(df.index.tzinfo):
-                        df = df[df.index < end.astimezone(df.index.tzinfo)]
-        return df, dict(tz_localize="UTC", tz_convert=tz, freq=freq)
+                if df.index[-1] >= end:
+                    df = df[df.index < end]
+        return df, dict(tz_convert=tz, freq=freq)
 
 
 YFData.override_column_config_doc(__pdoc__)
@@ -1660,7 +1638,7 @@ class BinanceData(RemoteData):
         del df["Close time"]
         del df["Ignore"]
 
-        return df, dict(tz_localize="UTC", tz_convert=tz, freq=freq)
+        return df, dict(tz_convert=tz, freq=freq)
 
 
 BinanceData.override_column_config_doc(__pdoc__)
@@ -2061,7 +2039,7 @@ class CCXTData(RemoteData):
         if "Volume" in df.columns:
             df["Volume"] = df["Volume"].astype(float)
 
-        return df, dict(tz_localize="UTC", tz_convert=tz, freq=freq)
+        return df, dict(tz_convert=tz, freq=freq)
 
 
 AlpacaDataT = tp.TypeVar("AlpacaDataT", bound="AlpacaData")
@@ -2353,6 +2331,8 @@ class AlpacaData(RemoteData):
             },
             inplace=True,
         )
+        if isinstance(df.index, pd.DatetimeIndex) and df.index.tzinfo is None:
+            df = df.tz_localize("UTC")
 
         if "Open" in df.columns:
             df["Open"] = df["Open"].astype(float)
@@ -2371,20 +2351,14 @@ class AlpacaData(RemoteData):
 
         if not df.empty:
             if start is not None:
-                if df.index.tzinfo is None:
-                    if df.index[0] < start.replace(tzinfo=None):
-                        df = df[df.index >= start.replace(tzinfo=None)]
-                else:
-                    if df.index[0] < start.astimezone(df.index.tzinfo):
-                        df = df[df.index >= start.astimezone(df.index.tzinfo)]
+                start = to_timestamp(start, tz=df.index.tzinfo)
+                if df.index[0] < start:
+                    df = df[df.index >= start]
             if end is not None:
-                if df.index.tzinfo is None:
-                    if df.index[-1] >= end.replace(tzinfo=None):
-                        df = df[df.index < end.replace(tzinfo=None)]
-                else:
-                    if df.index[-1] >= end.astimezone(df.index.tzinfo):
-                        df = df[df.index < end.astimezone(df.index.tzinfo)]
-        return df, dict(tz_localize="UTC", tz_convert=tz, freq=freq)
+                end = to_timestamp(end, tz=df.index.tzinfo)
+                if df.index[-1] >= end:
+                    df = df[df.index < end]
+        return df, dict(tz_convert=tz, freq=freq)
 
 
 AlpacaData.override_column_config_doc(__pdoc__)
@@ -2746,7 +2720,7 @@ class PolygonData(RemoteData):
         if "VWAP" in df.columns:
             df["VWAP"] = df["VWAP"].astype(float)
 
-        return df, dict(tz_localize="UTC", tz_convert=tz, freq=freq)
+        return df, dict(tz_convert=tz, freq=freq)
 
 
 PolygonData.override_column_config_doc(__pdoc__)
@@ -3151,8 +3125,10 @@ class AVData(RemoteData):
         df = df.rename(columns=dict(zip(df.columns, new_columns)))
         if not df.empty and df.index[0] > df.index[1]:
             df = df.iloc[::-1]
+        if isinstance(df.index, pd.DatetimeIndex) and df.index.tzinfo is None:
+            df = df.tz_localize("UTC")
 
-        return df, dict(tz_localize="UTC", tz_convert=tz, freq=freq)
+        return df, dict(tz_convert=tz, freq=freq)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
         raise NotImplementedError
@@ -3295,22 +3271,18 @@ class NDLData(RemoteData):
             new_columns.append(new_c)
         df = df.rename(columns=dict(zip(df.columns, new_columns)))
 
+        if isinstance(df.index, pd.DatetimeIndex) and df.index.tzinfo is None:
+            df = df.tz_localize("UTC")
         if not df.empty:
             if start is not None:
-                if df.index.tzinfo is None:
-                    if df.index[0] < start.replace(tzinfo=None):
-                        df = df[df.index >= start.replace(tzinfo=None)]
-                else:
-                    if df.index[0] < start.astimezone(df.index.tzinfo):
-                        df = df[df.index >= start.astimezone(df.index.tzinfo)]
+                start = to_timestamp(start, tz=df.index.tzinfo)
+                if df.index[0] < start:
+                    df = df[df.index >= start]
             if end is not None:
-                if df.index.tzinfo is None:
-                    if df.index[-1] >= end.replace(tzinfo=None):
-                        df = df[df.index < end.replace(tzinfo=None)]
-                else:
-                    if df.index[-1] >= end.astimezone(df.index.tzinfo):
-                        df = df[df.index < end.astimezone(df.index.tzinfo)]
-        return df, dict(tz_localize="UTC", tz_convert=tz)
+                end = to_timestamp(end, tz=df.index.tzinfo)
+                if df.index[-1] >= end:
+                    df = df[df.index < end]
+        return df, dict(tz_convert=tz)
 
 
 TVDataT = tp.TypeVar("TVDataT", bound="TVData")
@@ -3498,6 +3470,8 @@ class TVData(RemoteData):
             },
             inplace=True,
         )
+        if isinstance(df.index, pd.DatetimeIndex) and df.index.tzinfo is None:
+            df = df.tz_localize("UTC")
 
         if "Symbol" in df:
             del df["Symbol"]
@@ -3512,7 +3486,7 @@ class TVData(RemoteData):
         if "Volume" in df.columns:
             df["Volume"] = df["Volume"].astype(float)
 
-        return df, dict(tz_localize="UTC", tz_convert=tz, freq=freq)
+        return df, dict(tz_convert=tz, freq=freq)
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)

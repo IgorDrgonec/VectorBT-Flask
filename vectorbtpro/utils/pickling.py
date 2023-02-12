@@ -70,11 +70,10 @@ def dumps(
     Other keyword arguments are passed to the `dumps` method of the pickling package."""
     from vectorbtpro.utils.module_ import warn_cannot_import, assert_can_import
 
-    warn_cannot_import("dill")
-    try:
-        import dill as pickle
-    except ImportError:
+    if warn_cannot_import("dill"):
         import pickle
+    else:
+        import dill as pickle
 
     if isinstance(compression, bool) and compression:
         from vectorbtpro._settings import settings
@@ -126,11 +125,10 @@ def loads(bytes_: bytes, compression: tp.Union[None, bool, str] = None, **kwargs
     Other keyword arguments are passed to the `loads` method of the pickling package."""
     from vectorbtpro.utils.module_ import warn_cannot_import, assert_can_import
 
-    warn_cannot_import("dill")
-    try:
-        import dill as pickle
-    except ImportError:
+    if warn_cannot_import("dill"):
         import pickle
+    else:
+        import dill as pickle
 
     if isinstance(compression, bool) and compression:
         from vectorbtpro._settings import settings

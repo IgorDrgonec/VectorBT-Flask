@@ -41,8 +41,9 @@ RUN pip install --quiet --no-cache-dir \
     'mypy_extensions' \
     'humanize' \
     'attrs>=19.2.0' \
+    'websocket-client' \
     'hyperopt' \
-    'yfinance>=0.1.63' \
+    'yfinance>=0.2.10' \
     'python-binance>=1.0.16' \
     'alpaca-py' \
     'ccxt>=1.89.14' \
