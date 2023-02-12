@@ -13,7 +13,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import merge_dicts, Configured
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.parsing import get_func_arg_names
-from vectorbtpro.utils.template import CustomTemplate, deep_substitute
+from vectorbtpro.utils.template import CustomTemplate, substitute_templates
 
 try:
     if not tp.TYPE_CHECKING:
@@ -661,7 +661,7 @@ def execute(
     # Substitute templates
     if isinstance(funcs_args, CustomTemplate):
         template_context = merge_dicts(dict(chunk_meta=chunk_meta), template_context)
-        funcs_args = deep_substitute(funcs_args, template_context, sub_id="funcs_args")
+        funcs_args = substitute_templates(funcs_args, template_context, sub_id="funcs_args")
         if hasattr(funcs_args, "__len__"):
             n_calls = len(funcs_args)
         else:

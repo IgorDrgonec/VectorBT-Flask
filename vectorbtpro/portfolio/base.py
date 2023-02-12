@@ -1669,7 +1669,7 @@ from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.mapping import to_mapping
 from vectorbtpro.utils.parsing import get_func_kwargs, get_func_arg_names
 from vectorbtpro.utils.random_ import set_seed
-from vectorbtpro.utils.template import CustomTemplate, Rep, RepEval, RepFunc, deep_substitute
+from vectorbtpro.utils.template import CustomTemplate, Rep, RepEval, RepFunc, substitute_templates
 from vectorbtpro.utils.chunking import ArgsTaker
 
 try:
@@ -3149,6 +3149,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             return obj
         if wrapper is None:
             wrapper = self.wrapper
+        is_grouped = wrapper.grouper.is_grouped(group_by=group_by)
         if wrap_func is not None:
             return wrap_func(
                 self,
@@ -3164,92 +3165,92 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 **kwargs,
             )
 
-        def _wrap_1d_grouped(obj: tp.Array) -> tp.Series:
+        def _wrap_reduced_grouped(obj):
             _wrap_kwargs = merge_dicts(dict(name_or_index=obj_name), wrap_kwargs)
             return wrapper.wrap_reduced(obj, group_by=group_by, **_wrap_kwargs)
 
-        def _wrap_1d(obj: tp.Array) -> tp.Series:
+        def _wrap_reduced(obj):
             _wrap_kwargs = merge_dicts(dict(name_or_index=obj_name), wrap_kwargs)
             return wrapper.wrap_reduced(obj, group_by=False, **_wrap_kwargs)
 
-        def _wrap_2d_grouped(obj: tp.Array) -> tp.Frame:
+        def _wrap_grouped(obj):
             return wrapper.wrap(obj, group_by=group_by, **resolve_dict(wrap_kwargs))
 
-        def _wrap_2d(obj: tp.Array) -> tp.Frame:
+        def _wrap(obj):
             return wrapper.wrap(obj, group_by=False, **resolve_dict(wrap_kwargs))
 
         if obj_type is not None and obj_type not in {"records"}:
-            is_grouped = wrapper.grouper.is_grouped(group_by=group_by)
             if grouping == "cash_sharing":
                 if obj_type == "array":
                     if is_grouped and self.cash_sharing:
-                        return _wrap_2d_grouped(obj)
-                    return _wrap_2d(obj)
+                        return _wrap_grouped(obj)
+                    return _wrap(obj)
                 if obj_type == "red_array":
                     if is_grouped and self.cash_sharing:
-                        return _wrap_1d_grouped(obj)
-                    return _wrap_1d(obj)
+                        return _wrap_reduced_grouped(obj)
+                    return _wrap_reduced(obj)
                 if obj.ndim == 2:
                     if is_grouped and self.cash_sharing:
-                        return _wrap_2d_grouped(obj)
-                    return _wrap_2d(obj)
+                        return _wrap_grouped(obj)
+                    return _wrap(obj)
                 if obj.ndim == 1:
                     if is_grouped and self.cash_sharing:
-                        return _wrap_1d_grouped(obj)
-                    return _wrap_1d(obj)
+                        return _wrap_reduced_grouped(obj)
+                    return _wrap_reduced(obj)
             if grouping == "columns_or_groups":
                 if obj_type == "array":
                     if is_grouped:
-                        return _wrap_2d_grouped(obj)
-                    return _wrap_2d(obj)
+                        return _wrap_grouped(obj)
+                    return _wrap(obj)
                 if obj_type == "red_array":
                     if is_grouped:
-                        return _wrap_1d_grouped(obj)
-                    return _wrap_1d(obj)
+                        return _wrap_reduced_grouped(obj)
+                    return _wrap_reduced(obj)
                 if obj.ndim == 2:
                     if is_grouped:
-                        return _wrap_2d_grouped(obj)
-                    return _wrap_2d(obj)
+                        return _wrap_grouped(obj)
+                    return _wrap(obj)
                 if obj.ndim == 1:
                     if is_grouped:
-                        return _wrap_1d_grouped(obj)
-                    return _wrap_1d(obj)
+                        return _wrap_reduced_grouped(obj)
+                    return _wrap_reduced(obj)
             if grouping == "groups":
                 if obj_type == "array":
-                    return _wrap_2d_grouped(obj)
+                    return _wrap_grouped(obj)
                 if obj_type == "red_array":
-                    return _wrap_1d_grouped(obj)
+                    return _wrap_reduced_grouped(obj)
                 if obj.ndim == 2:
-                    return _wrap_2d_grouped(obj)
+                    return _wrap_grouped(obj)
                 if obj.ndim == 1:
-                    return _wrap_1d_grouped(obj)
+                    return _wrap_reduced_grouped(obj)
             if grouping == "columns":
                 if obj_type == "array":
-                    return _wrap_2d(obj)
+                    return _wrap(obj)
                 if obj_type == "red_array":
-                    return _wrap_1d(obj)
+                    return _wrap_reduced(obj)
                 if obj.ndim == 2:
-                    return _wrap_2d(obj)
+                    return _wrap(obj)
                 if obj.ndim == 1:
-                    return _wrap_1d(obj)
-            if checks.is_np_array(obj):
+                    return _wrap_reduced(obj)
+        if obj_type not in {"records"}:
+            if checks.is_np_array(obj) and not checks.is_record_array(obj):
                 if is_grouped:
-                    if obj_type == "array":
-                        return _wrap_2d_grouped(obj)
-                    if obj_type == "red_array":
-                        return _wrap_1d_grouped(obj)
+                    if obj_type is not None and obj_type == "array":
+                        return _wrap_grouped(obj)
+                    if obj_type is not None and obj_type == "red_array":
+                        return _wrap_reduced_grouped(obj)
                     if to_2d_shape(obj.shape) == wrapper.get_shape_2d():
-                        return _wrap_2d_grouped(obj)
+                        return _wrap_grouped(obj)
                     if obj.shape == (wrapper.get_shape_2d()[1],):
-                        return _wrap_1d_grouped(obj)
-                if obj_type == "array":
-                    return _wrap_2d(obj)
-                if obj_type == "red_array":
-                    return _wrap_1d(obj)
+                        return _wrap_reduced_grouped(obj)
+                if obj_type is not None and obj_type == "array":
+                    return _wrap(obj)
+                if obj_type is not None and obj_type == "red_array":
+                    return _wrap_reduced(obj)
                 if to_2d_shape(obj.shape) == wrapper.shape_2d:
-                    return _wrap_2d(obj)
+                    return _wrap(obj)
                 if obj.shape == (wrapper.shape_2d[1],):
-                    return _wrap_1d(obj)
+                    return _wrap_reduced(obj)
         if force_wrapping:
             raise NotImplementedError(f"Cannot wrap object '{obj_name}'")
         if not silence_warnings:
@@ -3295,7 +3296,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             field_aliases = {field, *field_aliases}
             found_attr = True
         else:
-            obj_type = "array"
+            obj_type = None
             group_by_aware = True
             wrap_func = None
             wrap_kwargs = None
@@ -6156,12 +6157,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             template_context,
         )
         if flexible_mode:
-            in_outputs = deep_substitute(in_outputs, template_context, sub_id="in_outputs")
-            post_segment_args = deep_substitute(post_segment_args, template_context, sub_id="post_segment_args")
+            in_outputs = substitute_templates(in_outputs, template_context, sub_id="in_outputs")
+            post_segment_args = substitute_templates(post_segment_args, template_context, sub_id="post_segment_args")
             if signal_func_mode:
-                signal_args = deep_substitute(signal_args, template_context, sub_id="signal_args")
+                signal_args = substitute_templates(signal_args, template_context, sub_id="signal_args")
             else:
-                adjust_args = deep_substitute(adjust_args, template_context, sub_id="adjust_args")
+                adjust_args = substitute_templates(adjust_args, template_context, sub_id="adjust_args")
                 if ls_mode:
                     signal_args = (
                         broadcasted_args.pop("entries"),
@@ -7519,17 +7520,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ),
             template_context,
         )
-        pre_sim_args = deep_substitute(pre_sim_args, template_context, sub_id="pre_sim_args")
-        post_sim_args = deep_substitute(post_sim_args, template_context, sub_id="post_sim_args")
-        pre_group_args = deep_substitute(pre_group_args, template_context, sub_id="pre_group_args")
-        post_group_args = deep_substitute(post_group_args, template_context, sub_id="post_group_args")
-        pre_row_args = deep_substitute(pre_row_args, template_context, sub_id="pre_row_args")
-        post_row_args = deep_substitute(post_row_args, template_context, sub_id="post_row_args")
-        pre_segment_args = deep_substitute(pre_segment_args, template_context, sub_id="pre_segment_args")
-        post_segment_args = deep_substitute(post_segment_args, template_context, sub_id="post_segment_args")
-        order_args = deep_substitute(order_args, template_context, sub_id="order_args")
-        post_order_args = deep_substitute(post_order_args, template_context, sub_id="post_order_args")
-        in_outputs = deep_substitute(in_outputs, template_context, sub_id="in_outputs")
+        pre_sim_args = substitute_templates(pre_sim_args, template_context, sub_id="pre_sim_args")
+        post_sim_args = substitute_templates(post_sim_args, template_context, sub_id="post_sim_args")
+        pre_group_args = substitute_templates(pre_group_args, template_context, sub_id="pre_group_args")
+        post_group_args = substitute_templates(post_group_args, template_context, sub_id="post_group_args")
+        pre_row_args = substitute_templates(pre_row_args, template_context, sub_id="pre_row_args")
+        post_row_args = substitute_templates(post_row_args, template_context, sub_id="post_row_args")
+        pre_segment_args = substitute_templates(pre_segment_args, template_context, sub_id="pre_segment_args")
+        post_segment_args = substitute_templates(post_segment_args, template_context, sub_id="post_segment_args")
+        order_args = substitute_templates(order_args, template_context, sub_id="order_args")
+        post_order_args = substitute_templates(post_order_args, template_context, sub_id="post_order_args")
+        in_outputs = substitute_templates(in_outputs, template_context, sub_id="in_outputs")
         for k in broadcast_named_args:
             broadcasted_args.pop(k)
 

@@ -56,8 +56,13 @@ def is_dt_like(arg: tp.Any) -> bool:
 
 
 def is_np_array(arg: tp.Any) -> bool:
-    """Check whether the argument is `np.ndarray`."""
+    """Check whether the argument is a NumPy array."""
     return isinstance(arg, np.ndarray)
+
+
+def is_record_array(arg: tp.Any) -> bool:
+    """Check whether the argument is a structured NumPy array."""
+    return is_np_array(arg) and arg.dtype.fields is not None
 
 
 def is_series(arg: tp.Any) -> bool:

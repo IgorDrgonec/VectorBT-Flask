@@ -13,7 +13,7 @@ from vectorbtpro.returns.accessors import ReturnsAccessor
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.parsing import get_func_arg_names, warn_stdout
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
-from vectorbtpro.utils.template import deep_substitute, Rep, RepFunc, CustomTemplate
+from vectorbtpro.utils.template import substitute_templates, Rep, RepFunc, CustomTemplate
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.random_ import set_seed_nb
@@ -2076,7 +2076,7 @@ class PortfolioOptimizer(Analyzable):
                 )
 
                 if _index_points is None:
-                    get_index_points_kwargs = deep_substitute(
+                    get_index_points_kwargs = substitute_templates(
                         dict(
                             every=_every,
                             normalize_every=_normalize_every,
@@ -2102,7 +2102,7 @@ class PortfolioOptimizer(Analyzable):
                         dict(index_points=_index_points),
                     )
                 else:
-                    _index_points = deep_substitute(
+                    _index_points = substitute_templates(
                         _index_points,
                         _template_context,
                         sub_id="index_points",
@@ -2112,14 +2112,14 @@ class PortfolioOptimizer(Analyzable):
                     _template_context = merge_dicts(_template_context, dict(index_points=_index_points))
 
                 if jitted_loop:
-                    _allocate_func = deep_substitute(
+                    _allocate_func = substitute_templates(
                         _allocate_func,
                         _template_context,
                         sub_id="allocate_func",
                         strict=True,
                     )
-                    _args = deep_substitute(_args, _template_context, sub_id="args")
-                    _kwargs = deep_substitute(_kwargs, _template_context, sub_id="kwargs")
+                    _args = substitute_templates(_args, _template_context, sub_id="args")
+                    _kwargs = substitute_templates(_kwargs, _template_context, sub_id="kwargs")
                     func = jit_reg.resolve_option(nb.allocate_meta_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
                     _allocations = func(len(wrapper.columns), _index_points, _allocate_func, *_args, **_kwargs)
@@ -2127,14 +2127,14 @@ class PortfolioOptimizer(Analyzable):
                     funcs_args = []
                     for i in range(len(_index_points)):
                         __template_context = merge_dicts(dict(i=i, index_point=_index_points[i]), _template_context)
-                        __allocate_func = deep_substitute(
+                        __allocate_func = substitute_templates(
                             _allocate_func,
                             __template_context,
                             sub_id="allocate_func",
                             strict=True,
                         )
-                        __args = deep_substitute(_args, __template_context, sub_id="args")
-                        __kwargs = deep_substitute(_kwargs, __template_context, sub_id="kwargs")
+                        __args = substitute_templates(_args, __template_context, sub_id="args")
+                        __kwargs = substitute_templates(_kwargs, __template_context, sub_id="kwargs")
                         funcs_args.append((__allocate_func, __args, __kwargs))
 
                     _execute_kwargs = merge_dicts(
@@ -2847,7 +2847,7 @@ class PortfolioOptimizer(Analyzable):
                 )
 
                 if _index_ranges is None:
-                    get_index_ranges_defaults = deep_substitute(
+                    get_index_ranges_defaults = substitute_templates(
                         dict(
                             every=_every,
                             normalize_every=_normalize_every,
@@ -2878,7 +2878,7 @@ class PortfolioOptimizer(Analyzable):
                         dict(index_ranges=_index_ranges),
                     )
                 else:
-                    _index_ranges = deep_substitute(
+                    _index_ranges = substitute_templates(
                         _index_ranges,
                         _template_context,
                         sub_id="index_ranges",
@@ -2891,7 +2891,7 @@ class PortfolioOptimizer(Analyzable):
                         _index_ranges = (_index_ranges[:, 0], _index_ranges[:, 1])
                     _template_context = merge_dicts(_template_context, dict(index_ranges=_index_ranges))
                 if _index_loc is not None:
-                    _index_loc = deep_substitute(
+                    _index_loc = substitute_templates(
                         _index_loc,
                         _template_context,
                         sub_id="index_loc",
@@ -2901,14 +2901,14 @@ class PortfolioOptimizer(Analyzable):
                     _template_context = merge_dicts(_template_context, dict(index_loc=_index_loc))
 
                 if jitted_loop:
-                    _optimize_func = deep_substitute(
+                    _optimize_func = substitute_templates(
                         _optimize_func,
                         _template_context,
                         sub_id="optimize_func",
                         strict=True,
                     )
-                    _args = deep_substitute(_args, _template_context, sub_id="args")
-                    _kwargs = deep_substitute(_kwargs, _template_context, sub_id="kwargs")
+                    _args = substitute_templates(_args, _template_context, sub_id="args")
+                    _kwargs = substitute_templates(_kwargs, _template_context, sub_id="kwargs")
                     func = jit_reg.resolve_option(nb.optimize_meta_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
                     _allocations = func(
@@ -2924,14 +2924,14 @@ class PortfolioOptimizer(Analyzable):
                     for i in range(len(_index_ranges[0])):
                         index_slice = slice(max(0, _index_ranges[0][i]), _index_ranges[1][i])
                         __template_context = merge_dicts(dict(i=i, index_slice=index_slice), _template_context)
-                        __optimize_func = deep_substitute(
+                        __optimize_func = substitute_templates(
                             _optimize_func,
                             __template_context,
                             sub_id="optimize_func",
                             strict=True,
                         )
-                        __args = deep_substitute(_args, __template_context, sub_id="args")
-                        __kwargs = deep_substitute(_kwargs, __template_context, sub_id="kwargs")
+                        __args = substitute_templates(_args, __template_context, sub_id="args")
+                        __kwargs = substitute_templates(_kwargs, __template_context, sub_id="kwargs")
                         funcs_args.append((__optimize_func, __args, __kwargs))
 
                     _execute_kwargs = merge_dicts(
@@ -2952,7 +2952,7 @@ class PortfolioOptimizer(Analyzable):
                 _allocations = _allocations[notna_mask]
                 _index_ranges = (_index_ranges[0][notna_mask], _index_ranges[1][notna_mask])
                 if _index_loc is None:
-                    _alloc_wait = deep_substitute(
+                    _alloc_wait = substitute_templates(
                         _alloc_wait,
                         _template_context,
                         sub_id="alloc_wait",

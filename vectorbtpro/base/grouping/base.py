@@ -380,6 +380,11 @@ class Grouper(Configured):
             yield group_idxs[group_start:group_end]
             group_start += group_len
 
+    def __iter__(self) -> tp.Generator[tp.Tuple[tp.Label, tp.GroupIdxs], None, None]:
+        index = self.get_index()
+        for g, group_idxs in enumerate(self.yield_group_idxs()):
+            yield index[g], group_idxs
+
     def select_groups(self, group_idxs: tp.Array1d, jitted: tp.JittedOption = None) -> tp.Tuple[tp.Array1d, tp.Array1d]:
         """Select groups.
 

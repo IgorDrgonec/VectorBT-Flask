@@ -220,7 +220,7 @@ from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.decorators import class_or_instancemethod, class_or_instanceproperty
 from vectorbtpro.utils.mapping import apply_mapping, to_mapping
-from vectorbtpro.utils.template import deep_substitute
+from vectorbtpro.utils.template import substitute_templates
 from vectorbtpro.utils.datetime_ import freq_to_timedelta, freq_to_timedelta64, try_to_datetime_index, parse_timedelta
 from vectorbtpro.utils.colors import adjust_opacity, map_value_to_cmap
 from vectorbtpro.utils.enum_ import map_enum_fields
@@ -900,7 +900,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 checks.assert_not_none(wrapper)
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
-            args = deep_substitute(args, template_context, sub_id="args")
+            args = substitute_templates(args, template_context, sub_id="args")
             func = jit_reg.resolve_option(nb.map_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(wrapper.shape_2d, map_func_nb, *args)
@@ -1018,7 +1018,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 checks.assert_not_none(wrapper)
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper, axis=axis), template_context)
-            args = deep_substitute(args, template_context, sub_id="args")
+            args = substitute_templates(args, template_context, sub_id="args")
             if axis == 0:
                 func = jit_reg.resolve_option(nb.row_apply_meta_nb, jitted)
             else:
@@ -1188,7 +1188,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 dict(wrapper=wrapper, window=window, minp=minp),
                 template_context,
             )
-            args = deep_substitute(args, template_context, sub_id="args")
+            args = substitute_templates(args, template_context, sub_id="args")
             if isinstance(window, int):
                 func = jit_reg.resolve_option(nb.rolling_reduce_meta_nb, jitted)
                 func = ch_reg.resolve_option(func, chunked)
@@ -1323,7 +1323,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 checks.assert_not_none(wrapper)
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
-            by = deep_substitute(by, template_context, sub_id="by")
+            by = substitute_templates(by, template_context, sub_id="by")
         else:
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -1333,7 +1333,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         if isinstance(cls_or_self, type):
             group_map = grouper.get_group_map()
             template_context = merge_dicts(dict(by=by, grouper=grouper), template_context)
-            args = deep_substitute(args, template_context, sub_id="args")
+            args = substitute_templates(args, template_context, sub_id="args")
             func = jit_reg.resolve_option(nb.groupby_reduce_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(wrapper.shape_2d[1], group_map, reduce_func_nb, *args)
@@ -1449,7 +1449,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 checks.assert_not_none(wrapper)
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
-            rule = deep_substitute(rule, template_context, sub_id="rule")
+            rule = substitute_templates(rule, template_context, sub_id="rule")
         else:
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -1610,8 +1610,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 checks.assert_not_none(wrapper)
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
-            apply_args = deep_substitute(apply_args, template_context, sub_id="apply_args")
-            reduce_args = deep_substitute(reduce_args, template_context, sub_id="reduce_args")
+            apply_args = substitute_templates(apply_args, template_context, sub_id="apply_args")
+            reduce_args = substitute_templates(reduce_args, template_context, sub_id="reduce_args")
             func = jit_reg.resolve_option(nb.apply_and_reduce_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(wrapper.shape_2d[1], apply_func_nb, apply_args, reduce_func_nb, reduce_args)
@@ -1823,7 +1823,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 ),
                 template_context,
             )
-            args = deep_substitute(args, template_context, sub_id="args")
+            args = substitute_templates(args, template_context, sub_id="args")
             if wrapper.grouper.is_grouped(group_by=group_by):
                 group_map = wrapper.grouper.get_group_map(group_by=group_by)
                 if returns_array:
@@ -1998,7 +1998,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 dict(wrapper=wrapper, window=window),
                 template_context,
             )
-            args = deep_substitute(args, template_context, sub_id="args")
+            args = substitute_templates(args, template_context, sub_id="args")
             func = jit_reg.resolve_option(nb.proximity_reduce_meta_nb, jitted)
             out = func(wrapper.shape_2d, window, reduce_func_nb, *args)
         else:
@@ -2118,7 +2118,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 dict(wrapper=wrapper, group_by=group_by),
                 template_context,
             )
-            args = deep_substitute(args, template_context, sub_id="args")
+            args = substitute_templates(args, template_context, sub_id="args")
             if not wrapper.grouper.is_grouped(group_by=group_by):
                 raise ValueError("Grouping required")
             group_map = wrapper.grouper.get_group_map(group_by=group_by)
@@ -2487,7 +2487,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 checks.assert_not_none(wrapper)
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
-            index = deep_substitute(index, template_context, sub_id="index")
+            index = substitute_templates(index, template_context, sub_id="index")
         else:
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -2508,7 +2508,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 ),
                 template_context,
             )
-            args = deep_substitute(args, template_context, sub_id="args")
+            args = substitute_templates(args, template_context, sub_id="args")
             func = jit_reg.resolve_option(nb.reduce_index_ranges_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(
@@ -2646,8 +2646,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 checks.assert_not_none(wrapper)
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
-            target_lbound_index = deep_substitute(target_lbound_index, template_context, sub_id="target_lbound_index")
-            target_rbound_index = deep_substitute(target_rbound_index, template_context, sub_id="target_rbound_index")
+            target_lbound_index = substitute_templates(target_lbound_index, template_context, sub_id="target_lbound_index")
+            target_rbound_index = substitute_templates(target_rbound_index, template_context, sub_id="target_rbound_index")
         else:
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -2681,7 +2681,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 ),
                 template_context,
             )
-            args = deep_substitute(args, template_context, sub_id="args")
+            args = substitute_templates(args, template_context, sub_id="args")
             func = jit_reg.resolve_option(nb.reduce_index_ranges_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(

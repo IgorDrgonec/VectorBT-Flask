@@ -366,7 +366,7 @@ from vectorbtpro.utils.jitting import (
     get_id_of_jitter_type,
     get_func_suffix,
 )
-from vectorbtpro.utils.template import RepEval, deep_substitute, CustomTemplate
+from vectorbtpro.utils.template import RepEval, substitute_templates, CustomTemplate
 
 __all__ = [
     "jit_reg",
@@ -629,7 +629,7 @@ class JITRegistry:
             template_context,
             dict(task_id=task_id, py_func=py_func, task_setups=atomic_dict(task_setups)),
         )
-        jitter = deep_substitute(jitter, template_context, sub_id="jitter")
+        jitter = substitute_templates(jitter, template_context, sub_id="jitter")
 
         if jitter is None and py_func is not None:
             jitter = get_func_suffix(py_func)
@@ -662,7 +662,7 @@ class JITRegistry:
             template_context,
             dict(jitter_id=jitter_id, jitter=jitter, jitable_setup=jitable_setup),
         )
-        disable = deep_substitute(disable, template_context, sub_id="disable")
+        disable = substitute_templates(disable, template_context, sub_id="disable")
         if disable is None:
             disable = jitting_cfg["disable"]
         if disable:
@@ -680,7 +680,7 @@ class JITRegistry:
                 setup_cfg.get("resolve_kwargs", None),
                 jitter_kwargs,
             )
-            jitter_kwargs = deep_substitute(jitter_kwargs, template_context, sub_id="jitter_kwargs")
+            jitter_kwargs = substitute_templates(jitter_kwargs, template_context, sub_id="jitter_kwargs")
             jitter = resolve_jitter(jitter=jitter, **jitter_kwargs)
 
         if jitable_setup is not None:

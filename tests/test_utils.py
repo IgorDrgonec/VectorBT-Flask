@@ -2309,29 +2309,29 @@ class TestTemplate:
         assert template.RepFunc(lambda hello: hello == 100, {"hello": 100}).substitute()
         assert not template.RepFunc(lambda hello: hello == 100, {"hello": 100}).substitute({"hello": 200})
 
-    def test_deep_substitute(self):
-        assert template.deep_substitute(template.Rep("hello"), {"hello": 100}) == 100
+    def test_substitute_templates(self):
+        assert template.substitute_templates(template.Rep("hello"), {"hello": 100}) == 100
         with pytest.raises(Exception):
-            template.deep_substitute(template.Rep("hello2"), {"hello": 100})
-        assert isinstance(template.deep_substitute(template.Rep("hello2"), {"hello": 100}, strict=False), template.Rep)
-        assert template.deep_substitute(template.Sub("$hello"), {"hello": 100}) == "100"
+            template.substitute_templates(template.Rep("hello2"), {"hello": 100})
+        assert isinstance(template.substitute_templates(template.Rep("hello2"), {"hello": 100}, strict=False), template.Rep)
+        assert template.substitute_templates(template.Sub("$hello"), {"hello": 100}) == "100"
         with pytest.raises(Exception):
-            template.deep_substitute(template.Sub("$hello2"), {"hello": 100})
-        assert template.deep_substitute([template.Rep("hello")], {"hello": 100}, except_types=()) == [100]
-        assert template.deep_substitute({template.Rep("hello")}, {"hello": 100}, except_types=()) == {100}
-        assert template.deep_substitute({"test": template.Rep("hello")}, {"hello": 100}) == {"test": 100}
+            template.substitute_templates(template.Sub("$hello2"), {"hello": 100})
+        assert template.substitute_templates([template.Rep("hello")], {"hello": 100}, except_types=()) == [100]
+        assert template.substitute_templates({template.Rep("hello")}, {"hello": 100}, except_types=()) == {100}
+        assert template.substitute_templates({"test": template.Rep("hello")}, {"hello": 100}) == {"test": 100}
         Tup = namedtuple("Tup", ["a"])
         tup = Tup(template.Rep("hello"))
-        assert template.deep_substitute(tup, {"hello": 100}) == Tup(100)
-        assert template.deep_substitute(template.RepEval("100"), max_depth=0) == 100
-        assert template.deep_substitute((template.RepEval("100"),), max_depth=0) == (template.RepEval("100"),)
-        assert template.deep_substitute((template.RepEval("100"),), max_depth=1) == (100,)
-        assert template.deep_substitute((template.RepEval("100"),), max_len=1) == (100,)
-        assert template.deep_substitute((0, template.RepEval("100")), max_len=1) == (
+        assert template.substitute_templates(tup, {"hello": 100}) == Tup(100)
+        assert template.substitute_templates(template.RepEval("100"), max_depth=0) == 100
+        assert template.substitute_templates((template.RepEval("100"),), max_depth=0) == (template.RepEval("100"),)
+        assert template.substitute_templates((template.RepEval("100"),), max_depth=1) == (100,)
+        assert template.substitute_templates((template.RepEval("100"),), max_len=1) == (100,)
+        assert template.substitute_templates((0, template.RepEval("100")), max_len=1) == (
             0,
             template.RepEval("100"),
         )
-        assert template.deep_substitute((0, template.RepEval("100")), max_len=2) == (
+        assert template.substitute_templates((0, template.RepEval("100")), max_len=2) == (
             0,
             100,
         )

@@ -46,7 +46,7 @@ from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.parsing import glob2re, get_func_arg_names, get_func_kwargs
-from vectorbtpro.utils.template import deep_substitute
+from vectorbtpro.utils.template import substitute_templates
 
 try:
     if not tp.TYPE_CHECKING:
@@ -358,7 +358,7 @@ class RandomOHLCData(RandomData):
         if n_ticks is None:
             n_ticks = random_ohlc_cfg["n_ticks"]
         template_context = merge_dicts(dict(symbol=symbol, index=index), template_context)
-        n_ticks = deep_substitute(n_ticks, template_context, sub_id="n_ticks")
+        n_ticks = substitute_templates(n_ticks, template_context, sub_id="n_ticks")
         n_ticks = broadcast_array_to(n_ticks, len(index))
         if start_value is None:
             start_value = random_ohlc_cfg["start_value"]
@@ -514,7 +514,7 @@ class GBMOHLCData(GBMData):
         if n_ticks is None:
             n_ticks = gbm_cfg["n_ticks"]
         template_context = merge_dicts(dict(symbol=symbol, index=index), template_context)
-        n_ticks = deep_substitute(n_ticks, template_context, sub_id="n_ticks")
+        n_ticks = substitute_templates(n_ticks, template_context, sub_id="n_ticks")
         n_ticks = broadcast_array_to(n_ticks, len(index))
         if start_value is None:
             start_value = gbm_cfg["start_value"]

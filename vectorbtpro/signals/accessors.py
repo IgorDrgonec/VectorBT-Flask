@@ -199,7 +199,7 @@ from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import class_or_instancemethod, class_or_instanceproperty
 from vectorbtpro.utils.random_ import set_seed_nb
-from vectorbtpro.utils.template import RepEval, deep_substitute
+from vectorbtpro.utils.template import RepEval, substitute_templates
 
 __all__ = [
     "SignalsAccessor",
@@ -318,7 +318,7 @@ class SignalsAccessor(GenericAccessor):
             dict(shape=shape, shape_2d=shape_2d, wait=wait),
             template_context,
         )
-        args = deep_substitute(args, template_context, sub_id="args")
+        args = substitute_templates(args, template_context, sub_id="args")
         func = jit_reg.resolve_option(nb.generate_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         result = func(shape_2d, only_once, wait, place_func_nb, *args)
@@ -451,8 +451,8 @@ class SignalsAccessor(GenericAccessor):
             ),
             template_context,
         )
-        entry_args = deep_substitute(entry_args, template_context, sub_id="entry_args")
-        exit_args = deep_substitute(exit_args, template_context, sub_id="exit_args")
+        entry_args = substitute_templates(entry_args, template_context, sub_id="entry_args")
+        exit_args = substitute_templates(exit_args, template_context, sub_id="exit_args")
         func = jit_reg.resolve_option(nb.generate_enex_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         result1, result2 = func(
@@ -529,7 +529,7 @@ class SignalsAccessor(GenericAccessor):
             dict(wait=wait, until_next=until_next, skip_until_exit=skip_until_exit),
             template_context,
         )
-        args = deep_substitute(args, template_context, sub_id="args")
+        args = substitute_templates(args, template_context, sub_id="args")
         func = jit_reg.resolve_option(nb.generate_ex_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         exits = func(obj, wait, until_next, skip_until_exit, exit_place_func_nb, *args)
@@ -1531,7 +1531,7 @@ class SignalsAccessor(GenericAccessor):
             ),
             template_context,
         )
-        args = deep_substitute(args, template_context, sub_id="args")
+        args = substitute_templates(args, template_context, sub_id="args")
         func = jit_reg.resolve_option(nb.rank_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         rank = func(obj, reset_by, after_false, after_reset, reset_wait, rank_func_nb, *args)

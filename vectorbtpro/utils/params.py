@@ -17,7 +17,7 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.config import Config, merge_dicts
 from vectorbtpro.utils.execution import execute
-from vectorbtpro.utils.template import deep_substitute
+from vectorbtpro.utils.template import substitute_templates
 from vectorbtpro.utils.parsing import annotate_args, ann_args_to_args
 
 __all__ = [
@@ -932,8 +932,8 @@ def parameterized(
                             v["value"] = param_config[k]
                             __ann_args[k] = v
                         _args, _kwargs = ann_args_to_args(__ann_args)
-                        _args = deep_substitute(_args, __template_context, sub_id="args")
-                        _kwargs = deep_substitute(_kwargs, __template_context, sub_id="kwargs")
+                        _args = substitute_templates(_args, __template_context, sub_id="args")
+                        _kwargs = substitute_templates(_kwargs, __template_context, sub_id="kwargs")
                         yield func, _args, _kwargs
 
                 funcs_args = _prepare_args()
@@ -957,7 +957,7 @@ def parameterized(
                 return use_meta
 
             if selection is not None:
-                selection = deep_substitute(selection, template_context, sub_id="selection")
+                selection = substitute_templates(selection, template_context, sub_id="selection")
                 found_param = False
                 if checks.is_hashable(selection):
                     if checks.is_int(selection):
@@ -1006,7 +1006,7 @@ def parameterized(
                 return funcs_args[0][0](*funcs_args[0][1], **funcs_args[0][2])
 
             # Execute function on each parameter combination
-            execute_kwargs = deep_substitute(execute_kwargs, template_context, sub_id="execute_kwargs")
+            execute_kwargs = substitute_templates(execute_kwargs, template_context, sub_id="execute_kwargs")
             results = execute(
                 template_context["funcs_args"],
                 n_calls=len(template_context["param_configs"]),
@@ -1020,7 +1020,7 @@ def parameterized(
 
                     merge_func = resolve_merge_func(merge_func)
                     merge_kwargs = {**dict(keys=template_context["param_index"]), **merge_kwargs}
-                merge_kwargs = deep_substitute(merge_kwargs, template_context, sub_id="merge_kwargs")
+                merge_kwargs = substitute_templates(merge_kwargs, template_context, sub_id="merge_kwargs")
                 return merge_func(results, **merge_kwargs)
             return results
 

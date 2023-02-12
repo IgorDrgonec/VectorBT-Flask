@@ -17,7 +17,7 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, Config
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.parsing import annotate_args, match_ann_arg, get_func_arg_names, Regex
-from vectorbtpro.utils.template import deep_substitute, Rep
+from vectorbtpro.utils.template import substitute_templates, Rep
 
 __all__ = [
     "ChunkMeta",
@@ -779,14 +779,14 @@ def yield_arg_chunks(
 
     for _chunk_meta in chunk_meta:
         context = merge_dicts(dict(ann_args=ann_args, chunk_meta=_chunk_meta), template_context)
-        chunk_ann_args = deep_substitute(ann_args, context=context, sub_id="chunk_ann_args")
+        chunk_ann_args = substitute_templates(ann_args, context=context, sub_id="chunk_ann_args")
         if callable(arg_take_spec):
             chunk_args, chunk_kwargs = arg_take_spec(chunk_ann_args, _chunk_meta, **kwargs)
         else:
             chunk_arg_take_spec = arg_take_spec
             if not checks.is_mapping(chunk_arg_take_spec):
                 chunk_arg_take_spec = dict(zip(range(len(chunk_arg_take_spec)), chunk_arg_take_spec))
-            chunk_arg_take_spec = deep_substitute(chunk_arg_take_spec, context=context, sub_id="chunk_arg_take_spec")
+            chunk_arg_take_spec = substitute_templates(chunk_arg_take_spec, context=context, sub_id="chunk_arg_take_spec")
             chunk_args, chunk_kwargs = take_from_args(chunk_ann_args, chunk_arg_take_spec, _chunk_meta, **kwargs)
         yield func, chunk_args, chunk_kwargs
 
@@ -1120,7 +1120,7 @@ def chunked(
                 ),
                 template_context,
             )
-            execute_kwargs = deep_substitute(execute_kwargs, context, sub_id="execute_kwargs")
+            execute_kwargs = substitute_templates(execute_kwargs, context, sub_id="execute_kwargs")
             results = execute(funcs_args, n_calls=len(chunk_meta), **execute_kwargs)
             if merge_func is not None:
                 context["funcs_args"] = funcs_args
@@ -1128,7 +1128,7 @@ def chunked(
                     from vectorbtpro.base.merging import resolve_merge_func
 
                     merge_func = resolve_merge_func(merge_func)
-                merge_kwargs = deep_substitute(merge_kwargs, context, sub_id="merge_kwargs")
+                merge_kwargs = substitute_templates(merge_kwargs, context, sub_id="merge_kwargs")
                 return merge_func(results, **merge_kwargs)
             return results
 

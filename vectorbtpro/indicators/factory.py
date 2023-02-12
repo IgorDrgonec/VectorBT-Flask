@@ -66,7 +66,7 @@ from vectorbtpro.utils.mapping import to_mapping, apply_mapping
 from vectorbtpro.utils.params import to_typed_list, broadcast_params, create_param_product, params_to_list
 from vectorbtpro.utils.parsing import get_expr_var_names, get_func_arg_names, get_func_kwargs, supress_stdout
 from vectorbtpro.utils.random_ import set_seed
-from vectorbtpro.utils.template import has_templates, deep_substitute
+from vectorbtpro.utils.template import has_templates, substitute_templates
 from vectorbtpro.utils.datetime_ import freq_to_timedelta64, infer_index_freq
 from vectorbtpro.utils.module_ import search_package_for_funcs
 
@@ -708,8 +708,8 @@ def run_pipeline(
                 ),
                 template_context,
             )
-            func_args = deep_substitute(func_args, template_context, sub_id="custom_func_args")
-            func_kwargs = deep_substitute(func_kwargs, template_context, sub_id="custom_func_kwargs")
+            func_args = substitute_templates(func_args, template_context, sub_id="custom_func_args")
+            func_kwargs = substitute_templates(func_kwargs, template_context, sub_id="custom_func_kwargs")
 
         # Run the custom function
         if checks.is_numba_func(custom_func):

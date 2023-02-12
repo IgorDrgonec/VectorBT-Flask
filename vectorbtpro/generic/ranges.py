@@ -148,7 +148,7 @@ from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.params import combine_params, Param
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.parsing import get_func_kwargs
-from vectorbtpro.utils.template import deep_substitute
+from vectorbtpro.utils.template import substitute_templates
 
 __all__ = [
     "Ranges",
@@ -1191,7 +1191,7 @@ class Ranges(PriceRecords):
             for i in range(len(self_col.values)):
                 start_index = start_idx[i]
                 end_index = end_idx[i]
-                _shape_kwargs = deep_substitute(
+                _shape_kwargs = substitute_templates(
                     shape_kwargs,
                     context=dict(
                         self_col=self_col,

@@ -134,7 +134,7 @@ from vectorbtpro.utils.execution import (
     RayEngine
 )
 from vectorbtpro.utils.jitting import NumPyJitter, NumbaJitter
-from vectorbtpro.utils.template import Sub, RepEval, deep_substitute
+from vectorbtpro.utils.template import Sub, RepEval, substitute_templates
 
 __all__ = [
     "settings",
@@ -1630,7 +1630,7 @@ class SettingsConfig(Config):
         for k, v in __pdoc__.items():
             if k in self:
                 config_doc = self[k].prettify(**prettify_kwargs.get(k, {}))
-                __pdoc__[k] = deep_substitute(
+                __pdoc__[k] = substitute_templates(
                     v,
                     context=dict(config_doc=config_doc),
                     sub_id="__pdoc__",

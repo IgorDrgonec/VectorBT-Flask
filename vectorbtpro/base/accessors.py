@@ -24,7 +24,7 @@ from vectorbtpro.utils.config import merge_dicts, resolve_dict, Configured
 from vectorbtpro.utils.decorators import class_or_instanceproperty, class_or_instancemethod
 from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, attach_unary_magic_methods
 from vectorbtpro.utils.parsing import get_context_vars
-from vectorbtpro.utils.template import deep_substitute
+from vectorbtpro.utils.template import substitute_templates
 from vectorbtpro.utils.datetime_ import infer_index_freq, freq_to_timedelta64, parse_timedelta, try_to_datetime_index
 from vectorbtpro.utils.eval_ import multiline_eval
 
@@ -846,8 +846,8 @@ class BaseAccessor(Wrapping):
                     ),
                     template_context,
                 )
-                _func_args = deep_substitute(args, _template_context, sub_id="func_args")
-                _func_kwargs = deep_substitute(func_kwargs, _template_context, sub_id="func_kwargs")
+                _func_args = substitute_templates(args, _template_context, sub_id="func_args")
+                _func_kwargs = substitute_templates(func_kwargs, _template_context, sub_id="func_kwargs")
                 v = value_or_func(*_func_args, **_func_kwargs)
                 if self.is_series() or columns is None:
                     obj.iloc[index_points[i]] = v
@@ -917,8 +917,8 @@ class BaseAccessor(Wrapping):
                     ),
                     template_context,
                 )
-                _func_args = deep_substitute(args, _template_context, sub_id="func_args")
-                _func_kwargs = deep_substitute(func_kwargs, _template_context, sub_id="func_kwargs")
+                _func_args = substitute_templates(args, _template_context, sub_id="func_args")
+                _func_kwargs = substitute_templates(func_kwargs, _template_context, sub_id="func_kwargs")
                 v = value_or_func(*_func_args, **_func_kwargs)
             elif checks.is_sequence(value_or_func) and not isinstance(value_or_func, str):
                 v = value_or_func[i]
@@ -1147,8 +1147,8 @@ class BaseAccessor(Wrapping):
         elif not keep_pd:
             broadcast_named_args = {k: np.asarray(v) for k, v in broadcast_named_args.items()}
         template_context = merge_dicts(broadcast_named_args, template_context)
-        args = deep_substitute(args, template_context, sub_id="args")
-        kwargs = deep_substitute(kwargs, template_context, sub_id="kwargs")
+        args = substitute_templates(args, template_context, sub_id="args")
+        kwargs = substitute_templates(kwargs, template_context, sub_id="kwargs")
         out = apply_func(broadcast_named_args["obj"], *args, **kwargs)
         return wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
@@ -1287,8 +1287,8 @@ class BaseAccessor(Wrapping):
         elif not keep_pd:
             broadcast_named_args = {k: np.asarray(v) for k, v in broadcast_named_args.items()}
         template_context = merge_dicts(broadcast_named_args, dict(ntimes=ntimes), template_context)
-        args = deep_substitute(args, template_context, sub_id="args")
-        kwargs = deep_substitute(kwargs, template_context, sub_id="kwargs")
+        args = substitute_templates(args, template_context, sub_id="args")
+        kwargs = substitute_templates(kwargs, template_context, sub_id="kwargs")
         out = combining.apply_and_concat(ntimes, apply_func, broadcast_named_args["obj"], *args, **kwargs)
         if keys is not None:
             new_columns = indexes.combine_indexes([keys, wrapper.columns])
@@ -1466,8 +1466,8 @@ class BaseAccessor(Wrapping):
         elif not keep_pd:
             broadcast_named_args = {k: np.asarray(v) for k, v in broadcast_named_args.items()}
         template_context = merge_dicts(broadcast_named_args, template_context)
-        args = deep_substitute(args, template_context, sub_id="args")
-        kwargs = deep_substitute(kwargs, template_context, sub_id="kwargs")
+        args = substitute_templates(args, template_context, sub_id="args")
+        kwargs = substitute_templates(kwargs, template_context, sub_id="kwargs")
         inputs = [broadcast_named_args["obj_" + str(i)] for i in range(len(objs))]
 
         if concat is None:
