@@ -156,7 +156,7 @@ class SyntheticData(CustomData):
         normalize: tp.Optional[bool] = None,
         inclusive: tp.Optional[str] = None,
         **kwargs,
-    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
+    ) -> tp.SymbolData:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to generate a symbol.
 
         Generates datetime index using `pd.date_range` and passes it to `SyntheticData.generate_symbol`
@@ -733,7 +733,7 @@ class CSVData(LocalData):
         squeeze: tp.Optional[bool] = None,
         chunk_func: tp.Optional[tp.Callable] = None,
         **read_csv_kwargs,
-    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
+    ) -> tp.SymbolData:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to load a CSV file.
 
         Args:
@@ -1013,7 +1013,7 @@ class HDFData(LocalData):
         end_row: tp.Optional[int] = None,
         chunk_func: tp.Optional[tp.Callable] = None,
         **read_hdf_kwargs,
-    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
+    ) -> tp.SymbolData:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to load an HDF object.
 
         Args:
@@ -1147,7 +1147,7 @@ class RemoteData(CustomData):
 
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.remote")
 
-    def update_symbol(self, symbol: str, **kwargs) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
+    def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
         fetch_kwargs["start"] = self.last_index[symbol]
         kwargs = merge_dicts(fetch_kwargs, kwargs)
@@ -1233,7 +1233,7 @@ class YFData(RemoteData):
         timeframe: tp.Optional[str] = None,
         tz: tp.Optional[tp.TimezoneLike] = None,
         **history_kwargs,
-    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
+    ) -> tp.SymbolData:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Yahoo Finance.
 
         Args:
@@ -1454,7 +1454,7 @@ class BinanceData(RemoteData):
         pbar_kwargs: tp.KwargsLike = None,
         silence_warnings: tp.Optional[bool] = None,
         **get_klines_kwargs,
-    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
+    ) -> tp.SymbolData:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Binance.
 
         Args:
@@ -1825,7 +1825,7 @@ class CCXTData(RemoteData):
         pbar_kwargs: tp.KwargsLike = None,
         silence_warnings: tp.Optional[bool] = None,
         return_fetch_method: bool = False,
-    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
+    ) -> tp.SymbolData:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from CCXT.
 
         Args:
@@ -2198,7 +2198,7 @@ class AlpacaData(RemoteData):
         adjustment: tp.Optional[str] = None,
         feed: tp.Optional[str] = None,
         limit: tp.Optional[int] = None,
-    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
+    ) -> tp.SymbolData:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Alpaca.
 
         Args:
@@ -2469,7 +2469,7 @@ class PolygonData(RemoteData):
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
         silence_warnings: tp.Optional[bool] = None,
-    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
+    ) -> tp.SymbolData:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Polygon.
 
         Args:
@@ -2871,7 +2871,7 @@ class AVData(RemoteData):
         params: tp.KwargsLike = None,
         read_csv_kwargs: tp.KwargsLike = None,
         silence_warnings: tp.Optional[bool] = None,
-    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
+    ) -> tp.SymbolData:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Alpha Vantage.
 
         See https://www.alphavantage.co/documentation/ for API endpoints and their parameters.
@@ -3130,7 +3130,7 @@ class AVData(RemoteData):
 
         return df, dict(tz_convert=tz, freq=freq)
 
-    def update_symbol(self, symbol: str, **kwargs) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
+    def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
         raise NotImplementedError
 
 
@@ -3180,7 +3180,7 @@ class NDLData(RemoteData):
         collapse: tp.Optional[str] = None,
         transform: tp.Optional[str] = None,
         **params,
-    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
+    ) -> tp.SymbolData:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Nasdaq Data Link.
 
         Args:
@@ -3372,7 +3372,7 @@ class TVData(RemoteData):
         extended_session: tp.Optional[bool] = None,
         pro_data: tp.Optional[bool] = None,
         limit: tp.Optional[int] = None,
-    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
+    ) -> tp.SymbolData:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from TradingView.
 
         Args:

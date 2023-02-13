@@ -53,6 +53,15 @@ class SerialEngine(ExecutionEngine):
 
     For defaults, see `engines.serial` in `vectorbtpro._settings.execution`."""
 
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+        "show_progress",
+        "progress_desc",
+        "pbar_kwargs",
+        "clear_cache",
+        "collect_garbage",
+        "cooldown",
+    }
+
     def __init__(
         self,
         show_progress: tp.Optional[bool] = None,
@@ -60,6 +69,8 @@ class SerialEngine(ExecutionEngine):
         pbar_kwargs: tp.KwargsLike = None,
         clear_cache: tp.Union[None, bool, int] = None,
         collect_garbage: tp.Union[None, bool, int] = None,
+        cooldown: tp.Optional[int] = None,
+        **kwargs,
     ) -> None:
         from vectorbtpro._settings import settings
 
@@ -72,20 +83,25 @@ class SerialEngine(ExecutionEngine):
             clear_cache = serial_cfg["clear_cache"]
         if collect_garbage is None:
             collect_garbage = serial_cfg["collect_garbage"]
+        if cooldown is None:
+            cooldown = serial_cfg["cooldown"]
 
         self._show_progress = show_progress
         self._progress_desc = progress_desc
         self._pbar_kwargs = pbar_kwargs
         self._clear_cache = clear_cache
         self._collect_garbage = collect_garbage
+        self._cooldown = cooldown
 
         ExecutionEngine.__init__(
             self,
             show_progress=show_progress,
             progress_desc=progress_desc,
-            bar_kwargs=pbar_kwargs,
+            pbar_kwargs=pbar_kwargs,
             clear_cache=clear_cache,
             collect_garbage=collect_garbage,
+            cooldown=cooldown,
+            **kwargs,
         )
 
     @property
@@ -117,8 +133,14 @@ class SerialEngine(ExecutionEngine):
         If integer, do it once a number of calls."""
         return self._collect_garbage
 
+    @property
+    def cooldown(self) -> tp.Optional[int]:
+        """Number of seconds to sleep after each call."""
+        return self._cooldown
+
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         from vectorbtpro.registries.ca_registry import CAQueryDelegator
+        import time
 
         results = []
         if n_calls is None and hasattr(funcs_args, "__len__"):
@@ -126,10 +148,7 @@ class SerialEngine(ExecutionEngine):
         with get_pbar(total=n_calls, show_progress=self.show_progress, **self.pbar_kwargs) as pbar:
             for i, (func, args, kwargs) in enumerate(funcs_args):
                 if self.progress_desc is not None:
-                    if isinstance(self.progress_desc, str):
-                        pbar.set_description(self.progress_desc)
-                    else:
-                        pbar.set_description(str(self.progress_desc[i]))
+                    pbar.set_description(str(self.progress_desc[i]))
                 results.append(func(*args, **kwargs))
                 pbar.update(1)
                 if isinstance(self.clear_cache, bool):
@@ -142,6 +161,8 @@ class SerialEngine(ExecutionEngine):
                         gc.collect()
                 elif i > 0 and (i + 1) % self.collect_garbage == 0:
                     gc.collect()
+                if self.cooldown is not None:
+                    time.sleep(self.cooldown)
 
         return results
 
@@ -151,7 +172,11 @@ class ThreadPoolEngine(ExecutionEngine):
 
     For defaults, see `engines.threadpool` in `vectorbtpro._settings.execution`."""
 
-    def __init__(self, init_kwargs: tp.KwargsLike = None) -> None:
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+        "init_kwargs",
+    }
+
+    def __init__(self, init_kwargs: tp.KwargsLike = None, **kwargs) -> None:
         from vectorbtpro._settings import settings
 
         threadpool_cfg = settings["execution"]["engines"]["threadpool"]
@@ -160,7 +185,7 @@ class ThreadPoolEngine(ExecutionEngine):
 
         self._init_kwargs = init_kwargs
 
-        ExecutionEngine.__init__(self, init_kwargs=init_kwargs)
+        ExecutionEngine.__init__(self, init_kwargs=init_kwargs, **kwargs)
 
     @property
     def init_kwargs(self) -> tp.Kwargs:
@@ -220,11 +245,18 @@ class PathosEngine(ExecutionEngine):
 
     For defaults, see `engines.pathos` in `vectorbtpro._settings.execution`."""
 
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+        "pool_type",
+        "sleep",
+        "init_kwargs",
+    }
+
     def __init__(
         self,
         pool_type: tp.Optional[str] = None,
         sleep: tp.Optional[int] = None,
         init_kwargs: tp.KwargsLike = None,
+        **kwargs,
     ) -> None:
         from vectorbtpro._settings import settings
 
@@ -240,7 +272,7 @@ class PathosEngine(ExecutionEngine):
         self._sleep = sleep
         self._init_kwargs = init_kwargs
 
-        ExecutionEngine.__init__(self, init_kwargs=init_kwargs)
+        ExecutionEngine.__init__(self, init_kwargs=init_kwargs, **kwargs)
 
     @property
     def pool_type(self) -> str:
@@ -249,7 +281,10 @@ class PathosEngine(ExecutionEngine):
 
     @property
     def sleep(self) -> tp.Optional[int]:
-        """Seconds to sleep."""
+        """Number of seconds between task checks.
+
+        The higher, the less CPU it uses but also the more time it takes to gather the results.
+        Thus, should be in a millisecond range."""
         return self._sleep
 
     @property
@@ -294,7 +329,11 @@ class DaskEngine(ExecutionEngine):
         Use multi-threading mainly on numeric code that releases the GIL
         (like NumPy, Pandas, Scikit-Learn, Numba)."""
 
-    def __init__(self, **compute_kwargs) -> None:
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+        "compute_kwargs",
+    }
+
+    def __init__(self, compute_kwargs: tp.KwargsLike = None, **kwargs) -> None:
         from vectorbtpro._settings import settings
 
         dask_cfg = settings["execution"]["engines"]["dask"]
@@ -303,7 +342,7 @@ class DaskEngine(ExecutionEngine):
 
         self._compute_kwargs = compute_kwargs
 
-        ExecutionEngine.__init__(self, **compute_kwargs)
+        ExecutionEngine.__init__(self, compute_kwargs=compute_kwargs, **kwargs)
 
     @property
     def compute_kwargs(self) -> tp.Kwargs:
@@ -333,6 +372,15 @@ class RayEngine(ExecutionEngine):
         a considerable amount of time compared to this copying operation, otherwise there will be
         a little to no speedup."""
 
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+        "restart",
+        "reuse_refs",
+        "del_refs",
+        "shutdown",
+        "init_kwargs",
+        "remote_kwargs",
+    }
+
     def __init__(
         self,
         restart: tp.Optional[bool] = None,
@@ -341,6 +389,7 @@ class RayEngine(ExecutionEngine):
         shutdown: tp.Optional[bool] = None,
         init_kwargs: tp.KwargsLike = None,
         remote_kwargs: tp.KwargsLike = None,
+        **kwargs,
     ) -> None:
         from vectorbtpro._settings import settings
 
@@ -372,6 +421,7 @@ class RayEngine(ExecutionEngine):
             shutdown=shutdown,
             init_kwargs=init_kwargs,
             remote_kwargs=remote_kwargs,
+            **kwargs,
         )
 
     @property
@@ -538,7 +588,7 @@ def build_serial_chunk(funcs_args: tp.FuncsArgs) -> tp.FuncArgs:
 
 def execute(
     funcs_args: tp.FuncsArgs,
-    engine: tp.EngineLike = SerialEngine,
+    engine: tp.EngineLike = "serial",
     n_calls: tp.Optional[int] = None,
     n_chunks: tp.Optional[tp.Union[str, int]] = None,
     chunk_len: tp.Optional[tp.Union[str, int]] = None,
@@ -546,18 +596,19 @@ def execute(
     distribute: tp.Optional[str] = None,
     in_chunk_order: bool = False,
     show_progress: tp.Optional[bool] = None,
+    progress_desc: tp.Optional[tp.Sequence] = None,
     pbar_kwargs: tp.KwargsLike = None,
     template_context: tp.KwargsLike = None,
-    **kwargs,
+    **engine_kwargs,
 ) -> list:
     """Execute using an engine.
 
     Supported values for `engine`:
 
     * Name of the engine (see supported engines)
-    * Subclass of `ExecutionEngine` - initializes with `**kwargs`
+    * Subclass of `ExecutionEngine` - initializes with `**engine_kwargs`
     * Instance of `ExecutionEngine` - calls `ExecutionEngine.execute` with `n_calls`
-    * Callable - passes `funcs_args`, `n_calls` (if not None), and `**kwargs`
+    * Callable - passes `funcs_args`, `n_calls` (if not None), and `**engine_kwargs`
 
     Can execute per chunk if `chunk_meta` is provided. Otherwise, if any of `n_chunks` and `chunk_len`
     are set, passes them to `vectorbtpro.utils.chunking.yield_chunk_meta` to generate `chunk_meta`.
@@ -565,8 +616,8 @@ def execute(
     Set `n_chunks` and `chunk_len` to 'auto' to set them to the number of cores.
 
     If `distribute` is "calls", distributes calls within each chunk.
-    If indices in `chunk_meta` are perfectly sorted and `funcs_args` is an iterable, traverses
-    through `funcs_args` to avoid converting it into a list. Otherwise, traverses through `chunk_meta`.
+    If indices in `chunk_meta` are perfectly sorted and `funcs_args` is an iterable, iterates
+    over `funcs_args` to avoid converting it into a list. Otherwise, iterates over `chunk_meta`.
     If `in_chunk_order` is True, returns the outputs in the order they appear in `chunk_meta`.
     Otherwise, always returns them in the same order as in `funcs_args`.
 
@@ -600,10 +651,12 @@ def execute(
                 engine_cfg = v
         func_arg_names = get_func_arg_names(engine.__init__)
         if "show_progress" in func_arg_names:
-            kwargs["show_progress"] = show_progress
+            engine_kwargs["show_progress"] = show_progress
+        if "progress_desc" in func_arg_names:
+            engine_kwargs["progress_desc"] = progress_desc
         if "pbar_kwargs" in func_arg_names:
-            kwargs["pbar_kwargs"] = pbar_kwargs
-        engine = engine(**kwargs)
+            engine_kwargs["pbar_kwargs"] = pbar_kwargs
+        engine = engine(**engine_kwargs)
     elif isinstance(engine, ExecutionEngine):
         for k, v in engines_cfg.items():
             if v["cls"] is type(engine):
@@ -611,9 +664,11 @@ def execute(
     if callable(engine):
         func_arg_names = get_func_arg_names(engine)
         if "show_progress" in func_arg_names:
-            kwargs["show_progress"] = show_progress
+            engine_kwargs["show_progress"] = show_progress
+        if "progress_desc" in func_arg_names:
+            engine_kwargs["progress_desc"] = progress_desc
         if "pbar_kwargs" in func_arg_names:
-            kwargs["pbar_kwargs"] = pbar_kwargs
+            engine_kwargs["pbar_kwargs"] = pbar_kwargs
 
     if n_chunks is None:
         n_chunks = engine_cfg.get("n_chunks", execution_cfg["n_chunks"])
@@ -630,8 +685,8 @@ def execute(
             return engine.execute(_funcs_args, n_calls=_n_calls)
         if callable(engine):
             if "n_calls" in func_arg_names:
-                return engine(_funcs_args, n_calls=_n_calls, **kwargs)
-            return engine(_funcs_args, **kwargs)
+                return engine(_funcs_args, n_calls=_n_calls, **engine_kwargs)
+            return engine(_funcs_args, **engine_kwargs)
         raise TypeError(f"Engine of type {type(engine)} is not supported")
 
     if n_chunks is None and chunk_len is None and chunk_meta is None:
@@ -689,7 +744,7 @@ def execute(
 
     if distribute.lower() == "calls":
         if indices_sorted and not hasattr(funcs_args, "__len__"):
-            # Iterate through funcs_args
+            # Iterate over funcs_args
             outputs = []
             chunk_idx = 0
             _funcs_args = []
@@ -709,7 +764,7 @@ def execute(
                     pbar.update(1)
             return outputs
         else:
-            # Iterate through chunks
+            # Iterate over chunks
             funcs_args = list(funcs_args)
             outputs = []
 
@@ -729,7 +784,7 @@ def execute(
             return list(list(zip(*sorted(outputs, key=lambda x: x[0])))[1])
     elif distribute.lower() == "chunks":
         if indices_sorted and not hasattr(funcs_args, "__len__"):
-            # Iterate through funcs_args
+            # Iterate over funcs_args
             chunk_idx = 0
             _funcs_args = []
             funcs_args_chunks = []
@@ -745,7 +800,7 @@ def execute(
             outputs = _execute(funcs_args_chunks, len(funcs_args_chunks))
             return [x for o in outputs for x in o]
         else:
-            # Iterate through chunks
+            # Iterate over chunks
             funcs_args = list(funcs_args)
             funcs_args_chunks = []
             output_indices = []

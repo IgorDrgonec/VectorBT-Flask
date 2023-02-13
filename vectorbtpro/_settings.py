@@ -298,6 +298,7 @@ execution = child_dict(
             pbar_kwargs=Config(),
             clear_cache=False,
             collect_garbage=False,
+            cooldown=None,
         ),
         threadpool=Config(
             cls=ThreadPoolEngine,
@@ -592,14 +593,13 @@ _settings["datetime"] = datetime
 
 data = child_dict(
     wrapper_kwargs=Config(),
-    show_progress=True,
-    pbar_kwargs=Config(),
+    skip_on_error=False,
+    silence_warnings=False,
+    execute_kwargs=Config(),
     tz_localize="UTC",
     tz_convert="UTC",
     missing_index="nan",
     missing_columns="raise",
-    skip_on_error=False,
-    silence_warnings=False,
     custom=Config(
         # Synthetic
         synthetic=Config(

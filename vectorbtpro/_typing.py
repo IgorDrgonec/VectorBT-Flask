@@ -166,6 +166,7 @@ SettingsKeys = ClassVar[Union[None, Hashable, Dict[Hashable, Hashable]]]
 # Data
 Symbol = Hashable
 Symbols = Sequence[Symbol]
+SymbolData = Union[None, SeriesFrame, Tuple[SeriesFrame, Kwargs]]
 
 # Plotting
 TraceName = Union[str, None]

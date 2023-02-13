@@ -168,7 +168,7 @@ def annualized_return_1d_nb(
 ) -> float:
     """Annualized total return.
 
-    This is equivalent to the compound annual growth rate."""
+    This is equivalent to the compound annual growth rate (CAGR)."""
     if period is None:
         period = rets.shape[0]
     cum_return = cum_returns_final_1d_nb(rets, start_value=1.0, log_returns=log_returns)
