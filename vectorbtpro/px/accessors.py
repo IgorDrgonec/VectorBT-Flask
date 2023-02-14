@@ -1,11 +1,11 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Plotly Express pandas accessors.
 
 !!! note
     Accessors do not utilize caching."""
 
-from vectorbtpro.utils.opt_packages import assert_can_import
+from vectorbtpro.utils.module_ import assert_can_import
 
 assert_can_import("plotly")
 
@@ -23,6 +23,12 @@ from vectorbtpro.accessors import register_vbt_accessor, register_df_vbt_accesso
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.figure import make_figure
+
+__all__ = [
+    "PXAccessor",
+    "PXSRAccessor",
+    "PXDFAccessor",
+]
 
 
 def attach_px_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
@@ -91,7 +97,7 @@ class PXAccessor(BaseAccessor):
         >>> pd.Series([1, 2, 3]).vbt.px.bar().show()
         ```
 
-        ![](/assets/images/api/px_bar.svg)
+        ![](/assets/images/api/px_bar.svg){: .iimg }
     """
 
     def __init__(

@@ -2465,6 +2465,213 @@ def test_calculations():
     )
 
 
+def test_approx_order_value_nb():
+    assert (
+        nb.approx_order_value_nb(
+            ExecState(
+                cash=100.0,
+                position=0.0,
+                debt=0.0,
+                locked_cash=0.0,
+                free_cash=100.0,
+                val_price=15.0,
+                value=100.0,
+            ),
+            np.inf,
+            SizeType.Amount,
+            Direction.Both,
+        )
+        == np.inf
+    )
+    assert (
+        nb.approx_order_value_nb(
+            ExecState(
+                cash=100.0,
+                position=0.0,
+                debt=0.0,
+                locked_cash=0.0,
+                free_cash=100.0,
+                val_price=15.0,
+                value=100.0,
+            ),
+            -np.inf,
+            SizeType.Amount,
+            Direction.Both,
+        )
+        == np.inf
+    )
+    assert (
+        nb.approx_order_value_nb(
+            ExecState(
+                cash=100.0,
+                position=0.0,
+                debt=0.0,
+                locked_cash=0.0,
+                free_cash=100.0,
+                val_price=15.0,
+                value=100.0,
+            ),
+            10,
+            SizeType.Amount,
+            Direction.Both,
+        )
+        == 150.0
+    )
+    assert (
+        nb.approx_order_value_nb(
+            ExecState(
+                cash=100.0,
+                position=0.0,
+                debt=0.0,
+                locked_cash=0.0,
+                free_cash=100.0,
+                val_price=15.0,
+                value=100.0,
+            ),
+            -10,
+            SizeType.Amount,
+            Direction.Both,
+        )
+        == 150.0
+    )
+    assert (
+        nb.approx_order_value_nb(
+            ExecState(
+                cash=0.0,
+                position=10.0,
+                debt=0.0,
+                locked_cash=0.0,
+                free_cash=0.0,
+                val_price=15.0,
+                value=100.0,
+            ),
+            -5,
+            SizeType.Amount,
+            Direction.LongOnly,
+        )
+        == -75.0
+    )
+    assert (
+        nb.approx_order_value_nb(
+            ExecState(
+                cash=0.0,
+                position=10.0,
+                debt=0.0,
+                locked_cash=0.0,
+                free_cash=0.0,
+                val_price=15.0,
+                value=100.0,
+            ),
+            -np.inf,
+            SizeType.Amount,
+            Direction.LongOnly,
+        )
+        == -150.0
+    )
+    assert (
+        nb.approx_order_value_nb(
+            ExecState(
+                cash=0.0,
+                position=10.0,
+                debt=0.0,
+                locked_cash=0.0,
+                free_cash=0.0,
+                val_price=15.0,
+                value=100.0,
+            ),
+            -15,
+            SizeType.Amount,
+            Direction.Both,
+        )
+        == -75.0
+    )
+    assert (
+        nb.approx_order_value_nb(
+            ExecState(
+                cash=0.0,
+                position=10.0,
+                debt=0.0,
+                locked_cash=0.0,
+                free_cash=0.0,
+                val_price=15.0,
+                value=100.0,
+            ),
+            -np.inf,
+            SizeType.Amount,
+            Direction.Both,
+        )
+        == np.inf
+    )
+    assert (
+        nb.approx_order_value_nb(
+            ExecState(
+                cash=200.0,
+                position=-10.0,
+                debt=100.0,
+                locked_cash=100.0,
+                free_cash=0.0,
+                val_price=10.0,
+                value=100.0,
+            ),
+            -5,
+            SizeType.Amount,
+            Direction.ShortOnly,
+        )
+        == -50.0
+    )
+    assert (
+        nb.approx_order_value_nb(
+            ExecState(
+                cash=200.0,
+                position=-10.0,
+                debt=100.0,
+                locked_cash=100.0,
+                free_cash=0.0,
+                val_price=10.0,
+                value=100.0,
+            ),
+            -np.inf,
+            SizeType.Amount,
+            Direction.ShortOnly,
+        )
+        == -100.0
+    )
+    assert (
+        nb.approx_order_value_nb(
+            ExecState(
+                cash=200.0,
+                position=-10.0,
+                debt=100.0,
+                locked_cash=100.0,
+                free_cash=0.0,
+                val_price=10.0,
+                value=100.0,
+            ),
+            15,
+            SizeType.Amount,
+            Direction.Both,
+        )
+        == -50.0
+    )
+    assert (
+        nb.approx_order_value_nb(
+            ExecState(
+                cash=200.0,
+                position=-10.0,
+                debt=100.0,
+                locked_cash=100.0,
+                free_cash=0.0,
+                val_price=10.0,
+                value=100.0,
+            ),
+            np.inf,
+            SizeType.Amount,
+            Direction.Both,
+        )
+        == np.inf
+    )
+
+
 def test_build_call_seq_nb():
     group_lens = np.array([1, 2, 3, 4])
     np.testing.assert_array_equal(

@@ -1228,8 +1228,8 @@ class TestMappedArray:
         assert_frame_equal(
             mapped_array2.value_counts(sort_uniques=False),
             pd.DataFrame(
-                np.array([[2, 1, 0, 0], [1, 0, 1, 0], [0, 1, 1, 0], [0, 0, 1, 0], [0, 1, 0, 0]]),
-                index=pd.Index([4.0, 3.0, 2.0, 1.0, None], dtype="float64"),
+                np.array([[2, 1, 0, 0], [1, 0, 1, 0], [0, 1, 1, 0], [0, 1, 0, 0], [0, 0, 1, 0]]),
+                index=pd.Index([4.0, 3.0, 2.0, None, 1.0], dtype="float64"),
                 columns=wrapper.columns,
             ),
         )
@@ -6697,14 +6697,14 @@ class TestExitTrades:
         )
 
     def test_best_price(self):
-        np.testing.assert_array_almost_equal(exit_trades["a"].best_price.values, np.array([2.5, 3.5, 6.5, 8.0]))
+        np.testing.assert_array_almost_equal(exit_trades["a"].best_price.values, np.array([3.0, 4.0, 7.0, 8.0]))
         np.testing.assert_array_almost_equal(
             exit_trades.best_price.values,
-            np.array([2.5, 3.5, 6.5, 8.0, 1.0, 1.0, 6.0, 8.0, 2.5, 3.5, 6.5, 7.0, 8.0]),
+            np.array([3.0, 4.0, 7.0, 8.0, 1.0, 1.0, 6.0, 8.0, 3.0, 4.0, 7.0, 7.0, 8.0]),
         )
         np.testing.assert_array_almost_equal(
             exit_trades.get_best_price(entry_price_open=True).values,
-            np.array([2.5, 3.5, 6.5, 8.25, 0.25, 0.25, 5.25, 7.25, 2.5, 3.5, 6.5, 6.25, 8.25]),
+            np.array([3.0, 4.0, 7.0, 8.25, 0.25, 0.25, 5.25, 7.25, 3.0, 4.0, 7.0, 6.25, 8.25]),
         )
         np.testing.assert_array_almost_equal(
             exit_trades.get_best_price(exit_price_close=True).values,
@@ -6719,11 +6719,11 @@ class TestExitTrades:
         np.testing.assert_array_almost_equal(exit_trades["a"].worst_price.values, np.array([1.0, 1.0, 6.0, 8.0]))
         np.testing.assert_array_almost_equal(
             exit_trades.worst_price.values,
-            np.array([1.0, 1.0, 6.0, 8.0, 2.5, 3.5, 6.5, 8.0, 1.0, 1.0, 6.0, 7.5, 8.0]),
+            np.array([1.0, 1.0, 6.0, 8.0, 3.0, 4.0, 7.0, 8.0, 1.0, 1.0, 6.0, 8.0, 8.0]),
         )
         np.testing.assert_array_almost_equal(
             exit_trades.get_worst_price(entry_price_open=True).values,
-            np.array([0.25, 0.25, 5.25, 7.25, 2.5, 3.5, 6.5, 8.25, 0.25, 0.25, 5.25, 7.5, 7.25]),
+            np.array([0.25, 0.25, 5.25, 7.25, 3.0, 4.0, 7.0, 8.25, 0.25, 0.25, 5.25, 8.0, 7.25]),
         )
         np.testing.assert_array_almost_equal(
             exit_trades.get_worst_price(exit_price_close=True).values,
@@ -6737,23 +6737,23 @@ class TestExitTrades:
     def test_mfe(self):
         np.testing.assert_array_almost_equal(
             exit_trades["a"].mfe.values,
-            np.array([1.4090909090909092, 0.24090909090909113, 0.5, 0.0]),
+            np.array([1.9090909090909092, 0.2909090909090912, 1.0, 0.0]),
         )
         np.testing.assert_array_almost_equal(
             exit_trades.mfe.values,
             np.array(
                 [
-                    1.4090909090909092,
-                    0.24090909090909113,
-                    0.5,
+                    1.9090909090909092,
+                    0.2909090909090912,
+                    1.0,
                     0.0,
                     0.09090909090909083,
                     0.00909090909090909,
                     0.0,
                     0.0,
-                    1.4090909090909092,
-                    0.24090909090909113,
-                    0.5,
+                    1.9090909090909092,
+                    0.2909090909090912,
+                    1.0,
                     0.0,
                     0.0,
                 ]
@@ -6763,17 +6763,17 @@ class TestExitTrades:
             exit_trades.get_mfe(entry_price_open=True).values,
             np.array(
                 [
-                    1.4090909090909092,
-                    0.24090909090909113,
-                    0.5,
+                    1.9090909090909092,
+                    0.2909090909090912,
+                    1.0,
                     0.5,
                     0.8409090909090908,
                     0.08409090909090916,
                     0.75,
                     1.5,
-                    1.4090909090909092,
-                    0.24090909090909113,
-                    0.5,
+                    1.9090909090909092,
+                    0.2909090909090912,
+                    1.0,
                     0.75,
                     0.25,
                 ]
@@ -6823,17 +6823,17 @@ class TestExitTrades:
             exit_trades.mfe_returns.values,
             np.array(
                 [
-                    1.2916666666666667,
-                    2.2083333333333335,
-                    0.08333333333333333,
+                    1.7500000000000002,
+                    2.666666666666667,
+                    0.16666666666666666,
                     0.0,
                     0.09090909090909083,
                     0.09090909090909083,
                     0.0,
                     0.0,
-                    1.2916666666666667,
-                    2.2083333333333335,
-                    0.08333333333333333,
+                    1.7500000000000002,
+                    2.666666666666667,
+                    0.16666666666666666,
                     0.0,
                     0.0,
                 ]
@@ -6853,14 +6853,14 @@ class TestExitTrades:
                     -0.00909090909090909,
                     0.0,
                     0.0,
-                    -1.4090909090909092,
-                    -0.24090909090909113,
-                    -0.5,
+                    -1.9090909090909092,
+                    -0.2909090909090912,
+                    -1.0,
                     0.0,
                     -0.09090909090909083,
                     -0.00909090909090909,
                     0.0,
-                    -0.5,
+                    -1.0,
                     0.0,
                 ]
             ),
@@ -6873,14 +6873,14 @@ class TestExitTrades:
                     -0.08409090909090916,
                     -0.75,
                     -1.5,
-                    -1.4090909090909092,
-                    -0.24090909090909113,
-                    -0.5,
+                    -1.9090909090909092,
+                    -0.2909090909090912,
+                    -1.0,
                     -0.5,
                     -0.8409090909090908,
                     -0.08409090909090916,
                     -0.75,
-                    -0.5,
+                    -1.0,
                     -0.75,
                 ]
             ),
@@ -6933,14 +6933,14 @@ class TestExitTrades:
                     -0.08333333333333326,
                     0.0,
                     0.0,
-                    -0.5636363636363637,
-                    -0.6883116883116883,
-                    -0.07692307692307693,
+                    -0.6363636363636364,
+                    -0.7272727272727273,
+                    -0.14285714285714285,
                     0.0,
                     -0.08333333333333326,
                     -0.08333333333333326,
                     0.0,
-                    -0.06666666666666667,
+                    -0.125,
                     0.0,
                 ]
             ),
@@ -6952,15 +6952,15 @@ class TestExitTrades:
             exit_trades.edge_ratio.values,
             np.array([np.nan, np.nan, np.nan, np.nan]),
         )
-        assert exit_trades["a"].get_edge_ratio(volatility=1) == 21.50000000000002
+        assert exit_trades["a"].get_edge_ratio(volatility=1) == 32.00000000000003
         np.testing.assert_array_almost_equal(
             exit_trades.get_edge_ratio(volatility=1).values,
-            np.array([21.5, 0.046512, 3.583333, np.nan]),
+            np.array([32.00000000000003, 0.031249999999999976, 2.9090909090909096, np.nan]),
         )
-        assert exit_trades["a"].get_edge_ratio(volatility=1, max_duration=2) == 21.250000000000018
+        assert exit_trades["a"].get_edge_ratio(volatility=1, max_duration=2) == 26.25000000000002
         np.testing.assert_array_almost_equal(
             exit_trades.get_edge_ratio(volatility=1, max_duration=2).values,
-            np.array([21.25, 0.047059, 3.541667, np.nan]),
+            np.array([26.25000000000002, 0.038095238095238064, 2.3863636363636367, np.nan]),
         )
 
     def test_running_edge_ratio(self):
@@ -7007,15 +7007,15 @@ class TestExitTrades:
         )
         np.testing.assert_array_almost_equal(
             exit_trades["a"].get_running_edge_ratio(volatility=1, incl_shorter=True).values,
-            np.array([17.75, 21.25, 21.5]),
+            np.array([17.750000000000014, 26.25000000000002, 31.50000000000003]),
         )
         np.testing.assert_array_almost_equal(
             exit_trades.get_running_edge_ratio(volatility=1, incl_shorter=True).values,
             np.array(
                 [
                     [17.750000000000014, 0.05633802816901404, 2.9583333333333344, np.nan],
-                    [21.250000000000018, 0.04705882352941173, 3.5416666666666674, np.nan],
-                    [21.50000000000002, 0.0465116279069767, 3.583333333333335, np.nan],
+                    [26.25000000000002, 0.038095238095238064, 2.3863636363636367, np.nan],
+                    [31.50000000000003, 0.031746031746031717, 2.8636363636363646, np.nan],
                 ]
             ),
         )
@@ -9153,7 +9153,42 @@ class TestLogs:
         )
         np.testing.assert_array_equal(
             records_readable["[REQ] Price Area Violation Mode"].values,
-            np.array(["Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore", "Ignore"]),
+            np.array(
+                [
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                    "Ignore",
+                ]
+            ),
         )
         np.testing.assert_array_equal(
             records_readable["[REQ] Allow Partial"].values,

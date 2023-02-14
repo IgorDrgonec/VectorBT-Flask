@@ -1,10 +1,13 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Named tuples and enumerated types for returns."""
 
 from vectorbtpro import _typing as tp
 
-__all__ = ["RollSharpeAIS", "RollSharpeAOS"]
+__pdoc__all__ = __all__ = [
+    "RollSharpeAIS",
+    "RollSharpeAOS",
+]
 
 __pdoc__ = {}
 

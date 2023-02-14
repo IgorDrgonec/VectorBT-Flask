@@ -1,7 +1,9 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Custom pandas accessors for base operations with pandas objects."""
 
+import inspect
+import ast
 import warnings
 
 import numpy as np
@@ -21,9 +23,17 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Configured
 from vectorbtpro.utils.decorators import class_or_instanceproperty, class_or_instancemethod
 from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, attach_unary_magic_methods
-from vectorbtpro.utils.parsing import get_expr_var_names, get_context_vars
-from vectorbtpro.utils.template import deep_substitute
-from vectorbtpro.utils.datetime_ import freq_to_timedelta, infer_index_freq, freq_to_timedelta64, prepare_freq
+from vectorbtpro.utils.parsing import get_context_vars
+from vectorbtpro.utils.template import substitute_templates
+from vectorbtpro.utils.datetime_ import infer_index_freq, freq_to_timedelta64, parse_timedelta, try_to_datetime_index
+from vectorbtpro.utils.eval_ import multiline_eval
+
+__all__ = [
+    "BaseIDXAccessor",
+    "BaseAccessor",
+    "BaseSRAccessor",
+    "BaseDFAccessor"
+]
 
 
 class BaseIDXAccessor(Configured):
@@ -255,13 +265,13 @@ class BaseIDXAccessor(Configured):
             pass
         if isinstance(self.obj, pd.DatetimeIndex):
             try:
-                by = to_offset(prepare_freq(by))
+                by = to_offset(parse_timedelta(by))
                 if by.n == 1:
                     return Grouper(index=self.obj, group_by=self.obj.tz_localize(None).to_period(by), **kwargs)
             except Exception as e:
                 pass
             try:
-                pd_group_by = pd.Series(index=self.obj, dtype=object).resample(prepare_freq(by), **groupby_kwargs)
+                pd_group_by = pd.Series(index=self.obj, dtype=object).resample(parse_timedelta(by), **groupby_kwargs)
                 return Grouper.from_pd_group_by(pd_group_by, **kwargs)
             except Exception as e:
                 pass
@@ -271,25 +281,46 @@ class BaseIDXAccessor(Configured):
     def get_resampler(
         self,
         rule: tp.AnyRuleLike,
+        freq: tp.Optional[tp.FrequencyLike] = None,
         resample_kwargs: tp.KwargsLike = None,
         return_pd_resampler: bool = False,
+        silence_warnings: tp.Optional[bool] = None,
     ) -> tp.Union[Resampler, tp.PandasResampler]:
         """Get an index resampler of type `vectorbtpro.base.resampling.base.Resampler`."""
-        if not isinstance(rule, Resampler):
-            if not isinstance(rule, PandasResampler):
+        if checks.is_td_like(rule):
+            try:
+                rule = parse_timedelta(rule)
+                is_td = True
+            except Exception as e:
+                is_td = False
+            if is_td:
                 resample_kwargs = merge_dicts(
                     dict(closed="left", label="left"),
                     resample_kwargs,
                 )
-                rule = pd.Series(index=self.obj, dtype=object).resample(
-                    prepare_freq(rule), **resolve_dict(resample_kwargs)
-                )
+                rule = pd.Series(index=self.obj, dtype=object).resample(rule, **resolve_dict(resample_kwargs))
+        if isinstance(rule, PandasResampler):
             if return_pd_resampler:
                 return rule
-            rule = Resampler.from_pd_resampler(rule)
+            if silence_warnings is None:
+                silence_warnings = True
+            rule = Resampler.from_pd_resampler(rule, source_freq=self.freq, silence_warnings=silence_warnings)
         if return_pd_resampler:
             raise TypeError("Cannot convert Resampler to Pandas Resampler")
-        return rule
+        if checks.is_dt_like(rule) or checks.is_iterable(rule):
+            rule = try_to_datetime_index(rule)
+            rule = Resampler(
+                source_index=self.obj,
+                target_index=rule,
+                source_freq=self.freq,
+                target_freq=freq,
+                silence_warnings=silence_warnings,
+            )
+        if isinstance(rule, Resampler):
+            if freq is not None:
+                rule = rule.replace(target_freq=freq)
+            return rule
+        raise ValueError(f"Cannot build Resampler from {rule}")
 
     # ############# Points and ranges ############# #
 
@@ -424,7 +455,7 @@ class BaseAccessor(Wrapping):
         * The same using the broadcasting mechanism:
 
         ```pycon
-        >>> df.vbt > vbt.BCO(np.arange(3), name='threshold', product=True)
+        >>> df.vbt > vbt.Param(np.arange(3), name='threshold')
         threshold     0                  1                  2
                      a2    b2    c2     a2    b2    c2     a2     b2    c2
         x2         True  True  True  False  True  True  False  False  True
@@ -538,7 +569,10 @@ class BaseAccessor(Wrapping):
         obj: tp.Optional[tp.ArrayLike] = None,
         **kwargs,
     ) -> None:
-        wrapper_kwargs, kwargs = ArrayWrapper.extract_init_kwargs(**kwargs)
+        if len(kwargs) > 0:
+            wrapper_kwargs, kwargs = ArrayWrapper.extract_init_kwargs(**kwargs)
+        else:
+            wrapper_kwargs, kwargs = {}, {}
         if not isinstance(wrapper, ArrayWrapper):
             if obj is not None:
                 raise ValueError("Must either provide wrapper and object, or only object")
@@ -586,6 +620,13 @@ class BaseAccessor(Wrapping):
     @property
     def obj(self) -> tp.SeriesFrame:
         """Pandas object."""
+        if isinstance(self._obj, (pd.Series, pd.DataFrame)):
+            if self._obj.shape == self.wrapper.shape:
+                if self._obj.index is self.wrapper.index:
+                    if isinstance(self._obj, pd.Series) and self._obj.name == self.wrapper.name:
+                        return self._obj
+                    if isinstance(self._obj, pd.DataFrame) and self._obj.columns is self.wrapper.columns:
+                        return self._obj
         return self.wrapper.wrap(self._obj, group_by=False)
 
     @class_or_instanceproperty
@@ -762,21 +803,6 @@ class BaseAccessor(Wrapping):
 
         return self.apply_on_index(apply_func, axis=axis, copy_data=copy_data)
 
-    # ############# Getting ############# #
-
-    def ago(self, delta: tp.FrequencyLike, **kwargs) -> tp.SeriesFrame:
-        """Get the value some periods behind each value.
-
-        Keyword arguments are passed to
-        [pandas.Index.get_indexer](https://pandas.pydata.org/docs/reference/api/pandas.Index.get_indexer.html)."""
-        if isinstance(delta, str):
-            delta = freq_to_timedelta(delta)
-        indices = self.wrapper.index.get_indexer(self.wrapper.index - delta, **kwargs)
-        new_obj = self.wrapper.fill()
-        found_mask = indices != -1
-        new_obj.iloc[np.flatnonzero(found_mask)] = self.obj.iloc[indices[found_mask]]
-        return new_obj
-
     # ############# Setting ############# #
 
     def set(
@@ -820,8 +846,8 @@ class BaseAccessor(Wrapping):
                     ),
                     template_context,
                 )
-                _func_args = deep_substitute(args, _template_context, sub_id="func_args")
-                _func_kwargs = deep_substitute(func_kwargs, _template_context, sub_id="func_kwargs")
+                _func_args = substitute_templates(args, _template_context, sub_id="func_args")
+                _func_kwargs = substitute_templates(func_kwargs, _template_context, sub_id="func_kwargs")
                 v = value_or_func(*_func_args, **_func_kwargs)
                 if self.is_series() or columns is None:
                     obj.iloc[index_points[i]] = v
@@ -891,8 +917,8 @@ class BaseAccessor(Wrapping):
                     ),
                     template_context,
                 )
-                _func_args = deep_substitute(args, _template_context, sub_id="func_args")
-                _func_kwargs = deep_substitute(func_kwargs, _template_context, sub_id="func_kwargs")
+                _func_args = substitute_templates(args, _template_context, sub_id="func_args")
+                _func_kwargs = substitute_templates(func_kwargs, _template_context, sub_id="func_kwargs")
                 v = value_or_func(*_func_args, **_func_kwargs)
             elif checks.is_sequence(value_or_func) and not isinstance(value_or_func, str):
                 v = value_or_func[i]
@@ -1121,8 +1147,8 @@ class BaseAccessor(Wrapping):
         elif not keep_pd:
             broadcast_named_args = {k: np.asarray(v) for k, v in broadcast_named_args.items()}
         template_context = merge_dicts(broadcast_named_args, template_context)
-        args = deep_substitute(args, template_context, sub_id="args")
-        kwargs = deep_substitute(kwargs, template_context, sub_id="kwargs")
+        args = substitute_templates(args, template_context, sub_id="args")
+        kwargs = substitute_templates(kwargs, template_context, sub_id="kwargs")
         out = apply_func(broadcast_named_args["obj"], *args, **kwargs)
         return wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
@@ -1261,8 +1287,8 @@ class BaseAccessor(Wrapping):
         elif not keep_pd:
             broadcast_named_args = {k: np.asarray(v) for k, v in broadcast_named_args.items()}
         template_context = merge_dicts(broadcast_named_args, dict(ntimes=ntimes), template_context)
-        args = deep_substitute(args, template_context, sub_id="args")
-        kwargs = deep_substitute(kwargs, template_context, sub_id="kwargs")
+        args = substitute_templates(args, template_context, sub_id="args")
+        kwargs = substitute_templates(kwargs, template_context, sub_id="kwargs")
         out = combining.apply_and_concat(ntimes, apply_func, broadcast_named_args["obj"], *args, **kwargs)
         if keys is not None:
             new_columns = indexes.combine_indexes([keys, wrapper.columns])
@@ -1440,8 +1466,8 @@ class BaseAccessor(Wrapping):
         elif not keep_pd:
             broadcast_named_args = {k: np.asarray(v) for k, v in broadcast_named_args.items()}
         template_context = merge_dicts(broadcast_named_args, template_context)
-        args = deep_substitute(args, template_context, sub_id="args")
-        kwargs = deep_substitute(kwargs, template_context, sub_id="kwargs")
+        args = substitute_templates(args, template_context, sub_id="args")
+        kwargs = substitute_templates(kwargs, template_context, sub_id="kwargs")
         inputs = [broadcast_named_args["obj_" + str(i)] for i in range(len(objs))]
 
         if concat is None:
@@ -1465,8 +1491,9 @@ class BaseAccessor(Wrapping):
     @classmethod
     def eval(
         cls,
-        expression: str,
-        use_numexpr: tp.Optional[bool] = None,
+        expr: str,
+        frames_back: int = 1,
+        use_numexpr: bool = False,
         numexpr_kwargs: tp.KwargsLike = None,
         local_dict: tp.Optional[tp.Mapping] = None,
         global_dict: tp.Optional[tp.Mapping] = None,
@@ -1475,37 +1502,16 @@ class BaseAccessor(Wrapping):
     ):
         """Evaluate a simple array expression element-wise using NumExpr or NumPy.
 
-        The only advantage of this method over `pd.eval` is using vectorbt's own broadcasting.
+        If NumExpr is enables, only one-line statements are supported. Otherwise, uses
+        `vectorbtpro.utils.eval_.multiline_eval`.
 
         !!! note
-            All variables will broadcast against each other prior to the evaluation.
+            All required variables will broadcast against each other prior to the evaluation.
 
         Usage:
-            * A bit slower than `pd.eval`:
-
-            ```pycon
-            >>> df = pd.DataFrame(np.full((1000, 1000), 0))
-            >>> sr = pd.Series(np.full(1000, 1))
-            >>> a = np.full(1000, 2)
-
-            >>> %timeit pd.eval('df + sr + a')
-            1.12 ms ± 12.1 µs per loop (mean ± std. dev. of 7 runs, 1000 loops each)
-
-            >>> %timeit vbt.pd_acc.eval('df + sr + a')
-            1.3 ms ± 5.3 µs per loop (mean ± std. dev. of 7 runs, 1000 loops each)
-            ```
-
-            * But broadcasts nicely:
-
             ```pycon
             >>> sr = pd.Series([1, 2, 3], index=['x', 'y', 'z'])
             >>> df = pd.DataFrame([[4, 5, 6]], index=['x', 'y', 'z'], columns=['a', 'b', 'c'])
-            >>> pd.eval('sr + df')
-                a   b   c   x   y   z
-            x NaN NaN NaN NaN NaN NaN
-            y NaN NaN NaN NaN NaN NaN
-            z NaN NaN NaN NaN NaN NaN
-
             >>> vbt.pd_acc.eval('sr + df')
                a  b  c
             x  5  6  7
@@ -1520,35 +1526,36 @@ class BaseAccessor(Wrapping):
         if wrap_kwargs is None:
             wrap_kwargs = {}
 
-        var_names = get_expr_var_names(expression)
-        objs = get_context_vars(var_names, frames_back=1, local_dict=local_dict, global_dict=global_dict)
-        objs = reshaping.broadcast(*objs, **broadcast_kwargs)
-        vars_by_name = {}
-        for i, obj in enumerate(objs):
-            vars_by_name[var_names[i]] = np.asarray(obj)
-        if use_numexpr is None:
-            if objs[0].size >= 100000:
-                from vectorbtpro.utils.opt_packages import warn_cannot_import
+        expr = inspect.cleandoc(expr)
+        parsed = ast.parse(expr)
+        body_nodes = list(parsed.body)
 
-                warn_cannot_import("numexpr")
-                try:
-                    import numexpr
+        load_vars = set()
+        store_vars = set()
+        for body_node in body_nodes:
+            for child_node in ast.walk(body_node):
+                if type(child_node) is ast.Name:
+                    if isinstance(child_node.ctx, ast.Load):
+                        if child_node.id not in store_vars:
+                            load_vars.add(child_node.id)
+                    if isinstance(child_node.ctx, ast.Store):
+                        store_vars.add(child_node.id)
+        load_vars = list(load_vars)
+        objs = get_context_vars(load_vars, frames_back=frames_back, local_dict=local_dict, global_dict=global_dict)
+        objs = dict(zip(load_vars, objs))
+        objs, wrapper = reshaping.broadcast(objs, return_wrapper=True, **broadcast_kwargs)
+        objs = {k: np.asarray(v) for k, v in objs.items()}
 
-                    use_numexpr = True
-                except ImportError:
-                    use_numexpr = False
-            else:
-                use_numexpr = False
         if use_numexpr:
-            from vectorbtpro.utils.opt_packages import assert_can_import
+            from vectorbtpro.utils.module_ import assert_can_import
 
             assert_can_import("numexpr")
             import numexpr
 
-            out = numexpr.evaluate(expression, local_dict=vars_by_name, **numexpr_kwargs)
+            out = numexpr.evaluate(expr, local_dict=objs, **numexpr_kwargs)
         else:
-            out = eval(expression, {}, vars_by_name)
-        return ArrayWrapper.from_obj(objs[0]).wrap(out, **wrap_kwargs)
+            out = multiline_eval(expr, context=objs)
+        return wrapper.wrap(out, **wrap_kwargs)
 
 
 class BaseSRAccessor(BaseAccessor):

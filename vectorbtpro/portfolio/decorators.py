@@ -1,12 +1,14 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Class decorators for portfolio."""
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.config import Config, merge_dicts, resolve_dict
+from vectorbtpro.utils.config import Config, resolve_dict
 from vectorbtpro.utils.decorators import cacheable_property, cached_property
 from vectorbtpro.utils.parsing import get_func_arg_names
+
+__all__ = []
 
 
 def attach_returns_acc_methods(config: Config) -> tp.ClassWrapper:

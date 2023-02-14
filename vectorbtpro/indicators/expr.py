@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Functions and config for evaluating indicator expressions."""
 
@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.grouping import Grouper
+from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.generic.nb import (
     fshift_nb,
     diff_nb,
@@ -30,6 +30,8 @@ from vectorbtpro.generic.nb import (
 from vectorbtpro.indicators.nb import vwap_nb
 from vectorbtpro.returns.nb import returns_nb
 from vectorbtpro.utils.config import HybridConfig
+
+__all__ = []
 
 
 # ############# Delay ############# #

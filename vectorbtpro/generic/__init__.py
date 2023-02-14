@@ -1,25 +1,27 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Modules for working with generic time series.
 
 In contrast to the `vectorbtpro.base` sub-package, focuses on the data itself."""
 
-from vectorbtpro.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
-from vectorbtpro.generic.analyzable import Analyzable
-from vectorbtpro.generic.drawdowns import Drawdowns
-from vectorbtpro.generic.enums import *
-from vectorbtpro.generic.ranges import Ranges, PatternRanges, PSC
-from vectorbtpro.generic.splitting import *
-from vectorbtpro.utils.module_ import create__all__
-from vectorbtpro.utils.opt_packages import check_installed
-from vectorbtpro._settings import settings
+from typing import TYPE_CHECKING
 
-__blacklist__ = []
-
-if not check_installed("plotly") or not settings["importing"]["plotly"]:
-    __blacklist__.append("plotting")
-else:
+if TYPE_CHECKING:
+    from vectorbtpro.generic.nb import *
+    from vectorbtpro.generic.splitting import *
+    from vectorbtpro.generic.accessors import *
+    from vectorbtpro.generic.analyzable import *
+    from vectorbtpro.generic.decorators import *
+    from vectorbtpro.generic.drawdowns import *
+    from vectorbtpro.generic.plots_builder import *
     from vectorbtpro.generic.plotting import *
+    from vectorbtpro.generic.price_records import *
+    from vectorbtpro.generic.ranges import *
+    from vectorbtpro.generic.stats_builder import *
 
-__all__ = create__all__(__name__)
-__pdoc__ = {k: False for k in __all__}
+__exclude_from__all__ = [
+    "enums",
+]
+
+__import_if_installed__ = dict()
+__import_if_installed__["plotting"] = "plotly"

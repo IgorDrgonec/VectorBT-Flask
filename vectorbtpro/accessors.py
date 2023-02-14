@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Root pandas accessors of vectorbtpro.
 
@@ -53,6 +53,17 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base.accessors import BaseIDXAccessor
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
+
+__all__ = [
+    "Vbt_Accessor",
+    "Vbt_SRAccessor",
+    "Vbt_DFAccessor",
+    "pd_acc",
+    "sr_acc",
+    "df_acc",
+]
+
+__pdoc__ = {}
 
 ParentAccessorT = tp.TypeVar("ParentAccessorT", bound=object)
 AccessorT = tp.TypeVar("AccessorT", bound=object)
@@ -167,6 +178,12 @@ class Vbt_Accessor(DirNamesMixin, GenericAccessor):
         GenericAccessor.__init__(self, wrapper, obj=obj, **kwargs)
 
 
+pd_acc = Vbt_Accessor
+"""Shortcut for `Vbt_Accessor`."""
+
+__pdoc__["pd_acc"] = False
+
+
 @register_series_accessor("vbt")
 class Vbt_SRAccessor(DirNamesMixin, GenericSRAccessor):
     """The main vectorbt accessor for `pd.Series`."""
@@ -181,6 +198,12 @@ class Vbt_SRAccessor(DirNamesMixin, GenericSRAccessor):
         GenericSRAccessor.__init__(self, wrapper, obj=obj, **kwargs)
 
 
+sr_acc = Vbt_SRAccessor
+"""Shortcut for `Vbt_SRAccessor`."""
+
+__pdoc__["sr_acc"] = False
+
+
 @register_dataframe_accessor("vbt")
 class Vbt_DFAccessor(DirNamesMixin, GenericDFAccessor):
     """The main vectorbt accessor for `pd.DataFrame`."""
@@ -193,6 +216,12 @@ class Vbt_DFAccessor(DirNamesMixin, GenericDFAccessor):
     ) -> None:
         DirNamesMixin.__init__(self)
         GenericDFAccessor.__init__(self, wrapper, obj=obj, **kwargs)
+
+
+df_acc = Vbt_DFAccessor
+"""Shortcut for `Vbt_DFAccessor`."""
+
+__pdoc__["df_acc"] = False
 
 
 def register_vbt_accessor(name: str, parent: tp.Type[DirNamesMixin] = Vbt_Accessor) -> tp.Callable:

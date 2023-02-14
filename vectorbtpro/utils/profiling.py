@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for profiling time and memory."""
 
@@ -9,6 +9,11 @@ from timeit import default_timer
 import humanize
 
 from vectorbtpro import _typing as tp
+
+__all__ = [
+    "Timer",
+    "MemTracer",
+]
 
 TimerT = tp.TypeVar("TimerT", bound="Timer")
 

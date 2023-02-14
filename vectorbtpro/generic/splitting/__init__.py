@@ -1,10 +1,10 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Modules for splitting."""
 
-from vectorbtpro.generic.splitting.base import FixRange, RelRange, Takeable, Splitter, SKLSplitter
-from vectorbtpro.generic.splitting.decorators import split, cv_split
-from vectorbtpro.utils.module_ import create__all__
+from typing import TYPE_CHECKING
 
-__all__ = create__all__(__name__)
-__pdoc__ = {k: False for k in __all__}
+if TYPE_CHECKING:
+    from vectorbtpro.generic.splitting.base import *
+    from vectorbtpro.generic.splitting.decorators import *
+    from vectorbtpro.generic.splitting.nb import *

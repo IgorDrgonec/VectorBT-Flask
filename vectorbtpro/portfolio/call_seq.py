@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Functions for working with call sequence arrays."""
 
@@ -7,6 +7,8 @@ import numpy as np
 from vectorbtpro import _typing as tp
 from vectorbtpro.portfolio.enums import CallSeqType
 from vectorbtpro.registries.jit_registry import register_jitted
+
+__all__ = []
 
 
 @register_jitted(cache=True)

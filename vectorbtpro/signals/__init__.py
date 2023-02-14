@@ -1,12 +1,15 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Modules for working with signals."""
 
-from vectorbtpro.signals.accessors import SignalsAccessor, SignalsSRAccessor, SignalsDFAccessor
-from vectorbtpro.signals.enums import *
-from vectorbtpro.signals.factory import SignalFactory
-from vectorbtpro.signals.generators import *
-from vectorbtpro.utils.module_ import create__all__
+from typing import TYPE_CHECKING
 
-__all__ = create__all__(__name__)
-__pdoc__ = {k: False for k in __all__}
+if TYPE_CHECKING:
+    from vectorbtpro.signals.accessors import *
+    from vectorbtpro.signals.factory import *
+    from vectorbtpro.signals.generators import *
+    from vectorbtpro.signals.nb import *
+
+__exclude_from__all__ = [
+    "enums",
+]

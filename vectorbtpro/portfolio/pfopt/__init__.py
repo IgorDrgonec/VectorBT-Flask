@@ -1,10 +1,10 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Modules with classes and utilities for portfolio optimization."""
 
-from vectorbtpro.portfolio.pfopt.base import pfopt_func_dict, pypfopt_optimize, riskfolio_optimize, PortfolioOptimizer
-from vectorbtpro.portfolio.pfopt.records import AllocRanges, AllocPoints
-from vectorbtpro.utils.module_ import create__all__
+from typing import TYPE_CHECKING
 
-__all__ = create__all__(__name__)
-__pdoc__ = {k: False for k in __all__}
+if TYPE_CHECKING:
+    from vectorbtpro.portfolio.pfopt.base import *
+    from vectorbtpro.portfolio.pfopt.nb import *
+    from vectorbtpro.portfolio.pfopt.records import *

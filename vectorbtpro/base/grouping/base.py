@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base classes and functions for grouping.
 
@@ -22,6 +22,11 @@ from vectorbtpro.utils.config import Configured
 from vectorbtpro.utils.decorators import cached_method
 from vectorbtpro.utils.template import CustomTemplate
 from vectorbtpro.base.grouping import nb
+
+__all__ = [
+    "Grouper",
+    "ExceptLevel",
+]
 
 GroupByT = tp.Union[None, bool, tp.Index]
 
@@ -374,6 +379,11 @@ class Grouper(Configured):
             group_end += group_len
             yield group_idxs[group_start:group_end]
             group_start += group_len
+
+    def __iter__(self) -> tp.Generator[tp.Tuple[tp.Label, tp.GroupIdxs], None, None]:
+        index = self.get_index()
+        for g, group_idxs in enumerate(self.yield_group_idxs()):
+            yield index[g], group_idxs
 
     def select_groups(self, group_idxs: tp.Array1d, jitted: tp.JittedOption = None) -> tp.Tuple[tp.Array1d, tp.Array1d]:
         """Select groups.

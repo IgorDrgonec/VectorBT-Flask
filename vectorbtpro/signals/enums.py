@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Named tuples and enumerated types for signals.
 
@@ -7,7 +7,14 @@ Defines enums and other schemas for `vectorbtpro.signals`."""
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.formatting import prettify
 
-__all__ = ["StopType", "FactoryMode", "GenEnContext", "GenExContext", "GenEnExContext", "RankContext"]
+__pdoc__all__ = __all__ = [
+    "StopType",
+    "FactoryMode",
+    "GenEnContext",
+    "GenExContext",
+    "GenEnExContext",
+    "RankContext",
+]
 
 __pdoc__ = {}
 
@@ -54,25 +61,25 @@ __pdoc__[
 ```
 
 Attributes:
-    Entries: Generate entries only using `generate_func`.
+    Entries: Generate entries only using `generate_func_nb`.
     
         Takes no input signal arrays.
         Produces one output signal array - `entries`.
         
         Such generators often have no suffix.
-    Exits: Generate exits only using `generate_ex_func`.
+    Exits: Generate exits only using `generate_ex_func_nb`.
         
         Takes one input signal array - `entries`.
         Produces one output signal array - `exits`.
         
         Such generators often have suffix 'X'.
-    Both: Generate both entries and exits using `generate_enex_func`.
+    Both: Generate both entries and exits using `generate_enex_func_nb`.
             
         Takes no input signal arrays.
         Produces two output signal arrays - `entries` and `exits`.
         
         Such generators often have suffix 'NX'.
-    Chain: Generate chain of entries and exits using `generate_enex_func`.
+    Chain: Generate chain of entries and exits using `generate_enex_func_nb`.
                 
         Takes one input signal array - `entries`.
         Produces two output signal arrays - `new_entries` and `exits`.
@@ -85,6 +92,8 @@ Attributes:
 
 class GenEnContext(tp.NamedTuple):
     target_shape: tp.Shape
+    only_once: bool
+    wait: int
     entries_out: tp.Array2d
     out: tp.Array1d
     from_i: int
@@ -94,11 +103,13 @@ class GenEnContext(tp.NamedTuple):
 
 __pdoc__["GenEnContext"] = "Context of an entry signal generator."
 __pdoc__["GenEnContext.target_shape"] = "Target shape."
+__pdoc__["GenEnContext.only_once"] = "Whether to run the placement function only once."
+__pdoc__["GenEnContext.wait"] = "Number of ticks to wait before placing the next entry."
 __pdoc__["GenEnContext.entries_out"] = "Output array with entries."
 __pdoc__["GenEnContext.out"] = "Current segment of the output array with entries."
 __pdoc__["GenEnContext.from_i"] = "Start index of the segment (inclusive)."
 __pdoc__["GenEnContext.to_i"] = "End index of the segment (exclusive)."
-__pdoc__["GenEnContext.to_i"] = "Column of the segment."
+__pdoc__["GenEnContext.col"] = "Column of the segment."
 
 
 class GenExContext(tp.NamedTuple):

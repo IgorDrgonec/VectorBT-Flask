@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for chunking."""
 
@@ -17,7 +17,30 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, Config
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.parsing import annotate_args, match_ann_arg, get_func_arg_names, Regex
-from vectorbtpro.utils.template import deep_substitute, Rep
+from vectorbtpro.utils.template import substitute_templates, Rep
+
+__all__ = [
+    "ChunkMeta",
+    "ArgChunkMeta",
+    "LenChunkMeta",
+    "ArgSizer",
+    "LenSizer",
+    "ShapeSizer",
+    "ArraySizer",
+    "ChunkMapper",
+    "ChunkSelector",
+    "ChunkSlicer",
+    "CountAdapter",
+    "ShapeSelector",
+    "ShapeSlicer",
+    "ArraySelector",
+    "ArraySlicer",
+    "SequenceTaker",
+    "MappingTaker",
+    "ArgsTaker",
+    "KwargsTaker",
+    "chunked",
+]
 
 __pdoc__ = {}
 
@@ -756,14 +779,14 @@ def yield_arg_chunks(
 
     for _chunk_meta in chunk_meta:
         context = merge_dicts(dict(ann_args=ann_args, chunk_meta=_chunk_meta), template_context)
-        chunk_ann_args = deep_substitute(ann_args, context=context, sub_id="chunk_ann_args")
+        chunk_ann_args = substitute_templates(ann_args, context=context, sub_id="chunk_ann_args")
         if callable(arg_take_spec):
             chunk_args, chunk_kwargs = arg_take_spec(chunk_ann_args, _chunk_meta, **kwargs)
         else:
             chunk_arg_take_spec = arg_take_spec
             if not checks.is_mapping(chunk_arg_take_spec):
                 chunk_arg_take_spec = dict(zip(range(len(chunk_arg_take_spec)), chunk_arg_take_spec))
-            chunk_arg_take_spec = deep_substitute(chunk_arg_take_spec, context=context, sub_id="chunk_arg_take_spec")
+            chunk_arg_take_spec = substitute_templates(chunk_arg_take_spec, context=context, sub_id="chunk_arg_take_spec")
             chunk_args, chunk_kwargs = take_from_args(chunk_ann_args, chunk_arg_take_spec, _chunk_meta, **kwargs)
         yield func, chunk_args, chunk_kwargs
 
@@ -781,12 +804,11 @@ def chunked(
     prepend_chunk_meta: tp.Optional[bool] = None,
     merge_func: tp.Union[None, str, tuple, tp.Callable] = None,
     merge_kwargs: tp.KwargsLike = None,
-    engine: tp.Optional[tp.EngineLike] = None,
     return_raw_chunks: bool = False,
     silence_warnings: tp.Optional[bool] = None,
     disable: tp.Optional[bool] = None,
     forward_kwargs_as: tp.KwargsLike = None,
-    **engine_kwargs,
+    **execute_kwargs,
 ) -> tp.Callable:
     """Decorator that chunks the inputs of a function. Engine-agnostic.
     Returns a new function with the same signature as the passed one.
@@ -797,12 +819,12 @@ def chunked(
         to `get_chunk_meta_from_args`.
     2. Splits arguments and keyword arguments by passing chunk metadata, `arg_take_spec`,
         and `template_context` to `yield_arg_chunks`, which yields one chunk at a time.
-    3. Executes all chunks by passing `engine` and `**engine_kwargs` to `vectorbtpro.utils.execution.execute`.
+    3. Executes all chunks by passing `**execute_kwargs` to `vectorbtpro.utils.execution.execute`.
     4. Optionally, post-processes and merges the results by passing them and `**merge_kwargs` to `merge_func`.
 
     Argument `merge_func` is resolved using `vectorbtpro.base.merging.resolve_merge_func`.
 
-    Any template in both `engine_kwargs` and `merge_kwargs` will be substituted. You can use
+    Any template in both `execute_kwargs` and `merge_kwargs` will be substituted. You can use
     the keys `ann_args`, `chunk_meta`, `arg_take_spec`, and `funcs_args` to be replaced by the actual objects.
 
     Use `prepend_chunk_meta` to prepend an instance of `ChunkMeta` to the arguments.
@@ -987,7 +1009,7 @@ def chunked(
 
         Templates in arguments are substituted right before taking a chunk from them.
 
-        Keyword arguments to the engine can be provided using `engine_kwargs`:
+        Keyword arguments to the engine can be provided using `execute_kwargs`:
 
         ```pycon
         >>> @vbt.chunked(
@@ -1044,10 +1066,7 @@ def chunked(
             if isinstance(arg_take_spec, dict) and "chunk_meta" not in arg_take_spec:
                 arg_take_spec["chunk_meta"] = None
             template_context = merge_dicts(wrapper.options["template_context"], kwargs.pop("_template_context", {}))
-            engine = kwargs.pop("_engine", wrapper.options["engine"])
-            if engine is None:
-                engine = chunking_cfg["engine"]
-            engine_kwargs = merge_dicts(wrapper.options["engine_kwargs"], kwargs.pop("_engine_kwargs", {}))
+            execute_kwargs = merge_dicts(wrapper.options["execute_kwargs"], kwargs.pop("_execute_kwargs", {}))
             merge_func = kwargs.pop("_merge_func", wrapper.options["merge_func"])
             merge_kwargs = merge_dicts(wrapper.options["merge_kwargs"], kwargs.pop("_merge_kwargs", {}))
             return_raw_chunks = kwargs.pop("_return_raw_chunks", wrapper.options["return_raw_chunks"])
@@ -1101,15 +1120,15 @@ def chunked(
                 ),
                 template_context,
             )
-            engine_kwargs = deep_substitute(engine_kwargs, context, sub_id="engine_kwargs")
-            results = execute(funcs_args, engine=engine, n_calls=len(chunk_meta), **engine_kwargs)
+            execute_kwargs = substitute_templates(execute_kwargs, context, sub_id="execute_kwargs")
+            results = execute(funcs_args, n_calls=len(chunk_meta), **execute_kwargs)
             if merge_func is not None:
                 context["funcs_args"] = funcs_args
                 if isinstance(merge_func, (str, tuple)):
                     from vectorbtpro.base.merging import resolve_merge_func
 
                     merge_func = resolve_merge_func(merge_func)
-                merge_kwargs = deep_substitute(merge_kwargs, context, sub_id="merge_kwargs")
+                merge_kwargs = substitute_templates(merge_kwargs, context, sub_id="merge_kwargs")
                 return merge_func(results, **merge_kwargs)
             return results
 
@@ -1124,14 +1143,13 @@ def chunked(
                 skip_one_chunk=skip_one_chunk,
                 arg_take_spec=arg_take_spec,
                 template_context=template_context,
-                engine=engine,
-                engine_kwargs=engine_kwargs,
                 merge_func=merge_func,
                 merge_kwargs=merge_kwargs,
                 return_raw_chunks=return_raw_chunks,
                 silence_warnings=silence_warnings,
                 disable=disable,
                 forward_kwargs_as=forward_kwargs_as,
+                execute_kwargs=execute_kwargs,
             ),
             options_=dict(
                 frozen_keys=True,

@@ -99,7 +99,7 @@ pf_kwargs = dict(
 )
 
 pf = vbt.Portfolio.from_orders(**pf_kwargs)  # independent
-pf_filled = vbt.Portfolio.from_orders(**pf_kwargs, fill_returns=True)
+pf_filled = vbt.Portfolio.from_orders(**pf_kwargs, save_returns=True)
 
 pf_grouped_kwargs = dict(
     open=open_na,
@@ -130,7 +130,7 @@ pf_grouped_kwargs = dict(
 )
 
 pf_grouped = vbt.Portfolio.from_orders(**pf_grouped_kwargs)  # grouped
-pf_grouped_filled = vbt.Portfolio.from_orders(**pf_grouped_kwargs, fill_returns=True)
+pf_grouped_filled = vbt.Portfolio.from_orders(**pf_grouped_kwargs, save_returns=True)
 
 pf_shared_kwargs = dict(
     open=open_na,
@@ -161,7 +161,7 @@ pf_shared_kwargs = dict(
 )
 
 pf_shared = vbt.Portfolio.from_orders(**pf_shared_kwargs)  # shared
-pf_shared_filled = vbt.Portfolio.from_orders(**pf_shared_kwargs, fill_returns=True)
+pf_shared_filled = vbt.Portfolio.from_orders(**pf_shared_kwargs, save_returns=True)
 
 
 class TestPortfolio:

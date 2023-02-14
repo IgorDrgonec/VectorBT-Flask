@@ -1,9 +1,11 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for portfolio analysis."""
 
+import numpy as np
 from numba import prange
 
+from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
 from vectorbtpro.base.flex_indexing import flex_select_nb

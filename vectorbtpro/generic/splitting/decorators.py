@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Decorators for splitting."""
 
@@ -16,8 +16,13 @@ from vectorbtpro.utils.parsing import (
     match_ann_arg,
 )
 from vectorbtpro.utils.params import parameterized
-from vectorbtpro.utils.template import Rep, RepEval, deep_substitute
+from vectorbtpro.utils.template import Rep, RepEval, substitute_templates
 from vectorbtpro.generic.splitting.base import Splitter, Takeable
+
+__all__ = [
+    "split",
+    "cv_split",
+]
 
 
 def split(
@@ -371,7 +376,7 @@ def cv_split(
             def apply_wrapper(*_args, __template_context=None, **_kwargs):
                 __template_context = dict(__template_context)
                 __template_context["all_grid_results"] = all_grid_results
-                _parameterized_kwargs = deep_substitute(
+                _parameterized_kwargs = substitute_templates(
                     parameterized_kwargs, __template_context, sub_id="parameterized_kwargs"
                 )
                 parameterized_func = parameterized(func, template_context=__template_context, **_parameterized_kwargs)

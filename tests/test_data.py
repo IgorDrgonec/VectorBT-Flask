@@ -1252,19 +1252,19 @@ class TestData:
     def test_symbol_wrapper(self):
         assert_index_equal(
             MyData.fetch(0, shape=(5,), columns="feat0").symbol_wrapper.columns,
-            pd.Int64Index([0], dtype="int64", name="symbol"),
+            pd.Index([0], dtype="int64", name="symbol"),
         )
         assert_index_equal(
             MyData.fetch([0], shape=(5,), columns="feat0").symbol_wrapper.columns,
-            pd.Int64Index([0], dtype="int64", name="symbol"),
+            pd.Index([0], dtype="int64", name="symbol"),
         )
         assert_index_equal(
             MyData.fetch([0, 1], shape=(5,), columns="feat0").symbol_wrapper.columns,
-            pd.Int64Index([0, 1], dtype="int64", name="symbol"),
+            pd.Index([0, 1], dtype="int64", name="symbol"),
         )
         assert_index_equal(
             MyData.fetch([0, 1, 2], shape=(5,), columns="feat0").get_symbol_wrapper(symbols=[0, 2]).columns,
-            pd.Int64Index([0, 2], dtype="int64", name="symbol"),
+            pd.Index([0, 2], dtype="int64", name="symbol"),
         )
         assert_index_equal(
             MyData.fetch(0, symbol_classes="C1", shape=(5,), columns="feat0").symbol_wrapper.columns,
@@ -1756,6 +1756,14 @@ class TestData:
         assert_frame_equal(data.run("from_holding").low, data.low)
         assert_frame_equal(data.run("from_holding").close, data.close)
         assert_frame_equal(data.run("ma", 3).ma, vbt.MA.run(data.close, 3).ma)
+        assert_frame_equal(data.run("ma", 3, unpack=True), vbt.MA.run(data.close, 3).ma)
+        assert_frame_equal(data.run("ma", 3, unpack="dict")["ma"], vbt.MA.run(data.close, 3).ma)
+        assert_frame_equal(data.run("bbands", 3, unpack=True)[0], vbt.BBANDS.run(data.close, 3).middle)
+        assert_frame_equal(data.run("bbands", 3, unpack=True)[1], vbt.BBANDS.run(data.close, 3).upper)
+        assert_frame_equal(data.run("bbands", 3, unpack=True)[2], vbt.BBANDS.run(data.close, 3).lower)
+        assert_frame_equal(data.run("bbands", 3, unpack="dict")["middle"], vbt.BBANDS.run(data.close, 3).middle)
+        assert_frame_equal(data.run("bbands", 3, unpack="dict")["upper"], vbt.BBANDS.run(data.close, 3).upper)
+        assert_frame_equal(data.run("bbands", 3, unpack="dict")["lower"], vbt.BBANDS.run(data.close, 3).lower)
         assert_frame_equal(data.run("talib_sma", 3).real, vbt.talib("SMA").run(data.close, 3).real)
         assert_frame_equal(data.run("pandas_ta_sma", 3).sma, vbt.pandas_ta("SMA").run(data.close, 3).sma)
         assert_frame_equal(data.run("wqa101_1").out, vbt.wqa101(1).run(data.close).out)
@@ -1823,7 +1831,7 @@ class TestData:
 
 class TestCustom:
     def test_csv_data(self, tmp_path):
-        sr = pd.Series(np.arange(10))
+        sr = pd.Series(np.arange(10), index=pd.date_range("2020", periods=10, tz="utc"))
         sr.to_csv(tmp_path / "temp.csv")
         csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv")
         assert_series_equal(csv_data.get(), sr)
@@ -1836,9 +1844,19 @@ class TestCustom:
         csv_data = vbt.CSVData.fetch(["TEMP"], paths=tmp_path / "temp.csv")
         assert csv_data.symbols[0] == "TEMP"
         assert_series_equal(csv_data.get()["TEMP"], sr.rename("TEMP"))
-        csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", start_row=2, end_row=3)
-        assert_series_equal(csv_data.get(), sr.iloc[2:4])
-        df = pd.DataFrame(np.arange(20).reshape((10, 2)))
+        csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", start="2020-01-03")
+        assert_series_equal(csv_data.get(), sr.iloc[2:], check_freq=False)
+        assert csv_data.returned_kwargs["temp"]["last_row"] == 9
+        csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", end="2020-01-05")
+        assert_series_equal(csv_data.get(), sr.iloc[:4], check_freq=False)
+        assert csv_data.returned_kwargs["temp"]["last_row"] == 3
+        csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", start="2020-01-03", end="2020-01-05")
+        assert_series_equal(csv_data.get(), sr.iloc[2:4], check_freq=False)
+        assert csv_data.returned_kwargs["temp"]["last_row"] == 3
+        csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", start_row=2, end_row=4)
+        assert_series_equal(csv_data.get(), sr.iloc[2:4], check_freq=False)
+        assert csv_data.returned_kwargs["temp"]["last_row"] == 3
+        df = pd.DataFrame(np.arange(20).reshape((10, 2)), index=pd.date_range("2020", periods=10, tz="utc"))
         df.columns = pd.Index(["0", "1"], dtype="object")
         df.to_csv(tmp_path / "temp.csv")
         csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", iterator=True)
@@ -1846,23 +1864,23 @@ class TestCustom:
         csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", chunksize=1)
         assert_frame_equal(csv_data.get(), df)
         csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", chunksize=1, chunk_func=lambda x: list(x)[-1])
-        assert_frame_equal(csv_data.get(), df.iloc[[-1]])
-        df = pd.DataFrame(np.arange(20).reshape((10, 2)))
+        assert_frame_equal(csv_data.get(), df.iloc[[-1]], check_freq=False)
+        df = pd.DataFrame(np.arange(20).reshape((10, 2)), index=pd.date_range("2020", periods=10, tz="utc"))
         df.columns = pd.MultiIndex.from_tuples([("1", "2"), ("3", "4")], names=["a", "b"])
         df.to_csv(tmp_path / "temp.csv")
-        csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", header=[0, 1], start_row=0, end_row=1)
-        assert_frame_equal(csv_data.get(), df.iloc[:2])
-        assert csv_data.returned_kwargs["temp"] == {"last_row": 1}
+        csv_data = vbt.CSVData.fetch(tmp_path / "temp.csv", header=[0, 1], start_row=0, end_row=2)
+        assert_frame_equal(csv_data.get(), df.iloc[:2], check_freq=False)
+        assert csv_data.returned_kwargs["temp"]["last_row"] == 1
         csv_data = csv_data.update()
-        assert_frame_equal(csv_data.get(), df.iloc[:2])
-        assert csv_data.returned_kwargs["temp"] == {"last_row": 1}
-        csv_data = csv_data.update(end_row=2)
+        assert_frame_equal(csv_data.get(), df.iloc[:2], check_freq=False)
+        assert csv_data.returned_kwargs["temp"]["last_row"] == 1
+        csv_data = csv_data.update(end_row=3)
         csv_data.get()
-        assert_frame_equal(csv_data.get(), df.iloc[:3])
-        assert csv_data.returned_kwargs["temp"] == {"last_row": 2}
+        assert_frame_equal(csv_data.get(), df.iloc[:3], check_freq=False)
+        assert csv_data.returned_kwargs["temp"]["last_row"] == 2
         csv_data = csv_data.update(end_row=None)
         assert_frame_equal(csv_data.get(), df)
-        assert csv_data.returned_kwargs["temp"] == {"last_row": 9}
+        assert csv_data.returned_kwargs["temp"]["last_row"] == 9
 
         data1 = MyData.fetch(shape=(5,))
         data2 = MyData.fetch(shape=(6,))
@@ -1921,8 +1939,8 @@ class TestCustom:
             vbt.CSVData.fetch(0)
 
     def test_hdf_data(self, tmp_path):
-        sr = pd.Series(np.arange(10))
-        sr.to_hdf(tmp_path / "temp.h5", "s")
+        sr = pd.Series(np.arange(10), index=pd.date_range("2020", periods=10, tz="utc"))
+        sr.to_hdf(tmp_path / "temp.h5", "s", format="table")
         hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "s")
         assert_series_equal(hdf_data.get(), sr)
         hdf_data = vbt.HDFData.fetch("S", paths=tmp_path / "temp.h5" / "s")
@@ -1934,9 +1952,19 @@ class TestCustom:
         hdf_data = vbt.HDFData.fetch(["S"], paths=tmp_path / "temp.h5" / "s")
         assert hdf_data.symbols[0] == "S"
         assert_series_equal(hdf_data.get()["S"], sr.rename("S"))
-        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "s", start_row=2, end_row=3)
-        assert_series_equal(hdf_data.get(), sr.iloc[2:4])
-        df = pd.DataFrame(np.arange(20).reshape((10, 2)))
+        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "s", start="2020-01-03")
+        assert_series_equal(hdf_data.get(), sr.iloc[2:], check_freq=False)
+        assert hdf_data.returned_kwargs["s"]["last_row"] == 9
+        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "s", end="2020-01-05")
+        assert_series_equal(hdf_data.get(), sr.iloc[:4], check_freq=False)
+        assert hdf_data.returned_kwargs["s"]["last_row"] == 3
+        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "s", start="2020-01-03", end="2020-01-05")
+        assert_series_equal(hdf_data.get(), sr.iloc[2:4], check_freq=False)
+        assert hdf_data.returned_kwargs["s"]["last_row"] == 3
+        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "s", start_row=2, end_row=4)
+        assert_series_equal(hdf_data.get(), sr.iloc[2:4], check_freq=False)
+        assert hdf_data.returned_kwargs["s"]["last_row"] == 3
+        df = pd.DataFrame(np.arange(20).reshape((10, 2)), index=pd.date_range("2020", periods=10, tz="utc"))
         df.columns = pd.Index(["0", "1"], dtype="object")
         df.to_hdf(tmp_path / "temp.h5", "df", format="table")
         hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "df", iterator=True)
@@ -1944,23 +1972,23 @@ class TestCustom:
         hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "df", chunksize=1)
         assert_frame_equal(hdf_data.get(), df)
         hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "df", chunksize=1, chunk_func=lambda x: list(x)[-1])
-        assert_frame_equal(hdf_data.get(), df.iloc[[-1]])
-        df = pd.DataFrame(np.arange(20).reshape((10, 2)))
+        assert_frame_equal(hdf_data.get(), df.iloc[[-1]], check_freq=False)
+        df = pd.DataFrame(np.arange(20).reshape((10, 2)), index=pd.date_range("2020", periods=10, tz="utc"))
         df.columns = pd.MultiIndex.from_tuples([("1", "2"), ("3", "4")], names=["a", "b"])
         df.to_hdf(tmp_path / "temp.h5", "df")
-        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "df", header=[0, 1], start_row=0, end_row=1)
-        assert_frame_equal(hdf_data.get(), df.iloc[:2])
-        assert hdf_data.returned_kwargs["df"] == {"last_row": 1}
+        hdf_data = vbt.HDFData.fetch(tmp_path / "temp.h5" / "df", header=[0, 1], start_row=0, end_row=2)
+        assert_frame_equal(hdf_data.get(), df.iloc[:2], check_freq=False)
+        assert hdf_data.returned_kwargs["df"]["last_row"] == 1
         hdf_data = hdf_data.update()
-        assert_frame_equal(hdf_data.get(), df.iloc[:2])
-        assert hdf_data.returned_kwargs["df"] == {"last_row": 1}
-        hdf_data = hdf_data.update(end_row=2)
+        assert_frame_equal(hdf_data.get(), df.iloc[:2], check_freq=False)
+        assert hdf_data.returned_kwargs["df"]["last_row"] == 1
+        hdf_data = hdf_data.update(end_row=3)
         hdf_data.get()
-        assert_frame_equal(hdf_data.get(), df.iloc[:3])
-        assert hdf_data.returned_kwargs["df"] == {"last_row": 2}
+        assert_frame_equal(hdf_data.get(), df.iloc[:3], check_freq=False)
+        assert hdf_data.returned_kwargs["df"]["last_row"] == 2
         hdf_data = hdf_data.update(end_row=None)
         assert_frame_equal(hdf_data.get(), df)
-        assert hdf_data.returned_kwargs["df"] == {"last_row": 9}
+        assert hdf_data.returned_kwargs["df"]["last_row"] == 9
 
         data1 = MyData.fetch(shape=(5,))
         data2 = MyData.fetch(shape=(6,))
@@ -2074,7 +2102,7 @@ class TestCustom:
 
     def test_random_data(self):
         assert_series_equal(
-            vbt.RandomData.fetch(start="2021-01-01 UTC", end="2021-01-05 UTC", seed=42).get(),
+            vbt.RandomData.fetch(start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42).get(),
             pd.Series(
                 [100.49671415301123, 100.35776307348756, 101.00776880200878, 102.54614727815496, 102.3060320136544],
                 index=pd.DatetimeIndex(
@@ -2091,7 +2119,7 @@ class TestCustom:
             ),
         )
         assert_series_equal(
-            vbt.RandomData.fetch(start="2021-01-01 UTC", end="2021-01-05 UTC", symmetric=True, seed=42).get(),
+            vbt.RandomData.fetch(start="2021-01-01 UTC", end="2021-01-06 UTC", symmetric=True, seed=42).get(),
             pd.Series(
                 [100.49671415301123, 100.35795492796039, 101.00796189910105, 102.54634331617359, 102.30678851828695],
                 index=pd.DatetimeIndex(
@@ -2108,7 +2136,9 @@ class TestCustom:
             ),
         )
         assert_frame_equal(
-            vbt.RandomData.fetch(num_paths=2, start="2021-01-01 UTC", end="2021-01-05 UTC", seed=42).get(),
+            vbt.RandomData.fetch(
+                columns=pd.Index([0, 1], name="path"), start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42
+            ).get(),
             pd.DataFrame(
                 [
                     [100.49671415301123, 99.7658630430508],
@@ -2132,7 +2162,7 @@ class TestCustom:
             ),
         )
         assert_frame_equal(
-            vbt.RandomData.fetch([0, 1], start="2021-01-01 UTC", end="2021-01-05 UTC", seed=42).get(),
+            vbt.RandomData.fetch([0, 1], start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42).get(),
             pd.DataFrame(
                 [
                     [100.49671415301123, 100.49671415301123],
@@ -2160,24 +2190,28 @@ class TestCustom:
         assert_frame_equal(
             vbt.RandomOHLCData.fetch(
                 start="2021-01-01 UTC",
-                end="2021-01-05 UTC",
-                ohlc_freq="2D",
+                end="2021-01-06 UTC",
                 seed=42,
+                n_ticks=10,
             ).get(),
             pd.DataFrame(
                 [
-                    [100.49671415301123, 100.49671415301123, 100.35776307348756, 100.35776307348756],
-                    [101.00776880200878, 102.54614727815496, 101.00776880200878, 102.54614727815496],
-                    [102.3060320136544, 102.3060320136544, 102.3060320136544, 102.3060320136544],
+                    [100.04967141530112, 100.4487295660908, 100.03583811740049, 100.4487295660908],
+                    [100.40217984758935, 100.40217984758935, 99.65708696443218, 99.65708696443218],
+                    [99.8031492512559, 99.8031492512559, 99.43592824293678, 99.43592824293678],
+                    [99.37609698741984, 99.56016916393129, 99.10790499793339, 99.12741550259568],
+                    [99.20061778610567, 99.21761762546865, 98.8767232135222, 98.8767232135222],
                 ],
                 index=pd.DatetimeIndex(
                     [
                         datetime(2021, 1, 1),
+                        datetime(2021, 1, 2),
                         datetime(2021, 1, 3),
+                        datetime(2021, 1, 4),
                         datetime(2021, 1, 5),
                     ],
                     dtype="datetime64[ns, UTC]",
-                    freq="2D",
+                    freq="1D",
                 ),
                 columns=pd.Index(["Open", "High", "Low", "Close"], dtype="object"),
             ),
@@ -2185,7 +2219,7 @@ class TestCustom:
 
     def test_gbm_data(self):
         assert_series_equal(
-            vbt.GBMData.fetch(start="2021-01-01 UTC", end="2021-01-05 UTC", seed=42).get(),
+            vbt.GBMData.fetch(start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42).get(),
             pd.Series(
                 [100.49292505095792, 100.34905764408163, 100.99606643427086, 102.54091282498935, 102.29597577584751],
                 index=pd.DatetimeIndex(
@@ -2202,7 +2236,9 @@ class TestCustom:
             ),
         )
         assert_frame_equal(
-            vbt.GBMData.fetch(num_paths=2, start="2021-01-01 UTC", end="2021-01-05 UTC", seed=42).get(),
+            vbt.GBMData.fetch(
+                columns=pd.Index([0, 1], name="path"), start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42
+            ).get(),
             pd.DataFrame(
                 [
                     [100.49292505095792, 99.76114874768454],
@@ -2226,7 +2262,7 @@ class TestCustom:
             ),
         )
         assert_frame_equal(
-            vbt.GBMData.fetch([0, 1], start="2021-01-01 UTC", end="2021-01-05 UTC", seed=42).get(),
+            vbt.GBMData.fetch([0, 1], start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42).get(),
             pd.DataFrame(
                 [
                     [100.49292505095792, 100.49292505095792],
@@ -2254,24 +2290,28 @@ class TestCustom:
         assert_frame_equal(
             vbt.GBMOHLCData.fetch(
                 start="2021-01-01 UTC",
-                end="2021-01-05 UTC",
-                ohlc_freq="2D",
+                end="2021-01-06 UTC",
                 seed=42,
+                n_ticks=10,
             ).get(),
             pd.DataFrame(
                 [
-                    [100.49292505095792, 100.49292505095792, 100.34905764408163, 100.34905764408163],
-                    [100.99606643427086, 102.54091282498935, 100.99606643427086, 102.54091282498935],
-                    [102.29597577584751, 102.29597577584751, 102.29597577584751, 102.29597577584751],
+                    [100.04963372876203, 100.44856416230552, 100.03575137446511, 100.44856416230552],
+                    [100.40197510375286, 100.40197510375286, 99.6569924965322, 99.6569924965322],
+                    [99.80311183354723, 99.80311183354723, 99.4356577399506, 99.4356577399506],
+                    [99.37579495605948, 99.55998737434406, 99.10782027760916, 99.12728312249477],
+                    [99.20046274334108, 99.2174144041126, 98.87648952724908, 98.87648952724908],
                 ],
                 index=pd.DatetimeIndex(
                     [
                         datetime(2021, 1, 1),
+                        datetime(2021, 1, 2),
                         datetime(2021, 1, 3),
+                        datetime(2021, 1, 4),
                         datetime(2021, 1, 5),
                     ],
                     dtype="datetime64[ns, UTC]",
-                    freq="2D",
+                    freq="1D",
                 ),
                 columns=pd.Index(["Open", "High", "Low", "Close"], dtype="object"),
             ),

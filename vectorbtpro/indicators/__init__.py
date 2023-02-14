@@ -1,50 +1,19 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Modules for building and running indicators.
 
 Technical indicators are used to see past trends and anticipate future moves.
 See [Using Technical Indicators to Develop Trading Strategies](https://www.investopedia.com/articles/trading/11/indicators-and-strategies-explained.asp)."""
 
-from vectorbtpro import _typing as tp
-from vectorbtpro.indicators.custom import *
-from vectorbtpro.indicators.factory import IndicatorFactory, IndicatorBase
-from vectorbtpro.indicators.configs import flex_col_param_config, flex_elem_param_config
-from vectorbtpro.utils.module_ import create__all__
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from vectorbtpro.indicators.configs import *
+    from vectorbtpro.indicators.custom import *
+    from vectorbtpro.indicators.expr import *
+    from vectorbtpro.indicators.factory import *
+    from vectorbtpro.indicators.nb import *
 
-def talib(*args, **kwargs) -> tp.Type[IndicatorBase]:
-    """Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory.from_talib`."""
-    return IndicatorFactory.from_talib(*args, **kwargs)
-
-
-def pandas_ta(*args, **kwargs) -> tp.Type[IndicatorBase]:
-    """Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory.from_pandas_ta`."""
-    return IndicatorFactory.from_pandas_ta(*args, **kwargs)
-
-
-def ta(*args, **kwargs) -> tp.Type[IndicatorBase]:
-    """Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory.from_ta`."""
-    return IndicatorFactory.from_ta(*args, **kwargs)
-
-
-def wqa101(*args, **kwargs) -> tp.Type[IndicatorBase]:
-    """Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory.from_wqa101`."""
-    return IndicatorFactory.from_wqa101(*args, **kwargs)
-
-
-def technical(*args, **kwargs) -> tp.Type[IndicatorBase]:
-    """Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory.from_technical`."""
-    return IndicatorFactory.from_technical(*args, **kwargs)
-
-
-def techcon(*args, **kwargs) -> tp.Type[IndicatorBase]:
-    """Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory.from_techcon`."""
-    return IndicatorFactory.from_techcon(*args, **kwargs)
-
-
-IF = IndicatorFactory
-"""Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory`."""
-
-__whitelist__ = ["talib", "pandas_ta", "ta", "wqa101", "technical", "techcon"]
-__all__ = create__all__(__name__)
-__pdoc__ = {k: k in __whitelist__ for k in __all__}
+__exclude_from__all__ = [
+    "enums",
+]

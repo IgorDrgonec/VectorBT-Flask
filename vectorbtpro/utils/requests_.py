@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for requests."""
 
@@ -9,6 +9,8 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
 from vectorbtpro import _typing as tp
+
+__all__ = []
 
 
 def requests_retry_session(

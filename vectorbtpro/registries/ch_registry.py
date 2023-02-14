@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Global registry for chunkables."""
 
@@ -10,6 +10,11 @@ from vectorbtpro.utils.chunking import chunked, resolve_chunked, resolve_chunked
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.hashing import Hashable
 from vectorbtpro.utils.template import RepEval
+
+__all__ = [
+    "ch_reg",
+    "register_chunkable",
+]
 
 
 @attr.s(frozen=True, eq=False)

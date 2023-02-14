@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Client for TradingView."""
 
@@ -19,6 +19,10 @@ try:
     from websocket import WebSocket as WebSocketT
 except ImportError:
     WebSocketT = tp.Any
+
+__all__ = [
+    "TVClient",
+]
 
 
 class Interval(enum.Enum):
@@ -153,7 +157,7 @@ class TVClient:
         volume_data = True
         for xi in x:
             xi = re.split("\[|:|,|\]", xi)
-            ts = datetime.datetime.fromtimestamp(float(xi[4]))
+            ts = datetime.datetime.utcfromtimestamp(float(xi[4]))
             row = [ts]
             for i in range(5, 10):
                 # skip converting volume data if does not exists

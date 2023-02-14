@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Mapping utilities."""
 
@@ -9,6 +9,8 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
+
+__all__ = []
 
 
 def reverse_mapping(mapping: tp.Mapping) -> dict:

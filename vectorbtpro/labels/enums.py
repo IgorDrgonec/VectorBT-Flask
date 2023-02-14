@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Named tuples and enumerated types for label generation.
 
@@ -7,7 +7,7 @@ Defines enums and other schemas for `vectorbtpro.labels`."""
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.formatting import prettify
 
-__all__ = ["TrendLabelMode"]
+__pdoc__all__ = __all__ = ["TrendLabelMode"]
 
 __pdoc__ = {}
 

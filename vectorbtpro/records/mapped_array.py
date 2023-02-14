@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base class for working with mapped arrays.
 
@@ -389,7 +389,7 @@ We can build histograms and boxplots of `MappedArray` directly:
 >>> ma.boxplot().show()
 ```
 
-![](/assets/images/api/mapped_boxplot.svg)
+![](/assets/images/api/mapped_boxplot.svg){: .iimg }
 
 To use scatterplots or any other plots that require index, convert to pandas first:
 
@@ -397,7 +397,7 @@ To use scatterplots or any other plots that require index, convert to pandas fir
 >>> ma.to_pd().vbt.plot().show()
 ```
 
-![](/assets/images/api/mapped_to_pd_plot.svg)
+![](/assets/images/api/mapped_to_pd_plot.svg){: .iimg }
 
 !!! hint
     See `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots` and `MappedArray.subplots`.
@@ -414,7 +414,7 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array, to_dict
 from vectorbtpro.base.resampling.base import Resampler
-from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
+from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.records import nb
@@ -428,6 +428,10 @@ from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridCo
 from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method
 from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, attach_unary_magic_methods
 from vectorbtpro.utils.mapping import to_mapping, apply_mapping
+
+__all__ = [
+    "MappedArray",
+]
 
 MappedArrayT = tp.TypeVar("MappedArrayT", bound="MappedArray")
 
@@ -1549,7 +1553,7 @@ class MappedArray(Analyzable):
         checks.assert_in(axis, (-1, 0, 1))
 
         mapping = self.resolve_mapping(mapping)
-        mapped_codes, mapped_uniques = pd.factorize(self.values, sort=False, na_sentinel=None)
+        mapped_codes, mapped_uniques = pd.factorize(self.values, sort=False, use_na_sentinel=False)
         if axis == 0:
             if idx_arr is None:
                 idx_arr = self.idx_arr

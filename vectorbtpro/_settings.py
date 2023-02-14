@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Global settings of vectorbtpro.
 
@@ -123,12 +123,22 @@ import pkgutil
 import numpy as np
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils import checks
-from vectorbtpro.utils.config import child_dict, Config, FrozenConfig
-from vectorbtpro.utils.datetime_ import get_local_tz, get_utc_tz
-from vectorbtpro.utils.execution import SequenceEngine, ThreadPoolEngine, ProcessPoolEngine, DaskEngine, RayEngine
+from vectorbtpro.utils.checks import is_instance_of
+from vectorbtpro.utils.config import child_dict, Config
+from vectorbtpro.utils.execution import (
+    SerialEngine,
+    ThreadPoolEngine,
+    ProcessPoolEngine,
+    PathosEngine,
+    DaskEngine,
+    RayEngine
+)
 from vectorbtpro.utils.jitting import NumPyJitter, NumbaJitter
-from vectorbtpro.utils.template import Sub, RepEval, deep_substitute
+from vectorbtpro.utils.template import Sub, RepEval, substitute_templates
+
+__all__ = [
+    "settings",
+]
 
 __pdoc__: dict = {}
 
@@ -137,6 +147,7 @@ __pdoc__: dict = {}
 _settings = {}
 
 importing = child_dict(
+    auto_import=True,
     plotly=True,
     telegram=True,
     quantstats=True,
@@ -145,9 +156,15 @@ importing = child_dict(
 """_"""
 
 __pdoc__["importing"] = Sub(
-    """Sub-config with settings applied on import.
+    """Sub-config with settings applied on importing.
     
-Disabling these options will make vectorbt load faster.
+Disabling these options will make vectorbt load faster, but will limit the flexibility of accessing
+various features of the package.
+    
+!!! note
+    If `auto_import` is False, you won't be able to access most important modules and objects 
+    such as via `vbt.Portfolio`, only by explicitly importing them such as via 
+    `from vectorbtpro.portfolio.base import Portfolio`.
 
 ```python
 ${config_doc}
@@ -191,7 +208,7 @@ jitting = child_dict(
     allow_new=False,
     register_new=False,
     jitters=Config(
-        nb=FrozenConfig(
+        nb=Config(
             cls=NumbaJitter,
             aliases={"numba"},
             options=dict(),
@@ -199,7 +216,7 @@ jitting = child_dict(
             resolve_kwargs=dict(),
             tasks=dict(),
         ),
-        np=FrozenConfig(
+        np=Config(
             cls=NumPyJitter,
             aliases={"numpy"},
             options=dict(),
@@ -269,37 +286,39 @@ ${config_doc}
 _settings["math"] = math
 
 execution = child_dict(
+    n_chunks=None,
+    chunk_len=None,
+    distribute="calls",
     show_progress=True,
     pbar_kwargs=Config(),
     engines=Config(
-        sequence=FrozenConfig(
-            cls=SequenceEngine,
+        serial=Config(
+            cls=SerialEngine,
             show_progress=False,
             pbar_kwargs=Config(),
             clear_cache=False,
             collect_garbage=False,
-            n_chunks=None,
-            chunk_len=None,
+            cooldown=None,
         ),
-        threadpool=FrozenConfig(
+        threadpool=Config(
             cls=ThreadPoolEngine,
             init_kwargs=Config(),
-            n_chunks=None,
-            chunk_len=None,
         ),
-        processpool=FrozenConfig(
+        processpool=Config(
             cls=ProcessPoolEngine,
             init_kwargs=Config(),
-            n_chunks=None,
-            chunk_len=None,
         ),
-        dask=FrozenConfig(
+        pathos=Config(
+            cls=PathosEngine,
+            pool_type="process",
+            sleep=0.001,
+            init_kwargs=Config(),
+        ),
+        dask=Config(
             cls=DaskEngine,
             compute_kwargs=Config(),
-            n_chunks=None,
-            chunk_len=None,
         ),
-        ray=FrozenConfig(
+        ray=Config(
             cls=RayEngine,
             restart=False,
             reuse_refs=True,
@@ -307,8 +326,6 @@ execution = child_dict(
             shutdown=False,
             init_kwargs=Config(),
             remote_kwargs=Config(),
-            n_chunks=None,
-            chunk_len=None,
         ),
     ),
 )
@@ -328,7 +345,7 @@ chunking = child_dict(
     disable=False,
     disable_wrapping=False,
     option=False,
-    engine="sequence",
+    engine="serial",
     n_chunks=None,
     min_size=None,
     chunk_len=None,
@@ -400,6 +417,21 @@ _settings["template"] = template
 
 pickling = child_dict(
     pickle_classes=None,
+    file_format="pickle",
+    compression=None,
+    extensions=child_dict(
+        serialization=child_dict(
+            pickle={"pickle", "pkl", "p"},
+            config={"config", "cfg", "ini"},
+        ),
+        compression=child_dict(
+            bz2={"bzip2", "bz2", "bz"},
+            gzip={"gzip", "gz"},
+            lzma={"lzma", "xz"},
+            lz4={"lz4"},
+            blosc={"blosc"},
+        ),
+    )
 )
 """_"""
 
@@ -464,9 +496,8 @@ broadcasting = child_dict(
     keep_flex=False,
     min_ndim=None,
     expand_axis=1,
-    index_to_product=True,
-    repeat_product=True,
-    keys_from_sr_index=True,
+    index_to_param=True,
+    repeat_param=True,
 )
 """_"""
 
@@ -543,9 +574,10 @@ ${config_doc}
 _settings["resampling"] = resampling
 
 datetime = child_dict(
-    naive_tz=get_local_tz(),
-    to_fixed_offset=True,
+    naive_tz="tzlocal()",
+    to_fixed_offset=None,
     parse_index=False,
+    parser_kwargs=Config(),
 )
 """_"""
 
@@ -560,54 +592,57 @@ ${config_doc}
 _settings["datetime"] = datetime
 
 data = child_dict(
-    show_progress=True,
-    pbar_kwargs=Config(),
-    tz_localize=get_utc_tz(),
-    tz_convert=get_utc_tz(),
-    missing_index="nan",
-    missing_columns="raise",
+    wrapper_kwargs=Config(),
     skip_on_error=False,
     silence_warnings=False,
+    execute_kwargs=Config(),
+    tz_localize="UTC",
+    tz_convert="UTC",
+    missing_index="nan",
+    missing_columns="raise",
     custom=Config(
         # Synthetic
-        synthetic=FrozenConfig(
-            start=0,
-            end="now",
+        synthetic=Config(
+            start=None,
+            end=None,
             freq=None,
-            date_range_kwargs=dict(),
+            tz=None,
+            normalize=False,
+            inclusive="left",
         ),
-        random=FrozenConfig(
-            num_paths=1,
+        random=Config(
             start_value=100.0,
             mean=0.0,
             std=0.01,
             symmetric=False,
             seed=None,
-            jitted=None,
         ),
-        random_ohlc=FrozenConfig(
-            ohlc_freq=None,
+        random_ohlc=Config(
+            std=0.001,
+            n_ticks=50,
         ),
-        gbm=FrozenConfig(
-            num_paths=1,
+        gbm=Config(
             start_value=100.0,
             mean=0.0,
             std=0.01,
             dt=1.0,
             seed=None,
-            jitted=None,
         ),
-        gbm_ohlc=FrozenConfig(
-            ohlc_freq=None,
+        gbm_ohlc=Config(
+            std=0.001,
+            n_ticks=50,
         ),
         # Local
-        local=FrozenConfig(
+        local=Config(
             match_paths=True,
             match_regex=None,
             sort_paths=True,
         ),
-        csv=FrozenConfig(
-            start_row=0,
+        csv=Config(
+            start=None,
+            end=None,
+            tz=None,
+            start_row=None,
             end_row=None,
             header=0,
             index_col=0,
@@ -615,29 +650,34 @@ data = child_dict(
             squeeze=True,
             read_csv_kwargs=dict(),
         ),
-        hdf=FrozenConfig(
-            start_row=0,
+        hdf=Config(
+            start=None,
+            end=None,
+            tz=None,
+            start_row=None,
             end_row=None,
             read_hdf_kwargs=dict(),
         ),
         # Remote
-        remote=FrozenConfig(),
-        yf=FrozenConfig(
+        remote=Config(),
+        yf=Config(
             period="max",
             start=None,
             end=None,
             timeframe="1d",
+            tz=None,
             history_kwargs=dict(),
         ),
-        binance=FrozenConfig(
+        binance=Config(
             client=None,
             client_config=dict(
                 api_key=None,
                 api_secret=None,
             ),
             start=0,
-            end="now UTC",
+            end="now",
             timeframe="1d",
+            tz="UTC",
             klines_type="spot",
             limit=1000,
             delay=500,
@@ -646,14 +686,15 @@ data = child_dict(
             silence_warnings=False,
             get_klines_kwargs=dict(),
         ),
-        ccxt=FrozenConfig(
+        ccxt=Config(
             exchange="binance",
             exchange_config=dict(
                 enableRateLimit=True,
             ),
-            start=0,
-            end="now UTC",
+            start=None,
+            end=None,
             timeframe="1d",
+            tz="UTC",
             find_earliest_date=True,
             limit=1000,
             delay=None,
@@ -664,7 +705,7 @@ data = child_dict(
             exchanges=dict(),
             silence_warnings=False,
         ),
-        alpaca=FrozenConfig(
+        alpaca=Config(
             client=None,
             client_type="stocks",
             client_config=dict(
@@ -674,20 +715,22 @@ data = child_dict(
                 paper=False,
             ),
             start=0,
-            end="now UTC",
+            end="now",
             timeframe="1d",
+            tz="UTC",
             adjustment="raw",
             feed=None,
             limit=None,
         ),
-        polygon=FrozenConfig(
+        polygon=Config(
             client=None,
             client_config=dict(
                 api_key=None,
             ),
             start=0,
-            end="now UTC",
+            end="now",
             timeframe="1d",
+            tz="UTC",
             adjusted=True,
             limit=50000,
             params=dict(),
@@ -697,12 +740,13 @@ data = child_dict(
             pbar_kwargs=dict(),
             silence_warnings=False,
         ),
-        alpha_vantage=FrozenConfig(
+        alpha_vantage=Config(
             apikey=None,
             api_meta=None,
             category=None,
             function=None,
             timeframe=None,
+            tz="UTC",
             adjusted=False,
             extended=False,
             slice="year1month1",
@@ -718,16 +762,17 @@ data = child_dict(
             params=dict(),
             silence_warnings=False,
         ),
-        ndl=FrozenConfig(
+        ndl=Config(
             api_key=None,
             start=None,
             end=None,
+            tz="UTC",
             column_indices=None,
             collapse=None,
             transform=None,
             params=dict(),
         ),
-        tv=FrozenConfig(
+        tv=Config(
             client=None,
             client_config=dict(
                 username=None,
@@ -736,6 +781,7 @@ data = child_dict(
             ),
             exchange=None,
             timeframe="D",
+            tz="UTC",
             fut_contract=None,
             extended_session=False,
             pro_data=True,
@@ -824,14 +870,14 @@ plotting = child_dict(
             color_schema=Config(
                 blue="rgb(76,114,176)",
                 orange="rgb(221,132,82)",
-                green="rgb(129,114,179)",
-                red="rgb(85,168,104)",
-                purple="rgb(218,139,195)",
-                brown="rgb(204,185,116)",
-                pink="rgb(140,140,140)",
-                gray="rgb(100,181,205)",
-                yellow="rgb(147,120,96)",
-                cyan="rgb(196,78,82)",
+                green="rgb(85,168,104)",
+                red="rgb(196,78,82)",
+                purple="rgb(129,114,179)",
+                brown="rgb(147,120,96)",
+                pink="rgb(218,139,195)",
+                gray="rgb(140,140,140)",
+                yellow="rgb(204,185,116)",
+                cyan="rgb(100,181,205)",
             ),
             path="__name__/templates/seaborn.json",
         ),
@@ -1276,7 +1322,6 @@ portfolio = child_dict(
     allow_partial=True,
     raise_reject=False,
     log=False,
-    skipna=False,
     # Signals
     signal_direction="longonly",
     accumulate=False,
@@ -1322,8 +1367,9 @@ portfolio = child_dict(
     call_post_segment=False,
     ffill_val_price=True,
     update_value=False,
-    fill_state=False,
-    fill_returns=False,
+    save_state=False,
+    save_value=False,
+    save_returns=False,
     fill_pos_record=True,
     track_value=True,
     row_wise=False,
@@ -1335,7 +1381,7 @@ portfolio = child_dict(
     ),
     template_context=Config(),
     keep_inout_raw=True,
-    from_ago=0,
+    from_ago=None,
     call_seq=None,
     attach_call_seq=False,
     bm_close=None,
@@ -1440,14 +1486,14 @@ pfopt = child_dict(
     stats=Config(
         filters=dict(
             alloc_ranges=dict(
-                filter_func=lambda self, metric_settings: checks.is_instance_of(self.alloc_records, "AllocRanges"),
+                filter_func=lambda self, metric_settings: is_instance_of(self.alloc_records, "AllocRanges"),
             )
         )
     ),
     plots=Config(
         filters=dict(
             alloc_ranges=dict(
-                filter_func=lambda self, metric_settings: checks.is_instance_of(self.alloc_records, "AllocRanges"),
+                filter_func=lambda self, metric_settings: is_instance_of(self.alloc_records, "AllocRanges"),
             )
         )
     ),
@@ -1584,7 +1630,7 @@ class SettingsConfig(Config):
         for k, v in __pdoc__.items():
             if k in self:
                 config_doc = self[k].prettify(**prettify_kwargs.get(k, {}))
-                __pdoc__[k] = deep_substitute(
+                __pdoc__[k] = substitute_templates(
                     v,
                     context=dict(config_doc=config_doc),
                     sub_id="__pdoc__",

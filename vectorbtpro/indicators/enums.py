@@ -1,11 +1,16 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Named tuples and enumerated types for indicators."""
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.formatting import prettify
 
-__all__ = ["Pivot", "TrendMode", "SuperTrendAIS", "SuperTrendAOS"]
+__pdoc__all__ = __all__ = [
+    "Pivot",
+    "TrendMode",
+    "SuperTrendAIS",
+    "SuperTrendAOS",
+]
 
 __pdoc__ = {}
 

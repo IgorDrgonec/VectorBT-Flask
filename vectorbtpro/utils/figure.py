@@ -1,8 +1,8 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for constructing and displaying figures."""
 
-from vectorbtpro.utils.opt_packages import assert_can_import
+from vectorbtpro.utils.module_ import assert_can_import
 
 assert_can_import("plotly")
 
@@ -11,6 +11,13 @@ from plotly.subplots import make_subplots as _make_subplots
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import merge_dicts
+
+__all__ = [
+    "Figure",
+    "FigureWidget",
+    "make_figure",
+    "make_subplots",
+]
 
 
 def get_domain(ref: str, fig: tp.BaseFigure) -> tp.Tuple[int, int]:

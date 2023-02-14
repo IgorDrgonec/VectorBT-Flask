@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Mixin for building plots out of subplots."""
 
@@ -14,7 +14,9 @@ from vectorbtpro.utils.attr_ import get_dict_attr, AttrResolverMixin
 from vectorbtpro.utils.config import Config, HybridConfig, merge_dicts
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.tagging import match_tags
-from vectorbtpro.utils.template import deep_substitute, CustomTemplate
+from vectorbtpro.utils.template import substitute_templates, CustomTemplate
+
+__all__ = []
 
 
 class MetaPlotsBuilderMixin(type):
@@ -193,18 +195,18 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
 
         # Replace templates globally (not used at subplot level)
         if len(template_context) > 0:
-            sub_settings = deep_substitute(
+            sub_settings = substitute_templates(
                 settings,
                 context=template_context,
                 sub_id="sub_settings",
                 strict=False,
             )
-            sub_make_subplots_kwargs = deep_substitute(
+            sub_make_subplots_kwargs = substitute_templates(
                 make_subplots_kwargs,
                 context=template_context,
                 sub_id="sub_make_subplots_kwargs",
             )
-            sub_layout_kwargs = deep_substitute(
+            sub_layout_kwargs = substitute_templates(
                 layout_kwargs,
                 context=template_context,
                 sub_id="sub_layout_kwargs",
@@ -264,7 +266,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                     ),
                     settings,
                 )
-                subplot_context = deep_substitute(
+                subplot_context = substitute_templates(
                     subplot_context,
                     context=subplot_context,
                     sub_id="subplot_context",
@@ -320,14 +322,14 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
             merged_settings = merge_dicts(opt_settings, _subplot_settings, passed_subplot_settings)
             subplot_template_context = merged_settings.pop("template_context", {})
             template_context_merged = merge_dicts(template_context, subplot_template_context)
-            template_context_merged = deep_substitute(
+            template_context_merged = substitute_templates(
                 template_context_merged,
                 context=merged_settings,
                 sub_id="template_context_merged",
             )
             context = merge_dicts(template_context_merged, merged_settings)
-            # safe because we will use deep_substitute again once layout params are known
-            merged_settings = deep_substitute(
+            # safe because we will use substitute_templates again once layout params are known
+            merged_settings = substitute_templates(
                 merged_settings,
                 context=context,
                 sub_id="merged_settings",
@@ -377,7 +379,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
 
             for filter_name in subplot_filters:
                 filter_settings = filters[filter_name]
-                _filter_settings = deep_substitute(
+                _filter_settings = substitute_templates(
                     filter_settings,
                     context=context,
                     sub_id="filter_settings",
@@ -556,7 +558,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                         custom_arg_names.add(k)
                 final_kwargs = merge_dicts(subplot_layout_kwargs, final_kwargs)
                 context = merge_dicts(subplot_layout_kwargs, context)
-                final_kwargs = deep_substitute(final_kwargs, context=context, sub_id="final_kwargs")
+                final_kwargs = substitute_templates(final_kwargs, context=context, sub_id="final_kwargs")
 
                 # Clean up keys
                 for k, v in list(final_kwargs.items()):

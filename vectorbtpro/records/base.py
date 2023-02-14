@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base class for working with records.
 
@@ -420,7 +420,7 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array
 from vectorbtpro.base.resampling.base import Resampler
-from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
+from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.records import nb
 from vectorbtpro.records.col_mapper import ColumnMapper
@@ -433,6 +433,10 @@ from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridCo
 from vectorbtpro.utils.decorators import cached_method, class_or_instancemethod
 from vectorbtpro.utils.random_ import set_seed_nb
 from vectorbtpro.utils.template import Sub
+
+__all__ = [
+    "Records",
+]
 
 __pdoc__ = {}
 

@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base class for splitting."""
 
@@ -15,7 +15,7 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.array_ import is_range
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.colors import adjust_opacity
-from vectorbtpro.utils.template import CustomTemplate, Rep, RepFunc, deep_substitute
+from vectorbtpro.utils.template import CustomTemplate, Rep, RepFunc, substitute_templates
 from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.datetime_ import try_to_datetime_index, try_align_to_datetime_index, parse_timedelta
@@ -25,8 +25,8 @@ from vectorbtpro.base.indexing import hslice, PandasIndexer, get_index_ranges
 from vectorbtpro.base.indexes import combine_indexes, stack_indexes
 from vectorbtpro.base.reshaping import to_dict
 from vectorbtpro.base.accessors import BaseIDXAccessor
-from vectorbtpro.base.resampling import Resampler
-from vectorbtpro.base.grouping import Grouper
+from vectorbtpro.base.resampling.base import Resampler
+from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.merging import row_stack_merge, column_stack_merge, resolve_merge_func
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.splitting import nb
@@ -36,6 +36,13 @@ if tp.TYPE_CHECKING:
 else:
     BaseCrossValidatorT = tp.Any
 
+__all__ = [
+    "FixRange",
+    "RelRange",
+    "Takeable",
+    "Splitter",
+    "SKLSplitter",
+]
 
 __pdoc__ = {}
 
@@ -348,7 +355,7 @@ class Splitter(Analyzable):
         removed_indices = []
         for i, split in enumerate(splits):
             already_fixed = False
-            if checks.is_number(split) or checks.is_td(split):
+            if checks.is_number(split) or checks.is_td_like(split):
                 split = cls.split_range(
                     slice(None),
                     split,
@@ -383,7 +390,7 @@ class Splitter(Analyzable):
                 )
             _new_split = []
             for range_ in new_split:
-                if checks.is_number(range_) or checks.is_td(range_):
+                if checks.is_number(range_) or checks.is_td_like(range_):
                     range_ = RelRange(length=range_)
                 if not isinstance(range_, (FixRange, RelRange)):
                     if wrap_with_fixrange or checks.is_sequence(range_):
@@ -394,7 +401,7 @@ class Splitter(Analyzable):
                     _new_split.append(range_)
             if split_check_template is not None:
                 _template_context = merge_dicts(dict(index=index, i=i, split=_new_split), template_context)
-                split_ok = deep_substitute(split_check_template, _template_context, sub_id="split_check_template")
+                split_ok = substitute_templates(split_check_template, _template_context, sub_id="split_check_template")
                 if not split_ok:
                     removed_indices.append(i)
                     continue
@@ -410,7 +417,7 @@ class Splitter(Analyzable):
         else:
             if isinstance(split_labels, CustomTemplate):
                 _template_context = merge_dicts(dict(index=index, splits_arr=new_splits_arr), template_context)
-                split_labels = deep_substitute(split_labels, _template_context, sub_id=split_labels)
+                split_labels = substitute_templates(split_labels, _template_context, sub_id=split_labels)
                 if not isinstance(split_labels, pd.Index):
                     split_labels = pd.Index(split_labels, name="split")
             else:
@@ -423,7 +430,7 @@ class Splitter(Analyzable):
         else:
             if isinstance(split_labels, CustomTemplate):
                 _template_context = merge_dicts(dict(index=index, splits_arr=new_splits_arr), template_context)
-                set_labels = deep_substitute(set_labels, _template_context, sub_id=set_labels)
+                set_labels = substitute_templates(set_labels, _template_context, sub_id=set_labels)
             if not isinstance(set_labels, pd.Index):
                 set_labels = pd.Index(set_labels, name="set")
         if wrapper_kwargs is None:
@@ -520,7 +527,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_rolling_1.svg)
+            ![](/assets/images/api/from_rolling_1.svg){: .iimg }
 
             * Divide a range into ranges, each split into 1/2:
 
@@ -534,7 +541,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_rolling_2.svg)
+            ![](/assets/images/api/from_rolling_2.svg){: .iimg }
 
             * Make the ranges above non-overlapping by using the right bound of the last
             set as an offset anchor:
@@ -550,7 +557,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_rolling_3.svg)
+            ![](/assets/images/api/from_rolling_3.svg){: .iimg }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -678,7 +685,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_n_rolling.svg)
+            ![](/assets/images/api/from_n_rolling.svg){: .iimg }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -786,7 +793,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_expanding.svg)
+            ![](/assets/images/api/from_expanding.svg){: .iimg }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -890,7 +897,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_n_expanding.svg)
+            ![](/assets/images/api/from_n_expanding.svg){: .iimg }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -975,7 +982,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_ranges_1.svg)
+            ![](/assets/images/api/from_ranges_1.svg){: .iimg }
 
             * In addition to the above, reserve the last month for testing purposes:
 
@@ -989,7 +996,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_ranges_2.svg)
+            ![](/assets/images/api/from_ranges_2.svg){: .iimg }
         """
         index = try_to_datetime_index(index)
         if split_range_kwargs is None:
@@ -1063,7 +1070,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_grouper.svg)
+            ![](/assets/images/api/from_grouper.svg){: .iimg }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -1077,7 +1084,7 @@ class Splitter(Analyzable):
 
         if isinstance(by, CustomTemplate):
             _template_context = merge_dicts(dict(index=index), template_context)
-            by = deep_substitute(by, _template_context, sub_id="by")
+            by = substitute_templates(by, _template_context, sub_id="by")
         grouper = BaseIDXAccessor(index).get_grouper(by, groupby_kwargs=groupby_kwargs, **grouper_kwargs)
         splits = []
         indices = []
@@ -1163,7 +1170,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_n_random.svg)
+            ![](/assets/images/api/from_n_random.svg){: .iimg }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -1420,7 +1427,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_split_func.svg)
+            ![](/assets/images/api/from_split_func.svg){: .iimg }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -1459,9 +1466,9 @@ class Splitter(Analyzable):
                 ),
                 template_context,
             )
-            _split_func = deep_substitute(split_func, _template_context, sub_id="split_func")
-            _split_args = deep_substitute(split_args, _template_context, sub_id="split_args")
-            _split_kwargs = deep_substitute(split_kwargs, _template_context, sub_id="split_kwargs")
+            _split_func = substitute_templates(split_func, _template_context, sub_id="split_func")
+            _split_args = substitute_templates(split_args, _template_context, sub_id="split_args")
+            _split_kwargs = substitute_templates(split_kwargs, _template_context, sub_id="split_kwargs")
             new_split = _split_func(*_split_args, **_split_kwargs)
             if new_split is None:
                 break
@@ -1829,7 +1836,7 @@ class Splitter(Analyzable):
     @classmethod
     def is_range_relative(cls, range_: tp.RangeLike) -> bool:
         """Return whether a range is relative."""
-        return checks.is_number(range_) or checks.is_td(range_) or isinstance(range_, RelRange)
+        return checks.is_number(range_) or checks.is_td_like(range_) or isinstance(range_, RelRange)
 
     @class_or_instancemethod
     def get_ready_range(
@@ -2125,7 +2132,7 @@ class Splitter(Analyzable):
         # Substitute template
         if isinstance(new_split, CustomTemplate):
             _template_context = merge_dicts(dict(index=index[range_]), template_context)
-            new_split = deep_substitute(new_split, _template_context, sub_id="new_split")
+            new_split = substitute_templates(new_split, _template_context, sub_id="new_split")
 
         # Split by gap
         if isinstance(new_split, str) and new_split.lower() == "by_gap":
@@ -2145,7 +2152,7 @@ class Splitter(Analyzable):
                 new_split = (new_split, 1.0)
             else:
                 new_split = (1.0, new_split)
-        elif checks.is_td(new_split):
+        elif checks.is_td_like(new_split):
             new_split = parse_timedelta(new_split)
             if new_split < pd.Timedelta(0):
                 backwards = not backwards
@@ -2178,7 +2185,7 @@ class Splitter(Analyzable):
                 return_meta=True,
             )
             new_range = new_range_meta["range_"]
-            if checks.is_number(new_range) or checks.is_td(new_range):
+            if checks.is_number(new_range) or checks.is_td_like(new_range):
                 new_range = RelRange(length=new_range)
             if isinstance(new_range, RelRange):
                 new_range_is_gap = new_range.is_gap
@@ -3075,7 +3082,7 @@ class Splitter(Analyzable):
             ... ).T.vbt.drop_levels("split", axis=0).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/Splitter_apply.svg)
+            ![](/assets/images/api/Splitter_apply.svg){: .iimg }
         """
         if isinstance(attach_bounds, bool):
             if attach_bounds:
@@ -3285,9 +3292,9 @@ class Splitter(Analyzable):
                 ),
                 _template_context,
             )
-            _apply_func = deep_substitute(apply_func, _template_context, sub_id="apply_func")
-            _apply_args = deep_substitute(_apply_args, _template_context, sub_id="apply_args")
-            _apply_kwargs = deep_substitute(_apply_kwargs, _template_context, sub_id="apply_kwargs")
+            _apply_func = substitute_templates(apply_func, _template_context, sub_id="apply_func")
+            _apply_args = substitute_templates(_apply_args, _template_context, sub_id="apply_args")
+            _apply_kwargs = substitute_templates(_apply_kwargs, _template_context, sub_id="apply_kwargs")
             return _apply_func, _apply_args, _apply_kwargs
 
         def _attach_bounds(keys, range_bounds):
@@ -3397,7 +3404,7 @@ class Splitter(Analyzable):
                 if isinstance(merge_func, (str, tuple)):
                     merge_func = resolve_merge_func(merge_func)
                     merge_kwargs = {**dict(keys=keys), **merge_kwargs}
-                merge_kwargs = deep_substitute(merge_kwargs, template_context, sub_id="merge_kwargs")
+                merge_kwargs = substitute_templates(merge_kwargs, template_context, sub_id="merge_kwargs")
                 return merge_func(results, **merge_kwargs)
             if wrap_results:
                 if isinstance(results[0], tuple):
@@ -3463,7 +3470,7 @@ class Splitter(Analyzable):
                     else:
                         _merge_func = merge_func
                         _merge_kwargs = merge_kwargs
-                    _merge_kwargs = deep_substitute(_merge_kwargs, _template_context, sub_id="merge_kwargs")
+                    _merge_kwargs = substitute_templates(_merge_kwargs, _template_context, sub_id="merge_kwargs")
                     merged_results.append(_merge_func(_results, **_merge_kwargs))
             if one_major:
                 return merged_results[0]
@@ -4583,9 +4590,9 @@ class Splitter(Analyzable):
         >>> splitter.plot().show()
         ```
 
-        ![](/assets/images/api/Splitter.svg)
+        ![](/assets/images/api/Splitter.svg){: .iimg }
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         from vectorbtpro.utils.figure import make_figure
@@ -4677,7 +4684,7 @@ class Splitter(Analyzable):
             >>> splitter.plot_coverage().show()
             ```
 
-            ![](/assets/images/api/Splitter_coverage_area.svg)
+            ![](/assets/images/api/Splitter_coverage_area.svg){: .iimg }
 
             * Line plot:
 
@@ -4685,9 +4692,9 @@ class Splitter(Analyzable):
             >>> splitter.plot_coverage(stacked=False).show()
             ```
 
-            ![](/assets/images/api/Splitter_coverage_line.svg)
+            ![](/assets/images/api/Splitter_coverage_line.svg){: .iimg }
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         from vectorbtpro.utils.figure import make_figure

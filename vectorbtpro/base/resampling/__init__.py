@@ -1,9 +1,9 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Modules with classes and utilities for resampling."""
 
-from vectorbtpro.base.resampling.base import Resampler
-from vectorbtpro.utils.module_ import create__all__
+from typing import TYPE_CHECKING
 
-__all__ = create__all__(__name__)
-__pdoc__ = {k: False for k in __all__}
+if TYPE_CHECKING:
+    from vectorbtpro.base.resampling.base import *
+    from vectorbtpro.base.resampling.nb import *

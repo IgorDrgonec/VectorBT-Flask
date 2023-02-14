@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for portfolio simulation based on orders."""
 
@@ -53,8 +53,9 @@ from vectorbtpro.utils.array_ import insert_argsort_nb
         auto_call_seq=None,
         ffill_val_price=None,
         update_value=None,
-        fill_state=None,
-        fill_returns=None,
+        save_state=None,
+        save_value=None,
+        save_returns=None,
         max_orders=None,
         max_logs=None,
         skipna=None,
@@ -98,11 +99,11 @@ def simulate_from_orders_nb(
     auto_call_seq: bool = False,
     ffill_val_price: bool = True,
     update_value: bool = False,
-    fill_state: bool = False,
-    fill_returns: bool = False,
+    save_state: bool = False,
+    save_value: bool = False,
+    save_returns: bool = False,
     max_orders: tp.Optional[int] = None,
     max_logs: tp.Optional[int] = 0,
-    skipna: bool = False,
 ) -> SimulationOutput:
     """Creates on order out of each element.
 
@@ -184,8 +185,6 @@ def simulate_from_orders_nb(
     )
 
     last_val_price = np.full_like(last_position, np.nan)
-    if ffill_val_price and skipna:
-        raise ValueError("Cannot skip NaN and forward-fill valuation price simultaneously")
     last_debt = np.full(target_shape[1], 0.0, dtype=np.float_)
     last_locked_cash = np.full(target_shape[1], 0.0, dtype=np.float_)
     prev_close_value = last_value.copy()
@@ -194,20 +193,16 @@ def simulate_from_orders_nb(
     log_counts = np.full(target_shape[1], 0, dtype=np.int_)
     track_cash_deposits = np.any(cash_deposits_)
     if track_cash_deposits:
-        if skipna:
-            raise ValueError("Cannot skip NaN and track cash deposits simultaneously")
         cash_deposits_out = np.full((target_shape[0], len(group_lens)), 0.0, dtype=np.float_)
     else:
         cash_deposits_out = np.full((1, 1), 0.0, dtype=np.float_)
     track_cash_earnings = np.any(cash_earnings_) or np.any(cash_dividends_)
     if track_cash_earnings:
-        if skipna:
-            raise ValueError("Cannot skip NaN and track cash earnings simultaneously")
         cash_earnings_out = np.full(target_shape, 0.0, dtype=np.float_)
     else:
         cash_earnings_out = np.full((1, 1), 0.0, dtype=np.float_)
 
-    if fill_state:
+    if save_state:
         cash = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
         position = np.full(target_shape, np.nan, dtype=np.float_)
         debt = np.full(target_shape, np.nan, dtype=np.float_)
@@ -219,7 +214,11 @@ def simulate_from_orders_nb(
         debt = np.full((0, 0), np.nan, dtype=np.float_)
         locked_cash = np.full((0, 0), np.nan, dtype=np.float_)
         free_cash = np.full((0, 0), np.nan, dtype=np.float_)
-    if fill_returns:
+    if save_value:
+        value = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
+    else:
+        value = np.full((0, 0), np.nan, dtype=np.float_)
+    if save_returns:
         returns = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
     else:
         returns = np.full((0, 0), np.nan, dtype=np.float_)
@@ -229,6 +228,7 @@ def simulate_from_orders_nb(
         debt=debt,
         locked_cash=locked_cash,
         free_cash=free_cash,
+        value=value,
         returns=returns,
     )
 
@@ -246,18 +246,28 @@ def simulate_from_orders_nb(
         free_cash_now = cash_now
 
         for i in range(target_shape[0]):
-            if skipna:
-                skip = True
+            skip = not ffill_val_price and not save_state and not save_value and not save_returns
+            if skip:
+                if flex_select_nb(cash_deposits_, i, group) != 0:
+                    skip = False
+            if skip:
                 for c in range(group_len):
                     col = from_col + c
+                    if flex_select_nb(cash_earnings_, i, col) != 0:
+                        skip = False
+                        break
+                    if flex_select_nb(cash_dividends_, i, col) != 0:
+                        skip = False
+                        break
                     _i = i - abs(flex_select_nb(from_ago_, i, col))
                     if _i < 0:
                         continue
                     if not np.isnan(flex_select_nb(size_, _i, col)):
-                        skip = False
-                        break
-                if skip:
-                    continue
+                        if not np.isnan(flex_select_nb(price_, _i, col)):
+                            skip = False
+                            break
+            if skip:
+                continue
 
             # Add cash
             _cash_deposits = flex_select_nb(cash_deposits_, i, group)
@@ -447,7 +457,7 @@ def simulate_from_orders_nb(
                 free_cash_now += _cash_earnings
                 if track_cash_earnings:
                     cash_earnings_out[i, col] += _cash_earnings
-                if fill_state:
+                if save_state:
                     position[i, col] = last_position[col]
                     debt[i, col] = last_debt[col]
                     locked_cash[i, col] = last_locked_cash[col]
@@ -456,7 +466,7 @@ def simulate_from_orders_nb(
                         free_cash[i, col] = free_cash_now
 
                 # Update previous value, current value, and return
-                if fill_returns:
+                if save_value or save_returns:
                     if cash_sharing:
                         if last_position[col] != 0:
                             group_value += last_position[col] * last_val_price[col]
@@ -470,21 +480,27 @@ def simulate_from_orders_nb(
                             last_value[col] - _cash_deposits,
                         )
                         prev_close_value[col] = last_value[col]
-                        in_outputs.returns[i, group] = last_return[col]
+                        if save_value:
+                            in_outputs.value[i, group] = last_value[col]
+                        if save_returns:
+                            in_outputs.returns[i, group] = last_return[col]
 
             # Fill group state and returns
             if cash_sharing:
-                if fill_state:
+                if save_state:
                     cash[i, group] = cash_now
                     free_cash[i, group] = free_cash_now
-                if fill_returns:
+                if save_value or save_returns:
                     last_value[group] = group_value
                     last_return[group] = get_return_nb(
                         prev_close_value[group],
                         last_value[group] - _cash_deposits,
                     )
                     prev_close_value[group] = last_value[group]
-                    in_outputs.returns[i, group] = last_return[group]
+                    if save_value:
+                        in_outputs.value[i, group] = last_value[group]
+                    if save_returns:
+                        in_outputs.returns[i, group] = last_return[group]
 
     return prepare_simout_nb(
         order_records=order_records,

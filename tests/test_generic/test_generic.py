@@ -3497,8 +3497,8 @@ class TestAccessors:
         assert_frame_equal(
             df.vbt.value_counts(sort_uniques=False),
             pd.DataFrame(
-                np.array([[1, 1, 2], [1, 1, 2], [1, 1, 0], [1, 1, 0], [1, 1, 1]]),
-                index=pd.Index([1.0, 2.0, 4.0, 3.0, np.nan], dtype="float64"),
+                np.array([[1, 1, 2], [1, 1, 1], [1, 1, 2], [1, 1, 0], [1, 1, 0]]),
+                index=pd.Index([1.0, np.nan, 2.0, 4.0, 3.0], dtype="float64"),
                 columns=df.columns,
             ),
         )
@@ -3654,7 +3654,11 @@ class TestAccessors:
             pd.Series([False, False, True, False, False, False, True]),
         )
         assert_series_equal(
-            sr3.vbt.crossed_above(sr4, wait=1),
+            sr3.vbt.crossed_above(sr4, wait=1, dropna=True),
+            pd.Series([False, False, False, False, True, False, False]),
+        )
+        assert_series_equal(
+            sr3.vbt.crossed_above(sr4, wait=1, dropna=False),
             pd.Series([False, False, False, False, False, False, False]),
         )
         assert_frame_equal(
@@ -3701,7 +3705,11 @@ class TestAccessors:
             pd.Series([False, False, True, False, False, False, True]),
         )
         assert_series_equal(
-            sr3.vbt.crossed_above(sr4, wait=1),
+            sr3.vbt.crossed_above(sr4, wait=1, dropna=True),
+            pd.Series([False, False, False, False, True, False, False]),
+        )
+        assert_series_equal(
+            sr3.vbt.crossed_above(sr4, wait=1, dropna=False),
             pd.Series([False, False, False, False, False, False, False]),
         )
         assert_frame_equal(

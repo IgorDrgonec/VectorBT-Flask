@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for scheduling jobs."""
 
@@ -13,6 +13,13 @@ from schedule import Scheduler, Job, CancelJob
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.datetime_ import tzaware_to_naive_time
+
+__all__ = [
+    "AsyncJob",
+    "AsyncScheduler",
+    "CancelledError",
+    "ScheduleManager",
+]
 
 logger = logging.getLogger(__name__)
 

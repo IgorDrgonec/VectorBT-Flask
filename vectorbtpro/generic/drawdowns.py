@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base class for working with drawdown records.
 
@@ -166,7 +166,7 @@ Name: group, dtype: object
 >>> drawdowns['a'].plots().show()
 ```
 
-![](/assets/images/api/drawdowns_plots.svg)
+![](/assets/images/api/drawdowns_plots.svg){: .iimg }
 """
 
 import numpy as np
@@ -185,6 +185,10 @@ from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.template import RepEval, RepFunc
+
+__all__ = [
+    "Drawdowns",
+]
 
 __pdoc__ = {}
 
@@ -819,9 +823,9 @@ class Drawdowns(Ranges):
             >>> vbt.Drawdowns.from_price(price, wrapper_kwargs=dict(freq='1 day')).plot().show()
             ```
 
-            ![](/assets/images/api/drawdowns_plot.svg)
+            ![](/assets/images/api/drawdowns_plot.svg){: .iimg }
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         import plotly.graph_objects as go

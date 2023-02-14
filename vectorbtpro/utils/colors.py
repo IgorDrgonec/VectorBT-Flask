@@ -1,10 +1,12 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for working with colors."""
 
 import numpy as np
 
 from vectorbtpro import _typing as tp
+
+__all__ = []
 
 
 def map_value_to_cmap(
@@ -15,7 +17,7 @@ def map_value_to_cmap(
     vmax: tp.Optional[float] = None,
 ) -> tp.MaybeSequence[str]:
     """Get RGB of `value` from the colormap."""
-    from vectorbtpro.utils.opt_packages import assert_can_import
+    from vectorbtpro.utils.module_ import assert_can_import
 
     assert_can_import("matplotlib")
     import matplotlib.pyplot as plt
@@ -65,7 +67,7 @@ def parse_rgb_tuple(color: str) -> tp.Tuple[float, float, float]:
 
 def adjust_opacity(color: tp.Any, opacity: float) -> str:
     """Adjust opacity of color."""
-    from vectorbtpro.utils.opt_packages import assert_can_import
+    from vectorbtpro.utils.module_ import assert_can_import
 
     assert_can_import("matplotlib")
     import matplotlib.colors as mc
@@ -83,7 +85,7 @@ def adjust_lightness(color: tp.Any, amount: float = 0.7) -> str:
 
     Input can be matplotlib color string, hex string, or RGB tuple.
     Output will be an RGB string."""
-    from vectorbtpro.utils.opt_packages import assert_can_import
+    from vectorbtpro.utils.module_ import assert_can_import
 
     assert_can_import("matplotlib")
     import matplotlib.colors as mc

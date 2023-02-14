@@ -53,7 +53,6 @@ import numpy as np
             line = remove_re(r"\:[\w-]+\:", line)
 
             # remove svg
-            # ![](/assets/images/tutorials/patterns/open_projections_sub.svg)
             line = remove_re(r"^!\[\]\(/assets/.+?.svg\)", line)
             yield line
     yield '"""\n'

@@ -2417,7 +2417,6 @@ class TestFactory:
             "save",
             "select_col",
             "select_col_from_obj",
-            "select_params_func",
             "self_aliases",
             "set_settings",
             "short_name",
@@ -4370,55 +4369,7 @@ class TestBasic:
             ),
         )
         assert_frame_equal(
-            vbt.OLS.run(
-                np.arange(len(close_ts))[:, None],
-                close_ts.vbt.tile(2),
-                window=(2, 3),
-                per_column=True,
-            ).slope,
-            vbt.OLS.run(
-                np.arange(len(close_ts))[:, None],
-                close_ts,
-                window=(2, 3),
-                per_column=False,
-            ).slope,
-        )
-        assert_frame_equal(
-            vbt.OLS.run(
-                np.arange(len(close_ts))[:, None],
-                close_ts.vbt.tile(2),
-                window=(2, 3),
-                per_column=True,
-            ).intercept,
-            vbt.OLS.run(
-                np.arange(len(close_ts))[:, None],
-                close_ts,
-                window=(2, 3),
-                per_column=False,
-            ).intercept,
-        )
-
-    def test_OLSS(self):
-        assert_frame_equal(
-            vbt.OLSS.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).spread,
-            pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan],
-                        [0.0, np.nan],
-                        [0.0, 0.0],
-                        [0.0, 0.0],
-                        [0.0, -0.3333333333333335],
-                        [0.0, 0.0],
-                        [0.0, 0.0],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=pd.Index([2, 3], name="ols_window"),
-            ),
-        )
-        assert_frame_equal(
-            vbt.OLSS.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).zscore,
+            vbt.OLS.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).zscore,
             pd.DataFrame(
                 np.array(
                     [
@@ -4436,32 +4387,146 @@ class TestBasic:
             ),
         )
         assert_frame_equal(
-            vbt.OLSS.run(
-                np.arange(len(close_ts))[:, None],
-                close_ts.vbt.tile(2),
-                window=(2, 3),
-                per_column=True,
-            ).spread,
-            vbt.OLSS.run(
-                np.arange(len(close_ts))[:, None],
-                close_ts,
-                window=(2, 3),
-                per_column=False,
-            ).spread,
+            vbt.OLS.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).pred,
+            pd.DataFrame(
+                np.array(
+                    [
+                        [np.nan, np.nan],
+                        [2.0, np.nan],
+                        [3.0, 3.0],
+                        [4.0, 4.0],
+                        [3.0, 3.3333333333333335],
+                        [2.0, 2.0],
+                        [1.0, 1.0],
+                    ]
+                ),
+                index=close_ts.index,
+                columns=pd.Index([2, 3], name="ols_window"),
+            ),
         )
         assert_frame_equal(
-            vbt.OLSS.run(
+            vbt.OLS.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).error,
+            pd.DataFrame(
+                np.array(
+                    [
+                        [np.nan, np.nan],
+                        [0.0, np.nan],
+                        [0.0, 0.0],
+                        [0.0, 0.0],
+                        [0.0, -0.3333333333333335],
+                        [0.0, 0.0],
+                        [0.0, 0.0],
+                    ]
+                ),
+                index=close_ts.index,
+                columns=pd.Index([2, 3], name="ols_window"),
+            ),
+        )
+        assert_frame_equal(
+            vbt.OLS.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).angle,
+            pd.DataFrame(
+                np.array(
+                    [
+                        [np.nan, np.nan],
+                        [45.0, np.nan],
+                        [45.0, 45.0],
+                        [45.0, 45.0],
+                        [-45.0, 0.0],
+                        [-45.0, -45.0],
+                        [-45.0, -45.0],
+                    ]
+                ),
+                index=close_ts.index,
+                columns=pd.Index([2, 3], name="ols_window"),
+            ),
+        )
+        assert_frame_equal(
+            vbt.OLS.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3), with_zscore=False).zscore,
+            pd.DataFrame(
+                np.array(
+                    [
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                    ]
+                ),
+                index=close_ts.index,
+                columns=pd.Index([2, 3], name="ols_window"),
+            ),
+        )
+        assert_frame_equal(
+            vbt.OLS.run(
+                np.arange(len(close_ts))[:, None],
+                close_ts.vbt.tile(2),
+                window=(2, 3),
+                per_column=True,
+            ).slope,
+            vbt.OLS.run(
+                np.arange(len(close_ts))[:, None],
+                close_ts,
+                window=(2, 3),
+                per_column=False,
+            ).slope,
+        )
+        assert_frame_equal(
+            vbt.OLS.run(
+                np.arange(len(close_ts))[:, None],
+                close_ts.vbt.tile(2),
+                window=(2, 3),
+                per_column=True,
+            ).intercept,
+            vbt.OLS.run(
+                np.arange(len(close_ts))[:, None],
+                close_ts,
+                window=(2, 3),
+                per_column=False,
+            ).intercept,
+        )
+        assert_frame_equal(
+            vbt.OLS.run(
                 np.arange(len(close_ts))[:, None],
                 close_ts.vbt.tile(2),
                 window=(2, 3),
                 per_column=True,
             ).zscore,
-            vbt.OLSS.run(
+            vbt.OLS.run(
                 np.arange(len(close_ts))[:, None],
                 close_ts,
                 window=(2, 3),
                 per_column=False,
             ).zscore,
+        )
+        assert_frame_equal(
+            vbt.OLS.run(
+                np.arange(len(close_ts))[:, None],
+                close_ts.vbt.tile(2),
+                window=(2, 3),
+                per_column=True,
+            ).error,
+            vbt.OLS.run(
+                np.arange(len(close_ts))[:, None],
+                close_ts,
+                window=(2, 3),
+                per_column=False,
+            ).error,
+        )
+        assert_frame_equal(
+            vbt.OLS.run(
+                np.arange(len(close_ts))[:, None],
+                close_ts.vbt.tile(2),
+                window=(2, 3),
+                per_column=True,
+            ).angle,
+            vbt.OLS.run(
+                np.arange(len(close_ts))[:, None],
+                close_ts,
+                window=(2, 3),
+                per_column=False,
+            ).angle,
         )
 
     def test_PATSIM(self):

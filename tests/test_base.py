@@ -3498,7 +3498,7 @@ class TestReshaping:
             a2,
             sr2,
             p,
-            repeat_product=False,
+            repeat_param=False,
             align_index=False,
         )
         _, _, _, _, _, _p2 = reshaping.broadcast(
@@ -3508,7 +3508,7 @@ class TestReshaping:
             sr2,
             df2,
             p,
-            repeat_product=False,
+            repeat_param=False,
             align_index=False,
         )
         _, _, _, _p3 = reshaping.broadcast(
@@ -3517,7 +3517,7 @@ class TestReshaping:
             sr2,
             p,
             keep_flex=True,
-            repeat_product=False,
+            repeat_param=False,
             align_index=False,
         )
         _, _, _, _, _df2_p, _p4 = reshaping.broadcast(
@@ -3528,7 +3528,7 @@ class TestReshaping:
             df2,
             p,
             keep_flex=True,
-            repeat_product=False,
+            repeat_param=False,
             align_index=False,
         )
 
@@ -3705,7 +3705,7 @@ class TestReshaping:
             sr2,
             p,
             tile=p,
-            repeat_product=False,
+            repeat_param=False,
             align_index=False,
         )
         _, _, _, _, _p2 = reshaping.broadcast(
@@ -3715,7 +3715,7 @@ class TestReshaping:
             df2,
             p,
             tile=p,
-            repeat_product=False,
+            repeat_param=False,
             align_index=False,
         )
         _, _, _, _p3 = reshaping.broadcast(
@@ -3725,7 +3725,7 @@ class TestReshaping:
             p,
             tile=p,
             keep_flex=True,
-            repeat_product=False,
+            repeat_param=False,
             align_index=False,
         )
         _, _, _, _, _p4 = reshaping.broadcast(
@@ -3736,7 +3736,7 @@ class TestReshaping:
             p,
             tile=p,
             keep_flex=True,
-            repeat_product=False,
+            repeat_param=False,
             align_index=False,
         )
 
@@ -3776,9 +3776,9 @@ class TestReshaping:
         )
         result, wrapper = reshaping.broadcast(
             dict(
-                a=vbt.BCO([1, 2], product=True),
-                b=vbt.BCO([False, True], product=True),
-                c=vbt.BCO(["x", "y"], product=True),
+                a=vbt.BCO(vbt.Param([1, 2])),
+                b=vbt.BCO(vbt.Param([False, True])),
+                c=vbt.BCO(vbt.Param(["x", "y"])),
                 sr=pd.Series([1, 2, 3]),
             ),
             keep_flex=True,
@@ -3806,9 +3806,9 @@ class TestReshaping:
 
         result, wrapper = reshaping.broadcast(
             dict(
-                a=vbt.BCO(1, product=True),
-                b=vbt.BCO([False, True], product=True),
-                c=vbt.BCO(["x", "y", "z"], product=True),
+                a=vbt.BCO(vbt.Param(1)),
+                b=vbt.BCO(vbt.Param([False, True])),
+                c=vbt.BCO(vbt.Param(["x", "y", "z"])),
                 sr=pd.Series([1, 2, 3]),
             ),
             keep_flex=True,
@@ -3827,9 +3827,9 @@ class TestReshaping:
 
         result2, wrapper2 = reshaping.broadcast(
             dict(
-                a=vbt.BCO(1, product=True, level=0),
-                b=vbt.BCO([False, True], product=True, level=1),
-                c=vbt.BCO(["x", "y", "z"], product=True, level=2),
+                a=vbt.BCO(vbt.Param(1, level=0)),
+                b=vbt.BCO(vbt.Param([False, True], level=1)),
+                c=vbt.BCO(vbt.Param(["x", "y", "z"], level=2)),
                 sr=pd.Series([1, 2, 3]),
             ),
             keep_flex=True,
@@ -3842,9 +3842,9 @@ class TestReshaping:
 
         result, wrapper = reshaping.broadcast(
             dict(
-                a=vbt.BCO(1, product=True, level=0),
-                b=vbt.BCO([False, True], product=True, level=1),
-                c=vbt.BCO(["x", "y", "z"], product=True, level=0),
+                a=vbt.BCO(vbt.Param(1, level=0)),
+                b=vbt.BCO(vbt.Param([False, True], level=1)),
+                c=vbt.BCO(vbt.Param(["x", "y", "z"], level=0)),
                 sr=pd.Series([1, 2, 3]),
             ),
             keep_flex=True,
@@ -3864,42 +3864,41 @@ class TestReshaping:
         with pytest.raises(Exception):
             reshaping.broadcast(
                 dict(
-                    a=vbt.BCO(1, product=True),
-                    b=vbt.BCO([False, True], product=True, level=0),
-                    c=vbt.BCO(["x", "y", "z"], product=True, level=1),
+                    a=vbt.BCO(vbt.Param(1)),
+                    b=vbt.BCO(vbt.Param([False, True], level=0)),
+                    c=vbt.BCO(vbt.Param(["x", "y", "z"], level=1)),
                 )
             )
         with pytest.raises(Exception):
             reshaping.broadcast(
                 dict(
-                    a=vbt.BCO(1, product=True, level=0),
-                    b=vbt.BCO([False, True], product=True, level=1),
-                    c=vbt.BCO(["x", "y", "z"], product=True),
+                    a=vbt.BCO(vbt.Param(1, level=0)),
+                    b=vbt.BCO(vbt.Param([False, True], level=1)),
+                    c=vbt.BCO(vbt.Param(["x", "y", "z"])),
                 )
             )
         with pytest.raises(Exception):
             reshaping.broadcast(
                 dict(
-                    a=vbt.BCO(1, product=True, level=-1),
-                    b=vbt.BCO([False, True], product=True, level=0),
-                    c=vbt.BCO(["x", "y", "z"], product=True, level=1),
+                    a=vbt.BCO(vbt.Param(1, level=-1)),
+                    b=vbt.BCO(vbt.Param([False, True], level=0)),
+                    c=vbt.BCO(vbt.Param(["x", "y", "z"], level=1)),
                 )
             )
         with pytest.raises(Exception):
             reshaping.broadcast(
                 dict(
-                    a=vbt.BCO(1, product=True, level=0),
-                    b=vbt.BCO([False, True], product=True, level=1),
-                    c=vbt.BCO(["x", "y", "z"], product=True, level=3),
+                    a=vbt.BCO(vbt.Param(1, level=0)),
+                    b=vbt.BCO(vbt.Param([False, True], level=1)),
+                    c=vbt.BCO(vbt.Param(["x", "y", "z"], level=3)),
                 )
             )
 
     def test_broadcast_product_keys(self):
         _, wrapper = reshaping.broadcast(
             dict(
-                a=vbt.BCO(
+                a=vbt.Param(
                     pd.Series([1, 2, 3], index=pd.Index(["a", "b", "c"], name="a3"), name="a2"),
-                    product=True,
                     keys=pd.Index(["x", "y", "z"], name="a4"),
                 ),
                 sr=pd.Series([1, 2, 3]),
@@ -3909,9 +3908,8 @@ class TestReshaping:
         assert_index_equal(wrapper.columns, pd.Index(["x", "y", "z"], dtype="object", name="a4"))
         _, wrapper = reshaping.broadcast(
             dict(
-                a=vbt.BCO(
+                a=vbt.Param(
                     pd.Series([1, 2, 3], index=pd.Index(["a", "b", "c"], name="a3"), name="a2"),
-                    product=True,
                     keys=pd.Index(["x", "y", "z"]),
                 ),
                 sr=pd.Series([1, 2, 3]),
@@ -3921,15 +3919,7 @@ class TestReshaping:
         assert_index_equal(wrapper.columns, pd.Index(["x", "y", "z"], dtype="object", name="a2"))
         _, wrapper = reshaping.broadcast(
             dict(
-                a=vbt.BCO(pd.Series([1, 2, 3], index=pd.Index(["a", "b", "c"], name="a3"), name="a2"), product=True),
-                sr=pd.Series([1, 2, 3]),
-            ),
-            return_wrapper=True,
-        )
-        assert_index_equal(wrapper.columns, pd.Index(["a", "b", "c"], dtype="object", name="a3"))
-        _, wrapper = reshaping.broadcast(
-            dict(
-                a=vbt.BCO(pd.Series([1, 2, 3], index=pd.Index(["a", "b", "c"]), name="a2"), product=True),
+                a=vbt.Param(pd.Series([1, 2, 3], index=pd.Index(["a", "b", "c"], name="a3"), name="a2")),
                 sr=pd.Series([1, 2, 3]),
             ),
             return_wrapper=True,
@@ -3937,14 +3927,22 @@ class TestReshaping:
         assert_index_equal(wrapper.columns, pd.Index(["a", "b", "c"], dtype="object", name="a2"))
         _, wrapper = reshaping.broadcast(
             dict(
-                a=vbt.BCO(pd.Series([1, 2, 3], index=pd.Index(["a", "b", "c"])), product=True),
+                a=vbt.Param(pd.Series([1, 2, 3], index=pd.Index(["a", "b", "c"]), name="a2")),
+                sr=pd.Series([1, 2, 3]),
+            ),
+            return_wrapper=True,
+        )
+        assert_index_equal(wrapper.columns, pd.Index(["a", "b", "c"], dtype="object", name="a2"))
+        _, wrapper = reshaping.broadcast(
+            dict(
+                a=vbt.Param(pd.Series([1, 2, 3], index=pd.Index(["a", "b", "c"]))),
                 sr=pd.Series([1, 2, 3]),
             ),
             return_wrapper=True,
         )
         assert_index_equal(wrapper.columns, pd.Index(["a", "b", "c"], dtype="object", name="a"))
         _, wrapper = reshaping.broadcast(
-            dict(a=vbt.BCO(pd.Series([1, 2, 3], name="a2"), product=True), sr=pd.Series([1, 2, 3])),
+            dict(a=vbt.Param(pd.Series([1, 2, 3], name="a2")), sr=pd.Series([1, 2, 3])),
             return_wrapper=True,
         )
         assert_index_equal(wrapper.columns, pd.Index([1, 2, 3], dtype="int64", name="a2"))

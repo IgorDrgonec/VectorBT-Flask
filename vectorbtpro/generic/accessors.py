@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Custom pandas accessors for generic data.
 
@@ -187,7 +187,7 @@ Name: 0, dtype: object
 >>> df2.vbt.plots().show()
 ```
 
-![](/assets/images/api/generic_plots.svg)
+![](/assets/images/api/generic_plots.svg){: .iimg }
 """
 
 import warnings
@@ -220,8 +220,8 @@ from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.decorators import class_or_instancemethod, class_or_instanceproperty
 from vectorbtpro.utils.mapping import apply_mapping, to_mapping
-from vectorbtpro.utils.template import deep_substitute
-from vectorbtpro.utils.datetime_ import freq_to_timedelta64, try_to_datetime_index
+from vectorbtpro.utils.template import substitute_templates
+from vectorbtpro.utils.datetime_ import freq_to_timedelta, freq_to_timedelta64, try_to_datetime_index, parse_timedelta
 from vectorbtpro.utils.colors import adjust_opacity, map_value_to_cmap
 from vectorbtpro.utils.enum_ import map_enum_fields
 
@@ -246,6 +246,12 @@ except ImportError:
     nanmedian = np.nanmedian
     nanargmax = np.nanargmax
     nanargmin = np.nanargmin
+
+__all__ = [
+    "GenericAccessor",
+    "GenericSRAccessor",
+    "GenericDFAccessor",
+]
 
 __pdoc__ = {}
 
@@ -364,6 +370,43 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """See `vectorbtpro.utils.mapping.apply_mapping`."""
         mapping = self.resolve_mapping(mapping)
         return apply_mapping(self.obj, mapping, **kwargs)
+
+    # ############# Shifting ############# #
+
+    def ago(
+        self,
+        n: tp.Union[int, tp.FrequencyLike],
+        fill_value: tp.Scalar = np.nan,
+        get_indexer_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """For each value, get the value `n` periods ago."""
+        if checks.is_int(n):
+            return self.fshift(n, fill_value=fill_value, **kwargs)
+        if get_indexer_kwargs is None:
+            get_indexer_kwargs = {}
+        n = freq_to_timedelta(n)
+        indices = self.wrapper.index.get_indexer(self.wrapper.index - n, **get_indexer_kwargs)
+        new_obj = self.wrapper.fill(fill_value=fill_value)
+        found_mask = indices != -1
+        new_obj.iloc[np.flatnonzero(found_mask)] = self.obj.iloc[indices[found_mask]]
+        return new_obj
+
+    def any_ago(self, n: tp.Union[int, tp.FrequencyLike], **kwargs) -> tp.SeriesFrame:
+        """For each value, check whether any value within a window of `n` last periods is True."""
+        wrap_kwargs = kwargs.pop("wrap_kwargs", {})
+        wrap_kwargs = merge_dicts(dict(fillna=False, dtype=bool), wrap_kwargs)
+        if checks.is_int(n):
+            return self.rolling_any(n, wrap_kwargs=wrap_kwargs, **kwargs)
+        return self.rolling_apply(n, "any", wrap_kwargs=wrap_kwargs, **kwargs)
+
+    def all_ago(self, n: tp.Union[int, tp.FrequencyLike], **kwargs) -> tp.SeriesFrame:
+        """For each value, check whether all values within a window of `n` last periods are True."""
+        wrap_kwargs = kwargs.pop("wrap_kwargs", {})
+        wrap_kwargs = merge_dicts(dict(fillna=False, dtype=bool), wrap_kwargs)
+        if checks.is_int(n):
+            return self.rolling_all(n, wrap_kwargs=wrap_kwargs, **kwargs)
+        return self.rolling_apply(n, "all", wrap_kwargs=wrap_kwargs, **kwargs)
 
     # ############# Rolling ############# #
 
@@ -857,7 +900,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 checks.assert_not_none(wrapper)
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
-            args = deep_substitute(args, template_context, sub_id="args")
+            args = substitute_templates(args, template_context, sub_id="args")
             func = jit_reg.resolve_option(nb.map_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(wrapper.shape_2d, map_func_nb, *args)
@@ -975,7 +1018,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 checks.assert_not_none(wrapper)
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper, axis=axis), template_context)
-            args = deep_substitute(args, template_context, sub_id="args")
+            args = substitute_templates(args, template_context, sub_id="args")
             if axis == 0:
                 func = jit_reg.resolve_option(nb.row_apply_meta_nb, jitted)
             else:
@@ -993,6 +1036,16 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 wrapper = cls_or_self.wrapper
 
         return wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+
+    @class_or_instancemethod
+    def row_apply(self, *args, **kwargs) -> tp.SeriesFrame:
+        """`GenericAccessor.apply_along_axis` with `axis=0`."""
+        return self.apply_along_axis(*args, axis=0, **kwargs)
+
+    @class_or_instancemethod
+    def column_apply(self, *args, **kwargs) -> tp.SeriesFrame:
+        """`GenericAccessor.apply_along_axis` with `axis=1`."""
+        return self.apply_along_axis(*args, axis=1, **kwargs)
 
     # ############# Reducing ############# #
 
@@ -1135,7 +1188,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 dict(wrapper=wrapper, window=window, minp=minp),
                 template_context,
             )
-            args = deep_substitute(args, template_context, sub_id="args")
+            args = substitute_templates(args, template_context, sub_id="args")
             if isinstance(window, int):
                 func = jit_reg.resolve_option(nb.rolling_reduce_meta_nb, jitted)
                 func = ch_reg.resolve_option(func, chunked)
@@ -1270,7 +1323,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 checks.assert_not_none(wrapper)
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
-            by = deep_substitute(by, template_context, sub_id="by")
+            by = substitute_templates(by, template_context, sub_id="by")
         else:
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -1280,7 +1333,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         if isinstance(cls_or_self, type):
             group_map = grouper.get_group_map()
             template_context = merge_dicts(dict(by=by, grouper=grouper), template_context)
-            args = deep_substitute(args, template_context, sub_id="args")
+            args = substitute_templates(args, template_context, sub_id="args")
             func = jit_reg.resolve_option(nb.groupby_reduce_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(wrapper.shape_2d[1], group_map, reduce_func_nb, *args)
@@ -1300,6 +1353,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         reduce_func_nb: tp.Union[str, tp.ReduceFunc, tp.GroupByReduceMetaFunc, tp.RangeReduceMetaFunc],
         *args,
         use_groupby_apply: bool = False,
+        freq: tp.Optional[tp.FrequencyLike] = None,
         resample_kwargs: tp.KwargsLike = None,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
@@ -1395,7 +1449,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 checks.assert_not_none(wrapper)
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
-            rule = deep_substitute(rule, template_context, sub_id="rule")
+            rule = substitute_templates(rule, template_context, sub_id="rule")
         else:
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -1432,7 +1486,12 @@ class GenericAccessor(BaseAccessor, Analyzable):
             return resampled_obj
 
         if not isinstance(rule, Resampler):
-            rule = wrapper.get_resampler(rule, resample_kwargs=resample_kwargs, return_pd_resampler=False)
+            rule = wrapper.get_resampler(
+                rule,
+                freq=freq,
+                resample_kwargs=resample_kwargs,
+                return_pd_resampler=False,
+            )
         return cls_or_self.resample_to_index(
             rule,
             reduce_func_nb,
@@ -1551,8 +1610,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 checks.assert_not_none(wrapper)
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
-            apply_args = deep_substitute(apply_args, template_context, sub_id="apply_args")
-            reduce_args = deep_substitute(reduce_args, template_context, sub_id="reduce_args")
+            apply_args = substitute_templates(apply_args, template_context, sub_id="apply_args")
+            reduce_args = substitute_templates(reduce_args, template_context, sub_id="reduce_args")
             func = jit_reg.resolve_option(nb.apply_and_reduce_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(wrapper.shape_2d[1], apply_func_nb, apply_args, reduce_func_nb, reduce_args)
@@ -1764,7 +1823,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 ),
                 template_context,
             )
-            args = deep_substitute(args, template_context, sub_id="args")
+            args = substitute_templates(args, template_context, sub_id="args")
             if wrapper.grouper.is_grouped(group_by=group_by):
                 group_map = wrapper.grouper.get_group_map(group_by=group_by)
                 if returns_array:
@@ -1939,7 +1998,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 dict(wrapper=wrapper, window=window),
                 template_context,
             )
-            args = deep_substitute(args, template_context, sub_id="args")
+            args = substitute_templates(args, template_context, sub_id="args")
             func = jit_reg.resolve_option(nb.proximity_reduce_meta_nb, jitted)
             out = func(wrapper.shape_2d, window, reduce_func_nb, *args)
         else:
@@ -2059,7 +2118,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 dict(wrapper=wrapper, group_by=group_by),
                 template_context,
             )
-            args = deep_substitute(args, template_context, sub_id="args")
+            args = substitute_templates(args, template_context, sub_id="args")
             if not wrapper.grouper.is_grouped(group_by=group_by):
                 raise ValueError("Grouping required")
             group_map = wrapper.grouper.get_group_map(group_by=group_by)
@@ -2148,9 +2207,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
     def latest_at_index(
         self,
-        target_index: tp.Union[Resampler, tp.IndexLike],
-        source_freq: tp.Union[None, bool, tp.FrequencyLike] = None,
-        target_freq: tp.Union[None, bool, tp.FrequencyLike] = None,
+        index: tp.AnyRuleLike,
+        freq: tp.Union[None, bool, tp.FrequencyLike] = None,
         nan_value: tp.Optional[tp.Scalar] = None,
         ffill: bool = True,
         source_rbound: tp.Union[bool, str, tp.IndexLike] = False,
@@ -2162,7 +2220,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     ) -> tp.MaybeSeriesFrame:
         """See `vectorbtpro.generic.nb.base.latest_at_index_nb`.
 
-        `target_index` can be either an instance of `vectorbtpro.base.resampling.base.Resampler`,
+        `index` can be either an instance of `vectorbtpro.base.resampling.base.Resampler`,
         or any index-like object.
 
         Gives the same results as `df.resample(closed='right', label='right').last().ffill()`
@@ -2204,24 +2262,22 @@ class GenericAccessor(BaseAccessor, Analyzable):
             Freq: H, Length: 97, dtype: float64
             ```
         """
-        from vectorbtpro._settings import settings
-
-        resampling_cfg = settings["resampling"]
-
-        if silence_warnings is None:
-            silence_warnings = resampling_cfg["silence_warnings"]
-
-        target_index_str = isinstance(target_index, str)
-        if not isinstance(target_index, Resampler):
-            resampler = Resampler(
-                self.wrapper.index,
-                target_index,
-                source_freq=source_freq,
-                target_freq=target_freq,
-                silence_warnings=silence_warnings,
-            )
-        else:
-            resampler = target_index
+        resampler = self.wrapper.get_resampler(
+            index,
+            freq=freq,
+            return_pd_resampler=False,
+            silence_warnings=silence_warnings,
+        )
+        one_index = False
+        if len(resampler.target_index) == 1 and checks.is_dt_like(index):
+            if isinstance(index, str):
+                try:
+                    parse_timedelta(index)
+                    one_index = False
+                except Exception as e:
+                    one_index = True
+            else:
+                one_index = True
         if isinstance(source_rbound, bool):
             use_source_rbound = source_rbound
         else:
@@ -2235,10 +2291,10 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 resampler = resampler.replace(source_index=source_rbound)
         if isinstance(target_rbound, bool):
             use_target_rbound = target_rbound
-            target_index = resampler.target_index
+            index = resampler.target_index
         else:
             use_target_rbound = False
-            target_index = resampler.target_index
+            index = resampler.target_index
             if isinstance(target_rbound, str):
                 if target_rbound == "pandas":
                     resampler = resampler.replace(target_index=resampler.target_rbound_index)
@@ -2250,29 +2306,11 @@ class GenericAccessor(BaseAccessor, Analyzable):
         if not use_source_rbound:
             source_freq = None
         else:
-            source_freq = resampler.source_freq
-            if source_freq is not None:
-                if not isinstance(source_freq, (int, float)):
-                    try:
-                        source_freq = freq_to_timedelta64(source_freq)
-                    except ValueError as e:
-                        source_freq = None
-            if source_freq is None:
-                if not silence_warnings:
-                    warnings.warn("Using right bound of source index without frequency. Set source_freq.", stacklevel=2)
+            source_freq = resampler.get_np_source_freq()
         if not use_target_rbound:
             target_freq = None
         else:
-            target_freq = resampler.target_freq
-            if target_freq is not None:
-                if not isinstance(target_freq, (int, float)):
-                    try:
-                        target_freq = freq_to_timedelta64(target_freq)
-                    except ValueError as e:
-                        target_freq = None
-            if target_freq is None:
-                if not silence_warnings:
-                    warnings.warn("Using right bound of target index without frequency. Set target_freq.", stacklevel=2)
+            target_freq = resampler.get_np_target_freq()
         if nan_value is None:
             if self.mapping is not None:
                 nan_value = -1
@@ -2292,56 +2330,32 @@ class GenericAccessor(BaseAccessor, Analyzable):
             nan_value=nan_value,
             ffill=ffill,
         )
-        wrap_kwargs = merge_dicts(dict(index=target_index), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(index=index), wrap_kwargs)
         out = self.wrapper.wrap(out, group_by=False, **wrap_kwargs)
-        if target_index_str:
+        if one_index:
             return out.iloc[0]
         return out
 
-    def resample_opening(
-        self,
-        rule: tp.Union[Resampler, tp.PandasResampler],
-        resample_kwargs: tp.KwargsLike = None,
-        **kwargs,
-    ) -> tp.MaybeSeriesFrame:
+    def resample_opening(self, *args, **kwargs) -> tp.MaybeSeriesFrame:
         """`GenericAccessor.latest_at_index` but creating a resampler and using the left bound
         of the source and target index."""
-        if not isinstance(rule, Resampler):
-            rule = self.wrapper.get_resampler(rule, resample_kwargs=resample_kwargs, return_pd_resampler=False)
-        return self.latest_at_index(
-            rule,
-            source_rbound=False,
-            target_rbound=False,
-            **kwargs,
-        )
+        return self.latest_at_index(*args, source_rbound=False, target_rbound=False, **kwargs)
 
-    def resample_closing(
-        self,
-        rule: tp.Union[Resampler, tp.PandasResampler],
-        resample_kwargs: tp.KwargsLike = None,
-        **kwargs,
-    ) -> tp.MaybeSeriesFrame:
+    def resample_closing(self, *args, **kwargs) -> tp.MaybeSeriesFrame:
         """`GenericAccessor.latest_at_index` but creating a resampler and using the right bound
         of the source and target index.
 
         !!! note
             The timestamps in the source and target index should denote the open time."""
-        if not isinstance(rule, Resampler):
-            rule = self.wrapper.get_resampler(rule, resample_kwargs=resample_kwargs, return_pd_resampler=False)
-        return self.latest_at_index(
-            rule,
-            source_rbound=True,
-            target_rbound=True,
-            **kwargs,
-        )
+        return self.latest_at_index(*args, source_rbound=True, target_rbound=True, **kwargs)
 
     @class_or_instancemethod
     def resample_to_index(
         cls_or_self,
-        target_index: tp.Union[Resampler, tp.IndexLike],
+        index: tp.AnyRuleLike,
         reduce_func_nb: tp.Union[str, tp.ReduceFunc, tp.RangeReduceMetaFunc],
         *args,
-        target_freq: tp.Union[None, bool, tp.FrequencyLike] = None,
+        freq: tp.Union[None, bool, tp.FrequencyLike] = None,
         before: bool = False,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
@@ -2473,27 +2487,18 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 checks.assert_not_none(wrapper)
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
-            target_index = deep_substitute(target_index, template_context, sub_id="target_index")
+            index = substitute_templates(index, template_context, sub_id="index")
         else:
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
 
-        if not isinstance(target_index, Resampler):
-            resampler = Resampler(
-                wrapper.index,
-                target_index,
-                target_freq=target_freq,
-                silence_warnings=silence_warnings,
-            )
-        else:
-            resampler = target_index
-            if target_freq is not None:
-                resampler = resampler.replace(target_freq=target_freq)
-        index_ranges = resampler.map_index_to_source_ranges(
-            before=before,
-            jitted=jitted,
+        resampler = wrapper.get_resampler(
+            index,
+            freq=freq,
+            return_pd_resampler=False,
             silence_warnings=silence_warnings,
         )
+        index_ranges = resampler.map_index_to_source_ranges(before=before, jitted=jitted)
 
         if isinstance(cls_or_self, type):
             template_context = merge_dicts(
@@ -2503,7 +2508,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 ),
                 template_context,
             )
-            args = deep_substitute(args, template_context, sub_id="args")
+            args = substitute_templates(args, template_context, sub_id="args")
             func = jit_reg.resolve_option(nb.reduce_index_ranges_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(
@@ -2641,8 +2646,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 checks.assert_not_none(wrapper)
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
-            target_lbound_index = deep_substitute(target_lbound_index, template_context, sub_id="target_lbound_index")
-            target_rbound_index = deep_substitute(target_rbound_index, template_context, sub_id="target_rbound_index")
+            target_lbound_index = substitute_templates(target_lbound_index, template_context, sub_id="target_lbound_index")
+            target_rbound_index = substitute_templates(target_rbound_index, template_context, sub_id="target_rbound_index")
         else:
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -2676,7 +2681,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 ),
                 template_context,
             )
-            args = deep_substitute(args, template_context, sub_id="args")
+            args = substitute_templates(args, template_context, sub_id="args")
             func = jit_reg.resolve_option(nb.reduce_index_ranges_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             out = func(
@@ -3560,7 +3565,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
     def to_returns(self, **kwargs) -> tp.SeriesFrame:
         """Get returns of this object."""
-        return self.obj.vbt.returns.from_value(self.obj, **kwargs).obj
+        from vectorbtpro.returns.accessors import ReturnsAccessor
+
+        return ReturnsAccessor.from_value(self._obj, wrapper=self.wrapper, return_values=True, **kwargs)
 
     # ############# Patterns ############# #
 
@@ -3576,6 +3583,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         self,
         other: tp.SeriesFrame,
         wait: int = 0,
+        dropna: bool = False,
         broadcast_kwargs: tp.KwargsLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -3615,13 +3623,19 @@ class GenericAccessor(BaseAccessor, Analyzable):
         self_obj, other_obj = reshaping.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
         func = jit_reg.resolve_option(nb.crossed_above_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(reshaping.to_2d_array(self_obj), reshaping.to_2d_array(other_obj), wait=wait)
+        out = func(
+            reshaping.to_2d_array(self_obj),
+            reshaping.to_2d_array(other_obj),
+            wait=wait,
+            dropna=dropna,
+        )
         return ArrayWrapper.from_obj(self_obj).wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
     def crossed_below(
         self,
         other: tp.SeriesFrame,
         wait: int = 0,
+        dropna: bool = True,
         broadcast_kwargs: tp.KwargsLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -3633,7 +3647,12 @@ class GenericAccessor(BaseAccessor, Analyzable):
         self_obj, other_obj = reshaping.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
         func = jit_reg.resolve_option(nb.crossed_above_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(reshaping.to_2d_array(other_obj), reshaping.to_2d_array(self_obj), wait=wait)
+        out = func(
+            reshaping.to_2d_array(other_obj),
+            reshaping.to_2d_array(self_obj),
+            wait=wait,
+            dropna=dropna,
+        )
         return ArrayWrapper.from_obj(self_obj).wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
     # ############# Resolution ############# #
@@ -3757,7 +3776,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.plot().show()
             ```
 
-            ![](/assets/images/api/df_plot.svg)
+            ![](/assets/images/api/df_plot.svg){: .iimg }
         """
         from vectorbtpro.generic.plotting import Scatter
 
@@ -3783,7 +3802,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.lineplot().show()
             ```
 
-            ![](/assets/images/api/df_lineplot.svg)
+            ![](/assets/images/api/df_lineplot.svg){: .iimg }
         """
         return self.plot(column=column, **merge_dicts(dict(trace_kwargs=dict(mode="lines")), kwargs))
 
@@ -3795,7 +3814,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.scatterplot().show()
             ```
 
-            ![](/assets/images/api/df_scatterplot.svg)
+            ![](/assets/images/api/df_scatterplot.svg){: .iimg }
         """
         return self.plot(column=column, **merge_dicts(dict(trace_kwargs=dict(mode="markers")), kwargs))
 
@@ -3814,7 +3833,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.barplot().show()
             ```
 
-            ![](/assets/images/api/df_barplot.svg)
+            ![](/assets/images/api/df_barplot.svg){: .iimg }
         """
         from vectorbtpro.generic.plotting import Bar
 
@@ -3848,7 +3867,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.histplot().show()
             ```
 
-            ![](/assets/images/api/df_histplot.svg)
+            ![](/assets/images/api/df_histplot.svg){: .iimg }
         """
         from vectorbtpro.generic.plotting import Histogram
 
@@ -3893,7 +3912,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.boxplot().show()
             ```
 
-            ![](/assets/images/api/df_boxplot.svg)
+            ![](/assets/images/api/df_boxplot.svg){: .iimg }
         """
         from vectorbtpro.generic.plotting import Box
 
@@ -3956,7 +3975,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df['a'].vbt.plot_against(df['b']).show()
             ```
 
-            ![](/assets/images/api/sr_plot_against.svg)
+            ![](/assets/images/api/sr_plot_against.svg){: .iimg }
         """
         from vectorbtpro.utils.figure import make_figure
 
@@ -4101,7 +4120,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df['a'].vbt.overlay_with_heatmap(df['b']).show()
             ```
 
-            ![](/assets/images/api/sr_overlay_with_heatmap.svg)
+            ![](/assets/images/api/sr_overlay_with_heatmap.svg){: .iimg }
         """
         from vectorbtpro.utils.figure import make_subplots
         from vectorbtpro._settings import settings
@@ -4180,7 +4199,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.heatmap().show()
             ```
 
-            ![](/assets/images/api/df_heatmap.svg)
+            ![](/assets/images/api/df_heatmap.svg){: .iimg }
 
             * Plotting a figure based on a multi-index:
 
@@ -4200,7 +4219,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> sr.vbt.heatmap().show()
             ```
 
-            ![](/assets/images/api/sr_heatmap.svg)
+            ![](/assets/images/api/sr_heatmap.svg){: .iimg }
         """
         from vectorbtpro.generic.plotting import Heatmap
 
@@ -4345,7 +4364,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> sr.vbt.volume().show()
             ```
 
-            ![](/assets/images/api/sr_volume.svg)
+            ![](/assets/images/api/sr_volume.svg){: .iimg }
         """
         from vectorbtpro.generic.plotting import Volume
 
@@ -4468,7 +4487,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> pd.Series(np.random.standard_normal(100)).vbt.qqplot().show()
             ```
 
-            ![](/assets/images/api/sr_qqplot.svg)
+            ![](/assets/images/api/sr_qqplot.svg){: .iimg }
         """
         import scipy.stats as st
 
@@ -4512,9 +4531,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.areaplot().show()
             ```
 
-            ![](/assets/images/api/df_areaplot.svg)
+            ![](/assets/images/api/df_areaplot.svg){: .iimg }
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         from vectorbtpro.utils.figure import make_figure
@@ -4622,9 +4641,9 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> sr.vbt.plot_pattern([1, 2, 3, 2, 1]).show()
             ```
 
-            ![](/assets/images/api/sr_plot_pattern.svg)"""
+            ![](/assets/images/api/sr_plot_pattern.svg){: .iimg }"""
         from vectorbtpro.utils.figure import make_figure
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         from vectorbtpro._settings import settings
@@ -5044,7 +5063,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
             >>> df.vbt.plot_projections().show()
             ```
 
-            ![](/assets/images/api/df_plot_projections.svg)
+            ![](/assets/images/api/df_plot_projections.svg){: .iimg }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings

@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for resampling."""
 
@@ -7,6 +7,8 @@ import numpy as np
 from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils.datetime_nb import d_td
+
+__all__ = []
 
 
 @register_jitted(cache=True)

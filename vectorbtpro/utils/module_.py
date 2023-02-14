@@ -1,14 +1,19 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for modules."""
 
+import warnings
 import importlib
+import importlib.util
 import inspect
 import pkgutil
 import sys
 from types import ModuleType, FunctionType
 
 from vectorbtpro import _typing as tp
+from vectorbtpro._opt_deps import opt_dep_config
+
+__all__ = []
 
 
 def is_from_module(obj: tp.Any, module: ModuleType) -> bool:
@@ -40,36 +45,6 @@ def list_module_keys(
             and name not in blacklist
         )
         or name in whitelist
-    ]
-
-
-def import_submodules(package: tp.Union[str, ModuleType]) -> tp.Dict[str, ModuleType]:
-    """Import all submodules of a module, recursively, including subpackages.
-
-    If package defines `__blacklist__`, does not import modules that match names from this list."""
-    if isinstance(package, str):
-        package = importlib.import_module(package)
-    blacklist = []
-    if hasattr(package, "__blacklist__"):
-        blacklist = package.__blacklist__
-    results = {}
-    for _, name, is_pkg in pkgutil.walk_packages(package.__path__, package.__name__ + "."):
-        if ".".join(name.split(".")[:-1]) != package.__name__:
-            continue
-        if name.split(".")[-1] in blacklist:
-            continue
-        results[name] = importlib.import_module(name)
-        if is_pkg:
-            results.update(import_submodules(name))
-    return results
-
-
-def create__all__(module_name: str) -> tp.List[str]:
-    """Create `__all__` for a module."""
-    return [
-        name
-        for name, obj in inspect.getmembers(sys.modules[module_name])
-        if not inspect.ismodule(obj) and not name.startswith("__") and name != "create__all__"
     ]
 
 
@@ -116,3 +91,46 @@ def find_class(path: str) -> tp.Optional[tp.Type]:
     except Exception as e:
         pass
     return None
+
+
+def check_installed(pkg_name: str) -> bool:
+    """Check if a package is installed."""
+    return importlib.util.find_spec(pkg_name) is not None
+
+
+def get_installed_overview() -> tp.Dict[str, bool]:
+    """Get an overview of installed packages in `opt_dep_config`."""
+    return {pkg_name: check_installed(pkg_name) for pkg_name in opt_dep_config.keys()}
+
+
+def assert_can_import(pkg_name: str) -> None:
+    """Assert that the package can be imported. Must be listed in `opt_dep_config`."""
+    from importlib.metadata import version as get_version
+
+    if pkg_name not in opt_dep_config:
+        raise KeyError(f"Package '{pkg_name}' not found in opt_dep_config")
+    dist_name = opt_dep_config[pkg_name].get("dist_name", pkg_name)
+    version = version_str = opt_dep_config[pkg_name].get("version", "")
+    link = opt_dep_config[pkg_name]["link"]
+    if not check_installed(pkg_name):
+        raise ImportError(f"Please install {dist_name}{version_str} (see {link})")
+    if version != "":
+        actual_version = "(" + get_version(dist_name).replace(".", ",") + ")"
+        if version[0].isdigit():
+            operator = "=="
+        else:
+            operator = version[:2]
+            version = version[2:]
+            version = "(" + version.replace(".", ",") + ")"
+        if not eval(f"{actual_version} {operator} {version}"):
+            raise ImportError(f"Please install {dist_name}{version_str} (see {link})")
+
+
+def warn_cannot_import(pkg_name: str) -> bool:
+    """Warn if the package is cannot be imported. Must be listed in `opt_dep_config`."""
+    try:
+        assert_can_import(pkg_name)
+        return False
+    except ImportError as e:
+        warnings.warn(str(e), stacklevel=2)
+        return True

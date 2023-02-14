@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base class for working with log records.
 
@@ -101,6 +101,10 @@ from vectorbtpro.portfolio.enums import (
 )
 from vectorbtpro.records.decorators import attach_fields, override_field_config
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
+
+__all__ = [
+    "Logs",
+]
 
 __pdoc__ = {}
 

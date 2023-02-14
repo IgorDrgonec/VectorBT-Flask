@@ -1,13 +1,18 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Modules for working with portfolio."""
 
-from vectorbtpro.portfolio.base import Portfolio
-from vectorbtpro.portfolio.logs import Logs
-from vectorbtpro.portfolio.orders import Orders, FSOrders
-from vectorbtpro.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
-from vectorbtpro.portfolio.pfopt import *
-from vectorbtpro.utils.module_ import create__all__
+from typing import TYPE_CHECKING
 
-__all__ = create__all__(__name__)
-__pdoc__ = {k: False for k in __all__}
+if TYPE_CHECKING:
+    from vectorbtpro.portfolio.base import *
+    from vectorbtpro.portfolio.call_seq import *
+    from vectorbtpro.portfolio.chunking import *
+    from vectorbtpro.portfolio.decorators import *
+    from vectorbtpro.portfolio.logs import *
+    from vectorbtpro.portfolio.orders import *
+    from vectorbtpro.portfolio.trades import *
+
+__exclude_from__all__ = [
+    "enums",
+]

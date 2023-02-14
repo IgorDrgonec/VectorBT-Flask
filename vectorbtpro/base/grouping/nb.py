@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for grouping."""
 
@@ -9,6 +9,8 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import checks
+
+__all__ = []
 
 GroupByT = tp.Union[None, bool, tp.Index]
 

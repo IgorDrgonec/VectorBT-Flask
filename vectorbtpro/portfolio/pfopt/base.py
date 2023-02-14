@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base functions and classes for portfolio optimization."""
 
@@ -13,7 +13,7 @@ from vectorbtpro.returns.accessors import ReturnsAccessor
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.parsing import get_func_arg_names, warn_stdout
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
-from vectorbtpro.utils.template import deep_substitute, Rep, RepFunc, CustomTemplate
+from vectorbtpro.utils.template import substitute_templates, Rep, RepFunc, CustomTemplate
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.random_ import set_seed_nb
@@ -64,6 +64,13 @@ except ImportError as e:
     AlgoT = tp.Any
     AlgoResultT = tp.Any
 
+__all__ = [
+    "pfopt_func_dict",
+    "pypfopt_optimize",
+    "riskfolio_optimize",
+    "PortfolioOptimizer",
+    "PFO",
+]
 
 __pdoc__ = {}
 
@@ -135,7 +142,7 @@ def resolve_pypfopt_func_kwargs(
 
         Functions `market_implied_prior_returns` and `BlackLittermanModel.bl_weights` take `risk_aversion`,
         which is different from arguments with the same name in other functions. To set it, pass `delta`."""
-    from vectorbtpro.utils.opt_packages import assert_can_import
+    from vectorbtpro.utils.module_ import assert_can_import
 
     assert_can_import("pypfopt")
 
@@ -338,7 +345,7 @@ def resolve_pypfopt_expected_returns(
     * 'bl_returns': `pypfopt.black_litterman.BlackLittermanModel.bl_returns`
 
     Any function is resolved using `resolve_pypfopt_func_call`."""
-    from vectorbtpro.utils.opt_packages import assert_can_import
+    from vectorbtpro.utils.module_ import assert_can_import
 
     assert_can_import("pypfopt")
 
@@ -395,7 +402,7 @@ def resolve_pypfopt_cov_matrix(
         with 'oracle_approximating' as shrinkage factor
 
     Any function is resolved using `resolve_pypfopt_func_call`."""
-    from vectorbtpro.utils.opt_packages import assert_can_import
+    from vectorbtpro.utils.module_ import assert_can_import
 
     assert_can_import("pypfopt")
 
@@ -460,7 +467,7 @@ def resolve_pypfopt_optimizer(
     * 'cla': `pypfopt.cla.CLA`
 
     Any function is resolved using `resolve_pypfopt_func_call`."""
-    from vectorbtpro.utils.opt_packages import assert_can_import
+    from vectorbtpro.utils.module_ import assert_can_import
 
     assert_can_import("pypfopt")
     from pypfopt.base_optimizer import BaseOptimizer
@@ -642,7 +649,7 @@ def pypfopt_optimize(
         {'MSFT': 0.24595, 'AMZN': 0.23047, 'KO': 0.25862, 'MA': 0.26496}
         ```
     """
-    from vectorbtpro.utils.opt_packages import assert_can_import
+    from vectorbtpro.utils.module_ import assert_can_import
 
     assert_can_import("pypfopt")
     from pypfopt.exceptions import OptimizationError
@@ -727,7 +734,9 @@ def pypfopt_optimize(
                         solver=target_solver,
                         initial_guess=target_initial_guess,
                     )
-        except (OptimizationError, SolverError) as e:
+        except (OptimizationError, SolverError, ValueError) as e:
+            if isinstance(e, ValueError) and "expected return exceeding the risk-free rate" not in str(e):
+                raise e
             if ignore_opt_errors:
                 warnings.warn(str(e), stacklevel=2)
                 return {}
@@ -815,7 +824,11 @@ def resolve_riskfolio_func_kwargs(
     return select_pfopt_func_kwargs(riskfolio_func, matched_kwargs)
 
 
-def resolve_asset_classes(asset_classes: tp.Union[None, tp.Frame, tp.Sequence], columns: tp.Index) -> tp.Frame:
+def resolve_asset_classes(
+    asset_classes: tp.Union[None, tp.Frame, tp.Sequence],
+    columns: tp.Index,
+    col_indices: tp.Optional[tp.Sequence[int]] = None,
+) -> tp.Frame:
     """Resolve asset classes for Riskfolio-Lib.
 
     Supports the following formats:
@@ -824,8 +837,8 @@ def resolve_asset_classes(asset_classes: tp.Union[None, tp.Frame, tp.Sequence], 
     * Index: Each level in the index must be a different asset class set
     * Nested dict: Each sub-dict must be a different asset class set
     * Sequence of strings or ints: Matches them against level names in the columns.
-        If the columns have a single level, or some level names were not found, uses the sequence
-        directly as one class asset set named 'Class'.
+    If the columns have a single level, or some level names were not found, uses the sequence
+    directly as one class asset set named 'Class'.
     * Sequence of dicts: Each dict becomes a row in the new DataFrame
     * DataFrame where the first column is the asset list and the next columns are the
     different asset’s classes sets (this is the target format accepted by Riskfolio-Lib).
@@ -855,6 +868,8 @@ def resolve_asset_classes(asset_classes: tp.Union[None, tp.Frame, tp.Sequence], 
             assets = columns.get_level_values(-1)
         else:
             assets = columns
+        if col_indices is not None and len(col_indices) > 0:
+            asset_classes = asset_classes.iloc[col_indices]
         asset_classes.insert(loc=0, column="Assets", value=assets)
     return asset_classes
 
@@ -1248,7 +1263,7 @@ def riskfolio_optimize(
          'MA': 0.41248601983467814}
         ```
     """
-    from vectorbtpro.utils.opt_packages import assert_can_import
+    from vectorbtpro.utils.module_ import assert_can_import
 
     assert_can_import("riskfolio")
     import riskfolio as rp
@@ -1306,13 +1321,15 @@ def riskfolio_optimize(
             warnings.simplefilter("ignore")
 
         # Prepare returns
-        returns = prepare_returns(
+        new_returns = prepare_returns(
             returns,
             nan_to_zero=nan_to_zero,
             dropna_rows=dropna_rows,
             dropna_cols=dropna_cols,
             dropna_any=dropna_any,
         )
+        col_indices = [i for i, c in enumerate(returns.columns) if c in new_returns.columns]
+        returns = new_returns
         if returns.size == 0:
             return {}
 
@@ -1455,7 +1472,7 @@ def riskfolio_optimize(
                 else:
                     raise ValueError("Constraints method is required")
             if constraints_method.lower() in ("assets", "assets_constraints"):
-                asset_classes = resolve_asset_classes(asset_classes, returns.columns)
+                asset_classes = resolve_asset_classes(asset_classes, returns.columns, col_indices)
                 kwargs["asset_classes"] = asset_classes
                 unused_arg_names.add("asset_classes")
                 constraints = resolve_assets_constraints(constraints)
@@ -1495,7 +1512,7 @@ def riskfolio_optimize(
                 )
                 port.ainequality, port.binequality = warn_stdout(rp.factors_constraints)(**matched_kwargs)
             elif constraints_method.lower() in ("hrp", "hrp_constraints"):
-                asset_classes = resolve_asset_classes(asset_classes, returns.columns)
+                asset_classes = resolve_asset_classes(asset_classes, returns.columns, col_indices)
                 kwargs["asset_classes"] = asset_classes
                 unused_arg_names.add("asset_classes")
                 constraints = resolve_hrp_constraints(constraints)
@@ -1519,7 +1536,7 @@ def riskfolio_optimize(
                 else:
                     views_method = "assets"
             if views_method.lower() in ("assets", "assets_views"):
-                asset_classes = resolve_asset_classes(asset_classes, returns.columns)
+                asset_classes = resolve_asset_classes(asset_classes, returns.columns, col_indices)
                 kwargs["asset_classes"] = asset_classes
                 unused_arg_names.add("asset_classes")
                 views = resolve_assets_views(views)
@@ -2059,7 +2076,7 @@ class PortfolioOptimizer(Analyzable):
                 )
 
                 if _index_points is None:
-                    get_index_points_kwargs = deep_substitute(
+                    get_index_points_kwargs = substitute_templates(
                         dict(
                             every=_every,
                             normalize_every=_normalize_every,
@@ -2085,7 +2102,7 @@ class PortfolioOptimizer(Analyzable):
                         dict(index_points=_index_points),
                     )
                 else:
-                    _index_points = deep_substitute(
+                    _index_points = substitute_templates(
                         _index_points,
                         _template_context,
                         sub_id="index_points",
@@ -2095,14 +2112,14 @@ class PortfolioOptimizer(Analyzable):
                     _template_context = merge_dicts(_template_context, dict(index_points=_index_points))
 
                 if jitted_loop:
-                    _allocate_func = deep_substitute(
+                    _allocate_func = substitute_templates(
                         _allocate_func,
                         _template_context,
                         sub_id="allocate_func",
                         strict=True,
                     )
-                    _args = deep_substitute(_args, _template_context, sub_id="args")
-                    _kwargs = deep_substitute(_kwargs, _template_context, sub_id="kwargs")
+                    _args = substitute_templates(_args, _template_context, sub_id="args")
+                    _kwargs = substitute_templates(_kwargs, _template_context, sub_id="kwargs")
                     func = jit_reg.resolve_option(nb.allocate_meta_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
                     _allocations = func(len(wrapper.columns), _index_points, _allocate_func, *_args, **_kwargs)
@@ -2110,14 +2127,14 @@ class PortfolioOptimizer(Analyzable):
                     funcs_args = []
                     for i in range(len(_index_points)):
                         __template_context = merge_dicts(dict(i=i, index_point=_index_points[i]), _template_context)
-                        __allocate_func = deep_substitute(
+                        __allocate_func = substitute_templates(
                             _allocate_func,
                             __template_context,
                             sub_id="allocate_func",
                             strict=True,
                         )
-                        __args = deep_substitute(_args, __template_context, sub_id="args")
-                        __kwargs = deep_substitute(_kwargs, __template_context, sub_id="kwargs")
+                        __args = substitute_templates(_args, __template_context, sub_id="args")
+                        __kwargs = substitute_templates(_kwargs, __template_context, sub_id="kwargs")
                         funcs_args.append((__allocate_func, __args, __kwargs))
 
                     _execute_kwargs = merge_dicts(
@@ -2325,7 +2342,7 @@ class PortfolioOptimizer(Analyzable):
         `universal.algo.Algo`, instance of `universal.algo.Algo`, or instance of `universal.result.AlgoResult`.
 
         Extracts allocation points using `vectorbtpro.portfolio.pfopt.nb.get_alloc_points_nb`."""
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("universal")
         from universal.algo import Algo
@@ -2830,7 +2847,7 @@ class PortfolioOptimizer(Analyzable):
                 )
 
                 if _index_ranges is None:
-                    get_index_ranges_defaults = deep_substitute(
+                    get_index_ranges_defaults = substitute_templates(
                         dict(
                             every=_every,
                             normalize_every=_normalize_every,
@@ -2861,7 +2878,7 @@ class PortfolioOptimizer(Analyzable):
                         dict(index_ranges=_index_ranges),
                     )
                 else:
-                    _index_ranges = deep_substitute(
+                    _index_ranges = substitute_templates(
                         _index_ranges,
                         _template_context,
                         sub_id="index_ranges",
@@ -2874,7 +2891,7 @@ class PortfolioOptimizer(Analyzable):
                         _index_ranges = (_index_ranges[:, 0], _index_ranges[:, 1])
                     _template_context = merge_dicts(_template_context, dict(index_ranges=_index_ranges))
                 if _index_loc is not None:
-                    _index_loc = deep_substitute(
+                    _index_loc = substitute_templates(
                         _index_loc,
                         _template_context,
                         sub_id="index_loc",
@@ -2884,14 +2901,14 @@ class PortfolioOptimizer(Analyzable):
                     _template_context = merge_dicts(_template_context, dict(index_loc=_index_loc))
 
                 if jitted_loop:
-                    _optimize_func = deep_substitute(
+                    _optimize_func = substitute_templates(
                         _optimize_func,
                         _template_context,
                         sub_id="optimize_func",
                         strict=True,
                     )
-                    _args = deep_substitute(_args, _template_context, sub_id="args")
-                    _kwargs = deep_substitute(_kwargs, _template_context, sub_id="kwargs")
+                    _args = substitute_templates(_args, _template_context, sub_id="args")
+                    _kwargs = substitute_templates(_kwargs, _template_context, sub_id="kwargs")
                     func = jit_reg.resolve_option(nb.optimize_meta_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
                     _allocations = func(
@@ -2907,14 +2924,14 @@ class PortfolioOptimizer(Analyzable):
                     for i in range(len(_index_ranges[0])):
                         index_slice = slice(max(0, _index_ranges[0][i]), _index_ranges[1][i])
                         __template_context = merge_dicts(dict(i=i, index_slice=index_slice), _template_context)
-                        __optimize_func = deep_substitute(
+                        __optimize_func = substitute_templates(
                             _optimize_func,
                             __template_context,
                             sub_id="optimize_func",
                             strict=True,
                         )
-                        __args = deep_substitute(_args, __template_context, sub_id="args")
-                        __kwargs = deep_substitute(_kwargs, __template_context, sub_id="kwargs")
+                        __args = substitute_templates(_args, __template_context, sub_id="args")
+                        __kwargs = substitute_templates(_kwargs, __template_context, sub_id="kwargs")
                         funcs_args.append((__optimize_func, __args, __kwargs))
 
                     _execute_kwargs = merge_dicts(
@@ -2935,7 +2952,7 @@ class PortfolioOptimizer(Analyzable):
                 _allocations = _allocations[notna_mask]
                 _index_ranges = (_index_ranges[0][notna_mask], _index_ranges[1][notna_mask])
                 if _index_loc is None:
-                    _alloc_wait = deep_substitute(
+                    _alloc_wait = substitute_templates(
                         _alloc_wait,
                         _template_context,
                         sub_id="alloc_wait",
@@ -3228,9 +3245,9 @@ class PortfolioOptimizer(Analyzable):
             >>> pf_opt.plot().show()
             ```
 
-            ![](/assets/images/api/pfopt_plot.svg)
+            ![](/assets/images/api/pfopt_plot.svg){: .iimg }
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         from vectorbtpro.utils.figure import make_figure
@@ -3310,3 +3327,8 @@ class PortfolioOptimizer(Analyzable):
 
 PortfolioOptimizer.override_metrics_doc(__pdoc__)
 PortfolioOptimizer.override_subplots_doc(__pdoc__)
+
+PFO = PortfolioOptimizer
+"""Shortcut for `PortfolioOptimizer`."""
+
+__pdoc__["PFO"] = False

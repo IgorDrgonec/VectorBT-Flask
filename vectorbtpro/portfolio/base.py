@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base class for simulating a portfolio and measuring its performance.
 
@@ -256,7 +256,7 @@ Date
 >>> pf.value.vbt.plot().show()
 ```
 
-![](/assets/images/api/portfolio_value.svg)
+![](/assets/images/api/portfolio_value.svg){: .iimg }
 
 ## Broadcasting
 
@@ -810,7 +810,7 @@ Let's simulate a portfolio with two columns:
 ```pycon
 >>> pf = vbt.Portfolio.from_random_signals(close, n=[10, 20], seed=42)
 >>> pf.wrapper.columns
-Int64Index([10, 20], dtype='int64', name='rand_n')
+Index([10, 20], dtype='int64', name='rand_n')
 ```
 
 ### Column, group, and tag selection
@@ -1471,7 +1471,7 @@ Plot a single column of a portfolio:
 >>> pf.plot(column=10).show()
 ```
 
-![](/assets/images/api/portfolio_col_plot.svg)
+![](/assets/images/api/portfolio_col_plot.svg){: .iimg }
 
 To plot a single column of a grouped portfolio:
 
@@ -1491,7 +1491,7 @@ UserWarning: Subplot 'orders' does not support grouped data
 UserWarning: Subplot 'trade_pnl' does not support grouped data
 ```
 
-![](/assets/images/api/portfolio_group_plot.svg)
+![](/assets/images/api/portfolio_group_plot.svg){: .iimg }
 
 !!! note
     Some subplots do not support plotting grouped data.
@@ -1516,7 +1516,7 @@ control their appearance using keyword arguments:
 ... ).show()
 ```
 
-![](/assets/images/api/portfolio_plot_drawdowns.svg)
+![](/assets/images/api/portfolio_plot_drawdowns.svg){: .iimg }
 
 ### Custom subplots
 
@@ -1563,7 +1563,7 @@ Alternatively, you can create a placeholder and overwrite it manually later:
 ... ).show()
 ```
 
-![](/assets/images/api/portfolio_plot_custom.svg)
+![](/assets/images/api/portfolio_plot_custom.svg){: .iimg }
 
 If a plotting function can in any way be accessed from the current portfolio, you can pass
 the path to this function (see `vectorbtpro.utils.attr_.deep_getattr` for the path format).
@@ -1612,7 +1612,7 @@ You can also replace templates across all subplots by using the global template 
 >>> pf.plot(subplots, column=10, template_context=dict(window=10)).show()
 ```
 
-![](/assets/images/api/portfolio_plot_path.svg)
+![](/assets/images/api/portfolio_plot_path.svg){: .iimg }
 """
 
 import string
@@ -1669,7 +1669,7 @@ from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.mapping import to_mapping
 from vectorbtpro.utils.parsing import get_func_kwargs, get_func_arg_names
 from vectorbtpro.utils.random_ import set_seed
-from vectorbtpro.utils.template import Rep, RepEval, RepFunc, deep_substitute
+from vectorbtpro.utils.template import CustomTemplate, Rep, RepEval, RepFunc, substitute_templates
 from vectorbtpro.utils.chunking import ArgsTaker
 
 try:
@@ -1678,6 +1678,11 @@ try:
     from vectorbtpro.returns.qs_adapter import QSAdapter as QSAdapterT
 except ImportError:
     QSAdapterT = tp.Any
+
+__all__ = [
+    "Portfolio",
+    "PF",
+]
 
 __pdoc__ = {}
 
@@ -3144,6 +3149,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             return obj
         if wrapper is None:
             wrapper = self.wrapper
+        is_grouped = wrapper.grouper.is_grouped(group_by=group_by)
         if wrap_func is not None:
             return wrap_func(
                 self,
@@ -3159,92 +3165,92 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 **kwargs,
             )
 
-        def _wrap_1d_grouped(obj: tp.Array) -> tp.Series:
+        def _wrap_reduced_grouped(obj):
             _wrap_kwargs = merge_dicts(dict(name_or_index=obj_name), wrap_kwargs)
             return wrapper.wrap_reduced(obj, group_by=group_by, **_wrap_kwargs)
 
-        def _wrap_1d(obj: tp.Array) -> tp.Series:
+        def _wrap_reduced(obj):
             _wrap_kwargs = merge_dicts(dict(name_or_index=obj_name), wrap_kwargs)
             return wrapper.wrap_reduced(obj, group_by=False, **_wrap_kwargs)
 
-        def _wrap_2d_grouped(obj: tp.Array) -> tp.Frame:
+        def _wrap_grouped(obj):
             return wrapper.wrap(obj, group_by=group_by, **resolve_dict(wrap_kwargs))
 
-        def _wrap_2d(obj: tp.Array) -> tp.Frame:
+        def _wrap(obj):
             return wrapper.wrap(obj, group_by=False, **resolve_dict(wrap_kwargs))
 
         if obj_type is not None and obj_type not in {"records"}:
-            is_grouped = wrapper.grouper.is_grouped(group_by=group_by)
             if grouping == "cash_sharing":
                 if obj_type == "array":
                     if is_grouped and self.cash_sharing:
-                        return _wrap_2d_grouped(obj)
-                    return _wrap_2d(obj)
+                        return _wrap_grouped(obj)
+                    return _wrap(obj)
                 if obj_type == "red_array":
                     if is_grouped and self.cash_sharing:
-                        return _wrap_1d_grouped(obj)
-                    return _wrap_1d(obj)
+                        return _wrap_reduced_grouped(obj)
+                    return _wrap_reduced(obj)
                 if obj.ndim == 2:
                     if is_grouped and self.cash_sharing:
-                        return _wrap_2d_grouped(obj)
-                    return _wrap_2d(obj)
+                        return _wrap_grouped(obj)
+                    return _wrap(obj)
                 if obj.ndim == 1:
                     if is_grouped and self.cash_sharing:
-                        return _wrap_1d_grouped(obj)
-                    return _wrap_1d(obj)
+                        return _wrap_reduced_grouped(obj)
+                    return _wrap_reduced(obj)
             if grouping == "columns_or_groups":
                 if obj_type == "array":
                     if is_grouped:
-                        return _wrap_2d_grouped(obj)
-                    return _wrap_2d(obj)
+                        return _wrap_grouped(obj)
+                    return _wrap(obj)
                 if obj_type == "red_array":
                     if is_grouped:
-                        return _wrap_1d_grouped(obj)
-                    return _wrap_1d(obj)
+                        return _wrap_reduced_grouped(obj)
+                    return _wrap_reduced(obj)
                 if obj.ndim == 2:
                     if is_grouped:
-                        return _wrap_2d_grouped(obj)
-                    return _wrap_2d(obj)
+                        return _wrap_grouped(obj)
+                    return _wrap(obj)
                 if obj.ndim == 1:
                     if is_grouped:
-                        return _wrap_1d_grouped(obj)
-                    return _wrap_1d(obj)
+                        return _wrap_reduced_grouped(obj)
+                    return _wrap_reduced(obj)
             if grouping == "groups":
                 if obj_type == "array":
-                    return _wrap_2d_grouped(obj)
+                    return _wrap_grouped(obj)
                 if obj_type == "red_array":
-                    return _wrap_1d_grouped(obj)
+                    return _wrap_reduced_grouped(obj)
                 if obj.ndim == 2:
-                    return _wrap_2d_grouped(obj)
+                    return _wrap_grouped(obj)
                 if obj.ndim == 1:
-                    return _wrap_1d_grouped(obj)
+                    return _wrap_reduced_grouped(obj)
             if grouping == "columns":
                 if obj_type == "array":
-                    return _wrap_2d(obj)
+                    return _wrap(obj)
                 if obj_type == "red_array":
-                    return _wrap_1d(obj)
+                    return _wrap_reduced(obj)
                 if obj.ndim == 2:
-                    return _wrap_2d(obj)
+                    return _wrap(obj)
                 if obj.ndim == 1:
-                    return _wrap_1d(obj)
-            if checks.is_np_array(obj):
+                    return _wrap_reduced(obj)
+        if obj_type not in {"records"}:
+            if checks.is_np_array(obj) and not checks.is_record_array(obj):
                 if is_grouped:
-                    if obj_type == "array":
-                        return _wrap_2d_grouped(obj)
-                    if obj_type == "red_array":
-                        return _wrap_1d_grouped(obj)
+                    if obj_type is not None and obj_type == "array":
+                        return _wrap_grouped(obj)
+                    if obj_type is not None and obj_type == "red_array":
+                        return _wrap_reduced_grouped(obj)
                     if to_2d_shape(obj.shape) == wrapper.get_shape_2d():
-                        return _wrap_2d_grouped(obj)
+                        return _wrap_grouped(obj)
                     if obj.shape == (wrapper.get_shape_2d()[1],):
-                        return _wrap_1d_grouped(obj)
-                if obj_type == "array":
-                    return _wrap_2d(obj)
-                if obj_type == "red_array":
-                    return _wrap_1d(obj)
+                        return _wrap_reduced_grouped(obj)
+                if obj_type is not None and obj_type == "array":
+                    return _wrap(obj)
+                if obj_type is not None and obj_type == "red_array":
+                    return _wrap_reduced(obj)
                 if to_2d_shape(obj.shape) == wrapper.shape_2d:
-                    return _wrap_2d(obj)
+                    return _wrap(obj)
                 if obj.shape == (wrapper.shape_2d[1],):
-                    return _wrap_1d(obj)
+                    return _wrap_reduced(obj)
         if force_wrapping:
             raise NotImplementedError(f"Cannot wrap object '{obj_name}'")
         if not silence_warnings:
@@ -3929,11 +3935,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         attach_call_seq: tp.Optional[bool] = None,
         ffill_val_price: tp.Optional[bool] = None,
         update_value: tp.Optional[bool] = None,
-        fill_state: tp.Optional[bool] = None,
-        fill_returns: tp.Optional[bool] = None,
+        save_state: tp.Optional[bool] = None,
+        save_value: tp.Optional[bool] = None,
+        save_returns: tp.Optional[bool] = None,
         max_orders: tp.Optional[int] = None,
         max_logs: tp.Optional[int] = None,
-        skipna: tp.Optional[bool] = None,
         seed: tp.Optional[int] = None,
         group_by: tp.GroupByLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
@@ -3966,7 +3972,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
                 See `vectorbtpro.portfolio.enums.Order.price`. Can be also provided as
                 `vectorbtpro.portfolio.enums.PriceType`. Options `PriceType.NextOpen` and `PriceType.NextClose`
-                are only applicable as single values, that is, they cannot be used inside arrays.
+                are only applicable per column, that is, they cannot be used inside full arrays.
                 In addition, they require the argument `from_ago` to be None.
             fees (float or array_like): Fees in percentage of the order value.
                 See `vectorbtpro.portfolio.enums.Order.fees`. Will broadcast.
@@ -4116,12 +4122,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
                 Otherwise, unknown `close` will lead to NaN in valuation price at the next timestamp.
             update_value (bool): Whether to update group value after each filled order.
-            fill_state (bool): Whether to fill state.
+            save_state (bool): Whether to save the state.
 
-                The arrays will be avaiable as `cash`, `position`, `debt`, `locked_cash`, and `free_cash` in in-outputs.
-            fill_returns (bool): Whether to fill returns.
+                The arrays will be available as `cash`, `position`, `debt`, `locked_cash`, and `free_cash` in in-outputs.
+            save_value (bool): Whether to save the value.
+            
+                The array will be available as `value` in in-outputs.
+            save_returns (bool): Whether to save the returns.
 
-                The array will be avaiable as `returns` in in-outputs.
+                The array will be available as `returns` in in-outputs.
             max_orders (int): The max number of order records expected to be filled at each column.
                 Defaults to the maximum number of non-NaN values across all columns of the size array.
 
@@ -4130,10 +4139,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Defaults to the maximum number of True values across all columns of the log array.
 
                 Set to a lower number if you run out of memory, and to 0 to not fill.
-            skipna (bool): Whether to skip the rows where the size of all columns is NaN.
-
-                Cannot work together with cash deposits, cash earnings, filling returns, and
-                forward-filling the valuation price.
             seed (int): Seed to be set for both `call_seq` and at the beginning of the simulation.
             group_by (any): Group columns. See `vectorbtpro.base.grouping.base.Grouper`.
             broadcast_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.reshaping.broadcast`.
@@ -4264,7 +4269,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> pf.get_asset_value(group_by=False).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/simulate_nb_example.svg)
+            ![](/assets/images/api/simulate_nb_example.svg){: .iimg }
 
             * Test 10 random weight combinations:
 
@@ -4348,6 +4353,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 high = data.high
             if low is None:
                 low = data.low
+            if freq is None:
+                freq = data.freq
         if open is None:
             open_none = True
             open = np.nan
@@ -4372,17 +4379,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             direction = portfolio_cfg["direction"]
         if price is None:
             price = portfolio_cfg["price"]
-        if isinstance(price, str):
-            price = map_enum_fields(price, PriceType)
-        if isinstance(price, (int, float)):
-            if price in (-1, -2):
-                if from_ago is not None:
-                    raise ValueError("Price of next open/close and from_ago cannot be used simultaneously")
-                if price == -1:
-                    price = -np.inf
-                if price == -2:
-                    price = np.inf
-                from_ago = 1
         if size is None:
             size = portfolio_cfg["size"]
         if fees is None:
@@ -4438,6 +4434,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             group_by = True
         if from_ago is None:
             from_ago = portfolio_cfg["from_ago"]
+        if from_ago is None:
+            from_ago = 0
+            from_ago_none = True
+        else:
+            from_ago_none = False
         if call_seq is None:
             call_seq = portfolio_cfg["call_seq"]
         auto_call_seq = False
@@ -4453,12 +4454,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ffill_val_price = portfolio_cfg["ffill_val_price"]
         if update_value is None:
             update_value = portfolio_cfg["update_value"]
-        if fill_state is None:
-            fill_state = portfolio_cfg["fill_state"]
-        if fill_returns is None:
-            fill_returns = portfolio_cfg["fill_returns"]
-        if skipna is None:
-            skipna = portfolio_cfg["skipna"]
+        if save_state is None:
+            save_state = portfolio_cfg["save_state"]
+        if save_value is None:
+            save_value = portfolio_cfg["save_value"]
+        if save_returns is None:
+            save_returns = portfolio_cfg["save_returns"]
         if seed is None:
             seed = portfolio_cfg["seed"]
         if seed is not None:
@@ -4508,6 +4509,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         broadcast_kwargs = merge_dicts(
             dict(
+                to_pd=False,
                 keep_flex=True,
                 reindex_kwargs=dict(
                     cash_earnings=dict(fill_value=0.0),
@@ -4555,9 +4557,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         init_cash = np.require(broadcast_array_to(init_cash, len(cs_group_lens)), dtype=np.float_)
         init_position = np.require(broadcast_array_to(init_position, target_shape_2d[1]), dtype=np.float_)
         init_price = np.require(broadcast_array_to(init_price, target_shape_2d[1]), dtype=np.float_)
+        if (((init_position > 0) | (init_position < 0)) & np.isnan(init_price)).any():
+            warnings.warn(f"Initial position has undefined price. Set init_price.", stacklevel=2)
         cash_deposits = broadcast(
             cash_deposits,
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
+            to_pd=False,
             keep_flex=True,
             reindex_kwargs=dict(fill_value=0.0),
             require_kwargs=require_kwargs,
@@ -4640,6 +4645,22 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             checks.assert_subdtype(broadcasted_args["bm_close"], np.number, arg_name="bm_close")
         checks.assert_subdtype(broadcasted_args["from_ago"], np.integer, arg_name="from_ago")
 
+        # Prepare price
+        if from_ago_none:
+            price = broadcasted_args["price"]
+            if price.size == 1 or price.shape[0] == 1:
+                next_open_mask = price == PriceType.NextOpen
+                next_close_mask = price == PriceType.NextClose
+                if next_open_mask.any() or next_close_mask.any():
+                    price = price.astype(np.float_)
+                    price[next_open_mask] = PriceType.Open
+                    price[next_close_mask] = PriceType.Close
+                    from_ago = np.full(price.shape, 0, dtype=np.int_)
+                    from_ago[next_open_mask] = 1
+                    from_ago[next_close_mask] = 1
+                    broadcasted_args["price"] = price
+                    broadcasted_args["from_ago"] = from_ago
+
         # Remove arguments
         bm_close = broadcasted_args.pop("bm_close", None)
 
@@ -4660,11 +4681,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             auto_call_seq=auto_call_seq,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
-            fill_state=fill_state,
-            fill_returns=fill_returns,
+            save_state=save_state,
+            save_value=save_value,
+            save_returns=save_returns,
             max_orders=max_orders,
             max_logs=max_logs,
-            skipna=skipna,
         )
 
         # Create an instance
@@ -4762,8 +4783,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         attach_call_seq: tp.Optional[bool] = None,
         ffill_val_price: tp.Optional[bool] = None,
         update_value: tp.Optional[bool] = None,
-        fill_state: tp.Optional[bool] = None,
-        fill_returns: tp.Optional[bool] = None,
+        save_state: tp.Optional[bool] = None,
+        save_value: tp.Optional[bool] = None,
+        save_returns: tp.Optional[bool] = None,
         max_orders: tp.Optional[int] = None,
         max_logs: tp.Optional[int] = None,
         in_outputs: tp.Optional[tp.MappingLike] = None,
@@ -5002,8 +5024,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             attach_call_seq (bool): See `Portfolio.from_orders`.
             ffill_val_price (bool): See `Portfolio.from_orders`.
             update_value (bool): See `Portfolio.from_orders`.
-            fill_state (bool): See `Portfolio.from_orders`.
-            fill_returns (bool): See `Portfolio.from_orders`.
+            save_state (bool): See `Portfolio.from_orders`.
+            save_value (bool): See `Portfolio.from_orders`.
+            save_returns (bool): See `Portfolio.from_orders`.
             max_orders (int): See `Portfolio.from_orders`.
             max_logs (int): See `Portfolio.from_orders`.
             in_outputs (mapping_like): Mapping with in-output objects. Only for flexible mode.
@@ -5342,7 +5365,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ...     close,
             ...     entries=pd.Series([True, True, True, False, False]),
             ...     exits=pd.Series([False, False, True, True, True]),
-            ...     direction=vbt.BCO(Direction, product=True))
+            ...     direction=vbt.Param(Direction))
             >>> pf.asset_flow
             direction  LongOnly  ShortOnly   Both
             0             100.0     -100.0  100.0
@@ -5499,6 +5522,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 high = data.high
             if low is None:
                 low = data.low
+            if freq is None:
+                freq = data.freq
         if open is None:
             open_none = True
             open = np.nan
@@ -5547,17 +5572,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             size_type = portfolio_cfg["size_type"]
         if price is None:
             price = portfolio_cfg["price"]
-        if isinstance(price, str):
-            price = map_enum_fields(price, PriceType)
-        if isinstance(price, (int, float)):
-            if price in (-1, -2):
-                if from_ago is not None:
-                    raise ValueError("Price of next open/close and from_ago cannot be used simultaneously")
-                if price == -1:
-                    price = -np.inf
-                if price == -2:
-                    price = np.inf
-                from_ago = 1
         if fees is None:
             fees = portfolio_cfg["fees"]
         if fixed_fees is None:
@@ -5673,6 +5687,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             group_by = True
         if from_ago is None:
             from_ago = portfolio_cfg["from_ago"]
+        if from_ago is None:
+            from_ago = 0
+            from_ago_none = True
+        else:
+            from_ago_none = False
         if call_seq is None:
             call_seq = portfolio_cfg["call_seq"]
         auto_call_seq = False
@@ -5688,20 +5707,28 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ffill_val_price = portfolio_cfg["ffill_val_price"]
         if update_value is None:
             update_value = portfolio_cfg["update_value"]
-        if fill_state is None:
-            fill_state = portfolio_cfg["fill_state"]
-        if fill_returns is None:
-            fill_returns = portfolio_cfg["fill_returns"]
+        if save_state is None:
+            save_state = portfolio_cfg["save_state"]
+        if save_value is None:
+            save_value = portfolio_cfg["save_value"]
+        if save_returns is None:
+            save_returns = portfolio_cfg["save_returns"]
         if seed is None:
             seed = portfolio_cfg["seed"]
         if seed is not None:
             set_seed(seed)
         if flexible_mode:
-            if fill_state:
-                raise ValueError("Argument fill_state cannot be used in flexible mode")
-            if fill_returns:
-                raise ValueError("Argument fill_returns cannot be used in flexible mode")
-            if in_outputs is not None and not checks.is_namedtuple(in_outputs):
+            if save_state:
+                raise ValueError("Argument save_state cannot be used in flexible mode")
+            if save_value:
+                raise ValueError("Argument save_value cannot be used in flexible mode")
+            if save_returns:
+                raise ValueError("Argument save_returns cannot be used in flexible mode")
+            if (
+                in_outputs is not None
+                and not isinstance(in_outputs, CustomTemplate)
+                and not checks.is_namedtuple(in_outputs)
+            ):
                 in_outputs = to_mapping(in_outputs)
                 in_outputs = namedtuple("InOutputs", in_outputs)(**in_outputs)
         else:
@@ -5789,6 +5816,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         broadcastable_args = {**broadcastable_args, **broadcast_named_args}
         broadcast_kwargs = merge_dicts(
             dict(
+                to_pd=False,
                 keep_flex=True,
                 reindex_kwargs=dict(
                     cash_earnings=dict(fill_value=0.0),
@@ -5868,9 +5896,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         init_cash = np.require(broadcast_array_to(init_cash, len(cs_group_lens)), dtype=np.float_)
         init_position = np.require(broadcast_array_to(init_position, target_shape_2d[1]), dtype=np.float_)
         init_price = np.require(broadcast_array_to(init_price, target_shape_2d[1]), dtype=np.float_)
+        if (((init_position > 0) | (init_position < 0)) & np.isnan(init_price)).any():
+            warnings.warn(f"Initial position has undefined price. Set init_price.", stacklevel=2)
         cash_deposits = broadcast(
             cash_deposits,
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
+            to_pd=False,
             keep_flex=True,
             reindex_kwargs=dict(fill_value=0.0),
             require_kwargs=require_kwargs,
@@ -6077,6 +6108,22 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(cash_earnings, np.number, arg_name="cash_earnings")
         checks.assert_subdtype(cash_dividends, np.number, arg_name="cash_dividends")
 
+        # Prepare price
+        if from_ago_none:
+            price = broadcasted_args["price"]
+            if price.size == 1 or price.shape[0] == 1:
+                next_open_mask = price == PriceType.NextOpen
+                next_close_mask = price == PriceType.NextClose
+                if next_open_mask.any() or next_close_mask.any():
+                    price = price.astype(np.float_)
+                    price[next_open_mask] = PriceType.Open
+                    price[next_close_mask] = PriceType.Close
+                    from_ago = np.full(price.shape, 0, dtype=np.int_)
+                    from_ago[next_open_mask] = 1
+                    from_ago[next_close_mask] = 1
+                    broadcasted_args["price"] = price
+                    broadcasted_args["from_ago"] = from_ago
+
         # Prepare arguments
         template_context = merge_dicts(
             broadcasted_args,
@@ -6099,8 +6146,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 auto_call_seq=auto_call_seq,
                 ffill_val_price=ffill_val_price,
                 update_value=update_value,
-                fill_state=fill_state,
-                fill_returns=fill_returns,
+                save_state=save_state,
+                save_value=save_value,
+                save_returns=save_returns,
                 max_orders=max_orders,
                 max_logs=max_logs,
                 in_outputs=in_outputs,
@@ -6109,12 +6157,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             template_context,
         )
         if flexible_mode:
-            in_outputs = deep_substitute(in_outputs, template_context, sub_id="in_outputs")
-            post_segment_args = deep_substitute(post_segment_args, template_context, sub_id="post_segment_args")
+            in_outputs = substitute_templates(in_outputs, template_context, sub_id="in_outputs")
+            post_segment_args = substitute_templates(post_segment_args, template_context, sub_id="post_segment_args")
             if signal_func_mode:
-                signal_args = deep_substitute(signal_args, template_context, sub_id="signal_args")
+                signal_args = substitute_templates(signal_args, template_context, sub_id="signal_args")
             else:
-                adjust_args = deep_substitute(adjust_args, template_context, sub_id="adjust_args")
+                adjust_args = substitute_templates(adjust_args, template_context, sub_id="adjust_args")
                 if ls_mode:
                     signal_args = (
                         broadcasted_args.pop("entries"),
@@ -6256,8 +6304,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 auto_call_seq=auto_call_seq,
                 ffill_val_price=ffill_val_price,
                 update_value=update_value,
-                fill_state=fill_state,
-                fill_returns=fill_returns,
+                save_state=save_state,
+                save_value=save_value,
+                save_returns=save_returns,
                 max_orders=max_orders,
                 max_logs=max_logs,
                 **broadcasted_args,
@@ -6488,15 +6537,20 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cls: tp.Type[PortfolioT],
         close: tp.Union[tp.ArrayLike, Data],
         optimizer: PortfolioOptimizer,
+        pf_method: str = "from_orders",
         squeeze_groups: bool = True,
         dropna: tp.Optional[str] = None,
         fill_value: tp.Scalar = np.nan,
         size_type: tp.ArrayLike = "targetpercent",
         direction: tp.Optional[tp.ArrayLike] = None,
+        adjust_func_nb: nb.AdjustFuncT = nb.no_adjust_func_nb,
+        adjust_args: tp.Args = (),
         cash_sharing: tp.Optional[bool] = True,
         call_seq: tp.Optional[tp.ArrayLike] = "auto",
         group_by: tp.GroupByLike = None,
-        silence_warnings: bool = False,
+        broadcast_named_args: tp.KwargsLike = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        chunked: tp.ChunkedOption = None,
         **kwargs,
     ) -> PortfolioT:
         """Build portfolio from an optimizer of type `vectorbtpro.portfolio.pfopt.base.PortfolioOptimizer`.
@@ -6551,6 +6605,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             else:
                 direction = "shortonly"
                 size = size.abs()
+
         if group_by is None:
 
             def _substitute_group_by(index):
@@ -6564,16 +6619,93 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 return optimizer.wrapper.grouper.group_by
 
             group_by = RepFunc(_substitute_group_by)
-        return cls.from_orders(
-            close,
-            size=size,
-            size_type=size_type,
-            direction=direction,
-            cash_sharing=cash_sharing,
-            call_seq=call_seq,
-            group_by=group_by,
-            **kwargs,
-        )
+
+        if pf_method.lower() == "from_orders":
+            return cls.from_orders(
+                close,
+                size=size,
+                size_type=size_type,
+                direction=direction,
+                cash_sharing=cash_sharing,
+                call_seq=call_seq,
+                group_by=group_by,
+                broadcast_kwargs=broadcast_kwargs,
+                chunked=chunked,
+                **kwargs,
+            )
+        elif pf_method.lower() == "from_signals":
+            if broadcast_named_args is None:
+                broadcast_named_args = {}
+            broadcast_named_args = merge_dicts(dict(direction=direction), broadcast_named_args)
+            broadcast_kwargs = merge_dicts(
+                dict(
+                    keep_flex=dict(
+                        size_type=False,
+                        direction=False,
+                        min_size=False,
+                        max_size=False,
+                        _def=True,
+                    ),
+                    require_kwargs=dict(
+                        size_type=dict(requirements="O"),
+                        direction=dict(requirements="O"),
+                        min_size=dict(requirements="O"),
+                        max_size=dict(requirements="O"),
+                    ),
+                    reindex_kwargs=dict(direction=dict(fill_value=Direction.Both))
+                ),
+                broadcast_kwargs,
+            )
+
+            def _prepare_direction(direction):
+                direction = map_enum_fields(direction, Direction)
+                checks.assert_subdtype(direction, np.integer, arg_name="direction")
+                return direction
+
+            arg_take_spec = dict(
+                signal_args=ch.ArgsTaker(
+                    base_ch.flex_array_gl_slicer,
+                    base_ch.flex_array_gl_slicer,
+                    base_ch.flex_array_gl_slicer,
+                    base_ch.flex_array_gl_slicer,
+                    base_ch.flex_array_gl_slicer,
+                    base_ch.flex_array_gl_slicer,
+                    base_ch.flex_array_gl_slicer,
+                    base_ch.flex_array_gl_slicer,
+                    None,
+                    ArgsTaker(),
+                )
+            )
+            chunked = ch.specialize_chunked_option(chunked, arg_take_spec=arg_take_spec)
+
+            return cls.from_signals(
+                close,
+                signal_func_nb=nb.order_signal_func_nb,
+                signal_args=(
+                    Rep("size"),
+                    Rep("price"),
+                    Rep("size_type"),
+                    RepFunc(_prepare_direction),
+                    Rep("min_size"),
+                    Rep("max_size"),
+                    Rep("val_price"),
+                    Rep("from_ago"),
+                    adjust_func_nb,
+                    adjust_args,
+                ),
+                size=size,
+                size_type=size_type,
+                accumulate=True,
+                cash_sharing=cash_sharing,
+                call_seq=call_seq,
+                group_by=group_by,
+                broadcast_named_args=broadcast_named_args,
+                broadcast_kwargs=broadcast_kwargs,
+                chunked=chunked,
+                **kwargs,
+            )
+        else:
+            raise ValueError(f"Invalid option pf_method='{pf_method}'")
 
     @classmethod
     def from_order_func(
@@ -6943,7 +7075,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> pf.get_asset_value(group_by=False).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/simulate_nb_example.svg)
+            ![](/assets/images/api/simulate_nb_example.svg){: .iimg }
 
             Templates are a very powerful tool to prepare any custom arguments after they are broadcast and
             before they are passed to the simulation function. In the example above, we use `broadcast_named_args`
@@ -6964,9 +7096,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> pf['g2'].get_asset_value(group_by=False).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/from_order_func_g1.svg)
+            ![](/assets/images/api/from_order_func_g1.svg){: .iimg }
 
-            ![](/assets/images/api/from_order_func_g2.svg)
+            ![](/assets/images/api/from_order_func_g2.svg){: .iimg }
 
             * Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit:
 
@@ -7153,6 +7285,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 high = data.high
             if low is None:
                 low = data.low
+            if freq is None:
+                freq = data.freq
         if open is None:
             open_none = True
             open = np.nan
@@ -7223,7 +7357,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             seed = portfolio_cfg["seed"]
         if seed is not None:
             set_seed(seed)
-        if in_outputs is not None and not checks.is_namedtuple(in_outputs):
+        if (
+            in_outputs is not None
+            and not isinstance(in_outputs, CustomTemplate)
+            and not checks.is_namedtuple(in_outputs)
+        ):
             in_outputs = to_mapping(in_outputs)
             in_outputs = namedtuple("InOutputs", in_outputs)(**in_outputs)
         if group_by is None:
@@ -7251,6 +7389,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         broadcastable_args = {**broadcastable_args, **broadcast_named_args}
         broadcast_kwargs = merge_dicts(
             dict(
+                to_pd=False,
                 keep_flex=True,
                 reindex_kwargs=dict(
                     cash_earnings=dict(fill_value=0.0),
@@ -7279,9 +7418,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         init_cash = np.require(broadcast_array_to(init_cash, len(cs_group_lens)), dtype=np.float_)
         init_position = np.require(broadcast_array_to(init_position, target_shape_2d[1]), dtype=np.float_)
         init_price = np.require(broadcast_array_to(init_price, target_shape_2d[1]), dtype=np.float_)
+        if (((init_position > 0) | (init_position < 0)) & np.isnan(init_price)).any():
+            warnings.warn(f"Initial position has undefined price. Set init_price.", stacklevel=2)
         cash_deposits = broadcast(
             cash_deposits,
             to_shape=(target_shape_2d[0], len(cs_group_lens)),
+            to_pd=False,
             keep_flex=keep_inout_raw,
             reindex_kwargs=dict(fill_value=0.0),
             require_kwargs=require_kwargs,
@@ -7298,6 +7440,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             segment_mask = broadcast(
                 segment_mask,
                 to_shape=(target_shape_2d[0], len(group_lens)),
+                to_pd=False,
                 keep_flex=keep_inout_raw,
                 reindex_kwargs=dict(fill_value=False),
                 require_kwargs=require_kwargs,
@@ -7377,17 +7520,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ),
             template_context,
         )
-        pre_sim_args = deep_substitute(pre_sim_args, template_context, sub_id="pre_sim_args")
-        post_sim_args = deep_substitute(post_sim_args, template_context, sub_id="post_sim_args")
-        pre_group_args = deep_substitute(pre_group_args, template_context, sub_id="pre_group_args")
-        post_group_args = deep_substitute(post_group_args, template_context, sub_id="post_group_args")
-        pre_row_args = deep_substitute(pre_row_args, template_context, sub_id="pre_row_args")
-        post_row_args = deep_substitute(post_row_args, template_context, sub_id="post_row_args")
-        pre_segment_args = deep_substitute(pre_segment_args, template_context, sub_id="pre_segment_args")
-        post_segment_args = deep_substitute(post_segment_args, template_context, sub_id="post_segment_args")
-        order_args = deep_substitute(order_args, template_context, sub_id="order_args")
-        post_order_args = deep_substitute(post_order_args, template_context, sub_id="post_order_args")
-        in_outputs = deep_substitute(in_outputs, template_context, sub_id="in_outputs")
+        pre_sim_args = substitute_templates(pre_sim_args, template_context, sub_id="pre_sim_args")
+        post_sim_args = substitute_templates(post_sim_args, template_context, sub_id="post_sim_args")
+        pre_group_args = substitute_templates(pre_group_args, template_context, sub_id="pre_group_args")
+        post_group_args = substitute_templates(post_group_args, template_context, sub_id="post_group_args")
+        pre_row_args = substitute_templates(pre_row_args, template_context, sub_id="pre_row_args")
+        post_row_args = substitute_templates(post_row_args, template_context, sub_id="post_row_args")
+        pre_segment_args = substitute_templates(pre_segment_args, template_context, sub_id="pre_segment_args")
+        post_segment_args = substitute_templates(post_segment_args, template_context, sub_id="post_segment_args")
+        order_args = substitute_templates(order_args, template_context, sub_id="order_args")
+        post_order_args = substitute_templates(post_order_args, template_context, sub_id="post_order_args")
+        in_outputs = substitute_templates(in_outputs, template_context, sub_id="in_outputs")
         for k in broadcast_named_args:
             broadcasted_args.pop(k)
 
@@ -7713,7 +7856,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> asset_value.vbt.plot().show()
             ```
 
-            ![](/assets/images/api/simulate_nb_example.svg)
+            ![](/assets/images/api/simulate_nb_example.svg){: .iimg }
         """
         # Get defaults
         from vectorbtpro._settings import settings
@@ -11166,3 +11309,8 @@ Portfolio.override_metrics_doc(__pdoc__)
 Portfolio.override_subplots_doc(__pdoc__)
 
 __pdoc__["Portfolio.plot"] = "See `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots`."
+
+PF = Portfolio
+"""Shortcut for `Portfolio`."""
+
+__pdoc__["PF"] = False

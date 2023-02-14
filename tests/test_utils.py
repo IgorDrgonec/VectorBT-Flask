@@ -41,6 +41,12 @@ from vectorbtpro.utils import (
 
 from tests.utils import *
 
+pathos_available = True
+try:
+    import pathos
+except:
+    pathos_available = False
+
 dask_available = True
 try:
     import dask
@@ -1917,15 +1923,15 @@ class TestParams:
         assert fp(1, 2, 3, b=4, c=5) == (1, (2, 3), 4, {"c": 5})
 
         assert fp(vbt.Param([1]))[0] == [(1, (), 2, {})]
-        assert_index_equal(fp(vbt.Param([1]))[1], pd.Int64Index([1], dtype="int64", name="a"))
+        assert_index_equal(fp(vbt.Param([1]))[1], pd.Index([1], dtype="int64", name="a"))
         assert fp(vbt.Param([1, 2]))[0] == [(1, (), 2, {}), (2, (), 2, {})]
-        assert_index_equal(fp(vbt.Param([1, 2]))[1], pd.Int64Index([1, 2], dtype="int64", name="a"))
+        assert_index_equal(fp(vbt.Param([1, 2]))[1], pd.Index([1, 2], dtype="int64", name="a"))
         assert fp(1, vbt.Param([2, 3]))[0] == [(1, (2,), 2, {}), (1, (3,), 2, {})]
-        assert_index_equal(fp(1, vbt.Param([2, 3]))[1], pd.Int64Index([2, 3], dtype="int64", name="my_args_0"))
+        assert_index_equal(fp(1, vbt.Param([2, 3]))[1], pd.Index([2, 3], dtype="int64", name="my_args_0"))
         assert fp(1, b=vbt.Param([2, 3]))[0] == [(1, (), 2, {}), (1, (), 3, {})]
-        assert_index_equal(fp(1, b=vbt.Param([2, 3]))[1], pd.Int64Index([2, 3], dtype="int64", name="b"))
+        assert_index_equal(fp(1, b=vbt.Param([2, 3]))[1], pd.Index([2, 3], dtype="int64", name="b"))
         assert fp(1, c=vbt.Param([2, 3]))[0] == [(1, (), 2, {"c": 2}), (1, (), 2, {"c": 3})]
-        assert_index_equal(fp(1, c=vbt.Param([2, 3]))[1], pd.Int64Index([2, 3], dtype="int64", name="c"))
+        assert_index_equal(fp(1, c=vbt.Param([2, 3]))[1], pd.Index([2, 3], dtype="int64", name="c"))
         kwargs = dict(c=dict(d=(2, dict(e=vbt.Param([3, 4])))), f=(5, vbt.Param([6, 7])))
         assert fp(1, **kwargs)[0] == [
             (1, (), 2, {"c": dict(d=(2, dict(e=3))), "f": (5, 6)}),
@@ -2014,27 +2020,27 @@ class TestParams:
 
         param_configs = [dict(a=1)]
         assert fp(param_configs=param_configs)[0] == [(1, (), 2, {})]
-        assert_index_equal(fp(param_configs=param_configs)[1], pd.Int64Index([0], dtype="int64", name="param_config"))
+        assert_index_equal(fp(param_configs=param_configs)[1], pd.Index([0], dtype="int64", name="param_config"))
         param_configs = [dict(a=1, my_args=(2, 3))]
         assert fp(param_configs=param_configs)[0] == [(1, (2, 3), 2, {})]
-        assert_index_equal(fp(param_configs=param_configs)[1], pd.Int64Index([0], dtype="int64", name="param_config"))
+        assert_index_equal(fp(param_configs=param_configs)[1], pd.Index([0], dtype="int64", name="param_config"))
         param_configs = [dict(a=1, my_args_0=2, my_args_1=3)]
         assert fp(param_configs=param_configs)[0] == [(1, (2, 3), 2, {})]
-        assert_index_equal(fp(param_configs=param_configs)[1], pd.Int64Index([0], dtype="int64", name="param_config"))
+        assert_index_equal(fp(param_configs=param_configs)[1], pd.Index([0], dtype="int64", name="param_config"))
         param_configs = [dict(a=1, b=3)]
         assert fp(param_configs=param_configs)[0] == [(1, (), 3, {})]
-        assert_index_equal(fp(param_configs=param_configs)[1], pd.Int64Index([0], dtype="int64", name="param_config"))
+        assert_index_equal(fp(param_configs=param_configs)[1], pd.Index([0], dtype="int64", name="param_config"))
         param_configs = [dict(a=1, my_kwargs=dict(c=3))]
         assert fp(param_configs=param_configs)[0] == [(1, (), 2, {"c": 3})]
-        assert_index_equal(fp(param_configs=param_configs)[1], pd.Int64Index([0], dtype="int64", name="param_config"))
+        assert_index_equal(fp(param_configs=param_configs)[1], pd.Index([0], dtype="int64", name="param_config"))
         param_configs = [dict(a=1, c=3)]
         assert fp(param_configs=param_configs)[0] == [(1, (), 2, {"c": 3})]
-        assert_index_equal(fp(param_configs=param_configs)[1], pd.Int64Index([0], dtype="int64", name="param_config"))
+        assert_index_equal(fp(param_configs=param_configs)[1], pd.Index([0], dtype="int64", name="param_config"))
         param_configs = [dict(a=2, my_args=(3, 4)), dict(b=5, my_kwargs=dict(c=6))]
         assert fp(1, 1, 1, param_configs=param_configs)[0] == [(2, (3, 4), 2, {}), (1, (1, 1), 5, {"c": 6})]
         assert_index_equal(
             fp(1, 1, 1, param_configs=param_configs)[1],
-            pd.Int64Index([0, 1], dtype="int64", name="param_config"),
+            pd.Index([0, 1], dtype="int64", name="param_config"),
         )
 
         param_configs = [dict(b=3)]
@@ -2043,7 +2049,7 @@ class TestParams:
         ]
         assert_index_equal(
             fp(vbt.Param([2]), param_configs=param_configs)[1],
-            pd.Int64Index([2], dtype="int64", name="a"),
+            pd.Index([2], dtype="int64", name="a"),
         )
         param_configs = [dict(b=3, _name="my_config")]
         assert fp(vbt.Param([2]), param_configs=param_configs)[0] == [
@@ -2127,32 +2133,24 @@ class TestDatetime:
         assert datetime_.is_tz_aware(pd.Timestamp("2020-01-01", tz=datetime_.get_utc_tz()))
 
     def test_to_timezone(self):
-        assert datetime_.to_timezone("UTC") == _timezone.utc
-        assert isinstance(datetime_.to_timezone("Europe/Berlin"), _timezone)
-        assert datetime_.to_timezone("Europe/Berlin", to_fixed_offset=False) == zoneinfo.ZoneInfo("Europe/Berlin")
+        assert datetime_.to_timezone("UTC") == zoneinfo.ZoneInfo("UTC")
+        assert datetime_.to_timezone("UTC", to_fixed_offset=True) == _timezone.utc
+        assert isinstance(datetime_.to_timezone("Europe/Berlin"), zoneinfo.ZoneInfo)
+        assert isinstance(datetime_.to_timezone("Europe/Berlin", to_fixed_offset=True), _timezone)
         assert datetime_.to_timezone("+0500") == _timezone(_timedelta(hours=5))
         assert datetime_.to_timezone(_timezone(_timedelta(hours=1))) == _timezone(_timedelta(hours=1))
-        assert isinstance(datetime_.to_timezone(zoneinfo.ZoneInfo("Europe/Berlin")), _timezone)
-        assert datetime_.to_timezone(1) == _timezone(_timedelta(hours=1))
-        assert datetime_.to_timezone(0.5) == _timezone(_timedelta(hours=0.5))
+        assert isinstance(datetime_.to_timezone(zoneinfo.ZoneInfo("Europe/Berlin")), zoneinfo.ZoneInfo)
+        assert isinstance(datetime_.to_timezone(zoneinfo.ZoneInfo("Europe/Berlin"), to_fixed_offset=True), _timezone)
+        assert datetime_.to_timezone(3600) == _timezone(_timedelta(hours=1))
+        assert datetime_.to_timezone(1800) == _timezone(_timedelta(hours=0.5))
         with pytest.raises(Exception):
             datetime_.to_timezone("+05")
 
     def test_to_tzaware_datetime(self):
-        assert datetime_.to_tzaware_datetime(0.5) == _datetime(
-            1970,
-            1,
-            1,
-            0,
-            0,
-            0,
-            500000,
-            tzinfo=datetime_.get_utc_tz(),
-        )
         assert datetime_.to_tzaware_datetime(0) == _datetime(1970, 1, 1, 0, 0, 0, 0, tzinfo=datetime_.get_utc_tz())
-        assert datetime_.to_tzaware_datetime(pd.Timestamp("2020-01-01").value) == _datetime(2020, 1, 1).replace(
-            tzinfo=datetime_.get_utc_tz()
-        )
+        assert datetime_.to_tzaware_datetime(pd.Timestamp("2020-01-01").value, unit="ns") == _datetime(
+            2020, 1, 1
+        ).replace(tzinfo=datetime_.get_utc_tz())
         assert datetime_.to_tzaware_datetime("2020-01-01") == _datetime(2020, 1, 1).replace(
             tzinfo=datetime_.get_local_tz()
         )
@@ -2311,29 +2309,29 @@ class TestTemplate:
         assert template.RepFunc(lambda hello: hello == 100, {"hello": 100}).substitute()
         assert not template.RepFunc(lambda hello: hello == 100, {"hello": 100}).substitute({"hello": 200})
 
-    def test_deep_substitute(self):
-        assert template.deep_substitute(template.Rep("hello"), {"hello": 100}) == 100
+    def test_substitute_templates(self):
+        assert template.substitute_templates(template.Rep("hello"), {"hello": 100}) == 100
         with pytest.raises(Exception):
-            template.deep_substitute(template.Rep("hello2"), {"hello": 100})
-        assert isinstance(template.deep_substitute(template.Rep("hello2"), {"hello": 100}, strict=False), template.Rep)
-        assert template.deep_substitute(template.Sub("$hello"), {"hello": 100}) == "100"
+            template.substitute_templates(template.Rep("hello2"), {"hello": 100})
+        assert isinstance(template.substitute_templates(template.Rep("hello2"), {"hello": 100}, strict=False), template.Rep)
+        assert template.substitute_templates(template.Sub("$hello"), {"hello": 100}) == "100"
         with pytest.raises(Exception):
-            template.deep_substitute(template.Sub("$hello2"), {"hello": 100})
-        assert template.deep_substitute([template.Rep("hello")], {"hello": 100}, except_types=()) == [100]
-        assert template.deep_substitute({template.Rep("hello")}, {"hello": 100}, except_types=()) == {100}
-        assert template.deep_substitute({"test": template.Rep("hello")}, {"hello": 100}) == {"test": 100}
+            template.substitute_templates(template.Sub("$hello2"), {"hello": 100})
+        assert template.substitute_templates([template.Rep("hello")], {"hello": 100}, except_types=()) == [100]
+        assert template.substitute_templates({template.Rep("hello")}, {"hello": 100}, except_types=()) == {100}
+        assert template.substitute_templates({"test": template.Rep("hello")}, {"hello": 100}) == {"test": 100}
         Tup = namedtuple("Tup", ["a"])
         tup = Tup(template.Rep("hello"))
-        assert template.deep_substitute(tup, {"hello": 100}) == Tup(100)
-        assert template.deep_substitute(template.RepEval("100"), max_depth=0) == 100
-        assert template.deep_substitute((template.RepEval("100"),), max_depth=0) == (template.RepEval("100"),)
-        assert template.deep_substitute((template.RepEval("100"),), max_depth=1) == (100,)
-        assert template.deep_substitute((template.RepEval("100"),), max_len=1) == (100,)
-        assert template.deep_substitute((0, template.RepEval("100")), max_len=1) == (
+        assert template.substitute_templates(tup, {"hello": 100}) == Tup(100)
+        assert template.substitute_templates(template.RepEval("100"), max_depth=0) == 100
+        assert template.substitute_templates((template.RepEval("100"),), max_depth=0) == (template.RepEval("100"),)
+        assert template.substitute_templates((template.RepEval("100"),), max_depth=1) == (100,)
+        assert template.substitute_templates((template.RepEval("100"),), max_len=1) == (100,)
+        assert template.substitute_templates((0, template.RepEval("100")), max_len=1) == (
             0,
             template.RepEval("100"),
         )
-        assert template.deep_substitute((0, template.RepEval("100")), max_len=2) == (
+        assert template.substitute_templates((0, template.RepEval("100")), max_len=2) == (
             0,
             100,
         )
@@ -2530,9 +2528,9 @@ class TestExecution:
             (execute_func, (10, 11, 12), dict(b=13, c=14)),
         ]
         assert execution.execute(funcs_args, show_progress=True) == [10, 35, 60]
-        assert execution.execute(funcs_args, engine="sequence", show_progress=True) == [10, 35, 60]
-        assert execution.execute(funcs_args, engine=execution.SequenceEngine, show_progress=True) == [10, 35, 60]
-        assert execution.execute(funcs_args, engine=execution.SequenceEngine(show_progress=True)) == [10, 35, 60]
+        assert execution.execute(funcs_args, engine="serial", show_progress=True) == [10, 35, 60]
+        assert execution.execute(funcs_args, engine=execution.SerialEngine, show_progress=True) == [10, 35, 60]
+        assert execution.execute(funcs_args, engine=execution.SerialEngine(show_progress=True)) == [10, 35, 60]
         assert execution.execute(
             funcs_args,
             engine=lambda funcs_args, my_arg: [func(*args, **kwargs) * my_arg for func, args, kwargs in funcs_args],
@@ -2546,6 +2544,10 @@ class TestExecution:
             assert execution.execute(funcs_args, engine="ray") == [10, 35, 60]
         assert execution.execute(funcs_args, engine="threadpool") == [10, 35, 60]
         assert execution.execute(funcs_args, engine="processpool") == [10, 35, 60]
+        if pathos_available:
+            assert execution.execute(funcs_args, engine="pathos", pool_type="thread") == [10, 35, 60]
+            assert execution.execute(funcs_args, engine="pathos", pool_type="process") == [10, 35, 60]
+            assert execution.execute(funcs_args, engine="pathos", pool_type="parallel") == [10, 35, 60]
 
     def test_execute_chunks(self):
         def f(a, *args, b=None, **kwargs):
@@ -2656,7 +2658,7 @@ class TestPickling:
         d2 = dict(acc1=acc1, acc2=acc2)
         d3 = d2
         d4 = dict(a=dict(b=dict(d3=d3)))
-        pdict = pickling.pdict(hello="world", d1=d1, d2=d2, d3=d3, d4=d4)
+        pdict = pickling.pdict(hello="world", cls=vbt.ArrayWrapper, d1=d1, d2=d2, d3=d3, d4=d4)
         pdict.save(tmp_path / "pdict")
         assert pickling.pdict.load(tmp_path / "pdict") == pdict
         pdict.save(tmp_path / "pdict", rec_state_only=True)
@@ -2667,10 +2669,31 @@ class TestPickling:
         assert pickling.pdict.load(tmp_path / "pdict", file_format="ini") == pdict
         pdict.save(tmp_path / "pdict", file_format="ini", use_refs=False)
         assert pickling.pdict.load(tmp_path / "pdict", file_format="ini", use_refs=False) == pdict
+        pdict.save(tmp_path / "pdict", file_format="ini", use_class_ids=False)
+        assert pickling.pdict.load(tmp_path / "pdict", file_format="ini", use_class_ids=False) == pdict
+
+    def test_compression(self, tmp_path):
+        vbt.Config(a=0).save(tmp_path)
+        with pytest.raises(Exception):
+            vbt.Config(a=1).save(tmp_path, compression=True)
+        vbt.Config(a=2).save(tmp_path, compression=False)
+        vbt.Config(a=3).save(tmp_path, compression="gzip")
+        vbt.Config(a=4).save(tmp_path, compression="gz")
+        vbt.Config(a=5).save(tmp_path, compression="bz2")
+        assert vbt.Config.load(tmp_path)["a"] == 2
+        assert vbt.Config.load(tmp_path, compression=False)["a"] == 2
+        assert vbt.Config.load(tmp_path, compression="gzip")["a"] == 3
+        assert vbt.Config.load(tmp_path, compression="gz")["a"] == 4
+        assert vbt.Config.load(tmp_path, compression="bz")["a"] == 5
+        (tmp_path / "Config.pickle").unlink()
+        with pytest.raises(Exception):
+            vbt.Config.load(tmp_path)
+        (tmp_path / "Config.pickle.bz2").unlink()
+        with pytest.raises(Exception):
+            vbt.Config.load(tmp_path, compression="bz")
 
 
 # ############# chunking ############# #
-
 
 class TestChunking:
     def test_arg_getter_mixin(self):

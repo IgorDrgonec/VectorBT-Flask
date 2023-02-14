@@ -1,9 +1,14 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for caching."""
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.decorators import class_or_instancemethod
+
+__all__ = [
+    "clear_pycache",
+    "Cacheable",
+]
 
 
 def delete_dir(p):

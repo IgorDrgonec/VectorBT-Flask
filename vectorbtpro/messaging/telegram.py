@@ -1,8 +1,8 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Messaging using Python Telegram Bot."""
 
-from vectorbtpro.utils.opt_packages import assert_can_import
+from vectorbtpro.utils.module_ import assert_can_import
 
 assert_can_import("telegram")
 
@@ -13,6 +13,10 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import merge_dicts, Configured
 from vectorbtpro.utils.parsing import get_func_kwargs
 from vectorbtpro.utils.requests_ import text_to_giphy_url
+
+__all__ = [
+    "TelegramBot",
+]
 
 logger = logging.getLogger(__name__)
 

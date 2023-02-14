@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for custom indicators.
 
@@ -24,6 +24,8 @@ from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.indicators.enums import Pivot, SuperTrendAIS, SuperTrendAOS
 from vectorbtpro.utils import chunking as ch
 
+__all__ = []
+
 
 @register_jitted(cache=True)
 def ma_cache_nb(
@@ -34,7 +36,7 @@ def ma_cache_nb(
     minp: tp.Optional[int] = None,
     per_column: bool = False,
 ) -> tp.Optional[tp.Dict[int, tp.Array2d]]:
-    """Caching function for `vectorbtpro.indicators.custom.MA`."""
+    """Cache function for `vectorbtpro.indicators.custom.MA`."""
     if per_column:
         return None
 
@@ -72,7 +74,7 @@ def msd_cache_nb(
     minp: tp.Optional[int] = None,
     per_column: bool = False,
 ) -> tp.Optional[tp.Dict[int, tp.Array2d]]:
-    """Caching function for `vectorbtpro.indicators.custom.MSD`."""
+    """Cache function for `vectorbtpro.indicators.custom.MSD`."""
     if per_column:
         return None
 
@@ -112,7 +114,7 @@ def bbands_cache_nb(
     minp: tp.Optional[int] = None,
     per_column: bool = False,
 ) -> tp.Tuple[tp.Optional[tp.Dict[int, tp.Array2d]], tp.Optional[tp.Dict[int, tp.Array2d]]]:
-    """Caching function for `vectorbtpro.indicators.custom.BBANDS`."""
+    """Cache function for `vectorbtpro.indicators.custom.BBANDS`."""
     if per_column:
         return None, None
 
@@ -179,7 +181,7 @@ def rsi_cache_nb(
     minp: tp.Optional[int] = None,
     per_column: bool = False,
 ) -> tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]]:
-    """Caching function for `vectorbtpro.indicators.custom.RSI`."""
+    """Cache function for `vectorbtpro.indicators.custom.RSI`."""
     up, down = rsi_up_down_nb(close)
     if per_column:
         return None
@@ -227,7 +229,7 @@ def stoch_cache_nb(
     minp: tp.Optional[int] = None,
     per_column: bool = False,
 ) -> tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]]:
-    """Caching function for `vectorbtpro.indicators.custom.STOCH`."""
+    """Cache function for `vectorbtpro.indicators.custom.STOCH`."""
     if per_column:
         return None
 
@@ -279,7 +281,7 @@ def macd_cache_nb(
     minp: tp.Optional[int] = None,
     per_column: bool = False,
 ) -> tp.Optional[tp.Dict[int, tp.Array2d]]:
-    """Caching function for `vectorbtpro.indicators.custom.MACD`."""
+    """Cache function for `vectorbtpro.indicators.custom.MACD`."""
     if per_column:
         return None
 
@@ -350,7 +352,7 @@ def atr_cache_nb(
     minp: tp.Optional[int] = None,
     per_column: bool = False,
 ) -> tp.Tuple[tp.Optional[tp.Array2d], tp.Optional[tp.Dict[int, tp.Array2d]]]:
-    """Caching function for `vectorbtpro.indicators.custom.ATR`."""
+    """Cache function for `vectorbtpro.indicators.custom.ATR`."""
     tr = tr_nb(high, low, close)
     if per_column:
         return None, None
@@ -417,17 +419,19 @@ def ols_cache_nb(
     x: tp.Array2d,
     y: tp.Array2d,
     windows: tp.List[int],
+    with_zscore: bool = True,
+    ddof: int = 0,
     minp: tp.Optional[int] = None,
     per_column: bool = False,
-) -> tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]]:
-    """Caching function for `vectorbtpro.indicators.custom.OLS`."""
+) -> tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d, tp.Array2d]]]:
+    """Cache function for `vectorbtpro.indicators.custom.OLS`."""
     if per_column:
         return None
     cache_dict = dict()
     for i in range(len(windows)):
         h = hash(windows[i])
         if h not in cache_dict:
-            cache_dict[h] = generic_nb.rolling_ols_nb(x, y, windows[i], minp=minp)
+            cache_dict[h] = ols_nb(x, y, windows[i], with_zscore=with_zscore, ddof=ddof, minp=minp)
     return cache_dict
 
 
@@ -436,56 +440,25 @@ def ols_nb(
     x: tp.Array2d,
     y: tp.Array2d,
     window: int,
+    with_zscore: bool = True,
+    ddof: int = 0,
     minp: tp.Optional[int] = None,
-    cache_dict: tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]] = None,
-) -> tp.Tuple[tp.Array2d, tp.Array2d]:
+    cache_dict: tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d, tp.Array2d]]] = None,
+) -> tp.Tuple[tp.Array2d, tp.Array2d, tp.Array2d]:
     """Apply function for `vectorbtpro.indicators.custom.OLS`."""
     if cache_dict is not None:
         h = hash(window)
         return cache_dict[h]
-    return generic_nb.rolling_ols_nb(x, y, window, minp=minp)
-
-
-@register_jitted(cache=True)
-def ols_spread_cache_nb(
-    x: tp.Array2d,
-    y: tp.Array2d,
-    windows: tp.List[int],
-    ddof: int = 0,
-    minp: tp.Optional[int] = None,
-    per_column: bool = False,
-) -> tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]]:
-    """Caching function for `vectorbtpro.indicators.custom.OLSS`."""
-    if per_column:
-        return None
-    cache_dict = dict()
-    for i in range(len(windows)):
-        h = hash(windows[i])
-        if h not in cache_dict:
-            cache_dict[h] = ols_spread_nb(x, y, windows[i], ddof=ddof, minp=minp)
-    return cache_dict
-
-
-@register_jitted(cache=True)
-def ols_spread_nb(
-    x: tp.Array2d,
-    y: tp.Array2d,
-    window: int,
-    ddof: int = 0,
-    minp: tp.Optional[int] = None,
-    cache_dict: tp.Optional[tp.Dict[int, tp.Tuple[tp.Array2d, tp.Array2d]]] = None,
-) -> tp.Tuple[tp.Array2d, tp.Array2d]:
-    """Apply function for `vectorbtpro.indicators.custom.OLSS`."""
-    if cache_dict is not None:
-        h = hash(window)
-        return cache_dict[h]
     slope, intercept = generic_nb.rolling_ols_nb(x, y, window, minp=minp)
-    pred = intercept + slope * x
-    spread = y - pred
-    spread_mean = generic_nb.rolling_mean_nb(spread, window, minp=minp)
-    spread_std = generic_nb.rolling_std_nb(spread, window, ddof=ddof, minp=minp)
-    spread_zscore = (spread - spread_mean) / spread_std
-    return spread, spread_zscore
+    if with_zscore:
+        pred = intercept + slope * x
+        error = y - pred
+        error_mean = generic_nb.rolling_mean_nb(error, window, minp=minp)
+        error_std = generic_nb.rolling_std_nb(error, window, ddof=ddof, minp=minp)
+        zscore = (error - error_mean) / error_std
+    else:
+        zscore = np.full(x.shape, np.nan, dtype=np.float_)
+    return slope, intercept, zscore
 
 
 @register_chunkable(

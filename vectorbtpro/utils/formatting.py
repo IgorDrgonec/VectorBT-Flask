@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for formatting."""
 
@@ -8,6 +8,14 @@ import inspect
 import numpy as np
 
 from vectorbtpro import _typing as tp
+
+__all__ = [
+    "prettify",
+    "format_func",
+    "pprint",
+    "phelp",
+    "pdir",
+]
 
 
 class Prettified:
@@ -165,7 +173,7 @@ def prettify(
     if hasattr(obj, "shape") and isinstance(obj.shape, tuple) and len(obj.shape) > 0:
         module = type(obj).__module__
         qualname = type(obj).__qualname__
-        return "<%s.%s object at %s of shape %s>" % (module, qualname, str(hex(id(obj))), obj.shape)
+        return "<%s.%s object at %s with shape %s>" % (module, qualname, str(hex(id(obj))), obj.shape)
     if isinstance(obj, float):
         if np.isnan(obj):
             return "np.nan"
@@ -249,10 +257,13 @@ def format_func(func: tp.Callable, incl_doc: bool = True, **kwargs) -> str:
     if inspect.isclass(func):
         func_name = func.__name__ + ".__init__"
         func = func.__init__
-    elif inspect.ismethod(func):
-        func_name = func.__self__.__name__ + "." + func.__name__
+    elif inspect.ismethod(func) and hasattr(func, "__self__"):
+        if isinstance(func.__self__, type):
+            func_name = func.__self__.__name__ + "." + func.__name__
+        else:
+            func_name = type(func.__self__).__name__ + "." + func.__name__
     else:
-        func_name = func.__name__
+        func_name = func.__qualname__
     if incl_doc and func.__doc__ is not None:
         return "{}{}:\n{}".format(
             func_name,
@@ -274,3 +285,9 @@ def phelp(*args, **kwargs) -> None:
     """Print the output of `format_func`."""
     print(format_func(*args, **kwargs))
 
+
+def pdir(*args, **kwargs) -> None:
+    """Print the output of `vectorbtpro.utils.attr_.parse_attrs`."""
+    from vectorbtpro.utils.attr_ import parse_attrs
+
+    print(parse_attrs(*args, **kwargs).to_string())

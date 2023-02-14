@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for portfolio simulation based on an order function."""
 
@@ -590,11 +590,11 @@ def simulate_nb(
                [1, 0, 0]])
         ```
 
-        ![](/assets/images/api/simulate_nb.svg)
+        ![](/assets/images/api/simulate_nb.svg){: .iimg }
 
         And here is the context information available at each step:
 
-        ![](/assets/images/api/context_info.svg)
+        ![](/assets/images/api/context_info.svg){: .iimg }
 
     Usage:
         * Create a group of three assets together sharing 100$ and simulate an equal-weighted portfolio
@@ -750,7 +750,7 @@ def simulate_nb(
         >>> vbt.Scatter(data=asset_value).fig.show()
         ```
 
-        ![](/assets/images/api/simulate_nb_example.svg)
+        ![](/assets/images/api/simulate_nb_example.svg){: .iimg }
 
         Note that the last order in a group with cash sharing is always disadvantaged
         as it has a bit less funds than the previous orders due to costs, which are not
@@ -1604,7 +1604,7 @@ def simulate_row_wise_nb(
 
         Let's illustrate the same example as in `simulate_nb` but adapted for this function:
 
-        ![](/assets/images/api/simulate_row_wise_nb.svg)
+        ![](/assets/images/api/simulate_row_wise_nb.svg){: .iimg }
 
     Usage:
         * Running the same example as in `simulate_nb` but adapted for this function:
@@ -2591,7 +2591,7 @@ def flex_simulate_nb(
 
         Let's illustrate the same example as in `simulate_nb` but adapted for this function:
 
-        ![](/assets/images/api/flex_simulate_nb.svg)
+        ![](/assets/images/api/flex_simulate_nb.svg){: .iimg }
 
     Usage:
         * The same example as in `simulate_nb`:
@@ -3588,7 +3588,7 @@ def flex_simulate_row_wise_nb(
         ... )
         ```
 
-        ![](/assets/images/api/flex_simulate_row_wise_nb.svg)
+        ![](/assets/images/api/flex_simulate_row_wise_nb.svg){: .iimg }
     """
     check_group_lens_nb(group_lens, target_shape[1])
 

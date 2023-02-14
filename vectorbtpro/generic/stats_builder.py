@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Mixin for building statistics out of performance metrics."""
 
@@ -17,7 +17,9 @@ from vectorbtpro.utils.attr_ import get_dict_attr, AttrResolverMixin
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.tagging import match_tags
-from vectorbtpro.utils.template import deep_substitute, CustomTemplate
+from vectorbtpro.utils.template import substitute_templates, CustomTemplate
+
+__all__ = []
 
 
 class MetaStatsBuilderMixin(type):
@@ -268,7 +270,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
         # Replace templates globally (not used at metric level)
         if len(template_context) > 0:
-            sub_settings = deep_substitute(
+            sub_settings = substitute_templates(
                 settings,
                 context=template_context,
                 sub_id="sub_settings",
@@ -329,7 +331,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     ),
                     settings,
                 )
-                metric_context = deep_substitute(
+                metric_context = substitute_templates(
                     metric_context,
                     context=metric_context,
                     sub_id="metric_context",
@@ -386,13 +388,13 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
             merged_settings = merge_dicts(opt_settings, _metric_settings, passed_metric_settings)
             metric_template_context = merged_settings.pop("template_context", {})
             template_context_merged = merge_dicts(template_context, metric_template_context)
-            template_context_merged = deep_substitute(
+            template_context_merged = substitute_templates(
                 template_context_merged,
                 context=merged_settings,
                 sub_id="template_context_merged",
             )
             context = merge_dicts(template_context_merged, merged_settings)
-            merged_settings = deep_substitute(
+            merged_settings = substitute_templates(
                 merged_settings,
                 context=context,
                 sub_id="merged_settings",
@@ -442,7 +444,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
             for filter_name in metric_filters:
                 filter_settings = filters[filter_name]
-                _filter_settings = deep_substitute(
+                _filter_settings = substitute_templates(
                     filter_settings,
                     context=context,
                     sub_id="filter_settings",

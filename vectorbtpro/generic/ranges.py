@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base class for working with range records.
 
@@ -109,7 +109,7 @@ Name: group, dtype: object
 >>> ranges['a'].plots().show()
 ```
 
-![](/assets/images/api/ranges_plots.svg)
+![](/assets/images/api/ranges_plots.svg){: .iimg }
 """
 
 import attr
@@ -148,7 +148,13 @@ from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.params import combine_params, Param
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.parsing import get_func_kwargs
-from vectorbtpro.utils.template import deep_substitute
+from vectorbtpro.utils.template import substitute_templates
+
+__all__ = [
+    "Ranges",
+    "PatternRanges",
+    "PSC",
+]
 
 __pdoc__ = {}
 
@@ -843,9 +849,9 @@ class Ranges(PriceRecords):
             ... ).show()
             ```
 
-            ![](/assets/images/api/ranges_plot_projections.svg)
+            ![](/assets/images/api/ranges_plot_projections.svg){: .iimg }
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         from vectorbtpro.utils.figure import make_figure
@@ -1102,9 +1108,9 @@ class Ranges(PriceRecords):
             ... ).show()
             ```
 
-            ![](/assets/images/api/ranges_plot_shapes.svg)
+            ![](/assets/images/api/ranges_plot_shapes.svg){: .iimg }
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         from vectorbtpro.utils.figure import make_figure, get_domain
@@ -1185,7 +1191,7 @@ class Ranges(PriceRecords):
             for i in range(len(self_col.values)):
                 start_index = start_idx[i]
                 end_index = end_idx[i]
-                _shape_kwargs = deep_substitute(
+                _shape_kwargs = substitute_templates(
                     shape_kwargs,
                     context=dict(
                         self_col=self_col,
@@ -1281,9 +1287,9 @@ class Ranges(PriceRecords):
             >>> vbt.Ranges.from_array(price >= 2).plot().show()
             ```
 
-            ![](/assets/images/api/ranges_plot.svg)
+            ![](/assets/images/api/ranges_plot.svg){: .iimg }
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         import plotly.graph_objects as go
@@ -2113,6 +2119,10 @@ class PatternRanges(Ranges):
             fig (Figure or FigureWidget): Figure to add traces to.
             **kwargs: Keyword arguments passed to `Ranges.plot`.
         """
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
         self_col = self.select_col(column=column, group_by=False)
         if top_n is not None:
             self_col = self_col.apply_mask(self_col.duration.top_n_mask(top_n))
@@ -2125,9 +2135,19 @@ class PatternRanges(Ranges):
         if upper_max_error_trace_kwargs is None:
             upper_max_error_trace_kwargs = {}
 
+        open_shape_kwargs = merge_dicts(
+            dict(fillcolor=plotting_cfg["contrast_color_schema"]["blue"]),
+            kwargs.pop("open_shape_kwargs", None),
+        )
+        closed_shape_kwargs = merge_dicts(
+            dict(fillcolor=plotting_cfg["contrast_color_schema"]["blue"]),
+            kwargs.pop("closed_shape_kwargs", None),
+        )
         fig, close = Ranges.plot(
             self_col,
             return_close=True,
+            open_shape_kwargs=open_shape_kwargs,
+            closed_shape_kwargs=closed_shape_kwargs,
             add_trace_kwargs=add_trace_kwargs,
             xref=xref,
             yref=yref,

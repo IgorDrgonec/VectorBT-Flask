@@ -1,12 +1,16 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for showing progress bars."""
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import merge_dicts
 
+__all__ = [
+    "get_pbar",
+]
 
-def get_pbar(*args, pbar_type: tp.Optional[str] = None, show_progress: bool = True, **kwargs):
+
+def get_pbar(*args, pbar_type: tp.Optional[str] = None, show_progress: bool = True, **kwargs) -> object:
     """Get a `tqdm` progress bar.
 
     Supported types:

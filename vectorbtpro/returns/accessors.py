@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Custom pandas accessors for returns.
 
@@ -114,7 +114,7 @@ dtype: object
 >>> ret_acc.plots().show()
 ```
 
-![](/assets/images/api/returns_plots.svg)
+![](/assets/images/api/returns_plots.svg){: .iimg }
 """
 
 import warnings
@@ -136,6 +136,12 @@ from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, HybridConfig, Config
 from vectorbtpro.utils.datetime_ import freq_to_timedelta, PandasDatetimeIndex
 from vectorbtpro.utils.decorators import class_or_instanceproperty
+
+__all__ = [
+    "ReturnsAccessor",
+    "ReturnsSRAccessor",
+    "ReturnsDFAccessor",
+]
 
 __pdoc__ = {}
 
@@ -159,27 +165,34 @@ class ReturnsAccessor(GenericAccessor):
     @classmethod
     def from_value(
         cls: tp.Type[ReturnsAccessorT],
-        value: tp.SeriesFrame,
-        init_value: tp.MaybeSeries = np.nan,
+        value: tp.ArrayLike,
+        init_value: tp.ArrayLike = np.nan,
         log_returns: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
-        wrap_kwargs: tp.KwargsLike = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrapper_kwargs: tp.KwargsLike = None,
+        return_values: bool = False,
         **kwargs,
-    ) -> ReturnsAccessorT:
+    ) -> tp.Union[ReturnsAccessorT, tp.SeriesFrame]:
         """Returns a new `ReturnsAccessor` instance with returns calculated from `value`."""
-        if wrap_kwargs is None:
-            wrap_kwargs = {}
+        if wrapper_kwargs is None:
+            wrapper_kwargs = {}
         if not checks.is_any_array(value):
             value = np.asarray(value)
-        value_2d = to_2d_array(value)
-        init_value = broadcast_array_to(init_value, value_2d.shape[1])
+        if wrapper is None:
+            wrapper = ArrayWrapper.from_obj(value, **wrapper_kwargs)
+        elif len(wrapper_kwargs) > 0:
+            wrapper = wrapper.replace(**wrapper_kwargs)
+        value = to_2d_array(value)
+        init_value = broadcast_array_to(init_value, value.shape[1])
 
         func = jit_reg.resolve_option(nb.returns_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        returns = func(value_2d, init_value, log_returns=log_returns)
-        returns = ArrayWrapper.from_obj(value).wrap(returns, **wrap_kwargs)
-        return cls(returns, **kwargs)
+        returns = func(value, init_value, log_returns=log_returns)
+        if return_values:
+            return wrapper.wrap(returns, group_by=False)
+        return cls(wrapper, returns, **kwargs)
 
     @classmethod
     def resolve_row_stack_kwargs(
@@ -1766,7 +1779,7 @@ class ReturnsAccessor(GenericAccessor):
             >>> rets.vbt.returns.plot_cumulative(bm_returns=bm_returns).show()
             ```
 
-            ![](/assets/images/api/plot_cumulative.svg)
+            ![](/assets/images/api/plot_cumulative.svg){: .iimg }
         """
         from vectorbtpro.utils.figure import make_figure, get_domain
         from vectorbtpro._settings import settings

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for pickling."""
 
@@ -13,48 +13,183 @@ import pandas as pd
 import vectorbtpro as vbt
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.path_ import check_mkdir
-from vectorbtpro.utils.module_ import find_class
 from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.checks import Comparable, is_hashable, is_deep_equal
 from vectorbtpro.utils.formatting import Prettified, prettify_dict
 
 PickleableT = tp.TypeVar("PickleableT", bound="Pickleable")
 
+__all__ = [
+    "dumps",
+    "loads",
+    "save",
+    "load",
+    "RecState",
+    "RecInfo",
+    "Pickleable",
+    "pdict",
+]
 
-def dumps(obj: tp.Any, **kwargs) -> bytes:
-    """Pickle an object to a byte stream."""
-    from vectorbtpro.utils.opt_packages import warn_cannot_import
 
-    warn_cannot_import("dill")
-    try:
-        import dill as pickle
-    except ImportError:
+def get_serialization_extensions(cls_name: tp.Optional[str] = None) -> tp.Set[str]:
+    """Get all supported serialization extensions from `vectorbtpro._settings`."""
+    from vectorbtpro._settings import settings
+
+    pickling_cfg = settings["pickling"]
+
+    if cls_name is None:
+        return set.union(*pickling_cfg["extensions"]["serialization"].values())
+    return pickling_cfg["extensions"]["serialization"][cls_name]
+
+
+def get_compression_extensions(cls_name: tp.Optional[str] = None) -> tp.Set[str]:
+    """Get all supported compression extensions from `vectorbtpro._settings`."""
+    from vectorbtpro._settings import settings
+
+    pickling_cfg = settings["pickling"]
+
+    if cls_name is None:
+        return set.union(*pickling_cfg["extensions"]["compression"].values())
+    return pickling_cfg["extensions"]["compression"][cls_name]
+
+
+def dumps(
+    obj: tp.Any,
+    compression: tp.Union[None, bool, str] = None,
+    compress_kwargs: tp.KwargsLike = None,
+    **kwargs,
+) -> bytes:
+    """Pickle an object to a byte stream.
+
+    Uses `dill` when available.
+
+    For compression options, see `extensions`.
+
+    Keyword arguments `compress_kwargs` are passed to the `compress` method of the compressing package.
+
+    Other keyword arguments are passed to the `dumps` method of the pickling package."""
+    from vectorbtpro.utils.module_ import warn_cannot_import, assert_can_import
+
+    if warn_cannot_import("dill"):
         import pickle
-
-    return pickle.dumps(obj, **kwargs)
-
-
-def loads(bytes_: bytes, **kwargs) -> tp.Any:
-    """Unpickle an object from a byte stream."""
-    from vectorbtpro.utils.opt_packages import warn_cannot_import
-
-    warn_cannot_import("dill")
-    try:
+    else:
         import dill as pickle
-    except ImportError:
-        import pickle
 
+    if isinstance(compression, bool) and compression:
+        from vectorbtpro._settings import settings
+
+        pickling_cfg = settings["pickling"]
+
+        compression = pickling_cfg["compression"]
+        if compression is None:
+            raise ValueError("Set default compression in settings")
+    if compress_kwargs is None:
+        compress_kwargs = {}
+
+    bytes_ = pickle.dumps(obj, **kwargs)
+    if compression not in (None, False):
+        if compression.lower() in get_compression_extensions("bz2"):
+            import bz2
+
+            bytes_ = bz2.compress(bytes_, **compress_kwargs)
+        elif compression.lower() in get_compression_extensions("gzip"):
+            import gzip
+
+            bytes_ = gzip.compress(bytes_, **compress_kwargs)
+        elif compression.lower() in get_compression_extensions("lzma"):
+            import lzma
+
+            bytes_ = lzma.compress(bytes_, **compress_kwargs)
+        elif compression.lower() in get_compression_extensions("lz4"):
+            assert_can_import("lz4")
+
+            import lz4.frame
+
+            bytes_ = lz4.frame.compress(bytes_, return_bytearray=True, **compress_kwargs)
+        elif compression.lower() in get_compression_extensions("blosc"):
+            assert_can_import("blosc")
+
+            import blosc
+
+            bytes_ = blosc.compress(bytes_, **compress_kwargs)
+        else:
+            raise ValueError(f"Invalid compression format '{compression}'")
+    return bytes_
+
+
+def loads(bytes_: bytes, compression: tp.Union[None, bool, str] = None, **kwargs) -> tp.Any:
+    """Unpickle an object from a byte stream.
+
+    Accepts the same options for `compression` as in the `dumps` method.
+
+    Other keyword arguments are passed to the `loads` method of the pickling package."""
+    from vectorbtpro.utils.module_ import warn_cannot_import, assert_can_import
+
+    if warn_cannot_import("dill"):
+        import pickle
+    else:
+        import dill as pickle
+
+    if isinstance(compression, bool) and compression:
+        from vectorbtpro._settings import settings
+
+        pickling_cfg = settings["pickling"]
+
+        compression = pickling_cfg["compression"]
+        if compression is None:
+            raise ValueError("Set default compression in settings")
+    if compression not in (None, False):
+        if compression.lower() in get_compression_extensions("bz2"):
+            import bz2
+
+            bytes_ = bz2.decompress(bytes_)
+        elif compression.lower() in get_compression_extensions("gzip"):
+            import gzip
+
+            bytes_ = gzip.decompress(bytes_)
+        elif compression.lower() in get_compression_extensions("lzma"):
+            import lzma
+
+            bytes_ = lzma.decompress(bytes_)
+        elif compression.lower() in get_compression_extensions("lz4"):
+            assert_can_import("lz4")
+
+            import lz4.frame
+
+            bytes_ = lz4.frame.decompress(bytes_, return_bytearray=True)
+        elif compression.lower() in get_compression_extensions("blosc"):
+            assert_can_import("blosc")
+
+            import blosc
+
+            bytes_ = blosc.decompress(bytes_, as_bytearray=True)
+        else:
+            raise ValueError(f"Invalid compression format '{compression}'")
     return pickle.loads(bytes_, **kwargs)
 
 
-def save(obj: object, path: tp.Optional[tp.PathLike] = None, mkdir_kwargs: tp.KwargsLike = None, **kwargs) -> None:
-    """Pickle an object to a byte stream and write to a file."""
-    bytes_ = dumps(obj, **kwargs)
+def save(
+    obj: object,
+    path: tp.Optional[tp.PathLike] = None,
+    mkdir_kwargs: tp.KwargsLike = None,
+    compression: tp.Union[None, bool, str] = None,
+    **kwargs,
+) -> None:
+    """Pickle an object to a byte stream and write to a file.
+
+    Can recognize the compression algorithm based on the extension (see `dumps` for options).
+
+    Uses `dumps` for serialization."""
     if path is None:
         path = type(obj).__name__
     path = Path(path)
-    if path.suffix == "":
-        path = path.with_suffix(".pickle")
+    if path.is_dir():
+        path /= type(obj).__name__
+    if compression is None:
+        suffixes = [suffix[1:].lower() for suffix in path.suffixes]
+        if len(suffixes) > 0 and suffixes[-1] in get_compression_extensions():
+            compression = suffixes[-1]
+    bytes_ = dumps(obj, compression=compression, **kwargs)
     if mkdir_kwargs is None:
         mkdir_kwargs = {}
     check_mkdir(path.parent, **mkdir_kwargs)
@@ -62,17 +197,20 @@ def save(obj: object, path: tp.Optional[tp.PathLike] = None, mkdir_kwargs: tp.Kw
         f.write(bytes_)
 
 
-def load(path: tp.PathLike, **kwargs) -> object:
-    """Read a byte stream from a file and unpickle."""
+def load(path: tp.PathLike, compression: tp.Union[None, bool, str] = None, **kwargs) -> object:
+    """Read a byte stream from a file and unpickle.
+
+    Can recognize the compression algorithm based on the extension (see `dumps` for options).
+
+    Uses `loads` for deserialization."""
     path = Path(path)
-    if path.suffix == "" and not path.exists():
-        if path.with_suffix(".pickle").exists():
-            path = path.with_suffix(".pickle")
-        elif path.with_suffix(".pkl").exists():
-            path = path.with_suffix(".pkl")
     with open(path, "rb") as f:
         bytes_ = f.read()
-    return loads(bytes_, **kwargs)
+    if compression is None:
+        suffixes = [suffix[1:].lower() for suffix in path.suffixes]
+        if len(suffixes) > 0 and suffixes[-1] in get_compression_extensions():
+            compression = suffixes[-1]
+    return loads(bytes_, compression=compression, **kwargs)
 
 
 @attr.s(frozen=True)
@@ -113,15 +251,52 @@ rec_info_registry = {}
 Populate with the required information if any instance cannot be unpickled."""
 
 
+def to_class_id(obj: tp.Any) -> tp.Optional[str]:
+    """Get the class id from a class.
+
+    If the object is an instance or a subclass of `Pickleable` and `Pickleable._rec_id` is not None,
+    uses the reconstruction id. Otherwise, returns the path to the class definition
+    with `vectorbtpro.utils.module_.find_class`."""
+    from vectorbtpro.utils.module_ import find_class
+
+    if isinstance(obj, type):
+        cls = obj
+    else:
+        cls = type(obj)
+    if issubclass(cls, Pickleable):
+        if cls._rec_id is not None:
+            if not isinstance(cls._rec_id, str):
+                raise TypeError(f"Reconstructing id of class {cls} must be a string")
+            return cls._rec_id
+    class_path = cls.__module__ + "." + cls.__name__
+    if find_class(class_path) is not None:
+        return class_path
+    return None
+
+
+def from_class_id(class_id: str) -> tp.Optional[tp.Type]:
+    """Get the class from a class id."""
+    from vectorbtpro.utils.module_ import find_class
+
+    if class_id in rec_info_registry:
+        return rec_info_registry[class_id].cls
+    cls = find_class(class_id)
+    if cls is not None:
+        return cls
+    raise ValueError(f"Please register an instance of RecInfo for '{class_id}'")
+
+
 def reconstruct(cls: tp.Union[tp.Hashable, tp.Type], rec_state: RecState) -> object:
     """Reconstruct an instance using a class and a reconstruction state."""
+    from vectorbtpro.utils.module_ import find_class
+
     found_rec = False
     if not isinstance(cls, type):
-        cls_id = cls
-        if cls_id in rec_info_registry:
+        class_id = cls
+        if class_id in rec_info_registry:
             found_rec = True
-            cls = rec_info_registry[cls_id].cls
-            modify_state = rec_info_registry[cls_id].modify_state
+            cls = rec_info_registry[class_id].cls
+            modify_state = rec_info_registry[class_id].modify_state
             if modify_state is not None:
                 rec_state = modify_state(rec_state)
     if not isinstance(cls, type):
@@ -193,6 +368,7 @@ class Pickleable:
         unpack_objects: bool = True,
         compress_unpacked: bool = True,
         use_refs: bool = True,
+        use_class_ids: bool = True,
         nested: bool = True,
         to_dict: bool = False,
         parser_kwargs: tp.KwargsLike = None,
@@ -217,6 +393,9 @@ class Pickleable:
 
         !!! note
             The initial order of keys can be preserved only by using references.
+
+        If `use_class_ids` is True, substitutes any class defined as a value by its id instead of
+        pickling its definition. If `to_class_id` returns None, will pickle the definition.
 
         If the instance is nested, set `nested` to True to represent each sub-dict as a section.
 
@@ -253,6 +432,8 @@ class Pickleable:
         id_objs = dict()
         while stack:
             parent_k, k, v = stack.pop(0)
+            if not isinstance(k, str):
+                raise TypeError("Dictionary keys must be strings")
             if parent_k is not None and use_refs and _is_referable(k):
                 if id(v) in id_paths:
                     v = "&" + id_paths[id(v)]
@@ -280,15 +461,9 @@ class Pickleable:
                     i += 1
             else:
                 if (unpack_objects or k == "top") and isinstance(v, Pickleable):
-                    if v._rec_id is not None:
-                        if not isinstance(v._rec_id, str):
-                            raise TypeError("Reconstructing id must be a string")
-                        class_ = v._rec_id
-                    else:
-                        class_ = type(v).__module__ + "." + type(v).__name__
-                        found_class = find_class(class_)
-                        if found_class is None:
-                            raise ValueError(f"Class '{class_}' cannot be found. Set reconstruction id.")
+                    class_id = to_class_id(v)
+                    if class_id is None:
+                        raise ValueError(f"Class {type(v)} cannot be found. Set reconstruction id.")
                     rec_state = v.rec_state
                     if rec_state is None:
                         if parent_k is None:
@@ -301,7 +476,7 @@ class Pickleable:
                         new_v = new_v["init_kwargs"]
                     else:
                         new_v = {k + "~": v for k, v in new_v.items()}
-                    stack.insert(0, (parent_k, k + " @" + class_, new_v))
+                    stack.insert(0, (parent_k, k + " @" + class_id, new_v))
                 else:
                     if parent_k is None:
                         dct[k] = v
@@ -318,23 +493,26 @@ class Pickleable:
                 if isinstance(v2, str):
                     if not (k2 == "_" and v2 == "_") and not v2.startswith("&"):
                         v2 = repr(v2)
+                elif use_class_ids and isinstance(v2, type):
+                    class_id = to_class_id(v2)
+                    if class_id is not None:
+                        v2 = "@" + class_id
+                elif isinstance(v2, float) and np.isnan(v2):
+                    v2 = "np.nan"
+                elif isinstance(v2, float) and np.isposinf(v2):
+                    v2 = "np.inf"
+                elif isinstance(v2, float) and np.isneginf(v2):
+                    v2 = "-np.inf"
                 else:
-                    if isinstance(v2, float) and np.isnan(v2):
-                        v2 = "np.nan"
-                    elif isinstance(v2, float) and np.isposinf(v2):
-                        v2 = "np.inf"
-                    elif isinstance(v2, float) and np.isneginf(v2):
-                        v2 = "-np.inf"
-                    else:
+                    try:
+                        ast.literal_eval(repr(v2))
+                        v2 = repr(v2)
+                    except Exception as e:
                         try:
-                            ast.literal_eval(repr(v2))
+                            float(repr(v2))
                             v2 = repr(v2)
                         except Exception as e:
-                            try:
-                                float(repr(v2))
-                                v2 = repr(v2)
-                            except Exception as e:
-                                v2 = "!vbt.loads(" + repr(dumps(v2)) + ")"
+                            v2 = "!vbt.loads(" + repr(dumps(v2)) + ")"
                 parser.set(k, k2, v2)
         with StringIO() as f:
             parser.write(f)
@@ -349,6 +527,7 @@ class Pickleable:
         run_code: bool = True,
         pack_objects: bool = True,
         use_refs: bool = True,
+        use_class_ids: bool = True,
         code_context: tp.KwargsLike = None,
         parser_kwargs: tp.KwargsLike = None,
         **kwargs,
@@ -378,6 +557,9 @@ class Pickleable:
 
         If `use_refs` is True, will substitute references prepended with `&` for actual objects.
         Constructs a DAG using [graphlib](https://docs.python.org/3/library/graphlib.html).
+
+        If `use_class_ids` is True, will substitute any class ids prepended with `@` with the
+        corresponding class.
 
         Other keyword arguments are forwarded to `Pickleable.decode_config_node`.
 
@@ -470,7 +652,13 @@ class Pickleable:
                 has_top_section = True
             elif not _get_path(k).startswith("top."):
                 k = "top." + k
-            dct[k] = v
+            new_v = {}
+            for k2, v2 in v.items():
+                if use_refs and v2.startswith("&") and not v2[1:].startswith("top."):
+                    new_v[k2] = "&top." + v2[1:]
+                else:
+                    new_v[k2] = v2
+            dct[k] = new_v
         if not has_top_section:
             dct = {"top": {"_": "_"}, **dct}
 
@@ -512,6 +700,8 @@ class Pickleable:
                         ref_node = _get_ref_node(v2[1:])
                         ref_edges.add((k, (k, k2)))
                         ref_edges.add(((k, k2), ref_node))
+                    elif use_class_ids and v2.startswith("@"):
+                        v2 = from_class_id(v2[1:])
                     elif run_code and v2.startswith("!"):
                         v2 = multiline_eval(v2.lstrip("!"), context=code_context)
                     else:
@@ -572,7 +762,7 @@ class Pickleable:
                             if isinstance(k2, tuple):
                                 section_dct[k2[1]] = resolved_nodes[k2]
                             else:
-                                _k2 = k2[len(k) + 1:]
+                                _k2 = k2[len(k) + 1 :]
                                 last_k = _k2.split(".")[-1]
                                 d = section_dct
                                 for s in _k2.split(".")[:-1]:
@@ -610,74 +800,162 @@ class Pickleable:
         cls,
         path: tp.Optional[tp.PathLike] = None,
         file_format: tp.Optional[str] = None,
-        for_load: bool = False,
-    ) -> tp.Optional[Path]:
+        compression: tp.Union[None, bool, str] = None,
+        for_save: bool = False,
+    ) -> Path:
         """Resolve a file path.
 
-        The following file formats are supported:
+        A file must have either one or two extensions: file format (required) and compression (optional).
+        For file format options, see `pickle_extensions` and `config_extensions`.
+        For compression options, see `compression_extensions`. Each can be provided either
+        via a suffix in `path`, or via the argument `file_format` and `compression` respectively.
 
-        * "pickle", "pkl", or None: Binary file
-        * "config", "cfg", or "ini": Config
-        """
+        When saving, uses `file_format` and `compression` from `vectorbtpro._settings.pickling`
+        as default options. When loading, searches for matching files in the current directory.
+
+        Path can be also None or directory, in such a case the file name will be set to the class name."""
+        from vectorbtpro._settings import settings
+
+        pickling_cfg = settings["pickling"]
+
+        default_file_format = pickling_cfg["file_format"]
+        default_compression = pickling_cfg["compression"]
+        if isinstance(compression, bool) and compression:
+            compression = default_compression
+            if compression is None:
+                raise ValueError("Set default compression in settings")
+
         if path is None:
             path = cls.__name__
         path = Path(path)
+        if path.is_dir():
+            path /= cls.__name__
 
-        pickle_extensions = (".pickle", ".pkl")
-        config_extensions = (".config", ".cfg", ".ini")
+        serialization_extensions = get_serialization_extensions()
+        compression_extensions = get_compression_extensions()
+        suffixes = [suffix[1:].lower() for suffix in path.suffixes]
+        if len(suffixes) > 2:
+            raise ValueError("Only two file extensions are supported: file format and compression")
+        if len(suffixes) >= 1:
+            if file_format is not None:
+                raise ValueError("File format is already provided via file extension")
+            file_format = suffixes[0]
+        if len(suffixes) == 2:
+            if compression is not None:
+                raise ValueError("Compression is already provided via file extension")
+            compression = suffixes[1]
         if file_format is not None:
-            if not file_format.startswith("."):
-                file_format = "." + file_format
-            if file_format.lower() in pickle_extensions:
-                extensions = pickle_extensions
-            elif file_format.lower() in config_extensions:
-                extensions = config_extensions
-            else:
+            file_format = file_format.lower()
+            if file_format not in serialization_extensions:
                 raise ValueError(f"Invalid file format '{file_format}'")
-        else:
-            extensions = pickle_extensions + config_extensions
+        if compression not in (None, False):
+            compression = compression.lower()
+            if compression not in compression_extensions:
+                raise ValueError(f"Invalid compression format '{compression}'")
+        for _ in range(len(suffixes)):
+            path = path.with_suffix("")
 
-        if for_load:
-            if path.suffix == "":
-                paths = []
-                for k in extensions:
-                    if path.with_suffix(k).exists():
-                        paths.append(path.with_suffix(k))
-                if len(paths) == 1:
-                    return paths[0]
-                if len(paths) > 1:
-                    raise ValueError(f"Multiple paths founds: {paths}. Please provide an extension.")
-                if len(paths) == 0:
-                    return None
+        if for_save:
+            new_suffixes = []
+            if file_format is None:
+                file_format = default_file_format
+            new_suffixes.append(file_format)
+            if compression is None and file_format in get_serialization_extensions("pickle"):
+                compression = default_compression
+            if compression not in (None, False):
+                if file_format not in get_serialization_extensions("pickle"):
+                    raise ValueError("Compression can be used only with pickling")
+                new_suffixes.append(compression)
+            new_path = path.with_suffix("." + ".".join(new_suffixes))
+            return new_path
+
+        def _extensions_match(a, b, ext_type):
+            from vectorbtpro._settings import settings
+
+            pickling_cfg = settings["pickling"]
+
+            for extensions in pickling_cfg["extensions"][ext_type].values():
+                if a in extensions and b in extensions:
+                    return True
+            return False
+
+        if file_format is not None:
+            if compression not in (None, False):
+                new_path = path.with_suffix(f".{file_format}.{compression}")
+                if new_path.exists():
+                    return new_path
+            elif default_compression not in (None, False):
+                new_path = path.with_suffix(f".{file_format}.{default_compression}")
+                if new_path.exists():
+                    return new_path
             else:
-                if path.suffix not in extensions:
-                    raise ValueError(f"Invalid file extension '{path.suffix}'")
-                if path.exists():
-                    return path
+                new_path = path.with_suffix(f".{file_format}")
+                if new_path.exists():
+                    return new_path
         else:
-            if path.suffix == "":
-                if file_format is not None:
-                    return path.with_suffix(file_format)
-                return path.with_suffix(extensions[0])
+            if compression not in (None, False):
+                new_path = path.with_suffix(f".{default_file_format}.{compression}")
+                if new_path.exists():
+                    return new_path
+            elif default_compression not in (None, False):
+                new_path = path.with_suffix(f".{default_file_format}.{default_compression}")
+                if new_path.exists():
+                    return new_path
             else:
-                if path.suffix not in extensions:
-                    raise ValueError(f"Invalid file extension '{path.suffix}'")
-                return path
-        return None
+                new_path = path.with_suffix(f".{default_file_format}")
+                if new_path.exists():
+                    return new_path
+
+        paths = []
+        for p in path.parent.iterdir():
+            if p.is_file():
+                if p.stem.split(".")[0] == path.stem.split(".")[0]:
+                    suffixes = [suffix[1:].lower() for suffix in p.suffixes]
+                    if len(suffixes) == 0:
+                        continue
+                    if file_format is None:
+                        if suffixes[0] not in serialization_extensions:
+                            continue
+                    else:
+                        if not _extensions_match(suffixes[0], file_format, "serialization"):
+                            continue
+                    if compression is False:
+                        if len(suffixes) >= 2:
+                            continue
+                    elif compression is None:
+                        if len(suffixes) >= 2 and suffixes[1] not in compression_extensions:
+                            continue
+                    else:
+                        if len(suffixes) == 1 or not _extensions_match(suffixes[1], compression, "compression"):
+                            continue
+                    paths.append(p)
+        if len(paths) == 1:
+            return paths[0]
+        if len(paths) > 1:
+            raise ValueError(f"Multiple files found with path '{path}': {paths}. Please provide an extension.")
+        error_message = f"No file found with path '{path}'"
+        if file_format is not None:
+            error_message += f", file format '{file_format}'"
+        if compression not in (None, False):
+            error_message += f", compression '{compression}'"
+        raise FileNotFoundError(error_message)
 
     @classmethod
-    def file_exists(
-        cls,
-        path: tp.Optional[tp.PathLike] = None,
-        file_format: tp.Optional[str] = None,
-    ) -> bool:
-        """Return whether a file already exists."""
-        return cls.resolve_file_path(path=path, file_format=file_format, for_load=True) is not None
+    def file_exists(cls, *args, **kwargs) -> bool:
+        """Return whether a file already exists.
+
+        Resolves the file path using `Pickleable.resolve_file_path`."""
+        try:
+            cls.resolve_file_path(*args, **kwargs)
+            return True
+        except FileNotFoundError as e:
+            return False
 
     def save(
         self,
         path: tp.Optional[tp.PathLike] = None,
         file_format: tp.Optional[str] = None,
+        compression: tp.Union[None, bool, str] = None,
         mkdir_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> None:
@@ -687,13 +965,18 @@ class Pickleable:
         if mkdir_kwargs is None:
             mkdir_kwargs = {}
 
-        path = self.resolve_file_path(path=path, file_format=file_format)
-        if path.suffix in (".pickle", ".pkl"):
-            bytes_ = self.dumps(**kwargs)
+        path = self.resolve_file_path(path=path, file_format=file_format, compression=compression, for_save=True)
+        suffixes = [suffix[1:].lower() for suffix in path.suffixes]
+        if suffixes[0] in get_serialization_extensions("pickle"):
+            if compression is None:
+                suffixes = [suffix[1:].lower() for suffix in path.suffixes]
+                if len(suffixes) > 0 and suffixes[-1] in get_compression_extensions():
+                    compression = suffixes[-1]
+            bytes_ = self.dumps(compression=compression, **kwargs)
             check_mkdir(path.parent, **mkdir_kwargs)
             with open(path, "wb") as f:
                 f.write(bytes_)
-        elif path.suffix in (".config", ".cfg", ".ini"):
+        elif suffixes[0] in get_serialization_extensions("config"):
             str_ = self.encode_config(**kwargs)
             check_mkdir(path.parent, **mkdir_kwargs)
             with open(path, "w") as f:
@@ -706,17 +989,23 @@ class Pickleable:
         cls: tp.Type[PickleableT],
         path: tp.Optional[tp.PathLike] = None,
         file_format: tp.Optional[str] = None,
+        compression: tp.Union[None, bool, str] = None,
         **kwargs,
     ) -> PickleableT:
         """Unpickle/decode the instance from a file.
 
         Resolves the file path using `Pickleable.resolve_file_path`."""
-        path = cls.resolve_file_path(path=path, file_format=file_format, for_load=True)
-        if path.suffix in (".pickle", ".pkl"):
+        path = cls.resolve_file_path(path=path, file_format=file_format, compression=compression)
+        suffixes = [suffix[1:].lower() for suffix in path.suffixes]
+        if suffixes[0] in get_serialization_extensions("pickle"):
+            if compression is None:
+                suffixes = [suffix[1:].lower() for suffix in path.suffixes]
+                if len(suffixes) > 0 and suffixes[-1] in get_compression_extensions():
+                    compression = suffixes[-1]
             with open(path, "rb") as f:
                 bytes_ = f.read()
-            return cls.loads(bytes_, **kwargs)
-        elif path.suffix in (".config", ".cfg", ".ini"):
+            return cls.loads(bytes_, compression=compression, **kwargs)
+        elif suffixes[0] in get_serialization_extensions("config"):
             with open(path, "r") as f:
                 str_ = f.read()
             return cls.decode_config(str_, **kwargs)
@@ -741,14 +1030,11 @@ class Pickleable:
         rec_state = self.rec_state
         if rec_state is None:
             return object.__reduce__(self)
-        if self._rec_id is None:
-            class_path = type(self).__module__ + "." + type(self).__name__
-            if find_class(class_path) is not None:
-                cls = class_path
-            else:
-                cls = type(self)
+        class_id = to_class_id(self)
+        if class_id is None:
+            cls = type(self)
         else:
-            cls = self._rec_id
+            cls = class_id
         return reconstruct, (cls, rec_state)
 
 

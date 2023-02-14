@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Classes for wrapping NumPy arrays into Series/DataFrames."""
 
@@ -29,6 +29,11 @@ if tp.TYPE_CHECKING:
 else:
     BaseIDXAccessorT = tp.Any
     SplitterT = tp.Any
+
+__all__ = [
+    "ArrayWrapper",
+    "Wrapping",
+]
 
 ArrayWrapperT = tp.TypeVar("ArrayWrapperT", bound="ArrayWrapper")
 
@@ -567,9 +572,13 @@ class ArrayWrapper(Configured, PandasIndexer):
                 return arr, True
             if isinstance(arr, np.integer):
                 arr = arr.item()
-            if isinstance(arr, int) and not return_scalars:
-                arr = np.array([arr])
-            return arr, True
+            columns_changed = True
+            if isinstance(arr, int):
+                if arr == 0 and n == 1:
+                    columns_changed = False
+                if not return_scalars:
+                    arr = np.array([arr])
+            return arr, columns_changed
 
         if column_only_select:
             if i_wrapper.ndim == 1:
@@ -834,7 +843,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         if "index" not in wrapper_kwargs:
             wrapper_kwargs["index"] = _resampler.target_index
         if "freq" not in wrapper_kwargs:
-            wrapper_kwargs["freq"] = infer_index_freq(wrapper_kwargs["index"])
+            wrapper_kwargs["freq"] = infer_index_freq(wrapper_kwargs["index"], freq=_resampler.target_freq)
         new_wrapper = self.replace(**wrapper_kwargs)
         return dict(resampler=resampler, new_wrapper=new_wrapper)
 

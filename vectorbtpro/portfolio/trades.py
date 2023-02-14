@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base class for working with trade records.
 
@@ -483,7 +483,7 @@ Name: group, dtype: object
 >>> pf.trades['a'].plots().show()
 ```
 
-![](/assets/images/api/trades_plots.svg)
+![](/assets/images/api/trades_plots.svg){: .iimg }
 """
 
 from functools import partialmethod
@@ -506,6 +506,13 @@ from vectorbtpro.utils.array_ import min_rel_rescale, max_rel_rescale
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.template import Rep, RepEval, RepFunc
+
+__all__ = [
+    "Trades",
+    "EntryTrades",
+    "ExitTrades",
+    "Positions",
+]
 
 __pdoc__ = {}
 
@@ -907,7 +914,7 @@ class Trades(Ranges):
                     wtype=WType.Wilder,
                 )
         else:
-            volatility = broadcast_to(volatility, self.wrapper, keep_flex=True)
+            volatility = broadcast_to(volatility, self.wrapper, to_pd=False, keep_flex=True)
         out = func(
             self.values,
             col_map,
@@ -973,7 +980,7 @@ class Trades(Ranges):
                     wtype=WType.Wilder,
                 )
         else:
-            volatility = broadcast_to(volatility, self.wrapper, keep_flex=True)
+            volatility = broadcast_to(volatility, self.wrapper, to_pd=False, keep_flex=True)
         out = func(
             self.values,
             col_map,
@@ -1186,9 +1193,9 @@ class Trades(Ranges):
             >>> pf.trades.plot_pnl().show()
             ```
 
-            ![](/assets/images/api/trades_plot_pnl.svg)
+            ![](/assets/images/api/trades_plot_pnl.svg){: .iimg }
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         import plotly.graph_objects as go
@@ -1377,9 +1384,9 @@ class Trades(Ranges):
             >>> trades.plot_against_pnl("MFE").show()
             ```
 
-            ![](/assets/images/api/trades_plot_against_pnl.svg)
+            ![](/assets/images/api/trades_plot_against_pnl.svg){: .iimg }
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         import plotly.graph_objects as go
@@ -1700,9 +1707,9 @@ class Trades(Ranges):
             >>> pf.trades.plot().show()
             ```
 
-            ![](/assets/images/api/trades_plot.svg)
+            ![](/assets/images/api/trades_plot.svg){: .iimg }
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         import plotly.graph_objects as go
@@ -2125,9 +2132,9 @@ class EntryTrades(Trades):
             >>> pf.entry_trades.plot_signals().show()
             ```
 
-            ![](/assets/images/api/entry_trades_plot_signals.svg)
+            ![](/assets/images/api/entry_trades_plot_signals.svg){: .iimg }
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         import plotly.graph_objects as go
@@ -2360,9 +2367,9 @@ class ExitTrades(Trades):
             >>> pf.exit_trades.plot_signals().show()
             ```
 
-            ![](/assets/images/api/exit_trades_plot_signals.svg)
+            ![](/assets/images/api/exit_trades_plot_signals.svg){: .iimg }
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         import plotly.graph_objects as go

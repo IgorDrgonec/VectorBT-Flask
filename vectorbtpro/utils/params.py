@@ -1,9 +1,8 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for working with parameters."""
 
 import attr
-import itertools
 import inspect
 from collections import defaultdict, OrderedDict
 from collections.abc import Callable
@@ -18,8 +17,15 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.config import Config, merge_dicts
 from vectorbtpro.utils.execution import execute
-from vectorbtpro.utils.template import deep_substitute
+from vectorbtpro.utils.template import substitute_templates
 from vectorbtpro.utils.parsing import annotate_args, ann_args_to_args
+
+__all__ = [
+    "generate_param_combs",
+    "Param",
+    "combine_params",
+    "parameterized",
+]
 
 
 def to_typed_list(lst: list) -> List:
@@ -50,34 +56,37 @@ def generate_param_combs(op_tree: tp.Tuple, depth: int = 0) -> tp.List[tp.List]:
     """Generate arbitrary parameter combinations from the operation tree `op_tree`.
 
     `op_tree` is a tuple with nested instructions to generate parameters.
-    The first element of the tuple must be a callable that takes remaining elements as arguments.
-    If one of the elements is a tuple itself and its first argument is a callable, it will be
-    unfolded in the same way as above.
+    The first element of the tuple must be either the name of a callale from `itertools` or the
+    callable itself that takes remaining elements as arguments. If one of the elements is a tuple
+    itself and its first argument is a callable, it will be unfolded in the same way as above.
 
     Usage:
         ```pycon
-        >>> import numpy as np
-        >>> from itertools import combinations, product
-        >>> from vectorbtpro.utils.params import generate_param_combs
+        >>> import vectorbtpro as vbt
 
-        >>> generate_param_combs((product, (combinations, [0, 1, 2, 3], 2), [4, 5]))
+        >>> vbt.generate_param_combs(("product", ("combinations", [0, 1, 2, 3], 2), [4, 5]))
         [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2],
          [1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 3, 3],
          [4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5]]
 
-        >>> generate_param_combs((product, (zip, [0, 1, 2, 3], [4, 5, 6, 7]), [8, 9]))
+        >>> vbt.generate_param_combs(("product", (zip, [0, 1, 2, 3], [4, 5, 6, 7]), [8, 9]))
         [[0, 0, 1, 1, 2, 2, 3, 3], [4, 4, 5, 5, 6, 6, 7, 7], [8, 9, 8, 9, 8, 9, 8, 9]]
         ```
     """
     checks.assert_instance_of(op_tree, tuple)
-    checks.assert_instance_of(op_tree[0], Callable)
+    checks.assert_instance_of(op_tree[0], (Callable, str))
     new_op_tree = (op_tree[0],)
     for elem in op_tree[1:]:
-        if isinstance(elem, tuple) and isinstance(elem[0], Callable):
+        if isinstance(elem, tuple) and isinstance(elem[0], (Callable, str)):
             new_op_tree += (generate_param_combs(elem, depth=depth + 1),)
         else:
             new_op_tree += (elem,)
-    out = list(new_op_tree[0](*new_op_tree[1:]))
+    if isinstance(new_op_tree[0], Callable):
+        out = list(new_op_tree[0](*new_op_tree[1:]))
+    else:
+        import itertools
+
+        out = list(getattr(itertools, new_op_tree[0])(*new_op_tree[1:]))
     if depth == 0:
         # do something
         return flatten_param_tuples(out)
@@ -103,6 +112,8 @@ def broadcast_params(param_list: tp.Sequence[tp.Params], to_n: tp.Optional[int] 
 
 def create_param_product(param_list: tp.Sequence[tp.Params]) -> tp.List[tp.List]:
     """Make Cartesian product out of all params in `param_list`."""
+    import itertools
+
     return list(map(list, zip(*itertools.product(*param_list))))
 
 
@@ -156,6 +167,9 @@ class Param:
     Condition should be an expression where `x` denotes this parameter and any other variable
     denotes the name of other parameter(s)."""
 
+    context: tp.KwargsLike = attr.ib(default=None)
+    """Context used in evaluation of `Param.condition`."""
+
     keys: tp.Optional[tp.IndexLike] = attr.ib(default=None)
     """Keys acting as an index level.
 
@@ -175,7 +189,8 @@ def combine_params(
     seed: tp.Optional[int] = None,
     index_stack_kwargs: tp.KwargsLike = None,
     name_tuple_to_str: tp.Union[None, bool, tp.Callable] = None,
-) -> tp.Tuple[dict, pd.Index]:
+    build_index: bool = True,
+) -> tp.Union[dict, tp.Tuple[dict, pd.Index]]:
     """Combine a dictionary with parameters of the type `Param`.
 
     Returns a dictionary with combined parameters and an index."""
@@ -196,18 +211,22 @@ def combine_params(
         index_stack_kwargs = {}
 
     # Build a product
-    param_index = None
     level_values = defaultdict(OrderedDict)
     product_indexes = OrderedDict()
     level_seen = False
     curr_idx = 0
     max_idx = 0
     conditions = {}
+    contexts = {}
     names = {}
+
     for k, p in param_dct.items():
-        names[k] = p.name
         if p.condition is not None:
             conditions[k] = p.condition
+            if p.context is not None:
+                contexts[k] = p.context
+            else:
+                contexts[k] = {}
         if p.level is None:
             if level_seen:
                 raise ValueError("Please provide level for all product parameters")
@@ -220,35 +239,58 @@ def combine_params(
         if level > max_idx:
             max_idx = level
 
-        value = p.value
+        keys_name = None
+        p_name = p.name
+        sr_name = None
+        index_name = None
+
         keys = p.keys
+        if keys is not None:
+            if not isinstance(keys, pd.Index):
+                keys = pd.Index(keys)
+            keys_name = keys.name
+
+        value = p.value
         if isinstance(value, dict):
             if keys is None:
-                keys = list(value.keys())
+                keys = pd.Index(value.keys())
             value = list(value.values())
         elif isinstance(value, pd.Index):
             if keys is None:
                 keys = value
+            index_name = keys.name
             value = value.tolist()
+        elif isinstance(value, pd.Series):
+            if not checks.is_default_index(value.index):
+                if keys is None:
+                    keys = value.index
+                index_name = value.index.name
+            sr_name = value.name
+            value = value.values.tolist()
+
         values = params_to_list(value, is_tuple=p.is_tuple, is_array_like=p.is_array_like)
         level_values[level][k] = values
-        if p.name is None:
-            index_name = k
-        else:
-            index_name = p.name
+        if keys_name is None:
+            if p_name is not None:
+                keys_name = p_name
+            elif sr_name is not None:
+                keys_name = sr_name
+            elif index_name is not None:
+                keys_name = index_name
+            else:
+                keys_name = k
         if keys is None:
-            keys = indexes.index_from_values(values, name=index_name)
+            keys = indexes.index_from_values(values, name=keys_name)
         else:
-            if not isinstance(keys, pd.Index):
-                keys = pd.Index(keys, name=index_name)
-            elif keys.name is None:
-                keys = keys.rename(index_name)
+            keys = keys.rename(keys_name)
         product_indexes[k] = keys
         curr_idx += 1
+        names[k] = keys_name
 
     # Build an operation tree and parameter index
     op_tree_operands = []
     param_keys = []
+    new_product_indexes = []
     for level in range(max_idx + 1):
         if level not in level_values:
             raise ValueError("Levels must come in a strict order starting with 0 and without gaps")
@@ -263,81 +305,113 @@ def combine_params(
             op_tree_operands.append(param_lists[0])
 
         # Stack or combine parameter indexes together
-        levels = []
-        for k in level_values[level].keys():
-            levels.append(product_indexes[k])
-        if len(levels) > 1:
-            _param_index = indexes.stack_indexes(levels, **index_stack_kwargs)
+        if build_index:
+            levels = []
+            for k in level_values[level].keys():
+                levels.append(product_indexes[k])
+            if len(levels) > 1:
+                _param_index = indexes.stack_indexes(levels, **index_stack_kwargs)
+            else:
+                _param_index = levels[0]
+            new_product_indexes.append(_param_index)
+    if build_index:
+        if len(new_product_indexes) > 1:
+            param_index = indexes.combine_indexes(new_product_indexes, **index_stack_kwargs)
         else:
-            _param_index = levels[0]
-        if param_index is None:
-            param_index = _param_index
-        else:
-            param_index = indexes.combine_indexes([param_index, _param_index], **index_stack_kwargs)
+            param_index = new_product_indexes[0]
+    else:
+        param_index = None
 
     # Generate parameter combinations using the operation tree
     if len(op_tree_operands) > 1:
-        param_product = dict(zip(param_keys, generate_param_combs((itertools.product, *op_tree_operands))))
+        param_product = dict(zip(param_keys, generate_param_combs(("product", *op_tree_operands))))
     elif isinstance(op_tree_operands[0], tuple):
         param_product = dict(zip(param_keys, generate_param_combs(op_tree_operands[0])))
     else:
         param_product = dict(zip(param_keys, op_tree_operands))
+    ncombs = len(list(param_product.values())[0])
 
     # Filter by condition
     if len(conditions) > 0:
-        indices_to_keep = []
-        new_param_product = defaultdict(list)
-        for i in range(len(param_index)):
+        indices = np.arange(ncombs)
+        pre_random_subset = random_subset is not None and not checks.is_float(random_subset)
+        if pre_random_subset:
+            if seed is not None:
+                set_seed(seed)
+            indices = np.random.permutation(indices)
+        keep_indices = []
+        condition_funcs = {
+            k: eval(
+                f"lambda {', '.join({'x'} | set(names.keys()) | set(names.values()) | set(contexts[k].keys()))}: {expr}"
+            )
+            for k, expr in conditions.items()
+        }
+        any_discarded = False
+        for i in indices:
             param_values = {}
             for k in param_product:
                 param_values[k] = param_product[k][i]
-            for k in param_product:
                 param_values[names[k]] = param_product[k][i]
             conditions_met = True
-            for k, expr in conditions.items():
-                if not eval(expr, {"x": param_product[k][i], **param_values}):
+            for k, condition_func in condition_funcs.items():
+                param_context = {"x": param_values[k], **param_values, **contexts[k]}
+                if not condition_func(**param_context):
                     conditions_met = False
                     break
             if conditions_met:
-                indices_to_keep.append(i)
-                for k, v in param_product.items():
-                    new_param_product[k].append(v[i])
-        if len(indices_to_keep) == 0:
-            raise ValueError("No parameters left")
-        param_product = new_param_product
-        param_index = param_index[indices_to_keep]
+                keep_indices.append(i)
+                if pre_random_subset:
+                    if len(keep_indices) == random_subset:
+                        break
+            else:
+                any_discarded = True
+        if any_discarded:
+            if len(keep_indices) == 0:
+                raise ValueError("No parameters left")
+            if pre_random_subset:
+                keep_indices = np.sort(keep_indices)
+            param_product = {k: [v[i] for i in keep_indices] for k, v in param_product.items()}
+            ncombs = len(keep_indices)
+            if build_index:
+                param_index = param_index[keep_indices]
+    else:
+        pre_random_subset = False
 
     # Select a random subset
-    if random_subset is not None:
+    if random_subset is not None and not pre_random_subset:
         if seed is not None:
             set_seed(seed)
-        if isinstance(random_subset, (float, np.floating)):
-            random_subset = int(random_subset * len(param_index))
-        random_indices = np.sort(np.random.permutation(np.arange(len(param_index)))[:random_subset])
+        if checks.is_float(random_subset):
+            random_subset = int(random_subset * ncombs)
+        random_indices = np.sort(np.random.permutation(np.arange(ncombs))[:random_subset])
         param_product = {k: [v[i] for i in random_indices] for k, v in param_product.items()}
-        if param_index is not None:
+        ncombs = len(random_indices)
+        if build_index:
             param_index = param_index[random_indices]
 
     # Stringify index names
-    if isinstance(name_tuple_to_str, bool):
-        if name_tuple_to_str:
-            name_tuple_to_str = lambda name_tuple: "_".join(map(lambda x: str(x).strip().lower(), name_tuple))
-        else:
-            name_tuple_to_str = None
-    if name_tuple_to_str is not None:
-        found_tuple = False
-        new_names = []
-        for name in param_index.names:
-            if isinstance(name, tuple):
-                name = name_tuple_to_str(name)
-                found_tuple = True
-            new_names.append(name)
-        if found_tuple:
-            if isinstance(param_index, pd.MultiIndex):
-                param_index.rename(new_names, inplace=True)
+    if build_index:
+        if isinstance(name_tuple_to_str, bool):
+            if name_tuple_to_str:
+                name_tuple_to_str = lambda name_tuple: "_".join(map(lambda x: str(x).strip().lower(), name_tuple))
             else:
-                param_index.rename(new_names[0], inplace=True)
-    return param_product, param_index
+                name_tuple_to_str = None
+        if name_tuple_to_str is not None:
+            found_tuple = False
+            new_names = []
+            for name in param_index.names:
+                if isinstance(name, tuple):
+                    name = name_tuple_to_str(name)
+                    found_tuple = True
+                new_names.append(name)
+            if found_tuple:
+                if isinstance(param_index, pd.MultiIndex):
+                    param_index.rename(new_names, inplace=True)
+                else:
+                    param_index.rename(new_names[0], inplace=True)
+    if build_index:
+        return param_product, param_index
+    return param_product
 
 
 def find_params_in_obj(
@@ -858,8 +932,8 @@ def parameterized(
                             v["value"] = param_config[k]
                             __ann_args[k] = v
                         _args, _kwargs = ann_args_to_args(__ann_args)
-                        _args = deep_substitute(_args, __template_context, sub_id="args")
-                        _kwargs = deep_substitute(_kwargs, __template_context, sub_id="kwargs")
+                        _args = substitute_templates(_args, __template_context, sub_id="args")
+                        _kwargs = substitute_templates(_kwargs, __template_context, sub_id="kwargs")
                         yield func, _args, _kwargs
 
                 funcs_args = _prepare_args()
@@ -883,7 +957,7 @@ def parameterized(
                 return use_meta
 
             if selection is not None:
-                selection = deep_substitute(selection, template_context, sub_id="selection")
+                selection = substitute_templates(selection, template_context, sub_id="selection")
                 found_param = False
                 if checks.is_hashable(selection):
                     if checks.is_int(selection):
@@ -932,7 +1006,7 @@ def parameterized(
                 return funcs_args[0][0](*funcs_args[0][1], **funcs_args[0][2])
 
             # Execute function on each parameter combination
-            execute_kwargs = deep_substitute(execute_kwargs, template_context, sub_id="execute_kwargs")
+            execute_kwargs = substitute_templates(execute_kwargs, template_context, sub_id="execute_kwargs")
             results = execute(
                 template_context["funcs_args"],
                 n_calls=len(template_context["param_configs"]),
@@ -946,7 +1020,7 @@ def parameterized(
 
                     merge_func = resolve_merge_func(merge_func)
                     merge_kwargs = {**dict(keys=template_context["param_index"]), **merge_kwargs}
-                merge_kwargs = deep_substitute(merge_kwargs, template_context, sub_id="merge_kwargs")
+                merge_kwargs = substitute_templates(merge_kwargs, template_context, sub_id="merge_kwargs")
                 return merge_func(results, **merge_kwargs)
             return results
 
@@ -973,7 +1047,7 @@ def parameterized(
             options_=dict(
                 frozen_keys=True,
                 as_attrs=True,
-            )
+            ),
         )
         signature = inspect.signature(wrapper)
         lists_var_kwargs = False

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Custom pandas accessors for signals.
 
@@ -17,11 +17,11 @@ Methods can be accessed as follows:
 
 >>> # vectorbtpro.signals.accessors.SignalsAccessor.pos_rank
 >>> pd.Series([False, True, True, True, False]).vbt.signals.pos_rank()
-0    0
-1    1
-2    2
-3    3
-4    0
+0   -1
+1    0
+2    1
+3    2
+4   -1
 dtype: int64
 ```
 
@@ -64,28 +64,25 @@ Run for the examples below:
 
 ```pycon
 >>> mask.vbt.signals.stats(column='a')
-Start                       2020-01-01 00:00:00
-End                         2020-01-05 00:00:00
-Period                          5 days 00:00:00
-Total                                         1
-Rate [%]                                     20
-First Index                 2020-01-01 00:00:00
-Last Index                  2020-01-01 00:00:00
-Norm Avg Index [-1, 1]                       -1
-Distance: Min                               NaT
-Distance: Max                               NaT
-Distance: Mean                              NaT
-Distance: Std                               NaT
-Total Partitions                              1
-Partition Rate [%]                          100
-Partition Length: Min           1 days 00:00:00
-Partition Length: Max           1 days 00:00:00
-Partition Length: Mean          1 days 00:00:00
-Partition Length: Std                       NaT
-Partition Distance: Min                     NaT
-Partition Distance: Max                     NaT
-Partition Distance: Mean                    NaT
-Partition Distance: Std                     NaT
+Start                         2020-01-01 00:00:00
+End                           2020-01-05 00:00:00
+Period                            5 days 00:00:00
+Total                                           1
+Rate [%]                                     20.0
+First Index                   2020-01-01 00:00:00
+Last Index                    2020-01-01 00:00:00
+Norm Avg Index [-1, 1]                       -1.0
+Distance: Min                                 NaT
+Distance: Median                              NaT
+Distance: Max                                 NaT
+Total Partitions                                1
+Partition Rate [%]                          100.0
+Partition Length: Min             1 days 00:00:00
+Partition Length: Median          1 days 00:00:00
+Partition Length: Max             1 days 00:00:00
+Partition Distance: Min                       NaT
+Partition Distance: Median                    NaT
+Partition Distance: Max                       NaT
 Name: a, dtype: object
 ```
 
@@ -93,30 +90,28 @@ We can pass another signal array to compare this array with:
 
 ```pycon
 >>> mask.vbt.signals.stats(column='a', settings=dict(other=mask['b']))
-Start                       2020-01-01 00:00:00
-End                         2020-01-05 00:00:00
-Period                          5 days 00:00:00
-Total                                         1
-Rate [%]                                     20
-Total Overlapping                             1
-Overlapping Rate [%]                    33.3333
-First Index                 2020-01-01 00:00:00
-Last Index                  2020-01-01 00:00:00
-Norm Avg Index [-1, 1]                       -1
-Distance -> Other: Min          0 days 00:00:00
-Distance -> Other: Max          0 days 00:00:00
-Distance -> Other: Mean         0 days 00:00:00
-Distance -> Other: Std                      NaT
-Total Partitions                              1
-Partition Rate [%]                          100
-Partition Length: Min           1 days 00:00:00
-Partition Length: Max           1 days 00:00:00
-Partition Length: Mean          1 days 00:00:00
-Partition Length: Std                       NaT
-Partition Distance: Min                     NaT
-Partition Distance: Max                     NaT
-Partition Distance: Mean                    NaT
-Partition Distance: Std                     NaT
+
+Start                         2020-01-01 00:00:00
+End                           2020-01-05 00:00:00
+Period                            5 days 00:00:00
+Total                                           1
+Rate [%]                                     20.0
+Total Overlapping                               1
+Overlapping Rate [%]                    33.333333
+First Index                   2020-01-01 00:00:00
+Last Index                    2020-01-01 00:00:00
+Norm Avg Index [-1, 1]                       -1.0
+Distance -> Other: Min            0 days 00:00:00
+Distance -> Other: Median         2 days 00:00:00
+Distance -> Other: Max            4 days 00:00:00
+Total Partitions                                1
+Partition Rate [%]                          100.0
+Partition Length: Min             1 days 00:00:00
+Partition Length: Median          1 days 00:00:00
+Partition Length: Max             1 days 00:00:00
+Partition Distance: Min                       NaT
+Partition Distance: Median                    NaT
+Partition Distance: Max                       NaT
 Name: a, dtype: object
 ```
 
@@ -124,28 +119,25 @@ We can also return duration as a floating number rather than a timedelta:
 
 ```pycon
 >>> mask.vbt.signals.stats(column='a', settings=dict(to_timedelta=False))
-Start                       2020-01-01 00:00:00
-End                         2020-01-05 00:00:00
-Period                                        5
-Total                                         1
-Rate [%]                                     20
-First Index                 2020-01-01 00:00:00
-Last Index                  2020-01-01 00:00:00
-Norm Avg Index [-1, 1]                       -1
-Distance: Min                               NaN
-Distance: Max                               NaN
-Distance: Mean                              NaN
-Distance: Std                               NaN
-Total Partitions                              1
-Partition Rate [%]                          100
-Partition Length: Min                         1
-Partition Length: Max                         1
-Partition Length: Mean                        1
-Partition Length: Std                       NaN
-Partition Distance: Min                     NaN
-Partition Distance: Max                     NaN
-Partition Distance: Mean                    NaN
-Partition Distance: Std                     NaN
+Start                         2020-01-01 00:00:00
+End                           2020-01-05 00:00:00
+Period                                          5
+Total                                           1
+Rate [%]                                     20.0
+First Index                   2020-01-01 00:00:00
+Last Index                    2020-01-01 00:00:00
+Norm Avg Index [-1, 1]                       -1.0
+Distance: Min                                 NaN
+Distance: Median                              NaN
+Distance: Max                                 NaN
+Total Partitions                                1
+Partition Rate [%]                          100.0
+Partition Length: Min                         1.0
+Partition Length: Median                      1.0
+Partition Length: Max                         1.0
+Partition Distance: Min                       NaN
+Partition Distance: Median                    NaN
+Partition Distance: Max                       NaN
 Name: a, dtype: object
 ```
 
@@ -153,28 +145,25 @@ Name: a, dtype: object
 
 ```pycon
 >>> mask.vbt.signals.stats(column=0, group_by=[0, 0, 1])
-Start                       2020-01-01 00:00:00
-End                         2020-01-05 00:00:00
-Period                          5 days 00:00:00
-Total                                         4
-Rate [%]                                     40
-First Index                 2020-01-01 00:00:00
-Last Index                  2020-01-05 00:00:00
-Norm Avg Index [-1, 1]                    -0.25
-Distance: Min                   2 days 00:00:00
-Distance: Max                   2 days 00:00:00
-Distance: Mean                  2 days 00:00:00
-Distance: Std                   0 days 00:00:00
-Total Partitions                              4
-Partition Rate [%]                          100
-Partition Length: Min           1 days 00:00:00
-Partition Length: Max           1 days 00:00:00
-Partition Length: Mean          1 days 00:00:00
-Partition Length: Std           0 days 00:00:00
-Partition Distance: Min         2 days 00:00:00
-Partition Distance: Max         2 days 00:00:00
-Partition Distance: Mean        2 days 00:00:00
-Partition Distance: Std         0 days 00:00:00
+Start                         2020-01-01 00:00:00
+End                           2020-01-05 00:00:00
+Period                            5 days 00:00:00
+Total                                           4
+Rate [%]                                     40.0
+First Index                   2020-01-01 00:00:00
+Last Index                    2020-01-05 00:00:00
+Norm Avg Index [-1, 1]                      -0.25
+Distance: Min                     2 days 00:00:00
+Distance: Median                  2 days 00:00:00
+Distance: Max                     2 days 00:00:00
+Total Partitions                                4
+Partition Rate [%]                          100.0
+Partition Length: Min             1 days 00:00:00
+Partition Length: Median          1 days 00:00:00
+Partition Length: Max             1 days 00:00:00
+Partition Distance: Min           2 days 00:00:00
+Partition Distance: Median        2 days 00:00:00
+Partition Distance: Max           2 days 00:00:00
 Name: 0, dtype: object
 ```
 
@@ -210,7 +199,13 @@ from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import class_or_instancemethod, class_or_instanceproperty
 from vectorbtpro.utils.random_ import set_seed_nb
-from vectorbtpro.utils.template import RepEval, deep_substitute
+from vectorbtpro.utils.template import RepEval, substitute_templates
+
+__all__ = [
+    "SignalsAccessor",
+    "SignalsSRAccessor",
+    "SignalsDFAccessor",
+]
 
 __pdoc__ = {}
 
@@ -243,14 +238,6 @@ class SignalsAccessor(GenericAccessor):
 
     # ############# Overriding ############# #
 
-    def bshift(self, *args, fill_value: bool = False, **kwargs) -> tp.SeriesFrame:
-        """`vectorbtpro.generic.accessors.GenericAccessor.bshift` with `fill_value=False`."""
-        return GenericAccessor.bshift(self, *args, fill_value=fill_value, **kwargs)
-
-    def fshift(self, *args, fill_value: bool = False, **kwargs) -> tp.SeriesFrame:
-        """`vectorbtpro.generic.accessors.GenericAccessor.fshift` with `fill_value=False`."""
-        return GenericAccessor.fshift(self, *args, fill_value=fill_value, **kwargs)
-
     @classmethod
     def empty(cls, *args, fill_value: bool = False, **kwargs) -> tp.SeriesFrame:
         """`vectorbtpro.base.accessors.BaseAccessor.empty` with `fill_value=False`."""
@@ -261,6 +248,9 @@ class SignalsAccessor(GenericAccessor):
         """`vectorbtpro.base.accessors.BaseAccessor.empty_like` with `fill_value=False`."""
         return GenericAccessor.empty_like(*args, fill_value=fill_value, dtype=np.bool_, **kwargs)
 
+    bshift = partialmethod(GenericAccessor.bshift, fill_value=False)
+    fshift = partialmethod(GenericAccessor.fshift, fill_value=False)
+    ago = partialmethod(GenericAccessor.ago, fill_value=False)
     latest_at_index = partialmethod(GenericAccessor.latest_at_index, nan_value=False)
 
     # ############# Generation ############# #
@@ -271,6 +261,8 @@ class SignalsAccessor(GenericAccessor):
         shape: tp.ShapeLike,
         place_func_nb: tp.PlaceFunc,
         *args,
+        only_once: bool = True,
+        wait: int = 1,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
         template_context: tp.Optional[tp.Mapping] = None,
@@ -321,11 +313,15 @@ class SignalsAccessor(GenericAccessor):
                 to_shape=shape_2d,
                 **broadcast_kwargs
             )
-        template_context = merge_dicts(broadcast_named_args, dict(shape=shape, shape_2d=shape_2d), template_context)
-        args = deep_substitute(args, template_context, sub_id="args")
+        template_context = merge_dicts(
+            broadcast_named_args,
+            dict(shape=shape, shape_2d=shape_2d, wait=wait),
+            template_context,
+        )
+        args = substitute_templates(args, template_context, sub_id="args")
         func = jit_reg.resolve_option(nb.generate_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        result = func(shape_2d, place_func_nb, *args)
+        result = func(shape_2d, only_once, wait, place_func_nb, *args)
 
         if wrapper is None:
             wrapper = ArrayWrapper.from_shape(shape_2d, ndim=cls.ndim)
@@ -455,8 +451,8 @@ class SignalsAccessor(GenericAccessor):
             ),
             template_context,
         )
-        entry_args = deep_substitute(entry_args, template_context, sub_id="entry_args")
-        exit_args = deep_substitute(exit_args, template_context, sub_id="exit_args")
+        entry_args = substitute_templates(entry_args, template_context, sub_id="entry_args")
+        exit_args = substitute_templates(exit_args, template_context, sub_id="exit_args")
         func = jit_reg.resolve_option(nb.generate_enex_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         result1, result2 = func(
@@ -533,7 +529,7 @@ class SignalsAccessor(GenericAccessor):
             dict(wait=wait, until_next=until_next, skip_until_exit=skip_until_exit),
             template_context,
         )
-        args = deep_substitute(args, template_context, sub_id="args")
+        args = substitute_templates(args, template_context, sub_id="args")
         func = jit_reg.resolve_option(nb.generate_ex_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         exits = func(obj, wait, until_next, skip_until_exit, exit_place_func_nb, *args)
@@ -1535,7 +1531,7 @@ class SignalsAccessor(GenericAccessor):
             ),
             template_context,
         )
-        args = deep_substitute(args, template_context, sub_id="args")
+        args = substitute_templates(args, template_context, sub_id="args")
         func = jit_reg.resolve_option(nb.rank_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         rank = func(obj, reset_by, after_false, after_reset, reset_wait, rank_func_nb, *args)
@@ -2247,7 +2243,7 @@ class SignalsAccessor(GenericAccessor):
             >>> mask[['a', 'c']].vbt.signals.plot().show()
             ```
 
-            ![](/assets/images/api/signals_df_plot.svg)
+            ![](/assets/images/api/signals_df_plot.svg){: .iimg }
         """
         if column is not None:
             _self = self.select_col(column=column)
@@ -2278,7 +2274,7 @@ class SignalsAccessor(GenericAccessor):
             >>> (~mask['b']).vbt.signals.plot_as_exits(y=ts, fig=fig).show()
             ```
 
-            ![](/assets/images/api/signals_plot_as_markers.svg)
+            ![](/assets/images/api/signals_plot_as_markers.svg){: .iimg }
         """
         from vectorbtpro._settings import settings
 

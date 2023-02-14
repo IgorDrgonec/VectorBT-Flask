@@ -1,69 +1,18 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Modules with base classes and utilities for pandas objects, such as broadcasting."""
 
-from vectorbtpro.base.accessors import BaseAccessor, BaseSRAccessor, BaseDFAccessor
-from vectorbtpro.base.chunking import (
-    GroupLensSizer,
-    GroupLensSlicer,
-    GroupLensMapper,
-    GroupMapSlicer,
-    GroupIdxsMapper,
-    FlexArraySelector,
-    FlexArraySlicer,
-    shape_gl_slicer,
-    flex_1d_array_gl_slicer,
-    flex_array_gl_slicer,
-    array_gl_slicer,
-)
-from vectorbtpro.base.grouping import *
-from vectorbtpro.base.resampling import *
-from vectorbtpro.base.indexes import repeat_index, tile_index, stack_indexes, combine_indexes
-from vectorbtpro.base.indexing import (
-    PandasIndexer,
-    hslice,
-    RowIdx,
-    ColIdx,
-    RowPoints,
-    RowRanges,
-    ElemIdx,
-    index_dict,
-    get_index_points,
-    get_index_ranges,
-)
-from vectorbtpro.base.flex_indexing import (
-    flex_select_1d_nb,
-    flex_select_1d_pr_nb,
-    flex_select_1d_pc_nb,
-    flex_select_nb,
-)
-from vectorbtpro.base.reshaping import (
-    to_1d_shape,
-    to_2d_shape,
-    repeat_shape,
-    tile_shape,
-    to_1d_array,
-    to_2d_array,
-    to_2d_pr_array,
-    to_2d_pc_array,
-    to_1d_array_nb,
-    to_2d_array_nb,
-    to_2d_pr_array_nb,
-    to_2d_pc_array_nb,
-    broadcast_shapes,
-    broadcast_array_to,
-    broadcast_arrays,
-    repeat,
-    tile,
-    BCO,
-    Default,
-    Ref,
-    broadcast,
-    broadcast_to,
-)
-from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.base.merging import concat_merge, row_stack_merge, column_stack_merge
-from vectorbtpro.utils.module_ import create__all__
+from typing import TYPE_CHECKING
 
-__all__ = create__all__(__name__)
-__pdoc__ = {k: False for k in __all__}
+if TYPE_CHECKING:
+    from vectorbtpro.base.grouping import *
+    from vectorbtpro.base.resampling import *
+    from vectorbtpro.base.accessors import *
+    from vectorbtpro.base.chunking import *
+    from vectorbtpro.base.combining import *
+    from vectorbtpro.base.flex_indexing import *
+    from vectorbtpro.base.indexes import *
+    from vectorbtpro.base.indexing import *
+    from vectorbtpro.base.merging import *
+    from vectorbtpro.base.reshaping import *
+    from vectorbtpro.base.wrapping import *

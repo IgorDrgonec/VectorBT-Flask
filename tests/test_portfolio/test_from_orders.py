@@ -59,10 +59,10 @@ class TestFromOrders:
     def test_data(self):
         data = vbt.RandomOHLCData.fetch(
             [0, 1],
-            ohlc_freq="1d",
             start="2020-01-01",
             end="2020-02-01",
-            freq="1h",
+            tick_freq="1h",
+            freq="1d",
             seed=42,
         )
         pf = vbt.Portfolio.from_orders(data)
@@ -1770,7 +1770,7 @@ class TestFromOrders:
         )
         np.testing.assert_array_equal(
             pf.call_seq.values,
-            np.array([[0, 1, 2], [2, 0, 1], [1, 2, 0], [0, 1, 2], [2, 0, 1]]),
+            np.array([[0, 1, 2], [0, 1, 2], [2, 0, 1], [1, 0, 2], [0, 1, 2]]),
         )
         pf = from_orders_longonly(**kwargs)
         assert_records_close(
@@ -1801,16 +1801,20 @@ class TestFromOrders:
                 [
                     (0, 0, 2, 100.0, 1.0, 0.0, 1),
                     (1, 0, 3, 100.0, 1.0, 0.0, 0),
-                    (0, 1, 4, 100.0, 1.0, 0.0, 1),
+                    (0, 1, 1, 100.0, 1.0, 0.0, 1),
+                    (1, 1, 2, 100.0, 1.0, 0.0, 0),
+                    (2, 1, 4, 100.0, 1.0, 0.0, 1),
                     (0, 2, 0, 100.0, 1.0, 0.0, 1),
                     (1, 2, 1, 100.0, 1.0, 0.0, 0),
+                    (2, 2, 3, 100.0, 1.0, 0.0, 1),
+                    (3, 2, 4, 100.0, 1.0, 0.0, 0),
                 ],
                 dtype=order_dt,
             ),
         )
         np.testing.assert_array_equal(
             pf.call_seq.values,
-            np.array([[2, 0, 1], [1, 0, 2], [0, 2, 1], [2, 1, 0], [1, 0, 2]]),
+            np.array([[0, 1, 2], [2, 0, 1], [1, 2, 0], [0, 1, 2], [2, 0, 1]]),
         )
         _ = from_orders_both(attach_call_seq=False, **kwargs)
         _ = from_orders_longonly(attach_call_seq=False, **kwargs)
@@ -2328,17 +2332,17 @@ class TestFromOrders:
 
     @pytest.mark.parametrize("test_group_by", [False, np.array([0, 0, 1])])
     @pytest.mark.parametrize("test_cash_sharing", [False, True])
-    def test_fill_returns(self, test_group_by, test_cash_sharing):
+    def test_save_returns(self, test_group_by, test_cash_sharing):
         assert_frame_equal(
             from_orders_both(
                 close=price_wide,
-                fill_returns=True,
+                save_returns=True,
                 group_by=test_group_by,
                 cash_sharing=test_cash_sharing,
             ).returns,
             from_orders_both(
                 close=price_wide,
-                fill_returns=False,
+                save_returns=False,
                 group_by=test_group_by,
                 cash_sharing=test_cash_sharing,
             ).returns,
@@ -2346,13 +2350,13 @@ class TestFromOrders:
         assert_frame_equal(
             from_orders_longonly(
                 close=price_wide,
-                fill_returns=True,
+                save_returns=True,
                 group_by=test_group_by,
                 cash_sharing=test_cash_sharing,
             ).returns,
             from_orders_longonly(
                 close=price_wide,
-                fill_returns=False,
+                save_returns=False,
                 group_by=test_group_by,
                 cash_sharing=test_cash_sharing,
             ).returns,
@@ -2360,13 +2364,13 @@ class TestFromOrders:
         assert_frame_equal(
             from_orders_shortonly(
                 close=price_wide,
-                fill_returns=True,
+                save_returns=True,
                 group_by=test_group_by,
                 cash_sharing=test_cash_sharing,
             ).returns,
             from_orders_shortonly(
                 close=price_wide,
-                fill_returns=False,
+                save_returns=False,
                 group_by=test_group_by,
                 cash_sharing=test_cash_sharing,
             ).returns,

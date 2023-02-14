@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Named tuples and enumerated types for portfolio.
 
@@ -9,7 +9,7 @@ import numpy as np
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.formatting import prettify
 
-__all__ = [
+__pdoc__all__ = __all__ = [
     "RejectedOrderError",
     "PriceType",
     "ValPriceType",
@@ -354,6 +354,7 @@ class DeltaFormatT(tp.NamedTuple):
     Absolute: int = 0
     Percent: int = 1
     Percent100: int = 2
+    Target: int = 3
 
 
 DeltaFormat = DeltaFormatT()
@@ -367,12 +368,13 @@ __pdoc__[
 {prettify(DeltaFormat)}
 ```
 
-In which format a delta value is provided?
+In which format a delta is provided?
 
 Attributes:
-    Absolute: Absolute terms
-    Percent: Percentage terms where 0.01 means 1%
-    Percent100: Percentage terms where 1.0 means 1%
+    Absolute: Absolute format
+    Percent: Percentage format where 0.01 means 1%
+    Percent100: Percentage format where 1.0 means 1%
+    Target: Target format
 """
 
 
@@ -392,13 +394,13 @@ __pdoc__[
 {prettify(TimeDeltaFormat)}
 ```
 
-In which format a time delta value is provided?
+In which format a time delta is provided?
 
 Attributes:
-    Rows: Row terms where 1 means one row (simulation step) has passed. 
+    Rows: Row format where 1 means one row (simulation step) has passed. 
     
         Doesn't require the index to be provided.
-    Index: Index terms where 1 means one value in index has passed. 
+    Index: Index format where 1 means one value in index has passed. 
     
         If index is datetime-like, 1 means one nanosecond.
     
@@ -875,7 +877,7 @@ class AccountState(tp.NamedTuple):
 __pdoc__["AccountState"] = "State of the account."
 __pdoc__["AccountState.cash"] = """Cash. 
 
-Per group."""
+Per group with cash sharing, otherwise per column."""
 __pdoc__["AccountState.position"] = """Position. 
 
 Per column."""
@@ -887,7 +889,7 @@ __pdoc__["AccountState.locked_cash"] = """Locked cash.
 Per column."""
 __pdoc__["AccountState.free_cash"] = """Free cash. 
 
-Per group."""
+Per group with cash sharing, otherwise per column."""
 
 
 class ExecState(tp.NamedTuple):
@@ -2329,6 +2331,7 @@ class FOInOutputs(tp.NamedTuple):
     debt: tp.Array2d
     locked_cash: tp.Array2d
     free_cash: tp.Array2d
+    value: tp.Array2d
     returns: tp.Array2d
 
 
@@ -2337,32 +2340,51 @@ __pdoc__[
     "FOInOutputs.cash"
 ] = """See `AccountState.cash`.
 
-Gets filled if `fill_state` is True, otherwise has the shape `(0, 0)`."""
+Follows groups if cash sharing is enabled, otherwise columns.
+
+Gets filled if `save_state` is True, otherwise has the shape `(0, 0)`."""
 __pdoc__[
     "FOInOutputs.position"
 ] = """See `AccountState.position`.
 
-Gets filled if `fill_state` is True, otherwise has the shape `(0, 0)`."""
+Follows columns.
+
+Gets filled if `save_state` is True, otherwise has the shape `(0, 0)`."""
 __pdoc__[
     "FOInOutputs.debt"
 ] = """See `AccountState.debt`.
 
-Gets filled if `fill_state` is True, otherwise has the shape `(0, 0)`."""
+Follows columns.
+
+Gets filled if `save_state` is True, otherwise has the shape `(0, 0)`."""
 __pdoc__[
     "FOInOutputs.locked_cash"
 ] = """See `AccountState.locked_cash`.
 
-Gets filled if `fill_state` is True, otherwise has the shape `(0, 0)`."""
+Follows columns.
+
+Gets filled if `save_state` is True, otherwise has the shape `(0, 0)`."""
 __pdoc__[
     "FOInOutputs.free_cash"
 ] = """See `AccountState.free_cash`.
 
-Gets filled if `fill_state` is True, otherwise has the shape `(0, 0)`."""
+Follows groups if cash sharing is enabled, otherwise columns.
+
+Gets filled if `save_state` is True, otherwise has the shape `(0, 0)`."""
+__pdoc__[
+    "FOInOutputs.value"
+] = """Value.
+
+Follows groups if cash sharing is enabled, otherwise columns.
+
+Gets filled if `fill_value` is True, otherwise has the shape `(0, 0)`."""
 __pdoc__[
     "FOInOutputs.returns"
 ] = """Returns.
 
-Gets filled if `fill_returns` is True, otherwise has the shape `(0, 0)`."""
+Follows groups if cash sharing is enabled, otherwise columns.
+
+Gets filled if `save_returns` is True, otherwise has the shape `(0, 0)`."""
 
 
 class FSInOutputs(tp.NamedTuple):

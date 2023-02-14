@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for working with templates."""
 
@@ -17,6 +17,15 @@ from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.hashing import Hashable
 from vectorbtpro.utils.parsing import get_func_arg_names
 
+__all__ = [
+    "CustomTemplate",
+    "Sub",
+    "Rep",
+    "RepEval",
+    "RepFunc",
+    "substitute_templates",
+]
+
 
 @attr.s(frozen=True)
 class CustomTemplate:
@@ -31,12 +40,12 @@ class CustomTemplate:
     strict: tp.Optional[bool] = attr.ib(default=None)
     """Whether to raise an error if processing template fails.
 
-    If not None, overrides `strict` passed by `deep_substitute`."""
+    If not None, overrides `strict` passed by `substitute_templates`."""
 
     sub_id: tp.Optional[tp.MaybeCollection[Hashable]] = attr.ib(default=None)
     """Substitution id or ids at which to evaluate this template
 
-    Checks against `sub_id` passed by `deep_substitute`."""
+    Checks against `sub_id` passed by `substitute_templates`."""
 
     context_merge_kwargs: tp.KwargsLike = attr.ib(default=None)
     """Keyword arguments passed to `vectorbtpro.utils.config.merge_dicts`."""
@@ -221,7 +230,7 @@ def has_templates(
 ) -> tp.Any:
     """Check if the object has any templates.
 
-    For arguments, see `deep_substitute`."""
+    For arguments, see `substitute_templates`."""
     from vectorbtpro._settings import settings
 
     template_cfg = settings["template"]
@@ -263,7 +272,7 @@ def has_templates(
     return False
 
 
-def deep_substitute(
+def substitute_templates(
     obj: tp.Any,
     context: tp.Optional[tp.Mapping] = None,
     strict: tp.Optional[bool] = None,
@@ -300,23 +309,23 @@ def deep_substitute(
         ```pycon
         >>> import vectorbtpro as vbt
 
-        >>> vbt.deep_substitute(vbt.Sub('$key', {'key': 100}))
+        >>> vbt.substitute_templates(vbt.Sub('$key', {'key': 100}))
         100
-        >>> vbt.deep_substitute(vbt.Sub('$key', {'key': 100}), {'key': 200})
+        >>> vbt.substitute_templates(vbt.Sub('$key', {'key': 100}), {'key': 200})
         200
-        >>> vbt.deep_substitute(vbt.Sub('$key$key'), {'key': 100})
+        >>> vbt.substitute_templates(vbt.Sub('$key$key'), {'key': 100})
         100100
-        >>> vbt.deep_substitute(vbt.Rep('key'), {'key': 100})
+        >>> vbt.substitute_templates(vbt.Rep('key'), {'key': 100})
         100
-        >>> vbt.deep_substitute([vbt.Rep('key'), vbt.Sub('$key$key')], {'key': 100}, except_types=())
+        >>> vbt.substitute_templates([vbt.Rep('key'), vbt.Sub('$key$key')], {'key': 100}, except_types=())
         [100, '100100']
-        >>> vbt.deep_substitute(vbt.RepFunc(lambda key: key == 100), {'key': 100})
+        >>> vbt.substitute_templates(vbt.RepFunc(lambda key: key == 100), {'key': 100})
         True
-        >>> vbt.deep_substitute(vbt.RepEval('key == 100'), {'key': 100})
+        >>> vbt.substitute_templates(vbt.RepEval('key == 100'), {'key': 100})
         True
-        >>> vbt.deep_substitute(vbt.RepEval('key == 100', strict=True))
+        >>> vbt.substitute_templates(vbt.RepEval('key == 100', strict=True))
         NameError: name 'key' is not defined
-        >>> vbt.deep_substitute(vbt.RepEval('key == 100', strict=False))
+        >>> vbt.substitute_templates(vbt.RepEval('key == 100', strict=False))
         <vectorbtpro.utils.template.RepEval at 0x7fe3ad2ab668>
         ```
     """
@@ -357,7 +366,7 @@ def deep_substitute(
                     set_dict_item(
                         obj,
                         k,
-                        deep_substitute(
+                        substitute_templates(
                             v,
                             context=context,
                             strict=strict,
@@ -375,7 +384,7 @@ def deep_substitute(
                 if make_copy:
                     obj = copy(obj)
                 for i in range(len(obj)):
-                    obj[i] = deep_substitute(
+                    obj[i] = substitute_templates(
                         obj[i],
                         context=context,
                         strict=strict,
@@ -391,7 +400,7 @@ def deep_substitute(
                 result = []
                 for o in obj:
                     result.append(
-                        deep_substitute(
+                        substitute_templates(
                             o,
                             context=context,
                             strict=strict,

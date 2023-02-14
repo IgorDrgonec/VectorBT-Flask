@@ -1,72 +1,43 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
-"""Modules with utilities that are used throughout vectorbtpro."""
+"""Modules with utilities that are used throughout the package."""
 
-from vectorbtpro.utils.attr_ import deep_getattr
-from vectorbtpro.utils.caching import Cacheable
-from vectorbtpro.utils.chunking import (
-    ChunkMeta,
-    ArgChunkMeta,
-    LenChunkMeta,
-    ArgSizer,
-    LenSizer,
-    ShapeSizer,
-    ArraySizer,
-    ChunkMapper,
-    ChunkSelector,
-    ChunkSlicer,
-    CountAdapter,
-    ShapeSelector,
-    ShapeSlicer,
-    ArraySelector,
-    ArraySlicer,
-    SequenceTaker,
-    MappingTaker,
-    ArgsTaker,
-    KwargsTaker,
-    chunked,
-)
-from vectorbtpro.utils.config import (
-    atomic_dict,
-    merge_dicts,
-    child_dict,
-    Config,
-    FrozenConfig,
-    ReadonlyConfig,
-    HybridConfig,
-    Configured,
-    AtomicConfig,
-)
-from vectorbtpro.utils.decorators import (
-    cacheable_property,
-    cached_property,
-    cacheable,
-    cached,
-    cacheable_method,
-    cached_method,
-)
-from vectorbtpro.utils.execution import SequenceEngine, ThreadPoolEngine, DaskEngine, RayEngine, execute
-from vectorbtpro.utils.formatting import prettify, format_func, pprint, phelp
-from vectorbtpro.utils.image_ import save_animation
-from vectorbtpro.utils.jitting import jitted
-from vectorbtpro.utils.params import generate_param_combs, Param, parameterized
-from vectorbtpro.utils.parsing import Regex
-from vectorbtpro.utils.profiling import Timer, MemTracer
-from vectorbtpro.utils.random_ import set_seed
-from vectorbtpro.utils.schedule_ import AsyncJob, AsyncScheduler, CancelledError, ScheduleManager
-from vectorbtpro.utils.template import Sub, Rep, RepEval, RepFunc, deep_substitute
-from vectorbtpro.utils.enum_ import map_enum_fields
-from vectorbtpro.utils.module_ import create__all__
-from vectorbtpro.utils.opt_packages import check_installed
-from vectorbtpro.utils.pickling import dumps, loads, save, load, RecState, RecInfo, Pickleable, pdict
-from vectorbtpro._settings import settings
+from typing import TYPE_CHECKING
 
-__blacklist__ = []
+if TYPE_CHECKING:
+    from vectorbtpro.utils.array_ import *
+    from vectorbtpro.utils.attr_ import *
+    from vectorbtpro.utils.caching import *
+    from vectorbtpro.utils.checks import *
+    from vectorbtpro.utils.chunking import *
+    from vectorbtpro.utils.colors import *
+    from vectorbtpro.utils.config import *
+    from vectorbtpro.utils.datetime_ import *
+    from vectorbtpro.utils.datetime_nb import *
+    from vectorbtpro.utils.decorators import *
+    from vectorbtpro.utils.enum_ import *
+    from vectorbtpro.utils.eval_ import *
+    from vectorbtpro.utils.execution import *
+    from vectorbtpro.utils.figure import *
+    from vectorbtpro.utils.formatting import *
+    from vectorbtpro.utils.hashing import *
+    from vectorbtpro.utils.image_ import *
+    from vectorbtpro.utils.jitting import *
+    from vectorbtpro.utils.magic_decorators import *
+    from vectorbtpro.utils.mapping import *
+    from vectorbtpro.utils.math_ import *
+    from vectorbtpro.utils.module_ import *
+    from vectorbtpro.utils.params import *
+    from vectorbtpro.utils.parsing import *
+    from vectorbtpro.utils.path_ import *
+    from vectorbtpro.utils.pbar import *
+    from vectorbtpro.utils.pickling import *
+    from vectorbtpro.utils.profiling import *
+    from vectorbtpro.utils.random_ import *
+    from vectorbtpro.utils.requests_ import *
+    from vectorbtpro.utils.schedule_ import *
+    from vectorbtpro.utils.tagging import *
+    from vectorbtpro.utils.template import *
 
-if not check_installed("plotly") or not settings["importing"]["plotly"]:
-    __blacklist__.append("figure")
-else:
-    from vectorbtpro.utils.figure import Figure, FigureWidget, make_figure, make_subplots
-
-__all__ = create__all__(__name__)
-__pdoc__ = {k: False for k in __all__}
+__import_if_installed__ = dict()
+__import_if_installed__["figure"] = "plotly"

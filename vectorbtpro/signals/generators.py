@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Custom signal generators built with the signal factory."""
 
@@ -41,7 +41,7 @@ RAND = SignalFactory(
     mode="entries",
     param_names=["n"],
 ).with_place_func(
-    entry_place_func=rand_place_nb,
+    entry_place_func_nb=rand_place_nb,
     entry_settings=dict(pass_params=["n"]),
     param_settings=dict(n=flex_col_param_config),
     seed=None,
@@ -102,7 +102,7 @@ class _RAND(RAND):
 setattr(RAND, "__doc__", _RAND.__doc__)
 
 RANDX = SignalFactory(class_name="RANDX", module_name=__name__, short_name="randx", mode="exits").with_place_func(
-    exit_place_func=rand_place_nb,
+    exit_place_func_nb=rand_place_nb,
     exit_settings=dict(pass_kwargs=dict(n=np.array([1]))),
     seed=None,
 )
@@ -210,7 +210,7 @@ RPROB = SignalFactory(
     mode="entries",
     param_names=["prob"],
 ).with_place_func(
-    entry_place_func=rand_by_prob_place_nb,
+    entry_place_func_nb=rand_by_prob_place_nb,
     entry_settings=dict(pass_params=["prob"], pass_kwargs=["pick_first"]),
     param_settings=dict(prob=flex_elem_param_config),
     seed=None,
@@ -272,7 +272,7 @@ rprobx_config = ReadonlyConfig(
 
 rprobx_func_config = ReadonlyConfig(
     dict(
-        exit_place_func=rand_by_prob_place_nb,
+        exit_place_func_nb=rand_by_prob_place_nb,
         exit_settings=dict(pass_params=["prob"], pass_kwargs=["pick_first"]),
         param_settings=dict(prob=flex_elem_param_config),
         seed=None,
@@ -320,9 +320,9 @@ RPROBNX = SignalFactory(
     mode="both",
     param_names=["entry_prob", "exit_prob"],
 ).with_place_func(
-    entry_place_func=rand_by_prob_place_nb,
+    entry_place_func_nb=rand_by_prob_place_nb,
     entry_settings=dict(pass_params=["entry_prob"], pass_kwargs=["pick_first"]),
-    exit_place_func=rand_by_prob_place_nb,
+    exit_place_func_nb=rand_by_prob_place_nb,
     exit_settings=dict(pass_params=["exit_prob"], pass_kwargs=["pick_first"]),
     param_settings=dict(entry_prob=flex_elem_param_config, exit_prob=flex_elem_param_config),
     seed=None,
@@ -423,7 +423,7 @@ stx_config = ReadonlyConfig(
 
 stx_func_config = ReadonlyConfig(
     dict(
-        exit_place_func=stop_place_nb,
+        exit_place_func_nb=stop_place_nb,
         exit_settings=dict(
             pass_inputs=["entry_ts", "ts", "follow_ts"],
             pass_in_outputs=["stop_ts"],
@@ -491,7 +491,7 @@ ohlcstx_config = ReadonlyConfig(
 
 ohlcstx_func_config = ReadonlyConfig(
     dict(
-        exit_place_func=ohlc_stop_place_nb,
+        exit_place_func_nb=ohlc_stop_place_nb,
         exit_settings=dict(
             pass_inputs=["entry_price", "open", "high", "low", "close"],  # do not pass entries
             pass_in_outputs=["stop_price", "stop_type"],
@@ -604,7 +604,7 @@ def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:
         >>> ohlcstx.iloc[:, 0].plot().show()
         ```
         
-        ![](/assets/images/api/OHLCSTX.svg)
+        ![](/assets/images/api/OHLCSTX.svg){: .iimg }
     """
     return plot
 

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for parsing."""
 
@@ -12,6 +12,10 @@ import warnings
 import attr
 
 from vectorbtpro import _typing as tp
+
+__all__ = [
+    "Regex",
+]
 
 
 @attr.s(frozen=True)

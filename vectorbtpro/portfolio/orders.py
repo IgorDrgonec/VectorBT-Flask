@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base class for working with order records.
 
@@ -97,7 +97,7 @@ Name: group, dtype: object
 >>> pf.orders['a'].plots().show()
 ```
 
-![](/assets/images/api/orders_plots.svg)
+![](/assets/images/api/orders_plots.svg){: .iimg }
 """
 
 import numpy as np
@@ -115,6 +115,11 @@ from vectorbtpro.records.decorators import attach_fields, override_field_config,
 from vectorbtpro.signals.enums import StopType
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
+
+__all__ = [
+    "Orders",
+    "FSOrders",
+]
 
 __pdoc__ = {}
 
@@ -335,9 +340,9 @@ class Orders(PriceRecords):
             >>> orders.plot().show()
             ```
 
-            ![](/assets/images/api/orders_plot.svg)
+            ![](/assets/images/api/orders_plot.svg){: .iimg }
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         import plotly.graph_objects as go

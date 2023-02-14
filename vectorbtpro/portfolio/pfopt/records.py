@@ -1,4 +1,4 @@
-# Copyright (c) 2022 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Classes for working with allocation records."""
 
@@ -8,6 +8,11 @@ from vectorbtpro.records.base import Records
 from vectorbtpro.generic.ranges import Ranges
 from vectorbtpro.records.decorators import override_field_config
 from vectorbtpro.portfolio.enums import alloc_range_dt, alloc_point_dt
+
+__all__ = [
+    "AllocRanges",
+    "AllocPoints",
+]
 
 __pdoc__ = {}
 

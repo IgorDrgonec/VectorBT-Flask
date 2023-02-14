@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Class for analyzing data."""
 
@@ -6,6 +6,10 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic.plots_builder import PlotsBuilderMixin
 from vectorbtpro.generic.stats_builder import StatsBuilderMixin
+
+__all__ = [
+    "Analyzable",
+]
 
 
 class MetaAnalyzable(type(StatsBuilderMixin), type(PlotsBuilderMixin)):

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Custom pandas accessors for OHLC(V) data.
 
@@ -82,28 +82,23 @@ Name: agg_stats, dtype: object
 >>> ohlcv_acc.plots(settings=dict(ohlc_type='candlestick')).show()
 ```
 
-![](/assets/images/api/ohlcv_plots.svg)
+![](/assets/images/api/ohlcv_plots.svg){: .iimg }
 """
 
 import numpy as np
 import pandas as pd
-from pandas.core.groupby import GroupBy as PandasGroupBy
-from pandas.core.resample import Resampler as PandasResampler
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.accessors import register_df_vbt_accessor
-from vectorbtpro.base.reshaping import to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.base.grouping import Grouper
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import GenericAccessor, GenericDFAccessor
 from vectorbtpro.generic.drawdowns import Drawdowns
-from vectorbtpro.ohlcv import nb
-from vectorbtpro.registries.ch_registry import ch_reg
-from vectorbtpro.registries.jit_registry import jit_reg
-from vectorbtpro.utils import checks
-from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
-from vectorbtpro.utils.decorators import class_or_instancemethod
+from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
+
+__all__ = [
+    "OHLCVDFAccessor",
+]
 
 __pdoc__ = {}
 
@@ -391,9 +386,9 @@ class OHLCVDFAccessor(GenericDFAccessor):
 
             [=100% "100%"]{: .candystripe}
 
-            ![](/assets/images/api/ohlcv_plot.svg)
+            ![](/assets/images/api/ohlcv_plot.svg){: .iimg }
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
         import plotly.graph_objects as go

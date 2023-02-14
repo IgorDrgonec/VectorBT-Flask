@@ -31,6 +31,7 @@ RUN pip install --quiet --no-cache-dir --ignore-installed 'llvmlite'
 RUN pip install --quiet --no-cache-dir \
     'numpy==1.23.3' \
     'numba==0.56.4' \
+    'pandas>=1.5.0' \
     'schedule' \
     'requests' \
     'tqdm' \
@@ -40,11 +41,13 @@ RUN pip install --quiet --no-cache-dir \
     'mypy_extensions' \
     'humanize' \
     'attrs>=19.2.0' \
+    'websocket-client' \
     'hyperopt' \
-    'yfinance>=0.1.63' \
+    'yfinance>=0.2.10' \
     'python-binance>=1.0.16' \
     'alpaca-py' \
     'ccxt>=1.89.14' \
+    'tables' \
     'polygon-api-client>=1.0.0' \
     'nasdaq-data-link' \
     'ta' \
@@ -55,7 +58,10 @@ RUN pip install --quiet --no-cache-dir \
     'quantstats>=0.0.37' \
     'PyPortfolioOpt>=1.5.1' \
     'Riskfolio-Lib>=3.3.0' \
-    'python-telegram-bot>=13.4'
+    'python-telegram-bot>=13.4' \
+    'dill' \
+    'lz4' \
+    'blosc'
 
 RUN pip install --quiet --no-cache-dir --no-deps 'universal-portfolios'
 RUN pip install --quiet --no-cache-dir 'pandas_datareader'

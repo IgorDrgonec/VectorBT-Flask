@@ -1,17 +1,11 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Modules for plotting with Plotly Express."""
 
-from vectorbtpro.utils.module_ import create__all__
-from vectorbtpro.utils.opt_packages import check_installed
-from vectorbtpro._settings import settings
+from typing import TYPE_CHECKING
 
-__blacklist__ = []
+if TYPE_CHECKING:
+    from vectorbtpro.px.accessors import *
 
-if not check_installed("plotly") or not settings["importing"]["plotly"]:
-    __blacklist__.append("accessors")
-else:
-    from vectorbtpro.px.accessors import PXAccessor, PXSRAccessor, PXDFAccessor
-
-__all__ = create__all__(__name__)
-__pdoc__ = {k: False for k in __all__}
+__import_if_installed__ = dict()
+__import_if_installed__["accessors"] = "plotly"

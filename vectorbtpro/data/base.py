@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base class for working with data sources.
 
@@ -23,6 +23,7 @@ from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.indexes import stack_indexes
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic import nb as generic_nb
+from vectorbtpro.returns.accessors import ReturnsAccessor
 from vectorbtpro.data.decorators import attach_symbol_dict_methods
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import get_dict_attr
@@ -33,6 +34,9 @@ from vectorbtpro.utils.path_ import check_mkdir
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.template import RepEval
 from vectorbtpro.utils.pickling import pdict
+from vectorbtpro.utils.execution import execute
+
+__all__ = ["symbol_dict", "run_func_dict", "Data"]
 
 __pdoc__ = {}
 
@@ -307,10 +311,17 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 kwargs["data"] = new_data
         return Analyzable.replace(self, **kwargs)
 
-    def indexing_func(self: DataT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> DataT:
+    def indexing_func(self: DataT, *args, **kwargs) -> DataT:
         """Perform indexing on `Data`."""
-        new_wrapper = pd_indexing_func(self.wrapper)
-        new_data = {s: pd_indexing_func(obj) for s, obj in self.data.items()}
+        wrapper_meta = self.wrapper.indexing_func_meta(*args, **kwargs)
+        new_wrapper = wrapper_meta["new_wrapper"]
+        new_data = {}
+        for k, v in self.data.items():
+            if wrapper_meta["rows_changed"]:
+                v = v.iloc[wrapper_meta["row_idxs"]]
+            if wrapper_meta["columns_changed"]:
+                v = v.iloc[:, wrapper_meta["col_idxs"]]
+            new_data[k] = v
         new_last_index = dict()
         for s, obj in self.data.items():
             if s in self.last_index:
@@ -373,18 +384,11 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         return self._missing_columns
 
     @property
-    def index(self) -> tp.Index:
-        """Index.
+    def ndim(self) -> int:
+        """Number of dimensions.
 
         Based on the default symbol wrapper."""
-        return self.symbol_wrapper.index
-
-    @property
-    def columns(self) -> tp.Index:
-        """Columns.
-
-        Based on the default symbol wrapper."""
-        return self.symbol_wrapper.columns
+        return self.symbol_wrapper.ndim
 
     @property
     def shape(self) -> tp.Shape:
@@ -394,11 +398,25 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         return self.symbol_wrapper.shape
 
     @property
-    def ndim(self) -> int:
-        """Number of dimensions.
+    def columns(self) -> tp.Index:
+        """Columns.
 
         Based on the default symbol wrapper."""
-        return self.symbol_wrapper.ndim
+        return self.symbol_wrapper.columns
+
+    @property
+    def index(self) -> tp.Index:
+        """Index.
+
+        Based on the default symbol wrapper."""
+        return self.symbol_wrapper.index
+
+    @property
+    def freq(self) -> tp.Optional[pd.Timedelta]:
+        """Frequency.
+
+        Based on the default symbol wrapper."""
+        return self.symbol_wrapper.freq
 
     # ############# Pre- and post-processing ############# #
 
@@ -716,13 +734,46 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         cls,
         symbol: tp.Symbol,
         **kwargs,
-    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
+    ) -> tp.SymbolData:
         """Fetch a symbol.
 
         Can also return a dictionary that will be accessible in `Data.returned_kwargs`.
+        If there are keyword arguments `tz_localize`, `tz_convert`, or `freq` in this dict,
+        will pop them and use them to override global settings.
 
         This is an abstract method - override it to define custom logic."""
         raise NotImplementedError
+
+    @classmethod
+    def try_fetch_symbol(
+        cls,
+        symbol: tp.Symbol,
+        skip_on_error: bool = False,
+        silence_warnings: bool = False,
+        fetch_kwargs: tp.KwargsLike = None,
+    ) -> tp.SymbolData:
+        """Try to fetch a symbol using `Data.fetch_symbol`."""
+        if fetch_kwargs is None:
+            fetch_kwargs = {}
+        try:
+            out = cls.fetch_symbol(symbol, **fetch_kwargs)
+            if out is None:
+                if not silence_warnings:
+                    warnings.warn(
+                        f"Symbol '{str(symbol)}' returned None. Skipping.",
+                        stacklevel=2,
+                    )
+            return out
+        except Exception as e:
+            if not skip_on_error:
+                raise e
+            if not silence_warnings:
+                warnings.warn(traceback.format_exc(), stacklevel=2)
+                warnings.warn(
+                    f"Symbol '{str(symbol)}' raised an exception. Skipping.",
+                    stacklevel=2,
+                )
+        return None
 
     @classmethod
     def fetch(
@@ -735,13 +786,15 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         missing_index: tp.Optional[str] = None,
         missing_columns: tp.Optional[str] = None,
         wrapper_kwargs: tp.KwargsLike = None,
-        show_progress: tp.Optional[bool] = None,
-        pbar_kwargs: tp.KwargsLike = None,
         skip_on_error: tp.Optional[bool] = None,
         silence_warnings: tp.Optional[bool] = None,
+        execute_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> DataT:
-        """Fetch data using `Data.fetch_symbol` and pass to `Data.from_data`.
+        """Fetch data of each symbol using `Data.fetch_symbol` and pass to `Data.from_data`.
+
+        Iteration over symbols is done using `vectorbtpro.utils.execution.execute`.
+        That is, it can be distributed and parallelized when needed.
 
         Args:
             symbols (hashable or sequence of hashable): One or multiple symbols.
@@ -760,17 +813,11 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             missing_index (str): See `Data.from_data`.
             missing_columns (str): See `Data.from_data`.
             wrapper_kwargs (dict): See `Data.from_data`.
-            show_progress (bool): Whether to show the progress bar.
-                Defaults to True if the global flag for data is True and there is more than one symbol.
-
-                Will also forward this argument to `Data.fetch_symbol` if in the signature.
-            pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
-
-                Will also forward this argument to `Data.fetch_symbol` if in the signature.
             skip_on_error (bool): Whether to skip the symbol when an exception is raised.
             silence_warnings (bool): Whether to silence all warnings.
 
                 Will also forward this argument to `Data.fetch_symbol` if in the signature.
+            execute_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.execution.execute`.
             **kwargs: Passed to `Data.fetch_symbol`.
 
                 If two symbols require different keyword arguments, pass `symbol_dict` for each argument.
@@ -782,10 +829,11 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         if checks.is_hashable(symbols):
             single_symbol = True
             symbols = [symbols]
-        elif not checks.is_sequence(symbols):
-            raise TypeError("Symbols must be either a hashable or a sequence of hashable")
-        else:
+        elif checks.is_iterable(symbols):
+            symbols = list(symbols)
             single_symbol = False
+        else:
+            raise TypeError("Symbols must be either a hashable or a sequence of hashable")
         if symbol_classes is not None:
             if not isinstance(symbol_classes, symbol_dict):
                 new_symbol_classes = symbol_dict()
@@ -803,72 +851,63 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                             _symbol_classes = {"symbol_class": _symbol_classes}
                         new_symbol_classes[symbol] = _symbol_classes
                 symbol_classes = new_symbol_classes
-        show_symbol_progress = show_progress
-        if show_symbol_progress is None:
-            show_symbol_progress = data_cfg["show_progress"]
-        if show_progress is None:
-            show_progress = data_cfg["show_progress"] and not single_symbol
-        pbar_kwargs = merge_dicts(data_cfg["pbar_kwargs"], pbar_kwargs)
+        wrapper_kwargs = merge_dicts(data_cfg["wrapper_kwargs"], wrapper_kwargs)
         if skip_on_error is None:
             skip_on_error = data_cfg["skip_on_error"]
         if silence_warnings is None:
             silence_warnings = data_cfg["silence_warnings"]
+        execute_kwargs = merge_dicts(data_cfg["execute_kwargs"], execute_kwargs)
+        if not single_symbol and "show_progress" not in execute_kwargs:
+            execute_kwargs["show_progress"] = True
+
+        funcs_args = []
+        fetch_kwargs = symbol_dict()
+        func_arg_names = get_func_arg_names(cls.fetch_symbol)
+        for symbol in symbols:
+            symbol_fetch_kwargs = cls.select_symbol_kwargs(symbol, kwargs)
+            if "silence_warnings" in func_arg_names:
+                symbol_fetch_kwargs["silence_warnings"] = silence_warnings
+            funcs_args.append((
+                cls.try_fetch_symbol,
+                (symbol,),
+                dict(
+                    skip_on_error=skip_on_error,
+                    silence_warnings=silence_warnings,
+                    fetch_kwargs=symbol_fetch_kwargs,
+                )
+            ))
+            fetch_kwargs[symbol] = symbol_fetch_kwargs
+
+        outputs = execute(funcs_args, n_calls=len(symbols), progress_desc=symbols, **execute_kwargs)
 
         data = symbol_dict()
-        fetch_kwargs = symbol_dict()
         returned_kwargs = symbol_dict()
-        with get_pbar(total=len(symbols), show_progress=show_progress, **pbar_kwargs) as pbar:
-            for symbol in symbols:
-                if symbol is not None:
-                    pbar.set_description(str(symbol))
-
-                _kwargs = cls.select_symbol_kwargs(symbol, kwargs)
-                func_arg_names = get_func_arg_names(cls.fetch_symbol)
-                if "show_progress" in func_arg_names:
-                    _kwargs["show_progress"] = show_symbol_progress
-                if "pbar_kwargs" in func_arg_names:
-                    _kwargs["pbar_kwargs"] = pbar_kwargs
-                if "silence_warnings" in func_arg_names:
-                    _kwargs["silence_warnings"] = silence_warnings
-
-                try:
-                    out = cls.fetch_symbol(symbol, **_kwargs)
-                except Exception as e:
-                    if not skip_on_error:
-                        raise e
+        for i, out in enumerate(outputs):
+            symbol = symbols[i]
+            if out is not None:
+                if isinstance(out, tuple):
+                    _data = out[0]
+                    _returned_kwargs = out[1]
+                else:
+                    _data = out
+                    _returned_kwargs = {}
+                _data = to_any_array(_data)
+                if tz_localize is None:
+                    tz_localize = _returned_kwargs.pop("tz_localize", None)
+                if tz_convert is None:
+                    tz_convert = _returned_kwargs.pop("tz_convert", None)
+                if wrapper_kwargs.get("freq", None) is None:
+                    wrapper_kwargs["freq"] = _returned_kwargs.pop("freq", None)
+                if _data.size == 0:
                     if not silence_warnings:
-                        warnings.warn(traceback.format_exc(), stacklevel=2)
                         warnings.warn(
-                            f"Symbol '{str(symbol)}' raised an exception. Skipping.",
+                            f"Symbol '{str(symbol)}' returned an empty array. Skipping.",
                             stacklevel=2,
                         )
                 else:
-                    if out is None:
-                        if not silence_warnings:
-                            warnings.warn(
-                                f"Symbol '{str(symbol)}' returned None. Skipping.",
-                                stacklevel=2,
-                            )
-                    else:
-                        if isinstance(out, tuple):
-                            _data = out[0]
-                            _returned_kwargs = out[1]
-                        else:
-                            _data = out
-                            _returned_kwargs = {}
-                        _data = to_any_array(_data)
-                        if _data.size == 0:
-                            if not silence_warnings:
-                                warnings.warn(
-                                    f"Symbol '{str(symbol)}' returned an empty array. Skipping.",
-                                    stacklevel=2,
-                                )
-                        else:
-                            data[symbol] = _data
-                            returned_kwargs[symbol] = _returned_kwargs
-                            fetch_kwargs[symbol] = _kwargs
+                    data[symbol] = _data
+                    returned_kwargs[symbol] = _returned_kwargs
 
-                pbar.update(1)
         if len(data) == 0:
             raise ValueError("No symbols could be fetched")
 
@@ -893,7 +932,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         self,
         symbol: tp.Symbol,
         **kwargs,
-    ) -> tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.Kwargs]]:
+    ) -> tp.SymbolData:
         """Update a symbol.
 
         Can also return a dictionary that will be accessible in `Data.returned_kwargs`.
@@ -901,121 +940,137 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         This is an abstract method - override it to define custom logic."""
         raise NotImplementedError
 
+    def try_update_symbol(
+        self,
+        symbol: tp.Symbol,
+        skip_on_error: bool = False,
+        silence_warnings: bool = False,
+        update_kwargs: tp.KwargsLike = None,
+    ) -> tp.SymbolData:
+        """Try to update a symbol using `Data.update_symbol`."""
+        if update_kwargs is None:
+            update_kwargs = {}
+        try:
+            out = self.update_symbol(symbol, **update_kwargs)
+            if out is None:
+                if not silence_warnings:
+                    warnings.warn(
+                        f"Symbol '{str(symbol)}' returned None. Skipping.",
+                        stacklevel=2,
+                    )
+            return out
+        except Exception as e:
+            if not skip_on_error:
+                raise e
+            if not silence_warnings:
+                warnings.warn(traceback.format_exc(), stacklevel=2)
+                warnings.warn(
+                    f"Symbol '{str(symbol)}' raised an exception. Skipping.",
+                    stacklevel=2,
+                )
+        return None
+
     def update(
         self: DataT,
         *,
         concat: bool = True,
-        show_progress: bool = False,
-        pbar_kwargs: tp.KwargsLike = None,
         skip_on_error: tp.Optional[bool] = None,
         silence_warnings: tp.Optional[bool] = None,
+        execute_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> DataT:
-        """Fetch additional data using `Data.update_symbol` and append it to the existing data.
+        """Fetch additional data of each symbol using `Data.update_symbol`.
 
         Args:
             concat (bool): Whether to concatenate existing and updated/new data.
-            show_progress (bool): Whether to show the progress bar.
-
-                Will also forward this argument to `Data.update_symbol` if accepted by `Data.fetch_symbol`.
-            pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
-
-                Will also forward this argument to `Data.update_symbol` if accepted by `Data.fetch_symbol`.
             skip_on_error (bool): Whether to skip the symbol when an exception is raised.
             silence_warnings (bool): Whether to silence all warnings.
 
                 Will also forward this argument to `Data.update_symbol` if accepted by `Data.fetch_symbol`.
+            execute_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.execution.execute`.
             **kwargs: Passed to `Data.update_symbol`.
 
                 If two symbols require different keyword arguments, pass `symbol_dict` for each argument.
 
         !!! note
-            Returns a new `Data` instance instead of changing the data in place."""
+            Returns a new `Data` instance instead of changing the data in place.
+        """
         data_cfg = self.get_settings(key_id="base")
 
-        pbar_kwargs = merge_dicts(data_cfg["pbar_kwargs"], pbar_kwargs)
         if skip_on_error is None:
             skip_on_error = data_cfg["skip_on_error"]
         if silence_warnings is None:
             silence_warnings = data_cfg["silence_warnings"]
+        execute_kwargs = merge_dicts(data_cfg["execute_kwargs"], execute_kwargs)
+        if "show_progress" not in execute_kwargs:
+            execute_kwargs["show_progress"] = False
+        func_arg_names = get_func_arg_names(self.fetch_symbol)
+        if "show_progress" in func_arg_names and "show_progress" not in kwargs:
+            kwargs["show_progress"] = False
+
+        funcs_args = []
+        for symbol in self.symbols:
+            symbol_update_kwargs = self.select_symbol_kwargs(symbol, kwargs)
+            if "silence_warnings" in func_arg_names:
+                symbol_update_kwargs["silence_warnings"] = silence_warnings
+            funcs_args.append((
+                self.try_update_symbol,
+                (symbol,),
+                dict(
+                    skip_on_error=skip_on_error,
+                    silence_warnings=silence_warnings,
+                    update_kwargs=symbol_update_kwargs,
+                )
+            ))
+
+        outputs = execute(funcs_args, n_calls=len(self.symbols), progress_desc=self.symbols, **execute_kwargs)
 
         new_data = symbol_dict()
         new_last_index = symbol_dict()
         new_returned_kwargs = symbol_dict()
-        with get_pbar(total=len(self.data), show_progress=show_progress, **pbar_kwargs) as pbar:
-            for symbol, obj in self.data.items():
-                if symbol is not None:
-                    pbar.set_description(str(symbol))
-
-                _kwargs = self.select_symbol_kwargs(symbol, kwargs)
-                func_arg_names = get_func_arg_names(self.fetch_symbol)
-                if "show_progress" in func_arg_names:
-                    _kwargs["show_progress"] = show_progress
-                if "pbar_kwargs" in func_arg_names:
-                    _kwargs["pbar_kwargs"] = pbar_kwargs
-                if "silence_warnings" in func_arg_names:
-                    _kwargs["silence_warnings"] = silence_warnings
-
-                skip_symbol = False
-                try:
-                    out = self.update_symbol(symbol, **_kwargs)
-                except Exception as e:
-                    if not skip_on_error:
-                        raise e
+        for i, out in enumerate(outputs):
+            symbol = self.symbols[i]
+            obj = self.data[symbol]
+            skip_symbol = False
+            if out is not None:
+                if isinstance(out, tuple):
+                    new_obj = out[0]
+                    new_returned_kwargs[symbol] = out[1]
+                else:
+                    new_obj = out
+                    new_returned_kwargs[symbol] = {}
+                new_obj = to_any_array(new_obj)
+                if new_obj.size == 0:
                     if not silence_warnings:
-                        warnings.warn(traceback.format_exc(), stacklevel=2)
                         warnings.warn(
-                            f"Symbol '{str(symbol)}' raised an exception. Skipping.",
+                            f"Symbol '{str(symbol)}' returned an empty array. Skipping.",
                             stacklevel=2,
                         )
                     skip_symbol = True
                 else:
-                    if out is None:
-                        if not silence_warnings:
-                            warnings.warn(
-                                f"Symbol '{str(symbol)}' returned None. Skipping.",
-                                stacklevel=2,
-                            )
-                        skip_symbol = True
+                    if not checks.is_pandas(new_obj):
+                        new_obj = to_pd_array(new_obj)
+                        new_obj.index = pd.RangeIndex(
+                            start=obj.index[-1],
+                            stop=obj.index[-1] + new_obj.shape[0],
+                            step=1,
+                        )
+                    new_obj = new_obj[~new_obj.index.duplicated(keep="last")]
+                    new_obj = self.prepare_tzaware_index(
+                        new_obj,
+                        tz_localize=self.tz_localize,
+                        tz_convert=self.tz_convert,
+                    )
+                    new_data[symbol] = new_obj
+                    if len(new_obj.index) > 0:
+                        new_last_index[symbol] = new_obj.index[-1]
                     else:
-                        if isinstance(out, tuple):
-                            new_obj = out[0]
-                            new_returned_kwargs[symbol] = out[1]
-                        else:
-                            new_obj = out
-                            new_returned_kwargs[symbol] = {}
-                        new_obj = to_any_array(new_obj)
-                        if new_obj.size == 0:
-                            if not silence_warnings:
-                                warnings.warn(
-                                    f"Symbol '{str(symbol)}' returned an empty array. Skipping.",
-                                    stacklevel=2,
-                                )
-                            skip_symbol = True
-                        else:
-                            if not checks.is_pandas(new_obj):
-                                new_obj = to_pd_array(new_obj)
-                                new_obj.index = pd.RangeIndex(
-                                    start=obj.index[-1],
-                                    stop=obj.index[-1] + new_obj.shape[0],
-                                    step=1,
-                                )
-                            new_obj = new_obj[~new_obj.index.duplicated(keep="last")]
-                            new_obj = self.prepare_tzaware_index(
-                                new_obj,
-                                tz_localize=self.tz_localize,
-                                tz_convert=self.tz_convert,
-                            )
-                            new_data[symbol] = new_obj
-                            if len(new_obj.index) > 0:
-                                new_last_index[symbol] = new_obj.index[-1]
-                            else:
-                                new_last_index[symbol] = self.last_index[symbol]
-
-                if skip_symbol:
-                    new_data[symbol] = obj.iloc[0:0]
-                    new_last_index[symbol] = self.last_index[symbol]
-                pbar.update(1)
+                        new_last_index[symbol] = self.last_index[symbol]
+            else:
+                skip_symbol = True
+            if skip_symbol:
+                new_data[symbol] = obj.iloc[0:0]
+                new_last_index[symbol] = self.last_index[symbol]
 
         # Get the last index in the old data from where the new data should begin
         from_index = None
@@ -1320,7 +1375,12 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     @property
     def returns(self) -> tp.Optional[tp.SeriesFrame]:
         """Returns."""
-        return self.close.vbt.to_returns()
+        return ReturnsAccessor.from_value(self.close, wrapper=self.symbol_wrapper, return_values=True)
+
+    @property
+    def returns_acc(self) -> tp.Optional[tp.SeriesFrame]:
+        """Return accessor of type `vectorbtpro.returns.accessors.ReturnsAccessor`."""
+        return ReturnsAccessor.from_value(self.close, wrapper=self.symbol_wrapper, return_values=False)
 
     # ############# Selecting ############# #
 
@@ -1464,6 +1524,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         key: tp.Optional[tp.Union[str, symbol_dict]] = None,
         path_or_buf: tp.Optional[tp.Union[str, symbol_dict]] = None,
         mkdir_kwargs: tp.Union[tp.KwargsLike, symbol_dict] = None,
+        format: str = "table",
         **kwargs,
     ) -> None:
         """Save data into an HDF file.
@@ -1473,6 +1534,10 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         If `file_path` exists, and it's a directory, will create inside it a file named
         after this class. This won't work with directories that do not exist, otherwise
         they could be confused with file names."""
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("tables")
+
         for k, v in self.data.items():
             if path_or_buf is None:
                 if isinstance(file_path, symbol_dict):
@@ -1500,7 +1565,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             else:
                 _key = key
             _kwargs = self.select_symbol_kwargs(k, kwargs)
-            v.to_hdf(path_or_buf=_path_or_buf, key=_key, **_kwargs)
+            v.to_hdf(path_or_buf=_path_or_buf, key=_key, format=format, **_kwargs)
 
     # ############# Transforming ############# #
 
@@ -1616,6 +1681,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         on_symbols: tp.Union[None, tp.Symbol, tp.Symbols] = None,
         pass_as_first: bool = False,
         rename_args: tp.DictLike = None,
+        unpack: tp.Union[bool, str] = False,
         silence_warnings: bool = False,
         **kwargs,
     ) -> tp.Any:
@@ -1646,6 +1712,10 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         Use `rename_args` to rename arguments. For example, in `vectorbtpro.portfolio.base.Portfolio`,
         data can be passed instead of `close`.
 
+        Set `unpack` to True to return the actual output arrays of the indicator instance.
+        If there's only one output, it will be returned as-is. If multiple, a tuple will be returned.
+        Set `unpack` to 'dict' to return a dictionary instead.
+
         Any argument in `*args` and `**kwargs` can be wrapped with `run_func_dict` to specify
         the value per function name or index when `func` is an iterable."""
         from vectorbtpro.indicators.factory import IndicatorBase, IndicatorFactory
@@ -1653,7 +1723,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         from vectorbtpro.signals import generators as signal_generators
         from vectorbtpro.labels import generators as label_generators
         from vectorbtpro.portfolio.base import Portfolio
-        from vectorbtpro.utils.opt_packages import check_installed
+        from vectorbtpro.utils.module_ import check_installed
 
         _self = self
         if on_indices is not None:
@@ -1799,7 +1869,18 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                     if column_idx != -1:
                         with_kwargs[real_arg_name] = _self.get_column(column_idx)
         new_args, new_kwargs = extend_args(func, args, kwargs, **with_kwargs)
-        return func(*new_args, **new_kwargs)
+        out = func(*new_args, **new_kwargs)
+        if isinstance(out, IndicatorBase):
+            if isinstance(unpack, bool):
+                if unpack:
+                    out = tuple([getattr(out, name) for name in out.output_names])
+                    if len(out) == 1:
+                        out = out[0]
+            elif isinstance(unpack, str) and unpack.lower() == "dict":
+                out = {name: getattr(out, name) for name in out.output_names}
+            else:
+                raise ValueError(f"Invalid option unpack='{unpack}'")
+        return out
 
     # ############# Stats ############# #
 
@@ -1912,13 +1993,13 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
             * Plot OHLC(V) of one symbol (only if data contains the respective columns):
 
-            ![](/assets/images/api/data_plot.svg)
+            ![](/assets/images/api/data_plot.svg){: .iimg }
 
             ```pycon
             >>> data.plot(symbol='BTC-USD').show()
             ```
 
-            ![](/assets/images/api/data_plot_ohlcv.svg)
+            ![](/assets/images/api/data_plot_ohlcv.svg){: .iimg }
         """
         if column is None:
             first_data = self.data[self.symbols[0]]

@@ -1,10 +1,12 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for working with tags."""
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.parsing import get_expr_var_names
 from vectorbtpro.utils.template import RepEval
+
+__all__ = []
 
 
 def match_tags(tags: tp.MaybeIterable[str], in_tags: tp.MaybeIterable[str]) -> bool:

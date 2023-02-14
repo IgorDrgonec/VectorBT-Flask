@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Utilities for images."""
 
@@ -7,6 +7,10 @@ import numpy as np
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.pbar import get_pbar
+
+__all__ = [
+    "save_animation",
+]
 
 
 def hstack_image_arrays(a: tp.Array3d, b: tp.Array3d) -> tp.Array3d:
@@ -62,7 +66,7 @@ def save_animation(
         to_image_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.to_image`.
         **kwargs: Keyword arguments passed to `plot_func`.
     """
-    from vectorbtpro.utils.opt_packages import assert_can_import
+    from vectorbtpro.utils.module_ import assert_can_import
 
     assert_can_import("plotly")
     import plotly.graph_objects as go

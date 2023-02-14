@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Base plotting functions.
 
@@ -10,7 +10,7 @@ on using Plotly, see [Getting Started with Plotly in Python](https://plotly.com/
 !!! warning
     Errors related to plotting in Jupyter environment usually appear in the logs, not under the cell."""
 
-from vectorbtpro.utils.opt_packages import assert_can_import
+from vectorbtpro.utils.module_ import assert_can_import
 
 assert_can_import("plotly")
 
@@ -29,7 +29,16 @@ from vectorbtpro.utils.colors import map_value_to_cmap
 from vectorbtpro.utils.config import Configured, resolve_dict, merge_dicts
 from vectorbtpro.utils.figure import make_figure
 
-__all__ = ["clean_labels", "TraceUpdater", "Gauge", "Bar", "Scatter", "Histogram", "Box", "Heatmap", "Volume"]
+__all__ = [
+    "TraceUpdater",
+    "Gauge",
+    "Bar",
+    "Scatter",
+    "Histogram",
+    "Box",
+    "Heatmap",
+    "Volume",
+]
 
 
 def clean_labels(labels: tp.Labels) -> tp.Labels:
@@ -111,7 +120,7 @@ class Gauge(Configured, TraceUpdater):
             >>> gauge.fig.show()
             ```
 
-            ![](/assets/images/api/Gauge.svg)
+            ![](/assets/images/api/Gauge.svg){: .iimg }
         """
         Configured.__init__(
             self,
@@ -239,7 +248,7 @@ class Bar(Configured, TraceUpdater):
             >>> bar.fig.show()
             ```
 
-            ![](/assets/images/api/Bar.svg)
+            ![](/assets/images/api/Bar.svg){: .iimg }
         """
         Configured.__init__(
             self,
@@ -352,7 +361,7 @@ class Scatter(Configured, TraceUpdater):
             >>> scatter.fig.show()
             ```
 
-            ![](/assets/images/api/Scatter.svg)
+            ![](/assets/images/api/Scatter.svg){: .iimg }
         """
         Configured.__init__(
             self,
@@ -408,6 +417,7 @@ class Scatter(Configured, TraceUpdater):
                 scatter_obj = go.Scatter
             try:
                 from plotly_resampler.aggregation import AbstractFigureAggregator
+
                 if isinstance(fig, AbstractFigureAggregator):
                     use_resampler = True
                 else:
@@ -498,7 +508,7 @@ class Histogram(Configured, TraceUpdater):
             >>> hist.fig.show()
             ```
 
-            ![](/assets/images/api/Histogram.svg)
+            ![](/assets/images/api/Histogram.svg){: .iimg }
         """
         Configured.__init__(
             self,
@@ -663,7 +673,7 @@ class Box(Configured, TraceUpdater):
             >>> box.fig.show()
             ```
 
-            ![](/assets/images/api/Box.svg)
+            ![](/assets/images/api/Box.svg){: .iimg }
         """
         Configured.__init__(
             self,
@@ -835,7 +845,7 @@ class Heatmap(Configured, TraceUpdater):
             >>> heatmap.fig.show()
             ```
 
-            ![](/assets/images/api/Heatmap.svg)
+            ![](/assets/images/api/Heatmap.svg){: .iimg }
         """
         Configured.__init__(
             self,
@@ -970,7 +980,7 @@ class Volume(Configured, TraceUpdater):
             >>> volume.fig.show()
             ```
 
-            ![](/assets/images/api/Volume.svg)
+            ![](/assets/images/api/Volume.svg){: .iimg }
         """
         Configured.__init__(
             self,

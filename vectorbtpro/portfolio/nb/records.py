@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for portfolio records."""
 
@@ -1015,6 +1015,11 @@ def trade_best_worst_price_nb(
     vmin = np.nan
     vmax = np.nan
     for i in range(from_i, to_i + 1):
+        if i == from_i:
+            if np.isnan(vmin) or trade["entry_price"] < vmin:
+                vmin = trade["entry_price"]
+            if np.isnan(vmax) or trade["entry_price"] > vmax:
+                vmax = trade["entry_price"]
         if i > from_i or entry_price_open:
             if open is not None:
                 _open = flex_select_nb(open, i, trade["col"])
@@ -1040,6 +1045,11 @@ def trade_best_worst_price_nb(
         if max_duration is not None:
             if from_i + max_duration == i:
                 break
+        if i == to_i:
+            if np.isnan(vmin) or trade["exit_price"] < vmin:
+                vmin = trade["exit_price"]
+            if np.isnan(vmax) or trade["exit_price"] > vmax:
+                vmax = trade["exit_price"]
     if trade_long:
         return vmax, vmin
     return vmin, vmax

@@ -87,10 +87,10 @@ class TestFromOrderFunc:
     def test_data(self):
         data = vbt.RandomOHLCData.fetch(
             [0, 1],
-            ohlc_freq="1d",
             start="2020-01-01",
             end="2020-02-01",
-            freq="1h",
+            tick_freq="1h",
+            freq="1d",
             seed=42,
         )
         pf = vbt.Portfolio.from_order_func(data, order_func_nb, np.array([[np.inf]]))
@@ -3307,32 +3307,6 @@ class TestFromDefOrderFunc:
     @pytest.mark.parametrize("test_row_wise", [False, True])
     @pytest.mark.parametrize("test_flexible", [False, True])
     def test_compare(self, test_row_wise, test_flexible):
-        pf = vbt.Portfolio.from_def_order_func(
-            price_wide,
-            size=[[0, 1, np.inf]],
-            log=True,
-            row_wise=test_row_wise,
-            flexible=test_flexible,
-        )
-        pf2 = vbt.Portfolio.from_orders(price_wide, size=[[0, 1, np.inf]], log=True)
-        assert_records_close(pf.order_records, pf2.order_records)
-        assert_records_close(pf.log_records, pf2.log_records)
-        assert pf.wrapper == pf2.wrapper
-
-        pf = vbt.Portfolio.from_def_order_func(
-            price_wide,
-            size=[[0, 1, np.inf]],
-            log=True,
-            group_by=True,
-            cash_sharing=True,
-            row_wise=test_row_wise,
-            flexible=test_flexible,
-        )
-        pf2 = vbt.Portfolio.from_orders(price_wide, size=[[0, 1, np.inf]], log=True, group_by=True, cash_sharing=True)
-        assert_records_close(pf.order_records, pf2.order_records)
-        assert_records_close(pf.log_records, pf2.log_records)
-        assert pf.wrapper == pf2.wrapper
-
         target_hold_value = pd.DataFrame(
             {
                 "a": [0.0, 70.0, 30.0, 0.0, 70.0],

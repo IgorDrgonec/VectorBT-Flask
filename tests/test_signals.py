@@ -2701,7 +2701,7 @@ class TestFactory:
             in_output_names=["in_out2"],
             param_names=["n2"],
         ).with_place_func(
-            entry_place_func=place_nb,
+            entry_place_func_nb=place_nb,
             entry_settings=dict(
                 pass_inputs=["ts2"],
                 pass_in_outputs=["in_out2"],
@@ -2750,7 +2750,7 @@ class TestFactory:
             in_output_names=["in_out2"],
             param_names=["n2"],
         ).with_place_func(
-            exit_place_func=place_nb,
+            exit_place_func_nb=place_nb,
             exit_settings=dict(
                 pass_inputs=["ts2"],
                 pass_in_outputs=["in_out2"],
@@ -2839,7 +2839,7 @@ class TestFactory:
             in_output_names=["in_out2"],
             param_names=["n2"],
         ).with_place_func(
-            exit_place_func=place_nb,
+            exit_place_func_nb=place_nb,
             exit_settings=dict(
                 pass_inputs=["ts2"],
                 pass_in_outputs=["in_out2"],
@@ -2952,7 +2952,7 @@ class TestFactory:
                 pass_params=["n1", "n2"],
                 pass_kwargs=["temp_idx_arr0", ("kw0", 1000)],
             ),
-            entry_place_func=place_nb,
+            entry_place_func_nb=place_nb,
             entry_settings=dict(
                 pass_inputs=["ts1"],
                 pass_in_outputs=["in_out1"],
@@ -2960,7 +2960,7 @@ class TestFactory:
                 pass_kwargs=["temp_idx_arr1", ("kw1", 1000)],
                 pass_cache=True,
             ),
-            exit_place_func=place_nb,
+            exit_place_func_nb=place_nb,
             exit_settings=dict(
                 pass_inputs=["ts2"],
                 pass_in_outputs=["in_out2"],
@@ -3258,7 +3258,7 @@ class TestGenerators:
     def test_RPROB(self):
         rprob = vbt.RPROB.run(prob=1, input_shape=(5,), seed=seed)
         assert_series_equal(rprob.entries, pd.Series(np.array([True, True, True, True, True]), name=1))
-        rprob = vbt.RPROB.run(prob=[0, 0.5, 1], input_shape=(5,), seed=seed)
+        rprob = vbt.RPROB.run(prob=[0., 0.5, 1.], input_shape=(5,), seed=seed)
         assert_frame_equal(
             rprob.entries,
             pd.DataFrame(
@@ -3271,10 +3271,10 @@ class TestGenerators:
                         [False, False, True],
                     ]
                 ),
-                columns=pd.Index([0, 0.5, 1], dtype="float64", name="rprob_prob"),
+                columns=pd.Index([0., 0.5, 1.], dtype="float64", name="rprob_prob"),
             ),
         )
-        rprob = vbt.RPROB.run(prob=[np.array([[0, 0.25]]), np.array([[0.75, 1]])], input_shape=(5, 2), seed=seed)
+        rprob = vbt.RPROB.run(prob=[np.array([[0., 0.25]]), np.array([[0.75, 1.]])], input_shape=(5, 2), seed=seed)
         assert_frame_equal(
             rprob.entries,
             pd.DataFrame(

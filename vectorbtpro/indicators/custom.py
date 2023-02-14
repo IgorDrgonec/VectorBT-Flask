@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Oleg Polakow. All rights reserved.
+# Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
 """Custom indicators built with the indicator factory.
 
@@ -59,7 +59,7 @@ Date
 >>> ohlcv.vbt.ohlcv.plot().show()
 ```
 
-![](/assets/images/api/custom_price.svg)"""
+![](/assets/images/api/custom_price.svg){: .iimg }"""
 
 import numpy as np
 import pandas as pd
@@ -86,7 +86,6 @@ __all__ = [
     "ATR",
     "OBV",
     "OLS",
-    "OLSS",
     "PATSIM",
     "VWAP",
     "PIVOTINFO",
@@ -156,7 +155,7 @@ class _MA(MA):
             >>> vbt.MA.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/MA.svg)
+            ![](/assets/images/api/MA.svg){: .iimg }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -257,7 +256,7 @@ class _MSD(MSD):
             >>> vbt.MSD.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/MSD.svg)
+            ![](/assets/images/api/MSD.svg){: .iimg }
         """
         from vectorbtpro._settings import settings
 
@@ -361,7 +360,7 @@ class _BBANDS(BBANDS):
             >>> vbt.BBANDS.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/BBANDS.svg)
+            ![](/assets/images/api/BBANDS.svg){: .iimg }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -498,7 +497,7 @@ class _RSI(RSI):
             >>> vbt.RSI.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/RSI.svg)
+            ![](/assets/images/api/RSI.svg){: .iimg }
         """
         from vectorbtpro._settings import settings
 
@@ -624,7 +623,7 @@ class _STOCH(STOCH):
             >>> vbt.STOCH.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/STOCH.svg)
+            ![](/assets/images/api/STOCH.svg){: .iimg }
         """
         from vectorbtpro._settings import settings
 
@@ -775,9 +774,9 @@ class _MACD(MACD):
             >>> vbt.MACD.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/MACD.svg)
+            ![](/assets/images/api/MACD.svg){: .iimg }
         """
-        from vectorbtpro.utils.opt_packages import assert_can_import
+        from vectorbtpro.utils.module_ import assert_can_import
         from vectorbtpro._settings import settings
 
         plotting_cfg = settings["plotting"]
@@ -909,7 +908,7 @@ class _ATR(ATR):
             >>> vbt.ATR.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/ATR.svg)
+            ![](/assets/images/api/ATR.svg){: .iimg }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -994,7 +993,7 @@ class _OBV(OBV):
             >>> vbt.OBV.run(ohlcv['Close'], ohlcv['Volume']).plot().show()
             ```
 
-            ![](/assets/images/api/OBV.svg)
+            ![](/assets/images/api/OBV.svg){: .iimg }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -1036,7 +1035,7 @@ OLS = IndicatorFactory(
     short_name="ols",
     input_names=["x", "y"],
     param_names=["window"],
-    output_names=["slope", "intercept"],
+    output_names=["slope", "intercept", "zscore"],
     lazy_outputs=dict(
         pred=lambda self: self.wrapper.wrap(self.intercept.values + self.slope.values * self.x.values),
         error=lambda self: self.wrapper.wrap(self.y.values - self.pred.values),
@@ -1046,14 +1045,16 @@ OLS = IndicatorFactory(
     nb.ols_nb,
     cache_func=nb.ols_cache_nb,
     cache_pass_per_column=True,
-    kwargs_as_args=["minp"],
+    kwargs_as_args=["with_zscore", "ddof", "minp"],
     window=14,
+    with_zscore=True,
+    ddof=0,
     minp=None,
 )
 
 
 class _OLS(OLS):
-    """Ordinary least squares (OLS).
+    """Rolling Ordinary Least Squares (OLS).
 
     The indicator can be used to detect changes in the behavior of the stocks against the market or each other.
 
@@ -1086,7 +1087,7 @@ class _OLS(OLS):
             >>> vbt.OLS.run(np.arange(len(ohlcv)), ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/OLS.svg)
+            ![](/assets/images/api/OLS.svg){: .iimg }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -1126,36 +1127,7 @@ class _OLS(OLS):
 
         return fig
 
-
-setattr(OLS, "__doc__", _OLS.__doc__)
-setattr(OLS, "plot", _OLS.plot)
-
-
-# ############# OLSS ############# #
-
-
-OLSS = IndicatorFactory(
-    class_name="OLSS",
-    module_name=__name__,
-    short_name="ols",
-    input_names=["x", "y"],
-    param_names=["window"],
-    output_names=["spread", "zscore"],
-).with_apply_func(
-    nb.ols_spread_nb,
-    cache_func=nb.ols_spread_cache_nb,
-    cache_pass_per_column=True,
-    kwargs_as_args=["ddof", "minp"],
-    window=14,
-    ddof=0,
-    minp=None,
-)
-
-
-class _OLSS(OLSS):
-    """Spread of OLS."""
-
-    def plot(
+    def plot_zscore(
         self,
         column: tp.Optional[tp.Label] = None,
         alpha: float = 0.05,
@@ -1165,14 +1137,14 @@ class _OLSS(OLSS):
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs
     ) -> tp.BaseFigure:
-        """Plot `OLSS.zscore` with confidence intervals.
+        """Plot `OLS.zscore` with confidence intervals.
 
         Args:
             column (str): Name of the column to plot.
             alpha (float): The alpha level for the confidence interval.
 
                 The default alpha = .05 returns a 95% confidence interval.
-            zscore_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `OLSS.zscore`.
+            zscore_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `OLS.zscore`.
             add_shape_kwargs (dict): Keyword arguments passed to `fig.add_shape`
                 when adding the range between both confidence intervals.
             add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
@@ -1181,10 +1153,10 @@ class _OLSS(OLSS):
 
         Usage:
             ```pycon
-            >>> vbt.OLSS.run(np.arange(len(ohlcv)), ohlcv['Close']).plot().show()
+            >>> vbt.OLS.run(np.arange(len(ohlcv)), ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/OLSS.svg)
+            ![](/assets/images/api/OLS_zscore.svg){: .iimg }
         """
         import scipy.stats as st
         from vectorbtpro.utils.figure import make_figure
@@ -1236,8 +1208,9 @@ class _OLSS(OLSS):
         return fig
 
 
-setattr(OLSS, "__doc__", _OLSS.__doc__)
-setattr(OLSS, "plot", _OLSS.plot)
+setattr(OLS, "__doc__", _OLS.__doc__)
+setattr(OLS, "plot", _OLS.plot)
+setattr(OLS, "plot_zscore", _OLS.plot_zscore)
 
 
 # ############# PATSIM ############# #
@@ -1348,7 +1321,7 @@ class _PATSIM(PATSIM):
             >>> vbt.PATSIM.run(ohlcv['Close'], np.array([1, 2, 3, 2, 1]), 30).plot().show()
             ```
 
-            ![](/assets/images/api/PATSIM.svg)
+            ![](/assets/images/api/PATSIM.svg){: .iimg }
         """
         from vectorbtpro._settings import settings
 
@@ -1400,7 +1373,7 @@ class _PATSIM(PATSIM):
             >>> vbt.PATSIM.run(ohlcv['Close'], np.array([1, 2, 3, 2, 1]), 30).overlay_with_heatmap().show()
             ```
 
-            ![](/assets/images/api/PATSIM_heatmap.svg)
+            ![](/assets/images/api/PATSIM_heatmap.svg){: .iimg }
         """
         from vectorbtpro._settings import settings
 
@@ -1511,7 +1484,7 @@ class _VWAP(VWAP):
             ... ).plot().show()
             ```
 
-            ![](/assets/images/api/VWAP.svg)
+            ![](/assets/images/api/VWAP.svg){: .iimg }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -1649,7 +1622,7 @@ class _PIVOTINFO(PIVOTINFO):
             >>> vbt.PIVOTINFO.run(ohlcv['High'], ohlcv['Low'], 0.1, 0.1).plot(fig=fig).show()
             ```
 
-            ![](/assets/images/api/PIVOTINFO.svg)
+            ![](/assets/images/api/PIVOTINFO.svg){: .iimg }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -1711,7 +1684,7 @@ class _PIVOTINFO(PIVOTINFO):
             >>> vbt.PIVOTINFO.run(ohlcv['High'], ohlcv['Low'], 0.1, 0.1).plot_zigzag(fig=fig).show()
             ```
 
-            ![](/assets/images/api/PIVOTINFO_zigzag.svg)
+            ![](/assets/images/api/PIVOTINFO_zigzag.svg){: .iimg }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -1795,7 +1768,7 @@ class _SUPERTREND(SUPERTREND):
             >>> vbt.SUPERTREND.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/SUPERTREND.svg)
+            ![](/assets/images/api/SUPERTREND.svg){: .iimg }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -1904,7 +1877,7 @@ class _SIGDET(SIGDET):
             >>> vbt.SIGDET.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/SIGDET.svg)
+            ![](/assets/images/api/SIGDET.svg){: .iimg }
         """
         from vectorbtpro._settings import settings
 
@@ -1953,7 +1926,7 @@ class _SIGDET(SIGDET):
             >>> vbt.SIGDET.run(ohlcv['Close']).plot_bands().show()
             ```
 
-            ![](/assets/images/api/SIGDET_plot_bands.svg)
+            ![](/assets/images/api/SIGDET_plot_bands.svg){: .iimg }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
