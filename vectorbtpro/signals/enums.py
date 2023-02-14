@@ -92,6 +92,8 @@ Attributes:
 
 class GenEnContext(tp.NamedTuple):
     target_shape: tp.Shape
+    only_once: bool
+    wait: int
     entries_out: tp.Array2d
     out: tp.Array1d
     from_i: int
@@ -101,11 +103,13 @@ class GenEnContext(tp.NamedTuple):
 
 __pdoc__["GenEnContext"] = "Context of an entry signal generator."
 __pdoc__["GenEnContext.target_shape"] = "Target shape."
+__pdoc__["GenEnContext.only_once"] = "Whether to run the placement function only once."
+__pdoc__["GenEnContext.wait"] = "Number of ticks to wait before placing the next entry."
 __pdoc__["GenEnContext.entries_out"] = "Output array with entries."
 __pdoc__["GenEnContext.out"] = "Current segment of the output array with entries."
 __pdoc__["GenEnContext.from_i"] = "Start index of the segment (inclusive)."
 __pdoc__["GenEnContext.to_i"] = "End index of the segment (exclusive)."
-__pdoc__["GenEnContext.to_i"] = "Column of the segment."
+__pdoc__["GenEnContext.col"] = "Column of the segment."
 
 
 class GenExContext(tp.NamedTuple):

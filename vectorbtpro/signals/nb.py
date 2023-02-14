@@ -83,6 +83,8 @@ def generate_nb(target_shape: tp.Shape, only_once: bool, wait: int, place_func_n
         while from_i <= target_shape[0] - 1:
             c = GenEnContext(
                 target_shape=target_shape,
+                only_once=only_once,
+                wait=wait,
                 entries_out=out,
                 out=out[from_i:, col],
                 from_i=from_i,
