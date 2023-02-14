@@ -38,10 +38,10 @@ warnings.filterwarnings(
     "ignore", message="The localize method is no longer necessary, as this time zone supports the fold attribute"
 )
 
-if settings["importing"]["recursive_import"]:
+if settings["importing"]["auto_import"]:
     from vectorbtpro.utils.module_ import check_installed
 
-    def _recursive_import(package):
+    def _auto_import(package):
         if isinstance(package, str):
             package = importlib.import_module(package)
         if not hasattr(package, "__all__"):
@@ -60,7 +60,7 @@ if settings["importing"]["recursive_import"]:
             if relative_name in blacklist:
                 continue
             if is_pkg:
-                module = _recursive_import(mod_name)
+                module = _auto_import(mod_name)
             else:
                 module = importlib.import_module(mod_name)
             if hasattr(module, "__all__") and relative_name not in package.__exclude_from__all__:
@@ -73,7 +73,7 @@ if settings["importing"]["recursive_import"]:
                     package.__all__.append(k)
         return package
 
-    _recursive_import(__name__)
+    _auto_import(__name__)
 
     from vectorbtpro.generic import nb, enums
     from vectorbtpro.indicators import nb as ind_nb, enums as ind_enums

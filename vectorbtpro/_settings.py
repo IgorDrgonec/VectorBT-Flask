@@ -147,7 +147,7 @@ __pdoc__: dict = {}
 _settings = {}
 
 importing = child_dict(
-    recursive_import=True,
+    auto_import=True,
     plotly=True,
     telegram=True,
     quantstats=True,
@@ -162,7 +162,7 @@ Disabling these options will make vectorbt load faster, but will limit the flexi
 various features of the package.
     
 !!! note
-    If `recursive_import` is False, you won't be able to access most important modules and objects 
+    If `auto_import` is False, you won't be able to access most important modules and objects 
     such as via `vbt.Portfolio`, only by explicitly importing them such as via 
     `from vectorbtpro.portfolio.base import Portfolio`.
 
