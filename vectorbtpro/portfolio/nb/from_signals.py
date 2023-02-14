@@ -238,13 +238,16 @@ def signal_to_size_nb(
     accumulate: int,
 ) -> tp.Tuple[float, int, int]:
     """Translate direction-aware signals into size, size type, and direction."""
-    if (
-        size_type == SizeType.TargetAmount
-        or size_type == SizeType.TargetValue
-        or size_type == SizeType.TargetPercent
-        or size_type == SizeType.TargetPercent100
-    ):
-        raise ValueError("Target size types are not supported")
+
+    def _check_size_type(_size_type):
+        if (
+            _size_type == SizeType.TargetAmount
+            or _size_type == SizeType.TargetValue
+            or _size_type == SizeType.TargetPercent
+            or _size_type == SizeType.TargetPercent100
+        ):
+            raise ValueError("Target size types are not supported")
+
     if is_less_nb(size, 0):
         raise ValueError("Negative size is not allowed. Please express direction using signals.")
     if size_type == SizeType.Percent100:
@@ -263,6 +266,7 @@ def signal_to_size_nb(
     if position_now > 0:
         # We're in a long position
         if is_short_entry:
+            _check_size_type(size)
             if accumulate == AccumulationMode.Both or accumulate == AccumulationMode.RemoveOnly:
                 # Decrease the position
                 order_size = -size
@@ -282,12 +286,14 @@ def signal_to_size_nb(
             direction = Direction.LongOnly
             if accumulate == AccumulationMode.Both or accumulate == AccumulationMode.RemoveOnly:
                 # Decrease the position
+                _check_size_type(size)
                 order_size = -size
             else:
                 # Close the position
                 order_size = -abs_position_now
                 size_type = SizeType.Amount
         elif is_long_entry:
+            _check_size_type(size)
             direction = Direction.LongOnly
             if accumulate == AccumulationMode.Both or accumulate == AccumulationMode.AddOnly:
                 # Increase the position
@@ -295,6 +301,7 @@ def signal_to_size_nb(
     elif position_now < 0:
         # We're in a short position
         if is_long_entry:
+            _check_size_type(size)
             if accumulate == AccumulationMode.Both or accumulate == AccumulationMode.RemoveOnly:
                 # Decrease the position
                 order_size = size
@@ -314,17 +321,20 @@ def signal_to_size_nb(
             direction = Direction.ShortOnly
             if accumulate == AccumulationMode.Both or accumulate == AccumulationMode.RemoveOnly:
                 # Decrease the position
+                _check_size_type(size)
                 order_size = size
             else:
                 # Close the position
                 order_size = abs_position_now
                 size_type = SizeType.Amount
         elif is_short_entry:
+            _check_size_type(size)
             direction = Direction.ShortOnly
             if accumulate == AccumulationMode.Both or accumulate == AccumulationMode.AddOnly:
                 # Increase the position
                 order_size = -size
     else:
+        _check_size_type(size)
         if is_long_entry:
             # Open long position
             order_size = size
@@ -1605,7 +1615,10 @@ def simulate_from_signals_nb(
                         keep_limit = False
                         keep_stop = False
                         execute_stop = True
-                        exec_stop_bar_zone = BarZone.Open
+                        if exec_stop_set_on_close:
+                            exec_stop_bar_zone = BarZone.Close
+                        else:
+                            exec_stop_bar_zone = BarZone.Open
                     elif any_user_signal and user_on_open:
                         execute_user = True
                         if any_limit_signal and (execute_user or not exec_user_set):
@@ -3498,7 +3511,10 @@ def simulate_from_signal_func_nb(
                         keep_limit = False
                         keep_stop = False
                         execute_stop = True
-                        exec_stop_bar_zone = BarZone.Open
+                        if exec_stop_set_on_close:
+                            exec_stop_bar_zone = BarZone.Close
+                        else:
+                            exec_stop_bar_zone = BarZone.Open
                     elif any_user_signal and user_on_open:
                         execute_user = True
                         if any_limit_signal and (execute_user or not exec_user_set):
