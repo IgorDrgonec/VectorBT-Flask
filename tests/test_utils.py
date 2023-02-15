@@ -11,11 +11,6 @@ import pytest
 from numba import njit
 from numba.core.registry import CPUDispatcher
 
-try:
-    import zoneinfo
-except ImportError:
-    from backports import zoneinfo
-
 import vectorbtpro as vbt
 from vectorbtpro.utils import (
     checks,
@@ -2133,14 +2128,10 @@ class TestDatetime:
         assert datetime_.is_tz_aware(pd.Timestamp("2020-01-01", tz=datetime_.get_utc_tz()))
 
     def test_to_timezone(self):
-        assert datetime_.to_timezone("UTC") == zoneinfo.ZoneInfo("UTC")
         assert datetime_.to_timezone("UTC", to_fixed_offset=True) == _timezone.utc
-        assert isinstance(datetime_.to_timezone("Europe/Berlin"), zoneinfo.ZoneInfo)
         assert isinstance(datetime_.to_timezone("Europe/Berlin", to_fixed_offset=True), _timezone)
         assert datetime_.to_timezone("+0500") == _timezone(_timedelta(hours=5))
         assert datetime_.to_timezone(_timezone(_timedelta(hours=1))) == _timezone(_timedelta(hours=1))
-        assert isinstance(datetime_.to_timezone(zoneinfo.ZoneInfo("Europe/Berlin")), zoneinfo.ZoneInfo)
-        assert isinstance(datetime_.to_timezone(zoneinfo.ZoneInfo("Europe/Berlin"), to_fixed_offset=True), _timezone)
         assert datetime_.to_timezone(3600) == _timezone(_timedelta(hours=1))
         assert datetime_.to_timezone(1800) == _timezone(_timedelta(hours=0.5))
         with pytest.raises(Exception):

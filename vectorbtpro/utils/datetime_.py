@@ -11,11 +11,6 @@ import pandas as pd
 from pandas.tseries.frequencies import to_offset
 import re
 
-try:
-    import zoneinfo
-except ImportError:
-    from backports import zoneinfo
-
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts
@@ -306,7 +301,7 @@ def to_timezone(
 ) -> tzinfo:
     """Parse the timezone.
 
-    Strings are parsed by `zoneinfo` and `dateparser`, while integers and floats are treated as hour offsets.
+    Strings are parsed with `pandas`, and `dateparser`, while integers and floats are treated as hour offsets.
 
     If `to_fixed_offset` is set to True, will convert to `datetime.timezone`. See global settings.
 
@@ -326,15 +321,12 @@ def to_timezone(
 
     if isinstance(tz, str):
         try:
-            tz = zoneinfo.ZoneInfo(tz)
-        except zoneinfo.ZoneInfoNotFoundError:
-            try:
-                tz = pd.Timestamp("now", tz=tz).tz
-            except Exception as e:
-                dt = dateparser.parse("now %s" % tz, **parser_kwargs)
-                if dt is not None:
-                    tz = dt.tzinfo
-                    to_fixed_offset = True
+            tz = pd.Timestamp("now", tz=tz).tz
+        except Exception as e:
+            dt = dateparser.parse("now %s" % tz, **parser_kwargs)
+            if dt is not None:
+                tz = dt.tzinfo
+                to_fixed_offset = True
     if checks.is_number(tz):
         tz = timezone(timedelta(seconds=tz))
     if isinstance(tz, timedelta):
