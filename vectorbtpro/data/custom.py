@@ -3369,6 +3369,7 @@ class TVData(RemoteData):
         timeframe: tp.Optional[str] = None,
         tz: tp.Optional[tp.TimezoneLike] = None,
         fut_contract: tp.Optional[int] = None,
+        adjustment: tp.Optional[str] = None,
         extended_session: tp.Optional[bool] = None,
         pro_data: tp.Optional[bool] = None,
         limit: tp.Optional[int] = None,
@@ -3396,6 +3397,9 @@ class TVData(RemoteData):
                 See `vectorbtpro.utils.datetime_.to_timezone`.
             fut_contract (int): None for cash, 1 for continuous current contract in front,
                 2 for continuous next contract in front.
+            adjustment (str): Adjustment.
+
+                Either "splits" (default) or "dividends".
             extended_session (bool): Regular session if False, extended session if True.
             pro_data (bool): Whether to use pro data.
             limit (int): The maximum number of returned items.
@@ -3417,6 +3421,8 @@ class TVData(RemoteData):
             tz = tv_cfg["tz"]
         if fut_contract is None:
             fut_contract = tv_cfg["fut_contract"]
+        if adjustment is None:
+            adjustment = tv_cfg["adjustment"]
         if extended_session is None:
             extended_session = tv_cfg["extended_session"]
         if pro_data is None:
@@ -3455,6 +3461,7 @@ class TVData(RemoteData):
             exchange=exchange,
             interval=interval,
             fut_contract=fut_contract,
+            adjustment=adjustment,
             extended_session=extended_session,
             pro_data=pro_data,
             limit=limit,

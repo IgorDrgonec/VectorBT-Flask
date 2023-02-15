@@ -194,6 +194,7 @@ class TVClient:
         exchange: str = "NSE",
         interval: Interval = Interval.in_daily,
         fut_contract: tp.Optional[int] = None,
+        adjustment: str = "splits",
         extended_session: bool = False,
         pro_data: bool = True,
         limit: int = 20000,
@@ -245,7 +246,9 @@ class TVClient:
                 "symbol_1",
                 '={"symbol":"'
                 + symbol
-                + '","adjustment":"splits","session":'
+                + '","adjustment":"'
+                + adjustment
+                + '","session":'
                 + ('"regular"' if not extended_session else '"extended"')
                 + "}",
             ],

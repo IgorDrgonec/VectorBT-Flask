@@ -783,6 +783,7 @@ data = child_dict(
             timeframe="D",
             tz="UTC",
             fut_contract=None,
+            adjustment="splits",
             extended_session=False,
             pro_data=True,
             limit=20000,
