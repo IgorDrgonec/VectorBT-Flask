@@ -266,7 +266,7 @@ def signal_to_size_nb(
     if position_now > 0:
         # We're in a long position
         if is_short_entry:
-            _check_size_type(size)
+            _check_size_type(size_type)
             if accumulate == AccumulationMode.Both or accumulate == AccumulationMode.RemoveOnly:
                 # Decrease the position
                 order_size = -size
@@ -286,14 +286,14 @@ def signal_to_size_nb(
             direction = Direction.LongOnly
             if accumulate == AccumulationMode.Both or accumulate == AccumulationMode.RemoveOnly:
                 # Decrease the position
-                _check_size_type(size)
+                _check_size_type(size_type)
                 order_size = -size
             else:
                 # Close the position
                 order_size = -abs_position_now
                 size_type = SizeType.Amount
         elif is_long_entry:
-            _check_size_type(size)
+            _check_size_type(size_type)
             direction = Direction.LongOnly
             if accumulate == AccumulationMode.Both or accumulate == AccumulationMode.AddOnly:
                 # Increase the position
@@ -301,7 +301,7 @@ def signal_to_size_nb(
     elif position_now < 0:
         # We're in a short position
         if is_long_entry:
-            _check_size_type(size)
+            _check_size_type(size_type)
             if accumulate == AccumulationMode.Both or accumulate == AccumulationMode.RemoveOnly:
                 # Decrease the position
                 order_size = size
@@ -321,20 +321,20 @@ def signal_to_size_nb(
             direction = Direction.ShortOnly
             if accumulate == AccumulationMode.Both or accumulate == AccumulationMode.RemoveOnly:
                 # Decrease the position
-                _check_size_type(size)
+                _check_size_type(size_type)
                 order_size = size
             else:
                 # Close the position
                 order_size = abs_position_now
                 size_type = SizeType.Amount
         elif is_short_entry:
-            _check_size_type(size)
+            _check_size_type(size_type)
             direction = Direction.ShortOnly
             if accumulate == AccumulationMode.Both or accumulate == AccumulationMode.AddOnly:
                 # Increase the position
                 order_size = -size
     else:
-        _check_size_type(size)
+        _check_size_type(size_type)
         if is_long_entry:
             # Open long position
             order_size = size
