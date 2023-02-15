@@ -59,7 +59,6 @@ setup(
         "python-dateutil",
         "dateparser",
         "imageio",
-        "backports.zoneinfo; python_version < '3.9'",
         "mypy_extensions",
         "humanize",
         "attrs>=21.1.0",
