@@ -174,7 +174,7 @@ def save(
     mkdir_kwargs: tp.KwargsLike = None,
     compression: tp.Union[None, bool, str] = None,
     **kwargs,
-) -> None:
+) -> Path:
     """Pickle an object to a byte stream and write to a file.
 
     Can recognize the compression algorithm based on the extension (see `dumps` for options).
@@ -195,6 +195,7 @@ def save(
     check_mkdir(path.parent, **mkdir_kwargs)
     with open(path, "wb") as f:
         f.write(bytes_)
+    return path
 
 
 def load(path: tp.PathLike, compression: tp.Union[None, bool, str] = None, **kwargs) -> object:
@@ -959,7 +960,7 @@ class Pickleable:
         compression: tp.Union[None, bool, str] = None,
         mkdir_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> None:
+    ) -> Path:
         """Pickle/encode the instance and save to a file.
 
         Resolves the file path using `Pickleable.resolve_file_path`."""
@@ -984,6 +985,7 @@ class Pickleable:
                 f.write(str_)
         else:
             raise ValueError(f"Invalid file extension '{path.suffix}'")
+        return path
 
     @classmethod
     def load(

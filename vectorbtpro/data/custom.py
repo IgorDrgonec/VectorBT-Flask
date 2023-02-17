@@ -867,9 +867,10 @@ class CSVData(LocalData):
             if end is not None:
                 mask &= obj.index < end
             mask_indices = np.flatnonzero(mask)
-            if len(mask_indices) > 0:
-                obj = obj.iloc[mask_indices[0] : mask_indices[-1] + 1]
-                start_row += mask_indices[0]
+            if len(mask_indices) == 0:
+                return None
+            obj = obj.iloc[mask_indices[0] : mask_indices[-1] + 1]
+            start_row += mask_indices[0]
         return obj, dict(last_row=start_row - header_rows + len(obj.index) - 1, tz_convert=tz)
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Tuple[tp.SeriesFrame, dict]:
@@ -1111,9 +1112,10 @@ class HDFData(LocalData):
             if end is not None:
                 mask &= index < end
             mask_indices = np.flatnonzero(mask)
-            if len(mask_indices) > 0:
-                start_row += mask_indices[0]
-                end_row = start_row + mask_indices[-1] - mask_indices[0] + 1
+            if len(mask_indices) == 0:
+                return None
+            start_row += mask_indices[0]
+            end_row = start_row + mask_indices[-1] - mask_indices[0] + 1
 
         obj = pd.read_hdf(file_path, key=key, start=start_row, stop=end_row, **read_hdf_kwargs)
         if isinstance(obj, TableIterator):

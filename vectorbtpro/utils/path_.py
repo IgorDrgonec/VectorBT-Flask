@@ -4,12 +4,14 @@
 
 from pathlib import Path
 from itertools import islice
+import humanize
 
 from vectorbtpro import _typing as tp
 
 __all__ = [
     "file_exists",
     "dir_exists",
+    "file_size",
 ]
 
 
@@ -27,6 +29,17 @@ def dir_exists(path: tp.PathLike) -> bool:
     if path.exists() and path.is_dir():
         return True
     return False
+
+
+def file_size(path: tp.PathLike, readable: bool = True, **kwargs) -> tp.Union[str, int]:
+    """Get size of a file."""
+    path = Path(path)
+    if not file_exists(path):
+        raise FileNotFoundError(f"File '{path}' not found")
+    n_bytes = path.stat().st_size
+    if readable:
+        return humanize.naturalsize(n_bytes, **kwargs)
+    return n_bytes
 
 
 def check_mkdir(
