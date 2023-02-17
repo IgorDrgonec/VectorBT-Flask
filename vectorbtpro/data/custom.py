@@ -1595,6 +1595,8 @@ class BinanceData(RemoteData):
                     )
                     pbar.update(1)
                     prev_end_ts = next_data[-1][0]
+                    if end_ts is not None and prev_end_ts >= end_ts:
+                        break
                     if delay is not None:
                         time.sleep(delay / 1000)  # be kind to api
         except Exception as e:
@@ -2013,6 +2015,8 @@ class CCXTData(RemoteData):
                     )
                     pbar.update(1)
                     prev_end_ts = next_data[-1][0]
+                    if end_ts is not None and prev_end_ts >= end_ts:
+                        break
                     if delay is not None:
                         time.sleep(delay / 1000)  # be kind to api
         except Exception as e:
@@ -2678,6 +2682,8 @@ class PolygonData(RemoteData):
                     )
                     pbar.update(1)
                     prev_end_ts = next_data[-1]["t"]
+                    if end_ts is not None and prev_end_ts >= end_ts:
+                        break
                     if delay is not None:
                         time.sleep(delay / 1000)  # be kind to api
         except Exception as e:

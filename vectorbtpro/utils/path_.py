@@ -7,7 +7,26 @@ from itertools import islice
 
 from vectorbtpro import _typing as tp
 
-__all__ = []
+__all__ = [
+    "file_exists",
+    "dir_exists",
+]
+
+
+def file_exists(path: tp.PathLike) -> bool:
+    """Check whether a file exists."""
+    path = Path(path)
+    if path.exists() and path.is_file():
+        return True
+    return False
+
+
+def dir_exists(path: tp.PathLike) -> bool:
+    """Check whether a directory exists."""
+    path = Path(path)
+    if path.exists() and path.is_dir():
+        return True
+    return False
 
 
 def check_mkdir(

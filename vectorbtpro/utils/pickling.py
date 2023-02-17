@@ -345,12 +345,12 @@ class Pickleable:
         return dumps(self, **kwargs)
 
     @classmethod
-    def loads(cls: tp.Type[PickleableT], bytes_: bytes, **kwargs) -> PickleableT:
+    def loads(cls: tp.Type[PickleableT], bytes_: bytes, check_type: bool = True, **kwargs) -> PickleableT:
         """Unpickle an instance from a byte stream."""
         obj = loads(bytes_, **kwargs)
         if isinstance(obj, RecState):
             obj = reconstruct(cls, obj)
-        if not isinstance(obj, cls):
+        if check_type and not isinstance(obj, cls):
             raise TypeError(f"Loaded object must be an instance of {cls}")
         return obj
 
@@ -530,6 +530,7 @@ class Pickleable:
         use_class_ids: bool = True,
         code_context: tp.KwargsLike = None,
         parser_kwargs: tp.KwargsLike = None,
+        check_type: bool = True,
         **kwargs,
     ) -> PickleableT:
         """Decode an instance from a config string.
@@ -791,7 +792,7 @@ class Pickleable:
             obj = dct["top"]
         if type(obj) is dict:
             obj = reconstruct(cls, RecState(init_kwargs=obj))
-        if not isinstance(obj, cls):
+        if check_type and not isinstance(obj, cls):
             raise TypeError(f"Decoded object must be an instance of {cls}")
         return obj
 

@@ -842,7 +842,7 @@ def chunked(
     ```pycon
     >>> import vectorbtpro as vbt
 
-    >>> vbt.settings.chunking['engine'] = 'dask'
+    >>> vbt.settings.chunking["execute_kwargs"]["engine"] = 'dask'
     ```
 
     !!! note
