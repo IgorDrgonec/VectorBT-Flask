@@ -2646,8 +2646,12 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 checks.assert_not_none(wrapper)
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
-            target_lbound_index = substitute_templates(target_lbound_index, template_context, sub_id="target_lbound_index")
-            target_rbound_index = substitute_templates(target_rbound_index, template_context, sub_id="target_rbound_index")
+            target_lbound_index = substitute_templates(
+                target_lbound_index, template_context, sub_id="target_lbound_index"
+            )
+            target_rbound_index = substitute_templates(
+                target_rbound_index, template_context, sub_id="target_rbound_index"
+            )
         else:
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -3567,7 +3571,47 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """Get returns of this object."""
         from vectorbtpro.returns.accessors import ReturnsAccessor
 
-        return ReturnsAccessor.from_value(self._obj, wrapper=self.wrapper, return_values=True, **kwargs)
+        return ReturnsAccessor.from_value(
+            self._obj,
+            wrapper=self.wrapper,
+            return_values=True,
+            **kwargs,
+        )
+
+    def to_log_returns(self, **kwargs) -> tp.SeriesFrame:
+        """Get log returns of this object."""
+        from vectorbtpro.returns.accessors import ReturnsAccessor
+
+        return ReturnsAccessor.from_value(
+            self._obj,
+            wrapper=self.wrapper,
+            return_values=True,
+            log_returns=True,
+            **kwargs,
+        )
+
+    def to_daily_returns(self, **kwargs) -> tp.SeriesFrame:
+        """Get daily returns of this object."""
+        from vectorbtpro.returns.accessors import ReturnsAccessor
+
+        return ReturnsAccessor.from_value(
+            self._obj,
+            wrapper=self.wrapper,
+            return_values=False,
+            **kwargs,
+        ).daily()
+
+    def to_daily_log_returns(self, **kwargs) -> tp.SeriesFrame:
+        """Get daily log returns of this object."""
+        from vectorbtpro.returns.accessors import ReturnsAccessor
+
+        return ReturnsAccessor.from_value(
+            self._obj,
+            wrapper=self.wrapper,
+            return_values=False,
+            log_returns=True,
+            **kwargs,
+        ).daily()
 
     # ############# Patterns ############# #
 
@@ -4754,9 +4798,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                     dict(
                         mode="markers+lines",
                         marker=dict(color=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.5)),
-                        line=dict(
-                            color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.5), dash="dot"
-                        ),
+                        line=dict(color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.5), dash="dot"),
                     ),
                     lower_max_error_trace_kwargs,
                 )
@@ -4765,9 +4807,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                     dict(
                         mode="markers+lines",
                         marker=dict(color=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.5)),
-                        line=dict(
-                            color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.5), dash="dot"
-                        ),
+                        line=dict(color=adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.5), dash="dot"),
                         showlegend=False,
                     ),
                     upper_max_error_trace_kwargs,
@@ -4777,9 +4817,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                     def_max_error_trace_kwargs,
                     dict(
                         mode="lines",
-                        line=dict(
-                            color=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.5), dash="dot"
-                        ),
+                        line=dict(color=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.5), dash="dot"),
                     ),
                     lower_max_error_trace_kwargs,
                 )
@@ -4787,24 +4825,30 @@ class GenericAccessor(BaseAccessor, Analyzable):
                     def_max_error_trace_kwargs,
                     dict(
                         mode="lines",
-                        line=dict(
-                            color=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.5), dash="dot"
-                        ),
+                        line=dict(color=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.5), dash="dot"),
                         fillcolor=adjust_opacity(plotting_cfg["color_schema"]["pink"], 0.1),
                         fill="tonexty",
                         showlegend=False,
                     ),
                     upper_max_error_trace_kwargs,
                 )
-            fig = (pattern_sr - max_error_sr).rename(None).vbt.plot(
-                trace_kwargs=_lower_max_error_trace_kwargs,
-                add_trace_kwargs=add_trace_kwargs,
-                fig=fig,
+            fig = (
+                (pattern_sr - max_error_sr)
+                .rename(None)
+                .vbt.plot(
+                    trace_kwargs=_lower_max_error_trace_kwargs,
+                    add_trace_kwargs=add_trace_kwargs,
+                    fig=fig,
+                )
             )
-            fig = (pattern_sr + max_error_sr).rename(None).vbt.plot(
-                trace_kwargs=_upper_max_error_trace_kwargs,
-                add_trace_kwargs=add_trace_kwargs,
-                fig=fig,
+            fig = (
+                (pattern_sr + max_error_sr)
+                .rename(None)
+                .vbt.plot(
+                    trace_kwargs=_upper_max_error_trace_kwargs,
+                    add_trace_kwargs=add_trace_kwargs,
+                    fig=fig,
+                )
             )
 
         return fig
@@ -5311,14 +5355,10 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
                         vcenter=0,
                         vmax=proj_max,
                     )
-                    def_lower_trace_kwargs["line"] = dict(
-                        color=adjust_opacity(lower_color, 0.75)
-                    )
+                    def_lower_trace_kwargs["line"] = dict(color=adjust_opacity(lower_color, 0.75))
                 else:
                     lower_color = plotting_cfg["color_schema"]["gray"]
-                    def_lower_trace_kwargs["line"] = dict(
-                        color=adjust_opacity(lower_color, 0.5)
-                    )
+                    def_lower_trace_kwargs["line"] = dict(color=adjust_opacity(lower_color, 0.5))
                 lower_band.rename(None).vbt.lineplot(
                     trace_kwargs=merge_dicts(def_lower_trace_kwargs, lower_trace_kwargs),
                     add_trace_kwargs=add_trace_kwargs,
@@ -5367,14 +5407,10 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
                         vcenter=0,
                         vmax=proj_max,
                     )
-                    def_upper_trace_kwargs["line"] = dict(
-                        color=adjust_opacity(upper_color, 0.75)
-                    )
+                    def_upper_trace_kwargs["line"] = dict(color=adjust_opacity(upper_color, 0.75))
                 else:
                     upper_color = plotting_cfg["color_schema"]["gray"]
-                    def_upper_trace_kwargs["line"] = dict(
-                        color=adjust_opacity(upper_color, 0.5)
-                    )
+                    def_upper_trace_kwargs["line"] = dict(color=adjust_opacity(upper_color, 0.5))
                 if plot_fill and (lower_band is not None or middle_band is not None):
                     def_upper_trace_kwargs["fill"] = "tonexty"
                     def_upper_trace_kwargs["fillcolor"] = adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.25)
@@ -5401,7 +5437,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
                     )
                 else:
                     aux_middle_color = plotting_cfg["color_schema"]["gray"]
-                def_aux_middle_trace_kwargs["line"] = dict(dash='dot', color=aux_middle_color)
+                def_aux_middle_trace_kwargs["line"] = dict(dash="dot", color=aux_middle_color)
                 aux_middle_band.rename(None).vbt.lineplot(
                     trace_kwargs=merge_dicts(def_aux_middle_trace_kwargs, aux_middle_trace_kwargs),
                     add_trace_kwargs=add_trace_kwargs,

@@ -1735,12 +1735,13 @@ def returns_resample_func(
     resampler: tp.Union[Resampler, tp.PandasResampler],
     wrapper: ArrayWrapper,
     fill_with_zero: bool = True,
+    log_returns: bool = False,
     **kwargs,
 ):
     """Apply resampling function on returns."""
     return (
         pd.DataFrame(obj, index=wrapper.index)
-        .vbt.returns.resample(
+        .vbt.returns(log_returns=log_returns).resample(
             resampler,
             fill_with_zero=fill_with_zero,
         )
@@ -1970,6 +1971,16 @@ shortcut_config = ReadonlyConfig(
         "final_value": dict(obj_type="red_array"),
         "total_return": dict(obj_type="red_array"),
         "returns": dict(resample_func=returns_resample_func),
+        "log_returns": dict(
+            method_name="get_returns",
+            method_kwargs=dict(log_returns=True),
+            resample_func=partial(returns_resample_func, log_returns=True),
+        ),
+        "daily_log_returns": dict(
+            method_name="get_returns",
+            method_kwargs=dict(daily_returns=True, log_returns=True),
+            resample_func=partial(returns_resample_func, log_returns=True),
+        ),
         "asset_pnl": dict(resample_func="sum", resample_kwargs=dict(wrap_kwargs=dict(fillna=0.0))),
         "asset_returns": dict(resample_func=returns_resample_func),
         "market_value": dict(),

@@ -867,15 +867,17 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             symbol_fetch_kwargs = cls.select_symbol_kwargs(symbol, kwargs)
             if "silence_warnings" in func_arg_names:
                 symbol_fetch_kwargs["silence_warnings"] = silence_warnings
-            funcs_args.append((
-                cls.try_fetch_symbol,
-                (symbol,),
-                dict(
-                    skip_on_error=skip_on_error,
-                    silence_warnings=silence_warnings,
-                    fetch_kwargs=symbol_fetch_kwargs,
+            funcs_args.append(
+                (
+                    cls.try_fetch_symbol,
+                    (symbol,),
+                    dict(
+                        skip_on_error=skip_on_error,
+                        silence_warnings=silence_warnings,
+                        fetch_kwargs=symbol_fetch_kwargs,
+                    ),
                 )
-            ))
+            )
             fetch_kwargs[symbol] = symbol_fetch_kwargs
 
         outputs = execute(funcs_args, n_calls=len(symbols), progress_desc=symbols, **execute_kwargs)
@@ -1013,15 +1015,17 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             symbol_update_kwargs = self.select_symbol_kwargs(symbol, kwargs)
             if "silence_warnings" in func_arg_names:
                 symbol_update_kwargs["silence_warnings"] = silence_warnings
-            funcs_args.append((
-                self.try_update_symbol,
-                (symbol,),
-                dict(
-                    skip_on_error=skip_on_error,
-                    silence_warnings=silence_warnings,
-                    update_kwargs=symbol_update_kwargs,
+            funcs_args.append(
+                (
+                    self.try_update_symbol,
+                    (symbol,),
+                    dict(
+                        skip_on_error=skip_on_error,
+                        silence_warnings=silence_warnings,
+                        update_kwargs=symbol_update_kwargs,
+                    ),
                 )
-            ))
+            )
 
         outputs = execute(funcs_args, n_calls=len(self.symbols), progress_desc=self.symbols, **execute_kwargs)
 
@@ -1318,12 +1322,14 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             return found_indices[0]
         return found_indices
 
-    def get_column(self, idx_or_label: tp.Hashable) -> tp.Optional[tp.SeriesFrame]:
+    def get_column(self, idx_or_label: tp.Hashable, raise_error: bool = False) -> tp.Optional[tp.SeriesFrame]:
         """Get column(s) that match a column index or label."""
         if checks.is_int(idx_or_label):
             return self.get(columns=self.wrapper.columns[idx_or_label])
         column_idx = self.get_column_index(idx_or_label)
         if column_idx == -1:
+            if raise_error:
+                raise ValueError(f"Column(s) {idx_or_label} not found")
             return None
         return self.get(columns=self.wrapper.columns[column_idx])
 
@@ -1365,22 +1371,66 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     @property
     def hlc3(self) -> tp.Optional[tp.SeriesFrame]:
         """HLC/3."""
-        return (self.high + self.low + self.close) / 3
+        high = self.get_column("High", raise_error=True)
+        low = self.get_column("Low", raise_error=True)
+        close = self.get_column("Close", raise_error=True)
+        return (high + low + close) / 3
 
     @property
     def ohlc4(self) -> tp.Optional[tp.SeriesFrame]:
         """OHLC/4."""
-        return (self.open + self.high + self.low + self.close) / 4
-
-    @property
-    def returns(self) -> tp.Optional[tp.SeriesFrame]:
-        """Returns."""
-        return ReturnsAccessor.from_value(self.close, wrapper=self.symbol_wrapper, return_values=True)
+        open = self.get_column("Open", raise_error=True)
+        high = self.get_column("High", raise_error=True)
+        low = self.get_column("Low", raise_error=True)
+        close = self.get_column("Close", raise_error=True)
+        return (open + high + low + close) / 4
 
     @property
     def returns_acc(self) -> tp.Optional[tp.SeriesFrame]:
         """Return accessor of type `vectorbtpro.returns.accessors.ReturnsAccessor`."""
-        return ReturnsAccessor.from_value(self.close, wrapper=self.symbol_wrapper, return_values=False)
+        return ReturnsAccessor.from_value(
+            self.get_column("Close", raise_error=True),
+            wrapper=self.symbol_wrapper,
+            return_values=False,
+        )
+
+    @property
+    def returns(self) -> tp.Optional[tp.SeriesFrame]:
+        """Returns."""
+        return ReturnsAccessor.from_value(
+            self.get_column("Close", raise_error=True),
+            wrapper=self.symbol_wrapper,
+            return_values=True,
+        )
+
+    @property
+    def log_returns(self) -> tp.Optional[tp.SeriesFrame]:
+        """Log returns."""
+        return ReturnsAccessor.from_value(
+            self.get_column("Close", raise_error=True),
+            wrapper=self.symbol_wrapper,
+            return_values=True,
+            log_returns=True,
+        )
+
+    @property
+    def daily_returns(self) -> tp.Optional[tp.SeriesFrame]:
+        """Daily returns."""
+        return ReturnsAccessor.from_value(
+            self.get_column("Close", raise_error=True),
+            wrapper=self.symbol_wrapper,
+            return_values=False,
+        ).daily()
+
+    @property
+    def daily_log_returns(self) -> tp.Optional[tp.SeriesFrame]:
+        """Daily log returns."""
+        return ReturnsAccessor.from_value(
+            self.get_column("Close", raise_error=True),
+            wrapper=self.symbol_wrapper,
+            return_values=False,
+            log_returns=True,
+        ).daily()
 
     # ############# Selecting ############# #
 
