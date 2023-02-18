@@ -513,7 +513,7 @@ class Pickleable:
                             float(repr(v2))
                             v2 = repr(v2)
                         except Exception as e:
-                            v2 = "!vbt.loads(" + repr(dumps(v2)) + ")"
+                            v2 = "!loads(" + repr(dumps(v2)) + ")"
                 parser.set(k, k2, v2)
         with StringIO() as f:
             parser.write(f)
@@ -688,7 +688,7 @@ class Pickleable:
         new_dct = dict()
         if code_context is None:
             code_context = {}
-        code_context = {"np": np, "pd": pd, "vbt": vbt, **code_context}
+        code_context = {"np": np, "pd": pd, "vbt": vbt, "loads": loads, **code_context}
         ref_edges = set()
         for k, v in dct.items():
             new_dct[k] = {}
@@ -705,7 +705,10 @@ class Pickleable:
                     elif use_class_ids and v2.startswith("@"):
                         v2 = from_class_id(v2[1:])
                     elif run_code and v2.startswith("!"):
-                        v2 = multiline_eval(v2.lstrip("!"), context=code_context)
+                        if v2.startswith("!vbt.loads(") and v2.endswith(")"):
+                            v2 = multiline_eval(v2[5:], context=code_context)
+                        else:
+                            v2 = multiline_eval(v2.lstrip("!"), context=code_context)
                     else:
                         if (v2.startswith("'") and v2.endswith("'")) or (v2.startswith('"') and v2.endswith('"')):
                             v2 = v2[1:-1]
