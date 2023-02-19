@@ -2072,11 +2072,23 @@ class AlpacaData(RemoteData):
         ... )
         ```
 
-        * Fetch data:
+        * Fetch stock data:
 
         ```pycon
         >>> data = vbt.AlpacaData.fetch(
         ...     "AAPL",
+        ...     start="2021-01-01",
+        ...     end="2022-01-01",
+        ...     timeframe="1 day"
+        ... )
+        ```
+
+        * Fetch crypto data:
+
+        ```pycon
+        >>> data = vbt.AlpacaData.fetch(
+        ...     "BTCUSD",
+        ...     client_type="crypto",
         ...     start="2021-01-01",
         ...     end="2022-01-01",
         ...     timeframe="1 day"

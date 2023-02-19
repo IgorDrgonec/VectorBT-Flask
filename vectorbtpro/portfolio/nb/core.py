@@ -59,6 +59,13 @@ def approx_long_buy_value_nb(val_price: float, size: float) -> float:
 
 
 @register_jitted(cache=True)
+def adj_size_granularity_nb(size: float, size_granularity: float) -> bool:
+    """Whether to adjust the size with the size granularity."""
+    adj_size = size // size_granularity * size_granularity
+    return not is_close_nb(size, adj_size) and not is_close_nb(size, adj_size + size_granularity)
+
+
+@register_jitted(cache=True)
 def long_buy_nb(
     account_state: AccountState,
     size: float,
@@ -96,7 +103,7 @@ def long_buy_nb(
         raise ValueError("Attempt to go in long direction infinitely")
 
     # Adjust for granularity
-    if not np.isnan(size_granularity):
+    if not np.isnan(size_granularity) and adj_size_granularity_nb(size, size_granularity):
         size = size // size_granularity * size_granularity
 
     # Get price adjusted with slippage
@@ -128,7 +135,7 @@ def long_buy_nb(
         max_acq_size = max_req_cash / adj_price
 
         # Adjust for granularity
-        if not np.isnan(size_granularity):
+        if not np.isnan(size_granularity) and adj_size_granularity_nb(max_acq_size, size_granularity):
             final_size = max_acq_size // size_granularity * size_granularity
             new_order_value = final_size * adj_price
             fees_paid = new_order_value * fees + fixed_fees
@@ -245,7 +252,7 @@ def long_sell_nb(
         size_limit = max_size
 
     # Adjust for granularity
-    if not np.isnan(size_granularity):
+    if not np.isnan(size_granularity) and adj_size_granularity_nb(size_limit, size_granularity):
         size_limit = size_limit // size_granularity * size_granularity
 
     # Check against size of zero
@@ -367,7 +374,7 @@ def short_sell_nb(
         raise ValueError("Attempt to go in short direction infinitely")
 
     # Adjust for granularity
-    if not np.isnan(size_granularity):
+    if not np.isnan(size_granularity) and adj_size_granularity_nb(size_limit, size_granularity):
         size_limit = size_limit // size_granularity * size_granularity
 
     # Check against size of zero
@@ -481,7 +488,7 @@ def short_buy_nb(
         size_limit = max_size
 
     # Adjust for granularity
-    if not np.isnan(size_granularity):
+    if not np.isnan(size_granularity) and adj_size_granularity_nb(size_limit, size_granularity):
         size_limit = size_limit // size_granularity * size_granularity
 
     # Get price adjusted with slippage
@@ -513,7 +520,7 @@ def short_buy_nb(
         max_acq_size = max_req_cash / adj_price
 
         # Adjust for granularity
-        if not np.isnan(size_granularity):
+        if not np.isnan(size_granularity) and adj_size_granularity_nb(max_acq_size, size_granularity):
             final_size = max_acq_size // size_granularity * size_granularity
             new_order_value = final_size * adj_price
             fees_paid = new_order_value * fees + fixed_fees

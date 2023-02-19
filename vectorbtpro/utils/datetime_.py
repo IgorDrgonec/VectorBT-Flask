@@ -65,8 +65,6 @@ def split_freq_str(freq: str) -> tp.Optional[tp.Tuple[int, str]]:
         unit = "Q"
     elif unit in ("y", "year", "years", "yearly", "annual", "annually"):
         unit = "Y"
-    else:
-        return None
     return multiplier, unit
 
 
