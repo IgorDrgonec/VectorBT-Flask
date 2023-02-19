@@ -679,6 +679,8 @@ def buy_nb(
     )
     if new_order_result1.status != OrderStatus.Filled:
         return new_order_result1, account_state
+    if new_account_state1.position != 0:
+        return new_order_result1, new_account_state1
     new_size = add_nb(size, -abs(account_state.position))
     if new_size <= 0:
         return new_order_result1, new_account_state1
@@ -830,6 +832,8 @@ def sell_nb(
     )
     if new_order_result1.status != OrderStatus.Filled:
         return new_order_result1, account_state
+    if new_account_state1.position != 0:
+        return new_order_result1, new_account_state1
     new_size = add_nb(size, -abs(account_state.position))
     if new_size <= 0:
         return new_order_result1, new_account_state1
