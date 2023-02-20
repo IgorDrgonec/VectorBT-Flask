@@ -2888,7 +2888,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     def __init__(
         self,
         wrapper: ArrayWrapper,
-        order_records: tp.RecordArray,
+        order_records: tp.Union[tp.RecordArray, SimulationOutput],
         *,
         close: tp.ArrayLike,
         open: tp.Optional[tp.ArrayLike] = None,
@@ -2924,6 +2924,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if cash_sharing:
             if wrapper.grouper.allow_enable or wrapper.grouper.allow_modify:
                 wrapper = wrapper.replace(allow_enable=False, allow_modify=False)
+        if isinstance(order_records, SimulationOutput):
+            sim_out = order_records
+            order_records = sim_out.order_records
+            log_records = sim_out.log_records
+            cash_deposits = sim_out.cash_deposits
+            cash_earnings = sim_out.cash_earnings
+            call_seq = sim_out.call_seq
+            in_outputs = sim_out.in_outputs
         Analyzable.__init__(
             self,
             wrapper,
@@ -4702,20 +4710,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         # Create an instance
         return cls(
             wrapper,
-            sim_out.order_records,
+            sim_out,
             open=broadcasted_args["open"] if not open_none else None,
             high=broadcasted_args["high"] if not high_none else None,
             low=broadcasted_args["low"] if not low_none else None,
             close=broadcasted_args["close"],
-            log_records=sim_out.log_records,
             cash_sharing=cash_sharing,
             init_cash=init_cash if init_cash_mode is None else init_cash_mode,
             init_position=init_position,
             init_price=init_price,
-            cash_deposits=sim_out.cash_deposits,
-            cash_earnings=sim_out.cash_earnings,
-            call_seq=call_seq if attach_call_seq else None,
-            in_outputs=sim_out.in_outputs,
             bm_close=bm_close,
             **kwargs,
         )
@@ -6328,20 +6331,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             kwargs["orders_cls"] = FSOrders
         return cls(
             wrapper,
-            sim_out.order_records,
+            sim_out,
             open=broadcasted_args["open"] if not open_none else None,
             high=broadcasted_args["high"] if not high_none else None,
             low=broadcasted_args["low"] if not low_none else None,
             close=broadcasted_args["close"],
-            log_records=sim_out.log_records,
             cash_sharing=cash_sharing,
             init_cash=init_cash if init_cash_mode is None else init_cash_mode,
             init_position=init_position,
             init_price=init_price,
-            cash_deposits=sim_out.cash_deposits,
-            cash_earnings=sim_out.cash_earnings,
-            call_seq=call_seq if attach_call_seq else None,
-            in_outputs=sim_out.in_outputs,
             bm_close=bm_close,
             **kwargs,
         )
@@ -7740,20 +7738,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             bm_close = broadcasted_args["bm_close"]
         return cls(
             wrapper,
-            sim_out.order_records,
+            sim_out,
             open=broadcasted_args["open"] if not open_none else None,
             high=broadcasted_args["high"] if not high_none else None,
             low=broadcasted_args["low"] if not low_none else None,
             close=broadcasted_args["close"],
-            log_records=sim_out.log_records,
             cash_sharing=cash_sharing,
             init_cash=init_cash if init_cash_mode is None else init_cash_mode,
             init_position=init_position,
             init_price=init_price,
-            cash_deposits=sim_out.cash_deposits,
-            cash_earnings=sim_out.cash_earnings,
-            call_seq=call_seq if not flexible and attach_call_seq else None,
-            in_outputs=sim_out.in_outputs,
             bm_close=bm_close,
             **kwargs,
         )
