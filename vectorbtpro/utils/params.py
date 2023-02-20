@@ -14,7 +14,6 @@ from numba.typed import List
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.config import Config, merge_dicts
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.template import substitute_templates
@@ -148,6 +147,9 @@ class Param:
     
     If so, providing a NumPy array will be considered as a single value."""
 
+    random_subset: tp.Union[None, int, float] = attr.ib(default=None)
+    """Random subset of values to select."""
+
     level: tp.Optional[int] = attr.ib(default=None)
     """Level of the product the parameter takes part in.
 
@@ -203,10 +205,10 @@ def combine_params(
         random_subset = params_cfg["random_subset"]
     if seed is None:
         seed = params_cfg["seed"]
+    rng = np.random.default_rng(seed=seed)
     index_stack_kwargs = merge_dicts(params_cfg["index_stack_kwargs"], index_stack_kwargs)
     if name_tuple_to_str is None:
         name_tuple_to_str = params_cfg["name_tuple_to_str"]
-
     if index_stack_kwargs is None:
         index_stack_kwargs = {}
 
@@ -269,7 +271,14 @@ def combine_params(
             value = value.values.tolist()
 
         values = params_to_list(value, is_tuple=p.is_tuple, is_array_like=p.is_array_like)
-        level_values[level][k] = values
+        if p.random_subset is not None:
+            if checks.is_float(p.random_subset):
+                _random_subset = int(p.random_subset * len(values))
+            else:
+                _random_subset = p.random_subset
+            random_indices = np.sort(rng.permutation(np.arange(len(values)))[:_random_subset])
+        else:
+            random_indices = None
         if keys_name is None:
             if p_name is not None:
                 keys_name = p_name
@@ -283,9 +292,13 @@ def combine_params(
             keys = indexes.index_from_values(values, name=keys_name)
         else:
             keys = keys.rename(keys_name)
+        if random_indices is not None:
+            values = [values[i] for i in random_indices]
+            keys = keys[random_indices]
+        level_values[level][k] = values
         product_indexes[k] = keys
-        curr_idx += 1
         names[k] = keys_name
+        curr_idx += 1
 
     # Build an operation tree and parameter index
     op_tree_operands = []
@@ -336,9 +349,7 @@ def combine_params(
         indices = np.arange(ncombs)
         pre_random_subset = random_subset is not None and not checks.is_float(random_subset)
         if pre_random_subset:
-            if seed is not None:
-                set_seed(seed)
-            indices = np.random.permutation(indices)
+            indices = rng.permutation(indices)
         keep_indices = []
         condition_funcs = {
             k: eval(
@@ -379,11 +390,9 @@ def combine_params(
 
     # Select a random subset
     if random_subset is not None and not pre_random_subset:
-        if seed is not None:
-            set_seed(seed)
         if checks.is_float(random_subset):
             random_subset = int(random_subset * ncombs)
-        random_indices = np.sort(np.random.permutation(np.arange(ncombs))[:random_subset])
+        random_indices = np.sort(rng.permutation(np.arange(ncombs))[:random_subset])
         param_product = {k: [v[i] for i in random_indices] for k, v in param_product.items()}
         ncombs = len(random_indices)
         if build_index:
