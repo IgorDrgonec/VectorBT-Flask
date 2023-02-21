@@ -5,6 +5,7 @@
 from pathlib import Path
 from itertools import islice
 import humanize
+import shutil
 
 from vectorbtpro import _typing as tp
 
@@ -12,31 +13,46 @@ __all__ = [
     "file_exists",
     "dir_exists",
     "file_size",
+    "dir_size",
+    "make_dir",
+    "remove_file",
+    "remove_dir",
 ]
 
 
-def file_exists(path: tp.PathLike) -> bool:
+def file_exists(file_path: tp.PathLike) -> bool:
     """Check whether a file exists."""
-    path = Path(path)
-    if path.exists() and path.is_file():
+    file_path = Path(file_path)
+    if file_path.exists() and file_path.is_file():
         return True
     return False
 
 
-def dir_exists(path: tp.PathLike) -> bool:
+def dir_exists(dir_path: tp.PathLike) -> bool:
     """Check whether a directory exists."""
-    path = Path(path)
-    if path.exists() and path.is_dir():
+    dir_path = Path(dir_path)
+    if dir_path.exists() and dir_path.is_dir():
         return True
     return False
 
 
-def file_size(path: tp.PathLike, readable: bool = True, **kwargs) -> tp.Union[str, int]:
+def file_size(file_path: tp.PathLike, readable: bool = True, **kwargs) -> tp.Union[str, int]:
     """Get size of a file."""
-    path = Path(path)
-    if not file_exists(path):
-        raise FileNotFoundError(f"File '{path}' not found")
-    n_bytes = path.stat().st_size
+    file_path = Path(file_path)
+    if not file_exists(file_path):
+        raise FileNotFoundError(f"File '{file_path}' not found")
+    n_bytes = file_path.stat().st_size
+    if readable:
+        return humanize.naturalsize(n_bytes, **kwargs)
+    return n_bytes
+
+
+def dir_size(dir_path: tp.PathLike, readable: bool = True, **kwargs) -> tp.Union[str, int]:
+    """Get size of a directory."""
+    dir_path = Path(dir_path)
+    if not dir_exists(dir_path):
+        raise FileNotFoundError(f"Directory '{dir_path}' not found")
+    n_bytes = sum(path.stat().st_size for path in dir_path.glob('**/*') if path.is_file())
     if readable:
         return humanize.naturalsize(n_bytes, **kwargs)
     return n_bytes
@@ -48,7 +64,7 @@ def check_mkdir(
     mode: tp.Optional[int] = None,
     parents: tp.Optional[bool] = None,
     exist_ok: tp.Optional[bool] = None,
-):
+) -> None:
     """Check whether the path to a directory exists and create if it doesn't.
 
     For defaults, see `mkdir` in `vectorbtpro._settings.path`."""
@@ -69,8 +85,33 @@ def check_mkdir(
     if dir_path.exists() and not dir_path.is_dir():
         raise TypeError(f"Path '{dir_path}' is not a directory")
     if not dir_path.exists() and not mkdir:
-        raise ValueError(f"Path '{dir_path}' not exists. Pass mkdir=True to create parent directories.")
+        raise FileNotFoundError(f"Directory '{dir_path}' not found. Use mkdir=True to proceed.")
     dir_path.mkdir(mode=mode, parents=parents, exist_ok=exist_ok)
+
+
+def make_dir(dir_path: tp.PathLike, **kwargs) -> None:
+    """Make a directory."""
+    check_mkdir(dir_path, mkdir=True, **kwargs)
+
+
+def remove_file(file_path: tp.PathLike, missing_ok: bool = False) -> None:
+    """Remove a file."""
+    file_path = Path(file_path)
+    if file_exists(file_path):
+        file_path.unlink()
+    elif not missing_ok:
+        raise FileNotFoundError(f"File '{file_path}' not found")
+
+
+def remove_dir(dir_path: tp.PathLike, missing_ok: bool = False, with_contents: bool = False) -> None:
+    """Remove a directory."""
+    dir_path = Path(dir_path)
+    if dir_exists(dir_path):
+        if any(dir_path.iterdir()) and not with_contents:
+            raise ValueError(f"Directory '{dir_path}' has contents. Use with_contents=True to proceed.")
+        shutil.rmtree(dir_path)
+    elif not missing_ok:
+        raise FileNotFoundError(f"Directory '{dir_path}' not found")
 
 
 def tree(
@@ -88,6 +129,10 @@ def tree(
 
     Inspired by this answer: https://stackoverflow.com/a/59109706"""
     dir_path = Path(dir_path)
+    if not dir_path.exists():
+        raise FileNotFoundError(f"Directory '{dir_path}' not found")
+    if not dir_path.is_dir():
+        raise TypeError(f"Path '{dir_path}' is not a directory")
     files = 0
     directories = 0
 
