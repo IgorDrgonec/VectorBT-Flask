@@ -808,7 +808,8 @@ def chunked(
     silence_warnings: tp.Optional[bool] = None,
     disable: tp.Optional[bool] = None,
     forward_kwargs_as: tp.KwargsLike = None,
-    **execute_kwargs,
+    execute_kwargs: tp.KwargsLike = None,
+    **kwargs,
 ) -> tp.Callable:
     """Decorator that chunks the inputs of a function. Engine-agnostic.
     Returns a new function with the same signature as the passed one.
@@ -1149,7 +1150,7 @@ def chunked(
                 silence_warnings=silence_warnings,
                 disable=disable,
                 forward_kwargs_as=forward_kwargs_as,
-                execute_kwargs=execute_kwargs,
+                execute_kwargs=merge_dicts(kwargs, execute_kwargs),
             ),
             options_=dict(
                 frozen_keys=True,

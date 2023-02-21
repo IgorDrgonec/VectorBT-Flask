@@ -567,7 +567,8 @@ def parameterized(
     use_meta: tp.KwargsLike = None,
     selection: tp.Union[None, tp.MaybeIterable[tp.Hashable]] = None,
     forward_kwargs_as: tp.KwargsLike = None,
-    **execute_kwargs,
+    execute_kwargs: tp.KwargsLike = None,
+    **kwargs,
 ) -> tp.Callable:
     """Decorator that parameterizes a function. Engine-agnostic.
     Returns a new function with the same signature as the passed one.
@@ -1051,7 +1052,7 @@ def parameterized(
                 use_meta=use_meta,
                 selection=selection,
                 forward_kwargs_as=forward_kwargs_as,
-                execute_kwargs=execute_kwargs,
+                execute_kwargs=merge_dicts(kwargs, execute_kwargs),
             ),
             options_=dict(
                 frozen_keys=True,
