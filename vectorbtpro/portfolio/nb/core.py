@@ -417,6 +417,8 @@ def short_sell_nb(
     if np.isinf(leverage):
         if np.isinf(account_state.free_cash):
             raise ValueError("Leverage must be finite when account_state.free_cash is infinite")
+        if is_close_or_less_nb(account_state.free_cash, fees_paid):
+            return order_not_filled_nb(OrderStatus.Rejected, OrderStatusInfo.CantCoverFees), account_state
         leverage_ = order_value / (account_state.free_cash - fees_paid)
     else:
         leverage_ = float(leverage)
