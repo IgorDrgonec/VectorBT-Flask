@@ -1890,14 +1890,14 @@ shortcut_config = ReadonlyConfig(
             resample_func="sum",
             resample_kwargs=dict(wrap_kwargs=dict(fillna=0.0)),
         ),
-        "longonly_asset_flow": dict(
+        "long_asset_flow": dict(
             method_name="get_asset_flow",
             group_by_aware=False,
             method_kwargs=dict(direction="longonly"),
             resample_func="sum",
             resample_kwargs=dict(wrap_kwargs=dict(fillna=0.0)),
         ),
-        "shortonly_asset_flow": dict(
+        "short_asset_flow": dict(
             method_name="get_asset_flow",
             group_by_aware=False,
             method_kwargs=dict(direction="shortonly"),
@@ -1905,26 +1905,26 @@ shortcut_config = ReadonlyConfig(
             resample_kwargs=dict(wrap_kwargs=dict(fillna=0.0)),
         ),
         "assets": dict(group_by_aware=False),
-        "longonly_assets": dict(
+        "long_assets": dict(
             method_name="get_assets",
             group_by_aware=False,
             method_kwargs=dict(direction="longonly"),
         ),
-        "shortonly_assets": dict(
+        "short_assets": dict(
             method_name="get_assets",
             group_by_aware=False,
             method_kwargs=dict(direction="shortonly"),
         ),
         "position_mask": dict(),
-        "longonly_position_mask": dict(method_name="get_position_mask", method_kwargs=dict(direction="longonly")),
-        "shortonly_position_mask": dict(method_name="get_position_mask", method_kwargs=dict(direction="shortonly")),
+        "long_position_mask": dict(method_name="get_position_mask", method_kwargs=dict(direction="longonly")),
+        "short_position_mask": dict(method_name="get_position_mask", method_kwargs=dict(direction="shortonly")),
         "position_coverage": dict(obj_type="red_array"),
-        "longonly_position_coverage": dict(
+        "long_position_coverage": dict(
             method_name="get_position_coverage",
             obj_type="red_array",
             method_kwargs=dict(direction="longonly"),
         ),
-        "shortonly_position_coverage": dict(
+        "short_position_coverage": dict(
             method_name="get_position_coverage",
             obj_type="red_array",
             method_kwargs=dict(direction="shortonly"),
@@ -1949,20 +1949,20 @@ shortcut_config = ReadonlyConfig(
         "init_value": dict(obj_type="red_array"),
         "input_value": dict(obj_type="red_array"),
         "asset_value": dict(),
-        "longonly_asset_value": dict(method_name="get_asset_value", method_kwargs=dict(direction="longonly")),
-        "shortonly_asset_value": dict(method_name="get_asset_value", method_kwargs=dict(direction="shortonly")),
+        "long_asset_value": dict(method_name="get_asset_value", method_kwargs=dict(direction="longonly")),
+        "short_asset_value": dict(method_name="get_asset_value", method_kwargs=dict(direction="shortonly")),
         "gross_exposure": dict(),
-        "longonly_gross_exposure": dict(method_name="get_gross_exposure", method_kwargs=dict(direction="longonly")),
-        "shortonly_gross_exposure": dict(method_name="get_gross_exposure", method_kwargs=dict(direction="shortonly")),
+        "long_gross_exposure": dict(method_name="get_gross_exposure", method_kwargs=dict(direction="longonly")),
+        "short_gross_exposure": dict(method_name="get_gross_exposure", method_kwargs=dict(direction="shortonly")),
         "net_exposure": dict(),
         "value": dict(),
         "allocations": dict(group_by_aware=False),
-        "longonly_allocations": dict(
+        "long_allocations": dict(
             method_name="get_allocations",
             method_kwargs=dict(direction="longonly"),
             group_by_aware=False,
         ),
-        "shortonly_allocations": dict(
+        "short_allocations": dict(
             method_name="get_allocations",
             method_kwargs=dict(direction="shortonly"),
             group_by_aware=False,
@@ -8713,10 +8713,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         func = ch_reg.resolve_option(func, chunked)
         assets = func(to_2d_array(asset_flow), init_position=to_1d_array(init_position))
         if direction == Direction.LongOnly:
-            func = jit_reg.resolve_option(nb.longonly_assets_nb, jitted)
+            func = jit_reg.resolve_option(nb.long_assets_nb, jitted)
             assets = func(assets)
         elif direction == Direction.ShortOnly:
-            func = jit_reg.resolve_option(nb.shortonly_assets_nb, jitted)
+            func = jit_reg.resolve_option(nb.short_assets_nb, jitted)
             assets = func(assets)
         return wrapper.wrap(assets, group_by=False, **resolve_dict(wrap_kwargs))
 
@@ -9313,18 +9313,39 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         wrapper: tp.Optional[ArrayWrapper] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """Get gross exposure."""
+        """Get gross exposure.
+
+        !!! note
+            When both directions, `asset_value` must include the addition of the absolute long-only
+            and short-only asset values."""
         direction = map_enum_fields(direction, Direction)
 
         if not isinstance(cls_or_self, type):
             if asset_value is None:
-                asset_value = cls_or_self.resolve_shortcut_attr(
-                    "asset_value",
-                    group_by=group_by,
-                    direction=direction,
-                    jitted=jitted,
-                    chunked=chunked,
-                )
+                if direction == Direction.Both and cls_or_self.wrapper.grouper.is_grouped(group_by=group_by):
+                    long_asset_value = cls_or_self.resolve_shortcut_attr(
+                        "asset_value",
+                        direction="longonly",
+                        group_by=group_by,
+                        jitted=jitted,
+                        chunked=chunked,
+                    )
+                    short_asset_value = cls_or_self.resolve_shortcut_attr(
+                        "asset_value",
+                        direction="shortonly",
+                        group_by=group_by,
+                        jitted=jitted,
+                        chunked=chunked,
+                    )
+                    asset_value = long_asset_value + short_asset_value
+                else:
+                    asset_value = cls_or_self.resolve_shortcut_attr(
+                        "asset_value",
+                        group_by=group_by,
+                        direction=direction,
+                        jitted=jitted,
+                        chunked=chunked,
+                    )
             if value is None:
                 value = cls_or_self.resolve_shortcut_attr(
                     "value",
@@ -10198,9 +10219,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if "direction" in _kwargs:
                 direction = map_enum_fields(_kwargs.pop("direction"), Direction)
                 if direction == Direction.LongOnly:
-                    prop_name = "longonly_" + naked_attr_name
+                    prop_name = "long_" + naked_attr_name
                 elif direction == Direction.ShortOnly:
-                    prop_name = "shortonly_" + naked_attr_name
+                    prop_name = "short_" + naked_attr_name
 
             if prop_name in self.cls_dir:
                 prop = getattr(type(self), prop_name)
