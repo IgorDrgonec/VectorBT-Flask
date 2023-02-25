@@ -497,6 +497,27 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """Expanding version of `GenericAccessor.rolling_std`."""
         return self.rolling_std(None, minp=minp, **kwargs)
 
+    def rolling_zscore(
+        self,
+        window: tp.Optional[int],
+        minp: tp.Optional[int] = None,
+        ddof: int = 1,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """See `vectorbtpro.generic.nb.rolling.rolling_zscore_nb`."""
+        if window is None:
+            window = self.wrapper.shape[0]
+        func = jit_reg.resolve_option(nb.rolling_zscore_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(self.to_2d_array(), window, minp=minp, ddof=ddof)
+        return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+
+    def expanding_zscore(self, minp: tp.Optional[int] = 1, **kwargs) -> tp.SeriesFrame:
+        """Expanding version of `GenericAccessor.rolling_zscore`."""
+        return self.rolling_zscore(None, minp=minp, **kwargs)
+
     def wm_mean(
         self,
         span: int,

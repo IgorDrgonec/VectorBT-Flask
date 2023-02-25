@@ -2404,11 +2404,22 @@ class PolygonData(RemoteData):
         ... )
         ```
 
-        * Fetch data:
+        * Fetch stock data:
 
         ```pycon
         >>> data = vbt.PolygonData.fetch(
         ...     "AAPL",
+        ...     start="2021-01-01",
+        ...     end="2022-01-01",
+        ...     timeframe="1 day"
+        ... )
+        ```
+
+        * Fetch crypto data:
+
+        ```pycon
+        >>> data = vbt.PolygonData.fetch(
+        ...     "X:BTCUSD",
         ...     start="2021-01-01",
         ...     end="2022-01-01",
         ...     timeframe="1 day"

@@ -216,10 +216,15 @@ def yield_chunk_meta(
         yield ChunkMeta(uuid=str(uuid.uuid4()), idx=0, start=0, end=size, indices=None)
     else:
         if n_chunks is None and chunk_len is None:
-            n_chunks = multiprocessing.cpu_count()
+            n_chunks = "auto"
         if n_chunks is not None and chunk_len is not None:
             raise ValueError("Either n_chunks or chunk_len must be set, not both")
         if n_chunks is not None:
+            if isinstance(n_chunks, str):
+                if n_chunks.lower() == "auto":
+                    n_chunks = multiprocessing.cpu_count()
+                else:
+                    raise ValueError(f"Invalid option n_chunks='{n_chunks}'")
             if n_chunks == 0:
                 raise ValueError("Chunk count cannot be zero")
             if size is not None:
@@ -240,6 +245,11 @@ def yield_chunk_meta(
                     yield ChunkMeta(uuid=str(uuid.uuid4()), idx=i, start=None, end=None, indices=None)
         if chunk_len is not None:
             checks.assert_not_none(size)
+            if isinstance(chunk_len, str):
+                if chunk_len.lower() == "auto":
+                    chunk_len = multiprocessing.cpu_count()
+                else:
+                    raise ValueError(f"Invalid option chunk_len='{chunk_len}'")
             if chunk_len == 0:
                 raise ValueError("Chunk length cannot be zero")
             for chunk_i, i in enumerate(range(0, size, chunk_len)):

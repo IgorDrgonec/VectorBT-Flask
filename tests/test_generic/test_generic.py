@@ -333,6 +333,35 @@ class TestAccessors:
             df.vbt.rolling_std(test_window, minp=test_minp, ddof=test_ddof, chunked=False),
         )
 
+    @pytest.mark.parametrize("test_window", [1, 2, 3, 4, 5])
+    @pytest.mark.parametrize("test_minp", [1, None])
+    @pytest.mark.parametrize("test_ddof", [0, 1])
+    def test_rolling_zscore(self, test_window, test_minp, test_ddof):
+        if test_minp is None:
+            test_minp = test_window
+        assert_series_equal(
+            df["a"].vbt.rolling_zscore(test_window, minp=test_minp, ddof=test_ddof),
+            (df["a"] - df["a"].vbt.rolling_mean(test_window, minp=test_minp))
+            / df["a"].vbt.rolling_std(test_window, minp=test_minp, ddof=test_ddof),
+        )
+        assert_frame_equal(
+            df.vbt.rolling_zscore(test_window, minp=test_minp, ddof=test_ddof),
+            (df - df.vbt.rolling_mean(test_window, minp=test_minp))
+            / df.vbt.rolling_std(test_window, minp=test_minp, ddof=test_ddof),
+        )
+        assert_frame_equal(
+            df.vbt.rolling_zscore(test_window),
+            (df - df.vbt.rolling_mean(test_window)) / df.vbt.rolling_std(test_window),
+        )
+        assert_frame_equal(
+            df.vbt.rolling_zscore(test_window, minp=test_minp, ddof=test_ddof, jitted=dict(parallel=True)),
+            df.vbt.rolling_zscore(test_window, minp=test_minp, ddof=test_ddof, jitted=dict(parallel=False)),
+        )
+        assert_frame_equal(
+            df.vbt.rolling_zscore(test_window, minp=test_minp, ddof=test_ddof, chunked=True),
+            df.vbt.rolling_zscore(test_window, minp=test_minp, ddof=test_ddof, chunked=False),
+        )
+
     @pytest.mark.parametrize("test_minp", [1, 3])
     @pytest.mark.parametrize("test_ddof", [0, 1])
     def test_expanding_std(self, test_minp, test_ddof):
