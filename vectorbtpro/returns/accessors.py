@@ -1579,11 +1579,21 @@ class ReturnsAccessor(GenericAccessor):
         """Perform resampling on `ReturnsAccessor`."""
         if wrapper_meta is None:
             wrapper_meta = self.wrapper.resample_meta(*args, **kwargs)
-        new_obj = self.resample_apply(wrapper_meta["resampler"], nb.cum_returns_final_1d_nb)
+        new_obj = self.resample_apply(
+            wrapper_meta["resampler"],
+            nb.cum_returns_final_1d_nb,
+            0.0,
+            self.log_returns,
+        )
         if fill_with_zero:
             new_obj = new_obj.vbt.fillna(0.0)
         if self._bm_returns is not None:
-            new_bm_returns = self.bm_returns.vbt.resample_apply(wrapper_meta["resampler"], nb.cum_returns_final_1d_nb)
+            new_bm_returns = self.bm_returns.vbt.resample_apply(
+                wrapper_meta["resampler"],
+                nb.cum_returns_final_1d_nb,
+                0.0,
+                self.log_returns,
+            )
             if fill_with_zero:
                 new_bm_returns = new_bm_returns.vbt.fillna(0.0)
         else:

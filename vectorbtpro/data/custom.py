@@ -867,9 +867,10 @@ class CSVData(LocalData):
             if end is not None:
                 mask &= obj.index < end
             mask_indices = np.flatnonzero(mask)
-            if len(mask_indices) > 0:
-                obj = obj.iloc[mask_indices[0] : mask_indices[-1] + 1]
-                start_row += mask_indices[0]
+            if len(mask_indices) == 0:
+                return None
+            obj = obj.iloc[mask_indices[0] : mask_indices[-1] + 1]
+            start_row += mask_indices[0]
         return obj, dict(last_row=start_row - header_rows + len(obj.index) - 1, tz_convert=tz)
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Tuple[tp.SeriesFrame, dict]:
@@ -1111,9 +1112,10 @@ class HDFData(LocalData):
             if end is not None:
                 mask &= index < end
             mask_indices = np.flatnonzero(mask)
-            if len(mask_indices) > 0:
-                start_row += mask_indices[0]
-                end_row = start_row + mask_indices[-1] - mask_indices[0] + 1
+            if len(mask_indices) == 0:
+                return None
+            start_row += mask_indices[0]
+            end_row = start_row + mask_indices[-1] - mask_indices[0] + 1
 
         obj = pd.read_hdf(file_path, key=key, start=start_row, stop=end_row, **read_hdf_kwargs)
         if isinstance(obj, TableIterator):
@@ -1595,6 +1597,8 @@ class BinanceData(RemoteData):
                     )
                     pbar.update(1)
                     prev_end_ts = next_data[-1][0]
+                    if end_ts is not None and prev_end_ts >= end_ts:
+                        break
                     if delay is not None:
                         time.sleep(delay / 1000)  # be kind to api
         except Exception as e:
@@ -2013,6 +2017,8 @@ class CCXTData(RemoteData):
                     )
                     pbar.update(1)
                     prev_end_ts = next_data[-1][0]
+                    if end_ts is not None and prev_end_ts >= end_ts:
+                        break
                     if delay is not None:
                         time.sleep(delay / 1000)  # be kind to api
         except Exception as e:
@@ -2066,11 +2072,23 @@ class AlpacaData(RemoteData):
         ... )
         ```
 
-        * Fetch data:
+        * Fetch stock data:
 
         ```pycon
         >>> data = vbt.AlpacaData.fetch(
         ...     "AAPL",
+        ...     start="2021-01-01",
+        ...     end="2022-01-01",
+        ...     timeframe="1 day"
+        ... )
+        ```
+
+        * Fetch crypto data:
+
+        ```pycon
+        >>> data = vbt.AlpacaData.fetch(
+        ...     "BTCUSD",
+        ...     client_type="crypto",
         ...     start="2021-01-01",
         ...     end="2022-01-01",
         ...     timeframe="1 day"
@@ -2386,11 +2404,22 @@ class PolygonData(RemoteData):
         ... )
         ```
 
-        * Fetch data:
+        * Fetch stock data:
 
         ```pycon
         >>> data = vbt.PolygonData.fetch(
         ...     "AAPL",
+        ...     start="2021-01-01",
+        ...     end="2022-01-01",
+        ...     timeframe="1 day"
+        ... )
+        ```
+
+        * Fetch crypto data:
+
+        ```pycon
+        >>> data = vbt.PolygonData.fetch(
+        ...     "X:BTCUSD",
         ...     start="2021-01-01",
         ...     end="2022-01-01",
         ...     timeframe="1 day"
@@ -2678,6 +2707,8 @@ class PolygonData(RemoteData):
                     )
                     pbar.update(1)
                     prev_end_ts = next_data[-1]["t"]
+                    if end_ts is not None and prev_end_ts >= end_ts:
+                        break
                     if delay is not None:
                         time.sleep(delay / 1000)  # be kind to api
         except Exception as e:
@@ -3369,6 +3400,7 @@ class TVData(RemoteData):
         timeframe: tp.Optional[str] = None,
         tz: tp.Optional[tp.TimezoneLike] = None,
         fut_contract: tp.Optional[int] = None,
+        adjustment: tp.Optional[str] = None,
         extended_session: tp.Optional[bool] = None,
         pro_data: tp.Optional[bool] = None,
         limit: tp.Optional[int] = None,
@@ -3396,6 +3428,9 @@ class TVData(RemoteData):
                 See `vectorbtpro.utils.datetime_.to_timezone`.
             fut_contract (int): None for cash, 1 for continuous current contract in front,
                 2 for continuous next contract in front.
+            adjustment (str): Adjustment.
+
+                Either "splits" (default) or "dividends".
             extended_session (bool): Regular session if False, extended session if True.
             pro_data (bool): Whether to use pro data.
             limit (int): The maximum number of returned items.
@@ -3417,6 +3452,8 @@ class TVData(RemoteData):
             tz = tv_cfg["tz"]
         if fut_contract is None:
             fut_contract = tv_cfg["fut_contract"]
+        if adjustment is None:
+            adjustment = tv_cfg["adjustment"]
         if extended_session is None:
             extended_session = tv_cfg["extended_session"]
         if pro_data is None:
@@ -3455,6 +3492,7 @@ class TVData(RemoteData):
             exchange=exchange,
             interval=interval,
             fut_contract=fut_contract,
+            adjustment=adjustment,
             extended_session=extended_session,
             pro_data=pro_data,
             limit=limit,

@@ -1735,12 +1735,13 @@ def returns_resample_func(
     resampler: tp.Union[Resampler, tp.PandasResampler],
     wrapper: ArrayWrapper,
     fill_with_zero: bool = True,
+    log_returns: bool = False,
     **kwargs,
 ):
     """Apply resampling function on returns."""
     return (
         pd.DataFrame(obj, index=wrapper.index)
-        .vbt.returns.resample(
+        .vbt.returns(log_returns=log_returns).resample(
             resampler,
             fill_with_zero=fill_with_zero,
         )
@@ -1889,14 +1890,14 @@ shortcut_config = ReadonlyConfig(
             resample_func="sum",
             resample_kwargs=dict(wrap_kwargs=dict(fillna=0.0)),
         ),
-        "longonly_asset_flow": dict(
+        "long_asset_flow": dict(
             method_name="get_asset_flow",
             group_by_aware=False,
             method_kwargs=dict(direction="longonly"),
             resample_func="sum",
             resample_kwargs=dict(wrap_kwargs=dict(fillna=0.0)),
         ),
-        "shortonly_asset_flow": dict(
+        "short_asset_flow": dict(
             method_name="get_asset_flow",
             group_by_aware=False,
             method_kwargs=dict(direction="shortonly"),
@@ -1904,26 +1905,26 @@ shortcut_config = ReadonlyConfig(
             resample_kwargs=dict(wrap_kwargs=dict(fillna=0.0)),
         ),
         "assets": dict(group_by_aware=False),
-        "longonly_assets": dict(
+        "long_assets": dict(
             method_name="get_assets",
             group_by_aware=False,
             method_kwargs=dict(direction="longonly"),
         ),
-        "shortonly_assets": dict(
+        "short_assets": dict(
             method_name="get_assets",
             group_by_aware=False,
             method_kwargs=dict(direction="shortonly"),
         ),
         "position_mask": dict(),
-        "longonly_position_mask": dict(method_name="get_position_mask", method_kwargs=dict(direction="longonly")),
-        "shortonly_position_mask": dict(method_name="get_position_mask", method_kwargs=dict(direction="shortonly")),
+        "long_position_mask": dict(method_name="get_position_mask", method_kwargs=dict(direction="longonly")),
+        "short_position_mask": dict(method_name="get_position_mask", method_kwargs=dict(direction="shortonly")),
         "position_coverage": dict(obj_type="red_array"),
-        "longonly_position_coverage": dict(
+        "long_position_coverage": dict(
             method_name="get_position_coverage",
             obj_type="red_array",
             method_kwargs=dict(direction="longonly"),
         ),
-        "shortonly_position_coverage": dict(
+        "short_position_coverage": dict(
             method_name="get_position_coverage",
             obj_type="red_array",
             method_kwargs=dict(direction="shortonly"),
@@ -1948,20 +1949,20 @@ shortcut_config = ReadonlyConfig(
         "init_value": dict(obj_type="red_array"),
         "input_value": dict(obj_type="red_array"),
         "asset_value": dict(),
-        "longonly_asset_value": dict(method_name="get_asset_value", method_kwargs=dict(direction="longonly")),
-        "shortonly_asset_value": dict(method_name="get_asset_value", method_kwargs=dict(direction="shortonly")),
+        "long_asset_value": dict(method_name="get_asset_value", method_kwargs=dict(direction="longonly")),
+        "short_asset_value": dict(method_name="get_asset_value", method_kwargs=dict(direction="shortonly")),
         "gross_exposure": dict(),
-        "longonly_gross_exposure": dict(method_name="get_gross_exposure", method_kwargs=dict(direction="longonly")),
-        "shortonly_gross_exposure": dict(method_name="get_gross_exposure", method_kwargs=dict(direction="shortonly")),
+        "long_gross_exposure": dict(method_name="get_gross_exposure", method_kwargs=dict(direction="longonly")),
+        "short_gross_exposure": dict(method_name="get_gross_exposure", method_kwargs=dict(direction="shortonly")),
         "net_exposure": dict(),
         "value": dict(),
         "allocations": dict(group_by_aware=False),
-        "longonly_allocations": dict(
+        "long_allocations": dict(
             method_name="get_allocations",
             method_kwargs=dict(direction="longonly"),
             group_by_aware=False,
         ),
-        "shortonly_allocations": dict(
+        "short_allocations": dict(
             method_name="get_allocations",
             method_kwargs=dict(direction="shortonly"),
             group_by_aware=False,
@@ -1970,6 +1971,16 @@ shortcut_config = ReadonlyConfig(
         "final_value": dict(obj_type="red_array"),
         "total_return": dict(obj_type="red_array"),
         "returns": dict(resample_func=returns_resample_func),
+        "log_returns": dict(
+            method_name="get_returns",
+            method_kwargs=dict(log_returns=True),
+            resample_func=partial(returns_resample_func, log_returns=True),
+        ),
+        "daily_log_returns": dict(
+            method_name="get_returns",
+            method_kwargs=dict(daily_returns=True, log_returns=True),
+            resample_func=partial(returns_resample_func, log_returns=True),
+        ),
         "asset_pnl": dict(resample_func="sum", resample_kwargs=dict(wrap_kwargs=dict(fillna=0.0))),
         "asset_returns": dict(resample_func=returns_resample_func),
         "market_value": dict(),
@@ -2877,7 +2888,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     def __init__(
         self,
         wrapper: ArrayWrapper,
-        order_records: tp.RecordArray,
+        order_records: tp.Union[tp.RecordArray, SimulationOutput],
         *,
         close: tp.ArrayLike,
         open: tp.Optional[tp.ArrayLike] = None,
@@ -2913,6 +2924,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if cash_sharing:
             if wrapper.grouper.allow_enable or wrapper.grouper.allow_modify:
                 wrapper = wrapper.replace(allow_enable=False, allow_modify=False)
+        if isinstance(order_records, SimulationOutput):
+            sim_out = order_records
+            order_records = sim_out.order_records
+            log_records = sim_out.log_records
+            cash_deposits = sim_out.cash_deposits
+            cash_earnings = sim_out.cash_earnings
+            call_seq = sim_out.call_seq
+            in_outputs = sim_out.in_outputs
         Analyzable.__init__(
             self,
             wrapper,
@@ -4691,20 +4710,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         # Create an instance
         return cls(
             wrapper,
-            sim_out.order_records,
+            sim_out,
             open=broadcasted_args["open"] if not open_none else None,
             high=broadcasted_args["high"] if not high_none else None,
             low=broadcasted_args["low"] if not low_none else None,
             close=broadcasted_args["close"],
-            log_records=sim_out.log_records,
             cash_sharing=cash_sharing,
             init_cash=init_cash if init_cash_mode is None else init_cash_mode,
             init_position=init_position,
             init_price=init_price,
-            cash_deposits=sim_out.cash_deposits,
-            cash_earnings=sim_out.cash_earnings,
-            call_seq=call_seq if attach_call_seq else None,
-            in_outputs=sim_out.in_outputs,
             bm_close=bm_close,
             **kwargs,
         )
@@ -6317,20 +6331,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             kwargs["orders_cls"] = FSOrders
         return cls(
             wrapper,
-            sim_out.order_records,
+            sim_out,
             open=broadcasted_args["open"] if not open_none else None,
             high=broadcasted_args["high"] if not high_none else None,
             low=broadcasted_args["low"] if not low_none else None,
             close=broadcasted_args["close"],
-            log_records=sim_out.log_records,
             cash_sharing=cash_sharing,
             init_cash=init_cash if init_cash_mode is None else init_cash_mode,
             init_position=init_position,
             init_price=init_price,
-            cash_deposits=sim_out.cash_deposits,
-            cash_earnings=sim_out.cash_earnings,
-            call_seq=call_seq if attach_call_seq else None,
-            in_outputs=sim_out.in_outputs,
             bm_close=bm_close,
             **kwargs,
         )
@@ -7729,20 +7738,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             bm_close = broadcasted_args["bm_close"]
         return cls(
             wrapper,
-            sim_out.order_records,
+            sim_out,
             open=broadcasted_args["open"] if not open_none else None,
             high=broadcasted_args["high"] if not high_none else None,
             low=broadcasted_args["low"] if not low_none else None,
             close=broadcasted_args["close"],
-            log_records=sim_out.log_records,
             cash_sharing=cash_sharing,
             init_cash=init_cash if init_cash_mode is None else init_cash_mode,
             init_position=init_position,
             init_price=init_price,
-            cash_deposits=sim_out.cash_deposits,
-            cash_earnings=sim_out.cash_earnings,
-            call_seq=call_seq if not flexible and attach_call_seq else None,
-            in_outputs=sim_out.in_outputs,
             bm_close=bm_close,
             **kwargs,
         )
@@ -8709,10 +8713,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         func = ch_reg.resolve_option(func, chunked)
         assets = func(to_2d_array(asset_flow), init_position=to_1d_array(init_position))
         if direction == Direction.LongOnly:
-            func = jit_reg.resolve_option(nb.longonly_assets_nb, jitted)
+            func = jit_reg.resolve_option(nb.long_assets_nb, jitted)
             assets = func(assets)
         elif direction == Direction.ShortOnly:
-            func = jit_reg.resolve_option(nb.shortonly_assets_nb, jitted)
+            func = jit_reg.resolve_option(nb.short_assets_nb, jitted)
             assets = func(assets)
         return wrapper.wrap(assets, group_by=False, **resolve_dict(wrap_kwargs))
 
@@ -9309,18 +9313,39 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         wrapper: tp.Optional[ArrayWrapper] = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """Get gross exposure."""
+        """Get gross exposure.
+
+        !!! note
+            When both directions, `asset_value` must include the addition of the absolute long-only
+            and short-only asset values."""
         direction = map_enum_fields(direction, Direction)
 
         if not isinstance(cls_or_self, type):
             if asset_value is None:
-                asset_value = cls_or_self.resolve_shortcut_attr(
-                    "asset_value",
-                    group_by=group_by,
-                    direction=direction,
-                    jitted=jitted,
-                    chunked=chunked,
-                )
+                if direction == Direction.Both and cls_or_self.wrapper.grouper.is_grouped(group_by=group_by):
+                    long_asset_value = cls_or_self.resolve_shortcut_attr(
+                        "asset_value",
+                        direction="longonly",
+                        group_by=group_by,
+                        jitted=jitted,
+                        chunked=chunked,
+                    )
+                    short_asset_value = cls_or_self.resolve_shortcut_attr(
+                        "asset_value",
+                        direction="shortonly",
+                        group_by=group_by,
+                        jitted=jitted,
+                        chunked=chunked,
+                    )
+                    asset_value = long_asset_value + short_asset_value
+                else:
+                    asset_value = cls_or_self.resolve_shortcut_attr(
+                        "asset_value",
+                        group_by=group_by,
+                        direction=direction,
+                        jitted=jitted,
+                        chunked=chunked,
+                    )
             if value is None:
                 value = cls_or_self.resolve_shortcut_attr(
                     "value",
@@ -10194,9 +10219,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if "direction" in _kwargs:
                 direction = map_enum_fields(_kwargs.pop("direction"), Direction)
                 if direction == Direction.LongOnly:
-                    prop_name = "longonly_" + naked_attr_name
+                    prop_name = "long_" + naked_attr_name
                 elif direction == Direction.ShortOnly:
-                    prop_name = "shortonly_" + naked_attr_name
+                    prop_name = "short_" + naked_attr_name
 
             if prop_name in self.cls_dir:
                 prop = getattr(type(self), prop_name)

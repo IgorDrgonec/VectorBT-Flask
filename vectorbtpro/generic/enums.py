@@ -30,6 +30,8 @@ __pdoc__all__ = __all__ = [
     "RollMeanAOS",
     "RollStdAIS",
     "RollStdAOS",
+    "RollZScoreAIS",
+    "RollZScoreAOS",
     "WMMeanAIS",
     "WMMeanAOS",
     "EWMMeanAIS",
@@ -456,6 +458,38 @@ __pdoc__[
     "RollStdAOS"
 ] = """A named tuple representing the output state of 
 `vectorbtpro.generic.nb.rolling.rolling_std_acc_nb`."""
+
+
+class RollZScoreAIS(tp.NamedTuple):
+    i: int
+    value: float
+    pre_window_value: float
+    cumsum: float
+    cumsum_sq: float
+    nancnt: int
+    window: int
+    minp: tp.Optional[int]
+    ddof: int
+
+
+__pdoc__[
+    "RollZScoreAIS"
+] = """A named tuple representing the input state of 
+`vectorbtpro.generic.nb.rolling.rolling_zscore_acc_nb`."""
+
+
+class RollZScoreAOS(tp.NamedTuple):
+    cumsum: float
+    cumsum_sq: float
+    nancnt: int
+    window_len: int
+    value: float
+
+
+__pdoc__[
+    "RollZScoreAOS"
+] = """A named tuple representing the output state of 
+`vectorbtpro.generic.nb.rolling.rolling_zscore_acc_nb`."""
 
 
 class WMMeanAIS(tp.NamedTuple):

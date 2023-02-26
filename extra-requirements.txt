@@ -18,6 +18,7 @@ technical:                  ta
 Bottleneck:                 compute
 numexpr:                    compute, base
 hyperopt:                   optimize
+optuna:                     optimize
 pathos:                     distribute, base
 dask:                       distribute, base
 ray>=1.4.1:                 distribute

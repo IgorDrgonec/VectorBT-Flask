@@ -129,13 +129,13 @@ def assets_nb(asset_flow: tp.Array2d, init_position: tp.FlexArray1dLike = 0.0) -
 
 
 @register_jitted(cache=True)
-def longonly_assets_nb(assets: tp.Array2d) -> tp.Array2d:
+def long_assets_nb(assets: tp.Array2d) -> tp.Array2d:
     """Get long-only assets."""
     return np.where(assets > 0, assets, 0.0)
 
 
 @register_jitted(cache=True)
-def shortonly_assets_nb(assets: tp.Array2d) -> tp.Array2d:
+def short_assets_nb(assets: tp.Array2d) -> tp.Array2d:
     """Get short-only assets."""
     return np.where(assets < 0, -assets, 0.0)
 

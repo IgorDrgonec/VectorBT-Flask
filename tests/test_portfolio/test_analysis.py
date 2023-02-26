@@ -5274,11 +5274,11 @@ class TestPortfolio:
         result = pd.DataFrame(
             np.array(
                 [
-                    [0.004975124378109453, 0.010012024441354066],
-                    [0.0, 0.021830620581035857],
-                    [0.004741319828723564, 0.002949383274126105],
+                    [0.014925373134328358, 0.010012024441354066],
+                    [0.022022903819972774, 0.021830620581035857],
+                    [0.00623857872200469, 0.002949383274126105],
                     [0.010039749879711245, 0.0],
-                    [0.012593941357067706, 0.0],
+                    [0.03778182407120312, 0.0],
                 ]
             ),
             index=close_na.index,
@@ -5290,7 +5290,7 @@ class TestPortfolio:
         assert_frame_equal(
             pf.gross_exposure,
             vbt.Portfolio.get_gross_exposure(
-                asset_value=pf.asset_value,
+                asset_value=pf.long_asset_value + pf.short_asset_value,
                 value=pf.get_value(),
                 wrapper=pf.wrapper,
             ),
@@ -5298,7 +5298,7 @@ class TestPortfolio:
         assert_frame_equal(
             pf_grouped.gross_exposure,
             vbt.Portfolio.get_gross_exposure(
-                asset_value=pf_grouped.asset_value,
+                asset_value=pf_grouped.long_asset_value + pf_grouped.short_asset_value,
                 value=pf_grouped.get_value(),
                 wrapper=pf_grouped.wrapper,
             ),
@@ -5306,7 +5306,7 @@ class TestPortfolio:
         assert_frame_equal(
             pf_shared.gross_exposure,
             vbt.Portfolio.get_gross_exposure(
-                asset_value=pf_shared.asset_value,
+                asset_value=pf_shared.long_asset_value + pf_shared.short_asset_value,
                 value=pf_shared.get_value(),
                 wrapper=pf_shared.wrapper,
             ),
@@ -5315,7 +5315,10 @@ class TestPortfolio:
             pf.get_gross_exposure(jitted=dict(parallel=True)),
             pf.get_gross_exposure(jitted=dict(parallel=False)),
         )
-        assert_frame_equal(pf.get_gross_exposure(chunked=True), pf.get_gross_exposure(chunked=False))
+        assert_frame_equal(
+            pf.get_gross_exposure(chunked=True),
+            pf.get_gross_exposure(chunked=False),
+        )
 
     def test_net_exposure(self):
         result = pd.DataFrame(
@@ -6942,7 +6945,7 @@ class TestPortfolio:
                         -0.9934413965087281,
                         -68.75458196678184,
                         100.0,
-                        1.2593941357067706,
+                        3.778182407120312,
                         0.9273023412387791,
                         pd.Timedelta("2 days 00:00:00"),
                         7,

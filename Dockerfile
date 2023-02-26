@@ -43,6 +43,7 @@ RUN pip install --quiet --no-cache-dir \
     'attrs>=19.2.0' \
     'websocket-client' \
     'hyperopt' \
+    'optuna' \
     'yfinance>=0.2.10' \
     'python-binance>=1.0.16' \
     'alpaca-py' \

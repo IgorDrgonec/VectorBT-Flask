@@ -2750,9 +2750,11 @@ class Splitter(Analyzable):
             return bounds
 
         def _get_range_meta(i, j):
+            split_idx = split_group_indices[i]
+            set_idx = set_group_indices[j]
             range_ = self.select_range(
-                split=i,
-                set_=j,
+                split=split_idx,
+                set_=set_idx,
                 split_group_by=split_group_by,
                 set_group_by=set_group_by,
                 split_as_indices=True,
@@ -2781,8 +2783,8 @@ class Splitter(Analyzable):
             obj_slice = self.take_range(obj, obj_range_meta["range_"])
             bounds = _get_bounds(range_meta, obj_meta, obj_range_meta)
             return dict(
-                split_idx=i,
-                set_idx=j,
+                split_idx=split_idx,
+                set_idx=set_idx,
                 range_meta=range_meta,
                 obj_range_meta=obj_range_meta,
                 obj_slice=obj_slice,
@@ -3147,9 +3149,11 @@ class Splitter(Analyzable):
         )
 
         def _get_range_meta(i, j, _template_context):
+            split_idx = split_group_indices[i]
+            set_idx = set_group_indices[j]
             range_ = self.select_range(
-                split=i,
-                set_=j,
+                split=split_idx,
+                set_=set_idx,
                 split_group_by=split_group_by,
                 set_group_by=set_group_by,
                 split_as_indices=True,
@@ -3266,8 +3270,15 @@ class Splitter(Analyzable):
         bounds = {}
 
         def _get_func_args(i, j, _bounds=bounds):
+            split_idx = split_group_indices[i]
+            set_idx = set_group_indices[j]
             _template_context = merge_dicts(
-                {"split_idx": i, "split_label": split_labels[i], "set_idx": j, "set_label": set_labels[j]},
+                {
+                    "split_idx": split_idx,
+                    "split_label": split_labels[i],
+                    "set_idx": set_idx,
+                    "set_label": set_labels[j],
+                },
                 template_context,
             )
             range_meta = _get_range_meta(i, j, _template_context)

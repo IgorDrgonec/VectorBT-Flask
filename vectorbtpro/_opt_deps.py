@@ -123,6 +123,9 @@ opt_dep_config = HybridConfig(
         tables=dict(
             link="https://github.com/PyTables/PyTables",
         ),
+        optuna=dict(
+            link="https://github.com/optuna/optuna",
+        ),
     )
 )
 """_"""

@@ -174,7 +174,7 @@ def save(
     mkdir_kwargs: tp.KwargsLike = None,
     compression: tp.Union[None, bool, str] = None,
     **kwargs,
-) -> None:
+) -> Path:
     """Pickle an object to a byte stream and write to a file.
 
     Can recognize the compression algorithm based on the extension (see `dumps` for options).
@@ -195,6 +195,7 @@ def save(
     check_mkdir(path.parent, **mkdir_kwargs)
     with open(path, "wb") as f:
         f.write(bytes_)
+    return path
 
 
 def load(path: tp.PathLike, compression: tp.Union[None, bool, str] = None, **kwargs) -> object:
@@ -345,12 +346,12 @@ class Pickleable:
         return dumps(self, **kwargs)
 
     @classmethod
-    def loads(cls: tp.Type[PickleableT], bytes_: bytes, **kwargs) -> PickleableT:
+    def loads(cls: tp.Type[PickleableT], bytes_: bytes, check_type: bool = True, **kwargs) -> PickleableT:
         """Unpickle an instance from a byte stream."""
         obj = loads(bytes_, **kwargs)
         if isinstance(obj, RecState):
             obj = reconstruct(cls, obj)
-        if not isinstance(obj, cls):
+        if check_type and not isinstance(obj, cls):
             raise TypeError(f"Loaded object must be an instance of {cls}")
         return obj
 
@@ -512,7 +513,7 @@ class Pickleable:
                             float(repr(v2))
                             v2 = repr(v2)
                         except Exception as e:
-                            v2 = "!vbt.loads(" + repr(dumps(v2)) + ")"
+                            v2 = "!loads(" + repr(dumps(v2)) + ")"
                 parser.set(k, k2, v2)
         with StringIO() as f:
             parser.write(f)
@@ -530,6 +531,7 @@ class Pickleable:
         use_class_ids: bool = True,
         code_context: tp.KwargsLike = None,
         parser_kwargs: tp.KwargsLike = None,
+        check_type: bool = True,
         **kwargs,
     ) -> PickleableT:
         """Decode an instance from a config string.
@@ -686,7 +688,7 @@ class Pickleable:
         new_dct = dict()
         if code_context is None:
             code_context = {}
-        code_context = {"np": np, "pd": pd, "vbt": vbt, **code_context}
+        code_context = {"np": np, "pd": pd, "vbt": vbt, "loads": loads, **code_context}
         ref_edges = set()
         for k, v in dct.items():
             new_dct[k] = {}
@@ -703,7 +705,10 @@ class Pickleable:
                     elif use_class_ids and v2.startswith("@"):
                         v2 = from_class_id(v2[1:])
                     elif run_code and v2.startswith("!"):
-                        v2 = multiline_eval(v2.lstrip("!"), context=code_context)
+                        if v2.startswith("!vbt.loads(") and v2.endswith(")"):
+                            v2 = multiline_eval(v2[5:], context=code_context)
+                        else:
+                            v2 = multiline_eval(v2.lstrip("!"), context=code_context)
                     else:
                         if (v2.startswith("'") and v2.endswith("'")) or (v2.startswith('"') and v2.endswith('"')):
                             v2 = v2[1:-1]
@@ -791,7 +796,7 @@ class Pickleable:
             obj = dct["top"]
         if type(obj) is dict:
             obj = reconstruct(cls, RecState(init_kwargs=obj))
-        if not isinstance(obj, cls):
+        if check_type and not isinstance(obj, cls):
             raise TypeError(f"Decoded object must be an instance of {cls}")
         return obj
 
@@ -958,7 +963,7 @@ class Pickleable:
         compression: tp.Union[None, bool, str] = None,
         mkdir_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> None:
+    ) -> Path:
         """Pickle/encode the instance and save to a file.
 
         Resolves the file path using `Pickleable.resolve_file_path`."""
@@ -983,6 +988,7 @@ class Pickleable:
                 f.write(str_)
         else:
             raise ValueError(f"Invalid file extension '{path.suffix}'")
+        return path
 
     @classmethod
     def load(

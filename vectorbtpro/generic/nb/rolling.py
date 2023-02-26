@@ -357,6 +357,97 @@ def rolling_std_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None, 
 
 
 @register_jitted(cache=True)
+def rolling_zscore_acc_nb(in_state: RollZScoreAIS) -> RollZScoreAOS:
+    """Accumulator of `rolling_zscore_1d_nb`.
+
+    Takes a state of type `vectorbtpro.generic.enums.RollZScoreAIS` and returns
+    a state of type `vectorbtpro.generic.enums.RollZScoreAOS`."""
+    mean_in_state = RollMeanAIS(
+        i=in_state.i,
+        value=in_state.value,
+        pre_window_value=in_state.pre_window_value,
+        cumsum=in_state.cumsum,
+        nancnt=in_state.nancnt,
+        window=in_state.window,
+        minp=in_state.minp,
+    )
+    std_in_state = RollStdAIS(
+        i=in_state.i,
+        value=in_state.value,
+        pre_window_value=in_state.pre_window_value,
+        cumsum=in_state.cumsum,
+        cumsum_sq=in_state.cumsum_sq,
+        nancnt=in_state.nancnt,
+        window=in_state.window,
+        minp=in_state.minp,
+        ddof=in_state.ddof,
+    )
+    mean_out_state = rolling_mean_acc_nb(mean_in_state)
+    std_out_state = rolling_std_acc_nb(std_in_state)
+    if std_out_state.value == 0:
+        value = np.nan
+    else:
+        value = (in_state.value - mean_out_state.value) / std_out_state.value
+
+    return RollZScoreAOS(
+        cumsum=std_out_state.cumsum,
+        cumsum_sq=std_out_state.cumsum_sq,
+        nancnt=std_out_state.nancnt,
+        window_len=std_out_state.window_len,
+        value=value,
+    )
+
+
+@register_jitted(cache=True)
+def rolling_zscore_1d_nb(arr: tp.Array1d, window: int, minp: tp.Optional[int] = None, ddof: int = 0) -> tp.Array1d:
+    """Compute rolling z-score.
+
+    Uses `rolling_zscore_acc_nb` at each iteration."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    out = np.empty_like(arr, dtype=np.float_)
+    cumsum = 0.0
+    cumsum_sq = 0.0
+    nancnt = 0
+
+    for i in range(arr.shape[0]):
+        in_state = RollZScoreAIS(
+            i=i,
+            value=arr[i],
+            pre_window_value=arr[i - window] if i - window >= 0 else np.nan,
+            cumsum=cumsum,
+            cumsum_sq=cumsum_sq,
+            nancnt=nancnt,
+            window=window,
+            minp=minp,
+            ddof=ddof,
+        )
+        out_state = rolling_zscore_acc_nb(in_state)
+        cumsum = out_state.cumsum
+        cumsum_sq = out_state.cumsum_sq
+        nancnt = out_state.nancnt
+        out[i] = out_state.value
+
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr", axis=1),
+    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), window=None, minp=None, ddof=None),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def rolling_zscore_nb(arr: tp.Array2d, window: int, minp: tp.Optional[int] = None, ddof: int = 0) -> tp.Array2d:
+    """2-dim version of `rolling_zscore_1d_nb`."""
+    out = np.empty_like(arr, dtype=np.float_)
+    for col in prange(arr.shape[1]):
+        out[:, col] = rolling_zscore_1d_nb(arr[:, col], window, minp=minp, ddof=ddof)
+    return out
+
+
+@register_jitted(cache=True)
 def wm_mean_acc_nb(in_state: WMMeanAIS) -> WMMeanAOS:
     """Accumulator of `wm_mean_1d_nb`.
 
