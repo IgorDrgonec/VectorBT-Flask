@@ -2414,6 +2414,7 @@ class TestFactory:
             "row_stack",
             "run",
             "run_combs",
+            "run_pipeline",
             "save",
             "select_col",
             "select_col_from_obj",
