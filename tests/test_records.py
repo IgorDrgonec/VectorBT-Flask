@@ -6734,6 +6734,44 @@ class TestExitTrades:
             np.array([0.25, 0.25, 5.25, 7.25, 3.25, 4.25, 7.25, 8.25, 0.25, 0.25, 5.25, 8.25, 7.25]),
         )
 
+    def test_best_price_idx(self):
+        np.testing.assert_array_almost_equal(exit_trades["a"].best_price_idx.values, np.array([2, 3, 1, 0]))
+        np.testing.assert_array_almost_equal(
+            exit_trades.best_price_idx.values,
+            np.array([2, 3, 1, 0, 0, 0, 0, 0, 2, 3, 1, 0, 0]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_best_price_idx(entry_price_open=True).values,
+            np.array([2, 3, 1, 0, 0, 0, 0, 0, 2, 3, 1, 0, 0]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_best_price_idx(exit_price_close=True).values,
+            np.array([2, 3, 1, 0, 0, 0, 0, 0, 2, 3, 1, 0, 0]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_best_price_idx(entry_price_open=True, exit_price_close=True).values,
+            np.array([2, 3, 1, 0, 0, 0, 0, 0, 2, 3, 1, 0, 0]),
+        )
+
+    def test_worst_price_idx(self):
+        np.testing.assert_array_almost_equal(exit_trades["a"].worst_price_idx.values, np.array([0, 0, 0, 0]))
+        np.testing.assert_array_almost_equal(
+            exit_trades.worst_price_idx.values,
+            np.array([0, 0, 0, 0, 2, 3, 1, 0, 0, 0, 0, 1, 0]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_worst_price_idx(entry_price_open=True).values,
+            np.array([0, 0, 0, 0, 2, 3, 1, 0, 0, 0, 0, 1, 0]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_worst_price_idx(exit_price_close=True).values,
+            np.array([0, 0, 0, 0, 2, 3, 1, 0, 0, 0, 0, 1, 0]),
+        )
+        np.testing.assert_array_almost_equal(
+            exit_trades.get_worst_price_idx(entry_price_open=True, exit_price_close=True).values,
+            np.array([0, 0, 0, 0, 2, 3, 1, 0, 0, 0, 0, 1, 0]),
+        )
+
     def test_mfe(self):
         np.testing.assert_array_almost_equal(
             exit_trades["a"].mfe.values,

@@ -1005,8 +1005,9 @@ def trade_best_worst_price_nb(
     entry_price_open: bool = False,
     exit_price_close: bool = False,
     max_duration: tp.Optional[int] = None,
-) -> tp.Tuple[float, float]:
-    """Best and worst price during a trade."""
+    idx_relative: bool = True,
+) -> tp.Tuple[float, float, int, int]:
+    """Best price, worst price, and their indices during a trade."""
     from_i = trade["entry_idx"]
     to_i = trade["exit_idx"]
     trade_open = trade["status"] == TradeStatus.Open
@@ -1014,45 +1015,60 @@ def trade_best_worst_price_nb(
 
     vmin = np.nan
     vmax = np.nan
+    vmin_idx = -1
+    vmax_idx = -1
     for i in range(from_i, to_i + 1):
         if i == from_i:
             if np.isnan(vmin) or trade["entry_price"] < vmin:
                 vmin = trade["entry_price"]
+                vmin_idx = i
             if np.isnan(vmax) or trade["entry_price"] > vmax:
                 vmax = trade["entry_price"]
+                vmax_idx = i
         if i > from_i or entry_price_open:
             if open is not None:
                 _open = flex_select_nb(open, i, trade["col"])
                 if np.isnan(vmin) or _open < vmin:
                     vmin = _open
+                    vmin_idx = i
                 if np.isnan(vmax) or _open > vmax:
                     vmax = _open
+                    vmax_idx = i
         if (i > from_i or entry_price_open) and (i < to_i or exit_price_close or trade_open):
             if low is not None:
                 _low = flex_select_nb(low, i, trade["col"])
                 if np.isnan(vmin) or _low < vmin:
                     vmin = _low
+                    vmin_idx = i
             if high is not None:
                 _high = flex_select_nb(high, i, trade["col"])
                 if np.isnan(vmax) or _high > vmax:
                     vmax = _high
+                    vmax_idx = i
         if i < to_i or exit_price_close or trade_open:
             _close = flex_select_nb(close, i, trade["col"])
             if np.isnan(vmin) or _close < vmin:
                 vmin = _close
+                vmin_idx = i
             if np.isnan(vmax) or _close > vmax:
                 vmax = _close
+                vmax_idx = i
         if max_duration is not None:
             if from_i + max_duration == i:
                 break
         if i == to_i:
             if np.isnan(vmin) or trade["exit_price"] < vmin:
                 vmin = trade["exit_price"]
+                vmin_idx = i
             if np.isnan(vmax) or trade["exit_price"] > vmax:
                 vmax = trade["exit_price"]
+                vmax_idx = i
+    if idx_relative:
+        vmin_idx = vmin_idx - from_i
+        vmax_idx = vmax_idx - from_i
     if trade_long:
-        return vmax, vmin
-    return vmin, vmax
+        return vmax, vmin, vmax_idx, vmin_idx
+    return vmin, vmax, vmin_idx, vmax_idx
 
 
 @register_chunkable(
@@ -1130,6 +1146,90 @@ def worst_price_nb(
             entry_price_open=entry_price_open,
             exit_price_close=exit_price_close,
         )[1]
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="records", axis=0),
+    arg_take_spec=dict(
+        records=ch.ArraySlicer(axis=0),
+        open=None,
+        high=None,
+        low=None,
+        close=None,
+        entry_price_open=None,
+        exit_price_close=None,
+        relative=None,
+    ),
+    merge_func="concat",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def best_price_idx_nb(
+    records: tp.RecordArray,
+    open: tp.Optional[tp.FlexArray2d],
+    high: tp.Optional[tp.FlexArray2d],
+    low: tp.Optional[tp.FlexArray2d],
+    close: tp.FlexArray2d,
+    entry_price_open: bool = False,
+    exit_price_close: bool = False,
+    relative: bool = True,
+) -> tp.Array1d:
+    """Get index of best price by applying `trade_best_worst_price_nb` on each trade."""
+    out = np.empty(len(records), dtype=np.float_)
+    for r in prange(len(records)):
+        trade = records[r]
+        out[r] = trade_best_worst_price_nb(
+            trade=trade,
+            open=open,
+            high=high,
+            low=low,
+            close=close,
+            entry_price_open=entry_price_open,
+            exit_price_close=exit_price_close,
+            idx_relative=relative,
+        )[2]
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="records", axis=0),
+    arg_take_spec=dict(
+        records=ch.ArraySlicer(axis=0),
+        open=None,
+        high=None,
+        low=None,
+        close=None,
+        entry_price_open=None,
+        exit_price_close=None,
+        relative=None,
+    ),
+    merge_func="concat",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def worst_price_idx_nb(
+    records: tp.RecordArray,
+    open: tp.Optional[tp.FlexArray2d],
+    high: tp.Optional[tp.FlexArray2d],
+    low: tp.Optional[tp.FlexArray2d],
+    close: tp.FlexArray2d,
+    entry_price_open: bool = False,
+    exit_price_close: bool = False,
+    relative: bool = True,
+) -> tp.Array1d:
+    """Get worst price by applying `trade_best_worst_price_nb` on each trade."""
+    out = np.empty(len(records), dtype=np.float_)
+    for r in prange(len(records)):
+        trade = records[r]
+        out[r] = trade_best_worst_price_nb(
+            trade=trade,
+            open=open,
+            high=high,
+            low=low,
+            close=close,
+            entry_price_open=entry_price_open,
+            exit_price_close=exit_price_close,
+            idx_relative=relative,
+        )[3]
     return out
 
 
@@ -1278,7 +1378,7 @@ def edge_ratio_nb(
         norm_mae_cnt = 0
         for r in ridxs:
             trade = records[r]
-            best_price, worst_price = trade_best_worst_price_nb(
+            best_price, worst_price, _, _ = trade_best_worst_price_nb(
                 trade=trade,
                 open=open,
                 high=high,
@@ -1394,7 +1494,7 @@ def running_edge_ratio_nb(
                     trade_duration = trade["exit_idx"] - trade["entry_idx"]
                     if trade_duration < k + 1:
                         continue
-                best_price, worst_price = trade_best_worst_price_nb(
+                best_price, worst_price, _, _ = trade_best_worst_price_nb(
                     trade=trade,
                     open=open,
                     high=high,

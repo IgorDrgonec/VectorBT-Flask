@@ -600,6 +600,8 @@ trades_shortcut_config = ReadonlyConfig(
         ),
         best_price=dict(obj_type="mapped_array"),
         worst_price=dict(obj_type="mapped_array"),
+        best_price_idx=dict(obj_type="mapped_array"),
+        worst_price_idx=dict(obj_type="mapped_array"),
         mfe=dict(obj_type="mapped_array"),
         mae=dict(obj_type="mapped_array"),
         mfe_returns=dict(
@@ -776,7 +778,12 @@ class Trades(Ranges):
             **kwargs,
         )
 
-    def get_best_price(self, entry_price_open: bool = False, exit_price_close: bool = False, **kwargs) -> MappedArray:
+    def get_best_price(
+        self,
+        entry_price_open: bool = False,
+        exit_price_close: bool = False,
+        **kwargs,
+    ) -> MappedArray:
         """Get best price.
 
         See `vectorbtpro.portfolio.nb.records.best_price_nb`."""
@@ -791,7 +798,12 @@ class Trades(Ranges):
             **kwargs,
         )
 
-    def get_worst_price(self, entry_price_open: bool = False, exit_price_close: bool = False, **kwargs) -> MappedArray:
+    def get_worst_price(
+        self,
+        entry_price_open: bool = False,
+        exit_price_close: bool = False,
+        **kwargs,
+    ) -> MappedArray:
         """Get worst price.
 
         See `vectorbtpro.portfolio.nb.records.worst_price_nb`."""
@@ -803,6 +815,52 @@ class Trades(Ranges):
             self._close,
             entry_price_open,
             exit_price_close,
+            **kwargs,
+        )
+
+    def get_best_price_idx(
+        self,
+        entry_price_open: bool = False,
+        exit_price_close: bool = False,
+        relative: bool = True,
+        **kwargs,
+    ) -> MappedArray:
+        """Get (relative) index of best price.
+
+        See `vectorbtpro.portfolio.nb.records.best_price_idx_nb`."""
+        return self.apply(
+            nb.best_price_idx_nb,
+            self._open,
+            self._high,
+            self._low,
+            self._close,
+            entry_price_open,
+            exit_price_close,
+            relative,
+            dtype=np.int_,
+            **kwargs,
+        )
+
+    def get_worst_price_idx(
+        self,
+        entry_price_open: bool = False,
+        exit_price_close: bool = False,
+        relative: bool = True,
+        **kwargs,
+    ) -> MappedArray:
+        """Get (relative) index of worst price.
+
+        See `vectorbtpro.portfolio.nb.records.worst_price_idx_nb`."""
+        return self.apply(
+            nb.worst_price_idx_nb,
+            self._open,
+            self._high,
+            self._low,
+            self._close,
+            entry_price_open,
+            exit_price_close,
+            relative,
+            dtype=np.int_,
             **kwargs,
         )
 
