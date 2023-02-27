@@ -341,7 +341,7 @@ def rolling_freq_reduce_meta_nb(
 
 @register_jitted
 def groupby_reduce_1d_nb(arr: tp.Array1d, group_map: tp.GroupMap, reduce_func_nb: tp.ReduceFunc, *args) -> tp.Array1d:
-    """Provide group-by calculations.
+    """Provide group-by reduce calculations.
 
     `reduce_func_nb` must accept the array and `*args`. Must return a single value."""
     group_idxs, group_lens = group_map
@@ -419,6 +419,58 @@ def groupby_reduce_meta_nb(
     out[:, 0] = col_0_out
     for col in prange(1, n_cols):
         out[:, col] = groupby_reduce_1d_meta_nb(col, group_map, reduce_func_nb, *args)
+    return out
+
+
+@register_jitted(tags={"can_parallel"})
+def groupby_transform_nb(
+    arr: tp.Array2d,
+    group_map: tp.GroupMap,
+    transform_func_nb: tp.GroupByTransformFunc,
+    *args,
+) -> tp.Array2d:
+    """Provide group-by transform calculations.
+
+    `transform_func_nb` must accept the 2-dim array of the group and `*args`. Must return a scalar
+    or an array that broadcasts against the group array's shape."""
+    group_idxs, group_lens = group_map
+    group_start_idxs = np.cumsum(group_lens) - group_lens
+    group_0_idxs = group_idxs[group_start_idxs[0]: group_start_idxs[0] + group_lens[0]]
+    group_0_out = transform_func_nb(arr[group_0_idxs], *args)
+    out = np.empty(arr.shape, dtype=np.asarray(group_0_out).dtype)
+    out[group_0_idxs] = group_0_out
+
+    for group in prange(1, group_lens.shape[0]):
+        group_len = group_lens[group]
+        start_idx = group_start_idxs[group]
+        idxs = group_idxs[start_idx: start_idx + group_len]
+        out[idxs] = transform_func_nb(arr[idxs], *args)
+    return out
+
+
+@register_jitted(tags={"can_parallel"})
+def groupby_transform_meta_nb(
+    target_shape: tp.Shape,
+    group_map: tp.GroupMap,
+    transform_func_nb: tp.GroupByTransformMetaFunc,
+    *args,
+) -> tp.Array2d:
+    """Meta version of `groupby_transform_nb`.
+
+    `transform_func_nb` must accept the array of indices in the group, the group index, and `*args`.
+    Must return a scalar or an array that broadcasts against the group's shape."""
+    group_idxs, group_lens = group_map
+    group_start_idxs = np.cumsum(group_lens) - group_lens
+    group_0_idxs = group_idxs[group_start_idxs[0]: group_start_idxs[0] + group_lens[0]]
+    group_0_out = transform_func_nb(group_0_idxs, 0, *args)
+    out = np.empty(target_shape, dtype=np.asarray(group_0_out).dtype)
+    out[group_0_idxs] = group_0_out
+
+    for group in prange(1, group_lens.shape[0]):
+        group_len = group_lens[group]
+        start_idx = group_start_idxs[group]
+        idxs = group_idxs[start_idx: start_idx + group_len]
+        out[idxs] = transform_func_nb(idxs, group, *args)
     return out
 
 

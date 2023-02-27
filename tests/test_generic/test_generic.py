@@ -1443,13 +1443,13 @@ class TestAccessors:
         )
 
         @njit
-        def mean_diff_meta_nb(from_i, to_i, col, x, y):
+        def mean_ratio_meta_nb(from_i, to_i, col, x, y):
             return np.nanmean(x[from_i:to_i, col]) / np.nanmean(y[from_i:to_i, col])
 
         assert_frame_equal(
             pd.DataFrame.vbt.rolling_apply(
                 3,
-                mean_diff_meta_nb,
+                mean_ratio_meta_nb,
                 vbt.RepEval("to_2d_array(x)"),
                 vbt.RepEval("to_2d_array(y)"),
                 broadcast_named_args=dict(
@@ -1633,13 +1633,13 @@ class TestAccessors:
         )
 
         @njit
-        def mean_diff_meta_nb(idxs, group, col, x, y):
+        def mean_ratio_meta_nb(idxs, group, col, x, y):
             return np.nanmean(x[idxs, col]) / np.nanmean(y[idxs, col])
 
         assert_frame_equal(
             pd.DataFrame.vbt.groupby_apply(
                 vbt.RepEval("group_by_evenly_nb(wrapper.shape[0], 2)"),
-                mean_diff_meta_nb,
+                mean_ratio_meta_nb,
                 vbt.RepEval("to_2d_array(x)"),
                 vbt.RepEval("to_2d_array(y)"),
                 broadcast_named_args=dict(
@@ -1652,6 +1652,96 @@ class TestAccessors:
                 ),
             ),
             pd.DataFrame([[2.0, 1.0, 0.6666666666666666], [4.5, 2.25, 1.5]], columns=df.columns).rename_axis("group"),
+        )
+
+    def test_groupby_transform(self):
+        def zscore(x):
+            return (x - np.nanmean(x)) / np.nanstd(x)
+
+        @njit
+        def zscore_nb(x):
+            return (x - np.nanmean(x)) / np.nanstd(x)
+
+        @njit
+        def zscore_meta_nb(idxs, group, x):
+            return zscore_nb(x[idxs])
+
+        assert_series_equal(
+            df["a"].vbt.groupby_transform(np.array([1, 1, 2, 2, 3]), zscore_nb),
+            df["a"].groupby(np.array([1, 1, 2, 2, 3]), group_keys=False).apply(zscore),
+        )
+        assert_frame_equal(
+            df.vbt.groupby_transform(np.array([1, 1, 2, 2, 3]), zscore_nb),
+            df.groupby(np.array([1, 1, 2, 2, 3]), group_keys=False).apply(zscore),
+        )
+        assert_frame_equal(
+            df.vbt.groupby_transform(df.groupby(np.array([1, 1, 2, 2, 3])), zscore_nb),
+            df.vbt.groupby_transform(np.array([1, 1, 2, 2, 3]), zscore_nb),
+        )
+        assert_frame_equal(
+            df.vbt.groupby_transform(vbt.Grouper(df.index, np.array([1, 1, 2, 2, 3])), zscore_nb),
+            df.vbt.groupby_transform(np.array([1, 1, 2, 2, 3]), zscore_nb),
+        )
+        assert_frame_equal(
+            df.vbt.groupby_transform(np.array([1, 1, 2, 2, 3]), zscore_nb, jitted=dict(parallel=True)),
+            df.vbt.groupby_transform(np.array([1, 1, 2, 2, 3]), zscore_nb, jitted=dict(parallel=False)),
+        )
+        assert_frame_equal(
+            pd.DataFrame.vbt.groupby_transform(
+                np.array([1, 1, 2, 2, 3]),
+                zscore_meta_nb,
+                df.vbt.to_2d_array(),
+                wrapper=df.vbt.wrapper,
+            ),
+            df.vbt.groupby_transform(np.array([1, 1, 2, 2, 3]), zscore_nb),
+        )
+        assert_frame_equal(
+            pd.DataFrame.vbt.groupby_transform(
+                np.array([1, 1, 2, 2, 3]),
+                zscore_meta_nb,
+                df.vbt.to_2d_array(),
+                wrapper=df.vbt.wrapper,
+                jitted=dict(parallel=True),
+            ),
+            pd.DataFrame.vbt.groupby_transform(
+                np.array([1, 1, 2, 2, 3]),
+                zscore_meta_nb,
+                df.vbt.to_2d_array(),
+                wrapper=df.vbt.wrapper,
+                jitted=dict(parallel=False),
+            ),
+        )
+
+        @njit
+        def zscore_ratio_meta_nb(idxs, group, x, y):
+            return zscore_nb(x[idxs]) / zscore_nb(y[idxs])
+
+        assert_frame_equal(
+            pd.DataFrame.vbt.groupby_transform(
+                vbt.RepEval("group_by_evenly_nb(wrapper.shape[0], 2)"),
+                zscore_ratio_meta_nb,
+                vbt.RepEval("to_2d_array(x)"),
+                vbt.RepEval("to_2d_array(y)"),
+                broadcast_named_args=dict(
+                    x=pd.Series([1, 2, 3, 4, 5], index=df.index),
+                    y=pd.DataFrame([[1, 2, 3]], columns=df.columns),
+                ),
+                template_context=dict(
+                    to_2d_array=vbt.base.reshaping.to_2d_array,
+                    group_by_evenly_nb=vbt.base.grouping.nb.group_by_evenly_nb,
+                ),
+            ),
+            pd.DataFrame(
+                [
+                    [1.0, -np.inf, -1.0],
+                    [0.0, np.nan, 0.0],
+                    [-1.0, np.inf, 1.0],
+                    [0.816497, -np.inf, -0.816497],
+                    [-0.816497, np.inf, 0.816497],
+                ],
+                index=df.index,
+                columns=df.columns
+            ),
         )
 
     @pytest.mark.parametrize("test_freq", ["1h", "10h", "3d"])
@@ -1752,13 +1842,13 @@ class TestAccessors:
         )
 
         @njit
-        def mean_diff_meta_nb(from_i, to_i, col, x, y):
+        def mean_ratio_meta_nb(from_i, to_i, col, x, y):
             return np.nanmean(x[from_i:to_i, col]) / np.nanmean(y[from_i:to_i, col])
 
         assert_frame_equal(
             pd.DataFrame.vbt.resample_apply(
                 "2d",
-                mean_diff_meta_nb,
+                mean_ratio_meta_nb,
                 vbt.RepEval("to_2d_array(x)"),
                 vbt.RepEval("to_2d_array(y)"),
                 broadcast_named_args=dict(
@@ -2085,13 +2175,13 @@ class TestAccessors:
         )
 
         @njit
-        def mean_diff_meta_nb(from_i, to_i, col, x, y):
+        def mean_ratio_meta_nb(from_i, to_i, col, x, y):
             return np.nanmean(x[from_i:to_i, col]) / np.nanmean(y[from_i:to_i, col])
 
         assert_frame_equal(
             pd.DataFrame.vbt.resample_to_index(
                 df.resample("2d").asfreq().index,
-                mean_diff_meta_nb,
+                mean_ratio_meta_nb,
                 vbt.RepEval("to_2d_array(x)"),
                 vbt.RepEval("to_2d_array(y)"),
                 broadcast_named_args=dict(
@@ -2231,14 +2321,14 @@ class TestAccessors:
         )
 
         @njit
-        def mean_diff_meta_nb(from_i, to_i, col, x, y):
+        def mean_ratio_meta_nb(from_i, to_i, col, x, y):
             return np.nanmean(x[from_i:to_i, col]) / np.nanmean(y[from_i:to_i, col])
 
         assert_frame_equal(
             pd.DataFrame.vbt.resample_between_bounds(
                 df.resample("2d").asfreq().index,
                 df.resample("2d").asfreq().index.shift(),
-                mean_diff_meta_nb,
+                mean_ratio_meta_nb,
                 vbt.RepEval("to_2d_array(x)"),
                 vbt.RepEval("to_2d_array(y)"),
                 broadcast_named_args=dict(

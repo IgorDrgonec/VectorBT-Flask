@@ -189,6 +189,8 @@ RangeReduceMetaFunc = Callable[[int, int, int, VarArg()], Scalar]
 ProximityReduceMetaFunc = Callable[[int, int, int, int, VarArg()], Scalar]
 GroupByReduceMetaFunc = Callable[[GroupIdxs, int, int, VarArg()], Scalar]
 GroupSqueezeMetaFunc = Callable[[int, GroupIdxs, int, VarArg()], Scalar]
+GroupByTransformFunc = Callable[[Array2d, VarArg()], MaybeArray]
+GroupByTransformMetaFunc = Callable[[GroupIdxs, int, VarArg()], MaybeArray]
 
 # Signals
 PlaceFunc = Callable[[NamedTuple, VarArg()], int]
