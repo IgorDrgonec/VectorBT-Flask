@@ -3648,11 +3648,11 @@ class TestFromSignals:
             ).order_records,
         )
         target_tsl_stop = pd.concat((close, close, close, close, close), axis=1)
-        target_tsl_stop.iloc[:, 0] = close * (1 - np.nan)
-        target_tsl_stop.iloc[:, 1] = close * (1 - 0.15)
-        target_tsl_stop.iloc[:, 2] = close * (1 - 0.2)
-        target_tsl_stop.iloc[:, 3] = close * (1 - 0.25)
-        target_tsl_stop.iloc[:, 4] = close * (1 - np.inf)
+        target_tsl_stop.iloc[:, 0] = close - np.nan
+        target_tsl_stop.iloc[:, 1] = close - 1
+        target_tsl_stop.iloc[:, 2] = close - 2
+        target_tsl_stop.iloc[:, 3] = close - 3
+        target_tsl_stop.iloc[:, 4] = close - np.inf
         assert_records_close(
             _from_signals_longonly(
                 close=close,
@@ -3661,8 +3661,8 @@ class TestFromSignals:
                 open=open,
                 high=high,
                 low=low,
-                tsl_stop=[[np.nan, 0.15, 0.2, 0.25, np.inf]],
-                delta_format="percent",
+                tsl_stop=[[np.nan, 1, 2, 3, np.inf]],
+                delta_format="absolute",
             ).order_records,
             _from_signals_longonly(
                 close=close,
@@ -3840,11 +3840,11 @@ class TestFromSignals:
             ),
         )
         target_tsl_stop = pd.concat((close, close, close, close, close), axis=1)
-        target_tsl_stop.iloc[:, 0] = close * (1 + np.nan)
-        target_tsl_stop.iloc[:, 1] = close * (1 + 0.15)
-        target_tsl_stop.iloc[:, 2] = close * (1 + 0.2)
-        target_tsl_stop.iloc[:, 3] = close * (1 + 0.25)
-        target_tsl_stop.iloc[:, 4] = close * (1 + np.inf)
+        target_tsl_stop.iloc[:, 0] = close + np.nan
+        target_tsl_stop.iloc[:, 1] = close + 1
+        target_tsl_stop.iloc[:, 2] = close + 2
+        target_tsl_stop.iloc[:, 3] = close + 3
+        target_tsl_stop.iloc[:, 4] = close + np.inf
         assert_records_close(
             _from_signals_shortonly(
                 close=close,
@@ -3853,8 +3853,8 @@ class TestFromSignals:
                 open=open,
                 high=high,
                 low=low,
-                tsl_stop=[[np.nan, 0.15, 0.2, 0.25, np.inf]],
-                delta_format="percent",
+                tsl_stop=[[np.nan, 1, 2, 3, np.inf]],
+                delta_format="absolute",
             ).order_records,
             _from_signals_shortonly(
                 close=close,
@@ -4037,19 +4037,19 @@ class TestFromSignals:
             ).order_records,
         )
         target_tsl_th = pd.concat((close, close, close, close, close, close), axis=1)
-        target_tsl_th.iloc[:, 0] = close * (1 + np.nan)
-        target_tsl_th.iloc[:, 1] = close * (1 + 0.1)
-        target_tsl_th.iloc[:, 2] = close * (1 + 0.5)
-        target_tsl_th.iloc[:, 3] = close * (1 + 0.1)
-        target_tsl_th.iloc[:, 4] = close * (1 + 0.5)
-        target_tsl_th.iloc[:, 5] = close * (1 + np.inf)
+        target_tsl_th.iloc[:, 0] = close + np.nan
+        target_tsl_th.iloc[:, 1] = close + 1
+        target_tsl_th.iloc[:, 2] = close + 2
+        target_tsl_th.iloc[:, 3] = close + 1
+        target_tsl_th.iloc[:, 4] = close + 2
+        target_tsl_th.iloc[:, 5] = close + np.inf
         target_tsl_stop = pd.concat((close, close, close, close, close, close), axis=1)
-        target_tsl_stop.iloc[:, 0] = close * (1 - np.nan)
-        target_tsl_stop.iloc[:, 1] = close * (1 - 0.1)
-        target_tsl_stop.iloc[:, 2] = close * (1 - 0.1)
-        target_tsl_stop.iloc[:, 3] = close * (1 - 0.5)
-        target_tsl_stop.iloc[:, 4] = close * (1 - 0.5)
-        target_tsl_stop.iloc[:, 4] = close * (1 - np.inf)
+        target_tsl_stop.iloc[:, 0] = close - np.nan
+        target_tsl_stop.iloc[:, 1] = close - 1
+        target_tsl_stop.iloc[:, 2] = close - 1
+        target_tsl_stop.iloc[:, 3] = close - 2
+        target_tsl_stop.iloc[:, 4] = close - 2
+        target_tsl_stop.iloc[:, 4] = close - np.inf
         assert_records_close(
             _from_signals_longonly(
                 close=close,
@@ -4058,9 +4058,9 @@ class TestFromSignals:
                 open=open,
                 high=high,
                 low=low,
-                tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
-                tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
-                delta_format="percent",
+                tsl_th=[[np.nan, 1, 2, 1, 2, np.inf]],
+                tsl_stop=[[np.nan, 1, 1, 2, 2, np.inf]],
+                delta_format="absolute",
             ).order_records,
             _from_signals_longonly(
                 close=close,
@@ -4738,7 +4738,7 @@ class TestFromSignals:
             np.array(
                 [
                     (0, 0, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
-                    (1, 0, 0, 3, 3, 20.0, 2.25, 0.0, 1, 0, 4),
+                    (1, 0, 0, 2, 2, 20.0, 3.0, 0.0, 1, 0, 4),
                 ],
                 dtype=fs_order_dt,
             ),

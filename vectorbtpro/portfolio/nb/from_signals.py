@@ -1350,15 +1350,15 @@ def simulate_from_signals_nb(
                             if _open > last_tsl_info["peak_price"][col]:
                                 if last_tsl_info["delta_format"][col] == DeltaFormat.Target:
                                     last_tsl_info["stop"][col] = (
-                                        last_tsl_info["stop"][col] * _open / last_tsl_info["peak_price"][col]
+                                        last_tsl_info["stop"][col] + _open - last_tsl_info["peak_price"][col]
                                     )
                                 last_tsl_info["peak_idx"][col] = i
                                 last_tsl_info["peak_price"][col] = _open
-                        elif last_position[col] < 0:
+                        else:
                             if _open < last_tsl_info["peak_price"][col]:
                                 if last_tsl_info["delta_format"][col] == DeltaFormat.Target:
                                     last_tsl_info["stop"][col] = (
-                                        last_tsl_info["stop"][col] * _open / last_tsl_info["peak_price"][col]
+                                        last_tsl_info["stop"][col] + _open - last_tsl_info["peak_price"][col]
                                     )
                                 last_tsl_info["peak_idx"][col] = i
                                 last_tsl_info["peak_price"][col] = _open
@@ -1390,15 +1390,15 @@ def simulate_from_signals_nb(
                             if _high > last_tsl_info["peak_price"][col]:
                                 if last_tsl_info["delta_format"][col] == DeltaFormat.Target:
                                     last_tsl_info["stop"][col] = (
-                                        last_tsl_info["stop"][col] * _high / last_tsl_info["peak_price"][col]
+                                        last_tsl_info["stop"][col] + _high - last_tsl_info["peak_price"][col]
                                     )
                                 last_tsl_info["peak_idx"][col] = i
                                 last_tsl_info["peak_price"][col] = _high
-                        elif last_position[col] < 0:
+                        else:
                             if _low < last_tsl_info["peak_price"][col]:
                                 if last_tsl_info["delta_format"][col] == DeltaFormat.Target:
                                     last_tsl_info["stop"][col] = (
-                                        last_tsl_info["stop"][col] * _low / last_tsl_info["peak_price"][col]
+                                        last_tsl_info["stop"][col] + _low - last_tsl_info["peak_price"][col]
                                     )
                                 last_tsl_info["peak_idx"][col] = i
                                 last_tsl_info["peak_price"][col] = _low
@@ -2345,8 +2345,8 @@ def simulate_from_signals_nb(
                                             if last_tsl_info["delta_format"][col] == DeltaFormat.Target:
                                                 last_tsl_info["stop"][col] = (
                                                     last_tsl_info["stop"][col]
-                                                    * _high
-                                                    / last_tsl_info["peak_price"][col]
+                                                    + _high
+                                                    - last_tsl_info["peak_price"][col]
                                                 )
                                             last_tsl_info["peak_idx"][col] = i
                                             last_tsl_info["peak_price"][col] = _high
@@ -2355,8 +2355,8 @@ def simulate_from_signals_nb(
                                             if last_tsl_info["delta_format"][col] == DeltaFormat.Target:
                                                 last_tsl_info["stop"][col] = (
                                                     last_tsl_info["stop"][col]
-                                                    * _low
-                                                    / last_tsl_info["peak_price"][col]
+                                                    + _low
+                                                    - last_tsl_info["peak_price"][col]
                                                 )
                                             last_tsl_info["peak_idx"][col] = i
                                             last_tsl_info["peak_price"][col] = _low
@@ -3377,15 +3377,15 @@ def simulate_from_signal_func_nb(
                             if _open > last_tsl_info["peak_price"][col]:
                                 if last_tsl_info["delta_format"][col] == DeltaFormat.Target:
                                     last_tsl_info["stop"][col] = (
-                                        last_tsl_info["stop"][col] * _open / last_tsl_info["peak_price"][col]
+                                        last_tsl_info["stop"][col] + _open - last_tsl_info["peak_price"][col]
                                     )
                                 last_tsl_info["peak_idx"][col] = i
                                 last_tsl_info["peak_price"][col] = _open
-                        elif last_position[col] < 0:
+                        else:
                             if _open < last_tsl_info["peak_price"][col]:
                                 if last_tsl_info["delta_format"][col] == DeltaFormat.Target:
                                     last_tsl_info["stop"][col] = (
-                                        last_tsl_info["stop"][col] * _open / last_tsl_info["peak_price"][col]
+                                        last_tsl_info["stop"][col] + _open - last_tsl_info["peak_price"][col]
                                     )
                                 last_tsl_info["peak_idx"][col] = i
                                 last_tsl_info["peak_price"][col] = _open
@@ -3417,15 +3417,15 @@ def simulate_from_signal_func_nb(
                             if _high > last_tsl_info["peak_price"][col]:
                                 if last_tsl_info["delta_format"][col] == DeltaFormat.Target:
                                     last_tsl_info["stop"][col] = (
-                                        last_tsl_info["stop"][col] * _high / last_tsl_info["peak_price"][col]
+                                        last_tsl_info["stop"][col] + _high - last_tsl_info["peak_price"][col]
                                     )
                                 last_tsl_info["peak_idx"][col] = i
                                 last_tsl_info["peak_price"][col] = _high
-                        elif last_position[col] < 0:
+                        else:
                             if _low < last_tsl_info["peak_price"][col]:
                                 if last_tsl_info["delta_format"][col] == DeltaFormat.Target:
                                     last_tsl_info["stop"][col] = (
-                                        last_tsl_info["stop"][col] * _low / last_tsl_info["peak_price"][col]
+                                        last_tsl_info["stop"][col] + _low - last_tsl_info["peak_price"][col]
                                     )
                                 last_tsl_info["peak_idx"][col] = i
                                 last_tsl_info["peak_price"][col] = _low
@@ -4372,8 +4372,8 @@ def simulate_from_signal_func_nb(
                                             if last_tsl_info["delta_format"][col] == DeltaFormat.Target:
                                                 last_tsl_info["stop"][col] = (
                                                         last_tsl_info["stop"][col]
-                                                        * _high
-                                                        / last_tsl_info["peak_price"][col]
+                                                        + _high
+                                                        - last_tsl_info["peak_price"][col]
                                                 )
                                             last_tsl_info["peak_idx"][col] = i
                                             last_tsl_info["peak_price"][col] = _high
@@ -4382,8 +4382,8 @@ def simulate_from_signal_func_nb(
                                             if last_tsl_info["delta_format"][col] == DeltaFormat.Target:
                                                 last_tsl_info["stop"][col] = (
                                                         last_tsl_info["stop"][col]
-                                                        * _low
-                                                        / last_tsl_info["peak_price"][col]
+                                                        + _low
+                                                        - last_tsl_info["peak_price"][col]
                                                 )
                                             last_tsl_info["peak_idx"][col] = i
                                             last_tsl_info["peak_price"][col] = _low
