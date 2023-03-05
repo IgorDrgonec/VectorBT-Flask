@@ -4548,6 +4548,202 @@ class TestFromSignals:
             ),
         )
 
+    @pytest.mark.parametrize("test_flexible", [False, True])
+    def test_td_stop(self, test_flexible):
+        if test_flexible:
+            _from_signals_both = partial(from_signals_both, adjust_func_nb=adjust_func_nb)
+        else:
+            _from_signals_both = from_signals_both
+        entries = pd.Series([True, False, True, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+
+        close = pd.Series([5.0, 4.0, 3.0, 2.0, 1.0], index=price.index)
+        open = close + 0.25
+        assert_records_close(
+            _from_signals_both(
+                close=close,
+                entries=entries,
+                exits=exits,
+                td_stop=[[-1, 0, 1, 2]],
+                time_delta_format="rows",
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (0, 1, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 1, 0, 1, 1, 20.0, 4.0, 0.0, 1, 0, 4),
+                    (2, 1, 2, 2, 2, 26.666666666666668, 3.0, 0.0, 0, 0, -1),
+                    (3, 1, 2, 3, 3, 26.666666666666668, 2.0, 0.0, 1, 0, 4),
+                    (0, 2, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 2, 0, 1, 1, 20.0, 4.0, 0.0, 1, 0, 4),
+                    (2, 2, 2, 2, 2, 26.666666666666668, 3.0, 0.0, 0, 0, -1),
+                    (3, 2, 2, 3, 3, 26.666666666666668, 2.0, 0.0, 1, 0, 4),
+                    (0, 3, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 3, 0, 2, 2, 20.0, 3.0, 0.0, 1, 0, 4),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            _from_signals_both(
+                open=open,
+                close=close,
+                entries=entries,
+                exits=exits,
+                td_stop=[[-1, 0, 1, 2]],
+                time_delta_format="rows",
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (0, 1, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 1, 0, 1, 1, 20.0, 4.25, 0.0, 1, 0, 4),
+                    (2, 1, 2, 2, 2, 28.333333333333332, 3.0, 0.0, 0, 0, -1),
+                    (3, 1, 2, 3, 3, 28.333333333333332, 2.25, 0.0, 1, 0, 4),
+                    (0, 2, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 2, 0, 1, 1, 20.0, 4.25, 0.0, 1, 0, 4),
+                    (2, 2, 2, 2, 2, 28.333333333333332, 3.0, 0.0, 0, 0, -1),
+                    (3, 2, 2, 3, 3, 28.333333333333332, 2.25, 0.0, 1, 0, 4),
+                    (0, 3, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 3, 0, 2, 2, 20.0, 3.25, 0.0, 1, 0, 4),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            _from_signals_both(
+                open=open,
+                close=close,
+                entries=entries,
+                exits=exits,
+                td_stop=[[-1, 0 * day_dt, 1 * day_dt, 2 * day_dt]],
+                time_delta_format="index",
+            ).order_records,
+            _from_signals_both(
+                open=open,
+                close=close,
+                entries=entries,
+                exits=exits,
+                td_stop=[[-1, 0, 1, 2]],
+                time_delta_format="rows",
+            ).order_records,
+        )
+        assert_records_close(
+            _from_signals_both(
+                open=open,
+                close=close,
+                entries=entries,
+                exits=exits,
+                td_stop="3 days",
+                time_delta_format="index",
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 0, 0, 3, 3, 20.0, 2.25, 0.0, 1, 0, 4),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+
+    @pytest.mark.parametrize("test_flexible", [False, True])
+    def test_dt_stop(self, test_flexible):
+        if test_flexible:
+            _from_signals_both = partial(from_signals_both, adjust_func_nb=adjust_func_nb)
+        else:
+            _from_signals_both = from_signals_both
+        entries = pd.Series([True, False, True, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+
+        close = pd.Series([5.0, 4.0, 3.0, 2.0, 1.0], index=price.index)
+        open = close + 0.25
+        assert_records_close(
+            _from_signals_both(
+                close=close,
+                entries=entries,
+                exits=exits,
+                dt_stop=[[-1, 0, 1, 2]],
+                time_delta_format="rows",
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (0, 1, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 1, 0, 1, 1, 20.0, 4.0, 0.0, 1, 0, 4),
+                    (2, 1, 2, 2, 2, 26.666666666666668, 3.0, 0.0, 0, 0, -1),
+                    (3, 1, 2, 3, 3, 26.666666666666668, 2.0, 0.0, 1, 0, 4),
+                    (0, 2, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 2, 0, 1, 1, 20.0, 4.0, 0.0, 1, 0, 4),
+                    (2, 2, 2, 2, 2, 26.666666666666668, 3.0, 0.0, 0, 0, -1),
+                    (3, 2, 2, 3, 3, 26.666666666666668, 2.0, 0.0, 1, 0, 4),
+                    (0, 3, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 3, 0, 2, 2, 20.0, 3.0, 0.0, 1, 0, 4),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            _from_signals_both(
+                open=open,
+                close=close,
+                entries=entries,
+                exits=exits,
+                dt_stop=[[-1, 0, 1, 2]],
+                time_delta_format="rows",
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (0, 1, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 1, 0, 1, 1, 20.0, 4.25, 0.0, 1, 0, 4),
+                    (2, 1, 2, 2, 2, 28.333333333333332, 3.0, 0.0, 0, 0, -1),
+                    (3, 1, 2, 3, 3, 28.333333333333332, 2.25, 0.0, 1, 0, 4),
+                    (0, 2, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 2, 0, 1, 1, 20.0, 4.25, 0.0, 1, 0, 4),
+                    (2, 2, 2, 2, 2, 28.333333333333332, 3.0, 0.0, 0, 0, -1),
+                    (3, 2, 2, 3, 3, 28.333333333333332, 2.25, 0.0, 1, 0, 4),
+                    (0, 3, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 3, 0, 2, 2, 20.0, 3.25, 0.0, 1, 0, 4),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            _from_signals_both(
+                open=open,
+                close=close,
+                entries=entries,
+                exits=exits,
+                dt_stop=[[-1, price.index[0], price.index[0] + day_dt, price.index[0] + 2 * day_dt]],
+                time_delta_format="index",
+            ).order_records,
+            _from_signals_both(
+                open=open,
+                close=close,
+                entries=entries,
+                exits=exits,
+                dt_stop=[[-1, 0, 1, 2]],
+                time_delta_format="rows",
+            ).order_records,
+        )
+        assert_records_close(
+            _from_signals_both(
+                open=open,
+                close=close,
+                entries=entries,
+                exits=exits,
+                dt_stop="3 days",
+                time_delta_format="index",
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 0, 0, 3, 3, 20.0, 2.25, 0.0, 1, 0, 4),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+
     def test_stop_entry_price(self):
         entries = pd.Series([True, False, False, False, False], index=price.index)
         exits = pd.Series([False, False, False, False, False], index=price.index)

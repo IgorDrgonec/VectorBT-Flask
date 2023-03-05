@@ -27,6 +27,7 @@ class StopTypeT(tp.NamedTuple):
     TSL: int = 1
     TTP: int = 2
     TP: int = 3
+    T: int = 4
 
 
 StopType = StopTypeT()

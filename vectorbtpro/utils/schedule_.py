@@ -25,29 +25,34 @@ logger = logging.getLogger(__name__)
 
 
 class CustomScheduler(Scheduler):
-    def __init__(self):
+    def __init__(self) -> None:
         super(CustomScheduler, self).__init__()
 
 
+CustomJobT = tp.TypeVar("CustomJobT", bound="CustomJob")
+
+
 class CustomJob(Job):
-    def __init__(self, interval, scheduler=None):
+    def __init__(self, interval: int, scheduler: tp.Optional[Scheduler] = None) -> None:
         super(CustomJob, self).__init__(interval, scheduler)
         self._zero_offset = False
         self._force_missed_run = False
         self.future_run = None
 
     @property
-    def zero_offset(self):
+    def zero_offset(self: CustomJobT) -> CustomJobT:
         self._zero_offset = True
         return self
 
     @property
-    def force_missed_run(self):
+    def force_missed_run(self: CustomJobT) -> CustomJobT:
         self._force_missed_run = True
         return self
 
     @property
-    def modulo(self):
+    def modulo(self) -> int:
+        if self.unit == "seconds":
+            return self.next_run.second % self.interval
         if self.unit == "minutes":
             return self.next_run.minute % self.interval
         if self.unit == "hours":
@@ -55,7 +60,7 @@ class CustomJob(Job):
         if self.unit == "days":
             return self.next_run.day % self.interval
 
-    def _schedule_next_run(self):
+    def _schedule_next_run(self) -> None:
         super(CustomJob, self)._schedule_next_run()
 
         if self.latest is None and self._zero_offset:

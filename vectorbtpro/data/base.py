@@ -1617,6 +1617,38 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             _kwargs = self.select_symbol_kwargs(k, kwargs)
             v.to_hdf(path_or_buf=_path_or_buf, key=_key, format=format, **_kwargs)
 
+    # ############# Loading ############# #
+
+    @classmethod
+    def from_csv(cls: tp.Type[DataT], *args, fetch_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
+        """Use `CSVData` to load data from CSV and switch the class back to this class.
+
+        Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
+        from vectorbtpro.data.custom import CSVData
+
+        if fetch_kwargs is None:
+            fetch_kwargs = {}
+        data = CSVData.fetch(*args, **kwargs)
+        data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
+        data = data.update_fetch_kwargs(**fetch_kwargs)
+        return data
+
+    @classmethod
+    def from_hdf(cls: tp.Type[DataT], *args, fetch_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
+        """Use `HDFData` to load data from HDF and switch the class back to this class.
+
+        Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
+        from vectorbtpro.data.custom import HDFData
+
+        if fetch_kwargs is None:
+            fetch_kwargs = {}
+        if len(args) == 0 and "symbols" not in kwargs:
+            args = (cls.__name__ + ".h5",)
+        data = HDFData.fetch(*args, **kwargs)
+        data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
+        data = data.update_fetch_kwargs(**fetch_kwargs)
+        return data
+
     # ############# Transforming ############# #
 
     def transform(self: DataT, transform_func: tp.Callable, *args, **kwargs) -> DataT:

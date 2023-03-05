@@ -1663,7 +1663,7 @@ from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig, atomic_dict
-from vectorbtpro.utils.datetime_ import freq_to_timedelta64
+from vectorbtpro.utils.datetime_ import freq_to_timedelta64, parse_timedelta
 from vectorbtpro.utils.decorators import custom_property, cached_property, class_or_instancemethod
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.mapping import to_mapping
@@ -4772,6 +4772,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         tsl_stop: tp.Optional[tp.ArrayLike] = None,
         tsl_th: tp.Optional[tp.ArrayLike] = None,
         tp_stop: tp.Optional[tp.ArrayLike] = None,
+        td_stop: tp.Optional[tp.ArrayLike] = None,
+        dt_stop: tp.Optional[tp.ArrayLike] = None,
         stop_entry_price: tp.Optional[tp.ArrayLike] = None,
         stop_exit_price: tp.Optional[tp.ArrayLike] = None,
         stop_exit_type: tp.Optional[tp.ArrayLike] = None,
@@ -4981,6 +4983,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Will broadcast.
 
                 Set an element to `np.nan` to disable. Use `delta_format` to specify the format.
+            td_stop (array_like of float): Timedelta-stop.
+                Will broadcast.
+
+                Set an element to `-1` to disable. Use `time_delta_format` to specify the format.
+            dt_stop (array_like of float): Datetime-stop.
+                Will broadcast.
+
+                Set an element to `-1` to disable. Use `time_delta_format` to specify the format.
             stop_entry_price (StopEntryPrice or array_like): See `vectorbtpro.portfolio.enums.StopEntryPrice`.
                 Will broadcast.
 
@@ -5636,8 +5646,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             limit_expiry = portfolio_cfg["limit_expiry"]
         if isinstance(limit_expiry, (str, timedelta, pd.DateOffset, pd.Timedelta)):
             limit_expiry = RepEval(
-                "wrapper.get_period_ns_index(limit_expiry)[:, None]",
-                context=dict(limit_expiry=limit_expiry),
+                "wrapper.get_period_ns_index(parse_timedelta(limit_expiry))[:, None]",
+                context=dict(parse_timedelta=parse_timedelta, limit_expiry=limit_expiry),
             )
         if limit_reverse is None:
             limit_reverse = portfolio_cfg["limit_reverse"]
@@ -5653,6 +5663,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             tsl_th = portfolio_cfg["tsl_th"]
         if tp_stop is None:
             tp_stop = portfolio_cfg["tp_stop"]
+        if td_stop is None:
+            td_stop = portfolio_cfg["td_stop"]
+        if isinstance(td_stop, (str, timedelta, pd.DateOffset, pd.Timedelta)):
+            td_stop = freq_to_timedelta64(td_stop)
+        if dt_stop is None:
+            dt_stop = portfolio_cfg["dt_stop"]
+        if isinstance(dt_stop, (str, timedelta, pd.DateOffset, pd.Timedelta)):
+            dt_stop = RepEval(
+                "wrapper.get_period_ns_index(parse_timedelta(dt_stop))[:, None] - 1",
+                context=dict(parse_timedelta=parse_timedelta, dt_stop=dt_stop),
+            )
         if use_stops is None:
             use_stops = portfolio_cfg["use_stops"]
         if stop_entry_price is None:
@@ -5797,6 +5818,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             tsl_stop=tsl_stop,
             tsl_th=tsl_th,
             tp_stop=tp_stop,
+            td_stop=td_stop,
+            dt_stop=dt_stop,
             stop_entry_price=stop_entry_price,
             stop_exit_price=stop_exit_price,
             stop_exit_type=stop_exit_type,
@@ -5873,6 +5896,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     tsl_stop=dict(fill_value=np.nan),
                     tsl_th=dict(fill_value=np.nan),
                     tp_stop=dict(fill_value=np.nan),
+                    td_stop=dict(fill_value=-1),
+                    dt_stop=dict(fill_value=-1),
                     stop_entry_price=dict(fill_value=StopEntryPrice.Close),
                     stop_exit_price=dict(fill_value=StopExitPrice.Stop),
                     stop_exit_type=dict(fill_value=StopExitType.Close),
@@ -5945,6 +5970,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     not np.any(broadcasted_args["sl_stop"])
                     and not np.any(broadcasted_args["tsl_stop"])
                     and not np.any(broadcasted_args["tp_stop"])
+                    and not np.any(broadcasted_args["td_stop"] != -1)
+                    and not np.any(broadcasted_args["dt_stop"] != -1)
                 ):
                     use_stops = False
                 else:
@@ -6011,6 +6038,36 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     limit_expiry_cols.append(limit_expiry_col.values)
                 limit_expiry = np.column_stack(limit_expiry_cols)
         broadcasted_args["limit_expiry"] = limit_expiry.astype(np.int64)
+        td_stop = broadcasted_args["td_stop"]
+        if td_stop.dtype == object:
+            if td_stop.ndim in (0, 1):
+                td_stop = pd.to_timedelta(td_stop)
+                if isinstance(td_stop, pd.Timedelta):
+                    td_stop = td_stop.to_timedelta64()
+                else:
+                    td_stop = td_stop.values
+            else:
+                td_stop_cols = []
+                for col in range(td_stop.shape[1]):
+                    td_stop_col = pd.to_timedelta(td_stop[:, col])
+                    td_stop_cols.append(td_stop_col.values)
+                td_stop = np.column_stack(td_stop_cols)
+        broadcasted_args["td_stop"] = td_stop.astype(np.int64)
+        dt_stop = broadcasted_args["dt_stop"]
+        if dt_stop.dtype == object:
+            if dt_stop.ndim in (0, 1):
+                dt_stop = pd.to_datetime(dt_stop).tz_localize(None)
+                if isinstance(dt_stop, pd.Timestamp):
+                    dt_stop = dt_stop.to_datetime64()
+                else:
+                    dt_stop = dt_stop.values
+            else:
+                dt_stop_cols = []
+                for col in range(dt_stop.shape[1]):
+                    dt_stop_col = pd.to_datetime(dt_stop[:, col]).tz_localize(None)
+                    dt_stop_cols.append(dt_stop_col.values)
+                dt_stop = np.column_stack(dt_stop_cols)
+        broadcasted_args["dt_stop"] = dt_stop.astype(np.int64)
         broadcasted_args["upon_adj_limit_conflict"] = map_enum_fields(
             broadcasted_args["upon_adj_limit_conflict"],
             PendingConflictMode,
@@ -6091,6 +6148,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         checks.assert_subdtype(broadcasted_args["tsl_stop"], np.number, arg_name="tsl_stop")
         checks.assert_subdtype(broadcasted_args["tsl_th"], np.number, arg_name="tsl_th")
         checks.assert_subdtype(broadcasted_args["tp_stop"], np.number, arg_name="tp_stop")
+        checks.assert_subdtype(broadcasted_args["td_stop"], np.integer, arg_name="td_stop")
+        checks.assert_subdtype(broadcasted_args["dt_stop"], np.integer, arg_name="dt_stop")
         checks.assert_subdtype(broadcasted_args["stop_entry_price"], np.number, arg_name="stop_entry_price")
         checks.assert_subdtype(broadcasted_args["stop_exit_price"], np.number, arg_name="stop_exit_price")
         checks.assert_subdtype(broadcasted_args["stop_exit_type"], np.integer, arg_name="stop_exit_type")

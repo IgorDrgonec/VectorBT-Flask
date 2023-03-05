@@ -258,7 +258,7 @@ class SignalsAccessor(GenericAccessor):
     @classmethod
     def generate(
         cls,
-        shape: tp.ShapeLike,
+        shape: tp.Union[tp.ShapeLike, ArrayWrapper],
         place_func_nb: tp.PlaceFunc,
         *args,
         only_once: bool = True,
@@ -272,6 +272,9 @@ class SignalsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """See `vectorbtpro.signals.nb.generate_nb`.
+
+        `shape` can be a shape-like tuple or an instance of `vectorbtpro.base.wrapping.ArrayWrapper`
+        (will be used as `wrapper`).
 
         Usage:
             * Generate random signals manually:
@@ -299,6 +302,9 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05  False  False  False
             ```
         """
+        if isinstance(shape, ArrayWrapper):
+            wrapper = shape
+            shape = wrapper.shape
         if broadcast_named_args is None:
             broadcast_named_args = {}
         if broadcast_kwargs is None:
@@ -332,7 +338,7 @@ class SignalsAccessor(GenericAccessor):
     @classmethod
     def generate_both(
         cls,
-        shape: tp.ShapeLike,
+        shape: tp.Union[tp.ShapeLike, ArrayWrapper],
         entry_place_func_nb: tp.Optional[tp.PlaceFunc] = None,
         entry_args: tp.ArgsLike = None,
         exit_place_func_nb: tp.Optional[tp.PlaceFunc] = None,
@@ -348,6 +354,9 @@ class SignalsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.Tuple[tp.SeriesFrame, tp.SeriesFrame]:
         """See `vectorbtpro.signals.nb.generate_enex_nb`.
+
+        `shape` can be a shape-like tuple or an instance of `vectorbtpro.base.wrapping.ArrayWrapper`
+        (will be used as `wrapper`).
 
         Usage:
             * Generate entry and exit signals one after another:
@@ -423,6 +432,9 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05  False  False  False
             ```
         """
+        if isinstance(shape, ArrayWrapper):
+            wrapper = shape
+            shape = wrapper.shape
         if entry_args is None:
             entry_args = ()
         if exit_args is None:
@@ -591,7 +603,7 @@ class SignalsAccessor(GenericAccessor):
     @classmethod
     def generate_random(
         cls,
-        shape: tp.ShapeLike,
+        shape: tp.Union[tp.ShapeLike, ArrayWrapper],
         n: tp.Optional[tp.ArrayLike] = None,
         prob: tp.Optional[tp.ArrayLike] = None,
         pick_first: bool = False,
@@ -602,10 +614,13 @@ class SignalsAccessor(GenericAccessor):
     ) -> tp.SeriesFrame:
         """Generate signals randomly.
 
+        `shape` can be a shape-like tuple or an instance of `vectorbtpro.base.wrapping.ArrayWrapper`
+        (will be used as `wrapper`).
+
         If `n` is set, uses `vectorbtpro.signals.nb.rand_place_nb`.
         If `prob` is set, uses `vectorbtpro.signals.nb.rand_by_prob_place_nb`.
 
-        For arguments, see `SignalsAccessor.generate_random`.
+        For arguments, see `SignalsAccessor.generate`.
 
         `n` must be either a scalar or an array that will broadcast to the number of columns.
         `prob` must be either a single number or an array that will broadcast to match `shape`.
@@ -653,6 +668,9 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05   True  False   True
             ```
         """
+        if isinstance(shape, ArrayWrapper):
+            wrapper = shape
+            shape = wrapper.shape
         shape_2d = cls.resolve_shape(shape)
         if n is not None and prob is not None:
             raise ValueError("Either n or prob must be provided, not both")
@@ -693,7 +711,7 @@ class SignalsAccessor(GenericAccessor):
     @classmethod
     def generate_random_both(
         cls,
-        shape: tp.ShapeLike,
+        shape: tp.Union[tp.ShapeLike, ArrayWrapper],
         n: tp.Optional[tp.ArrayLike] = None,
         entry_prob: tp.Optional[tp.ArrayLike] = None,
         exit_prob: tp.Optional[tp.ArrayLike] = None,
@@ -708,6 +726,9 @@ class SignalsAccessor(GenericAccessor):
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.Tuple[tp.SeriesFrame, tp.SeriesFrame]:
         """Generate chain of entry and exit signals randomly.
+
+        `shape` can be a shape-like tuple or an instance of `vectorbtpro.base.wrapping.ArrayWrapper`
+        (will be used as `wrapper`).
 
         If `n` is set, uses `vectorbtpro.signals.nb.generate_rand_enex_nb`.
         If `entry_prob` and `exit_prob` are set, uses `SignalsAccessor.generate_both` with
@@ -771,6 +792,9 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05  False  False   True
             ```
         """
+        if isinstance(shape, ArrayWrapper):
+            wrapper = shape
+            shape = wrapper.shape
         shape_2d = cls.resolve_shape(shape)
         if n is not None and (entry_prob is not None or exit_prob is not None):
             raise ValueError("Either n or any of the entry_prob and exit_prob must be provided, not both")

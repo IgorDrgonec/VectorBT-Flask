@@ -98,7 +98,7 @@ __pdoc__ = {}
 
 
 class CustomData(Data):
-    """Subclass of `vectorbtpro.data.base.Data` for custom-generated data."""
+    """Data class for fetching custom data."""
 
     _setting_keys: tp.SettingsKeys = dict(custom=None)
 
@@ -132,7 +132,7 @@ class CustomData(Data):
 
 
 class SyntheticData(CustomData):
-    """Subclass of `vectorbtpro.data.base.Data` for synthetically generated data.
+    """Data class for fetching synthetic data.
 
     Exposes an abstract class method `SyntheticData.generate_symbol`.
     Everything else is taken care of."""
@@ -557,9 +557,20 @@ LocalDataT = tp.TypeVar("LocalDataT", bound="LocalData")
 
 
 class LocalData(CustomData):
-    """Subclass of `vectorbtpro.data.base.Data` for local data."""
+    """Data class for fetching local data."""
 
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.local")
+
+
+# ############# File ############# #
+
+FileDataT = tp.TypeVar("FileDataT", bound="FileData")
+
+
+class FileData(LocalData):
+    """Data class for fetching file data."""
+
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.file")
 
     @classmethod
     def match_path(
@@ -593,7 +604,7 @@ class LocalData(CustomData):
 
     @classmethod
     def fetch(
-        cls: tp.Type[LocalDataT],
+        cls: tp.Type[FileDataT],
         symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
         *,
         paths: tp.Any = None,
@@ -603,7 +614,7 @@ class LocalData(CustomData):
         match_path_kwargs: tp.KwargsLike = None,
         path_to_symbol_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> LocalDataT:
+    ) -> FileDataT:
         """Override `vectorbtpro.data.base.Data.fetch` to take care of paths.
 
         Use either `symbols` or `paths` to specify the path to one or multiple files.
@@ -689,7 +700,7 @@ class LocalData(CustomData):
             if len(symbols) == 1 and single_symbol:
                 symbols = symbols[0]
 
-        return super(LocalData, cls).fetch(
+        return super(FileData, cls).fetch(
             symbols,
             path=paths,
             **kwargs,
@@ -699,8 +710,8 @@ class LocalData(CustomData):
 CSVDataT = tp.TypeVar("CSVDataT", bound="CSVData")
 
 
-class CSVData(LocalData):
-    """Subclass of `vectorbtpro.data.base.Data` for data that can be fetched and updated using `pd.read_csv`."""
+class CSVData(FileData):
+    """Data class for fetching CSV data."""
 
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.csv")
 
@@ -895,8 +906,8 @@ class HDFKeyNotFoundError(Exception):
 HDFDataT = tp.TypeVar("HDFDataT", bound="HDFData")
 
 
-class HDFData(LocalData):
-    """Subclass of `vectorbtpro.data.base.Data` for data that can be fetched and updated using `pd.read_hdf`."""
+class HDFData(FileData):
+    """Data class for fetching HDF data."""
 
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.hdf")
 
@@ -944,7 +955,7 @@ class HDFData(LocalData):
         recursive: bool = True,
         **kwargs,
     ) -> tp.List[Path]:
-        """Override `LocalData.match_path` to return a list of HDF paths
+        """Override `FileData.match_path` to return a list of HDF paths
         (path to file + key) matching a path."""
         path = Path(path)
         if path.exists():
@@ -1141,7 +1152,7 @@ RemoteDataT = tp.TypeVar("RemoteDataT", bound="RemoteData")
 
 
 class RemoteData(CustomData):
-    """Subclass of `vectorbtpro.data.base.Data` for remote data.
+    """Data class for fetching remote data.
 
     Remote data usually has arguments such as `start`, `end`, and `timeframe`.
 
@@ -1155,35 +1166,9 @@ class RemoteData(CustomData):
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)
 
-    @classmethod
-    def from_csv(cls: tp.Type[RemoteDataT], *args, fetch_kwargs: tp.KwargsLike = None, **kwargs) -> RemoteDataT:
-        """Use `CSVData` to load data from CSV and switch the class back to this class.
-
-        Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
-        if fetch_kwargs is None:
-            fetch_kwargs = {}
-        data = CSVData.fetch(*args, **kwargs)
-        data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
-        data = data.update_fetch_kwargs(**fetch_kwargs)
-        return data
-
-    @classmethod
-    def from_hdf(cls: tp.Type[RemoteDataT], *args, fetch_kwargs: tp.KwargsLike = None, **kwargs) -> RemoteDataT:
-        """Use `HDFData` to load data from HDF and switch the class back to this class.
-
-        Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
-        if fetch_kwargs is None:
-            fetch_kwargs = {}
-        if len(args) == 0 and "symbols" not in kwargs:
-            args = (cls.__name__ + ".h5",)
-        data = HDFData.fetch(*args, **kwargs)
-        data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
-        data = data.update_fetch_kwargs(**fetch_kwargs)
-        return data
-
 
 class YFData(RemoteData):
-    """Subclass of `vectorbtpro.data.base.Data` for `yfinance`.
+    """Data class for fetching from Yahoo Finance.
 
     See https://github.com/ranaroussi/yfinance for API.
 
@@ -1326,7 +1311,7 @@ BinanceDataT = tp.TypeVar("BinanceDataT", bound="BinanceData")
 
 
 class BinanceData(RemoteData):
-    """Subclass of `vectorbtpro.data.base.Data` for `python-binance`.
+    """Data class for fetching from Binance.
 
     See https://github.com/sammchardy/python-binance for API.
 
@@ -1649,7 +1634,7 @@ BinanceData.override_column_config_doc(__pdoc__)
 
 
 class CCXTData(RemoteData):
-    """Subclass of `vectorbtpro.data.base.Data` for `ccxt`.
+    """Data class for fetching using CCXT.
 
     See https://github.com/ccxt/ccxt for API.
 
@@ -2052,7 +2037,7 @@ AlpacaDataT = tp.TypeVar("AlpacaDataT", bound="AlpacaData")
 
 
 class AlpacaData(RemoteData):
-    """Subclass of `vectorbtpro.data.base.Data` for `alpaca-py`.
+    """Data class for fetching from Alpaca.
 
     See https://github.com/alpacahq/alpaca-py for API.
 
@@ -2385,7 +2370,7 @@ PolygonDataT = tp.TypeVar("PolygonDataT", bound="PolygonData")
 
 
 class PolygonData(RemoteData):
-    """Subclass of `vectorbtpro.data.base.Data` for `polygon-api-client`.
+    """Data class for fetching from Polygon.
 
     See https://github.com/polygon-io/client-python for API.
 
@@ -2760,7 +2745,7 @@ AVDataT = tp.TypeVar("AVDataT", bound="AVData")
 
 
 class AVData(RemoteData):
-    """Subclass of `vectorbtpro.data.base.Data` for `alpha_vantage`.
+    """Data class for fetching from Alpha Vantage.
 
     See https://www.alphavantage.co/documentation/ for API.
 
@@ -3169,7 +3154,7 @@ NDLDataT = tp.TypeVar("NDLDataT", bound="NDLData")
 
 
 class NDLData(RemoteData):
-    """Subclass of `vectorbtpro.data.base.Data` for `nasdaqdatalink`.
+    """Data class for fetching from Nasdaq Data Link.
 
     See https://github.com/Nasdaq/data-link-python for API.
 
@@ -3320,7 +3305,7 @@ TVDataT = tp.TypeVar("TVDataT", bound="TVData")
 
 
 class TVData(RemoteData):
-    """Subclass of `vectorbtpro.data.base.Data` for `vectorbtpro.data.tv.TVClient`.
+    """Data class for fetching from TradingView.
 
     See `TVData.fetch_symbol` for arguments.
 
