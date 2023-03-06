@@ -398,6 +398,13 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         return self.symbol_wrapper.shape
 
     @property
+    def shape_2d(self) -> tp.Shape:
+        """Shape as if the object was two-dimensional.
+
+        Based on the default symbol wrapper."""
+        return self.symbol_wrapper.shape_2d
+
+    @property
     def columns(self) -> tp.Index:
         """Columns.
 
@@ -1940,6 +1947,18 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             if real_arg_name not in kwargs:
                 if arg_name == "data":
                     with_kwargs[real_arg_name] = _self
+                elif arg_name == "wrapper":
+                    with_kwargs[real_arg_name] = _self.symbol_wrapper
+                elif arg_name in ("input_shape", "shape"):
+                    with_kwargs[real_arg_name] = _self.shape
+                elif arg_name in ("target_shape", "shape_2d"):
+                    with_kwargs[real_arg_name] = _self.shape_2d
+                elif arg_name in ("input_index", "index"):
+                    with_kwargs[real_arg_name] = _self.index
+                elif arg_name in ("input_columns", "columns"):
+                    with_kwargs[real_arg_name] = _self.columns
+                elif arg_name == "freq":
+                    with_kwargs[real_arg_name] = _self.freq
                 elif arg_name == "hlc3":
                     with_kwargs[real_arg_name] = _self.hlc3
                 elif arg_name == "ohlc4":

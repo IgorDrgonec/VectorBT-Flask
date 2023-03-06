@@ -2725,6 +2725,7 @@ PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
         auto_call_seq=None,
         ffill_val_price=None,
         update_value=None,
+        fill_pos_info=None,
         max_orders=None,
         max_logs=None,
         in_outputs=ch.ArgsTaker(),
@@ -2803,6 +2804,7 @@ def simulate_from_signal_func_nb(
     auto_call_seq: bool = False,
     ffill_val_price: bool = True,
     update_value: bool = False,
+    fill_pos_info: bool = True,
     max_orders: tp.Optional[int] = None,
     max_logs: tp.Optional[int] = 0,
     in_outputs: tp.Optional[tp.NamedTuple] = None,
@@ -2911,6 +2913,12 @@ def simulate_from_signal_func_nb(
         init_cash=init_cash_,
         init_position=init_position_,
         init_price=init_price_,
+    )
+    last_pos_info = prepare_last_pos_info_nb(
+        target_shape,
+        init_position=init_position_,
+        init_price=init_price_,
+        fill_pos_info=fill_pos_info,
     )
     last_cash_deposits = np.full_like(last_cash, 0.0)
     last_val_price = np.full_like(last_position, np.nan)
@@ -3064,6 +3072,11 @@ def simulate_from_signal_func_nb(
                         input_value=prev_close_value[col], output_value=last_value[col] - last_cash_deposits[col]
                     )
 
+            # Update open position stats
+            if fill_pos_info:
+                for col in range(from_col, to_col):
+                    update_open_pos_info_stats_nb(last_pos_info[col], last_position[col], last_val_price[col])
+
             # Get signals
             for c in range(group_len):
                 col = from_col + c  # order doesn't matter
@@ -3098,6 +3111,7 @@ def simulate_from_signal_func_nb(
                     last_val_price=last_val_price,
                     last_value=last_value,
                     last_return=last_return,
+                    last_pos_info=last_pos_info,
                     last_limit_info=last_limit_info,
                     last_sl_info=last_sl_info,
                     last_tsl_info=last_tsl_info,
@@ -4171,6 +4185,23 @@ def simulate_from_signal_func_nb(
                     val_price_now = new_exec_state.val_price
                     value_now = new_exec_state.value
 
+                    # Update position record
+                    if fill_pos_info:
+                        if order_result.status == OrderStatus.Filled:
+                            if order_counts[col] > 0:
+                                order_id = order_records["id"][order_counts[col] - 1, col]
+                            else:
+                                order_id = -1
+                            update_pos_info_nb(
+                                last_pos_info[col],
+                                i,
+                                col,
+                                exec_state.position,
+                                position_now,
+                                order_result,
+                                order_id,
+                            )
+
                     if use_stops:
                         # Update stop price
                         if position_now == 0:
@@ -4450,6 +4481,11 @@ def simulate_from_signal_func_nb(
                     )
                     prev_close_value[col] = last_value[col]
 
+            # Update open position stats
+            if fill_pos_info:
+                for col in range(from_col, to_col):
+                    update_open_pos_info_stats_nb(last_pos_info[col], last_position[col], last_val_price[col])
+
             # Call post-segment function
             post_segment_ctx = SignalSegmentContext(
                 target_shape=target_shape,
@@ -4481,10 +4517,12 @@ def simulate_from_signal_func_nb(
                 last_val_price=last_val_price,
                 last_value=last_value,
                 last_return=last_return,
+                last_pos_info=last_pos_info,
                 last_limit_info=last_limit_info,
                 last_sl_info=last_sl_info,
                 last_tsl_info=last_tsl_info,
                 last_tp_info=last_tp_info,
+                last_time_info=last_time_info,
                 group=group,
                 group_len=group_len,
                 from_col=from_col,

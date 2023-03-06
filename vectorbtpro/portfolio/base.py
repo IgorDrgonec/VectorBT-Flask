@@ -4799,6 +4799,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         attach_call_seq: tp.Optional[bool] = None,
         ffill_val_price: tp.Optional[bool] = None,
         update_value: tp.Optional[bool] = None,
+        fill_pos_info: tp.Optional[bool] = None,
         save_state: tp.Optional[bool] = None,
         save_value: tp.Optional[bool] = None,
         save_returns: tp.Optional[bool] = None,
@@ -5048,6 +5049,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             attach_call_seq (bool): See `Portfolio.from_orders`.
             ffill_val_price (bool): See `Portfolio.from_orders`.
             update_value (bool): See `Portfolio.from_orders`.
+            fill_pos_info (bool): fill_pos_info (bool): Whether to fill position record.
+
+                Disable this to make simulation faster for simple use cases.
             save_state (bool): See `Portfolio.from_orders`.
             save_value (bool): See `Portfolio.from_orders`.
             save_returns (bool): See `Portfolio.from_orders`.
@@ -5742,6 +5746,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ffill_val_price = portfolio_cfg["ffill_val_price"]
         if update_value is None:
             update_value = portfolio_cfg["update_value"]
+        if fill_pos_info is None:
+            fill_pos_info = portfolio_cfg["fill_pos_info"]
         if save_state is None:
             save_state = portfolio_cfg["save_state"]
         if save_value is None:
@@ -6219,6 +6225,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 auto_call_seq=auto_call_seq,
                 ffill_val_price=ffill_val_price,
                 update_value=update_value,
+                fill_pos_info=fill_pos_info,
                 save_state=save_state,
                 save_value=save_value,
                 save_returns=save_returns,
@@ -6310,6 +6317,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 auto_call_seq=auto_call_seq,
                 ffill_val_price=ffill_val_price,
                 update_value=update_value,
+                fill_pos_info=fill_pos_info,
                 max_orders=max_orders,
                 max_logs=max_logs,
                 in_outputs=in_outputs,
@@ -6816,7 +6824,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         low: tp.Optional[tp.ArrayLike] = None,
         ffill_val_price: tp.Optional[bool] = None,
         update_value: tp.Optional[bool] = None,
-        fill_pos_record: tp.Optional[bool] = None,
+        fill_pos_info: tp.Optional[bool] = None,
         track_value: tp.Optional[bool] = None,
         row_wise: tp.Optional[bool] = None,
         max_orders: tp.Optional[int] = None,
@@ -6935,7 +6943,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
                 Otherwise, unknown `close` will lead to NaN in valuation price at the next timestamp.
             update_value (bool): Whether to update group value after each filled order.
-            fill_pos_record (bool): Whether to fill position record.
+            fill_pos_info (bool): Whether to fill position record.
 
                 Disable this to make simulation faster for simple use cases.
             track_value (bool): Whether to track value metrics such as
@@ -7415,8 +7423,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ffill_val_price = portfolio_cfg["ffill_val_price"]
         if update_value is None:
             update_value = portfolio_cfg["update_value"]
-        if fill_pos_record is None:
-            fill_pos_record = portfolio_cfg["fill_pos_record"]
+        if fill_pos_info is None:
+            fill_pos_info = portfolio_cfg["fill_pos_info"]
         if track_value is None:
             track_value = portfolio_cfg["track_value"]
         if row_wise is None:
@@ -7579,7 +7587,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 post_order_args=post_order_args,
                 ffill_val_price=ffill_val_price,
                 update_value=update_value,
-                fill_pos_record=fill_pos_record,
+                fill_pos_info=fill_pos_info,
                 track_value=track_value,
                 max_orders=max_orders,
                 max_logs=max_logs,
@@ -7644,7 +7652,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     bm_close=broadcasted_args["bm_close"],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
-                    fill_pos_record=fill_pos_record,
+                    fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     max_orders=max_orders,
                     max_logs=max_logs,
@@ -7691,7 +7699,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     bm_close=broadcasted_args["bm_close"],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
-                    fill_pos_record=fill_pos_record,
+                    fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     max_orders=max_orders,
                     max_logs=max_logs,
@@ -7738,7 +7746,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     bm_close=broadcasted_args["bm_close"],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
-                    fill_pos_record=fill_pos_record,
+                    fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     max_orders=max_orders,
                     max_logs=max_logs,
@@ -7785,7 +7793,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     bm_close=broadcasted_args["bm_close"],
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
-                    fill_pos_record=fill_pos_record,
+                    fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     max_orders=max_orders,
                     max_logs=max_logs,

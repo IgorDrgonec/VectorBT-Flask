@@ -1788,7 +1788,7 @@ class IndicatorFactory(Configured):
         return self._plots_defaults
 
     @property
-    def Indicator(self) -> type:
+    def Indicator(self) -> tp.Type[IndicatorBase]:
         """Built indicator class."""
         return self._Indicator
 
@@ -2083,6 +2083,8 @@ class IndicatorFactory(Configured):
             _2 = ", ".join(_2) + ", " if len(_2) > 0 else ""
             _3 = "*args, " if var_args else ""
             _4 = ["{}={}".format(k, k) for k in main_kw_names + other_kw_names]
+            if require_input_shape:
+                _4 += ["input_index=None", "input_columns=None"]
             _4 = ", ".join(_4) + ", " if len(_4) > 0 else ""
             _5 = docstring
             _6 = all_input_names
@@ -2092,6 +2094,8 @@ class IndicatorFactory(Configured):
                 _7.append("input_shape")
             _7.extend(other_kw_names)
             _7 = ["{}={}".format(k, k) for k in _7]
+            if require_input_shape:
+                _7 += ["input_index=input_index", "input_columns=input_columns"]
             _7 = ", ".join(_7) + ", " if len(_7) > 0 else ""
             func_str = (
                 "@classmethod\n"

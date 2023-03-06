@@ -361,7 +361,7 @@ PostOrderFuncT = tp.Callable[[PostOrderContext, OrderResult, tp.VarArg()], None]
         bm_close=base_ch.flex_array_gl_slicer,
         ffill_val_price=None,
         update_value=None,
-        fill_pos_record=None,
+        fill_pos_info=None,
         track_value=None,
         max_orders=None,
         max_logs=None,
@@ -408,7 +408,7 @@ def simulate_nb(
     bm_close: tp.FlexArray2dLike = np.nan,
     ffill_val_price: bool = True,
     update_value: bool = False,
-    fill_pos_record: bool = True,
+    fill_pos_info: bool = True,
     track_value: bool = True,
     max_orders: tp.Optional[int] = None,
     max_logs: tp.Optional[int] = 0,
@@ -527,7 +527,7 @@ def simulate_nb(
         bm_close (array_like of float): See `vectorbtpro.portfolio.enums.SimulationContext.bm_close`.
         ffill_val_price (bool): See `vectorbtpro.portfolio.enums.SimulationContext.ffill_val_price`.
         update_value (bool): See `vectorbtpro.portfolio.enums.SimulationContext.update_value`.
-        fill_pos_record (bool): See `vectorbtpro.portfolio.enums.SimulationContext.fill_pos_record`.
+        fill_pos_info (bool): See `vectorbtpro.portfolio.enums.SimulationContext.fill_pos_info`.
         track_value (bool): See `vectorbtpro.portfolio.enums.SimulationContext.track_value`.
         max_orders (int): The max number of order records expected to be filled at each column.
         max_logs (int): The max number of log records expected to be filled at each column.
@@ -781,11 +781,11 @@ def simulate_nb(
         init_position=init_position_,
         init_price=init_price_,
     )
-    last_pos_record = prepare_last_pos_record_nb(
+    last_pos_info = prepare_last_pos_info_nb(
         target_shape,
         init_position=init_position_,
         init_price=init_price_,
-        fill_pos_record=fill_pos_record,
+        fill_pos_info=fill_pos_info,
     )
 
     last_cash_deposits = np.full_like(last_cash, 0.0)
@@ -826,7 +826,7 @@ def simulate_nb(
         bm_close=bm_close_,
         ffill_val_price=ffill_val_price,
         update_value=update_value,
-        fill_pos_record=fill_pos_record,
+        fill_pos_info=fill_pos_info,
         track_value=track_value,
         order_records=order_records,
         log_records=log_records,
@@ -841,7 +841,7 @@ def simulate_nb(
         last_return=last_return,
         order_counts=order_counts,
         log_counts=log_counts,
-        last_pos_record=last_pos_record,
+        last_pos_info=last_pos_info,
     )
     pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
 
@@ -873,7 +873,7 @@ def simulate_nb(
             bm_close=bm_close_,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
-            fill_pos_record=fill_pos_record,
+            fill_pos_info=fill_pos_info,
             track_value=track_value,
             order_records=order_records,
             log_records=log_records,
@@ -888,7 +888,7 @@ def simulate_nb(
             last_return=last_return,
             order_counts=order_counts,
             log_counts=log_counts,
-            last_pos_record=last_pos_record,
+            last_pos_info=last_pos_info,
             group=group,
             group_len=group_len,
             from_col=from_col,
@@ -930,9 +930,9 @@ def simulate_nb(
                         last_return[col] = returns_nb_.get_return_nb(prev_close_value[col], last_value[col])
 
                 # Update open position stats
-                if fill_pos_record:
+                if fill_pos_info:
                     for col in range(from_col, to_col):
-                        update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
+                        update_open_pos_info_stats_nb(last_pos_info[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
             is_segment_active = flex_select_nb(segment_mask_, i, group)
@@ -960,7 +960,7 @@ def simulate_nb(
                     bm_close=bm_close_,
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
-                    fill_pos_record=fill_pos_record,
+                    fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     order_records=order_records,
                     log_records=log_records,
@@ -975,7 +975,7 @@ def simulate_nb(
                     last_return=last_return,
                     order_counts=order_counts,
                     log_counts=log_counts,
-                    last_pos_record=last_pos_record,
+                    last_pos_info=last_pos_info,
                     group=group,
                     group_len=group_len,
                     from_col=from_col,
@@ -1024,9 +1024,9 @@ def simulate_nb(
                         )
 
                 # Update open position stats
-                if fill_pos_record:
+                if fill_pos_info:
                     for col in range(from_col, to_col):
-                        update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
+                        update_open_pos_info_stats_nb(last_pos_info[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
             if is_segment_active:
@@ -1044,7 +1044,7 @@ def simulate_nb(
                     debt_now = last_debt[col]
                     locked_cash_now = last_locked_cash[col]
                     val_price_now = last_val_price[col]
-                    pos_record_now = last_pos_record[col]
+                    pos_info_now = last_pos_info[col]
                     if cash_sharing:
                         cash_now = last_cash[group]
                         free_cash_now = last_free_cash[group]
@@ -1081,7 +1081,7 @@ def simulate_nb(
                         bm_close=bm_close_,
                         ffill_val_price=ffill_val_price,
                         update_value=update_value,
-                        fill_pos_record=fill_pos_record,
+                        fill_pos_info=fill_pos_info,
                         track_value=track_value,
                         order_records=order_records,
                         log_records=log_records,
@@ -1096,7 +1096,7 @@ def simulate_nb(
                         last_return=last_return,
                         order_counts=order_counts,
                         log_counts=log_counts,
-                        last_pos_record=last_pos_record,
+                        last_pos_info=last_pos_info,
                         group=group,
                         group_len=group_len,
                         from_col=from_col,
@@ -1113,7 +1113,7 @@ def simulate_nb(
                         val_price_now=val_price_now,
                         value_now=value_now,
                         return_now=return_now,
-                        pos_record_now=pos_record_now,
+                        pos_info_now=pos_info_now,
                     )
                     order = order_func_nb(order_ctx, *pre_segment_out, *order_args)
 
@@ -1195,14 +1195,14 @@ def simulate_nb(
                             last_return[col] = return_now
 
                     # Update position record
-                    if fill_pos_record:
+                    if fill_pos_info:
                         if order_result.status == OrderStatus.Filled:
                             if order_counts[col] > 0:
                                 order_id = order_records["id"][order_counts[col] - 1, col]
                             else:
                                 order_id = -1
-                            update_pos_record_nb(
-                                pos_record_now,
+                            update_pos_info_nb(
+                                pos_info_now,
                                 i,
                                 col,
                                 exec_state.position,
@@ -1234,7 +1234,7 @@ def simulate_nb(
                         bm_close=bm_close_,
                         ffill_val_price=ffill_val_price,
                         update_value=update_value,
-                        fill_pos_record=fill_pos_record,
+                        fill_pos_info=fill_pos_info,
                         track_value=track_value,
                         order_records=order_records,
                         log_records=log_records,
@@ -1249,7 +1249,7 @@ def simulate_nb(
                         last_return=last_return,
                         order_counts=order_counts,
                         log_counts=log_counts,
-                        last_pos_record=last_pos_record,
+                        last_pos_info=last_pos_info,
                         group=group,
                         group_len=group_len,
                         from_col=from_col,
@@ -1274,7 +1274,7 @@ def simulate_nb(
                         val_price_now=val_price_now,
                         value_now=value_now,
                         return_now=return_now,
-                        pos_record_now=pos_record_now,
+                        pos_info_now=pos_info_now,
                     )
                     post_order_func_nb(post_order_ctx, *pre_segment_out, *post_order_args)
 
@@ -1323,9 +1323,9 @@ def simulate_nb(
                         prev_close_value[col] = last_value[col]
 
                 # Update open position stats
-                if fill_pos_record:
+                if fill_pos_info:
                     for col in range(from_col, to_col):
-                        update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
+                        update_open_pos_info_stats_nb(last_pos_info[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
             if call_post_segment or is_segment_active:
@@ -1352,7 +1352,7 @@ def simulate_nb(
                     bm_close=bm_close_,
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
-                    fill_pos_record=fill_pos_record,
+                    fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     order_records=order_records,
                     log_records=log_records,
@@ -1367,7 +1367,7 @@ def simulate_nb(
                     last_return=last_return,
                     order_counts=order_counts,
                     log_counts=log_counts,
-                    last_pos_record=last_pos_record,
+                    last_pos_info=last_pos_info,
                     group=group,
                     group_len=group_len,
                     from_col=from_col,
@@ -1400,7 +1400,7 @@ def simulate_nb(
             bm_close=bm_close_,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
-            fill_pos_record=fill_pos_record,
+            fill_pos_info=fill_pos_info,
             track_value=track_value,
             order_records=order_records,
             log_records=log_records,
@@ -1415,7 +1415,7 @@ def simulate_nb(
             last_return=last_return,
             order_counts=order_counts,
             log_counts=log_counts,
-            last_pos_record=last_pos_record,
+            last_pos_info=last_pos_info,
             group=group,
             group_len=group_len,
             from_col=from_col,
@@ -1446,7 +1446,7 @@ def simulate_nb(
         bm_close=bm_close_,
         ffill_val_price=ffill_val_price,
         update_value=update_value,
-        fill_pos_record=fill_pos_record,
+        fill_pos_info=fill_pos_info,
         track_value=track_value,
         order_records=order_records,
         log_records=log_records,
@@ -1461,7 +1461,7 @@ def simulate_nb(
         last_return=last_return,
         order_counts=order_counts,
         log_counts=log_counts,
-        last_pos_record=last_pos_record,
+        last_pos_info=last_pos_info,
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
@@ -1517,7 +1517,7 @@ def simulate_nb(
         bm_close=base_ch.flex_array_gl_slicer,
         ffill_val_price=None,
         update_value=None,
-        fill_pos_record=None,
+        fill_pos_info=None,
         track_value=None,
         max_orders=None,
         max_logs=None,
@@ -1564,7 +1564,7 @@ def simulate_row_wise_nb(
     bm_close: tp.FlexArray2dLike = np.nan,
     ffill_val_price: bool = True,
     update_value: bool = False,
-    fill_pos_record: bool = True,
+    fill_pos_info: bool = True,
     track_value: bool = True,
     max_orders: tp.Optional[int] = None,
     max_logs: tp.Optional[int] = 0,
@@ -1700,11 +1700,11 @@ def simulate_row_wise_nb(
         init_position=init_position_,
         init_price=init_price_,
     )
-    last_pos_record = prepare_last_pos_record_nb(
+    last_pos_info = prepare_last_pos_info_nb(
         target_shape,
         init_position=init_position_,
         init_price=init_price_,
-        fill_pos_record=fill_pos_record,
+        fill_pos_info=fill_pos_info,
     )
 
     last_cash_deposits = np.full_like(last_cash, 0.0)
@@ -1745,7 +1745,7 @@ def simulate_row_wise_nb(
         bm_close=bm_close_,
         ffill_val_price=ffill_val_price,
         update_value=update_value,
-        fill_pos_record=fill_pos_record,
+        fill_pos_info=fill_pos_info,
         track_value=track_value,
         order_records=order_records,
         log_records=log_records,
@@ -1760,7 +1760,7 @@ def simulate_row_wise_nb(
         last_return=last_return,
         order_counts=order_counts,
         log_counts=log_counts,
-        last_pos_record=last_pos_record,
+        last_pos_info=last_pos_info,
     )
     pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
 
@@ -1789,7 +1789,7 @@ def simulate_row_wise_nb(
             bm_close=bm_close_,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
-            fill_pos_record=fill_pos_record,
+            fill_pos_info=fill_pos_info,
             track_value=track_value,
             order_records=order_records,
             log_records=log_records,
@@ -1804,7 +1804,7 @@ def simulate_row_wise_nb(
             last_return=last_return,
             order_counts=order_counts,
             log_counts=log_counts,
-            last_pos_record=last_pos_record,
+            last_pos_info=last_pos_info,
             i=i,
         )
         pre_row_out = pre_row_func_nb(pre_row_ctx, *pre_sim_out, *pre_row_args)
@@ -1847,9 +1847,9 @@ def simulate_row_wise_nb(
                         last_return[col] = returns_nb_.get_return_nb(prev_close_value[col], last_value[col])
 
                 # Update open position stats
-                if fill_pos_record:
+                if fill_pos_info:
                     for col in range(from_col, to_col):
-                        update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
+                        update_open_pos_info_stats_nb(last_pos_info[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
             is_segment_active = flex_select_nb(segment_mask_, i, group)
@@ -1877,7 +1877,7 @@ def simulate_row_wise_nb(
                     bm_close=bm_close_,
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
-                    fill_pos_record=fill_pos_record,
+                    fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     order_records=order_records,
                     log_records=log_records,
@@ -1892,7 +1892,7 @@ def simulate_row_wise_nb(
                     last_return=last_return,
                     order_counts=order_counts,
                     log_counts=log_counts,
-                    last_pos_record=last_pos_record,
+                    last_pos_info=last_pos_info,
                     group=group,
                     group_len=group_len,
                     from_col=from_col,
@@ -1941,9 +1941,9 @@ def simulate_row_wise_nb(
                         )
 
                 # Update open position stats
-                if fill_pos_record:
+                if fill_pos_info:
                     for col in range(from_col, to_col):
-                        update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
+                        update_open_pos_info_stats_nb(last_pos_info[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
             if is_segment_active:
@@ -1961,7 +1961,7 @@ def simulate_row_wise_nb(
                     debt_now = last_debt[col]
                     locked_cash_now = last_locked_cash[col]
                     val_price_now = last_val_price[col]
-                    pos_record_now = last_pos_record[col]
+                    pos_info_now = last_pos_info[col]
                     if cash_sharing:
                         cash_now = last_cash[group]
                         free_cash_now = last_free_cash[group]
@@ -1998,7 +1998,7 @@ def simulate_row_wise_nb(
                         bm_close=bm_close_,
                         ffill_val_price=ffill_val_price,
                         update_value=update_value,
-                        fill_pos_record=fill_pos_record,
+                        fill_pos_info=fill_pos_info,
                         track_value=track_value,
                         order_records=order_records,
                         log_records=log_records,
@@ -2013,7 +2013,7 @@ def simulate_row_wise_nb(
                         last_return=last_return,
                         order_counts=order_counts,
                         log_counts=log_counts,
-                        last_pos_record=last_pos_record,
+                        last_pos_info=last_pos_info,
                         group=group,
                         group_len=group_len,
                         from_col=from_col,
@@ -2030,7 +2030,7 @@ def simulate_row_wise_nb(
                         val_price_now=val_price_now,
                         value_now=value_now,
                         return_now=return_now,
-                        pos_record_now=pos_record_now,
+                        pos_info_now=pos_info_now,
                     )
                     order = order_func_nb(order_ctx, *pre_segment_out, *order_args)
 
@@ -2112,14 +2112,14 @@ def simulate_row_wise_nb(
                             last_return[col] = return_now
 
                     # Update position record
-                    if fill_pos_record:
+                    if fill_pos_info:
                         if order_result.status == OrderStatus.Filled:
                             if order_counts[col] > 0:
                                 order_id = order_records["id"][order_counts[col] - 1, col]
                             else:
                                 order_id = -1
-                            update_pos_record_nb(
-                                pos_record_now,
+                            update_pos_info_nb(
+                                pos_info_now,
                                 i,
                                 col,
                                 exec_state.position,
@@ -2151,7 +2151,7 @@ def simulate_row_wise_nb(
                         bm_close=bm_close_,
                         ffill_val_price=ffill_val_price,
                         update_value=update_value,
-                        fill_pos_record=fill_pos_record,
+                        fill_pos_info=fill_pos_info,
                         track_value=track_value,
                         order_records=order_records,
                         log_records=log_records,
@@ -2166,7 +2166,7 @@ def simulate_row_wise_nb(
                         last_return=last_return,
                         order_counts=order_counts,
                         log_counts=log_counts,
-                        last_pos_record=last_pos_record,
+                        last_pos_info=last_pos_info,
                         group=group,
                         group_len=group_len,
                         from_col=from_col,
@@ -2191,7 +2191,7 @@ def simulate_row_wise_nb(
                         val_price_now=val_price_now,
                         value_now=value_now,
                         return_now=return_now,
-                        pos_record_now=pos_record_now,
+                        pos_info_now=pos_info_now,
                     )
                     post_order_func_nb(post_order_ctx, *pre_segment_out, *post_order_args)
 
@@ -2240,9 +2240,9 @@ def simulate_row_wise_nb(
                         prev_close_value[col] = last_value[col]
 
                 # Update open position stats
-                if fill_pos_record:
+                if fill_pos_info:
                     for col in range(from_col, to_col):
-                        update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
+                        update_open_pos_info_stats_nb(last_pos_info[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
             if call_post_segment or is_segment_active:
@@ -2269,7 +2269,7 @@ def simulate_row_wise_nb(
                     bm_close=bm_close_,
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
-                    fill_pos_record=fill_pos_record,
+                    fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     order_records=order_records,
                     log_records=log_records,
@@ -2284,7 +2284,7 @@ def simulate_row_wise_nb(
                     last_return=last_return,
                     order_counts=order_counts,
                     log_counts=log_counts,
-                    last_pos_record=last_pos_record,
+                    last_pos_info=last_pos_info,
                     group=group,
                     group_len=group_len,
                     from_col=from_col,
@@ -2317,7 +2317,7 @@ def simulate_row_wise_nb(
             bm_close=bm_close_,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
-            fill_pos_record=fill_pos_record,
+            fill_pos_info=fill_pos_info,
             track_value=track_value,
             order_records=order_records,
             log_records=log_records,
@@ -2332,7 +2332,7 @@ def simulate_row_wise_nb(
             last_return=last_return,
             order_counts=order_counts,
             log_counts=log_counts,
-            last_pos_record=last_pos_record,
+            last_pos_info=last_pos_info,
             i=i,
         )
         post_row_func_nb(post_row_ctx, *pre_sim_out, *post_row_args)
@@ -2360,7 +2360,7 @@ def simulate_row_wise_nb(
         bm_close=bm_close_,
         ffill_val_price=ffill_val_price,
         update_value=update_value,
-        fill_pos_record=fill_pos_record,
+        fill_pos_info=fill_pos_info,
         track_value=track_value,
         order_records=order_records,
         log_records=log_records,
@@ -2375,7 +2375,7 @@ def simulate_row_wise_nb(
         last_return=last_return,
         order_counts=order_counts,
         log_counts=log_counts,
-        last_pos_record=last_pos_record,
+        last_pos_info=last_pos_info,
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
@@ -2506,7 +2506,7 @@ FlexOrderFuncT = tp.Callable[[FlexOrderContext, tp.VarArg()], tp.Tuple[int, Orde
         bm_close=base_ch.flex_array_gl_slicer,
         ffill_val_price=None,
         update_value=None,
-        fill_pos_record=None,
+        fill_pos_info=None,
         track_value=None,
         max_orders=None,
         max_logs=None,
@@ -2552,7 +2552,7 @@ def flex_simulate_nb(
     bm_close: tp.FlexArray2dLike = np.nan,
     ffill_val_price: bool = True,
     update_value: bool = False,
-    fill_pos_record: bool = True,
+    fill_pos_info: bool = True,
     track_value: bool = True,
     max_orders: tp.Optional[int] = None,
     max_logs: tp.Optional[int] = 0,
@@ -2762,11 +2762,11 @@ def flex_simulate_nb(
         init_position=init_position_,
         init_price=init_price_,
     )
-    last_pos_record = prepare_last_pos_record_nb(
+    last_pos_info = prepare_last_pos_info_nb(
         target_shape,
         init_position=init_position_,
         init_price=init_price_,
-        fill_pos_record=fill_pos_record,
+        fill_pos_info=fill_pos_info,
     )
 
     last_cash_deposits = np.full_like(last_cash, 0.0)
@@ -2805,7 +2805,7 @@ def flex_simulate_nb(
         bm_close=bm_close_,
         ffill_val_price=ffill_val_price,
         update_value=update_value,
-        fill_pos_record=fill_pos_record,
+        fill_pos_info=fill_pos_info,
         track_value=track_value,
         order_records=order_records,
         log_records=log_records,
@@ -2820,7 +2820,7 @@ def flex_simulate_nb(
         last_return=last_return,
         order_counts=order_counts,
         log_counts=log_counts,
-        last_pos_record=last_pos_record,
+        last_pos_info=last_pos_info,
     )
     pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
 
@@ -2852,7 +2852,7 @@ def flex_simulate_nb(
             bm_close=bm_close_,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
-            fill_pos_record=fill_pos_record,
+            fill_pos_info=fill_pos_info,
             track_value=track_value,
             order_records=order_records,
             log_records=log_records,
@@ -2867,7 +2867,7 @@ def flex_simulate_nb(
             last_return=last_return,
             order_counts=order_counts,
             log_counts=log_counts,
-            last_pos_record=last_pos_record,
+            last_pos_info=last_pos_info,
             group=group,
             group_len=group_len,
             from_col=from_col,
@@ -2903,9 +2903,9 @@ def flex_simulate_nb(
                         last_return[col] = returns_nb_.get_return_nb(prev_close_value[col], last_value[col])
 
                 # Update open position stats
-                if fill_pos_record:
+                if fill_pos_info:
                     for col in range(from_col, to_col):
-                        update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
+                        update_open_pos_info_stats_nb(last_pos_info[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
             is_segment_active = flex_select_nb(segment_mask_, i, group)
@@ -2933,7 +2933,7 @@ def flex_simulate_nb(
                     bm_close=bm_close_,
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
-                    fill_pos_record=fill_pos_record,
+                    fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     order_records=order_records,
                     log_records=log_records,
@@ -2948,7 +2948,7 @@ def flex_simulate_nb(
                     last_return=last_return,
                     order_counts=order_counts,
                     log_counts=log_counts,
-                    last_pos_record=last_pos_record,
+                    last_pos_info=last_pos_info,
                     group=group,
                     group_len=group_len,
                     from_col=from_col,
@@ -2997,9 +2997,9 @@ def flex_simulate_nb(
                         )
 
                 # Update open position stats
-                if fill_pos_record:
+                if fill_pos_info:
                     for col in range(from_col, to_col):
-                        update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
+                        update_open_pos_info_stats_nb(last_pos_info[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
             is_segment_active = flex_select_nb(segment_mask_, i, group)
@@ -3032,7 +3032,7 @@ def flex_simulate_nb(
                         bm_close=bm_close_,
                         ffill_val_price=ffill_val_price,
                         update_value=update_value,
-                        fill_pos_record=fill_pos_record,
+                        fill_pos_info=fill_pos_info,
                         track_value=track_value,
                         order_records=order_records,
                         log_records=log_records,
@@ -3047,7 +3047,7 @@ def flex_simulate_nb(
                         last_return=last_return,
                         order_counts=order_counts,
                         log_counts=log_counts,
-                        last_pos_record=last_pos_record,
+                        last_pos_info=last_pos_info,
                         group=group,
                         group_len=group_len,
                         from_col=from_col,
@@ -3075,7 +3075,7 @@ def flex_simulate_nb(
                     debt_now = last_debt[col]
                     locked_cash_now = last_locked_cash[col]
                     val_price_now = last_val_price[col]
-                    pos_record_now = last_pos_record[col]
+                    pos_info_now = last_pos_info[col]
                     if cash_sharing:
                         cash_now = last_cash[group]
                         free_cash_now = last_free_cash[group]
@@ -3165,14 +3165,14 @@ def flex_simulate_nb(
                             last_return[col] = return_now
 
                     # Update position record
-                    if fill_pos_record:
+                    if fill_pos_info:
                         if order_result.status == OrderStatus.Filled:
                             if order_counts[col] > 0:
                                 order_id = order_records["id"][order_counts[col] - 1, col]
                             else:
                                 order_id = -1
-                            update_pos_record_nb(
-                                pos_record_now,
+                            update_pos_info_nb(
+                                pos_info_now,
                                 i,
                                 col,
                                 exec_state.position,
@@ -3204,7 +3204,7 @@ def flex_simulate_nb(
                         bm_close=bm_close_,
                         ffill_val_price=ffill_val_price,
                         update_value=update_value,
-                        fill_pos_record=fill_pos_record,
+                        fill_pos_info=fill_pos_info,
                         track_value=track_value,
                         order_records=order_records,
                         log_records=log_records,
@@ -3219,7 +3219,7 @@ def flex_simulate_nb(
                         last_return=last_return,
                         order_counts=order_counts,
                         log_counts=log_counts,
-                        last_pos_record=last_pos_record,
+                        last_pos_info=last_pos_info,
                         group=group,
                         group_len=group_len,
                         from_col=from_col,
@@ -3244,7 +3244,7 @@ def flex_simulate_nb(
                         val_price_now=val_price_now,
                         value_now=value_now,
                         return_now=return_now,
-                        pos_record_now=pos_record_now,
+                        pos_info_now=pos_info_now,
                     )
                     post_order_func_nb(post_order_ctx, *pre_segment_out, *post_order_args)
 
@@ -3293,9 +3293,9 @@ def flex_simulate_nb(
                         prev_close_value[col] = last_value[col]
 
                 # Update open position stats
-                if fill_pos_record:
+                if fill_pos_info:
                     for col in range(from_col, to_col):
-                        update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
+                        update_open_pos_info_stats_nb(last_pos_info[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
             if call_post_segment or is_segment_active:
@@ -3322,7 +3322,7 @@ def flex_simulate_nb(
                     bm_close=bm_close_,
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
-                    fill_pos_record=fill_pos_record,
+                    fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     order_records=order_records,
                     log_records=log_records,
@@ -3337,7 +3337,7 @@ def flex_simulate_nb(
                     last_return=last_return,
                     order_counts=order_counts,
                     log_counts=log_counts,
-                    last_pos_record=last_pos_record,
+                    last_pos_info=last_pos_info,
                     group=group,
                     group_len=group_len,
                     from_col=from_col,
@@ -3370,7 +3370,7 @@ def flex_simulate_nb(
             bm_close=bm_close_,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
-            fill_pos_record=fill_pos_record,
+            fill_pos_info=fill_pos_info,
             track_value=track_value,
             order_records=order_records,
             log_records=log_records,
@@ -3385,7 +3385,7 @@ def flex_simulate_nb(
             last_return=last_return,
             order_counts=order_counts,
             log_counts=log_counts,
-            last_pos_record=last_pos_record,
+            last_pos_info=last_pos_info,
             group=group,
             group_len=group_len,
             from_col=from_col,
@@ -3416,7 +3416,7 @@ def flex_simulate_nb(
         bm_close=bm_close_,
         ffill_val_price=ffill_val_price,
         update_value=update_value,
-        fill_pos_record=fill_pos_record,
+        fill_pos_info=fill_pos_info,
         track_value=track_value,
         order_records=order_records,
         log_records=log_records,
@@ -3431,7 +3431,7 @@ def flex_simulate_nb(
         last_return=last_return,
         order_counts=order_counts,
         log_counts=log_counts,
-        last_pos_record=last_pos_record,
+        last_pos_info=last_pos_info,
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
@@ -3486,7 +3486,7 @@ def flex_simulate_nb(
         bm_close=base_ch.flex_array_gl_slicer,
         ffill_val_price=None,
         update_value=None,
-        fill_pos_record=None,
+        fill_pos_info=None,
         track_value=None,
         max_orders=None,
         max_logs=None,
@@ -3532,7 +3532,7 @@ def flex_simulate_row_wise_nb(
     bm_close: tp.FlexArray2dLike = np.nan,
     ffill_val_price: bool = True,
     update_value: bool = False,
-    fill_pos_record: bool = True,
+    fill_pos_info: bool = True,
     track_value: bool = True,
     max_orders: tp.Optional[int] = None,
     max_logs: tp.Optional[int] = 0,
@@ -3615,11 +3615,11 @@ def flex_simulate_row_wise_nb(
         init_position=init_position_,
         init_price=init_price_,
     )
-    last_pos_record = prepare_last_pos_record_nb(
+    last_pos_info = prepare_last_pos_info_nb(
         target_shape,
         init_position=init_position_,
         init_price=init_price_,
-        fill_pos_record=fill_pos_record,
+        fill_pos_info=fill_pos_info,
     )
 
     last_cash_deposits = np.full_like(last_cash, 0.0)
@@ -3658,7 +3658,7 @@ def flex_simulate_row_wise_nb(
         bm_close=bm_close_,
         ffill_val_price=ffill_val_price,
         update_value=update_value,
-        fill_pos_record=fill_pos_record,
+        fill_pos_info=fill_pos_info,
         track_value=track_value,
         order_records=order_records,
         log_records=log_records,
@@ -3673,7 +3673,7 @@ def flex_simulate_row_wise_nb(
         last_return=last_return,
         order_counts=order_counts,
         log_counts=log_counts,
-        last_pos_record=last_pos_record,
+        last_pos_info=last_pos_info,
     )
     pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
 
@@ -3702,7 +3702,7 @@ def flex_simulate_row_wise_nb(
             bm_close=bm_close_,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
-            fill_pos_record=fill_pos_record,
+            fill_pos_info=fill_pos_info,
             track_value=track_value,
             order_records=order_records,
             log_records=log_records,
@@ -3717,7 +3717,7 @@ def flex_simulate_row_wise_nb(
             last_return=last_return,
             order_counts=order_counts,
             log_counts=log_counts,
-            last_pos_record=last_pos_record,
+            last_pos_info=last_pos_info,
             i=i,
         )
         pre_row_out = pre_row_func_nb(pre_row_ctx, *pre_sim_out, *pre_row_args)
@@ -3753,9 +3753,9 @@ def flex_simulate_row_wise_nb(
                         last_return[col] = returns_nb_.get_return_nb(prev_close_value[col], last_value[col])
 
                 # Update open position stats
-                if fill_pos_record:
+                if fill_pos_info:
                     for col in range(from_col, to_col):
-                        update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
+                        update_open_pos_info_stats_nb(last_pos_info[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
             is_segment_active = flex_select_nb(segment_mask_, i, group)
@@ -3783,7 +3783,7 @@ def flex_simulate_row_wise_nb(
                     bm_close=bm_close_,
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
-                    fill_pos_record=fill_pos_record,
+                    fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     order_records=order_records,
                     log_records=log_records,
@@ -3798,7 +3798,7 @@ def flex_simulate_row_wise_nb(
                     last_return=last_return,
                     order_counts=order_counts,
                     log_counts=log_counts,
-                    last_pos_record=last_pos_record,
+                    last_pos_info=last_pos_info,
                     group=group,
                     group_len=group_len,
                     from_col=from_col,
@@ -3847,9 +3847,9 @@ def flex_simulate_row_wise_nb(
                         )
 
                 # Update open position stats
-                if fill_pos_record:
+                if fill_pos_info:
                     for col in range(from_col, to_col):
-                        update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
+                        update_open_pos_info_stats_nb(last_pos_info[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
             is_segment_active = flex_select_nb(segment_mask_, i, group)
@@ -3882,7 +3882,7 @@ def flex_simulate_row_wise_nb(
                         bm_close=bm_close_,
                         ffill_val_price=ffill_val_price,
                         update_value=update_value,
-                        fill_pos_record=fill_pos_record,
+                        fill_pos_info=fill_pos_info,
                         track_value=track_value,
                         order_records=order_records,
                         log_records=log_records,
@@ -3897,7 +3897,7 @@ def flex_simulate_row_wise_nb(
                         last_return=last_return,
                         order_counts=order_counts,
                         log_counts=log_counts,
-                        last_pos_record=last_pos_record,
+                        last_pos_info=last_pos_info,
                         group=group,
                         group_len=group_len,
                         from_col=from_col,
@@ -3925,7 +3925,7 @@ def flex_simulate_row_wise_nb(
                     debt_now = last_debt[col]
                     locked_cash_now = last_locked_cash[col]
                     val_price_now = last_val_price[col]
-                    pos_record_now = last_pos_record[col]
+                    pos_info_now = last_pos_info[col]
                     if cash_sharing:
                         cash_now = last_cash[group]
                         free_cash_now = last_free_cash[group]
@@ -4015,14 +4015,14 @@ def flex_simulate_row_wise_nb(
                             last_return[col] = return_now
 
                     # Update position record
-                    if fill_pos_record:
+                    if fill_pos_info:
                         if order_result.status == OrderStatus.Filled:
                             if order_counts[col] > 0:
                                 order_id = order_records["id"][order_counts[col] - 1, col]
                             else:
                                 order_id = -1
-                            update_pos_record_nb(
-                                pos_record_now,
+                            update_pos_info_nb(
+                                pos_info_now,
                                 i,
                                 col,
                                 exec_state.position,
@@ -4054,7 +4054,7 @@ def flex_simulate_row_wise_nb(
                         bm_close=bm_close_,
                         ffill_val_price=ffill_val_price,
                         update_value=update_value,
-                        fill_pos_record=fill_pos_record,
+                        fill_pos_info=fill_pos_info,
                         track_value=track_value,
                         order_records=order_records,
                         log_records=log_records,
@@ -4069,7 +4069,7 @@ def flex_simulate_row_wise_nb(
                         last_return=last_return,
                         order_counts=order_counts,
                         log_counts=log_counts,
-                        last_pos_record=last_pos_record,
+                        last_pos_info=last_pos_info,
                         group=group,
                         group_len=group_len,
                         from_col=from_col,
@@ -4094,7 +4094,7 @@ def flex_simulate_row_wise_nb(
                         val_price_now=val_price_now,
                         value_now=value_now,
                         return_now=return_now,
-                        pos_record_now=pos_record_now,
+                        pos_info_now=pos_info_now,
                     )
                     post_order_func_nb(post_order_ctx, *pre_segment_out, *post_order_args)
 
@@ -4143,9 +4143,9 @@ def flex_simulate_row_wise_nb(
                         prev_close_value[col] = last_value[col]
 
                 # Update open position stats
-                if fill_pos_record:
+                if fill_pos_info:
                     for col in range(from_col, to_col):
-                        update_open_pos_stats_nb(last_pos_record[col], last_position[col], last_val_price[col])
+                        update_open_pos_info_stats_nb(last_pos_info[col], last_position[col], last_val_price[col])
 
             # Is this segment active?
             if call_post_segment or is_segment_active:
@@ -4172,7 +4172,7 @@ def flex_simulate_row_wise_nb(
                     bm_close=bm_close_,
                     ffill_val_price=ffill_val_price,
                     update_value=update_value,
-                    fill_pos_record=fill_pos_record,
+                    fill_pos_info=fill_pos_info,
                     track_value=track_value,
                     order_records=order_records,
                     log_records=log_records,
@@ -4187,7 +4187,7 @@ def flex_simulate_row_wise_nb(
                     last_return=last_return,
                     order_counts=order_counts,
                     log_counts=log_counts,
-                    last_pos_record=last_pos_record,
+                    last_pos_info=last_pos_info,
                     group=group,
                     group_len=group_len,
                     from_col=from_col,
@@ -4220,7 +4220,7 @@ def flex_simulate_row_wise_nb(
             bm_close=bm_close_,
             ffill_val_price=ffill_val_price,
             update_value=update_value,
-            fill_pos_record=fill_pos_record,
+            fill_pos_info=fill_pos_info,
             track_value=track_value,
             order_records=order_records,
             log_records=log_records,
@@ -4235,7 +4235,7 @@ def flex_simulate_row_wise_nb(
             last_return=last_return,
             order_counts=order_counts,
             log_counts=log_counts,
-            last_pos_record=last_pos_record,
+            last_pos_info=last_pos_info,
             i=i,
         )
         post_row_func_nb(post_row_ctx, *pre_sim_out, *post_row_args)
@@ -4263,7 +4263,7 @@ def flex_simulate_row_wise_nb(
         bm_close=bm_close_,
         ffill_val_price=ffill_val_price,
         update_value=update_value,
-        fill_pos_record=fill_pos_record,
+        fill_pos_info=fill_pos_info,
         track_value=track_value,
         order_records=order_records,
         log_records=log_records,
@@ -4278,7 +4278,7 @@ def flex_simulate_row_wise_nb(
         last_return=last_return,
         order_counts=order_counts,
         log_counts=log_counts,
-        last_pos_record=last_pos_record,
+        last_pos_info=last_pos_info,
     )
     post_sim_func_nb(post_sim_ctx, *post_sim_args)
 

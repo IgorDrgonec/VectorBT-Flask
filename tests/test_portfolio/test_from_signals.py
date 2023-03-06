@@ -265,6 +265,73 @@ class TestFromSignals:
         )
         assert_records_close(pf_base.order_records, pf.order_records)
 
+    def test_pos_info(self):
+        out = np.empty((5, 3), dtype=vbt.pf_enums.trade_dt)
+
+        @njit
+        def post_segment_func_nb(c, out):
+            for col in range(c.from_col, c.to_col):
+                out[c.i, col] = c.last_pos_info[col]
+
+        pf = from_signals_both(
+            close=pd.concat(
+                (
+                    price.rename("a"),
+                    price.rename("b"),
+                    price.rename("c"),
+                ),
+                axis=1,
+            ),
+            entries=pd.concat(
+                (
+                    entries.rename("a"),
+                    pd.Series(np.roll(entries.values, 1), index=entries.index, name="b"),
+                    pd.Series(np.roll(entries.values, 2), index=entries.index, name="c"),
+                ),
+                axis=1,
+            ),
+            exits=pd.concat(
+                (
+                    exits.rename("a"),
+                    pd.Series(np.roll(exits.values, 1), index=exits.index, name="b"),
+                    pd.Series(np.roll(exits.values, 2), index=exits.index, name="c"),
+                ),
+                axis=1,
+            ),
+            post_segment_func_nb=post_segment_func_nb,
+            post_segment_args=(out,),
+        )
+        assert_records_close(
+            out,
+            np.array([
+                [
+                    (0, 0, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 0.0, 0.0, 0, 0, 0),
+                    (0, 1, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 0.0, 0.0, 1, 0, 0),
+                    (0, 2, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 0.0, 0.0, 1, 0, 0),
+                ],
+                [
+                    (0, 0, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 100.0, 1.0, 0, 0, 0),
+                    (0, 1, 100.0, 0, 0, 1.0, 0.0, 1, 1, 2.0, 0.0, -100.0, -1.0, 1, 1, 0),
+                    (0, 2, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, -100.0, -1.0, 1, 0, 0),
+                ],
+                [
+                    (0, 0, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 200.0, 2.0, 0, 0, 0),
+                    (0, 1, 100.0, 0, 0, 1.0, 0.0, 1, 1, 2.0, 0.0, -100.0, -1.0, 1, 1, 0),
+                    (0, 2, 100.0, 0, 0, 1.0, 0.0, 1, -1, 3.0, 0.0, -200.0, -2.0, 1, 0, 0),
+                ],
+                [
+                    (1, 0, 100.0, 1, 3, 4.0, 0.0, -1, -1, np.nan, 0.0, 0.0, 0.0, 1, 0, 1),
+                    (0, 1, 100.0, 0, 0, 1.0, 0.0, 1, 1, 2.0, 0.0, -100.0, -1.0, 1, 1, 0),
+                    (0, 2, 100.0, 0, 0, 1.0, 0.0, 1, -1, 3.0, 0.0, -233.33333333333331, -2.333333333333333, 1, 0, 0),
+                ],
+                [
+                    (1, 0, 100.0, 1, 3, 4.0, 0.0, -1, -1, np.nan, 0.0, -100.0, -0.25, 1, 0, 1),
+                    (0, 1, 100.0, 0, 0, 1.0, 0.0, 1, 1, 2.0, 0.0, -100.0, -1.0, 1, 1, 0),
+                    (0, 2, 100.0, 0, 0, 1.0, 0.0, 1, -1, 3.0, 0.0, -266.66666666666663, -2.666666666666666, 1, 0, 0),
+                ],
+            ], dtype=vbt.pf_enums.trade_dt),
+        )
+
     def test_amount(self):
         assert_records_close(
             from_signals_both(size=[[0, 1, np.inf]], size_type="amount").order_records,

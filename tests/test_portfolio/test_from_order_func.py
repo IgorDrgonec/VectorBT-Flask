@@ -772,15 +772,15 @@ class TestFromOrderFunc:
         return_arr1 = np.empty((size.shape[0], 2), dtype=np.float_)
         return_arr2 = np.empty(size.shape, dtype=np.float_)
         return_arr3 = np.empty(size.shape, dtype=np.float_)
-        pos_record_arr1 = np.empty(size.shape, dtype=trade_dt)
-        pos_record_arr2 = np.empty(size.shape, dtype=trade_dt)
-        pos_record_arr3 = np.empty(size.shape, dtype=trade_dt)
+        pos_info_arr1 = np.empty(size.shape, dtype=trade_dt)
+        pos_info_arr2 = np.empty(size.shape, dtype=trade_dt)
+        pos_info_arr3 = np.empty(size.shape, dtype=trade_dt)
 
         def pre_segment_func_nb(c):
             value_arr1[c.i, c.group] = c.last_value[c.group]
             return_arr1[c.i, c.group] = c.last_return[c.group]
             for col in range(c.from_col, c.to_col):
-                pos_record_arr1[c.i, col] = c.last_pos_record[col]
+                pos_info_arr1[c.i, col] = c.last_pos_info[col]
             c.last_val_price[c.from_col : c.to_col] = c.last_val_price[c.from_col : c.to_col] + 0.5
             return ()
 
@@ -791,7 +791,7 @@ class TestFromOrderFunc:
                 if c.call_idx < c.group_len:
                     value_arr2[c.i, col] = c.last_value[c.group]
                     return_arr2[c.i, col] = c.last_return[c.group]
-                    pos_record_arr2[c.i, col] = c.last_pos_record[col]
+                    pos_info_arr2[c.i, col] = c.last_pos_info[col]
                     return col, nb.order_nb(size[c.i, col], fixed_fees=1.0)
                 return -1, nb.order_nothing_nb()
 
@@ -800,13 +800,13 @@ class TestFromOrderFunc:
             def order_func_nb(c):
                 value_arr2[c.i, c.col] = c.value_now
                 return_arr2[c.i, c.col] = c.return_now
-                pos_record_arr2[c.i, c.col] = c.pos_record_now
+                pos_info_arr2[c.i, c.col] = c.pos_info_now
                 return nb.order_nb(size[c.i, c.col], fixed_fees=1.0)
 
         def post_order_func_nb(c):
             value_arr3[c.i, c.col] = c.value_now
             return_arr3[c.i, c.col] = c.return_now
-            pos_record_arr3[c.i, c.col] = c.pos_record_now
+            pos_info_arr3[c.i, c.col] = c.pos_info_now
 
         vbt.Portfolio.from_order_func(
             close,
@@ -890,7 +890,7 @@ class TestFromOrderFunc:
             ),
         )
         assert_records_close(
-            pos_record_arr1.flatten()[3:],
+            pos_info_arr1.flatten()[3:],
             np.array(
                 [
                     (0, 0, 1.0, 0, 0, 1.0, 1.0, -1, -1, np.nan, 0.0, -1.0, -1.0, 0, 0, 0),
@@ -944,7 +944,7 @@ class TestFromOrderFunc:
             ),
         )
         assert_records_close(
-            pos_record_arr2.flatten()[3:],
+            pos_info_arr2.flatten()[3:],
             np.array(
                 [
                     (0, 0, 1.0, 0, 0, 1.0, 1.0, -1, -1, np.nan, 0.0, -0.5, -0.5, 0, 0, 0),
@@ -964,7 +964,7 @@ class TestFromOrderFunc:
             ),
         )
         assert_records_close(
-            pos_record_arr3.flatten(),
+            pos_info_arr3.flatten(),
             np.array(
                 [
                     (0, 0, 1.0, 0, 0, 1.0, 1.0, -1, -1, np.nan, 0.0, -1.0, -1.0, 0, 0, 0),
@@ -992,7 +992,7 @@ class TestFromOrderFunc:
         val_price_arr = np.empty(size.shape, dtype=np.float_)
         value_arr = np.empty((size.shape[0], 2), dtype=np.float_)
         return_arr = np.empty((size.shape[0], 2), dtype=np.float_)
-        pos_record_arr = np.empty(size.shape[1], dtype=trade_dt)
+        pos_info_arr = np.empty(size.shape[1], dtype=trade_dt)
 
         def post_segment_func_nb(c):
             cash_arr[c.i, c.group] = c.last_cash[c.group]
@@ -1003,7 +1003,7 @@ class TestFromOrderFunc:
             return_arr[c.i, c.group] = c.last_return[c.group]
 
         def post_sim_func_nb(c):
-            pos_record_arr[:] = c.last_pos_record
+            pos_info_arr[:] = c.last_pos_info
 
         pf = vbt.Portfolio.from_order_func(
             close,
@@ -2071,10 +2071,10 @@ class TestFromOrderFunc:
     @pytest.mark.parametrize("test_flexible", [False, True])
     def test_init_position(self, test_row_wise, test_flexible):
 
-        pos_record_arr = np.empty(1, dtype=trade_dt)
+        pos_info_arr = np.empty(1, dtype=trade_dt)
 
         def pre_segment_func_nb(c):
-            pos_record_arr[:] = c.last_pos_record[:]
+            pos_info_arr[:] = c.last_pos_info[:]
             return ()
 
         if test_flexible:
@@ -2104,7 +2104,7 @@ class TestFromOrderFunc:
         assert pf.init_position == 1.0
         assert_records_close(pf.order_records, np.array([(0, 0, 0, 1.0, 1.0, 0.0, 1)], dtype=order_dt))
         assert_records_close(
-            pos_record_arr,
+            pos_info_arr,
             np.array([(0, 0, 1.0, -1, -1, 0.5, 0.0, -1, -1, np.nan, 0.0, 0.0, 0.0, 0, 0, 0)], dtype=trade_dt),
         )
 
