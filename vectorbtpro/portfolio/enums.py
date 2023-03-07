@@ -2648,6 +2648,9 @@ sl_info_dt = np.dtype(
         ("order_type", np.int_),
         ("limit_delta", np.float_),
         ("delta_format", np.int_),
+        ("ladder", np.bool_),
+        ("step", np.int_),
+        ("step_idx", np.int_),
     ],
     align=True,
 )
@@ -2672,6 +2675,9 @@ Attributes:
     order_type: See `OrderType`.
     limit_delta: Delta from the hit price. Only for `StopType.Limit`.
     delta_format: See `DeltaFormat`.
+    ladder: Whether to keep the stop after execution.
+    step: Step in the ladder (i.e., the number of times the stop was executed)
+    step_idx: Step row.
 """
 
 tsl_info_dt = np.dtype(
@@ -2689,6 +2695,9 @@ tsl_info_dt = np.dtype(
         ("order_type", np.int_),
         ("limit_delta", np.float_),
         ("delta_format", np.int_),
+        ("ladder", np.bool_),
+        ("step", np.int_),
+        ("step_idx", np.int_),
     ],
     align=True,
 )
@@ -2716,6 +2725,9 @@ Attributes:
     order_type: See `OrderType`.
     limit_delta: Delta from the hit price. Only for `StopType.Limit`.
     delta_format: See `DeltaFormat`.
+    ladder: Whether to keep the stop after execution.
+    step: Step in the ladder (i.e., the number of times the stop was executed)
+    step_idx: Step row.
 """
 
 tp_info_dt = np.dtype(
@@ -2730,6 +2742,9 @@ tp_info_dt = np.dtype(
         ("order_type", np.int_),
         ("limit_delta", np.float_),
         ("delta_format", np.int_),
+        ("ladder", np.bool_),
+        ("step", np.int_),
+        ("step_idx", np.int_),
     ],
     align=True,
 )
@@ -2754,6 +2769,9 @@ Attributes:
     order_type: See `OrderType`.
     limit_delta: Delta from the hit price. Only for `StopType.Limit`.
     delta_format: See `DeltaFormat`.
+    ladder: Whether to keep the stop after execution.
+    step: Step in the ladder (i.e., the number of times the stop was executed)
+    step_idx: Step row.
 """
 
 time_info_dt = np.dtype(
@@ -2769,6 +2787,9 @@ time_info_dt = np.dtype(
         ("limit_delta", np.float_),
         ("delta_format", np.int_),
         ("time_delta_format", np.int_),
+        ("ladder", np.bool_),
+        ("step", np.int_),
+        ("step_idx", np.int_),
     ],
     align=True,
 )
@@ -2794,4 +2815,7 @@ Attributes:
     limit_delta: Delta from the hit price. Only for `StopType.Limit`.
     delta_format: See `DeltaFormat`. Only for `StopType.Limit`.
     time_delta_format: See `TimeDeltaFormat`.
+    ladder: Whether to keep the stop after execution.
+    step: Step in the ladder (i.e., the number of times the stop was executed)
+    step_idx: Step row.
 """

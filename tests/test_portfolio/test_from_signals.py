@@ -273,7 +273,7 @@ class TestFromSignals:
             for col in range(c.from_col, c.to_col):
                 out[c.i, col] = c.last_pos_info[col]
 
-        pf = from_signals_both(
+        _ = from_signals_both(
             close=pd.concat(
                 (
                     price.rename("a"),
@@ -330,6 +330,33 @@ class TestFromSignals:
                     (0, 2, 100.0, 0, 0, 1.0, 0.0, 1, -1, 3.0, 0.0, -266.66666666666663, -2.666666666666666, 1, 0, 0),
                 ],
             ], dtype=vbt.pf_enums.trade_dt),
+        )
+
+    def test_ladder(self):
+        @njit
+        def adjust_func_nb(c, tp_stops, tp_sizes):
+            tp_info = c.last_tp_info[c.col]
+            if tp_info["step_idx"] == c.i - 1:
+                tp_info["ladder"] = True
+                tp_info["stop"] = tp_stops[tp_info["step"]]
+                tp_info["exit_size"] = tp_sizes[tp_info["step"]]
+                tp_info["exit_size_type"] = vbt.pf_enums.SizeType.Percent
+
+        assert_records_close(
+            from_signals_both(
+                adjust_func_nb=adjust_func_nb,
+                adjust_args=(np.array([1.0, 2.0]), np.array([0.5, 1.0])),
+                use_stops=True
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 0, 100.0, 1.0, 0.0, 0, 0, -1),
+                    (1, 0, 0, 1, 1, 50.0, 2.0, 0.0, 1, 0, 3),
+                    (2, 0, 0, 2, 2, 50.0, 3.0, 0.0, 1, 0, 3),
+                    (3, 0, 3, 3, 3, 62.5, 4.0, 0.0, 1, 0, -1),
+                ],
+                dtype=fs_order_dt,
+            ),
         )
 
     def test_amount(self):

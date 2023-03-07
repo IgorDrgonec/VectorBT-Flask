@@ -1060,6 +1060,9 @@ def simulate_from_signals_nb(
         last_sl_info["order_type"][:] = -1
         last_sl_info["limit_delta"][:] = np.nan
         last_sl_info["delta_format"][:] = -1
+        last_sl_info["ladder"][:] = False
+        last_sl_info["step"][:] = -1
+        last_sl_info["step_idx"][:] = -1
 
         last_tsl_info = np.empty(target_shape[1], dtype=tsl_info_dt)
         last_tsl_info["init_idx"][:] = -1
@@ -1075,6 +1078,9 @@ def simulate_from_signals_nb(
         last_tsl_info["order_type"][:] = -1
         last_tsl_info["limit_delta"][:] = np.nan
         last_tsl_info["delta_format"][:] = -1
+        last_tsl_info["ladder"][:] = False
+        last_tsl_info["step"][:] = -1
+        last_tsl_info["step_idx"][:] = -1
 
         last_tp_info = np.empty(target_shape[1], dtype=tp_info_dt)
         last_tp_info["init_idx"][:] = -1
@@ -1087,6 +1093,9 @@ def simulate_from_signals_nb(
         last_tp_info["order_type"][:] = -1
         last_tp_info["limit_delta"][:] = np.nan
         last_tp_info["delta_format"][:] = -1
+        last_tp_info["ladder"][:] = False
+        last_tp_info["step"][:] = -1
+        last_tp_info["step_idx"][:] = -1
 
         last_time_info = np.empty(target_shape[1], dtype=time_info_dt)
         last_time_info["init_idx"][:] = -1
@@ -1100,6 +1109,9 @@ def simulate_from_signals_nb(
         last_time_info["limit_delta"][:] = np.nan
         last_time_info["delta_format"][:] = -1
         last_time_info["time_delta_format"][:] = -1
+        last_time_info["ladder"][:] = False
+        last_time_info["step"][:] = -1
+        last_time_info["step_idx"][:] = -1
     else:
         last_sl_info = np.empty(0, dtype=sl_info_dt)
         last_tsl_info = np.empty(0, dtype=tsl_info_dt)
@@ -1358,6 +1370,7 @@ def simulate_from_signals_nb(
                             _stop_order_type = last_sl_info["order_type"][col]
                             _limit_delta = last_sl_info["limit_delta"][col]
                             _delta_format = last_sl_info["delta_format"][col]
+                            _ladder = last_sl_info["delta_format"][col]
 
                     # Check TSL and TTP
                     if not stop_hit and not np.isnan(last_tsl_info["stop"][col]):
@@ -1457,6 +1470,7 @@ def simulate_from_signals_nb(
                             _stop_order_type = last_tsl_info["order_type"][col]
                             _limit_delta = last_tsl_info["limit_delta"][col]
                             _delta_format = last_tsl_info["delta_format"][col]
+                            _ladder = last_tsl_info["delta_format"][col]
 
                     # Check TP
                     if not stop_hit and not np.isnan(last_tp_info["stop"][col]):
@@ -1482,6 +1496,7 @@ def simulate_from_signals_nb(
                             _stop_order_type = last_tp_info["order_type"][col]
                             _limit_delta = last_tp_info["limit_delta"][col]
                             _delta_format = last_tp_info["delta_format"][col]
+                            _ladder = last_tp_info["delta_format"][col]
 
                     # Check time stop
                     if not stop_hit and (last_time_info["td_stop"][col] != -1 or last_time_info["dt_stop"][col] != -1):
@@ -1511,6 +1526,7 @@ def simulate_from_signals_nb(
                             _stop_order_type = last_time_info["order_type"][col]
                             _limit_delta = last_time_info["limit_delta"][col]
                             _delta_format = last_time_info["delta_format"][col]
+                            _ladder = last_time_info["delta_format"][col]
 
                     if stop_hit:
                         # Stop price was hit
@@ -1758,7 +1774,7 @@ def simulate_from_signals_nb(
                         exec_limit_bar_zone = BarZone.Open
                     elif exec_stop_set_on_open:
                         keep_limit = False
-                        keep_stop = False
+                        keep_stop = _ladder
                         execute_stop = True
                         if exec_stop_set_on_close:
                             exec_stop_bar_zone = BarZone.Close
@@ -1797,7 +1813,7 @@ def simulate_from_signals_nb(
                             exec_limit_bar_zone = BarZone.Middle
                         elif exec_stop_set and not exec_stop_set_on_open and not exec_stop_set_on_close and keep_stop:
                             keep_limit = False
-                            keep_stop = False
+                            keep_stop = _ladder
                             execute_stop = True
                             exec_stop_bar_zone = BarZone.Middle
                         elif any_user_signal and not user_on_open and not user_on_close:
@@ -1828,7 +1844,7 @@ def simulate_from_signals_nb(
                             # Check whether the main signal comes on close
                             if exec_stop_set_on_close and keep_stop:
                                 keep_limit = False
-                                keep_stop = False
+                                keep_stop = _ladder
                                 execute_stop = True
                                 exec_stop_bar_zone = BarZone.Close
                             elif any_user_signal and user_on_close:
@@ -1925,7 +1941,25 @@ def simulate_from_signals_nb(
                             main_info["direction"][col] = exec_stop_direction
                             main_info["type"][col] = exec_stop_type
                             main_info["stop_type"][col] = exec_stop_stop_type
-                    if execute_stop or (any_stop_signal and not keep_stop):
+                        if keep_stop:
+                            if _stop_type == StopType.SL:
+                                last_sl_info["stop"][col] = np.nan
+                                last_sl_info["step"][col] = last_sl_info["step"][col] + 1
+                                last_sl_info["step_idx"][col] = i
+                            elif _stop_type == StopType.TSL or _stop_type == StopType.TTP:
+                                last_tsl_info["stop"][col] = np.nan
+                                last_tsl_info["step"][col] = last_tsl_info["step"][col] + 1
+                                last_tsl_info["step_idx"][col] = i
+                            elif _stop_type == StopType.TP:
+                                last_tp_info["stop"][col] = np.nan
+                                last_tp_info["step"][col] = last_tp_info["step"][col] + 1
+                                last_tp_info["step_idx"][col] = i
+                            else:
+                                last_time_info["td_stop"][col] = -1
+                                last_time_info["dt_stop"][col] = -1
+                                last_time_info["step"][col] = last_time_info["step"][col] + 1
+                                last_time_info["step_idx"][col] = i
+                    if any_stop_signal and not keep_stop:
                         # Clear the pending info
                         any_stop_signal = False
 
@@ -1939,6 +1973,9 @@ def simulate_from_signals_nb(
                         last_sl_info["order_type"][col] = -1
                         last_sl_info["limit_delta"][col] = np.nan
                         last_sl_info["delta_format"][col] = -1
+                        last_sl_info["ladder"][col] = False
+                        last_sl_info["step"][col] = -1
+                        last_sl_info["step_idx"][col] = -1
 
                         last_tsl_info["init_idx"][col] = -1
                         last_tsl_info["init_price"][col] = np.nan
@@ -1953,6 +1990,9 @@ def simulate_from_signals_nb(
                         last_tsl_info["order_type"][col] = -1
                         last_tsl_info["limit_delta"][col] = np.nan
                         last_tsl_info["delta_format"][col] = -1
+                        last_tsl_info["ladder"][col] = False
+                        last_tsl_info["step"][col] = -1
+                        last_tsl_info["step_idx"][col] = -1
 
                         last_tp_info["init_idx"][col] = -1
                         last_tp_info["init_price"][col] = np.nan
@@ -1964,6 +2004,9 @@ def simulate_from_signals_nb(
                         last_tp_info["order_type"][col] = -1
                         last_tp_info["limit_delta"][col] = np.nan
                         last_tp_info["delta_format"][col] = -1
+                        last_tp_info["ladder"][col] = False
+                        last_tp_info["step"][col] = -1
+                        last_tp_info["step_idx"][col] = -1
 
                         last_time_info["init_idx"][col] = -1
                         last_time_info["td_stop"][col] = -1
@@ -1976,6 +2019,9 @@ def simulate_from_signals_nb(
                         last_time_info["limit_delta"][col] = np.nan
                         last_time_info["delta_format"][col] = -1
                         last_time_info["time_delta_format"][col] = -1
+                        last_time_info["ladder"][col] = False
+                        last_time_info["step"][col] = -1
+                        last_time_info["step_idx"][col] = -1
 
                     # Process the user signal
                     if execute_user:
@@ -2198,6 +2244,9 @@ def simulate_from_signals_nb(
                             last_sl_info["order_type"][col] = -1
                             last_sl_info["limit_delta"][col] = np.nan
                             last_sl_info["delta_format"][col] = -1
+                            last_sl_info["ladder"][col] = False
+                            last_sl_info["step"][col] = -1
+                            last_sl_info["step_idx"][col] = -1
 
                             last_tsl_info["init_idx"][col] = -1
                             last_tsl_info["init_price"][col] = np.nan
@@ -2212,6 +2261,9 @@ def simulate_from_signals_nb(
                             last_tsl_info["order_type"][col] = -1
                             last_tsl_info["limit_delta"][col] = np.nan
                             last_tsl_info["delta_format"][col] = -1
+                            last_tsl_info["ladder"][col] = False
+                            last_tsl_info["step"][col] = -1
+                            last_tsl_info["step_idx"][col] = -1
 
                             last_tp_info["init_idx"][col] = -1
                             last_tp_info["init_price"][col] = np.nan
@@ -2223,6 +2275,9 @@ def simulate_from_signals_nb(
                             last_tp_info["order_type"][col] = -1
                             last_tp_info["limit_delta"][col] = np.nan
                             last_tp_info["delta_format"][col] = -1
+                            last_tp_info["ladder"][col] = False
+                            last_tp_info["step"][col] = -1
+                            last_tp_info["step_idx"][col] = -1
 
                             last_time_info["init_idx"][col] = -1
                             last_time_info["td_stop"][col] = -1
@@ -2235,6 +2290,9 @@ def simulate_from_signals_nb(
                             last_time_info["limit_delta"][col] = np.nan
                             last_time_info["delta_format"][col] = -1
                             last_time_info["time_delta_format"][col] = -1
+                            last_time_info["ladder"][col] = False
+                            last_time_info["step"][col] = -1
+                            last_time_info["step_idx"][col] = -1
 
                         if order_result.status == OrderStatus.Filled and position_now != 0:
                             # Order filled and in position -> possibly set stops
@@ -2291,6 +2349,9 @@ def simulate_from_signals_nb(
                                 last_sl_info["order_type"][col] = _stop_order_type
                                 last_sl_info["limit_delta"][col] = _stop_limit_delta
                                 last_sl_info["delta_format"][col] = _delta_format
+                                last_sl_info["ladder"][col] = False
+                                last_sl_info["step"][col] = 0
+                                last_sl_info["step_idx"][col] = i
 
                                 tsl_updated = True
                                 last_tsl_info["init_idx"][col] = i
@@ -2306,6 +2367,9 @@ def simulate_from_signals_nb(
                                 last_tsl_info["order_type"][col] = _stop_order_type
                                 last_tsl_info["limit_delta"][col] = _stop_limit_delta
                                 last_tsl_info["delta_format"][col] = _delta_format
+                                last_tsl_info["ladder"][col] = False
+                                last_tsl_info["step"][col] = 0
+                                last_tsl_info["step_idx"][col] = i
 
                                 last_tp_info["init_idx"][col] = i
                                 last_tp_info["init_price"][col] = new_init_price
@@ -2317,6 +2381,9 @@ def simulate_from_signals_nb(
                                 last_tp_info["order_type"][col] = _stop_order_type
                                 last_tp_info["limit_delta"][col] = _stop_limit_delta
                                 last_tp_info["delta_format"][col] = _delta_format
+                                last_tp_info["ladder"][col] = False
+                                last_tp_info["step"][col] = 0
+                                last_tp_info["step_idx"][col] = i
 
                                 last_time_info["init_idx"][col] = i
                                 last_time_info["td_stop"][col] = _td_stop
@@ -2329,6 +2396,9 @@ def simulate_from_signals_nb(
                                 last_time_info["limit_delta"][col] = _stop_limit_delta
                                 last_time_info["delta_format"][col] = _delta_format
                                 last_time_info["time_delta_format"][col] = _time_delta_format
+                                last_time_info["ladder"][col] = False
+                                last_time_info["step"][col] = 0
+                                last_time_info["step_idx"][col] = i
 
                             elif abs(position_now) > abs(exec_state.position):
                                 # Position increased -> keep/override stops
@@ -2344,6 +2414,9 @@ def simulate_from_signals_nb(
                                     last_sl_info["order_type"][col] = _stop_order_type
                                     last_sl_info["limit_delta"][col] = _stop_limit_delta
                                     last_sl_info["delta_format"][col] = _delta_format
+                                    last_sl_info["ladder"][col] = False
+                                    last_sl_info["step"][col] = 0
+                                    last_sl_info["step_idx"][col] = i
                                 if should_update_stop_nb(new_stop=_tsl_stop, upon_stop_update=_upon_stop_update):
                                     tsl_updated = True
                                     last_tsl_info["init_idx"][col] = i
@@ -2359,6 +2432,9 @@ def simulate_from_signals_nb(
                                     last_tsl_info["order_type"][col] = _stop_order_type
                                     last_tsl_info["limit_delta"][col] = _stop_limit_delta
                                     last_tsl_info["delta_format"][col] = _delta_format
+                                    last_tsl_info["ladder"][col] = False
+                                    last_tsl_info["step"][col] = 0
+                                    last_tsl_info["step_idx"][col] = i
                                 if should_update_stop_nb(new_stop=_tp_stop, upon_stop_update=_upon_stop_update):
                                     last_tp_info["init_idx"][col] = i
                                     last_tp_info["init_price"][col] = new_init_price
@@ -2370,6 +2446,9 @@ def simulate_from_signals_nb(
                                     last_tp_info["order_type"][col] = _stop_order_type
                                     last_tp_info["limit_delta"][col] = _stop_limit_delta
                                     last_tp_info["delta_format"][col] = _delta_format
+                                    last_tp_info["ladder"][col] = False
+                                    last_tp_info["step"][col] = 0
+                                    last_tp_info["step_idx"][col] = i
                                 if should_update_time_stop_nb(
                                     new_td_stop=_td_stop,
                                     new_dt_stop=_dt_stop,
@@ -2386,6 +2465,9 @@ def simulate_from_signals_nb(
                                     last_time_info["limit_delta"][col] = _stop_limit_delta
                                     last_time_info["delta_format"][col] = _delta_format
                                     last_time_info["time_delta_format"][col] = _time_delta_format
+                                    last_time_info["ladder"][col] = False
+                                    last_time_info["step"][col] = 0
+                                    last_time_info["step_idx"][col] = i
 
                             if tsl_updated:
                                 # Update highest/lowest price
@@ -3059,6 +3141,9 @@ def simulate_from_signal_func_nb(
         last_sl_info["order_type"][:] = -1
         last_sl_info["limit_delta"][:] = np.nan
         last_sl_info["delta_format"][:] = -1
+        last_sl_info["ladder"][:] = False
+        last_sl_info["step"][:] = -1
+        last_sl_info["step_idx"][:] = -1
 
         last_tsl_info = np.empty(target_shape[1], dtype=tsl_info_dt)
         last_tsl_info["init_idx"][:] = -1
@@ -3074,6 +3159,9 @@ def simulate_from_signal_func_nb(
         last_tsl_info["order_type"][:] = -1
         last_tsl_info["limit_delta"][:] = np.nan
         last_tsl_info["delta_format"][:] = -1
+        last_tsl_info["ladder"][:] = False
+        last_tsl_info["step"][:] = -1
+        last_tsl_info["step_idx"][:] = -1
 
         last_tp_info = np.empty(target_shape[1], dtype=tp_info_dt)
         last_tp_info["init_idx"][:] = -1
@@ -3086,6 +3174,9 @@ def simulate_from_signal_func_nb(
         last_tp_info["order_type"][:] = -1
         last_tp_info["limit_delta"][:] = np.nan
         last_tp_info["delta_format"][:] = -1
+        last_tp_info["ladder"][:] = False
+        last_tp_info["step"][:] = -1
+        last_tp_info["step_idx"][:] = -1
 
         last_time_info = np.empty(target_shape[1], dtype=time_info_dt)
         last_time_info["init_idx"][:] = -1
@@ -3099,6 +3190,9 @@ def simulate_from_signal_func_nb(
         last_time_info["limit_delta"][:] = np.nan
         last_time_info["delta_format"][:] = -1
         last_time_info["time_delta_format"][:] = -1
+        last_time_info["ladder"][:] = False
+        last_time_info["step"][:] = -1
+        last_time_info["step_idx"][:] = -1
     else:
         last_sl_info = np.empty(0, dtype=sl_info_dt)
         last_tsl_info = np.empty(0, dtype=tsl_info_dt)
@@ -3481,6 +3575,7 @@ def simulate_from_signal_func_nb(
                             _stop_order_type = last_sl_info["order_type"][col]
                             _limit_delta = last_sl_info["limit_delta"][col]
                             _delta_format = last_sl_info["delta_format"][col]
+                            _ladder = last_sl_info["delta_format"][col]
 
                     # Check TSL and TTP
                     if not stop_hit and not np.isnan(last_tsl_info["stop"][col]):
@@ -3580,6 +3675,7 @@ def simulate_from_signal_func_nb(
                             _stop_order_type = last_tsl_info["order_type"][col]
                             _limit_delta = last_tsl_info["limit_delta"][col]
                             _delta_format = last_tsl_info["delta_format"][col]
+                            _ladder = last_tsl_info["delta_format"][col]
 
                     # Check TP
                     if not stop_hit and not np.isnan(last_tp_info["stop"][col]):
@@ -3605,6 +3701,7 @@ def simulate_from_signal_func_nb(
                             _stop_order_type = last_tp_info["order_type"][col]
                             _limit_delta = last_tp_info["limit_delta"][col]
                             _delta_format = last_tp_info["delta_format"][col]
+                            _ladder = last_tp_info["delta_format"][col]
 
                     # Check time stop
                     if not stop_hit and (last_time_info["td_stop"][col] != -1 or last_time_info["dt_stop"][col] != -1):
@@ -3634,6 +3731,7 @@ def simulate_from_signal_func_nb(
                             _stop_order_type = last_time_info["order_type"][col]
                             _limit_delta = last_time_info["limit_delta"][col]
                             _delta_format = last_time_info["delta_format"][col]
+                            _ladder = last_time_info["delta_format"][col]
 
                     if stop_hit:
                         # Stop price was hit
@@ -3881,7 +3979,7 @@ def simulate_from_signal_func_nb(
                         exec_limit_bar_zone = BarZone.Open
                     elif exec_stop_set_on_open:
                         keep_limit = False
-                        keep_stop = False
+                        keep_stop = _ladder
                         execute_stop = True
                         if exec_stop_set_on_close:
                             exec_stop_bar_zone = BarZone.Close
@@ -3920,7 +4018,7 @@ def simulate_from_signal_func_nb(
                             exec_limit_bar_zone = BarZone.Middle
                         elif exec_stop_set and not exec_stop_set_on_open and not exec_stop_set_on_close and keep_stop:
                             keep_limit = False
-                            keep_stop = False
+                            keep_stop = _ladder
                             execute_stop = True
                             exec_stop_bar_zone = BarZone.Middle
                         elif any_user_signal and not user_on_open and not user_on_close:
@@ -3951,7 +4049,7 @@ def simulate_from_signal_func_nb(
                             # Check whether the main signal comes on close
                             if exec_stop_set_on_close and keep_stop:
                                 keep_limit = False
-                                keep_stop = False
+                                keep_stop = _ladder
                                 execute_stop = True
                                 exec_stop_bar_zone = BarZone.Close
                             elif any_user_signal and user_on_close:
@@ -4048,7 +4146,25 @@ def simulate_from_signal_func_nb(
                             main_info["direction"][col] = exec_stop_direction
                             main_info["type"][col] = exec_stop_type
                             main_info["stop_type"][col] = exec_stop_stop_type
-                    if execute_stop or (any_stop_signal and not keep_stop):
+                        if keep_stop:
+                            if _stop_type == StopType.SL:
+                                last_sl_info["stop"][col] = np.nan
+                                last_sl_info["step"][col] = last_sl_info["step"][col] + 1
+                                last_sl_info["step_idx"][col] = i
+                            elif _stop_type == StopType.TSL or _stop_type == StopType.TTP:
+                                last_tsl_info["stop"][col] = np.nan
+                                last_tsl_info["step"][col] = last_tsl_info["step"][col] + 1
+                                last_tsl_info["step_idx"][col] = i
+                            elif _stop_type == StopType.TP:
+                                last_tp_info["stop"][col] = np.nan
+                                last_tp_info["step"][col] = last_tp_info["step"][col] + 1
+                                last_tp_info["step_idx"][col] = i
+                            else:
+                                last_time_info["td_stop"][col] = -1
+                                last_time_info["dt_stop"][col] = -1
+                                last_time_info["step"][col] = last_time_info["step"][col] + 1
+                                last_time_info["step_idx"][col] = i
+                    if any_stop_signal and not keep_stop:
                         # Clear the pending info
                         any_stop_signal = False
 
@@ -4062,6 +4178,9 @@ def simulate_from_signal_func_nb(
                         last_sl_info["order_type"][col] = -1
                         last_sl_info["limit_delta"][col] = np.nan
                         last_sl_info["delta_format"][col] = -1
+                        last_sl_info["ladder"][col] = False
+                        last_sl_info["step"][col] = -1
+                        last_sl_info["step_idx"][col] = -1
 
                         last_tsl_info["init_idx"][col] = -1
                         last_tsl_info["init_price"][col] = np.nan
@@ -4076,6 +4195,9 @@ def simulate_from_signal_func_nb(
                         last_tsl_info["order_type"][col] = -1
                         last_tsl_info["limit_delta"][col] = np.nan
                         last_tsl_info["delta_format"][col] = -1
+                        last_tsl_info["ladder"][col] = False
+                        last_tsl_info["step"][col] = -1
+                        last_tsl_info["step_idx"][col] = -1
 
                         last_tp_info["init_idx"][col] = -1
                         last_tp_info["init_price"][col] = np.nan
@@ -4087,6 +4209,9 @@ def simulate_from_signal_func_nb(
                         last_tp_info["order_type"][col] = -1
                         last_tp_info["limit_delta"][col] = np.nan
                         last_tp_info["delta_format"][col] = -1
+                        last_tp_info["ladder"][col] = False
+                        last_tp_info["step"][col] = -1
+                        last_tp_info["step_idx"][col] = -1
 
                         last_time_info["init_idx"][col] = -1
                         last_time_info["td_stop"][col] = -1
@@ -4099,6 +4224,9 @@ def simulate_from_signal_func_nb(
                         last_time_info["limit_delta"][col] = np.nan
                         last_time_info["delta_format"][col] = -1
                         last_time_info["time_delta_format"][col] = -1
+                        last_time_info["ladder"][col] = False
+                        last_time_info["step"][col] = -1
+                        last_time_info["step_idx"][col] = -1
 
                     # Process the user signal
                     if execute_user:
@@ -4338,6 +4466,9 @@ def simulate_from_signal_func_nb(
                             last_sl_info["order_type"][col] = -1
                             last_sl_info["limit_delta"][col] = np.nan
                             last_sl_info["delta_format"][col] = -1
+                            last_sl_info["ladder"][col] = False
+                            last_sl_info["step"][col] = -1
+                            last_sl_info["step_idx"][col] = -1
 
                             last_tsl_info["init_idx"][col] = -1
                             last_tsl_info["init_price"][col] = np.nan
@@ -4352,6 +4483,9 @@ def simulate_from_signal_func_nb(
                             last_tsl_info["order_type"][col] = -1
                             last_tsl_info["limit_delta"][col] = np.nan
                             last_tsl_info["delta_format"][col] = -1
+                            last_tsl_info["ladder"][col] = False
+                            last_tsl_info["step"][col] = -1
+                            last_tsl_info["step_idx"][col] = -1
 
                             last_tp_info["init_idx"][col] = -1
                             last_tp_info["init_price"][col] = np.nan
@@ -4363,6 +4497,9 @@ def simulate_from_signal_func_nb(
                             last_tp_info["order_type"][col] = -1
                             last_tp_info["limit_delta"][col] = np.nan
                             last_tp_info["delta_format"][col] = -1
+                            last_tp_info["ladder"][col] = False
+                            last_tp_info["step"][col] = -1
+                            last_tp_info["step_idx"][col] = -1
 
                             last_time_info["init_idx"][col] = -1
                             last_time_info["td_stop"][col] = -1
@@ -4375,6 +4512,9 @@ def simulate_from_signal_func_nb(
                             last_time_info["limit_delta"][col] = np.nan
                             last_time_info["delta_format"][col] = -1
                             last_time_info["time_delta_format"][col] = -1
+                            last_time_info["ladder"][col] = False
+                            last_time_info["step"][col] = -1
+                            last_time_info["step_idx"][col] = -1
 
                         if order_result.status == OrderStatus.Filled and position_now != 0:
                             # Order filled and in position -> possibly set stops
@@ -4431,6 +4571,9 @@ def simulate_from_signal_func_nb(
                                 last_sl_info["order_type"][col] = _stop_order_type
                                 last_sl_info["limit_delta"][col] = _stop_limit_delta
                                 last_sl_info["delta_format"][col] = _delta_format
+                                last_sl_info["ladder"][col] = False
+                                last_sl_info["step"][col] = 0
+                                last_sl_info["step_idx"][col] = i
 
                                 tsl_updated = True
                                 last_tsl_info["init_idx"][col] = i
@@ -4446,6 +4589,9 @@ def simulate_from_signal_func_nb(
                                 last_tsl_info["order_type"][col] = _stop_order_type
                                 last_tsl_info["limit_delta"][col] = _stop_limit_delta
                                 last_tsl_info["delta_format"][col] = _delta_format
+                                last_tsl_info["ladder"][col] = False
+                                last_tsl_info["step"][col] = 0
+                                last_tsl_info["step_idx"][col] = i
 
                                 last_tp_info["init_idx"][col] = i
                                 last_tp_info["init_price"][col] = new_init_price
@@ -4457,6 +4603,9 @@ def simulate_from_signal_func_nb(
                                 last_tp_info["order_type"][col] = _stop_order_type
                                 last_tp_info["limit_delta"][col] = _stop_limit_delta
                                 last_tp_info["delta_format"][col] = _delta_format
+                                last_tp_info["ladder"][col] = False
+                                last_tp_info["step"][col] = 0
+                                last_tp_info["step_idx"][col] = i
 
                                 last_time_info["init_idx"][col] = i
                                 last_time_info["td_stop"][col] = _td_stop
@@ -4469,6 +4618,9 @@ def simulate_from_signal_func_nb(
                                 last_time_info["limit_delta"][col] = _stop_limit_delta
                                 last_time_info["delta_format"][col] = _delta_format
                                 last_time_info["time_delta_format"][col] = _time_delta_format
+                                last_time_info["ladder"][col] = False
+                                last_time_info["step"][col] = 0
+                                last_time_info["step_idx"][col] = i
 
                             elif abs(position_now) > abs(exec_state.position):
                                 # Position increased -> keep/override stops
@@ -4484,6 +4636,9 @@ def simulate_from_signal_func_nb(
                                     last_sl_info["order_type"][col] = _stop_order_type
                                     last_sl_info["limit_delta"][col] = _stop_limit_delta
                                     last_sl_info["delta_format"][col] = _delta_format
+                                    last_sl_info["ladder"][col] = False
+                                    last_sl_info["step"][col] = 0
+                                    last_sl_info["step_idx"][col] = i
                                 if should_update_stop_nb(new_stop=_tsl_stop, upon_stop_update=_upon_stop_update):
                                     tsl_updated = True
                                     last_tsl_info["init_idx"][col] = i
@@ -4499,6 +4654,9 @@ def simulate_from_signal_func_nb(
                                     last_tsl_info["order_type"][col] = _stop_order_type
                                     last_tsl_info["limit_delta"][col] = _stop_limit_delta
                                     last_tsl_info["delta_format"][col] = _delta_format
+                                    last_tsl_info["ladder"][col] = False
+                                    last_tsl_info["step"][col] = 0
+                                    last_tsl_info["step_idx"][col] = i
                                 if should_update_stop_nb(new_stop=_tp_stop, upon_stop_update=_upon_stop_update):
                                     last_tp_info["init_idx"][col] = i
                                     last_tp_info["init_price"][col] = new_init_price
@@ -4510,6 +4668,9 @@ def simulate_from_signal_func_nb(
                                     last_tp_info["order_type"][col] = _stop_order_type
                                     last_tp_info["limit_delta"][col] = _stop_limit_delta
                                     last_tp_info["delta_format"][col] = _delta_format
+                                    last_tp_info["ladder"][col] = False
+                                    last_tp_info["step"][col] = 0
+                                    last_tp_info["step_idx"][col] = i
                                 if should_update_time_stop_nb(
                                         new_td_stop=_td_stop,
                                         new_dt_stop=_dt_stop,
@@ -4526,6 +4687,9 @@ def simulate_from_signal_func_nb(
                                     last_time_info["limit_delta"][col] = _stop_limit_delta
                                     last_time_info["delta_format"][col] = _delta_format
                                     last_time_info["time_delta_format"][col] = _time_delta_format
+                                    last_time_info["ladder"][col] = False
+                                    last_time_info["step"][col] = 0
+                                    last_time_info["step_idx"][col] = i
 
                             if tsl_updated:
                                 # Update highest/lowest price
