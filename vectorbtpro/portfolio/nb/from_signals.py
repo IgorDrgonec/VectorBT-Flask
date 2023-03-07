@@ -710,14 +710,20 @@ def resolve_dyn_stop_entry_price_nb(val_price: float, price: float, stop_entry_p
 
 @register_jitted(cache=True)
 def is_limit_active_nb(limit_info: tp.Record) -> bool:
-    """Return whether the limit information is active."""
+    """Return whether a limit order is active."""
     return limit_info["init_idx"] != -1
 
 
 @register_jitted(cache=True)
 def is_stop_active_nb(stop_info: tp.Record) -> bool:
-    """Return whether the stop information is active."""
+    """Return whether a stop order is active."""
     return not np.isnan(stop_info["stop"])
+
+
+@register_jitted(cache=True)
+def is_time_stop_active_nb(stop_info: tp.Record) -> bool:
+    """Return whether a time stop order is active."""
+    return stop_info["td_stop"] != -1 or stop_info["dt_stop"] != -1
 
 
 @register_chunkable(
@@ -1048,6 +1054,8 @@ def simulate_from_signals_nb(
         last_sl_info["init_price"][:] = np.nan
         last_sl_info["stop"][:] = np.nan
         last_sl_info["exit_price"][:] = -1
+        last_sl_info["exit_size"][:] = np.nan
+        last_sl_info["exit_size_type"][:] = -1
         last_sl_info["exit_type"][:] = -1
         last_sl_info["order_type"][:] = -1
         last_sl_info["limit_delta"][:] = np.nan
@@ -1061,6 +1069,8 @@ def simulate_from_signals_nb(
         last_tsl_info["stop"][:] = np.nan
         last_tsl_info["th"][:] = np.nan
         last_tsl_info["exit_price"][:] = -1
+        last_tsl_info["exit_size"][:] = np.nan
+        last_tsl_info["exit_size_type"][:] = -1
         last_tsl_info["exit_type"][:] = -1
         last_tsl_info["order_type"][:] = -1
         last_tsl_info["limit_delta"][:] = np.nan
@@ -1071,6 +1081,8 @@ def simulate_from_signals_nb(
         last_tp_info["init_price"][:] = np.nan
         last_tp_info["stop"][:] = np.nan
         last_tp_info["exit_price"][:] = -1
+        last_tp_info["exit_size"][:] = np.nan
+        last_tp_info["exit_size_type"][:] = -1
         last_tp_info["exit_type"][:] = -1
         last_tp_info["order_type"][:] = -1
         last_tp_info["limit_delta"][:] = np.nan
@@ -1081,6 +1093,8 @@ def simulate_from_signals_nb(
         last_time_info["td_stop"][:] = -1
         last_time_info["dt_stop"][:] = -1
         last_time_info["exit_price"][:] = -1
+        last_time_info["exit_size"][:] = np.nan
+        last_time_info["exit_size_type"][:] = -1
         last_time_info["exit_type"][:] = -1
         last_time_info["order_type"][:] = -1
         last_time_info["limit_delta"][:] = np.nan
@@ -1338,6 +1352,8 @@ def simulate_from_signals_nb(
                             _stop_type = StopType.SL
                             _init_i = last_sl_info["init_idx"][col]
                             _stop_exit_price = last_sl_info["exit_price"][col]
+                            _stop_exit_size = last_sl_info["exit_size"][col]
+                            _stop_exit_size_type = last_sl_info["exit_size_type"][col]
                             _stop_exit_type = last_sl_info["exit_type"][col]
                             _stop_order_type = last_sl_info["order_type"][col]
                             _limit_delta = last_sl_info["limit_delta"][col]
@@ -1435,6 +1451,8 @@ def simulate_from_signals_nb(
                                 _stop_type = StopType.TTP
                             _init_i = last_tsl_info["init_idx"][col]
                             _stop_exit_price = last_tsl_info["exit_price"][col]
+                            _stop_exit_size = last_tsl_info["exit_size"][col]
+                            _stop_exit_size_type = last_tsl_info["exit_size_type"][col]
                             _stop_exit_type = last_tsl_info["exit_type"][col]
                             _stop_order_type = last_tsl_info["order_type"][col]
                             _limit_delta = last_tsl_info["limit_delta"][col]
@@ -1458,6 +1476,8 @@ def simulate_from_signals_nb(
                             _stop_type = StopType.TP
                             _init_i = last_tp_info["init_idx"][col]
                             _stop_exit_price = last_tp_info["exit_price"][col]
+                            _stop_exit_size = last_tp_info["exit_size"][col]
+                            _stop_exit_size_type = last_tp_info["exit_size_type"][col]
                             _stop_exit_type = last_tp_info["exit_type"][col]
                             _stop_order_type = last_tp_info["order_type"][col]
                             _limit_delta = last_tp_info["limit_delta"][col]
@@ -1485,6 +1505,8 @@ def simulate_from_signals_nb(
                             _stop_type = StopType.T
                             _init_i = last_time_info["init_idx"][col]
                             _stop_exit_price = last_time_info["exit_price"][col]
+                            _stop_exit_size = last_time_info["exit_size"][col]
+                            _stop_exit_size_type = last_time_info["exit_size_type"][col]
                             _stop_exit_type = last_time_info["exit_type"][col]
                             _stop_order_type = last_time_info["order_type"][col]
                             _limit_delta = last_time_info["limit_delta"][col]
@@ -1494,6 +1516,16 @@ def simulate_from_signals_nb(
                         # Stop price was hit
                         # Resolve the final stop signal
                         _accumulate = flex_select_nb(accumulate_, i, col)
+                        _size = flex_select_nb(size_, i, col)
+                        _size_type = flex_select_nb(size_type_, i, col)
+                        if not np.isnan(_stop_exit_size):
+                            _accumulate = True
+                            if _stop_exit_type == StopExitType.Close:
+                                _stop_exit_type = StopExitType.CloseReduce
+                            _size = _stop_exit_size
+                        if _stop_exit_size_type != -1:
+                            _size_type = _stop_exit_size_type
+
                         (
                             stop_is_long_entry,
                             stop_is_long_exit,
@@ -1522,8 +1554,8 @@ def simulate_from_signals_nb(
                             is_long_exit=stop_is_long_exit,
                             is_short_entry=stop_is_short_entry,
                             is_short_exit=stop_is_short_exit,
-                            size=flex_select_nb(size_, i, col),
-                            size_type=flex_select_nb(size_type_, i, col),
+                            size=_size,
+                            size_type=_size_type,
                             accumulate=_accumulate,
                         )
 
@@ -1901,6 +1933,8 @@ def simulate_from_signals_nb(
                         last_sl_info["init_price"][col] = np.nan
                         last_sl_info["stop"][col] = np.nan
                         last_sl_info["exit_price"][col] = -1
+                        last_sl_info["exit_size"][col] = np.nan
+                        last_sl_info["exit_size_type"][col] = -1
                         last_sl_info["exit_type"][col] = -1
                         last_sl_info["order_type"][col] = -1
                         last_sl_info["limit_delta"][col] = np.nan
@@ -1913,6 +1947,8 @@ def simulate_from_signals_nb(
                         last_tsl_info["stop"][col] = np.nan
                         last_tsl_info["th"][col] = np.nan
                         last_tsl_info["exit_price"][col] = -1
+                        last_tsl_info["exit_size"][col] = np.nan
+                        last_tsl_info["exit_size_type"][col] = -1
                         last_tsl_info["exit_type"][col] = -1
                         last_tsl_info["order_type"][col] = -1
                         last_tsl_info["limit_delta"][col] = np.nan
@@ -1922,6 +1958,8 @@ def simulate_from_signals_nb(
                         last_tp_info["init_price"][col] = np.nan
                         last_tp_info["stop"][col] = np.nan
                         last_tp_info["exit_price"][col] = -1
+                        last_tp_info["exit_size"][col] = np.nan
+                        last_tp_info["exit_size_type"][col] = -1
                         last_tp_info["exit_type"][col] = -1
                         last_tp_info["order_type"][col] = -1
                         last_tp_info["limit_delta"][col] = np.nan
@@ -1931,6 +1969,8 @@ def simulate_from_signals_nb(
                         last_time_info["td_stop"][col] = -1
                         last_time_info["dt_stop"][col] = -1
                         last_time_info["exit_price"][col] = -1
+                        last_time_info["exit_size"][col] = np.nan
+                        last_time_info["exit_size_type"][col] = -1
                         last_time_info["exit_type"][col] = -1
                         last_time_info["order_type"][col] = -1
                         last_time_info["limit_delta"][col] = np.nan
@@ -2152,6 +2192,8 @@ def simulate_from_signals_nb(
                             last_sl_info["init_price"][col] = np.nan
                             last_sl_info["stop"][col] = np.nan
                             last_sl_info["exit_price"][col] = -1
+                            last_sl_info["exit_size"][col] = np.nan
+                            last_sl_info["exit_size_type"][col] = -1
                             last_sl_info["exit_type"][col] = -1
                             last_sl_info["order_type"][col] = -1
                             last_sl_info["limit_delta"][col] = np.nan
@@ -2164,6 +2206,8 @@ def simulate_from_signals_nb(
                             last_tsl_info["stop"][col] = np.nan
                             last_tsl_info["th"][col] = np.nan
                             last_tsl_info["exit_price"][col] = -1
+                            last_tsl_info["exit_size"][col] = np.nan
+                            last_tsl_info["exit_size_type"][col] = -1
                             last_tsl_info["exit_type"][col] = -1
                             last_tsl_info["order_type"][col] = -1
                             last_tsl_info["limit_delta"][col] = np.nan
@@ -2173,6 +2217,8 @@ def simulate_from_signals_nb(
                             last_tp_info["init_price"][col] = np.nan
                             last_tp_info["stop"][col] = np.nan
                             last_tp_info["exit_price"][col] = -1
+                            last_tp_info["exit_size"][col] = np.nan
+                            last_tp_info["exit_size_type"][col] = -1
                             last_tp_info["exit_type"][col] = -1
                             last_tp_info["order_type"][col] = -1
                             last_tp_info["limit_delta"][col] = np.nan
@@ -2182,6 +2228,8 @@ def simulate_from_signals_nb(
                             last_time_info["td_stop"][col] = -1
                             last_time_info["dt_stop"][col] = -1
                             last_time_info["exit_price"][col] = -1
+                            last_time_info["exit_size"][col] = np.nan
+                            last_time_info["exit_size_type"][col] = -1
                             last_time_info["exit_type"][col] = -1
                             last_time_info["order_type"][col] = -1
                             last_time_info["limit_delta"][col] = np.nan
@@ -2237,6 +2285,8 @@ def simulate_from_signals_nb(
                                 last_sl_info["init_price"][col] = new_init_price
                                 last_sl_info["stop"][col] = _sl_stop
                                 last_sl_info["exit_price"][col] = _stop_exit_price
+                                last_sl_info["exit_size"][col] = np.nan
+                                last_sl_info["exit_size_type"][col] = -1
                                 last_sl_info["exit_type"][col] = _stop_exit_type
                                 last_sl_info["order_type"][col] = _stop_order_type
                                 last_sl_info["limit_delta"][col] = _stop_limit_delta
@@ -2250,6 +2300,8 @@ def simulate_from_signals_nb(
                                 last_tsl_info["stop"][col] = _tsl_stop
                                 last_tsl_info["th"][col] = _tsl_th
                                 last_tsl_info["exit_price"][col] = _stop_exit_price
+                                last_tsl_info["exit_size"][col] = np.nan
+                                last_tsl_info["exit_size_type"][col] = -1
                                 last_tsl_info["exit_type"][col] = _stop_exit_type
                                 last_tsl_info["order_type"][col] = _stop_order_type
                                 last_tsl_info["limit_delta"][col] = _stop_limit_delta
@@ -2259,6 +2311,8 @@ def simulate_from_signals_nb(
                                 last_tp_info["init_price"][col] = new_init_price
                                 last_tp_info["stop"][col] = _tp_stop
                                 last_tp_info["exit_price"][col] = _stop_exit_price
+                                last_tp_info["exit_size"][col] = np.nan
+                                last_tp_info["exit_size_type"][col] = -1
                                 last_tp_info["exit_type"][col] = _stop_exit_type
                                 last_tp_info["order_type"][col] = _stop_order_type
                                 last_tp_info["limit_delta"][col] = _stop_limit_delta
@@ -2268,6 +2322,8 @@ def simulate_from_signals_nb(
                                 last_time_info["td_stop"][col] = _td_stop
                                 last_time_info["dt_stop"][col] = _dt_stop
                                 last_time_info["exit_price"][col] = _stop_exit_price
+                                last_time_info["exit_size"][col] = np.nan
+                                last_time_info["exit_size_type"][col] = -1
                                 last_time_info["exit_type"][col] = _stop_exit_type
                                 last_time_info["order_type"][col] = _stop_order_type
                                 last_time_info["limit_delta"][col] = _stop_limit_delta
@@ -2282,6 +2338,8 @@ def simulate_from_signals_nb(
                                     last_sl_info["init_price"][col] = new_init_price
                                     last_sl_info["stop"][col] = _sl_stop
                                     last_sl_info["exit_price"][col] = _stop_exit_price
+                                    last_sl_info["exit_size"][col] = np.nan
+                                    last_sl_info["exit_size_type"][col] = -1
                                     last_sl_info["exit_type"][col] = _stop_exit_type
                                     last_sl_info["order_type"][col] = _stop_order_type
                                     last_sl_info["limit_delta"][col] = _stop_limit_delta
@@ -2295,6 +2353,8 @@ def simulate_from_signals_nb(
                                     last_tsl_info["stop"][col] = _tsl_stop
                                     last_tsl_info["th"][col] = _tsl_th
                                     last_tsl_info["exit_price"][col] = _stop_exit_price
+                                    last_tsl_info["exit_size"][col] = np.nan
+                                    last_tsl_info["exit_size_type"][col] = -1
                                     last_tsl_info["exit_type"][col] = _stop_exit_type
                                     last_tsl_info["order_type"][col] = _stop_order_type
                                     last_tsl_info["limit_delta"][col] = _stop_limit_delta
@@ -2304,6 +2364,8 @@ def simulate_from_signals_nb(
                                     last_tp_info["init_price"][col] = new_init_price
                                     last_tp_info["stop"][col] = _tp_stop
                                     last_tp_info["exit_price"][col] = _stop_exit_price
+                                    last_tp_info["exit_size"][col] = np.nan
+                                    last_tp_info["exit_size_type"][col] = -1
                                     last_tp_info["exit_type"][col] = _stop_exit_type
                                     last_tp_info["order_type"][col] = _stop_order_type
                                     last_tp_info["limit_delta"][col] = _stop_limit_delta
@@ -2317,6 +2379,8 @@ def simulate_from_signals_nb(
                                     last_time_info["td_stop"][col] = _td_stop
                                     last_time_info["dt_stop"][col] = _dt_stop
                                     last_time_info["exit_price"][col] = _stop_exit_price
+                                    last_time_info["exit_size"][col] = np.nan
+                                    last_time_info["exit_size_type"][col] = -1
                                     last_time_info["exit_type"][col] = _stop_exit_type
                                     last_time_info["order_type"][col] = _stop_order_type
                                     last_time_info["limit_delta"][col] = _stop_limit_delta
@@ -2485,6 +2549,8 @@ def set_sl_info_nb(
     init_price: float = -np.inf,
     stop: float = np.nan,
     exit_price: float = StopExitPrice.Stop,
+    exit_size: float = np.nan,
+    exit_size_type: int = -1,
     exit_type: int = StopExitType.Close,
     order_type: int = OrderType.Market,
     limit_delta: float = np.nan,
@@ -2497,6 +2563,8 @@ def set_sl_info_nb(
     sl_info["init_price"] = init_price
     sl_info["stop"] = stop
     sl_info["exit_price"] = exit_price
+    sl_info["exit_size"] = exit_size
+    sl_info["exit_size_type"] = exit_size_type
     sl_info["exit_type"] = exit_type
     sl_info["order_type"] = order_type
     sl_info["limit_delta"] = limit_delta
@@ -2510,6 +2578,8 @@ def clear_sl_info_nb(sl_info: tp.Record) -> None:
     sl_info["init_price"] = np.nan
     sl_info["stop"] = np.nan
     sl_info["exit_price"] = -1
+    sl_info["exit_size"] = np.nan
+    sl_info["exit_size_type"] = -1
     sl_info["exit_type"] = -1
     sl_info["order_type"] = -1
     sl_info["limit_delta"] = np.nan
@@ -2526,6 +2596,8 @@ def set_tsl_info_nb(
     stop: float = np.nan,
     th: float = np.nan,
     exit_price: float = StopExitPrice.Stop,
+    exit_size: float = np.nan,
+    exit_size_type: int = -1,
     exit_type: int = StopExitType.Close,
     order_type: int = OrderType.Market,
     limit_delta: float = np.nan,
@@ -2541,6 +2613,8 @@ def set_tsl_info_nb(
     tsl_info["stop"] = stop
     tsl_info["th"] = th
     tsl_info["exit_price"] = exit_price
+    tsl_info["exit_size"] = exit_size
+    tsl_info["exit_size_type"] = exit_size_type
     tsl_info["exit_type"] = exit_type
     tsl_info["order_type"] = order_type
     tsl_info["limit_delta"] = limit_delta
@@ -2557,6 +2631,8 @@ def clear_tsl_info_nb(tsl_info: tp.Record) -> None:
     tsl_info["stop"] = np.nan
     tsl_info["th"] = np.nan
     tsl_info["exit_price"] = -1
+    tsl_info["exit_size"] = np.nan
+    tsl_info["exit_size_type"] = -1
     tsl_info["exit_type"] = -1
     tsl_info["order_type"] = -1
     tsl_info["limit_delta"] = np.nan
@@ -2570,6 +2646,8 @@ def set_tp_info_nb(
     init_price: float = -np.inf,
     stop: float = np.nan,
     exit_price: float = StopExitPrice.Stop,
+    exit_size: float = np.nan,
+    exit_size_type: int = -1,
     exit_type: int = StopExitType.Close,
     order_type: int = OrderType.Market,
     limit_delta: float = np.nan,
@@ -2582,6 +2660,8 @@ def set_tp_info_nb(
     tp_info["init_price"] = init_price
     tp_info["stop"] = stop
     tp_info["exit_price"] = exit_price
+    tp_info["exit_size"] = exit_size
+    tp_info["exit_size_type"] = exit_size_type
     tp_info["exit_type"] = exit_type
     tp_info["order_type"] = order_type
     tp_info["limit_delta"] = limit_delta
@@ -2595,6 +2675,8 @@ def clear_tp_info_nb(tp_info: tp.Record) -> None:
     tp_info["init_price"] = np.nan
     tp_info["stop"] = np.nan
     tp_info["exit_price"] = -1
+    tp_info["exit_size"] = np.nan
+    tp_info["exit_size_type"] = -1
     tp_info["exit_type"] = -1
     tp_info["order_type"] = -1
     tp_info["limit_delta"] = np.nan
@@ -2608,6 +2690,8 @@ def set_time_info_nb(
     td_stop: int = -1,
     dt_stop: int = -1,
     exit_price: float = StopExitPrice.Stop,
+    exit_size: float = np.nan,
+    exit_size_type: int = -1,
     exit_type: int = StopExitType.Close,
     order_type: int = OrderType.Market,
     limit_delta: float = np.nan,
@@ -2621,6 +2705,8 @@ def set_time_info_nb(
     time_info["td_stop"] = td_stop
     time_info["dt_stop"] = dt_stop
     time_info["exit_price"] = exit_price
+    time_info["exit_size"] = exit_size
+    time_info["exit_size_type"] = exit_size_type
     time_info["exit_type"] = exit_type
     time_info["order_type"] = order_type
     time_info["limit_delta"] = limit_delta
@@ -2635,6 +2721,8 @@ def clear_time_info_nb(time_info: tp.Record) -> None:
     time_info["td_stop"] = -1
     time_info["td_stop"] = -1
     time_info["exit_price"] = -1
+    time_info["exit_size"] = np.nan
+    time_info["exit_size_type"] = -1
     time_info["exit_type"] = -1
     time_info["order_type"] = -1
     time_info["limit_delta"] = np.nan
@@ -2965,6 +3053,8 @@ def simulate_from_signal_func_nb(
         last_sl_info["init_price"][:] = np.nan
         last_sl_info["stop"][:] = np.nan
         last_sl_info["exit_price"][:] = -1
+        last_sl_info["exit_size"][:] = np.nan
+        last_sl_info["exit_size_type"][:] = -1
         last_sl_info["exit_type"][:] = -1
         last_sl_info["order_type"][:] = -1
         last_sl_info["limit_delta"][:] = np.nan
@@ -2978,6 +3068,8 @@ def simulate_from_signal_func_nb(
         last_tsl_info["stop"][:] = np.nan
         last_tsl_info["th"][:] = np.nan
         last_tsl_info["exit_price"][:] = -1
+        last_tsl_info["exit_size"][:] = np.nan
+        last_tsl_info["exit_size_type"][:] = -1
         last_tsl_info["exit_type"][:] = -1
         last_tsl_info["order_type"][:] = -1
         last_tsl_info["limit_delta"][:] = np.nan
@@ -2988,6 +3080,8 @@ def simulate_from_signal_func_nb(
         last_tp_info["init_price"][:] = np.nan
         last_tp_info["stop"][:] = np.nan
         last_tp_info["exit_price"][:] = -1
+        last_tp_info["exit_size"][:] = np.nan
+        last_tp_info["exit_size_type"][:] = -1
         last_tp_info["exit_type"][:] = -1
         last_tp_info["order_type"][:] = -1
         last_tp_info["limit_delta"][:] = np.nan
@@ -2998,6 +3092,8 @@ def simulate_from_signal_func_nb(
         last_time_info["td_stop"][:] = -1
         last_time_info["dt_stop"][:] = -1
         last_time_info["exit_price"][:] = -1
+        last_time_info["exit_size"][:] = np.nan
+        last_time_info["exit_size_type"][:] = -1
         last_time_info["exit_type"][:] = -1
         last_time_info["order_type"][:] = -1
         last_time_info["limit_delta"][:] = np.nan
@@ -3379,6 +3475,8 @@ def simulate_from_signal_func_nb(
                             _stop_type = StopType.SL
                             _init_i = last_sl_info["init_idx"][col]
                             _stop_exit_price = last_sl_info["exit_price"][col]
+                            _stop_exit_size = last_sl_info["exit_size"][col]
+                            _stop_exit_size_type = last_sl_info["exit_size_type"][col]
                             _stop_exit_type = last_sl_info["exit_type"][col]
                             _stop_order_type = last_sl_info["order_type"][col]
                             _limit_delta = last_sl_info["limit_delta"][col]
@@ -3476,6 +3574,8 @@ def simulate_from_signal_func_nb(
                                 _stop_type = StopType.TTP
                             _init_i = last_tsl_info["init_idx"][col]
                             _stop_exit_price = last_tsl_info["exit_price"][col]
+                            _stop_exit_size = last_tsl_info["exit_size"][col]
+                            _stop_exit_size_type = last_tsl_info["exit_size_type"][col]
                             _stop_exit_type = last_tsl_info["exit_type"][col]
                             _stop_order_type = last_tsl_info["order_type"][col]
                             _limit_delta = last_tsl_info["limit_delta"][col]
@@ -3499,6 +3599,8 @@ def simulate_from_signal_func_nb(
                             _stop_type = StopType.TP
                             _init_i = last_tp_info["init_idx"][col]
                             _stop_exit_price = last_tp_info["exit_price"][col]
+                            _stop_exit_size = last_tp_info["exit_size"][col]
+                            _stop_exit_size_type = last_tp_info["exit_size_type"][col]
                             _stop_exit_type = last_tp_info["exit_type"][col]
                             _stop_order_type = last_tp_info["order_type"][col]
                             _limit_delta = last_tp_info["limit_delta"][col]
@@ -3526,6 +3628,8 @@ def simulate_from_signal_func_nb(
                             _stop_type = StopType.T
                             _init_i = last_time_info["init_idx"][col]
                             _stop_exit_price = last_time_info["exit_price"][col]
+                            _stop_exit_size = last_time_info["exit_size"][col]
+                            _stop_exit_size_type = last_time_info["exit_size_type"][col]
                             _stop_exit_type = last_time_info["exit_type"][col]
                             _stop_order_type = last_time_info["order_type"][col]
                             _limit_delta = last_time_info["limit_delta"][col]
@@ -3535,6 +3639,16 @@ def simulate_from_signal_func_nb(
                         # Stop price was hit
                         # Resolve the final stop signal
                         _accumulate = flex_select_nb(accumulate_, i, col)
+                        _size = flex_select_nb(size_, i, col)
+                        _size_type = flex_select_nb(size_type_, i, col)
+                        if not np.isnan(_stop_exit_size):
+                            _accumulate = True
+                            if _stop_exit_type == StopExitType.Close:
+                                _stop_exit_type = StopExitType.CloseReduce
+                            _size = _stop_exit_size
+                        if _stop_exit_size_type != -1:
+                            _size_type = _stop_exit_size_type
+
                         (
                             stop_is_long_entry,
                             stop_is_long_exit,
@@ -3563,8 +3677,8 @@ def simulate_from_signal_func_nb(
                             is_long_exit=stop_is_long_exit,
                             is_short_entry=stop_is_short_entry,
                             is_short_exit=stop_is_short_exit,
-                            size=flex_select_nb(size_, i, col),
-                            size_type=flex_select_nb(size_type_, i, col),
+                            size=_size,
+                            size_type=_size_type,
                             accumulate=_accumulate,
                         )
 
@@ -3942,6 +4056,8 @@ def simulate_from_signal_func_nb(
                         last_sl_info["init_price"][col] = np.nan
                         last_sl_info["stop"][col] = np.nan
                         last_sl_info["exit_price"][col] = -1
+                        last_sl_info["exit_size"][col] = np.nan
+                        last_sl_info["exit_size_type"][col] = -1
                         last_sl_info["exit_type"][col] = -1
                         last_sl_info["order_type"][col] = -1
                         last_sl_info["limit_delta"][col] = np.nan
@@ -3954,6 +4070,8 @@ def simulate_from_signal_func_nb(
                         last_tsl_info["stop"][col] = np.nan
                         last_tsl_info["th"][col] = np.nan
                         last_tsl_info["exit_price"][col] = -1
+                        last_tsl_info["exit_size"][col] = np.nan
+                        last_tsl_info["exit_size_type"][col] = -1
                         last_tsl_info["exit_type"][col] = -1
                         last_tsl_info["order_type"][col] = -1
                         last_tsl_info["limit_delta"][col] = np.nan
@@ -3963,6 +4081,8 @@ def simulate_from_signal_func_nb(
                         last_tp_info["init_price"][col] = np.nan
                         last_tp_info["stop"][col] = np.nan
                         last_tp_info["exit_price"][col] = -1
+                        last_tp_info["exit_size"][col] = np.nan
+                        last_tp_info["exit_size_type"][col] = -1
                         last_tp_info["exit_type"][col] = -1
                         last_tp_info["order_type"][col] = -1
                         last_tp_info["limit_delta"][col] = np.nan
@@ -3972,6 +4092,8 @@ def simulate_from_signal_func_nb(
                         last_time_info["td_stop"][col] = -1
                         last_time_info["dt_stop"][col] = -1
                         last_time_info["exit_price"][col] = -1
+                        last_time_info["exit_size"][col] = np.nan
+                        last_time_info["exit_size_type"][col] = -1
                         last_time_info["exit_type"][col] = -1
                         last_time_info["order_type"][col] = -1
                         last_time_info["limit_delta"][col] = np.nan
@@ -4210,6 +4332,8 @@ def simulate_from_signal_func_nb(
                             last_sl_info["init_price"][col] = np.nan
                             last_sl_info["stop"][col] = np.nan
                             last_sl_info["exit_price"][col] = -1
+                            last_sl_info["exit_size"][col] = np.nan
+                            last_sl_info["exit_size_type"][col] = -1
                             last_sl_info["exit_type"][col] = -1
                             last_sl_info["order_type"][col] = -1
                             last_sl_info["limit_delta"][col] = np.nan
@@ -4222,6 +4346,8 @@ def simulate_from_signal_func_nb(
                             last_tsl_info["stop"][col] = np.nan
                             last_tsl_info["th"][col] = np.nan
                             last_tsl_info["exit_price"][col] = -1
+                            last_tsl_info["exit_size"][col] = np.nan
+                            last_tsl_info["exit_size_type"][col] = -1
                             last_tsl_info["exit_type"][col] = -1
                             last_tsl_info["order_type"][col] = -1
                             last_tsl_info["limit_delta"][col] = np.nan
@@ -4231,6 +4357,8 @@ def simulate_from_signal_func_nb(
                             last_tp_info["init_price"][col] = np.nan
                             last_tp_info["stop"][col] = np.nan
                             last_tp_info["exit_price"][col] = -1
+                            last_tp_info["exit_size"][col] = np.nan
+                            last_tp_info["exit_size_type"][col] = -1
                             last_tp_info["exit_type"][col] = -1
                             last_tp_info["order_type"][col] = -1
                             last_tp_info["limit_delta"][col] = np.nan
@@ -4240,6 +4368,8 @@ def simulate_from_signal_func_nb(
                             last_time_info["td_stop"][col] = -1
                             last_time_info["dt_stop"][col] = -1
                             last_time_info["exit_price"][col] = -1
+                            last_time_info["exit_size"][col] = np.nan
+                            last_time_info["exit_size_type"][col] = -1
                             last_time_info["exit_type"][col] = -1
                             last_time_info["order_type"][col] = -1
                             last_time_info["limit_delta"][col] = np.nan
@@ -4295,6 +4425,8 @@ def simulate_from_signal_func_nb(
                                 last_sl_info["init_price"][col] = new_init_price
                                 last_sl_info["stop"][col] = _sl_stop
                                 last_sl_info["exit_price"][col] = _stop_exit_price
+                                last_sl_info["exit_size"][col] = np.nan
+                                last_sl_info["exit_size_type"][col] = -1
                                 last_sl_info["exit_type"][col] = _stop_exit_type
                                 last_sl_info["order_type"][col] = _stop_order_type
                                 last_sl_info["limit_delta"][col] = _stop_limit_delta
@@ -4308,6 +4440,8 @@ def simulate_from_signal_func_nb(
                                 last_tsl_info["stop"][col] = _tsl_stop
                                 last_tsl_info["th"][col] = _tsl_th
                                 last_tsl_info["exit_price"][col] = _stop_exit_price
+                                last_tsl_info["exit_size"][col] = np.nan
+                                last_tsl_info["exit_size_type"][col] = -1
                                 last_tsl_info["exit_type"][col] = _stop_exit_type
                                 last_tsl_info["order_type"][col] = _stop_order_type
                                 last_tsl_info["limit_delta"][col] = _stop_limit_delta
@@ -4317,6 +4451,8 @@ def simulate_from_signal_func_nb(
                                 last_tp_info["init_price"][col] = new_init_price
                                 last_tp_info["stop"][col] = _tp_stop
                                 last_tp_info["exit_price"][col] = _stop_exit_price
+                                last_tp_info["exit_size"][col] = np.nan
+                                last_tp_info["exit_size_type"][col] = -1
                                 last_tp_info["exit_type"][col] = _stop_exit_type
                                 last_tp_info["order_type"][col] = _stop_order_type
                                 last_tp_info["limit_delta"][col] = _stop_limit_delta
@@ -4326,6 +4462,8 @@ def simulate_from_signal_func_nb(
                                 last_time_info["td_stop"][col] = _td_stop
                                 last_time_info["dt_stop"][col] = _dt_stop
                                 last_time_info["exit_price"][col] = _stop_exit_price
+                                last_time_info["exit_size"][col] = np.nan
+                                last_time_info["exit_size_type"][col] = -1
                                 last_time_info["exit_type"][col] = _stop_exit_type
                                 last_time_info["order_type"][col] = _stop_order_type
                                 last_time_info["limit_delta"][col] = _stop_limit_delta
@@ -4340,6 +4478,8 @@ def simulate_from_signal_func_nb(
                                     last_sl_info["init_price"][col] = new_init_price
                                     last_sl_info["stop"][col] = _sl_stop
                                     last_sl_info["exit_price"][col] = _stop_exit_price
+                                    last_sl_info["exit_size"][col] = np.nan
+                                    last_sl_info["exit_size_type"][col] = -1
                                     last_sl_info["exit_type"][col] = _stop_exit_type
                                     last_sl_info["order_type"][col] = _stop_order_type
                                     last_sl_info["limit_delta"][col] = _stop_limit_delta
@@ -4353,6 +4493,8 @@ def simulate_from_signal_func_nb(
                                     last_tsl_info["stop"][col] = _tsl_stop
                                     last_tsl_info["th"][col] = _tsl_th
                                     last_tsl_info["exit_price"][col] = _stop_exit_price
+                                    last_tsl_info["exit_size"][col] = np.nan
+                                    last_tsl_info["exit_size_type"][col] = -1
                                     last_tsl_info["exit_type"][col] = _stop_exit_type
                                     last_tsl_info["order_type"][col] = _stop_order_type
                                     last_tsl_info["limit_delta"][col] = _stop_limit_delta
@@ -4362,19 +4504,23 @@ def simulate_from_signal_func_nb(
                                     last_tp_info["init_price"][col] = new_init_price
                                     last_tp_info["stop"][col] = _tp_stop
                                     last_tp_info["exit_price"][col] = _stop_exit_price
+                                    last_tp_info["exit_size"][col] = np.nan
+                                    last_tp_info["exit_size_type"][col] = -1
                                     last_tp_info["exit_type"][col] = _stop_exit_type
                                     last_tp_info["order_type"][col] = _stop_order_type
                                     last_tp_info["limit_delta"][col] = _stop_limit_delta
                                     last_tp_info["delta_format"][col] = _delta_format
                                 if should_update_time_stop_nb(
-                                    new_td_stop=_td_stop,
-                                    new_dt_stop=_dt_stop,
-                                    upon_stop_update=_upon_stop_update,
+                                        new_td_stop=_td_stop,
+                                        new_dt_stop=_dt_stop,
+                                        upon_stop_update=_upon_stop_update,
                                 ):
                                     last_time_info["init_idx"][col] = i
                                     last_time_info["td_stop"][col] = _td_stop
                                     last_time_info["dt_stop"][col] = _dt_stop
                                     last_time_info["exit_price"][col] = _stop_exit_price
+                                    last_time_info["exit_size"][col] = np.nan
+                                    last_time_info["exit_size_type"][col] = -1
                                     last_time_info["exit_type"][col] = _stop_exit_type
                                     last_time_info["order_type"][col] = _stop_order_type
                                     last_time_info["limit_delta"][col] = _stop_limit_delta

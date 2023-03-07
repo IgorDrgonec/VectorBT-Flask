@@ -2624,7 +2624,7 @@ Attributes:
     creation_idx: Limit creation row.
     init_idx: Initial row from where order information is taken.
     init_price: Initial price.
-    init_size: Requested size.
+    init_size: Order size.
     init_size_type: See `SizeType`.
     init_direction: See `Direction`.
     init_stop_type: See `vectorbtpro.signals.enums.StopType`.
@@ -2641,7 +2641,9 @@ sl_info_dt = np.dtype(
         ("init_idx", np.int_),
         ("init_price", np.float_),
         ("stop", np.float_),
-        ("exit_price", np.int_),
+        ("exit_price", np.float_),
+        ("exit_size", np.float_),
+        ("exit_size_type", np.int_),
         ("exit_type", np.int_),
         ("order_type", np.int_),
         ("limit_delta", np.float_),
@@ -2664,6 +2666,8 @@ Attributes:
     init_price: Initial price.
     stop: Latest updated stop value.
     exit_price: See `StopExitPrice`.
+    exit_size: Order size.
+    exit_size_type: See `SizeType`.
     exit_type: See `StopExitType`.
     order_type: See `OrderType`.
     limit_delta: Delta from the hit price. Only for `StopType.Limit`.
@@ -2678,7 +2682,9 @@ tsl_info_dt = np.dtype(
         ("peak_price", np.float_),
         ("stop", np.float_),
         ("th", np.float_),
-        ("exit_price", np.int_),
+        ("exit_price", np.float_),
+        ("exit_size", np.float_),
+        ("exit_size_type", np.int_),
         ("exit_type", np.int_),
         ("order_type", np.int_),
         ("limit_delta", np.float_),
@@ -2704,6 +2710,8 @@ Attributes:
     stop: Latest updated stop value.
     th: Latest updated threshold value.
     exit_price: See `StopExitPrice`.
+    exit_size: Order size.
+    exit_size_type: See `SizeType`.
     exit_type: See `StopExitType`.
     order_type: See `OrderType`.
     limit_delta: Delta from the hit price. Only for `StopType.Limit`.
@@ -2715,7 +2723,9 @@ tp_info_dt = np.dtype(
         ("init_idx", np.int_),
         ("init_price", np.float_),
         ("stop", np.float_),
-        ("exit_price", np.int_),
+        ("exit_price", np.float_),
+        ("exit_size", np.float_),
+        ("exit_size_type", np.int_),
         ("exit_type", np.int_),
         ("order_type", np.int_),
         ("limit_delta", np.float_),
@@ -2738,6 +2748,8 @@ Attributes:
     init_price: Initial price.
     stop: Latest updated stop value.
     exit_price: See `StopExitPrice`.
+    exit_size: Order size.
+    exit_size_type: See `SizeType`.
     exit_type: See `StopExitType`.
     order_type: See `OrderType`.
     limit_delta: Delta from the hit price. Only for `StopType.Limit`.
@@ -2749,7 +2761,9 @@ time_info_dt = np.dtype(
         ("init_idx", np.int_),
         ("td_stop", np.int_),
         ("dt_stop", np.int_),
-        ("exit_price", np.int_),
+        ("exit_price", np.float_),
+        ("exit_size", np.float_),
+        ("exit_size_type", np.int_),
         ("exit_type", np.int_),
         ("order_type", np.int_),
         ("limit_delta", np.float_),
@@ -2773,6 +2787,8 @@ Attributes:
     td_stop: Latest updated timedelta-stop value.
     dt_stop: Latest updated datetime-stop value.
     exit_price: See `StopExitPrice`.
+    exit_size: Order size.
+    exit_size_type: See `SizeType`.
     exit_type: See `StopExitType`.
     order_type: See `OrderType`.
     limit_delta: Delta from the hit price. Only for `StopType.Limit`.
