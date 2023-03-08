@@ -3343,17 +3343,38 @@ class TVData(RemoteData):
     @classmethod
     def get_symbols(
         cls,
-        text: str,
-        exchange: str = "",
+        pattern: tp.Optional[str] = None,
+        use_regex: bool = False,
+        market: tp.Optional[str] = None,
+        text: tp.Optional[str] = None,
+        exchange: tp.Optional[str] = None,
         client: tp.Optional[PolygonClientT] = None,
         client_config: tp.DictLike = None,
     ) -> tp.Set[str]:
-        """Search for symbols."""
+        """Search for symbols.
+
+        Uses market scanner when `market` is provided (returns all symbols, big payload)
+        Uses symbol search when either `text` or `exchange` is provided (returns a subset of symbols)."""
+        if market is None and text is None and exchange is None:
+            raise ValueError("Please provide either market, or text and/or exchange")
+        if market is not None and (text is not None or exchange is not None):
+            raise ValueError("Please provide either market, or text and/or exchange")
         if client_config is None:
             client_config = {}
         client = cls.resolve_client(client=client, **client_config)
-        all_symbols = client.search_symbol(text, exchange)
-        return set(map(lambda x: x["exchange"] + ":" + x["symbol"], all_symbols))
+        if market is None:
+            data = client.search_symbol(text=text, exchange=exchange)
+            all_symbols = map(lambda x: x["exchange"] + ":" + x["symbol"], data)
+        else:
+            data = client.scan_symbols(market.lower())
+            all_symbols = map(lambda x: x["s"], data)
+        found_symbols = set()
+        for symbol in all_symbols:
+            if pattern is not None:
+                if not cls.symbol_match(symbol.split(":")[1], pattern, use_regex=use_regex):
+                    continue
+            found_symbols.add(symbol)
+        return found_symbols
 
     @classmethod
     def resolve_client(cls, client: tp.Optional[TVClient] = None, **client_config) -> TVClient:
