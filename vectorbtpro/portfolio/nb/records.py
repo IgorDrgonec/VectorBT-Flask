@@ -221,7 +221,7 @@ def get_entry_trades_nb(
         >>> group_lens = np.full(target_shape[1], 1)
         >>> init_cash = np.full(target_shape[1], 100)
 
-        >>> sim_out = vbt.pf_nb.simulate_from_orders_nb(
+        >>> sim_out = vbt.pf_nb.from_orders_nb(
         ...     target_shape,
         ...     group_lens,
         ...     init_cash=init_cash,

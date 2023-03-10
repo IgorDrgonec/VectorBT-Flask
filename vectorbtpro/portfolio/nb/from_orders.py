@@ -63,7 +63,7 @@ from vectorbtpro.utils.array_ import insert_argsort_nb
     **portfolio_ch.merge_sim_outs_config
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def simulate_from_orders_nb(
+def from_orders_nb(
     target_shape: tp.Shape,
     group_lens: tp.Array1d,
     open: tp.FlexArray2dLike = np.nan,
@@ -120,10 +120,10 @@ def simulate_from_orders_nb(
         ```pycon
         >>> import numpy as np
         >>> from vectorbtpro.records.nb import col_map_nb
-        >>> from vectorbtpro.portfolio.nb import simulate_from_orders_nb, asset_flow_nb
+        >>> from vectorbtpro.portfolio.nb import from_orders_nb, asset_flow_nb
 
         >>> close = np.array([1, 2, 3, 4, 5])[:, None]
-        >>> sim_out = simulate_from_orders_nb(
+        >>> sim_out = from_orders_nb(
         ...     target_shape=close.shape,
         ...     group_lens=np.array([1]),
         ...     call_seq=np.full(close.shape, 0),

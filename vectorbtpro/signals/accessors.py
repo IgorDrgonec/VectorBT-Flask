@@ -978,7 +978,7 @@ class SignalsAccessor(GenericAccessor):
             ```pycon
             >>> ts = pd.Series([1, 2, 3, 2, 1])
 
-            >>> mask.vbt.signals.generate_stop_exits(ts, -0.1)
+            >>> mask.vbt.signals.generate_stop_exits(ts, stop=-0.1)
                             a      b      c
             2020-01-01  False  False  False
             2020-01-02  False  False  False
@@ -990,7 +990,7 @@ class SignalsAccessor(GenericAccessor):
             * Trailing stop loss:
 
             ```pycon
-            >>> mask.vbt.signals.generate_stop_exits(ts, -0.1, trailing=True)
+            >>> mask.vbt.signals.generate_stop_exits(ts, stop=-0.1, trailing=True)
                             a      b      c
             2020-01-01  False  False  False
             2020-01-02  False  False  False
@@ -1002,7 +1002,7 @@ class SignalsAccessor(GenericAccessor):
             * Testing multiple take profit stops:
 
             ```pycon
-            >>> mask.vbt.signals.generate_stop_exits(ts, pd.Index([1.0, 1.5]))
+            >>> mask.vbt.signals.generate_stop_exits(ts, stop=pd.Index([1.0, 1.5]))
             stop                        1.0                  1.5
                             a      b      c      a      b      c
             2020-01-01  False  False  False  False  False  False

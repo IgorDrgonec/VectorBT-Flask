@@ -219,6 +219,11 @@ FuncArgs = Tuple[Callable, Args, Kwargs]
 FuncsArgs = Iterable[FuncArgs]
 EngineLike = Union[str, type, ExecutionEngine, Callable]
 
+# JIT
+JittedOption = Union[None, bool, str, Callable, Kwargs]
+JitterLike = Union[str, Jitter, Type[Jitter]]
+TaskId = Union[Hashable, Callable]
+
 # Chunking
 SizeFunc = Callable[[AnnArgs], int]
 SizeLike = Union[int, Sizer, SizeFunc]
@@ -231,11 +236,7 @@ ArgTakeSpecLike = Union[Sequence[TakeSpec], ArgTakeSpec, ArgTakeSpecFunc]
 MappingTakeSpec = Mapping[Hashable, TakeSpec]
 SequenceTakeSpec = Sequence[TakeSpec]
 ContainerTakeSpec = Union[MappingTakeSpec, SequenceTakeSpec]
-ChunkedOption = Union[None, bool, str, Kwargs]
-
-# JIT
-JittedOption = Union[None, bool, str, Kwargs]
-JitterLike = Union[str, Jitter, Type[Jitter]]
+ChunkedOption = Union[None, bool, str, Callable, Kwargs]
 
 # Decorators
 ClassWrapper = Callable[[Type[T]], Type[T]]

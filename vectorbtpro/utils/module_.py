@@ -134,3 +134,12 @@ def warn_cannot_import(pkg_name: str) -> bool:
     except ImportError as e:
         warnings.warn(str(e), stacklevel=2)
         return True
+
+
+def import_module_from_path(module_path: tp.PathLike) -> ModuleType:
+    """Import a module by its path."""
+    spec = importlib.util.spec_from_file_location(module_path.stem, str(module_path.resolve()))
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_path.stem] = module
+    spec.loader.exec_module(module)
+    return module

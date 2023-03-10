@@ -145,7 +145,7 @@ from predefined arrays, it lets us define an arbitrary logic through callbacks. 
 kinds of callbacks, each called at some point while the simulation function traverses the shape.
 For example, apart from the main callback that returns an order (`order_func_nb`), there is a callback
 that does preprocessing on the entire group of columns at once. For more details on the general procedure
-and the callback zoo, see `vectorbtpro.portfolio.nb.from_order_func.simulate_nb`.
+and the callback zoo, see `vectorbtpro.portfolio.nb.from_order_func.from_order_func_nb`.
 
 Let's replicate our example using an order function:
 
@@ -177,7 +177,7 @@ Let's replicate our example using an order function:
 7         3      b          3   1.0    1.0  0.01   Buy
 ```
 
-There is an even more flexible version available - `vectorbtpro.portfolio.nb.from_order_func.flex_simulate_nb`
+There is an even more flexible version available - `vectorbtpro.portfolio.nb.from_order_func.from_flex_order_func_nb`
 (activated by passing `flexible=True` to `Portfolio.from_order_func`) - that allows creating multiple
 orders per symbol and bar.
 
@@ -1621,6 +1621,7 @@ import warnings
 from collections import namedtuple
 from functools import partial
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -1671,6 +1672,8 @@ from vectorbtpro.utils.parsing import get_func_kwargs, get_func_arg_names
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import CustomTemplate, Rep, RepEval, RepFunc, substitute_templates
 from vectorbtpro.utils.chunking import ArgsTaker
+from vectorbtpro.utils.cutting import cut_and_save_func
+from vectorbtpro.utils.module_ import import_module_from_path
 
 try:
     if not tp.TYPE_CHECKING:
@@ -1741,7 +1744,8 @@ def returns_resample_func(
     """Apply resampling function on returns."""
     return (
         pd.DataFrame(obj, index=wrapper.index)
-        .vbt.returns(log_returns=log_returns).resample(
+        .vbt.returns(log_returns=log_returns)
+        .resample(
             resampler,
             fill_with_zero=fill_with_zero,
         )
@@ -3970,7 +3974,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     ) -> PortfolioT:
         """Simulate portfolio from orders - size, price, fees, and other information.
 
-        See `vectorbtpro.portfolio.nb.from_orders.simulate_from_orders_nb`.
+        See `vectorbtpro.portfolio.nb.from_orders.from_orders_nb`.
 
         Args:
             close (array_like or Data): Latest asset price at each time step.
@@ -4145,7 +4149,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
                 The arrays will be available as `cash`, `position`, `debt`, `locked_cash`, and `free_cash` in in-outputs.
             save_value (bool): Whether to save the value.
-            
+
                 The array will be available as `value` in in-outputs.
             save_returns (bool): Whether to save the returns.
 
@@ -4265,7 +4269,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             dtype: float64
             ```
 
-            * Equal-weighted portfolio as in `vectorbtpro.portfolio.nb.from_order_func.simulate_nb` example
+            * Equal-weighted portfolio as in `vectorbtpro.portfolio.nb.from_order_func.from_order_func_nb` example
             (it's more compact but has less control over execution):
 
             ```pycon
@@ -4288,7 +4292,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> pf.get_asset_value(group_by=False).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/simulate_nb_example.svg){: .iimg }
+            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg }
 
             * Test 10 random weight combinations:
 
@@ -4684,7 +4688,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         bm_close = broadcasted_args.pop("bm_close", None)
 
         # Perform the simulation
-        func = jit_reg.resolve_option(nb.simulate_from_orders_nb, jitted)
+        func = jit_reg.resolve_option(nb.from_orders_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         sim_out = func(
             target_shape=target_shape_2d,
@@ -4732,12 +4736,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         short_entries: tp.Optional[tp.ArrayLike] = None,
         short_exits: tp.Optional[tp.ArrayLike] = None,
         direction: tp.Optional[tp.ArrayLike] = None,
-        adjust_func_nb: nb.AdjustFuncT = nb.no_adjust_func_nb,
+        adjust_func_nb: tp.Optional[nb.AdjustFuncT] = None,
         adjust_args: tp.Args = (),
-        signal_func_nb: nb.SignalFuncT = nb.no_signal_func_nb,
+        signal_func_nb: tp.Optional[nb.SignalFuncT] = None,
         signal_args: tp.ArgsLike = (),
-        post_segment_func_nb: nb.SignalFuncT = nb.no_post_func_nb,
+        post_segment_func_nb: tp.Optional[nb.SignalFuncT] = None,
         post_segment_args: tp.ArgsLike = (),
+        order_mode: bool = False,
         size: tp.Optional[tp.ArrayLike] = None,
         size_type: tp.Optional[tp.ArrayLike] = None,
         price: tp.Optional[tp.ArrayLike] = None,
@@ -4813,21 +4818,27 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         template_context: tp.Optional[tp.Mapping] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
+        staticized: tp.Union[bool, dict, tp.TaskId] = False,
         freq: tp.Optional[tp.FrequencyLike] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
         **kwargs,
     ) -> PortfolioT:
         """Simulate portfolio from entry and exit signals.
 
-        See `vectorbtpro.portfolio.nb.from_signals.simulate_from_signal_func_nb`.
+        See `vectorbtpro.portfolio.nb.from_signals.from_signal_func_nb`.
 
-        You have three options to provide signals:
+        Supports the following modes:
 
         1. `entries` and `exits`:
-            Uses `vectorbtpro.portfolio.nb.from_signals.dir_enex_signal_func_nb` as `signal_func_nb`.
+            Uses `vectorbtpro.portfolio.nb.from_signals.dir_signal_func_nb` as `signal_func_nb`
+            if an adjustment function is provided (not cacheable), otherwise translates signals using
+            `vectorbtpro.portfolio.nb.from_signals.dir_to_ls_signals_nb` then simulates statically (cacheable)
         2. `entries` (acting as long), `exits` (acting as long), `short_entries`, and `short_exits`:
-            Uses `vectorbtpro.portfolio.nb.from_signals.ls_enex_signal_func_nb` as `signal_func_nb`.
-        3. `signal_func_nb` and `signal_args`: Custom signal function that returns direction-aware signals.
+            Uses `vectorbtpro.portfolio.nb.from_signals.ls_signal_func_nb` as `signal_func_nb`
+            if an adjustment function is provided (not cacheable), otherwise simulates statically (cacheable)
+        3. `order_mode=True` without signals:
+            Uses `vectorbtpro.portfolio.nb.from_signals.order_signal_func_nb` as `signal_func_nb` (not cacheable)
+        4. `signal_func_nb` and `signal_args`: Custom signal function (not cacheable)
 
         Args:
             close (array_like or Data): See `Portfolio.from_orders`.
@@ -4853,21 +4864,23 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             adjust_func_nb (callable): User-defined function to adjust the current simulation state.
                 Defaults to `vectorbtpro.portfolio.nb.from_signals.no_adjust_func_nb`.
 
-                Passed as argument to `vectorbtpro.portfolio.nb.from_signals.dir_enex_signal_func_nb`
-                and `vectorbtpro.portfolio.nb.from_signals.ls_enex_signal_func_nb`. Has no effect
+                Passed as argument to `vectorbtpro.portfolio.nb.from_signals.dir_signal_func_nb`,
+                `vectorbtpro.portfolio.nb.from_signals.ls_signal_func_nb`, and
+                `vectorbtpro.portfolio.nb.from_signals.order_signal_func_nb`. Has no effect
                 when using other signal functions.
             adjust_args (tuple): Packed arguments passed to `adjust_func_nb`.
                 Defaults to `()`.
             signal_func_nb (callable): Function called to generate signals.
 
-                See `vectorbtpro.portfolio.nb.from_signals.simulate_from_signal_func_nb`.
+                See `vectorbtpro.portfolio.nb.from_signals.from_signal_func_nb`.
             signal_args (tuple): Packed arguments passed to `signal_func_nb`.
                 Defaults to `()`.
             post_segment_func_nb (callable): Post-segment function.
 
-                See `vectorbtpro.portfolio.nb.from_signals.simulate_from_signal_func_nb`.
+                See `vectorbtpro.portfolio.nb.from_signals.from_signal_func_nb`.
             post_segment_args (tuple): Packed arguments passed to `post_segment_func_nb`.
                 Defaults to `()`.
+            order_mode (bool): Whether to simulate as orders without signals.
             size (float or array_like): See `Portfolio.from_orders`.
 
                 !!! note
@@ -5081,6 +5094,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             template_context (mapping): Mapping to replace templates in arguments.
             jitted (any): See `Portfolio.from_orders`.
             chunked (any): See `Portfolio.from_orders`.
+            staticized (bool, dict, hashable, or callable): Option for staticizing.
+
+                If True or dictionary, will be passed as keyword arguments to
+                `vectorbtpro.utils.cutting.cut_and_save_func` to save a cacheable version of the
+                simulator to a file. If a hashable or callable, will be used as a task id of an
+                already registered jittable and chunkable simulator. Dictionary allows an
+                additional option "override" to override an already existing file.
             freq (any): See `Portfolio.from_orders`.
             bm_close (array_like): See `Portfolio.from_orders`.
             **kwargs: Keyword arguments passed to the `Portfolio` constructor.
@@ -5568,15 +5588,56 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         else:
             low_none = False
 
+        if isinstance(staticized, bool):
+            if staticized:
+                staticized = dict(func=nb.from_signal_func_nb)
+            else:
+                staticized = None
         flexible_mode = (
-            (adjust_func_nb is not nb.no_adjust_func_nb)
-            or (signal_func_nb is not nb.no_signal_func_nb)
-            or (post_segment_func_nb is not nb.no_post_func_nb)
+            (adjust_func_nb is not None)
+            or (signal_func_nb is not None)
+            or (post_segment_func_nb is not None)
+            or order_mode
         )
+        signal_func_mode = signal_func_nb is not None
         ls_mode = short_entries is not None or short_exits is not None
-        signal_func_mode = signal_func_nb is not nb.no_signal_func_nb
-        if (entries is not None or exits is not None or ls_mode) and signal_func_mode:
-            raise ValueError("Either any of the signal arrays or signal_func_nb must be provided, not both")
+        signals_mode = entries is not None or exits is not None or ls_mode
+        if ls_mode and direction is not None:
+            raise ValueError("Direction and short signal arrays cannot be used together")
+        if signals_mode and order_mode:
+            raise ValueError("Signal arrays and order mode cannot be used together")
+        if flexible_mode:
+            if signal_func_nb is None:
+                if ls_mode:
+                    signal_func_nb = nb.ls_signal_func_nb
+                    if isinstance(staticized, dict):
+                        staticized["addons"] = "ls_signal_func_nb"
+                        if "path" not in staticized:
+                            staticized["path"] = "./from_ls_signal_func_nb.py"
+                elif signals_mode:
+                    signal_func_nb = nb.dir_signal_func_nb
+                    if isinstance(staticized, dict):
+                        staticized["addons"] = "dir_signal_func_nb"
+                        if "path" not in staticized:
+                            staticized["path"] = "./from_dir_signal_func_nb.py"
+                elif order_mode:
+                    signal_func_nb = nb.order_signal_func_nb
+                    if isinstance(staticized, dict):
+                        staticized["addons"] = "order_signal_func_nb"
+                        if "path" not in staticized:
+                            staticized["path"] = "./from_order_signal_func_nb.py"
+                else:
+                    signal_func_nb = nb.no_signal_func_nb
+            else:
+                if signals_mode:
+                    raise ValueError("Signal arrays and signal_func_nb cannot be used together")
+                if order_mode:
+                    raise ValueError("Order mode must be implemented in the signal function")
+            if adjust_func_nb is None:
+                adjust_func_nb = nb.no_adjust_func_nb
+            if post_segment_func_nb is None:
+                post_segment_func_nb = nb.no_post_func_nb
+
         if entries is None:
             entries = False
         if exits is None:
@@ -5585,15 +5646,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             short_entries = False
         if short_exits is None:
             short_exits = False
-        if direction is not None and ls_mode:
-            warnings.warn("direction has no effect if short_entries and short_exits are set", stacklevel=2)
         if direction is None:
             direction = portfolio_cfg["signal_direction"]
-        if signal_func_nb is nb.no_signal_func_nb:
-            if ls_mode:
-                signal_func_nb = nb.ls_enex_signal_func_nb
-            else:
-                signal_func_nb = nb.dir_enex_signal_func_nb
         if size is None:
             size = portfolio_cfg["size"]
         if size_type is None:
@@ -5789,6 +5843,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         # Prepare the simulation
         broadcastable_args = dict(
+            entries=entries,
+            exits=exits,
+            short_entries=short_entries,
+            short_exits=short_exits,
+            direction=direction,
             cash_earnings=cash_earnings,
             cash_dividends=cash_dividends,
             size=size,
@@ -5846,88 +5905,97 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             broadcastable_args["bm_close"] = bm_close
         else:
             broadcastable_args["bm_close"] = None
-        if not signal_func_mode:
-            if ls_mode:
-                broadcastable_args["entries"] = entries
-                broadcastable_args["exits"] = exits
-                broadcastable_args["short_entries"] = short_entries
-                broadcastable_args["short_exits"] = short_exits
-            else:
-                broadcastable_args["entries"] = entries
-                broadcastable_args["exits"] = exits
-                broadcastable_args["direction"] = direction
         broadcastable_args = {**broadcastable_args, **broadcast_named_args}
-        broadcast_kwargs = merge_dicts(
-            dict(
-                to_pd=False,
-                keep_flex=True,
-                reindex_kwargs=dict(
-                    cash_earnings=dict(fill_value=0.0),
-                    cash_dividends=dict(fill_value=0.0),
-                    entries=dict(fill_value=False),
-                    exits=dict(fill_value=False),
-                    short_entries=dict(fill_value=False),
-                    short_exits=dict(fill_value=False),
-                    size=dict(fill_value=np.nan),
-                    price=dict(fill_value=np.nan),
-                    size_type=dict(fill_value=SizeType.Amount),
-                    direction=dict(fill_value=Direction.Both),
-                    fees=dict(fill_value=0.0),
-                    fixed_fees=dict(fill_value=0.0),
-                    slippage=dict(fill_value=0.0),
-                    min_size=dict(fill_value=np.nan),
-                    max_size=dict(fill_value=np.nan),
-                    size_granularity=dict(fill_value=np.nan),
-                    leverage=dict(fill_value=1.0),
-                    leverage_mode=dict(fill_value=LeverageMode.Lazy),
-                    reject_prob=dict(fill_value=0.0),
-                    price_area_vio_mode=dict(fill_value=PriceAreaVioMode.Ignore),
-                    allow_partial=dict(fill_value=True),
-                    raise_reject=dict(fill_value=False),
-                    log=dict(fill_value=False),
-                    val_price=dict(fill_value=np.nan),
-                    accumulate=dict(fill_value=False),
-                    upon_long_conflict=dict(fill_value=ConflictMode.Ignore),
-                    upon_short_conflict=dict(fill_value=ConflictMode.Ignore),
-                    upon_dir_conflict=dict(fill_value=DirectionConflictMode.Ignore),
-                    upon_opposite_entry=dict(fill_value=OppositeEntryMode.ReverseReduce),
-                    order_type=dict(fill_value=OrderType.Market),
-                    limit_delta=dict(fill_value=np.nan),
-                    limit_tif=dict(fill_value=-1),
-                    limit_expiry=dict(fill_value=-1),
-                    limit_reverse=dict(fill_value=False),
-                    upon_adj_limit_conflict=dict(fill_value=PendingConflictMode.KeepIgnore),
-                    upon_opp_limit_conflict=dict(fill_value=PendingConflictMode.CancelExecute),
-                    sl_stop=dict(fill_value=np.nan),
-                    tsl_stop=dict(fill_value=np.nan),
-                    tsl_th=dict(fill_value=np.nan),
-                    tp_stop=dict(fill_value=np.nan),
-                    td_stop=dict(fill_value=-1),
-                    dt_stop=dict(fill_value=-1),
-                    stop_entry_price=dict(fill_value=StopEntryPrice.Close),
-                    stop_exit_price=dict(fill_value=StopExitPrice.Stop),
-                    stop_exit_type=dict(fill_value=StopExitType.Close),
-                    stop_order_type=dict(fill_value=OrderType.Market),
-                    stop_limit_delta=dict(fill_value=np.nan),
-                    upon_stop_update=dict(fill_value=StopUpdateMode.Override),
-                    upon_adj_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
-                    upon_opp_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
-                    delta_format=dict(fill_value=DeltaFormat.Percent),
-                    time_delta_format=dict(fill_value=TimeDeltaFormat.Index),
-                    open=dict(fill_value=np.nan),
-                    high=dict(fill_value=np.nan),
-                    low=dict(fill_value=np.nan),
-                    close=dict(fill_value=np.nan),
-                    bm_close=dict(fill_value=np.nan),
-                    from_ago=dict(fill_value=0),
-                ),
-                wrapper_kwargs=dict(
-                    freq=freq,
-                    group_by=group_by,
-                ),
+        def_broadcast_kwargs = dict(
+            to_pd=False,
+            keep_flex=True,
+            reindex_kwargs=dict(
+                entries=dict(fill_value=False),
+                exits=dict(fill_value=False),
+                short_entries=dict(fill_value=False),
+                short_exits=dict(fill_value=False),
+                direction=dict(fill_value=Direction.Both),
+                cash_earnings=dict(fill_value=0.0),
+                cash_dividends=dict(fill_value=0.0),
+                size=dict(fill_value=np.nan),
+                price=dict(fill_value=np.nan),
+                size_type=dict(fill_value=SizeType.Amount),
+                fees=dict(fill_value=0.0),
+                fixed_fees=dict(fill_value=0.0),
+                slippage=dict(fill_value=0.0),
+                min_size=dict(fill_value=np.nan),
+                max_size=dict(fill_value=np.nan),
+                size_granularity=dict(fill_value=np.nan),
+                leverage=dict(fill_value=1.0),
+                leverage_mode=dict(fill_value=LeverageMode.Lazy),
+                reject_prob=dict(fill_value=0.0),
+                price_area_vio_mode=dict(fill_value=PriceAreaVioMode.Ignore),
+                allow_partial=dict(fill_value=True),
+                raise_reject=dict(fill_value=False),
+                log=dict(fill_value=False),
+                val_price=dict(fill_value=np.nan),
+                accumulate=dict(fill_value=False),
+                upon_long_conflict=dict(fill_value=ConflictMode.Ignore),
+                upon_short_conflict=dict(fill_value=ConflictMode.Ignore),
+                upon_dir_conflict=dict(fill_value=DirectionConflictMode.Ignore),
+                upon_opposite_entry=dict(fill_value=OppositeEntryMode.ReverseReduce),
+                order_type=dict(fill_value=OrderType.Market),
+                limit_delta=dict(fill_value=np.nan),
+                limit_tif=dict(fill_value=-1),
+                limit_expiry=dict(fill_value=-1),
+                limit_reverse=dict(fill_value=False),
+                upon_adj_limit_conflict=dict(fill_value=PendingConflictMode.KeepIgnore),
+                upon_opp_limit_conflict=dict(fill_value=PendingConflictMode.CancelExecute),
+                sl_stop=dict(fill_value=np.nan),
+                tsl_stop=dict(fill_value=np.nan),
+                tsl_th=dict(fill_value=np.nan),
+                tp_stop=dict(fill_value=np.nan),
+                td_stop=dict(fill_value=-1),
+                dt_stop=dict(fill_value=-1),
+                stop_entry_price=dict(fill_value=StopEntryPrice.Close),
+                stop_exit_price=dict(fill_value=StopExitPrice.Stop),
+                stop_exit_type=dict(fill_value=StopExitType.Close),
+                stop_order_type=dict(fill_value=OrderType.Market),
+                stop_limit_delta=dict(fill_value=np.nan),
+                upon_stop_update=dict(fill_value=StopUpdateMode.Override),
+                upon_adj_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
+                upon_opp_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
+                delta_format=dict(fill_value=DeltaFormat.Percent),
+                time_delta_format=dict(fill_value=TimeDeltaFormat.Index),
+                open=dict(fill_value=np.nan),
+                high=dict(fill_value=np.nan),
+                low=dict(fill_value=np.nan),
+                close=dict(fill_value=np.nan),
+                bm_close=dict(fill_value=np.nan),
+                from_ago=dict(fill_value=0),
             ),
-            broadcast_kwargs,
+            wrapper_kwargs=dict(
+                freq=freq,
+                group_by=group_by,
+            ),
         )
+        if order_mode:
+            def_broadcast_kwargs["keep_flex"] = dict(
+                size=False,
+                size_type=False,
+                min_size=False,
+                max_size=False,
+                _def=True,
+            )
+            def_broadcast_kwargs["min_ndim"] = dict(
+                size=2,
+                size_type=2,
+                min_size=2,
+                max_size=2,
+                _def=None,
+            )
+            def_broadcast_kwargs["require_kwargs"] = dict(
+                size=dict(requirements="O"),
+                size_type=dict(requirements="O"),
+                min_size=dict(requirements="O"),
+                max_size=dict(requirements="O"),
+            )
+        broadcast_kwargs = merge_dicts(def_broadcast_kwargs, broadcast_kwargs)
         broadcasted_args, wrapper = broadcast(broadcastable_args, return_wrapper=True, **broadcast_kwargs)
         if not wrapper.group_select and cash_sharing:
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
@@ -6107,16 +6175,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         broadcasted_args["time_delta_format"] = map_enum_fields(broadcasted_args["time_delta_format"], TimeDeltaFormat)
 
         # Check data types
-        if "entries" in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args["entries"], np.bool_, arg_name="entries")
-        if "exits" in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args["exits"], np.bool_, arg_name="exits")
-        if "short_entries" in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args["short_entries"], np.bool_, arg_name="short_entries")
-        if "short_exits" in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args["short_exits"], np.bool_, arg_name="short_exits")
-        if "direction" in broadcasted_args:
-            checks.assert_subdtype(broadcasted_args["direction"], np.integer, arg_name="direction")
+        checks.assert_subdtype(broadcasted_args["entries"], np.bool_, arg_name="entries")
+        checks.assert_subdtype(broadcasted_args["exits"], np.bool_, arg_name="exits")
+        checks.assert_subdtype(broadcasted_args["short_entries"], np.bool_, arg_name="short_entries")
+        checks.assert_subdtype(broadcasted_args["short_exits"], np.bool_, arg_name="short_exits")
+        checks.assert_subdtype(broadcasted_args["direction"], np.integer, arg_name="direction")
         checks.assert_subdtype(broadcasted_args["size"], np.number, arg_name="size")
         checks.assert_subdtype(broadcasted_args["price"], np.number, arg_name="price")
         checks.assert_subdtype(broadcasted_args["size_type"], np.integer, arg_name="size_type")
@@ -6236,6 +6299,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ),
             template_context,
         )
+        entries = broadcasted_args.pop("entries")
+        exits = broadcasted_args.pop("exits")
+        short_entries = broadcasted_args.pop("short_entries")
+        short_exits = broadcasted_args.pop("short_exits")
+        direction = broadcasted_args.pop("direction")
+
         if flexible_mode:
             in_outputs = substitute_templates(in_outputs, template_context, sub_id="in_outputs")
             post_segment_args = substitute_templates(post_segment_args, template_context, sub_id="post_segment_args")
@@ -6245,12 +6314,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 adjust_args = substitute_templates(adjust_args, template_context, sub_id="adjust_args")
                 if ls_mode:
                     signal_args = (
-                        broadcasted_args.pop("entries"),
-                        broadcasted_args.pop("exits"),
-                        broadcasted_args.pop("short_entries"),
-                        broadcasted_args.pop("short_exits"),
+                        entries,
+                        exits,
+                        short_entries,
+                        short_exits,
                         broadcasted_args["from_ago"],
-                        adjust_func_nb,
+                        *((adjust_func_nb,) if staticized is None else ()),
                         adjust_args,
                     )
                     chunked = ch.specialize_chunked_option(
@@ -6262,18 +6331,49 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                                 base_ch.flex_array_gl_slicer,
                                 base_ch.flex_array_gl_slicer,
                                 base_ch.flex_array_gl_slicer,
-                                None,
+                                *((None,) if staticized is None else ()),
+                                ArgsTaker(),
+                            )
+                        ),
+                    )
+                elif order_mode:
+                    adjust_args = substitute_templates(adjust_args, template_context, sub_id="adjust_args")
+                    signal_args = (
+                        broadcasted_args["size"],
+                        broadcasted_args["price"],
+                        broadcasted_args["size_type"],
+                        direction,
+                        broadcasted_args["min_size"],
+                        broadcasted_args["max_size"],
+                        broadcasted_args["val_price"],
+                        broadcasted_args["from_ago"],
+                        *((adjust_func_nb,) if staticized is None else ()),
+                        adjust_args,
+                    )
+                    chunked = ch.specialize_chunked_option(
+                        chunked,
+                        arg_take_spec=dict(
+                            signal_args=ch.ArgsTaker(
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                *((None,) if staticized is None else ()),
                                 ArgsTaker(),
                             )
                         ),
                     )
                 else:
                     signal_args = (
-                        broadcasted_args.pop("entries"),
-                        broadcasted_args.pop("exits"),
-                        broadcasted_args.pop("direction"),
+                        entries,
+                        exits,
+                        direction,
                         broadcasted_args["from_ago"],
-                        adjust_func_nb,
+                        *((adjust_func_nb,) if staticized is None else ()),
                         adjust_args,
                     )
                     chunked = ch.specialize_chunked_option(
@@ -6284,7 +6384,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                                 base_ch.flex_array_gl_slicer,
                                 base_ch.flex_array_gl_slicer,
                                 base_ch.flex_array_gl_slicer,
-                                None,
+                                *((None,) if staticized is None else ()),
                                 ArgsTaker(),
                             )
                         ),
@@ -6294,8 +6394,26 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             bm_close = broadcasted_args.pop("bm_close", None)
 
             # Perform the simulation
-            func = jit_reg.resolve_option(nb.simulate_from_signal_func_nb, jitted)
+            if staticized is None:
+                func = nb.from_signal_func_nb
+            else:
+                if isinstance(staticized, dict):
+                    if "new_func_name" not in staticized:
+                        staticized["new_func_name"] = "from_signal_func_nb"
+                    if Path(staticized["path"]).exists() and not staticized.pop("override", False):
+                        module_path = Path(staticized["path"])
+                    else:
+                        module_path = cut_and_save_func(**staticized)
+                    module = import_module_from_path(module_path)
+                    func = getattr(module, staticized["new_func_name"])
+                else:
+                    func = staticized
+            func = jit_reg.resolve_option(func, jitted)
             func = ch_reg.resolve_option(func, chunked)
+            callbacks = dict(
+                signal_func_nb=signal_func_nb,
+                post_segment_func_nb=post_segment_func_nb,
+            )
             sim_out = func(
                 target_shape=target_shape_2d,
                 group_lens=group_lens,
@@ -6308,9 +6426,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 cash_deposits=cash_deposits,
                 cash_earnings=cash_earnings,
                 cash_dividends=cash_dividends,
-                signal_func_nb=signal_func_nb,
                 signal_args=signal_args,
-                post_segment_func_nb=post_segment_func_nb,
                 post_segment_args=post_segment_args,
                 use_stops=use_stops,
                 call_seq=call_seq,
@@ -6322,17 +6438,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 max_logs=max_logs,
                 in_outputs=in_outputs,
                 **broadcasted_args,
+                **(callbacks if staticized is None else {}),
             )
         else:
-            entries = broadcasted_args.pop("entries")
-            exits = broadcasted_args.pop("exits")
             if ls_mode:
                 long_entries = entries
                 long_exits = exits
-                short_entries = broadcasted_args.pop("short_entries")
-                short_exits = broadcasted_args.pop("short_exits")
             else:
-                direction = broadcasted_args.pop("direction")
                 if direction.size == 1:
                     _direction = direction.item(0)
                     if _direction == Direction.LongOnly:
@@ -6363,7 +6475,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             bm_close = broadcasted_args.pop("bm_close", None)
 
             # Perform the simulation
-            func = jit_reg.resolve_option(nb.simulate_from_signals_nb, jitted)
+            func = jit_reg.resolve_option(nb.from_signals_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             sim_out = func(
                 target_shape=target_shape_2d,
@@ -6624,9 +6736,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cash_sharing: tp.Optional[bool] = True,
         call_seq: tp.Optional[tp.ArrayLike] = "auto",
         group_by: tp.GroupByLike = None,
-        broadcast_named_args: tp.KwargsLike = None,
-        broadcast_kwargs: tp.KwargsLike = None,
-        chunked: tp.ChunkedOption = None,
         **kwargs,
     ) -> PortfolioT:
         """Build portfolio from an optimizer of type `vectorbtpro.portfolio.pfopt.base.PortfolioOptimizer`.
@@ -6705,79 +6814,19 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 cash_sharing=cash_sharing,
                 call_seq=call_seq,
                 group_by=group_by,
-                broadcast_kwargs=broadcast_kwargs,
-                chunked=chunked,
                 **kwargs,
             )
         elif pf_method.lower() == "from_signals":
-            if broadcast_named_args is None:
-                broadcast_named_args = {}
-            broadcast_named_args = merge_dicts(dict(direction=direction), broadcast_named_args)
-            broadcast_kwargs = merge_dicts(
-                dict(
-                    keep_flex=dict(
-                        size_type=False,
-                        direction=False,
-                        min_size=False,
-                        max_size=False,
-                        _def=True,
-                    ),
-                    require_kwargs=dict(
-                        size_type=dict(requirements="O"),
-                        direction=dict(requirements="O"),
-                        min_size=dict(requirements="O"),
-                        max_size=dict(requirements="O"),
-                    ),
-                    reindex_kwargs=dict(direction=dict(fill_value=Direction.Both))
-                ),
-                broadcast_kwargs,
-            )
-
-            def _prepare_direction(direction):
-                direction = map_enum_fields(direction, Direction)
-                checks.assert_subdtype(direction, np.integer, arg_name="direction")
-                return direction
-
-            arg_take_spec = dict(
-                signal_args=ch.ArgsTaker(
-                    base_ch.flex_array_gl_slicer,
-                    base_ch.flex_array_gl_slicer,
-                    base_ch.flex_array_gl_slicer,
-                    base_ch.flex_array_gl_slicer,
-                    base_ch.flex_array_gl_slicer,
-                    base_ch.flex_array_gl_slicer,
-                    base_ch.flex_array_gl_slicer,
-                    base_ch.flex_array_gl_slicer,
-                    None,
-                    ArgsTaker(),
-                )
-            )
-            chunked = ch.specialize_chunked_option(chunked, arg_take_spec=arg_take_spec)
-
             return cls.from_signals(
                 close,
-                signal_func_nb=nb.order_signal_func_nb,
-                signal_args=(
-                    Rep("size"),
-                    Rep("price"),
-                    Rep("size_type"),
-                    RepFunc(_prepare_direction),
-                    Rep("min_size"),
-                    Rep("max_size"),
-                    Rep("val_price"),
-                    Rep("from_ago"),
-                    adjust_func_nb,
-                    adjust_args,
-                ),
+                order_mode=True,
                 size=size,
                 size_type=size_type,
+                direction=direction,
                 accumulate=True,
                 cash_sharing=cash_sharing,
                 call_seq=call_seq,
                 group_by=group_by,
-                broadcast_named_args=broadcast_named_args,
-                broadcast_kwargs=broadcast_kwargs,
-                chunked=chunked,
                 **kwargs,
             )
         else:
@@ -6845,14 +6894,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         """Build portfolio from a custom order function.
 
         !!! hint
-            See `vectorbtpro.portfolio.nb.from_order_func.simulate_nb` for illustrations and argument definitions.
+            See `vectorbtpro.portfolio.nb.from_order_func.from_order_func_nb` for illustrations and argument definitions.
 
         For more details on individual simulation functions:
 
-        * not `row_wise` and not `flexible`: See `vectorbtpro.portfolio.nb.from_order_func.simulate_nb`
-        * not `row_wise` and `flexible`: See `vectorbtpro.portfolio.nb.from_order_func.flex_simulate_nb`
-        * `row_wise` and not `flexible`: See `vectorbtpro.portfolio.nb.from_order_func.simulate_row_wise_nb`
-        * `row_wise` and `flexible`: See `vectorbtpro.portfolio.nb.from_order_func.flex_simulate_row_wise_nb`
+        * not `row_wise` and not `flexible`: See `vectorbtpro.portfolio.nb.from_order_func.from_order_func_nb`
+        * not `row_wise` and `flexible`: See `vectorbtpro.portfolio.nb.from_order_func.from_flex_order_func_nb`
+        * `row_wise` and not `flexible`: See `vectorbtpro.portfolio.nb.from_order_func.from_order_func_rw_nb`
+        * `row_wise` and `flexible`: See `vectorbtpro.portfolio.nb.from_order_func.from_flex_order_func_rw_nb`
 
         Args:
             close (array_like or Data): Latest asset price at each time step.
@@ -7086,7 +7135,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             dtype: float64
             ```
 
-            * Equal-weighted portfolio as in the example under `vectorbtpro.portfolio.nb.from_order_func.simulate_nb`:
+            * Equal-weighted portfolio as in the example under `vectorbtpro.portfolio.nb.from_order_func.from_order_func_nb`:
 
             ```pycon
             >>> @njit
@@ -7151,7 +7200,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> pf.get_asset_value(group_by=False).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/simulate_nb_example.svg){: .iimg }
+            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg }
 
             Templates are a very powerful tool to prepare any custom arguments after they are broadcast and
             before they are passed to the simulation function. In the example above, we use `broadcast_named_args`
@@ -7613,7 +7662,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         # Perform the simulation
         if row_wise:
             if flexible:
-                func = jit_reg.resolve_option(nb.flex_simulate_row_wise_nb, jitted)
+                func = jit_reg.resolve_option(nb.from_flex_order_func_rw_nb, jitted)
                 func = ch_reg.resolve_option(func, chunked)
                 sim_out = func(
                     target_shape=target_shape_2d,
@@ -7659,7 +7708,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     in_outputs=in_outputs,
                 )
             else:
-                func = jit_reg.resolve_option(nb.simulate_row_wise_nb, jitted)
+                func = jit_reg.resolve_option(nb.from_order_func_rw_nb, jitted)
                 func = ch_reg.resolve_option(func, chunked)
                 sim_out = func(
                     target_shape=target_shape_2d,
@@ -7707,7 +7756,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 )
         else:
             if flexible:
-                func = jit_reg.resolve_option(nb.flex_simulate_nb, jitted)
+                func = jit_reg.resolve_option(nb.from_flex_order_func_nb, jitted)
                 func = ch_reg.resolve_option(func, chunked)
                 sim_out = func(
                     target_shape=target_shape_2d,
@@ -7753,7 +7802,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     in_outputs=in_outputs,
                 )
             else:
-                func = jit_reg.resolve_option(nb.simulate_nb, jitted)
+                func = jit_reg.resolve_option(nb.from_order_func_nb, jitted)
                 func = ch_reg.resolve_option(func, chunked)
                 sim_out = func(
                     target_shape=target_shape_2d,
@@ -7927,7 +7976,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> asset_value.vbt.plot().show()
             ```
 
-            ![](/assets/images/api/simulate_nb_example.svg){: .iimg }
+            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg }
         """
         # Get defaults
         from vectorbtpro._settings import settings
