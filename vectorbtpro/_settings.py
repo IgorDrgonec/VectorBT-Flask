@@ -1377,7 +1377,6 @@ portfolio = child_dict(
     fill_pos_info=True,
     track_value=True,
     row_wise=False,
-    flexible=False,
     seed=None,
     group_by=None,
     broadcast_kwargs=Config(
@@ -1389,6 +1388,7 @@ portfolio = child_dict(
     call_seq=None,
     attach_call_seq=False,
     bm_close=None,
+    staticized=False,
     # Portfolio
     freq=None,
     use_in_outputs=True,

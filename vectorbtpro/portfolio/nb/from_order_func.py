@@ -187,7 +187,7 @@ def sort_call_seq_nb(
 
 
 @register_jitted
-def try_order_nb(ctx: OrderContext, order: Order) -> tp.Tuple[ExecState, OrderResult]:
+def try_order_nb(ctx: OrderContext, order: Order) -> tp.Tuple[OrderResult, ExecState]:
     """Execute an order without persistence."""
     exec_state = ExecState(
         cash=ctx.cash_now,
@@ -225,102 +225,168 @@ def no_post_func_nb(c: tp.NamedTuple, *args) -> None:
     return None
 
 
-@register_jitted
-def set_val_price_nb(c: SegmentContext, val_price: tp.FlexArray2d, price: tp.FlexArray2d) -> None:
-    """Override valuation price in a context.
-
-    Allows specifying a valuation price of positive infinity (takes the current price)
-    and negative infinity (takes the latest valuation price)."""
-    for col in range(c.from_col, c.to_col):
-        _val_price = select_from_col_nb(c, col, val_price)
-        if np.isinf(_val_price):
-            if _val_price > 0:
-                _price = select_from_col_nb(c, col, price)
-                if np.isinf(_price):
-                    if _price > 0:
-                        _price = select_from_col_nb(c, col, c.close)
-                    else:
-                        _price = select_from_col_nb(c, col, c.open)
-                _val_price = _price
-            else:
-                _val_price = c.last_val_price[col]
-        if not np.isnan(_val_price) or not c.ffill_val_price:
-            c.last_val_price[col] = _val_price
-
-
-@register_jitted
-def def_pre_segment_func_nb(
-    c: SegmentContext,
-    val_price: tp.FlexArray2d,
-    price: tp.FlexArray2d,
-    size: tp.FlexArray2d,
-    size_type: tp.FlexArray2d,
-    direction: tp.FlexArray2d,
-    auto_call_seq: bool,
-) -> tp.Args:
-    """Pre-segment function that overrides the valuation price and optionally sorts the call sequence."""
-    set_val_price_nb(c, val_price, price)
-    if auto_call_seq:
-        order_value_out = np.empty(c.group_len, dtype=np.float_)
-        sort_call_seq_nb(c, size, size_type, direction, order_value_out)
-    return ()
-
-
-@register_jitted
-def def_order_func_nb(
-    c: OrderContext,
-    size: tp.FlexArray2d,
-    price: tp.FlexArray2d,
-    size_type: tp.FlexArray2d,
-    direction: tp.FlexArray2d,
-    fees: tp.FlexArray2d,
-    fixed_fees: tp.FlexArray2d,
-    slippage: tp.FlexArray2d,
-    min_size: tp.FlexArray2d,
-    max_size: tp.FlexArray2d,
-    size_granularity: tp.FlexArray2d,
-    leverage: tp.FlexArray2d,
-    leverage_mode: tp.FlexArray2d,
-    reject_prob: tp.FlexArray2d,
-    price_area_vio_mode: tp.FlexArray2d,
-    allow_partial: tp.FlexArray2d,
-    raise_reject: tp.FlexArray2d,
-    log: tp.FlexArray2d,
-) -> tp.Tuple[int, Order]:
-    """Order function that creates an order based on default information."""
-    return order_nb(
-        size=select_nb(c, size),
-        price=select_nb(c, price),
-        size_type=select_nb(c, size_type),
-        direction=select_nb(c, direction),
-        fees=select_nb(c, fees),
-        fixed_fees=select_nb(c, fixed_fees),
-        slippage=select_nb(c, slippage),
-        min_size=select_nb(c, min_size),
-        max_size=select_nb(c, max_size),
-        size_granularity=select_nb(c, size_granularity),
-        leverage=select_nb(c, leverage),
-        leverage_mode=select_nb(c, leverage_mode),
-        reject_prob=select_nb(c, reject_prob),
-        price_area_vio_mode=select_nb(c, price_area_vio_mode),
-        allow_partial=select_nb(c, allow_partial),
-        raise_reject=select_nb(c, raise_reject),
-        log=select_nb(c, log),
-    )
-
-
 PreSimFuncT = tp.Callable[[SimulationContext, tp.VarArg()], tp.Args]
 PostSimFuncT = tp.Callable[[SimulationContext, tp.VarArg()], None]
 PreGroupFuncT = tp.Callable[[GroupContext, tp.VarArg()], tp.Args]
 PostGroupFuncT = tp.Callable[[GroupContext, tp.VarArg()], None]
-PreRowFuncT = tp.Callable[[RowContext, tp.VarArg()], tp.Args]
-PostRowFuncT = tp.Callable[[RowContext, tp.VarArg()], None]
 PreSegmentFuncT = tp.Callable[[SegmentContext, tp.VarArg()], tp.Args]
 PostSegmentFuncT = tp.Callable[[SegmentContext, tp.VarArg()], None]
 OrderFuncT = tp.Callable[[OrderContext, tp.VarArg()], Order]
-PostOrderFuncT = tp.Callable[[PostOrderContext, OrderResult, tp.VarArg()], None]
+PostOrderFuncT = tp.Callable[[PostOrderContext, tp.VarArg()], None]
 
 
+# % <block pre_sim_func_nb>
+# % <skip? skip_func(out_lines, "pre_sim_func_nb")>
+# % <uncomment>
+# @register_jitted
+# def pre_sim_func_nb(
+#     c: SimulationContext,
+#     *args,
+# ) -> tp.Args:
+#     """Custom simulation pre-processing function."""
+#     return args
+#
+#
+# % </uncomment>
+# % </skip>
+# % </block>
+
+# % <block post_sim_func_nb>
+# % <skip? skip_func(out_lines, "post_sim_func_nb")>
+# % <uncomment>
+# @register_jitted
+# def post_sim_func_nb(
+#     c: SimulationContext,
+#     *args,
+# ) -> None:
+#     """Custom simulation post-processing function."""
+#     return None
+#
+#
+# % </uncomment>
+# % </skip>
+# % </block>
+
+# % <block pre_group_func_nb>
+# % <skip? skip_func(out_lines, "pre_group_func_nb")>
+# % <uncomment>
+# @register_jitted
+# def pre_group_func_nb(
+#     c: GroupContext,
+#     *args,
+# ) -> tp.Args:
+#     """Custom group pre-processing function."""
+#     return args
+#
+#
+# % </uncomment>
+# % </skip>
+# % </block>
+
+# % <block post_group_func_nb>
+# % <skip? skip_func(out_lines, "post_group_func_nb")>
+# % <uncomment>
+# @register_jitted
+# def post_group_func_nb(
+#     c: GroupContext,
+#     *args,
+# ) -> None:
+#     """Custom group post-processing function."""
+#     return None
+#
+#
+# % </uncomment>
+# % </skip>
+# % </block>
+
+# % <block pre_segment_func_nb>
+# % <skip? skip_func(out_lines, "pre_segment_func_nb")>
+# % <uncomment>
+# @register_jitted
+# def pre_segment_func_nb(
+#     c: SegmentContext,
+#     *args,
+# ) -> tp.Args:
+#     """Custom segment pre-processing function."""
+#     return args
+#
+#
+# % </uncomment>
+# % </skip>
+# % </block>
+
+# % <block post_segment_func_nb>
+# % <skip? skip_func(out_lines, "post_segment_func_nb")>
+# % <uncomment>
+# @register_jitted
+# def post_segment_func_nb(
+#     c: SegmentContext,
+#     *args,
+# ) -> None:
+#     """Custom segment post-processing function."""
+#     return None
+#
+#
+# % </uncomment>
+# % </skip>
+# % </block>
+
+# % <block order_func_nb>
+# % <skip? skip_func(out_lines, "order_func_nb")>
+# % <uncomment>
+# @register_jitted
+# def order_func_nb(
+#     c: OrderContext,
+#     *args,
+# ) -> Order:
+#     """Custom order function."""
+#     return NoOrder
+#
+#
+# % </uncomment>
+# % </skip>
+# % </block>
+
+# % <block post_order_func_nb>
+# % <skip? skip_func(out_lines, "post_order_func_nb")>
+# % <uncomment>
+# @register_jitted
+# def post_order_func_nb(
+#     c: PostOrderContext,
+#     *args,
+# ) -> None:
+#     """Custom order post-processing function."""
+#     return None
+#
+#
+# % </uncomment>
+# % </skip>
+# % </block>
+
+# % <section from_order_func_nb>
+# % <uncomment>
+# import vectorbtpro as vbt
+# from vectorbtpro.portfolio.nb.from_order_func import *
+# %? import_lines
+#
+#
+# % </uncomment>
+# %? blocks[pre_sim_func_nb_block]
+# % blocks["pre_sim_func_nb"]
+# %? blocks[post_sim_func_nb_block]
+# % blocks["post_sim_func_nb"]
+# %? blocks[pre_group_func_nb_block]
+# % blocks["pre_group_func_nb"]
+# %? blocks[post_group_func_nb_block]
+# % blocks["post_group_func_nb"]
+# %? blocks[pre_segment_func_nb_block]
+# % blocks["pre_segment_func_nb"]
+# %? blocks[post_segment_func_nb_block]
+# % blocks["post_segment_func_nb"]
+# %? blocks[order_func_nb_block]
+# % blocks["order_func_nb"]
+# %? blocks[post_order_func_nb_block]
+# % blocks["post_order_func_nb"]
 @register_chunkable(
     size=ch.ArraySizer(arg_query="group_lens", axis=0),
     arg_take_spec=dict(
@@ -336,21 +402,21 @@ PostOrderFuncT = tp.Callable[[PostOrderContext, OrderResult, tp.VarArg()], None]
         segment_mask=base_ch.FlexArraySlicer(axis=1),
         call_pre_segment=None,
         call_post_segment=None,
-        pre_sim_func_nb=None,
+        pre_sim_func_nb=None,  # % None
         pre_sim_args=ch.ArgsTaker(),
-        post_sim_func_nb=None,
+        post_sim_func_nb=None,  # % None
         post_sim_args=ch.ArgsTaker(),
-        pre_group_func_nb=None,
+        pre_group_func_nb=None,  # % None
         pre_group_args=ch.ArgsTaker(),
-        post_group_func_nb=None,
+        post_group_func_nb=None,  # % None
         post_group_args=ch.ArgsTaker(),
-        pre_segment_func_nb=None,
+        pre_segment_func_nb=None,  # % None
         pre_segment_args=ch.ArgsTaker(),
-        post_segment_func_nb=None,
+        post_segment_func_nb=None,  # % None
         post_segment_args=ch.ArgsTaker(),
-        order_func_nb=None,
+        order_func_nb=None,  # % None
         order_args=ch.ArgsTaker(),
-        post_order_func_nb=None,
+        post_order_func_nb=None,  # % None
         post_order_args=ch.ArgsTaker(),
         index=None,
         freq=None,
@@ -367,10 +433,15 @@ PostOrderFuncT = tp.Callable[[PostOrderContext, OrderResult, tp.VarArg()], None]
         max_logs=None,
         in_outputs=ch.ArgsTaker(),
     ),
-    **portfolio_ch.merge_sim_outs_config
+    **portfolio_ch.merge_sim_outs_config,
+    setup_id=None,  # %? line.replace("None", task_id)
 )
-@register_jitted(tags={"can_parallel"})
-def from_order_func_nb(
+@register_jitted(
+    tags={"can_parallel"},
+    cache=False,  # % line.replace("False", "True")
+    task_id_or_func=None,  # %? line.replace("None", task_id)
+)
+def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
     target_shape: tp.Shape,
     group_lens: tp.Array1d,
     cash_sharing: bool,
@@ -383,21 +454,21 @@ def from_order_func_nb(
     segment_mask: tp.FlexArray2dLike = True,
     call_pre_segment: bool = False,
     call_post_segment: bool = False,
-    pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
+    pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,  # % None
     pre_sim_args: tp.Args = (),
-    post_sim_func_nb: PostSimFuncT = no_post_func_nb,
+    post_sim_func_nb: PostSimFuncT = no_post_func_nb,  # % None
     post_sim_args: tp.Args = (),
-    pre_group_func_nb: PreGroupFuncT = no_pre_func_nb,
+    pre_group_func_nb: PreGroupFuncT = no_pre_func_nb,  # % None
     pre_group_args: tp.Args = (),
-    post_group_func_nb: PostGroupFuncT = no_post_func_nb,
+    post_group_func_nb: PostGroupFuncT = no_post_func_nb,  # % None
     post_group_args: tp.Args = (),
-    pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,
+    pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,  # % None
     pre_segment_args: tp.Args = (),
-    post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,
+    post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,  # % None
     post_segment_args: tp.Args = (),
-    order_func_nb: OrderFuncT = no_order_func_nb,
+    order_func_nb: OrderFuncT = no_order_func_nb,  # % None
     order_args: tp.Args = (),
-    post_order_func_nb: PostOrderFuncT = no_post_func_nb,
+    post_order_func_nb: PostOrderFuncT = no_post_func_nb,  # % None
     post_order_args: tp.Args = (),
     index: tp.Optional[tp.Array1d] = None,
     freq: tp.Optional[int] = None,
@@ -1477,6 +1548,68 @@ def from_order_func_nb(
     )
 
 
+# % </section>
+
+PreRowFuncT = tp.Callable[[RowContext, tp.VarArg()], tp.Args]
+PostRowFuncT = tp.Callable[[RowContext, tp.VarArg()], None]
+
+
+# % <block pre_row_func_nb>
+# % <skip? skip_func(out_lines, "pre_row_func_nb")>
+# % <uncomment>
+# @register_jitted
+# def pre_row_func_nb(
+#     c: RowContext,
+#     *args,
+# ) -> tp.Args:
+#     """Custom row pre-processing function."""
+#     return args
+#
+#
+# % </uncomment>
+# % </skip>
+# % </block>
+
+# % <block post_row_func_nb>
+# % <skip? skip_func(out_lines, "post_row_func_nb")>
+# % <uncomment>
+# @register_jitted
+# def post_row_func_nb(
+#     c: RowContext,
+#     *args,
+# ) -> None:
+#     """Custom row post-processing function."""
+#     return None
+#
+#
+# % </uncomment>
+# % </skip>
+# % </block>
+
+# % <section from_order_func_rw_nb>
+# % <uncomment>
+# import vectorbtpro as vbt
+# from vectorbtpro.portfolio.nb.from_order_func import *
+# %? import_lines
+#
+#
+# % </uncomment>
+# %? blocks[pre_sim_func_nb_block]
+# % blocks["pre_sim_func_nb"]
+# %? blocks[post_sim_func_nb_block]
+# % blocks["post_sim_func_nb"]
+# %? blocks[pre_row_func_nb_block]
+# % blocks["pre_row_func_nb"]
+# %? blocks[post_row_func_nb_block]
+# % blocks["post_row_func_nb"]
+# %? blocks[pre_segment_func_nb_block]
+# % blocks["pre_segment_func_nb"]
+# %? blocks[post_segment_func_nb_block]
+# % blocks["post_segment_func_nb"]
+# %? blocks[order_func_nb_block]
+# % blocks["order_func_nb"]
+# %? blocks[post_order_func_nb_block]
+# % blocks["post_order_func_nb"]
 @register_chunkable(
     size=ch.ArraySizer(arg_query="group_lens", axis=0),
     arg_take_spec=dict(
@@ -1492,21 +1625,21 @@ def from_order_func_nb(
         segment_mask=base_ch.FlexArraySlicer(axis=1),
         call_pre_segment=None,
         call_post_segment=None,
-        pre_sim_func_nb=None,
+        pre_sim_func_nb=None,  # % None
         pre_sim_args=ch.ArgsTaker(),
-        post_sim_func_nb=None,
+        post_sim_func_nb=None,  # % None
         post_sim_args=ch.ArgsTaker(),
-        pre_row_func_nb=None,
+        pre_row_func_nb=None,  # % None
         pre_row_args=ch.ArgsTaker(),
-        post_row_func_nb=None,
+        post_row_func_nb=None,  # % None
         post_row_args=ch.ArgsTaker(),
-        pre_segment_func_nb=None,
+        pre_segment_func_nb=None,  # % None
         pre_segment_args=ch.ArgsTaker(),
-        post_segment_func_nb=None,
+        post_segment_func_nb=None,  # % None
         post_segment_args=ch.ArgsTaker(),
-        order_func_nb=None,
+        order_func_nb=None,  # % None
         order_args=ch.ArgsTaker(),
-        post_order_func_nb=None,
+        post_order_func_nb=None,  # % None
         post_order_args=ch.ArgsTaker(),
         index=None,
         freq=None,
@@ -1523,10 +1656,15 @@ def from_order_func_nb(
         max_logs=None,
         in_outputs=ch.ArgsTaker(),
     ),
-    **portfolio_ch.merge_sim_outs_config
+    **portfolio_ch.merge_sim_outs_config,
+    setup_id=None,  # %? line.replace("None", task_id)
 )
-@register_jitted
-def from_order_func_rw_nb(
+@register_jitted(
+    tags={"can_parallel"},
+    cache=False,  # % line.replace("False", "True")
+    task_id_or_func=None,  # %? line.replace("None", task_id)
+)
+def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_name)
     target_shape: tp.Shape,
     group_lens: tp.Array1d,
     cash_sharing: bool,
@@ -1539,21 +1677,21 @@ def from_order_func_rw_nb(
     segment_mask: tp.FlexArray2dLike = True,
     call_pre_segment: bool = False,
     call_post_segment: bool = False,
-    pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
+    pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,  # % None
     pre_sim_args: tp.Args = (),
-    post_sim_func_nb: PostSimFuncT = no_post_func_nb,
+    post_sim_func_nb: PostSimFuncT = no_post_func_nb,  # % None
     post_sim_args: tp.Args = (),
-    pre_row_func_nb: PreRowFuncT = no_pre_func_nb,
+    pre_row_func_nb: PreRowFuncT = no_pre_func_nb,  # % None
     pre_row_args: tp.Args = (),
-    post_row_func_nb: PostRowFuncT = no_post_func_nb,
+    post_row_func_nb: PostRowFuncT = no_post_func_nb,  # % None
     post_row_args: tp.Args = (),
-    pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,
+    pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,  # % None
     pre_segment_args: tp.Args = (),
-    post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,
+    post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,  # % None
     post_segment_args: tp.Args = (),
-    order_func_nb: OrderFuncT = no_order_func_nb,
+    order_func_nb: OrderFuncT = no_order_func_nb,  # % None
     order_args: tp.Args = (),
-    post_order_func_nb: PostOrderFuncT = no_post_func_nb,
+    post_order_func_nb: PostOrderFuncT = no_post_func_nb,  # % None
     post_order_args: tp.Args = (),
     index: tp.Optional[tp.Array1d] = None,
     freq: tp.Optional[int] = None,
@@ -2391,82 +2529,58 @@ def from_order_func_rw_nb(
     )
 
 
+# % </section>
+
+
 @register_jitted
 def no_flex_order_func_nb(c: FlexOrderContext, *args) -> tp.Tuple[int, Order]:
     """Placeholder flexible order function that returns "break" column and no order."""
     return -1, NoOrder
 
 
-@register_jitted
-def def_flex_pre_segment_func_nb(
-    c: SegmentContext,
-    val_price: tp.FlexArray2d,
-    price: tp.FlexArray2d,
-    size: tp.FlexArray2d,
-    size_type: tp.FlexArray2d,
-    direction: tp.FlexArray2d,
-    auto_call_seq: bool,
-) -> tp.Args:
-    """Flexible pre-segment function that overrides the valuation price and optionally sorts the call sequence."""
-    set_val_price_nb(c, val_price, price)
-    call_seq_out = np.arange(c.group_len)
-    if auto_call_seq:
-        order_value_out = np.empty(c.group_len, dtype=np.float_)
-        sort_call_seq_out_nb(c, size, size_type, direction, order_value_out, call_seq_out)
-    return (call_seq_out,)
-
-
-@register_jitted
-def def_flex_order_func_nb(
-    c: FlexOrderContext,
-    call_seq_now: tp.Array1d,
-    size: tp.FlexArray2d,
-    price: tp.FlexArray2d,
-    size_type: tp.FlexArray2d,
-    direction: tp.FlexArray2d,
-    fees: tp.FlexArray2d,
-    fixed_fees: tp.FlexArray2d,
-    slippage: tp.FlexArray2d,
-    min_size: tp.FlexArray2d,
-    max_size: tp.FlexArray2d,
-    size_granularity: tp.FlexArray2d,
-    leverage: tp.FlexArray2d,
-    leverage_mode: tp.FlexArray2d,
-    reject_prob: tp.FlexArray2d,
-    price_area_vio_mode: tp.FlexArray2d,
-    allow_partial: tp.FlexArray2d,
-    raise_reject: tp.FlexArray2d,
-    log: tp.FlexArray2d,
-) -> tp.Tuple[int, Order]:
-    """Flexible order function that creates an order based on default information."""
-    if c.call_idx < c.group_len:
-        col = c.from_col + call_seq_now[c.call_idx]
-        order = order_nb(
-            size=select_from_col_nb(c, col, size),
-            price=select_from_col_nb(c, col, price),
-            size_type=select_from_col_nb(c, col, size_type),
-            direction=select_from_col_nb(c, col, direction),
-            fees=select_from_col_nb(c, col, fees),
-            fixed_fees=select_from_col_nb(c, col, fixed_fees),
-            slippage=select_from_col_nb(c, col, slippage),
-            min_size=select_from_col_nb(c, col, min_size),
-            max_size=select_from_col_nb(c, col, max_size),
-            size_granularity=select_from_col_nb(c, col, size_granularity),
-            leverage=select_from_col_nb(c, col, leverage),
-            leverage_mode=select_from_col_nb(c, col, leverage_mode),
-            reject_prob=select_from_col_nb(c, col, reject_prob),
-            price_area_vio_mode=select_from_col_nb(c, col, price_area_vio_mode),
-            allow_partial=select_from_col_nb(c, col, allow_partial),
-            raise_reject=select_from_col_nb(c, col, raise_reject),
-            log=select_from_col_nb(c, col, log),
-        )
-        return col, order
-    return -1, order_nothing_nb()
-
-
 FlexOrderFuncT = tp.Callable[[FlexOrderContext, tp.VarArg()], tp.Tuple[int, Order]]
 
 
+# % <block flex_order_func_nb>
+# % <skip? skip_func(out_lines, "flex_order_func_nb")>
+# % <uncomment>
+# @register_jitted
+# def flex_order_func_nb(
+#     c: FlexOrderContext,
+#     *args,
+# ) -> tp.Tuple[int, Order]:
+#     """Custom flexible order function."""
+#     return -1, NoOrder
+#
+#
+# % </uncomment>
+# % </skip>
+# % </block>
+
+# % <section from_flex_order_func_nb>
+# % <uncomment>
+# import vectorbtpro as vbt
+# from vectorbtpro.portfolio.nb.from_order_func import *
+# %? import_lines
+#
+#
+# % </uncomment>
+# %? blocks[pre_sim_func_nb_block]
+# % blocks["pre_sim_func_nb"]
+# %? blocks[post_sim_func_nb_block]
+# % blocks["post_sim_func_nb"]
+# %? blocks[pre_group_func_nb_block]
+# % blocks["pre_group_func_nb"]
+# %? blocks[post_group_func_nb_block]
+# % blocks["post_group_func_nb"]
+# %? blocks[pre_segment_func_nb_block]
+# % blocks["pre_segment_func_nb"]
+# %? blocks[post_segment_func_nb_block]
+# % blocks["post_segment_func_nb"]
+# %? blocks[flex_order_func_nb_block]
+# % blocks["flex_order_func_nb"]
+# %? blocks[post_order_func_nb_block]
+# % blocks["post_order_func_nb"]
 @register_chunkable(
     size=ch.ArraySizer(arg_query="group_lens", axis=0),
     arg_take_spec=dict(
@@ -2481,21 +2595,21 @@ FlexOrderFuncT = tp.Callable[[FlexOrderContext, tp.VarArg()], tp.Tuple[int, Orde
         segment_mask=base_ch.FlexArraySlicer(axis=1),
         call_pre_segment=None,
         call_post_segment=None,
-        pre_sim_func_nb=None,
+        pre_sim_func_nb=None,  # % None
         pre_sim_args=ch.ArgsTaker(),
-        post_sim_func_nb=None,
+        post_sim_func_nb=None,  # % None
         post_sim_args=ch.ArgsTaker(),
-        pre_group_func_nb=None,
+        pre_group_func_nb=None,  # % None
         pre_group_args=ch.ArgsTaker(),
-        post_group_func_nb=None,
+        post_group_func_nb=None,  # % None
         post_group_args=ch.ArgsTaker(),
-        pre_segment_func_nb=None,
+        pre_segment_func_nb=None,  # % None
         pre_segment_args=ch.ArgsTaker(),
-        post_segment_func_nb=None,
+        post_segment_func_nb=None,  # % None
         post_segment_args=ch.ArgsTaker(),
-        flex_order_func_nb=None,
+        flex_order_func_nb=None,  # % None
         flex_order_args=ch.ArgsTaker(),
-        post_order_func_nb=None,
+        post_order_func_nb=None,  # % None
         post_order_args=ch.ArgsTaker(),
         index=None,
         freq=None,
@@ -2512,10 +2626,15 @@ FlexOrderFuncT = tp.Callable[[FlexOrderContext, tp.VarArg()], tp.Tuple[int, Orde
         max_logs=None,
         in_outputs=ch.ArgsTaker(),
     ),
-    **portfolio_ch.merge_sim_outs_config
+    **portfolio_ch.merge_sim_outs_config,
+    setup_id=None,  # %? line.replace("None", task_id)
 )
-@register_jitted(tags={"can_parallel"})
-def from_flex_order_func_nb(
+@register_jitted(
+    tags={"can_parallel"},
+    cache=False,  # % line.replace("False", "True")
+    task_id_or_func=None,  # %? line.replace("None", task_id)
+)
+def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_func_name)
     target_shape: tp.Shape,
     group_lens: tp.Array1d,
     cash_sharing: bool,
@@ -2527,21 +2646,21 @@ def from_flex_order_func_nb(
     segment_mask: tp.FlexArray2dLike = True,
     call_pre_segment: bool = False,
     call_post_segment: bool = False,
-    pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
+    pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,  # % None
     pre_sim_args: tp.Args = (),
-    post_sim_func_nb: PostSimFuncT = no_post_func_nb,
+    post_sim_func_nb: PostSimFuncT = no_post_func_nb,  # % None
     post_sim_args: tp.Args = (),
-    pre_group_func_nb: PreGroupFuncT = no_pre_func_nb,
+    pre_group_func_nb: PreGroupFuncT = no_pre_func_nb,  # % None
     pre_group_args: tp.Args = (),
-    post_group_func_nb: PostGroupFuncT = no_post_func_nb,
+    post_group_func_nb: PostGroupFuncT = no_post_func_nb,  # % None
     post_group_args: tp.Args = (),
-    pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,
+    pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,  # % None
     pre_segment_args: tp.Args = (),
-    post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,
+    post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,  # % None
     post_segment_args: tp.Args = (),
-    flex_order_func_nb: FlexOrderFuncT = no_flex_order_func_nb,
+    flex_order_func_nb: FlexOrderFuncT = no_flex_order_func_nb,  # % None
     flex_order_args: tp.Args = (),
-    post_order_func_nb: PostOrderFuncT = no_post_func_nb,
+    post_order_func_nb: PostOrderFuncT = no_post_func_nb,  # % None
     post_order_args: tp.Args = (),
     index: tp.Optional[tp.Array1d] = None,
     freq: tp.Optional[int] = None,
@@ -3447,6 +3566,33 @@ def from_flex_order_func_nb(
     )
 
 
+# % </section>
+
+
+# % <section from_flex_order_func_rw_nb>
+# % <uncomment>
+# import vectorbtpro as vbt
+# from vectorbtpro.portfolio.nb.from_order_func import *
+# %? import_lines
+#
+#
+# % </uncomment>
+# %? blocks[pre_sim_func_nb_block]
+# % blocks["pre_sim_func_nb"]
+# %? blocks[post_sim_func_nb_block]
+# % blocks["post_sim_func_nb"]
+# %? blocks[pre_row_func_nb_block]
+# % blocks["pre_row_func_nb"]
+# %? blocks[post_row_func_nb_block]
+# % blocks["post_row_func_nb"]
+# %? blocks[pre_segment_func_nb_block]
+# % blocks["pre_segment_func_nb"]
+# %? blocks[post_segment_func_nb_block]
+# % blocks["post_segment_func_nb"]
+# %? blocks[flex_order_func_nb_block]
+# % blocks["flex_order_func_nb"]
+# %? blocks[post_order_func_nb_block]
+# % blocks["post_order_func_nb"]
 @register_chunkable(
     size=ch.ArraySizer(arg_query="group_lens", axis=0),
     arg_take_spec=dict(
@@ -3461,21 +3607,21 @@ def from_flex_order_func_nb(
         segment_mask=base_ch.FlexArraySlicer(axis=1),
         call_pre_segment=None,
         call_post_segment=None,
-        pre_sim_func_nb=None,
+        pre_sim_func_nb=None,  # % None
         pre_sim_args=ch.ArgsTaker(),
-        post_sim_func_nb=None,
+        post_sim_func_nb=None,  # % None
         post_sim_args=ch.ArgsTaker(),
-        pre_row_func_nb=None,
+        pre_row_func_nb=None,  # % None
         pre_row_args=ch.ArgsTaker(),
-        post_row_func_nb=None,
+        post_row_func_nb=None,  # % None
         post_row_args=ch.ArgsTaker(),
-        pre_segment_func_nb=None,
+        pre_segment_func_nb=None,  # % None
         pre_segment_args=ch.ArgsTaker(),
-        post_segment_func_nb=None,
+        post_segment_func_nb=None,  # % None
         post_segment_args=ch.ArgsTaker(),
-        flex_order_func_nb=None,
+        flex_order_func_nb=None,  # % None
         flex_order_args=ch.ArgsTaker(),
-        post_order_func_nb=None,
+        post_order_func_nb=None,  # % None
         post_order_args=ch.ArgsTaker(),
         index=None,
         freq=None,
@@ -3492,10 +3638,15 @@ def from_flex_order_func_nb(
         max_logs=None,
         in_outputs=ch.ArgsTaker(),
     ),
-    **portfolio_ch.merge_sim_outs_config
+    **portfolio_ch.merge_sim_outs_config,
+    setup_id=None,  # %? line.replace("None", task_id)
 )
-@register_jitted
-def from_flex_order_func_rw_nb(
+@register_jitted(
+    tags={"can_parallel"},
+    cache=False,  # % line.replace("False", "True")
+    task_id_or_func=None,  # %? line.replace("None", task_id)
+)
+def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb", new_func_name)
     target_shape: tp.Shape,
     group_lens: tp.Array1d,
     cash_sharing: bool,
@@ -3507,21 +3658,21 @@ def from_flex_order_func_rw_nb(
     segment_mask: tp.FlexArray2dLike = True,
     call_pre_segment: bool = False,
     call_post_segment: bool = False,
-    pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
+    pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,  # % None
     pre_sim_args: tp.Args = (),
-    post_sim_func_nb: PostSimFuncT = no_post_func_nb,
+    post_sim_func_nb: PostSimFuncT = no_post_func_nb,  # % None
     post_sim_args: tp.Args = (),
-    pre_row_func_nb: PreRowFuncT = no_pre_func_nb,
+    pre_row_func_nb: PreRowFuncT = no_pre_func_nb,  # % None
     pre_row_args: tp.Args = (),
-    post_row_func_nb: PostRowFuncT = no_post_func_nb,
+    post_row_func_nb: PostRowFuncT = no_post_func_nb,  # % None
     post_row_args: tp.Args = (),
-    pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,
+    pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,  # % None
     pre_segment_args: tp.Args = (),
-    post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,
+    post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,  # % None
     post_segment_args: tp.Args = (),
-    flex_order_func_nb: FlexOrderFuncT = no_flex_order_func_nb,
+    flex_order_func_nb: FlexOrderFuncT = no_flex_order_func_nb,  # % None
     flex_order_args: tp.Args = (),
-    post_order_func_nb: PostOrderFuncT = no_post_func_nb,
+    post_order_func_nb: PostOrderFuncT = no_post_func_nb,  # % None
     post_order_args: tp.Args = (),
     index: tp.Optional[tp.Array1d] = None,
     freq: tp.Optional[int] = None,
@@ -4292,3 +4443,173 @@ def from_flex_order_func_rw_nb(
         call_seq=None,
         in_outputs=in_outputs,
     )
+
+
+# % </section>
+
+
+@register_jitted
+def set_val_price_nb(c: SegmentContext, val_price: tp.FlexArray2d, price: tp.FlexArray2d) -> None:
+    """Override valuation price in a context.
+
+    Allows specifying a valuation price of positive infinity (takes the current price)
+    and negative infinity (takes the latest valuation price)."""
+    for col in range(c.from_col, c.to_col):
+        _val_price = select_from_col_nb(c, col, val_price)
+        if np.isinf(_val_price):
+            if _val_price > 0:
+                _price = select_from_col_nb(c, col, price)
+                if np.isinf(_price):
+                    if _price > 0:
+                        _price = select_from_col_nb(c, col, c.close)
+                    else:
+                        _price = select_from_col_nb(c, col, c.open)
+                _val_price = _price
+            else:
+                _val_price = c.last_val_price[col]
+        if not np.isnan(_val_price) or not c.ffill_val_price:
+            c.last_val_price[col] = _val_price
+
+
+# % <block def_pre_segment_func_nb>
+@register_jitted
+def def_pre_segment_func_nb(  # % line.replace("def_pre_segment_func_nb", "pre_segment_func_nb")
+    c: SegmentContext,
+    val_price: tp.FlexArray2d,
+    price: tp.FlexArray2d,
+    size: tp.FlexArray2d,
+    size_type: tp.FlexArray2d,
+    direction: tp.FlexArray2d,
+    auto_call_seq: bool,
+) -> tp.Args:
+    """Pre-segment function that overrides the valuation price and optionally sorts the call sequence."""
+    set_val_price_nb(c, val_price, price)
+    if auto_call_seq:
+        order_value_out = np.empty(c.group_len, dtype=np.float_)
+        sort_call_seq_nb(c, size, size_type, direction, order_value_out)
+    return ()
+
+
+# % </block>
+
+
+# % <block def_order_func_nb>
+@register_jitted
+def def_order_func_nb(  # % line.replace("def_order_func_nb", "order_func_nb")
+    c: OrderContext,
+    size: tp.FlexArray2d,
+    price: tp.FlexArray2d,
+    size_type: tp.FlexArray2d,
+    direction: tp.FlexArray2d,
+    fees: tp.FlexArray2d,
+    fixed_fees: tp.FlexArray2d,
+    slippage: tp.FlexArray2d,
+    min_size: tp.FlexArray2d,
+    max_size: tp.FlexArray2d,
+    size_granularity: tp.FlexArray2d,
+    leverage: tp.FlexArray2d,
+    leverage_mode: tp.FlexArray2d,
+    reject_prob: tp.FlexArray2d,
+    price_area_vio_mode: tp.FlexArray2d,
+    allow_partial: tp.FlexArray2d,
+    raise_reject: tp.FlexArray2d,
+    log: tp.FlexArray2d,
+) -> tp.Tuple[int, Order]:
+    """Order function that creates an order based on default information."""
+    return order_nb(
+        size=select_nb(c, size),
+        price=select_nb(c, price),
+        size_type=select_nb(c, size_type),
+        direction=select_nb(c, direction),
+        fees=select_nb(c, fees),
+        fixed_fees=select_nb(c, fixed_fees),
+        slippage=select_nb(c, slippage),
+        min_size=select_nb(c, min_size),
+        max_size=select_nb(c, max_size),
+        size_granularity=select_nb(c, size_granularity),
+        leverage=select_nb(c, leverage),
+        leverage_mode=select_nb(c, leverage_mode),
+        reject_prob=select_nb(c, reject_prob),
+        price_area_vio_mode=select_nb(c, price_area_vio_mode),
+        allow_partial=select_nb(c, allow_partial),
+        raise_reject=select_nb(c, raise_reject),
+        log=select_nb(c, log),
+    )
+
+
+# % </block>
+
+
+# % <block def_flex_pre_segment_func_nb>
+@register_jitted
+def def_flex_pre_segment_func_nb(  # % line.replace("def_flex_pre_segment_func_nb", "pre_segment_func_nb")
+    c: SegmentContext,
+    val_price: tp.FlexArray2d,
+    price: tp.FlexArray2d,
+    size: tp.FlexArray2d,
+    size_type: tp.FlexArray2d,
+    direction: tp.FlexArray2d,
+    auto_call_seq: bool,
+) -> tp.Args:
+    """Flexible pre-segment function that overrides the valuation price and optionally sorts the call sequence."""
+    set_val_price_nb(c, val_price, price)
+    call_seq_out = np.arange(c.group_len)
+    if auto_call_seq:
+        order_value_out = np.empty(c.group_len, dtype=np.float_)
+        sort_call_seq_out_nb(c, size, size_type, direction, order_value_out, call_seq_out)
+    return (call_seq_out,)
+
+
+# % </block>
+
+
+# % <block def_flex_order_func_nb>
+@register_jitted
+def def_flex_order_func_nb(  # % line.replace("def_flex_order_func_nb", "flex_order_func_nb")
+    c: FlexOrderContext,
+    call_seq_now: tp.Array1d,
+    size: tp.FlexArray2d,
+    price: tp.FlexArray2d,
+    size_type: tp.FlexArray2d,
+    direction: tp.FlexArray2d,
+    fees: tp.FlexArray2d,
+    fixed_fees: tp.FlexArray2d,
+    slippage: tp.FlexArray2d,
+    min_size: tp.FlexArray2d,
+    max_size: tp.FlexArray2d,
+    size_granularity: tp.FlexArray2d,
+    leverage: tp.FlexArray2d,
+    leverage_mode: tp.FlexArray2d,
+    reject_prob: tp.FlexArray2d,
+    price_area_vio_mode: tp.FlexArray2d,
+    allow_partial: tp.FlexArray2d,
+    raise_reject: tp.FlexArray2d,
+    log: tp.FlexArray2d,
+) -> tp.Tuple[int, Order]:
+    """Flexible order function that creates an order based on default information."""
+    if c.call_idx < c.group_len:
+        col = c.from_col + call_seq_now[c.call_idx]
+        order = order_nb(
+            size=select_from_col_nb(c, col, size),
+            price=select_from_col_nb(c, col, price),
+            size_type=select_from_col_nb(c, col, size_type),
+            direction=select_from_col_nb(c, col, direction),
+            fees=select_from_col_nb(c, col, fees),
+            fixed_fees=select_from_col_nb(c, col, fixed_fees),
+            slippage=select_from_col_nb(c, col, slippage),
+            min_size=select_from_col_nb(c, col, min_size),
+            max_size=select_from_col_nb(c, col, max_size),
+            size_granularity=select_from_col_nb(c, col, size_granularity),
+            leverage=select_from_col_nb(c, col, leverage),
+            leverage_mode=select_from_col_nb(c, col, leverage_mode),
+            reject_prob=select_from_col_nb(c, col, reject_prob),
+            price_area_vio_mode=select_from_col_nb(c, col, price_area_vio_mode),
+            allow_partial=select_from_col_nb(c, col, allow_partial),
+            raise_reject=select_from_col_nb(c, col, raise_reject),
+            log=select_from_col_nb(c, col, log),
+        )
+        return col, order
+    return -1, order_nothing_nb()
+
+
+# % </block>

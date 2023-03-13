@@ -71,6 +71,17 @@ def adjust_func_nb(c):
     pass
 
 
+@njit
+def signal_func_nb(c, long_num_arr, short_num_arr):
+    long_num = nb.select_nb(c, long_num_arr)
+    short_num = nb.select_nb(c, short_num_arr)
+    is_long_entry = long_num > 0
+    is_long_exit = long_num < 0
+    is_short_entry = short_num > 0
+    is_short_exit = short_num < 0
+    return is_long_entry, is_long_exit, is_short_entry, is_short_exit
+
+
 class TestFromSignals:
     def test_data(self):
         data = vbt.RandomOHLCData.fetch(
@@ -233,16 +244,6 @@ class TestFromSignals:
         assert pf.wrapper.grouper.group_by is None
 
     def test_custom_signal_func(self):
-        @njit
-        def signal_func_nb(c, long_num_arr, short_num_arr):
-            long_num = nb.select_nb(c, long_num_arr)
-            short_num = nb.select_nb(c, short_num_arr)
-            is_long_entry = long_num > 0
-            is_long_exit = long_num < 0
-            is_short_entry = short_num > 0
-            is_short_exit = short_num < 0
-            return is_long_entry, is_long_exit, is_short_entry, is_short_exit
-
         pf_base = vbt.Portfolio.from_signals(
             pd.Series([1, 2, 3, 4, 5]),
             entries=pd.Series([True, False, False, False, False]),
@@ -6011,12 +6012,108 @@ class TestFromSignals:
             ).returns,
         )
 
+    def test_staticized(self, tmp_path):
+        close = [1, 2, 3, 4]
+        entries = [True, False, False, False]
+        exits = [False, True, False, False]
+        short_entries = [False, False, True, False]
+        short_exits = [False, False, False, True]
+        assert_records_close(
+            vbt.Portfolio.from_signals(
+                close,
+                entries=entries,
+                exits=exits,
+                short_entries=short_entries,
+                short_exits=short_exits,
+                staticized=dict(path=tmp_path, override=True),
+            ).order_records,
+            vbt.Portfolio.from_signals(
+                close,
+                entries=entries,
+                exits=exits,
+                short_entries=short_entries,
+                short_exits=short_exits,
+            ).order_records,
+        )
+        assert_records_close(
+            vbt.Portfolio.from_signals(
+                close,
+                entries=entries,
+                exits=exits,
+                direction="both",
+                staticized=dict(path=tmp_path, override=True),
+            ).order_records,
+            vbt.Portfolio.from_signals(
+                close,
+                entries=entries,
+                exits=exits,
+                direction="both",
+            ).order_records,
+        )
+        assert_records_close(
+            vbt.Portfolio.from_signals(
+                close,
+                size=0.5,
+                size_type="targetpercent",
+                order_mode=True,
+                staticized=dict(path=tmp_path, override=True),
+            ).order_records,
+            vbt.Portfolio.from_signals(
+                close,
+                size=0.5,
+                size_type="targetpercent",
+                order_mode=True,
+            ).order_records,
+        )
+        assert_records_close(
+            vbt.Portfolio.from_signals(
+                close,
+                size=0.5,
+                size_type="targetpercent",
+                order_mode=True,
+                adjust_func_nb=adjust_func_nb,
+                staticized=dict(path=tmp_path, override=True),
+            ).order_records,
+            vbt.Portfolio.from_signals(
+                close,
+                size=0.5,
+                size_type="targetpercent",
+                order_mode=True,
+                adjust_func_nb=adjust_func_nb,
+            ).order_records,
+        )
+        assert_records_close(
+            vbt.Portfolio.from_signals(
+                pd.Series([1, 2, 3, 4, 5]),
+                signal_func_nb=signal_func_nb,
+                signal_args=(vbt.Rep("long_num_arr"), vbt.Rep("short_num_arr")),
+                broadcast_named_args=dict(
+                    long_num_arr=pd.Series([1, 0, -1, 0, 0]),
+                    short_num_arr=pd.Series([0, 1, 0, 1, -1]),
+                ),
+                size=1,
+                upon_opposite_entry="ignore",
+                staticized=dict(path=tmp_path, override=True),
+            ).order_records,
+            vbt.Portfolio.from_signals(
+                pd.Series([1, 2, 3, 4, 5]),
+                signal_func_nb=signal_func_nb,
+                signal_args=(vbt.Rep("long_num_arr"), vbt.Rep("short_num_arr")),
+                broadcast_named_args=dict(
+                    long_num_arr=pd.Series([1, 0, -1, 0, 0]),
+                    short_num_arr=pd.Series([0, 1, 0, 1, -1]),
+                ),
+                size=1,
+                upon_opposite_entry="ignore",
+            ).order_records,
+        )
+
 
 # ############# from_holding ############# #
 
 
 class TestFromHolding:
-    def test_from_holding(self):
+    def test_from_holding(self, tmp_path):
         df = pd.DataFrame(
             [
                 [1, np.nan, np.nan],
@@ -6068,6 +6165,37 @@ class TestFromHolding:
         assert_records_close(
             vbt.Portfolio.from_holding(df, at_first_valid_in=None, close_at_end=True).order_records,
             vbt.Portfolio.from_signals(df, entries, exits, accumulate=False).order_records,
+        )
+
+    def test_staticized(self, tmp_path):
+        df = pd.DataFrame(
+            [
+                [1, np.nan, np.nan],
+                [2, 5, np.nan],
+                [3, 6, 8],
+                [4, 7, 9],
+            ]
+        )
+        assert_records_close(
+            vbt.Portfolio.from_holding(
+                df,
+                dynamic_mode=True,
+                staticized=dict(path=tmp_path, override=True),
+            ).order_records,
+            vbt.Portfolio.from_holding(df, dynamic_mode=True).order_records,
+        )
+        assert_records_close(
+            vbt.Portfolio.from_signals(
+                df,
+                signal_func_nb="holding_enex_signal_func_nb",
+                signal_args=(Direction.LongOnly, True),
+                staticized=dict(path=tmp_path, override=True),
+            ).order_records,
+            vbt.Portfolio.from_holding(
+                df,
+                dynamic_mode=True,
+                close_at_end=True,
+            ).order_records,
         )
 
 

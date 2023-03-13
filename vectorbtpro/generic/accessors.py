@@ -3760,9 +3760,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """Generate crossover above another array.
-
-        See `vectorbtpro.generic.nb.base.crossed_above_nb`.
+        """See `vectorbtpro.generic.nb.base.crossed_above_nb`.
 
         Usage:
             ```pycon
@@ -3812,15 +3810,15 @@ class GenericAccessor(BaseAccessor, Analyzable):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """Generate crossover below another array.
+        """See `vectorbtpro.generic.nb.base.crossed_below_nb`.
 
-        See `vectorbtpro.generic.nb.base.crossed_above_nb` but in reversed order."""
+        Also, see `GenericAccessor.crossed_above` for similar examples."""
         self_obj, other_obj = reshaping.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
-        func = jit_reg.resolve_option(nb.crossed_above_nb, jitted)
+        func = jit_reg.resolve_option(nb.crossed_below_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(
-            reshaping.to_2d_array(other_obj),
             reshaping.to_2d_array(self_obj),
+            reshaping.to_2d_array(other_obj),
             wait=wait,
             dropna=dropna,
         )

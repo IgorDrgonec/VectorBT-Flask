@@ -2847,21 +2847,8 @@ SignalFuncT = tp.Callable[[SignalContext, tp.VarArg()], tp.Tuple[bool, bool, boo
 PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
 
 
-# % <section: from_signal_func_nb>
-# % <uncomment>
-# import vectorbtpro as vbt
-# from vectorbtpro.portfolio.nb.from_signals import *
-#
-#
-# % </uncomment>
-# % <for-each-addon>
-# % insert_addon
-# % <uncomment>
-#
-#
-# % </uncomment>
-# % </for-each-addon>
-# % <skip: any(map(lambda x: x.startswith("def signal_func_nb"), new_lines))>
+# % <block signal_func_nb>
+# % <skip? skip_func(out_lines, "signal_func_nb")>
 # % <uncomment>
 # @register_jitted
 # def signal_func_nb(
@@ -2873,18 +2860,35 @@ PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
 #
 # % </uncomment>
 # % </skip>
-# % <skip: any(map(lambda x: x.startswith("def post_segment_func_nb"), new_lines))>
+# % </block>
+
+# % <block post_segment_func_nb>
+# % <skip? skip_func(out_lines, "post_segment_func_nb")>
 # % <uncomment>
 # @register_jitted
 # def post_segment_func_nb(
 #     c: SignalSegmentContext,
 # ) -> None:
 #     """Custom post-segment function."""
-#     pass
+#     return None
 #
 #
 # % </uncomment>
 # % </skip>
+# % </block>
+
+# % <section from_signal_func_nb>
+# % <uncomment>
+# import vectorbtpro as vbt
+# from vectorbtpro.portfolio.nb.from_signals import *
+# %? import_lines
+#
+#
+# % </uncomment>
+# %? blocks[signal_func_nb_block]
+# % blocks["signal_func_nb"]
+# %? blocks[post_segment_func_nb_block]
+# % blocks["post_segment_func_nb"]
 @register_chunkable(
     size=ch.ArraySizer(arg_query="group_lens", axis=0),
     arg_take_spec=dict(
@@ -2903,9 +2907,9 @@ PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
         cash_deposits=RepFunc(portfolio_ch.get_cash_deposits_slicer),
         cash_earnings=base_ch.flex_array_gl_slicer,
         cash_dividends=base_ch.flex_array_gl_slicer,
-        signal_func_nb=None,  # % skip
+        signal_func_nb=None,  # % None
         signal_args=ch.ArgsTaker(),
-        post_segment_func_nb=None,  # % skip
+        post_segment_func_nb=None,  # % None
         post_segment_args=ch.ArgsTaker(),
         size=base_ch.flex_array_gl_slicer,
         price=base_ch.flex_array_gl_slicer,
@@ -2968,10 +2972,10 @@ PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
 )
 @register_jitted(
     tags={"can_parallel"},
-    cache=False,  # %! line.replace("False", "True")
+    cache=False,  # % line.replace("False", "True")
     task_id_or_func=None,  # %? line.replace("None", task_id)
 )
-def from_signal_func_nb(  # %? line.replace(section_name, new_func_name)
+def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name)
     target_shape: tp.Shape,
     group_lens: tp.Array1d,
     cash_sharing: bool,
@@ -2987,9 +2991,9 @@ def from_signal_func_nb(  # %? line.replace(section_name, new_func_name)
     cash_deposits: tp.FlexArray2dLike = 0.0,
     cash_earnings: tp.FlexArray2dLike = 0.0,
     cash_dividends: tp.FlexArray2dLike = 0.0,
-    signal_func_nb: SignalFuncT = no_signal_func_nb,  # % skip
+    signal_func_nb: SignalFuncT = no_signal_func_nb,  # % None
     signal_args: tp.ArgsLike = (),
-    post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,  # % skip
+    post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,  # % None
     post_segment_args: tp.ArgsLike = (),
     size: tp.FlexArray2dLike = np.inf,
     price: tp.FlexArray2dLike = np.inf,
@@ -4944,132 +4948,8 @@ def from_signal_func_nb(  # %? line.replace(section_name, new_func_name)
         call_seq=call_seq,
         in_outputs=in_outputs,
     )
-# % </section>
 
 
-# % <section: holding_enex_signal_func_nb>
-@register_jitted
-def holding_enex_signal_func_nb(  # %! line.replace(section_name, "signal_func_nb")
-    c: SignalContext,
-    direction: int,
-    close_at_end: bool,
-) -> tp.Tuple[bool, bool, bool, bool]:
-    """Resolve direction-aware signals for holding."""
-    if c.last_position[c.col] == 0:
-        if direction == Direction.ShortOnly:
-            return False, False, True, False
-        return True, False, False, False
-    if close_at_end and c.i == c.target_shape[0] - 1:
-        if c.last_position[c.col] < 0:
-            return False, False, False, True
-        return False, True, False, False
-    return False, False, False, False
-# % </section>
-
-
-AdjustFuncT = tp.Callable[[SignalContext, tp.VarArg()], None]
-
-
-@register_jitted
-def no_adjust_func_nb(c: SignalContext, *args) -> None:
-    """Placeholder adjustment function."""
-    return None
-
-
-# % <section: dir_signal_func_nb>
-# % <skip: any(map(lambda x: x.startswith("def adjust_func_nb"), new_lines))>
-# % <uncomment>
-# @register_jitted
-# def adjust_func_nb(
-#     c: SignalContext,
-# ) -> None:
-#     """Custom adjustment function."""
-#     pass
-#
-#
-# % </uncomment>
-# % </skip>
-@register_jitted
-def dir_signal_func_nb(  # %! line.replace(section_name, "signal_func_nb")
-    c: SignalContext,
-    entries: tp.FlexArray2d,
-    exits: tp.FlexArray2d,
-    direction: tp.FlexArray2d,
-    from_ago: tp.FlexArray2d,
-    adjust_func_nb: AdjustFuncT = no_adjust_func_nb,  # % skip
-    adjust_args: tp.Args = (),
-) -> tp.Tuple[bool, bool, bool, bool]:
-    """Resolve direction-aware signals out of entries, exits, and direction.
-
-    The direction of each pair of signals is taken from `direction` argument:
-
-    * True, True, `Direction.LongOnly` -> True, True, False, False
-    * True, True, `Direction.ShortOnly` -> False, False, True, True
-    * True, True, `Direction.Both` -> True, False, True, False
-
-    Best to use when the direction doesn't change throughout time.
-
-    Prior to returning the signals, calls user-defined `adjust_func_nb`, which can be used to adjust
-    stop values in the context. Must accept `vectorbtpro.portfolio.enums.SignalContext` and `*adjust_args`,
-    and return nothing."""
-    adjust_func_nb(c, *adjust_args)
-
-    _i = c.i - abs(flex_select_nb(from_ago, c.i, c.col))
-    if _i < 0:
-        return False, False, False, False
-    is_entry = flex_select_nb(entries, _i, c.col)
-    is_exit = flex_select_nb(exits, _i, c.col)
-    _direction = flex_select_nb(direction, _i, c.col)
-    if _direction == Direction.LongOnly:
-        return is_entry, is_exit, False, False
-    if _direction == Direction.ShortOnly:
-        return False, False, is_entry, is_exit
-    return is_entry, False, is_exit, False
-# % </section>
-
-
-# % <section: ls_signal_func_nb>
-# % <skip: any(map(lambda x: x.startswith("def adjust_func_nb"), new_lines))>
-# % <uncomment>
-# @register_jitted
-# def adjust_func_nb(
-#     c: SignalContext,
-# ) -> None:
-#     """Custom adjustment function."""
-#     pass
-#
-#
-# % </uncomment>
-# % </skip>
-@register_jitted
-def ls_signal_func_nb(  # %! line.replace(section_name, "signal_func_nb")
-    c: SignalContext,
-    long_entries: tp.FlexArray2d,
-    long_exits: tp.FlexArray2d,
-    short_entries: tp.FlexArray2d,
-    short_exits: tp.FlexArray2d,
-    from_ago: tp.FlexArray2d,
-    adjust_func_nb: AdjustFuncT = no_adjust_func_nb,  # % skip
-    adjust_args: tp.Args = (),
-) -> tp.Tuple[bool, bool, bool, bool]:
-    """Get an element of direction-aware signals.
-
-    The direction is already built into the arrays. Best to use when the direction changes frequently
-    (for example, if you have one indicator providing long signals and one providing short signals).
-
-    Prior to returning the signals, calls user-defined `adjust_func_nb`, which can be used to adjust
-    stop values in the context. Must accept `vectorbtpro.portfolio.enums.SignalContext` and `*adjust_args`,
-    and return nothing."""
-    adjust_func_nb(c, *adjust_args)
-
-    _i = c.i - abs(flex_select_nb(from_ago, c.i, c.col))
-    if _i < 0:
-        return False, False, False, False
-    is_long_entry = flex_select_nb(long_entries, _i, c.col)
-    is_long_exit = flex_select_nb(long_exits, _i, c.col)
-    is_short_entry = flex_select_nb(short_entries, _i, c.col)
-    is_short_exit = flex_select_nb(short_exits, _i, c.col)
-    return is_long_entry, is_long_exit, is_short_entry, is_short_exit
 # % </section>
 
 
@@ -5117,21 +4997,135 @@ def dir_to_ls_signals_nb(
     return long_entries_out, long_exits_out, short_entries_out, short_exits_out
 
 
-# % <section: order_signal_func_nb>
-# % <skip: any(map(lambda x: x.startswith("def adjust_func_nb"), new_lines))>
+# % <block holding_enex_signal_func_nb>
+@register_jitted
+def holding_enex_signal_func_nb(  # % line.replace("holding_enex_signal_func_nb", "signal_func_nb")
+    c: SignalContext,
+    direction: int,
+    close_at_end: bool,
+) -> tp.Tuple[bool, bool, bool, bool]:
+    """Resolve direction-aware signals for holding."""
+    if c.last_position[c.col] == 0:
+        if direction == Direction.ShortOnly:
+            return False, False, True, False
+        return True, False, False, False
+    if close_at_end and c.i == c.target_shape[0] - 1:
+        if c.last_position[c.col] < 0:
+            return False, False, False, True
+        return False, True, False, False
+    return False, False, False, False
+
+
+# % </block>
+
+
+AdjustFuncT = tp.Callable[[SignalContext, tp.VarArg()], None]
+
+
+@register_jitted
+def no_adjust_func_nb(c: SignalContext, *args) -> None:
+    """Placeholder adjustment function."""
+    return None
+
+
+# % <block adjust_func_nb>
+# % <skip? skip_func(out_lines, "adjust_func_nb")>
 # % <uncomment>
 # @register_jitted
 # def adjust_func_nb(
 #     c: SignalContext,
 # ) -> None:
 #     """Custom adjustment function."""
-#     pass
+#     return None
 #
 #
 # % </uncomment>
 # % </skip>
+# % </block>
+
+# % <block dir_signal_func_nb>
+# % blocks["adjust_func_nb"]
 @register_jitted
-def order_signal_func_nb(  # %! line.replace(section_name, "signal_func_nb")
+def dir_signal_func_nb(  # % line.replace("dir_signal_func_nb", "signal_func_nb")
+    c: SignalContext,
+    entries: tp.FlexArray2d,
+    exits: tp.FlexArray2d,
+    direction: tp.FlexArray2d,
+    from_ago: tp.FlexArray2d,
+    adjust_func_nb: AdjustFuncT = no_adjust_func_nb,  # % None
+    adjust_args: tp.Args = (),
+) -> tp.Tuple[bool, bool, bool, bool]:
+    """Resolve direction-aware signals out of entries, exits, and direction.
+
+    The direction of each pair of signals is taken from `direction` argument:
+
+    * True, True, `Direction.LongOnly` -> True, True, False, False
+    * True, True, `Direction.ShortOnly` -> False, False, True, True
+    * True, True, `Direction.Both` -> True, False, True, False
+
+    Best to use when the direction doesn't change throughout time.
+
+    Prior to returning the signals, calls user-defined `adjust_func_nb`, which can be used to adjust
+    stop values in the context. Must accept `vectorbtpro.portfolio.enums.SignalContext` and `*adjust_args`,
+    and return nothing."""
+    adjust_func_nb(c, *adjust_args)
+
+    _i = c.i - abs(flex_select_nb(from_ago, c.i, c.col))
+    if _i < 0:
+        return False, False, False, False
+    is_entry = flex_select_nb(entries, _i, c.col)
+    is_exit = flex_select_nb(exits, _i, c.col)
+    _direction = flex_select_nb(direction, _i, c.col)
+    if _direction == Direction.LongOnly:
+        return is_entry, is_exit, False, False
+    if _direction == Direction.ShortOnly:
+        return False, False, is_entry, is_exit
+    return is_entry, False, is_exit, False
+
+
+# % </block>
+
+
+# % <block ls_signal_func_nb>
+# % blocks["adjust_func_nb"]
+@register_jitted
+def ls_signal_func_nb(  # % line.replace("ls_signal_func_nb", "signal_func_nb")
+    c: SignalContext,
+    long_entries: tp.FlexArray2d,
+    long_exits: tp.FlexArray2d,
+    short_entries: tp.FlexArray2d,
+    short_exits: tp.FlexArray2d,
+    from_ago: tp.FlexArray2d,
+    adjust_func_nb: AdjustFuncT = no_adjust_func_nb,  # % None
+    adjust_args: tp.Args = (),
+) -> tp.Tuple[bool, bool, bool, bool]:
+    """Get an element of direction-aware signals.
+
+    The direction is already built into the arrays. Best to use when the direction changes frequently
+    (for example, if you have one indicator providing long signals and one providing short signals).
+
+    Prior to returning the signals, calls user-defined `adjust_func_nb`, which can be used to adjust
+    stop values in the context. Must accept `vectorbtpro.portfolio.enums.SignalContext` and `*adjust_args`,
+    and return nothing."""
+    adjust_func_nb(c, *adjust_args)
+
+    _i = c.i - abs(flex_select_nb(from_ago, c.i, c.col))
+    if _i < 0:
+        return False, False, False, False
+    is_long_entry = flex_select_nb(long_entries, _i, c.col)
+    is_long_exit = flex_select_nb(long_exits, _i, c.col)
+    is_short_entry = flex_select_nb(short_entries, _i, c.col)
+    is_short_exit = flex_select_nb(short_exits, _i, c.col)
+    return is_long_entry, is_long_exit, is_short_entry, is_short_exit
+
+
+# % </block>
+
+
+# % <block order_signal_func_nb>
+# % blocks["adjust_func_nb"]
+@register_jitted
+def order_signal_func_nb(  # % line.replace("order_signal_func_nb", "signal_func_nb")
     c: SignalContext,
     size: tp.FlexArray2d,
     price: tp.FlexArray2d,
@@ -5141,7 +5135,7 @@ def order_signal_func_nb(  # %! line.replace(section_name, "signal_func_nb")
     max_size: tp.FlexArray2d,
     val_price: tp.FlexArray2d,
     from_ago: tp.FlexArray2d,
-    adjust_func_nb: AdjustFuncT = no_adjust_func_nb,  # % skip
+    adjust_func_nb: AdjustFuncT = no_adjust_func_nb,  # % None
     adjust_args: tp.Args = (),
 ) -> tp.Tuple[bool, bool, bool, bool]:
     """Resolve direction-aware signals out of orders.
@@ -5222,4 +5216,6 @@ def order_signal_func_nb(  # %! line.replace(section_name, "signal_func_nb")
             return False, True, False, False
         return False, False, True, False
     return False, False, False, False
-# % </section>
+
+
+# % </block>
