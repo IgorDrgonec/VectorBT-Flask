@@ -232,8 +232,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         fetch_kwargs: tp.Optional[symbol_dict] = None,
         returned_kwargs: tp.Optional[symbol_dict] = None,
         last_index: tp.Optional[symbol_dict] = None,
-        tz_localize: tp.Optional[tp.TimezoneLike] = None,
-        tz_convert: tp.Optional[tp.TimezoneLike] = None,
+        tz_localize: tp.Union[None, bool, tp.TimezoneLike] = None,
+        tz_convert: tp.Union[None, bool, tp.TimezoneLike] = None,
         missing_index: tp.Optional[str] = None,
         missing_columns: tp.Optional[str] = None,
         **kwargs,
@@ -364,12 +364,12 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         return self._last_index
 
     @property
-    def tz_localize(self) -> tp.Optional[tp.TimezoneLike]:
+    def tz_localize(self) -> tp.Union[None, bool, tp.TimezoneLike]:
         """`tz_localize` initially passed to `Data.fetch_symbol`."""
         return self._tz_localize
 
     @property
-    def tz_convert(self) -> tp.Optional[tp.TimezoneLike]:
+    def tz_convert(self) -> tp.Union[None, bool, tp.TimezoneLike]:
         """`tz_convert` initially passed to `Data.fetch_symbol`."""
         return self._tz_convert
 
@@ -431,8 +431,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     def prepare_tzaware_index(
         cls,
         obj: tp.SeriesFrame,
-        tz_localize: tp.Optional[tp.TimezoneLike] = None,
-        tz_convert: tp.Optional[tp.TimezoneLike] = None,
+        tz_localize: tp.Union[None, bool, tp.TimezoneLike] = None,
+        tz_convert: tp.Union[None, bool, tp.TimezoneLike] = None,
     ) -> tp.SeriesFrame:
         """Prepare a timezone-aware index of a pandas object.
 
@@ -445,8 +445,18 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         if tz_localize is None:
             tz_localize = data_cfg["tz_localize"]
+        if isinstance(tz_localize, bool):
+            if tz_localize:
+                raise ValueError("tz_localize cannot be True")
+            else:
+                tz_localize = None
         if tz_convert is None:
             tz_convert = data_cfg["tz_convert"]
+        if isinstance(tz_convert, bool):
+            if tz_convert:
+                raise ValueError("tz_convert cannot be True")
+            else:
+                tz_convert = None
 
         if isinstance(obj.index, pd.DatetimeIndex):
             if tz_localize is not None:
@@ -640,8 +650,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         symbol_oriented: bool = False,
         single_symbol: bool = True,
         symbol_classes: tp.Optional[symbol_dict] = None,
-        tz_localize: tp.Optional[tp.TimezoneLike] = None,
-        tz_convert: tp.Optional[tp.TimezoneLike] = None,
+        tz_localize: tp.Union[None, bool, tp.TimezoneLike] = None,
+        tz_convert: tp.Union[None, bool, tp.TimezoneLike] = None,
         missing_index: tp.Optional[str] = None,
         missing_columns: tp.Optional[str] = None,
         wrapper_kwargs: tp.KwargsLike = None,
@@ -788,8 +798,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
         *,
         symbol_classes: tp.Optional[tp.MaybeSequence[tp.Union[tp.Hashable, dict]]] = None,
-        tz_localize: tp.Optional[tp.TimezoneLike] = None,
-        tz_convert: tp.Optional[tp.TimezoneLike] = None,
+        tz_localize: tp.Union[None, bool, tp.TimezoneLike] = None,
+        tz_convert: tp.Union[None, bool, tp.TimezoneLike] = None,
         missing_index: tp.Optional[str] = None,
         missing_columns: tp.Optional[str] = None,
         wrapper_kwargs: tp.KwargsLike = None,

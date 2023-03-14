@@ -45,14 +45,34 @@ def is_number(arg: tp.Any) -> bool:
     return is_int(arg) or is_float(arg)
 
 
+def is_td(arg: tp.Any) -> bool:
+    """Check whether the argument is a timedelta object."""
+    return isinstance(arg, (pd.Timedelta, datetime.timedelta, np.timedelta64))
+
+
 def is_td_like(arg: tp.Any) -> bool:
     """Check whether the argument is a timedelta-like object."""
-    return is_number(arg) or isinstance(arg, (str, pd.Timedelta, datetime.timedelta, np.timedelta64))
+    return is_td(arg) or is_number(arg) or isinstance(arg, str)
+
+
+def is_dt(arg: tp.Any) -> bool:
+    """Check whether the argument is a datetime object."""
+    return isinstance(arg, (pd.Timestamp, datetime.datetime, np.datetime64))
 
 
 def is_dt_like(arg: tp.Any) -> bool:
     """Check whether the argument is a datetime-like object."""
-    return is_number(arg) or isinstance(arg, (str, pd.Timestamp, datetime.datetime, np.datetime64))
+    return is_dt(arg) or is_number(arg) or isinstance(arg, str)
+
+
+def is_time(arg: tp.Any) -> bool:
+    """Check whether the argument is a time object."""
+    return isinstance(arg, datetime.time)
+
+
+def is_time_like(arg: tp.Any) -> bool:
+    """Check whether the argument is a time-like object."""
+    return is_time(arg) or isinstance(arg, str)
 
 
 def is_np_array(arg: tp.Any) -> bool:

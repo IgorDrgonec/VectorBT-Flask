@@ -1622,7 +1622,7 @@ import inspect
 import warnings
 from collections import namedtuple
 from functools import partial
-from datetime import datetime, timedelta
+from datetime import timedelta, time
 from pathlib import Path
 
 import numpy as np
@@ -1637,7 +1637,6 @@ from vectorbtpro.base.reshaping import (
     broadcast_to,
     to_pd_array,
     to_2d_shape,
-    BCO,
 )
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
@@ -1655,7 +1654,6 @@ from vectorbtpro.portfolio.logs import Logs
 from vectorbtpro.portfolio.orders import Orders, FSOrders
 from vectorbtpro.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
 from vectorbtpro.portfolio.pfopt.base import PortfolioOptimizer
-from vectorbtpro.records import nb as records_nb
 from vectorbtpro.records.base import Records
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
@@ -1666,11 +1664,16 @@ from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig, atomic_dict
-from vectorbtpro.utils.datetime_ import freq_to_timedelta64, parse_timedelta
+from vectorbtpro.utils.datetime_ import (
+    freq_to_timedelta64,
+    parse_timedelta,
+    time_to_timedelta,
+    try_align_to_datetime_index,
+)
 from vectorbtpro.utils.decorators import custom_property, cached_property, class_or_instancemethod
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.mapping import to_mapping
-from vectorbtpro.utils.parsing import get_func_kwargs, get_func_arg_names
+from vectorbtpro.utils.parsing import get_func_kwargs
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import CustomTemplate, Rep, RepEval, RepFunc, substitute_templates
 from vectorbtpro.utils.chunking import ArgsTaker
@@ -1692,7 +1695,7 @@ __all__ = [
 __pdoc__ = {}
 
 
-def adapt_staticized_to_udf(staticized: tp.Kwargs, func: tp.Callable, func_name: str) -> None:
+def adapt_staticized_to_udf(staticized: tp.Kwargs, func: tp.Union[str, tp.Callable], func_name: str) -> None:
     """Adapt `staticized` dictionary to a UDF."""
     sim_func_module = inspect.getmodule(staticized["func"])
     if isinstance(func, (str, Path)):
@@ -5773,11 +5776,33 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             limit_tif = limit_tif.values
         if limit_expiry is None:
             limit_expiry = portfolio_cfg["limit_expiry"]
-        if isinstance(limit_expiry, (str, timedelta, pd.DateOffset, pd.Timedelta)):
-            limit_expiry = RepEval(
-                "wrapper.get_period_ns_index(parse_timedelta(limit_expiry))[:, None]",
+        if isinstance(limit_expiry, (str, time, timedelta, pd.DateOffset, pd.Timedelta)):
+            limit_expiry_dt_template = RepEval(
+                "try_align_to_datetime_index([limit_expiry], wrapper.index).vbt.to_ns()",
+                context=dict(try_align_to_datetime_index=try_align_to_datetime_index, limit_expiry=limit_expiry),
+            )
+            limit_expiry_td_template = RepEval(
+                "wrapper.index.vbt.to_period_ns(parse_timedelta(limit_expiry))",
                 context=dict(parse_timedelta=parse_timedelta, limit_expiry=limit_expiry),
             )
+            limit_expiry_time_template = RepEval(
+                "(wrapper.index.floor(\"1d\") + time_to_timedelta(limit_expiry)).vbt.to_ns()",
+                context=dict(time_to_timedelta=time_to_timedelta, limit_expiry=limit_expiry),
+            )
+            if isinstance(limit_expiry, str):
+                try:
+                    time.fromisoformat(limit_expiry)
+                    limit_expiry = limit_expiry_time_template
+                except Exception as e:
+                    try:
+                        parse_timedelta(limit_expiry)
+                        limit_expiry = limit_expiry_td_template
+                    except Exception as e:
+                        limit_expiry = limit_expiry_dt_template
+            elif isinstance(limit_expiry, time):
+                limit_expiry = limit_expiry_time_template
+            else:
+                limit_expiry = limit_expiry_td_template
         elif isinstance(limit_expiry, pd.Index):
             limit_expiry = limit_expiry.values
         if limit_reverse is None:
@@ -5802,11 +5827,33 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             td_stop = td_stop.values
         if dt_stop is None:
             dt_stop = portfolio_cfg["dt_stop"]
-        if isinstance(dt_stop, (str, timedelta, pd.DateOffset, pd.Timedelta)):
-            dt_stop = RepEval(
-                "wrapper.get_period_ns_index(parse_timedelta(dt_stop))[:, None] - 1",
+        if isinstance(dt_stop, (str, time, timedelta, pd.DateOffset, pd.Timedelta)):
+            dt_stop_dt_template = RepEval(
+                "try_align_to_datetime_index([dt_stop], wrapper.index).vbt.to_ns() - 1",
+                context=dict(try_align_to_datetime_index=try_align_to_datetime_index, dt_stop=dt_stop),
+            )
+            dt_stop_td_template = RepEval(
+                "wrapper.index.vbt.to_period_ns(parse_timedelta(dt_stop)) - 1",
                 context=dict(parse_timedelta=parse_timedelta, dt_stop=dt_stop),
             )
+            dt_stop_time_template = RepEval(
+                "(wrapper.index.floor(\"1d\") + time_to_timedelta(dt_stop)).vbt.to_ns() - 1",
+                context=dict(time_to_timedelta=time_to_timedelta, dt_stop=dt_stop),
+            )
+            if isinstance(dt_stop, str):
+                try:
+                    time.fromisoformat(dt_stop)
+                    dt_stop = dt_stop_time_template
+                except Exception as e:
+                    try:
+                        parse_timedelta(dt_stop)
+                        dt_stop = dt_stop_td_template
+                    except Exception as e:
+                        dt_stop = dt_stop_dt_template
+            elif isinstance(dt_stop, time):
+                dt_stop = dt_stop_time_template
+            else:
+                dt_stop = dt_stop_td_template
         elif isinstance(dt_stop, pd.Index):
             dt_stop = dt_stop.values
         if use_stops is None:
@@ -8502,7 +8549,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     # ############# Price ############# #
 
     @custom_property(group_by_aware=False, resample_func="first")
-    def open(self) -> tp.SeriesFrame:
+    def open(self) -> tp.Optional[tp.SeriesFrame]:
         """Open price of each bar."""
         if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, "open"):
             open = self.in_outputs.open
@@ -8514,7 +8561,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         return self.wrapper.wrap(open, group_by=False)
 
     @custom_property(group_by_aware=False, resample_func="max")
-    def high(self) -> tp.SeriesFrame:
+    def high(self) -> tp.Optional[tp.SeriesFrame]:
         """High price of each bar."""
         if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, "high"):
             high = self.in_outputs.high
@@ -8526,7 +8573,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         return self.wrapper.wrap(high, group_by=False)
 
     @custom_property(group_by_aware=False, resample_func="min")
-    def low(self) -> tp.SeriesFrame:
+    def low(self) -> tp.Optional[tp.SeriesFrame]:
         """Low price of each bar."""
         if self.use_in_outputs and self.in_outputs is not None and hasattr(self.in_outputs, "low"):
             low = self.in_outputs.low
