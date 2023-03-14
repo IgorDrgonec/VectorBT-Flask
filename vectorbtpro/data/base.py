@@ -1711,7 +1711,10 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                     obj = v[c]
                 resample_func = self.column_config.get(c, {}).get("resample_func", None)
                 if resample_func is not None:
-                    new_v.append(resample_func(self, obj, wrapper_meta["resampler"]))
+                    if isinstance(resample_func, str):
+                        new_v.append(obj.vbt.resample_apply(wrapper_meta["resampler"], resample_func))
+                    else:
+                        new_v.append(resample_func(self, obj, wrapper_meta["resampler"]))
                 else:
                     if isinstance(c, str) and c.lower() == "open":
                         new_v.append(obj.vbt.resample_apply(wrapper_meta["resampler"], generic_nb.first_reduce_nb))

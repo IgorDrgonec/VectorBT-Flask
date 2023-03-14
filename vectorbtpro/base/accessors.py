@@ -440,11 +440,10 @@ class BaseAccessor(Wrapping):
 
         Many interesting use cases can be implemented this way.
 
-        * For example, let's compare an array with 3 different thresholds
-        (index is treated as multiple values by `BaseAccessor.combine`):
+        * For example, let's compare an array with 3 different thresholds:
 
         ```pycon
-        >>> df.vbt > pd.Index(np.arange(3), name='threshold')
+        >>> df.vbt > vbt.Param(np.arange(3), name='threshold')
         threshold     0                  1                  2
                      a2    b2    c2     a2    b2    c2     a2     b2    c2
         x2         True  True  True  False  True  True  False  False  True
@@ -1384,7 +1383,7 @@ class BaseAccessor(Wrapping):
             x  4  5   7   9
             y  7  8  12  14
 
-            >>> sr.vbt.combine(pd.Index([1, 2], name='param'), np.add)
+            >>> sr.vbt.combine(vbt.Param([1, 2], name='param'), np.add)
             param  1  2
             x      2  3
             y      3  4

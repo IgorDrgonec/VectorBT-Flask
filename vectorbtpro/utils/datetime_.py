@@ -4,7 +4,6 @@
 
 import warnings
 from datetime import datetime, timezone, timedelta, tzinfo, time
-from dateutil.parser import parse
 
 import numpy as np
 import pandas as pd
@@ -121,6 +120,8 @@ def parse_timedelta(td: tp.TimedeltaLike) -> tp.Union[pd.Timedelta, pd.DateOffse
 
 def time_to_timedelta(time: tp.TimeLike) -> pd.Timedelta:
     """Convert a time-like object into `pd.Timedelta`."""
+    from dateutil.parser import parse
+
     if isinstance(time, str):
         time = parse(time).time()
     return pd.Timedelta(

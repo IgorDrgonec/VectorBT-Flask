@@ -5063,11 +5063,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Will broadcast.
 
                 Set an element to `np.nan` to disable. Use `delta_format` to specify the format.
-            td_stop (array_like of float): Timedelta-stop.
+            td_stop (frequency_like or array_like): Timedelta-stop.
                 Will broadcast.
 
                 Set an element to `-1` to disable. Use `time_delta_format` to specify the format.
-            dt_stop (array_like of float): Datetime-stop.
+            dt_stop (frequency_like, datetime_like, or array_like): Datetime-stop.
                 Will broadcast.
 
                 Set an element to `-1` to disable. Use `time_delta_format` to specify the format.
@@ -5537,8 +5537,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ```pycon
             >>> pf = vbt.Portfolio.from_signals(
             ...     close, entries, exits,
-            ...     tsl_stop=pd.Index([0.1, 0.2]),
-            ...     tp_stop=pd.Index([0.2, 0.3])
+            ...     tsl_stop=vbt.Param([0.1, 0.2]),
+            ...     tp_stop=vbt.Param([0.2, 0.3])
             ... )
             >>> pf.asset_flow
             tsl_stop   0.1         0.2
@@ -5769,6 +5769,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             limit_tif = portfolio_cfg["limit_tif"]
         if isinstance(limit_tif, (str, timedelta, pd.DateOffset, pd.Timedelta)):
             limit_tif = freq_to_timedelta64(limit_tif)
+        elif isinstance(limit_tif, pd.Index):
+            limit_tif = limit_tif.values
         if limit_expiry is None:
             limit_expiry = portfolio_cfg["limit_expiry"]
         if isinstance(limit_expiry, (str, timedelta, pd.DateOffset, pd.Timedelta)):
@@ -5776,6 +5778,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 "wrapper.get_period_ns_index(parse_timedelta(limit_expiry))[:, None]",
                 context=dict(parse_timedelta=parse_timedelta, limit_expiry=limit_expiry),
             )
+        elif isinstance(limit_expiry, pd.Index):
+            limit_expiry = limit_expiry.values
         if limit_reverse is None:
             limit_reverse = portfolio_cfg["limit_reverse"]
         if upon_adj_limit_conflict is None:
@@ -5794,6 +5798,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             td_stop = portfolio_cfg["td_stop"]
         if isinstance(td_stop, (str, timedelta, pd.DateOffset, pd.Timedelta)):
             td_stop = freq_to_timedelta64(td_stop)
+        elif isinstance(td_stop, pd.Index):
+            td_stop = td_stop.values
         if dt_stop is None:
             dt_stop = portfolio_cfg["dt_stop"]
         if isinstance(dt_stop, (str, timedelta, pd.DateOffset, pd.Timedelta)):
@@ -5801,6 +5807,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 "wrapper.get_period_ns_index(parse_timedelta(dt_stop))[:, None] - 1",
                 context=dict(parse_timedelta=parse_timedelta, dt_stop=dt_stop),
             )
+        elif isinstance(dt_stop, pd.Index):
+            dt_stop = dt_stop.values
         if use_stops is None:
             use_stops = portfolio_cfg["use_stops"]
         if stop_entry_price is None:
@@ -7393,7 +7401,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             Or much simpler using Cartesian product:
 
             ```pycon
-            >>> stop = pd.Index([0.1, 0.2, np.nan])
+            >>> stop = vbt.Param([0.1, 0.2, np.nan])
             >>> simulate(close, entries, exits, np.inf, stop).asset_flow
             threshold   0.1   0.2   NaN
             0          10.0  10.0  10.0

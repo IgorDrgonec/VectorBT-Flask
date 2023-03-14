@@ -1002,7 +1002,7 @@ class SignalsAccessor(GenericAccessor):
             * Testing multiple take profit stops:
 
             ```pycon
-            >>> mask.vbt.signals.generate_stop_exits(ts, stop=pd.Index([1.0, 1.5]))
+            >>> mask.vbt.signals.generate_stop_exits(ts, stop=vbt.Param([1.0, 1.5]))
             stop                        1.0                  1.5
                             a      b      c      a      b      c
             2020-01-01  False  False  False  False  False  False
@@ -1315,8 +1315,8 @@ class SignalsAccessor(GenericAccessor):
             ...     price['high'],
             ...     price['low'],
             ...     price['close'],
-            ...     sl_stop=pd.Index([False, 0.1]),
-            ...     tsl_stop=pd.Index([False, 0.1]),
+            ...     sl_stop=vbt.Param([False, 0.1]),
+            ...     tsl_stop=vbt.Param([False, 0.1]),
             ...     is_entry_open=True
             ... )
             >>> exits
