@@ -493,6 +493,8 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast_to
+from vectorbtpro.base.indexes import stack_indexes
+from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic.ranges import Ranges
 from vectorbtpro.generic.enums import range_dt
 from vectorbtpro.portfolio import nb
@@ -602,16 +604,30 @@ trades_shortcut_config = ReadonlyConfig(
         worst_price=dict(obj_type="mapped_array"),
         best_price_idx=dict(obj_type="mapped_array"),
         worst_price_idx=dict(obj_type="mapped_array"),
+        expanding_best_price=dict(obj_type="array"),
+        expanding_worst_price=dict(obj_type="array"),
         mfe=dict(obj_type="mapped_array"),
-        mae=dict(obj_type="mapped_array"),
         mfe_returns=dict(
             obj_type="mapped_array",
             method_name="get_mfe",
             method_kwargs=dict(use_returns=True),
         ),
+        mae=dict(obj_type="mapped_array"),
         mae_returns=dict(
             obj_type="mapped_array",
             method_name="get_mae",
+            method_kwargs=dict(use_returns=True),
+        ),
+        expanding_mfe=dict(obj_type="array"),
+        expanding_mfe_returns=dict(
+            obj_type="array",
+            method_name="get_expanding_mfe",
+            method_kwargs=dict(use_returns=True),
+        ),
+        expanding_mae=dict(obj_type="array"),
+        expanding_mae_returns=dict(
+            obj_type="array",
+            method_name="get_expanding_mae",
             method_kwargs=dict(use_returns=True),
         ),
         edge_ratio=dict(obj_type="red_array"),
@@ -782,6 +798,7 @@ class Trades(Ranges):
         self,
         entry_price_open: bool = False,
         exit_price_close: bool = False,
+        max_duration: tp.Optional[int] = None,
         **kwargs,
     ) -> MappedArray:
         """Get best price.
@@ -795,6 +812,7 @@ class Trades(Ranges):
             self._close,
             entry_price_open,
             exit_price_close,
+            max_duration,
             **kwargs,
         )
 
@@ -802,6 +820,7 @@ class Trades(Ranges):
         self,
         entry_price_open: bool = False,
         exit_price_close: bool = False,
+        max_duration: tp.Optional[int] = None,
         **kwargs,
     ) -> MappedArray:
         """Get worst price.
@@ -815,6 +834,7 @@ class Trades(Ranges):
             self._close,
             entry_price_open,
             exit_price_close,
+            max_duration,
             **kwargs,
         )
 
@@ -822,6 +842,7 @@ class Trades(Ranges):
         self,
         entry_price_open: bool = False,
         exit_price_close: bool = False,
+        max_duration: tp.Optional[int] = None,
         relative: bool = True,
         **kwargs,
     ) -> MappedArray:
@@ -836,6 +857,7 @@ class Trades(Ranges):
             self._close,
             entry_price_open,
             exit_price_close,
+            max_duration,
             relative,
             dtype=np.int_,
             **kwargs,
@@ -845,6 +867,7 @@ class Trades(Ranges):
         self,
         entry_price_open: bool = False,
         exit_price_close: bool = False,
+        max_duration: tp.Optional[int] = None,
         relative: bool = True,
         **kwargs,
     ) -> MappedArray:
@@ -859,15 +882,95 @@ class Trades(Ranges):
             self._close,
             entry_price_open,
             exit_price_close,
+            max_duration,
             relative,
             dtype=np.int_,
             **kwargs,
+        )
+
+    def get_expanding_best_price(
+        self,
+        entry_price_open: bool = False,
+        exit_price_close: bool = False,
+        max_duration: tp.Optional[int] = None,
+        jitted: tp.JittedOption = None,
+        index_stack_kwargs: tp.KwargsLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """Get expanding best price.
+
+        See `vectorbtpro.portfolio.nb.records.expanding_best_price_nb`."""
+        func = jit_reg.resolve_option(nb.expanding_best_price_nb, jitted)
+        out = func(
+            self.values,
+            self._open,
+            self._high,
+            self._low,
+            self._close,
+            entry_price_open=entry_price_open,
+            exit_price_close=exit_price_close,
+            max_duration=max_duration,
+        )
+        if index_stack_kwargs is None:
+            index_stack_kwargs = {}
+        new_columns = stack_indexes((
+            self.wrapper.columns[self.get_field_arr("col")],
+            pd.Index(self.get_field_arr("id"), name="id"),
+        ), **index_stack_kwargs)
+        if wrap_kwargs is None:
+            wrap_kwargs = {}
+        return self.wrapper.wrap(
+            out,
+            group_by=False,
+            index=pd.RangeIndex(stop=len(out)),
+            columns=new_columns,
+            **wrap_kwargs
+        )
+
+    def get_expanding_worst_price(
+        self,
+        entry_price_open: bool = False,
+        exit_price_close: bool = False,
+        max_duration: tp.Optional[int] = None,
+        jitted: tp.JittedOption = None,
+        index_stack_kwargs: tp.KwargsLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """Get expanding worst price.
+
+        See `vectorbtpro.portfolio.nb.records.expanding_worst_price_nb`."""
+        func = jit_reg.resolve_option(nb.expanding_worst_price_nb, jitted)
+        out = func(
+            self.values,
+            self._open,
+            self._high,
+            self._low,
+            self._close,
+            entry_price_open=entry_price_open,
+            exit_price_close=exit_price_close,
+            max_duration=max_duration,
+        )
+        if index_stack_kwargs is None:
+            index_stack_kwargs = {}
+        new_columns = stack_indexes((
+            self.wrapper.columns[self.get_field_arr("col")],
+            pd.Index(self.get_field_arr("id"), name="id"),
+        ), **index_stack_kwargs)
+        if wrap_kwargs is None:
+            wrap_kwargs = {}
+        return self.wrapper.wrap(
+            out,
+            group_by=False,
+            index=pd.RangeIndex(stop=len(out)),
+            columns=new_columns,
+            **wrap_kwargs
         )
 
     def get_mfe(
         self,
         entry_price_open: bool = False,
         exit_price_close: bool = False,
+        max_duration: tp.Optional[int] = None,
         use_returns: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -880,6 +983,7 @@ class Trades(Ranges):
             "best_price",
             entry_price_open=entry_price_open,
             exit_price_close=exit_price_close,
+            max_duration=max_duration,
             jitted=jitted,
             chunked=chunked,
         )
@@ -898,6 +1002,7 @@ class Trades(Ranges):
         self,
         entry_price_open: bool = False,
         exit_price_close: bool = False,
+        max_duration: tp.Optional[int] = None,
         use_returns: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -910,6 +1015,7 @@ class Trades(Ranges):
             "worst_price",
             entry_price_open=entry_price_open,
             exit_price_close=exit_price_close,
+            max_duration=max_duration,
             jitted=jitted,
             chunked=chunked,
         )
@@ -923,6 +1029,66 @@ class Trades(Ranges):
             use_returns=use_returns,
         )
         return self.map_array(drawdown, **kwargs)
+
+    def get_expanding_mfe(
+        self,
+        entry_price_open: bool = False,
+        exit_price_close: bool = False,
+        max_duration: tp.Optional[int] = None,
+        use_returns: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Get expanding MFE.
+
+        See `vectorbtpro.portfolio.nb.records.expanding_mfe_nb`."""
+        expanding_best_price = self.resolve_shortcut_attr(
+            "expanding_best_price",
+            entry_price_open=entry_price_open,
+            exit_price_close=exit_price_close,
+            max_duration=max_duration,
+            jitted=jitted,
+            **kwargs,
+        )
+        func = jit_reg.resolve_option(nb.expanding_mfe_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(
+            self.values,
+            expanding_best_price.values,
+            use_returns=use_returns,
+        )
+        return ArrayWrapper.from_obj(expanding_best_price).wrap(out)
+
+    def get_expanding_mae(
+        self,
+        entry_price_open: bool = False,
+        exit_price_close: bool = False,
+        max_duration: tp.Optional[int] = None,
+        use_returns: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Get expanding MAE.
+
+        See `vectorbtpro.portfolio.nb.records.expanding_mae_nb`."""
+        expanding_worst_price = self.resolve_shortcut_attr(
+            "expanding_worst_price",
+            entry_price_open=entry_price_open,
+            exit_price_close=exit_price_close,
+            max_duration=max_duration,
+            jitted=jitted,
+            **kwargs,
+        )
+        func = jit_reg.resolve_option(nb.expanding_mae_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(
+            self.values,
+            expanding_worst_price.values,
+            use_returns=use_returns,
+        )
+        return ArrayWrapper.from_obj(expanding_worst_price).wrap(out)
 
     def get_edge_ratio(
         self,
@@ -998,7 +1164,6 @@ class Trades(Ranges):
         incl_shorter: bool = False,
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
-        chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Get running edge ratio.
@@ -1012,7 +1177,6 @@ class Trades(Ranges):
 
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         func = jit_reg.resolve_option(nb.running_edge_ratio_nb, jitted)
-        func = ch_reg.resolve_option(func, chunked)
         if volatility is None:
             if self._high is not None and self._low is not None:
                 from vectorbtpro.indicators.nb import atr_nb
@@ -1610,14 +1774,6 @@ class Trades(Ranges):
     )
     """`Trades.plot_against_pnl` for `Trades.mfe`."""
 
-    plot_mae = partialmethod(
-        plot_against_pnl,
-        field="mae",
-        field_label="MAE",
-        pct_scale=False,
-    )
-    """`Trades.plot_against_pnl` for `Trades.mae`."""
-
     plot_mfe_returns = partialmethod(
         plot_against_pnl,
         field="mfe_returns",
@@ -1626,6 +1782,14 @@ class Trades(Ranges):
         field_pct_scale=True,
     )
     """`Trades.plot_against_pnl` for `Trades.mfe_returns`."""
+
+    plot_mae = partialmethod(
+        plot_against_pnl,
+        field="mae",
+        field_label="MAE",
+        pct_scale=False,
+    )
+    """`Trades.plot_against_pnl` for `Trades.mae`."""
 
     plot_mae_returns = partialmethod(
         plot_against_pnl,
