@@ -68,6 +68,7 @@ __pdoc__all__ = __all__ = [
     "sl_info_dt",
     "tsl_info_dt",
     "tp_info_dt",
+    "time_info_dt",
 ]
 
 __pdoc__ = {}
@@ -960,7 +961,7 @@ class SimulationContext(tp.NamedTuple):
     bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
-    fill_pos_record: bool
+    fill_pos_info: bool
     track_value: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
@@ -975,7 +976,7 @@ class SimulationContext(tp.NamedTuple):
     last_return: tp.Array1d
     order_counts: tp.Array1d
     log_counts: tp.Array1d
-    last_pos_record: tp.RecordArray
+    last_pos_info: tp.RecordArray
 
 
 __pdoc__[
@@ -1199,7 +1200,7 @@ only once, before executing any order).
 
 The change is marginal and mostly driven by transaction costs and slippage."""
 __pdoc__[
-    "SimulationContext.fill_pos_record"
+    "SimulationContext.fill_pos_info"
 ] = """Whether to fill position record.
 
 Disable this to make simulation faster for simple use cases."""
@@ -1395,17 +1396,12 @@ Similar to `SimulationContext.log_counts` but for log records.
     Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
 """
 __pdoc__[
-    "SimulationContext.last_pos_record"
+    "SimulationContext.last_pos_info"
 ] = """Latest position record in each column.
 
 It's a 1-dimensional array with records of type `trade_dt`.
 
 Has shape `(target_shape[1],)`.
-
-The array is initialized with empty records first (they contain random data)
-and the field `id` is set to -1. Once the first position is entered in a column,
-the `id` becomes 0 and the record materializes. Once the position is closed, the record
-fixates its identifier and other data until the next position is entered. 
 
 If `SimulationContext.init_position` is not zero in a column, that column's position record
 is automatically filled before the simulation with `entry_price` set to `SimulationContext.init_price` and 
@@ -1420,47 +1416,6 @@ right after `order_func_nb`, and right before `post_segment_func_nb`.
 !!! note
     In an open position record, the field `exit_price` doesn't reflect the latest valuation price,
     but keeps the average price at which the position has been reduced.
-    
-!!! note
-    Changing this array may produce results inconsistent with those of `vectorbtpro.portfolio.base.Portfolio`.
-
-Example:
-    Consider a simulation that orders `order_size` for `order_price` and $1 fixed fees.
-    Here's order info from `order_func_nb` and the updated position info from `post_order_func_nb`:
-    
-    ```plaintext
-        order_size  order_price  id  col  size  entry_idx  entry_price  \\
-    0          NaN            1  -1    0   1.0         13    14.000000   
-    1          0.5            2   0    0   0.5          1     2.000000   
-    2          1.0            3   0    0   1.5          1     2.666667   
-    3          NaN            4   0    0   1.5          1     2.666667   
-    4         -1.0            5   0    0   1.5          1     2.666667   
-    5         -0.5            6   0    0   1.5          1     2.666667   
-    6          NaN            7   0    0   1.5          1     2.666667   
-    7         -0.5            8   1    0   0.5          7     8.000000   
-    8         -1.0            9   1    0   1.5          7     8.666667   
-    9          1.0           10   1    0   1.5          7     8.666667   
-    10         0.5           11   1    0   1.5          7     8.666667   
-    11         1.0           12   2    0   1.0         11    12.000000   
-    12        -2.0           13   3    0   1.0         12    13.000000   
-    13         2.0           14   4    0   1.0         13    14.000000   
-    
-        entry_fees  exit_idx  exit_price  exit_fees   pnl    return  direction  status
-    0          0.5        -1         NaN        0.0 -0.50 -0.035714          0       0
-    1          1.0        -1         NaN        0.0 -1.00 -1.000000          0       0
-    2          2.0        -1         NaN        0.0 -1.50 -0.375000          0       0
-    3          2.0        -1         NaN        0.0 -0.75 -0.187500          0       0
-    4          2.0        -1    5.000000        1.0  0.50  0.125000          0       0
-    5          2.0         5    5.333333        2.0  0.00  0.000000          0       1
-    6          2.0         5    5.333333        2.0  0.00  0.000000          0       1
-    7          1.0        -1         NaN        0.0 -1.00 -0.250000          1       0
-    8          2.0        -1         NaN        0.0 -2.50 -0.192308          1       0
-    9          2.0        -1   10.000000        1.0 -5.00 -0.384615          1       0
-    10         2.0        10   10.333333        2.0 -6.50 -0.500000          1       1
-    11         1.0        -1         NaN        0.0 -1.00 -0.083333          0       0
-    12         0.5        -1         NaN        0.0 -0.50 -0.038462          1       0
-    13         0.5        -1         NaN        0.0 -0.50 -0.035714          0       0
-    ```
 """
 
 
@@ -1486,7 +1441,7 @@ class GroupContext(tp.NamedTuple):
     bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
-    fill_pos_record: bool
+    fill_pos_info: bool
     track_value: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
@@ -1501,7 +1456,7 @@ class GroupContext(tp.NamedTuple):
     last_return: tp.Array1d
     order_counts: tp.Array1d
     log_counts: tp.Array1d
-    last_pos_record: tp.RecordArray
+    last_pos_info: tp.RecordArray
     group: int
     group_len: int
     from_col: int
@@ -1584,7 +1539,7 @@ class RowContext(tp.NamedTuple):
     bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
-    fill_pos_record: bool
+    fill_pos_info: bool
     track_value: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
@@ -1599,7 +1554,7 @@ class RowContext(tp.NamedTuple):
     last_return: tp.Array1d
     order_counts: tp.Array1d
     log_counts: tp.Array1d
-    last_pos_record: tp.RecordArray
+    last_pos_info: tp.RecordArray
     i: int
 
 
@@ -1646,7 +1601,7 @@ class SegmentContext(tp.NamedTuple):
     bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
-    fill_pos_record: bool
+    fill_pos_info: bool
     track_value: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
@@ -1661,7 +1616,7 @@ class SegmentContext(tp.NamedTuple):
     last_return: tp.Array1d
     order_counts: tp.Array1d
     log_counts: tp.Array1d
-    last_pos_record: tp.RecordArray
+    last_pos_info: tp.RecordArray
     group: int
     group_len: int
     from_col: int
@@ -1727,7 +1682,7 @@ class OrderContext(tp.NamedTuple):
     bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
-    fill_pos_record: bool
+    fill_pos_info: bool
     track_value: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
@@ -1742,7 +1697,7 @@ class OrderContext(tp.NamedTuple):
     last_return: tp.Array1d
     order_counts: tp.Array1d
     log_counts: tp.Array1d
-    last_pos_record: tp.RecordArray
+    last_pos_info: tp.RecordArray
     group: int
     group_len: int
     from_col: int
@@ -1759,7 +1714,7 @@ class OrderContext(tp.NamedTuple):
     val_price_now: float
     value_now: float
     return_now: float
-    pos_record_now: tp.Record
+    pos_info_now: tp.Record
 
 
 __pdoc__[
@@ -1799,7 +1754,7 @@ __pdoc__["OrderContext.free_cash_now"] = "`SimulationContext.last_free_cash` for
 __pdoc__["OrderContext.val_price_now"] = "`SimulationContext.last_val_price` for the current column."
 __pdoc__["OrderContext.value_now"] = "`SimulationContext.last_value` for the current column/group."
 __pdoc__["OrderContext.return_now"] = "`SimulationContext.last_return` for the current column/group."
-__pdoc__["OrderContext.pos_record_now"] = "`SimulationContext.last_pos_record` for the current column."
+__pdoc__["OrderContext.pos_info_now"] = "`SimulationContext.last_pos_info` for the current column."
 
 
 class PostOrderContext(tp.NamedTuple):
@@ -1824,7 +1779,7 @@ class PostOrderContext(tp.NamedTuple):
     bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
-    fill_pos_record: bool
+    fill_pos_info: bool
     track_value: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
@@ -1839,7 +1794,7 @@ class PostOrderContext(tp.NamedTuple):
     last_return: tp.Array1d
     order_counts: tp.Array1d
     log_counts: tp.Array1d
-    last_pos_record: tp.RecordArray
+    last_pos_info: tp.RecordArray
     group: int
     group_len: int
     from_col: int
@@ -1864,7 +1819,7 @@ class PostOrderContext(tp.NamedTuple):
     val_price_now: float
     value_now: float
     return_now: float
-    pos_record_now: tp.Record
+    pos_info_now: tp.Record
 
 
 __pdoc__[
@@ -1918,7 +1873,7 @@ __pdoc__[
 If `SimulationContext.update_value`, gets updated with the new cash and value of the column. Otherwise, stays the same.
 """
 __pdoc__["PostOrderContext.return_now"] = "`OrderContext.return_now` after execution."
-__pdoc__["PostOrderContext.pos_record_now"] = "`OrderContext.pos_record_now` after execution."
+__pdoc__["PostOrderContext.pos_info_now"] = "`OrderContext.pos_info_now` after execution."
 
 
 class FlexOrderContext(tp.NamedTuple):
@@ -1943,7 +1898,7 @@ class FlexOrderContext(tp.NamedTuple):
     bm_close: tp.FlexArray2d
     ffill_val_price: bool
     update_value: bool
-    fill_pos_record: bool
+    fill_pos_info: bool
     track_value: bool
     order_records: tp.RecordArray2d
     log_records: tp.RecordArray2d
@@ -1958,7 +1913,7 @@ class FlexOrderContext(tp.NamedTuple):
     last_return: tp.Array1d
     order_counts: tp.Array1d
     log_counts: tp.Array1d
-    last_pos_record: tp.RecordArray
+    last_pos_info: tp.RecordArray
     group: int
     group_len: int
     from_col: int
@@ -2189,10 +2144,12 @@ class SignalSegmentContext(tp.NamedTuple):
     last_value: tp.Array1d
     last_return: tp.Array1d
 
+    last_pos_info: tp.Array1d
     last_limit_info: tp.Array1d
     last_sl_info: tp.Array1d
     last_tsl_info: tp.Array1d
     last_tp_info: tp.Array1d
+    last_time_info: tp.Array1d
 
     group: int
     group_len: int
@@ -2242,6 +2199,7 @@ __pdoc__["SignalSegmentContext.last_free_cash"] = "See `SimulationContext.last_f
 __pdoc__["SignalSegmentContext.last_val_price"] = "See `SimulationContext.last_val_price`."
 __pdoc__["SignalSegmentContext.last_value"] = "See `SimulationContext.last_value`."
 __pdoc__["SignalSegmentContext.last_return"] = "See `SimulationContext.last_return`."
+__pdoc__["SignalSegmentContext.last_pos_info"] = "See `SimulationContext.last_pos_info`."
 __pdoc__["SignalSegmentContext.last_limit_info"] = """Record of type `limit_info_dt` per column.
 
 Accessible via `c.limit_info_dt[field][col]`."""
@@ -2254,6 +2212,9 @@ Accessible via `c.last_tsl_info[field][col]`."""
 __pdoc__["SignalSegmentContext.last_tp_info"] = """Record of type `tp_info_dt` per column.
 
 Accessible via `c.last_tp_info[field][col]`."""
+__pdoc__["SignalSegmentContext.last_time_info"] = """Record of type `time_info_dt` per column.
+
+Accessible via `c.last_time_info[field][col]`."""
 __pdoc__["SignalSegmentContext.group"] = "See `GroupContext.group`."
 __pdoc__["SignalSegmentContext.group_len"] = "See `GroupContext.group_len`."
 __pdoc__["SignalSegmentContext.from_col"] = "See `GroupContext.from_col`."
@@ -2295,10 +2256,12 @@ class SignalContext(tp.NamedTuple):
     last_value: tp.Array1d
     last_return: tp.Array1d
 
+    last_pos_info: tp.Array1d
     last_limit_info: tp.Array1d
     last_sl_info: tp.Array1d
     last_tsl_info: tp.Array1d
     last_tp_info: tp.Array1d
+    last_time_info: tp.Array1d
 
     group: int
     group_len: int
@@ -2456,7 +2419,7 @@ __pdoc__[
 ```
 """
 
-_trade_fields = [
+trade_dt = np.dtype([
     ("id", np.int_),
     ("col", np.int_),
     ("size", np.float_),
@@ -2473,9 +2436,7 @@ _trade_fields = [
     ("direction", np.int_),
     ("status", np.int_),
     ("parent_id", np.int_),
-]
-
-trade_dt = np.dtype(_trade_fields, align=True)
+], align=True)
 """_"""
 
 __pdoc__[
@@ -2487,7 +2448,7 @@ __pdoc__[
 ```
 """
 
-_log_fields = [
+log_dt = np.dtype([
     ("id", np.int_),
     ("group", np.int_),
     ("col", np.int_),
@@ -2534,9 +2495,7 @@ _log_fields = [
     ("st1_val_price", np.float_),
     ("st1_value", np.float_),
     ("order_id", np.int_),
-]
-
-log_dt = np.dtype(_log_fields, align=True)
+], align=True)
 """_"""
 
 __pdoc__[
@@ -2618,17 +2577,17 @@ __pdoc__[
 ```
 
 Attributes:
-    bar_zone: Bar zone. See `vectorbtpro.generic.enums.BarZone`.
+    bar_zone: See `vectorbtpro.generic.enums.BarZone`.
     signal_idx: Row where signal was placed.
     creation_idx: Row where order was created.
     i: Row from where order information was taken.
     val_price: Valuation price.
     price: Requested price.
     size: Order size.
-    size_type: Order size type. See `SizeType`.
-    direction: Order direction. See `Direction`.
-    type: Order type. See `OrderType`.
-    stop_type: Stop type. See `vectorbtpro.signals.enums.StopType`.
+    size_type: See `SizeType`.
+    direction: See `Direction`.
+    type: See `OrderType`.
+    stop_type: See `vectorbtpro.signals.enums.StopType`.
 """
 
 limit_info_dt = np.dtype(
@@ -2665,15 +2624,15 @@ Attributes:
     creation_idx: Limit creation row.
     init_idx: Initial row from where order information is taken.
     init_price: Initial price.
-    init_size: Requested size.
-    init_size_type: Type of the requested size. See `SizeType`.
-    init_direction: Direction of the requested size. See `Direction`.
-    init_stop_type: Stop type. See `vectorbtpro.signals.enums.StopType`.
+    init_size: Order size.
+    init_size_type: See `SizeType`.
+    init_direction: See `Direction`.
+    init_stop_type: See `vectorbtpro.signals.enums.StopType`.
     delta: Delta from the initial price.
-    delta_format: Format of the delta value. See `DeltaFormat`.
+    delta_format: See `DeltaFormat`.
     tif: Time in force in integer format. Set to `-1` to disable.
     expiry: Expiry time in integer format. Set to `-1` to disable.
-    time_delta_format: Format of the time-in-force and expire-time values. See `TimeDeltaFormat`.
+    time_delta_format: See `TimeDeltaFormat`.
     reverse: Whether to reverse the price hit detection.
 """
 
@@ -2682,11 +2641,16 @@ sl_info_dt = np.dtype(
         ("init_idx", np.int_),
         ("init_price", np.float_),
         ("stop", np.float_),
-        ("exit_price", np.int_),
+        ("exit_price", np.float_),
+        ("exit_size", np.float_),
+        ("exit_size_type", np.int_),
         ("exit_type", np.int_),
         ("order_type", np.int_),
         ("limit_delta", np.float_),
         ("delta_format", np.int_),
+        ("ladder", np.bool_),
+        ("step", np.int_),
+        ("step_idx", np.int_),
     ],
     align=True,
 )
@@ -2704,11 +2668,16 @@ Attributes:
     init_idx: Initial row.
     init_price: Initial price.
     stop: Latest updated stop value.
-    exit_price: Exit price. See `StopExitPrice`.
-    exit_type: Exit type. See `StopExitType`.
-    order_type: Order type. See `OrderType`.
+    exit_price: See `StopExitPrice`.
+    exit_size: Order size.
+    exit_size_type: See `SizeType`.
+    exit_type: See `StopExitType`.
+    order_type: See `OrderType`.
     limit_delta: Delta from the hit price. Only for `StopType.Limit`.
-    delta_format: Format of the stop value. See `DeltaFormat`.
+    delta_format: See `DeltaFormat`.
+    ladder: Whether to keep the stop after execution.
+    step: Step in the ladder (i.e., the number of times the stop was executed)
+    step_idx: Step row.
 """
 
 tsl_info_dt = np.dtype(
@@ -2719,11 +2688,16 @@ tsl_info_dt = np.dtype(
         ("peak_price", np.float_),
         ("stop", np.float_),
         ("th", np.float_),
-        ("exit_price", np.int_),
+        ("exit_price", np.float_),
+        ("exit_size", np.float_),
+        ("exit_size_type", np.int_),
         ("exit_type", np.int_),
         ("order_type", np.int_),
         ("limit_delta", np.float_),
         ("delta_format", np.int_),
+        ("ladder", np.bool_),
+        ("step", np.int_),
+        ("step_idx", np.int_),
     ],
     align=True,
 )
@@ -2744,11 +2718,16 @@ Attributes:
     peak_price: Highest/lowest price.
     stop: Latest updated stop value.
     th: Latest updated threshold value.
-    exit_price: Exit price. See `StopExitPrice`.
-    exit_type: Exit type. See `StopExitType`.
-    order_type: Order type. See `OrderType`.
+    exit_price: See `StopExitPrice`.
+    exit_size: Order size.
+    exit_size_type: See `SizeType`.
+    exit_type: See `StopExitType`.
+    order_type: See `OrderType`.
     limit_delta: Delta from the hit price. Only for `StopType.Limit`.
-    delta_format: Format of the threshold and stop values. See `DeltaFormat`.
+    delta_format: See `DeltaFormat`.
+    ladder: Whether to keep the stop after execution.
+    step: Step in the ladder (i.e., the number of times the stop was executed)
+    step_idx: Step row.
 """
 
 tp_info_dt = np.dtype(
@@ -2756,11 +2735,16 @@ tp_info_dt = np.dtype(
         ("init_idx", np.int_),
         ("init_price", np.float_),
         ("stop", np.float_),
-        ("exit_price", np.int_),
+        ("exit_price", np.float_),
+        ("exit_size", np.float_),
+        ("exit_size_type", np.int_),
         ("exit_type", np.int_),
         ("order_type", np.int_),
         ("limit_delta", np.float_),
         ("delta_format", np.int_),
+        ("ladder", np.bool_),
+        ("step", np.int_),
+        ("step_idx", np.int_),
     ],
     align=True,
 )
@@ -2778,9 +2762,60 @@ Attributes:
     init_idx: Initial row.
     init_price: Initial price.
     stop: Latest updated stop value.
-    exit_price: Exit price. See `StopExitPrice`.
-    exit_type: Exit type. See `StopExitType`.
-    order_type: Order type. See `OrderType`.
+    exit_price: See `StopExitPrice`.
+    exit_size: Order size.
+    exit_size_type: See `SizeType`.
+    exit_type: See `StopExitType`.
+    order_type: See `OrderType`.
     limit_delta: Delta from the hit price. Only for `StopType.Limit`.
-    delta_format: Format of the stop value. See `DeltaFormat`.
+    delta_format: See `DeltaFormat`.
+    ladder: Whether to keep the stop after execution.
+    step: Step in the ladder (i.e., the number of times the stop was executed)
+    step_idx: Step row.
+"""
+
+time_info_dt = np.dtype(
+    [
+        ("init_idx", np.int_),
+        ("td_stop", np.int_),
+        ("dt_stop", np.int_),
+        ("exit_price", np.float_),
+        ("exit_size", np.float_),
+        ("exit_size_type", np.int_),
+        ("exit_type", np.int_),
+        ("order_type", np.int_),
+        ("limit_delta", np.float_),
+        ("delta_format", np.int_),
+        ("time_delta_format", np.int_),
+        ("ladder", np.bool_),
+        ("step", np.int_),
+        ("step_idx", np.int_),
+    ],
+    align=True,
+)
+"""_"""
+
+__pdoc__[
+    "time_info_dt"
+] = f"""`np.dtype` of time signal records.
+
+```python
+{prettify(time_info_dt)}
+```
+
+Attributes:
+    init_idx: Initial row.
+    td_stop: Latest updated timedelta-stop value.
+    dt_stop: Latest updated datetime-stop value.
+    exit_price: See `StopExitPrice`.
+    exit_size: Order size.
+    exit_size_type: See `SizeType`.
+    exit_type: See `StopExitType`.
+    order_type: See `OrderType`.
+    limit_delta: Delta from the hit price. Only for `StopType.Limit`.
+    delta_format: See `DeltaFormat`. Only for `StopType.Limit`.
+    time_delta_format: See `TimeDeltaFormat`.
+    ladder: Whether to keep the stop after execution.
+    step: Step in the ladder (i.e., the number of times the stop was executed)
+    step_idx: Step row.
 """

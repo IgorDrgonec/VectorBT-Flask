@@ -632,7 +632,9 @@ data = child_dict(
             n_ticks=50,
         ),
         # Local
-        local=Config(
+        local=Config(),
+        # File
+        file=Config(
             match_paths=True,
             match_regex=None,
             sort_paths=True,
@@ -1341,6 +1343,8 @@ portfolio = child_dict(
     tsl_th=np.nan,
     tsl_stop=np.nan,
     tp_stop=np.nan,
+    td_stop=-1,
+    dt_stop=-1,
     stop_entry_price="close",
     stop_exit_price="stop",
     stop_order_type="market",
@@ -1370,10 +1374,9 @@ portfolio = child_dict(
     save_state=False,
     save_value=False,
     save_returns=False,
-    fill_pos_record=True,
+    fill_pos_info=True,
     track_value=True,
     row_wise=False,
-    flexible=False,
     seed=None,
     group_by=None,
     broadcast_kwargs=Config(
@@ -1385,6 +1388,7 @@ portfolio = child_dict(
     call_seq=None,
     attach_call_seq=False,
     bm_close=None,
+    staticized=False,
     # Portfolio
     freq=None,
     use_in_outputs=True,

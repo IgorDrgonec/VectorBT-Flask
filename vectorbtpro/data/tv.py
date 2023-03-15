@@ -43,8 +43,9 @@ class Interval(enum.Enum):
 
 SIGNIN_URL = "https://www.tradingview.com/accounts/signin/"
 SEARCH_URL = (
-    "https://symbol-search.tradingview.com/symbol_search/?text={}&hl=1&exchange={}&lang=en&type=&domain=production"
+    "https://symbol-search.tradingview.com/symbol_search/?text={}&hl=2&exchange={}&lang=en&type=&domain=production"
 )
+SCAN_URL = "https://scanner.tradingview.com/{}/scan"
 ORIGIN_URL = "https://data.tradingview.com"
 REFERER_URL = "https://www.tradingview.com"
 WS_URL = "wss://data.tradingview.com/socket.io/websocket"
@@ -270,9 +271,20 @@ class TVClient:
         return self.convert_raw_data(raw_data, symbol)
 
     @staticmethod
-    def search_symbol(text: str, exchange: str = "") -> tp.List[str]:
+    def search_symbol(text: tp.Optional[str] = None, exchange: tp.Optional[str] = None) -> tp.List[dict]:
         """Search for a symbol."""
-        url = SEARCH_URL.format(text, exchange)
+        if text is None:
+            text = ""
+        if exchange is None:
+            exchange = ""
+        url = SEARCH_URL.format(text, exchange.upper())
         resp = requests.get(url)
-        symbols_list = json.loads(resp.text.replace("</em>", "").replace("<em>", ""))
+        symbols_list = json.loads(resp.text)
+        return symbols_list
+
+    @staticmethod
+    def scan_symbols(market: str) -> tp.List[dict]:
+        url = SCAN_URL.format(market.lower())
+        resp = requests.get(url)
+        symbols_list = json.loads(resp.text)["data"]
         return symbols_list

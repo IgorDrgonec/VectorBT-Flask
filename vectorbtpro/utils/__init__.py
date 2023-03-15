@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from vectorbtpro.utils.chunking import *
     from vectorbtpro.utils.colors import *
     from vectorbtpro.utils.config import *
+    from vectorbtpro.utils.cutting import *
     from vectorbtpro.utils.datetime_ import *
     from vectorbtpro.utils.datetime_nb import *
     from vectorbtpro.utils.decorators import *

@@ -785,8 +785,6 @@ class CacheableRegistry:
             setups = self.class_setups
         else:
             raise TypeError(str(type(setup)))
-        if hash(setup) in setups:
-            raise ValueError(f"Setup '{str(setup)}' already registered")
         setups[hash(setup)] = setup
 
     def deregister_setup(self, setup: "CABaseSetup") -> None:

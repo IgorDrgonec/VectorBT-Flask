@@ -263,7 +263,6 @@ class Orders(PriceRecords):
                     "Median": out.loc["50%"],
                     "Max": out.loc["max"],
                 },
-                apply_to_timedelta=True,
                 tags=["orders", "size"],
             ),
             fees=dict(
@@ -274,7 +273,6 @@ class Orders(PriceRecords):
                     "Median": out.loc["50%"],
                     "Max": out.loc["max"],
                 },
-                apply_to_timedelta=True,
                 tags=["orders", "fees"],
             ),
             weighted_buy_price=dict(

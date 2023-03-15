@@ -8,12 +8,15 @@ import importlib.util
 import inspect
 import pkgutil
 import sys
+from pathlib import Path
 from types import ModuleType, FunctionType
 
 from vectorbtpro import _typing as tp
 from vectorbtpro._opt_deps import opt_dep_config
 
-__all__ = []
+__all__ = [
+    "import_module_from_path",
+]
 
 
 def is_from_module(obj: tp.Any, module: ModuleType) -> bool:
@@ -134,3 +137,15 @@ def warn_cannot_import(pkg_name: str) -> bool:
     except ImportError as e:
         warnings.warn(str(e), stacklevel=2)
         return True
+
+
+def import_module_from_path(module_path: tp.PathLike, reload: bool = False) -> ModuleType:
+    """Import the module from a path."""
+    module_path = Path(module_path)
+    spec = importlib.util.spec_from_file_location(module_path.stem, str(module_path.resolve()))
+    module = importlib.util.module_from_spec(spec)
+    if module.__name__ in sys.modules and not reload:
+        return sys.modules[module.__name__]
+    spec.loader.exec_module(module)
+    sys.modules[module.__name__] = module
+    return module

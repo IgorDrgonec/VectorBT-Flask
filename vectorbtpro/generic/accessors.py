@@ -1368,6 +1368,112 @@ class GenericAccessor(BaseAccessor, Analyzable):
         return wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
     @class_or_instancemethod
+    def groupby_transform(
+        cls_or_self,
+        by: tp.AnyGroupByLike,
+        transform_func_nb: tp.Union[str, tp.GroupByTransformFunc, tp.GroupByTransformMetaFunc],
+        *args,
+        groupby_kwargs: tp.KwargsLike = None,
+        broadcast_named_args: tp.KwargsLike = None,
+        broadcast_kwargs: tp.KwargsLike = None,
+        template_context: tp.Optional[tp.Mapping] = None,
+        jitted: tp.JittedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """See `vectorbtpro.generic.nb.apply_reduce.groupby_transform_nb`.
+
+        For details on the meta version, see `vectorbtpro.generic.nb.apply_reduce.groupby_transform_meta_nb`.
+
+        For argument `by`, see `GenericAccessor.groupby_apply`.
+
+        Usage:
+            * Using regular function:
+
+            ```pycon
+            >>> zscore_nb = njit(lambda a: (a - np.nanmean(a)) / np.nanstd(a))
+
+            >>> df.vbt.groupby_transform([1, 1, 2, 2, 3], zscore_nb)
+                               a         b         c
+            2020-01-01 -1.000000  1.666667 -1.000000
+            2020-01-02 -0.333333  1.000000 -0.333333
+            2020-01-03  0.242536  0.242536  0.242536
+            2020-01-04  1.697749 -1.212678 -1.212678
+            2020-01-05  1.414214 -0.707107 -0.707107
+            ```
+
+            * Using meta function:
+
+            ```pycon
+            >>> zscore_ratio_meta_nb = njit(lambda idxs, group, a, b: \\
+            ...     zscore_nb(a[idxs]) / zscore_nb(b[idxs]))
+
+            >>> vbt.pd_acc.groupby_transform(
+            ...     [1, 1, 2, 2, 3],
+            ...     zscore_ratio_meta_nb,
+            ...     df.vbt.to_2d_array(),
+            ...     df.vbt.to_2d_array()[::-1],
+            ...     wrapper=df.vbt.wrapper
+            ... )
+                               a         b    c
+            2020-01-01 -0.600000 -1.666667  1.0
+            2020-01-02 -0.333333 -3.000000  1.0
+            2020-01-03  1.000000  1.000000  1.0
+            2020-01-04 -1.400000 -0.714286  1.0
+            2020-01-05 -2.000000 -0.500000  1.0
+            ```
+        """
+        if broadcast_named_args is None:
+            broadcast_named_args = {}
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
+        if template_context is None:
+            template_context = {}
+        if wrap_kwargs is None:
+            wrap_kwargs = {}
+
+        if isinstance(transform_func_nb, str):
+            transform_func_nb = getattr(nb, transform_func_nb + "_transform_nb")
+
+        if isinstance(cls_or_self, type):
+            if len(broadcast_named_args) > 0:
+                broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
+                if wrapper is not None:
+                    broadcast_named_args = reshaping.broadcast(
+                        broadcast_named_args,
+                        to_shape=wrapper.shape_2d,
+                        **broadcast_kwargs,
+                    )
+                else:
+                    broadcast_named_args, wrapper = reshaping.broadcast(
+                        broadcast_named_args,
+                        return_wrapper=True,
+                        **broadcast_kwargs,
+                    )
+            else:
+                checks.assert_not_none(wrapper)
+            template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
+            by = substitute_templates(by, template_context, sub_id="by")
+        else:
+            if wrapper is None:
+                wrapper = cls_or_self.wrapper
+
+        grouper = wrapper.get_index_grouper(by, **resolve_dict(groupby_kwargs))
+
+        if isinstance(cls_or_self, type):
+            group_map = grouper.get_group_map()
+            template_context = merge_dicts(dict(by=by, grouper=grouper), template_context)
+            args = substitute_templates(args, template_context, sub_id="args")
+            func = jit_reg.resolve_option(nb.groupby_transform_meta_nb, jitted)
+            out = func(wrapper.shape_2d, group_map, transform_func_nb, *args)
+        else:
+            group_map = grouper.get_group_map()
+            func = jit_reg.resolve_option(nb.groupby_transform_nb, jitted)
+            out = func(cls_or_self.to_2d_array(), group_map, transform_func_nb, *args)
+
+        return wrapper.wrap(out, group_by=False, **wrap_kwargs)
+
+    @class_or_instancemethod
     def resample_apply(
         cls_or_self,
         rule: tp.AnyRuleLike,
@@ -3654,9 +3760,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """Generate crossover above another array.
-
-        See `vectorbtpro.generic.nb.base.crossed_above_nb`.
+        """See `vectorbtpro.generic.nb.base.crossed_above_nb`.
 
         Usage:
             ```pycon
@@ -3706,15 +3810,15 @@ class GenericAccessor(BaseAccessor, Analyzable):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """Generate crossover below another array.
+        """See `vectorbtpro.generic.nb.base.crossed_below_nb`.
 
-        See `vectorbtpro.generic.nb.base.crossed_above_nb` but in reversed order."""
+        Also, see `GenericAccessor.crossed_above` for similar examples."""
         self_obj, other_obj = reshaping.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
-        func = jit_reg.resolve_option(nb.crossed_above_nb, jitted)
+        func = jit_reg.resolve_option(nb.crossed_below_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(
-            reshaping.to_2d_array(other_obj),
             reshaping.to_2d_array(self_obj),
+            reshaping.to_2d_array(other_obj),
             wait=wait,
             dropna=dropna,
         )
@@ -5104,11 +5208,10 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
 
         Argument `colorize` allows the following values:
 
-        * True: Colorize bands by their median
         * False: Do not colorize
-        * "median": Median
-        * "mean": Mean
-        * "last": Last value
+        * True or "median": Colorize by median
+        * "mean": Colorize by mean
+        * "last": Colorize by last value
         * callable: Custom function that accepts (rebased to 0) Series/DataFrame with
             nans already dropped and reduces it across rows
 

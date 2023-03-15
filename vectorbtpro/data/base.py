@@ -232,8 +232,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         fetch_kwargs: tp.Optional[symbol_dict] = None,
         returned_kwargs: tp.Optional[symbol_dict] = None,
         last_index: tp.Optional[symbol_dict] = None,
-        tz_localize: tp.Optional[tp.TimezoneLike] = None,
-        tz_convert: tp.Optional[tp.TimezoneLike] = None,
+        tz_localize: tp.Union[None, bool, tp.TimezoneLike] = None,
+        tz_convert: tp.Union[None, bool, tp.TimezoneLike] = None,
         missing_index: tp.Optional[str] = None,
         missing_columns: tp.Optional[str] = None,
         **kwargs,
@@ -364,12 +364,12 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         return self._last_index
 
     @property
-    def tz_localize(self) -> tp.Optional[tp.TimezoneLike]:
+    def tz_localize(self) -> tp.Union[None, bool, tp.TimezoneLike]:
         """`tz_localize` initially passed to `Data.fetch_symbol`."""
         return self._tz_localize
 
     @property
-    def tz_convert(self) -> tp.Optional[tp.TimezoneLike]:
+    def tz_convert(self) -> tp.Union[None, bool, tp.TimezoneLike]:
         """`tz_convert` initially passed to `Data.fetch_symbol`."""
         return self._tz_convert
 
@@ -398,6 +398,13 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         return self.symbol_wrapper.shape
 
     @property
+    def shape_2d(self) -> tp.Shape:
+        """Shape as if the object was two-dimensional.
+
+        Based on the default symbol wrapper."""
+        return self.symbol_wrapper.shape_2d
+
+    @property
     def columns(self) -> tp.Index:
         """Columns.
 
@@ -424,8 +431,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     def prepare_tzaware_index(
         cls,
         obj: tp.SeriesFrame,
-        tz_localize: tp.Optional[tp.TimezoneLike] = None,
-        tz_convert: tp.Optional[tp.TimezoneLike] = None,
+        tz_localize: tp.Union[None, bool, tp.TimezoneLike] = None,
+        tz_convert: tp.Union[None, bool, tp.TimezoneLike] = None,
     ) -> tp.SeriesFrame:
         """Prepare a timezone-aware index of a pandas object.
 
@@ -438,8 +445,18 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         if tz_localize is None:
             tz_localize = data_cfg["tz_localize"]
+        if isinstance(tz_localize, bool):
+            if tz_localize:
+                raise ValueError("tz_localize cannot be True")
+            else:
+                tz_localize = None
         if tz_convert is None:
             tz_convert = data_cfg["tz_convert"]
+        if isinstance(tz_convert, bool):
+            if tz_convert:
+                raise ValueError("tz_convert cannot be True")
+            else:
+                tz_convert = None
 
         if isinstance(obj.index, pd.DatetimeIndex):
             if tz_localize is not None:
@@ -633,8 +650,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         symbol_oriented: bool = False,
         single_symbol: bool = True,
         symbol_classes: tp.Optional[symbol_dict] = None,
-        tz_localize: tp.Optional[tp.TimezoneLike] = None,
-        tz_convert: tp.Optional[tp.TimezoneLike] = None,
+        tz_localize: tp.Union[None, bool, tp.TimezoneLike] = None,
+        tz_convert: tp.Union[None, bool, tp.TimezoneLike] = None,
         missing_index: tp.Optional[str] = None,
         missing_columns: tp.Optional[str] = None,
         wrapper_kwargs: tp.KwargsLike = None,
@@ -781,8 +798,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
         *,
         symbol_classes: tp.Optional[tp.MaybeSequence[tp.Union[tp.Hashable, dict]]] = None,
-        tz_localize: tp.Optional[tp.TimezoneLike] = None,
-        tz_convert: tp.Optional[tp.TimezoneLike] = None,
+        tz_localize: tp.Union[None, bool, tp.TimezoneLike] = None,
+        tz_convert: tp.Union[None, bool, tp.TimezoneLike] = None,
         missing_index: tp.Optional[str] = None,
         missing_columns: tp.Optional[str] = None,
         wrapper_kwargs: tp.KwargsLike = None,
@@ -1617,6 +1634,38 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             _kwargs = self.select_symbol_kwargs(k, kwargs)
             v.to_hdf(path_or_buf=_path_or_buf, key=_key, format=format, **_kwargs)
 
+    # ############# Loading ############# #
+
+    @classmethod
+    def from_csv(cls: tp.Type[DataT], *args, fetch_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
+        """Use `CSVData` to load data from CSV and switch the class back to this class.
+
+        Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
+        from vectorbtpro.data.custom import CSVData
+
+        if fetch_kwargs is None:
+            fetch_kwargs = {}
+        data = CSVData.fetch(*args, **kwargs)
+        data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
+        data = data.update_fetch_kwargs(**fetch_kwargs)
+        return data
+
+    @classmethod
+    def from_hdf(cls: tp.Type[DataT], *args, fetch_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
+        """Use `HDFData` to load data from HDF and switch the class back to this class.
+
+        Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
+        from vectorbtpro.data.custom import HDFData
+
+        if fetch_kwargs is None:
+            fetch_kwargs = {}
+        if len(args) == 0 and "symbols" not in kwargs:
+            args = (cls.__name__ + ".h5",)
+        data = HDFData.fetch(*args, **kwargs)
+        data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
+        data = data.update_fetch_kwargs(**fetch_kwargs)
+        return data
+
     # ############# Transforming ############# #
 
     def transform(self: DataT, transform_func: tp.Callable, *args, **kwargs) -> DataT:
@@ -1672,7 +1721,10 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                     obj = v[c]
                 resample_func = self.column_config.get(c, {}).get("resample_func", None)
                 if resample_func is not None:
-                    new_v.append(resample_func(self, obj, wrapper_meta["resampler"]))
+                    if isinstance(resample_func, str):
+                        new_v.append(obj.vbt.resample_apply(wrapper_meta["resampler"], resample_func))
+                    else:
+                        new_v.append(resample_func(self, obj, wrapper_meta["resampler"]))
                 else:
                     if isinstance(c, str) and c.lower() == "open":
                         new_v.append(obj.vbt.resample_apply(wrapper_meta["resampler"], generic_nb.first_reduce_nb))
@@ -1908,6 +1960,18 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             if real_arg_name not in kwargs:
                 if arg_name == "data":
                     with_kwargs[real_arg_name] = _self
+                elif arg_name == "wrapper":
+                    with_kwargs[real_arg_name] = _self.symbol_wrapper
+                elif arg_name in ("input_shape", "shape"):
+                    with_kwargs[real_arg_name] = _self.shape
+                elif arg_name in ("target_shape", "shape_2d"):
+                    with_kwargs[real_arg_name] = _self.shape_2d
+                elif arg_name in ("input_index", "index"):
+                    with_kwargs[real_arg_name] = _self.index
+                elif arg_name in ("input_columns", "columns"):
+                    with_kwargs[real_arg_name] = _self.columns
+                elif arg_name == "freq":
+                    with_kwargs[real_arg_name] = _self.freq
                 elif arg_name == "hlc3":
                     with_kwargs[real_arg_name] = _self.hlc3
                 elif arg_name == "ohlc4":
@@ -2015,7 +2079,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             plot_volume (bool): Whether to plot volume beneath.
 
                 Applied only if OHLC(V) is plotted.
-            base (float): Rebase all series of a column to a given intial base.
+            base (float): Rebase all series of a column to a given initial base.
 
                 !!! note
                     The column must contain prices.

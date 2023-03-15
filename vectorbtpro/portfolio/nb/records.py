@@ -221,7 +221,7 @@ def get_entry_trades_nb(
         >>> group_lens = np.full(target_shape[1], 1)
         >>> init_cash = np.full(target_shape[1], 100)
 
-        >>> sim_out = vbt.pf_nb.simulate_from_orders_nb(
+        >>> sim_out = vbt.pf_nb.from_orders_nb(
         ...     target_shape,
         ...     group_lens,
         ...     init_cash=init_cash,
@@ -1005,54 +1005,86 @@ def trade_best_worst_price_nb(
     entry_price_open: bool = False,
     exit_price_close: bool = False,
     max_duration: tp.Optional[int] = None,
-) -> tp.Tuple[float, float]:
-    """Best and worst price during a trade."""
+    idx_relative: bool = True,
+    cont_idx: int = -1,
+    one_iteration: bool = False,
+    vmin: float = np.nan,
+    vmax: float = np.nan,
+    imin: int = -1,
+    imax: int = -1,
+) -> tp.Tuple[float, float, int, int]:
+    """Best price, worst price, and their indices during a trade."""
     from_i = trade["entry_idx"]
     to_i = trade["exit_idx"]
     trade_open = trade["status"] == TradeStatus.Open
     trade_long = trade["direction"] == TradeDirection.Long
 
-    vmin = np.nan
-    vmax = np.nan
-    for i in range(from_i, to_i + 1):
+    if cont_idx == -1 or cont_idx == from_i:
+        cont_idx = from_i
+        vmin = np.nan
+        vmax = np.nan
+        imin = -1
+        imax = -1
+    else:
+        if trade_long:
+            vmin, vmax, imin, imax = vmax, vmin, imax, imin
+        if idx_relative:
+            imin = from_i + imin
+            imax = from_i + imax
+    for i in range(cont_idx, to_i + 1):
         if i == from_i:
             if np.isnan(vmin) or trade["entry_price"] < vmin:
                 vmin = trade["entry_price"]
+                imin = i
             if np.isnan(vmax) or trade["entry_price"] > vmax:
                 vmax = trade["entry_price"]
+                imax = i
         if i > from_i or entry_price_open:
             if open is not None:
                 _open = flex_select_nb(open, i, trade["col"])
                 if np.isnan(vmin) or _open < vmin:
                     vmin = _open
+                    imin = i
                 if np.isnan(vmax) or _open > vmax:
                     vmax = _open
+                    imax = i
         if (i > from_i or entry_price_open) and (i < to_i or exit_price_close or trade_open):
             if low is not None:
                 _low = flex_select_nb(low, i, trade["col"])
                 if np.isnan(vmin) or _low < vmin:
                     vmin = _low
+                    imin = i
             if high is not None:
                 _high = flex_select_nb(high, i, trade["col"])
                 if np.isnan(vmax) or _high > vmax:
                     vmax = _high
+                    imax = i
         if i < to_i or exit_price_close or trade_open:
             _close = flex_select_nb(close, i, trade["col"])
             if np.isnan(vmin) or _close < vmin:
                 vmin = _close
+                imin = i
             if np.isnan(vmax) or _close > vmax:
                 vmax = _close
+                imax = i
         if max_duration is not None:
             if from_i + max_duration == i:
                 break
         if i == to_i:
             if np.isnan(vmin) or trade["exit_price"] < vmin:
                 vmin = trade["exit_price"]
+                imin = i
             if np.isnan(vmax) or trade["exit_price"] > vmax:
                 vmax = trade["exit_price"]
+                imax = i
+        if one_iteration:
+            break
+    if idx_relative:
+        imin = imin - from_i
+        imax = imax - from_i
     if trade_long:
-        return vmax, vmin
-    return vmin, vmax
+        return vmax, vmin, imax, imin
+    return vmin, vmax, imin, imax
 
 
 @register_chunkable(
@@ -1065,6 +1097,7 @@ def trade_best_worst_price_nb(
         close=None,
         entry_price_open=None,
         exit_price_close=None,
+        max_duration=None,
     ),
     merge_func="concat",
 )
@@ -1077,6 +1110,7 @@ def best_price_nb(
     close: tp.FlexArray2d,
     entry_price_open: bool = False,
     exit_price_close: bool = False,
+    max_duration: tp.Optional[int] = None,
 ) -> tp.Array1d:
     """Get best price by applying `trade_best_worst_price_nb` on each trade."""
     out = np.empty(len(records), dtype=np.float_)
@@ -1090,6 +1124,7 @@ def best_price_nb(
             close=close,
             entry_price_open=entry_price_open,
             exit_price_close=exit_price_close,
+            max_duration=max_duration,
         )[0]
     return out
 
@@ -1104,6 +1139,7 @@ def best_price_nb(
         close=None,
         entry_price_open=None,
         exit_price_close=None,
+        max_duration=None,
     ),
     merge_func="concat",
 )
@@ -1116,6 +1152,7 @@ def worst_price_nb(
     close: tp.FlexArray2d,
     entry_price_open: bool = False,
     exit_price_close: bool = False,
+    max_duration: tp.Optional[int] = None,
 ) -> tp.Array1d:
     """Get worst price by applying `trade_best_worst_price_nb` on each trade."""
     out = np.empty(len(records), dtype=np.float_)
@@ -1129,7 +1166,208 @@ def worst_price_nb(
             close=close,
             entry_price_open=entry_price_open,
             exit_price_close=exit_price_close,
+            max_duration=max_duration,
         )[1]
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="records", axis=0),
+    arg_take_spec=dict(
+        records=ch.ArraySlicer(axis=0),
+        open=None,
+        high=None,
+        low=None,
+        close=None,
+        entry_price_open=None,
+        exit_price_close=None,
+        max_duration=None,
+        relative=None,
+    ),
+    merge_func="concat",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def best_price_idx_nb(
+    records: tp.RecordArray,
+    open: tp.Optional[tp.FlexArray2d],
+    high: tp.Optional[tp.FlexArray2d],
+    low: tp.Optional[tp.FlexArray2d],
+    close: tp.FlexArray2d,
+    entry_price_open: bool = False,
+    exit_price_close: bool = False,
+    max_duration: tp.Optional[int] = None,
+    relative: bool = True,
+) -> tp.Array1d:
+    """Get index of best price by applying `trade_best_worst_price_nb` on each trade."""
+    out = np.empty(len(records), dtype=np.float_)
+    for r in prange(len(records)):
+        trade = records[r]
+        out[r] = trade_best_worst_price_nb(
+            trade=trade,
+            open=open,
+            high=high,
+            low=low,
+            close=close,
+            entry_price_open=entry_price_open,
+            exit_price_close=exit_price_close,
+            max_duration=max_duration,
+            idx_relative=relative,
+        )[2]
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="records", axis=0),
+    arg_take_spec=dict(
+        records=ch.ArraySlicer(axis=0),
+        open=None,
+        high=None,
+        low=None,
+        close=None,
+        entry_price_open=None,
+        exit_price_close=None,
+        max_duration=None,
+        relative=None,
+    ),
+    merge_func="concat",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def worst_price_idx_nb(
+    records: tp.RecordArray,
+    open: tp.Optional[tp.FlexArray2d],
+    high: tp.Optional[tp.FlexArray2d],
+    low: tp.Optional[tp.FlexArray2d],
+    close: tp.FlexArray2d,
+    entry_price_open: bool = False,
+    exit_price_close: bool = False,
+    max_duration: tp.Optional[int] = None,
+    relative: bool = True,
+) -> tp.Array1d:
+    """Get worst price by applying `trade_best_worst_price_nb` on each trade."""
+    out = np.empty(len(records), dtype=np.float_)
+    for r in prange(len(records)):
+        trade = records[r]
+        out[r] = trade_best_worst_price_nb(
+            trade=trade,
+            open=open,
+            high=high,
+            low=low,
+            close=close,
+            entry_price_open=entry_price_open,
+            exit_price_close=exit_price_close,
+            max_duration=max_duration,
+            idx_relative=relative,
+        )[3]
+    return out
+
+
+@register_jitted(cache=True, tags={"can_parallel"})
+def expanding_best_price_nb(
+    records: tp.RecordArray,
+    open: tp.Optional[tp.FlexArray2d],
+    high: tp.Optional[tp.FlexArray2d],
+    low: tp.Optional[tp.FlexArray2d],
+    close: tp.FlexArray2d,
+    entry_price_open: bool = False,
+    exit_price_close: bool = False,
+    max_duration: tp.Optional[int] = None,
+) -> tp.Array2d:
+    """Get expanding best price of each trade."""
+    if max_duration is None:
+        _max_duration = 0
+        for r in range(len(records)):
+            trade = records[r]
+            trade_duration = trade["exit_idx"] - trade["entry_idx"]
+            if trade_duration > _max_duration:
+                _max_duration = trade_duration
+    else:
+        _max_duration = max_duration
+    out = np.full((_max_duration + 1, len(records)), np.nan, dtype=np.float_)
+
+    for r in prange(len(records)):
+        trade = records[r]
+        from_i = trade["entry_idx"]
+        to_i = trade["exit_idx"]
+        vmin = np.nan
+        vmax = np.nan
+        imin = -1
+        imax = -1
+        for i in range(from_i, to_i + 1):
+            vmin, vmax, imin, imax = trade_best_worst_price_nb(
+                trade=trade,
+                open=open,
+                high=high,
+                low=low,
+                close=close,
+                entry_price_open=entry_price_open,
+                exit_price_close=exit_price_close,
+                max_duration=max_duration,
+                cont_idx=i,
+                one_iteration=True,
+                vmin=vmin,
+                vmax=vmax,
+                imin=imin,
+                imax=imax,
+            )
+            out[i - from_i, r] = vmin
+            if max_duration is not None:
+                if from_i + max_duration == i:
+                    break
+    return out
+
+
+@register_jitted(cache=True, tags={"can_parallel"})
+def expanding_worst_price_nb(
+    records: tp.RecordArray,
+    open: tp.Optional[tp.FlexArray2d],
+    high: tp.Optional[tp.FlexArray2d],
+    low: tp.Optional[tp.FlexArray2d],
+    close: tp.FlexArray2d,
+    entry_price_open: bool = False,
+    exit_price_close: bool = False,
+    max_duration: tp.Optional[int] = None,
+) -> tp.Array2d:
+    """Get expanding worst price of each trade."""
+    if max_duration is None:
+        _max_duration = 0
+        for r in range(len(records)):
+            trade = records[r]
+            trade_duration = trade["exit_idx"] - trade["entry_idx"]
+            if trade_duration > _max_duration:
+                _max_duration = trade_duration
+    else:
+        _max_duration = max_duration
+    out = np.full((_max_duration + 1, len(records)), np.nan, dtype=np.float_)
+
+    for r in prange(len(records)):
+        trade = records[r]
+        from_i = trade["entry_idx"]
+        to_i = trade["exit_idx"]
+        vmin = np.nan
+        vmax = np.nan
+        imin = -1
+        imax = -1
+        for i in range(from_i, to_i + 1):
+            vmin, vmax, imin, imax = trade_best_worst_price_nb(
+                trade=trade,
+                open=open,
+                high=high,
+                low=low,
+                close=close,
+                entry_price_open=entry_price_open,
+                exit_price_close=exit_price_close,
+                max_duration=max_duration,
+                cont_idx=i,
+                one_iteration=True,
+                vmin=vmin,
+                vmax=vmax,
+                imin=imin,
+                imax=imax,
+            )
+            out[i - from_i, r] = vmax
+            if max_duration is not None:
+                if from_i + max_duration == i:
+                    break
     return out
 
 
@@ -1232,6 +1470,64 @@ def mae_nb(
 
 
 @register_chunkable(
+    size=ch.ArraySizer(arg_query="records", axis=0),
+    arg_take_spec=dict(
+        records=ch.ArraySlicer(axis=0),
+        expanding_best_price=ch.ArraySlicer(axis=1),
+        use_returns=None,
+    ),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def expanding_mfe_nb(
+    records: tp.RecordArray,
+    expanding_best_price: tp.Array2d,
+    use_returns: bool = False,
+) -> tp.Array2d:
+    """Get expanding MFE of each trade."""
+    out = np.empty_like(expanding_best_price, dtype=np.float_)
+    for r in prange(expanding_best_price.shape[1]):
+        for i in range(expanding_best_price.shape[0]):
+            out[i, r] = trade_mfe_nb(
+                size=records["size"][r],
+                direction=records["direction"][r],
+                entry_price=records["entry_price"][r],
+                best_price=expanding_best_price[i, r],
+                use_returns=use_returns,
+            )
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="records", axis=0),
+    arg_take_spec=dict(
+        records=ch.ArraySlicer(axis=0),
+        expanding_worst_price=ch.ArraySlicer(axis=1),
+        use_returns=None,
+    ),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def expanding_mae_nb(
+    records: tp.RecordArray,
+    expanding_worst_price: tp.Array2d,
+    use_returns: bool = False,
+) -> tp.Array2d:
+    """Get expanding MAE of each trade."""
+    out = np.empty_like(expanding_worst_price, dtype=np.float_)
+    for r in prange(expanding_worst_price.shape[1]):
+        for i in range(expanding_worst_price.shape[0]):
+            out[i, r] = trade_mae_nb(
+                size=records["size"][r],
+                direction=records["direction"][r],
+                entry_price=records["entry_price"][r],
+                worst_price=expanding_worst_price[i, r],
+                use_returns=use_returns,
+            )
+    return out
+
+
+@register_chunkable(
     size=base_ch.GroupLensSizer(arg_query="col_map"),
     arg_take_spec=dict(
         records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
@@ -1278,7 +1574,7 @@ def edge_ratio_nb(
         norm_mae_cnt = 0
         for r in ridxs:
             trade = records[r]
-            best_price, worst_price = trade_best_worst_price_nb(
+            best_price, worst_price, _, _ = trade_best_worst_price_nb(
                 trade=trade,
                 open=open,
                 high=high,
@@ -1330,23 +1626,6 @@ def edge_ratio_nb(
     return out
 
 
-@register_chunkable(
-    size=base_ch.GroupLensSizer(arg_query="col_map"),
-    arg_take_spec=dict(
-        records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
-        col_map=base_ch.GroupMapSlicer(),
-        open=None,
-        high=None,
-        low=None,
-        close=None,
-        volatility=None,
-        entry_price_open=None,
-        exit_price_close=None,
-        max_duration=None,
-        incl_shorter=None,
-    ),
-    merge_func="concat",
-)
 @register_jitted(cache=True, tags={"can_parallel"})
 def running_edge_ratio_nb(
     records: tp.RecordArray,
@@ -1394,7 +1673,7 @@ def running_edge_ratio_nb(
                     trade_duration = trade["exit_idx"] - trade["entry_idx"]
                     if trade_duration < k + 1:
                         continue
-                best_price, worst_price = trade_best_worst_price_nb(
+                best_price, worst_price, _, _ = trade_best_worst_price_nb(
                     trade=trade,
                     open=open,
                     high=high,

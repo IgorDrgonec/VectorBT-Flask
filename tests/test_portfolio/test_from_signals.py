@@ -71,6 +71,17 @@ def adjust_func_nb(c):
     pass
 
 
+@njit
+def signal_func_nb(c, long_num_arr, short_num_arr):
+    long_num = nb.select_nb(c, long_num_arr)
+    short_num = nb.select_nb(c, short_num_arr)
+    is_long_entry = long_num > 0
+    is_long_exit = long_num < 0
+    is_short_entry = short_num > 0
+    is_short_exit = short_num < 0
+    return is_long_entry, is_long_exit, is_short_entry, is_short_exit
+
+
 class TestFromSignals:
     def test_data(self):
         data = vbt.RandomOHLCData.fetch(
@@ -233,16 +244,6 @@ class TestFromSignals:
         assert pf.wrapper.grouper.group_by is None
 
     def test_custom_signal_func(self):
-        @njit
-        def signal_func_nb(c, long_num_arr, short_num_arr):
-            long_num = nb.select_nb(c, long_num_arr)
-            short_num = nb.select_nb(c, short_num_arr)
-            is_long_entry = long_num > 0
-            is_long_exit = long_num < 0
-            is_short_entry = short_num > 0
-            is_short_exit = short_num < 0
-            return is_long_entry, is_long_exit, is_short_entry, is_short_exit
-
         pf_base = vbt.Portfolio.from_signals(
             pd.Series([1, 2, 3, 4, 5]),
             entries=pd.Series([True, False, False, False, False]),
@@ -264,6 +265,100 @@ class TestFromSignals:
             upon_opposite_entry="ignore",
         )
         assert_records_close(pf_base.order_records, pf.order_records)
+
+    def test_pos_info(self):
+        out = np.empty((5, 3), dtype=vbt.pf_enums.trade_dt)
+
+        @njit
+        def post_segment_func_nb(c, out):
+            for col in range(c.from_col, c.to_col):
+                out[c.i, col] = c.last_pos_info[col]
+
+        _ = from_signals_both(
+            close=pd.concat(
+                (
+                    price.rename("a"),
+                    price.rename("b"),
+                    price.rename("c"),
+                ),
+                axis=1,
+            ),
+            entries=pd.concat(
+                (
+                    entries.rename("a"),
+                    pd.Series(np.roll(entries.values, 1), index=entries.index, name="b"),
+                    pd.Series(np.roll(entries.values, 2), index=entries.index, name="c"),
+                ),
+                axis=1,
+            ),
+            exits=pd.concat(
+                (
+                    exits.rename("a"),
+                    pd.Series(np.roll(exits.values, 1), index=exits.index, name="b"),
+                    pd.Series(np.roll(exits.values, 2), index=exits.index, name="c"),
+                ),
+                axis=1,
+            ),
+            post_segment_func_nb=post_segment_func_nb,
+            post_segment_args=(out,),
+        )
+        assert_records_close(
+            out,
+            np.array([
+                [
+                    (0, 0, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 0.0, 0.0, 0, 0, 0),
+                    (0, 1, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 0.0, 0.0, 1, 0, 0),
+                    (0, 2, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 0.0, 0.0, 1, 0, 0),
+                ],
+                [
+                    (0, 0, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 100.0, 1.0, 0, 0, 0),
+                    (0, 1, 100.0, 0, 0, 1.0, 0.0, 1, 1, 2.0, 0.0, -100.0, -1.0, 1, 1, 0),
+                    (0, 2, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, -100.0, -1.0, 1, 0, 0),
+                ],
+                [
+                    (0, 0, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 200.0, 2.0, 0, 0, 0),
+                    (0, 1, 100.0, 0, 0, 1.0, 0.0, 1, 1, 2.0, 0.0, -100.0, -1.0, 1, 1, 0),
+                    (0, 2, 100.0, 0, 0, 1.0, 0.0, 1, -1, 3.0, 0.0, -200.0, -2.0, 1, 0, 0),
+                ],
+                [
+                    (1, 0, 100.0, 1, 3, 4.0, 0.0, -1, -1, np.nan, 0.0, 0.0, 0.0, 1, 0, 1),
+                    (0, 1, 100.0, 0, 0, 1.0, 0.0, 1, 1, 2.0, 0.0, -100.0, -1.0, 1, 1, 0),
+                    (0, 2, 100.0, 0, 0, 1.0, 0.0, 1, -1, 3.0, 0.0, -233.33333333333331, -2.333333333333333, 1, 0, 0),
+                ],
+                [
+                    (1, 0, 100.0, 1, 3, 4.0, 0.0, -1, -1, np.nan, 0.0, -100.0, -0.25, 1, 0, 1),
+                    (0, 1, 100.0, 0, 0, 1.0, 0.0, 1, 1, 2.0, 0.0, -100.0, -1.0, 1, 1, 0),
+                    (0, 2, 100.0, 0, 0, 1.0, 0.0, 1, -1, 3.0, 0.0, -266.66666666666663, -2.666666666666666, 1, 0, 0),
+                ],
+            ], dtype=vbt.pf_enums.trade_dt),
+        )
+
+    def test_ladder(self):
+        @njit
+        def adjust_func_nb(c, tp_stops, tp_sizes):
+            tp_info = c.last_tp_info[c.col]
+            if tp_info["step_idx"] == c.i - 1:
+                tp_info["ladder"] = True
+                tp_info["stop"] = tp_stops[tp_info["step"]]
+                tp_info["exit_size"] = tp_sizes[tp_info["step"]]
+                tp_info["exit_size_type"] = vbt.pf_enums.SizeType.Percent
+
+        assert_records_close(
+            from_signals_both(
+                adjust_func_nb=adjust_func_nb,
+                adjust_args=(np.array([1.0, 2.0]), np.array([0.5, 1.0])),
+                use_stops=True
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 0, 100.0, 1.0, 0.0, 0, 0, -1),
+                    (1, 0, 0, 1, 1, 50.0, 2.0, 0.0, 1, 0, 3),
+                    (2, 0, 0, 2, 2, 50.0, 3.0, 0.0, 1, 0, 3),
+                    (3, 0, 3, 3, 3, 62.5, 4.0, 0.0, 1, 0, -1),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
 
     def test_amount(self):
         assert_records_close(
@@ -3648,11 +3743,11 @@ class TestFromSignals:
             ).order_records,
         )
         target_tsl_stop = pd.concat((close, close, close, close, close), axis=1)
-        target_tsl_stop.iloc[:, 0] = close * (1 - np.nan)
-        target_tsl_stop.iloc[:, 1] = close * (1 - 0.15)
-        target_tsl_stop.iloc[:, 2] = close * (1 - 0.2)
-        target_tsl_stop.iloc[:, 3] = close * (1 - 0.25)
-        target_tsl_stop.iloc[:, 4] = close * (1 - np.inf)
+        target_tsl_stop.iloc[:, 0] = close - np.nan
+        target_tsl_stop.iloc[:, 1] = close - 1
+        target_tsl_stop.iloc[:, 2] = close - 2
+        target_tsl_stop.iloc[:, 3] = close - 3
+        target_tsl_stop.iloc[:, 4] = close - np.inf
         assert_records_close(
             _from_signals_longonly(
                 close=close,
@@ -3661,8 +3756,8 @@ class TestFromSignals:
                 open=open,
                 high=high,
                 low=low,
-                tsl_stop=[[np.nan, 0.15, 0.2, 0.25, np.inf]],
-                delta_format="percent",
+                tsl_stop=[[np.nan, 1, 2, 3, np.inf]],
+                delta_format="absolute",
             ).order_records,
             _from_signals_longonly(
                 close=close,
@@ -3840,11 +3935,11 @@ class TestFromSignals:
             ),
         )
         target_tsl_stop = pd.concat((close, close, close, close, close), axis=1)
-        target_tsl_stop.iloc[:, 0] = close * (1 + np.nan)
-        target_tsl_stop.iloc[:, 1] = close * (1 + 0.15)
-        target_tsl_stop.iloc[:, 2] = close * (1 + 0.2)
-        target_tsl_stop.iloc[:, 3] = close * (1 + 0.25)
-        target_tsl_stop.iloc[:, 4] = close * (1 + np.inf)
+        target_tsl_stop.iloc[:, 0] = close + np.nan
+        target_tsl_stop.iloc[:, 1] = close + 1
+        target_tsl_stop.iloc[:, 2] = close + 2
+        target_tsl_stop.iloc[:, 3] = close + 3
+        target_tsl_stop.iloc[:, 4] = close + np.inf
         assert_records_close(
             _from_signals_shortonly(
                 close=close,
@@ -3853,8 +3948,8 @@ class TestFromSignals:
                 open=open,
                 high=high,
                 low=low,
-                tsl_stop=[[np.nan, 0.15, 0.2, 0.25, np.inf]],
-                delta_format="percent",
+                tsl_stop=[[np.nan, 1, 2, 3, np.inf]],
+                delta_format="absolute",
             ).order_records,
             _from_signals_shortonly(
                 close=close,
@@ -4037,19 +4132,19 @@ class TestFromSignals:
             ).order_records,
         )
         target_tsl_th = pd.concat((close, close, close, close, close, close), axis=1)
-        target_tsl_th.iloc[:, 0] = close * (1 + np.nan)
-        target_tsl_th.iloc[:, 1] = close * (1 + 0.1)
-        target_tsl_th.iloc[:, 2] = close * (1 + 0.5)
-        target_tsl_th.iloc[:, 3] = close * (1 + 0.1)
-        target_tsl_th.iloc[:, 4] = close * (1 + 0.5)
-        target_tsl_th.iloc[:, 5] = close * (1 + np.inf)
+        target_tsl_th.iloc[:, 0] = close + np.nan
+        target_tsl_th.iloc[:, 1] = close + 1
+        target_tsl_th.iloc[:, 2] = close + 2
+        target_tsl_th.iloc[:, 3] = close + 1
+        target_tsl_th.iloc[:, 4] = close + 2
+        target_tsl_th.iloc[:, 5] = close + np.inf
         target_tsl_stop = pd.concat((close, close, close, close, close, close), axis=1)
-        target_tsl_stop.iloc[:, 0] = close * (1 - np.nan)
-        target_tsl_stop.iloc[:, 1] = close * (1 - 0.1)
-        target_tsl_stop.iloc[:, 2] = close * (1 - 0.1)
-        target_tsl_stop.iloc[:, 3] = close * (1 - 0.5)
-        target_tsl_stop.iloc[:, 4] = close * (1 - 0.5)
-        target_tsl_stop.iloc[:, 4] = close * (1 - np.inf)
+        target_tsl_stop.iloc[:, 0] = close - np.nan
+        target_tsl_stop.iloc[:, 1] = close - 1
+        target_tsl_stop.iloc[:, 2] = close - 1
+        target_tsl_stop.iloc[:, 3] = close - 2
+        target_tsl_stop.iloc[:, 4] = close - 2
+        target_tsl_stop.iloc[:, 4] = close - np.inf
         assert_records_close(
             _from_signals_longonly(
                 close=close,
@@ -4058,9 +4153,9 @@ class TestFromSignals:
                 open=open,
                 high=high,
                 low=low,
-                tsl_th=[[np.nan, 0.1, 0.5, 0.1, 0.5, np.inf]],
-                tsl_stop=[[np.nan, 0.1, 0.1, 0.5, 0.5, np.inf]],
-                delta_format="percent",
+                tsl_th=[[np.nan, 1, 2, 1, 2, np.inf]],
+                tsl_stop=[[np.nan, 1, 1, 2, 2, np.inf]],
+                delta_format="absolute",
             ).order_records,
             _from_signals_longonly(
                 close=close,
@@ -4543,6 +4638,202 @@ class TestFromSignals:
                     (0, 2, 0, 0, 0, 100.0, 1.0, 0.0, 1, 0, -1),
                     (0, 3, 0, 0, 0, 100.0, 1.0, 0.0, 1, 0, -1),
                     (0, 4, 0, 0, 0, 100.0, 1.0, 0.0, 1, 0, -1),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+
+    @pytest.mark.parametrize("test_flexible", [False, True])
+    def test_td_stop(self, test_flexible):
+        if test_flexible:
+            _from_signals_both = partial(from_signals_both, adjust_func_nb=adjust_func_nb)
+        else:
+            _from_signals_both = from_signals_both
+        entries = pd.Series([True, False, True, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+
+        close = pd.Series([5.0, 4.0, 3.0, 2.0, 1.0], index=price.index)
+        open = close + 0.25
+        assert_records_close(
+            _from_signals_both(
+                close=close,
+                entries=entries,
+                exits=exits,
+                td_stop=[[-1, 0, 1, 2]],
+                time_delta_format="rows",
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (0, 1, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 1, 0, 1, 1, 20.0, 4.0, 0.0, 1, 0, 4),
+                    (2, 1, 2, 2, 2, 26.666666666666668, 3.0, 0.0, 0, 0, -1),
+                    (3, 1, 2, 3, 3, 26.666666666666668, 2.0, 0.0, 1, 0, 4),
+                    (0, 2, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 2, 0, 1, 1, 20.0, 4.0, 0.0, 1, 0, 4),
+                    (2, 2, 2, 2, 2, 26.666666666666668, 3.0, 0.0, 0, 0, -1),
+                    (3, 2, 2, 3, 3, 26.666666666666668, 2.0, 0.0, 1, 0, 4),
+                    (0, 3, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 3, 0, 2, 2, 20.0, 3.0, 0.0, 1, 0, 4),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            _from_signals_both(
+                open=open,
+                close=close,
+                entries=entries,
+                exits=exits,
+                td_stop=[[-1, 0, 1, 2]],
+                time_delta_format="rows",
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (0, 1, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 1, 0, 1, 1, 20.0, 4.25, 0.0, 1, 0, 4),
+                    (2, 1, 2, 2, 2, 28.333333333333332, 3.0, 0.0, 0, 0, -1),
+                    (3, 1, 2, 3, 3, 28.333333333333332, 2.25, 0.0, 1, 0, 4),
+                    (0, 2, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 2, 0, 1, 1, 20.0, 4.25, 0.0, 1, 0, 4),
+                    (2, 2, 2, 2, 2, 28.333333333333332, 3.0, 0.0, 0, 0, -1),
+                    (3, 2, 2, 3, 3, 28.333333333333332, 2.25, 0.0, 1, 0, 4),
+                    (0, 3, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 3, 0, 2, 2, 20.0, 3.25, 0.0, 1, 0, 4),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            _from_signals_both(
+                open=open,
+                close=close,
+                entries=entries,
+                exits=exits,
+                td_stop=[[-1, 0 * day_dt, 1 * day_dt, 2 * day_dt]],
+                time_delta_format="index",
+            ).order_records,
+            _from_signals_both(
+                open=open,
+                close=close,
+                entries=entries,
+                exits=exits,
+                td_stop=[[-1, 0, 1, 2]],
+                time_delta_format="rows",
+            ).order_records,
+        )
+        assert_records_close(
+            _from_signals_both(
+                open=open,
+                close=close,
+                entries=entries,
+                exits=exits,
+                td_stop="3 days",
+                time_delta_format="index",
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 0, 0, 3, 3, 20.0, 2.25, 0.0, 1, 0, 4),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+
+    @pytest.mark.parametrize("test_flexible", [False, True])
+    def test_dt_stop(self, test_flexible):
+        if test_flexible:
+            _from_signals_both = partial(from_signals_both, adjust_func_nb=adjust_func_nb)
+        else:
+            _from_signals_both = from_signals_both
+        entries = pd.Series([True, False, True, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+
+        close = pd.Series([5.0, 4.0, 3.0, 2.0, 1.0], index=price.index)
+        open = close + 0.25
+        assert_records_close(
+            _from_signals_both(
+                close=close,
+                entries=entries,
+                exits=exits,
+                dt_stop=[[-1, 0, 1, 2]],
+                time_delta_format="rows",
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (0, 1, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 1, 0, 1, 1, 20.0, 4.0, 0.0, 1, 0, 4),
+                    (2, 1, 2, 2, 2, 26.666666666666668, 3.0, 0.0, 0, 0, -1),
+                    (3, 1, 2, 3, 3, 26.666666666666668, 2.0, 0.0, 1, 0, 4),
+                    (0, 2, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 2, 0, 1, 1, 20.0, 4.0, 0.0, 1, 0, 4),
+                    (2, 2, 2, 2, 2, 26.666666666666668, 3.0, 0.0, 0, 0, -1),
+                    (3, 2, 2, 3, 3, 26.666666666666668, 2.0, 0.0, 1, 0, 4),
+                    (0, 3, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 3, 0, 2, 2, 20.0, 3.0, 0.0, 1, 0, 4),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            _from_signals_both(
+                open=open,
+                close=close,
+                entries=entries,
+                exits=exits,
+                dt_stop=[[-1, 0, 1, 2]],
+                time_delta_format="rows",
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (0, 1, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 1, 0, 1, 1, 20.0, 4.25, 0.0, 1, 0, 4),
+                    (2, 1, 2, 2, 2, 28.333333333333332, 3.0, 0.0, 0, 0, -1),
+                    (3, 1, 2, 3, 3, 28.333333333333332, 2.25, 0.0, 1, 0, 4),
+                    (0, 2, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 2, 0, 1, 1, 20.0, 4.25, 0.0, 1, 0, 4),
+                    (2, 2, 2, 2, 2, 28.333333333333332, 3.0, 0.0, 0, 0, -1),
+                    (3, 2, 2, 3, 3, 28.333333333333332, 2.25, 0.0, 1, 0, 4),
+                    (0, 3, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 3, 0, 2, 2, 20.0, 3.25, 0.0, 1, 0, 4),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            _from_signals_both(
+                open=open,
+                close=close,
+                entries=entries,
+                exits=exits,
+                dt_stop=[[-1, price.index[0], price.index[0] + day_dt, price.index[0] + 2 * day_dt]],
+                time_delta_format="index",
+            ).order_records,
+            _from_signals_both(
+                open=open,
+                close=close,
+                entries=entries,
+                exits=exits,
+                dt_stop=[[-1, 0, 1, 2]],
+                time_delta_format="rows",
+            ).order_records,
+        )
+        assert_records_close(
+            _from_signals_both(
+                open=open,
+                close=close,
+                entries=entries,
+                exits=exits,
+                dt_stop="3 days",
+                time_delta_format="index",
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 0, 20.0, 5.0, 0.0, 0, 0, -1),
+                    (1, 0, 0, 2, 2, 20.0, 3.0, 0.0, 1, 0, 4),
                 ],
                 dtype=fs_order_dt,
             ),
@@ -5721,12 +6012,108 @@ class TestFromSignals:
             ).returns,
         )
 
+    def test_staticized(self, tmp_path):
+        close = [1, 2, 3, 4]
+        entries = [True, False, False, False]
+        exits = [False, True, False, False]
+        short_entries = [False, False, True, False]
+        short_exits = [False, False, False, True]
+        assert_records_close(
+            vbt.Portfolio.from_signals(
+                close,
+                entries=entries,
+                exits=exits,
+                short_entries=short_entries,
+                short_exits=short_exits,
+                staticized=dict(path=tmp_path, override=True),
+            ).order_records,
+            vbt.Portfolio.from_signals(
+                close,
+                entries=entries,
+                exits=exits,
+                short_entries=short_entries,
+                short_exits=short_exits,
+            ).order_records,
+        )
+        assert_records_close(
+            vbt.Portfolio.from_signals(
+                close,
+                entries=entries,
+                exits=exits,
+                direction="both",
+                staticized=dict(path=tmp_path, override=True),
+            ).order_records,
+            vbt.Portfolio.from_signals(
+                close,
+                entries=entries,
+                exits=exits,
+                direction="both",
+            ).order_records,
+        )
+        assert_records_close(
+            vbt.Portfolio.from_signals(
+                close,
+                size=0.5,
+                size_type="targetpercent",
+                order_mode=True,
+                staticized=dict(path=tmp_path, override=True),
+            ).order_records,
+            vbt.Portfolio.from_signals(
+                close,
+                size=0.5,
+                size_type="targetpercent",
+                order_mode=True,
+            ).order_records,
+        )
+        assert_records_close(
+            vbt.Portfolio.from_signals(
+                close,
+                size=0.5,
+                size_type="targetpercent",
+                order_mode=True,
+                adjust_func_nb=adjust_func_nb,
+                staticized=dict(path=tmp_path, override=True),
+            ).order_records,
+            vbt.Portfolio.from_signals(
+                close,
+                size=0.5,
+                size_type="targetpercent",
+                order_mode=True,
+                adjust_func_nb=adjust_func_nb,
+            ).order_records,
+        )
+        assert_records_close(
+            vbt.Portfolio.from_signals(
+                pd.Series([1, 2, 3, 4, 5]),
+                signal_func_nb=signal_func_nb,
+                signal_args=(vbt.Rep("long_num_arr"), vbt.Rep("short_num_arr")),
+                broadcast_named_args=dict(
+                    long_num_arr=pd.Series([1, 0, -1, 0, 0]),
+                    short_num_arr=pd.Series([0, 1, 0, 1, -1]),
+                ),
+                size=1,
+                upon_opposite_entry="ignore",
+                staticized=dict(path=tmp_path, override=True),
+            ).order_records,
+            vbt.Portfolio.from_signals(
+                pd.Series([1, 2, 3, 4, 5]),
+                signal_func_nb=signal_func_nb,
+                signal_args=(vbt.Rep("long_num_arr"), vbt.Rep("short_num_arr")),
+                broadcast_named_args=dict(
+                    long_num_arr=pd.Series([1, 0, -1, 0, 0]),
+                    short_num_arr=pd.Series([0, 1, 0, 1, -1]),
+                ),
+                size=1,
+                upon_opposite_entry="ignore",
+            ).order_records,
+        )
+
 
 # ############# from_holding ############# #
 
 
 class TestFromHolding:
-    def test_from_holding(self):
+    def test_from_holding(self, tmp_path):
         df = pd.DataFrame(
             [
                 [1, np.nan, np.nan],
@@ -5778,6 +6165,37 @@ class TestFromHolding:
         assert_records_close(
             vbt.Portfolio.from_holding(df, at_first_valid_in=None, close_at_end=True).order_records,
             vbt.Portfolio.from_signals(df, entries, exits, accumulate=False).order_records,
+        )
+
+    def test_staticized(self, tmp_path):
+        df = pd.DataFrame(
+            [
+                [1, np.nan, np.nan],
+                [2, 5, np.nan],
+                [3, 6, 8],
+                [4, 7, 9],
+            ]
+        )
+        assert_records_close(
+            vbt.Portfolio.from_holding(
+                df,
+                dynamic_mode=True,
+                staticized=dict(path=tmp_path, override=True),
+            ).order_records,
+            vbt.Portfolio.from_holding(df, dynamic_mode=True).order_records,
+        )
+        assert_records_close(
+            vbt.Portfolio.from_signals(
+                df,
+                signal_func_nb="holding_enex_signal_func_nb",
+                signal_args=(Direction.LongOnly, True),
+                staticized=dict(path=tmp_path, override=True),
+            ).order_records,
+            vbt.Portfolio.from_holding(
+                df,
+                dynamic_mode=True,
+                close_at_end=True,
+            ).order_records,
         )
 
 

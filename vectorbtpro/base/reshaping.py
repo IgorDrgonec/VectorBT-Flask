@@ -672,9 +672,6 @@ class BCO:
     reindex_kwargs: tp.Optional[tp.Kwargs] = attr.ib(default=None)
     """Keyword arguments passed to `pd.DataFrame.reindex`."""
 
-    index_to_param: tp.Optional[bool] = attr.ib(default=None)
-    """Whether to create an instance of `vectorbtpro.utils.params.Param` if `BCO.value` is an index."""
-
     repeat_param: tp.Optional[bool] = attr.ib(default=None)
     """Whether to repeat every parameter value to match the number of columns in regular arrays."""
 
@@ -736,7 +733,6 @@ def broadcast(
     post_func: tp.MaybeMappingSequence[tp.Optional[tp.Callable]] = None,
     require_kwargs: tp.MaybeMappingSequence[tp.Optional[tp.Kwargs]] = None,
     reindex_kwargs: tp.MaybeMappingSequence[tp.Optional[tp.Kwargs]] = None,
-    index_to_param: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
     repeat_param: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
     tile: tp.Union[None, int, tp.IndexLike] = None,
     random_subset: tp.Optional[int] = None,
@@ -799,7 +795,6 @@ def broadcast(
 
             This key will be merged with any argument-specific dict. If the mapping contains all keys in
             `pd.DataFrame.reindex`, it will be applied on all objects.
-        index_to_param (bool, sequence or mapping): See `BCO.index_to_param`.
         repeat_param (bool, sequence or mapping): See `BCO.repeat_param`.
         tile (int or index_like): Tile the final object by the number of times or index.
         random_subset (int): Select a random subset of parameter values.
@@ -1056,21 +1051,6 @@ def broadcast(
          'c': array([[False, True, False, True, False, True, False, True, False, True, False, True]])}
         ```
 
-        * Or the same using `pd.Index`:
-
-        ```pycon
-        >>> vbt.broadcast(
-        ...     dict(
-        ...         a=pd.Index([1, 2, 3]),
-        ...         b=pd.Index(['x', 'y']),
-        ...         c=pd.Index([False, True])
-        ...     )
-        ... )
-        {'a': array([[1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3]]),
-         'b': array([['x', 'x', 'y', 'y', 'x', 'x', 'y', 'y', 'x', 'x', 'y', 'y']], dtype='<U1'),
-         'c': array([[False, True, False, True, False, True, False, True, False, True, False, True]])}
-        ```
-
         * Build a Cartesian product of two groups of parameters - (a, d) and (b, c):
 
         ```pycon
@@ -1093,9 +1073,9 @@ def broadcast(
         ```pycon
         >>> vbt.broadcast(
         ...     dict(
-        ...         a=pd.Index([1, 2, 3]),
-        ...         b=pd.Index(['x', 'y']),
-        ...         c=pd.Index([False, True])
+        ...         a=vbt.Param([1, 2, 3]),
+        ...         b=vbt.Param(['x', 'y']),
+        ...         c=vbt.Param([False, True])
         ...     ),
         ...     random_subset=5,
         ...     seed=42
@@ -1224,16 +1204,10 @@ def broadcast(
         else:
             _reindex_kwargs = merge_dicts(reindex_kwargs, _reindex_kwargs)
 
-        _index_to_param = _resolve_arg(obj, "index_to_param", index_to_param, None)
-        if _index_to_param is None:
-            _index_to_param = broadcasting_cfg["index_to_param"]
-
         _repeat_param = _resolve_arg(obj, "repeat_param", repeat_param, None)
         if _repeat_param is None:
             _repeat_param = broadcasting_cfg["repeat_param"]
 
-        if _index_to_param and isinstance(value, pd.Index):
-            value = Param(value)
         if isinstance(value, Param):
             param_keys.add(k)
         elif isinstance(value, indexing.index_dict) or isinstance(value, CustomTemplate):
@@ -1250,7 +1224,6 @@ def broadcast(
             post_func=_post_func,
             require_kwargs=_require_kwargs,
             reindex_kwargs=_reindex_kwargs,
-            index_to_param=_index_to_param,
             repeat_param=_repeat_param,
         )
 

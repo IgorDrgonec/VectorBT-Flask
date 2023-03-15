@@ -398,6 +398,10 @@ class ReturnsAccessor(GenericAccessor):
             raise ValueError("Year frequency is None. Pass `year_freq` or define it globally under `settings.returns`.")
         return self.year_freq / self.wrapper.freq
 
+    def deannualize(self, value: float) -> float:
+        """Deannualize a value."""
+        return np.power(1 + value, 1. / self.ann_factor) - 1.
+
     @property
     def defaults(self) -> tp.Kwargs:
         """Defaults for `ReturnsAccessor`.

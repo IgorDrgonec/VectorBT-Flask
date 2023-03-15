@@ -1150,6 +1150,33 @@ def crossed_above_nb(arr1: tp.Array2d, arr2: tp.Array2d, wait: int = 0, dropna: 
     return out
 
 
+@register_jitted(cache=True)
+def crossed_below_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d, wait: int = 0, dropna: bool = False) -> tp.Array1d:
+    """Get the crossover of the first array going below the second array.
+
+    Calls `crossed_above_1d_nb` but with the arguments switched."""
+    return crossed_above_1d_nb(arr2, arr1, wait=wait, dropna=dropna)
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr1", axis=1),
+    arg_take_spec=dict(
+        arr1=ch.ArraySlicer(axis=1),
+        arr2=ch.ArraySlicer(axis=1),
+        wait=None,
+        dropna=None,
+    ),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def crossed_below_nb(arr1: tp.Array2d, arr2: tp.Array2d, wait: int = 0, dropna: bool = False) -> tp.Array2d:
+    """2-dim version of `crossed_below_1d_nb`."""
+    out = np.empty(arr1.shape, dtype=np.bool_)
+    for col in prange(arr1.shape[1]):
+        out[:, col] = crossed_below_1d_nb(arr1[:, col], arr2[:, col], wait=wait, dropna=dropna)
+    return out
+
+
 # ############# Transformation ############# #
 
 

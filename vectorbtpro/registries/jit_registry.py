@@ -482,11 +482,6 @@ class JITRegistry:
         jitable_setup_hash = hash(jitable_setup)
         jitted_setup = JittedSetup(jitter=jitter, jitted_func=jitted_func)
         jitted_setup_hash = hash(jitted_setup)
-        if jitable_setup_hash in self.jitted_setups:
-            if jitted_setup_hash in self.jitted_setups[jitable_setup_hash]:
-                raise ValueError(
-                    f"Jitted setup with task id '{jitable_setup.task_id}' and jitter {jitter} already registered"
-                )
         if jitable_setup_hash not in self.jitted_setups:
             self.jitted_setups[jitable_setup_hash] = dict()
         if jitted_setup_hash not in self.jitted_setups[jitable_setup_hash]:

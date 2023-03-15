@@ -66,9 +66,6 @@ class ChunkableRegistry:
         """Register a new setup."""
         if setup_id is None:
             setup_id = func.__module__ + "." + func.__name__
-        if setup_id in self.setups:
-            raise ValueError(f"Setup id '{str(setup_id)}' already registered")
-
         setup = ChunkedSetup(setup_id=setup_id, func=func, options=options, tags=tags)
         self.setups[setup_id] = setup
 

@@ -1633,22 +1633,40 @@ def prepare_last_value_nb(
 
 
 @register_jitted(cache=True)
-def prepare_last_pos_record_nb(
+def prepare_last_pos_info_nb(
     target_shape: tp.Shape,
     init_position: tp.FlexArray1d,
     init_price: tp.FlexArray1d,
-    fill_pos_record: bool = True,
+    fill_pos_info: bool = True,
 ) -> tp.RecordArray:
-    """Prepare `last_pos_record`."""
-    last_pos_record = np.empty(target_shape[1], dtype=trade_dt)
-    last_pos_record["id"][:] = -1
-    if fill_pos_record:
+    """Prepare `last_pos_info`."""
+    if fill_pos_info:
+        last_pos_info = np.empty(target_shape[1], dtype=trade_dt)
+        last_pos_info["id"][:] = -1
+        last_pos_info["col"][:] = -1
+        last_pos_info["size"][:] = np.nan
+        last_pos_info["entry_order_id"][:] = -1
+        last_pos_info["entry_idx"][:] = -1
+        last_pos_info["entry_price"][:] = np.nan
+        last_pos_info["entry_fees"][:] = np.nan
+        last_pos_info["exit_order_id"][:] = -1
+        last_pos_info["exit_idx"][:] = -1
+        last_pos_info["exit_price"][:] = np.nan
+        last_pos_info["exit_fees"][:] = np.nan
+        last_pos_info["pnl"][:] = np.nan
+        last_pos_info["return"][:] = np.nan
+        last_pos_info["direction"][:] = -1
+        last_pos_info["status"][:] = -1
+        last_pos_info["parent_id"][:] = -1
+
         for col in range(target_shape[1]):
             _init_position = float(flex_select_1d_pc_nb(init_position, col))
             _init_price = float(flex_select_1d_pc_nb(init_price, col))
             if _init_position != 0:
-                fill_init_pos_record_nb(last_pos_record[col], col, _init_position, _init_price)
-    return last_pos_record
+                fill_init_pos_info_nb(last_pos_info[col], col, _init_position, _init_price)
+    else:
+        last_pos_info = np.empty(0, dtype=trade_dt)
+    return last_pos_info
 
 
 @register_jitted
@@ -1699,7 +1717,7 @@ def get_trade_stats_nb(
 
 
 @register_jitted(cache=True)
-def update_open_pos_stats_nb(record: tp.Record, position_now: float, price: float) -> None:
+def update_open_pos_info_stats_nb(record: tp.Record, position_now: float, price: float) -> None:
     """Update statistics of an open position record using custom price."""
     if record["id"] >= 0 and record["status"] == TradeStatus.Open:
         if np.isnan(record["exit_price"]):
@@ -1722,7 +1740,7 @@ def update_open_pos_stats_nb(record: tp.Record, position_now: float, price: floa
 
 
 @register_jitted(cache=True)
-def fill_init_pos_record_nb(record: tp.Record, col: int, position_now: float, price: float) -> None:
+def fill_init_pos_info_nb(record: tp.Record, col: int, position_now: float, price: float) -> None:
     """Fill position record for an initial position."""
     record["id"] = 0
     record["col"] = col
@@ -1743,11 +1761,11 @@ def fill_init_pos_record_nb(record: tp.Record, col: int, position_now: float, pr
     record["parent_id"] = record["id"]
 
     # Update open position stats
-    update_open_pos_stats_nb(record, position_now, np.nan)
+    update_open_pos_info_stats_nb(record, position_now, np.nan)
 
 
 @register_jitted(cache=True)
-def update_pos_record_nb(
+def update_pos_info_nb(
     record: tp.Record,
     i: int,
     col: int,
@@ -1844,4 +1862,4 @@ def update_pos_record_nb(
                 record["exit_fees"] += order_result.fees
 
         # Update open position stats
-        update_open_pos_stats_nb(record, position_now, order_result.price)
+        update_open_pos_info_stats_nb(record, position_now, order_result.price)
