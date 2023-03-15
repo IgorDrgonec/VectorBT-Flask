@@ -5208,11 +5208,10 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
 
         Argument `colorize` allows the following values:
 
-        * True: Colorize bands by their median
         * False: Do not colorize
-        * "median": Median
-        * "mean": Mean
-        * "last": Last value
+        * True or "median": Colorize by median
+        * "mean": Colorize by mean
+        * "last": Colorize by last value
         * callable: Custom function that accepts (rebased to 0) Series/DataFrame with
             nans already dropped and reduces it across rows
 

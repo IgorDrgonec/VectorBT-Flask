@@ -1579,7 +1579,7 @@ class Trades(Ranges):
             field (str, MappedArray, or array_like): Field to be plotted.
 
                 Can be also provided as a mapped array or 1-dim array.
-            field_label (str): Label of the field to be displayed on hover.
+            field_label (str): Label of the field.
             column (str): Name of the column to plot.
             pct_scale (bool): Whether to set x-axis to `Trades.returns`, otherwise to `Trades.pnl`.
             field_pct_scale (bool): Whether to make y-axis a percentage scale.
@@ -1803,7 +1803,10 @@ class Trades(Ranges):
     def plot_expanding(
         self,
         field: tp.Union[str, tp.Array1d, MappedArray],
+        field_label: tp.Optional[str] = None,
         column: tp.Optional[tp.Label] = None,
+        plot_bands: bool = False,
+        colorize: tp.Union[bool, str, tp.Callable] = "last",
         field_pct_scale: bool = False,
         add_trace_kwargs: tp.KwargsLike = None,
         fig: tp.Optional[tp.BaseFigure] = None,
@@ -1815,11 +1818,28 @@ class Trades(Ranges):
             field (str or array_like): Field to be plotted.
 
                  Can be also provided as a 2-dim array.
+            field_label (str): Label of the field.
             column (str): Name of the column to plot. Optional.
+            plot_bands (bool): See `vectorbtpro.generic.accessors.GenericDFAccessor.plot_projections`.
+            colorize (bool, str or callable): See `vectorbtpro.generic.accessors.GenericDFAccessor.plot_projections`.
             field_pct_scale (bool): Whether to make y-axis a percentage scale.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             fig (Figure or FigureWidget): Figure to add traces to.
             **kwargs: Keyword arguments passed to `vectorbtpro.generic.accessors.GenericDFAccessor.plot_projections`.
+
+        Usage:
+            ```pycon
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+
+            >>> index = pd.date_range("2020", periods=10)
+            >>> price = pd.Series([1., 2., 3., 2., 4., 5., 6., 5., 6., 7.], index=index)
+            >>> orders = pd.Series([1., 0., 0., -2., 0., 0., 2., 0., 0., -1.], index=index)
+            >>> pf = vbt.Portfolio.from_orders(price, orders)
+            >>> pf.trades.plot_expanding("MFE").show()
+            ```
+
+            ![](/assets/images/api/trades_plot_expanding.svg){: .iimg }
         """
         if column is not None:
             self_col = self.select_col(column=column, group_by=False)
@@ -1827,32 +1847,44 @@ class Trades(Ranges):
             self_col = self
 
         if isinstance(field, str):
+            if field_label is None:
+                field_label = field
+            if not field.lower().startswith("expanding_"):
+                field = "expanding_" + field
             field = getattr(self_col, field.lower())
         if isinstance(field, MappedArray):
             field = field.values
+        if field_label is None:
+            field_label = "Field"
         field = to_pd_array(field)
 
         fig = field.vbt.plot_projections(
             add_trace_kwargs=add_trace_kwargs,
             fig=fig,
+            plot_bands=plot_bands,
+            colorize=colorize,
             **kwargs,
         )
-        if field_pct_scale:
-            yaxis = getattr(fig.data[-1], "yaxis", None)
-            if yaxis is None:
-                yaxis = "yaxis"
+        yaxis = getattr(fig.data[-1], "yaxis", None)
+        if yaxis is None:
+            yaxis = "yaxis"
+        if field_label is not None and "title" not in kwargs.get(yaxis, {}):
+            fig.update_layout(**{yaxis: dict(title=field_label)})
+        if field_pct_scale and "tickformat" not in kwargs.get(yaxis, {}):
             fig.update_layout(**{yaxis: dict(tickformat=".2%")})
         return fig
 
     plot_expanding_mfe = partialmethod(
         plot_expanding,
         field="expanding_mfe",
+        field_label="MFE",
     )
     """`Trades.plot_expanding` for `Trades.expanding_mfe`."""
 
     plot_expanding_mfe_returns = partialmethod(
         plot_expanding,
         field="expanding_mfe_returns",
+        field_label="MFE Return",
         field_pct_scale=True,
     )
     """`Trades.plot_expanding` for `Trades.expanding_mfe_returns`."""
@@ -1860,12 +1892,14 @@ class Trades(Ranges):
     plot_expanding_mae = partialmethod(
         plot_expanding,
         field="expanding_mae",
+        field_label="MAE",
     )
     """`Trades.plot_expanding` for `Trades.expanding_mae`."""
 
     plot_expanding_mae_returns = partialmethod(
         plot_expanding,
         field="expanding_mae_returns",
+        field_label="MAE Return",
         field_pct_scale=True,
     )
     """`Trades.plot_expanding` for `Trades.expanding_mae_returns`."""
@@ -1893,7 +1927,7 @@ class Trades(Ranges):
 
         Args:
             field (str, MappedArray, or array_like): Field to be plotted.
-            field_label (str): Label of the field to be displayed on hover.
+            field_label (str): Label of the field.
             column (str): Name of the column to plot.
             pct_scale (bool): Whether to set x-axis to `Trades.returns`, otherwise to `Trades.pnl`.
             field_pct_scale (bool): Whether to make y-axis a percentage scale.
