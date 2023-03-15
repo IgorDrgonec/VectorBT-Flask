@@ -11543,6 +11543,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 yaxis_kwargs=dict(title="Trade PnL"),
                 check_is_not_grouped=True,
                 plot_func="trades.plot_pnl",
+                pct_scale=True,
                 tags=["portfolio", "trades"],
             ),
             trade_signals=dict(

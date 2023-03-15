@@ -2079,7 +2079,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             plot_volume (bool): Whether to plot volume beneath.
 
                 Applied only if OHLC(V) is plotted.
-            base (float): Rebase all series of a column to a given intial base.
+            base (float): Rebase all series of a column to a given initial base.
 
                 !!! note
                     The column must contain prices.

@@ -492,7 +492,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, broadcast_to
+from vectorbtpro.base.reshaping import to_1d_array, to_2d_array, to_pd_array, broadcast_to
 from vectorbtpro.base.indexes import stack_indexes
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic.ranges import Ranges
@@ -1371,7 +1371,7 @@ class Trades(Ranges):
     def plot_pnl(
         self,
         column: tp.Optional[tp.Label] = None,
-        pct_scale: bool = True,
+        pct_scale: bool = False,
         marker_size_range: tp.Tuple[float, float] = (7, 14),
         opacity_range: tp.Tuple[float, float] = (0.75, 0.9),
         closed_trace_kwargs: tp.KwargsLike = None,
@@ -1559,7 +1559,323 @@ class Trades(Ranges):
         field: tp.Union[str, tp.Array1d, MappedArray],
         field_label: tp.Optional[str] = None,
         column: tp.Optional[tp.Label] = None,
-        pct_scale: bool = True,
+        pct_scale: bool = False,
+        field_pct_scale: bool = False,
+        closed_trace_kwargs: tp.KwargsLike = None,
+        closed_profit_trace_kwargs: tp.KwargsLike = None,
+        closed_loss_trace_kwargs: tp.KwargsLike = None,
+        open_trace_kwargs: tp.KwargsLike = None,
+        hline_shape_kwargs: tp.KwargsLike = None,
+        vline_shape_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        xref: str = "x",
+        yref: str = "y",
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:
+        """Plot a field against PnL or returns.
+
+        Args:
+            field (str, MappedArray, or array_like): Field to be plotted.
+
+                Can be also provided as a mapped array or 1-dim array.
+            field_label (str): Label of the field to be displayed on hover.
+            column (str): Name of the column to plot.
+            pct_scale (bool): Whether to set x-axis to `Trades.returns`, otherwise to `Trades.pnl`.
+            field_pct_scale (bool): Whether to make y-axis a percentage scale.
+            closed_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Closed" markers.
+            closed_profit_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Closed - Profit" markers.
+            closed_loss_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Closed - Loss" markers.
+            open_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Open" markers.
+            hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for horizontal zeroline.
+            vline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for vertical zeroline.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
+            xref (str): X coordinate axis.
+            yref (str): Y coordinate axis.
+            fig (Figure or FigureWidget): Figure to add traces to.
+            **layout_kwargs: Keyword arguments for layout.
+
+        Usage:
+            ```pycon
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+
+            >>> index = pd.date_range("2020", periods=10)
+            >>> price = pd.Series([1., 2., 3., 4., 5., 6., 5., 3., 2., 1.], index=index)
+            >>> orders = pd.Series([1., -0.5, 0., -0.5, 2., 0., -0.5, -0.5, 0., -0.5], index=index)
+            >>> pf = vbt.Portfolio.from_orders(price, orders)
+            >>> trades = pf.trades
+            >>> trades.plot_against_pnl("MFE").show()
+            ```
+
+            ![](/assets/images/api/trades_plot_against_pnl.svg){: .iimg }
+        """
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("plotly")
+        import plotly.graph_objects as go
+        from vectorbtpro.utils.figure import make_figure, get_domain
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        self_col = self.select_col(column=column, group_by=False)
+
+        if closed_trace_kwargs is None:
+            closed_trace_kwargs = {}
+        if closed_profit_trace_kwargs is None:
+            closed_profit_trace_kwargs = {}
+        if closed_loss_trace_kwargs is None:
+            closed_loss_trace_kwargs = {}
+        if open_trace_kwargs is None:
+            open_trace_kwargs = {}
+        if hline_shape_kwargs is None:
+            hline_shape_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
+        xaxis = "xaxis" + xref[1:]
+        yaxis = "yaxis" + yref[1:]
+
+        if isinstance(field, str):
+            if field_label is None:
+                field_label = field
+            field = getattr(self_col, field.lower())
+        if isinstance(field, MappedArray):
+            field = field.values
+        if field_label is None:
+            field_label = "Field"
+
+        if fig is None:
+            fig = make_figure()
+        def_layout_kwargs = {xaxis: {}, yaxis: {}}
+        if pct_scale:
+            def_layout_kwargs[xaxis]["tickformat"] = ".2%"
+            def_layout_kwargs[xaxis]["title"] = "Return"
+        else:
+            def_layout_kwargs[xaxis]["title"] = "PnL"
+        if field_pct_scale:
+            def_layout_kwargs[yaxis]["tickformat"] = ".2%"
+        def_layout_kwargs[yaxis]["title"] = field_label
+        fig.update_layout(**def_layout_kwargs)
+        fig.update_layout(**layout_kwargs)
+        x_domain = get_domain(xref, fig)
+        y_domain = get_domain(yref, fig)
+
+        if self_col.count() > 0:
+            # Extract information
+            pnl = self_col.get_field_arr("pnl")
+            returns = self_col.get_field_arr("return")
+            status = self_col.get_field_arr("status")
+
+            valid_mask = ~np.isnan(returns)
+            neutral_mask = (pnl == 0) & valid_mask
+            profit_mask = (pnl > 0) & valid_mask
+            loss_mask = (pnl < 0) & valid_mask
+
+            open_mask = status == TradeStatus.Open
+            closed_profit_mask = (~open_mask) & profit_mask
+            closed_loss_mask = (~open_mask) & loss_mask
+            open_mask &= ~neutral_mask
+
+            def _plot_scatter(mask, name, color, kwargs):
+                if np.any(mask):
+                    if self_col.get_field_setting("parent_id", "ignore", False):
+                        customdata, hovertemplate = self_col.prepare_customdata(
+                            incl_fields=["id", "exit_idx", "pnl", "return"], mask=mask
+                        )
+                    else:
+                        customdata, hovertemplate = self_col.prepare_customdata(
+                            incl_fields=["id", "parent_id", "exit_idx", "pnl", "return"], mask=mask
+                        )
+                    _kwargs = merge_dicts(
+                        dict(
+                            x=returns[mask] if pct_scale else pnl[mask],
+                            y=field[mask],
+                            mode="markers",
+                            marker=dict(
+                                symbol="circle",
+                                color=color,
+                                size=7,
+                                line=dict(width=1, color=adjust_lightness(color)),
+                            ),
+                            name=name,
+                            customdata=customdata,
+                            hovertemplate=hovertemplate,
+                        ),
+                        kwargs,
+                    )
+                    scatter = go.Scatter(**_kwargs)
+                    fig.add_trace(scatter, **add_trace_kwargs)
+
+            # Plot Closed - Neutral scatter
+            _plot_scatter(neutral_mask, "Closed", plotting_cfg["contrast_color_schema"]["gray"], closed_trace_kwargs)
+
+            # Plot Closed - Profit scatter
+            _plot_scatter(
+                closed_profit_mask,
+                "Closed - Profit",
+                plotting_cfg["contrast_color_schema"]["green"],
+                closed_profit_trace_kwargs,
+            )
+
+            # Plot Closed - Profit scatter
+            _plot_scatter(
+                closed_loss_mask,
+                "Closed - Loss",
+                plotting_cfg["contrast_color_schema"]["red"],
+                closed_loss_trace_kwargs,
+            )
+
+            # Plot Open scatter
+            _plot_scatter(open_mask, "Open", plotting_cfg["contrast_color_schema"]["orange"], open_trace_kwargs)
+
+        # Plot zerolines
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    xref="paper",
+                    yref=yref,
+                    x0=x_domain[0],
+                    y0=0,
+                    x1=x_domain[1],
+                    y1=0,
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                ),
+                hline_shape_kwargs,
+            )
+        )
+        fig.add_shape(
+            **merge_dicts(
+                dict(
+                    type="line",
+                    xref=xref,
+                    yref="paper",
+                    x0=0,
+                    y0=y_domain[0],
+                    x1=0,
+                    y1=y_domain[1],
+                    line=dict(
+                        color="gray",
+                        dash="dash",
+                    ),
+                ),
+                vline_shape_kwargs,
+            )
+        )
+        return fig
+
+    plot_mfe = partialmethod(
+        plot_against_pnl,
+        field="mfe",
+        field_label="MFE",
+    )
+    """`Trades.plot_against_pnl` for `Trades.mfe`."""
+
+    plot_mfe_returns = partialmethod(
+        plot_against_pnl,
+        field="mfe_returns",
+        field_label="MFE Return",
+        pct_scale=True,
+        field_pct_scale=True,
+    )
+    """`Trades.plot_against_pnl` for `Trades.mfe_returns`."""
+
+    plot_mae = partialmethod(
+        plot_against_pnl,
+        field="mae",
+        field_label="MAE",
+    )
+    """`Trades.plot_against_pnl` for `Trades.mae`."""
+
+    plot_mae_returns = partialmethod(
+        plot_against_pnl,
+        field="mae_returns",
+        field_label="MAE Return",
+        pct_scale=True,
+        field_pct_scale=True,
+    )
+    """`Trades.plot_against_pnl` for `Trades.mae_returns`."""
+
+    def plot_expanding(
+        self,
+        field: tp.Union[str, tp.Array1d, MappedArray],
+        column: tp.Optional[tp.Label] = None,
+        field_pct_scale: bool = False,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **kwargs,
+    ) -> tp.BaseFigure:
+        """Plot projections of an expanding field.
+
+        Args:
+            field (str or array_like): Field to be plotted.
+
+                 Can be also provided as a 2-dim array.
+            column (str): Name of the column to plot. Optional.
+            field_pct_scale (bool): Whether to make y-axis a percentage scale.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
+            fig (Figure or FigureWidget): Figure to add traces to.
+            **kwargs: Keyword arguments passed to `vectorbtpro.generic.accessors.GenericDFAccessor.plot_projections`.
+        """
+        if column is not None:
+            self_col = self.select_col(column=column, group_by=False)
+        else:
+            self_col = self
+
+        if isinstance(field, str):
+            field = getattr(self_col, field.lower())
+        if isinstance(field, MappedArray):
+            field = field.values
+        field = to_pd_array(field)
+
+        fig = field.vbt.plot_projections(
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
+            **kwargs,
+        )
+        if field_pct_scale:
+            yaxis = getattr(fig.data[-1], "yaxis", None)
+            if yaxis is None:
+                yaxis = "yaxis"
+            fig.update_layout(**{yaxis: dict(tickformat=".2%")})
+        return fig
+
+    plot_expanding_mfe = partialmethod(
+        plot_expanding,
+        field="expanding_mfe",
+    )
+    """`Trades.plot_expanding` for `Trades.expanding_mfe`."""
+
+    plot_expanding_mfe_returns = partialmethod(
+        plot_expanding,
+        field="expanding_mfe_returns",
+        field_pct_scale=True,
+    )
+    """`Trades.plot_expanding` for `Trades.expanding_mfe_returns`."""
+
+    plot_expanding_mae = partialmethod(
+        plot_expanding,
+        field="expanding_mae",
+    )
+    """`Trades.plot_expanding` for `Trades.expanding_mae`."""
+
+    plot_expanding_mae_returns = partialmethod(
+        plot_expanding,
+        field="expanding_mae_returns",
+        field_pct_scale=True,
+    )
+    """`Trades.plot_expanding` for `Trades.expanding_mae_returns`."""
+
+    def plot_against_pnl(
+        self,
+        field: tp.Union[str, tp.Array1d, MappedArray],
+        field_label: tp.Optional[str] = None,
+        column: tp.Optional[tp.Label] = None,
+        pct_scale: bool = False,
         field_pct_scale: bool = False,
         closed_trace_kwargs: tp.KwargsLike = None,
         closed_profit_trace_kwargs: tp.KwargsLike = None,
@@ -1765,40 +2081,6 @@ class Trades(Ranges):
             )
         )
         return fig
-
-    plot_mfe = partialmethod(
-        plot_against_pnl,
-        field="mfe",
-        field_label="MFE",
-        pct_scale=False,
-    )
-    """`Trades.plot_against_pnl` for `Trades.mfe`."""
-
-    plot_mfe_returns = partialmethod(
-        plot_against_pnl,
-        field="mfe_returns",
-        field_label="MFE Return",
-        pct_scale=True,
-        field_pct_scale=True,
-    )
-    """`Trades.plot_against_pnl` for `Trades.mfe_returns`."""
-
-    plot_mae = partialmethod(
-        plot_against_pnl,
-        field="mae",
-        field_label="MAE",
-        pct_scale=False,
-    )
-    """`Trades.plot_against_pnl` for `Trades.mae`."""
-
-    plot_mae_returns = partialmethod(
-        plot_against_pnl,
-        field="mae_returns",
-        field_label="MAE Return",
-        pct_scale=True,
-        field_pct_scale=True,
-    )
-    """`Trades.plot_against_pnl` for `Trades.mae_returns`."""
 
     def plot_running_edge_ratio(
         self,
