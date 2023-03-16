@@ -1717,7 +1717,7 @@ def adapt_staticized_to_udf(staticized: tp.Kwargs, func: tp.Union[str, tp.Callab
     reload = staticized.get("reload", False)
     staticized["import_lines"].extend(
         [
-            f'{func_name}_path = "{module_path}"',
+            f'{func_name}_path = r"{module_path}"',
             f"globals().update(vbt.import_module_from_path({func_name}_path).__dict__, reload={reload})",
         ]
     )
