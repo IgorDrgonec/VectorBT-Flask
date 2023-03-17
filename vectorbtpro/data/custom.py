@@ -721,7 +721,7 @@ class CSVData(FileData):
         path: tp.PathLike = ".",
         **match_path_kwargs,
     ) -> tp.List[str]:
-        """Get a list of symbols under a path."""
+        """List all symbols under a path."""
         if not isinstance(path, Path):
             path = Path(path)
         if path.exists() and path.is_dir():
@@ -917,7 +917,7 @@ class HDFData(FileData):
         path: tp.PathLike = ".",
         **match_path_kwargs,
     ) -> tp.List[str]:
-        """Get a list of symbols under a path."""
+        """List all symbols under a path."""
         if not isinstance(path, Path):
             path = Path(path)
         if path.exists() and path.is_dir():
@@ -1409,7 +1409,7 @@ class BinanceData(RemoteData):
         client: tp.Optional[BinanceClientT] = None,
         client_config: tp.KwargsLike = None,
     ) -> tp.List[str]:
-        """Get the list of symbols matching a pattern.
+        """List all symbols.
 
         Uses `CustomData.symbol_match` to check each symbol against `pattern`."""
         if client_config is None:
@@ -1681,7 +1681,7 @@ class CCXTData(RemoteData):
         exchange: tp.Optional[tp.Union[str, CCXTExchangeT]] = None,
         exchange_config: tp.Optional[tp.KwargsLike] = None,
     ) -> tp.List[str]:
-        """Get the list of symbols matching a pattern.
+        """List all symbols.
 
         Uses `CustomData.symbol_match` to check each symbol against `pattern`."""
         if exchange_config is None:
@@ -2094,7 +2094,7 @@ class AlpacaData(RemoteData):
         trading_client: tp.Optional[AlpacaClientT] = None,
         client_config: tp.KwargsLike = None,
     ) -> tp.List[str]:
-        """Get the list of symbols matching a pattern.
+        """List all symbols.
 
         Uses `CustomData.symbol_match` to check each symbol against `pattern`.
 
@@ -2423,7 +2423,7 @@ class PolygonData(RemoteData):
         client_config: tp.DictLike = None,
         **list_tickers_kwargs,
     ) -> tp.List[str]:
-        """Get the list of symbols matching a pattern.
+        """List all symbols.
 
         Uses `CustomData.symbol_match` to check each symbol against `pattern`.
 
@@ -2808,7 +2808,7 @@ class AVData(RemoteData):
 
     @classmethod
     def list_symbols(cls, keywords: str, apikey: tp.Optional[str] = None) -> tp.List[str]:
-        """Get a list of symbols by searching for keywords."""
+        """List all symbols."""
         alpha_vantage_cfg = cls.get_settings(key_id="custom")
 
         if apikey is None:
@@ -3341,7 +3341,7 @@ class TVData(RemoteData):
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.tv")
 
     @classmethod
-    def get_symbols(
+    def list_symbols(
         cls,
         pattern: tp.Optional[str] = None,
         use_regex: bool = False,
@@ -3351,7 +3351,7 @@ class TVData(RemoteData):
         client: tp.Optional[PolygonClientT] = None,
         client_config: tp.DictLike = None,
     ) -> tp.List[str]:
-        """Search for symbols.
+        """List all symbols.
 
         Uses market scanner when `market` is provided (returns all symbols, big payload)
         Uses symbol search when either `text` or `exchange` is provided (returns a subset of symbols)."""
