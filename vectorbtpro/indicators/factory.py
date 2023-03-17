@@ -2846,19 +2846,21 @@ Other keyword arguments are passed to `{0}.run`.
                 prepend_location = False
             else:
                 prepend_location = True
-        if location is not None:
-            location = location.lower()
-            all_indicators = getattr(cls, f"list_{location.lower()}_indicators")()
-        else:
-            all_indicators = [
-                *map(lambda x: "vbt:" + x if prepend_location else x, cls.list_vbt_indicators()),
-                *map(lambda x: "talib:" + x if prepend_location else x, cls.list_talib_indicators()),
-                *map(lambda x: "pandas_ta:" + x if prepend_location else x, cls.list_pandas_ta_indicators()),
-                *map(lambda x: "ta:" + x if prepend_location else x, cls.list_ta_indicators()),
-                *map(lambda x: "technical:" + x if prepend_location else x, cls.list_technical_indicators()),
-                *map(lambda x: "techcon:" + x if prepend_location else x, cls.list_techcon_indicators()),
-                *map(lambda x: "wqa101:" + str(x) if prepend_location else str(x), range(1, 102)),
-            ]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            if location is not None:
+                location = location.lower()
+                all_indicators = getattr(cls, f"list_{location.lower()}_indicators")()
+            else:
+                all_indicators = [
+                    *map(lambda x: "vbt:" + x if prepend_location else x, cls.list_vbt_indicators()),
+                    *map(lambda x: "talib:" + x if prepend_location else x, cls.list_talib_indicators()),
+                    *map(lambda x: "pandas_ta:" + x if prepend_location else x, cls.list_pandas_ta_indicators()),
+                    *map(lambda x: "ta:" + x if prepend_location else x, cls.list_ta_indicators()),
+                    *map(lambda x: "technical:" + x if prepend_location else x, cls.list_technical_indicators()),
+                    *map(lambda x: "techcon:" + x if prepend_location else x, cls.list_techcon_indicators()),
+                    *map(lambda x: "wqa101:" + str(x) if prepend_location else str(x), range(1, 102)),
+                ]
         found_indicators = []
         for indicator in all_indicators:
             if prepend_location and location is not None:
