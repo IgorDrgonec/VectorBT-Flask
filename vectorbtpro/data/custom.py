@@ -742,6 +742,7 @@ class CSVData(FileData):
         index_col: tp.Optional[int] = None,
         parse_dates: tp.Optional[bool] = None,
         squeeze: tp.Optional[bool] = None,
+        date_parser: tp.Optional[tp.Callable] = None,
         chunk_func: tp.Optional[tp.Callable] = None,
         **read_csv_kwargs,
     ) -> tp.SymbolData:
@@ -771,6 +772,9 @@ class CSVData(FileData):
             index_col (int): See `pd.read_csv`.
             parse_dates (bool): See `pd.read_csv`.
             squeeze (int): Whether to squeeze a DataFrame with one column into a Series.
+            date_parser (callable): Date parser function.
+
+                If `tz` is not None, will use a parser that localizes/converts each date to `tz`.
             chunk_func (callable): Function to select and concatenate chunks from `TextFileReader`.
 
                 Gets called only if `iterator` or `chunksize` are set.
@@ -838,6 +842,9 @@ class CSVData(FileData):
         if sep is None:
             sep = ","
 
+        if tz is not None and date_parser is None:
+            date_parser = lambda x: pd.Timestamp(x, tz=tz)
+
         obj = pd.read_csv(
             path,
             sep=sep,
@@ -846,6 +853,7 @@ class CSVData(FileData):
             parse_dates=parse_dates,
             skiprows=skiprows,
             nrows=nrows,
+            date_parser=date_parser,
             **read_csv_kwargs,
         )
         if isinstance(obj, TextFileReader):
