@@ -318,7 +318,7 @@ class SignalFactory(IndicatorFactory):
             **kwargs: Must be used instead of `entry_kwargs` with `FactoryMode.Entries` and instead of
                 `exit_kwargs` with `FactoryMode.Exits` and `FactoryMode.Chain` with default `entry_place_func_nb`.
 
-        For more arguments, see `vectorbtpro.indicators.factory.run_pipeline`.
+        For more arguments, see `vectorbtpro.indicators.factory.IndicatorBase.run_pipeline`.
 
         Usage:
             * The simplest signal indicator that places True at the very first index:

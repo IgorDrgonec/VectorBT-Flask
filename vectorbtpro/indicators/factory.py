@@ -64,7 +64,7 @@ from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.mapping import to_mapping, apply_mapping
 from vectorbtpro.utils.params import to_typed_list, broadcast_params, create_param_product, params_to_list
-from vectorbtpro.utils.parsing import get_expr_var_names, get_func_arg_names, get_func_kwargs, supress_stdout
+from vectorbtpro.utils.parsing import glob2re, get_expr_var_names, get_func_arg_names, get_func_kwargs, supress_stdout
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import has_templates, substitute_templates
 from vectorbtpro.utils.datetime_ import freq_to_timedelta64, infer_index_freq
@@ -74,6 +74,7 @@ __all__ = [
     "IndicatorBase",
     "IndicatorFactory",
     "IF",
+    "indicator",
     "talib",
     "pandas_ta",
     "ta",
@@ -320,6 +321,7 @@ class IndicatorBase(Analyzable):
     _param_names: tp.ClassVar[tp.Tuple[str, ...]]
     _in_output_names: tp.ClassVar[tp.Tuple[str, ...]]
     _output_names: tp.ClassVar[tp.Tuple[str, ...]]
+    _lazy_output_names: tp.ClassVar[tp.Tuple[str, ...]]
     _output_flags: tp.ClassVar[tp.Kwargs]
     _level_names: tp.Tuple[str, ...]
 
@@ -1195,6 +1197,11 @@ class IndicatorBase(Analyzable):
         return cls_or_self._output_names
 
     @classproperty
+    def lazy_output_names(cls_or_self) -> tp.Tuple[str, ...]:
+        """Names of the lazy output arrays."""
+        return cls_or_self._lazy_output_names
+
+    @classproperty
     def output_flags(cls_or_self) -> tp.Kwargs:
         """Dictionary of output flags."""
         return cls_or_self._output_flags
@@ -1203,6 +1210,39 @@ class IndicatorBase(Analyzable):
     def level_names(self) -> tp.Tuple[str, ...]:
         """Column level names corresponding to each parameter."""
         return self._level_names
+
+    @classproperty
+    def param_defaults(cls_or_self) -> tp.Dict[str, tp.Any]:
+        """Parameter defaults extracted from the signature of `IndicatorBase.run`."""
+        func_kwargs = get_func_kwargs(cls_or_self.run)
+        out = {}
+        for k, v in func_kwargs.items():
+            if k in cls_or_self.param_names:
+                if isinstance(v, Default):
+                    out[k] = v.value
+                else:
+                    out[k] = v
+        return out
+
+    def unpack(self) -> tp.MaybeTuple[tp.SeriesFrame]:
+        """Return outputs, either one output or a tuple if there are multiple."""
+        out = tuple([getattr(self, name) for name in self.output_names])
+        if len(out) == 1:
+            out = out[0]
+        return out
+
+    def to_dict(self, include_all: bool = True) -> tp.Dict[str, tp.SeriesFrame]:
+        """Return outputs as a dict."""
+        if include_all:
+            output_names = self.output_names + self.in_output_names + self.lazy_output_names
+        else:
+            output_names = self.output_names
+        return {name: getattr(self, name) for name in output_names}
+
+    def to_frame(self, include_all: bool = True) -> tp.Frame:
+        """Return outputs as a DataFrame."""
+        out = self.to_dict(include_all=include_all)
+        return pd.concat(list(out.values()), axis=1, keys=pd.Index(list(out.keys()), name="output"))
 
 
 class IndicatorFactory(Configured):
@@ -1403,6 +1443,7 @@ class IndicatorFactory(Configured):
         setattr(Indicator, "_param_names", tuple(param_names))
         setattr(Indicator, "_in_output_names", tuple(in_output_names))
         setattr(Indicator, "_output_names", tuple(output_names))
+        setattr(Indicator, "_lazy_output_names", tuple(lazy_outputs.keys()))
         setattr(Indicator, "_output_flags", output_flags)
 
         for param_name in param_names:
@@ -2753,11 +2794,167 @@ Other keyword arguments are passed to `{0}.run`.
 
         return self.with_custom_func(custom_func, pass_packed=True, **kwargs)
 
+    @classmethod
+    def list_vbt_indicators(cls) -> tp.List[str]:
+        """List all vectorbt indicators."""
+        import vectorbtpro as vbt
+
+        return sorted(
+            [
+                attr
+                for attr in dir(vbt)
+                if not attr.startswith("_")
+                   and isinstance(getattr(vbt, attr), type)
+                   and issubclass(getattr(vbt, attr), IndicatorBase)
+            ]
+        )
+
+    @classmethod
+    def list_locations(cls) -> tp.List[str]:
+        """List supported locations."""
+        return sorted({
+            "vbt",
+            "talib",
+            "pandas_ta",
+            "ta",
+            "technical",
+            "techcon",
+            "wqa101",
+        })
+
+    @classmethod
+    def list_indicators(
+        cls,
+        pattern: tp.Optional[str] = None,
+        case_sensitive: bool = False,
+        use_regex: bool = False,
+        location: tp.Optional[str] = None,
+        prepend_location: tp.Optional[bool] = None,
+    ) -> tp.List[str]:
+        """List indicators, optionally matching a pattern.
+
+        Pattern can also be a location, in such a case all indicators from that location will be returned.
+        For supported locations, see `IndicatorFactory.list_locations`."""
+        if pattern is not None:
+            if not case_sensitive:
+                pattern = pattern.lower()
+            if location is None and pattern.lower() in cls.list_locations():
+                location = pattern
+                pattern = None
+        if prepend_location is None:
+            if location is not None:
+                prepend_location = False
+            else:
+                prepend_location = True
+        if location is not None:
+            location = location.lower()
+            all_indicators = getattr(cls, f"list_{location.lower()}_indicators")()
+        else:
+            all_indicators = [
+                *map(lambda x: "vbt:" + x if prepend_location else x, cls.list_vbt_indicators()),
+                *map(lambda x: "talib:" + x if prepend_location else x, cls.list_talib_indicators()),
+                *map(lambda x: "pandas_ta:" + x if prepend_location else x, cls.list_pandas_ta_indicators()),
+                *map(lambda x: "ta:" + x if prepend_location else x, cls.list_ta_indicators()),
+                *map(lambda x: "technical:" + x if prepend_location else x, cls.list_technical_indicators()),
+                *map(lambda x: "techcon:" + x if prepend_location else x, cls.list_techcon_indicators()),
+                *map(lambda x: "wqa101:" + str(x) if prepend_location else str(x), range(1, 102)),
+            ]
+        found_indicators = []
+        for indicator in all_indicators:
+            if prepend_location and location is not None:
+                indicator = location + ":" + indicator
+            if case_sensitive:
+                indicator_name = indicator
+            else:
+                indicator_name = indicator.lower()
+            if pattern is not None:
+                if use_regex:
+                    if location is not None:
+                        if not re.match(pattern, indicator_name):
+                            continue
+                    else:
+                        if not re.match(pattern, indicator_name.split(":")[1]):
+                            continue
+                else:
+                    if location is not None:
+                        if not re.match(glob2re(pattern), indicator_name):
+                            continue
+                    else:
+                        if not re.match(glob2re(pattern), indicator_name.split(":")[1]):
+                            continue
+            found_indicators.append(indicator)
+        return sorted(found_indicators)
+
+    @classmethod
+    def get_indicator(cls, name: str) -> tp.Type[IndicatorBase]:
+        """Get the indicator class by its name.
+
+        The name can contain a location suffix followed by a colon. For example, "talib:sma"
+        or "talib_sma" will return the TA-Lib's SMA. Without a location, the indicator will be
+        searched throughout all indicators, including the vectorbt's ones."""
+        locations = cls.list_locations()
+
+        if ":" in name:
+            location = name.split(":")[0].lower().strip()
+            name = name.split(":")[1].upper().strip()
+        else:
+            location = None
+            name = name.lower().strip()
+            found_location = False
+            if "_" in name:
+                for location in locations:
+                    if name.startswith(location + "_"):
+                        found_location = True
+                        break
+            if found_location:
+                name = name[len(location) + 1:].upper()
+            else:
+                location = None
+                name = name.upper()
+
+        if location is not None:
+            if location == "vbt":
+                import vectorbtpro as vbt
+
+                return getattr(vbt, name.upper())
+            if location == "talib":
+                return cls.from_talib(name)
+            if location == "pandas_ta":
+                return cls.from_pandas_ta(name)
+            if location == "ta":
+                return cls.from_ta(name)
+            if location == "technical":
+                return cls.from_technical(name)
+            if location == "techcon":
+                return cls.from_techcon(name)
+            if location == "wqa101":
+                return cls.from_wqa101(int(name))
+            raise ValueError(f"Location '{location}' not found")
+        else:
+            import vectorbtpro as vbt
+            from vectorbtpro.utils.module_ import check_installed
+
+            if hasattr(vbt, name):
+                return getattr(vbt, name)
+            if str(name).isnumeric():
+                return cls.from_wqa101(int(name))
+            if check_installed("technical") and name in IndicatorFactory.list_techcon_indicators():
+                return cls.from_techcon(name)
+            if check_installed("talib") and name in IndicatorFactory.list_talib_indicators():
+                return cls.from_talib(name)
+            if check_installed("ta") and name in IndicatorFactory.list_ta_indicators(uppercase=True):
+                return cls.from_ta(name)
+            if check_installed("pandas_ta") and name in IndicatorFactory.list_pandas_ta_indicators():
+                return cls.from_pandas_ta(name)
+            if check_installed("technical") and name in IndicatorFactory.list_technical_indicators():
+                return cls.from_technical(name)
+        raise ValueError(f"Indicator '{name}' not found")
+
     # ############# Third party ############# #
 
     @classmethod
-    def get_talib_indicators(cls) -> tp.List[str]:
-        """Get all parseable indicators in `talib`."""
+    def list_talib_indicators(cls) -> tp.List[str]:
+        """List all parseable indicators in `talib`."""
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("talib")
@@ -3194,8 +3391,8 @@ Args:
         )
 
     @classmethod
-    def get_pandas_ta_indicators(cls, silence_warnings: bool = True, **kwargs) -> tp.List[str]:
-        """Get all parseable indicators in `pandas_ta`.
+    def list_pandas_ta_indicators(cls, silence_warnings: bool = True, **kwargs) -> tp.List[str]:
+        """List all parseable indicators in `pandas_ta`.
 
         !!! note
             Returns only the indicators that have been successfully parsed."""
@@ -3364,8 +3561,8 @@ Args:
         return Indicator
 
     @classmethod
-    def get_ta_indicators(cls) -> tp.List[str]:
-        """Get all parseable indicators in `ta`."""
+    def list_ta_indicators(cls, uppercase: bool = False) -> tp.List[str]:
+        """List all parseable indicators in `ta`."""
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("ta")
@@ -3382,7 +3579,10 @@ Args:
                     and obj != ta.utils.IndicatorMixin
                     and issubclass(obj, ta.utils.IndicatorMixin)
                 ):
-                    indicators.add(obj.__name__)
+                    if uppercase:
+                        indicators.add(obj.__name__.upper())
+                    else:
+                        indicators.add(obj.__name__)
         return sorted(indicators)
 
     @classmethod
@@ -3647,8 +3847,8 @@ Args:
         )
 
     @classmethod
-    def get_technical_indicators(cls, silence_warnings: bool = True, **kwargs) -> tp.List[str]:
-        """Get all parseable indicators in `technical`."""
+    def list_technical_indicators(cls, silence_warnings: bool = True, **kwargs) -> tp.List[str]:
+        """List all parseable indicators in `technical`."""
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("technical")
@@ -3964,8 +4164,8 @@ Args:
         raise ValueError(f"Unknown technical consensus class '{cls_name}'")
 
     @classmethod
-    def get_techcon_indicators(cls) -> tp.List[str]:
-        """Get all consensus indicators in `technical`."""
+    def list_techcon_indicators(cls) -> tp.List[str]:
+        """List all consensus indicators in `technical`."""
         return sorted({"MACON", "OSCCON", "SUMCON"})
 
     # ############# Expressions ############# #
@@ -4623,6 +4823,11 @@ IF = IndicatorFactory
 """Shortcut for `IndicatorFactory`."""
 
 __pdoc__["IF"] = False
+
+
+def indicator(*args, **kwargs) -> tp.Type[IndicatorBase]:
+    """Shortcut for `vectorbtpro.indicators.factory.IndicatorFactory.get_indicator`."""
+    return IndicatorFactory.get_indicator(*args, **kwargs)
 
 
 def talib(*args, **kwargs) -> tp.Type[IndicatorBase]:

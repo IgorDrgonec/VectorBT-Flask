@@ -1730,6 +1730,7 @@ setattr(PIVOTINFO, "plot_zigzag", _PIVOTINFO.plot_zigzag)
 
 SUPERTREND = IndicatorFactory(
     class_name="SUPERTREND",
+    module_name=__name__,
     short_name="supertrend",
     input_names=["high", "low", "close"],
     param_names=["period", "multiplier"],

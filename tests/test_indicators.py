@@ -2124,6 +2124,66 @@ class TestFactory:
             ),
         )
 
+    def test_unpacking(self):
+        obj = (
+            vbt.IndicatorFactory(
+                input_names=["ts1", "ts2"],
+                param_names=["p1", "p2"],
+                output_names=["o1", "o2"],
+                in_output_names=["in_o1", "in_o2"],
+                lazy_outputs={"co1": lambda self: self.ts1 + self.ts2, "co2": lambda self: self.o1 + self.o2},
+            )
+            .with_apply_func(lambda ts1, ts2, p1, p2, in_o1, in_o2: (ts1, ts2))
+            .run(ts, ts + 1, [1, 2], 3)
+        )
+        assert_frame_equal(
+            obj.unpack()[0],
+            obj.o1,
+        )
+        assert_frame_equal(
+            obj.unpack()[1],
+            obj.o2,
+        )
+        assert_frame_equal(
+            obj.to_dict()["o1"],
+            obj.o1,
+        )
+        assert_frame_equal(
+            obj.to_dict()["o2"],
+            obj.o2,
+        )
+        assert_frame_equal(
+            obj.to_dict()["in_o1"],
+            obj.in_o1,
+        )
+        assert_frame_equal(
+            obj.to_dict()["in_o2"],
+            obj.in_o2,
+        )
+        assert_frame_equal(
+            obj.to_dict()["co1"],
+            obj.co1,
+        )
+        assert_frame_equal(
+            obj.to_dict()["co2"],
+            obj.co2,
+        )
+        assert_frame_equal(
+            obj.to_frame(),
+            pd.concat(
+                (
+                    obj.o1,
+                    obj.o2,
+                    obj.in_o1,
+                    obj.in_o2,
+                    obj.co1,
+                    obj.co2,
+                ),
+                axis=1,
+                keys=pd.Index(["o1", "o2", "in_o1", "in_o2", "co1", "co2"], name="output"),
+            ),
+        )
+
     def test_boolean_attr(self):
         obj = (
             vbt.IndicatorFactory(
@@ -2311,6 +2371,7 @@ class TestFactory:
             "_indexing_kwargs",
             "_input_mapper",
             "_input_names",
+            "_lazy_output_names",
             "_level_names",
             "_loc",
             "_metrics",
@@ -2367,6 +2428,7 @@ class TestFactory:
             "indexing_func",
             "indexing_kwargs",
             "input_names",
+            "lazy_output_names",
             "level_names",
             "load",
             "loads",
@@ -2392,6 +2454,7 @@ class TestFactory:
             "p1_loc",
             "p2_list",
             "p2_loc",
+            "param_defaults",
             "param_names",
             "plots",
             "plots_defaults",
@@ -2425,6 +2488,8 @@ class TestFactory:
             "stats",
             "stats_defaults",
             "subplots",
+            "to_dict",
+            "to_frame",
             "ts",
             "ts_above",
             "ts_below",
@@ -2433,6 +2498,7 @@ class TestFactory:
             "ts_equal",
             "ts_stats",
             "tuple_loc",
+            "unpack",
             "update_config",
             "wrapper",
             "xs",
@@ -2765,9 +2831,9 @@ class TestFactory:
             wqa = WQA.run(*[data_dct[input_name] for input_name in WQA.input_names])
             assert wqa.out.shape == data_dct["open"].shape
 
-    def test_get_talib_indicators(self):
+    def test_list_talib_indicators(self):
         if talib_available:
-            assert len(vbt.IndicatorFactory.get_talib_indicators()) > 0
+            assert len(vbt.IndicatorFactory.list_talib_indicators()) > 0
 
     def test_from_talib(self):
         if talib_available:
@@ -2850,9 +2916,9 @@ class TestFactory:
                 ),
             )
 
-    def test_get_pandas_ta_indicators(self):
+    def test_list_pandas_ta_indicators(self):
         if pandas_ta_available:
-            assert len(vbt.IndicatorFactory.get_pandas_ta_indicators()) > 0
+            assert len(vbt.IndicatorFactory.list_pandas_ta_indicators()) > 0
 
     def test_from_pandas_ta(self):
         if pandas_ta_available:
@@ -2879,9 +2945,9 @@ class TestFactory:
                 ),
             )
 
-    def test_get_ta_indicators(self):
+    def test_list_ta_indicators(self):
         if ta_available:
-            assert len(vbt.IndicatorFactory.get_ta_indicators()) > 0
+            assert len(vbt.IndicatorFactory.list_ta_indicators()) > 0
 
     def test_from_ta(self):
         if ta_available:
@@ -2925,9 +2991,9 @@ class TestFactory:
             assert_frame_equal(BollingerBands.run(ts, window=2, window_dev=2).bollinger_mavg, target - 1)
             assert_frame_equal(BollingerBands.run(ts, window=2, window_dev=2).bollinger_lband, target - 2)
 
-    def test_get_technical_indicators(self):
+    def test_list_technical_indicators(self):
         if technical_available:
-            assert len(vbt.IndicatorFactory.get_technical_indicators()) > 0
+            assert len(vbt.IndicatorFactory.list_technical_indicators()) > 0
 
     def test_from_technical(self):
         if technical_available:

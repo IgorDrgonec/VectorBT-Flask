@@ -716,12 +716,12 @@ class CSVData(FileData):
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.csv")
 
     @classmethod
-    def get_symbols(
+    def list_symbols(
         cls,
         path: tp.PathLike = ".",
         **match_path_kwargs,
     ) -> tp.List[str]:
-        """Get the list of symbols under a path."""
+        """Get a list of symbols under a path."""
         if not isinstance(path, Path):
             path = Path(path)
         if path.exists() and path.is_dir():
@@ -912,12 +912,12 @@ class HDFData(FileData):
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.hdf")
 
     @classmethod
-    def get_symbols(
+    def list_symbols(
         cls,
         path: tp.PathLike = ".",
         **match_path_kwargs,
     ) -> tp.List[str]:
-        """Get the list of symbols under a path."""
+        """Get a list of symbols under a path."""
         if not isinstance(path, Path):
             path = Path(path)
         if path.exists() and path.is_dir():
@@ -1402,14 +1402,14 @@ class BinanceData(RemoteData):
         return client
 
     @classmethod
-    def get_symbols(
+    def list_symbols(
         cls,
         pattern: tp.Optional[str] = None,
         use_regex: bool = False,
         client: tp.Optional[BinanceClientT] = None,
         client_config: tp.KwargsLike = None,
-    ) -> tp.Set[str]:
-        """Get the list of symbols.
+    ) -> tp.List[str]:
+        """Get the list of symbols matching a pattern.
 
         Uses `CustomData.symbol_match` to check each symbol against `pattern`."""
         if client_config is None:
@@ -1422,7 +1422,7 @@ class BinanceData(RemoteData):
                 if not cls.symbol_match(symbol, pattern, use_regex=use_regex):
                     continue
             all_symbols.append(symbol)
-        return set(all_symbols)
+        return sorted(all_symbols)
 
     @classmethod
     def fetch_symbol(
@@ -1674,14 +1674,14 @@ class CCXTData(RemoteData):
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.ccxt")
 
     @classmethod
-    def get_symbols(
+    def list_symbols(
         cls,
         pattern: tp.Optional[str] = None,
         use_regex: bool = False,
         exchange: tp.Optional[tp.Union[str, CCXTExchangeT]] = None,
         exchange_config: tp.Optional[tp.KwargsLike] = None,
-    ) -> tp.Set[str]:
-        """Get the list of symbols.
+    ) -> tp.List[str]:
+        """Get the list of symbols matching a pattern.
 
         Uses `CustomData.symbol_match` to check each symbol against `pattern`."""
         if exchange_config is None:
@@ -1693,7 +1693,7 @@ class CCXTData(RemoteData):
                 if not cls.symbol_match(symbol, pattern, use_regex=use_regex):
                     continue
             all_symbols.append(symbol)
-        return set(all_symbols)
+        return sorted(all_symbols)
 
     @classmethod
     def resolve_exchange(
@@ -2084,7 +2084,7 @@ class AlpacaData(RemoteData):
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.alpaca")
 
     @classmethod
-    def get_symbols(
+    def list_symbols(
         cls,
         pattern: tp.Optional[str] = None,
         use_regex: bool = False,
@@ -2093,8 +2093,8 @@ class AlpacaData(RemoteData):
         exchange: tp.Optional[str] = None,
         trading_client: tp.Optional[AlpacaClientT] = None,
         client_config: tp.KwargsLike = None,
-    ) -> tp.Set[str]:
-        """Get the list of symbols.
+    ) -> tp.List[str]:
+        """Get the list of symbols matching a pattern.
 
         Uses `CustomData.symbol_match` to check each symbol against `pattern`.
 
@@ -2143,7 +2143,7 @@ class AlpacaData(RemoteData):
                 if not cls.symbol_match(symbol, pattern, use_regex=use_regex):
                     continue
             all_symbols.append(symbol)
-        return set(all_symbols)
+        return sorted(all_symbols)
 
     @classmethod
     def resolve_client(
@@ -2415,15 +2415,15 @@ class PolygonData(RemoteData):
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.polygon")
 
     @classmethod
-    def get_symbols(
+    def list_symbols(
         cls,
         pattern: tp.Optional[str] = None,
         use_regex: bool = False,
         client: tp.Optional[PolygonClientT] = None,
         client_config: tp.DictLike = None,
         **list_tickers_kwargs,
-    ) -> tp.Set[str]:
-        """Get the list of symbols.
+    ) -> tp.List[str]:
+        """Get the list of symbols matching a pattern.
 
         Uses `CustomData.symbol_match` to check each symbol against `pattern`.
 
@@ -2438,7 +2438,7 @@ class PolygonData(RemoteData):
                 if not cls.symbol_match(symbol, pattern, use_regex=use_regex):
                     continue
             all_symbols.append(symbol)
-        return set(all_symbols)
+        return sorted(all_symbols)
 
     @classmethod
     def resolve_client(cls, client: tp.Optional[PolygonClientT] = None, **client_config) -> PolygonClientT:
@@ -2807,8 +2807,8 @@ class AVData(RemoteData):
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.alpha_vantage")
 
     @classmethod
-    def get_symbols(cls, keywords: str, apikey: tp.Optional[str] = None) -> tp.Set[str]:
-        """Get the list of symbols by searching for keywords."""
+    def list_symbols(cls, keywords: str, apikey: tp.Optional[str] = None) -> tp.List[str]:
+        """Get a list of symbols by searching for keywords."""
         alpha_vantage_cfg = cls.get_settings(key_id="custom")
 
         if apikey is None:
@@ -2820,7 +2820,7 @@ class AVData(RemoteData):
         query["apikey"] = apikey
         url = "https://www.alphavantage.co/query?" + urllib.parse.urlencode(query)
         df = pd.read_csv(url)
-        return set(df["symbol"].tolist())
+        return sorted(df["symbol"].tolist())
 
     @classmethod
     @lru_cache()
@@ -3350,7 +3350,7 @@ class TVData(RemoteData):
         exchange: tp.Optional[str] = None,
         client: tp.Optional[PolygonClientT] = None,
         client_config: tp.DictLike = None,
-    ) -> tp.Set[str]:
+    ) -> tp.List[str]:
         """Search for symbols.
 
         Uses market scanner when `market` is provided (returns all symbols, big payload)
@@ -3368,13 +3368,13 @@ class TVData(RemoteData):
         else:
             data = client.scan_symbols(market.lower())
             all_symbols = map(lambda x: x["s"], data)
-        found_symbols = set()
+        found_symbols = []
         for symbol in all_symbols:
             if pattern is not None:
                 if not cls.symbol_match(symbol.split(":")[1], pattern, use_regex=use_regex):
                     continue
-            found_symbols.add(symbol)
-        return found_symbols
+            found_symbols.append(symbol)
+        return sorted(found_symbols)
 
     @classmethod
     def resolve_client(cls, client: tp.Optional[TVClient] = None, **client_config) -> TVClient:
