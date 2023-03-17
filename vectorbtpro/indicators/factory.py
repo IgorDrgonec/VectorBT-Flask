@@ -2812,7 +2812,7 @@ Other keyword arguments are passed to `{0}.run`.
     @classmethod
     def list_locations(cls) -> tp.List[str]:
         """List supported locations."""
-        return sorted({
+        return [
             "vbt",
             "talib",
             "pandas_ta",
@@ -2820,7 +2820,7 @@ Other keyword arguments are passed to `{0}.run`.
             "technical",
             "techcon",
             "wqa101",
-        })
+        ]
 
     @classmethod
     def list_indicators(
@@ -2883,7 +2883,7 @@ Other keyword arguments are passed to `{0}.run`.
                         if not re.match(glob2re(pattern), indicator_name.split(":")[1]):
                             continue
             found_indicators.append(indicator)
-        return sorted(found_indicators)
+        return found_indicators
 
     @classmethod
     def get_indicator(cls, name: str) -> tp.Type[IndicatorBase]:
