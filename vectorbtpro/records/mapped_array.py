@@ -803,6 +803,19 @@ class MappedArray(Analyzable):
         """Mapped array."""
         return self.mapped_arr
 
+    def to_readable(self, title: str = "Value", only_values: bool = False, **kwargs) -> tp.SeriesFrame:
+        """Get values in a human-readable format."""
+        values = pd.Series(self.apply_mapping(**kwargs).values, name=title)
+        if only_values:
+            return pd.Series(values, name=title)
+        columns = list()
+        columns.append(pd.Series(self.id_arr, name="Id"))
+        columns.append(pd.Series(self.wrapper.columns[self.col_arr], name="Column"))
+        if self.idx_arr is not None:
+            columns.append(pd.Series(self.wrapper.index[self.idx_arr], name="Index"))
+        columns.append(values)
+        return pd.concat(columns, axis=1)
+
     def __len__(self) -> int:
         return len(self.values)
 
