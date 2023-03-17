@@ -7641,12 +7641,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if not flexible:
             if call_seq is None:
                 call_seq = portfolio_cfg["call_seq"]
-            call_seq = map_enum_fields(call_seq, CallSeqType)
-            if checks.is_int(call_seq):
-                if call_seq == CallSeqType.Auto:
-                    raise ValueError(
-                        "CallSeqType.Auto must be implemented manually. Use sort_call_seq_1d_nb in pre_segment_func_nb."
-                    )
+            if call_seq is not None:
+                call_seq = map_enum_fields(call_seq, CallSeqType)
+                if checks.is_int(call_seq):
+                    if call_seq == CallSeqType.Auto:
+                        raise ValueError(
+                            "CallSeqType.Auto must be implemented manually. "
+                            "Use sort_call_seq_1d_nb in pre_segment_func_nb."
+                        )
         if attach_call_seq is None:
             attach_call_seq = portfolio_cfg["attach_call_seq"]
         if segment_mask is None:

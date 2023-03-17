@@ -1863,3 +1863,58 @@ def update_pos_info_nb(
 
         # Update open position stats
         update_open_pos_info_stats_nb(record, position_now, order_result.price)
+
+
+@register_jitted(cache=True)
+def resolve_hl_nb(open, high, low, close):
+    """Resolve the current high and low."""
+    if np.isnan(high):
+        if np.isnan(open):
+            high = close
+        elif np.isnan(close):
+            high = open
+        else:
+            high = max(open, close)
+    if np.isnan(low):
+        if np.isnan(open):
+            low = close
+        elif np.isnan(close):
+            low = open
+        else:
+            low = min(open, close)
+    return high, low
+
+
+@register_jitted(cache=True)
+def check_price_hit_nb(
+    open: float,
+    high: float,
+    low: float,
+    close: float,
+    price: float,
+    hit_below: bool = True,
+    can_use_ohlc: bool = True,
+    check_open: bool = True,
+) -> tp.Tuple[float, bool, bool]:
+    """Check whether a target price was hit.
+
+    If `can_use_ohlc` and `check_open` is True and the target price is hit before open, returns open.
+
+    Returns the stop price, whether it was hit before open, and whether it was hit during this bar."""
+    high, low = resolve_hl_nb(
+        open=open,
+        high=high,
+        low=low,
+        close=close,
+    )
+    if hit_below:
+        if can_use_ohlc and check_open and open <= price:
+            return open, True, True
+        if close <= price or (can_use_ohlc and low <= price):
+            return price, False, True
+        return price, False, False
+    if can_use_ohlc and check_open and open >= price:
+        return open, True, True
+    if close >= price or (can_use_ohlc and high >= price):
+        return price, False, True
+    return price, False, False
