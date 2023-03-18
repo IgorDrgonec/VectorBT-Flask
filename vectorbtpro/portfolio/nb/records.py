@@ -892,6 +892,38 @@ def get_positions_nb(trade_records: tp.RecordArray, col_map: tp.GroupMap) -> tp.
 
 
 @register_jitted(cache=True)
+def price_status_nb(
+    records: tp.RecordArray,
+    high: tp.Optional[tp.FlexArray2d],
+    low: tp.Optional[tp.FlexArray2d],
+) -> tp.Array1d:
+    """Return the status of the order's price related to high and low.
+
+    See `vectorbtpro.portfolio.enums.OrderPriceStatus`."""
+    out = np.full(len(records), 0, dtype=np.int_)
+    for i in range(len(records)):
+        order = records[i]
+        if high is not None:
+            _high = float(flex_select_nb(high, order["idx"], order["col"]))
+        else:
+            _high = np.nan
+        if low is not None:
+            _low = flex_select_nb(low, order["idx"], order["col"])
+        else:
+            _low = np.nan
+
+        if not np.isnan(_high) and order["price"] > _high:
+            out[i] = OrderPriceStatus.AboveHigh
+        elif not np.isnan(_low) and order["price"] < _low:
+            out[i] = OrderPriceStatus.BelowLow
+        elif np.isnan(_high) or np.isnan(_low):
+            out[i] = OrderPriceStatus.Unknown
+        else:
+            out[i] = OrderPriceStatus.OK
+    return out
+
+
+@register_jitted(cache=True)
 def trade_winning_streak_nb(records: tp.RecordArray) -> tp.Array1d:
     """Return the current winning streak of each trade."""
     out = np.full(len(records), 0, dtype=np.int_)

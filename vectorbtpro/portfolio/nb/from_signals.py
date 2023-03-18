@@ -366,26 +366,6 @@ def should_update_time_stop_nb(new_td_stop: int, new_dt_stop: int, upon_stop_upd
 
 
 @register_jitted(cache=True)
-def resolve_hl_nb(open, high, low, close):
-    """Resolve the current high and low."""
-    if np.isnan(high):
-        if np.isnan(open):
-            high = close
-        elif np.isnan(close):
-            high = open
-        else:
-            high = max(open, close)
-    if np.isnan(low):
-        if np.isnan(open):
-            low = close
-        elif np.isnan(close):
-            low = open
-        else:
-            low = min(open, close)
-    return high, low
-
-
-@register_jitted(cache=True)
 def check_limit_expired_nb(
     creation_idx: int,
     i: int,
@@ -552,38 +532,35 @@ def check_stop_hit_nb(
     If `can_use_ohlc` and `check_open` is True and the stop is hit before open, returns open.
 
     Returns the stop price, whether it was hit before open, and whether it was hit during this bar."""
-    high, low = resolve_hl_nb(
-        open=open,
-        high=high,
-        low=low,
-        close=close,
-    )
     if delta_format == DeltaFormat.Percent100:
         stop /= 100
         delta_format = DeltaFormat.Percent
     if (is_position_long and hit_below) or (not is_position_long and not hit_below):
+        hit_below = True
         if delta_format == DeltaFormat.Absolute:
             stop_price = init_price - abs(stop)
         elif delta_format == DeltaFormat.Percent:
             stop_price = init_price * (1 - abs(stop))
         else:
             stop_price = stop
-        if can_use_ohlc and check_open and open <= stop_price:
-            return open, True, True
-        if close <= stop_price or (can_use_ohlc and low <= stop_price):
-            return stop_price, False, True
-        return stop_price, False, False
-    if delta_format == DeltaFormat.Absolute:
-        stop_price = init_price + abs(stop)
-    elif delta_format == DeltaFormat.Percent:
-        stop_price = init_price * (1 + abs(stop))
     else:
-        stop_price = stop
-    if can_use_ohlc and check_open and open >= stop_price:
-        return open, True, True
-    if close >= stop_price or (can_use_ohlc and high >= stop_price):
-        return stop_price, False, True
-    return stop_price, False, False
+        hit_below = False
+        if delta_format == DeltaFormat.Absolute:
+            stop_price = init_price + abs(stop)
+        elif delta_format == DeltaFormat.Percent:
+            stop_price = init_price * (1 + abs(stop))
+        else:
+            stop_price = stop
+    return check_price_hit_nb(
+        open=open,
+        high=high,
+        low=low,
+        close=close,
+        price=stop_price,
+        hit_below=hit_below,
+        can_use_ohlc=can_use_ohlc,
+        check_open=check_open,
+    )
 
 
 @register_jitted(cache=True)
@@ -2662,6 +2639,9 @@ def set_sl_info_nb(
     order_type: int = OrderType.Market,
     limit_delta: float = np.nan,
     delta_format: int = DeltaFormat.Percent,
+    ladder: bool = False,
+    step: int = -1,
+    step_idx: int = -1,
 ) -> None:
     """Set SL order information.
 
@@ -2676,6 +2656,9 @@ def set_sl_info_nb(
     sl_info["order_type"] = order_type
     sl_info["limit_delta"] = limit_delta
     sl_info["delta_format"] = delta_format
+    sl_info["ladder"] = ladder
+    sl_info["step"] = step
+    sl_info["step_idx"] = step_idx
 
 
 @register_jitted(cache=True)
@@ -2691,6 +2674,9 @@ def clear_sl_info_nb(sl_info: tp.Record) -> None:
     sl_info["order_type"] = -1
     sl_info["limit_delta"] = np.nan
     sl_info["delta_format"] = -1
+    sl_info["ladder"] = False
+    sl_info["step"] = -1
+    sl_info["step_idx"] = -1
 
 
 @register_jitted(cache=True)
@@ -2709,6 +2695,9 @@ def set_tsl_info_nb(
     order_type: int = OrderType.Market,
     limit_delta: float = np.nan,
     delta_format: int = DeltaFormat.Percent,
+    ladder: bool = False,
+    step: int = -1,
+    step_idx: int = -1,
 ) -> None:
     """Set TSL order information.
 
@@ -2726,6 +2715,9 @@ def set_tsl_info_nb(
     tsl_info["order_type"] = order_type
     tsl_info["limit_delta"] = limit_delta
     tsl_info["delta_format"] = delta_format
+    tsl_info["ladder"] = ladder
+    tsl_info["step"] = step
+    tsl_info["step_idx"] = step_idx
 
 
 @register_jitted(cache=True)
@@ -2744,6 +2736,9 @@ def clear_tsl_info_nb(tsl_info: tp.Record) -> None:
     tsl_info["order_type"] = -1
     tsl_info["limit_delta"] = np.nan
     tsl_info["delta_format"] = -1
+    tsl_info["ladder"] = False
+    tsl_info["step"] = -1
+    tsl_info["step_idx"] = -1
 
 
 @register_jitted(cache=True)
@@ -2759,6 +2754,9 @@ def set_tp_info_nb(
     order_type: int = OrderType.Market,
     limit_delta: float = np.nan,
     delta_format: int = DeltaFormat.Percent,
+    ladder: bool = False,
+    step: int = -1,
+    step_idx: int = -1,
 ) -> None:
     """Set TP order information.
 
@@ -2773,6 +2771,9 @@ def set_tp_info_nb(
     tp_info["order_type"] = order_type
     tp_info["limit_delta"] = limit_delta
     tp_info["delta_format"] = delta_format
+    tp_info["ladder"] = ladder
+    tp_info["step"] = step
+    tp_info["step_idx"] = step_idx
 
 
 @register_jitted(cache=True)
@@ -2788,6 +2789,9 @@ def clear_tp_info_nb(tp_info: tp.Record) -> None:
     tp_info["order_type"] = -1
     tp_info["limit_delta"] = np.nan
     tp_info["delta_format"] = -1
+    tp_info["ladder"] = False
+    tp_info["step"] = -1
+    tp_info["step_idx"] = -1
 
 
 @register_jitted(cache=True)
@@ -2804,6 +2808,9 @@ def set_time_info_nb(
     limit_delta: float = np.nan,
     delta_format: int = DeltaFormat.Percent,
     time_delta_format: int = TimeDeltaFormat.Index,
+    ladder: bool = False,
+    step: int = -1,
+    step_idx: int = -1,
 ) -> None:
     """Set time order information.
 
@@ -2819,6 +2826,9 @@ def set_time_info_nb(
     time_info["limit_delta"] = limit_delta
     time_info["delta_format"] = delta_format
     time_info["time_delta_format"] = time_delta_format
+    time_info["ladder"] = ladder
+    time_info["step"] = step
+    time_info["step_idx"] = step_idx
 
 
 @register_jitted(cache=True)
@@ -2835,6 +2845,9 @@ def clear_time_info_nb(time_info: tp.Record) -> None:
     time_info["limit_delta"] = np.nan
     time_info["delta_format"] = -1
     time_info["time_delta_format"] = -1
+    time_info["ladder"] = False
+    time_info["step"] = -1
+    time_info["step_idx"] = -1
 
 
 @register_jitted

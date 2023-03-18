@@ -1764,6 +1764,9 @@ class TestData:
         assert_frame_equal(data.run("bbands", 3, unpack="dict")["middle"], vbt.BBANDS.run(data.close, 3).middle)
         assert_frame_equal(data.run("bbands", 3, unpack="dict")["upper"], vbt.BBANDS.run(data.close, 3).upper)
         assert_frame_equal(data.run("bbands", 3, unpack="dict")["lower"], vbt.BBANDS.run(data.close, 3).lower)
+        assert_frame_equal(data.run("talib:sma", 3).real, vbt.talib("SMA").run(data.close, 3).real)
+        assert_frame_equal(data.run("pandas_ta:sma", 3).sma, vbt.pandas_ta("SMA").run(data.close, 3).sma)
+        assert_frame_equal(data.run("wqa101:1").out, vbt.wqa101(1).run(data.close).out)
         assert_frame_equal(data.run("talib_sma", 3).real, vbt.talib("SMA").run(data.close, 3).real)
         assert_frame_equal(data.run("pandas_ta_sma", 3).sma, vbt.pandas_ta("SMA").run(data.close, 3).sma)
         assert_frame_equal(data.run("wqa101_1").out, vbt.wqa101(1).run(data.close).out)
@@ -1789,12 +1792,12 @@ class TestData:
                 index=data.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
-                        ("talib_sma_real", "S1"),
-                        ("talib_sma_real", "S2"),
-                        ("talib_ema_real", "S1"),
-                        ("talib_ema_real", "S2"),
+                        ('talib_sma', 'real', 'S1'),
+                        ('talib_sma', 'real', 'S2'),
+                        ('talib_ema', 'real', 'S1'),
+                        ('talib_ema', 'real', 'S2'),
                     ],
-                    names=["output", "symbol"],
+                    names=['run_func', 'output', 'symbol'],
                 ),
             ),
         )
@@ -1815,13 +1818,25 @@ class TestData:
                 index=data.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
-                        ("talib_sma_real", "S1"),
-                        ("talib_sma_real", "S2"),
-                        ("talib_ema_real", "S1"),
-                        ("talib_ema_real", "S2"),
+                        ('talib_sma', 'real', 'S1'),
+                        ('talib_sma', 'real', 'S2'),
+                        ('talib_ema', 'real', 'S1'),
+                        ('talib_ema', 'real', 'S2'),
                     ],
-                    names=["output", "symbol"],
+                    names=['run_func', 'output', 'symbol'],
                 ),
+            ),
+        )
+        assert_frame_equal(
+            data.run(
+                ["talib_sma", "talib_ema"],
+                timeperiod=vbt.run_func_dict(talib_sma=3, talib_ema=4),
+                hide_params=True,
+            ),
+            data.run(
+                ["talib_sma", "talib_ema"],
+                timeperiod=vbt.run_func_dict({0: 3, 1: 4}),
+                hide_params=True,
             ),
         )
 

@@ -1673,25 +1673,32 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         Concatenates all the data into a single DataFrame and calls `transform_func` on it.
         Then, splits the data by symbol and builds a new `Data` instance."""
-        concat_data = pd.concat(self.data.values(), axis=1, keys=pd.Index(self.symbols, name="symbol"))
+        if self.single_symbol:
+            concat_data = self.data[self.symbols[0]]
+        else:
+            concat_data = pd.concat(self.data.values(), axis=1, keys=pd.Index(self.symbols, name="symbol"))
         new_concat_data = transform_func(concat_data, *args, **kwargs)
-        new_wrapper = None
-        new_data = symbol_dict()
-        for k in self.symbols:
-            if isinstance(new_concat_data.columns, pd.MultiIndex):
-                new_v = new_concat_data.xs(k, axis=1, level="symbol")
-            else:
-                if len(self.wrapper.columns) == 1 and self.wrapper.columns[0] != 0:
-                    new_v = new_concat_data[k].rename(self.wrapper.columns[0])
+        if self.single_symbol:
+            new_wrapper = ArrayWrapper.from_obj(new_concat_data)
+            new_data = symbol_dict({self.symbols[0]: new_concat_data})
+        else:
+            new_wrapper = None
+            new_data = symbol_dict()
+            for k in self.symbols:
+                if isinstance(new_concat_data.columns, pd.MultiIndex):
+                    new_v = new_concat_data.xs(k, axis=1, level="symbol")
                 else:
-                    new_v = new_concat_data[k].rename(None)
-            _new_wrapper = ArrayWrapper.from_obj(new_v)
-            if new_wrapper is None:
-                new_wrapper = _new_wrapper
-            else:
-                if not checks.is_index_equal(new_wrapper.columns, _new_wrapper.columns):
-                    raise ValueError("Transformed symbols must have the same columns")
-            new_data[k] = new_v
+                    if len(self.wrapper.columns) == 1 and self.wrapper.columns[0] != 0:
+                        new_v = new_concat_data[k].rename(self.wrapper.columns[0])
+                    else:
+                        new_v = new_concat_data[k].rename(None)
+                _new_wrapper = ArrayWrapper.from_obj(new_v)
+                if new_wrapper is None:
+                    new_wrapper = _new_wrapper
+                else:
+                    if not checks.is_index_equal(new_wrapper.columns, _new_wrapper.columns):
+                        raise ValueError("Transformed symbols must have the same columns")
+                new_data[k] = new_v
         return self.replace(
             wrapper=new_wrapper,
             data=new_data,
@@ -1792,21 +1799,15 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         Looks into the signature of the function and searches for arguments with the name `data` or
         those found among columns or attributes.
 
+        For example, the argument `open` will be substituted by `Data.open`.
+
         `func` can be one of the following:
 
-        * "{name}": Name of a custom indicator, signal generator, or label generator
-        * "talib_{name}": Name of a TA-Lib indicator
-        * "pandas_ta_{name}": Name of a Pandas TA indicator
-        * "ta_{name}": Name of a TA indicator
-        * "wqa101_{number}": Number of a WQA indicator
-        * "techcon_{name}": Name of a technical consensus indicator
-        * "from_{mode}": Name of the simulation mode in `vectorbtpro.portfolio.base.Portfolio`
-        * Indicator: Any indicator class built with the indicator factory
-        * Callable: Function to run
-        * Iterable: Any of the above (apart from the simulation modes) will be stacked as columns into a DataFrame.
-        Can also be provided as "{lib_name}_all" to compute all indicators of a specific indicator library.
-
-        For example, the argument `open` will be substituted by `Data.open`.
+        * Location to compute all indicators from. See `vectorbtpro.indicators.factory.IndicatorFactory.get_locations`.
+        * Indicator name. See `vectorbtpro.indicators.factory.IndicatorFactory.get_indicator`.
+        * Simulation method. See `vectorbtpro.portfolio.base.Portfolio`.
+        * Any callable object
+        * Iterable with any of the above. Will be stacked as columns into a DataFrame.
 
         Use `on_indices` (using `iloc`), `on_dates` (using `loc`), and `on_symbols` (using `Data.select`)
         to filter data. For example, to filter a date range, pass `slice(start_date, end_date)`.
@@ -1814,18 +1815,15 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         Use `rename_args` to rename arguments. For example, in `vectorbtpro.portfolio.base.Portfolio`,
         data can be passed instead of `close`.
 
-        Set `unpack` to True to return the actual output arrays of the indicator instance.
-        If there's only one output, it will be returned as-is. If multiple, a tuple will be returned.
-        Set `unpack` to 'dict' to return a dictionary instead.
+        Set `unpack` to True, "dict", or "frame" to use
+        `vectorbtpro.indicators.factory.IndicatorBase.unpack`,
+        `vectorbtpro.indicators.factory.IndicatorBase.to_dict`, and
+        `vectorbtpro.indicators.factory.IndicatorBase.to_frame` respectively.
 
         Any argument in `*args` and `**kwargs` can be wrapped with `run_func_dict` to specify
-        the value per function name or index when `func` is an iterable."""
+        the value per function name or index when `func` is iterable."""
         from vectorbtpro.indicators.factory import IndicatorBase, IndicatorFactory
-        from vectorbtpro.indicators import custom
-        from vectorbtpro.signals import generators as signal_generators
-        from vectorbtpro.labels import generators as label_generators
         from vectorbtpro.portfolio.base import Portfolio
-        from vectorbtpro.utils.module_ import check_installed
 
         _self = self
         if on_indices is not None:
@@ -1842,8 +1840,10 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             _args = ()
             for v in args:
                 if isinstance(v, run_func_dict):
-                    if func_name in v or i == func_name:
+                    if func_name in v:
                         _args += (v[func_name],)
+                    elif i in v:
+                        _args += (v[i],)
                     elif "_def" in v:
                         _args += (v["_def"],)
                 else:
@@ -1854,8 +1854,10 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             _kwargs = {}
             for k, v in kwargs.items():
                 if isinstance(v, run_func_dict):
-                    if func_name in v or i == func_name:
+                    if func_name in v:
                         _kwargs[k] = v[func_name]
+                    elif i in v:
+                        _kwargs[k] = v[i]
                     elif "_def" in v:
                         _kwargs[k] = v["_def"]
                 else:
@@ -1869,85 +1871,52 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 if callable(f):
                     f_name = f.__name__
                 else:
-                    f_name = f
+                    if isinstance(f, str):
+                        f_name = f.lower().strip().replace(":", "_")
+                    else:
+                        f_name = f
                 try:
-                    indicator = _self.run(
+                    out = _self.run(
                         f,
                         *_select_func_args(i, f_name, args),
                         rename_args=rename_args,
                         silence_warnings=silence_warnings,
+                        unpack=unpack,
                         **_select_func_kwargs(i, f_name, kwargs),
                     )
-                    for output_name in indicator.output_names:
-                        outputs.append(getattr(indicator, output_name))
-                        keys.append(str(f_name) + "_" + output_name)
+                    if isinstance(out, pd.Series):
+                        out = out.to_frame()
+                    if isinstance(out, IndicatorBase):
+                        out = out.to_frame()
+                    outputs.append(out)
+                    keys.append(str(f_name))
                 except Exception as e:
                     if not silence_warnings:
                         warnings.warn(f_name + ": " + str(e), stacklevel=2)
-            return pd.concat(outputs, keys=pd.Index(keys, name="output"), axis=1)
+            return pd.concat(outputs, keys=pd.Index(keys, name="run_func"), axis=1)
         if isinstance(func, str):
             func = func.lower().strip()
             if func.startswith("from_") and getattr(Portfolio, func):
                 func = getattr(Portfolio, func)
-                return func(_self, *args, **kwargs)
-            if hasattr(custom, func.upper()):
-                func = getattr(custom, func.upper())
-            elif hasattr(signal_generators, func.upper()):
-                func = getattr(signal_generators, func.upper())
-            elif hasattr(label_generators, func.upper()):
-                func = getattr(label_generators, func.upper())
-            elif func.endswith("_all"):
-                lib_name = func[:-4]
-                if lib_name == "talib":
-                    indicator_names = IndicatorFactory.get_talib_indicators()
-                elif lib_name == "pandas_ta":
-                    indicator_names = IndicatorFactory.get_pandas_ta_indicators(silence_warnings=True)
-                elif lib_name == "ta":
-                    indicator_names = IndicatorFactory.get_ta_indicators()
-                elif lib_name == "wqa101":
-                    indicator_names = [str(i) for i in range(1, 102)]
-                elif lib_name == "technical":
-                    indicator_names = IndicatorFactory.get_technical_indicators(silence_warnings=True)
-                elif lib_name == "techcon":
-                    indicator_names = IndicatorFactory.get_techcon_indicators()
+                pf = func(_self, *args, **kwargs)
+                if isinstance(pf, Portfolio) and unpack:
+                    raise ValueError("Portfolio cannot be unpacked")
+                return pf
+            locations = IndicatorFactory.list_locations()
+            if func in locations or (func.endswith("_all") and func[:-4] in locations):
+                if func.endswith("_all"):
+                    func = func[:-4]
+                    prepend_location = True
                 else:
-                    raise ValueError(f"Could not find indicator library with name '{lib_name}'")
-                indicator_names = [lib_name + "_" + indicator_name.lower() for indicator_name in indicator_names]
+                    prepend_location = False
                 return _self.run(
-                    indicator_names,
+                    IndicatorFactory.list_indicators(func, prepend_location=prepend_location),
                     *args,
                     rename_args=rename_args,
                     silence_warnings=silence_warnings,
                     **kwargs,
                 )
-            elif func.startswith("talib_"):
-                func = IndicatorFactory.from_talib(func.replace("talib_", ""))
-            elif func.startswith("pandas_ta_"):
-                func = IndicatorFactory.from_pandas_ta(func.replace("pandas_ta_", ""))
-            elif func.startswith("ta_"):
-                func = IndicatorFactory.from_ta(func.replace("ta_", ""))
-            elif func.startswith("wqa101_"):
-                func = IndicatorFactory.from_wqa101(int(func.replace("wqa101_", "")))
-            elif func.startswith("technical_"):
-                func = IndicatorFactory.from_technical(func.replace("technical_", ""))
-            elif func.startswith("techcon_"):
-                func = IndicatorFactory.from_techcon(func.replace("techcon_", ""))
-            elif check_installed("technical") and func.upper() in IndicatorFactory.get_techcon_indicators():
-                func = IndicatorFactory.from_techcon(func)
-            elif check_installed("talib") and func.upper() in IndicatorFactory.get_talib_indicators():
-                func = IndicatorFactory.from_talib(func)
-            elif check_installed("ta") and func.upper() in IndicatorFactory.get_ta_indicators():
-                func = IndicatorFactory.from_ta(func)
-            elif check_installed("pandas_ta") and func.upper() in IndicatorFactory.get_pandas_ta_indicators(
-                silence_warnings=True
-            ):
-                func = IndicatorFactory.from_pandas_ta(func)
-            elif check_installed("technical") and func.upper() in IndicatorFactory.get_technical_indicators(
-                silence_warnings=True
-            ):
-                func = IndicatorFactory.from_technical(func)
-            else:
-                raise ValueError(f"Could not find indicator with name '{func}'")
+            func = IndicatorFactory.get_indicator(func)
         if isinstance(func, type) and issubclass(func, IndicatorBase):
             func = func.run
 
@@ -1987,11 +1956,11 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         if isinstance(out, IndicatorBase):
             if isinstance(unpack, bool):
                 if unpack:
-                    out = tuple([getattr(out, name) for name in out.output_names])
-                    if len(out) == 1:
-                        out = out[0]
+                    out = out.unpack()
             elif isinstance(unpack, str) and unpack.lower() == "dict":
-                out = {name: getattr(out, name) for name in out.output_names}
+                out = out.to_dict()
+            elif isinstance(unpack, str) and unpack.lower() == "frame":
+                out = out.to_frame()
             else:
                 raise ValueError(f"Invalid option unpack='{unpack}'")
         return out

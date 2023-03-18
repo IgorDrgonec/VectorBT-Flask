@@ -194,9 +194,7 @@ class ThreadPoolEngine(ExecutionEngine):
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         with concurrent.futures.ThreadPoolExecutor(**self.init_kwargs) as executor:
-            futures = {
-                executor.submit(func, *args, **kwargs): i for i, (func, args, kwargs) in enumerate(funcs_args)
-            }
+            futures = {executor.submit(func, *args, **kwargs): i for i, (func, args, kwargs) in enumerate(funcs_args)}
             results = [None] * len(futures)
             for fut in concurrent.futures.as_completed(futures):
                 results[futures[fut]] = fut.result()
@@ -226,9 +224,7 @@ class ProcessPoolEngine(ExecutionEngine):
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         with concurrent.futures.ProcessPoolExecutor(**self.init_kwargs) as executor:
-            futures = {
-                executor.submit(func, *args, **kwargs): i for i, (func, args, kwargs) in enumerate(funcs_args)
-            }
+            futures = {executor.submit(func, *args, **kwargs): i for i, (func, args, kwargs) in enumerate(funcs_args)}
             results = [None] * len(futures)
             for fut in concurrent.futures.as_completed(futures):
                 results[futures[fut]] = fut.result()
@@ -256,6 +252,8 @@ class PathosEngine(ExecutionEngine):
         pool_type: tp.Optional[str] = None,
         sleep: tp.Optional[int] = None,
         init_kwargs: tp.KwargsLike = None,
+        show_progress: tp.Optional[bool] = None,
+        pbar_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> None:
         from vectorbtpro._settings import settings
@@ -267,10 +265,15 @@ class PathosEngine(ExecutionEngine):
         if sleep is None:
             sleep = pathos_cfg["sleep"]
         init_kwargs = merge_dicts(init_kwargs, pathos_cfg["init_kwargs"])
+        if show_progress is None:
+            show_progress = pathos_cfg["show_progress"]
+        pbar_kwargs = merge_dicts(pbar_kwargs, pathos_cfg["pbar_kwargs"])
 
         self._pool_type = pool_type
         self._sleep = sleep
         self._init_kwargs = init_kwargs
+        self._show_progress = show_progress
+        self._pbar_kwargs = pbar_kwargs
 
         ExecutionEngine.__init__(self, init_kwargs=init_kwargs, **kwargs)
 
@@ -286,6 +289,16 @@ class PathosEngine(ExecutionEngine):
         The higher, the less CPU it uses but also the more time it takes to gather the results.
         Thus, should be in a millisecond range."""
         return self._sleep
+
+    @property
+    def show_progress(self) -> bool:
+        """Whether to show the progress bar using `vectorbtpro.utils.pbar.get_pbar`."""
+        return self._show_progress
+
+    @property
+    def pbar_kwargs(self) -> tp.Kwargs:
+        """Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`."""
+        return self._pbar_kwargs
 
     @property
     def init_kwargs(self) -> tp.Kwargs:
@@ -308,16 +321,21 @@ class PathosEngine(ExecutionEngine):
         else:
             raise ValueError(f"Invalid option pool_type='{self.pool_type}'")
 
-        with Pool(**self.init_kwargs) as pool:
-            futures = [pool.apipe(func, *args, **kwargs) for (func, args, kwargs) in funcs_args]
-            tasks = set(futures)
-            while tasks:
-                ready_tasks = {task for task in tasks if task.ready()}
-                if ready_tasks:
-                    tasks -= ready_tasks
-                if self.sleep is not None:
-                    time.sleep(self.sleep)
-            return [f.get() for f in futures]
+        if n_calls is None and hasattr(funcs_args, "__len__"):
+            n_calls = len(funcs_args)
+
+        with get_pbar(total=n_calls, show_progress=self.show_progress, **self.pbar_kwargs) as pbar:
+            with Pool(**self.init_kwargs) as pool:
+                futures = [pool.apipe(func, *args, **kwargs) for (func, args, kwargs) in funcs_args]
+                tasks = set(futures)
+                while tasks:
+                    ready_tasks = {task for task in tasks if task.ready()}
+                    if ready_tasks:
+                        pbar.update(len(ready_tasks))
+                        tasks -= ready_tasks
+                    if self.sleep is not None:
+                        time.sleep(self.sleep)
+                return [f.get() for f in futures]
 
 
 class DaskEngine(ExecutionEngine):
@@ -599,16 +617,17 @@ def execute(
     progress_desc: tp.Optional[tp.Sequence] = None,
     pbar_kwargs: tp.KwargsLike = None,
     template_context: tp.KwargsLike = None,
-    **engine_kwargs,
+    engine_kwargs: tp.KwargsLike = None,
+    **kwargs,
 ) -> list:
     """Execute using an engine.
 
     Supported values for `engine`:
 
     * Name of the engine (see supported engines)
-    * Subclass of `ExecutionEngine` - initializes with `**engine_kwargs`
+    * Subclass of `ExecutionEngine` - initializes with `kwargs` and `engine_kwargs`
     * Instance of `ExecutionEngine` - calls `ExecutionEngine.execute` with `n_calls`
-    * Callable - passes `funcs_args`, `n_calls` (if not None), and `**engine_kwargs`
+    * Callable - passes `funcs_args`, `n_calls` (if not None), and `kwargs` and `engine_kwargs`
 
     Can execute per chunk if `chunk_meta` is provided. Otherwise, if any of `n_chunks` and `chunk_len`
     are set, passes them to `vectorbtpro.utils.chunking.yield_chunk_meta` to generate `chunk_meta`.
@@ -638,6 +657,8 @@ def execute(
     execution_cfg = settings["execution"]
     engines_cfg = execution_cfg["engines"]
 
+    engine_kwargs = merge_dicts(kwargs, engine_kwargs)
+
     engine_cfg = dict()
     if isinstance(engine, str):
         if engine.lower() in engines_cfg:
@@ -650,11 +671,11 @@ def execute(
             if v["cls"] is engine:
                 engine_cfg = v
         func_arg_names = get_func_arg_names(engine.__init__)
-        if "show_progress" in func_arg_names:
+        if "show_progress" in func_arg_names and "show_progress" not in engine_kwargs:
             engine_kwargs["show_progress"] = show_progress
-        if "progress_desc" in func_arg_names:
+        if "progress_desc" in func_arg_names and "progress_desc" not in engine_kwargs:
             engine_kwargs["progress_desc"] = progress_desc
-        if "pbar_kwargs" in func_arg_names:
+        if "pbar_kwargs" in func_arg_names and "pbar_kwargs" not in engine_kwargs:
             engine_kwargs["pbar_kwargs"] = pbar_kwargs
         engine = engine(**engine_kwargs)
     elif isinstance(engine, ExecutionEngine):
@@ -663,11 +684,11 @@ def execute(
                 engine_cfg = v
     if callable(engine):
         func_arg_names = get_func_arg_names(engine)
-        if "show_progress" in func_arg_names:
+        if "show_progress" in func_arg_names and "show_progress" not in engine_kwargs:
             engine_kwargs["show_progress"] = show_progress
-        if "progress_desc" in func_arg_names:
+        if "progress_desc" in func_arg_names and "progress_desc" not in engine_kwargs:
             engine_kwargs["progress_desc"] = progress_desc
-        if "pbar_kwargs" in func_arg_names:
+        if "pbar_kwargs" in func_arg_names and "pbar_kwargs" not in engine_kwargs:
             engine_kwargs["pbar_kwargs"] = pbar_kwargs
 
     if n_chunks is None:

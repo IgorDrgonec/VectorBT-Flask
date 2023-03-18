@@ -8,7 +8,7 @@ from numba import prange
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.reshaping import to_1d_array_nb
-from vectorbtpro.base.flex_indexing import flex_select_1d_pc_nb
+from vectorbtpro.base.flex_indexing import flex_select_1d_pc_nb, flex_select_nb
 from vectorbtpro.generic.enums import *
 from vectorbtpro.generic.nb.base import repartition_nb
 from vectorbtpro.generic.nb.patterns import pattern_similarity_nb
@@ -1053,4 +1053,17 @@ def dd_recovery_return_nb(valley_val_arr: tp.Array1d, end_val_arr: tp.Array1d) -
             out[r] = np.nan
         else:
             out[r] = (end_val_arr[r] - valley_val_arr[r]) / valley_val_arr[r]
+    return out
+
+
+@register_jitted(cache=True)
+def bar_price_nb(records: tp.RecordArray, price: tp.Optional[tp.FlexArray2d]) -> tp.Array1d:
+    """Return the bar price."""
+    out = np.empty(len(records), dtype=np.float_)
+    for i in range(len(records)):
+        record = records[i]
+        if price is not None:
+            out[i] = float(flex_select_nb(price, record["idx"], record["col"]))
+        else:
+            out[i] = np.nan
     return out

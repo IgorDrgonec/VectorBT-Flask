@@ -109,7 +109,7 @@ from vectorbtpro.generic.price_records import PriceRecords
 from vectorbtpro.generic.enums import RangeStatus, range_dt
 from vectorbtpro.generic.ranges import Ranges
 from vectorbtpro.portfolio import nb
-from vectorbtpro.portfolio.enums import order_dt, OrderSide, fs_order_dt, OrderType
+from vectorbtpro.portfolio.enums import order_dt, OrderSide, fs_order_dt, OrderType, OrderPriceStatus
 from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.records.decorators import attach_fields, override_field_config, attach_shortcut_properties
 from vectorbtpro.signals.enums import StopType
@@ -164,6 +164,7 @@ orders_shortcut_config = ReadonlyConfig(
         signed_size=dict(obj_type="mapped"),
         value=dict(obj_type="mapped"),
         weighted_price=dict(obj_type="red_array"),
+        price_status=dict(obj_type="mapped"),
     )
 )
 """_"""
@@ -221,6 +222,16 @@ class Orders(PriceRecords):
             chunked=chunked,
             wrap_kwargs=wrap_kwargs,
             col_mapper=self.col_mapper,
+            **kwargs,
+        )
+
+    def get_price_status(self, **kwargs) -> MappedArray:
+        """See `vectorbtpro.portfolio.nb.records.price_status_nb`."""
+        return self.apply(
+            nb.price_status_nb,
+            self._high,
+            self._low,
+            mapping=OrderPriceStatus,
             **kwargs,
         )
 

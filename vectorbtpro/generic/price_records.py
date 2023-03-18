@@ -5,17 +5,45 @@
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
+from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.generic import nb
 from vectorbtpro.records.base import Records
+from vectorbtpro.records.mapped_array import MappedArray
+from vectorbtpro.records.decorators import attach_shortcut_properties
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.config import ReadonlyConfig
 
 __all__ = [
     "PriceRecords",
 ]
 
+__pdoc__ = {}
+
+price_records_shortcut_config = ReadonlyConfig(
+    dict(
+        bar_open_time=dict(obj_type="mapped"),
+        bar_close_time=dict(obj_type="mapped"),
+        bar_open=dict(obj_type="mapped"),
+        bar_high=dict(obj_type="mapped"),
+        bar_low=dict(obj_type="mapped"),
+        bar_close=dict(obj_type="mapped"),
+    )
+)
+"""_"""
+
+__pdoc__[
+    "price_records_shortcut_config"
+] = f"""Config of shortcut properties to be attached to `PriceRecords`.
+
+```python
+{price_records_shortcut_config.prettify()}
+```
+"""
+
 PriceRecordsT = tp.TypeVar("PriceRecordsT", bound="PriceRecords")
 
 
+@attach_shortcut_properties(price_records_shortcut_config)
 class PriceRecords(Records):
     """Extends `vectorbtpro.records.base.Records` for records that can make use of OHLC data."""
 
@@ -279,3 +307,32 @@ class PriceRecords(Records):
         if self._close is None:
             return None
         return self.wrapper.wrap(self._close, group_by=False)
+
+    def get_bar_open_time(self, **kwargs) -> MappedArray:
+        """Get a mapped array with the opening time of the bar."""
+        return self.map_array(self.wrapper.index[self.idx_arr], **kwargs)
+
+    def get_bar_close_time(self, **kwargs) -> MappedArray:
+        """Get a mapped array with the closing time of the bar."""
+        if self.wrapper.freq is None:
+            raise ValueError("Frequency must be provided")
+        return self.map_array(Resampler.get_rbound_index(
+            index=self.wrapper.index[self.idx_arr],
+            freq=self.wrapper.freq
+        ), **kwargs)
+
+    def get_bar_open(self, **kwargs) -> MappedArray:
+        """Get a mapped array with the opening price of the bar."""
+        return self.apply(nb.bar_price_nb, self._open, **kwargs)
+
+    def get_bar_high(self, **kwargs) -> MappedArray:
+        """Get a mapped array with the high price of the bar."""
+        return self.apply(nb.bar_price_nb, self._high, **kwargs)
+
+    def get_bar_low(self, **kwargs) -> MappedArray:
+        """Get a mapped array with the low price of the bar."""
+        return self.apply(nb.bar_price_nb, self._low, **kwargs)
+
+    def get_bar_close(self, **kwargs) -> MappedArray:
+        """Get a mapped array with the closing price of the bar."""
+        return self.apply(nb.bar_price_nb, self._close, **kwargs)

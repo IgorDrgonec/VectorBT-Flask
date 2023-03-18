@@ -313,6 +313,8 @@ execution = child_dict(
             pool_type="process",
             sleep=0.001,
             init_kwargs=Config(),
+            show_progress=False,
+            pbar_kwargs=Config(),
         ),
         dask=Config(
             cls=DaskEngine,

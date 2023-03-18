@@ -356,6 +356,12 @@ class Ranges(PriceRecords):
         """Pass self to `Ranges.from_delta`."""
         return Ranges.from_delta(self, *args, **kwargs)
 
+    def crop(self) -> RangesT:
+        """Remove any data outside the minimum start index and the maximum end index."""
+        min_start_idx = np.min(self.get_field_arr("start_idx"))
+        max_start_idx = np.max(self.get_field_arr("end_idx")) + 1
+        return self.iloc[min_start_idx:max_start_idx]
+
     # ############# Filtering ############# #
 
     def filter_min_duration(

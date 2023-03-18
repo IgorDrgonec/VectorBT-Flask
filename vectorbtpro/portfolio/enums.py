@@ -38,6 +38,7 @@ __pdoc__all__ = __all__ = [
     "TradeDirection",
     "TradeStatus",
     "TradesType",
+    "OrderPriceStatus",
     "PriceArea",
     "NoPriceArea",
     "AccountState",
@@ -57,17 +58,29 @@ __pdoc__all__ = __all__ = [
     "SignalContext",
     "FSInOutputs",
     "FOInOutputs",
+    "order_fields",
     "order_dt",
+    "fs_order_fields",
     "fs_order_dt",
+    "trade_fields",
     "trade_dt",
+    "log_fields",
     "log_dt",
+    "alloc_range_fields",
     "alloc_range_dt",
+    "alloc_point_fields",
     "alloc_point_dt",
+    "main_info_fields",
     "main_info_dt",
+    "limit_info_fields",
     "limit_info_dt",
+    "sl_info_fields",
     "sl_info_dt",
+    "tsl_info_fields",
     "tsl_info_dt",
+    "tp_info_fields",
     "tp_info_dt",
+    "time_info_fields",
     "time_info_dt",
 ]
 
@@ -823,6 +836,32 @@ __pdoc__[
 ```python
 {prettify(TradesType)}
 ```
+"""
+
+
+class OrderPriceStatusT(tp.NamedTuple):
+    OK: int = 0
+    AboveHigh: int = 1
+    BelowLow: int = 2
+    Unknown: int = 3
+
+
+OrderPriceStatus = OrderPriceStatusT()
+"""_"""
+
+__pdoc__[
+    "OrderPriceStatus"
+] = f"""Order price error.
+
+```python
+{prettify(OrderPriceStatus)}
+```
+
+Attributes:
+    OK: Order price is within OHLC.
+    AboveHigh: Order price is above high.
+    BelowLow: Order price is below low.
+    Unknown: High and/or low are unknown.
 """
 
 
@@ -2369,18 +2408,18 @@ __pdoc__["FSInOutputs.returns"] = "See `FOInOutputs.returns`."
 
 # ############# Records ############# #
 
-order_dt = np.dtype(
-    [
-        ("id", np.int_),
-        ("col", np.int_),
-        ("idx", np.int_),
-        ("size", np.float_),
-        ("price", np.float_),
-        ("fees", np.float_),
-        ("side", np.int_),
-    ],
-    align=True,
-)
+order_fields = [
+    ("id", np.int_),
+    ("col", np.int_),
+    ("idx", np.int_),
+    ("size", np.float_),
+    ("price", np.float_),
+    ("fees", np.float_),
+    ("side", np.int_),
+]
+"""Fields for `order_dt`."""
+
+order_dt = np.dtype(order_fields, align=True)
 """_"""
 
 __pdoc__[
@@ -2392,22 +2431,22 @@ __pdoc__[
 ```
 """
 
-fs_order_dt = np.dtype(
-    [
-        ("id", np.int_),
-        ("col", np.int_),
-        ("signal_idx", np.int_),
-        ("creation_idx", np.int_),
-        ("idx", np.int_),
-        ("size", np.float_),
-        ("price", np.float_),
-        ("fees", np.float_),
-        ("side", np.int_),
-        ("type", np.int_),
-        ("stop_type", np.int_),
-    ],
-    align=True,
-)
+fs_order_fields = [
+    ("id", np.int_),
+    ("col", np.int_),
+    ("signal_idx", np.int_),
+    ("creation_idx", np.int_),
+    ("idx", np.int_),
+    ("size", np.float_),
+    ("price", np.float_),
+    ("fees", np.float_),
+    ("side", np.int_),
+    ("type", np.int_),
+    ("stop_type", np.int_),
+]
+"""Fields for `fs_order_dt`."""
+
+fs_order_dt = np.dtype(fs_order_fields, align=True)
 """_"""
 
 __pdoc__[
@@ -2419,7 +2458,7 @@ __pdoc__[
 ```
 """
 
-trade_dt = np.dtype([
+trade_fields = [
     ("id", np.int_),
     ("col", np.int_),
     ("size", np.float_),
@@ -2436,7 +2475,10 @@ trade_dt = np.dtype([
     ("direction", np.int_),
     ("status", np.int_),
     ("parent_id", np.int_),
-], align=True)
+]
+"""Fields for `trade_dt`."""
+
+trade_dt = np.dtype(trade_fields, align=True)
 """_"""
 
 __pdoc__[
@@ -2448,7 +2490,7 @@ __pdoc__[
 ```
 """
 
-log_dt = np.dtype([
+log_fields = [
     ("id", np.int_),
     ("group", np.int_),
     ("col", np.int_),
@@ -2495,7 +2537,10 @@ log_dt = np.dtype([
     ("st1_val_price", np.float_),
     ("st1_value", np.float_),
     ("order_id", np.int_),
-], align=True)
+]
+"""Fields for `log_fields`."""
+
+log_dt = np.dtype(log_fields, align=True)
 """_"""
 
 __pdoc__[
@@ -2507,17 +2552,17 @@ __pdoc__[
 ```
 """
 
-alloc_range_dt = np.dtype(
-    [
-        ("id", np.int_),
-        ("col", np.int_),
-        ("start_idx", np.int_),
-        ("end_idx", np.int_),
-        ("alloc_idx", np.int_),
-        ("status", np.int_),
-    ],
-    align=True,
-)
+alloc_range_fields = [
+    ("id", np.int_),
+    ("col", np.int_),
+    ("start_idx", np.int_),
+    ("end_idx", np.int_),
+    ("alloc_idx", np.int_),
+    ("status", np.int_),
+]
+"""Fields for `alloc_range_dt`."""
+
+alloc_range_dt = np.dtype(alloc_range_fields, align=True)
 """_"""
 
 __pdoc__[
@@ -2529,14 +2574,14 @@ __pdoc__[
 ```
 """
 
-alloc_point_dt = np.dtype(
-    [
-        ("id", np.int_),
-        ("col", np.int_),
-        ("alloc_idx", np.int_),
-    ],
-    align=True,
-)
+alloc_point_fields = [
+    ("id", np.int_),
+    ("col", np.int_),
+    ("alloc_idx", np.int_),
+]
+"""Fields for `alloc_point_dt`."""
+
+alloc_point_dt = np.dtype(alloc_point_fields, align=True)
 """_"""
 
 __pdoc__[
@@ -2550,22 +2595,22 @@ __pdoc__[
 
 # ############# Info records ############# #
 
-main_info_dt = np.dtype(
-    [
-        ("bar_zone", np.int_),
-        ("signal_idx", np.int_),
-        ("creation_idx", np.int_),
-        ("idx", np.int_),
-        ("val_price", np.float_),
-        ("price", np.float_),
-        ("size", np.float_),
-        ("size_type", np.int_),
-        ("direction", np.int_),
-        ("type", np.int_),
-        ("stop_type", np.int_),
-    ],
-    align=True,
-)
+main_info_fields = [
+    ("bar_zone", np.int_),
+    ("signal_idx", np.int_),
+    ("creation_idx", np.int_),
+    ("idx", np.int_),
+    ("val_price", np.float_),
+    ("price", np.float_),
+    ("size", np.float_),
+    ("size_type", np.int_),
+    ("direction", np.int_),
+    ("type", np.int_),
+    ("stop_type", np.int_),
+]
+"""Fields for `main_info_dt`."""
+
+main_info_dt = np.dtype(main_info_fields, align=True)
 """_"""
 
 __pdoc__[
@@ -2590,25 +2635,25 @@ Attributes:
     stop_type: See `vectorbtpro.signals.enums.StopType`.
 """
 
-limit_info_dt = np.dtype(
-    [
-        ("signal_idx", np.int_),
-        ("creation_idx", np.int_),
-        ("init_idx", np.int_),
-        ("init_price", np.float_),
-        ("init_size", np.float_),
-        ("init_size_type", np.int_),
-        ("init_direction", np.int_),
-        ("init_stop_type", np.int_),
-        ("delta", np.float_),
-        ("delta_format", np.int_),
-        ("tif", int),
-        ("expiry", int),
-        ("time_delta_format", np.int_),
-        ("reverse", np.float_),
-    ],
-    align=True,
-)
+limit_info_fields = [
+    ("signal_idx", np.int_),
+    ("creation_idx", np.int_),
+    ("init_idx", np.int_),
+    ("init_price", np.float_),
+    ("init_size", np.float_),
+    ("init_size_type", np.int_),
+    ("init_direction", np.int_),
+    ("init_stop_type", np.int_),
+    ("delta", np.float_),
+    ("delta_format", np.int_),
+    ("tif", int),
+    ("expiry", int),
+    ("time_delta_format", np.int_),
+    ("reverse", np.float_),
+]
+"""Fields for `limit_info_dt`."""
+
+limit_info_dt = np.dtype(limit_info_fields, align=True)
 """_"""
 
 __pdoc__[
@@ -2636,24 +2681,24 @@ Attributes:
     reverse: Whether to reverse the price hit detection.
 """
 
-sl_info_dt = np.dtype(
-    [
-        ("init_idx", np.int_),
-        ("init_price", np.float_),
-        ("stop", np.float_),
-        ("exit_price", np.float_),
-        ("exit_size", np.float_),
-        ("exit_size_type", np.int_),
-        ("exit_type", np.int_),
-        ("order_type", np.int_),
-        ("limit_delta", np.float_),
-        ("delta_format", np.int_),
-        ("ladder", np.bool_),
-        ("step", np.int_),
-        ("step_idx", np.int_),
-    ],
-    align=True,
-)
+sl_info_fields = [
+    ("init_idx", np.int_),
+    ("init_price", np.float_),
+    ("stop", np.float_),
+    ("exit_price", np.float_),
+    ("exit_size", np.float_),
+    ("exit_size_type", np.int_),
+    ("exit_type", np.int_),
+    ("order_type", np.int_),
+    ("limit_delta", np.float_),
+    ("delta_format", np.int_),
+    ("ladder", np.bool_),
+    ("step", np.int_),
+    ("step_idx", np.int_),
+]
+"""Fields for `sl_info_dt`."""
+
+sl_info_dt = np.dtype(sl_info_fields, align=True)
 """_"""
 
 __pdoc__[
@@ -2680,27 +2725,27 @@ Attributes:
     step_idx: Step row.
 """
 
-tsl_info_dt = np.dtype(
-    [
-        ("init_idx", np.int_),
-        ("init_price", np.float_),
-        ("peak_idx", np.int_),
-        ("peak_price", np.float_),
-        ("stop", np.float_),
-        ("th", np.float_),
-        ("exit_price", np.float_),
-        ("exit_size", np.float_),
-        ("exit_size_type", np.int_),
-        ("exit_type", np.int_),
-        ("order_type", np.int_),
-        ("limit_delta", np.float_),
-        ("delta_format", np.int_),
-        ("ladder", np.bool_),
-        ("step", np.int_),
-        ("step_idx", np.int_),
-    ],
-    align=True,
-)
+tsl_info_fields = [
+    ("init_idx", np.int_),
+    ("init_price", np.float_),
+    ("peak_idx", np.int_),
+    ("peak_price", np.float_),
+    ("stop", np.float_),
+    ("th", np.float_),
+    ("exit_price", np.float_),
+    ("exit_size", np.float_),
+    ("exit_size_type", np.int_),
+    ("exit_type", np.int_),
+    ("order_type", np.int_),
+    ("limit_delta", np.float_),
+    ("delta_format", np.int_),
+    ("ladder", np.bool_),
+    ("step", np.int_),
+    ("step_idx", np.int_),
+]
+"""Fields for `tsl_info_dt`."""
+
+tsl_info_dt = np.dtype(tsl_info_fields, align=True)
 """_"""
 
 __pdoc__[
@@ -2730,24 +2775,24 @@ Attributes:
     step_idx: Step row.
 """
 
-tp_info_dt = np.dtype(
-    [
-        ("init_idx", np.int_),
-        ("init_price", np.float_),
-        ("stop", np.float_),
-        ("exit_price", np.float_),
-        ("exit_size", np.float_),
-        ("exit_size_type", np.int_),
-        ("exit_type", np.int_),
-        ("order_type", np.int_),
-        ("limit_delta", np.float_),
-        ("delta_format", np.int_),
-        ("ladder", np.bool_),
-        ("step", np.int_),
-        ("step_idx", np.int_),
-    ],
-    align=True,
-)
+tp_info_fields = [
+    ("init_idx", np.int_),
+    ("init_price", np.float_),
+    ("stop", np.float_),
+    ("exit_price", np.float_),
+    ("exit_size", np.float_),
+    ("exit_size_type", np.int_),
+    ("exit_type", np.int_),
+    ("order_type", np.int_),
+    ("limit_delta", np.float_),
+    ("delta_format", np.int_),
+    ("ladder", np.bool_),
+    ("step", np.int_),
+    ("step_idx", np.int_),
+]
+"""Fields for `tp_info_dt`."""
+
+tp_info_dt = np.dtype(tp_info_fields, align=True)
 """_"""
 
 __pdoc__[
@@ -2774,25 +2819,25 @@ Attributes:
     step_idx: Step row.
 """
 
-time_info_dt = np.dtype(
-    [
-        ("init_idx", np.int_),
-        ("td_stop", np.int_),
-        ("dt_stop", np.int_),
-        ("exit_price", np.float_),
-        ("exit_size", np.float_),
-        ("exit_size_type", np.int_),
-        ("exit_type", np.int_),
-        ("order_type", np.int_),
-        ("limit_delta", np.float_),
-        ("delta_format", np.int_),
-        ("time_delta_format", np.int_),
-        ("ladder", np.bool_),
-        ("step", np.int_),
-        ("step_idx", np.int_),
-    ],
-    align=True,
-)
+time_info_fields = [
+    ("init_idx", np.int_),
+    ("td_stop", np.int_),
+    ("dt_stop", np.int_),
+    ("exit_price", np.float_),
+    ("exit_size", np.float_),
+    ("exit_size_type", np.int_),
+    ("exit_type", np.int_),
+    ("order_type", np.int_),
+    ("limit_delta", np.float_),
+    ("delta_format", np.int_),
+    ("time_delta_format", np.int_),
+    ("ladder", np.bool_),
+    ("step", np.int_),
+    ("step_idx", np.int_),
+]
+"""Fields for `time_info_dt`."""
+
+time_info_dt = np.dtype(time_info_fields, align=True)
 """_"""
 
 __pdoc__[
