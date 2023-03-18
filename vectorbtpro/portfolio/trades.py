@@ -1110,9 +1110,6 @@ class Trades(Ranges):
         if self._close is None:
             raise ValueError("Must provide close")
 
-        col_map = self.col_mapper.get_col_map(group_by=group_by)
-        func = jit_reg.resolve_option(nb.edge_ratio_nb, jitted)
-        func = ch_reg.resolve_option(func, chunked)
         if volatility is None:
             if self._high is not None and self._low is not None:
                 from vectorbtpro.indicators.nb import atr_nb
@@ -1122,9 +1119,9 @@ class Trades(Ranges):
                     raise ValueError("Must provide high and low for ATR calculation")
 
                 volatility = atr_nb(
-                    high=to_2d_array(self.high),
-                    low=to_2d_array(self.low),
-                    close=to_2d_array(self.close),
+                    high=to_2d_array(self._high),
+                    low=to_2d_array(self._low),
+                    close=to_2d_array(self._close),
                     window=14,
                     wtype=WType.Wilder,
                 )[1]
@@ -1133,12 +1130,15 @@ class Trades(Ranges):
                 from vectorbtpro.generic.enums import WType
 
                 volatility = msd_nb(
-                    close=to_2d_array(self.close),
+                    close=to_2d_array(self._close),
                     window=14,
                     wtype=WType.Wilder,
                 )
         else:
             volatility = broadcast_to(volatility, self.wrapper, to_pd=False, keep_flex=True)
+        col_map = self.col_mapper.get_col_map(group_by=group_by)
+        func = jit_reg.resolve_option(nb.edge_ratio_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
         out = func(
             self.values,
             col_map,
@@ -1175,8 +1175,6 @@ class Trades(Ranges):
         if self._close is None:
             raise ValueError("Must provide close")
 
-        col_map = self.col_mapper.get_col_map(group_by=group_by)
-        func = jit_reg.resolve_option(nb.running_edge_ratio_nb, jitted)
         if volatility is None:
             if self._high is not None and self._low is not None:
                 from vectorbtpro.indicators.nb import atr_nb
@@ -1186,9 +1184,9 @@ class Trades(Ranges):
                     raise ValueError("Must provide high and low for ATR calculation")
 
                 volatility = atr_nb(
-                    high=to_2d_array(self.high),
-                    low=to_2d_array(self.low),
-                    close=to_2d_array(self.close),
+                    high=to_2d_array(self._high),
+                    low=to_2d_array(self._low),
+                    close=to_2d_array(self._close),
                     window=14,
                     wtype=WType.Wilder,
                 )[1]
@@ -1197,12 +1195,14 @@ class Trades(Ranges):
                 from vectorbtpro.generic.enums import WType
 
                 volatility = msd_nb(
-                    close=to_2d_array(self.close),
+                    close=to_2d_array(self._close),
                     window=14,
                     wtype=WType.Wilder,
                 )
         else:
             volatility = broadcast_to(volatility, self.wrapper, to_pd=False, keep_flex=True)
+        col_map = self.col_mapper.get_col_map(group_by=group_by)
+        func = jit_reg.resolve_option(nb.running_edge_ratio_nb, jitted)
         out = func(
             self.values,
             col_map,
