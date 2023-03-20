@@ -431,6 +431,26 @@ class TestData:
                 columns=pd.Index([1], dtype="int64"),
             ),
         )
+        symbols = {
+            0: dict(index_mask=[False, True, True, True, True]),
+            1: dict(index_mask=[True, True, True, True, False]),
+        }
+        assert_series_equal(
+            MyData.fetch(symbols, shape=(5,), missing_index="nan").data[0],
+            pd.Series([np.nan, "0_1", "0_2", "0_3", "0_4"], index=index),
+        )
+        assert_series_equal(
+            MyData.fetch(symbols, shape=(5,), missing_index="nan").data[1],
+            pd.Series(["1_0", "1_1", "1_2", "1_3", np.nan], index=index),
+        )
+        assert_series_equal(
+            MyData.fetch(symbols, shape=(5,), missing_index="drop").data[0],
+            pd.Series(["0_1", "0_2", "0_3"], index=index[1:4]),
+        )
+        assert_series_equal(
+            MyData.fetch(symbols, shape=(5,), missing_index="drop").data[1],
+            pd.Series(["1_1", "1_2", "1_3"], index=index[1:4]),
+        )
         assert len(MyData.fetch([0, 1], shape=(5, 3), return_none=vbt.symbol_dict({0: True, 1: False})).symbols) == 1
         assert_frame_equal(
             MyData.fetch([0, 1], shape=(5, 3), return_none=vbt.symbol_dict({0: True, 1: False})).data[1],

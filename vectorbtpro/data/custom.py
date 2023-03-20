@@ -1723,6 +1723,7 @@ class CCXTData(RemoteData):
         if exchange is None:
             exchange = ccxt_cfg["exchange"]
         if isinstance(exchange, str):
+            exchange = exchange.lower()
             exchange_name = exchange
         elif isinstance(exchange, ccxt.Exchange):
             exchange_name = type(exchange).__name__
@@ -1827,6 +1828,8 @@ class CCXTData(RemoteData):
 
         Args:
             symbol (str): Symbol.
+
+                Symbol can be in the `EXCHANGE:SYMBOL` format, in this case `exchange` argument will be ignored.
             exchange (str or object): Exchange identifier or an exchange object.
 
                 See `CCXTData.resolve_exchange`.
@@ -1868,6 +1871,8 @@ class CCXTData(RemoteData):
 
         ccxt_cfg = cls.get_settings(key_id="custom")
 
+        if ":" in symbol:
+            exchange, symbol = symbol.split(":")
         if exchange_config is None:
             exchange_config = {}
         exchange = cls.resolve_exchange(exchange=exchange, **exchange_config)

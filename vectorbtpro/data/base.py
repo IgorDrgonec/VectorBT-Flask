@@ -814,7 +814,9 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         That is, it can be distributed and parallelized when needed.
 
         Args:
-            symbols (hashable or sequence of hashable): One or multiple symbols.
+            symbols (hashable, sequence of hashable, or dict): One or multiple symbols.
+
+                If provided as a dictionary, will use keys as symbols and values as keyword arguments.
 
                 !!! note
                     Tuple is considered as a single symbol (tuple is a hashable).
@@ -843,9 +845,17 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         """
         data_cfg = cls.get_settings(key_id="base")
 
+        fetch_kwargs = symbol_dict()
         if checks.is_hashable(symbols):
             single_symbol = True
             symbols = [symbols]
+        elif isinstance(symbols, dict):
+            new_symbols = []
+            for symbol, symbol_fetch_kwargs in symbols.items():
+                new_symbols.append(symbol)
+                fetch_kwargs[symbol] = symbol_fetch_kwargs
+            symbols = new_symbols
+            single_symbol = False
         elif checks.is_iterable(symbols):
             symbols = list(symbols)
             single_symbol = False
@@ -878,12 +888,13 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             execute_kwargs["show_progress"] = True
 
         funcs_args = []
-        fetch_kwargs = symbol_dict()
         func_arg_names = get_func_arg_names(cls.fetch_symbol)
         for symbol in symbols:
             symbol_fetch_kwargs = cls.select_symbol_kwargs(symbol, kwargs)
             if "silence_warnings" in func_arg_names:
                 symbol_fetch_kwargs["silence_warnings"] = silence_warnings
+            if symbol in fetch_kwargs:
+                symbol_fetch_kwargs = merge_dicts(symbol_fetch_kwargs, fetch_kwargs[symbol])
             funcs_args.append(
                 (
                     cls.try_fetch_symbol,
