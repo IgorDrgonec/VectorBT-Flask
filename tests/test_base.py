@@ -2869,6 +2869,20 @@ class TestReshaping:
         for i in range(len(broadcasted)):
             np.testing.assert_array_equal(broadcasted[i], broadcasted_arrs[i])
 
+    def test_broadcast_axis(self):
+        x1 = np.array([1])
+        x2 = np.array([[1, 2, 3]])
+        x3 = np.array([[1], [2], [3]])
+        dct = dict(x1=x1, x2=x2, x3=x3)
+        out_dct = reshaping.broadcast(dct, axis=0)
+        np.testing.assert_array_equal(out_dct["x1"], np.array([[1], [1], [1]]))
+        np.testing.assert_array_equal(out_dct["x2"], np.array([[1, 2, 3], [1, 2, 3], [1, 2, 3]]))
+        np.testing.assert_array_equal(out_dct["x3"], np.array([[1], [2], [3]]))
+        out_dct = reshaping.broadcast(dct, axis=1)
+        np.testing.assert_array_equal(out_dct["x1"], np.array([[1, 1, 1]]))
+        np.testing.assert_array_equal(out_dct["x2"], np.array([[1, 2, 3]]))
+        np.testing.assert_array_equal(out_dct["x3"], np.array([[1, 1, 1], [2, 2, 2], [3, 3, 3]]))
+
     def test_broadcast_stack(self):
         # 1d
         to_broadcast = 0, a1, a2, sr_none, sr1, sr2

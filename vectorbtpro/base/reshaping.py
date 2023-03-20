@@ -38,6 +38,7 @@ __all__ = [
     "broadcast_arrays",
     "repeat",
     "tile",
+    "align_pd_arrays",
     "BCO",
     "Default",
     "Ref",
@@ -274,7 +275,7 @@ def repeat(
             return wrapping.ArrayWrapper.from_obj(arg).wrap(np.repeat(arg.values, n, axis=1), columns=new_columns)
         return np.repeat(arg, n, axis=1)
     else:
-        raise ValueError("Only axes 0 and 1 are supported")
+        raise ValueError(f"Only axes 0 and 1 are supported, not {axis}")
 
 
 def tile(
@@ -303,7 +304,7 @@ def tile(
             return wrapping.ArrayWrapper.from_obj(arg).wrap(np.tile(arg.values, (1, n)), columns=new_columns)
         return np.tile(arg, (1, n))
     else:
-        raise ValueError("Only axes 0 and 1 are supported")
+        raise ValueError(f"Only axes 0 and 1 are supported, not {axis}")
 
 
 def column_stack(*arrs: tp.MaybeSequence[tp.AnyArray]) -> tp.Array2d:
@@ -320,8 +321,12 @@ def column_stack(*arrs: tp.MaybeSequence[tp.AnyArray]) -> tp.Array2d:
     return np.column_stack(arrs)
 
 
-def broadcast_shapes(*shapes: tp.ArrayLike, expand_axis: tp.Optional[int] = None) -> tp.Tuple[tp.Shape, ...]:
-    """Broadcast multiple shape-like objects using vectorbt's broadcasting rules."""
+def broadcast_shapes(
+    *shapes: tp.ArrayLike,
+    axis: tp.Optional[tp.MaybeSequence[int]] = None,
+    expand_axis: tp.Optional[tp.MaybeSequence[int]] = None,
+) -> tp.Tuple[tp.Shape, ...]:
+    """Broadcast shape-like objects using vectorbt's broadcasting rules."""
     from vectorbtpro._settings import settings
 
     broadcasting_cfg = settings["broadcasting"]
@@ -330,19 +335,46 @@ def broadcast_shapes(*shapes: tp.ArrayLike, expand_axis: tp.Optional[int] = None
         expand_axis = broadcasting_cfg["expand_axis"]
 
     is_2d = False
-    for shape in shapes:
+    for i, shape in enumerate(shapes):
         shape = to_tuple_shape(shape)
         if len(shape) == 2:
             is_2d = True
             break
-    if is_2d:
-        return tuple(np.broadcast_shapes(*[to_2d_shape(shape, expand_axis=expand_axis) for shape in shapes]))
-    return tuple(np.broadcast_shapes(*[to_1d_shape(shape) for shape in shapes]))
+
+    new_shapes = []
+    for i, shape in enumerate(shapes):
+        shape = to_tuple_shape(shape)
+        if is_2d:
+            if checks.is_sequence(expand_axis):
+                _expand_axis = expand_axis[i]
+            else:
+                _expand_axis = expand_axis
+            new_shape = to_2d_shape(shape, expand_axis=_expand_axis)
+        else:
+            new_shape = to_1d_shape(shape)
+        if axis is not None:
+            if checks.is_sequence(axis):
+                _axis = axis[i]
+            else:
+                _axis = axis
+            if _axis is not None:
+                if _axis == 0:
+                    if is_2d:
+                        new_shape = (new_shape[0], 1)
+                    else:
+                        new_shape = (new_shape[0],)
+                elif _axis == 1:
+                    new_shape = (1, new_shape[1])
+                else:
+                    raise ValueError(f"Only axes 0 and 1 are supported, not {_axis}")
+        new_shapes.append(new_shape)
+    return tuple(np.broadcast_shapes(*new_shapes))
 
 
 def broadcast_array_to(
     arr: tp.ArrayLike,
     target_shape: tp.ShapeLike,
+    axis: tp.Optional[int] = None,
     expand_axis: tp.Optional[int] = None,
 ) -> tp.Array:
     """Broadcast an array-like object to a target shape using vectorbt's broadcasting rules."""
@@ -356,38 +388,57 @@ def broadcast_array_to(
     arr = np.asarray(arr)
     target_shape = to_tuple_shape(target_shape)
     if len(target_shape) not in (1, 2):
-        raise ValueError("Target shape must have either 1 or 2 axes")
+        raise ValueError(f"Target shape must have either 1 or 2 dimensions, not {len(target_shape)}")
     if len(target_shape) == 2:
-        return np.broadcast_to(to_2d_array(arr, expand_axis=expand_axis), target_shape)
-    return np.broadcast_to(to_1d_array(arr), target_shape)
+        new_arr = to_2d_array(arr, expand_axis=expand_axis)
+    else:
+        new_arr = to_1d_array(arr)
+    if axis is not None:
+        if axis == 0:
+            if len(target_shape) == 2:
+                target_shape = (target_shape[0], new_arr.shape[1])
+            else:
+                target_shape = (target_shape[0],)
+        elif axis == 1:
+            target_shape = (new_arr.shape[0], target_shape[1])
+        else:
+            raise ValueError(f"Only axes 0 and 1 are supported, not {axis}")
+    return np.broadcast_to(new_arr, target_shape)
 
 
 def broadcast_arrays(
     *arrs: tp.ArrayLike,
     target_shape: tp.Optional[tp.ShapeLike] = None,
-    expand_axis: tp.Optional[int] = None,
+    axis: tp.Optional[tp.MaybeSequence[int]] = None,
+    expand_axis: tp.Optional[tp.MaybeSequence[int]] = None,
 ) -> tp.Tuple[tp.Array, ...]:
-    """Broadcast multiple array-like objects using vectorbt's broadcasting rules.
+    """Broadcast array-like objects using vectorbt's broadcasting rules.
 
     Optionally to a target shape."""
-    from vectorbtpro._settings import settings
-
-    broadcasting_cfg = settings["broadcasting"]
-
-    if expand_axis is None:
-        expand_axis = broadcasting_cfg["expand_axis"]
-
-    if target_shape is not None:
-        return tuple(map(lambda x: broadcast_array_to(x, target_shape, expand_axis=expand_axis), arrs))
-    is_2d = False
-    for arr in arrs:
-        arr = np.asarray(arr)
-        if arr.ndim == 2:
-            is_2d = True
-            break
-    if is_2d:
-        return tuple(np.broadcast_arrays(*[to_2d_array(arr, expand_axis=expand_axis) for arr in arrs]))
-    return tuple(np.broadcast_arrays(*[to_1d_array(arr) for arr in arrs]))
+    if target_shape is None:
+        shapes = []
+        for arr in arrs:
+            shapes.append(np.asarray(arr).shape)
+        target_shape = broadcast_shapes(*shapes, axis=axis, expand_axis=expand_axis)
+    new_arrs = []
+    for i, arr in enumerate(arrs):
+        if axis is not None:
+            if checks.is_sequence(axis):
+                _axis = axis[i]
+            else:
+                _axis = axis
+        else:
+            _axis = None
+        if expand_axis is not None:
+            if checks.is_sequence(expand_axis):
+                _expand_axis = expand_axis[i]
+            else:
+                _expand_axis = expand_axis
+        else:
+            _expand_axis = None
+        new_arr = broadcast_array_to(arr, target_shape, axis=_axis, expand_axis=_expand_axis)
+        new_arrs.append(new_arr)
+    return tuple(new_arrs)
 
 
 IndexFromLike = tp.Union[None, str, int, tp.Any]
@@ -446,7 +497,6 @@ def broadcast_index(
 
     index_str = "columns" if axis == 1 else "index"
     to_shape_2d = (to_shape[0], 1) if len(to_shape) == 1 else to_shape
-    # maxlen stores the length of the longest index
     maxlen = to_shape_2d[1] if axis == 1 else to_shape_2d[0]
     new_index = None
     args = list(args)
@@ -454,17 +504,14 @@ def broadcast_index(
     if index_from is None or (isinstance(index_from, str) and index_from.lower() == "keep"):
         return None
     if isinstance(index_from, int):
-        # Take index/columns of the object indexed by index_from
         if not checks.is_pandas(args[index_from]):
             raise TypeError(f"Argument under index {index_from} must be a pandas object")
         new_index = indexes.get_index(args[index_from], axis)
     elif isinstance(index_from, str):
         if index_from.lower() == "reset":
-            # Ignore index/columns
             new_index = pd.RangeIndex(start=0, stop=maxlen, step=1)
         elif index_from.lower() in ("stack", "strict"):
-            # Check whether all indexes/columns are equal
-            last_index = None  # of type pd.Index
+            last_index = None
             index_conflict = False
             for arg in args:
                 if checks.is_pandas(arg):
@@ -477,15 +524,12 @@ def broadcast_index(
             if not index_conflict:
                 new_index = last_index
             else:
-                # If pandas objects have different index/columns, stack them together
                 for arg in args:
                     if checks.is_pandas(arg):
                         index = indexes.get_index(arg, axis)
                         if axis == 1 and checks.is_series(arg) and ignore_sr_names:
-                            # ignore Series name
                             continue
                         if checks.is_default_index(index):
-                            # ignore simple ranges without name
                             continue
                         if new_index is None:
                             new_index = index
@@ -493,16 +537,10 @@ def broadcast_index(
                             if checks.is_index_equal(index, new_index, check_names=check_index_names):
                                 continue
                             if index_from.lower() == "strict":
-                                # If pandas objects have different index/columns, raise an exception
                                 raise ValueError(
                                     f"Arrays have different index. Broadcasting {index_str} "
                                     f"is not allowed when {index_str}_from=strict"
                                 )
-
-                            # Broadcasting index must follow the rules of a regular broadcasting operation
-                            # https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html#general-broadcasting-rules
-                            # 1. rule: if indexes are of the same length, they are simply stacked
-                            # 2. rule: if index has one element, it gets repeated and then stacked
                             if len(index) != len(new_index):
                                 if len(index) > 1 and len(new_index) > 1:
                                     raise ValueError("Indexes could not be broadcast together")
@@ -521,14 +559,10 @@ def broadcast_index(
         if maxlen > len(new_index):
             if isinstance(index_from, str) and index_from.lower() == "strict":
                 raise ValueError(f"Broadcasting {index_str} is not allowed when {index_str}_from=strict")
-            # This happens only when some numpy object is longer than the new pandas index
-            # In this case, new pandas index (one element) must be repeated to match this length.
             if maxlen > 1 and len(new_index) > 1:
                 raise ValueError("Indexes could not be broadcast together")
             new_index = indexes.repeat_index(new_index, maxlen, ignore_ranges=ignore_ranges)
     else:
-        # new_index=None can mean two things: 1) take original metadata or 2) reset index/columns
-        # In case when index_from is not None, we choose 2)
         new_index = pd.RangeIndex(start=0, stop=maxlen, step=1)
     return new_index
 
@@ -536,6 +570,7 @@ def broadcast_index(
 def wrap_broadcasted(
     new_obj: tp.Array,
     old_obj: tp.Optional[tp.AnyArray] = None,
+    axis: tp.Optional[int] = None,
     is_pd: bool = False,
     new_index: tp.Optional[tp.Index] = None,
     new_columns: tp.Optional[tp.Index] = None,
@@ -544,16 +579,18 @@ def wrap_broadcasted(
     """If the newly brodcasted array was originally a Pandas object, make it Pandas object again
     and assign it the newly broadcast index/columns."""
     if is_pd:
+        if axis == 0:
+            new_columns = None
+        elif axis == 1:
+            new_index = None
         if old_obj is not None and checks.is_pandas(old_obj):
             if new_index is None:
-                # Take index from original pandas object
                 old_index = indexes.get_index(old_obj, 0)
                 if old_obj.shape[0] == new_obj.shape[0]:
                     new_index = old_index
                 else:
                     new_index = indexes.repeat_index(old_index, new_obj.shape[0], ignore_ranges=ignore_ranges)
             if new_columns is None:
-                # Take columns from original pandas object
                 old_columns = indexes.get_index(old_obj, 1)
                 new_ncols = new_obj.shape[1] if new_obj.ndim == 2 else 1
                 if len(old_columns) == new_ncols:
@@ -578,6 +615,7 @@ def align_pd_arrays(
     align_columns: bool = True,
     to_index: tp.Optional[tp.Index] = None,
     to_columns: tp.Optional[tp.Index] = None,
+    axis: tp.Optional[tp.MaybeSequence[int]] = None,
     reindex_kwargs: tp.KwargsLikeSequence = None,
 ) -> tp.MaybeTuple[tp.ArrayLike]:
     """Align Pandas arrays against common index and/or column levels using reindexing
@@ -586,8 +624,17 @@ def align_pd_arrays(
     if align_index:
         indexes_to_align = []
         for i in range(len(args)):
-            if checks.is_pandas(args[i]) and not checks.is_default_index(args[i].index):
-                indexes_to_align.append(i)
+            if axis is not None:
+                if checks.is_sequence(axis):
+                    _axis = axis[i]
+                else:
+                    _axis = axis
+            else:
+                _axis = None
+            if _axis in (None, 0):
+                if checks.is_pandas(args[i]):
+                    if not checks.is_default_index(args[i].index):
+                        indexes_to_align.append(i)
         if (len(indexes_to_align) > 0 and to_index is not None) or len(indexes_to_align) > 1:
             if to_index is None:
                 new_index = None
@@ -625,8 +672,17 @@ def align_pd_arrays(
     if align_columns:
         columns_to_align = []
         for i in range(len(args)):
-            if checks.is_frame(args[i]) and len(args[i].columns) > 1 and not checks.is_default_index(args[i].columns):
-                columns_to_align.append(i)
+            if axis is not None:
+                if checks.is_sequence(axis):
+                    _axis = axis[i]
+                else:
+                    _axis = axis
+            else:
+                _axis = None
+            if _axis in (None, 1):
+                if checks.is_frame(args[i]) and len(args[i].columns) > 1:
+                    if not checks.is_default_index(args[i].columns):
+                        columns_to_align.append(i)
         if (len(columns_to_align) > 0 and to_columns is not None) or len(columns_to_align) > 1:
             indexes_ = [args[i].columns for i in columns_to_align]
             if to_columns is not None:
@@ -648,6 +704,11 @@ class BCO:
 
     value: tp.Any = attr.ib()
     """Value of the object."""
+
+    axis: tp.Optional[int] = attr.ib(default=None)
+    """Axis to broadcast.
+    
+    Set to None to broadcast all axes."""
 
     to_pd: tp.Optional[bool] = attr.ib(default=None)
     """Whether to convert the output array to a Pandas object."""
@@ -726,6 +787,7 @@ def broadcast(
     index_from: tp.Optional[IndexFromLike] = None,
     columns_from: tp.Optional[IndexFromLike] = None,
     to_frame: tp.Optional[bool] = None,
+    axis: tp.Optional[tp.MaybeMappingSequence[int]] = None,
     to_pd: tp.Optional[tp.MaybeMappingSequence[bool]] = None,
     keep_flex: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
     min_ndim: tp.MaybeMappingSequence[tp.Optional[int]] = None,
@@ -776,6 +838,7 @@ def broadcast(
 
             Pass None to use the default.
         to_frame (bool): Whether to convert all Series to DataFrames.
+        axis (int, sequence or mapping): See `BCO.axis`.
         to_pd (bool, sequence or mapping): See `BCO.to_pd`.
 
             If None, converts only if there is at least one Pandas object among them.
@@ -1158,6 +1221,7 @@ def broadcast(
             none_keys.add(k)
             continue
 
+        _axis = _resolve_arg(obj, "axis", axis, None)
         _to_pd = _resolve_arg(obj, "to_pd", to_pd, None)
 
         _keep_flex = _resolve_arg(obj, "keep_flex", keep_flex, None)
@@ -1217,6 +1281,7 @@ def broadcast(
 
         bco_instances[k] = BCO(
             value,
+            axis=_axis,
             to_pd=_to_pd,
             keep_flex=_keep_flex,
             min_ndim=_min_ndim,
@@ -1232,6 +1297,7 @@ def broadcast(
     is_2d = False
 
     old_objs = {}
+    obj_axis = {}
     obj_reindex_kwargs = {}
     for k, bco_obj in bco_instances.items():
         if k in none_keys or k in param_keys or k in special_keys:
@@ -1245,6 +1311,7 @@ def broadcast(
         if bco_obj.to_pd is not None and bco_obj.to_pd:
             is_pd = True
         old_objs[k] = obj
+        obj_axis[k] = bco_obj.axis
         obj_reindex_kwargs[k] = bco_obj.reindex_kwargs
 
     if to_shape is not None:
@@ -1270,6 +1337,7 @@ def broadcast(
         align_columns=align_columns,
         to_index=index_from if isinstance(index_from, pd.Index) else None,
         to_columns=columns_from if isinstance(columns_from, pd.Index) else None,
+        axis=list(obj_axis.values()),
         reindex_kwargs=list(obj_reindex_kwargs.values()),
     )
     if not isinstance(aligned_objs, tuple):
@@ -1292,7 +1360,10 @@ def broadcast(
     # Get final shape
     if to_shape is None:
         try:
-            to_shape = broadcast_shapes(*map(lambda x: x.shape, ready_objs.values()))
+            to_shape = broadcast_shapes(
+                *map(lambda x: x.shape, ready_objs.values()),
+                axis=list(obj_axis.values()),
+            )
         except ValueError:
             arr_shapes = {}
             for i, k in enumerate(bco_instances):
@@ -1312,7 +1383,7 @@ def broadcast(
         # Decide on index and columns
         # NOTE: Important to pass aligned_objs, not ready_objs, to preserve original shape info
         new_index = broadcast_index(
-            list(aligned_objs.values()),
+            [v for k, v in aligned_objs.items() if obj_axis[k] in (None, 0)],
             to_shape,
             index_from=index_from,
             axis=0,
@@ -1322,7 +1393,7 @@ def broadcast(
             **index_stack_kwargs,
         )
         new_columns = broadcast_index(
-            list(aligned_objs.values()),
+            [v for k, v in aligned_objs.items() if obj_axis[k] in (None, 1)],
             to_shape,
             index_from=columns_from,
             axis=1,
@@ -1413,10 +1484,13 @@ def broadcast(
         _keep_flex = bco_instances[k].keep_flex
         _repeat_param = bco_instances[k].repeat_param
         _min_ndim = bco_instances[k].min_ndim
+        _axis = bco_instances[k].axis
         _expand_axis = bco_instances[k].expand_axis
 
         if k in param_keys:
             # Broadcast parameters
+            if _axis == 0:
+                raise ValueError("Parameters do not support broadcasting with axis=0")
             obj = param_product[k]
             if _repeat_param:
                 obj = np.repeat(obj, to_shape_2d[1])
@@ -1432,7 +1506,7 @@ def broadcast(
             old_obj = aligned_objs[k]
             new_obj = ready_objs[k]
             if _keep_flex:
-                if n_params > 0:
+                if n_params > 0 and _axis in (None, 1):
                     if len(to_shape) == 1:
                         if new_obj.ndim == 1 and new_obj.shape[0] > 1:
                             new_obj = new_obj[:, None]  # product changes is_2d behavior
@@ -1442,8 +1516,8 @@ def broadcast(
                         elif new_obj.ndim == 2 and new_obj.shape[1] > 1:
                             new_obj = np.tile(new_obj, (1, n_params))
             else:
-                new_obj = broadcast_array_to(new_obj, to_shape)
-                if n_params > 0:
+                new_obj = broadcast_array_to(new_obj, to_shape, axis=_axis)
+                if n_params > 0 and _axis in (None, 1):
                     if new_obj.ndim == 1:
                         new_obj = new_obj[:, None]  # product changes is_2d behavior
                     new_obj = np.tile(new_obj, (1, n_params))
@@ -1516,6 +1590,7 @@ def broadcast(
         if k in none_keys:
             continue
         new_obj = new_objs2[k]
+        _axis = bco_instances[k].axis
         _keep_flex = bco_instances[k].keep_flex
         _repeat_param = bco_instances[k].repeat_param
 
@@ -1528,6 +1603,7 @@ def broadcast(
                 new_obj = wrap_broadcasted(
                     new_obj,
                     old_obj=aligned_objs2[k] if k not in special_keys else None,
+                    axis=_axis,
                     is_pd=_is_pd,
                     new_index=new_index,
                     new_columns=param_columns,
@@ -1537,6 +1613,7 @@ def broadcast(
                 new_obj = wrap_broadcasted(
                     new_obj,
                     old_obj=aligned_objs2[k] if k not in special_keys else None,
+                    axis=_axis,
                     is_pd=_is_pd,
                     new_index=new_index,
                     new_columns=new_columns,
