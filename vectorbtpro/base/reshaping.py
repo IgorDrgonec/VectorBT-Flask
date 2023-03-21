@@ -733,9 +733,6 @@ class BCO:
     reindex_kwargs: tp.Optional[tp.Kwargs] = attr.ib(default=None)
     """Keyword arguments passed to `pd.DataFrame.reindex`."""
 
-    repeat_param: tp.Optional[bool] = attr.ib(default=None)
-    """Whether to repeat every parameter value to match the number of columns in regular arrays."""
-
 
 @attr.s(frozen=True)
 class Default:
@@ -795,7 +792,6 @@ def broadcast(
     post_func: tp.MaybeMappingSequence[tp.Optional[tp.Callable]] = None,
     require_kwargs: tp.MaybeMappingSequence[tp.Optional[tp.Kwargs]] = None,
     reindex_kwargs: tp.MaybeMappingSequence[tp.Optional[tp.Kwargs]] = None,
-    repeat_param: tp.MaybeMappingSequence[tp.Optional[bool]] = None,
     tile: tp.Union[None, int, tp.IndexLike] = None,
     random_subset: tp.Optional[int] = None,
     seed: tp.Optional[int] = None,
@@ -858,7 +854,6 @@ def broadcast(
 
             This key will be merged with any argument-specific dict. If the mapping contains all keys in
             `pd.DataFrame.reindex`, it will be applied on all objects.
-        repeat_param (bool, sequence or mapping): See `BCO.repeat_param`.
         tile (int or index_like): Tile the final object by the number of times or index.
         random_subset (int): Select a random subset of parameter values.
 
@@ -1268,10 +1263,6 @@ def broadcast(
         else:
             _reindex_kwargs = merge_dicts(reindex_kwargs, _reindex_kwargs)
 
-        _repeat_param = _resolve_arg(obj, "repeat_param", repeat_param, None)
-        if _repeat_param is None:
-            _repeat_param = broadcasting_cfg["repeat_param"]
-
         if isinstance(value, Param):
             param_keys.add(k)
         elif isinstance(value, indexing.index_dict) or isinstance(value, CustomTemplate):
@@ -1289,7 +1280,6 @@ def broadcast(
             post_func=_post_func,
             require_kwargs=_require_kwargs,
             reindex_kwargs=_reindex_kwargs,
-            repeat_param=_repeat_param,
         )
 
     # Check whether we should broadcast Pandas metadata and work on 2-dim data
@@ -1422,7 +1412,6 @@ def broadcast(
             seed=seed,
             index_stack_kwargs=index_stack_kwargs,
         )
-        param_product = {k: np.asarray(v) for k, v in param_product.items()}
         n_params = len(param_columns)
 
         # Combine parameter columns with new columns
@@ -1436,13 +1425,11 @@ def broadcast(
     # Tile
     if tile is not None:
         if isinstance(tile, int):
-            n_tile = tile
             if param_columns is not None:
-                param_columns = indexes.tile_index(param_columns, n_tile)
+                param_columns = indexes.tile_index(param_columns, tile)
             if new_columns is not None:
-                new_columns = indexes.tile_index(new_columns, n_tile)
+                new_columns = indexes.tile_index(new_columns, tile)
         else:
-            n_tile = len(tile)
             if param_columns is not None:
                 param_columns = indexes.combine_indexes(
                     [tile, param_columns],
@@ -1455,9 +1442,8 @@ def broadcast(
                     ignore_ranges=ignore_ranges,
                     **index_stack_kwargs,
                 )
-        if param_product is not None:
-            param_product = {k: np.tile(v, n_tile) for k, v in param_product.items()}
-        n_params = max(n_params, 1) * n_tile
+            tile = len(tile)
+        n_params = max(n_params, 1) * tile
 
     # Build wrapper
     if n_params == 0:
@@ -1482,7 +1468,6 @@ def broadcast(
         if k in none_keys or k in special_keys:
             continue
         _keep_flex = bco_instances[k].keep_flex
-        _repeat_param = bco_instances[k].repeat_param
         _min_ndim = bco_instances[k].min_ndim
         _axis = bco_instances[k].axis
         _expand_axis = bco_instances[k].expand_axis
@@ -1492,13 +1477,38 @@ def broadcast(
             if _axis == 0:
                 raise ValueError("Parameters do not support broadcasting with axis=0")
             obj = param_product[k]
-            if _repeat_param:
-                obj = np.repeat(obj, to_shape_2d[1])
-            if not _keep_flex:
-                if _repeat_param:
-                    obj = broadcast_array_to(obj[None], (to_shape[0], len(obj)))
+            new_obj = []
+            any_needs_broadcasting = False
+            all_forced_broadcast = True
+            for o in obj:
+                o = to_2d_array(o)
+                if not _keep_flex:
+                    needs_broadcasting = True
+                elif o.shape[0] > 1:
+                    needs_broadcasting = True
+                elif o.shape[1] > 1 and o.shape[1] != to_shape_2d[1]:
+                    needs_broadcasting = True
                 else:
-                    obj = broadcast_array_to(obj[None], (to_shape[0], n_params))
+                    needs_broadcasting = False
+                if needs_broadcasting:
+                    any_needs_broadcasting = True
+                    o = broadcast_array_to(o, to_shape_2d, axis=_axis)
+                elif o.size == 1:
+                    all_forced_broadcast = False
+                    o = np.repeat(o, to_shape_2d[1], axis=1)
+                else:
+                    all_forced_broadcast = False
+                new_obj.append(o)
+            if any_needs_broadcasting and not all_forced_broadcast:
+                new_obj2 = []
+                for o in new_obj:
+                    if o.shape[1] != to_shape_2d[1]:
+                        o = broadcast_array_to(o, to_shape_2d, axis=_axis)
+                    new_obj2.append(o)
+                new_obj = new_obj2
+            obj = np.column_stack(new_obj)
+            if tile is not None:
+                obj = np.tile(obj, (1, tile))
             old_obj = obj
             new_obj = obj
         else:
@@ -1532,13 +1542,10 @@ def broadcast(
         if _min_ndim in (1, 2) and new_obj.ndim == 0:
             new_obj = new_obj[None]
         if _min_ndim == 2 and new_obj.ndim == 1:
-            if k in param_keys:
-                new_obj = new_obj[None]
+            if len(to_shape) == 1:
+                new_obj = new_obj[:, None]
             else:
-                if len(to_shape) == 1:
-                    new_obj = new_obj[:, None]
-                else:
-                    new_obj = np.expand_dims(new_obj, _expand_axis)
+                new_obj = np.expand_dims(new_obj, _expand_axis)
 
         aligned_objs2[k] = old_obj
         new_objs[k] = new_obj
@@ -1592,33 +1599,21 @@ def broadcast(
         new_obj = new_objs2[k]
         _axis = bco_instances[k].axis
         _keep_flex = bco_instances[k].keep_flex
-        _repeat_param = bco_instances[k].repeat_param
 
         if not _keep_flex:
             # Wrap array
             _is_pd = bco_instances[k].to_pd
             if _is_pd is None:
                 _is_pd = is_pd
-            if k in param_keys and not _repeat_param:
-                new_obj = wrap_broadcasted(
-                    new_obj,
-                    old_obj=aligned_objs2[k] if k not in special_keys else None,
-                    axis=_axis,
-                    is_pd=_is_pd,
-                    new_index=new_index,
-                    new_columns=param_columns,
-                    ignore_ranges=ignore_ranges,
-                )
-            else:
-                new_obj = wrap_broadcasted(
-                    new_obj,
-                    old_obj=aligned_objs2[k] if k not in special_keys else None,
-                    axis=_axis,
-                    is_pd=_is_pd,
-                    new_index=new_index,
-                    new_columns=new_columns,
-                    ignore_ranges=ignore_ranges,
-                )
+            new_obj = wrap_broadcasted(
+                new_obj,
+                old_obj=aligned_objs2[k] if k not in special_keys else None,
+                axis=_axis,
+                is_pd=_is_pd,
+                new_index=new_index,
+                new_columns=new_columns,
+                ignore_ranges=ignore_ranges,
+            )
 
         # Post-process array
         _post_func = bco_instances[k].post_func

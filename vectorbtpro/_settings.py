@@ -498,7 +498,6 @@ broadcasting = child_dict(
     min_ndim=None,
     expand_axis=1,
     index_to_param=True,
-    repeat_param=True,
 )
 """_"""
 
