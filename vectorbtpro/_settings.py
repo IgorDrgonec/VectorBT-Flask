@@ -742,7 +742,7 @@ data = child_dict(
             pbar_kwargs=dict(),
             silence_warnings=False,
         ),
-        alpha_vantage=Config(
+        av=Config(
             apikey=None,
             api_meta=None,
             category=None,

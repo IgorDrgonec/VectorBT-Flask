@@ -2817,15 +2817,15 @@ class AVData(RemoteData):
         ```
     """
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.alpha_vantage")
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.av")
 
     @classmethod
     def list_symbols(cls, keywords: str, apikey: tp.Optional[str] = None) -> tp.List[str]:
         """List all symbols."""
-        alpha_vantage_cfg = cls.get_settings(key_id="custom")
+        av_cfg = cls.get_settings(key_id="custom")
 
         if apikey is None:
-            apikey = alpha_vantage_cfg["apikey"]
+            apikey = av_cfg["apikey"]
         query = dict()
         query["function"] = "SYMBOL_SEARCH"
         query["keywords"] = keywords
@@ -2963,40 +2963,40 @@ class AVData(RemoteData):
             read_csv_kwargs (dict): Keyword arguments passed to `pd.read_csv`.
             silence_warnings (bool): Whether to silence all warnings.
 
-        For defaults, see `custom.alpha_vantage` in `vectorbtpro._settings.data`.
+        For defaults, see `custom.av` in `vectorbtpro._settings.data`.
         """
-        alpha_vantage_cfg = cls.get_settings(key_id="custom")
+        av_cfg = cls.get_settings(key_id="custom")
 
         if apikey is None:
-            apikey = alpha_vantage_cfg["apikey"]
+            apikey = av_cfg["apikey"]
         if api_meta is None:
-            api_meta = alpha_vantage_cfg["api_meta"]
+            api_meta = av_cfg["api_meta"]
         if category is None:
-            category = alpha_vantage_cfg["category"]
+            category = av_cfg["category"]
         if function is None:
-            function = alpha_vantage_cfg["function"]
+            function = av_cfg["function"]
         if timeframe is None:
-            timeframe = alpha_vantage_cfg["timeframe"]
+            timeframe = av_cfg["timeframe"]
         if tz is None:
-            tz = alpha_vantage_cfg["tz"]
+            tz = av_cfg["tz"]
         if adjusted is None:
-            adjusted = alpha_vantage_cfg["adjusted"]
+            adjusted = av_cfg["adjusted"]
         if extended is None:
-            extended = alpha_vantage_cfg["extended"]
+            extended = av_cfg["extended"]
         if slice is None:
-            slice = alpha_vantage_cfg["slice"]
+            slice = av_cfg["slice"]
         if series_type is None:
-            series_type = alpha_vantage_cfg["series_type"]
+            series_type = av_cfg["series_type"]
         if time_period is None:
-            time_period = alpha_vantage_cfg["time_period"]
+            time_period = av_cfg["time_period"]
         if outputsize is None:
-            outputsize = alpha_vantage_cfg["outputsize"]
-        read_csv_kwargs = merge_dicts(alpha_vantage_cfg["read_csv_kwargs"], read_csv_kwargs)
+            outputsize = av_cfg["outputsize"]
+        read_csv_kwargs = merge_dicts(av_cfg["read_csv_kwargs"], read_csv_kwargs)
         if match_params is None:
-            match_params = alpha_vantage_cfg["match_params"]
-        params = merge_dicts(alpha_vantage_cfg["params"], params)
+            match_params = av_cfg["match_params"]
+        params = merge_dicts(av_cfg["params"], params)
         if silence_warnings is None:
-            silence_warnings = alpha_vantage_cfg["silence_warnings"]
+            silence_warnings = av_cfg["silence_warnings"]
 
         if api_meta is None and (function is None or match_params):
             if not silence_warnings and cls.parse_api_meta.cache_info().misses == 0:
