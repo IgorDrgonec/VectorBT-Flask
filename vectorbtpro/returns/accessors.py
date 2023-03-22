@@ -453,7 +453,9 @@ class ReturnsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.returns.nb.cum_returns_nb`."""
+        """Cumulative return.
+
+        See `vectorbtpro.returns.nb.cum_returns_nb`."""
         if start_value is None:
             start_value = self.defaults["start_value"]
         func = jit_reg.resolve_option(nb.cum_returns_nb, jitted)
@@ -467,7 +469,9 @@ class ReturnsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """See `vectorbtpro.returns.nb.cum_returns_final_nb`."""
+        """Total return.
+
+        See `vectorbtpro.returns.nb.cum_returns_final_nb`."""
         func = jit_reg.resolve_option(nb.cum_returns_final_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(self.to_2d_array(), start_value=0.0, log_returns=self.log_returns)
@@ -511,7 +515,9 @@ class ReturnsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """See `vectorbtpro.returns.nb.annualized_return_nb`."""
+        """Annualized return.
+
+        See `vectorbtpro.returns.nb.annualized_return_nb`."""
         func = jit_reg.resolve_option(nb.annualized_return_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(self.to_2d_array(), self.ann_factor, period=self.wrapper.dt_period, log_returns=self.log_returns)
@@ -552,7 +558,9 @@ class ReturnsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """See `vectorbtpro.returns.nb.annualized_volatility_nb`."""
+        """Annualized volatility.
+
+        See `vectorbtpro.returns.nb.annualized_volatility_nb`."""
         if levy_alpha is None:
             levy_alpha = self.defaults["levy_alpha"]
         if ddof is None:
@@ -601,7 +609,9 @@ class ReturnsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """See `vectorbtpro.returns.nb.calmar_ratio_nb`."""
+        """Calmar ratio.
+
+        See `vectorbtpro.returns.nb.calmar_ratio_nb`."""
         func = jit_reg.resolve_option(nb.calmar_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(self.to_2d_array(), self.ann_factor, period=self.wrapper.dt_period, log_returns=self.log_returns)
@@ -642,7 +652,9 @@ class ReturnsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """See `vectorbtpro.returns.nb.omega_ratio_nb`."""
+        """Omega ratio.
+
+        See `vectorbtpro.returns.nb.omega_ratio_nb`."""
         if risk_free is None:
             risk_free = self.defaults["risk_free"]
         if required_return is None:
@@ -692,7 +704,9 @@ class ReturnsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """See `vectorbtpro.returns.nb.sharpe_ratio_nb`."""
+        """Sharpe ratio.
+
+        See `vectorbtpro.returns.nb.sharpe_ratio_nb`."""
         if risk_free is None:
             risk_free = self.defaults["risk_free"]
         if ddof is None:
@@ -831,7 +845,9 @@ class ReturnsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """See `vectorbtpro.returns.nb.downside_risk_nb`."""
+        """Downside risk.
+
+        See `vectorbtpro.returns.nb.downside_risk_nb`."""
         if required_return is None:
             required_return = self.defaults["required_return"]
         func = jit_reg.resolve_option(nb.downside_risk_nb, jitted)
@@ -881,7 +897,9 @@ class ReturnsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """See `vectorbtpro.returns.nb.sortino_ratio_nb`."""
+        """Sortino ratio.
+
+        See `vectorbtpro.returns.nb.sortino_ratio_nb`."""
         if required_return is None:
             required_return = self.defaults["required_return"]
         func = jit_reg.resolve_option(nb.sortino_ratio_nb, jitted)
@@ -932,7 +950,9 @@ class ReturnsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """See `vectorbtpro.returns.nb.information_ratio_nb`."""
+        """Information ratio.
+
+        See `vectorbtpro.returns.nb.information_ratio_nb`."""
         if ddof is None:
             ddof = self.defaults["ddof"]
         if bm_returns is None:
@@ -992,7 +1012,9 @@ class ReturnsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """See `vectorbtpro.returns.nb.beta_nb`."""
+        """Beta.
+
+        See `vectorbtpro.returns.nb.beta_nb`."""
         if ddof is None:
             ddof = self.defaults["ddof"]
         if bm_returns is None:
@@ -1051,7 +1073,9 @@ class ReturnsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """See `vectorbtpro.returns.nb.alpha_nb`."""
+        """Alpha.
+
+        See `vectorbtpro.returns.nb.alpha_nb`."""
         if risk_free is None:
             risk_free = self.defaults["risk_free"]
         if bm_returns is None:
@@ -1108,7 +1132,9 @@ class ReturnsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """See `vectorbtpro.returns.nb.tail_ratio_nb`."""
+        """Tail ratio.
+
+        See `vectorbtpro.returns.nb.tail_ratio_nb`."""
         func = jit_reg.resolve_option(nb.tail_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(self.to_2d_array())
@@ -1172,7 +1198,9 @@ class ReturnsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """See `vectorbtpro.returns.nb.value_at_risk_nb`."""
+        """Value at risk.
+
+        See `vectorbtpro.returns.nb.value_at_risk_nb`."""
         if cutoff is None:
             cutoff = self.defaults["cutoff"]
         func = jit_reg.resolve_option(nb.value_at_risk_nb, jitted)
@@ -1219,7 +1247,9 @@ class ReturnsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """See `vectorbtpro.returns.nb.cond_value_at_risk_nb`."""
+        """Conditional value at risk.
+
+        See `vectorbtpro.returns.nb.cond_value_at_risk_nb`."""
         if cutoff is None:
             cutoff = self.defaults["cutoff"]
         func = jit_reg.resolve_option(nb.cond_value_at_risk_nb, jitted)
@@ -1259,19 +1289,21 @@ class ReturnsAccessor(GenericAccessor):
         )
         return self.rolling_apply(window, func, cutoff, minp=minp, jitted=jitted, chunked=chunked, **kwargs)
 
-    def capture(
+    def capture_ratio(
         self,
         bm_returns: tp.Optional[tp.ArrayLike] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """See `vectorbtpro.returns.nb.capture_nb`."""
+        """Capture ratio.
+
+        See `vectorbtpro.returns.nb.capture_ratio_nb`."""
         if bm_returns is None:
             bm_returns = self.bm_returns
         checks.assert_not_none(bm_returns)
         bm_returns = broadcast_to(bm_returns, self.obj)
-        func = jit_reg.resolve_option(nb.capture_nb, jitted)
+        func = jit_reg.resolve_option(nb.capture_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(
             self.to_2d_array(),
@@ -1280,10 +1312,10 @@ class ReturnsAccessor(GenericAccessor):
             period=self.wrapper.dt_period,
             log_returns=self.log_returns,
         )
-        wrap_kwargs = merge_dicts(dict(name_or_index="capture"), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="capture_ratio"), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
-    def rolling_capture(
+    def rolling_capture_ratio(
         self,
         bm_returns: tp.Optional[tp.ArrayLike] = None,
         window: tp.Optional[int] = None,
@@ -1292,7 +1324,7 @@ class ReturnsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         **kwargs,
     ) -> tp.SeriesFrame:
-        """Rolling version of `ReturnsAccessor.capture`."""
+        """Rolling version of `ReturnsAccessor.capture_ratio`."""
         if window is None:
             window = self.defaults["window"]
         if minp is None:
@@ -1307,7 +1339,7 @@ class ReturnsAccessor(GenericAccessor):
         )
         return type(self).rolling_apply(
             window,
-            jit_reg.resolve_option(nb.capture_rollmeta_nb, jitted),
+            jit_reg.resolve_option(nb.capture_ratio_rollmeta_nb, jitted),
             to_2d_array(self.obj),
             to_2d_array(bm_returns),
             self.ann_factor,
@@ -1320,19 +1352,21 @@ class ReturnsAccessor(GenericAccessor):
             **kwargs,
         )
 
-    def up_capture(
+    def up_capture_ratio(
         self,
         bm_returns: tp.Optional[tp.ArrayLike] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """See `vectorbtpro.returns.nb.up_capture_nb`."""
+        """Up-market capture ratio.
+
+        See `vectorbtpro.returns.nb.up_capture_ratio_nb`."""
         if bm_returns is None:
             bm_returns = self.bm_returns
         checks.assert_not_none(bm_returns)
         bm_returns = broadcast_to(bm_returns, self.obj)
-        func = jit_reg.resolve_option(nb.up_capture_nb, jitted)
+        func = jit_reg.resolve_option(nb.up_capture_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(
             self.to_2d_array(),
@@ -1341,10 +1375,10 @@ class ReturnsAccessor(GenericAccessor):
             period=self.wrapper.dt_period,
             log_returns=self.log_returns,
         )
-        wrap_kwargs = merge_dicts(dict(name_or_index="up_capture"), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="up_capture_ratio"), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
-    def rolling_up_capture(
+    def rolling_up_capture_ratio(
         self,
         bm_returns: tp.Optional[tp.ArrayLike] = None,
         window: tp.Optional[int] = None,
@@ -1353,7 +1387,7 @@ class ReturnsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         **kwargs,
     ) -> tp.SeriesFrame:
-        """Rolling version of `ReturnsAccessor.up_capture`."""
+        """Rolling version of `ReturnsAccessor.up_capture_ratio`."""
         if window is None:
             window = self.defaults["window"]
         if minp is None:
@@ -1368,7 +1402,7 @@ class ReturnsAccessor(GenericAccessor):
         )
         return type(self).rolling_apply(
             window,
-            jit_reg.resolve_option(nb.up_capture_rollmeta_nb, jitted),
+            jit_reg.resolve_option(nb.up_capture_ratio_rollmeta_nb, jitted),
             to_2d_array(self.obj),
             to_2d_array(bm_returns),
             self.ann_factor,
@@ -1381,19 +1415,21 @@ class ReturnsAccessor(GenericAccessor):
             **kwargs,
         )
 
-    def down_capture(
+    def down_capture_ratio(
         self,
         bm_returns: tp.Optional[tp.ArrayLike] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """See `vectorbtpro.returns.nb.down_capture_nb`."""
+        """Down-market capture ratio.
+
+        See `vectorbtpro.returns.nb.down_capture_ratio_nb`."""
         if bm_returns is None:
             bm_returns = self.bm_returns
         checks.assert_not_none(bm_returns)
         bm_returns = broadcast_to(bm_returns, self.obj)
-        func = jit_reg.resolve_option(nb.down_capture_nb, jitted)
+        func = jit_reg.resolve_option(nb.down_capture_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(
             self.to_2d_array(),
@@ -1402,10 +1438,10 @@ class ReturnsAccessor(GenericAccessor):
             period=self.wrapper.dt_period,
             log_returns=self.log_returns,
         )
-        wrap_kwargs = merge_dicts(dict(name_or_index="down_capture"), wrap_kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index="down_capture_ratio"), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
-    def rolling_down_capture(
+    def rolling_down_capture_ratio(
         self,
         bm_returns: tp.Optional[tp.ArrayLike] = None,
         window: tp.Optional[int] = None,
@@ -1414,7 +1450,7 @@ class ReturnsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         **kwargs,
     ) -> tp.SeriesFrame:
-        """Rolling version of `ReturnsAccessor.down_capture`."""
+        """Rolling version of `ReturnsAccessor.down_capture_ratio`."""
         if window is None:
             window = self.defaults["window"]
         if minp is None:
@@ -1429,7 +1465,7 @@ class ReturnsAccessor(GenericAccessor):
         )
         return type(self).rolling_apply(
             window,
-            jit_reg.resolve_option(nb.down_capture_rollmeta_nb, jitted),
+            jit_reg.resolve_option(nb.down_capture_ratio_rollmeta_nb, jitted),
             to_2d_array(self.obj),
             to_2d_array(bm_returns),
             self.ann_factor,
@@ -1461,7 +1497,9 @@ class ReturnsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """See `vectorbtpro.returns.nb.max_drawdown_nb`.
+        """Maximum drawdown.
+
+        See `vectorbtpro.returns.nb.max_drawdown_nb`.
 
         Yields the same out as `max_drawdown` of `ReturnsAccessor.drawdowns`."""
         func = jit_reg.resolve_option(nb.max_drawdown_nb, jitted)
