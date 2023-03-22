@@ -3336,7 +3336,8 @@ class TVData(RemoteData):
         >>> vbt.TVData.set_custom_settings(
         ...     client_config=dict(
         ...         username="YOUR_USERNAME",
-        ...         password="YOUR_PASSWORD"
+        ...         password="YOUR_PASSWORD",
+        ...         user_agent="YOUR_USER_AGENT"  # optional, see https://useragentstring.com/
         ...     )
         ... )
         ```

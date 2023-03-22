@@ -779,6 +779,7 @@ data = child_dict(
             client_config=dict(
                 username=None,
                 password=None,
+                user_agent=None,
                 token=None,
             ),
             exchange=None,

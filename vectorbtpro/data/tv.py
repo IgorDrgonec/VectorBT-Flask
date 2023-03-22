@@ -1,6 +1,6 @@
 # Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
-"""Client for TradingView."""
+"""Classes for communicating with TradingView."""
 
 import datetime
 import enum
@@ -10,15 +10,10 @@ import string
 import pandas as pd
 import requests
 import json
+from websocket import WebSocket
 
 from vectorbtpro import _typing as tp
-
-try:
-    if not tp.TYPE_CHECKING:
-        raise ImportError
-    from websocket import WebSocket as WebSocketT
-except ImportError:
-    WebSocketT = tp.Any
+from vectorbtpro.utils.config import Configured
 
 __all__ = [
     "TVClient",
@@ -53,16 +48,39 @@ PRO_WS_URL = "wss://prodata.tradingview.com/socket.io/websocket"
 WS_TIMEOUT = 5
 
 
-class TVClient:
+class TVClient(Configured):
+    """Client for TradingView."""
+
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Configured._expected_keys or set()) | {
+        "username",
+        "password",
+        "user_agent",
+        "token",
+    }
+
     def __init__(
         self,
         username: tp.Optional[str] = None,
         password: tp.Optional[str] = None,
+        user_agent: tp.Optional[str] = None,
         token: tp.Optional[str] = None,
+        **kwargs,
     ) -> None:
         """Client for TradingView."""
+        Configured.__init__(
+            self,
+            username=username,
+            password=password,
+            user_agent=user_agent,
+            token=token,
+            **kwargs,
+        )
+
         if token is None:
-            token = self.auth(username, password)
+            token = self.auth(username, password, user_agent=user_agent)
+        elif username is not None or password is not None:
+            raise ValueError("Either username and password, or token must be provided")
+
         self._token = token
         self._ws = None
         self._session = self.generate_session()
@@ -74,7 +92,7 @@ class TVClient:
         return self._token
 
     @property
-    def ws(self) -> WebSocketT:
+    def ws(self) -> WebSocket:
         """Instance of `websocket.Websocket`."""
         return self._ws
 
@@ -88,15 +106,23 @@ class TVClient:
         """Chart session."""
         return self._chart_session
 
-    def auth(self, username: tp.Optional[str] = None, password: tp.Optional[str] = None) -> str:
+    def auth(
+        self,
+        username: tp.Optional[str] = None,
+        password: tp.Optional[str] = None,
+        user_agent: tp.Optional[str] = None,
+    ) -> str:
         """Authenticate."""
         if username is not None and password is not None:
             data = {"username": username, "password": password, "remember": "on"}
-            response = requests.post(url=SIGNIN_URL, data=data, headers={"Referer": REFERER_URL})
-            token = response.json()["user"]["auth_token"]
-        else:
-            token = "unauthorized_user_token"
-        return token
+            headers = {"Referer": REFERER_URL}
+            if user_agent is not None:
+                headers["User-Agent"] = user_agent
+            response = requests.post(url=SIGNIN_URL, data=data, headers=headers)
+            return response.json()["user"]["auth_token"]
+        if username is not None or password is not None:
+            raise ValueError("Both username and password must be provided")
+        return "unauthorized_user_token"
 
     @staticmethod
     def generate_session() -> str:
@@ -284,6 +310,7 @@ class TVClient:
 
     @staticmethod
     def scan_symbols(market: str) -> tp.List[dict]:
+        """Scan symbols in a region/market."""
         url = SCAN_URL.format(market.lower())
         resp = requests.get(url)
         symbols_list = json.loads(resp.text)["data"]
