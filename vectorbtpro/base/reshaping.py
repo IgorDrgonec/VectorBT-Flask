@@ -50,7 +50,7 @@ __all__ = [
 def to_tuple_shape(shape: tp.ShapeLike) -> tp.Shape:
     """Convert a shape-like object to a tuple."""
     if checks.is_int(shape):
-        return int(shape),
+        return (int(shape),)
     return tuple(shape)
 
 
@@ -58,11 +58,11 @@ def to_1d_shape(shape: tp.ShapeLike) -> tp.Shape:
     """Convert a shape-like object to a 1-dim shape."""
     shape = to_tuple_shape(shape)
     if len(shape) == 0:
-        return 1,
+        return (1,)
     if len(shape) == 1:
         return shape
     if len(shape) == 2 and shape[1] == 1:
-        return shape[0],
+        return (shape[0],)
     raise ValueError(f"Cannot reshape a {len(shape)}-dimensional shape to 1 dimension")
 
 
@@ -86,7 +86,7 @@ def repeat_shape(shape: tp.ShapeLike, n: int, axis: int = 1) -> tp.Shape:
     shape = to_tuple_shape(shape)
     if len(shape) <= axis:
         shape = tuple([shape[i] if i < len(shape) else 1 for i in range(axis + 1)])
-    return *shape[:axis], shape[axis] * n, *shape[axis + 1:]
+    return *shape[:axis], shape[axis] * n, *shape[axis + 1 :]
 
 
 def tile_shape(shape: tp.ShapeLike, n: int, axis: int = 1) -> tp.Shape:
@@ -1859,7 +1859,12 @@ def get_multiindex_series(arg: tp.SeriesFrame) -> tp.Series:
     return arg
 
 
-def unstack_to_array(arg: tp.SeriesFrame, levels: tp.Optional[tp.MaybeLevelSequence] = None) -> tp.Array:
+def unstack_to_array(
+    arg: tp.SeriesFrame,
+    levels: tp.Optional[tp.MaybeLevelSequence] = None,
+    sort: bool = False,
+    return_indexes: bool = False,
+) -> tp.Union[tp.Array, tp.Tuple[tp.Array, tp.List[tp.Index]]]:
     """Reshape `arg` based on its multi-index into a multi-dimensional array.
 
     Use `levels` to specify what index levels to unstack and in which order.
@@ -1890,27 +1895,30 @@ def unstack_to_array(arg: tp.SeriesFrame, levels: tp.Optional[tp.MaybeLevelSeque
          [nan  4.]]
         ```
     """
-    # Extract series
-    sr: tp.Series = to_1d(get_multiindex_series(arg))
+    sr = get_multiindex_series(arg)
     if sr.index.duplicated().any():
         raise ValueError("Index contains duplicate entries, cannot reshape")
 
-    unique_idx_list = []
-    vals_idx_list = []
+    new_index_list = []
+    value_indices_list = []
     if levels is None:
         levels = range(sr.index.nlevels)
     if isinstance(levels, (int, str)):
         levels = (levels,)
     for level in levels:
-        vals = indexes.select_levels(sr.index, level).to_numpy()
-        unique_vals = np.unique(vals)
-        unique_idx_list.append(unique_vals)
-        idx_map = dict(zip(unique_vals, range(len(unique_vals))))
-        vals_idx = list(map(lambda x: idx_map[x], vals))
-        vals_idx_list.append(vals_idx)
+        level_values = indexes.select_levels(sr.index, level)
+        new_index = level_values.unique()
+        if sort:
+            new_index = new_index.sort_values()
+        new_index_list.append(new_index)
+        index_map = pd.Series(range(len(new_index)), index=new_index)
+        value_indices = index_map.loc[level_values]
+        value_indices_list.append(value_indices)
 
-    a = np.full(list(map(len, unique_idx_list)), np.nan)
-    a[tuple(zip(vals_idx_list))] = sr.values
+    a = np.full(list(map(len, new_index_list)), np.nan)
+    a[tuple(zip(value_indices_list))] = sr.values
+    if return_indexes:
+        return a, new_index_list
     return a
 
 
@@ -1940,7 +1948,7 @@ def make_symmetric(arg: tp.SeriesFrame, sort: bool = True) -> tp.Frame:
         ```
     """
     checks.assert_instance_of(arg, (pd.Series, pd.DataFrame))
-    df: tp.Frame = to_2d(arg)
+    df = to_2d(arg)
     if isinstance(df.index, pd.MultiIndex) or isinstance(df.columns, pd.MultiIndex):
         checks.assert_instance_of(df.index, pd.MultiIndex)
         checks.assert_instance_of(df.columns, pd.MultiIndex)
@@ -2011,9 +2019,7 @@ def unstack_to_df(
         2 4  NaN  NaN  NaN  4.0
         ```
     """
-    # Extract series
-    sr = to_1d(get_multiindex_series(arg))
-
+    sr = get_multiindex_series(arg)
     if sr.index.nlevels > 2:
         if index_levels is None:
             raise ValueError("index_levels must be specified")
@@ -2025,12 +2031,12 @@ def unstack_to_df(
         if column_levels is None:
             column_levels = 1
 
-    # Build new index and column hierarchies
-    new_index = indexes.select_levels(arg.index, index_levels).unique()
-    new_columns = indexes.select_levels(arg.index, column_levels).unique()
-
-    # Unstack and post-process
-    unstacked = unstack_to_array(sr, levels=(index_levels, column_levels))
+    unstacked, (new_index, new_columns) = unstack_to_array(
+        sr,
+        levels=(index_levels, column_levels),
+        sort=sort,
+        return_indexes=True,
+    )
     df = pd.DataFrame(unstacked, index=new_index, columns=new_columns)
     if symmetric:
         return make_symmetric(df, sort=sort)

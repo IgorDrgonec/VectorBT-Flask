@@ -1,6 +1,6 @@
 # Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
-"""Plotly Express pandas accessors.
+"""Pandas accessors for Plotly Express.
 
 !!! note
     Accessors do not utilize caching."""

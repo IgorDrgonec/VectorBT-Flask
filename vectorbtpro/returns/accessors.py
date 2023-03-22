@@ -1,6 +1,6 @@
 # Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
-"""Custom pandas accessors for returns.
+"""Custom Pandas accessors for returns.
 
 Methods can be accessed as follows:
 

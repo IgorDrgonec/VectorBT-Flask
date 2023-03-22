@@ -1,6 +1,6 @@
 # Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
-"""Custom pandas accessors for OHLC(V) data.
+"""Custom Pandas accessors for OHLC(V) data.
 
 Methods can be accessed as follows:
 

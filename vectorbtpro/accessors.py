@@ -1,6 +1,6 @@
 # Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
-"""Root pandas accessors of vectorbtpro.
+"""Root Pandas accessors of vectorbtpro.
 
 An accessor adds additional "namespace" to pandas objects.
 

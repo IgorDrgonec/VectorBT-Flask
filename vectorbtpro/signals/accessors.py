@@ -1,6 +1,6 @@
 # Copyright (c) 2023 Oleg Polakow. All rights reserved.
 
-"""Custom pandas accessors for signals.
+"""Custom Pandas accessors for signals.
 
 Methods can be accessed as follows:
 
