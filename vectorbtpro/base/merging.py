@@ -378,28 +378,30 @@ def mixed_merge(
     outputs = []
     for i, obj_kind in enumerate(zip(*objs)):
         func_name = func_names[i]
-        if func_name.lower() == "reset_column_stack":
-            kwargs["reset_index"] = True
-            func_name = "column_stack"
-        elif func_name.lower() == "from_start_column_stack":
-            kwargs["reset_index"] = "from_start"
-            func_name = "column_stack"
-        elif func_name.lower() == "from_end_column_stack":
-            kwargs["reset_index"] = "from_end"
-            func_name = "column_stack"
-        outputs.append(resolve_merge_func(func_name)(
+        merge_func = resolve_merge_func(func_name)
+        output = merge_func(
             obj_kind,
             keys=keys,
             wrap=wrap,
             wrapper=wrapper,
             wrap_kwargs=wrap_kwargs,
             **kwargs,
-        ))
+        )
+        outputs.append(output)
     return tuple(outputs)
 
 
 def resolve_merge_func(func_name: tp.MaybeTuple[str]) -> tp.Callable:
-    """Resolve merging function based on name."""
+    """Resolve merging function based on name.
+
+    * Tuple of strings: `mixed_merge` with `func_names=func_name`
+    * String "concat": `concat_merge`
+    * String "row_stack": `column_stack_merge`
+    * String "column_stack": `column_stack_merge`
+    * String "reset_column_stack": `column_stack_merge` with `reset_index=True`
+    * String "from_start_column_stack": `column_stack_merge` with `reset_index="from_start"`
+    * String "from_end_column_stack": `column_stack_merge` with `reset_index="from_end"`
+    """
     if isinstance(func_name, tuple):
         return partial(mixed_merge, func_names=func_name)
     if func_name.lower() == "concat":
@@ -408,4 +410,10 @@ def resolve_merge_func(func_name: tp.MaybeTuple[str]) -> tp.Callable:
         return row_stack_merge
     if func_name.lower() == "column_stack":
         return column_stack_merge
+    if func_name.lower() == "reset_column_stack":
+        return partial(column_stack_merge, reset_index=True)
+    if func_name.lower() == "from_start_column_stack":
+        return partial(column_stack_merge, reset_index="from_start")
+    if func_name.lower() == "from_end_column_stack":
+        return partial(column_stack_merge, reset_index="from_end")
     raise ValueError(f"Invalid merging function name '{func_name}'")
