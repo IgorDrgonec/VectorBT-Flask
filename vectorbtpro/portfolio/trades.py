@@ -2126,7 +2126,6 @@ class Trades(Ranges):
         incl_shorter: bool = False,
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
-        chunked: tp.ChunkedOption = None,
         xref: str = "x",
         yref: str = "y",
         hline_shape_kwargs: tp.KwargsLike = None,
@@ -2146,7 +2145,6 @@ class Trades(Ranges):
             incl_shorter=incl_shorter,
             group_by=group_by,
             jitted=jitted,
-            chunked=chunked,
         )
         running_edge_ratio = self.select_col_from_obj(
             running_edge_ratio, column, wrapper=self.wrapper.regroup(group_by)
