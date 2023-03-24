@@ -195,11 +195,7 @@ def stack_indexes(
     return new_index
 
 
-def combine_indexes(
-    *indexes: tp.MaybeTuple[tp.IndexLike],
-    ignore_ranges: tp.Optional[bool] = None,
-    **kwargs,
-) -> tp.Index:
+def combine_indexes(*indexes: tp.MaybeTuple[tp.IndexLike], **kwargs) -> tp.Index:
     """Combine each index in `indexes` using Cartesian product.
 
     Keyword arguments will be passed to `stack_indexes`."""
@@ -210,8 +206,8 @@ def combine_indexes(
     new_index = to_any_index(indexes[0])
     for i in range(1, len(indexes)):
         index1, index2 = new_index, to_any_index(indexes[i])
-        new_index1 = repeat_index(index1, len(index2), ignore_ranges=ignore_ranges)
-        new_index2 = tile_index(index2, len(index1), ignore_ranges=ignore_ranges)
+        new_index1 = repeat_index(index1, len(index2), ignore_ranges=False)
+        new_index2 = tile_index(index2, len(index1), ignore_ranges=False)
         new_index = stack_indexes([new_index1, new_index2], **kwargs)
     return new_index
 

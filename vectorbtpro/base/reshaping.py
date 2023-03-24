@@ -364,7 +364,10 @@ def broadcast_shapes(
                     else:
                         new_shape = (new_shape[0],)
                 elif _axis == 1:
-                    new_shape = (1, new_shape[1])
+                    if is_2d:
+                        new_shape = (1, new_shape[1])
+                    else:
+                        new_shape = (1,)
                 else:
                     raise ValueError(f"Only axes 0 and 1 are supported, not {_axis}")
         new_shapes.append(new_shape)
@@ -733,6 +736,9 @@ class BCO:
     reindex_kwargs: tp.Optional[tp.Kwargs] = attr.ib(default=None)
     """Keyword arguments passed to `pd.DataFrame.reindex`."""
 
+    merge_kwargs: tp.Optional[int] = attr.ib(default=None)
+    """Keyword arguments passed to `vectorbtpro.base.merging.column_stack_merge`."""
+
 
 @attr.s(frozen=True)
 class Default:
@@ -792,6 +798,7 @@ def broadcast(
     post_func: tp.MaybeMappingSequence[tp.Optional[tp.Callable]] = None,
     require_kwargs: tp.MaybeMappingSequence[tp.Optional[tp.Kwargs]] = None,
     reindex_kwargs: tp.MaybeMappingSequence[tp.Optional[tp.Kwargs]] = None,
+    merge_kwargs: tp.MaybeMappingSequence[tp.Optional[tp.Kwargs]] = None,
     tile: tp.Union[None, int, tp.IndexLike] = None,
     random_subset: tp.Optional[int] = None,
     seed: tp.Optional[int] = None,
@@ -851,6 +858,10 @@ def broadcast(
             This key will be merged with any argument-specific dict. If the mapping contains all keys in
             `np.require`, it will be applied on all objects.
         reindex_kwargs (dict, sequence or mapping): See `BCO.reindex_kwargs`.
+
+            This key will be merged with any argument-specific dict. If the mapping contains all keys in
+            `pd.DataFrame.reindex`, it will be applied on all objects.
+        merge_kwargs (dict, sequence or mapping): See `BCO.merge_kwargs`.
 
             This key will be merged with any argument-specific dict. If the mapping contains all keys in
             `pd.DataFrame.reindex`, it will be applied on all objects.
@@ -1168,6 +1179,11 @@ def broadcast(
         reindex_arg_names = get_func_arg_names(pd.DataFrame.reindex)
         if set(reindex_kwargs) <= set(reindex_arg_names):
             reindex_kwargs_per_obj = False
+    merge_kwargs_per_obj = True
+    if merge_kwargs is not None and checks.is_mapping(merge_kwargs):
+        merge_arg_names = get_func_arg_names(pd.DataFrame.merge)
+        if set(merge_kwargs) <= set(merge_arg_names):
+            merge_kwargs_per_obj = False
     if checks.is_mapping(args[0]) and not isinstance(args[0], indexing.index_dict):
         if len(args) > 1:
             raise ValueError("Only one argument is allowed when passing a mapping")
@@ -1263,6 +1279,21 @@ def broadcast(
         else:
             _reindex_kwargs = merge_dicts(reindex_kwargs, _reindex_kwargs)
 
+        if isinstance(obj, BCO) and obj.merge_kwargs is not None:
+            _merge_kwargs = obj.merge_kwargs
+        else:
+            _merge_kwargs = None
+        if checks.is_mapping(merge_kwargs) and merge_kwargs_per_obj:
+            _merge_kwargs = merge_dicts(
+                merge_kwargs.get("_def", None),
+                merge_kwargs.get(k, None),
+                _merge_kwargs,
+            )
+        elif checks.is_sequence(merge_kwargs) and merge_kwargs_per_obj:
+            _merge_kwargs = merge_dicts(merge_kwargs[i], _merge_kwargs)
+        else:
+            _merge_kwargs = merge_dicts(merge_kwargs, _merge_kwargs)
+
         if isinstance(value, Param):
             param_keys.add(k)
         elif isinstance(value, indexing.index_dict) or isinstance(value, CustomTemplate):
@@ -1280,6 +1311,7 @@ def broadcast(
             post_func=_post_func,
             require_kwargs=_require_kwargs,
             reindex_kwargs=_reindex_kwargs,
+            merge_kwargs=_merge_kwargs,
         )
 
     # Check whether we should broadcast Pandas metadata and work on 2-dim data
@@ -1393,7 +1425,8 @@ def broadcast(
             **index_stack_kwargs,
         )
     else:
-        new_index, new_columns = None, None
+        new_index = pd.RangeIndex(stop=to_shape_2d[0])
+        new_columns = pd.RangeIndex(stop=to_shape_2d[1])
 
     # Build a product
     param_product = None
@@ -1416,32 +1449,16 @@ def broadcast(
 
         # Combine parameter columns with new columns
         if param_columns is not None and new_columns is not None:
-            new_columns = indexes.combine_indexes(
-                [param_columns, new_columns],
-                ignore_ranges=ignore_ranges,
-                **index_stack_kwargs,
-            )
+            new_columns = indexes.combine_indexes([param_columns, new_columns], **index_stack_kwargs)
 
     # Tile
     if tile is not None:
         if isinstance(tile, int):
-            if param_columns is not None:
-                param_columns = indexes.tile_index(param_columns, tile)
             if new_columns is not None:
                 new_columns = indexes.tile_index(new_columns, tile)
         else:
-            if param_columns is not None:
-                param_columns = indexes.combine_indexes(
-                    [tile, param_columns],
-                    ignore_ranges=ignore_ranges,
-                    **index_stack_kwargs,
-                )
             if new_columns is not None:
-                new_columns = indexes.combine_indexes(
-                    [tile, new_columns],
-                    ignore_ranges=ignore_ranges,
-                    **index_stack_kwargs,
-                )
+                new_columns = indexes.combine_indexes([tile, new_columns], **index_stack_kwargs)
             tile = len(tile)
         n_params = max(n_params, 1) * tile
 
@@ -1471,9 +1488,12 @@ def broadcast(
         _min_ndim = bco_instances[k].min_ndim
         _axis = bco_instances[k].axis
         _expand_axis = bco_instances[k].expand_axis
+        _merge_kwargs = bco_instances[k].merge_kwargs
 
         if k in param_keys:
             # Broadcast parameters
+            from vectorbtpro.base.merging import column_stack_merge
+
             if _axis == 0:
                 raise ValueError("Parameters do not support broadcasting with axis=0")
             obj = param_product[k]
@@ -1506,7 +1526,7 @@ def broadcast(
                         o = broadcast_array_to(o, to_shape_2d, axis=_axis)
                     new_obj2.append(o)
                 new_obj = new_obj2
-            obj = np.column_stack(new_obj)
+            obj = column_stack_merge(new_obj, **_merge_kwargs)
             if tile is not None:
                 obj = np.tile(obj, (1, tile))
             old_obj = obj
@@ -1862,7 +1882,7 @@ def get_multiindex_series(arg: tp.SeriesFrame) -> tp.Series:
 def unstack_to_array(
     arg: tp.SeriesFrame,
     levels: tp.Optional[tp.MaybeLevelSequence] = None,
-    sort: bool = False,
+    sort: bool = True,
     return_indexes: bool = False,
 ) -> tp.Union[tp.Array, tp.Tuple[tp.Array, tp.List[tp.Index]]]:
     """Reshape `arg` based on its multi-index into a multi-dimensional array.

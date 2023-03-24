@@ -1341,6 +1341,7 @@ portfolio = child_dict(
     upon_adj_limit_conflict="keepignore",
     upon_opp_limit_conflict="cancelexecute",
     use_stops=None,
+    stop_ladder="disabled",
     sl_stop=np.nan,
     tsl_th=np.nan,
     tsl_stop=np.nan,

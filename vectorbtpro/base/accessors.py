@@ -1058,9 +1058,9 @@ class BaseAccessor(Wrapping):
             return reshaping.broadcast_combs(*others, **kwargs)
         return reshaping.broadcast_combs(cls_or_self.obj, *others, **kwargs)
 
-    def make_symmetric(self) -> tp.Frame:
+    def make_symmetric(self, *args, **kwargs) -> tp.Frame:
         """See `vectorbtpro.base.reshaping.make_symmetric`."""
-        return reshaping.make_symmetric(self.obj)
+        return reshaping.make_symmetric(self.obj, *args, **kwargs)
 
     def unstack_to_array(self, *args, **kwargs) -> tp.Array:
         """See `vectorbtpro.base.reshaping.unstack_to_array`."""

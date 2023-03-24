@@ -159,7 +159,7 @@ Let's replicate our example using an order function:
 ...         fees=fees
 ... )
 
->>> direction_num = map_enum_fields(direction, Direction)
+>>> direction_num = map_enum_fields(direction, vbt.pf_enums.Direction)
 >>> pf = vbt.Portfolio.from_order_func(
 ...     price,
 ...     order_func_nb=order_func_nb,
@@ -1646,10 +1646,9 @@ from vectorbtpro.data.base import Data
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.drawdowns import Drawdowns
-from vectorbtpro.portfolio import nb
+from vectorbtpro.portfolio import nb, enums
 from vectorbtpro.portfolio.call_seq import require_call_seq, build_call_seq
 from vectorbtpro.portfolio.decorators import attach_shortcut_properties, attach_returns_acc_methods
-from vectorbtpro.portfolio.enums import *
 from vectorbtpro.portfolio.logs import Logs
 from vectorbtpro.portfolio.orders import Orders, FSOrders
 from vectorbtpro.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
@@ -2433,7 +2432,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if "init_cash" not in kwargs:
             stack_init_cash_objs = False
             for obj in objs:
-                if not checks.is_int(obj._init_cash) or obj._init_cash not in InitCashMode:
+                if not checks.is_int(obj._init_cash) or obj._init_cash not in enums.InitCashMode:
                     stack_init_cash_objs = True
                     break
             if stack_init_cash_objs:
@@ -2819,7 +2818,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if "init_cash" not in kwargs:
             stack_init_cash_objs = False
             for obj in objs:
-                if not checks.is_int(obj._init_cash) or obj._init_cash not in InitCashMode:
+                if not checks.is_int(obj._init_cash) or obj._init_cash not in enums.InitCashMode:
                     stack_init_cash_objs = True
                     break
             if stack_init_cash_objs:
@@ -2957,7 +2956,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     def __init__(
         self,
         wrapper: ArrayWrapper,
-        order_records: tp.Union[tp.RecordArray, SimulationOutput],
+        order_records: tp.Union[tp.RecordArray, enums.SimulationOutput],
         *,
         close: tp.ArrayLike,
         open: tp.Optional[tp.ArrayLike] = None,
@@ -2993,7 +2992,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if cash_sharing:
             if wrapper.grouper.allow_enable or wrapper.grouper.allow_modify:
                 wrapper = wrapper.replace(allow_enable=False, allow_modify=False)
-        if isinstance(order_records, SimulationOutput):
+        if isinstance(order_records, enums.SimulationOutput):
             sim_out = order_records
             order_records = sim_out.order_records
             log_records = sim_out.log_records
@@ -3040,8 +3039,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if low is not None:
             low = to_2d_array(low)
         if isinstance(init_cash, str):
-            init_cash = map_enum_fields(init_cash, InitCashMode)
-        if not checks.is_int(init_cash) or init_cash not in InitCashMode:
+            init_cash = map_enum_fields(init_cash, enums.InitCashMode)
+        if not checks.is_int(init_cash) or init_cash not in enums.InitCashMode:
             init_cash = to_1d_array(init_cash)
         init_position = to_1d_array(init_position)
         init_price = to_1d_array(init_price)
@@ -3050,7 +3049,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if bm_close is not None and not isinstance(bm_close, bool):
             bm_close = to_2d_array(bm_close)
         if log_records is None:
-            log_records = np.array([], dtype=log_dt)
+            log_records = np.array([], dtype=enums.log_dt)
         if use_in_outputs is None:
             use_in_outputs = portfolio_cfg["use_in_outputs"]
         if fillna_close is None:
@@ -3058,7 +3057,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if trades_type is None:
             trades_type = portfolio_cfg["trades_type"]
         if isinstance(trades_type, str):
-            trades_type = map_enum_fields(trades_type, TradesType)
+            trades_type = map_enum_fields(trades_type, enums.TradesType)
 
         self._open = open
         self._high = high
@@ -4500,8 +4499,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if init_cash is None:
             init_cash = portfolio_cfg["init_cash"]
         if isinstance(init_cash, str):
-            init_cash = map_enum_fields(init_cash, InitCashMode)
-        if checks.is_int(init_cash) and init_cash in InitCashMode:
+            init_cash = map_enum_fields(init_cash, enums.InitCashMode)
+        if checks.is_int(init_cash) and init_cash in enums.InitCashMode:
             init_cash_mode = init_cash
             init_cash = np.inf
         else:
@@ -4531,9 +4530,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             call_seq = portfolio_cfg["call_seq"]
         auto_call_seq = False
         if isinstance(call_seq, str):
-            call_seq = map_enum_fields(call_seq, CallSeqType)
+            call_seq = map_enum_fields(call_seq, enums.CallSeqType)
         if checks.is_int(call_seq):
-            if call_seq == CallSeqType.Auto:
+            if call_seq == enums.CallSeqType.Auto:
                 auto_call_seq = True
                 call_seq = None
         if attach_call_seq is None:
@@ -4604,8 +4603,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     cash_dividends=dict(fill_value=0.0),
                     size=dict(fill_value=np.nan),
                     price=dict(fill_value=np.nan),
-                    size_type=dict(fill_value=SizeType.Amount),
-                    direction=dict(fill_value=Direction.Both),
+                    size_type=dict(fill_value=enums.SizeType.Amount),
+                    direction=dict(fill_value=enums.Direction.Both),
                     fees=dict(fill_value=0.0),
                     fixed_fees=dict(fill_value=0.0),
                     slippage=dict(fill_value=0.0),
@@ -4613,9 +4612,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     max_size=dict(fill_value=np.nan),
                     size_granularity=dict(fill_value=np.nan),
                     leverage=dict(fill_value=1.0),
-                    leverage_mode=dict(fill_value=LeverageMode.Lazy),
+                    leverage_mode=dict(fill_value=enums.LeverageMode.Lazy),
                     reject_prob=dict(fill_value=0.0),
-                    price_area_vio_mode=dict(fill_value=PriceAreaVioMode.Ignore),
+                    price_area_vio_mode=dict(fill_value=enums.PriceAreaVioMode.Ignore),
                     allow_partial=dict(fill_value=True),
                     raise_reject=dict(fill_value=False),
                     log=dict(fill_value=False),
@@ -4657,7 +4656,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         )
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
         if call_seq is None and attach_call_seq:
-            call_seq = CallSeqType.Default
+            call_seq = enums.CallSeqType.Default
         if call_seq is not None:
             if checks.is_any_array(call_seq):
                 call_seq = require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
@@ -4683,17 +4682,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     max_logs = int(np.max(np.sum(_log, axis=0)))
 
         # Convert strings to numbers
-        broadcasted_args["price"] = map_enum_fields(broadcasted_args["price"], PriceType, ignore_type=(int, float))
-        broadcasted_args["size_type"] = map_enum_fields(broadcasted_args["size_type"], SizeType)
-        broadcasted_args["direction"] = map_enum_fields(broadcasted_args["direction"], Direction)
-        broadcasted_args["leverage_mode"] = map_enum_fields(broadcasted_args["leverage_mode"], LeverageMode)
+        broadcasted_args["price"] = map_enum_fields(broadcasted_args["price"], enums.PriceType, ignore_type=(int, float))
+        broadcasted_args["size_type"] = map_enum_fields(broadcasted_args["size_type"], enums.SizeType)
+        broadcasted_args["direction"] = map_enum_fields(broadcasted_args["direction"], enums.Direction)
+        broadcasted_args["leverage_mode"] = map_enum_fields(broadcasted_args["leverage_mode"], enums.LeverageMode)
         broadcasted_args["price_area_vio_mode"] = map_enum_fields(
             broadcasted_args["price_area_vio_mode"],
-            PriceAreaVioMode,
+            enums.PriceAreaVioMode,
         )
         broadcasted_args["val_price"] = map_enum_fields(
             broadcasted_args["val_price"],
-            ValPriceType,
+            enums.ValPriceType,
             ignore_type=(int, float),
         )
 
@@ -4737,12 +4736,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if from_ago_none:
             price = broadcasted_args["price"]
             if price.size == 1 or price.shape[0] == 1:
-                next_open_mask = price == PriceType.NextOpen
-                next_close_mask = price == PriceType.NextClose
+                next_open_mask = price == enums.PriceType.NextOpen
+                next_close_mask = price == enums.PriceType.NextClose
                 if next_open_mask.any() or next_close_mask.any():
                     price = price.astype(np.float_)
-                    price[next_open_mask] = PriceType.Open
-                    price[next_close_mask] = PriceType.Close
+                    price[next_open_mask] = enums.PriceType.Open
+                    price[next_close_mask] = enums.PriceType.Close
                     from_ago = np.full(price.shape, 0, dtype=np.int_)
                     from_ago[next_open_mask] = 1
                     from_ago[next_close_mask] = 1
@@ -4839,6 +4838,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         upon_adj_limit_conflict: tp.Optional[tp.ArrayLike] = None,
         upon_opp_limit_conflict: tp.Optional[tp.ArrayLike] = None,
         use_stops: tp.Optional[bool] = None,
+        stop_ladder: tp.Optional[bool] = None,
         sl_stop: tp.Optional[tp.ArrayLike] = None,
         tsl_stop: tp.Optional[tp.ArrayLike] = None,
         tsl_th: tp.Optional[tp.ArrayLike] = None,
@@ -5050,6 +5050,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 the adjustment function is not the default one.
 
                 Disable this to make simulation a bit faster for simple use cases.
+            stop_ladder (bool or StopLadderMode): Whether and which kind of stop laddering to use.
+                See `vectorbtpro.portfolio.enums.StopLadderMode`.
+
+                If so, rows in the supplied arrays will become ladder steps. Make sure that
+                they are increasing. If one column should have less steps, pad it with NaN
+                for price-based stops and -1 for time-based stops.
+
+                Rows in each array can be of an arbitrary length but columns must broadcast against
+                the number of columns in the data. Applied on all stop types.
             sl_stop (array_like of float): Stop loss.
                 Will broadcast.
 
@@ -5811,6 +5820,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             upon_adj_limit_conflict = portfolio_cfg["upon_adj_limit_conflict"]
         if upon_opp_limit_conflict is None:
             upon_opp_limit_conflict = portfolio_cfg["upon_opp_limit_conflict"]
+        if use_stops is None:
+            use_stops = portfolio_cfg["use_stops"]
+        if stop_ladder is None:
+            stop_ladder = portfolio_cfg["stop_ladder"]
+        if isinstance(stop_ladder, str):
+            stop_ladder = map_enum_fields(stop_ladder, enums.StopLadderMode)
         if sl_stop is None:
             sl_stop = portfolio_cfg["sl_stop"]
         if tsl_stop is None:
@@ -5856,8 +5871,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 dt_stop = dt_stop_td_template
         elif isinstance(dt_stop, pd.Index):
             dt_stop = dt_stop.values
-        if use_stops is None:
-            use_stops = portfolio_cfg["use_stops"]
         if stop_entry_price is None:
             stop_entry_price = portfolio_cfg["stop_entry_price"]
         if stop_exit_price is None:
@@ -5882,8 +5895,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if init_cash is None:
             init_cash = portfolio_cfg["init_cash"]
         if isinstance(init_cash, str):
-            init_cash = map_enum_fields(init_cash, InitCashMode)
-        if checks.is_int(init_cash) and init_cash in InitCashMode:
+            init_cash = map_enum_fields(init_cash, enums.InitCashMode)
+        if checks.is_int(init_cash) and init_cash in enums.InitCashMode:
             init_cash_mode = init_cash
             init_cash = np.inf
         else:
@@ -5913,9 +5926,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             call_seq = portfolio_cfg["call_seq"]
         auto_call_seq = False
         if isinstance(call_seq, str):
-            call_seq = map_enum_fields(call_seq, CallSeqType)
+            call_seq = map_enum_fields(call_seq, enums.CallSeqType)
         if checks.is_int(call_seq):
-            if call_seq == CallSeqType.Auto:
+            if call_seq == enums.CallSeqType.Auto:
                 auto_call_seq = True
                 call_seq = None
         if attach_call_seq is None:
@@ -6038,12 +6051,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 exits=dict(fill_value=False),
                 short_entries=dict(fill_value=False),
                 short_exits=dict(fill_value=False),
-                direction=dict(fill_value=Direction.Both),
+                direction=dict(fill_value=enums.Direction.Both),
                 cash_earnings=dict(fill_value=0.0),
                 cash_dividends=dict(fill_value=0.0),
                 size=dict(fill_value=np.nan),
                 price=dict(fill_value=np.nan),
-                size_type=dict(fill_value=SizeType.Amount),
+                size_type=dict(fill_value=enums.SizeType.Amount),
                 fees=dict(fill_value=0.0),
                 fixed_fees=dict(fill_value=0.0),
                 slippage=dict(fill_value=0.0),
@@ -6051,41 +6064,41 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 max_size=dict(fill_value=np.nan),
                 size_granularity=dict(fill_value=np.nan),
                 leverage=dict(fill_value=1.0),
-                leverage_mode=dict(fill_value=LeverageMode.Lazy),
+                leverage_mode=dict(fill_value=enums.LeverageMode.Lazy),
                 reject_prob=dict(fill_value=0.0),
-                price_area_vio_mode=dict(fill_value=PriceAreaVioMode.Ignore),
+                price_area_vio_mode=dict(fill_value=enums.PriceAreaVioMode.Ignore),
                 allow_partial=dict(fill_value=True),
                 raise_reject=dict(fill_value=False),
                 log=dict(fill_value=False),
                 val_price=dict(fill_value=np.nan),
                 accumulate=dict(fill_value=False),
-                upon_long_conflict=dict(fill_value=ConflictMode.Ignore),
-                upon_short_conflict=dict(fill_value=ConflictMode.Ignore),
-                upon_dir_conflict=dict(fill_value=DirectionConflictMode.Ignore),
-                upon_opposite_entry=dict(fill_value=OppositeEntryMode.ReverseReduce),
-                order_type=dict(fill_value=OrderType.Market),
+                upon_long_conflict=dict(fill_value=enums.ConflictMode.Ignore),
+                upon_short_conflict=dict(fill_value=enums.ConflictMode.Ignore),
+                upon_dir_conflict=dict(fill_value=enums.DirectionConflictMode.Ignore),
+                upon_opposite_entry=dict(fill_value=enums.OppositeEntryMode.ReverseReduce),
+                order_type=dict(fill_value=enums.OrderType.Market),
                 limit_delta=dict(fill_value=np.nan),
                 limit_tif=dict(fill_value=-1),
                 limit_expiry=dict(fill_value=-1),
                 limit_reverse=dict(fill_value=False),
-                upon_adj_limit_conflict=dict(fill_value=PendingConflictMode.KeepIgnore),
-                upon_opp_limit_conflict=dict(fill_value=PendingConflictMode.CancelExecute),
+                upon_adj_limit_conflict=dict(fill_value=enums.PendingConflictMode.KeepIgnore),
+                upon_opp_limit_conflict=dict(fill_value=enums.PendingConflictMode.CancelExecute),
                 sl_stop=dict(fill_value=np.nan),
                 tsl_stop=dict(fill_value=np.nan),
                 tsl_th=dict(fill_value=np.nan),
                 tp_stop=dict(fill_value=np.nan),
                 td_stop=dict(fill_value=-1),
                 dt_stop=dict(fill_value=-1),
-                stop_entry_price=dict(fill_value=StopEntryPrice.Close),
-                stop_exit_price=dict(fill_value=StopExitPrice.Stop),
-                stop_exit_type=dict(fill_value=StopExitType.Close),
-                stop_order_type=dict(fill_value=OrderType.Market),
+                stop_entry_price=dict(fill_value=enums.StopEntryPrice.Close),
+                stop_exit_price=dict(fill_value=enums.StopExitPrice.Stop),
+                stop_exit_type=dict(fill_value=enums.StopExitType.Close),
+                stop_order_type=dict(fill_value=enums.OrderType.Market),
                 stop_limit_delta=dict(fill_value=np.nan),
-                upon_stop_update=dict(fill_value=StopUpdateMode.Override),
-                upon_adj_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
-                upon_opp_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
-                delta_format=dict(fill_value=DeltaFormat.Percent),
-                time_delta_format=dict(fill_value=TimeDeltaFormat.Index),
+                upon_stop_update=dict(fill_value=enums.StopUpdateMode.Override),
+                upon_adj_stop_conflict=dict(fill_value=enums.PendingConflictMode.KeepExecute),
+                upon_opp_stop_conflict=dict(fill_value=enums.PendingConflictMode.KeepExecute),
+                delta_format=dict(fill_value=enums.DeltaFormat.Percent),
+                time_delta_format=dict(fill_value=enums.TimeDeltaFormat.Index),
                 open=dict(fill_value=np.nan),
                 high=dict(fill_value=np.nan),
                 low=dict(fill_value=np.nan),
@@ -6119,6 +6132,21 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 min_size=dict(requirements="O"),
                 max_size=dict(requirements="O"),
             )
+        if stop_ladder:
+            def_broadcast_kwargs["axis"] = dict(
+                sl_stop=1,
+                tsl_stop=1,
+                tp_stop=1,
+                td_stop=1,
+                dt_stop=1,
+            )
+            def_broadcast_kwargs["merge_kwargs"] = dict(
+                sl_stop=dict(reset_index="from_start", fill_value=np.nan),
+                tsl_stop=dict(reset_index="from_start", fill_value=np.nan),
+                tp_stop=dict(reset_index="from_start", fill_value=np.nan),
+                td_stop=dict(reset_index="from_start", fill_value=-1),
+                dt_stop=dict(reset_index="from_start", fill_value=-1),
+            )
         broadcast_kwargs = merge_dicts(def_broadcast_kwargs, broadcast_kwargs)
         broadcasted_args, wrapper = broadcast(broadcastable_args, return_wrapper=True, **broadcast_kwargs)
         if not wrapper.group_select and cash_sharing:
@@ -6145,7 +6173,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         )
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
         if call_seq is None and attach_call_seq:
-            call_seq = CallSeqType.Default
+            call_seq = enums.CallSeqType.Default
         if call_seq is not None:
             if checks.is_any_array(call_seq):
                 call_seq = require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
@@ -6177,35 +6205,35 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         # Convert strings to numbers
         if "direction" in broadcasted_args:
-            broadcasted_args["direction"] = map_enum_fields(broadcasted_args["direction"], Direction)
-        broadcasted_args["price"] = map_enum_fields(broadcasted_args["price"], PriceType, ignore_type=(int, float))
-        broadcasted_args["size_type"] = map_enum_fields(broadcasted_args["size_type"], SizeType)
-        broadcasted_args["leverage_mode"] = map_enum_fields(broadcasted_args["leverage_mode"], LeverageMode)
+            broadcasted_args["direction"] = map_enum_fields(broadcasted_args["direction"], enums.Direction)
+        broadcasted_args["price"] = map_enum_fields(broadcasted_args["price"], enums.PriceType, ignore_type=(int, float))
+        broadcasted_args["size_type"] = map_enum_fields(broadcasted_args["size_type"], enums.SizeType)
+        broadcasted_args["leverage_mode"] = map_enum_fields(broadcasted_args["leverage_mode"], enums.LeverageMode)
         broadcasted_args["price_area_vio_mode"] = map_enum_fields(
             broadcasted_args["price_area_vio_mode"],
-            PriceAreaVioMode,
+            enums.PriceAreaVioMode,
         )
         broadcasted_args["val_price"] = map_enum_fields(
             broadcasted_args["val_price"],
-            ValPriceType,
+            enums.ValPriceType,
             ignore_type=(int, float),
         )
         broadcasted_args["accumulate"] = map_enum_fields(
             broadcasted_args["accumulate"],
-            AccumulationMode,
+            enums.AccumulationMode,
             ignore_type=(int, bool),
         )
-        broadcasted_args["upon_long_conflict"] = map_enum_fields(broadcasted_args["upon_long_conflict"], ConflictMode)
-        broadcasted_args["upon_short_conflict"] = map_enum_fields(broadcasted_args["upon_short_conflict"], ConflictMode)
+        broadcasted_args["upon_long_conflict"] = map_enum_fields(broadcasted_args["upon_long_conflict"], enums.ConflictMode)
+        broadcasted_args["upon_short_conflict"] = map_enum_fields(broadcasted_args["upon_short_conflict"], enums.ConflictMode)
         broadcasted_args["upon_dir_conflict"] = map_enum_fields(
             broadcasted_args["upon_dir_conflict"],
-            DirectionConflictMode,
+            enums.DirectionConflictMode,
         )
         broadcasted_args["upon_opposite_entry"] = map_enum_fields(
             broadcasted_args["upon_opposite_entry"],
-            OppositeEntryMode,
+            enums.OppositeEntryMode,
         )
-        broadcasted_args["order_type"] = map_enum_fields(broadcasted_args["order_type"], OrderType)
+        broadcasted_args["order_type"] = map_enum_fields(broadcasted_args["order_type"], enums.OrderType)
         limit_tif = broadcasted_args["limit_tif"]
         if limit_tif.dtype == object:
             if limit_tif.ndim in (0, 1):
@@ -6268,35 +6296,35 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         broadcasted_args["dt_stop"] = dt_stop.astype(np.int64)
         broadcasted_args["upon_adj_limit_conflict"] = map_enum_fields(
             broadcasted_args["upon_adj_limit_conflict"],
-            PendingConflictMode,
+            enums.PendingConflictMode,
         )
         broadcasted_args["upon_opp_limit_conflict"] = map_enum_fields(
             broadcasted_args["upon_opp_limit_conflict"],
-            PendingConflictMode,
+            enums.PendingConflictMode,
         )
         broadcasted_args["stop_entry_price"] = map_enum_fields(
             broadcasted_args["stop_entry_price"],
-            StopEntryPrice,
+            enums.StopEntryPrice,
             ignore_type=(int, float),
         )
         broadcasted_args["stop_exit_price"] = map_enum_fields(
             broadcasted_args["stop_exit_price"],
-            StopExitPrice,
+            enums.StopExitPrice,
             ignore_type=(int, float),
         )
-        broadcasted_args["stop_exit_type"] = map_enum_fields(broadcasted_args["stop_exit_type"], StopExitType)
-        broadcasted_args["stop_order_type"] = map_enum_fields(broadcasted_args["stop_order_type"], OrderType)
-        broadcasted_args["upon_stop_update"] = map_enum_fields(broadcasted_args["upon_stop_update"], StopUpdateMode)
+        broadcasted_args["stop_exit_type"] = map_enum_fields(broadcasted_args["stop_exit_type"], enums.StopExitType)
+        broadcasted_args["stop_order_type"] = map_enum_fields(broadcasted_args["stop_order_type"], enums.OrderType)
+        broadcasted_args["upon_stop_update"] = map_enum_fields(broadcasted_args["upon_stop_update"], enums.StopUpdateMode)
         broadcasted_args["upon_adj_stop_conflict"] = map_enum_fields(
             broadcasted_args["upon_adj_stop_conflict"],
-            PendingConflictMode,
+            enums.PendingConflictMode,
         )
         broadcasted_args["upon_opp_stop_conflict"] = map_enum_fields(
             broadcasted_args["upon_opp_stop_conflict"],
-            PendingConflictMode,
+            enums.PendingConflictMode,
         )
-        broadcasted_args["delta_format"] = map_enum_fields(broadcasted_args["delta_format"], DeltaFormat)
-        broadcasted_args["time_delta_format"] = map_enum_fields(broadcasted_args["time_delta_format"], TimeDeltaFormat)
+        broadcasted_args["delta_format"] = map_enum_fields(broadcasted_args["delta_format"], enums.DeltaFormat)
+        broadcasted_args["time_delta_format"] = map_enum_fields(broadcasted_args["time_delta_format"], enums.TimeDeltaFormat)
 
         # Check data types
         checks.assert_subdtype(broadcasted_args["entries"], np.bool_, arg_name="entries")
@@ -6378,12 +6406,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if from_ago_none:
             price = broadcasted_args["price"]
             if price.size == 1 or price.shape[0] == 1:
-                next_open_mask = price == PriceType.NextOpen
-                next_close_mask = price == PriceType.NextClose
+                next_open_mask = price == enums.PriceType.NextOpen
+                next_close_mask = price == enums.PriceType.NextClose
                 if next_open_mask.any() or next_close_mask.any():
                     price = price.astype(np.float_)
-                    price[next_open_mask] = PriceType.Open
-                    price[next_close_mask] = PriceType.Close
+                    price[next_open_mask] = enums.PriceType.Open
+                    price[next_close_mask] = enums.PriceType.Close
                     from_ago = np.full(price.shape, 0, dtype=np.int_)
                     from_ago[next_open_mask] = 1
                     from_ago[next_close_mask] = 1
@@ -6407,6 +6435,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 cash_earnings=cash_earnings,
                 cash_dividends=cash_dividends,
                 use_stops=use_stops,
+                stop_ladder=stop_ladder,
                 adjust_func_nb=adjust_func_nb,
                 adjust_args=adjust_args,
                 auto_call_seq=auto_call_seq,
@@ -6541,6 +6570,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 signal_args=signal_args,
                 post_segment_args=post_segment_args,
                 use_stops=use_stops,
+                stop_ladder=stop_ladder,
                 call_seq=call_seq,
                 auto_call_seq=auto_call_seq,
                 ffill_val_price=ffill_val_price,
@@ -6559,12 +6589,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             else:
                 if direction.size == 1:
                     _direction = direction.item(0)
-                    if _direction == Direction.LongOnly:
+                    if _direction == enums.Direction.LongOnly:
                         long_entries = entries
                         long_exits = exits
                         short_entries = np.array([[False]])
                         short_exits = np.array([[False]])
-                    elif _direction == Direction.ShortOnly:
+                    elif _direction == enums.Direction.ShortOnly:
                         long_entries = np.array([[False]])
                         long_exits = np.array([[False]])
                         short_entries = entries
@@ -6606,6 +6636,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 short_entries=short_entries,
                 short_exits=short_exits,
                 use_stops=use_stops,
+                stop_ladder=stop_ladder,
                 call_seq=call_seq,
                 auto_call_seq=auto_call_seq,
                 ffill_val_price=ffill_val_price,
@@ -6657,7 +6688,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         if direction is None:
             direction = portfolio_cfg["hold_direction"]
-        direction = map_enum_fields(direction, Direction)
+        direction = map_enum_fields(direction, enums.Direction)
         if not checks.is_int(direction):
             raise TypeError("Direction must be a scalar")
         if close_at_end is None:
@@ -6835,8 +6866,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         fill_value: tp.Scalar = np.nan,
         size_type: tp.ArrayLike = "targetpercent",
         direction: tp.Optional[tp.ArrayLike] = None,
-        adjust_func_nb: nb.AdjustFuncT = nb.no_adjust_func_nb,
-        adjust_args: tp.Args = (),
         cash_sharing: tp.Optional[bool] = True,
         call_seq: tp.Optional[tp.ArrayLike] = "auto",
         group_by: tp.GroupByLike = None,
@@ -7620,8 +7649,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if init_cash is None:
             init_cash = portfolio_cfg["init_cash"]
         if isinstance(init_cash, str):
-            init_cash = map_enum_fields(init_cash, InitCashMode)
-        if checks.is_int(init_cash) and init_cash in InitCashMode:
+            init_cash = map_enum_fields(init_cash, enums.InitCashMode)
+        if checks.is_int(init_cash) and init_cash in enums.InitCashMode:
             init_cash_mode = init_cash
             init_cash = np.inf
         else:
@@ -7642,9 +7671,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if call_seq is None:
                 call_seq = portfolio_cfg["call_seq"]
             if call_seq is not None:
-                call_seq = map_enum_fields(call_seq, CallSeqType)
+                call_seq = map_enum_fields(call_seq, enums.CallSeqType)
                 if checks.is_int(call_seq):
-                    if call_seq == CallSeqType.Auto:
+                    if call_seq == enums.CallSeqType.Auto:
                         raise ValueError(
                             "CallSeqType.Auto must be implemented manually. "
                             "Use sort_call_seq_1d_nb in pre_segment_func_nb."
@@ -7761,7 +7790,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             )
         if not flexible:
             if call_seq is None and attach_call_seq:
-                call_seq = CallSeqType.Default
+                call_seq = enums.CallSeqType.Default
             if call_seq is not None:
                 if checks.is_any_array(call_seq):
                     call_seq = require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
@@ -8247,9 +8276,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             call_seq = portfolio_cfg["call_seq"]
         auto_call_seq = False
         if isinstance(call_seq, str):
-            call_seq = map_enum_fields(call_seq, CallSeqType)
+            call_seq = map_enum_fields(call_seq, enums.CallSeqType)
         if checks.is_int(call_seq):
-            if call_seq == CallSeqType.Auto:
+            if call_seq == enums.CallSeqType.Auto:
                 auto_call_seq = True
                 call_seq = None
         if broadcast_named_args is None:
@@ -8283,8 +8312,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 reindex_kwargs=dict(
                     size=dict(fill_value=np.nan),
                     price=dict(fill_value=np.nan),
-                    size_type=dict(fill_value=SizeType.Amount),
-                    direction=dict(fill_value=Direction.Both),
+                    size_type=dict(fill_value=enums.SizeType.Amount),
+                    direction=dict(fill_value=enums.Direction.Both),
                     fees=dict(fill_value=0.0),
                     fixed_fees=dict(fill_value=0.0),
                     slippage=dict(fill_value=0.0),
@@ -8292,9 +8321,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     max_size=dict(fill_value=np.nan),
                     size_granularity=dict(fill_value=np.nan),
                     leverage=dict(fill_value=1.0),
-                    leverage_mode=dict(fill_value=LeverageMode.Lazy),
+                    leverage_mode=dict(fill_value=enums.LeverageMode.Lazy),
                     reject_prob=dict(fill_value=0.0),
-                    price_area_vio_mode=dict(fill_value=PriceAreaVioMode.Ignore),
+                    price_area_vio_mode=dict(fill_value=enums.PriceAreaVioMode.Ignore),
                     allow_partial=dict(fill_value=True),
                     raise_reject=dict(fill_value=False),
                     log=dict(fill_value=False),
@@ -8311,17 +8340,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             return size
 
         def _prepare_price(price):
-            price = map_enum_fields(price, PriceType, ignore_type=(int, float))
+            price = map_enum_fields(price, enums.PriceType, ignore_type=(int, float))
             checks.assert_subdtype(price, np.number, arg_name="price")
             return price
 
         def _prepare_size_type(size_type):
-            size_type = map_enum_fields(size_type, SizeType)
+            size_type = map_enum_fields(size_type, enums.SizeType)
             checks.assert_subdtype(size_type, np.integer, arg_name="size_type")
             return size_type
 
         def _prepare_direction(direction):
-            direction = map_enum_fields(direction, Direction)
+            direction = map_enum_fields(direction, enums.Direction)
             checks.assert_subdtype(direction, np.integer, arg_name="direction")
             return direction
 
@@ -8354,7 +8383,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             return reject_prob
 
         def _prepare_price_area_vio_mode(price_area_vio_mode):
-            price_area_vio_mode = map_enum_fields(price_area_vio_mode, PriceAreaVioMode)
+            price_area_vio_mode = map_enum_fields(price_area_vio_mode, enums.PriceAreaVioMode)
             checks.assert_subdtype(price_area_vio_mode, np.integer, arg_name="price_area_vio_mode")
             return price_area_vio_mode
 
@@ -8363,7 +8392,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             return leverage
 
         def _prepare_leverage_mode(leverage_mode):
-            leverage_mode = map_enum_fields(leverage_mode, LeverageMode)
+            leverage_mode = map_enum_fields(leverage_mode, enums.LeverageMode)
             checks.assert_subdtype(leverage_mode, np.integer, arg_name="leverage_mode")
             return leverage_mode
 
@@ -8380,7 +8409,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             return log
 
         def _prepare_val_price(val_price):
-            val_price = map_enum_fields(val_price, ValPriceType, ignore_type=(int, float))
+            val_price = map_enum_fields(val_price, enums.ValPriceType, ignore_type=(int, float))
             checks.assert_subdtype(val_price, np.number, arg_name="val_price")
             return val_price
 
@@ -8442,6 +8471,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             pre_segment_args=pre_segment_args,
             call_seq=call_seq,
             broadcast_named_args=broadcast_named_args,
+            broadcast_kwargs=broadcast_kwargs,
             chunked=chunked,
             **kwargs,
         )
@@ -8865,11 +8895,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
     def get_trades(self, group_by: tp.GroupByLike = None, **kwargs) -> Trades:
         """Get trade/position records depending upon `Portfolio.trades_type`."""
-        if self.trades_type == TradesType.Trades:
+        if self.trades_type == enums.TradesType.Trades:
             raise NotImplementedError
-        if self.trades_type == TradesType.EntryTrades:
+        if self.trades_type == enums.TradesType.EntryTrades:
             return self.resolve_shortcut_attr("entry_trades", group_by=group_by, **kwargs)
-        if self.trades_type == TradesType.ExitTrades:
+        if self.trades_type == enums.TradesType.ExitTrades:
             return self.resolve_shortcut_attr("exit_trades", group_by=group_by, **kwargs)
         return self.resolve_shortcut_attr("positions", group_by=group_by, **kwargs)
 
@@ -8999,7 +9029,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = orders.wrapper
 
-        direction = map_enum_fields(direction, Direction)
+        direction = map_enum_fields(direction, enums.Direction)
         func = jit_reg.resolve_option(nb.asset_flow_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         asset_flow = func(
@@ -9029,7 +9059,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if asset_flow is None:
                 asset_flow = cls_or_self.resolve_shortcut_attr(
                     "asset_flow",
-                    direction=Direction.Both,
+                    direction=enums.Direction.Both,
                     jitted=jitted,
                     chunked=chunked,
                 )
@@ -9043,14 +9073,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 init_position = 0.0
             checks.assert_not_none(wrapper)
 
-        direction = map_enum_fields(direction, Direction)
+        direction = map_enum_fields(direction, enums.Direction)
         func = jit_reg.resolve_option(nb.assets_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         assets = func(to_2d_array(asset_flow), init_position=to_1d_array(init_position))
-        if direction == Direction.LongOnly:
+        if direction == enums.Direction.LongOnly:
             func = jit_reg.resolve_option(nb.long_assets_nb, jitted)
             assets = func(assets)
-        elif direction == Direction.ShortOnly:
+        elif direction == enums.Direction.ShortOnly:
             func = jit_reg.resolve_option(nb.short_assets_nb, jitted)
             assets = func(assets)
         return wrapper.wrap(assets, group_by=False, **resolve_dict(wrap_kwargs))
@@ -9311,7 +9341,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             checks.assert_not_none(cash_sharing)
             checks.assert_not_none(wrapper)
 
-        if checks.is_int(init_cash_raw) and init_cash_raw in InitCashMode:
+        if checks.is_int(init_cash_raw) and init_cash_raw in enums.InitCashMode:
             if not isinstance(cls_or_self, type):
                 if free_cash_flow is None:
                     free_cash_flow = cls_or_self.resolve_shortcut_attr(
@@ -9358,7 +9388,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cls_or_self,
         group_by: tp.GroupByLike = None,
         free: bool = False,
-        cash_sharing: tp.Optional[bool] = None,
         init_cash: tp.Optional[tp.ArrayLike] = None,
         cash_deposits: tp.Optional[tp.ArrayLike] = None,
         cash_flow: tp.Optional[tp.SeriesFrame] = None,
@@ -9371,8 +9400,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         For `free`, see `Portfolio.get_cash_flow`."""
         if not isinstance(cls_or_self, type):
-            if cash_sharing is None:
-                cash_sharing = cls_or_self.cash_sharing
             if cash_flow is None:
                 cash_flow = cls_or_self.resolve_shortcut_attr(
                     "cash_flow",
@@ -9384,7 +9411,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(cash_sharing)
             checks.assert_not_none(init_cash)
             if cash_deposits is None:
                 cash_deposits = 0.0
@@ -9653,11 +9679,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         !!! note
             When both directions, `asset_value` must include the addition of the absolute long-only
             and short-only asset values."""
-        direction = map_enum_fields(direction, Direction)
+        direction = map_enum_fields(direction, enums.Direction)
 
         if not isinstance(cls_or_self, type):
             if asset_value is None:
-                if direction == Direction.Both and cls_or_self.wrapper.grouper.is_grouped(group_by=group_by):
+                if direction == enums.Direction.Both and cls_or_self.wrapper.grouper.is_grouped(group_by=group_by):
                     long_asset_value = cls_or_self.resolve_shortcut_attr(
                         "asset_value",
                         direction="longonly",
@@ -9716,7 +9742,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if long_exposure is None:
                 long_exposure = cls_or_self.resolve_shortcut_attr(
                     "gross_exposure",
-                    direction=Direction.LongOnly,
+                    direction=enums.Direction.LongOnly,
                     group_by=group_by,
                     jitted=jitted,
                     chunked=chunked,
@@ -9724,7 +9750,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if short_exposure is None:
                 short_exposure = cls_or_self.resolve_shortcut_attr(
                     "gross_exposure",
-                    direction=Direction.ShortOnly,
+                    direction=enums.Direction.ShortOnly,
                     group_by=group_by,
                     jitted=jitted,
                     chunked=chunked,
@@ -10509,11 +10535,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if "trades_type" in final_kwargs:
             trades_type = final_kwargs["trades_type"]
             if isinstance(final_kwargs["trades_type"], str):
-                trades_type = map_enum_fields(trades_type, TradesType)
+                trades_type = map_enum_fields(trades_type, enums.TradesType)
             if attr == "trades" and trades_type != self.trades_type:
-                if trades_type == TradesType.EntryTrades:
+                if trades_type == enums.TradesType.EntryTrades:
                     attr = "entry_trades"
-                elif trades_type == TradesType.ExitTrades:
+                elif trades_type == enums.TradesType.ExitTrades:
                     attr = "exit_trades"
                 else:
                     attr = "positions"
@@ -10552,10 +10578,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 if _kwargs.pop("free"):
                     prop_name = "free_" + naked_attr_name
             if "direction" in _kwargs:
-                direction = map_enum_fields(_kwargs.pop("direction"), Direction)
-                if direction == Direction.LongOnly:
+                direction = map_enum_fields(_kwargs.pop("direction"), enums.Direction)
+                if direction == enums.Direction.LongOnly:
                     prop_name = "long_" + naked_attr_name
-                elif direction == Direction.ShortOnly:
+                elif direction == enums.Direction.ShortOnly:
                     prop_name = "short_" + naked_attr_name
 
             if prop_name in self.cls_dir:

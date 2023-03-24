@@ -11,7 +11,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import resolve_dict, merge_dicts
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.base.reshaping import column_stack
+from vectorbtpro.base.reshaping import column_stack, to_2d_array
 
 __all__ = [
     "concat_merge",
@@ -205,6 +205,7 @@ def row_stack_merge(
 def column_stack_merge(
     *objs,
     reset_index: tp.Union[None, bool, str] = None,
+    fill_value: tp.Scalar = np.nan,
     keys: tp.Optional[tp.Index] = None,
     wrap: tp.Union[None, str, bool] = None,
     wrapper: tp.Optional[ArrayWrapper] = None,
@@ -326,18 +327,31 @@ def column_stack_merge(
             objs = new_objs
         else:
             if reset_index is not None:
-                min_length = min(map(len, objs))
-                max_length = max(map(len, objs))
-                if min_length == max_length:
+                min_n_rows = None
+                max_n_rows = None
+                n_cols = 0
+                new_objs = []
+                for obj in objs:
+                    new_obj = to_2d_array(obj)
+                    new_objs.append(new_obj)
+                    if min_n_rows is None or new_obj.shape[0] < min_n_rows:
+                        min_n_rows = new_obj.shape[0]
+                    if max_n_rows is None or new_obj.shape[0] > min_n_rows:
+                        max_n_rows = new_obj.shape[0]
+                    n_cols += new_obj.shape[1]
+                if min_n_rows == max_n_rows:
                     return column_stack(objs)
-                new_obj = np.full((max_length, len(objs)), np.nan, dtype=np.float_)
-                for i, obj in enumerate(objs):
+                new_obj = np.full((max_n_rows, n_cols), fill_value)
+                start_col = 0
+                for obj in new_objs:
+                    end_col = start_col + obj.shape[1]
                     if isinstance(reset_index, str) and reset_index.lower() == "from_start":
-                        new_obj[:len(obj), i] = np.asarray(obj)
+                        new_obj[:len(obj), start_col:end_col] = obj
                     elif isinstance(reset_index, str) and reset_index.lower() == "from_end":
-                        new_obj[-len(obj):, i] = np.asarray(obj)
+                        new_obj[-len(obj):, start_col:end_col] = obj
                     else:
                         raise ValueError(f"Invalid index resetting option '{reset_index}'")
+                    start_col = end_col
                 return new_obj
             return column_stack(objs)
     if reset_index is not None:

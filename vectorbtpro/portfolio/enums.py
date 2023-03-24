@@ -22,6 +22,7 @@ __pdoc__all__ = __all__ = [
     "OppositeEntryMode",
     "DeltaFormat",
     "TimeDeltaFormat",
+    "StopLadderMode",
     "StopEntryPrice",
     "StopExitPrice",
     "StopExitType",
@@ -252,8 +253,12 @@ __pdoc__[
 Accumulation allows gradually increasing and decreasing positions by a size.
 
 Attributes:
-    Disabled: Disable accumulation.
-    Both: Allow both adding to and removing from the position.
+    Disabled: Disable accumulation. 
+    
+        Can also be provided as False.
+    Both: Allow both adding to and removing from the position. 
+    
+        Can also be provided as True.
     AddOnly: Allow accumulation to only add to the position.
     RemoveOnly: Allow accumulation to only remove from the position.
     
@@ -419,6 +424,43 @@ Attributes:
         If index is datetime-like, 1 means one nanosecond.
     
         Requires the index to be provided.
+"""
+
+
+class StopLadderModeT(tp.NamedTuple):
+    Disabled: int = 0
+    Uniform: int = 1
+    Weighted: int = 2
+    AdaptUniform: int = 3
+    AdaptWeighted: int = 4
+
+
+StopLadderMode = StopLadderModeT()
+"""_"""
+
+__pdoc__[
+    "StopLadderMode"
+] = f"""Stop ladder mode.
+
+```python
+{prettify(StopLadderMode)}
+```
+
+Attributes:
+    Disabled: Disable the stop ladder.
+    
+        Can also be provided as False.
+    Uniform: Enable the stop ladder with a uniform exit size.
+    
+        Can also be provided as True.
+    Weighted: Enable the stop ladder with a stop-weighted exit size.
+    AdaptUniform: Enable the stop ladder with a uniform exit size that adapts to the current position.
+    AdaptWeighted: Enable the stop ladder with a stop-weighted exit size that adapts to the current position.
+    
+!!! note
+    When disabled, make sure that stop values broadcast against the target shape.
+    
+    When enabled, make sure that rows in stop values represent steps in the ladder.
 """
 
 
@@ -2188,7 +2230,8 @@ class SignalSegmentContext(tp.NamedTuple):
     last_sl_info: tp.Array1d
     last_tsl_info: tp.Array1d
     last_tp_info: tp.Array1d
-    last_time_info: tp.Array1d
+    last_td_info: tp.Array1d
+    last_dt_info: tp.Array1d
 
     group: int
     group_len: int
@@ -2251,9 +2294,12 @@ Accessible via `c.last_tsl_info[field][col]`."""
 __pdoc__["SignalSegmentContext.last_tp_info"] = """Record of type `tp_info_dt` per column.
 
 Accessible via `c.last_tp_info[field][col]`."""
-__pdoc__["SignalSegmentContext.last_time_info"] = """Record of type `time_info_dt` per column.
+__pdoc__["SignalSegmentContext.last_td_info"] = """Record of type `time_info_dt` per column.
 
-Accessible via `c.last_time_info[field][col]`."""
+Accessible via `c.last_td_info[field][col]`."""
+__pdoc__["SignalSegmentContext.last_dt_info"] = """Record of type `time_info_dt` per column.
+
+Accessible via `c.last_dt_info[field][col]`."""
 __pdoc__["SignalSegmentContext.group"] = "See `GroupContext.group`."
 __pdoc__["SignalSegmentContext.group_len"] = "See `GroupContext.group_len`."
 __pdoc__["SignalSegmentContext.from_col"] = "See `GroupContext.from_col`."
@@ -2300,7 +2346,8 @@ class SignalContext(tp.NamedTuple):
     last_sl_info: tp.Array1d
     last_tsl_info: tp.Array1d
     last_tp_info: tp.Array1d
-    last_time_info: tp.Array1d
+    last_td_info: tp.Array1d
+    last_dt_info: tp.Array1d
 
     group: int
     group_len: int
@@ -2615,7 +2662,7 @@ main_info_dt = np.dtype(main_info_fields, align=True)
 
 __pdoc__[
     "main_info_dt"
-] = f"""`np.dtype` of main signal records.
+] = f"""`np.dtype` of main information records.
 
 ```python
 {prettify(main_info_dt)}
@@ -2658,7 +2705,7 @@ limit_info_dt = np.dtype(limit_info_fields, align=True)
 
 __pdoc__[
     "limit_info_dt"
-] = f"""`np.dtype` of limit signal records.
+] = f"""`np.dtype` of limit information records.
 
 ```python
 {prettify(limit_info_dt)}
@@ -2684,6 +2731,7 @@ Attributes:
 sl_info_fields = [
     ("init_idx", np.int_),
     ("init_price", np.float_),
+    ("init_position", np.float_),
     ("stop", np.float_),
     ("exit_price", np.float_),
     ("exit_size", np.float_),
@@ -2692,7 +2740,7 @@ sl_info_fields = [
     ("order_type", np.int_),
     ("limit_delta", np.float_),
     ("delta_format", np.int_),
-    ("ladder", np.bool_),
+    ("ladder", np.int_),
     ("step", np.int_),
     ("step_idx", np.int_),
 ]
@@ -2703,7 +2751,7 @@ sl_info_dt = np.dtype(sl_info_fields, align=True)
 
 __pdoc__[
     "sl_info_dt"
-] = f"""`np.dtype` of SL signal records.
+] = f"""`np.dtype` of SL information records.
 
 ```python
 {prettify(sl_info_dt)}
@@ -2712,6 +2760,7 @@ __pdoc__[
 Attributes:
     init_idx: Initial row.
     init_price: Initial price.
+    init_position: Initial position.
     stop: Latest updated stop value.
     exit_price: See `StopExitPrice`.
     exit_size: Order size.
@@ -2728,6 +2777,7 @@ Attributes:
 tsl_info_fields = [
     ("init_idx", np.int_),
     ("init_price", np.float_),
+    ("init_position", np.float_),
     ("peak_idx", np.int_),
     ("peak_price", np.float_),
     ("stop", np.float_),
@@ -2739,7 +2789,7 @@ tsl_info_fields = [
     ("order_type", np.int_),
     ("limit_delta", np.float_),
     ("delta_format", np.int_),
-    ("ladder", np.bool_),
+    ("ladder", np.int_),
     ("step", np.int_),
     ("step_idx", np.int_),
 ]
@@ -2750,7 +2800,7 @@ tsl_info_dt = np.dtype(tsl_info_fields, align=True)
 
 __pdoc__[
     "tsl_info_dt"
-] = f"""`np.dtype` of TSL signal records.
+] = f"""`np.dtype` of TSL information records.
 
 ```python
 {prettify(tsl_info_dt)}
@@ -2759,6 +2809,7 @@ __pdoc__[
 Attributes:
     init_idx: Initial row.
     init_price: Initial price.
+    init_position: Initial position.
     peak_idx: Row of the highest/lowest price.
     peak_price: Highest/lowest price.
     stop: Latest updated stop value.
@@ -2778,6 +2829,7 @@ Attributes:
 tp_info_fields = [
     ("init_idx", np.int_),
     ("init_price", np.float_),
+    ("init_position", np.float_),
     ("stop", np.float_),
     ("exit_price", np.float_),
     ("exit_size", np.float_),
@@ -2786,7 +2838,7 @@ tp_info_fields = [
     ("order_type", np.int_),
     ("limit_delta", np.float_),
     ("delta_format", np.int_),
-    ("ladder", np.bool_),
+    ("ladder", np.int_),
     ("step", np.int_),
     ("step_idx", np.int_),
 ]
@@ -2797,7 +2849,7 @@ tp_info_dt = np.dtype(tp_info_fields, align=True)
 
 __pdoc__[
     "tp_info_dt"
-] = f"""`np.dtype` of TP signal records.
+] = f"""`np.dtype` of TP information records.
 
 ```python
 {prettify(tp_info_dt)}
@@ -2806,6 +2858,7 @@ __pdoc__[
 Attributes:
     init_idx: Initial row.
     init_price: Initial price.
+    init_position: Initial position.
     stop: Latest updated stop value.
     exit_price: See `StopExitPrice`.
     exit_size: Order size.
@@ -2821,8 +2874,8 @@ Attributes:
 
 time_info_fields = [
     ("init_idx", np.int_),
-    ("td_stop", np.int_),
-    ("dt_stop", np.int_),
+    ("init_position", np.float_),
+    ("stop", np.int_),
     ("exit_price", np.float_),
     ("exit_size", np.float_),
     ("exit_size_type", np.int_),
@@ -2831,7 +2884,7 @@ time_info_fields = [
     ("limit_delta", np.float_),
     ("delta_format", np.int_),
     ("time_delta_format", np.int_),
-    ("ladder", np.bool_),
+    ("ladder", np.int_),
     ("step", np.int_),
     ("step_idx", np.int_),
 ]
@@ -2842,7 +2895,7 @@ time_info_dt = np.dtype(time_info_fields, align=True)
 
 __pdoc__[
     "time_info_dt"
-] = f"""`np.dtype` of time signal records.
+] = f"""`np.dtype` of time information records.
 
 ```python
 {prettify(time_info_dt)}
@@ -2850,8 +2903,8 @@ __pdoc__[
 
 Attributes:
     init_idx: Initial row.
-    td_stop: Latest updated timedelta-stop value.
-    dt_stop: Latest updated datetime-stop value.
+    init_position: Initial position.
+    stop: Latest updated stop value.
     exit_price: See `StopExitPrice`.
     exit_size: Order size.
     exit_size_type: See `SizeType`.
