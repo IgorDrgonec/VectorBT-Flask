@@ -735,7 +735,8 @@ def resolve_dyn_stop_entry_price_nb(val_price: float, price: float, stop_entry_p
     return float(stop_entry_price)
 
 
-def get_stop_ladder_exit_size(
+@register_jitted(cache=True)
+def get_stop_ladder_exit_size_nb(
     stop_: tp.FlexArray2d,
     step: int,
     col: int,
@@ -800,7 +801,8 @@ def get_stop_ladder_exit_size(
     raise ValueError("Stop ladder must be enabled")
 
 
-def get_time_stop_ladder_exit_size(
+@register_jitted(cache=True)
+def get_time_stop_ladder_exit_size_nb(
     stop_: tp.FlexArray2d,
     step: int,
     col: int,
@@ -1691,7 +1693,7 @@ def from_signals_nb(
                         if _ladder and np.isnan(_stop_exit_size):
                             step = last_sl_info["step"][col]
                             if stop_ladder and step < n_sl_steps:
-                                _stop_exit_size = get_stop_ladder_exit_size(
+                                _stop_exit_size = get_stop_ladder_exit_size_nb(
                                     stop_=sl_stop_,
                                     step=step,
                                     col=col,
@@ -1721,7 +1723,7 @@ def from_signals_nb(
                         if _ladder and np.isnan(_stop_exit_size):
                             step = last_tsl_info["step"][col]
                             if stop_ladder and step < n_tsl_steps:
-                                _stop_exit_size = get_stop_ladder_exit_size(
+                                _stop_exit_size = get_stop_ladder_exit_size_nb(
                                     stop_=tsl_stop_,
                                     step=step,
                                     col=col,
@@ -1748,7 +1750,7 @@ def from_signals_nb(
                         if _ladder and np.isnan(_stop_exit_size):
                             step = last_tp_info["step"][col]
                             if stop_ladder and step < n_tp_steps:
-                                _stop_exit_size = get_stop_ladder_exit_size(
+                                _stop_exit_size = get_stop_ladder_exit_size_nb(
                                     stop_=tp_stop_,
                                     step=step,
                                     col=col,
@@ -1776,7 +1778,7 @@ def from_signals_nb(
                             step = last_td_info["step"][col]
                             if stop_ladder and step < n_td_steps:
                                 step = last_td_info["step"][col]
-                                _stop_exit_size = get_time_stop_ladder_exit_size(
+                                _stop_exit_size = get_time_stop_ladder_exit_size_nb(
                                     stop_=td_stop_,
                                     step=step,
                                     col=col,
@@ -1804,7 +1806,7 @@ def from_signals_nb(
                             step = last_dt_info["step"][col]
                             if stop_ladder and step < n_dt_steps:
                                 step = last_dt_info["step"][col]
-                                _stop_exit_size = get_time_stop_ladder_exit_size(
+                                _stop_exit_size = get_time_stop_ladder_exit_size_nb(
                                     stop_=dt_stop_,
                                     step=step,
                                     col=col,
@@ -4287,7 +4289,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                         if _ladder and np.isnan(_stop_exit_size):
                             step = last_sl_info["step"][col]
                             if stop_ladder and step < n_sl_steps:
-                                _stop_exit_size = get_stop_ladder_exit_size(
+                                _stop_exit_size = get_stop_ladder_exit_size_nb(
                                     stop_=sl_stop_,
                                     step=step,
                                     col=col,
@@ -4317,7 +4319,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                         if _ladder and np.isnan(_stop_exit_size):
                             step = last_tsl_info["step"][col]
                             if stop_ladder and step < n_tsl_steps:
-                                _stop_exit_size = get_stop_ladder_exit_size(
+                                _stop_exit_size = get_stop_ladder_exit_size_nb(
                                     stop_=tsl_stop_,
                                     step=step,
                                     col=col,
@@ -4344,7 +4346,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                         if _ladder and np.isnan(_stop_exit_size):
                             step = last_tp_info["step"][col]
                             if stop_ladder and step < n_tp_steps:
-                                _stop_exit_size = get_stop_ladder_exit_size(
+                                _stop_exit_size = get_stop_ladder_exit_size_nb(
                                     stop_=tp_stop_,
                                     step=step,
                                     col=col,
@@ -4372,7 +4374,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                             step = last_td_info["step"][col]
                             if stop_ladder and step < n_td_steps:
                                 step = last_td_info["step"][col]
-                                _stop_exit_size = get_time_stop_ladder_exit_size(
+                                _stop_exit_size = get_time_stop_ladder_exit_size_nb(
                                     stop_=td_stop_,
                                     step=step,
                                     col=col,
@@ -4400,7 +4402,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                             step = last_dt_info["step"][col]
                             if stop_ladder and step < n_dt_steps:
                                 step = last_dt_info["step"][col]
-                                _stop_exit_size = get_time_stop_ladder_exit_size(
+                                _stop_exit_size = get_time_stop_ladder_exit_size_nb(
                                     stop_=dt_stop_,
                                     step=step,
                                     col=col,
