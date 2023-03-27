@@ -433,6 +433,7 @@ class StopLadderModeT(tp.NamedTuple):
     Weighted: int = 2
     AdaptUniform: int = 3
     AdaptWeighted: int = 4
+    Dynamic: int = 5
 
 
 StopLadderMode = StopLadderModeT()
@@ -456,11 +457,12 @@ Attributes:
     Weighted: Enable the stop ladder with a stop-weighted exit size.
     AdaptUniform: Enable the stop ladder with a uniform exit size that adapts to the current position.
     AdaptWeighted: Enable the stop ladder with a stop-weighted exit size that adapts to the current position.
+    Dynamic: Enable the stop ladder but do not use stop arrays.
     
 !!! note
-    When disabled, make sure that stop values broadcast against the target shape.
+    When disabled, make sure that stop arrays broadcast against the target shape.
     
-    When enabled, make sure that rows in stop values represent steps in the ladder.
+    When enabled, make sure that rows in stop arrays represent steps in the ladder.
 """
 
 
@@ -2769,7 +2771,7 @@ Attributes:
     order_type: See `OrderType`.
     limit_delta: Delta from the hit price. Only for `StopType.Limit`.
     delta_format: See `DeltaFormat`.
-    ladder: Whether to keep the stop after execution.
+    ladder: See `StopLadderMode`.
     step: Step in the ladder (i.e., the number of times the stop was executed)
     step_idx: Step row.
 """
@@ -2821,7 +2823,7 @@ Attributes:
     order_type: See `OrderType`.
     limit_delta: Delta from the hit price. Only for `StopType.Limit`.
     delta_format: See `DeltaFormat`.
-    ladder: Whether to keep the stop after execution.
+    ladder: See `StopLadderMode`.
     step: Step in the ladder (i.e., the number of times the stop was executed)
     step_idx: Step row.
 """
@@ -2867,7 +2869,7 @@ Attributes:
     order_type: See `OrderType`.
     limit_delta: Delta from the hit price. Only for `StopType.Limit`.
     delta_format: See `DeltaFormat`.
-    ladder: Whether to keep the stop after execution.
+    ladder: See `StopLadderMode`.
     step: Step in the ladder (i.e., the number of times the stop was executed)
     step_idx: Step row.
 """
@@ -2913,7 +2915,7 @@ Attributes:
     limit_delta: Delta from the hit price. Only for `StopType.Limit`.
     delta_format: See `DeltaFormat`. Only for `StopType.Limit`.
     time_delta_format: See `TimeDeltaFormat`.
-    ladder: Whether to keep the stop after execution.
+    ladder: See `StopLadderMode`.
     step: Step in the ladder (i.e., the number of times the stop was executed)
     step_idx: Step row.
 """
