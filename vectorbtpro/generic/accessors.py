@@ -5118,6 +5118,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         relative: tp.ArrayLike = False,
         start_value: tp.Optional[float] = None,
         max_out_len: tp.Optional[int] = None,
+        reset_index: bool = False,
         return_uptrend: bool = False,
         jitted: tp.JittedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
@@ -5131,7 +5132,10 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             start_value=start_value,
             max_out_len=max_out_len,
         )
-        new_index = self.wrapper.index[idx_out]
+        if reset_index:
+            new_index = pd.RangeIndex(stop=len(idx_out))
+        else:
+            new_index = self.wrapper.index[idx_out]
         wrap_kwargs = merge_dicts(
             dict(index=new_index),
             wrap_kwargs,
@@ -5141,6 +5145,35 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             uptrend_out = self.wrapper.wrap(uptrend_out, group_by=False, **wrap_kwargs)
             return sr_out, uptrend_out
         return sr_out
+
+    def to_renko_ohlc(
+        self,
+        brick_size: tp.ArrayLike,
+        relative: tp.ArrayLike = False,
+        start_value: tp.Optional[float] = None,
+        max_out_len: tp.Optional[int] = None,
+        reset_index: bool = False,
+        jitted: tp.JittedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.Frame:
+        """See `vectorbtpro.generic.nb.base.to_renko_ohlc_1d_nb`."""
+        func = jit_reg.resolve_option(nb.to_renko_ohlc_1d_nb, jitted)
+        arr_out, idx_out = func(
+            self.to_1d_array(),
+            reshaping.broadcast_array_to(brick_size, self.wrapper.shape[0]),
+            relative=reshaping.broadcast_array_to(relative, self.wrapper.shape[0]),
+            start_value=start_value,
+            max_out_len=max_out_len,
+        )
+        if reset_index:
+            new_index = pd.RangeIndex(stop=len(idx_out))
+        else:
+            new_index = self.wrapper.index[idx_out]
+        wrap_kwargs = merge_dicts(
+            dict(index=new_index, columns=["Open", "High", "Low", "Close"]),
+            wrap_kwargs,
+        )
+        return self.wrapper.wrap(arr_out, group_by=False, **wrap_kwargs)
 
 
 class GenericDFAccessor(GenericAccessor, BaseDFAccessor):

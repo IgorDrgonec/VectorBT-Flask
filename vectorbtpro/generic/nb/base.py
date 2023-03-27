@@ -1240,7 +1240,7 @@ def to_renko_1d_nb(
     trend = 0
 
     for i in range(arr.shape[0]):
-        _brick_size = abs(flex_select_1d_nb(brick_size, i))
+        _brick_size = abs(flex_select_1d_nb(brick_size_, i))
         _relative = flex_select_1d_nb(relative_, i)
         curr_value = arr[i]
         if np.isnan(curr_value):
@@ -1286,6 +1286,87 @@ def to_renko_1d_nb(
             k += 1
 
     return arr_out[:k], idx_out[:k], uptrend_out[:k]
+
+
+@register_jitted(cache=True)
+def to_renko_ohlc_1d_nb(
+    arr: tp.Array1d,
+    brick_size: tp.FlexArray1dLike,
+    relative: tp.FlexArray1dLike = False,
+    start_value: tp.Optional[float] = None,
+    max_out_len: tp.Optional[int] = None
+) -> tp.Tuple[tp.Array2d, tp.Array1d]:
+    """Convert to Renko OHLC format."""
+    brick_size_ = to_1d_array_nb(np.asarray(brick_size))
+    relative_ = to_1d_array_nb(np.asarray(relative))
+
+    if max_out_len is None:
+        out_n = arr.shape[0]
+    else:
+        out_n = max_out_len
+    arr_out = np.empty((out_n, 4), dtype=np.float_)
+    idx_out = np.empty(out_n, dtype=np.int_)
+    prev_value = np.nan
+    k = 0
+    trend = 0
+
+    for i in range(arr.shape[0]):
+        _brick_size = abs(flex_select_1d_nb(brick_size_, i))
+        _relative = flex_select_1d_nb(relative_, i)
+        curr_value = arr[i]
+        if np.isnan(curr_value):
+            continue
+        if np.isnan(prev_value):
+            if start_value is None:
+                if not _relative:
+                    prev_value = curr_value - curr_value % _brick_size
+                else:
+                    prev_value = curr_value
+            else:
+                prev_value = start_value
+            continue
+        if _relative:
+            diff = (curr_value - prev_value) / prev_value
+        else:
+            diff = curr_value - prev_value
+        while abs(diff) >= _brick_size:
+            open_value = prev_value
+            prev_trend = trend
+            if diff >= 0:
+                if _relative:
+                    prev_value *= 1 + _brick_size
+                else:
+                    prev_value += _brick_size
+                trend = 1
+            else:
+                if _relative:
+                    prev_value *= 1 - _brick_size
+                else:
+                    prev_value -= _brick_size
+                trend = -1
+            if _relative:
+                diff = (curr_value - prev_value) / prev_value
+            else:
+                diff = curr_value - prev_value
+            if trend == -prev_trend:
+                continue
+            if k >= len(arr_out):
+                raise IndexError("Index out of range. Set a higher max_out_len.")
+            if trend == 1:
+                high_value = prev_value
+                low_value = open_value
+            else:
+                high_value = open_value
+                low_value = prev_value
+            close_value = prev_value
+            arr_out[k, 0] = open_value
+            arr_out[k, 1] = high_value
+            arr_out[k, 2] = low_value
+            arr_out[k, 3] = close_value
+            idx_out[k] = i
+            k += 1
+
+    return arr_out[:k], idx_out[:k]
 
 
 # ############# Resampling ############# #
