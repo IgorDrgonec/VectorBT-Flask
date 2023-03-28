@@ -59,7 +59,7 @@ Date
 >>> ohlcv.vbt.ohlcv.plot().show()
 ```
 
-![](/assets/images/api/custom_price.svg){: .iimg }"""
+![](/assets/images/api/custom_price.svg){: .iimg loading=lazy }"""
 
 import numpy as np
 import pandas as pd
@@ -155,7 +155,7 @@ class _MA(MA):
             >>> vbt.MA.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/MA.svg){: .iimg }
+            ![](/assets/images/api/MA.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -256,7 +256,7 @@ class _MSD(MSD):
             >>> vbt.MSD.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/MSD.svg){: .iimg }
+            ![](/assets/images/api/MSD.svg){: .iimg loading=lazy }
         """
         from vectorbtpro._settings import settings
 
@@ -360,7 +360,7 @@ class _BBANDS(BBANDS):
             >>> vbt.BBANDS.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/BBANDS.svg){: .iimg }
+            ![](/assets/images/api/BBANDS.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -497,7 +497,7 @@ class _RSI(RSI):
             >>> vbt.RSI.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/RSI.svg){: .iimg }
+            ![](/assets/images/api/RSI.svg){: .iimg loading=lazy }
         """
         from vectorbtpro._settings import settings
 
@@ -623,7 +623,7 @@ class _STOCH(STOCH):
             >>> vbt.STOCH.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/STOCH.svg){: .iimg }
+            ![](/assets/images/api/STOCH.svg){: .iimg loading=lazy }
         """
         from vectorbtpro._settings import settings
 
@@ -774,7 +774,7 @@ class _MACD(MACD):
             >>> vbt.MACD.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/MACD.svg){: .iimg }
+            ![](/assets/images/api/MACD.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
         from vectorbtpro._settings import settings
@@ -908,7 +908,7 @@ class _ATR(ATR):
             >>> vbt.ATR.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/ATR.svg){: .iimg }
+            ![](/assets/images/api/ATR.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -993,7 +993,7 @@ class _OBV(OBV):
             >>> vbt.OBV.run(ohlcv['Close'], ohlcv['Volume']).plot().show()
             ```
 
-            ![](/assets/images/api/OBV.svg){: .iimg }
+            ![](/assets/images/api/OBV.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -1087,7 +1087,7 @@ class _OLS(OLS):
             >>> vbt.OLS.run(np.arange(len(ohlcv)), ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/OLS.svg){: .iimg }
+            ![](/assets/images/api/OLS.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -1156,7 +1156,7 @@ class _OLS(OLS):
             >>> vbt.OLS.run(np.arange(len(ohlcv)), ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/OLS_zscore.svg){: .iimg }
+            ![](/assets/images/api/OLS_zscore.svg){: .iimg loading=lazy }
         """
         import scipy.stats as st
         from vectorbtpro.utils.figure import make_figure
@@ -1321,7 +1321,7 @@ class _PATSIM(PATSIM):
             >>> vbt.PATSIM.run(ohlcv['Close'], np.array([1, 2, 3, 2, 1]), 30).plot().show()
             ```
 
-            ![](/assets/images/api/PATSIM.svg){: .iimg }
+            ![](/assets/images/api/PATSIM.svg){: .iimg loading=lazy }
         """
         from vectorbtpro._settings import settings
 
@@ -1373,7 +1373,7 @@ class _PATSIM(PATSIM):
             >>> vbt.PATSIM.run(ohlcv['Close'], np.array([1, 2, 3, 2, 1]), 30).overlay_with_heatmap().show()
             ```
 
-            ![](/assets/images/api/PATSIM_heatmap.svg){: .iimg }
+            ![](/assets/images/api/PATSIM_heatmap.svg){: .iimg loading=lazy }
         """
         from vectorbtpro._settings import settings
 
@@ -1484,7 +1484,7 @@ class _VWAP(VWAP):
             ... ).plot().show()
             ```
 
-            ![](/assets/images/api/VWAP.svg){: .iimg }
+            ![](/assets/images/api/VWAP.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -1622,7 +1622,7 @@ class _PIVOTINFO(PIVOTINFO):
             >>> vbt.PIVOTINFO.run(ohlcv['High'], ohlcv['Low'], 0.1, 0.1).plot(fig=fig).show()
             ```
 
-            ![](/assets/images/api/PIVOTINFO.svg){: .iimg }
+            ![](/assets/images/api/PIVOTINFO.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -1684,7 +1684,7 @@ class _PIVOTINFO(PIVOTINFO):
             >>> vbt.PIVOTINFO.run(ohlcv['High'], ohlcv['Low'], 0.1, 0.1).plot_zigzag(fig=fig).show()
             ```
 
-            ![](/assets/images/api/PIVOTINFO_zigzag.svg){: .iimg }
+            ![](/assets/images/api/PIVOTINFO_zigzag.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -1769,7 +1769,7 @@ class _SUPERTREND(SUPERTREND):
             >>> vbt.SUPERTREND.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/SUPERTREND.svg){: .iimg }
+            ![](/assets/images/api/SUPERTREND.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -1878,7 +1878,7 @@ class _SIGDET(SIGDET):
             >>> vbt.SIGDET.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/SIGDET.svg){: .iimg }
+            ![](/assets/images/api/SIGDET.svg){: .iimg loading=lazy }
         """
         from vectorbtpro._settings import settings
 
@@ -1927,7 +1927,7 @@ class _SIGDET(SIGDET):
             >>> vbt.SIGDET.run(ohlcv['Close']).plot_bands().show()
             ```
 
-            ![](/assets/images/api/SIGDET_plot_bands.svg){: .iimg }
+            ![](/assets/images/api/SIGDET_plot_bands.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings

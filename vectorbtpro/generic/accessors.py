@@ -187,7 +187,7 @@ Name: 0, dtype: object
 >>> df2.vbt.plots().show()
 ```
 
-![](/assets/images/api/generic_plots.svg){: .iimg }
+![](/assets/images/api/generic_plots.svg){: .iimg loading=lazy }
 """
 
 import warnings
@@ -3945,7 +3945,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.plot().show()
             ```
 
-            ![](/assets/images/api/df_plot.svg){: .iimg }
+            ![](/assets/images/api/df_plot.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.generic.plotting import Scatter
 
@@ -3971,7 +3971,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.lineplot().show()
             ```
 
-            ![](/assets/images/api/df_lineplot.svg){: .iimg }
+            ![](/assets/images/api/df_lineplot.svg){: .iimg loading=lazy }
         """
         return self.plot(column=column, **merge_dicts(dict(trace_kwargs=dict(mode="lines")), kwargs))
 
@@ -3983,7 +3983,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.scatterplot().show()
             ```
 
-            ![](/assets/images/api/df_scatterplot.svg){: .iimg }
+            ![](/assets/images/api/df_scatterplot.svg){: .iimg loading=lazy }
         """
         return self.plot(column=column, **merge_dicts(dict(trace_kwargs=dict(mode="markers")), kwargs))
 
@@ -4002,7 +4002,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.barplot().show()
             ```
 
-            ![](/assets/images/api/df_barplot.svg){: .iimg }
+            ![](/assets/images/api/df_barplot.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.generic.plotting import Bar
 
@@ -4036,7 +4036,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.histplot().show()
             ```
 
-            ![](/assets/images/api/df_histplot.svg){: .iimg }
+            ![](/assets/images/api/df_histplot.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.generic.plotting import Histogram
 
@@ -4081,7 +4081,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.boxplot().show()
             ```
 
-            ![](/assets/images/api/df_boxplot.svg){: .iimg }
+            ![](/assets/images/api/df_boxplot.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.generic.plotting import Box
 
@@ -4144,7 +4144,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df['a'].vbt.plot_against(df['b']).show()
             ```
 
-            ![](/assets/images/api/sr_plot_against.svg){: .iimg }
+            ![](/assets/images/api/sr_plot_against.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
 
@@ -4289,7 +4289,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df['a'].vbt.overlay_with_heatmap(df['b']).show()
             ```
 
-            ![](/assets/images/api/sr_overlay_with_heatmap.svg){: .iimg }
+            ![](/assets/images/api/sr_overlay_with_heatmap.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_subplots
         from vectorbtpro._settings import settings
@@ -4368,7 +4368,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.heatmap().show()
             ```
 
-            ![](/assets/images/api/df_heatmap.svg){: .iimg }
+            ![](/assets/images/api/df_heatmap.svg){: .iimg loading=lazy }
 
             * Plotting a figure based on a multi-index:
 
@@ -4388,7 +4388,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> sr.vbt.heatmap().show()
             ```
 
-            ![](/assets/images/api/sr_heatmap.svg){: .iimg }
+            ![](/assets/images/api/sr_heatmap.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.generic.plotting import Heatmap
 
@@ -4533,7 +4533,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> sr.vbt.volume().show()
             ```
 
-            ![](/assets/images/api/sr_volume.svg){: .iimg }
+            ![](/assets/images/api/sr_volume.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.generic.plotting import Volume
 
@@ -4656,7 +4656,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> pd.Series(np.random.standard_normal(100)).vbt.qqplot().show()
             ```
 
-            ![](/assets/images/api/sr_qqplot.svg){: .iimg }
+            ![](/assets/images/api/sr_qqplot.svg){: .iimg loading=lazy }
         """
         import scipy.stats as st
 
@@ -4700,7 +4700,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.areaplot().show()
             ```
 
-            ![](/assets/images/api/df_areaplot.svg){: .iimg }
+            ![](/assets/images/api/df_areaplot.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -4810,7 +4810,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> sr.vbt.plot_pattern([1, 2, 3, 2, 1]).show()
             ```
 
-            ![](/assets/images/api/sr_plot_pattern.svg){: .iimg }"""
+            ![](/assets/images/api/sr_plot_pattern.svg){: .iimg loading=lazy }"""
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -5264,7 +5264,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
             >>> df.vbt.plot_projections().show()
             ```
 
-            ![](/assets/images/api/df_plot_projections.svg){: .iimg }
+            ![](/assets/images/api/df_plot_projections.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings

@@ -604,7 +604,7 @@ def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:
         >>> ohlcstx.iloc[:, 0].plot().show()
         ```
         
-        ![](/assets/images/api/OHLCSTX.svg){: .iimg }
+        ![](/assets/images/api/OHLCSTX.svg){: .iimg loading=lazy }
     """
     return plot
 

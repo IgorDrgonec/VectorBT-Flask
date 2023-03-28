@@ -109,7 +109,7 @@ Name: group, dtype: object
 >>> ranges['a'].plots().show()
 ```
 
-![](/assets/images/api/ranges_plots.svg){: .iimg }
+![](/assets/images/api/ranges_plots.svg){: .iimg loading=lazy }
 """
 
 import attr
@@ -855,7 +855,7 @@ class Ranges(PriceRecords):
             ... ).show()
             ```
 
-            ![](/assets/images/api/ranges_plot_projections.svg){: .iimg }
+            ![](/assets/images/api/ranges_plot_projections.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -1114,7 +1114,7 @@ class Ranges(PriceRecords):
             ... ).show()
             ```
 
-            ![](/assets/images/api/ranges_plot_shapes.svg){: .iimg }
+            ![](/assets/images/api/ranges_plot_shapes.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -1293,7 +1293,7 @@ class Ranges(PriceRecords):
             >>> vbt.Ranges.from_array(price >= 2).plot().show()
             ```
 
-            ![](/assets/images/api/ranges_plot.svg){: .iimg }
+            ![](/assets/images/api/ranges_plot.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 

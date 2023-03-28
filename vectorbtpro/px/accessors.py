@@ -97,7 +97,7 @@ class PXAccessor(BaseAccessor):
         >>> pd.Series([1, 2, 3]).vbt.px.bar().show()
         ```
 
-        ![](/assets/images/api/px_bar.svg){: .iimg }
+        ![](/assets/images/api/px_bar.svg){: .iimg loading=lazy }
     """
 
     def __init__(

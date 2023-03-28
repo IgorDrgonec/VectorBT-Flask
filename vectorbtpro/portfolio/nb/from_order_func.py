@@ -661,11 +661,11 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
                [1, 0, 0]])
         ```
 
-        ![](/assets/images/api/from_order_func_nb.svg){: .iimg }
+        ![](/assets/images/api/from_order_func_nb.svg){: .iimg loading=lazy }
 
         And here is the context information available at each step:
 
-        ![](/assets/images/api/context_info.svg){: .iimg }
+        ![](/assets/images/api/context_info.svg){: .iimg loading=lazy }
 
     Usage:
         * Create a group of three assets together sharing 100$ and simulate an equal-weighted portfolio
@@ -821,7 +821,7 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
         >>> vbt.Scatter(data=asset_value).fig.show()
         ```
 
-        ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg }
+        ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg loading=lazy }
 
         Note that the last order in a group with cash sharing is always disadvantaged
         as it has a bit less funds than the previous orders due to costs, which are not
@@ -1742,7 +1742,7 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
 
         Let's illustrate the same example as in `from_order_func_nb` but adapted for this function:
 
-        ![](/assets/images/api/from_order_func_rw_nb.svg){: .iimg }
+        ![](/assets/images/api/from_order_func_rw_nb.svg){: .iimg loading=lazy }
 
     Usage:
         * Running the same example as in `from_order_func_nb` but adapted for this function:
@@ -2710,7 +2710,7 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
 
         Let's illustrate the same example as in `from_order_func_nb` but adapted for this function:
 
-        ![](/assets/images/api/from_flex_order_func_nb.svg){: .iimg }
+        ![](/assets/images/api/from_flex_order_func_nb.svg){: .iimg loading=lazy }
 
     Usage:
         * The same example as in `from_order_func_nb`:
@@ -3739,7 +3739,7 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
         ... )
         ```
 
-        ![](/assets/images/api/from_flex_order_func_rw_nb.svg){: .iimg }
+        ![](/assets/images/api/from_flex_order_func_rw_nb.svg){: .iimg loading=lazy }
     """
     check_group_lens_nb(group_lens, target_shape[1])
 

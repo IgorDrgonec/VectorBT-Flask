@@ -483,7 +483,7 @@ Name: group, dtype: object
 >>> pf.trades['a'].plots().show()
 ```
 
-![](/assets/images/api/trades_plots.svg){: .iimg }
+![](/assets/images/api/trades_plots.svg){: .iimg loading=lazy }
 """
 
 from functools import partialmethod
@@ -1415,7 +1415,7 @@ class Trades(Ranges):
             >>> pf.trades.plot_pnl().show()
             ```
 
-            ![](/assets/images/api/trades_plot_pnl.svg){: .iimg }
+            ![](/assets/images/api/trades_plot_pnl.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -1608,7 +1608,7 @@ class Trades(Ranges):
             >>> trades.plot_against_pnl("MFE").show()
             ```
 
-            ![](/assets/images/api/trades_plot_against_pnl.svg){: .iimg }
+            ![](/assets/images/api/trades_plot_against_pnl.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -1839,7 +1839,7 @@ class Trades(Ranges):
             >>> pf.trades.plot_expanding("MFE").show()
             ```
 
-            ![](/assets/images/api/trades_plot_expanding.svg){: .iimg }
+            ![](/assets/images/api/trades_plot_expanding.svg){: .iimg loading=lazy }
         """
         if column is not None:
             self_col = self.select_col(column=column, group_by=False)
@@ -1956,7 +1956,7 @@ class Trades(Ranges):
             >>> trades.plot_against_pnl("MFE").show()
             ```
 
-            ![](/assets/images/api/trades_plot_against_pnl.svg){: .iimg }
+            ![](/assets/images/api/trades_plot_against_pnl.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -2243,7 +2243,7 @@ class Trades(Ranges):
             >>> pf.trades.plot().show()
             ```
 
-            ![](/assets/images/api/trades_plot.svg){: .iimg }
+            ![](/assets/images/api/trades_plot.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -2668,7 +2668,7 @@ class EntryTrades(Trades):
             >>> pf.entry_trades.plot_signals().show()
             ```
 
-            ![](/assets/images/api/entry_trades_plot_signals.svg){: .iimg }
+            ![](/assets/images/api/entry_trades_plot_signals.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -2903,7 +2903,7 @@ class ExitTrades(Trades):
             >>> pf.exit_trades.plot_signals().show()
             ```
 
-            ![](/assets/images/api/exit_trades_plot_signals.svg){: .iimg }
+            ![](/assets/images/api/exit_trades_plot_signals.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
