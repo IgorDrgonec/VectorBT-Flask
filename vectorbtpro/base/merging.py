@@ -340,7 +340,7 @@ def column_stack_merge(
                         max_n_rows = new_obj.shape[0]
                     n_cols += new_obj.shape[1]
                 if min_n_rows == max_n_rows:
-                    return column_stack(objs)
+                    return column_stack(new_objs)
                 new_obj = np.full((max_n_rows, n_cols), fill_value)
                 start_col = 0
                 for obj in new_objs:

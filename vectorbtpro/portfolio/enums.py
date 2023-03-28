@@ -553,7 +553,6 @@ Attributes:
     CloseReduce: Close the current position or reduce it if accumulation is enabled.
     Reverse: Reverse the current position.
     ReverseReduce: Reverse the current position or reduce it if accumulation is enabled.
-            
 """
 
 

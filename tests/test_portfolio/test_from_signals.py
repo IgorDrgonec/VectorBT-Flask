@@ -6094,8 +6094,9 @@ class TestFromSignals:
 
         @njit
         def adjust_sl_func_nb(c, dur):
-            if c.i - c.last_sl_info["init_idx"][c.col] >= dur:
-                c.last_sl_info["stop"][c.col] = 0.0
+            if c.last_sl_info["init_idx"][c.col] != -1:
+                if c.i - c.last_sl_info["init_idx"][c.col] >= dur:
+                    c.last_sl_info["stop"][c.col] = 0.0
 
         assert_records_close(
             from_signals_longonly(
@@ -6118,8 +6119,9 @@ class TestFromSignals:
 
         @njit
         def adjust_tp_func_nb(c, dur):
-            if c.i - c.last_tp_info["init_idx"][c.col] >= dur:
-                c.last_tp_info["stop"][c.col] = 0.0
+            if c.last_tp_info["init_idx"][c.col] != -1:
+                if c.i - c.last_tp_info["init_idx"][c.col] >= dur:
+                    c.last_tp_info["stop"][c.col] = 0.0
 
         assert_records_close(
             from_signals_longonly(

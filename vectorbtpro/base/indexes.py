@@ -75,6 +75,8 @@ def index_from_values(
             if np.issubdtype(v.dtype, np.floating):
                 if np.isclose(v, v.item(0), equal_nan=True).all():
                     all_same = True
+            elif v.dtype.names is not None:
+                all_same = False
             else:
                 if np.equal(v, v.item(0)).all():
                     all_same = True
