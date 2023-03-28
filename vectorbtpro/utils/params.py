@@ -16,7 +16,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import Config, merge_dicts
 from vectorbtpro.utils.execution import execute
-from vectorbtpro.utils.template import substitute_templates
+from vectorbtpro.utils.template import CustomTemplate, substitute_templates
 from vectorbtpro.utils.parsing import annotate_args, ann_args_to_args
 
 __all__ = [
@@ -147,6 +147,9 @@ class Param:
     
     If so, providing a NumPy array will be considered as a single value."""
 
+    map_template: tp.Optional[CustomTemplate] = attr.ib(default=None)
+    """Template to map `Param.value` before building parameter combinations."""
+
     random_subset: tp.Union[None, int, float] = attr.ib(default=None)
     """Random subset of values to select."""
 
@@ -177,6 +180,11 @@ class Param:
 
     If None, converts `Param.value` to an index using 
     `vectorbtpro.base.indexes.index_from_values`."""
+
+    hide: bool = attr.ib(default=False)
+    """Whether to hid the parameter from the parameter index.
+    
+    At least one parameter must be displayed per level."""
 
     name: tp.Optional[tp.Hashable] = attr.ib(default=None)
     """Name of the parameter.
@@ -246,31 +254,49 @@ def combine_params(
         sr_name = None
         index_name = None
 
-        keys = p.keys
-        if keys is not None:
-            if not isinstance(keys, pd.Index):
-                keys = pd.Index(keys)
-            keys_name = keys.name
+        if not p.hide:
+            keys = p.keys
+            if keys is not None:
+                if not isinstance(keys, pd.Index):
+                    keys = pd.Index(keys)
+                keys_name = keys.name
+        else:
+            keys = None
 
         value = p.value
         if isinstance(value, dict):
-            if keys is None:
+            if not p.hide and keys is None:
                 keys = pd.Index(value.keys())
             value = list(value.values())
         elif isinstance(value, pd.Index):
-            if keys is None:
+            if not p.hide and keys is None:
                 keys = value
-            index_name = keys.name
+            index_name = value.name
             value = value.tolist()
         elif isinstance(value, pd.Series):
             if not checks.is_default_index(value.index):
-                if keys is None:
+                if not p.hide and keys is None:
                     keys = value.index
                 index_name = value.index.name
             sr_name = value.name
             value = value.values.tolist()
-
         values = params_to_list(value, is_tuple=p.is_tuple, is_array_like=p.is_array_like)
+
+        if not p.hide:
+            if keys_name is None:
+                if p_name is not None:
+                    keys_name = p_name
+                elif sr_name is not None:
+                    keys_name = sr_name
+                elif index_name is not None:
+                    keys_name = index_name
+                else:
+                    keys_name = k
+            if keys is None:
+                keys = indexes.index_from_values(values, name=keys_name)
+            else:
+                keys = keys.rename(keys_name)
+
         if p.random_subset is not None:
             if checks.is_float(p.random_subset):
                 _random_subset = int(p.random_subset * len(values))
@@ -279,22 +305,23 @@ def combine_params(
             random_indices = np.sort(rng.permutation(np.arange(len(values)))[:_random_subset])
         else:
             random_indices = None
-        if keys_name is None:
-            if p_name is not None:
-                keys_name = p_name
-            elif sr_name is not None:
-                keys_name = sr_name
-            elif index_name is not None:
-                keys_name = index_name
-            else:
-                keys_name = k
-        if keys is None:
-            keys = indexes.index_from_values(values, name=keys_name)
-        else:
-            keys = keys.rename(keys_name)
         if random_indices is not None:
             values = [values[i] for i in random_indices]
-            keys = keys[random_indices]
+            if keys is not None:
+                keys = keys[random_indices]
+
+        if p.map_template is not None:
+            param_context = merge_dicts(
+                dict(
+                    param=p,
+                    values=values,
+                    keys=keys,
+                    random_indices=random_indices,
+                ),
+                p.context,
+            )
+            values = p.map_template.substitute(param_context, sub_id="map_template")
+
         level_values[level][k] = values
         product_indexes[k] = keys
         names[k] = keys_name
@@ -321,11 +348,14 @@ def combine_params(
         if build_index:
             levels = []
             for k in level_values[level].keys():
-                levels.append(product_indexes[k])
+                if product_indexes[k] is not None:
+                    levels.append(product_indexes[k])
             if len(levels) > 1:
                 _param_index = indexes.stack_indexes(levels, **index_stack_kwargs)
-            else:
+            elif len(levels) == 1:
                 _param_index = levels[0]
+            else:
+                raise ValueError("At least one parameter must be displayed per level")
             new_product_indexes.append(_param_index)
     if build_index:
         if len(new_product_indexes) > 1:
@@ -394,7 +424,6 @@ def combine_params(
             random_subset = int(random_subset * ncombs)
         random_indices = np.sort(rng.permutation(np.arange(ncombs))[:random_subset])
         param_product = {k: [v[i] for i in random_indices] for k, v in param_product.items()}
-        ncombs = len(random_indices)
         if build_index:
             param_index = param_index[random_indices]
 
