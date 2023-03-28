@@ -917,10 +917,24 @@ def get_diraware_size_nb(size: float, direction: int) -> float:
 
 
 @register_jitted(cache=True)
+def get_mn_asset_value_nb(position: float, debt: float, val_price: float) -> float:
+    """Get market-neutral asset value."""
+    if position == 0:
+        return 0.0
+    if position < 0:
+        avg_entry_price = debt / abs(position)
+        entry_asset_value = avg_entry_price * position
+        asset_value = position * val_price
+        return 2 * entry_asset_value - asset_value
+    return position * val_price
+
+
+@register_jitted(cache=True)
 def resolve_size_nb(
     size: float,
     size_type: int,
     position: float,
+    debt: float,
     val_price: float,
     value: float,
     as_requirement: bool = False,
@@ -928,12 +942,20 @@ def resolve_size_nb(
     """Resolve size into an absolute amount of assets and percentage of resources.
 
     Percentage is only set if the option `SizeType.Percent(100)` is used."""
+    if size_type == SizeType.MNTargetPercent100:
+        size /= 100
+        size_type = SizeType.MNTargetPercent
     if size_type == SizeType.ValuePercent100:
         size /= 100
         size_type = SizeType.ValuePercent
     if size_type == SizeType.TargetPercent100:
         size /= 100
         size_type = SizeType.TargetPercent
+
+    if size_type == SizeType.MNTargetPercent:
+        # Percentage or target percentage of the current market-neutral value
+        size *= value
+        size_type = SizeType.MNTargetValue
     if size_type == SizeType.ValuePercent or size_type == SizeType.TargetPercent:
         # Percentage or target percentage of the current value
         size *= value
@@ -942,6 +964,15 @@ def resolve_size_nb(
         else:
             size_type = SizeType.TargetValue
 
+    if size_type == SizeType.MNTargetValue:
+        # Target market-neutral value
+        mn_asset_value = get_mn_asset_value_nb(
+            position=position,
+            debt=debt,
+            val_price=val_price,
+        )
+        size = size - mn_asset_value
+        size_type = SizeType.Value
     if size_type == SizeType.Value or size_type == SizeType.TargetValue:
         # Value or target value
         size /= val_price
@@ -984,28 +1015,29 @@ def approx_order_value_nb(
     Positive value means spending (for sorting reasons)."""
     size = get_diraware_size_nb(float(size), direction)
     amount_size, _ = resolve_size_nb(
-        size,
-        size_type,
-        exec_state.position,
-        exec_state.val_price,
-        exec_state.value,
+        size=size,
+        size_type=size_type,
+        position=exec_state.position,
+        debt=exec_state.debt,
+        val_price=exec_state.val_price,
+        value=exec_state.value,
     )
     if amount_size >= 0:
         order_value = approx_buy_value_nb(
-            exec_state.position,
-            exec_state.debt,
-            exec_state.locked_cash,
-            exec_state.val_price,
-            abs(amount_size),
-            direction,
+            position=exec_state.position,
+            debt=exec_state.debt,
+            locked_cash=exec_state.locked_cash,
+            val_price=exec_state.val_price,
+            size=abs(amount_size),
+            direction=direction,
         )
     else:
         order_value = approx_sell_value_nb(
-            exec_state.position,
-            exec_state.debt,
-            exec_state.val_price,
-            abs(amount_size),
-            direction,
+            position=exec_state.position,
+            debt=exec_state.debt,
+            val_price=exec_state.val_price,
+            size=abs(amount_size),
+            direction=direction,
         )
     return order_value
 
@@ -1162,6 +1194,7 @@ def execute_order_nb(
         size=order_size,
         size_type=order_size_type,
         position=position,
+        debt=debt,
         val_price=val_price,
         value=value,
     )
@@ -1170,6 +1203,7 @@ def execute_order_nb(
             size=min_order_size,
             size_type=order_size_type,
             position=position,
+            debt=debt,
             val_price=val_price,
             value=value,
             as_requirement=True,
@@ -1181,6 +1215,7 @@ def execute_order_nb(
             size=max_order_size,
             size_type=order_size_type,
             position=position,
+            debt=debt,
             val_price=val_price,
             value=value,
             as_requirement=True,
