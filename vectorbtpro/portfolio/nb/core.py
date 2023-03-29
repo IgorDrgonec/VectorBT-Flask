@@ -917,16 +917,12 @@ def get_diraware_size_nb(size: float, direction: int) -> float:
 
 
 @register_jitted(cache=True)
-def get_mn_asset_value_nb(position: float, debt: float, val_price: float) -> float:
+def get_mn_val_price_nb(position: float, debt: float, val_price: float) -> float:
     """Get market-neutral asset value."""
-    if position == 0:
-        return 0.0
     if position < 0:
         avg_entry_price = debt / abs(position)
-        entry_asset_value = avg_entry_price * position
-        asset_value = position * val_price
-        return 2 * entry_asset_value - asset_value
-    return position * val_price
+        return 2 * avg_entry_price - val_price
+    return val_price
 
 
 @register_jitted(cache=True)
@@ -942,20 +938,29 @@ def resolve_size_nb(
     """Resolve size into an absolute amount of assets and percentage of resources.
 
     Percentage is only set if the option `SizeType.Percent(100)` is used."""
+    market_neutral = False
     if size_type == SizeType.MNTargetPercent100:
-        size /= 100
-        size_type = SizeType.MNTargetPercent
+        market_neutral = True
+        size_type = SizeType.TargetPercent100
+    if size_type == SizeType.MNTargetPercent:
+        market_neutral = True
+        size_type = SizeType.TargetPercent
+    if size_type == SizeType.MNTargetValue:
+        market_neutral = True
+        size_type = SizeType.TargetValue
+    if market_neutral:
+        val_price = get_mn_val_price_nb(
+            position=position,
+            debt=debt,
+            val_price=val_price,
+        )
+
     if size_type == SizeType.ValuePercent100:
         size /= 100
         size_type = SizeType.ValuePercent
     if size_type == SizeType.TargetPercent100:
         size /= 100
         size_type = SizeType.TargetPercent
-
-    if size_type == SizeType.MNTargetPercent:
-        # Percentage or target percentage of the current market-neutral value
-        size *= value
-        size_type = SizeType.MNTargetValue
     if size_type == SizeType.ValuePercent or size_type == SizeType.TargetPercent:
         # Percentage or target percentage of the current value
         size *= value
@@ -963,16 +968,6 @@ def resolve_size_nb(
             size_type = SizeType.Value
         else:
             size_type = SizeType.TargetValue
-
-    if size_type == SizeType.MNTargetValue:
-        # Target market-neutral value
-        mn_asset_value = get_mn_asset_value_nb(
-            position=position,
-            debt=debt,
-            val_price=val_price,
-        )
-        size = size - mn_asset_value
-        size_type = SizeType.Value
     if size_type == SizeType.Value or size_type == SizeType.TargetValue:
         # Value or target value
         size /= val_price
@@ -980,7 +975,6 @@ def resolve_size_nb(
             size_type = SizeType.Amount
         else:
             size_type = SizeType.TargetAmount
-
     if size_type == SizeType.TargetAmount:
         # Target amount
         if not as_requirement:
