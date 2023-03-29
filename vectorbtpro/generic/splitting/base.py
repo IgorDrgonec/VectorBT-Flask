@@ -2543,10 +2543,16 @@ class Splitter(Analyzable):
         return ready_range_or_meta
 
     @classmethod
-    def take_range(cls, obj: tp.Any, ready_range: tp.ReadyRangeLike) -> tp.Any:
-        """Take a ready range from an array-like object."""
+    def take_range(cls, obj: tp.Any, ready_range: tp.ReadyRangeLike, point_wise: bool = False) -> tp.Any:
+        """Take a ready range from an array-like object.
+
+        Set `point_wise` to True to select one range point at a time and return a tuple."""
         if isinstance(obj, (pd.Series, pd.DataFrame, PandasIndexer)):
+            if point_wise:
+                return tuple(obj.iloc[i] for i in np.arange(len(obj))[ready_range])
             return obj.iloc[ready_range]
+        if point_wise:
+            return tuple(obj[i] for i in np.arange(len(obj))[ready_range])
         return obj[ready_range]
 
     def take(
@@ -2565,6 +2571,7 @@ class Splitter(Analyzable):
         obj_index: tp.Optional[tp.IndexLike] = None,
         obj_freq: tp.Optional[tp.FrequencyLike] = None,
         range_format: str = "slice_or_any",
+        point_wise: bool = False,
         attach_bounds: tp.Union[bool, str] = False,
         right_inclusive: bool = False,
         template_context: tp.KwargsLike = None,
@@ -2780,7 +2787,7 @@ class Splitter(Analyzable):
                 return_obj_meta=True,
                 return_meta=True,
             )
-            obj_slice = self.take_range(obj, obj_range_meta["range_"])
+            obj_slice = self.take_range(obj, obj_range_meta["range_"], point_wise=point_wise)
             bounds = _get_bounds(range_meta, obj_meta, obj_range_meta)
             return dict(
                 split_idx=split_idx,
@@ -2958,6 +2965,7 @@ class Splitter(Analyzable):
         obj_index: tp.Optional[tp.IndexLike] = None,
         obj_freq: tp.Optional[tp.FrequencyLike] = None,
         range_format: str = "slice_or_any",
+        point_wise: bool = False,
         attach_bounds: tp.Union[bool, str] = False,
         right_inclusive: bool = False,
         template_context: tp.KwargsLike = None,
@@ -3182,7 +3190,7 @@ class Splitter(Analyzable):
                 return_obj_meta=True,
                 return_meta=True,
             )
-            obj_slice = self.take_range(takeable.obj, obj_range_meta["range_"])
+            obj_slice = self.take_range(takeable.obj, obj_range_meta["range_"], point_wise=point_wise)
             return obj_meta, obj_range_meta, obj_slice
 
         def _take_args(args, range_, _template_context):
