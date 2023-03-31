@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from vectorbtpro.portfolio.decorators import *
     from vectorbtpro.portfolio.logs import *
     from vectorbtpro.portfolio.orders import *
+    from vectorbtpro.portfolio.preparers import *
     from vectorbtpro.portfolio.trades import *
 
 __exclude_from__all__ = [

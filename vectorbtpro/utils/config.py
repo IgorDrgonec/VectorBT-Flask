@@ -85,8 +85,8 @@ def get_dict_item(dct: dict, k: tp.Hashable) -> tp.Any:
         k = tuple(k.split("."))
     if isinstance(k, tuple):
         if len(k) == 1:
-            return dct[k[0]]
-        return get_dict_item(dct[k[0]], k[1:])
+            return get_dict_item(dct, k[0])
+        return get_dict_item(get_dict_item(dct, k[0]), k[1:])
     return dct[k]
 
 
@@ -185,6 +185,9 @@ def merge_dicts(
 
             If None, checks whether any dict is nested.
         same_keys (bool): Whether to merge on the overlapping keys only."""
+    if len(dicts) == 1:
+        dicts = (None, dicts[0])
+
     # Shortcut when both dicts are None
     if dicts[0] is None and dicts[1] is None:
         if len(dicts) > 2:
@@ -918,12 +921,43 @@ class Configured(Cacheable, Comparable, Pickleable, Prettified):
                     cls_cfgs.append(get_dict_item(settings, c_settings_key))
         if len(cls_cfgs) == 0:
             if key_id is None:
-                raise KeyError(f"No settings associated with the class {cls.__name__}")
+                raise KeyError(f"No settings associated with the class '{cls.__name__}'")
             else:
                 raise KeyError(f"Key id '{key_id}' not found among registered setting keys")
         if len(cls_cfgs) == 1:
             return cls_cfgs[0]
         return merge_dicts(*cls_cfgs)
+
+    @classmethod
+    def get_setting(cls, k: str, key_id: tp.Optional[str] = None) -> dict:
+        """Get class-related settings from `vectorbtpro._settings`."""
+        from vectorbtpro._settings import settings
+
+        found_settings = False
+        for c in cls.__mro__:
+            if hasattr(c, "_setting_keys"):
+                c_setting_keys = getattr(c, "_setting_keys")
+                if c_setting_keys is not None:
+                    if isinstance(c_setting_keys, dict):
+                        if key_id is None:
+                            raise ValueError("Must specify key_id")
+                        if key_id not in c_setting_keys:
+                            continue
+                        c_settings_key = c_setting_keys[key_id]
+                        if c_settings_key is None:
+                            continue
+                    else:
+                        c_settings_key = c_setting_keys
+                    try:
+                        return get_dict_item(settings, (c_settings_key, k))
+                    except Exception as e:
+                        found_settings = True
+        if not found_settings:
+            if key_id is None:
+                raise KeyError(f"No settings associated with the class '{cls.__name__}'")
+            else:
+                raise KeyError(f"Key id '{key_id}' not found among registered setting keys")
+        raise KeyError(f"Key '{k}' not found among registered settings")
 
     @classmethod
     def set_settings(cls, key_id: tp.Optional[str] = None, **kwargs) -> None:
@@ -939,7 +973,7 @@ class Configured(Cacheable, Comparable, Pickleable, Prettified):
         else:
             cls_settings_key = cls._setting_keys
         if cls_settings_key is None:
-            raise ValueError(f"No settings associated with the class {cls.__name__}")
+            raise ValueError(f"No settings associated with the class '{cls.__name__}'")
         cls_cfg = get_dict_item(settings, cls_settings_key)
         for k, v in kwargs.items():
             if k not in cls_cfg:
@@ -963,7 +997,7 @@ class Configured(Cacheable, Comparable, Pickleable, Prettified):
         else:
             cls_settings_key = cls._setting_keys
         if cls_settings_key is None:
-            raise ValueError(f"No settings associated with the class {cls.__name__}")
+            raise ValueError(f"No settings associated with the class '{cls.__name__}'")
         cls_cfg = get_dict_item(settings, cls_settings_key)
         cls_cfg.reset(force=True)
 

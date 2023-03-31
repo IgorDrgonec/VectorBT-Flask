@@ -256,7 +256,7 @@ Date
 >>> pf.value.vbt.plot().show()
 ```
 
-![](/assets/images/api/portfolio_value.svg){: .iimg }
+![](/assets/images/api/portfolio_value.svg){: .iimg loading=lazy }
 
 ## Broadcasting
 
@@ -1473,7 +1473,7 @@ Plot a single column of a portfolio:
 >>> pf.plot(column=10).show()
 ```
 
-![](/assets/images/api/portfolio_col_plot.svg){: .iimg }
+![](/assets/images/api/portfolio_col_plot.svg){: .iimg loading=lazy }
 
 To plot a single column of a grouped portfolio:
 
@@ -1493,7 +1493,7 @@ UserWarning: Subplot 'orders' does not support grouped data
 UserWarning: Subplot 'trade_pnl' does not support grouped data
 ```
 
-![](/assets/images/api/portfolio_group_plot.svg){: .iimg }
+![](/assets/images/api/portfolio_group_plot.svg){: .iimg loading=lazy }
 
 !!! note
     Some subplots do not support plotting grouped data.
@@ -1518,7 +1518,7 @@ control their appearance using keyword arguments:
 ... ).show()
 ```
 
-![](/assets/images/api/portfolio_plot_drawdowns.svg){: .iimg }
+![](/assets/images/api/portfolio_plot_drawdowns.svg){: .iimg loading=lazy }
 
 ### Custom subplots
 
@@ -1565,7 +1565,7 @@ Alternatively, you can create a placeholder and overwrite it manually later:
 ... ).show()
 ```
 
-![](/assets/images/api/portfolio_plot_custom.svg){: .iimg }
+![](/assets/images/api/portfolio_plot_custom.svg){: .iimg loading=lazy }
 
 If a plotting function can in any way be accessed from the current portfolio, you can pass
 the path to this function (see `vectorbtpro.utils.attr_.deep_getattr` for the path format).
@@ -1614,7 +1614,7 @@ You can also replace templates across all subplots by using the global template 
 >>> pf.plot(subplots, column=10, template_context=dict(window=10)).show()
 ```
 
-![](/assets/images/api/portfolio_plot_path.svg){: .iimg }
+![](/assets/images/api/portfolio_plot_path.svg){: .iimg loading=lazy }
 """
 
 import string
@@ -1653,6 +1653,7 @@ from vectorbtpro.portfolio.logs import Logs
 from vectorbtpro.portfolio.orders import Orders, FSOrders
 from vectorbtpro.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
 from vectorbtpro.portfolio.pfopt.base import PortfolioOptimizer
+from vectorbtpro.portfolio.preparers import FOPreparer
 from vectorbtpro.records.base import Records
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
@@ -3988,7 +3989,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_orders(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data],
+        close: tp.Union[tp.ArrayLike, Data, FOPreparer],
         size: tp.Optional[tp.ArrayLike] = None,
         size_type: tp.Optional[tp.ArrayLike] = None,
         direction: tp.Optional[tp.ArrayLike] = None,
@@ -4034,20 +4035,23 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         chunked: tp.ChunkedOption = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
+        return_preparer: bool = False,
         **kwargs,
-    ) -> PortfolioT:
+    ) -> tp.Union[PortfolioT, FOPreparer]:
         """Simulate portfolio from orders - size, price, fees, and other information.
 
         See `vectorbtpro.portfolio.nb.from_orders.from_orders_nb`.
 
         Args:
-            close (array_like or Data): Latest asset price at each time step.
+            close (array_like, Data, or FOPreparer): Latest asset price at each time step.
                 Will broadcast.
+
+                Used for calculating unrealized PnL and portfolio value.
 
                 If an instance of `vectorbtpro.data.base.Data`, will extract the open, high,
                 low, and close price.
 
-                Used for calculating unrealized PnL and portfolio value.
+                If an instance of `vectorbtpro.portfolio.preparers.FOPreparer`, will use it as a preparer.
             size (float or array_like): Size to order.
                 See `vectorbtpro.portfolio.enums.Order.size`. Will broadcast.
             size_type (SizeType or array_like): See `vectorbtpro.portfolio.enums.SizeType` and
@@ -4236,6 +4240,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Will broadcast.
 
                 If not provided, will use `close`. If False, will not use any benchmark.
+            return_preparer (bool): Whether to return the preparer of the type
+                `vectorbtpro.portfolio.preparers.FOPreparer`.
+
+                !!! note
+                    Seed won't be set in this case, you need to explicitly call `preparer.set_seed()`.
             **kwargs: Keyword arguments passed to the `Portfolio` constructor.
 
         All broadcastable arguments will broadcast using `vectorbtpro.base.reshaping.broadcast`
@@ -4356,7 +4365,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> pf.get_asset_value(group_by=False).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg }
+            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg loading=lazy }
 
             * Test 10 random weight combinations:
 
@@ -4424,372 +4433,65 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             Name: total_return, dtype: float64
             ```
         """
-        # Get defaults
-        from vectorbtpro._settings import settings
-
-        portfolio_cfg = settings["portfolio"]
-
-        if isinstance(close, Data):
-            data = close
-            close = data.close
-            if close is None:
-                raise ValueError("Column for close couldn't be found in data")
-            if open is None:
-                open = data.open
-            if high is None:
-                high = data.high
-            if low is None:
-                low = data.low
-            if freq is None:
-                freq = data.freq
-        if open is None:
-            open_none = True
-            open = np.nan
+        if isinstance(close, FOPreparer):
+            preparer = close
         else:
-            open_none = False
-        if high is None:
-            high_none = True
-            high = np.nan
+            preparer = FOPreparer(
+                data=close if isinstance(close, Data) else None,
+                open=open,
+                high=high,
+                low=low,
+                close=close if not isinstance(close, Data) else None,
+                size=size,
+                size_type=size_type,
+                direction=direction,
+                price=price,
+                fees=fees,
+                fixed_fees=fixed_fees,
+                slippage=slippage,
+                min_size=min_size,
+                max_size=max_size,
+                size_granularity=size_granularity,
+                leverage=leverage,
+                leverage_mode=leverage_mode,
+                reject_prob=reject_prob,
+                price_area_vio_mode=price_area_vio_mode,
+                allow_partial=allow_partial,
+                raise_reject=raise_reject,
+                log=log,
+                val_price=val_price,
+                init_cash=init_cash,
+                init_position=init_position,
+                init_price=init_price,
+                cash_deposits=cash_deposits,
+                cash_earnings=cash_earnings,
+                cash_dividends=cash_dividends,
+                cash_sharing=cash_sharing,
+                from_ago=from_ago,
+                call_seq=call_seq,
+                attach_call_seq=attach_call_seq,
+                ffill_val_price=ffill_val_price,
+                update_value=update_value,
+                save_state=save_state,
+                save_value=save_value,
+                save_returns=save_returns,
+                max_orders=max_orders,
+                max_logs=max_logs,
+                seed=seed,
+                group_by=group_by,
+                broadcast_kwargs=broadcast_kwargs,
+                freq=freq,
+                bm_close=bm_close,
+                **kwargs,
+            )
+        if return_preparer:
+            return preparer
         else:
-            high_none = False
-        if low is None:
-            low_none = True
-            low = np.nan
-        else:
-            low_none = False
-
-        if size is None:
-            size = portfolio_cfg["size"]
-        if size_type is None:
-            size_type = portfolio_cfg["size_type"]
-        if direction is None:
-            direction = portfolio_cfg["direction"]
-        if price is None:
-            price = portfolio_cfg["price"]
-        if size is None:
-            size = portfolio_cfg["size"]
-        if fees is None:
-            fees = portfolio_cfg["fees"]
-        if fixed_fees is None:
-            fixed_fees = portfolio_cfg["fixed_fees"]
-        if slippage is None:
-            slippage = portfolio_cfg["slippage"]
-        if min_size is None:
-            min_size = portfolio_cfg["min_size"]
-        if max_size is None:
-            max_size = portfolio_cfg["max_size"]
-        if size_granularity is None:
-            size_granularity = portfolio_cfg["size_granularity"]
-        if leverage is None:
-            leverage = portfolio_cfg["leverage"]
-        if leverage_mode is None:
-            leverage_mode = portfolio_cfg["leverage_mode"]
-        if reject_prob is None:
-            reject_prob = portfolio_cfg["reject_prob"]
-        if price_area_vio_mode is None:
-            price_area_vio_mode = portfolio_cfg["price_area_vio_mode"]
-        if allow_partial is None:
-            allow_partial = portfolio_cfg["allow_partial"]
-        if raise_reject is None:
-            raise_reject = portfolio_cfg["raise_reject"]
-        if log is None:
-            log = portfolio_cfg["log"]
-        if val_price is None:
-            val_price = portfolio_cfg["val_price"]
-        if init_cash is None:
-            init_cash = portfolio_cfg["init_cash"]
-        if isinstance(init_cash, str):
-            init_cash = map_enum_fields(init_cash, enums.InitCashMode)
-        if checks.is_int(init_cash) and init_cash in enums.InitCashMode:
-            init_cash_mode = init_cash
-            init_cash = np.inf
-        else:
-            init_cash_mode = None
-        if init_position is None:
-            init_position = portfolio_cfg["init_position"]
-        if init_price is None:
-            init_price = portfolio_cfg["init_price"]
-        if cash_deposits is None:
-            cash_deposits = portfolio_cfg["cash_deposits"]
-        if cash_earnings is None:
-            cash_earnings = portfolio_cfg["cash_earnings"]
-        if cash_dividends is None:
-            cash_dividends = portfolio_cfg["cash_dividends"]
-        if cash_sharing is None:
-            cash_sharing = portfolio_cfg["cash_sharing"]
-        if cash_sharing and group_by is None:
-            group_by = True
-        if from_ago is None:
-            from_ago = portfolio_cfg["from_ago"]
-        if from_ago is None:
-            from_ago = 0
-            from_ago_none = True
-        else:
-            from_ago_none = False
-        if call_seq is None:
-            call_seq = portfolio_cfg["call_seq"]
-        auto_call_seq = False
-        if isinstance(call_seq, str):
-            call_seq = map_enum_fields(call_seq, enums.CallSeqType)
-        if checks.is_int(call_seq):
-            if call_seq == enums.CallSeqType.Auto:
-                auto_call_seq = True
-                call_seq = None
-        if attach_call_seq is None:
-            attach_call_seq = portfolio_cfg["attach_call_seq"]
-        if ffill_val_price is None:
-            ffill_val_price = portfolio_cfg["ffill_val_price"]
-        if update_value is None:
-            update_value = portfolio_cfg["update_value"]
-        if save_state is None:
-            save_state = portfolio_cfg["save_state"]
-        if save_value is None:
-            save_value = portfolio_cfg["save_value"]
-        if save_returns is None:
-            save_returns = portfolio_cfg["save_returns"]
-        if seed is None:
-            seed = portfolio_cfg["seed"]
-        if seed is not None:
-            set_seed(seed)
-        if group_by is None:
-            group_by = portfolio_cfg["group_by"]
-        if freq is None:
-            freq = portfolio_cfg["freq"]
-        broadcast_kwargs = merge_dicts(portfolio_cfg["broadcast_kwargs"], broadcast_kwargs)
-        require_kwargs = broadcast_kwargs.get("require_kwargs", {})
-        if bm_close is None:
-            bm_close = portfolio_cfg["bm_close"]
-
-        # Prepare the simulation
-        # Only close is broadcast, others can remain unchanged thanks to flexible indexing
-        broadcastable_args = dict(
-            cash_earnings=cash_earnings,
-            cash_dividends=cash_dividends,
-            size=size,
-            price=price,
-            size_type=size_type,
-            direction=direction,
-            fees=fees,
-            fixed_fees=fixed_fees,
-            slippage=slippage,
-            min_size=min_size,
-            max_size=max_size,
-            size_granularity=size_granularity,
-            leverage=leverage,
-            leverage_mode=leverage_mode,
-            reject_prob=reject_prob,
-            price_area_vio_mode=price_area_vio_mode,
-            allow_partial=allow_partial,
-            raise_reject=raise_reject,
-            log=log,
-            val_price=val_price,
-            open=open,
-            high=high,
-            low=low,
-            close=close,
-            from_ago=from_ago,
-        )
-        if bm_close is not None and not isinstance(bm_close, bool):
-            broadcastable_args["bm_close"] = bm_close
-        else:
-            broadcastable_args["bm_close"] = None
-
-        broadcast_kwargs = merge_dicts(
-            dict(
-                to_pd=False,
-                keep_flex=True,
-                reindex_kwargs=dict(
-                    cash_earnings=dict(fill_value=0.0),
-                    cash_dividends=dict(fill_value=0.0),
-                    size=dict(fill_value=np.nan),
-                    price=dict(fill_value=np.nan),
-                    size_type=dict(fill_value=enums.SizeType.Amount),
-                    direction=dict(fill_value=enums.Direction.Both),
-                    fees=dict(fill_value=0.0),
-                    fixed_fees=dict(fill_value=0.0),
-                    slippage=dict(fill_value=0.0),
-                    min_size=dict(fill_value=np.nan),
-                    max_size=dict(fill_value=np.nan),
-                    size_granularity=dict(fill_value=np.nan),
-                    leverage=dict(fill_value=1.0),
-                    leverage_mode=dict(fill_value=enums.LeverageMode.Lazy),
-                    reject_prob=dict(fill_value=0.0),
-                    price_area_vio_mode=dict(fill_value=enums.PriceAreaVioMode.Ignore),
-                    allow_partial=dict(fill_value=True),
-                    raise_reject=dict(fill_value=False),
-                    log=dict(fill_value=False),
-                    val_price=dict(fill_value=np.nan),
-                    open=dict(fill_value=np.nan),
-                    high=dict(fill_value=np.nan),
-                    low=dict(fill_value=np.nan),
-                    close=dict(fill_value=np.nan),
-                    bm_close=dict(fill_value=np.nan),
-                    from_ago=dict(fill_value=0),
-                ),
-                wrapper_kwargs=dict(
-                    freq=freq,
-                    group_by=group_by,
-                ),
-            ),
-            broadcast_kwargs,
-        )
-        broadcasted_args, wrapper = broadcast(broadcastable_args, return_wrapper=True, **broadcast_kwargs)
-        if not wrapper.group_select and cash_sharing:
-            raise ValueError("group_select cannot be disabled if cash_sharing=True")
-        cash_earnings = broadcasted_args.pop("cash_earnings")
-        cash_dividends = broadcasted_args.pop("cash_dividends")
-        target_shape_2d = wrapper.shape_2d
-
-        cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
-        init_cash = np.require(broadcast_array_to(init_cash, len(cs_group_lens)), dtype=np.float_)
-        init_position = np.require(broadcast_array_to(init_position, target_shape_2d[1]), dtype=np.float_)
-        init_price = np.require(broadcast_array_to(init_price, target_shape_2d[1]), dtype=np.float_)
-        if (((init_position > 0) | (init_position < 0)) & np.isnan(init_price)).any():
-            warnings.warn(f"Initial position has undefined price. Set init_price.", stacklevel=2)
-        cash_deposits = broadcast(
-            cash_deposits,
-            to_shape=(target_shape_2d[0], len(cs_group_lens)),
-            to_pd=False,
-            keep_flex=True,
-            reindex_kwargs=dict(fill_value=0.0),
-            require_kwargs=require_kwargs,
-        )
-        group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-        if call_seq is None and attach_call_seq:
-            call_seq = enums.CallSeqType.Default
-        if call_seq is not None:
-            if checks.is_any_array(call_seq):
-                call_seq = require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
-            else:
-                call_seq = build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
-        if max_orders is None:
-            _size = broadcasted_args["size"]
-            if _size.size == 1:
-                max_orders = target_shape_2d[0] * int(not np.isnan(_size.item(0)))
-            else:
-                if _size.shape[0] == 1 and target_shape_2d[0] > 1:
-                    max_orders = target_shape_2d[0] * int(np.any(~np.isnan(_size)))
-                else:
-                    max_orders = int(np.max(np.sum(~np.isnan(_size), axis=0)))
-        if max_logs is None:
-            _log = broadcasted_args["log"]
-            if _log.size == 1:
-                max_logs = target_shape_2d[0] * int(_log.item(0))
-            else:
-                if _log.shape[0] == 1 and target_shape_2d[0] > 1:
-                    max_logs = target_shape_2d[0] * int(np.any(_log))
-                else:
-                    max_logs = int(np.max(np.sum(_log, axis=0)))
-
-        # Convert strings to numbers
-        broadcasted_args["price"] = map_enum_fields(broadcasted_args["price"], enums.PriceType, ignore_type=(int, float))
-        broadcasted_args["size_type"] = map_enum_fields(broadcasted_args["size_type"], enums.SizeType)
-        broadcasted_args["direction"] = map_enum_fields(broadcasted_args["direction"], enums.Direction)
-        broadcasted_args["leverage_mode"] = map_enum_fields(broadcasted_args["leverage_mode"], enums.LeverageMode)
-        broadcasted_args["price_area_vio_mode"] = map_enum_fields(
-            broadcasted_args["price_area_vio_mode"],
-            enums.PriceAreaVioMode,
-        )
-        broadcasted_args["val_price"] = map_enum_fields(
-            broadcasted_args["val_price"],
-            enums.ValPriceType,
-            ignore_type=(int, float),
-        )
-
-        # Check data types
-        checks.assert_subdtype(cs_group_lens, np.integer, arg_name="cs_group_lens")
-        if call_seq is not None:
-            checks.assert_subdtype(call_seq, np.integer, arg_name="call_seq")
-        checks.assert_subdtype(init_cash, np.number, arg_name="init_cash")
-        checks.assert_subdtype(init_position, np.number, arg_name="init_position")
-        checks.assert_subdtype(init_price, np.number, arg_name="init_price")
-        checks.assert_subdtype(cash_deposits, np.number, arg_name="cash_deposits")
-        checks.assert_subdtype(cash_earnings, np.number, arg_name="cash_earnings")
-        checks.assert_subdtype(cash_dividends, np.number, arg_name="cash_dividends")
-        checks.assert_subdtype(broadcasted_args["size"], np.number, arg_name="size")
-        checks.assert_subdtype(broadcasted_args["price"], np.number, arg_name="price")
-        checks.assert_subdtype(broadcasted_args["size_type"], np.integer, arg_name="size_type")
-        checks.assert_subdtype(broadcasted_args["direction"], np.integer, arg_name="direction")
-        checks.assert_subdtype(broadcasted_args["fees"], np.number, arg_name="fees")
-        checks.assert_subdtype(broadcasted_args["fixed_fees"], np.number, arg_name="fixed_fees")
-        checks.assert_subdtype(broadcasted_args["slippage"], np.number, arg_name="slippage")
-        checks.assert_subdtype(broadcasted_args["min_size"], np.number, arg_name="min_size")
-        checks.assert_subdtype(broadcasted_args["max_size"], np.number, arg_name="max_size")
-        checks.assert_subdtype(broadcasted_args["size_granularity"], np.number, arg_name="size_granularity")
-        checks.assert_subdtype(broadcasted_args["leverage"], np.number, arg_name="leverage")
-        checks.assert_subdtype(broadcasted_args["leverage_mode"], np.integer, arg_name="leverage_mode")
-        checks.assert_subdtype(broadcasted_args["reject_prob"], np.number, arg_name="reject_prob")
-        checks.assert_subdtype(broadcasted_args["price_area_vio_mode"], np.integer, arg_name="price_area_vio_mode")
-        checks.assert_subdtype(broadcasted_args["allow_partial"], np.bool_, arg_name="allow_partial")
-        checks.assert_subdtype(broadcasted_args["raise_reject"], np.bool_, arg_name="raise_reject")
-        checks.assert_subdtype(broadcasted_args["log"], np.bool_, arg_name="log")
-        checks.assert_subdtype(broadcasted_args["val_price"], np.number, arg_name="val_price")
-        checks.assert_subdtype(broadcasted_args["open"], np.number, arg_name="open")
-        checks.assert_subdtype(broadcasted_args["high"], np.number, arg_name="high")
-        checks.assert_subdtype(broadcasted_args["low"], np.number, arg_name="low")
-        checks.assert_subdtype(broadcasted_args["close"], np.number, arg_name="close")
-        if bm_close is not None and not isinstance(bm_close, bool):
-            checks.assert_subdtype(broadcasted_args["bm_close"], np.number, arg_name="bm_close")
-        checks.assert_subdtype(broadcasted_args["from_ago"], np.integer, arg_name="from_ago")
-
-        # Prepare price
-        if from_ago_none:
-            price = broadcasted_args["price"]
-            if price.size == 1 or price.shape[0] == 1:
-                next_open_mask = price == enums.PriceType.NextOpen
-                next_close_mask = price == enums.PriceType.NextClose
-                if next_open_mask.any() or next_close_mask.any():
-                    price = price.astype(np.float_)
-                    price[next_open_mask] = enums.PriceType.Open
-                    price[next_close_mask] = enums.PriceType.Close
-                    from_ago = np.full(price.shape, 0, dtype=np.int_)
-                    from_ago[next_open_mask] = 1
-                    from_ago[next_close_mask] = 1
-                    broadcasted_args["price"] = price
-                    broadcasted_args["from_ago"] = from_ago
-
-        # Remove arguments
-        bm_close = broadcasted_args.pop("bm_close", None)
-
-        # Perform the simulation
+            preparer.set_seed()
         func = jit_reg.resolve_option(nb.from_orders_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        sim_out = func(
-            target_shape=target_shape_2d,
-            group_lens=cs_group_lens,  # group only if cash sharing is enabled to speed up
-            call_seq=call_seq,
-            init_cash=init_cash,
-            init_position=init_position,
-            init_price=init_price,
-            cash_deposits=cash_deposits,
-            cash_earnings=cash_earnings,
-            cash_dividends=cash_dividends,
-            **broadcasted_args,
-            auto_call_seq=auto_call_seq,
-            ffill_val_price=ffill_val_price,
-            update_value=update_value,
-            save_state=save_state,
-            save_value=save_value,
-            save_returns=save_returns,
-            max_orders=max_orders,
-            max_logs=max_logs,
-        )
-
-        # Create an instance
-        return cls(
-            wrapper,
-            sim_out,
-            open=broadcasted_args["open"] if not open_none else None,
-            high=broadcasted_args["high"] if not high_none else None,
-            low=broadcasted_args["low"] if not low_none else None,
-            close=broadcasted_args["close"],
-            cash_sharing=cash_sharing,
-            init_cash=init_cash if init_cash_mode is None else init_cash_mode,
-            init_position=init_position,
-            init_price=init_price,
-            bm_close=bm_close,
-            **kwargs,
-        )
+        sim_out = func(**preparer.sim_args)
+        return cls(order_records=sim_out, **preparer.pf_args)
 
     @classmethod
     def from_signals(
@@ -5686,6 +5388,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         )
         ls_mode = short_entries is not None or short_exits is not None
         signals_mode = entries is not None or exits is not None or ls_mode
+        if not signals_mode and not order_mode and signal_func_nb is None:
+            ls_mode = True
+            signals_mode = True
         signal_func_mode = flexible_mode and not signals_mode and not order_mode
         if direction is not None and ls_mode:
             raise ValueError("Direction and short signal arrays cannot be used together")
@@ -6189,19 +5894,22 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 else:
                     max_logs = int(np.max(np.sum(_log, axis=0)))
         if use_stops is None:
-            if flexible_mode:
+            if stop_ladder:
                 use_stops = True
             else:
-                if (
-                    not np.any(broadcasted_args["sl_stop"])
-                    and not np.any(broadcasted_args["tsl_stop"])
-                    and not np.any(broadcasted_args["tp_stop"])
-                    and not np.any(broadcasted_args["td_stop"] != -1)
-                    and not np.any(broadcasted_args["dt_stop"] != -1)
-                ):
-                    use_stops = False
-                else:
+                if flexible_mode:
                     use_stops = True
+                else:
+                    if (
+                        not np.any(broadcasted_args["sl_stop"])
+                        and not np.any(broadcasted_args["tsl_stop"])
+                        and not np.any(broadcasted_args["tp_stop"])
+                        and not np.any(broadcasted_args["td_stop"] != -1)
+                        and not np.any(broadcasted_args["dt_stop"] != -1)
+                    ):
+                        use_stops = False
+                    else:
+                        use_stops = True
 
         # Convert strings to numbers
         if "direction" in broadcasted_args:
@@ -7339,7 +7047,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> pf.get_asset_value(group_by=False).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg }
+            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg loading=lazy }
 
             Templates are a very powerful tool to prepare any custom arguments after they are broadcast and
             before they are passed to the simulation function. In the example above, we use `broadcast_named_args`
@@ -7360,9 +7068,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> pf['g2'].get_asset_value(group_by=False).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/from_order_func_g1.svg){: .iimg }
+            ![](/assets/images/api/from_order_func_g1.svg){: .iimg loading=lazy }
 
-            ![](/assets/images/api/from_order_func_g2.svg){: .iimg }
+            ![](/assets/images/api/from_order_func_g2.svg){: .iimg loading=lazy }
 
             * Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit:
 
@@ -8227,7 +7935,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> asset_value.vbt.plot().show()
             ```
 
-            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg }
+            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg loading=lazy }
         """
         # Get defaults
         from vectorbtpro._settings import settings

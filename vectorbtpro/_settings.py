@@ -1326,6 +1326,7 @@ portfolio = child_dict(
     allow_partial=True,
     raise_reject=False,
     log=False,
+    from_orders=Config(),
     # Signals
     signal_direction="longonly",
     accumulate=False,
@@ -1362,6 +1363,12 @@ portfolio = child_dict(
     hold_direction="longonly",
     close_at_end=False,
     # Setup
+    data=None,
+    open=None,
+    high=None,
+    low=None,
+    close=None,
+    bm_close=None,
     val_price="price",
     init_cash=100.0,
     init_position=0.0,
@@ -1390,7 +1397,8 @@ portfolio = child_dict(
     from_ago=None,
     call_seq=None,
     attach_call_seq=False,
-    bm_close=None,
+    max_orders=None,
+    max_logs=None,
     staticized=False,
     # Portfolio
     freq=None,

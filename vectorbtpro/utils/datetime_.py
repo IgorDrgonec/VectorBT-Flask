@@ -247,14 +247,18 @@ def infer_index_freq(
     return freq_to_timedelta(freq)
 
 
-def get_utc_tz() -> timezone:
+def get_utc_tz(**kwargs) -> tzinfo:
     """Get UTC timezone."""
-    return timezone.utc
+    from dateutil.tz import tzutc
+
+    return to_timezone(tzutc(), **kwargs)
 
 
-def get_local_tz() -> timezone:
+def get_local_tz(**kwargs) -> tzinfo:
     """Get local timezone."""
-    return timezone(datetime.now(timezone.utc).astimezone().utcoffset())
+    from dateutil.tz import tzlocal
+
+    return to_timezone(tzlocal(), **kwargs)
 
 
 def convert_tzaware_time(t: time, tz_out: tp.Optional[tzinfo]) -> time:

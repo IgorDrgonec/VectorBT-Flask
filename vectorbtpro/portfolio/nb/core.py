@@ -918,7 +918,7 @@ def get_diraware_size_nb(size: float, direction: int) -> float:
 
 @register_jitted(cache=True)
 def get_mn_val_price_nb(position: float, debt: float, val_price: float) -> float:
-    """Get market-neutral asset value."""
+    """Get market-neutral asset valuation price."""
     if position < 0:
         avg_entry_price = debt / abs(position)
         return 2 * avg_entry_price - val_price

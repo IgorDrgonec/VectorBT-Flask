@@ -2,9 +2,11 @@
 
 """Class decorators for portfolio."""
 
+from functools import partial, cached_property
+
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.config import Config, resolve_dict
+from vectorbtpro.utils.config import Config, HybridConfig, resolve_dict, merge_dicts
 from vectorbtpro.utils.decorators import cacheable_property, cached_property
 from vectorbtpro.utils.parsing import get_func_arg_names
 
@@ -133,3 +135,84 @@ def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
         return cls
 
     return wrapper
+
+
+def override_arg_config(*args, merge_configs: bool = True) -> tp.FlexClassWrapper:
+    """Class decorator to override argument configs of all base classes in MRO that subclass
+    `vectorbtpro.portfolio.preparers.BasePreparer`.
+
+    Instead of overriding `_arg_config` class attribute, you can pass `config` directly to this decorator.
+
+    Disable `merge_configs` to not merge, which will effectively disable field inheritance."""
+
+    def wrapper(cls: tp.Type[tp.T], config: tp.DictLike = None) -> tp.Type[tp.T]:
+        checks.assert_subclass_of(cls, "BasePreparer")
+
+        if config is None:
+            config = cls.arg_config
+        if merge_configs:
+            configs = []
+            for base_cls in cls.mro()[::-1]:
+                if base_cls is not cls:
+                    if checks.is_subclass_of(base_cls, "BasePreparer"):
+                        configs.append(base_cls.arg_config)
+            configs.append(config)
+            config = merge_dicts(*configs)
+        if not isinstance(config, Config):
+            config = HybridConfig(config)
+
+        setattr(cls, "_arg_config", config)
+        return cls
+
+    if len(args) == 0:
+        return wrapper
+    elif len(args) == 1:
+        if isinstance(args[0], type):
+            return wrapper(args[0])
+        return partial(wrapper, config=args[0])
+    elif len(args) == 2:
+        return wrapper(args[0], config=args[1])
+    raise ValueError("Either class, config, class and config, or keyword arguments must be passed")
+
+
+def attach_arg_properties(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
+    """Class decorator to attach properties for arguments defined in the argument config
+    of a `vectorbtpro.portfolio.preparers.BasePreparer` subclass."""
+
+    checks.assert_subclass_of(cls, "BasePreparer")
+
+    for arg_name, settings in cls.arg_config["args"].items():
+        broadcast = settings.get("broadcast", False)
+        if broadcast:
+            target_pre_name = "pre_" + arg_name
+            if not hasattr(cls, target_pre_name):
+
+                def pre_arg_prop(self, _arg_name: str = arg_name) -> tp.ArrayLike:
+                    return self.get_arg(_arg_name)
+
+                pre_arg_prop.__name__ = target_pre_name
+                pre_arg_prop.__qualname__ = f"{cls.__name__}.{target_pre_name}"
+                pre_arg_prop.__doc__ = f"Argument `{arg_name}` before broadcasting."
+                setattr(cls, pre_arg_prop.__name__, cached_property(pre_arg_prop))
+
+            target_post_name = "post_" + arg_name
+            if not hasattr(cls, target_post_name):
+                def post_arg_prop(self, _arg_name: str = arg_name) -> tp.ArrayLike:
+                    return self.prepare_post_arg(_arg_name)
+
+                post_arg_prop.__name__ = target_post_name
+                post_arg_prop.__qualname__ = f"{cls.__name__}.{target_post_name}"
+                post_arg_prop.__doc__ = f"Argument `{arg_name}` after broadcasting."
+                setattr(cls, post_arg_prop.__name__, cached_property(post_arg_prop))
+
+            target_name = arg_name
+            if not hasattr(cls, target_name):
+                def arg_prop(self, _target_post_name: str = target_post_name) -> tp.ArrayLike:
+                    return getattr(self, _target_post_name)
+
+                arg_prop.__name__ = target_name
+                arg_prop.__qualname__ = f"{cls.__name__}.{target_name}"
+                arg_prop.__doc__ = f"Argument `{arg_name}`."
+                setattr(cls, arg_prop.__name__, cached_property(arg_prop))
+
+    return cls

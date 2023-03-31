@@ -5,13 +5,13 @@
 import re
 import inspect
 from collections.abc import Iterable
+from functools import cached_property as cachedproperty
 
 import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.decorators import cachedproperty
 from vectorbtpro.utils.parsing import get_func_arg_names
 
 __all__ = [

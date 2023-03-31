@@ -2,8 +2,9 @@
 
 """Utilities for hashing."""
 
+from functools import cached_property as cachedproperty
+
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.decorators import cachedproperty
 
 __all__ = []
 
