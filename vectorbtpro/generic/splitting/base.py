@@ -313,6 +313,9 @@ class Takeable:
     freq: tp.Optional[tp.FrequencyLike] = attr.ib(default=_DEF)
     """Frequency of `Takeable.index`."""
 
+    point_wise: bool = attr.ib(default=_DEF)
+    """Whether to select one range point at a time and return a tuple."""
+
 
 class Splitter(Analyzable):
     """Base class for splitting."""
@@ -3190,7 +3193,11 @@ class Splitter(Analyzable):
                 return_obj_meta=True,
                 return_meta=True,
             )
-            obj_slice = self.take_range(takeable.obj, obj_range_meta["range_"], point_wise=point_wise)
+            obj_slice = self.take_range(
+                takeable.obj,
+                obj_range_meta["range_"],
+                point_wise=takeable.point_wise if takeable.point_wise is not _DEF else point_wise,
+            )
             return obj_meta, obj_range_meta, obj_slice
 
         def _take_args(args, range_, _template_context):
