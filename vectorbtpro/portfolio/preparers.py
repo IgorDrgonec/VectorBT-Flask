@@ -28,11 +28,32 @@ from vectorbtpro.portfolio.call_seq import require_call_seq, build_call_seq
 from vectorbtpro.portfolio.decorators import override_arg_config, attach_arg_properties
 
 __all__ = [
+    "PreparerResult",
     "BasePreparer",
     "FOPreparer",
 ]
 
 __pdoc__ = {}
+
+
+PreparerResultT = tp.TypeVar("PreparerResultT", bound="PreparerResult")
+
+
+class PreparerResult(Configured):
+    """Result of preparation."""
+
+    def __init__(self, sim_args: tp.Kwargs, pf_args: tp.Kwargs) -> None:
+        Configured.__init__(self, sim_args=sim_args, pf_args=pf_args)
+
+    @property
+    def sim_args(self) -> tp.Kwargs:
+        """Simulation arguments."""
+        return self.config["sim_args"]
+
+    @property
+    def pf_args(self) -> tp.Kwargs:
+        """Portfolio arguments."""
+        return self.config["pf_args"]
 
 
 base_arg_config = ReadonlyConfig(
@@ -498,9 +519,9 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         checks.assert_subdtype(cash_earnings, np.number, arg_name="cash_earnings")
         return cash_earnings
 
-    # ############# Preparation ############# #
+    # ############# Result ############# #
 
-    @cachedproperty
+    @property
     def sim_args(self) -> tp.Kwargs:
         """Arguments to be passed to the simulation."""
         return dict(
@@ -520,7 +541,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             cash_earnings=self.cash_earnings,
         )
 
-    @cachedproperty
+    @property
     def pf_args(self) -> tp.Kwargs:
         """Arguments to be passed to the portfolio."""
         kwargs = dict()
@@ -540,6 +561,11 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             bm_close=self.bm_close,
             **kwargs,
         )
+
+    @property
+    def result(self) -> PreparerResult:
+        """Result as an instance of `PreparerResult`."""
+        return PreparerResult(sim_args=self.sim_args, pf_args=self.pf_args)
 
     # ############# Docs ############# #
 
@@ -837,9 +863,8 @@ class FOPreparer(BasePreparer):
                     max_logs = int(np.max(np.sum(_log, axis=0)))
         return max_logs
 
-    @cachedproperty
+    @property
     def sim_args(self) -> tp.Kwargs:
-        """Arguments to be passed to the simulation."""
         return dict(
             target_shape=self.target_shape,
             group_lens=self.cs_group_lens,

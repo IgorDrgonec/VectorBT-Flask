@@ -1653,7 +1653,7 @@ from vectorbtpro.portfolio.logs import Logs
 from vectorbtpro.portfolio.orders import Orders, FSOrders
 from vectorbtpro.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
 from vectorbtpro.portfolio.pfopt.base import PortfolioOptimizer
-from vectorbtpro.portfolio.preparers import FOPreparer
+from vectorbtpro.portfolio.preparers import PreparerResult, FOPreparer
 from vectorbtpro.records.base import Records
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
@@ -3989,7 +3989,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_orders(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data, FOPreparer],
+        close: tp.Union[tp.ArrayLike, Data, FOPreparer, PreparerResult],
         size: tp.Optional[tp.ArrayLike] = None,
         size_type: tp.Optional[tp.ArrayLike] = None,
         direction: tp.Optional[tp.ArrayLike] = None,
@@ -4036,22 +4036,23 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         freq: tp.Optional[tp.FrequencyLike] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
         return_preparer: bool = False,
+        return_preparer_result: bool = False,
+        return_sim_out: bool = False,
         **kwargs,
-    ) -> tp.Union[PortfolioT, FOPreparer]:
+    ) -> tp.Union[PortfolioT, FOPreparer, PreparerResult, enums.SimulationOutput]:
         """Simulate portfolio from orders - size, price, fees, and other information.
 
         See `vectorbtpro.portfolio.nb.from_orders.from_orders_nb`.
 
         Args:
-            close (array_like, Data, or FOPreparer): Latest asset price at each time step.
+            close (array_like, Data, FOPreparer, or PreparerResult): Latest asset price at each time step.
                 Will broadcast.
 
                 Used for calculating unrealized PnL and portfolio value.
 
-                If an instance of `vectorbtpro.data.base.Data`, will extract the open, high,
-                low, and close price.
-
+                If an instance of `vectorbtpro.data.base.Data`, will extract the open, high, low, and close price.
                 If an instance of `vectorbtpro.portfolio.preparers.FOPreparer`, will use it as a preparer.
+                If an instance of `vectorbtpro.portfolio.preparers.PreparerResult`, will use it as a preparer result.
             size (float or array_like): Size to order.
                 See `vectorbtpro.portfolio.enums.Order.size`. Will broadcast.
             size_type (SizeType or array_like): See `vectorbtpro.portfolio.enums.SizeType` and
@@ -4245,6 +4246,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
                 !!! note
                     Seed won't be set in this case, you need to explicitly call `preparer.set_seed()`.
+            return_preparer_result (bool): Whether to return the preparer result of the type
+                `vectorbtpro.portfolio.preparers.PreparerResult`.
+            return_sim_out (bool): Whether to return the simulation output of the type
+                `vectorbtpro.portfolio.enums.SimulationOutput`.
             **kwargs: Keyword arguments passed to the `Portfolio` constructor.
 
         All broadcastable arguments will broadcast using `vectorbtpro.base.reshaping.broadcast`
@@ -4435,6 +4440,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         """
         if isinstance(close, FOPreparer):
             preparer = close
+            preparer_result = None
+        elif isinstance(close, PreparerResult):
+            preparer = None
+            preparer_result = close
         else:
             preparer = FOPreparer(
                 data=close if isinstance(close, Data) else None,
@@ -4484,14 +4493,21 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 bm_close=bm_close,
                 **kwargs,
             )
+            if not return_preparer:
+                preparer.set_seed()
+            preparer_result = None
         if return_preparer:
             return preparer
-        else:
-            preparer.set_seed()
+        if preparer_result is None:
+            preparer_result = preparer.result
+        if return_preparer_result:
+            return preparer_result
         func = jit_reg.resolve_option(nb.from_orders_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        sim_out = func(**preparer.sim_args)
-        return cls(order_records=sim_out, **preparer.pf_args)
+        sim_out = func(**preparer_result.sim_args)
+        if return_sim_out:
+            return sim_out
+        return cls(order_records=sim_out, **preparer_result.pf_args)
 
     @classmethod
     def from_signals(
