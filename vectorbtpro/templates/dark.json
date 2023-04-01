@@ -337,7 +337,7 @@
       {
         "marker": {
           "line": {
-            "color": "#343545"
+            "color": "#333842"
           }
         },
         "type": "scatter"
@@ -375,7 +375,7 @@
         },
         "marker": {
           "line": {
-            "color": "#21222c",
+            "color": "#1f2228",
             "width": 0.5
           }
         },
@@ -419,7 +419,7 @@
       {
         "marker": {
           "line": {
-            "color": "#343545"
+            "color": "#333842"
           }
         },
         "type": "scattergl"
@@ -479,16 +479,16 @@
       {
         "aaxis": {
           "endlinecolor": "#A2B1C6",
-          "gridcolor": "#343545",
-          "linecolor": "#343545",
-          "minorgridcolor": "#343545",
+          "gridcolor": "#333842",
+          "linecolor": "#333842",
+          "minorgridcolor": "#333842",
           "startlinecolor": "#A2B1C6"
         },
         "baxis": {
           "endlinecolor": "#A2B1C6",
-          "gridcolor": "#343545",
-          "linecolor": "#343545",
-          "minorgridcolor": "#343545",
+          "gridcolor": "#333842",
+          "linecolor": "#333842",
+          "minorgridcolor": "#333842",
           "startlinecolor": "#A2B1C6"
         },
         "type": "carpet"
@@ -498,10 +498,10 @@
       {
         "cells": {
           "fill": {
-            "color": "#343545"
+            "color": "#333842"
           },
           "line": {
-            "color": "#21222c"
+            "color": "#1f2228"
           }
         },
         "header": {
@@ -509,7 +509,7 @@
             "color": "#2a3f5f"
           },
           "line": {
-            "color": "#21222c"
+            "color": "#1f2228"
           }
         },
         "type": "table"
@@ -519,7 +519,7 @@
       {
         "marker": {
           "line": {
-            "color": "#21222c",
+            "color": "#1f2228",
             "width": 0.5
           }
         },
@@ -553,36 +553,36 @@
     "hoverlabel": {
       "align": "left"
     },
-    "paper_bgcolor": "#21222c",
-    "plot_bgcolor": "#21222c",
+    "paper_bgcolor": "#1f2228",
+    "plot_bgcolor": "#1f2228",
     "polar": {
-      "bgcolor": "#21222c",
+      "bgcolor": "#1f2228",
       "angularaxis": {
-        "gridcolor": "#343545",
-        "linecolor": "#343545",
+        "gridcolor": "#333842",
+        "linecolor": "#333842",
         "ticks": ""
       },
       "radialaxis": {
-        "gridcolor": "#343545",
-        "linecolor": "#343545",
+        "gridcolor": "#333842",
+        "linecolor": "#333842",
         "ticks": ""
       }
     },
     "ternary": {
-      "bgcolor": "#21222c",
+      "bgcolor": "#1f2228",
       "aaxis": {
-        "gridcolor": "#343545",
-        "linecolor": "#343545",
+        "gridcolor": "#333842",
+        "linecolor": "#333842",
         "ticks": ""
       },
       "baxis": {
-        "gridcolor": "#343545",
-        "linecolor": "#343545",
+        "gridcolor": "#333842",
+        "linecolor": "#333842",
         "ticks": ""
       },
       "caxis": {
-        "gridcolor": "#343545",
-        "linecolor": "#343545",
+        "gridcolor": "#333842",
+        "linecolor": "#333842",
         "ticks": ""
       }
     },
@@ -725,50 +725,50 @@
       ]
     },
     "xaxis": {
-      "gridcolor": "#343545",
-      "linecolor": "#343545",
+      "gridcolor": "#333842",
+      "linecolor": "#333842",
       "ticks": "",
       "title": {
         "standoff": 15
       },
-      "zerolinecolor": "#343545",
+      "zerolinecolor": "#333842",
       "automargin": true,
       "zerolinewidth": 2
     },
     "yaxis": {
-      "gridcolor": "#343545",
-      "linecolor": "#343545",
+      "gridcolor": "#333842",
+      "linecolor": "#333842",
       "ticks": "",
       "title": {
         "standoff": 15
       },
-      "zerolinecolor": "#343545",
+      "zerolinecolor": "#333842",
       "automargin": true,
       "zerolinewidth": 2
     },
     "scene": {
       "xaxis": {
-        "backgroundcolor": "#21222c",
-        "gridcolor": "#343545",
-        "linecolor": "#343545",
+        "backgroundcolor": "#1f2228",
+        "gridcolor": "#333842",
+        "linecolor": "#333842",
         "showbackground": true,
         "ticks": "",
         "zerolinecolor": "#aec0d6",
         "gridwidth": 2
       },
       "yaxis": {
-        "backgroundcolor": "#21222c",
-        "gridcolor": "#343545",
-        "linecolor": "#343545",
+        "backgroundcolor": "#1f2228",
+        "gridcolor": "#333842",
+        "linecolor": "#333842",
         "showbackground": true,
         "ticks": "",
         "zerolinecolor": "#aec0d6",
         "gridwidth": 2
       },
       "zaxis": {
-        "backgroundcolor": "#21222c",
-        "gridcolor": "#343545",
-        "linecolor": "#343545",
+        "backgroundcolor": "#1f2228",
+        "gridcolor": "#333842",
+        "linecolor": "#333842",
         "showbackground": true,
         "ticks": "",
         "zerolinecolor": "#aec0d6",
@@ -786,24 +786,24 @@
       "arrowwidth": 1
     },
     "geo": {
-      "bgcolor": "#21222c",
-      "landcolor": "#21222c",
-      "subunitcolor": "#343545",
+      "bgcolor": "#1f2228",
+      "landcolor": "#1f2228",
+      "subunitcolor": "#333842",
       "showland": true,
       "showlakes": true,
-      "lakecolor": "#21222c"
+      "lakecolor": "#1f2228"
     },
     "title": {
       "x": 0.05
     },
     "updatemenudefaults": {
-      "bgcolor": "#343545",
+      "bgcolor": "#333842",
       "borderwidth": 0
     },
     "sliderdefaults": {
       "bgcolor": "#aec0d6",
       "borderwidth": 1,
-      "bordercolor": "#21222c",
+      "bordercolor": "#1f2228",
       "tickwidth": 0
     },
     "mapbox": {
