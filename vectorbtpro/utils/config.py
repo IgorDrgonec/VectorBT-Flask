@@ -15,6 +15,7 @@ from vectorbtpro.utils.pickling import RecState, Pickleable, pdict
 
 __all__ = [
     "atomic_dict",
+    "unsetkey",
     "merge_dicts",
     "child_dict",
     "Config",
@@ -100,6 +101,16 @@ def set_dict_item(dct: dict, k: tp.Any, v: tp.Any, force: bool = False) -> None:
         dct[k] = v
 
 
+def del_dict_item(dct: dict, k: tp.Any, force: bool = False) -> None:
+    """Delete dict item.
+
+    If the dict is of the type `Config`, also passes `force` keyword to override blocking flags."""
+    if isinstance(dct, Config):
+        dct.__delitem__(k, force=force)
+    else:
+        del dct[k]
+
+
 def copy_dict(dct: InConfigLikeT, copy_mode: str = "shallow", nested: bool = True) -> OutConfigLikeT:
     """Copy dict based on a copy mode.
 
@@ -168,6 +179,33 @@ def update_dict(
             set_dict_item(x, k, v, force=force)
 
 
+class _unsetkey:
+    pass
+
+
+unsetkey = _unsetkey()
+"""When passed as a value, the corresponding key will be deleted.
+
+It can still be overridden by another dict."""
+
+
+def unset_keys(
+    dct: InConfigLikeT,
+    nested: bool = True,
+    force: bool = False,
+) -> None:
+    """Unset the keys that have the value `unsetkey`."""
+    if dct is None:
+        return
+    assert_instance_of(dct, dict)
+
+    for k, v in list(dct.items()):
+        if isinstance(v, _unsetkey):
+            del_dict_item(dct, k, force=force)
+        elif isinstance(v, dict) and not isinstance(v, atomic_dict):
+            unset_keys(v, nested=nested, force=force)
+
+
 def merge_dicts(
     *dicts: InConfigLikeT,
     to_dict: bool = True,
@@ -220,6 +258,9 @@ def merge_dicts(
             for dct in dicts:
                 if dct is not None:
                     out.update(dct)
+            for k, v in list(out.items()):
+                if isinstance(v, _unsetkey):
+                    del out[k]
             return out
         dicts = tuple([convert_to_dict(dct, nested=True) for dct in dicts])
 
@@ -239,6 +280,9 @@ def merge_dicts(
         should_update = False
     if should_update:
         update_dict(x, y, nested=nested, force=True, same_keys=same_keys)
+
+    # Unset keys
+    unset_keys(x, nested=nested, force=True)
 
     # Merge resulting dict with remaining dicts
     if len(dicts) > 2:
