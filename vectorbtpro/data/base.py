@@ -292,19 +292,25 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         Replaces the data's index and/or columns if they were changed in the wrapper."""
         if "wrapper" in kwargs and "data" not in kwargs:
             wrapper = kwargs["wrapper"]
+            if isinstance(wrapper, dict):
+                new_index = wrapper.get("index", self.wrapper.index)
+                new_columns = wrapper.get("columns", self.wrapper.columns)
+            else:
+                new_index = wrapper.index
+                new_columns = wrapper.columns
             data = self.config["data"]
             new_data = symbol_dict()
             data_changed = False
             for k, v in data.items():
                 if isinstance(v, (pd.Series, pd.DataFrame)):
-                    if not v.index.equals(wrapper.index):
+                    if not v.index.equals(new_index):
                         v = v.copy(deep=False)
-                        v.index = wrapper.index
+                        v.index = new_index
                         data_changed = True
                     if isinstance(v, pd.DataFrame):
-                        if not v.columns.equals(wrapper.columns):
+                        if not v.columns.equals(new_columns):
                             v = v.copy(deep=False)
-                            v.columns = wrapper.columns
+                            v.columns = new_columns
                             data_changed = True
                 new_data[k] = v
             if data_changed:

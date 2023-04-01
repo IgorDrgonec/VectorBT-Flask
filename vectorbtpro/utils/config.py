@@ -157,9 +157,13 @@ def update_dict(
     """Update dict with keys and values from other dict.
 
     Set `nested` to True to update all child dicts in recursive manner.
+
     For `force`, see `set_dict_item`.
 
     If you want to treat any dict as a single value, wrap it with `atomic_dict`.
+
+    If `nested` is True, a value in `x` is an instance of `Configured`, and the corresponding
+    value in `y` is a dictionary, calls `Configured.replace`.
 
     !!! note
         If the child dict is not atomic, it will copy only its values, not its meta."""
@@ -171,8 +175,17 @@ def update_dict(
     assert_instance_of(y, dict)
 
     for k, v in y.items():
-        if nested and k in x and isinstance(x[k], dict) and isinstance(v, dict) and not isinstance(v, atomic_dict):
-            update_dict(x[k], v, force=force)
+        if (
+            nested
+            and k in x
+            and isinstance(x[k], (dict, Configured))
+            and isinstance(v, dict)
+            and not isinstance(v, atomic_dict)
+        ):
+            if isinstance(x[k], Configured):
+                set_dict_item(x, k, x[k].replace(**v), force=force)
+            else:
+                update_dict(x[k], v, force=force)
         else:
             if same_keys and k not in x:
                 continue
@@ -184,7 +197,7 @@ class _unsetkey:
 
 
 unsetkey = _unsetkey()
-"""When passed as a value, the corresponding key will be deleted.
+"""When passed as a value, the corresponding key will be unset.
 
 It can still be overridden by another dict."""
 
@@ -202,7 +215,7 @@ def unset_keys(
     for k, v in list(dct.items()):
         if isinstance(v, _unsetkey):
             del_dict_item(dct, k, force=force)
-        elif isinstance(v, dict) and not isinstance(v, atomic_dict):
+        elif nested and isinstance(v, dict) and not isinstance(v, atomic_dict):
             unset_keys(v, nested=nested, force=force)
 
 
@@ -253,7 +266,7 @@ def merge_dicts(
     # Convert dict-like objects to regular dicts
     if to_dict:
         # Shortcut when all dicts are already regular
-        if not nested and copy_mode in {"none", "shallow"}:  # shortcut
+        if not nested and not same_keys and copy_mode in {"none", "shallow"}:
             out = {}
             for dct in dicts:
                 if dct is not None:
@@ -455,7 +468,7 @@ class Config(pdict):
                             nested=nested,
                             convert_children=convert_children,
                             as_attrs=as_attrs,
-                        )
+                        ),
                     )
 
         # Copy initial config
