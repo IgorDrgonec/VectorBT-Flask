@@ -1623,7 +1623,6 @@ import warnings
 from collections import namedtuple
 from functools import partial
 from datetime import timedelta, time
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -1653,7 +1652,13 @@ from vectorbtpro.portfolio.logs import Logs
 from vectorbtpro.portfolio.orders import Orders, FSOrders
 from vectorbtpro.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
 from vectorbtpro.portfolio.pfopt.base import PortfolioOptimizer
-from vectorbtpro.portfolio.preparers import PreparerResult, FOPreparer
+from vectorbtpro.portfolio.preparers import (
+    PrepResult,
+    FOPreparer,
+    FSPreparer,
+    adapt_staticized_to_udf,
+    resolve_dynamic_simulator,
+)
 from vectorbtpro.records.base import Records
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
@@ -1676,9 +1681,6 @@ from vectorbtpro.utils.mapping import to_mapping
 from vectorbtpro.utils.parsing import get_func_kwargs
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import CustomTemplate, Rep, RepEval, RepFunc, substitute_templates
-from vectorbtpro.utils.chunking import ArgsTaker
-from vectorbtpro.utils.cutting import suggest_module_path, cut_and_save_func
-from vectorbtpro.utils.module_ import import_module_from_path
 
 try:
     if not tp.TYPE_CHECKING:
@@ -1693,66 +1695,6 @@ __all__ = [
 ]
 
 __pdoc__ = {}
-
-
-def adapt_staticized_to_udf(staticized: tp.Kwargs, func: tp.Union[str, tp.Callable], func_name: str) -> None:
-    """Adapt `staticized` dictionary to a UDF."""
-    sim_func_module = inspect.getmodule(staticized["func"])
-    if isinstance(func, (str, Path)):
-        if isinstance(func, str) and not func.endswith(".py") and hasattr(sim_func_module, func):
-            staticized[f"{func_name}_block"] = func
-            return None
-        func = Path(func)
-        module_path = func.resolve()
-    else:
-        if inspect.getmodule(func) == sim_func_module:
-            staticized[f"{func_name}_block"] = func.__name__
-            return None
-        module = inspect.getmodule(func)
-        if not hasattr(module, "__file__"):
-            raise TypeError(f"{func_name} must be defined in a Python file")
-        module_path = Path(module.__file__).resolve()
-    if "import_lines" not in staticized:
-        staticized["import_lines"] = []
-    reload = staticized.get("reload", False)
-    staticized["import_lines"].extend(
-        [
-            f'{func_name}_path = r"{module_path}"',
-            f"globals().update(vbt.import_module_from_path({func_name}_path).__dict__, reload={reload})",
-        ]
-    )
-
-
-def resolve_dynamic_simulator(simulator_name: str, staticized: tp.KwargsLike) -> tp.Callable:
-    """Resolve a dynamic simulator."""
-    if staticized is None:
-        func = getattr(nb, simulator_name)
-    else:
-        if isinstance(staticized, dict):
-            staticized = dict(staticized)
-            module_path = suggest_module_path(
-                staticized.get("suggest_fname", simulator_name),
-                path=staticized.pop("path", None),
-                mkdir_kwargs=staticized.get("mkdir_kwargs", None),
-            )
-            if "new_func_name" not in staticized:
-                staticized["new_func_name"] = simulator_name
-
-            if staticized.pop("override", False) or not module_path.exists():
-                if "skip_func" not in staticized:
-
-                    def _skip_func(out_lines, func_name):
-                        to_skip = lambda x: f"def {func_name}" in x or x.startswith(f"{func_name}_path =")
-                        return any(map(to_skip, out_lines))
-
-                    staticized["skip_func"] = _skip_func
-                module_path = cut_and_save_func(path=module_path, **staticized)
-            reload = staticized.pop("reload", False)
-            module = import_module_from_path(module_path, reload=reload)
-            func = getattr(module, staticized["new_func_name"])
-        else:
-            func = staticized
-    return func
 
 
 def fix_wrapper_for_records(pf: "Portfolio") -> ArrayWrapper:
@@ -3989,7 +3931,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_orders(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data, FOPreparer, PreparerResult],
+        close: tp.Union[tp.ArrayLike, Data, FOPreparer, PrepResult],
         size: tp.Optional[tp.ArrayLike] = None,
         size_type: tp.Optional[tp.ArrayLike] = None,
         direction: tp.Optional[tp.ArrayLike] = None,
@@ -4008,6 +3950,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         raise_reject: tp.Optional[tp.ArrayLike] = None,
         log: tp.Optional[tp.ArrayLike] = None,
         val_price: tp.Optional[tp.ArrayLike] = None,
+        from_ago: tp.Optional[tp.ArrayLike] = None,
         open: tp.Optional[tp.ArrayLike] = None,
         high: tp.Optional[tp.ArrayLike] = None,
         low: tp.Optional[tp.ArrayLike] = None,
@@ -4018,7 +3961,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cash_earnings: tp.Optional[tp.ArrayLike] = None,
         cash_dividends: tp.Optional[tp.ArrayLike] = None,
         cash_sharing: tp.Optional[bool] = None,
-        from_ago: tp.Optional[tp.ArrayLike] = None,
         call_seq: tp.Optional[tp.ArrayLike] = None,
         attach_call_seq: tp.Optional[bool] = None,
         ffill_val_price: tp.Optional[bool] = None,
@@ -4036,23 +3978,25 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         freq: tp.Optional[tp.FrequencyLike] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
         return_preparer: bool = False,
-        return_preparer_result: bool = False,
+        return_prep_result: bool = False,
         return_sim_out: bool = False,
         **kwargs,
-    ) -> tp.Union[PortfolioT, FOPreparer, PreparerResult, enums.SimulationOutput]:
+    ) -> tp.Union[PortfolioT, FOPreparer, PrepResult, enums.SimulationOutput]:
         """Simulate portfolio from orders - size, price, fees, and other information.
 
         See `vectorbtpro.portfolio.nb.from_orders.from_orders_nb`.
 
+        Prepared by `vectorbtpro.portfolio.preparers.FOPreparer`.
+
         Args:
-            close (array_like, Data, FOPreparer, or PreparerResult): Latest asset price at each time step.
+            close (array_like, Data, FOPreparer, or PrepResult): Latest asset price at each time step.
                 Will broadcast.
 
                 Used for calculating unrealized PnL and portfolio value.
 
                 If an instance of `vectorbtpro.data.base.Data`, will extract the open, high, low, and close price.
                 If an instance of `vectorbtpro.portfolio.preparers.FOPreparer`, will use it as a preparer.
-                If an instance of `vectorbtpro.portfolio.preparers.PreparerResult`, will use it as a preparer result.
+                If an instance of `vectorbtpro.portfolio.preparers.PrepResult`, will use it as a preparer result.
             size (float or array_like): Size to order.
                 See `vectorbtpro.portfolio.enums.Order.size`. Will broadcast.
             size_type (SizeType or array_like): See `vectorbtpro.portfolio.enums.SizeType` and
@@ -4246,8 +4190,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
                 !!! note
                     Seed won't be set in this case, you need to explicitly call `preparer.set_seed()`.
-            return_preparer_result (bool): Whether to return the preparer result of the type
-                `vectorbtpro.portfolio.preparers.PreparerResult`.
+            return_prep_result (bool): Whether to return the preparer result of the type
+                `vectorbtpro.portfolio.preparers.PrepResult`.
             return_sim_out (bool): Whether to return the simulation output of the type
                 `vectorbtpro.portfolio.enums.SimulationOutput`.
             **kwargs: Keyword arguments passed to the `Portfolio` constructor.
@@ -4440,79 +4384,40 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         """
         if isinstance(close, FOPreparer):
             preparer = close
-            preparer_result = None
-        elif isinstance(close, PreparerResult):
+            prep_result = None
+        elif isinstance(close, PrepResult):
             preparer = None
-            preparer_result = close
+            prep_result = close
         else:
-            preparer = FOPreparer(
-                data=close if isinstance(close, Data) else None,
-                open=open,
-                high=high,
-                low=low,
-                close=close if not isinstance(close, Data) else None,
-                size=size,
-                size_type=size_type,
-                direction=direction,
-                price=price,
-                fees=fees,
-                fixed_fees=fixed_fees,
-                slippage=slippage,
-                min_size=min_size,
-                max_size=max_size,
-                size_granularity=size_granularity,
-                leverage=leverage,
-                leverage_mode=leverage_mode,
-                reject_prob=reject_prob,
-                price_area_vio_mode=price_area_vio_mode,
-                allow_partial=allow_partial,
-                raise_reject=raise_reject,
-                log=log,
-                val_price=val_price,
-                init_cash=init_cash,
-                init_position=init_position,
-                init_price=init_price,
-                cash_deposits=cash_deposits,
-                cash_earnings=cash_earnings,
-                cash_dividends=cash_dividends,
-                cash_sharing=cash_sharing,
-                from_ago=from_ago,
-                call_seq=call_seq,
-                attach_call_seq=attach_call_seq,
-                ffill_val_price=ffill_val_price,
-                update_value=update_value,
-                save_state=save_state,
-                save_value=save_value,
-                save_returns=save_returns,
-                max_orders=max_orders,
-                max_logs=max_logs,
-                seed=seed,
-                group_by=group_by,
-                broadcast_kwargs=broadcast_kwargs,
-                freq=freq,
-                bm_close=bm_close,
-                **kwargs,
-            )
+            local_kwargs = locals()
+            local_kwargs = {**local_kwargs, **local_kwargs["kwargs"]}
+            del local_kwargs["kwargs"]
+            del local_kwargs["cls"]
+            del local_kwargs["return_preparer"]
+            del local_kwargs["return_prep_result"]
+            del local_kwargs["return_sim_out"]
+            if isinstance(close, Data):
+                local_kwargs["data"] = close
+                local_kwargs["close"] = None
+            preparer = FOPreparer(**local_kwargs)
             if not return_preparer:
                 preparer.set_seed()
-            preparer_result = None
+            prep_result = None
         if return_preparer:
             return preparer
-        if preparer_result is None:
-            preparer_result = preparer.result
-        if return_preparer_result:
-            return preparer_result
-        func = jit_reg.resolve_option(nb.from_orders_nb, jitted)
-        func = ch_reg.resolve_option(func, chunked)
-        sim_out = func(**preparer_result.sim_args)
+        if prep_result is None:
+            prep_result = preparer.result
+        if return_prep_result:
+            return prep_result
+        sim_out = prep_result.sim_func(**prep_result.sim_args)
         if return_sim_out:
             return sim_out
-        return cls(order_records=sim_out, **preparer_result.pf_args)
+        return cls(order_records=sim_out, **prep_result.pf_args)
 
     @classmethod
     def from_signals(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data],
+        close: tp.Union[tp.ArrayLike, Data, FSPreparer, PrepResult],
         entries: tp.Optional[tp.ArrayLike] = None,
         exits: tp.Optional[tp.ArrayLike] = None,
         short_entries: tp.Optional[tp.ArrayLike] = None,
@@ -4602,14 +4507,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         template_context: tp.Optional[tp.Mapping] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
-        staticized: tp.Union[None, bool, tp.Kwargs, tp.TaskId] = None,
+        staticized: tp.StaticizedOption = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
+        return_preparer: bool = False,
+        return_prep_result: bool = False,
+        return_sim_out: bool = False,
         **kwargs,
     ) -> PortfolioT:
         """Simulate portfolio from entry and exit signals.
-
-        See `vectorbtpro.portfolio.nb.from_signals.from_signal_func_nb`.
 
         Supports the following modes:
 
@@ -4623,6 +4529,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         3. `order_mode=True` without signals:
             Uses `vectorbtpro.portfolio.nb.from_signals.order_signal_func_nb` as `signal_func_nb` (not cacheable)
         4. `signal_func_nb` and `signal_args`: Custom signal function (not cacheable)
+
+        Prepared by `vectorbtpro.portfolio.preparers.FSPreparer`.
 
         Args:
             close (array_like or Data): See `Portfolio.from_orders`.
@@ -4899,6 +4807,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 `override` and `reload` to override and reload an already existing module respectively.
             freq (any): See `Portfolio.from_orders`.
             bm_close (array_like): See `Portfolio.from_orders`.
+            return_preparer (bool): See `Portfolio.from_orders`.
+            return_prep_result (bool): See `Portfolio.from_orders`.
+            return_sim_out (bool): See `Portfolio.from_orders`.
             **kwargs: Keyword arguments passed to the `Portfolio` constructor.
 
         All broadcastable arguments will broadcast using `vectorbtpro.base.reshaping.broadcast`
@@ -5350,1046 +5261,37 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             Passing both arrays as `broadcast_named_args` broadcasts them internally as any other array,
             so we don't have to worry about their dimensions every time we change our data.
         """
-        # Get defaults
-        from vectorbtpro._settings import settings
-
-        portfolio_cfg = settings["portfolio"]
-
-        if isinstance(close, Data):
-            data = close
-            close = data.close
-            if close is None:
-                raise ValueError("Column for close couldn't be found in data")
-            if open is None:
-                open = data.open
-            if high is None:
-                high = data.high
-            if low is None:
-                low = data.low
-            if freq is None:
-                freq = data.freq
-        if open is None:
-            open_none = True
-            open = np.nan
+        if isinstance(close, FSPreparer):
+            preparer = close
+            prep_result = None
+        elif isinstance(close, PrepResult):
+            preparer = None
+            prep_result = close
         else:
-            open_none = False
-        if high is None:
-            high_none = True
-            high = np.nan
-        else:
-            high_none = False
-        if low is None:
-            low_none = True
-            low = np.nan
-        else:
-            low_none = False
-
-        if staticized is None:
-            staticized = portfolio_cfg["staticized"]
-        if isinstance(staticized, bool):
-            if staticized:
-                staticized = dict()
-            else:
-                staticized = None
-        if isinstance(staticized, dict):
-            staticized = dict(staticized)
-            if "func" not in staticized:
-                staticized["func"] = nb.from_signal_func_nb
-        flexible_mode = (
-            (adjust_func_nb is not None)
-            or (signal_func_nb is not None)
-            or (post_segment_func_nb is not None)
-            or order_mode
-            or staticized is not None
-        )
-        ls_mode = short_entries is not None or short_exits is not None
-        signals_mode = entries is not None or exits is not None or ls_mode
-        if not signals_mode and not order_mode and signal_func_nb is None:
-            ls_mode = True
-            signals_mode = True
-        signal_func_mode = flexible_mode and not signals_mode and not order_mode
-        if direction is not None and ls_mode:
-            raise ValueError("Direction and short signal arrays cannot be used together")
-        if signals_mode and order_mode:
-            raise ValueError("Signal arrays and order mode cannot be used together")
-        if flexible_mode:
-            if signal_func_nb is None:
-                if ls_mode:
-                    signal_func_nb = nb.ls_signal_func_nb
-                    if isinstance(staticized, dict):
-                        adapt_staticized_to_udf(staticized, "ls_signal_func_nb", "signal_func_nb")
-                        staticized["suggest_fname"] = "from_ls_signal_func_nb"
-                elif signals_mode:
-                    signal_func_nb = nb.dir_signal_func_nb
-                    if isinstance(staticized, dict):
-                        adapt_staticized_to_udf(staticized, "dir_signal_func_nb", "signal_func_nb")
-                        staticized["suggest_fname"] = "from_dir_signal_func_nb"
-                elif order_mode:
-                    signal_func_nb = nb.order_signal_func_nb
-                    if isinstance(staticized, dict):
-                        adapt_staticized_to_udf(staticized, "order_signal_func_nb", "signal_func_nb")
-                        staticized["suggest_fname"] = "from_order_signal_func_nb"
-            elif isinstance(staticized, dict):
-                adapt_staticized_to_udf(staticized, signal_func_nb, "signal_func_nb")
-            if adjust_func_nb is None:
-                adjust_func_nb = nb.no_adjust_func_nb
-            elif isinstance(staticized, dict):
-                adapt_staticized_to_udf(staticized, adjust_func_nb, "adjust_func_nb")
-            if post_segment_func_nb is None:
-                post_segment_func_nb = nb.no_post_func_nb
-            elif isinstance(staticized, dict):
-                adapt_staticized_to_udf(staticized, post_segment_func_nb, "post_segment_func_nb")
-
-        if entries is None:
-            entries = False
-        if exits is None:
-            exits = False
-        if short_entries is None:
-            short_entries = False
-        if short_exits is None:
-            short_exits = False
-        if direction is None:
-            direction = portfolio_cfg["signal_direction"]
-        if size is None:
-            size = portfolio_cfg["size"]
-        if size_type is None:
-            size_type = portfolio_cfg["size_type"]
-        if price is None:
-            price = portfolio_cfg["price"]
-        if fees is None:
-            fees = portfolio_cfg["fees"]
-        if fixed_fees is None:
-            fixed_fees = portfolio_cfg["fixed_fees"]
-        if slippage is None:
-            slippage = portfolio_cfg["slippage"]
-        if min_size is None:
-            min_size = portfolio_cfg["min_size"]
-        if max_size is None:
-            max_size = portfolio_cfg["max_size"]
-        if size_granularity is None:
-            size_granularity = portfolio_cfg["size_granularity"]
-        if leverage is None:
-            leverage = portfolio_cfg["leverage"]
-        if leverage_mode is None:
-            leverage_mode = portfolio_cfg["leverage_mode"]
-        if reject_prob is None:
-            reject_prob = portfolio_cfg["reject_prob"]
-        if price_area_vio_mode is None:
-            price_area_vio_mode = portfolio_cfg["price_area_vio_mode"]
-        if allow_partial is None:
-            allow_partial = portfolio_cfg["allow_partial"]
-        if raise_reject is None:
-            raise_reject = portfolio_cfg["raise_reject"]
-        if log is None:
-            log = portfolio_cfg["log"]
-        if val_price is None:
-            val_price = portfolio_cfg["val_price"]
-        if accumulate is None:
-            accumulate = portfolio_cfg["accumulate"]
-        if upon_long_conflict is None:
-            upon_long_conflict = portfolio_cfg["upon_long_conflict"]
-        if upon_short_conflict is None:
-            upon_short_conflict = portfolio_cfg["upon_short_conflict"]
-        if upon_dir_conflict is None:
-            upon_dir_conflict = portfolio_cfg["upon_dir_conflict"]
-        if upon_opposite_entry is None:
-            upon_opposite_entry = portfolio_cfg["upon_opposite_entry"]
-        if order_type is None:
-            order_type = portfolio_cfg["order_type"]
-        if limit_delta is None:
-            limit_delta = portfolio_cfg["limit_delta"]
-        if limit_tif is None:
-            limit_tif = portfolio_cfg["limit_tif"]
-        if isinstance(limit_tif, (str, timedelta, pd.DateOffset, pd.Timedelta)):
-            limit_tif = freq_to_timedelta64(limit_tif)
-        elif isinstance(limit_tif, pd.Index):
-            limit_tif = limit_tif.values
-        if limit_expiry is None:
-            limit_expiry = portfolio_cfg["limit_expiry"]
-        if isinstance(limit_expiry, (str, time, timedelta, pd.DateOffset, pd.Timedelta)):
-            limit_expiry_dt_template = RepEval(
-                "try_align_to_datetime_index([limit_expiry], wrapper.index).vbt.to_ns()",
-                context=dict(try_align_to_datetime_index=try_align_to_datetime_index, limit_expiry=limit_expiry),
-            )
-            limit_expiry_td_template = RepEval(
-                "wrapper.index.vbt.to_period_ns(parse_timedelta(limit_expiry))",
-                context=dict(parse_timedelta=parse_timedelta, limit_expiry=limit_expiry),
-            )
-            limit_expiry_time_template = RepEval(
-                "(wrapper.index.floor(\"1d\") + time_to_timedelta(limit_expiry)).vbt.to_ns()",
-                context=dict(time_to_timedelta=time_to_timedelta, limit_expiry=limit_expiry),
-            )
-            if isinstance(limit_expiry, str):
-                try:
-                    time.fromisoformat(limit_expiry)
-                    limit_expiry = limit_expiry_time_template
-                except Exception as e:
-                    try:
-                        parse_timedelta(limit_expiry)
-                        limit_expiry = limit_expiry_td_template
-                    except Exception as e:
-                        limit_expiry = limit_expiry_dt_template
-            elif isinstance(limit_expiry, time):
-                limit_expiry = limit_expiry_time_template
-            else:
-                limit_expiry = limit_expiry_td_template
-        elif isinstance(limit_expiry, pd.Index):
-            limit_expiry = limit_expiry.values
-        if limit_reverse is None:
-            limit_reverse = portfolio_cfg["limit_reverse"]
-        if upon_adj_limit_conflict is None:
-            upon_adj_limit_conflict = portfolio_cfg["upon_adj_limit_conflict"]
-        if upon_opp_limit_conflict is None:
-            upon_opp_limit_conflict = portfolio_cfg["upon_opp_limit_conflict"]
-        if use_stops is None:
-            use_stops = portfolio_cfg["use_stops"]
-        if stop_ladder is None:
-            stop_ladder = portfolio_cfg["stop_ladder"]
-        if isinstance(stop_ladder, str):
-            stop_ladder = map_enum_fields(stop_ladder, enums.StopLadderMode)
-        if sl_stop is None:
-            sl_stop = portfolio_cfg["sl_stop"]
-        if tsl_stop is None:
-            tsl_stop = portfolio_cfg["tsl_stop"]
-        if tsl_th is None:
-            tsl_th = portfolio_cfg["tsl_th"]
-        if tp_stop is None:
-            tp_stop = portfolio_cfg["tp_stop"]
-        if td_stop is None:
-            td_stop = portfolio_cfg["td_stop"]
-        if isinstance(td_stop, (str, timedelta, pd.DateOffset, pd.Timedelta)):
-            td_stop = freq_to_timedelta64(td_stop)
-        elif isinstance(td_stop, pd.Index):
-            td_stop = td_stop.values
-        if dt_stop is None:
-            dt_stop = portfolio_cfg["dt_stop"]
-        if isinstance(dt_stop, (str, time, timedelta, pd.DateOffset, pd.Timedelta)):
-            dt_stop_dt_template = RepEval(
-                "try_align_to_datetime_index([dt_stop], wrapper.index).vbt.to_ns() - 1",
-                context=dict(try_align_to_datetime_index=try_align_to_datetime_index, dt_stop=dt_stop),
-            )
-            dt_stop_td_template = RepEval(
-                "wrapper.index.vbt.to_period_ns(parse_timedelta(dt_stop)) - 1",
-                context=dict(parse_timedelta=parse_timedelta, dt_stop=dt_stop),
-            )
-            dt_stop_time_template = RepEval(
-                "(wrapper.index.floor(\"1d\") + time_to_timedelta(dt_stop)).vbt.to_ns() - 1",
-                context=dict(time_to_timedelta=time_to_timedelta, dt_stop=dt_stop),
-            )
-            if isinstance(dt_stop, str):
-                try:
-                    time.fromisoformat(dt_stop)
-                    dt_stop = dt_stop_time_template
-                except Exception as e:
-                    try:
-                        parse_timedelta(dt_stop)
-                        dt_stop = dt_stop_td_template
-                    except Exception as e:
-                        dt_stop = dt_stop_dt_template
-            elif isinstance(dt_stop, time):
-                dt_stop = dt_stop_time_template
-            else:
-                dt_stop = dt_stop_td_template
-        elif isinstance(dt_stop, pd.Index):
-            dt_stop = dt_stop.values
-        if stop_entry_price is None:
-            stop_entry_price = portfolio_cfg["stop_entry_price"]
-        if stop_exit_price is None:
-            stop_exit_price = portfolio_cfg["stop_exit_price"]
-        if stop_exit_type is None:
-            stop_exit_type = portfolio_cfg["stop_exit_type"]
-        if stop_order_type is None:
-            stop_order_type = portfolio_cfg["stop_order_type"]
-        if stop_limit_delta is None:
-            stop_limit_delta = portfolio_cfg["stop_limit_delta"]
-        if upon_stop_update is None:
-            upon_stop_update = portfolio_cfg["upon_stop_update"]
-        if upon_adj_stop_conflict is None:
-            upon_adj_stop_conflict = portfolio_cfg["upon_adj_stop_conflict"]
-        if upon_opp_stop_conflict is None:
-            upon_opp_stop_conflict = portfolio_cfg["upon_opp_stop_conflict"]
-        if delta_format is None:
-            delta_format = portfolio_cfg["delta_format"]
-        if time_delta_format is None:
-            time_delta_format = portfolio_cfg["time_delta_format"]
-
-        if init_cash is None:
-            init_cash = portfolio_cfg["init_cash"]
-        if isinstance(init_cash, str):
-            init_cash = map_enum_fields(init_cash, enums.InitCashMode)
-        if checks.is_int(init_cash) and init_cash in enums.InitCashMode:
-            init_cash_mode = init_cash
-            init_cash = np.inf
-        else:
-            init_cash_mode = None
-        if init_position is None:
-            init_position = portfolio_cfg["init_position"]
-        if init_price is None:
-            init_price = portfolio_cfg["init_price"]
-        if cash_deposits is None:
-            cash_deposits = portfolio_cfg["cash_deposits"]
-        if cash_earnings is None:
-            cash_earnings = portfolio_cfg["cash_earnings"]
-        if cash_dividends is None:
-            cash_dividends = portfolio_cfg["cash_dividends"]
-        if cash_sharing is None:
-            cash_sharing = portfolio_cfg["cash_sharing"]
-        if cash_sharing and group_by is None:
-            group_by = True
-        if from_ago is None:
-            from_ago = portfolio_cfg["from_ago"]
-        if from_ago is None:
-            from_ago = 0
-            from_ago_none = True
-        else:
-            from_ago_none = False
-        if call_seq is None:
-            call_seq = portfolio_cfg["call_seq"]
-        auto_call_seq = False
-        if isinstance(call_seq, str):
-            call_seq = map_enum_fields(call_seq, enums.CallSeqType)
-        if checks.is_int(call_seq):
-            if call_seq == enums.CallSeqType.Auto:
-                auto_call_seq = True
-                call_seq = None
-        if attach_call_seq is None:
-            attach_call_seq = portfolio_cfg["attach_call_seq"]
-        if ffill_val_price is None:
-            ffill_val_price = portfolio_cfg["ffill_val_price"]
-        if update_value is None:
-            update_value = portfolio_cfg["update_value"]
-        if fill_pos_info is None:
-            fill_pos_info = portfolio_cfg["fill_pos_info"]
-        if save_state is None:
-            save_state = portfolio_cfg["save_state"]
-        if save_value is None:
-            save_value = portfolio_cfg["save_value"]
-        if save_returns is None:
-            save_returns = portfolio_cfg["save_returns"]
-        if seed is None:
-            seed = portfolio_cfg["seed"]
-        if seed is not None:
-            set_seed(seed)
-        if flexible_mode:
-            if save_state:
-                raise ValueError("Argument save_state cannot be used in flexible mode")
-            if save_value:
-                raise ValueError("Argument save_value cannot be used in flexible mode")
-            if save_returns:
-                raise ValueError("Argument save_returns cannot be used in flexible mode")
-            if (
-                in_outputs is not None
-                and not isinstance(in_outputs, CustomTemplate)
-                and not checks.is_namedtuple(in_outputs)
-            ):
-                in_outputs = to_mapping(in_outputs)
-                in_outputs = namedtuple("InOutputs", in_outputs)(**in_outputs)
-        else:
-            if in_outputs is not None:
-                raise ValueError("Argument in_outputs cannot be used in fixed mode")
-        if group_by is None:
-            group_by = portfolio_cfg["group_by"]
-        if freq is None:
-            freq = portfolio_cfg["freq"]
-        if broadcast_named_args is None:
-            broadcast_named_args = {}
-        broadcast_kwargs = merge_dicts(portfolio_cfg["broadcast_kwargs"], broadcast_kwargs)
-        require_kwargs = broadcast_kwargs.get("require_kwargs", {})
-        template_context = merge_dicts(portfolio_cfg["template_context"], template_context)
-        if bm_close is None:
-            bm_close = portfolio_cfg["bm_close"]
-
-        # Prepare the simulation
-        broadcastable_args = dict(
-            entries=entries,
-            exits=exits,
-            short_entries=short_entries,
-            short_exits=short_exits,
-            direction=direction,
-            cash_earnings=cash_earnings,
-            cash_dividends=cash_dividends,
-            size=size,
-            price=price,
-            size_type=size_type,
-            fees=fees,
-            fixed_fees=fixed_fees,
-            slippage=slippage,
-            min_size=min_size,
-            max_size=max_size,
-            size_granularity=size_granularity,
-            leverage=leverage,
-            leverage_mode=leverage_mode,
-            reject_prob=reject_prob,
-            price_area_vio_mode=price_area_vio_mode,
-            allow_partial=allow_partial,
-            raise_reject=raise_reject,
-            log=log,
-            val_price=val_price,
-            accumulate=accumulate,
-            upon_long_conflict=upon_long_conflict,
-            upon_short_conflict=upon_short_conflict,
-            upon_dir_conflict=upon_dir_conflict,
-            upon_opposite_entry=upon_opposite_entry,
-            order_type=order_type,
-            limit_delta=limit_delta,
-            limit_tif=limit_tif,
-            limit_expiry=limit_expiry,
-            limit_reverse=limit_reverse,
-            upon_adj_limit_conflict=upon_adj_limit_conflict,
-            upon_opp_limit_conflict=upon_opp_limit_conflict,
-            sl_stop=sl_stop,
-            tsl_stop=tsl_stop,
-            tsl_th=tsl_th,
-            tp_stop=tp_stop,
-            td_stop=td_stop,
-            dt_stop=dt_stop,
-            stop_entry_price=stop_entry_price,
-            stop_exit_price=stop_exit_price,
-            stop_exit_type=stop_exit_type,
-            stop_order_type=stop_order_type,
-            stop_limit_delta=stop_limit_delta,
-            upon_stop_update=upon_stop_update,
-            upon_adj_stop_conflict=upon_adj_stop_conflict,
-            upon_opp_stop_conflict=upon_opp_stop_conflict,
-            delta_format=delta_format,
-            time_delta_format=time_delta_format,
-            open=open,
-            high=high,
-            low=low,
-            close=close,
-            from_ago=from_ago,
-        )
-        if bm_close is not None and not isinstance(bm_close, bool):
-            broadcastable_args["bm_close"] = bm_close
-        else:
-            broadcastable_args["bm_close"] = None
-        broadcastable_args = {**broadcastable_args, **broadcast_named_args}
-        def_broadcast_kwargs = dict(
-            to_pd=False,
-            keep_flex=True,
-            reindex_kwargs=dict(
-                entries=dict(fill_value=False),
-                exits=dict(fill_value=False),
-                short_entries=dict(fill_value=False),
-                short_exits=dict(fill_value=False),
-                direction=dict(fill_value=enums.Direction.Both),
-                cash_earnings=dict(fill_value=0.0),
-                cash_dividends=dict(fill_value=0.0),
-                size=dict(fill_value=np.nan),
-                price=dict(fill_value=np.nan),
-                size_type=dict(fill_value=enums.SizeType.Amount),
-                fees=dict(fill_value=0.0),
-                fixed_fees=dict(fill_value=0.0),
-                slippage=dict(fill_value=0.0),
-                min_size=dict(fill_value=np.nan),
-                max_size=dict(fill_value=np.nan),
-                size_granularity=dict(fill_value=np.nan),
-                leverage=dict(fill_value=1.0),
-                leverage_mode=dict(fill_value=enums.LeverageMode.Lazy),
-                reject_prob=dict(fill_value=0.0),
-                price_area_vio_mode=dict(fill_value=enums.PriceAreaVioMode.Ignore),
-                allow_partial=dict(fill_value=True),
-                raise_reject=dict(fill_value=False),
-                log=dict(fill_value=False),
-                val_price=dict(fill_value=np.nan),
-                accumulate=dict(fill_value=False),
-                upon_long_conflict=dict(fill_value=enums.ConflictMode.Ignore),
-                upon_short_conflict=dict(fill_value=enums.ConflictMode.Ignore),
-                upon_dir_conflict=dict(fill_value=enums.DirectionConflictMode.Ignore),
-                upon_opposite_entry=dict(fill_value=enums.OppositeEntryMode.ReverseReduce),
-                order_type=dict(fill_value=enums.OrderType.Market),
-                limit_delta=dict(fill_value=np.nan),
-                limit_tif=dict(fill_value=-1),
-                limit_expiry=dict(fill_value=-1),
-                limit_reverse=dict(fill_value=False),
-                upon_adj_limit_conflict=dict(fill_value=enums.PendingConflictMode.KeepIgnore),
-                upon_opp_limit_conflict=dict(fill_value=enums.PendingConflictMode.CancelExecute),
-                sl_stop=dict(fill_value=np.nan),
-                tsl_stop=dict(fill_value=np.nan),
-                tsl_th=dict(fill_value=np.nan),
-                tp_stop=dict(fill_value=np.nan),
-                td_stop=dict(fill_value=-1),
-                dt_stop=dict(fill_value=-1),
-                stop_entry_price=dict(fill_value=enums.StopEntryPrice.Close),
-                stop_exit_price=dict(fill_value=enums.StopExitPrice.Stop),
-                stop_exit_type=dict(fill_value=enums.StopExitType.Close),
-                stop_order_type=dict(fill_value=enums.OrderType.Market),
-                stop_limit_delta=dict(fill_value=np.nan),
-                upon_stop_update=dict(fill_value=enums.StopUpdateMode.Override),
-                upon_adj_stop_conflict=dict(fill_value=enums.PendingConflictMode.KeepExecute),
-                upon_opp_stop_conflict=dict(fill_value=enums.PendingConflictMode.KeepExecute),
-                delta_format=dict(fill_value=enums.DeltaFormat.Percent),
-                time_delta_format=dict(fill_value=enums.TimeDeltaFormat.Index),
-                open=dict(fill_value=np.nan),
-                high=dict(fill_value=np.nan),
-                low=dict(fill_value=np.nan),
-                close=dict(fill_value=np.nan),
-                bm_close=dict(fill_value=np.nan),
-                from_ago=dict(fill_value=0),
-            ),
-            wrapper_kwargs=dict(
-                freq=freq,
-                group_by=group_by,
-            ),
-        )
-        if order_mode:
-            def_broadcast_kwargs["keep_flex"] = dict(
-                size=False,
-                size_type=False,
-                min_size=False,
-                max_size=False,
-                _def=True,
-            )
-            def_broadcast_kwargs["min_ndim"] = dict(
-                size=2,
-                size_type=2,
-                min_size=2,
-                max_size=2,
-                _def=None,
-            )
-            def_broadcast_kwargs["require_kwargs"] = dict(
-                size=dict(requirements="O"),
-                size_type=dict(requirements="O"),
-                min_size=dict(requirements="O"),
-                max_size=dict(requirements="O"),
-            )
-        if stop_ladder:
-            def_broadcast_kwargs["axis"] = dict(
-                sl_stop=1,
-                tsl_stop=1,
-                tp_stop=1,
-                td_stop=1,
-                dt_stop=1,
-            )
-            def_broadcast_kwargs["merge_kwargs"] = dict(
-                sl_stop=dict(reset_index="from_start", fill_value=np.nan),
-                tsl_stop=dict(reset_index="from_start", fill_value=np.nan),
-                tp_stop=dict(reset_index="from_start", fill_value=np.nan),
-                td_stop=dict(reset_index="from_start", fill_value=-1),
-                dt_stop=dict(reset_index="from_start", fill_value=-1),
-            )
-        broadcast_kwargs = merge_dicts(def_broadcast_kwargs, broadcast_kwargs)
-        broadcasted_args, wrapper = broadcast(broadcastable_args, return_wrapper=True, **broadcast_kwargs)
-        if not wrapper.group_select and cash_sharing:
-            raise ValueError("group_select cannot be disabled if cash_sharing=True")
-        cash_earnings = broadcasted_args.pop("cash_earnings")
-        cash_dividends = broadcasted_args.pop("cash_dividends")
-        target_shape_2d = wrapper.shape_2d
-        index = wrapper.ns_index
-        freq = wrapper.ns_freq
-
-        cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
-        init_cash = np.require(broadcast_array_to(init_cash, len(cs_group_lens)), dtype=np.float_)
-        init_position = np.require(broadcast_array_to(init_position, target_shape_2d[1]), dtype=np.float_)
-        init_price = np.require(broadcast_array_to(init_price, target_shape_2d[1]), dtype=np.float_)
-        if (((init_position > 0) | (init_position < 0)) & np.isnan(init_price)).any():
-            warnings.warn(f"Initial position has undefined price. Set init_price.", stacklevel=2)
-        cash_deposits = broadcast(
-            cash_deposits,
-            to_shape=(target_shape_2d[0], len(cs_group_lens)),
-            to_pd=False,
-            keep_flex=True,
-            reindex_kwargs=dict(fill_value=0.0),
-            require_kwargs=require_kwargs,
-        )
-        group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-        if call_seq is None and attach_call_seq:
-            call_seq = enums.CallSeqType.Default
-        if call_seq is not None:
-            if checks.is_any_array(call_seq):
-                call_seq = require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
-            else:
-                call_seq = build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
-        if max_logs is None:
-            _log = broadcasted_args["log"]
-            if _log.size == 1:
-                max_logs = target_shape_2d[0] * int(_log.item(0))
-            else:
-                if _log.shape[0] == 1 and target_shape_2d[0] > 1:
-                    max_logs = target_shape_2d[0] * int(np.any(_log))
-                else:
-                    max_logs = int(np.max(np.sum(_log, axis=0)))
-        if use_stops is None:
-            if stop_ladder:
-                use_stops = True
-            else:
-                if flexible_mode:
-                    use_stops = True
-                else:
-                    if (
-                        not np.any(broadcasted_args["sl_stop"])
-                        and not np.any(broadcasted_args["tsl_stop"])
-                        and not np.any(broadcasted_args["tp_stop"])
-                        and not np.any(broadcasted_args["td_stop"] != -1)
-                        and not np.any(broadcasted_args["dt_stop"] != -1)
-                    ):
-                        use_stops = False
-                    else:
-                        use_stops = True
-
-        # Convert strings to numbers
-        if "direction" in broadcasted_args:
-            broadcasted_args["direction"] = map_enum_fields(broadcasted_args["direction"], enums.Direction)
-        broadcasted_args["price"] = map_enum_fields(broadcasted_args["price"], enums.PriceType, ignore_type=(int, float))
-        broadcasted_args["size_type"] = map_enum_fields(broadcasted_args["size_type"], enums.SizeType)
-        broadcasted_args["leverage_mode"] = map_enum_fields(broadcasted_args["leverage_mode"], enums.LeverageMode)
-        broadcasted_args["price_area_vio_mode"] = map_enum_fields(
-            broadcasted_args["price_area_vio_mode"],
-            enums.PriceAreaVioMode,
-        )
-        broadcasted_args["val_price"] = map_enum_fields(
-            broadcasted_args["val_price"],
-            enums.ValPriceType,
-            ignore_type=(int, float),
-        )
-        broadcasted_args["accumulate"] = map_enum_fields(
-            broadcasted_args["accumulate"],
-            enums.AccumulationMode,
-            ignore_type=(int, bool),
-        )
-        broadcasted_args["upon_long_conflict"] = map_enum_fields(broadcasted_args["upon_long_conflict"], enums.ConflictMode)
-        broadcasted_args["upon_short_conflict"] = map_enum_fields(broadcasted_args["upon_short_conflict"], enums.ConflictMode)
-        broadcasted_args["upon_dir_conflict"] = map_enum_fields(
-            broadcasted_args["upon_dir_conflict"],
-            enums.DirectionConflictMode,
-        )
-        broadcasted_args["upon_opposite_entry"] = map_enum_fields(
-            broadcasted_args["upon_opposite_entry"],
-            enums.OppositeEntryMode,
-        )
-        broadcasted_args["order_type"] = map_enum_fields(broadcasted_args["order_type"], enums.OrderType)
-        limit_tif = broadcasted_args["limit_tif"]
-        if limit_tif.dtype == object:
-            if limit_tif.ndim in (0, 1):
-                limit_tif = pd.to_timedelta(limit_tif)
-                if isinstance(limit_tif, pd.Timedelta):
-                    limit_tif = limit_tif.to_timedelta64()
-                else:
-                    limit_tif = limit_tif.values
-            else:
-                limit_tif_cols = []
-                for col in range(limit_tif.shape[1]):
-                    limit_tif_col = pd.to_timedelta(limit_tif[:, col])
-                    limit_tif_cols.append(limit_tif_col.values)
-                limit_tif = np.column_stack(limit_tif_cols)
-        broadcasted_args["limit_tif"] = limit_tif.astype(np.int64)
-        limit_expiry = broadcasted_args["limit_expiry"]
-        if limit_expiry.dtype == object:
-            if limit_expiry.ndim in (0, 1):
-                limit_expiry = pd.to_datetime(limit_expiry).tz_localize(None)
-                if isinstance(limit_expiry, pd.Timestamp):
-                    limit_expiry = limit_expiry.to_datetime64()
-                else:
-                    limit_expiry = limit_expiry.values
-            else:
-                limit_expiry_cols = []
-                for col in range(limit_expiry.shape[1]):
-                    limit_expiry_col = pd.to_datetime(limit_expiry[:, col]).tz_localize(None)
-                    limit_expiry_cols.append(limit_expiry_col.values)
-                limit_expiry = np.column_stack(limit_expiry_cols)
-        broadcasted_args["limit_expiry"] = limit_expiry.astype(np.int64)
-        td_stop = broadcasted_args["td_stop"]
-        if td_stop.dtype == object:
-            if td_stop.ndim in (0, 1):
-                td_stop = pd.to_timedelta(td_stop)
-                if isinstance(td_stop, pd.Timedelta):
-                    td_stop = td_stop.to_timedelta64()
-                else:
-                    td_stop = td_stop.values
-            else:
-                td_stop_cols = []
-                for col in range(td_stop.shape[1]):
-                    td_stop_col = pd.to_timedelta(td_stop[:, col])
-                    td_stop_cols.append(td_stop_col.values)
-                td_stop = np.column_stack(td_stop_cols)
-        broadcasted_args["td_stop"] = td_stop.astype(np.int64)
-        dt_stop = broadcasted_args["dt_stop"]
-        if dt_stop.dtype == object:
-            if dt_stop.ndim in (0, 1):
-                dt_stop = pd.to_datetime(dt_stop).tz_localize(None)
-                if isinstance(dt_stop, pd.Timestamp):
-                    dt_stop = dt_stop.to_datetime64()
-                else:
-                    dt_stop = dt_stop.values
-            else:
-                dt_stop_cols = []
-                for col in range(dt_stop.shape[1]):
-                    dt_stop_col = pd.to_datetime(dt_stop[:, col]).tz_localize(None)
-                    dt_stop_cols.append(dt_stop_col.values)
-                dt_stop = np.column_stack(dt_stop_cols)
-        broadcasted_args["dt_stop"] = dt_stop.astype(np.int64)
-        broadcasted_args["upon_adj_limit_conflict"] = map_enum_fields(
-            broadcasted_args["upon_adj_limit_conflict"],
-            enums.PendingConflictMode,
-        )
-        broadcasted_args["upon_opp_limit_conflict"] = map_enum_fields(
-            broadcasted_args["upon_opp_limit_conflict"],
-            enums.PendingConflictMode,
-        )
-        broadcasted_args["stop_entry_price"] = map_enum_fields(
-            broadcasted_args["stop_entry_price"],
-            enums.StopEntryPrice,
-            ignore_type=(int, float),
-        )
-        broadcasted_args["stop_exit_price"] = map_enum_fields(
-            broadcasted_args["stop_exit_price"],
-            enums.StopExitPrice,
-            ignore_type=(int, float),
-        )
-        broadcasted_args["stop_exit_type"] = map_enum_fields(broadcasted_args["stop_exit_type"], enums.StopExitType)
-        broadcasted_args["stop_order_type"] = map_enum_fields(broadcasted_args["stop_order_type"], enums.OrderType)
-        broadcasted_args["upon_stop_update"] = map_enum_fields(broadcasted_args["upon_stop_update"], enums.StopUpdateMode)
-        broadcasted_args["upon_adj_stop_conflict"] = map_enum_fields(
-            broadcasted_args["upon_adj_stop_conflict"],
-            enums.PendingConflictMode,
-        )
-        broadcasted_args["upon_opp_stop_conflict"] = map_enum_fields(
-            broadcasted_args["upon_opp_stop_conflict"],
-            enums.PendingConflictMode,
-        )
-        broadcasted_args["delta_format"] = map_enum_fields(broadcasted_args["delta_format"], enums.DeltaFormat)
-        broadcasted_args["time_delta_format"] = map_enum_fields(broadcasted_args["time_delta_format"], enums.TimeDeltaFormat)
-
-        # Check data types
-        checks.assert_subdtype(broadcasted_args["entries"], np.bool_, arg_name="entries")
-        checks.assert_subdtype(broadcasted_args["exits"], np.bool_, arg_name="exits")
-        checks.assert_subdtype(broadcasted_args["short_entries"], np.bool_, arg_name="short_entries")
-        checks.assert_subdtype(broadcasted_args["short_exits"], np.bool_, arg_name="short_exits")
-        checks.assert_subdtype(broadcasted_args["direction"], np.integer, arg_name="direction")
-        checks.assert_subdtype(broadcasted_args["size"], np.number, arg_name="size")
-        checks.assert_subdtype(broadcasted_args["price"], np.number, arg_name="price")
-        checks.assert_subdtype(broadcasted_args["size_type"], np.integer, arg_name="size_type")
-        checks.assert_subdtype(broadcasted_args["fees"], np.number, arg_name="fees")
-        checks.assert_subdtype(broadcasted_args["fixed_fees"], np.number, arg_name="fixed_fees")
-        checks.assert_subdtype(broadcasted_args["slippage"], np.number, arg_name="slippage")
-        checks.assert_subdtype(broadcasted_args["min_size"], np.number, arg_name="min_size")
-        checks.assert_subdtype(broadcasted_args["max_size"], np.number, arg_name="max_size")
-        checks.assert_subdtype(broadcasted_args["size_granularity"], np.number, arg_name="size_granularity")
-        checks.assert_subdtype(broadcasted_args["leverage"], np.number, arg_name="leverage")
-        checks.assert_subdtype(broadcasted_args["leverage_mode"], np.integer, arg_name="leverage_mode")
-        checks.assert_subdtype(broadcasted_args["reject_prob"], np.number, arg_name="reject_prob")
-        checks.assert_subdtype(broadcasted_args["price_area_vio_mode"], np.integer, arg_name="price_area_vio_mode")
-        checks.assert_subdtype(broadcasted_args["allow_partial"], np.bool_, arg_name="allow_partial")
-        checks.assert_subdtype(broadcasted_args["raise_reject"], np.bool_, arg_name="raise_reject")
-        checks.assert_subdtype(broadcasted_args["log"], np.bool_, arg_name="log")
-        checks.assert_subdtype(broadcasted_args["val_price"], np.number, arg_name="val_price")
-        checks.assert_subdtype(broadcasted_args["accumulate"], (np.integer, np.bool_), arg_name="accumulate")
-        checks.assert_subdtype(broadcasted_args["upon_long_conflict"], np.integer, arg_name="upon_long_conflict")
-        checks.assert_subdtype(broadcasted_args["upon_short_conflict"], np.integer, arg_name="upon_short_conflict")
-        checks.assert_subdtype(broadcasted_args["upon_dir_conflict"], np.integer, arg_name="upon_dir_conflict")
-        checks.assert_subdtype(broadcasted_args["upon_opposite_entry"], np.integer, arg_name="upon_opposite_entry")
-        checks.assert_subdtype(broadcasted_args["order_type"], np.integer, arg_name="order_type")
-        checks.assert_subdtype(broadcasted_args["limit_delta"], np.number, arg_name="limit_delta")
-        checks.assert_subdtype(broadcasted_args["limit_tif"], np.integer, arg_name="limit_tif")
-        checks.assert_subdtype(broadcasted_args["limit_expiry"], np.integer, arg_name="limit_expiry")
-        checks.assert_subdtype(broadcasted_args["limit_reverse"], np.bool_, arg_name="limit_reverse")
-        checks.assert_subdtype(
-            broadcasted_args["upon_adj_limit_conflict"], np.integer, arg_name="upon_adj_limit_conflict"
-        )
-        checks.assert_subdtype(
-            broadcasted_args["upon_opp_limit_conflict"], np.integer, arg_name="upon_opp_limit_conflict"
-        )
-        checks.assert_subdtype(broadcasted_args["sl_stop"], np.number, arg_name="sl_stop")
-        checks.assert_subdtype(broadcasted_args["tsl_stop"], np.number, arg_name="tsl_stop")
-        checks.assert_subdtype(broadcasted_args["tsl_th"], np.number, arg_name="tsl_th")
-        checks.assert_subdtype(broadcasted_args["tp_stop"], np.number, arg_name="tp_stop")
-        checks.assert_subdtype(broadcasted_args["td_stop"], np.integer, arg_name="td_stop")
-        checks.assert_subdtype(broadcasted_args["dt_stop"], np.integer, arg_name="dt_stop")
-        checks.assert_subdtype(broadcasted_args["stop_entry_price"], np.number, arg_name="stop_entry_price")
-        checks.assert_subdtype(broadcasted_args["stop_exit_price"], np.number, arg_name="stop_exit_price")
-        checks.assert_subdtype(broadcasted_args["stop_exit_type"], np.integer, arg_name="stop_exit_type")
-        checks.assert_subdtype(broadcasted_args["stop_order_type"], np.integer, arg_name="stop_order_type")
-        checks.assert_subdtype(broadcasted_args["stop_limit_delta"], np.number, arg_name="stop_limit_delta")
-        checks.assert_subdtype(broadcasted_args["upon_stop_update"], np.integer, arg_name="upon_stop_update")
-        checks.assert_subdtype(
-            broadcasted_args["upon_adj_stop_conflict"], np.integer, arg_name="upon_adj_stop_conflict"
-        )
-        checks.assert_subdtype(
-            broadcasted_args["upon_opp_stop_conflict"], np.integer, arg_name="upon_opp_stop_conflict"
-        )
-        checks.assert_subdtype(broadcasted_args["delta_format"], np.integer, arg_name="delta_format")
-        checks.assert_subdtype(broadcasted_args["time_delta_format"], np.integer, arg_name="time_delta_format")
-        checks.assert_subdtype(broadcasted_args["open"], np.number, arg_name="open")
-        checks.assert_subdtype(broadcasted_args["high"], np.number, arg_name="high")
-        checks.assert_subdtype(broadcasted_args["low"], np.number, arg_name="low")
-        checks.assert_subdtype(broadcasted_args["close"], np.number, arg_name="close")
-        if bm_close is not None and not isinstance(bm_close, bool):
-            checks.assert_subdtype(broadcasted_args["bm_close"], np.number, arg_name="bm_close")
-        checks.assert_subdtype(cs_group_lens, np.integer, arg_name="cs_group_lens")
-        checks.assert_subdtype(broadcasted_args["from_ago"], np.integer, arg_name="from_ago")
-        if call_seq is not None:
-            checks.assert_subdtype(call_seq, np.integer, arg_name="call_seq")
-        checks.assert_subdtype(init_cash, np.number, arg_name="init_cash")
-        checks.assert_subdtype(init_position, np.number, arg_name="init_position")
-        checks.assert_subdtype(init_price, np.number, arg_name="init_price")
-        checks.assert_subdtype(cash_deposits, np.number, arg_name="cash_deposits")
-        checks.assert_subdtype(cash_earnings, np.number, arg_name="cash_earnings")
-        checks.assert_subdtype(cash_dividends, np.number, arg_name="cash_dividends")
-
-        # Prepare price
-        if from_ago_none:
-            price = broadcasted_args["price"]
-            if price.size == 1 or price.shape[0] == 1:
-                next_open_mask = price == enums.PriceType.NextOpen
-                next_close_mask = price == enums.PriceType.NextClose
-                if next_open_mask.any() or next_close_mask.any():
-                    price = price.astype(np.float_)
-                    price[next_open_mask] = enums.PriceType.Open
-                    price[next_close_mask] = enums.PriceType.Close
-                    from_ago = np.full(price.shape, 0, dtype=np.int_)
-                    from_ago[next_open_mask] = 1
-                    from_ago[next_close_mask] = 1
-                    broadcasted_args["price"] = price
-                    broadcasted_args["from_ago"] = from_ago
-
-        # Prepare arguments
-        template_context = merge_dicts(
-            broadcasted_args,
-            dict(
-                target_shape=target_shape_2d,
-                index=index,
-                freq=freq,
-                group_lens=group_lens if flexible_mode else cs_group_lens,
-                cs_group_lens=cs_group_lens,
-                call_seq=call_seq,
-                init_cash=init_cash,
-                init_position=init_position,
-                init_price=init_price,
-                cash_deposits=cash_deposits,
-                cash_earnings=cash_earnings,
-                cash_dividends=cash_dividends,
-                use_stops=use_stops,
-                stop_ladder=stop_ladder,
-                adjust_func_nb=adjust_func_nb,
-                adjust_args=adjust_args,
-                auto_call_seq=auto_call_seq,
-                ffill_val_price=ffill_val_price,
-                update_value=update_value,
-                fill_pos_info=fill_pos_info,
-                save_state=save_state,
-                save_value=save_value,
-                save_returns=save_returns,
-                max_orders=max_orders,
-                max_logs=max_logs,
-                in_outputs=in_outputs,
-                wrapper=wrapper,
-            ),
-            template_context,
-        )
-        entries = broadcasted_args.pop("entries")
-        exits = broadcasted_args.pop("exits")
-        short_entries = broadcasted_args.pop("short_entries")
-        short_exits = broadcasted_args.pop("short_exits")
-        direction = broadcasted_args.pop("direction")
-
-        if flexible_mode:
-            in_outputs = substitute_templates(in_outputs, template_context, sub_id="in_outputs")
-            post_segment_args = substitute_templates(post_segment_args, template_context, sub_id="post_segment_args")
-            if signal_func_mode:
-                signal_args = substitute_templates(signal_args, template_context, sub_id="signal_args")
-            else:
-                adjust_args = substitute_templates(adjust_args, template_context, sub_id="adjust_args")
-                if ls_mode:
-                    signal_args = (
-                        entries,
-                        exits,
-                        short_entries,
-                        short_exits,
-                        broadcasted_args["from_ago"],
-                        *((adjust_func_nb,) if staticized is None else ()),
-                        adjust_args,
-                    )
-                    chunked = ch.specialize_chunked_option(
-                        chunked,
-                        arg_take_spec=dict(
-                            signal_args=ch.ArgsTaker(
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                *((None,) if staticized is None else ()),
-                                ArgsTaker(),
-                            )
-                        ),
-                    )
-                elif order_mode:
-                    adjust_args = substitute_templates(adjust_args, template_context, sub_id="adjust_args")
-                    signal_args = (
-                        broadcasted_args["size"],
-                        broadcasted_args["price"],
-                        broadcasted_args["size_type"],
-                        direction,
-                        broadcasted_args["min_size"],
-                        broadcasted_args["max_size"],
-                        broadcasted_args["val_price"],
-                        broadcasted_args["from_ago"],
-                        *((adjust_func_nb,) if staticized is None else ()),
-                        adjust_args,
-                    )
-                    chunked = ch.specialize_chunked_option(
-                        chunked,
-                        arg_take_spec=dict(
-                            signal_args=ch.ArgsTaker(
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                *((None,) if staticized is None else ()),
-                                ArgsTaker(),
-                            )
-                        ),
-                    )
-                else:
-                    signal_args = (
-                        entries,
-                        exits,
-                        direction,
-                        broadcasted_args["from_ago"],
-                        *((adjust_func_nb,) if staticized is None else ()),
-                        adjust_args,
-                    )
-                    chunked = ch.specialize_chunked_option(
-                        chunked,
-                        arg_take_spec=dict(
-                            signal_args=ch.ArgsTaker(
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                *((None,) if staticized is None else ()),
-                                ArgsTaker(),
-                            )
-                        ),
-                    )
-            for k in broadcast_named_args:
-                if k in broadcasted_args:
-                    broadcasted_args.pop(k)
-            bm_close = broadcasted_args.pop("bm_close", None)
-
-            # Perform the simulation
-            func = resolve_dynamic_simulator("from_signal_func_nb", staticized)
-            func = jit_reg.resolve_option(func, jitted)
-            func = ch_reg.resolve_option(func, chunked)
-            callbacks = dict(
-                signal_func_nb=signal_func_nb,
-                post_segment_func_nb=post_segment_func_nb,
-            )
-            sim_out = func(
-                target_shape=target_shape_2d,
-                group_lens=group_lens,
-                cash_sharing=cash_sharing,
-                index=index,
-                freq=freq,
-                init_cash=init_cash,
-                init_position=init_position,
-                init_price=init_price,
-                cash_deposits=cash_deposits,
-                cash_earnings=cash_earnings,
-                cash_dividends=cash_dividends,
-                signal_args=signal_args,
-                post_segment_args=post_segment_args,
-                use_stops=use_stops,
-                stop_ladder=stop_ladder,
-                call_seq=call_seq,
-                auto_call_seq=auto_call_seq,
-                ffill_val_price=ffill_val_price,
-                update_value=update_value,
-                fill_pos_info=fill_pos_info,
-                max_orders=max_orders,
-                max_logs=max_logs,
-                in_outputs=in_outputs,
-                **broadcasted_args,
-                **(callbacks if staticized is None else {}),
-            )
-        else:
-            if ls_mode:
-                long_entries = entries
-                long_exits = exits
-            else:
-                if direction.size == 1:
-                    _direction = direction.item(0)
-                    if _direction == enums.Direction.LongOnly:
-                        long_entries = entries
-                        long_exits = exits
-                        short_entries = np.array([[False]])
-                        short_exits = np.array([[False]])
-                    elif _direction == enums.Direction.ShortOnly:
-                        long_entries = np.array([[False]])
-                        long_exits = np.array([[False]])
-                        short_entries = entries
-                        short_exits = exits
-                    else:
-                        long_entries = entries
-                        long_exits = np.array([[False]])
-                        short_entries = exits
-                        short_exits = np.array([[False]])
-                else:
-                    long_entries, long_exits, short_entries, short_exits = nb.dir_to_ls_signals_nb(
-                        target_shape=target_shape_2d,
-                        entries=entries,
-                        exits=exits,
-                        direction=direction,
-                    )
-
-            for k in broadcast_named_args:
-                if k in broadcasted_args:
-                    broadcasted_args.pop(k)
-            bm_close = broadcasted_args.pop("bm_close", None)
-
-            # Perform the simulation
-            func = jit_reg.resolve_option(nb.from_signals_nb, jitted)
-            func = ch_reg.resolve_option(func, chunked)
-            sim_out = func(
-                target_shape=target_shape_2d,
-                group_lens=cs_group_lens,  # group only if cash sharing is enabled to speed up
-                index=index,
-                freq=freq,
-                init_cash=init_cash,
-                init_position=init_position,
-                init_price=init_price,
-                cash_deposits=cash_deposits,
-                cash_earnings=cash_earnings,
-                cash_dividends=cash_dividends,
-                long_entries=long_entries,
-                long_exits=long_exits,
-                short_entries=short_entries,
-                short_exits=short_exits,
-                use_stops=use_stops,
-                stop_ladder=stop_ladder,
-                call_seq=call_seq,
-                auto_call_seq=auto_call_seq,
-                ffill_val_price=ffill_val_price,
-                update_value=update_value,
-                save_state=save_state,
-                save_value=save_value,
-                save_returns=save_returns,
-                max_orders=max_orders,
-                max_logs=max_logs,
-                **broadcasted_args,
-            )
-
-        # Create an instance
-        if "orders_cls" not in kwargs:
-            kwargs["orders_cls"] = FSOrders
-        return cls(
-            wrapper,
-            sim_out,
-            open=broadcasted_args["open"] if not open_none else None,
-            high=broadcasted_args["high"] if not high_none else None,
-            low=broadcasted_args["low"] if not low_none else None,
-            close=broadcasted_args["close"],
-            cash_sharing=cash_sharing,
-            init_cash=init_cash if init_cash_mode is None else init_cash_mode,
-            init_position=init_position,
-            init_price=init_price,
-            bm_close=bm_close,
-            **kwargs,
-        )
+            local_kwargs = locals()
+            local_kwargs = {**local_kwargs, **local_kwargs["kwargs"]}
+            del local_kwargs["kwargs"]
+            del local_kwargs["cls"]
+            del local_kwargs["return_preparer"]
+            del local_kwargs["return_prep_result"]
+            del local_kwargs["return_sim_out"]
+            if isinstance(close, Data):
+                local_kwargs["data"] = close
+                local_kwargs["close"] = None
+            preparer = FSPreparer(**local_kwargs)
+            if not return_preparer:
+                preparer.set_seed()
+            prep_result = None
+        if return_preparer:
+            return preparer
+        if prep_result is None:
+            prep_result = preparer.result
+        if return_prep_result:
+            return prep_result
+        sim_out = prep_result.sim_func(**prep_result.sim_args)
+        if return_sim_out:
+            return sim_out
+        return cls(order_records=sim_out, **prep_result.pf_args)
 
     @classmethod
     def from_holding(
@@ -6746,7 +5648,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         keep_inout_raw: tp.Optional[bool] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
-        staticized: tp.Union[None, bool, tp.Kwargs, tp.TaskId] = None,
+        staticized: tp.StaticizedOption = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
         **kwargs,

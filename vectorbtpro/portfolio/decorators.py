@@ -2,7 +2,7 @@
 
 """Class decorators for portfolio."""
 
-from functools import partial, cached_property
+from functools import partial, cached_property as cachedproperty
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
@@ -181,7 +181,7 @@ def attach_arg_properties(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
 
     checks.assert_subclass_of(cls, "BasePreparer")
 
-    for arg_name, settings in cls.arg_config["args"].items():
+    for arg_name, settings in cls.arg_config.items():
         broadcast = settings.get("broadcast", False)
         if broadcast:
             target_pre_name = "pre_" + arg_name
@@ -193,7 +193,8 @@ def attach_arg_properties(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
                 pre_arg_prop.__name__ = target_pre_name
                 pre_arg_prop.__qualname__ = f"{cls.__name__}.{target_pre_name}"
                 pre_arg_prop.__doc__ = f"Argument `{arg_name}` before broadcasting."
-                setattr(cls, pre_arg_prop.__name__, cached_property(pre_arg_prop))
+                setattr(cls, pre_arg_prop.__name__, cachedproperty(pre_arg_prop))
+                getattr(cls, pre_arg_prop.__name__).__set_name__(cls, pre_arg_prop.__name__)
 
             target_post_name = "post_" + arg_name
             if not hasattr(cls, target_post_name):
@@ -203,7 +204,8 @@ def attach_arg_properties(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
                 post_arg_prop.__name__ = target_post_name
                 post_arg_prop.__qualname__ = f"{cls.__name__}.{target_post_name}"
                 post_arg_prop.__doc__ = f"Argument `{arg_name}` after broadcasting."
-                setattr(cls, post_arg_prop.__name__, cached_property(post_arg_prop))
+                setattr(cls, post_arg_prop.__name__, cachedproperty(post_arg_prop))
+                getattr(cls, post_arg_prop.__name__).__set_name__(cls, post_arg_prop.__name__)
 
             target_name = arg_name
             if not hasattr(cls, target_name):
@@ -213,6 +215,17 @@ def attach_arg_properties(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
                 arg_prop.__name__ = target_name
                 arg_prop.__qualname__ = f"{cls.__name__}.{target_name}"
                 arg_prop.__doc__ = f"Argument `{arg_name}`."
-                setattr(cls, arg_prop.__name__, cached_property(arg_prop))
+                setattr(cls, arg_prop.__name__, cachedproperty(arg_prop))
+                getattr(cls, arg_prop.__name__).__set_name__(cls, arg_prop.__name__)
+        else:
+            if not hasattr(cls, arg_name):
+                def arg_prop(self, _arg_name: str = arg_name) -> tp.Any:
+                    return self.get_arg(_arg_name)
+
+                arg_prop.__name__ = arg_name
+                arg_prop.__qualname__ = f"{cls.__name__}.{arg_name}"
+                arg_prop.__doc__ = f"Argument `{arg_name}`."
+                setattr(cls, arg_prop.__name__, cachedproperty(arg_prop))
+                getattr(cls, arg_prop.__name__).__set_name__(cls, arg_prop.__name__)
 
     return cls

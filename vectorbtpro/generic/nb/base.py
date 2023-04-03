@@ -294,7 +294,7 @@ def fbfill_nb(arr: tp.Array2d) -> tp.Array2d:
 def bshift_1d_nb(arr: tp.Array1d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp.Array1d:
     """Shift backward by `n` positions.
 
-    Numba equivalent to `pd.Series(arr).shift(n)`.
+    Numba equivalent to `pd.Series(arr).shift(-n)`.
 
     !!! warning
         This operation looks ahead."""

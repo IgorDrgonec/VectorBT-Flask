@@ -253,3 +253,6 @@ Splits = Sequence[SplitLike]
 SplitsArray = Array2d
 SplitsMask = Array3d
 BoundsArray = Array3d
+
+# Staticization
+StaticizedOption = Union[None, bool, Kwargs, TaskId]
