@@ -55,6 +55,7 @@ __all__ = [
     "FOPreparer",
     "FSPreparer",
     "FOFPreparer",
+    "FDOFPreparer",
 ]
 
 __pdoc__ = {}
@@ -847,13 +848,8 @@ class BasePreparer(Configured, metaclass=MetaArgs):
 
 BasePreparer.override_arg_config_doc(__pdoc__)
 
-fo_arg_config = ReadonlyConfig(
+order_arg_config = ReadonlyConfig(
     dict(
-        cash_dividends=dict(
-            broadcast=True,
-            subdtype=np.number,
-            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=0.0)),
-        ),
         size=dict(
             broadcast=True,
             subdtype=np.number,
@@ -944,6 +940,26 @@ fo_arg_config = ReadonlyConfig(
             subdtype=np.bool_,
             broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=False)),
         ),
+    )
+)
+"""_"""
+
+__pdoc__[
+    "order_arg_config"
+] = f"""Argument config for order-related information.
+
+```python
+{order_arg_config.prettify()}
+```
+"""
+
+fo_arg_config = ReadonlyConfig(
+    dict(
+        cash_dividends=dict(
+            broadcast=True,
+            subdtype=np.number,
+            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=0.0)),
+        ),
         val_price=dict(
             broadcast=True,
             map_enum_kwargs=dict(enum=enums.ValPriceType, ignore_type=(int, float)),
@@ -977,6 +993,7 @@ __pdoc__[
 
 
 @attach_arg_properties
+@override_arg_config(order_arg_config)
 @override_arg_config(fo_arg_config)
 class FOPreparer(BasePreparer):
     """Class for preparing `vectorbtpro.portfolio.base.Portfolio.from_orders`."""
@@ -1136,12 +1153,6 @@ fs_arg_config = ReadonlyConfig(
             subdtype=np.bool_,
             broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=False)),
         ),
-        direction=dict(
-            broadcast=True,
-            map_enum_kwargs=dict(enum=enums.Direction),
-            subdtype=np.integer,
-            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=enums.Direction.Both)),
-        ),
         adjust_func_nb=dict(),
         adjust_args=dict(substitute_templates=True),
         signal_func_nb=dict(),
@@ -1149,90 +1160,6 @@ fs_arg_config = ReadonlyConfig(
         post_segment_func_nb=dict(),
         post_segment_args=dict(substitute_templates=True),
         order_mode=dict(),
-        size=dict(
-            broadcast=True,
-            subdtype=np.number,
-            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=np.nan)),
-        ),
-        price=dict(
-            broadcast=True,
-            map_enum_kwargs=dict(enum=enums.PriceType, ignore_type=(int, float)),
-            subdtype=np.number,
-            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=np.nan)),
-        ),
-        size_type=dict(
-            broadcast=True,
-            map_enum_kwargs=dict(enum=enums.SizeType),
-            subdtype=np.integer,
-            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=enums.SizeType.Amount)),
-        ),
-        fees=dict(
-            broadcast=True,
-            subdtype=np.number,
-            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=0.0)),
-        ),
-        fixed_fees=dict(
-            broadcast=True,
-            subdtype=np.number,
-            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=0.0)),
-        ),
-        slippage=dict(
-            broadcast=True,
-            subdtype=np.number,
-            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=0.0)),
-        ),
-        min_size=dict(
-            broadcast=True,
-            subdtype=np.number,
-            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=np.nan)),
-        ),
-        max_size=dict(
-            broadcast=True,
-            subdtype=np.number,
-            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=np.nan)),
-        ),
-        size_granularity=dict(
-            broadcast=True,
-            subdtype=np.number,
-            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=np.nan)),
-        ),
-        leverage=dict(
-            broadcast=True,
-            subdtype=np.number,
-            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=1.0)),
-        ),
-        leverage_mode=dict(
-            broadcast=True,
-            map_enum_kwargs=dict(enum=enums.LeverageMode),
-            subdtype=np.integer,
-            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=enums.LeverageMode.Lazy)),
-        ),
-        reject_prob=dict(
-            broadcast=True,
-            subdtype=np.number,
-            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=0.0)),
-        ),
-        price_area_vio_mode=dict(
-            broadcast=True,
-            map_enum_kwargs=dict(enum=enums.PriceAreaVioMode),
-            subdtype=np.integer,
-            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=enums.PriceAreaVioMode.Ignore)),
-        ),
-        allow_partial=dict(
-            broadcast=True,
-            subdtype=np.bool_,
-            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=True)),
-        ),
-        raise_reject=dict(
-            broadcast=True,
-            subdtype=np.bool_,
-            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=False)),
-        ),
-        log=dict(
-            broadcast=True,
-            subdtype=np.bool_,
-            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=False)),
-        ),
         val_price=dict(
             broadcast=True,
             map_enum_kwargs=dict(enum=enums.ValPriceType, ignore_type=(int, float)),
@@ -1431,6 +1358,7 @@ __pdoc__[
 
 
 @attach_arg_properties
+@override_arg_config(order_arg_config)
 @override_arg_config(fs_arg_config)
 class FSPreparer(BasePreparer):
     """Class for preparing `vectorbtpro.portfolio.base.Portfolio.from_signals`."""
@@ -2030,18 +1958,18 @@ class FOFPreparer(BasePreparer):
         if isinstance(staticized, dict):
             staticized = dict(staticized)
             if "func" not in staticized:
-                if not self.flexible_mode and not self.row_wise:
+                if not self.flexible and not self.row_wise:
                     staticized["func"] = nb.from_order_func_nb
-                elif not self.flexible_mode and self.row_wise:
+                elif not self.flexible and self.row_wise:
                     staticized["func"] = nb.from_order_func_rw_nb
-                elif self.flexible_mode and not self.row_wise:
+                elif self.flexible and not self.row_wise:
                     staticized["func"] = nb.from_flex_order_func_nb
                 else:
                     staticized["func"] = nb.from_flex_order_func_rw_nb
         return staticized
 
     @cachedproperty
-    def flexible_mode(self) -> bool:
+    def flexible(self) -> bool:
         """Whether the flexible mode is enabled."""
         return self["flex_order_func_nb"] is not None
 
@@ -2121,9 +2049,9 @@ class FOFPreparer(BasePreparer):
     def order_func_nb(self) -> tp.Callable:
         """Argument `order_func_nb`."""
         order_func_nb = self["order_func_nb"]
-        if self.flexible_mode and order_func_nb is not None:
+        if self.flexible and order_func_nb is not None:
             raise ValueError("Either order_func_nb or flex_order_func_nb must be provided")
-        if not self.flexible_mode and order_func_nb is None:
+        if not self.flexible and order_func_nb is None:
             raise ValueError("Either order_func_nb or flex_order_func_nb must be provided")
         if order_func_nb is None:
             order_func_nb = nb.no_order_func_nb
@@ -2260,11 +2188,11 @@ class FOFPreparer(BasePreparer):
 
     @cachedproperty
     def sim_func(self) -> tp.Optional[tp.Callable]:
-        if not self.row_wise and not self.flexible_mode:
+        if not self.row_wise and not self.flexible:
             func = self.resolve_dynamic_simulator("from_order_func_nb", self.staticized)
-        elif not self.row_wise and self.flexible_mode:
+        elif not self.row_wise and self.flexible:
             func = self.resolve_dynamic_simulator("from_flex_order_func_nb", self.staticized)
-        elif self.row_wise and not self.flexible_mode:
+        elif self.row_wise and not self.flexible:
             func = self.resolve_dynamic_simulator("from_order_func_rw_nb", self.staticized)
         else:
             func = self.resolve_dynamic_simulator("from_flex_order_func_rw_nb", self.staticized)
@@ -2288,3 +2216,157 @@ class FOFPreparer(BasePreparer):
             sim_arg_map["flex_order_func_nb"] = None
             sim_arg_map["post_order_func_nb"] = None
         return sim_arg_map
+    
+
+fdof_arg_config = ReadonlyConfig(
+    dict(
+        val_price=dict(
+            broadcast=True,
+            map_enum_kwargs=dict(enum=enums.ValPriceType, ignore_type=(int, float)),
+            subdtype=np.number,
+            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=np.nan)),
+        ),
+        flexible=dict(),
+    )
+)
+"""_"""
+
+__pdoc__[
+    "fdof_arg_config"
+] = f"""Argument config for `FDOFPreparer`.
+
+```python
+{fdof_arg_config.prettify()}
+```
+"""
+
+
+@attach_arg_properties
+@override_arg_config(order_arg_config)
+@override_arg_config(fdof_arg_config)
+class FDOFPreparer(FOFPreparer):
+    """Class for preparing `vectorbtpro.portfolio.base.Portfolio.from_def_order_func`."""
+
+    _setting_keys: tp.SettingsKeys = "portfolio.from_def_order_func"
+
+    # ############# Mode resolution ############# #
+
+    @cachedproperty
+    def flexible(self) -> bool:
+        return self["flexible"]
+
+    @cachedproperty
+    def pre_segment_func_nb(self) -> tp.Callable:
+        """Argument `pre_segment_func_nb`."""
+        pre_segment_func_nb = self["pre_segment_func_nb"]
+        if pre_segment_func_nb is None:
+            if self.flexible:
+                pre_segment_func_nb = nb.def_flex_pre_segment_func_nb
+            else:
+                pre_segment_func_nb = nb.def_pre_segment_func_nb
+        return pre_segment_func_nb
+
+    @cachedproperty
+    def order_func_nb(self) -> tp.Callable:
+        """Argument `order_func_nb`."""
+        order_func_nb = self["order_func_nb"]
+        if self.flexible and order_func_nb is not None:
+            raise ValueError("Argument order_func_nb cannot be provided when flexible=True")
+        if order_func_nb is None:
+            order_func_nb = nb.def_order_func_nb
+        return order_func_nb
+
+    @cachedproperty
+    def flex_order_func_nb(self) -> tp.Callable:
+        """Argument `flex_order_func_nb`."""
+        flex_order_func_nb = self["flex_order_func_nb"]
+        if not self.flexible and flex_order_func_nb is not None:
+            raise ValueError("Argument flex_order_func_nb cannot be provided when flexible=False")
+        if flex_order_func_nb is None:
+            flex_order_func_nb = nb.def_flex_order_func_nb
+        return flex_order_func_nb
+
+    @cachedproperty
+    def _pre_chunked(self) -> tp.ChunkedOption:
+        """Argument `chunked` before template substitution."""
+        return self["chunked"]
+
+    @cachedproperty
+    def staticized(self) -> tp.StaticizedOption:
+        staticized = FOFPreparer.staticized.func(self)
+        if isinstance(staticized, dict):
+            if "pre_segment_func_nb" not in staticized:
+                self.adapt_staticized_to_udf(staticized, self.pre_segment_func_nb, "pre_segment_func_nb")
+            if "order_func_nb" not in staticized:
+                self.adapt_staticized_to_udf(staticized, self.order_func_nb, "order_func_nb")
+            if "flex_order_func_nb" not in staticized:
+                self.adapt_staticized_to_udf(staticized, self.flex_order_func_nb, "flex_order_func_nb")
+        return staticized
+
+    # ############# Before broadcasting ############# #
+
+    @cachedproperty
+    def _pre_call_seq(self) -> tp.Optional[tp.ArrayLike]:
+        return BasePreparer._pre_call_seq.func(self)
+
+    # ############# Template substitution ############# #
+
+    @cachedproperty
+    def pre_segment_args(self) -> tp.Args:
+        """Argument `pre_segment_args`."""
+        return (
+            self.val_price,
+            self.price,
+            self.size,
+            self.size_type,
+            self.direction,
+            self.auto_call_seq,
+        )
+
+    @cachedproperty
+    def _order_args(self) -> tp.Args:
+        """Either `order_args` or `flex_order_args`."""
+        return (
+            self.size,
+            self.price,
+            self.size_type,
+            self.direction,
+            self.fees,
+            self.fixed_fees,
+            self.slippage,
+            self.min_size,
+            self.max_size,
+            self.size_granularity,
+            self.leverage,
+            self.leverage_mode,
+            self.reject_prob,
+            self.price_area_vio_mode,
+            self.allow_partial,
+            self.raise_reject,
+            self.log,
+        )
+
+    @cachedproperty
+    def order_args(self) -> tp.Args:
+        """Argument `order_args`."""
+        if self.flexible:
+            return self._post_order_args
+        return self._order_args
+
+    @cachedproperty
+    def flex_order_args(self) -> tp.Args:
+        """Argument `flex_order_args`."""
+        if not self.flexible:
+            return self._post_flex_order_args
+        return self._order_args
+
+    @cachedproperty
+    def chunked(self) -> tp.ChunkedOption:
+        arg_take_spec = dict()
+        arg_take_spec["pre_segment_args"] = ch.ArgsTaker(*[base_ch.flex_array_gl_slicer] * 5, None)
+        if self.flexible:
+            arg_take_spec["flex_order_args"] = ch.ArgsTaker(*[base_ch.flex_array_gl_slicer] * 17)
+        else:
+            arg_take_spec["order_args"] = ch.ArgsTaker(*[base_ch.flex_array_gl_slicer] * 17)
+        return ch.specialize_chunked_option(self._pre_chunked, arg_take_spec=arg_take_spec)
+

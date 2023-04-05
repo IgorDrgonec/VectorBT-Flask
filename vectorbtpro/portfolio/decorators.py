@@ -137,42 +137,26 @@ def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
     return wrapper
 
 
-def override_arg_config(*args, merge_configs: bool = True) -> tp.FlexClassWrapper:
-    """Class decorator to override argument configs of all base classes in MRO that subclass
+def override_arg_config(config: Config, merge_configs: bool = True) -> tp.ClassWrapper:
+    """Class decorator to override the argument config of a class subclassing
     `vectorbtpro.portfolio.preparers.BasePreparer`.
 
     Instead of overriding `_arg_config` class attribute, you can pass `config` directly to this decorator.
 
     Disable `merge_configs` to not merge, which will effectively disable field inheritance."""
 
-    def wrapper(cls: tp.Type[tp.T], config: tp.DictLike = None) -> tp.Type[tp.T]:
+    def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
         checks.assert_subclass_of(cls, "BasePreparer")
-
-        if config is None:
-            config = cls.arg_config
         if merge_configs:
-            configs = []
-            for base_cls in cls.mro()[::-1]:
-                if base_cls is not cls:
-                    if checks.is_subclass_of(base_cls, "BasePreparer"):
-                        configs.append(base_cls.arg_config)
-            configs.append(config)
-            config = merge_dicts(*configs)
-        if not isinstance(config, Config):
-            config = HybridConfig(config)
-
-        setattr(cls, "_arg_config", config)
+            new_config = merge_dicts(cls.arg_config, config)
+        else:
+            new_config = config
+        if not isinstance(new_config, Config):
+            new_config = HybridConfig(new_config)
+        setattr(cls, "_arg_config", new_config)
         return cls
 
-    if len(args) == 0:
-        return wrapper
-    elif len(args) == 1:
-        if isinstance(args[0], type):
-            return wrapper(args[0])
-        return partial(wrapper, config=args[0])
-    elif len(args) == 2:
-        return wrapper(args[0], config=args[1])
-    raise ValueError("Either class, config, class and config, or keyword arguments must be passed")
+    return wrapper
 
 
 def attach_arg_properties(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
