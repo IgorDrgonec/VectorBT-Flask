@@ -54,6 +54,7 @@ __all__ = [
     "BasePreparer",
     "FOPreparer",
     "FSPreparer",
+    "FOFPreparer",
 ]
 
 __pdoc__ = {}
@@ -131,6 +132,7 @@ base_arg_config = ReadonlyConfig(
         freq=dict(),
         call_seq=dict(map_enum_kwargs=dict(enum=enums.CallSeqType, look_for_type=str)),
         attach_call_seq=dict(),
+        keep_inout_flex=dict(),
         in_outputs=dict(has_default=False),
         broadcast_named_args=dict(is_dict=True),
         broadcast_kwargs=dict(is_dict=True),
@@ -138,6 +140,7 @@ base_arg_config = ReadonlyConfig(
         seed=dict(),
         jitted=dict(),
         chunked=dict(),
+        staticized=dict(),
     )
 )
 """_"""
@@ -327,7 +330,8 @@ class BasePreparer(Configured, metaclass=MetaArgs):
     def __getitem__(self, arg_name) -> tp.Any:
         return self.get_arg(arg_name)
 
-    def td_arr_to_ns(self, td_arr: tp.ArrayLike) -> tp.ArrayLike:
+    @staticmethod
+    def td_arr_to_ns(td_arr: tp.ArrayLike) -> tp.ArrayLike:
         """Prepare a timedelta array."""
         if td_arr.dtype == object:
             if td_arr.ndim in (0, 1):
@@ -344,7 +348,8 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                 td_arr = np.column_stack(td_arr_cols)
         return td_arr.astype(np.int64)
 
-    def dt_arr_to_ns(self, dt_arr: tp.ArrayLike) -> tp.ArrayLike:
+    @staticmethod
+    def dt_arr_to_ns(dt_arr: tp.ArrayLike) -> tp.ArrayLike:
         """Prepare a datetime array."""
         if dt_arr.dtype == object:
             if dt_arr.ndim in (0, 1):
@@ -361,14 +366,19 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                 dt_arr = np.column_stack(dt_arr_cols)
         return dt_arr.astype(np.int64)
 
-    def prepare_post_arg(self, arg_name: str, value: tp.Optional[tp.ArrayLike] = None) -> tp.ArrayLike:
-        """Prepare an argument after broadcasting."""
+    def prepare_post_arg(self, arg_name: str, value: tp.Optional[tp.ArrayLike] = None) -> object:
+        """Prepare an argument after broadcasting and/or template substitution."""
         if value is None:
-            arg = self.post_args[arg_name]
+            if arg_name in self.post_args:
+                arg = self.post_args[arg_name]
+            else:
+                arg = getattr(self, "_pre_" + arg_name)
         else:
             arg = value
         if arg is not None:
             arg_config = self.arg_config[arg_name]
+            if arg_config.get("substitute_templates", False):
+                arg = substitute_templates(arg, self.template_context, sub_id=arg_name)
             if "map_enum_kwargs" in arg_config:
                 arg = map_enum_fields(arg, **arg_config["map_enum_kwargs"])
             if arg_config.get("is_td", False):
@@ -378,6 +388,65 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             if "subdtype" in arg_config:
                 checks.assert_subdtype(arg, arg_config["subdtype"], arg_name=arg_name)
         return arg
+
+    @staticmethod
+    def adapt_staticized_to_udf(staticized: tp.Kwargs, func: tp.Union[str, tp.Callable], func_name: str) -> None:
+        """Adapt `staticized` dictionary to a UDF."""
+        sim_func_module = inspect.getmodule(staticized["func"])
+        if isinstance(func, (str, Path)):
+            if isinstance(func, str) and not func.endswith(".py") and hasattr(sim_func_module, func):
+                staticized[f"{func_name}_block"] = func
+                return None
+            func = Path(func)
+            module_path = func.resolve()
+        else:
+            if inspect.getmodule(func) == sim_func_module:
+                staticized[f"{func_name}_block"] = func.__name__
+                return None
+            module = inspect.getmodule(func)
+            if not hasattr(module, "__file__"):
+                raise TypeError(f"{func_name} must be defined in a Python file")
+            module_path = Path(module.__file__).resolve()
+        if "import_lines" not in staticized:
+            staticized["import_lines"] = []
+        reload = staticized.get("reload", False)
+        staticized["import_lines"].extend(
+            [
+                f'{func_name}_path = r"{module_path}"',
+                f"globals().update(vbt.import_module_from_path({func_name}_path).__dict__, reload={reload})",
+            ]
+        )
+
+    @staticmethod
+    def resolve_dynamic_simulator(simulator_name: str, staticized: tp.KwargsLike) -> tp.Callable:
+        """Resolve a dynamic simulator."""
+        if staticized is None:
+            func = getattr(nb, simulator_name)
+        else:
+            if isinstance(staticized, dict):
+                staticized = dict(staticized)
+                module_path = suggest_module_path(
+                    staticized.get("suggest_fname", simulator_name),
+                    path=staticized.pop("path", None),
+                    mkdir_kwargs=staticized.get("mkdir_kwargs", None),
+                )
+                if "new_func_name" not in staticized:
+                    staticized["new_func_name"] = simulator_name
+
+                if staticized.pop("override", False) or not module_path.exists():
+                    if "skip_func" not in staticized:
+                        def _skip_func(out_lines, func_name):
+                            to_skip = lambda x: f"def {func_name}" in x or x.startswith(f"{func_name}_path =")
+                            return any(map(to_skip, out_lines))
+
+                        staticized["skip_func"] = _skip_func
+                    module_path = cut_and_save_func(path=module_path, **staticized)
+                reload = staticized.pop("reload", False)
+                module = import_module_from_path(module_path, reload=reload)
+                func = getattr(module, staticized["new_func_name"])
+            else:
+                func = staticized
+        return func
 
     # ############# Ready arguments ############# #
 
@@ -412,7 +481,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
     # ############# Before broadcasting ############# #
 
     @cachedproperty
-    def pre_open(self) -> tp.ArrayLike:
+    def _pre_open(self) -> tp.ArrayLike:
         """Argument `open` before broadcasting."""
         open = self["open"]
         if open is None:
@@ -423,7 +492,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         return open
 
     @cachedproperty
-    def pre_high(self) -> tp.ArrayLike:
+    def _pre_high(self) -> tp.ArrayLike:
         """Argument `high` before broadcasting."""
         high = self["high"]
         if high is None:
@@ -434,7 +503,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         return high
 
     @cachedproperty
-    def pre_low(self) -> tp.ArrayLike:
+    def _pre_low(self) -> tp.ArrayLike:
         """Argument `low` before broadcasting."""
         low = self["low"]
         if low is None:
@@ -445,7 +514,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         return low
 
     @cachedproperty
-    def pre_close(self) -> tp.ArrayLike:
+    def _pre_close(self) -> tp.ArrayLike:
         """Argument `close` before broadcasting."""
         close = self["close"]
         if close is None:
@@ -456,7 +525,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         return close
 
     @cachedproperty
-    def pre_bm_close(self) -> tp.Optional[tp.ArrayLike]:
+    def _pre_bm_close(self) -> tp.Optional[tp.ArrayLike]:
         """Argument `bm_close` before broadcasting."""
         bm_close = self["bm_close"]
         if bm_close is not None and not isinstance(bm_close, bool):
@@ -464,29 +533,29 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         return None
 
     @cachedproperty
-    def pre_init_cash(self) -> tp.ArrayLike:
+    def _pre_init_cash(self) -> tp.ArrayLike:
         """Argument `init_cash` before broadcasting."""
         if self.init_cash_mode is not None:
             return np.inf
         return self["init_cash"]
 
     @cachedproperty
-    def pre_init_position(self) -> tp.ArrayLike:
+    def _pre_init_position(self) -> tp.ArrayLike:
         """Argument `init_position` before broadcasting."""
         return self["init_position"]
 
     @cachedproperty
-    def pre_init_price(self) -> tp.ArrayLike:
+    def _pre_init_price(self) -> tp.ArrayLike:
         """Argument `init_price` before broadcasting."""
         return self["init_price"]
 
     @cachedproperty
-    def pre_cash_deposits(self) -> tp.ArrayLike:
+    def _pre_cash_deposits(self) -> tp.ArrayLike:
         """Argument `cash_deposits` before broadcasting."""
         return self["cash_deposits"]
 
     @cachedproperty
-    def pre_freq(self) -> tp.Optional[tp.FrequencyLike]:
+    def _pre_freq(self) -> tp.Optional[tp.FrequencyLike]:
         """Argument `freq` before casting to nanosecond format."""
         freq = self["freq"]
         if freq is None and self.data is not None:
@@ -494,14 +563,14 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         return freq
 
     @cachedproperty
-    def pre_call_seq(self) -> tp.Optional[tp.ArrayLike]:
+    def _pre_call_seq(self) -> tp.Optional[tp.ArrayLike]:
         """Argument `call_seq` before broadcasting."""
         if self.auto_call_seq:
             return None
         return self["call_seq"]
 
     @cachedproperty
-    def pre_in_outputs(self) -> tp.Optional[tp.NamedTuple]:
+    def _pre_in_outputs(self) -> tp.Optional[tp.NamedTuple]:
         """Argument `in_outputs` before broadcasting."""
         in_outputs = self["in_outputs"]
         if (
@@ -514,7 +583,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         return in_outputs
 
     @cachedproperty
-    def pre_template_context(self) -> tp.Kwargs:
+    def _pre_template_context(self) -> tp.Kwargs:
         """Argument `template_context` before broadcasting."""
         return merge_dicts(dict(preparer=self), self["template_context"])
 
@@ -526,7 +595,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         pre_args = dict()
         for k, v in self.arg_config.items():
             if v.get("broadcast", False):
-                pre_args[k] = getattr(self, "pre_" + k)
+                pre_args[k] = getattr(self, "_pre_" + k)
         return pre_args
 
     @cachedproperty
@@ -534,9 +603,9 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         """Default keyword arguments for broadcasting."""
         return dict(
             to_pd=False,
-            keep_flex=True,
+            keep_flex=dict(cash_earnings=self.keep_inout_flex, _def=True),
             wrapper_kwargs=dict(
-                freq=self.pre_freq,
+                freq=self._pre_freq,
                 group_by=self.group_by,
             ),
             return_wrapper=True,
@@ -619,7 +688,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
     @cachedproperty
     def init_cash(self) -> tp.ArrayLike:
         """Argument `init_cash`."""
-        init_cash = broadcast_array_to(self.pre_init_cash, len(self.cs_group_lens))
+        init_cash = broadcast_array_to(self._pre_init_cash, len(self.cs_group_lens))
         checks.assert_subdtype(init_cash, np.number, arg_name="init_cash")
         init_cash = np.require(init_cash, dtype=np.float_)
         return init_cash
@@ -627,7 +696,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
     @cachedproperty
     def init_position(self) -> tp.ArrayLike:
         """Argument `init_position`."""
-        init_position = broadcast_array_to(self.pre_init_position, self.target_shape[1])
+        init_position = broadcast_array_to(self._pre_init_position, self.target_shape[1])
         checks.assert_subdtype(init_position, np.number, arg_name="init_position")
         init_position = np.require(init_position, dtype=np.float_)
         if (((init_position > 0) | (init_position < 0)) & np.isnan(self.init_price)).any():
@@ -637,7 +706,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
     @cachedproperty
     def init_price(self) -> tp.ArrayLike:
         """Argument `init_price`."""
-        init_price = broadcast_array_to(self.pre_init_price, self.target_shape[1])
+        init_price = broadcast_array_to(self._pre_init_price, self.target_shape[1])
         checks.assert_subdtype(init_price, np.number, arg_name="init_price")
         return np.require(init_price, dtype=np.float_)
 
@@ -650,7 +719,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             cash_deposits,
             to_shape=(self.target_shape[0], len(self.cs_group_lens)),
             to_pd=False,
-            keep_flex=True,
+            keep_flex=self.keep_inout_flex,
             reindex_kwargs=dict(fill_value=0.0),
             require_kwargs=self.broadcast_kwargs.get("require_kwargs", {}),
         )
@@ -658,7 +727,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
     @cachedproperty
     def call_seq(self) -> tp.Optional[tp.ArrayLike]:
         """Argument `call_seq`."""
-        call_seq = self.pre_call_seq
+        call_seq = self._pre_call_seq
         if call_seq is None and self.attach_call_seq:
             call_seq = enums.CallSeqType.Default
         if call_seq is not None:
@@ -694,18 +763,18 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                 call_seq=self.call_seq,
                 auto_call_seq=self.auto_call_seq,
                 attach_call_seq=self.attach_call_seq,
-                in_outputs=self.pre_in_outputs,
+                in_outputs=self._pre_in_outputs,
                 wrapper=self.wrapper,
             ),
             builtin_args,
             self.post_broadcast_named_args,
-            self.pre_template_context,
+            self._pre_template_context,
         )
 
     @cachedproperty
     def in_outputs(self) -> tp.Optional[tp.NamedTuple]:
         """Argument `in_outputs`."""
-        return substitute_templates(self.pre_in_outputs, self.template_context, sub_id="in_outputs")
+        return substitute_templates(self._pre_in_outputs, self.template_context, sub_id="in_outputs")
 
     # ############# Result ############# #
 
@@ -742,9 +811,9 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                 kwargs[k] = v
         return dict(
             wrapper=self.wrapper,
-            open=self.open if self.pre_open is not np.nan else None,
-            high=self.high if self.pre_high is not np.nan else None,
-            low=self.low if self.pre_low is not np.nan else None,
+            open=self.open if self._pre_open is not np.nan else None,
+            high=self.high if self._pre_high is not np.nan else None,
+            low=self.low if self._pre_low is not np.nan else None,
             close=self.close,
             cash_sharing=self.cash_sharing,
             init_cash=self.init_cash if self.init_cash_mode is None else self.init_cash_mode,
@@ -914,10 +983,17 @@ class FOPreparer(BasePreparer):
 
     _setting_keys: tp.SettingsKeys = "portfolio.from_orders"
 
+    # ############# Ready arguments ############# #
+
+    @cachedproperty
+    def staticized(self) -> tp.StaticizedOption:
+        """Argument `staticized`."""
+        raise ValueError("This method doesn't support staticization")
+
     # ############# Before broadcasting ############# #
 
     @cachedproperty
-    def pre_from_ago(self) -> tp.ArrayLike:
+    def _pre_from_ago(self) -> tp.ArrayLike:
         """Argument `from_ago` before broadcasting."""
         from_ago = self["from_ago"]
         if from_ago is not None:
@@ -925,12 +1001,12 @@ class FOPreparer(BasePreparer):
         return 0
 
     @cachedproperty
-    def pre_max_orders(self) -> tp.Optional[int]:
+    def _pre_max_orders(self) -> tp.Optional[int]:
         """Argument `max_orders` before broadcasting."""
         return self["max_orders"]
 
     @cachedproperty
-    def pre_max_logs(self) -> tp.Optional[int]:
+    def _pre_max_logs(self) -> tp.Optional[int]:
         """Argument `max_logs` before broadcasting."""
         return self["max_logs"]
 
@@ -939,8 +1015,8 @@ class FOPreparer(BasePreparer):
     @cachedproperty
     def price_and_from_ago(self) -> tp.Tuple[tp.ArrayLike, tp.ArrayLike]:
         """Arguments `price` and `from_ago` after broadcasting."""
-        price = self.post_price
-        from_ago = self.post_from_ago
+        price = self._post_price
+        from_ago = self._post_from_ago
         if self["from_ago"] is None:
             if price.size == 1 or price.shape[0] == 1:
                 next_open_mask = price == enums.PriceType.NextOpen
@@ -967,9 +1043,9 @@ class FOPreparer(BasePreparer):
     @cachedproperty
     def max_orders(self) -> tp.Optional[int]:
         """Argument `max_orders`."""
-        max_orders = self.pre_max_orders
+        max_orders = self._pre_max_orders
         if max_orders is None:
-            _size = self.post_size
+            _size = self._post_size
             if _size.size == 1:
                 max_orders = self.target_shape[0] * int(not np.isnan(_size.item(0)))
             else:
@@ -982,9 +1058,9 @@ class FOPreparer(BasePreparer):
     @cachedproperty
     def max_logs(self) -> tp.Optional[int]:
         """Argument `max_logs`."""
-        max_logs = self.pre_max_logs
+        max_logs = self._pre_max_logs
         if max_logs is None:
-            _log = self.post_log
+            _log = self._post_log
             if _log.size == 1:
                 max_logs = self.target_shape[0] * int(_log.item(0))
             else:
@@ -1000,7 +1076,7 @@ class FOPreparer(BasePreparer):
     def template_context(self) -> tp.Kwargs:
         return merge_dicts(
             dict(
-                group_lens=self.group_lens if self.flexible_mode else self.cs_group_lens,
+                group_lens=self.group_lens if self.dynamic_mode else self.cs_group_lens,
                 ffill_val_price=self.ffill_val_price,
                 update_value=self.update_value,
                 save_state=self.save_state,
@@ -1022,71 +1098,12 @@ class FOPreparer(BasePreparer):
 
     @cachedproperty
     def sim_arg_map(self) -> tp.Kwargs:
-        return dict(group_lens="cs_group_lens")
+        sim_arg_map = dict(BasePreparer.sim_arg_map.func(self))
+        sim_arg_map["group_lens"] = "cs_group_lens"
+        return sim_arg_map
 
 
 FOPreparer.override_arg_config_doc(__pdoc__)
-
-
-def adapt_staticized_to_udf(staticized: tp.Kwargs, func: tp.Union[str, tp.Callable], func_name: str) -> None:
-    """Adapt `staticized` dictionary to a UDF."""
-    sim_func_module = inspect.getmodule(staticized["func"])
-    if isinstance(func, (str, Path)):
-        if isinstance(func, str) and not func.endswith(".py") and hasattr(sim_func_module, func):
-            staticized[f"{func_name}_block"] = func
-            return None
-        func = Path(func)
-        module_path = func.resolve()
-    else:
-        if inspect.getmodule(func) == sim_func_module:
-            staticized[f"{func_name}_block"] = func.__name__
-            return None
-        module = inspect.getmodule(func)
-        if not hasattr(module, "__file__"):
-            raise TypeError(f"{func_name} must be defined in a Python file")
-        module_path = Path(module.__file__).resolve()
-    if "import_lines" not in staticized:
-        staticized["import_lines"] = []
-    reload = staticized.get("reload", False)
-    staticized["import_lines"].extend(
-        [
-            f'{func_name}_path = r"{module_path}"',
-            f"globals().update(vbt.import_module_from_path({func_name}_path).__dict__, reload={reload})",
-        ]
-    )
-
-
-def resolve_dynamic_simulator(simulator_name: str, staticized: tp.KwargsLike) -> tp.Callable:
-    """Resolve a dynamic simulator."""
-    if staticized is None:
-        func = getattr(nb, simulator_name)
-    else:
-        if isinstance(staticized, dict):
-            staticized = dict(staticized)
-            module_path = suggest_module_path(
-                staticized.get("suggest_fname", simulator_name),
-                path=staticized.pop("path", None),
-                mkdir_kwargs=staticized.get("mkdir_kwargs", None),
-            )
-            if "new_func_name" not in staticized:
-                staticized["new_func_name"] = simulator_name
-
-            if staticized.pop("override", False) or not module_path.exists():
-                if "skip_func" not in staticized:
-
-                    def _skip_func(out_lines, func_name):
-                        to_skip = lambda x: f"def {func_name}" in x or x.startswith(f"{func_name}_path =")
-                        return any(map(to_skip, out_lines))
-
-                    staticized["skip_func"] = _skip_func
-                module_path = cut_and_save_func(path=module_path, **staticized)
-            reload = staticized.pop("reload", False)
-            module = import_module_from_path(module_path, reload=reload)
-            func = getattr(module, staticized["new_func_name"])
-        else:
-            func = staticized
-    return func
-
 
 fs_arg_config = ReadonlyConfig(
     dict(
@@ -1126,11 +1143,11 @@ fs_arg_config = ReadonlyConfig(
             broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=enums.Direction.Both)),
         ),
         adjust_func_nb=dict(),
-        adjust_args=dict(),
+        adjust_args=dict(substitute_templates=True),
         signal_func_nb=dict(),
-        signal_args=dict(),
+        signal_args=dict(substitute_templates=True),
         post_segment_func_nb=dict(),
-        post_segment_args=dict(),
+        post_segment_args=dict(substitute_templates=True),
         order_mode=dict(),
         size=dict(
             broadcast=True,
@@ -1399,7 +1416,6 @@ fs_arg_config = ReadonlyConfig(
         save_returns=dict(),
         max_orders=dict(),
         max_logs=dict(),
-        staticized=dict(),
     )
 )
 """_"""
@@ -1424,7 +1440,7 @@ class FSPreparer(BasePreparer):
     # ############# Mode resolution ############# #
 
     @cachedproperty
-    def pre_staticized(self) -> tp.StaticizedOption:
+    def _pre_staticized(self) -> tp.StaticizedOption:
         """Argument `staticized` before its resolution."""
         staticized = self["staticized"]
         if isinstance(staticized, bool):
@@ -1447,32 +1463,32 @@ class FSPreparer(BasePreparer):
         return order_mode
 
     @cachedproperty
-    def flexible_mode(self) -> tp.StaticizedOption:
-        """Whether the flexible mode is enabled."""
+    def dynamic_mode(self) -> tp.StaticizedOption:
+        """Whether the dynamic mode is enabled."""
         return (
             self["adjust_func_nb"] is not None
             or self["signal_func_nb"] is not None
             or self["post_segment_func_nb"] is not None
             or self.order_mode
-            or self.pre_staticized is not None
+            or self._pre_staticized is not None
         )
 
     @cachedproperty
-    def pre_ls_mode(self) -> bool:
+    def _pre_ls_mode(self) -> bool:
         """Whether direction-aware mode is enabled before resolution."""
         return self["short_entries"] is not None or self["short_exits"] is not None
 
     @cachedproperty
-    def pre_signals_mode(self) -> bool:
+    def _pre_signals_mode(self) -> bool:
         """Whether signals mode is enabled before resolution."""
-        return self["entries"] is not None or self["exits"] is not None or self.pre_ls_mode
+        return self["entries"] is not None or self["exits"] is not None or self._pre_ls_mode
 
     @cachedproperty
     def ls_mode(self) -> bool:
         """Whether direction-aware mode is enabled."""
-        if not self.pre_signals_mode and not self.order_mode and self["signal_func_nb"] is None:
+        if not self._pre_signals_mode and not self.order_mode and self["signal_func_nb"] is None:
             return True
-        ls_mode = self.pre_ls_mode
+        ls_mode = self._pre_ls_mode
         if self.config.get("direction", None) is not None and ls_mode:
             raise ValueError("Direction and short signal arrays cannot be used together")
         return ls_mode
@@ -1480,9 +1496,9 @@ class FSPreparer(BasePreparer):
     @cachedproperty
     def signals_mode(self) -> bool:
         """Whether signals mode is enabled."""
-        if not self.pre_signals_mode and not self.order_mode and self["signal_func_nb"] is None:
+        if not self._pre_signals_mode and not self.order_mode and self["signal_func_nb"] is None:
             return True
-        signals_mode = self.pre_signals_mode
+        signals_mode = self._pre_signals_mode
         if signals_mode and self.order_mode:
             raise ValueError("Signal arrays and order mode cannot be used together")
         return signals_mode
@@ -1490,12 +1506,12 @@ class FSPreparer(BasePreparer):
     @cachedproperty
     def signal_func_mode(self) -> bool:
         """Whether signal function mode is enabled."""
-        return self.flexible_mode and not self.signals_mode and not self.order_mode
+        return self.dynamic_mode and not self.signals_mode and not self.order_mode
 
     @cachedproperty
     def adjust_func_nb(self) -> tp.Optional[tp.Callable]:
         """Argument `adjust_func_nb`."""
-        if self.flexible_mode:
+        if self.dynamic_mode:
             if self["adjust_func_nb"] is None:
                 return nb.no_adjust_func_nb
             return self["adjust_func_nb"]
@@ -1504,7 +1520,7 @@ class FSPreparer(BasePreparer):
     @cachedproperty
     def signal_func_nb(self) -> tp.Optional[tp.Callable]:
         """Argument `signal_func_nb`."""
-        if self.flexible_mode:
+        if self.dynamic_mode:
             if self["signal_func_nb"] is None:
                 if self.ls_mode:
                     return nb.ls_signal_func_nb
@@ -1519,7 +1535,7 @@ class FSPreparer(BasePreparer):
     @cachedproperty
     def post_segment_func_nb(self) -> tp.Optional[tp.Callable]:
         """Argument `post_segment_func_nb`."""
-        if self.flexible_mode:
+        if self.dynamic_mode:
             if self["post_segment_func_nb"] is None:
                 return nb.no_post_func_nb
             return self["post_segment_func_nb"]
@@ -1528,48 +1544,33 @@ class FSPreparer(BasePreparer):
     @cachedproperty
     def staticized(self) -> tp.StaticizedOption:
         """Argument `staticized`."""
-        staticized = self.pre_staticized
+        staticized = self._pre_staticized
         if isinstance(staticized, dict):
             staticized = dict(staticized)
-        if self.flexible_mode:
+        if self.dynamic_mode:
             if self["signal_func_nb"] is None:
                 if self.ls_mode:
                     if isinstance(staticized, dict):
-                        adapt_staticized_to_udf(staticized, "ls_signal_func_nb", "signal_func_nb")
+                        self.adapt_staticized_to_udf(staticized, "ls_signal_func_nb", "signal_func_nb")
                         staticized["suggest_fname"] = "from_ls_signal_func_nb"
                 elif self.signals_mode:
                     if isinstance(staticized, dict):
-                        adapt_staticized_to_udf(staticized, "dir_signal_func_nb", "signal_func_nb")
+                        self.adapt_staticized_to_udf(staticized, "dir_signal_func_nb", "signal_func_nb")
                         staticized["suggest_fname"] = "from_dir_signal_func_nb"
                 elif self.order_mode:
                     if isinstance(staticized, dict):
-                        adapt_staticized_to_udf(staticized, "order_signal_func_nb", "signal_func_nb")
+                        self.adapt_staticized_to_udf(staticized, "order_signal_func_nb", "signal_func_nb")
                         staticized["suggest_fname"] = "from_order_signal_func_nb"
             elif isinstance(staticized, dict):
-                adapt_staticized_to_udf(staticized, self["signal_func_nb"], "signal_func_nb")
+                self.adapt_staticized_to_udf(staticized, self["signal_func_nb"], "signal_func_nb")
             if self["adjust_func_nb"] is not None and isinstance(staticized, dict):
-                adapt_staticized_to_udf(staticized, self["adjust_func_nb"], "adjust_func_nb")
+                self.adapt_staticized_to_udf(staticized, self["adjust_func_nb"], "adjust_func_nb")
             if self["post_segment_func_nb"] is not None and isinstance(staticized, dict):
-                adapt_staticized_to_udf(staticized, self["post_segment_func_nb"], "post_segment_func_nb")
+                self.adapt_staticized_to_udf(staticized, self["post_segment_func_nb"], "post_segment_func_nb")
         return staticized
 
     @cachedproperty
-    def pre_adjust_args(self) -> tp.Args:
-        """Argument `adjust_args` before template substitution."""
-        return self["adjust_args"]
-
-    @cachedproperty
-    def pre_signal_args(self) -> tp.Args:
-        """Argument `signal_args` before template substitution."""
-        return self["signal_args"]
-
-    @cachedproperty
-    def pre_post_segment_args(self) -> tp.Args:
-        """Argument `post_segment_args` before template substitution."""
-        return self["post_segment_args"]
-
-    @cachedproperty
-    def pre_chunked(self) -> tp.ChunkedOption:
+    def _pre_chunked(self) -> tp.ChunkedOption:
         """Argument `chunked` before template substitution."""
         return self["chunked"]
 
@@ -1579,50 +1580,50 @@ class FSPreparer(BasePreparer):
     def save_state(self) -> bool:
         """Argument `save_state`."""
         save_state = self["save_state"]
-        if save_state and self.flexible_mode:
-            raise ValueError("Argument save_state cannot be used in flexible mode")
+        if save_state and self.dynamic_mode:
+            raise ValueError("Argument save_state cannot be used in dynamic mode. Write it in post_segment_func_nb.")
         return save_state
 
     @cachedproperty
     def save_value(self) -> bool:
         """Argument `save_value`."""
         save_value = self["save_value"]
-        if save_value and self.flexible_mode:
-            raise ValueError("Argument save_value cannot be used in flexible mode")
+        if save_value and self.dynamic_mode:
+            raise ValueError("Argument save_value cannot be used in dynamic mode. Write it in post_segment_func_nb.")
         return save_value
 
     @cachedproperty
     def save_returns(self) -> bool:
         """Argument `save_returns`."""
         save_returns = self["save_returns"]
-        if save_returns and self.flexible_mode:
-            raise ValueError("Argument save_returns cannot be used in flexible mode")
+        if save_returns and self.dynamic_mode:
+            raise ValueError("Argument save_returns cannot be used in dynamic mode. Write it in post_segment_func_nb.")
         return save_returns
 
     # ############# Before broadcasting ############# #
 
     @cachedproperty
-    def pre_entries(self) -> tp.ArrayLike:
+    def _pre_entries(self) -> tp.ArrayLike:
         """Argument `entries` before broadcasting."""
         return self["entries"] if self["entries"] is not None else False
 
     @cachedproperty
-    def pre_exits(self) -> tp.ArrayLike:
+    def _pre_exits(self) -> tp.ArrayLike:
         """Argument `exits` before broadcasting."""
         return self["exits"] if self["exits"] is not None else False
 
     @cachedproperty
-    def pre_short_entries(self) -> tp.ArrayLike:
+    def _pre_short_entries(self) -> tp.ArrayLike:
         """Argument `short_entries` before broadcasting."""
         return self["short_entries"] if self["short_entries"] is not None else False
 
     @cachedproperty
-    def pre_short_exits(self) -> tp.ArrayLike:
+    def _pre_short_exits(self) -> tp.ArrayLike:
         """Argument `short_exits` before broadcasting."""
         return self["short_exits"] if self["short_exits"] is not None else False
 
     @cachedproperty
-    def pre_from_ago(self) -> tp.ArrayLike:
+    def _pre_from_ago(self) -> tp.ArrayLike:
         """Argument `from_ago` before broadcasting."""
         from_ago = self["from_ago"]
         if from_ago is not None:
@@ -1630,14 +1631,14 @@ class FSPreparer(BasePreparer):
         return 0
 
     @cachedproperty
-    def pre_max_logs(self) -> tp.Optional[int]:
+    def _pre_max_logs(self) -> tp.Optional[int]:
         """Argument `max_logs` before broadcasting."""
         return self["max_logs"]
 
     @cachedproperty
-    def pre_in_outputs(self) -> tp.Optional[tp.NamedTuple]:
-        if self.flexible_mode:
-            return BasePreparer.pre_in_outputs.func(self)
+    def _pre_in_outputs(self) -> tp.Optional[tp.NamedTuple]:
+        if self.dynamic_mode:
+            return BasePreparer._pre_in_outputs.func(self)
         if self["in_outputs"] is not None:
             raise ValueError("Argument in_outputs cannot be used in fixed mode")
         return None
@@ -1647,56 +1648,55 @@ class FSPreparer(BasePreparer):
     @cachedproperty
     def def_broadcast_kwargs(self) -> tp.Kwargs:
         def_broadcast_kwargs = dict(BasePreparer.def_broadcast_kwargs.func(self))
+        new_def_broadcast_kwargs = dict()
         if self.order_mode:
-            def_broadcast_kwargs["keep_flex"] = dict(
+            new_def_broadcast_kwargs["keep_flex"] = dict(
                 size=False,
                 size_type=False,
                 min_size=False,
                 max_size=False,
-                _def=True,
             )
-            def_broadcast_kwargs["min_ndim"] = dict(
+            new_def_broadcast_kwargs["min_ndim"] = dict(
                 size=2,
                 size_type=2,
                 min_size=2,
                 max_size=2,
-                _def=None,
             )
-            def_broadcast_kwargs["require_kwargs"] = dict(
+            new_def_broadcast_kwargs["require_kwargs"] = dict(
                 size=dict(requirements="O"),
                 size_type=dict(requirements="O"),
                 min_size=dict(requirements="O"),
                 max_size=dict(requirements="O"),
             )
         if self.stop_ladder:
-            def_broadcast_kwargs["axis"] = dict(
+            new_def_broadcast_kwargs["axis"] = dict(
                 sl_stop=1,
                 tsl_stop=1,
                 tp_stop=1,
                 td_stop=1,
                 dt_stop=1,
             )
-            def_broadcast_kwargs["merge_kwargs"] = dict(
+            new_def_broadcast_kwargs["merge_kwargs"] = dict(
                 sl_stop=dict(reset_index="from_start", fill_value=np.nan),
                 tsl_stop=dict(reset_index="from_start", fill_value=np.nan),
                 tp_stop=dict(reset_index="from_start", fill_value=np.nan),
                 td_stop=dict(reset_index="from_start", fill_value=-1),
                 dt_stop=dict(reset_index="from_start", fill_value=-1),
             )
-        return def_broadcast_kwargs
+        return merge_dicts(def_broadcast_kwargs, new_def_broadcast_kwargs)
 
     # ############# After broadcasting ############# #
 
     @cachedproperty
     def signals(self) -> tp.Tuple[tp.ArrayLike, tp.ArrayLike, tp.ArrayLike, tp.ArrayLike]:
         """Arguments `entries`, `exits`, `short_entries`, and `short_exits` after broadcasting."""
-        entries = self.post_entries
-        exits = self.post_exits
-        short_entries = self.post_short_entries
-        short_exits = self.post_short_exits
+        entries = self._post_entries
+        exits = self._post_exits
+        short_entries = self._post_short_entries
+        short_exits = self._post_short_exits
 
-        if not self.flexible_mode and not self.ls_mode:
-            direction = self.post_direction
+        if not self.dynamic_mode and not self.ls_mode:
+            direction = self._post_direction
             if direction.size == 1:
                 _direction = direction.item(0)
                 if _direction == enums.Direction.LongOnly:
@@ -1748,8 +1748,8 @@ class FSPreparer(BasePreparer):
     @cachedproperty
     def price_and_from_ago(self) -> tp.Tuple[tp.ArrayLike, tp.ArrayLike]:
         """Arguments `price` and `from_ago` after broadcasting."""
-        price = self.post_price
-        from_ago = self.post_from_ago
+        price = self._post_price
+        from_ago = self._post_from_ago
         if self["from_ago"] is None:
             if price.size == 1 or price.shape[0] == 1:
                 next_open_mask = price == enums.PriceType.NextOpen
@@ -1776,9 +1776,9 @@ class FSPreparer(BasePreparer):
     @cachedproperty
     def max_logs(self) -> tp.Optional[int]:
         """Argument `max_logs`."""
-        max_logs = self.pre_max_logs
+        max_logs = self._pre_max_logs
         if max_logs is None:
-            _log = self.post_log
+            _log = self._post_log
             if _log.size == 1:
                 max_logs = self.target_shape[0] * int(_log.item(0))
             else:
@@ -1794,7 +1794,7 @@ class FSPreparer(BasePreparer):
         if self.stop_ladder:
             use_stops = True
         else:
-            if self.flexible_mode:
+            if self.dynamic_mode:
                 use_stops = True
             else:
                 if (
@@ -1819,11 +1819,11 @@ class FSPreparer(BasePreparer):
                 use_stops=self.use_stops,
                 stop_ladder=self.stop_ladder,
                 adjust_func_nb=self.adjust_func_nb,
-                adjust_args=self.pre_adjust_args,
+                adjust_args=self._pre_adjust_args,
                 signal_func_nb=self.signal_func_nb,
-                signal_args=self.pre_signal_args,
+                signal_args=self._pre_signal_args,
                 post_segment_func_nb=self.post_segment_func_nb,
-                post_segment_args=self.pre_post_segment_args,
+                post_segment_args=self._pre_post_segment_args,
                 ffill_val_price=self.ffill_val_price,
                 update_value=self.update_value,
                 fill_pos_info=self.fill_pos_info,
@@ -1837,29 +1837,9 @@ class FSPreparer(BasePreparer):
         )
 
     @cachedproperty
-    def post_adjust_args(self) -> tp.Args:
-        """Argument `adjust_args` after template substitution."""
-        return substitute_templates(self.pre_adjust_args, self.template_context, sub_id="adjust_args")
-
-    @cachedproperty
-    def post_signal_args(self) -> tp.Args:
-        """Argument `signal_args` after template substitution."""
-        return substitute_templates(self.pre_signal_args, self.template_context, sub_id="signal_args")
-
-    @cachedproperty
-    def post_post_segment_args(self) -> tp.Args:
-        """Argument `post_segment_args` after template substitution."""
-        return substitute_templates(self.pre_post_segment_args, self.template_context, sub_id="post_segment_args")
-
-    @cachedproperty
-    def adjust_args(self) -> tp.Args:
-        """Argument `adjust_args`."""
-        return self.post_adjust_args
-
-    @cachedproperty
     def signal_args(self) -> tp.Args:
         """Argument `signal_args`."""
-        if self.flexible_mode:
+        if self.dynamic_mode:
             if self.ls_mode:
                 return (
                     self.entries,
@@ -1892,19 +1872,14 @@ class FSPreparer(BasePreparer):
                     *((self.adjust_func_nb,) if self.staticized is None else ()),
                     self.adjust_args,
                 )
-        return self.post_signal_args
-
-    @cachedproperty
-    def post_segment_args(self) -> tp.Args:
-        """Argument `post_segment_args`."""
-        return self.post_post_segment_args
+        return self._post_signal_args
 
     @cachedproperty
     def chunked(self) -> tp.ChunkedOption:
-        if self.flexible_mode:
+        if self.dynamic_mode:
             if self.ls_mode:
                 return ch.specialize_chunked_option(
-                    self.pre_chunked,
+                    self._pre_chunked,
                     arg_take_spec=dict(
                         signal_args=ch.ArgsTaker(
                             base_ch.flex_array_gl_slicer,
@@ -1919,7 +1894,7 @@ class FSPreparer(BasePreparer):
                 )
             if self.signals_mode:
                 return ch.specialize_chunked_option(
-                    self.pre_chunked,
+                    self._pre_chunked,
                     arg_take_spec=dict(
                         signal_args=ch.ArgsTaker(
                             base_ch.flex_array_gl_slicer,
@@ -1933,7 +1908,7 @@ class FSPreparer(BasePreparer):
                 )
             if self.order_mode:
                 return ch.specialize_chunked_option(
-                    self.pre_chunked,
+                    self._pre_chunked,
                     arg_take_spec=dict(
                         signal_args=ch.ArgsTaker(
                             base_ch.flex_array_gl_slicer,
@@ -1949,25 +1924,24 @@ class FSPreparer(BasePreparer):
                         )
                     ),
                 )
-        return self.pre_chunked
+        return self._pre_chunked
 
     # ############# Result ############# #
 
     @cachedproperty
     def sim_func(self) -> tp.Optional[tp.Callable]:
-        if self.flexible_mode:
-            func = resolve_dynamic_simulator("from_signal_func_nb", self.staticized)
-            func = jit_reg.resolve_option(func, self.jitted)
-            func = ch_reg.resolve_option(func, self.chunked)
+        if self.dynamic_mode:
+            func = self.resolve_dynamic_simulator("from_signal_func_nb", self.staticized)
         else:
-            func = jit_reg.resolve_option(nb.from_signals_nb, self.jitted)
-            func = ch_reg.resolve_option(func, self.chunked)
+            func = nb.from_signals_nb
+        func = jit_reg.resolve_option(func, self.jitted)
+        func = ch_reg.resolve_option(func, self.chunked)
         return func
 
     @cachedproperty
     def sim_arg_map(self) -> tp.Kwargs:
-        sim_arg_map = {}
-        if self.flexible_mode:
+        sim_arg_map = dict(BasePreparer.sim_arg_map.func(self))
+        if self.dynamic_mode:
             if self.staticized is not None:
                 sim_arg_map["signal_func_nb"] = None
                 sim_arg_map["post_segment_func_nb"] = None
@@ -1985,3 +1959,332 @@ class FSPreparer(BasePreparer):
 
 
 FSPreparer.override_arg_config_doc(__pdoc__)
+
+
+fof_arg_config = ReadonlyConfig(
+    dict(
+        segment_mask=dict(),
+        call_pre_segment=dict(),
+        call_post_segment=dict(),
+        pre_sim_func_nb=dict(),
+        pre_sim_args=dict(substitute_templates=True),
+        post_sim_func_nb=dict(),
+        post_sim_args=dict(substitute_templates=True),
+        pre_group_func_nb=dict(),
+        pre_group_args=dict(substitute_templates=True),
+        post_group_func_nb=dict(),
+        post_group_args=dict(substitute_templates=True),
+        pre_row_func_nb=dict(),
+        pre_row_args=dict(substitute_templates=True),
+        post_row_func_nb=dict(),
+        post_row_args=dict(substitute_templates=True),
+        pre_segment_func_nb=dict(),
+        pre_segment_args=dict(substitute_templates=True),
+        post_segment_func_nb=dict(),
+        post_segment_args=dict(substitute_templates=True),
+        order_func_nb=dict(),
+        order_args=dict(substitute_templates=True),
+        flex_order_func_nb=dict(),
+        flex_order_args=dict(substitute_templates=True),
+        post_order_func_nb=dict(),
+        post_order_args=dict(substitute_templates=True),
+        ffill_val_price=dict(),
+        update_value=dict(),
+        fill_pos_info=dict(),
+        track_value=dict(),
+        row_wise=dict(),
+        max_orders=dict(),
+        max_logs=dict(),
+    )
+)
+"""_"""
+
+__pdoc__[
+    "fof_arg_config"
+] = f"""Argument config for `FOFPreparer`.
+
+```python
+{fof_arg_config.prettify()}
+```
+"""
+
+
+@attach_arg_properties
+@override_arg_config(fof_arg_config)
+class FOFPreparer(BasePreparer):
+    """Class for preparing `vectorbtpro.portfolio.base.Portfolio.from_order_func`."""
+
+    _setting_keys: tp.SettingsKeys = "portfolio.from_order_func"
+
+    # ############# Mode resolution ############# #
+
+    @cachedproperty
+    def _pre_staticized(self) -> tp.StaticizedOption:
+        """Argument `staticized` before its resolution."""
+        staticized = self["staticized"]
+        if isinstance(staticized, bool):
+            if staticized:
+                staticized = dict()
+            else:
+                staticized = None
+        if isinstance(staticized, dict):
+            staticized = dict(staticized)
+            if "func" not in staticized:
+                if not self.flexible_mode and not self.row_wise:
+                    staticized["func"] = nb.from_order_func_nb
+                elif not self.flexible_mode and self.row_wise:
+                    staticized["func"] = nb.from_order_func_rw_nb
+                elif self.flexible_mode and not self.row_wise:
+                    staticized["func"] = nb.from_flex_order_func_nb
+                else:
+                    staticized["func"] = nb.from_flex_order_func_rw_nb
+        return staticized
+
+    @cachedproperty
+    def flexible_mode(self) -> bool:
+        """Whether the flexible mode is enabled."""
+        return self["flex_order_func_nb"] is not None
+
+    @cachedproperty
+    def pre_sim_func_nb(self) -> tp.Callable:
+        """Argument `pre_sim_func_nb`."""
+        pre_sim_func_nb = self["pre_sim_func_nb"]
+        if pre_sim_func_nb is None:
+            pre_sim_func_nb = nb.no_pre_func_nb
+        return pre_sim_func_nb
+
+    @cachedproperty
+    def post_sim_func_nb(self) -> tp.Callable:
+        """Argument `post_sim_func_nb`."""
+        post_sim_func_nb = self["post_sim_func_nb"]
+        if post_sim_func_nb is None:
+            post_sim_func_nb = nb.no_post_func_nb
+        return post_sim_func_nb
+
+    @cachedproperty
+    def pre_group_func_nb(self) -> tp.Callable:
+        """Argument `pre_group_func_nb`."""
+        pre_group_func_nb = self["pre_group_func_nb"]
+        if self.row_wise and pre_group_func_nb is not None:
+            raise ValueError("Cannot use pre_group_func_nb in a row-wise simulation")
+        if pre_group_func_nb is None:
+            pre_group_func_nb = nb.no_pre_func_nb
+        return pre_group_func_nb
+
+    @cachedproperty
+    def post_group_func_nb(self) -> tp.Callable:
+        """Argument `post_group_func_nb`."""
+        post_group_func_nb = self["post_group_func_nb"]
+        if self.row_wise and post_group_func_nb is not None:
+            raise ValueError("Cannot use post_group_func_nb in a row-wise simulation")
+        if post_group_func_nb is None:
+            post_group_func_nb = nb.no_post_func_nb
+        return post_group_func_nb
+
+    @cachedproperty
+    def pre_row_func_nb(self) -> tp.Callable:
+        """Argument `pre_row_func_nb`."""
+        pre_row_func_nb = self["pre_row_func_nb"]
+        if not self.row_wise and pre_row_func_nb is not None:
+            raise ValueError("Cannot use pre_row_func_nb in a column-wise simulation")
+        if pre_row_func_nb is None:
+            pre_row_func_nb = nb.no_pre_func_nb
+        return pre_row_func_nb
+
+    @cachedproperty
+    def post_row_func_nb(self) -> tp.Callable:
+        """Argument `post_row_func_nb`."""
+        post_row_func_nb = self["post_row_func_nb"]
+        if not self.row_wise and post_row_func_nb is not None:
+            raise ValueError("Cannot use post_row_func_nb in a column-wise simulation")
+        if post_row_func_nb is None:
+            post_row_func_nb = nb.no_post_func_nb
+        return post_row_func_nb
+
+    @cachedproperty
+    def pre_segment_func_nb(self) -> tp.Callable:
+        """Argument `pre_segment_func_nb`."""
+        pre_segment_func_nb = self["pre_segment_func_nb"]
+        if pre_segment_func_nb is None:
+            pre_segment_func_nb = nb.no_pre_func_nb
+        return pre_segment_func_nb
+
+    @cachedproperty
+    def post_segment_func_nb(self) -> tp.Callable:
+        """Argument `post_segment_func_nb`."""
+        post_segment_func_nb = self["post_segment_func_nb"]
+        if post_segment_func_nb is None:
+            post_segment_func_nb = nb.no_post_func_nb
+        return post_segment_func_nb
+
+    @cachedproperty
+    def order_func_nb(self) -> tp.Callable:
+        """Argument `order_func_nb`."""
+        order_func_nb = self["order_func_nb"]
+        if self.flexible_mode and order_func_nb is not None:
+            raise ValueError("Either order_func_nb or flex_order_func_nb must be provided")
+        if not self.flexible_mode and order_func_nb is None:
+            raise ValueError("Either order_func_nb or flex_order_func_nb must be provided")
+        if order_func_nb is None:
+            order_func_nb = nb.no_order_func_nb
+        return order_func_nb
+
+    @cachedproperty
+    def flex_order_func_nb(self) -> tp.Callable:
+        """Argument `flex_order_func_nb`."""
+        flex_order_func_nb = self["flex_order_func_nb"]
+        if flex_order_func_nb is None:
+            flex_order_func_nb = nb.no_flex_order_func_nb
+        return flex_order_func_nb
+
+    @cachedproperty
+    def post_order_func_nb(self) -> tp.Callable:
+        """Argument `post_order_func_nb`."""
+        post_order_func_nb = self["post_order_func_nb"]
+        if post_order_func_nb is None:
+            post_order_func_nb = nb.no_post_func_nb
+        return post_order_func_nb
+
+    @cachedproperty
+    def staticized(self) -> tp.StaticizedOption:
+        """Argument `staticized`."""
+        staticized = self._pre_staticized
+        if isinstance(staticized, dict):
+            staticized = dict(staticized)
+            if self["pre_sim_func_nb"] is not None:
+                self.adapt_staticized_to_udf(staticized, self["pre_sim_func_nb"], "pre_sim_func_nb")
+            if self["post_sim_func_nb"] is not None:
+                self.adapt_staticized_to_udf(staticized, self["post_sim_func_nb"], "post_sim_func_nb")
+            if self["pre_group_func_nb"] is not None:
+                self.adapt_staticized_to_udf(staticized, self["pre_group_func_nb"], "pre_group_func_nb")
+            if self["post_group_func_nb"] is not None:
+                self.adapt_staticized_to_udf(staticized, self["post_group_func_nb"], "post_group_func_nb")
+            if self["pre_row_func_nb"] is not None:
+                self.adapt_staticized_to_udf(staticized, self["pre_row_func_nb"], "pre_row_func_nb")
+            if self["post_row_func_nb"] is not None:
+                self.adapt_staticized_to_udf(staticized, self["post_row_func_nb"], "post_row_func_nb")
+            if self["pre_segment_func_nb"] is not None:
+                self.adapt_staticized_to_udf(staticized, self["pre_segment_func_nb"], "pre_segment_func_nb")
+            if self["post_segment_func_nb"] is not None:
+                self.adapt_staticized_to_udf(staticized, self["post_segment_func_nb"], "post_segment_func_nb")
+            if self["order_func_nb"] is not None:
+                self.adapt_staticized_to_udf(staticized, self["order_func_nb"], "order_func_nb")
+            if self["flex_order_func_nb"] is not None:
+                self.adapt_staticized_to_udf(staticized, self["flex_order_func_nb"], "flex_order_func_nb")
+            if self["post_order_func_nb"] is not None:
+                self.adapt_staticized_to_udf(staticized, self["post_order_func_nb"], "post_order_func_nb")
+        return staticized
+
+    # ############# Before broadcasting ############# #
+
+    @cachedproperty
+    def _pre_call_seq(self) -> tp.Optional[tp.ArrayLike]:
+        if self.auto_call_seq:
+            raise ValueError(
+                "CallSeqType.Auto must be implemented manually. Use sort_call_seq_nb in pre_segment_func_nb."
+            )
+        return self["call_seq"]
+
+    @cachedproperty
+    def _pre_segment_mask(self) -> tp.ArrayLike:
+        """Argument `segment_mask` before broadcasting."""
+        return self["segment_mask"]
+
+    # ############# After broadcasting ############# #
+
+    @cachedproperty
+    def segment_mask(self) -> tp.ArrayLike:
+        """Argument `segment_mask`."""
+        segment_mask = self._pre_segment_mask
+        if checks.is_int(segment_mask):
+            if self.keep_inout_flex:
+                _segment_mask = np.full((self.target_shape[0], 1), False)
+            else:
+                _segment_mask = np.full((self.target_shape[0], len(self.group_lens)), False)
+            _segment_mask[0::segment_mask] = True
+            segment_mask = _segment_mask
+        else:
+            segment_mask = broadcast(
+                segment_mask,
+                to_shape=(self.target_shape[0], len(self.group_lens)),
+                to_pd=False,
+                keep_flex=self.keep_inout_flex,
+                reindex_kwargs=dict(fill_value=False),
+                require_kwargs=self.broadcast_kwargs.get("require_kwargs", {}),
+            )
+        checks.assert_subdtype(segment_mask, np.bool_, arg_name="segment_mask")
+        return segment_mask
+
+    # ############# Template substitution ############# #
+
+    @cachedproperty
+    def template_context(self) -> tp.Kwargs:
+        return merge_dicts(
+            dict(
+                segment_mask=self.segment_mask,
+                call_pre_segment=self.call_pre_segment,
+                call_post_segment=self.call_post_segment,
+                pre_sim_func_nb=self.pre_sim_func_nb,
+                pre_sim_args=self._pre_pre_sim_args,
+                post_sim_func_nb=self.post_sim_func_nb,
+                post_sim_args=self._pre_post_sim_args,
+                pre_group_func_nb=self.pre_group_func_nb,
+                pre_group_args=self._pre_pre_group_args,
+                post_group_func_nb=self.post_group_func_nb,
+                post_group_args=self._pre_post_group_args,
+                pre_row_func_nb=self.pre_row_func_nb,
+                pre_row_args=self._pre_pre_row_args,
+                post_row_func_nb=self.post_row_func_nb,
+                post_row_args=self._pre_post_row_args,
+                pre_segment_func_nb=self.pre_segment_func_nb,
+                pre_segment_args=self._pre_pre_segment_args,
+                post_segment_func_nb=self.post_segment_func_nb,
+                post_segment_args=self._pre_post_segment_args,
+                order_func_nb=self.order_func_nb,
+                order_args=self._pre_order_args,
+                flex_order_func_nb=self.flex_order_func_nb,
+                flex_order_args=self._pre_flex_order_args,
+                post_order_func_nb=self.post_order_func_nb,
+                post_order_args=self._pre_post_order_args,
+                ffill_val_price=self.ffill_val_price,
+                update_value=self.update_value,
+                fill_pos_info=self.fill_pos_info,
+                track_value=self.track_value,
+                max_orders=self.max_orders,
+                max_logs=self.max_logs,
+            ),
+            BasePreparer.template_context.func(self),
+        )
+
+    # ############# Result ############# #
+
+    @cachedproperty
+    def sim_func(self) -> tp.Optional[tp.Callable]:
+        if not self.row_wise and not self.flexible_mode:
+            func = self.resolve_dynamic_simulator("from_order_func_nb", self.staticized)
+        elif not self.row_wise and self.flexible_mode:
+            func = self.resolve_dynamic_simulator("from_flex_order_func_nb", self.staticized)
+        elif self.row_wise and not self.flexible_mode:
+            func = self.resolve_dynamic_simulator("from_order_func_rw_nb", self.staticized)
+        else:
+            func = self.resolve_dynamic_simulator("from_flex_order_func_rw_nb", self.staticized)
+        func = jit_reg.resolve_option(func, self.jitted)
+        func = ch_reg.resolve_option(func, self.chunked)
+        return func
+
+    @cachedproperty
+    def sim_arg_map(self) -> tp.Kwargs:
+        sim_arg_map = dict(BasePreparer.sim_arg_map.func(self))
+        if self.staticized is not None:
+            sim_arg_map["pre_sim_func_nb"] = None
+            sim_arg_map["post_sim_func_nb"] = None
+            sim_arg_map["pre_group_func_nb"] = None
+            sim_arg_map["post_group_func_nb"] = None
+            sim_arg_map["pre_row_func_nb"] = None
+            sim_arg_map["post_row_func_nb"] = None
+            sim_arg_map["pre_segment_func_nb"] = None
+            sim_arg_map["post_segment_func_nb"] = None
+            sim_arg_map["order_func_nb"] = None
+            sim_arg_map["flex_order_func_nb"] = None
+            sim_arg_map["post_order_func_nb"] = None
+        return sim_arg_map

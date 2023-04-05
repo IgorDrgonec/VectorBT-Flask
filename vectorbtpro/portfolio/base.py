@@ -1652,13 +1652,7 @@ from vectorbtpro.portfolio.logs import Logs
 from vectorbtpro.portfolio.orders import Orders, FSOrders
 from vectorbtpro.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
 from vectorbtpro.portfolio.pfopt.base import PortfolioOptimizer
-from vectorbtpro.portfolio.preparers import (
-    PrepResult,
-    FOPreparer,
-    FSPreparer,
-    adapt_staticized_to_udf,
-    resolve_dynamic_simulator,
-)
+from vectorbtpro.portfolio.preparers import PrepResult, BasePreparer, FOPreparer, FSPreparer, FOFPreparer
 from vectorbtpro.records.base import Records
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
@@ -2037,6 +2031,7 @@ __pdoc__[
 """
 
 PortfolioT = tp.TypeVar("PortfolioT", bound="Portfolio")
+PortfolioResultT = tp.Union[PortfolioT, BasePreparer, PrepResult, enums.SimulationOutput]
 
 
 class MetaInOutputs(type):
@@ -3981,7 +3976,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         return_prep_result: bool = False,
         return_sim_out: bool = False,
         **kwargs,
-    ) -> tp.Union[PortfolioT, FOPreparer, PrepResult, enums.SimulationOutput]:
+    ) -> PortfolioResultT:
         """Simulate portfolio from orders - size, price, fees, and other information.
 
         See `vectorbtpro.portfolio.nb.from_orders.from_orders_nb`.
@@ -4514,7 +4509,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         return_prep_result: bool = False,
         return_sim_out: bool = False,
         **kwargs,
-    ) -> PortfolioT:
+    ) -> PortfolioResultT:
         """Simulate portfolio from entry and exit signals.
 
         Supports the following modes:
@@ -4533,7 +4528,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         Prepared by `vectorbtpro.portfolio.preparers.FSPreparer`.
 
         Args:
-            close (array_like or Data): See `Portfolio.from_orders`.
+            close (array_like, Data, FSPreparer, or PrepResult): See `Portfolio.from_orders`.
             entries (array_like of bool): Boolean array of entry signals.
                 Defaults to True if all other signal arrays are not set, otherwise False. Will broadcast.
 
@@ -5302,7 +5297,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         close_at_end: tp.Optional[bool] = None,
         dynamic_mode: bool = False,
         **kwargs,
-    ) -> PortfolioT:
+    ) -> PortfolioResultT:
         """Simulate portfolio from plain holding using signals.
 
         If `close_at_end` is True, will place an opposite signal at the very end.
@@ -5375,7 +5370,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         seed: tp.Optional[int] = None,
         run_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> PortfolioT:
+    ) -> PortfolioResultT:
         """Simulate portfolio from random entry and exit signals.
 
         Generates signals based either on the number of signals `n` or the probability
@@ -5496,7 +5491,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         call_seq: tp.Optional[tp.ArrayLike] = "auto",
         group_by: tp.GroupByLike = None,
         **kwargs,
-    ) -> PortfolioT:
+    ) -> PortfolioResultT:
         """Build portfolio from an optimizer of type `vectorbtpro.portfolio.pfopt.base.PortfolioOptimizer`.
 
         Uses `Portfolio.from_orders` as the base simulation method.
@@ -5594,7 +5589,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_order_func(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data],
+        close: tp.Union[tp.ArrayLike, Data, FOFPreparer, PrepResult],
         *,
         init_cash: tp.Optional[tp.ArrayLike] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
@@ -5645,14 +5640,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
         template_context: tp.Optional[tp.Mapping] = None,
-        keep_inout_raw: tp.Optional[bool] = None,
+        keep_inout_flex: tp.Optional[bool] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         staticized: tp.StaticizedOption = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
+        return_preparer: bool = False,
+        return_prep_result: bool = False,
+        return_sim_out: bool = False,
         **kwargs,
-    ) -> PortfolioT:
+    ) -> PortfolioResultT:
         """Build portfolio from a custom order function.
 
         !!! hint
@@ -5665,8 +5663,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         * `flex_order_func_nb`: See `vectorbtpro.portfolio.nb.from_order_func.from_flex_order_func_nb`
         * `flex_order_func_nb` and `row_wise`: See `vectorbtpro.portfolio.nb.from_order_func.from_flex_order_func_rw_nb`
 
+        Prepared by `vectorbtpro.portfolio.preparers.FOFPreparer`.
+
         Args:
-            close (array_like or Data): Latest asset price at each time step.
+            close (array_like, Data, FOFPreparer, or PrepResult): Latest asset price at each time step.
                 Will broadcast.
 
                 If an instance of `vectorbtpro.data.base.Data`, will extract the open, high,
@@ -5781,7 +5781,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             broadcast_named_args (dict): See `Portfolio.from_signals`.
             broadcast_kwargs (dict): See `Portfolio.from_orders`.
             template_context (mapping): See `Portfolio.from_signals`.
-            keep_inout_raw (bool): Whether to keep arrays that can be edited in-place raw when broadcasting.
+            keep_inout_flex (bool): Whether to keep arrays that can be edited in-place raw when broadcasting.
 
                 Disable this to be able to edit `segment_mask`, `cash_deposits`, and
                 `cash_earnings` during the simulation.
@@ -5806,6 +5806,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 `override` and `reload` to override and reload an already existing module respectively.
             freq (any): See `Portfolio.from_orders`.
             bm_close (array_like): See `Portfolio.from_orders`.
+            return_preparer (bool): See `Portfolio.from_orders`.
+            return_prep_result (bool): See `Portfolio.from_orders`.
+            return_sim_out (bool): See `Portfolio.from_orders`.
             **kwargs: Keyword arguments passed to the `Portfolio` constructor.
 
         For defaults, see `vectorbtpro._settings.portfolio`. Those defaults are not used to fill
@@ -6160,588 +6163,37 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Since trades should come in an order that closely replicates that of the real world, the only
                 pieces of information that always remain in the correct order are the opening and closing price.
         """
-        # Get defaults
-        from vectorbtpro._settings import settings
-
-        portfolio_cfg = settings["portfolio"]
-
-        if isinstance(close, Data):
-            data = close
-            close = data.close
-            if close is None:
-                raise ValueError("Column for close couldn't be found in data")
-            if open is None:
-                open = data.open
-            if high is None:
-                high = data.high
-            if low is None:
-                low = data.low
-            if freq is None:
-                freq = data.freq
-        if open is None:
-            open_none = True
-            open = np.nan
+        if isinstance(close, FOFPreparer):
+            preparer = close
+            prep_result = None
+        elif isinstance(close, PrepResult):
+            preparer = None
+            prep_result = close
         else:
-            open_none = False
-        if high is None:
-            high_none = True
-            high = np.nan
-        else:
-            high_none = False
-        if low is None:
-            low_none = True
-            low = np.nan
-        else:
-            low_none = False
-
-        flexible = flex_order_func_nb is not None
-        if flexible and order_func_nb is not None:
-            raise ValueError("Either order_func_nb or flex_order_func_nb must be provided")
-        if not flexible and order_func_nb is None:
-            raise ValueError("Either order_func_nb or flex_order_func_nb must be provided")
-        if row_wise and pre_group_func_nb is not None:
-            raise ValueError("Cannot use pre_group_func_nb in a row-wise simulation")
-        if row_wise and post_group_func_nb is not None:
-            raise ValueError("Cannot use post_group_func_nb in a row-wise simulation")
-        if not row_wise and pre_row_func_nb is not None:
-            raise ValueError("Cannot use pre_row_func_nb in a column-wise simulation")
-        if not row_wise and post_row_func_nb is not None:
-            raise ValueError("Cannot use post_row_func_nb in a column-wise simulation")
-
-        if staticized is None:
-            staticized = portfolio_cfg["staticized"]
-        if isinstance(staticized, bool):
-            if staticized:
-                staticized = dict()
-            else:
-                staticized = None
-        if isinstance(staticized, dict):
-            staticized = dict(staticized)
-            if "func" not in staticized:
-                if not flexible and not row_wise:
-                    staticized["func"] = nb.from_order_func_nb
-                elif not flexible and row_wise:
-                    staticized["func"] = nb.from_order_func_rw_nb
-                elif flexible and not row_wise:
-                    staticized["func"] = nb.from_flex_order_func_nb
-                else:
-                    staticized["func"] = nb.from_flex_order_func_rw_nb
-
-        if pre_sim_func_nb is None:
-            pre_sim_func_nb = nb.no_pre_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, pre_sim_func_nb, "pre_sim_func_nb")
-        if post_sim_func_nb is None:
-            post_sim_func_nb = nb.no_post_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, post_sim_func_nb, "post_sim_func_nb")
-        if pre_group_func_nb is None:
-            pre_group_func_nb = nb.no_pre_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, pre_group_func_nb, "pre_group_func_nb")
-        if post_group_func_nb is None:
-            post_group_func_nb = nb.no_post_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, post_group_func_nb, "post_group_func_nb")
-        if pre_row_func_nb is None:
-            pre_row_func_nb = nb.no_pre_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, pre_row_func_nb, "pre_row_func_nb")
-        if post_row_func_nb is None:
-            post_row_func_nb = nb.no_post_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, post_row_func_nb, "post_row_func_nb")
-        if pre_segment_func_nb is None:
-            pre_segment_func_nb = nb.no_pre_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, pre_segment_func_nb, "pre_segment_func_nb")
-        if post_segment_func_nb is None:
-            post_segment_func_nb = nb.no_post_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, post_segment_func_nb, "post_segment_func_nb")
-        if order_func_nb is None:
-            order_func_nb = nb.no_order_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, order_func_nb, "order_func_nb")
-        if flex_order_func_nb is None:
-            flex_order_func_nb = nb.no_flex_order_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, flex_order_func_nb, "flex_order_func_nb")
-        if post_order_func_nb is None:
-            post_order_func_nb = nb.no_post_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, post_order_func_nb, "post_order_func_nb")
-
-        if init_cash is None:
-            init_cash = portfolio_cfg["init_cash"]
-        if isinstance(init_cash, str):
-            init_cash = map_enum_fields(init_cash, enums.InitCashMode)
-        if checks.is_int(init_cash) and init_cash in enums.InitCashMode:
-            init_cash_mode = init_cash
-            init_cash = np.inf
-        else:
-            init_cash_mode = None
-        if init_position is None:
-            init_position = portfolio_cfg["init_position"]
-        if init_price is None:
-            init_price = portfolio_cfg["init_price"]
-        if cash_deposits is None:
-            cash_deposits = portfolio_cfg["cash_deposits"]
-        if cash_earnings is None:
-            cash_earnings = portfolio_cfg["cash_earnings"]
-        if cash_sharing is None:
-            cash_sharing = portfolio_cfg["cash_sharing"]
-        if cash_sharing and group_by is None:
-            group_by = True
-        if not flexible:
-            if call_seq is None:
-                call_seq = portfolio_cfg["call_seq"]
-            if call_seq is not None:
-                call_seq = map_enum_fields(call_seq, enums.CallSeqType)
-                if checks.is_int(call_seq):
-                    if call_seq == enums.CallSeqType.Auto:
-                        raise ValueError(
-                            "CallSeqType.Auto must be implemented manually. "
-                            "Use sort_call_seq_1d_nb in pre_segment_func_nb."
-                        )
-        if attach_call_seq is None:
-            attach_call_seq = portfolio_cfg["attach_call_seq"]
-        if segment_mask is None:
-            segment_mask = True
-        if call_pre_segment is None:
-            call_pre_segment = portfolio_cfg["call_pre_segment"]
-        if call_post_segment is None:
-            call_post_segment = portfolio_cfg["call_post_segment"]
-        if ffill_val_price is None:
-            ffill_val_price = portfolio_cfg["ffill_val_price"]
-        if update_value is None:
-            update_value = portfolio_cfg["update_value"]
-        if fill_pos_info is None:
-            fill_pos_info = portfolio_cfg["fill_pos_info"]
-        if track_value is None:
-            track_value = portfolio_cfg["track_value"]
-        if row_wise is None:
-            row_wise = portfolio_cfg["row_wise"]
-        if seed is None:
-            seed = portfolio_cfg["seed"]
-        if seed is not None:
-            set_seed(seed)
-        if (
-            in_outputs is not None
-            and not isinstance(in_outputs, CustomTemplate)
-            and not checks.is_namedtuple(in_outputs)
-        ):
-            in_outputs = to_mapping(in_outputs)
-            in_outputs = namedtuple("InOutputs", in_outputs)(**in_outputs)
-        if group_by is None:
-            group_by = portfolio_cfg["group_by"]
-        if freq is None:
-            freq = portfolio_cfg["freq"]
-        if broadcast_named_args is None:
-            broadcast_named_args = {}
-        broadcast_kwargs = merge_dicts(portfolio_cfg["broadcast_kwargs"], broadcast_kwargs)
-        require_kwargs = broadcast_kwargs.get("require_kwargs", {})
-        template_context = merge_dicts(portfolio_cfg["template_context"], template_context)
-        if keep_inout_raw is None:
-            keep_inout_raw = portfolio_cfg["keep_inout_raw"]
-        if template_context is None:
-            template_context = {}
-        if bm_close is None:
-            bm_close = portfolio_cfg["bm_close"]
-
-        # Prepare the simulation
-        broadcastable_args = dict(cash_earnings=cash_earnings, open=open, high=high, low=low, close=close)
-        if bm_close is not None and not isinstance(bm_close, bool):
-            broadcastable_args["bm_close"] = bm_close
-        else:
-            broadcastable_args["bm_close"] = np.nan
-        broadcastable_args = {**broadcastable_args, **broadcast_named_args}
-        broadcast_kwargs = merge_dicts(
-            dict(
-                to_pd=False,
-                keep_flex=True,
-                reindex_kwargs=dict(
-                    cash_earnings=dict(fill_value=0.0),
-                    open=dict(fill_value=np.nan),
-                    high=dict(fill_value=np.nan),
-                    low=dict(fill_value=np.nan),
-                    close=dict(fill_value=np.nan),
-                    bm_close=dict(fill_value=np.nan),
-                ),
-                wrapper_kwargs=dict(
-                    freq=freq,
-                    group_by=group_by,
-                ),
-            ),
-            broadcast_kwargs,
-        )
-        broadcasted_args, wrapper = broadcast(broadcastable_args, return_wrapper=True, **broadcast_kwargs)
-        if not wrapper.group_select and cash_sharing:
-            raise ValueError("group_select cannot be disabled if cash_sharing=True")
-        cash_earnings = broadcasted_args.pop("cash_earnings")
-        target_shape_2d = wrapper.shape_2d
-        index = wrapper.ns_index
-        freq = wrapper.ns_freq
-
-        cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
-        init_cash = np.require(broadcast_array_to(init_cash, len(cs_group_lens)), dtype=np.float_)
-        init_position = np.require(broadcast_array_to(init_position, target_shape_2d[1]), dtype=np.float_)
-        init_price = np.require(broadcast_array_to(init_price, target_shape_2d[1]), dtype=np.float_)
-        if (((init_position > 0) | (init_position < 0)) & np.isnan(init_price)).any():
-            warnings.warn(f"Initial position has undefined price. Set init_price.", stacklevel=2)
-        cash_deposits = broadcast(
-            cash_deposits,
-            to_shape=(target_shape_2d[0], len(cs_group_lens)),
-            to_pd=False,
-            keep_flex=keep_inout_raw,
-            reindex_kwargs=dict(fill_value=0.0),
-            require_kwargs=require_kwargs,
-        )
-        group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-        if checks.is_int(segment_mask):
-            if keep_inout_raw:
-                _segment_mask = np.full((target_shape_2d[0], 1), False)
-            else:
-                _segment_mask = np.full((target_shape_2d[0], len(group_lens)), False)
-            _segment_mask[0::segment_mask] = True
-            segment_mask = _segment_mask
-        else:
-            segment_mask = broadcast(
-                segment_mask,
-                to_shape=(target_shape_2d[0], len(group_lens)),
-                to_pd=False,
-                keep_flex=keep_inout_raw,
-                reindex_kwargs=dict(fill_value=False),
-                require_kwargs=require_kwargs,
-            )
-        if not flexible:
-            if call_seq is None and attach_call_seq:
-                call_seq = enums.CallSeqType.Default
-            if call_seq is not None:
-                if checks.is_any_array(call_seq):
-                    call_seq = require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
-                else:
-                    call_seq = build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
-
-        # Check data types
-        checks.assert_subdtype(cs_group_lens, np.integer, arg_name="cs_group_lens")
-        if call_seq is not None:
-            checks.assert_subdtype(call_seq, np.integer, arg_name="call_seq")
-        checks.assert_subdtype(init_cash, np.number, arg_name="init_cash")
-        checks.assert_subdtype(init_position, np.number, arg_name="init_position")
-        checks.assert_subdtype(init_price, np.number, arg_name="init_price")
-        checks.assert_subdtype(cash_deposits, np.number, arg_name="cash_deposits")
-        checks.assert_subdtype(cash_earnings, np.number, arg_name="cash_earnings")
-        checks.assert_subdtype(segment_mask, np.bool_, arg_name="segment_mask")
-        checks.assert_subdtype(broadcasted_args["open"], np.number, arg_name="open")
-        checks.assert_subdtype(broadcasted_args["high"], np.number, arg_name="high")
-        checks.assert_subdtype(broadcasted_args["low"], np.number, arg_name="low")
-        checks.assert_subdtype(broadcasted_args["close"], np.number, arg_name="close")
-        if bm_close is not None and not isinstance(bm_close, bool):
-            checks.assert_subdtype(broadcasted_args["bm_close"], np.number, arg_name="bm_close")
-
-        # Prepare arguments
-        template_context = merge_dicts(
-            broadcasted_args,
-            dict(
-                target_shape=target_shape_2d,
-                index=index,
-                freq=freq,
-                group_lens=group_lens,
-                cs_group_lens=cs_group_lens,
-                cash_sharing=cash_sharing,
-                init_cash=init_cash,
-                init_position=init_position,
-                init_price=init_price,
-                cash_deposits=cash_deposits,
-                cash_earnings=cash_earnings,
-                segment_mask=segment_mask,
-                call_pre_segment=call_pre_segment,
-                call_post_segment=call_post_segment,
-                pre_sim_func_nb=pre_sim_func_nb,
-                pre_sim_args=pre_sim_args,
-                post_sim_func_nb=post_sim_func_nb,
-                post_sim_args=post_sim_args,
-                pre_group_func_nb=pre_group_func_nb,
-                pre_group_args=pre_group_args,
-                post_group_func_nb=post_group_func_nb,
-                post_group_args=post_group_args,
-                pre_row_func_nb=pre_row_func_nb,
-                pre_row_args=pre_row_args,
-                post_row_func_nb=post_row_func_nb,
-                post_row_args=post_row_args,
-                pre_segment_func_nb=pre_segment_func_nb,
-                pre_segment_args=pre_segment_args,
-                post_segment_func_nb=post_segment_func_nb,
-                post_segment_args=post_segment_args,
-                order_func_nb=order_func_nb,
-                order_args=order_args,
-                flex_order_func_nb=flex_order_func_nb,
-                flex_order_args=flex_order_args,
-                post_order_func_nb=post_order_func_nb,
-                post_order_args=post_order_args,
-                ffill_val_price=ffill_val_price,
-                update_value=update_value,
-                fill_pos_info=fill_pos_info,
-                track_value=track_value,
-                max_orders=max_orders,
-                max_logs=max_logs,
-                in_outputs=in_outputs,
-                wrapper=wrapper,
-            ),
-            template_context,
-        )
-        pre_sim_args = substitute_templates(pre_sim_args, template_context, sub_id="pre_sim_args")
-        post_sim_args = substitute_templates(post_sim_args, template_context, sub_id="post_sim_args")
-        pre_group_args = substitute_templates(pre_group_args, template_context, sub_id="pre_group_args")
-        post_group_args = substitute_templates(post_group_args, template_context, sub_id="post_group_args")
-        pre_row_args = substitute_templates(pre_row_args, template_context, sub_id="pre_row_args")
-        post_row_args = substitute_templates(post_row_args, template_context, sub_id="post_row_args")
-        pre_segment_args = substitute_templates(pre_segment_args, template_context, sub_id="pre_segment_args")
-        post_segment_args = substitute_templates(post_segment_args, template_context, sub_id="post_segment_args")
-        order_args = substitute_templates(order_args, template_context, sub_id="order_args")
-        flex_order_args = substitute_templates(flex_order_args, template_context, sub_id="flex_order_args")
-        post_order_args = substitute_templates(post_order_args, template_context, sub_id="post_order_args")
-        in_outputs = substitute_templates(in_outputs, template_context, sub_id="in_outputs")
-        for k in broadcast_named_args:
-            if k in broadcasted_args:
-                broadcasted_args.pop(k)
-
-        # Perform the simulation
-        if row_wise:
-            if flexible:
-                func = resolve_dynamic_simulator("from_flex_order_func_rw_nb", staticized)
-                func = jit_reg.resolve_option(func, jitted)
-                func = ch_reg.resolve_option(func, chunked)
-                sim_out = func(
-                    target_shape=target_shape_2d,
-                    group_lens=group_lens,
-                    cash_sharing=cash_sharing,
-                    init_cash=init_cash,
-                    init_position=init_position,
-                    init_price=init_price,
-                    cash_deposits=cash_deposits,
-                    cash_earnings=cash_earnings,
-                    segment_mask=segment_mask,
-                    call_pre_segment=call_pre_segment,
-                    call_post_segment=call_post_segment,
-                    pre_sim_args=pre_sim_args,
-                    post_sim_args=post_sim_args,
-                    pre_row_args=pre_row_args,
-                    post_row_args=post_row_args,
-                    pre_segment_args=pre_segment_args,
-                    post_segment_args=post_segment_args,
-                    flex_order_args=flex_order_args,
-                    post_order_args=post_order_args,
-                    index=index,
-                    freq=freq,
-                    open=broadcasted_args["open"],
-                    high=broadcasted_args["high"],
-                    low=broadcasted_args["low"],
-                    close=broadcasted_args["close"],
-                    bm_close=broadcasted_args["bm_close"],
-                    ffill_val_price=ffill_val_price,
-                    update_value=update_value,
-                    fill_pos_info=fill_pos_info,
-                    track_value=track_value,
-                    max_orders=max_orders,
-                    max_logs=max_logs,
-                    in_outputs=in_outputs,
-                    **(
-                        dict(
-                            pre_sim_func_nb=pre_sim_func_nb,
-                            post_sim_func_nb=post_sim_func_nb,
-                            pre_row_func_nb=pre_row_func_nb,
-                            post_row_func_nb=post_row_func_nb,
-                            pre_segment_func_nb=pre_segment_func_nb,
-                            post_segment_func_nb=post_segment_func_nb,
-                            flex_order_func_nb=flex_order_func_nb,
-                            post_order_func_nb=post_order_func_nb,
-                        )
-                        if staticized is None
-                        else {}
-                    ),
-                )
-            else:
-                func = resolve_dynamic_simulator("from_order_func_rw_nb", staticized)
-                func = jit_reg.resolve_option(func, jitted)
-                func = ch_reg.resolve_option(func, chunked)
-                sim_out = func(
-                    target_shape=target_shape_2d,
-                    group_lens=group_lens,
-                    cash_sharing=cash_sharing,
-                    call_seq=call_seq,
-                    init_cash=init_cash,
-                    init_position=init_position,
-                    init_price=init_price,
-                    cash_deposits=cash_deposits,
-                    cash_earnings=cash_earnings,
-                    segment_mask=segment_mask,
-                    call_pre_segment=call_pre_segment,
-                    call_post_segment=call_post_segment,
-                    pre_sim_args=pre_sim_args,
-                    post_sim_args=post_sim_args,
-                    pre_row_args=pre_row_args,
-                    post_row_args=post_row_args,
-                    pre_segment_args=pre_segment_args,
-                    post_segment_args=post_segment_args,
-                    order_args=order_args,
-                    post_order_args=post_order_args,
-                    index=index,
-                    freq=freq,
-                    open=broadcasted_args["open"],
-                    high=broadcasted_args["high"],
-                    low=broadcasted_args["low"],
-                    close=broadcasted_args["close"],
-                    bm_close=broadcasted_args["bm_close"],
-                    ffill_val_price=ffill_val_price,
-                    update_value=update_value,
-                    fill_pos_info=fill_pos_info,
-                    track_value=track_value,
-                    max_orders=max_orders,
-                    max_logs=max_logs,
-                    in_outputs=in_outputs,
-                    **(
-                        dict(
-                            pre_sim_func_nb=pre_sim_func_nb,
-                            post_sim_func_nb=post_sim_func_nb,
-                            pre_row_func_nb=pre_row_func_nb,
-                            post_row_func_nb=post_row_func_nb,
-                            pre_segment_func_nb=pre_segment_func_nb,
-                            post_segment_func_nb=post_segment_func_nb,
-                            order_func_nb=order_func_nb,
-                            post_order_func_nb=post_order_func_nb,
-                        )
-                        if staticized is None
-                        else {}
-                    ),
-                )
-        else:
-            if flexible:
-                func = resolve_dynamic_simulator("from_flex_order_func_nb", staticized)
-                func = jit_reg.resolve_option(func, jitted)
-                func = ch_reg.resolve_option(func, chunked)
-                sim_out = func(
-                    target_shape=target_shape_2d,
-                    group_lens=group_lens,
-                    cash_sharing=cash_sharing,
-                    init_cash=init_cash,
-                    init_position=init_position,
-                    init_price=init_price,
-                    cash_deposits=cash_deposits,
-                    cash_earnings=cash_earnings,
-                    segment_mask=segment_mask,
-                    call_pre_segment=call_pre_segment,
-                    call_post_segment=call_post_segment,
-                    pre_sim_args=pre_sim_args,
-                    post_sim_args=post_sim_args,
-                    pre_group_args=pre_group_args,
-                    post_group_args=post_group_args,
-                    pre_segment_args=pre_segment_args,
-                    post_segment_args=post_segment_args,
-                    flex_order_args=flex_order_args,
-                    post_order_args=post_order_args,
-                    index=index,
-                    freq=freq,
-                    open=broadcasted_args["open"],
-                    high=broadcasted_args["high"],
-                    low=broadcasted_args["low"],
-                    close=broadcasted_args["close"],
-                    bm_close=broadcasted_args["bm_close"],
-                    ffill_val_price=ffill_val_price,
-                    update_value=update_value,
-                    fill_pos_info=fill_pos_info,
-                    track_value=track_value,
-                    max_orders=max_orders,
-                    max_logs=max_logs,
-                    in_outputs=in_outputs,
-                    **(
-                        dict(
-                            pre_sim_func_nb=pre_sim_func_nb,
-                            post_sim_func_nb=post_sim_func_nb,
-                            pre_group_func_nb=pre_group_func_nb,
-                            post_group_func_nb=post_group_func_nb,
-                            pre_segment_func_nb=pre_segment_func_nb,
-                            post_segment_func_nb=post_segment_func_nb,
-                            flex_order_func_nb=flex_order_func_nb,
-                            post_order_func_nb=post_order_func_nb,
-                        )
-                        if staticized is None
-                        else {}
-                    ),
-                )
-            else:
-                func = resolve_dynamic_simulator("from_order_func_nb", staticized)
-                func = jit_reg.resolve_option(func, jitted)
-                func = ch_reg.resolve_option(func, chunked)
-                sim_out = func(
-                    target_shape=target_shape_2d,
-                    group_lens=group_lens,
-                    cash_sharing=cash_sharing,
-                    call_seq=call_seq,
-                    init_cash=init_cash,
-                    init_position=init_position,
-                    init_price=init_price,
-                    cash_deposits=cash_deposits,
-                    cash_earnings=cash_earnings,
-                    segment_mask=segment_mask,
-                    call_pre_segment=call_pre_segment,
-                    call_post_segment=call_post_segment,
-                    pre_sim_args=pre_sim_args,
-                    post_sim_args=post_sim_args,
-                    pre_group_args=pre_group_args,
-                    post_group_args=post_group_args,
-                    pre_segment_args=pre_segment_args,
-                    post_segment_args=post_segment_args,
-                    order_args=order_args,
-                    post_order_args=post_order_args,
-                    index=index,
-                    freq=freq,
-                    open=broadcasted_args["open"],
-                    high=broadcasted_args["high"],
-                    low=broadcasted_args["low"],
-                    close=broadcasted_args["close"],
-                    bm_close=broadcasted_args["bm_close"],
-                    ffill_val_price=ffill_val_price,
-                    update_value=update_value,
-                    fill_pos_info=fill_pos_info,
-                    track_value=track_value,
-                    max_orders=max_orders,
-                    max_logs=max_logs,
-                    in_outputs=in_outputs,
-                    **(
-                        dict(
-                            pre_sim_func_nb=pre_sim_func_nb,
-                            post_sim_func_nb=post_sim_func_nb,
-                            pre_group_func_nb=pre_group_func_nb,
-                            post_group_func_nb=post_group_func_nb,
-                            pre_segment_func_nb=pre_segment_func_nb,
-                            post_segment_func_nb=post_segment_func_nb,
-                            order_func_nb=order_func_nb,
-                            post_order_func_nb=post_order_func_nb,
-                        )
-                        if staticized is None
-                        else {}
-                    ),
-                )
-
-        # Create an instance
-        if bm_close is not None and not isinstance(bm_close, bool):
-            bm_close = broadcasted_args["bm_close"]
-        return cls(
-            wrapper,
-            sim_out,
-            open=broadcasted_args["open"] if not open_none else None,
-            high=broadcasted_args["high"] if not high_none else None,
-            low=broadcasted_args["low"] if not low_none else None,
-            close=broadcasted_args["close"],
-            cash_sharing=cash_sharing,
-            init_cash=init_cash if init_cash_mode is None else init_cash_mode,
-            init_position=init_position,
-            init_price=init_price,
-            bm_close=bm_close,
-            **kwargs,
-        )
+            local_kwargs = locals()
+            local_kwargs = {**local_kwargs, **local_kwargs["kwargs"]}
+            del local_kwargs["kwargs"]
+            del local_kwargs["cls"]
+            del local_kwargs["return_preparer"]
+            del local_kwargs["return_prep_result"]
+            del local_kwargs["return_sim_out"]
+            if isinstance(close, Data):
+                local_kwargs["data"] = close
+                local_kwargs["close"] = None
+            preparer = FOFPreparer(**local_kwargs)
+            if not return_preparer:
+                preparer.set_seed()
+            prep_result = None
+        if return_preparer:
+            return preparer
+        if prep_result is None:
+            prep_result = preparer.result
+        if return_prep_result:
+            return prep_result
+        sim_out = prep_result.sim_func(**prep_result.sim_args)
+        if return_sim_out:
+            return sim_out
+        return cls(order_records=sim_out, **prep_result.pf_args)
 
     @classmethod
     def from_def_order_func(
@@ -6774,7 +6226,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         broadcast_kwargs: tp.KwargsLike = None,
         chunked: tp.ChunkedOption = None,
         **kwargs,
-    ) -> PortfolioT:
+    ) -> PortfolioResultT:
         """Build portfolio from the default order function.
 
         Default order function takes size, price, fees, and other available information, and issues

@@ -183,33 +183,48 @@ def attach_arg_properties(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
 
     for arg_name, settings in cls.arg_config.items():
         broadcast = settings.get("broadcast", False)
-        if broadcast:
-            target_pre_name = "pre_" + arg_name
+        substitute_templates = settings.get("substitute_templates", False)
+        if broadcast or substitute_templates:
+            if broadcast:
+                return_type = tp.ArrayLike
+            else:
+                return_type = object
+            target_pre_name = "_pre_" + arg_name
             if not hasattr(cls, target_pre_name):
 
-                def pre_arg_prop(self, _arg_name: str = arg_name) -> tp.ArrayLike:
+                def pre_arg_prop(self, _arg_name: str = arg_name) -> return_type:
                     return self.get_arg(_arg_name)
 
                 pre_arg_prop.__name__ = target_pre_name
                 pre_arg_prop.__qualname__ = f"{cls.__name__}.{target_pre_name}"
-                pre_arg_prop.__doc__ = f"Argument `{arg_name}` before broadcasting."
+                if broadcast and substitute_templates:
+                    pre_arg_prop.__doc__ = f"Argument `{arg_name}` before broadcasting and template substitution."
+                elif broadcast:
+                    pre_arg_prop.__doc__ = f"Argument `{arg_name}` before broadcasting."
+                else:
+                    pre_arg_prop.__doc__ = f"Argument `{arg_name}` before template substitution."
                 setattr(cls, pre_arg_prop.__name__, cachedproperty(pre_arg_prop))
                 getattr(cls, pre_arg_prop.__name__).__set_name__(cls, pre_arg_prop.__name__)
 
-            target_post_name = "post_" + arg_name
+            target_post_name = "_post_" + arg_name
             if not hasattr(cls, target_post_name):
-                def post_arg_prop(self, _arg_name: str = arg_name) -> tp.ArrayLike:
+                def post_arg_prop(self, _arg_name: str = arg_name) -> return_type:
                     return self.prepare_post_arg(_arg_name)
 
                 post_arg_prop.__name__ = target_post_name
                 post_arg_prop.__qualname__ = f"{cls.__name__}.{target_post_name}"
-                post_arg_prop.__doc__ = f"Argument `{arg_name}` after broadcasting."
+                if broadcast and substitute_templates:
+                    post_arg_prop.__doc__ = f"Argument `{arg_name}` after broadcasting and template substitution."
+                elif broadcast:
+                    post_arg_prop.__doc__ = f"Argument `{arg_name}` after broadcasting."
+                else:
+                    post_arg_prop.__doc__ = f"Argument `{arg_name}` after template substitution."
                 setattr(cls, post_arg_prop.__name__, cachedproperty(post_arg_prop))
                 getattr(cls, post_arg_prop.__name__).__set_name__(cls, post_arg_prop.__name__)
 
             target_name = arg_name
             if not hasattr(cls, target_name):
-                def arg_prop(self, _target_post_name: str = target_post_name) -> tp.ArrayLike:
+                def arg_prop(self, _target_post_name: str = target_post_name) -> return_type:
                     return getattr(self, _target_post_name)
 
                 arg_prop.__name__ = target_name

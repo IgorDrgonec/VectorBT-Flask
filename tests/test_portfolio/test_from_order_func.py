@@ -1079,7 +1079,7 @@ class TestFromOrderFunc:
             jitted=False,
             group_by=[0, 0, 1],
             cash_sharing=True,
-            keep_inout_raw=False,
+            keep_inout_flex=False,
             max_logs=price_wide.shape[0],
             flexible=test_flexible,
         )
