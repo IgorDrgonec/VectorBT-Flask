@@ -630,11 +630,8 @@ def pivots_nb(
         To be used in plotting. Do not use it as an indicator!"""
     pivots = np.zeros(conf_pivot.shape, dtype=np.int_)
     for col in prange(conf_pivot.shape[1]):
-        last_conf_idx = -1
-        for i in range(conf_pivot.shape[0]):
-            if conf_idx[i, col] != last_conf_idx:
-                pivots[conf_idx[i, col], col] = conf_pivot[i, col]
-                last_conf_idx = conf_idx[i, col]
+        for i in range(conf_pivot.shape[0] - 1):
+            pivots[conf_idx[i, col], col] = conf_pivot[i, col]
         pivots[-1, col] = last_pivot[-1, col]
     return pivots
 
@@ -646,22 +643,17 @@ def pivots_nb(
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def pivots_to_modes_nb(pivots: tp.Array2d) -> tp.Array2d:
-    """Translate pivots into trend modes."""
+    """Translate pivots into trend modes.
+
+    !!! warning
+        To be used in plotting. Do not use it as an indicator!"""
     modes = np.zeros(pivots.shape, dtype=np.int_)
-
     for col in prange(pivots.shape[1]):
-        if pivots[0, col] != 0:
-            mode = -pivots[0, col]
-        else:
-            mode = 0
-        modes[0, col] = pivots[0, col]
-        for i in range(1, pivots.shape[0]):
+        mode = 0
+        for i in range(pivots.shape[0]):
             if pivots[i, col] != 0:
-                modes[i, col] = mode
                 mode = -pivots[i, col]
-            else:
-                modes[i, col] = mode
-
+            modes[i, col] = mode
     return modes
 
 
