@@ -4703,7 +4703,7 @@ class TestBasic:
         assert_frame_equal(
             vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).modes,
             pd.DataFrame(
-                np.array([[-1, -1], [1, 1], [1, 1], [1, 1], [-1, -1], [-1, -1], [-1, -1]]),
+                np.array([[1, 1], [1, 1], [1, 1], [-1, -1], [-1, -1], [-1, -1], [1, 1]]),
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
             ),
@@ -4731,13 +4731,13 @@ class TestBasic:
             pd.DataFrame(
                 np.array(
                     [
-                        ["Downtrend", "Downtrend"],
                         ["Uptrend", "Uptrend"],
                         ["Uptrend", "Uptrend"],
                         ["Uptrend", "Uptrend"],
                         ["Downtrend", "Downtrend"],
                         ["Downtrend", "Downtrend"],
                         ["Downtrend", "Downtrend"],
+                        ["Uptrend", "Uptrend"],
                     ]
                 ),
                 index=close_ts.index,

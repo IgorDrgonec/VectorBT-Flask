@@ -647,7 +647,7 @@ def pivots_to_modes_nb(pivots: tp.Array2d) -> tp.Array2d:
 
     !!! warning
         To be used in plotting. Do not use it as an indicator!"""
-    modes = np.zeros(pivots.shape, dtype=np.int_)
+    modes = np.empty(pivots.shape, dtype=np.int_)
     for col in prange(pivots.shape[1]):
         mode = 0
         for i in range(pivots.shape[0]):
