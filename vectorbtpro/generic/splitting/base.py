@@ -18,7 +18,7 @@ from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.template import CustomTemplate, Rep, RepFunc, substitute_templates
 from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.parsing import get_func_arg_names
-from vectorbtpro.utils.datetime_ import try_to_datetime_index, try_align_to_datetime_index, parse_timedelta
+from vectorbtpro.utils.datetime_ import try_to_datetime_index, try_align_to_dt_index, parse_timedelta
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.indexing import hslice, PandasIndexer, get_index_ranges
@@ -1199,7 +1199,7 @@ class Splitter(Analyzable):
             else:
                 if not isinstance(index, pd.DatetimeIndex):
                     raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
-                min_start = try_align_to_datetime_index([min_start], index)[0]
+                min_start = try_align_to_dt_index([min_start], index)[0]
                 if not isinstance(min_start, pd.Timestamp):
                     raise ValueError(f"Minimum start ({min_start}) could not be parsed")
                 if min_start < index[0] or min_start > index[-1]:
@@ -1220,7 +1220,7 @@ class Splitter(Analyzable):
         else:
             if not isinstance(index, pd.DatetimeIndex):
                 raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
-            max_end = try_align_to_datetime_index([max_end], index)[0]
+            max_end = try_align_to_dt_index([max_end], index)[0]
             if not isinstance(max_end, pd.Timestamp):
                 raise ValueError(f"Maximum end ({max_end}) could not be parsed")
             if freq is None:
@@ -1945,14 +1945,14 @@ class Splitter(Analyzable):
             if not checks.is_int(start):
                 if not isinstance(index, pd.DatetimeIndex):
                     raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
-                start = try_align_to_datetime_index([start], index)[0]
+                start = try_align_to_dt_index([start], index)[0]
                 if not isinstance(start, pd.Timestamp):
                     raise ValueError(f"Range start ({start}) could not be parsed")
                 meta["was_datetime"] = True
             if not checks.is_int(stop):
                 if not isinstance(index, pd.DatetimeIndex):
                     raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
-                stop = try_align_to_datetime_index([stop], index)[0]
+                stop = try_align_to_dt_index([stop], index)[0]
                 if not isinstance(stop, pd.Timestamp):
                     raise ValueError(f"Range start ({stop}) could not be parsed")
                 meta["was_datetime"] = True
@@ -2019,7 +2019,7 @@ class Splitter(Analyzable):
                         range_ = slice(meta["start"], meta["stop"])
             else:
                 if not np.issubdtype(range_.dtype, np.integer):
-                    range_ = try_align_to_datetime_index(range_, index)
+                    range_ = try_align_to_dt_index(range_, index)
                     if not isinstance(range_, pd.DatetimeIndex):
                         raise ValueError("Range array could not be parsed")
                     range_ = index.get_indexer(range_, method=None)
@@ -2593,6 +2593,7 @@ class Splitter(Analyzable):
         For each index pair, resolves the source range using `Splitter.select_range` and
         `Splitter.get_ready_range`. Then, remaps this range into the object index using
         `Splitter.get_ready_obj_range` and takes the slice from the object using `Splitter.take_range`.
+        If the object is a custom template, substitutes its instead of calling `Splitter.take_range`.
         Finally, uses `vectorbtpro.base.merging.column_stack_merge` (`stack_axis=1`) or
         `vectorbtpro.base.merging.row_stack_merge` (`stack_axis=0`) with `stack_kwargs` to merge the taken slices.
 
@@ -2790,7 +2791,20 @@ class Splitter(Analyzable):
                 return_obj_meta=True,
                 return_meta=True,
             )
-            obj_slice = self.take_range(obj, obj_range_meta["range_"], point_wise=point_wise)
+            if isinstance(obj, CustomTemplate):
+                _template_context = merge_dicts(
+                    dict(
+                        split_idx=split_idx,
+                        set_idx=set_idx,
+                        range_=obj_range_meta["range_"],
+                        range_meta=obj_range_meta,
+                        point_wise=point_wise,
+                    ),
+                    template_context,
+                )
+                obj_slice = substitute_templates(obj, _template_context, sub_id="take_range")
+            else:
+                obj_slice = self.take_range(obj, obj_range_meta["range_"], point_wise=point_wise)
             bounds = _get_bounds(range_meta, obj_meta, obj_range_meta)
             return dict(
                 split_idx=split_idx,
@@ -3193,11 +3207,22 @@ class Splitter(Analyzable):
                 return_obj_meta=True,
                 return_meta=True,
             )
-            obj_slice = self.take_range(
-                takeable.obj,
-                obj_range_meta["range_"],
-                point_wise=takeable.point_wise if takeable.point_wise is not _DEF else point_wise,
-            )
+            if isinstance(takeable.obj, CustomTemplate):
+                _template_context = merge_dicts(
+                    dict(
+                        range_=obj_range_meta["range_"],
+                        range_meta=obj_range_meta,
+                        point_wise=takeable.point_wise if takeable.point_wise is not _DEF else point_wise,
+                    ),
+                    _template_context,
+                )
+                obj_slice = substitute_templates(takeable.obj, _template_context, sub_id="take_range")
+            else:
+                obj_slice = self.take_range(
+                    takeable.obj,
+                    obj_range_meta["range_"],
+                    point_wise=takeable.point_wise if takeable.point_wise is not _DEF else point_wise,
+                )
             return obj_meta, obj_range_meta, obj_slice
 
         def _take_args(args, range_, _template_context):

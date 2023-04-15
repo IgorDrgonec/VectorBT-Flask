@@ -197,7 +197,7 @@ def try_to_datetime_index(index: tp.IndexLike, parser_kwargs: tp.KwargsLike = No
     return index
 
 
-def try_align_to_datetime_index(source_index: tp.IndexLike, target_index: tp.Index, **kwargs) -> tp.Index:
+def try_align_to_dt_index(source_index: tp.IndexLike, target_index: tp.Index, **kwargs) -> tp.Index:
     """Try aligning an index to another datetime index.
 
     Keyword arguments are passed to `try_to_datetime_index`."""
@@ -208,6 +208,20 @@ def try_align_to_datetime_index(source_index: tp.IndexLike, target_index: tp.Ind
         elif source_index.tzinfo is not None and target_index.tzinfo is not None:
             source_index = source_index.tz_convert(target_index.tzinfo)
     return source_index
+
+
+def try_align_dt_to_index(dt_like: tp.DatetimeLike, target_index: tp.Index, **kwargs) -> tp.DatetimeLike:
+    """Try aligning a datetime-like object to another datetime index.
+
+    Keyword arguments are passed to `to_timestamp`."""
+    if not isinstance(target_index, pd.DatetimeIndex):
+        return dt_like
+    dt = to_timestamp(dt_like, **kwargs)
+    if dt.tzinfo is None and target_index.tzinfo is not None:
+        dt = dt.tz_localize(target_index.tzinfo)
+    elif dt.tzinfo is not None and target_index.tzinfo is not None:
+        dt = dt.tz_convert(target_index.tzinfo)
+    return dt
 
 
 def infer_index_freq(

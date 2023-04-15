@@ -39,7 +39,7 @@ from vectorbtpro.utils.datetime_ import (
     freq_to_timedelta64,
     parse_timedelta,
     time_to_timedelta,
-    try_align_to_datetime_index,
+    try_align_to_dt_index,
 )
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.mapping import to_mapping
@@ -227,8 +227,8 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         """Prepare a datetime object for broadcasting."""
         if isinstance(dt_obj, (str, time, timedelta, pd.DateOffset, pd.Timedelta)):
             dt_obj_dt_template = RepEval(
-                "try_align_to_datetime_index([dt_obj], wrapper.index).vbt.to_ns() - ns_ago",
-                context=dict(try_align_to_datetime_index=try_align_to_datetime_index, dt_obj=dt_obj, ns_ago=ns_ago),
+                "try_align_to_dt_index([dt_obj], wrapper.index).vbt.to_ns() - ns_ago",
+                context=dict(try_align_to_dt_index=try_align_to_dt_index, dt_obj=dt_obj, ns_ago=ns_ago),
             )
             dt_obj_td_template = RepEval(
                 "wrapper.index.vbt.to_period_ns(parse_timedelta(dt_obj)) - ns_ago",

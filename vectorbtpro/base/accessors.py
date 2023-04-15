@@ -813,7 +813,7 @@ class BaseAccessor(Wrapping):
         template_context: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.Optional[tp.SeriesFrame]:
-        """Set value at each index point using `vectorbtpro.base.wrapping.ArrayWrapper.get_index_points`.
+        """Set value at each index point using `vectorbtpro.base.indexing.get_index_points`.
 
         If `value_or_func` is a function, selects all keyword arguments that were not passed
         to the `get_index_points` method, substitutes any templates, and passes everything to the function.
@@ -823,7 +823,7 @@ class BaseAccessor(Wrapping):
             obj = self.obj
         else:
             obj = self.obj.copy()
-        index_points = self.wrapper.get_index_points(**kwargs)
+        index_points = get_index_points(self.wrapper.index, **kwargs)
 
         if callable(value_or_func):
             func_kwargs = {k: v for k, v in kwargs.items() if k not in row_points_defaults}
@@ -883,7 +883,7 @@ class BaseAccessor(Wrapping):
         template_context: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.Optional[tp.SeriesFrame]:
-        """Set value at each index range using `vectorbtpro.base.wrapping.ArrayWrapper.get_index_ranges`.
+        """Set value at each index range using `vectorbtpro.base.indexing.get_index_ranges`.
 
         If `value_or_func` is a function, selects all keyword arguments that were not passed
         to the `get_index_points` method, substitutes any templates, and passes everything to the function.
@@ -893,7 +893,7 @@ class BaseAccessor(Wrapping):
             obj = self.obj
         else:
             obj = self.obj.copy()
-        index_ranges = self.wrapper.get_index_ranges(**kwargs)
+        index_ranges = get_index_ranges(self.wrapper.index, **kwargs)
 
         if callable(value_or_func):
             func_kwargs = {k: v for k, v in kwargs.items() if k not in row_ranges_defaults}
