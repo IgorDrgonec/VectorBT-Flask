@@ -10,10 +10,12 @@ import string
 import pandas as pd
 import requests
 import json
+import time
 from websocket import WebSocket
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import Configured
+from vectorbtpro.utils.pbar import get_pbar
 
 __all__ = [
     "TVClient",
@@ -37,9 +39,7 @@ class Interval(enum.Enum):
 
 
 SIGNIN_URL = "https://www.tradingview.com/accounts/signin/"
-SEARCH_URL = (
-    "https://symbol-search.tradingview.com/symbol_search/?text={}&hl=2&exchange={}&lang=en&type=&domain=production"
-)
+SEARCH_URL = "https://symbol-search.tradingview.com/symbol_search/v3/?text={}&exchange={}&start={}&hl=2&lang=en&domain=production"
 SCAN_URL = "https://scanner.tradingview.com/{}/scan"
 ORIGIN_URL = "https://data.tradingview.com"
 REFERER_URL = "https://www.tradingview.com"
@@ -297,15 +297,43 @@ class TVClient(Configured):
         return self.convert_raw_data(raw_data, symbol)
 
     @staticmethod
-    def search_symbol(text: tp.Optional[str] = None, exchange: tp.Optional[str] = None) -> tp.List[dict]:
+    def search_symbol(
+        text: tp.Optional[str] = None,
+        exchange: tp.Optional[str] = None,
+        delay: tp.Optional[int] = None,
+        show_progress: bool = True,
+        pbar_kwargs: tp.KwargsLike = None,
+    ) -> tp.List[dict]:
         """Search for a symbol."""
         if text is None:
             text = ""
         if exchange is None:
             exchange = ""
-        url = SEARCH_URL.format(text, exchange.upper())
-        resp = requests.get(url)
-        symbols_list = json.loads(resp.text)
+        if pbar_kwargs is None:
+            pbar_kwargs = {}
+        symbols_remaining = None
+        symbols_list = []
+        pbar = None
+
+        while symbols_remaining is None or symbols_remaining > 0:
+            url = SEARCH_URL.format(text, exchange.upper(), len(symbols_list))
+            resp = requests.get(url)
+            symbols_data = json.loads(resp.text)
+            symbols_remaining = symbols_data.get("symbols_remaining", 0)
+            new_symbols = symbols_data.get("symbols", [])
+            symbols_list.extend(new_symbols)
+            if pbar is None and symbols_remaining > 0:
+                pbar = get_pbar(
+                    total=len(new_symbols) + symbols_remaining,
+                    show_progress=show_progress,
+                    **pbar_kwargs,
+                )
+            if pbar is not None:
+                pbar.update(len(new_symbols))
+            if delay is not None:
+                time.sleep(delay / 1000)
+        if pbar is not None:
+            pbar.close()
         return symbols_list
 
     @staticmethod

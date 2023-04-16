@@ -3364,11 +3364,16 @@ class TVData(RemoteData):
         exchange: tp.Optional[str] = None,
         client: tp.Optional[PolygonClientT] = None,
         client_config: tp.DictLike = None,
+        delay: tp.Optional[int] = None,
+        show_progress: tp.Optional[bool] = None,
+        pbar_kwargs: tp.KwargsLike = None,
     ) -> tp.List[str]:
         """List all symbols.
 
         Uses market scanner when `market` is provided (returns all symbols, big payload)
         Uses symbol search when either `text` or `exchange` is provided (returns a subset of symbols)."""
+        tv_cfg = cls.get_settings(key_id="custom")
+
         if market is None and text is None and exchange is None:
             raise ValueError("Please provide either market, or text and/or exchange")
         if market is not None and (text is not None or exchange is not None):
@@ -3376,8 +3381,20 @@ class TVData(RemoteData):
         if client_config is None:
             client_config = {}
         client = cls.resolve_client(client=client, **client_config)
+        if delay is None:
+            delay = tv_cfg["delay"]
+        if show_progress is None:
+            show_progress = tv_cfg["show_progress"]
+        pbar_kwargs = merge_dicts(tv_cfg["pbar_kwargs"], pbar_kwargs)
+
         if market is None:
-            data = client.search_symbol(text=text, exchange=exchange)
+            data = client.search_symbol(
+                text=text,
+                exchange=exchange,
+                delay=delay,
+                show_progress=show_progress,
+                pbar_kwargs=pbar_kwargs,
+            )
             all_symbols = map(lambda x: x["exchange"] + ":" + x["symbol"], data)
         else:
             data = client.scan_symbols(market.lower())
