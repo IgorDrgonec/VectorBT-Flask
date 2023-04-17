@@ -1541,7 +1541,7 @@ PatternRangesT = tp.TypeVar("PatternRangesT", bound="PatternRanges")
 
 
 _DEF = object()
-"""Use as a default value for optional arguments in `PSC`."""
+"""Default value for internal purposes."""
 
 
 @attr.s(frozen=True, eq=False)

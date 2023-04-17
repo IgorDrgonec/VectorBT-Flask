@@ -18,7 +18,12 @@ from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.template import CustomTemplate, Rep, RepFunc, substitute_templates
 from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.parsing import get_func_arg_names
-from vectorbtpro.utils.datetime_ import try_to_datetime_index, try_align_to_dt_index, parse_timedelta
+from vectorbtpro.utils.datetime_ import (
+    try_to_datetime_index,
+    try_align_dt_to_index,
+    try_align_to_dt_index,
+    parse_timedelta,
+)
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.indexing import hslice, PandasIndexer, get_index_ranges
@@ -290,7 +295,7 @@ class RelRange:
 
 
 _DEF = object()
-"""Use as a default value for optional arguments in `Takeable`."""
+"""Default value for internal purposes."""
 
 
 @attr.s(frozen=True)
@@ -1199,7 +1204,7 @@ class Splitter(Analyzable):
             else:
                 if not isinstance(index, pd.DatetimeIndex):
                     raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
-                min_start = try_align_to_dt_index([min_start], index)[0]
+                min_start = try_align_dt_to_index(min_start, index)
                 if not isinstance(min_start, pd.Timestamp):
                     raise ValueError(f"Minimum start ({min_start}) could not be parsed")
                 if min_start < index[0] or min_start > index[-1]:
@@ -1220,7 +1225,7 @@ class Splitter(Analyzable):
         else:
             if not isinstance(index, pd.DatetimeIndex):
                 raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
-            max_end = try_align_to_dt_index([max_end], index)[0]
+            max_end = try_align_dt_to_index(max_end, index)
             if not isinstance(max_end, pd.Timestamp):
                 raise ValueError(f"Maximum end ({max_end}) could not be parsed")
             if freq is None:
@@ -1945,14 +1950,14 @@ class Splitter(Analyzable):
             if not checks.is_int(start):
                 if not isinstance(index, pd.DatetimeIndex):
                     raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
-                start = try_align_to_dt_index([start], index)[0]
+                start = try_align_dt_to_index(start, index)
                 if not isinstance(start, pd.Timestamp):
                     raise ValueError(f"Range start ({start}) could not be parsed")
                 meta["was_datetime"] = True
             if not checks.is_int(stop):
                 if not isinstance(index, pd.DatetimeIndex):
                     raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
-                stop = try_align_to_dt_index([stop], index)[0]
+                stop = try_align_dt_to_index(stop, index)
                 if not isinstance(stop, pd.Timestamp):
                     raise ValueError(f"Range start ({stop}) could not be parsed")
                 meta["was_datetime"] = True

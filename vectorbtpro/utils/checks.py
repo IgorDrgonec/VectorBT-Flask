@@ -30,6 +30,11 @@ class Comparable:
 
 # ############# Checks ############# #
 
+def is_bool(arg: tp.Any) -> bool:
+    """Check whether the argument is a bool."""
+    return isinstance(arg, (bool, np.bool_))
+
+
 def is_int(arg: tp.Any) -> bool:
     """Check whether the argument is an integer (and not a timedelta, for example)."""
     return isinstance(arg, (int, np.integer)) and not isinstance(arg, np.timedelta64)

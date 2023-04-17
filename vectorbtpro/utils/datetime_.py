@@ -113,7 +113,7 @@ def parse_timedelta(td: tp.TimedeltaLike) -> tp.Union[pd.Timedelta, pd.DateOffse
     if isinstance(td, (pd.Timedelta, pd.DateOffset)):
         return td
     try:
-        return to_offset(td)
+        return to_offset(prepare_freq(td))
     except Exception as e:
         return freq_to_timedelta(td)
 

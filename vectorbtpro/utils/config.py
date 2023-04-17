@@ -14,6 +14,7 @@ from vectorbtpro.utils.formatting import Prettified, prettify_dict, prettify_ini
 from vectorbtpro.utils.pickling import RecState, Pickleable, pdict
 
 __all__ = [
+    "hdict",
     "atomic_dict",
     "unsetkey",
     "merge_dicts",
@@ -25,6 +26,13 @@ __all__ = [
     "Configured",
     "AtomicConfig",
 ]
+
+
+class hdict(dict):
+    """Hashable dict."""
+
+    def __hash__(self):
+        return hash(frozenset(self.items()))
 
 
 def resolve_dict(dct: tp.DictLikeSequence, i: tp.Optional[int] = None) -> dict:

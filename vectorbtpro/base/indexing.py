@@ -14,25 +14,29 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.template import CustomTemplate
 from vectorbtpro.utils.datetime_ import (
     try_to_datetime_index,
-    try_align_to_datetime_index,
+    try_align_to_dt_index,
+    try_align_dt_to_index,
     time_to_timedelta,
     infer_index_freq,
     prepare_freq,
 )
+from vectorbtpro.utils.config import hdict, merge_dicts
 from vectorbtpro.utils.pickling import pdict
 
 __all__ = [
     "PandasIndexer",
     "hslice",
-    "RowIdx",
-    "ColIdx",
-    "RowPoints",
-    "RowRanges",
-    "ElemIdx",
-    "index_dict",
     "get_index_points",
     "get_index_ranges",
+    "index_dict",
+    "pointidx",
+    "rangeidx",
+    "rowidx",
+    "colidx",
+    "idx",
 ]
+
+__pdoc__ = {}
 
 
 class IndexingError(Exception):
@@ -349,18 +353,35 @@ def build_param_indexer(
 hsliceT = tp.TypeVar("hsliceT", bound="hslice")
 
 
-@attr.s(frozen=True)
+_DEF = object()
+"""Default value for internal purposes."""
+
+
+@attr.s(frozen=True, init=False)
 class hslice:
     """Hashable slice."""
 
-    start: tp.Any = attr.ib(default=None)
+    start: object = attr.ib()
     """Start."""
 
-    stop: tp.Any = attr.ib(default=None)
+    stop: object = attr.ib()
     """Stop."""
 
-    step: tp.Any = attr.ib(default=None)
+    step: object = attr.ib()
     """Step."""
+
+    def __init__(self, start: object = _DEF, stop: object = _DEF, step: object = _DEF) -> None:
+        if start is not _DEF and stop is _DEF and step is _DEF:
+            stop = start
+            start, step = None, None
+        else:
+            if start is _DEF:
+                start = None
+            if stop is _DEF:
+                stop = None
+            if step is _DEF:
+                step = None
+        self.__attrs_init__(start=start, stop=stop, step=step)
 
     @classmethod
     def from_slice(cls: tp.Type[hsliceT], slice_: slice) -> hsliceT:
@@ -372,56 +393,289 @@ class hslice:
         return slice(self.start, self.stop, self.step)
 
 
+class IdxrBase:
+    """Abstract class for resolving indices."""
+
+    def get(self, *args, **kwargs) -> tp.Any:
+        """Get indices."""
+        raise NotImplementedError
+
+    def slice_indexer(self, index: tp.Index, slice_: tp.Slice, closed_end: bool = False) -> slice:
+        """Compute the slice indexer for input labels and step."""
+        start = slice_.start
+        end = slice_.stop
+        if closed_end:
+            return index.slice_indexer(start, end, slice_.step)
+        if start is not None:
+            start = index.get_slice_bound(start, side="left")
+        if end is not None:
+            new_end = index.get_slice_bound(end, side="right")
+            if new_end != index.get_slice_bound(end, side="left"):
+                new_end = new_end - 1
+            end = new_end
+        return slice(start, end, slice_.step)
+
+    def check_indices(self, indices: tp.MaybeIndexArray) -> None:
+        """Check indices after resolving them."""
+        if isinstance(indices, slice):
+            if indices.start is not None and not checks.is_int(indices.start):
+                raise TypeError("Start of a returned index slice must be an integer or None")
+            if indices.stop is not None and not checks.is_int(indices.stop):
+                raise TypeError("Stop of a returned index slice must be an integer or None")
+            if indices.step is not None and not checks.is_int(indices.step):
+                raise TypeError("Step of a returned index slice must be an integer or None")
+            if indices.start == -1:
+                raise ValueError("Range start index couldn't be matched")
+            elif indices.stop == -1:
+                raise ValueError("Range end index couldn't be matched")
+        elif checks.is_int(indices):
+            if indices == -1:
+                raise ValueError("Index couldn't be matched")
+        elif checks.is_sequence(indices) and not np.isscalar(indices):
+            if not isinstance(indices, np.ndarray):
+                raise ValueError(f"Indices must be a NumPy array, not {type(indices)}")
+            if not np.issubdtype(indices.dtype, np.integer) or np.issubdtype(indices.dtype, np.bool_):
+                raise ValueError(f"Indices must be of integer data type, not {indices.dtype}")
+            if -1 in indices:
+                raise ValueError("Some indices couldn't be matched")
+            if indices.ndim not in (1, 2):
+                raise ValueError("Indices array must have either 1 or 2 dimensions")
+            if indices.ndim == 2 and indices.shape[1] != 2:
+                raise ValueError("Indices array provided as ranges must have exactly two columns")
+        else:
+            raise TypeError(f"Indices must be an integer, a slice, a NumPy array, or a tuple "
+                            f"of two NumPy arrays, not {type(indices)}")
+
+
+class UniIdxr(IdxrBase):
+    """Abstract class for resolving indices."""
+
+    def get(self, index: tp.Index, freq: tp.Optional[tp.FrequencyLike] = None) -> tp.MaybeIndexArray:
+        raise NotImplementedError
+
+
 @attr.s(frozen=True)
-class RowIdx:
-    """Indexer class for wrapping row indices or labels."""
+class PosIdxr(UniIdxr):
+    """Class for resolving indices provided as integer positions."""
 
-    value: tp.Union[tp.Label, slice, hslice, tp.Tuple[tp.MaybeTuple[tp.Label], ...]] = attr.ib()
-    """One or more indices or labels.
-    
-    * To index a single value, provide a constant: `value=0` or `value='2020-01-01'`
-    * To index multiple values, provide a tuple of constants: `value=(0, 1)` or `value=('2020-01-01', '2020-01-02')`
-    * To index values between two integer bounds, provide a tuple of two integer tuples: `value=((0, 3), (2, 5))`
-        (selects elements between 0 and 3, and 2 and 5), or also with step `value=((0, 3, 1), (2, 5, 2))`
-    * To index values between any two bounds, provide a slice of type `hslice`: `value=vbt.hslice(0, 2)` or 
-        `value=vbt.hslice('2020-01-01', '2020-01-05')` (multiple slices not allowed)"""
+    value: tp.Union[None, tp.MaybeSequence[tp.MaybeSequence[int]], tp.Slice] = attr.ib()
+    """One or more integer positions."""
 
-    is_labels: tp.Optional[bool] = attr.ib(default=None)
-    """Whether the provided indices are labels.
-    
-    If None, becomes False if `RowIdx.value` consists of integer data but index doesn't (except default index)."""
+    def get(self, index: tp.Index, freq: tp.Optional[tp.FrequencyLike] = None) -> tp.MaybeIndexArray:
+        if self.value is None:
+            return slice(None, None, None)
+        indices = self.value
+        if checks.is_sequence(indices) and not np.isscalar(indices):
+            indices = np.asarray(indices)
+        if isinstance(indices, hslice):
+            indices = indices.to_slice()
+        self.check_indices(indices)
+        return indices
 
-    method: tp.Optional[str] = attr.ib(default="bfill")
+
+@attr.s(frozen=True)
+class MaskIdxr(UniIdxr):
+    """Class for resolving indices provided as a mask."""
+
+    value: tp.Union[None, tp.Sequence[bool]] = attr.ib()
+    """Mask."""
+
+    def get(self, index: tp.Index, freq: tp.Optional[tp.FrequencyLike] = None) -> tp.MaybeIndexArray:
+        if self.value is None:
+            return slice(None, None, None)
+        indices = np.flatnonzero(self.value)
+        self.check_indices(indices)
+        return indices
+
+
+@attr.s(frozen=True)
+class LabelIdxr(UniIdxr):
+    """Class for resolving indices provided as labels."""
+
+    value: tp.Union[None, tp.MaybeSequence[tp.Label], tp.Slice] = attr.ib()
+    """One or more labels."""
+
+    closed_end: bool = attr.ib(default=True)
+    """Whether `end` should be inclusive."""
+
+    level: tp.MaybeLevelSequence = attr.ib(default=None)
+    """One or more levels."""
+
+    def get(self, index: tp.Index, freq: tp.Optional[tp.FrequencyLike] = None) -> tp.MaybeIndexArray:
+        if self.value is None:
+            return slice(None, None, None)
+        if self.level is not None:
+            from vectorbtpro.base.indexes import select_levels
+
+            index = select_levels(index, self.level)
+
+        if isinstance(self.value, (slice, hslice)):
+            indices = self.slice_indexer(index, self.value, closed_end=self.closed_end)
+        elif (checks.is_sequence(self.value) and not np.isscalar(self.value)) and (
+            not isinstance(index, pd.MultiIndex)
+            or (isinstance(index, pd.MultiIndex) and isinstance(self.value[0], tuple))
+        ):
+            indices = index.get_indexer_for(self.value)
+        else:
+            indices = index.get_loc(self.value)
+            if isinstance(indices, np.ndarray) and np.issubdtype(indices.dtype, np.bool_):
+                indices = np.flatnonzero(indices)
+        self.check_indices(indices)
+        return indices
+
+
+@attr.s(frozen=True)
+class DatetimeIdxr(UniIdxr):
+    """Class for resolving indices provided as datetime-like objects."""
+
+    value: tp.Union[None, tp.MaybeSequence[tp.DatetimeLike], tp.Slice] = attr.ib()
+    """One or more datetime-like objects."""
+
+    closed_end: bool = attr.ib(default=False)
+    """Whether `end` should be inclusive."""
+
+    indexer_method: tp.Optional[str] = attr.ib(default="bfill")
     """Method for `pd.Index.get_indexer`."""
 
+    def get(self, index: tp.Index, freq: tp.Optional[tp.FrequencyLike] = None) -> tp.MaybeIndexArray:
+        if self.value is None:
+            return slice(None, None, None)
+        index = try_to_datetime_index(index)
+        checks.assert_instance_of(index, pd.DatetimeIndex)
+        if not index.is_unique:
+            raise ValueError("Datetime index must be unique")
+        if not index.is_monotonic_increasing:
+            raise ValueError("Datetime index must be monotonically increasing")
+
+        if isinstance(self.value, (slice, hslice)):
+            start = try_align_dt_to_index(self.value.start, index)
+            stop = try_align_dt_to_index(self.value.stop, index)
+            new_value = slice(start, stop, self.value.step)
+            indices = self.slice_indexer(index, new_value, closed_end=self.closed_end)
+        elif checks.is_sequence(self.value) and not np.isscalar(self.value):
+            new_value = try_align_to_dt_index(self.value, index)
+            indices = index.get_indexer(new_value, method=self.indexer_method)
+        else:
+            new_value = try_align_dt_to_index(self.value, index)
+            if self.indexer_method is None or new_value in index:
+                indices = index.get_loc(new_value)
+                if isinstance(indices, np.ndarray) and np.issubdtype(indices.dtype, np.bool_):
+                    indices = np.flatnonzero(indices)
+            else:
+                indices = index.get_indexer([new_value], method=self.indexer_method)[0]
+        self.check_indices(indices)
+        return indices
+
 
 @attr.s(frozen=True)
-class ColIdx:
-    """Indexer class for wrapping column indices or labels."""
+class AutoIdxr(UniIdxr):
+    """Class for resolving indices, labels, or datetime-like objects for one axis."""
 
-    value: tp.Union[tp.Label, slice, hslice, tp.Tuple[tp.Label, ...]] = attr.ib()
-    """One or more indices or labels.
+    value: tp.Union[
+        None,
+        tp.MaybeSequence[tp.MaybeSequence[int]],
+        tp.MaybeSequence[tp.Label],
+        tp.MaybeSequence[tp.DatetimeLike],
+        tp.Slice,
+    ] = attr.ib()
+    """One or more integer indices, datetime-like objects, or labels."""
+
+    closed_end: bool = attr.ib(default=_DEF)
+    """Whether `end` should be inclusive."""
+
+    indexer_method: tp.Optional[str] = attr.ib(default=_DEF)
+    """Method for `pd.Index.get_indexer`."""
+
+    level: tp.MaybeLevelSequence = attr.ib(default=None)
+    """One or more levels.
     
-    * To index a single value, provide a constant: `value=0` or `value='BTCUSDT'`
-    * To index multiple values, provide a tuple of constants: `value=(0, 1)` or `value=('BTCUSDT', 'ETHUSDT')`
-    * To index values between any two bounds, provide a slice of type `hslice`: `value=vbt.hslice(0, 2)` 
-        (multiple slices not allowed)
-    * To index one or more values of one or more column levels, provide `ColIdx.level`:
-        `value='BTCUSDT', level='asset'`
-    """
+    If `level` is not None and `kind` is None, `kind` becomes "labels"."""
 
-    is_labels: tp.Optional[bool] = attr.ib(default=None)
-    """Whether the provided indices are labels.
+    kind: tp.Optional[str] = attr.ib(default=None)
+    """Kind of value.
+
+    Allowed are
     
-    If None, becomes False if `RowIdx.value` consists of integer data but index doesn't (except default index)."""
+    * "positions" for `PosIdxr`, 
+    * "mask" for `MaskIdxr`, 
+    * "labels" for `LabelIdxr`, and 
+    * "datetime" for `DatetimeIdxr`.
+    
+    If None, will (try to) determine automatically based on the type of indices."""
 
-    level: tp.MaybeTuple[tp.Union[int, str]] = attr.ib(default=None)
-    """One or more column levels."""
+    def get(self, index: tp.Index, freq: tp.Optional[tp.FrequencyLike] = None) -> tp.MaybeIndexArray:
+        if self.value is None:
+            return slice(None, None, None)
+        kind = self.kind
+        if self.level is not None:
+            from vectorbtpro.base.indexes import select_levels
+
+            index = select_levels(index, self.level)
+            if kind is None:
+                kind = "labels"
+
+        if kind is None:
+            if isinstance(self.value, (slice, hslice)):
+                if checks.is_int(self.value.start) or checks.is_int(self.value.stop):
+                    kind = "positions"
+                elif self.value.start is None and self.value.stop is None:
+                    kind = "positions"
+                elif isinstance(index, pd.DatetimeIndex):
+                    kind = "datetime"
+                else:
+                    kind = "labels"
+            elif (checks.is_sequence(self.value) and not np.isscalar(self.value)) and (
+                not isinstance(index, pd.MultiIndex)
+                or (isinstance(index, pd.MultiIndex) and isinstance(self.value[0], tuple))
+            ):
+                if isinstance(index, pd.MultiIndex) and isinstance(self.value[0], tuple):
+                    kind = "labels"
+                elif checks.is_bool(self.value[0]):
+                    kind = "mask"
+                elif checks.is_int(self.value[0]):
+                    kind = "positions"
+                elif isinstance(self.value[0], (slice, hslice)):
+                    kind = "positions"
+                elif checks.is_sequence(self.value[0]) and not np.isscalar(self.value[0][0]):
+                    kind = "positions"
+                elif isinstance(index, pd.DatetimeIndex):
+                    kind = "datetime"
+                else:
+                    kind = "labels"
+            else:
+                if checks.is_bool(self.value):
+                    kind = "mask"
+                elif checks.is_int(self.value):
+                    kind = "positions"
+                elif isinstance(index, pd.DatetimeIndex):
+                    kind = "datetime"
+                else:
+                    kind = "labels"
+
+        if kind.lower() == "positions":
+            idx = PosIdxr(self.value)
+        elif kind.lower() == "mask":
+            idx = MaskIdxr(self.value)
+        elif kind.lower() == "labels":
+            idxr_kwargs = dict()
+            if self.closed_end is not _DEF:
+                idxr_kwargs["closed_end"] = self.closed_end
+            idx = LabelIdxr(self.value, **idxr_kwargs)
+        elif kind.lower() == "datetime":
+            idxr_kwargs = dict()
+            if self.closed_end is not _DEF:
+                idxr_kwargs["closed_end"] = self.closed_end
+            if self.indexer_method is not _DEF:
+                idxr_kwargs["indexer_method"] = self.indexer_method
+            idx = DatetimeIdxr(self.value, **idxr_kwargs)
+        else:
+            raise ValueError(f"Invalid option kind='{kind}'")
+        return idx.get(index, freq=freq)
 
 
 @attr.s(frozen=True)
-class RowPoints:
-    """Indexer class for wrapping `get_index_points` instruction."""
+class PointIdxr(UniIdxr):
+    """Class for resolving index points."""
 
     every: tp.Optional[tp.FrequencyLike] = attr.ib(default=None)
     """Frequency either as an integer or timedelta.
@@ -494,158 +748,33 @@ class RowPoints:
     skip_minus_one: bool = attr.ib(default=True)
     """Whether to remove indices that are -1 (not found)."""
 
-
-@attr.s(frozen=True)
-class RowRanges:
-    """Indexer class for wrapping `get_index_ranges` instruction."""
-
-    every: tp.Optional[tp.FrequencyLike] = attr.ib(default=None)
-    """Frequency either as an integer or timedelta.
-
-    Gets translated into `start` and `end` arrays by creating a range. If integer, an index sequence from `start` 
-    to `end` (exclusive) is created and 'indices' as `kind` is used. If timedelta-like, a date sequence 
-    from `start` to `end` (inclusive) is created and 'bounds' as `kind` is used. 
-
-    If `start_time` and `end_time` are not None and `every`, `start`, and `end` are None, 
-    `every` defaults to one day."""
-
-    normalize_every: bool = attr.ib(default=False)
-    """Normalize start/end dates to midnight before generating date range."""
-
-    split_every: bool = attr.ib(default=True)
-    """Whether to split the sequence generated using `every` into `start` and `end` arrays.
-
-    After creation, and if `split_every` is True, an index range is created from each pair of elements in 
-    the generated sequence. Otherwise, the entire sequence is assigned to `start` and `end`, and only time 
-    and delta instructions can be used to further differentiate between them.
-
-    Forced to False if `every`, `start_time`, and `end_time` are not None and `fixed_start` is False."""
-
-    start_time: tp.Optional[tp.TimeLike] = attr.ib(default=None)
-    """Start time of the day either as a (human-readable) string or `datetime.time`. 
-
-    Every datetime in `start` gets floored to the daily frequency, while `start_time` gets converted into 
-    a timedelta using `vectorbtpro.utils.datetime_.time_to_timedelta` and added to `add_start_delta`. 
-    Index must be datetime-like."""
-
-    end_time: tp.Optional[tp.TimeLike] = attr.ib(default=None)
-    """End time of the day either as a (human-readable) string or `datetime.time`. 
-
-    Every datetime in `end` gets floored to the daily frequency, while `end_time` gets converted into 
-    a timedelta using `vectorbtpro.utils.datetime_.time_to_timedelta` and added to `add_end_delta`. 
-    Index must be datetime-like."""
-
-    lookback_period: tp.Optional[tp.FrequencyLike] = attr.ib(default=None)
-    """Lookback period either as an integer or offset.
-
-    If `lookback_period` is set, `start` becomes `end-lookback_period`. If `every` is not None, 
-    the sequence is generated from `start+lookback_period` to `end` and then assigned to `end`.
-
-    If string, gets converted into an offset using 
-    [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html).
-    If integer, gets multiplied by the frequency of the index if the index is not integer."""
-
-    start: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = attr.ib(default=None)
-    """Start index/label or a sequence of such.
-
-    Gets converted into datetime format whenever possible.
-
-    Gets broadcasted together with `end`."""
-
-    end: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = attr.ib(default=None)
-    """End index/label or a sequence of such.
-
-    Gets converted into datetime format whenever possible.
-
-    Gets broadcasted together with `start`."""
-
-    exact_start: bool = attr.ib(default=False)
-    """Whether the first index in the `start` array should be exactly `start`.
-
-    Depending on `every`, the first index picked by `pd.date_range` may happen after `start`.
-    In such a case, `start` gets injected before the first index generated by `pd.date_range`.
-
-    Cannot be used together with `lookback_period`."""
-
-    fixed_start: bool = attr.ib(default=False)
-    """Whether all indices in the `start` array should be exactly `start`.
-
-    Works only together with `every`.
-
-    Cannot be used together with `lookback_period`."""
-
-    closed_start: bool = attr.ib(default=True)
-    """Whether `start` should be inclusive."""
-
-    closed_end: bool = attr.ib(default=False)
-    """Whether `end` should be inclusive.
-
-    !!! note
-        Indices will still be exclusive."""
-
-    add_start_delta: tp.Optional[tp.FrequencyLike] = attr.ib(default=None)
-    """Offset to be added to each in `start`.
-
-    If string, gets converted into an offset using 
-    [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html)."""
-
-    add_end_delta: tp.Optional[tp.FrequencyLike] = attr.ib(default=None)
-    """Offset to be added to each in `end`.
-
-    If string, gets converted into an offset using 
-    [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html)."""
-
-    kind: tp.Optional[str] = attr.ib(default=None)
-    """Kind of data in `on`: indices, labels or bounds.
-
-    If None, gets assigned to `indices` if `start` and `end` contain integer data, to `bounds`
-    if `start`, `end`, and index are datetime-like, otherwise to `labels`.
-
-    If `kind` is 'labels', `start` and `end` get converted into indices using `pd.Index.get_indexer`. 
-    Prior to this, get their timezone aligned to the timezone of the index. If `kind` is 'indices', 
-    `start` and `end` get wrapped with NumPy. If kind` is 'bounds', 
-    `vectorbtpro.base.resampling.base.Resampler.map_bounds_to_source_ranges` is used."""
-
-    skip_minus_one: bool = attr.ib(default=True)
-    """Whether to remove indices that are -1 (not found)."""
-
-    jitted: tp.JittedOption = attr.ib(default=None)
-    """Jitting option passed to `vectorbtpro.base.resampling.base.Resampler.map_bounds_to_source_ranges`."""
+    def get(self, index: tp.Index, freq: tp.Optional[tp.FrequencyLike] = None) -> tp.MaybeIndexArray:
+        indices = get_index_points(index, **attr.asdict(self))
+        self.check_indices(indices)
+        return indices
 
 
-@attr.s(frozen=True)
-class ElemIdx:
-    """Indexer class for wrapping an element indices and/or labels."""
-
-    row_indexer: tp.Any = attr.ib()
-    """Row indexer."""
-
-    col_indexer: tp.Any = attr.ib()
-    """Column indexer."""
-
-
-row_points_defaults = {a.name: a.default for a in RowPoints.__attrs_attrs__}
-row_ranges_defaults = {a.name: a.default for a in RowRanges.__attrs_attrs__}
+point_idxr_defaults = {a.name: a.default for a in PointIdxr.__attrs_attrs__}
 
 
 def get_index_points(
     index: tp.Index,
-    every: tp.Optional[tp.FrequencyLike] = row_points_defaults["every"],
-    normalize_every: bool = row_points_defaults["normalize_every"],
-    at_time: tp.Optional[tp.TimeLike] = row_points_defaults["at_time"],
-    start: tp.Optional[tp.Union[int, tp.DatetimeLike]] = row_points_defaults["start"],
-    end: tp.Optional[tp.Union[int, tp.DatetimeLike]] = row_points_defaults["end"],
-    exact_start: bool = row_points_defaults["exact_start"],
-    on: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = row_points_defaults["on"],
-    add_delta: tp.Optional[tp.FrequencyLike] = row_points_defaults["add_delta"],
-    kind: tp.Optional[str] = row_points_defaults["kind"],
-    indexer_method: str = row_points_defaults["indexer_method"],
-    indexer_tolerance: str = row_points_defaults["indexer_tolerance"],
-    skip_minus_one: bool = row_points_defaults["skip_minus_one"],
+    every: tp.Optional[tp.FrequencyLike] = point_idxr_defaults["every"],
+    normalize_every: bool = point_idxr_defaults["normalize_every"],
+    at_time: tp.Optional[tp.TimeLike] = point_idxr_defaults["at_time"],
+    start: tp.Optional[tp.Union[int, tp.DatetimeLike]] = point_idxr_defaults["start"],
+    end: tp.Optional[tp.Union[int, tp.DatetimeLike]] = point_idxr_defaults["end"],
+    exact_start: bool = point_idxr_defaults["exact_start"],
+    on: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = point_idxr_defaults["on"],
+    add_delta: tp.Optional[tp.FrequencyLike] = point_idxr_defaults["add_delta"],
+    kind: tp.Optional[str] = point_idxr_defaults["kind"],
+    indexer_method: str = point_idxr_defaults["indexer_method"],
+    indexer_tolerance: str = point_idxr_defaults["indexer_tolerance"],
+    skip_minus_one: bool = point_idxr_defaults["skip_minus_one"],
 ) -> tp.Array1d:
     """Translate indices or labels into index points.
 
-    See `RowPoints` for argument descriptions.
+    See `PointIdxr` for arguments.
 
     Usage:
         * Provide nothing to generate at the beginning:
@@ -825,7 +954,7 @@ def get_index_points(
         on += add_delta
 
     if kind.lower() == "labels":
-        on = try_align_to_datetime_index(on, index)
+        on = try_align_to_dt_index(on, index)
         index_points = index.get_indexer(on, method=indexer_method, tolerance=indexer_tolerance)
     else:
         index_points = np.asarray(on)
@@ -847,30 +976,156 @@ def get_index_points(
     return index_points
 
 
+@attr.s(frozen=True)
+class RangeIdxr(UniIdxr):
+    """Class for resolving index ranges."""
+
+    every: tp.Optional[tp.FrequencyLike] = attr.ib(default=None)
+    """Frequency either as an integer or timedelta.
+
+    Gets translated into `start` and `end` arrays by creating a range. If integer, an index sequence from `start` 
+    to `end` (exclusive) is created and 'indices' as `kind` is used. If timedelta-like, a date sequence 
+    from `start` to `end` (inclusive) is created and 'bounds' as `kind` is used. 
+
+    If `start_time` and `end_time` are not None and `every`, `start`, and `end` are None, 
+    `every` defaults to one day."""
+
+    normalize_every: bool = attr.ib(default=False)
+    """Normalize start/end dates to midnight before generating date range."""
+
+    split_every: bool = attr.ib(default=True)
+    """Whether to split the sequence generated using `every` into `start` and `end` arrays.
+
+    After creation, and if `split_every` is True, an index range is created from each pair of elements in 
+    the generated sequence. Otherwise, the entire sequence is assigned to `start` and `end`, and only time 
+    and delta instructions can be used to further differentiate between them.
+
+    Forced to False if `every`, `start_time`, and `end_time` are not None and `fixed_start` is False."""
+
+    start_time: tp.Optional[tp.TimeLike] = attr.ib(default=None)
+    """Start time of the day either as a (human-readable) string or `datetime.time`. 
+
+    Every datetime in `start` gets floored to the daily frequency, while `start_time` gets converted into 
+    a timedelta using `vectorbtpro.utils.datetime_.time_to_timedelta` and added to `add_start_delta`. 
+    Index must be datetime-like."""
+
+    end_time: tp.Optional[tp.TimeLike] = attr.ib(default=None)
+    """End time of the day either as a (human-readable) string or `datetime.time`. 
+
+    Every datetime in `end` gets floored to the daily frequency, while `end_time` gets converted into 
+    a timedelta using `vectorbtpro.utils.datetime_.time_to_timedelta` and added to `add_end_delta`. 
+    Index must be datetime-like."""
+
+    lookback_period: tp.Optional[tp.FrequencyLike] = attr.ib(default=None)
+    """Lookback period either as an integer or offset.
+
+    If `lookback_period` is set, `start` becomes `end-lookback_period`. If `every` is not None, 
+    the sequence is generated from `start+lookback_period` to `end` and then assigned to `end`.
+
+    If string, gets converted into an offset using 
+    [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html).
+    If integer, gets multiplied by the frequency of the index if the index is not integer."""
+
+    start: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = attr.ib(default=None)
+    """Start index/label or a sequence of such.
+
+    Gets converted into datetime format whenever possible.
+
+    Gets broadcasted together with `end`."""
+
+    end: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = attr.ib(default=None)
+    """End index/label or a sequence of such.
+
+    Gets converted into datetime format whenever possible.
+
+    Gets broadcasted together with `start`."""
+
+    exact_start: bool = attr.ib(default=False)
+    """Whether the first index in the `start` array should be exactly `start`.
+
+    Depending on `every`, the first index picked by `pd.date_range` may happen after `start`.
+    In such a case, `start` gets injected before the first index generated by `pd.date_range`.
+
+    Cannot be used together with `lookback_period`."""
+
+    fixed_start: bool = attr.ib(default=False)
+    """Whether all indices in the `start` array should be exactly `start`.
+
+    Works only together with `every`.
+
+    Cannot be used together with `lookback_period`."""
+
+    closed_start: bool = attr.ib(default=True)
+    """Whether `start` should be inclusive."""
+
+    closed_end: bool = attr.ib(default=False)
+    """Whether `end` should be inclusive.
+
+    !!! note
+        Indices will still be exclusive."""
+
+    add_start_delta: tp.Optional[tp.FrequencyLike] = attr.ib(default=None)
+    """Offset to be added to each in `start`.
+
+    If string, gets converted into an offset using 
+    [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html)."""
+
+    add_end_delta: tp.Optional[tp.FrequencyLike] = attr.ib(default=None)
+    """Offset to be added to each in `end`.
+
+    If string, gets converted into an offset using 
+    [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html)."""
+
+    kind: tp.Optional[str] = attr.ib(default=None)
+    """Kind of data in `on`: indices, labels or bounds.
+
+    If None, gets assigned to `indices` if `start` and `end` contain integer data, to `bounds`
+    if `start`, `end`, and index are datetime-like, otherwise to `labels`.
+
+    If `kind` is 'labels', `start` and `end` get converted into indices using `pd.Index.get_indexer`. 
+    Prior to this, get their timezone aligned to the timezone of the index. If `kind` is 'indices', 
+    `start` and `end` get wrapped with NumPy. If kind` is 'bounds', 
+    `vectorbtpro.base.resampling.base.Resampler.map_bounds_to_source_ranges` is used."""
+
+    skip_minus_one: bool = attr.ib(default=True)
+    """Whether to remove indices that are -1 (not found)."""
+
+    jitted: tp.JittedOption = attr.ib(default=None)
+    """Jitting option passed to `vectorbtpro.base.resampling.base.Resampler.map_bounds_to_source_ranges`."""
+
+    def get(self, index: tp.Index, freq: tp.Optional[tp.FrequencyLike] = None) -> tp.MaybeIndexArray:
+        start_indices, end_indices = get_index_ranges(index, index_freq=freq, **attr.asdict(self))
+        indices = np.column_stack((start_indices, end_indices))
+        return indices
+
+
+range_idxr_defaults = {a.name: a.default for a in RangeIdxr.__attrs_attrs__}
+
+
 def get_index_ranges(
     index: tp.Index,
     index_freq: tp.Optional[tp.FrequencyLike] = None,
-    every: tp.Optional[tp.FrequencyLike] = row_ranges_defaults["every"],
-    normalize_every: bool = row_ranges_defaults["normalize_every"],
-    split_every: bool = row_ranges_defaults["split_every"],
-    start_time: tp.Optional[tp.TimeLike] = row_ranges_defaults["start_time"],
-    end_time: tp.Optional[tp.TimeLike] = row_ranges_defaults["end_time"],
-    lookback_period: tp.Optional[tp.FrequencyLike] = row_ranges_defaults["lookback_period"],
-    start: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = row_ranges_defaults["start"],
-    end: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = row_ranges_defaults["end"],
-    exact_start: bool = row_ranges_defaults["exact_start"],
-    fixed_start: bool = row_ranges_defaults["fixed_start"],
-    closed_start: bool = row_ranges_defaults["closed_start"],
-    closed_end: bool = row_ranges_defaults["closed_end"],
-    add_start_delta: tp.Optional[tp.FrequencyLike] = row_ranges_defaults["add_start_delta"],
-    add_end_delta: tp.Optional[tp.FrequencyLike] = row_ranges_defaults["add_end_delta"],
-    kind: tp.Optional[str] = row_ranges_defaults["kind"],
-    skip_minus_one: bool = row_ranges_defaults["skip_minus_one"],
-    jitted: tp.JittedOption = row_ranges_defaults["jitted"],
+    every: tp.Optional[tp.FrequencyLike] = range_idxr_defaults["every"],
+    normalize_every: bool = range_idxr_defaults["normalize_every"],
+    split_every: bool = range_idxr_defaults["split_every"],
+    start_time: tp.Optional[tp.TimeLike] = range_idxr_defaults["start_time"],
+    end_time: tp.Optional[tp.TimeLike] = range_idxr_defaults["end_time"],
+    lookback_period: tp.Optional[tp.FrequencyLike] = range_idxr_defaults["lookback_period"],
+    start: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = range_idxr_defaults["start"],
+    end: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = range_idxr_defaults["end"],
+    exact_start: bool = range_idxr_defaults["exact_start"],
+    fixed_start: bool = range_idxr_defaults["fixed_start"],
+    closed_start: bool = range_idxr_defaults["closed_start"],
+    closed_end: bool = range_idxr_defaults["closed_end"],
+    add_start_delta: tp.Optional[tp.FrequencyLike] = range_idxr_defaults["add_start_delta"],
+    add_end_delta: tp.Optional[tp.FrequencyLike] = range_idxr_defaults["add_end_delta"],
+    kind: tp.Optional[str] = range_idxr_defaults["kind"],
+    skip_minus_one: bool = range_idxr_defaults["skip_minus_one"],
+    jitted: tp.JittedOption = range_idxr_defaults["jitted"],
 ) -> tp.Tuple[tp.Array1d, tp.Array1d]:
     """Translate indices, labels, or bounds into index ranges.
 
-    See `RowRanges` for argument descriptions.
+    See `RangeIdxr` for arguments.
 
     Usage:
         * Provide nothing to generate one largest index range:
@@ -1056,11 +1311,11 @@ def get_index_ranges(
     index = try_to_datetime_index(index)
     if isinstance(index, pd.DatetimeIndex):
         if start is not None:
-            start = try_align_to_datetime_index(start, index)
+            start = try_align_to_dt_index(start, index)
             if isinstance(start, pd.DatetimeIndex):
                 start = start.tz_localize(None)
         if end is not None:
-            end = try_align_to_datetime_index(end, index)
+            end = try_align_to_dt_index(end, index)
             if isinstance(end, pd.DatetimeIndex):
                 end = end.tz_localize(None)
         naive_index = index.tz_localize(None)
@@ -1300,6 +1555,129 @@ def get_index_ranges(
     return range_starts, range_ends
 
 
+@attr.s(frozen=True, init=False)
+class RowIdxr(IdxrBase):
+    """Class for resolving row indices."""
+
+    idxr: object = attr.ib()
+    """Indexer.
+    
+    Can be an instance of `UniIdxr`, a custom template, or a value to be wrapped with `AutoIdxr`."""
+
+    idxr_kwargs: tp.KwargsLike = attr.ib()
+    """Keyword arguments passed to `AutoIdxr`."""
+
+    def __init__(self, idxr: object, **idxr_kwargs) -> None:
+        self.__attrs_init__(idxr=idxr, idxr_kwargs=hdict(idxr_kwargs))
+
+    def get(
+        self,
+        index: tp.Index,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        template_context: tp.KwargsLike = None,
+    ) -> tp.MaybeIndexArray:
+        idxr = self.idxr
+        if isinstance(idxr, CustomTemplate):
+            _template_context = merge_dicts(dict(index=index, freq=freq), template_context)
+            idxr = idxr.substitute(_template_context, sub_id="idxr")
+        if not isinstance(idxr, UniIdxr):
+            if isinstance(idxr, IdxrBase):
+                raise TypeError(f"Indexer of {type(self)} must be an instance of UniIdxr")
+            idxr = AutoIdxr(idxr, **self.idxr_kwargs)
+        return idxr.get(index, freq=freq)
+
+
+@attr.s(frozen=True, init=False)
+class ColIdxr(IdxrBase):
+    """Class for resolving column indices."""
+
+    idxr: object = attr.ib()
+    """Indexer.
+        
+    Can be an instance of `UniIdxr`, a custom template, or a value to be wrapped with `AutoIdxr`."""
+
+    idxr_kwargs: tp.KwargsLike = attr.ib()
+    """Keyword arguments passed to `AutoIdxr`."""
+
+    def __init__(self, idxr: object, **idxr_kwargs) -> None:
+        self.__attrs_init__(idxr=idxr, idxr_kwargs=hdict(idxr_kwargs))
+
+    def get(
+        self,
+        columns: tp.Index,
+        template_context: tp.KwargsLike = None,
+    ) -> tp.MaybeIndexArray:
+        idxr = self.idxr
+        if isinstance(idxr, CustomTemplate):
+            _template_context = merge_dicts(dict(columns=columns), template_context)
+            idxr = idxr.substitute(_template_context, sub_id="idxr")
+        if not isinstance(idxr, UniIdxr):
+            if isinstance(idxr, IdxrBase):
+                raise TypeError(f"Indexer of {type(self)} must be an instance of UniIdxr")
+            idxr = AutoIdxr(idxr, **self.idxr_kwargs)
+        return idxr.get(columns)
+
+
+@attr.s(frozen=True, init=False)
+class Idxr(IdxrBase):
+    """Class for resolving indices."""
+
+    idxrs: tp.Tuple[object, ...] = attr.ib()
+    """A tuple of one or more indexers.
+    
+    If one indexer is provided, can be an instance of `RowIdxr` or `ColIdxr`, 
+    a custom template, or a value to wrapped with `RowIdxr`.
+    
+    If two indexers are provided, can be an instance of `RowIdxr` and `ColIdxr` respectively,
+    or a value to wrapped with `RowIdxr` and `ColIdxr` respectively."""
+
+    idxr_kwargs: tp.KwargsLike = attr.ib()
+    """Keyword arguments passed to `RowIdxr` and `ColIdxr`."""
+
+    def __init__(self, *idxrs: object, **idxr_kwargs) -> None:
+        self.__attrs_init__(idxrs=idxrs, idxr_kwargs=hdict(idxr_kwargs))
+
+    def get(
+        self,
+        index: tp.Index,
+        columns: tp.Index,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        template_context: tp.KwargsLike = None,
+    ) -> tp.Tuple[tp.MaybeIndexArray, tp.MaybeIndexArray]:
+        if len(self.idxrs) == 0:
+            raise ValueError("At least one indexer must be provided")
+        elif len(self.idxrs) == 1:
+            idxr = self.idxrs[0]
+            if isinstance(idxr, CustomTemplate):
+                _template_context = merge_dicts(dict(index=index, columns=columns, freq=freq), template_context)
+                idxr = idxr.substitute(_template_context, sub_id="idxr")
+                if isinstance(idxr, tuple):
+                    return type(self)(*idxr).get(index, columns, freq=freq, template_context=template_context)
+                return type(self)(idxr).get(index, columns, freq=freq, template_context=template_context)
+            if isinstance(idxr, ColIdxr):
+                row_idxr = None
+                col_idxr = idxr
+            else:
+                row_idxr = idxr
+                col_idxr = None
+        elif len(self.idxrs) == 2:
+            row_idxr = self.idxrs[0]
+            col_idxr = self.idxrs[1]
+        else:
+            raise ValueError("At most two indexers must be provided")
+        if not isinstance(row_idxr, RowIdxr):
+            if isinstance(row_idxr, (ColIdxr, Idxr)):
+                raise TypeError(f"Indexer {type(row_idxr)} not supported as a row indexer")
+            row_idxr = RowIdxr(row_idxr, **self.idxr_kwargs)
+        row_indices = row_idxr.get(index, freq=freq, template_context=template_context)
+        if not isinstance(col_idxr, ColIdxr):
+            if isinstance(col_idxr, (RowIdxr, Idxr)):
+                raise TypeError(f"Indexer {type(col_idxr)} not supported as a column indexer")
+            col_idxr = ColIdxr(col_idxr, **self.idxr_kwargs)
+        col_indices = col_idxr.get(columns, template_context=template_context)
+        return row_indices, col_indices
+
+
 class index_dict(pdict):
     """Dict that contains indexer objects as keys.
 
@@ -1311,213 +1689,146 @@ class index_dict(pdict):
 def get_indices(
     index: tp.Index,
     columns: tp.Index,
-    indexer: tp.Any,
-    check_indices: bool = True,
+    idxr: object,
+    freq: tp.Optional[tp.FrequencyLike] = None,
+    template_context: tp.KwargsLike = None,
+    **kwargs,
 ) -> tp.Tuple[tp.MaybeIndexArray, tp.MaybeIndexArray]:
-    """Translate indexer to row and column indices, as both arrays and slices if possible.
+    """Translate indexer to row and column indices.
 
-    If `indexer` is not an indexer class, wraps it with `RowIdx`.
+    If `idxr` is not an indexer class, wraps it with `Idxr`.
 
-    If `indexer` is an instance of `vectorbtpro.utils.template.CustomTemplate`, substitutes it.
-    The result can be either row indices or both row and column indices as a tuple.
-    Each object with indices will be converted to a NumPy array, even tuples. If the returned array is a mask,
-    will convert it into indices using `np.flatnonzero`. If the returned array is two-dimensional,
-    the first and second column will be considered as a range start, end, and (optionally) step respectively."""
-    from vectorbtpro.base.indexes import select_levels
+    Keyword arguments are passed when constructing a new `Idxr`."""
+    if not isinstance(idxr, Idxr):
+        idxr = Idxr(idxr, **kwargs)
+    return idxr.get(index, columns, freq=freq, template_context=template_context)
 
-    def _check_indices(indices):
-        if not check_indices:
-            return None
-        if isinstance(indices, (slice, hslice)):
-            if indices.start == -1:
-                raise ValueError(f"{indexer}: Range start index couldn't be matched")
-            elif indices.stop == -1:
-                raise ValueError(f"{indexer}: Range end index couldn't be matched")
-        if isinstance(indices, np.ndarray):
-            if -1 in indices:
-                raise ValueError(f"{indexer}: Some indices couldn't be matched")
-        if checks.is_int(indices):
-            if indices == -1:
-                raise ValueError(f"{indexer}: Index couldn't be matched")
 
-    def _prepare_template_indices(indices):
-        if not isinstance(indices, (slice, hslice)) and not checks.is_int(indices):
-            indices = np.asarray(indices)
-            if indices.ndim == 2:
-                indices = tuple(indices[:, col] for col in range(indices.shape[1]))
-            elif indices.dtype == np.bool_:
-                indices = np.flatnonzero(indices)
-        _check_indices(indices)
-        return indices
+pointidx = PointIdxr
+"""Shortcut for `PointIdxr`."""
 
-    if isinstance(indexer, RowIdx):
-        value = indexer.value
-        if isinstance(value, (slice, hslice)):
-            if value.start is None and value.stop is None:
-                return slice(None, None, None), slice(None, None, None)
-        is_labels = indexer.is_labels
-        if is_labels is None:
-            is_labels = True
-            if (
-                not isinstance(index, pd.MultiIndex) and (not index.is_integer() or checks.is_default_index(index))
-            ) or (isinstance(index, pd.MultiIndex) and not all(lvl.is_integer() for lvl in index.levels)):
-                if isinstance(value, (slice, hslice)):
-                    if checks.is_int(value.start) or checks.is_int(value.stop):
-                        is_labels = False
-                elif checks.is_int(value):
-                    is_labels = False
-                elif checks.is_sequence(value) and not np.isscalar(value):
-                    if not checks.is_sequence(value[0]) or np.isscalar(value[0]):
-                        if pd.Index(value).is_integer():
-                            is_labels = False
-                    else:
-                        disable_is_labels = True
-                        for i in range(len(value)):
-                            if not pd.Index(value[i]).is_integer():
-                                disable_is_labels = False
-                                break
-                        if disable_is_labels:
-                            is_labels = False
-        if not is_labels:
-            row_indices = value
-            if checks.is_sequence(row_indices) and not np.isscalar(row_indices):
-                row_indices = np.asarray(row_indices)
-                if row_indices.ndim == 2:
-                    row_indices = tuple(row_indices[:, col] for col in range(row_indices.shape[1]))
-            if isinstance(row_indices, (slice, hslice)):
-                row_indices = slice(row_indices.start, row_indices.stop, row_indices.step)
-            _check_indices(row_indices)
-            return row_indices, slice(None, None, None)
-        else:
-            if isinstance(value, (slice, hslice)):
-                start_index = index.get_indexer(
-                    try_align_to_datetime_index([value.start], index),
-                    method="bfill",
-                ).item(0)
-                end_index = index.get_indexer(
-                    try_align_to_datetime_index([value.stop], index),
-                    method="ffill",
-                ).item(-1)
-                _check_indices(start_index)
-                _check_indices(end_index)
-                return slice(start_index, end_index + 1, value.step), slice(None, None, None)
-            if (checks.is_sequence(value) and not np.isscalar(value)) and (
-                (not isinstance(index, pd.MultiIndex))
-                or (isinstance(index, pd.MultiIndex) and isinstance(value[0], tuple))
-            ):
-                row_indices = index.get_indexer(
-                    try_align_to_datetime_index(value, index),
-                    method=indexer.method,
-                )
-                _check_indices(row_indices)
-                return row_indices, slice(None, None, None)
-            row_indices = index.get_indexer(
-                try_align_to_datetime_index([value], index),
-                method=indexer.method,
-            )
-            if len(row_indices) == 1:
-                row_indices = row_indices.item(0)
-            _check_indices(row_indices)
-            return row_indices, slice(None, None, None)
-    if isinstance(indexer, ColIdx):
-        value = indexer.value
-        if isinstance(value, (slice, hslice)):
-            if value.start is None and value.stop is None:
-                return slice(None, None, None), slice(None, None, None)
-        if indexer.level is not None:
-            new_columns = select_levels(columns, indexer.level)
-            return get_indices(index, new_columns, ColIdx(value, is_labels=indexer.is_labels))
-        is_labels = indexer.is_labels
-        if is_labels is None:
-            is_labels = True
-            if (
-                not isinstance(columns, pd.MultiIndex)
-                and (not columns.is_integer() or checks.is_default_index(columns))
-            ) or (isinstance(columns, pd.MultiIndex) and not all(lvl.is_integer() for lvl in columns.levels)):
-                if isinstance(value, (slice, hslice)):
-                    if checks.is_int(value.start) or checks.is_int(value.stop):
-                        is_labels = False
-                elif checks.is_int(value):
-                    is_labels = False
-                elif checks.is_sequence(value) and not np.isscalar(value):
-                    if not checks.is_sequence(value[0]) or np.isscalar(value[0]):
-                        if pd.Index(value).is_integer():
-                            is_labels = False
-        if not is_labels:
-            col_indices = value
-            if not checks.is_int(col_indices) and not isinstance(col_indices, (slice, hslice)):
-                col_indices = np.asarray(col_indices)
-            if isinstance(col_indices, (slice, hslice)):
-                col_indices = slice(col_indices.start, col_indices.stop, col_indices.step)
-            _check_indices(col_indices)
-            return slice(None, None, None), col_indices
-        else:
-            if indexer.level is not None:
-                new_columns = select_levels(columns, indexer.level)
-                return get_indices(index, new_columns, ColIdx(value, is_labels=True))
-            if isinstance(value, (slice, hslice)):
-                if columns.is_unique:
-                    start_index = columns.get_indexer([value.start], method="bfill").item(0)
-                    end_index = columns.get_indexer([value.stop], method="ffill").item(-1)
+__pdoc__["pointidx"] = False
+
+rangeidx = RangeIdxr
+"""Shortcut for `RangeIdxr`."""
+
+__pdoc__["rangeidx"] = False
+
+rowidx = RowIdxr
+"""Shortcut for `RowIdxr`."""
+
+__pdoc__["rowidx"] = False
+
+colidx = ColIdxr
+"""Shortcut for `ColIdxr`."""
+
+__pdoc__["colidx"] = False
+
+idx = Idxr
+"""Shortcut for `Idxr`."""
+
+__pdoc__["idx"] = False
+
+
+def set_rows(a: tp.Array, x: tp.MaybeIndexArray, v: tp.Any) -> None:
+    """Set row indices in an array."""
+    from vectorbtpro.base.reshaping import broadcast_array_to
+
+    if not isinstance(v, np.ndarray):
+        v = np.asarray(v)
+    single_v = v.size == 1 or (v.ndim == 2 and v.shape[0] == 1)
+    if a.ndim == 2:
+        single_x = not isinstance(x, slice) and (np.isscalar(x) or x.size == 1)
+        if not single_x:
+            if v.ndim == 1 and v.size > 1:
+                v = v[:, None]
+
+    if isinstance(x, np.ndarray) and x.ndim == 2:
+        if not single_v:
+            if a.ndim == 2:
+                v = broadcast_array_to(v, (len(x), a.shape[1]))
+            else:
+                v = broadcast_array_to(v, (len(x),))
+        for i in range(len(x)):
+            x_slice = slice(x[i, 0], x[i, 1])
+            if not single_v:
+                set_rows(a, x_slice, v[[i]])
+            else:
+                set_rows(a, x_slice, v)
+    else:
+        a[x] = v
+
+
+def set_cols(a: tp.Array, y: tp.MaybeIndexArray, v: tp.Any) -> None:
+    """Set column indices in an array."""
+    from vectorbtpro.base.reshaping import broadcast_array_to
+
+    if not isinstance(v, np.ndarray):
+        v = np.asarray(v)
+    single_v = v.size == 1 or (v.ndim == 2 and v.shape[1] == 1)
+
+    if isinstance(y, np.ndarray) and y.ndim == 2:
+        if not single_v:
+            v = broadcast_array_to(v, (a.shape[0], len(y)))
+        for j in range(len(y)):
+            y_slice = slice(y[j, 0], y[j, 1])
+            if not single_v:
+                set_cols(a, y_slice, v[:, [j]])
+            else:
+                set_cols(a, y_slice, v)
+    else:
+        a[:, y] = v
+
+
+def set_rows_and_cols(a: tp.Array, x: tp.MaybeIndexArray, y: tp.MaybeIndexArray, v: tp.Any) -> None:
+    """Set row and column indices in an array."""
+    from vectorbtpro.base.reshaping import broadcast_array_to
+
+    if not isinstance(v, np.ndarray):
+        v = np.asarray(v)
+    single_v = v.size == 1
+    if isinstance(x, np.ndarray) and x.ndim == 2 and isinstance(y, np.ndarray) and y.ndim == 2:
+        if not single_v:
+            v = broadcast_array_to(v, (len(x), len(y)))
+        for i in range(len(x)):
+            for j in range(len(y)):
+                x_slice = slice(x[i, 0], x[i, 1])
+                y_slice = slice(y[j, 0], y[j, 1])
+                if not single_v:
+                    set_rows_and_cols(a, x_slice, y_slice, v[i, j])
                 else:
-                    start_index = columns.get_indexer_for([value.start]).item(0)
-                    end_index = columns.get_indexer_for([value.stop]).item(-1)
-                _check_indices(start_index)
-                _check_indices(end_index)
-                return slice(None, None, None), slice(start_index, end_index + 1, value.step)
-            if (checks.is_sequence(value) and not np.isscalar(value)) and (
-                (not isinstance(columns, pd.MultiIndex))
-                or (isinstance(columns, pd.MultiIndex) and isinstance(value[0], tuple))
-            ):
-                col_indices = columns.get_indexer_for(value)
-                _check_indices(col_indices)
-                return slice(None, None, None), col_indices
-            col_indices = columns.get_indexer_for([value])
-            if len(col_indices) == 1:
-                col_indices = col_indices.item(0)
-            _check_indices(col_indices)
-            return slice(None, None, None), col_indices
-    if isinstance(indexer, RowPoints):
-        kwargs = dict()
-        for k in row_points_defaults:
-            kwargs[k] = getattr(indexer, k)
-        row_indices = get_index_points(index, **kwargs)
-        _check_indices(row_indices)
-        return row_indices, slice(None, None, None)
-    if isinstance(indexer, RowRanges):
-        kwargs = dict()
-        for k in row_ranges_defaults:
-            kwargs[k] = getattr(indexer, k)
-        row_indices = get_index_ranges(index, **kwargs)
-        _check_indices(row_indices)
-        return row_indices, slice(None, None, None)
-    if isinstance(indexer, ElemIdx):
-        if isinstance(indexer.row_indexer, (RowIdx, RowPoints, RowRanges, CustomTemplate)):
-            row_indexer = indexer.row_indexer
+                    set_rows_and_cols(a, x_slice, y_slice, v)
+    elif isinstance(x, np.ndarray) and x.ndim == 2:
+        if not single_v:
+            if isinstance(y, slice):
+                y = np.arange(a.shape[1])[y]
+            v = broadcast_array_to(v, (len(x), len(y)))
+        for i in range(len(x)):
+            x_slice = slice(x[i, 0], x[i, 1])
+            if not single_v:
+                set_rows_and_cols(a, x_slice, y, v[[i]])
+            else:
+                set_rows_and_cols(a, x_slice, y, v)
+    elif isinstance(y, np.ndarray) and y.ndim == 2:
+        if not single_v:
+            if isinstance(x, slice):
+                x = np.arange(a.shape[0])[x]
+            v = broadcast_array_to(v, (len(x), len(y)))
+        for j in range(len(y)):
+            y_slice = slice(y[j, 0], y[j, 1])
+            if not single_v:
+                set_rows_and_cols(a, x, y_slice, v[:, [j]])
+            else:
+                set_rows_and_cols(a, x, y_slice, v)
+    else:
+        if np.isscalar(x) or np.isscalar(y):
+            a[x, y] = v
+        elif np.isscalar(v) and (isinstance(x, slice) or isinstance(y, slice)):
+            a[x, y] = v
+        elif np.isscalar(v):
+            a[np.ix_(x, y)] = v
         else:
-            if isinstance(indexer.row_indexer, ColIdx):
-                raise TypeError(f"Indexer {type(indexer.row_indexer)} not supported as a row indexer")
-            row_indexer = RowIdx(indexer.row_indexer)
-        if isinstance(indexer.col_indexer, (ColIdx, CustomTemplate)):
-            col_indexer = indexer.col_indexer
-        else:
-            if isinstance(indexer.col_indexer, (RowIdx, RowPoints, RowRanges)):
-                raise TypeError(f"Indexer {type(indexer.col_indexer)} not supported as a column indexer")
-            col_indexer = ColIdx(indexer.col_indexer)
-        row_indices = get_indices(index, columns, row_indexer)[0]
-        col_indices = get_indices(index, columns, col_indexer)[1]
-        return row_indices, col_indices
-    if isinstance(indexer, CustomTemplate):
-        context = dict(index=index, columns=columns, check_indices=check_indices)
-        indices = indexer.substitute(context=context, sub_id="get_indices")
-        if isinstance(indices, tuple):
-            if len(indices) != 2:
-                raise ValueError("Custom template must either return row indices/mask "
-                                 "or both row and column indices/masks")
-            row_indices = _prepare_template_indices(indices[0])
-            col_indices = _prepare_template_indices(indices[1])
-            return row_indices, col_indices
-        else:
-            row_indices = _prepare_template_indices(indices)
-            return row_indices, slice(None, None, None)
-    return get_indices(index, columns, RowIdx(indexer))
+            x = np.arange(a.shape[0])[x]
+            y = np.arange(a.shape[1])[y]
+            v = broadcast_array_to(v, (len(x), len(y)))
+            a[np.ix_(x, y)] = v

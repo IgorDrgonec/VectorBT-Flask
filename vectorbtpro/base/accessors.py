@@ -16,7 +16,7 @@ from pandas.tseries.frequencies import to_offset
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import combining, reshaping, indexes
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.base.indexing import row_points_defaults, row_ranges_defaults, get_index_points, get_index_ranges
+from vectorbtpro.base.indexing import point_idxr_defaults, range_idxr_defaults, get_index_points, get_index_ranges
 from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.utils import checks
@@ -826,7 +826,7 @@ class BaseAccessor(Wrapping):
         index_points = get_index_points(self.wrapper.index, **kwargs)
 
         if callable(value_or_func):
-            func_kwargs = {k: v for k, v in kwargs.items() if k not in row_points_defaults}
+            func_kwargs = {k: v for k, v in kwargs.items() if k not in point_idxr_defaults}
             template_context = merge_dicts(kwargs, template_context)
         else:
             func_kwargs = None
@@ -896,7 +896,7 @@ class BaseAccessor(Wrapping):
         index_ranges = get_index_ranges(self.wrapper.index, **kwargs)
 
         if callable(value_or_func):
-            func_kwargs = {k: v for k, v in kwargs.items() if k not in row_ranges_defaults}
+            func_kwargs = {k: v for k, v in kwargs.items() if k not in range_idxr_defaults}
             template_context = merge_dicts(kwargs, template_context)
         else:
             func_kwargs = None

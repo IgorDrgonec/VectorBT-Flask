@@ -3,6 +3,7 @@
 """Classes for wrapping NumPy arrays into Series/DataFrames."""
 
 import warnings
+from functools import partial
 
 import numpy as np
 import pandas as pd
@@ -12,7 +13,16 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping
 from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.resampling.base import Resampler
-from vectorbtpro.base.indexing import IndexingError, PandasIndexer, index_dict, hslice, get_indices
+from vectorbtpro.base.indexing import (
+    IndexingError,
+    PandasIndexer,
+    index_dict,
+    hslice,
+    get_indices,
+    set_rows,
+    set_cols,
+    set_rows_and_cols,
+)
 from vectorbtpro.base.indexes import stack_indexes, concat_indexes
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
@@ -1387,8 +1397,9 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         Goes through each key acting as an indexer and puts its value at that index.
         Resolves an indexer using `vectorbtpro.base.indexing.get_indices`. Values can
-        be scalars, arrays, and templates. Setting takes place on NumPy arrays, wrapping
-        is done on the final object.
+        be scalars, arrays, and templates. Setting takes place on NumPy arrays using
+        `vectorbtpro.base.indexing.set_rows`, `vectorbtpro.base.indexing.set_cols`, and
+        `vectorbtpro.base.indexing.set_rows_and_cols`. Wrapping is done on the final object.
 
         If `to_pd` is True, will return a Pandas object, otherwise a NumPy array.
         If `keep_flex` is True, will return the most memory-efficient array representation
@@ -1407,16 +1418,6 @@ class ArrayWrapper(Configured, PandasIndexer):
             >>> wrapper = vbt.ArrayWrapper(index, columns)
 
             >>> wrapper.fill_using_index_dict(vbt.index_dict({
-            ...     "2020-01-02": 2
-            ... }))
-                          a    b    c
-            2020-01-01  NaN  NaN  NaN
-            2020-01-02  2.0  2.0  2.0
-            2020-01-03  NaN  NaN  NaN
-            2020-01-04  NaN  NaN  NaN
-            2020-01-05  NaN  NaN  NaN
-
-            >>> wrapper.fill_using_index_dict(vbt.index_dict({
             ...     1: 2
             ... }))
                           a    b    c
@@ -1427,7 +1428,17 @@ class ArrayWrapper(Configured, PandasIndexer):
             2020-01-05  NaN  NaN  NaN
 
             >>> wrapper.fill_using_index_dict(vbt.index_dict({
-            ...     1: [1, 2, 3]
+            ...     "2020-01-02": 2
+            ... }))
+                          a    b    c
+            2020-01-01  NaN  NaN  NaN
+            2020-01-02  2.0  2.0  2.0
+            2020-01-03  NaN  NaN  NaN
+            2020-01-04  NaN  NaN  NaN
+            2020-01-05  NaN  NaN  NaN
+
+            >>> wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     "2020-01-02": [1, 2, 3]
             ... }))
                           a    b    c
             2020-01-01  NaN  NaN  NaN
@@ -1441,7 +1452,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
             ```pycon
             >>> wrapper.fill_using_index_dict(vbt.index_dict({
-            ...     ("2020-01-02", "2020-01-04"): [2, 3]
+            ...     (1, 3): [2, 3]
             ... }))
                           a    b    c
             2020-01-01  NaN  NaN  NaN
@@ -1475,13 +1486,24 @@ class ArrayWrapper(Configured, PandasIndexer):
 
             ```pycon
             >>> wrapper.fill_using_index_dict(vbt.index_dict({
+            ...     vbt.hslice(1, 3): 2
+            ... }))
+                          a    b    c
+            2020-01-01  NaN  NaN  NaN
+            2020-01-02  2.0  2.0  2.0
+            2020-01-03  2.0  2.0  2.0
+            2020-01-04  NaN  NaN  NaN
+            2020-01-05  NaN  NaN  NaN
+
+            ```pycon
+            >>> wrapper.fill_using_index_dict(vbt.index_dict({
             ...     vbt.hslice("2020-01-02", "2020-01-04"): 2
             ... }))
                           a    b    c
             2020-01-01  NaN  NaN  NaN
             2020-01-02  2.0  2.0  2.0
             2020-01-03  2.0  2.0  2.0
-            2020-01-04  2.0  2.0  2.0
+            2020-01-04  NaN  NaN  NaN
             2020-01-05  NaN  NaN  NaN
 
             >>> wrapper.fill_using_index_dict(vbt.index_dict({
@@ -1505,14 +1527,11 @@ class ArrayWrapper(Configured, PandasIndexer):
             2020-01-05  4.0  5.0  6.0
             ```
 
-            All the above indexers can be wrapped with `vectorbtpro.base.indexing.RowIdx`.
-            If the index is integer-like when querying an integer position, set `is_labels` to False.
-
             * Set rows using index points:
 
             ```pycon
             >>> wrapper.fill_using_index_dict(vbt.index_dict({
-            ...     vbt.RowPoints(every="2D"): 2
+            ...     vbt.pointidx(every="2D"): 2
             ... }))
                           a    b    c
             2020-01-01  2.0  2.0  2.0
@@ -1526,7 +1545,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
             ```pycon
             >>> wrapper.fill_using_index_dict(vbt.index_dict({
-            ...     vbt.RowRanges(
+            ...     vbt.rangeidx(
             ...         start=("2020-01-01", "2020-01-03"),
             ...         end=("2020-01-02", "2020-01-05")
             ...     ): 2
@@ -1543,7 +1562,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
             ```pycon
             >>> wrapper.fill_using_index_dict(vbt.index_dict({
-            ...     vbt.ColIdx("a"): 2
+            ...     vbt.colidx("a"): 2
             ... }))
                           a   b   c
             2020-01-01  2.0 NaN NaN
@@ -1553,7 +1572,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             2020-01-05  2.0 NaN NaN
 
             >>> wrapper.fill_using_index_dict(vbt.index_dict({
-            ...     vbt.ColIdx(("a", "b")): [1, 2]
+            ...     vbt.colidx(("a", "b")): [1, 2]
             ... }))
                           a    b   c
             2020-01-01  1.0  2.0 NaN
@@ -1569,7 +1588,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             >>> multi_wrapper = vbt.ArrayWrapper(index, multi_columns)
 
             >>> multi_wrapper.fill_using_index_dict(vbt.index_dict({
-            ...     vbt.ColIdx(("a", 2)): 2
+            ...     vbt.colidx(("a", 2)): 2
             ... }))
             c1           a        b
             c2           1    2   1   2
@@ -1580,7 +1599,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             2020-01-05 NaN  2.0 NaN NaN
 
             >>> multi_wrapper.fill_using_index_dict(vbt.index_dict({
-            ...     vbt.ColIdx("b", level="c1"): [3, 4]
+            ...     vbt.colidx("b", level="c1"): [3, 4]
             ... }))
             c1           a        b
             c2           1   2    1    2
@@ -1591,11 +1610,11 @@ class ArrayWrapper(Configured, PandasIndexer):
             2020-01-05 NaN NaN  3.0  4.0
             ```
 
-            * Set element indices:
+            * Set row and column indices:
 
             ```pycon
             >>> wrapper.fill_using_index_dict(vbt.index_dict({
-            ...     vbt.ElemIdx(2, 2): 2
+            ...     vbt.idx(2, 2): 2
             ... }))
                          a   b    c
             2020-01-01 NaN NaN  NaN
@@ -1605,7 +1624,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             2020-01-05 NaN NaN  NaN
 
             >>> wrapper.fill_using_index_dict(vbt.index_dict({
-            ...     vbt.ElemIdx(("2020-01-01", "2020-01-03"), 2): [1, 2]
+            ...     vbt.idx(("2020-01-01", "2020-01-03"), 2): [1, 2]
             ... }))
                          a   b    c
             2020-01-01 NaN NaN  1.0
@@ -1615,7 +1634,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             2020-01-05 NaN NaN  NaN
 
             >>> wrapper.fill_using_index_dict(vbt.index_dict({
-            ...     vbt.ElemIdx(("2020-01-01", "2020-01-03"), (0, 2)): [[1, 2], [3, 4]]
+            ...     vbt.idx(("2020-01-01", "2020-01-03"), (0, 2)): [[1, 2], [3, 4]]
             ... }))
                           a   b    c
             2020-01-01  1.0 NaN  2.0
@@ -1625,10 +1644,10 @@ class ArrayWrapper(Configured, PandasIndexer):
             2020-01-05  NaN NaN  NaN
 
             >>> multi_wrapper.fill_using_index_dict(vbt.index_dict({
-            ...     vbt.ElemIdx(
-            ...         vbt.RowPoints(every="2d"),
-            ...         vbt.ColIdx(1, level="c2")
-            ...     ): [1, 2]
+            ...     vbt.idx(
+            ...         vbt.pointidx(every="2d"),
+            ...         vbt.colidx(1, level="c2")
+            ...     ): [[1, 2]]
             ... }))
             c1            a        b
             c2            1   2    1   2
@@ -1639,9 +1658,9 @@ class ArrayWrapper(Configured, PandasIndexer):
             2020-01-05  1.0 NaN  2.0 NaN
 
             >>> multi_wrapper.fill_using_index_dict(vbt.index_dict({
-            ...     vbt.ElemIdx(
-            ...         vbt.RowPoints(every="2d"),
-            ...         vbt.ColIdx(1, level="c2")
+            ...     vbt.idx(
+            ...         vbt.pointidx(every="2d"),
+            ...         vbt.colidx(1, level="c2")
             ...     ): [[1], [2], [3]]
             ... }))
             c1            a        b
@@ -1672,16 +1691,15 @@ class ArrayWrapper(Configured, PandasIndexer):
         set_ops = []
         if "_def" in index_dct:
             fill_value = index_dct["_def"]
-        for indexer, set_v in index_dct.items():
+        for indexer, v in index_dct.items():
             if indexer == "_def":
                 continue
-            row_indices, col_indices = get_indices(
-                self.index,
-                self.columns,
-                indexer,
-                check_indices=True,
-            )
-            if isinstance(set_v, CustomTemplate):
+            row_indices, col_indices = get_indices(self.index, self.columns, indexer)
+            if isinstance(row_indices, hslice):
+                row_indices = row_indices.to_slice()
+            if isinstance(col_indices, hslice):
+                col_indices = col_indices.to_slice()
+            if isinstance(v, CustomTemplate):
                 context = dict(
                     wrapper=self,
                     keep_flex=keep_flex,
@@ -1690,15 +1708,15 @@ class ArrayWrapper(Configured, PandasIndexer):
                     row_indices=row_indices,
                     col_indices=col_indices,
                 )
-                set_v = set_v.substitute(context, sub_id="fill_using_index_dict")
+                v = v.substitute(context, sub_id="fill_using_index_dict")
+
+            if not isinstance(v, np.ndarray):
+                v = np.asarray(v)
 
             def _check_use_indices(indices, _indexer=indexer):
                 use_indices = True
-                if isinstance(indices, (slice, hslice)):
+                if isinstance(indices, slice):
                     if indices.start is None and indices.stop is None:
-                        use_indices = False
-                if isinstance(indices, tuple):
-                    if all(_indices.size == 0 for _indices in indices):
                         use_indices = False
                 if isinstance(indices, np.ndarray):
                     if indices.size == 0:
@@ -1707,63 +1725,33 @@ class ArrayWrapper(Configured, PandasIndexer):
 
             use_row_indices = _check_use_indices(row_indices)
             use_col_indices = _check_use_indices(col_indices)
-            set_v = np.asarray(set_v)
 
             if use_row_indices and use_col_indices:
-
-                def _set_op(x, y=row_indices, z=col_indices, v=set_v):
-                    if np.isscalar(y) or np.isscalar(z):
-                        x[y, z] = v
-                    else:
-                        if isinstance(y, slice):
-                            y = np.arange(x.shape[1])[y]
-                        if isinstance(z, slice):
-                            z = np.arange(x.shape[1])[z]
-                        _y = np.repeat(y, len(z))
-                        _z = np.tile(z, len(y))
-                        if np.isscalar(v):
-                            x[_y, _z] = v
-                        else:
-                            v = reshaping.broadcast_array_to(v, (len(y), len(z)))
-                            x[_y, _z] = v.flatten()
-
-                set_ops.append(_set_op)
+                set_ops.append(partial(set_rows_and_cols, x=row_indices, y=col_indices, v=v))
                 changed_rows = True
                 changed_cols = True
-            elif use_col_indices:
-
-                def _set_op(x, z=col_indices, v=set_v):
-                    x[:, z] = v
-
-                set_ops.append(_set_op)
-                if isinstance(col_indices, (int, np.integer)):
-                    if set_v.size > 1:
-                        changed_rows = True
-                else:
-                    if set_v.ndim == 2:
-                        if set_v.shape[0] > 1:
-                            changed_rows = True
-                changed_cols = True
-            else:
-
-                def _set_op(x, y=row_indices, v=set_v):
-                    if x.ndim == 2:
-                        if not np.isscalar(y):
-                            if v.ndim == 1 and v.size > 1:
-                                v = v[:, None]
-                    x[y] = v
-
-                set_ops.append(_set_op)
+            elif use_row_indices:
+                set_ops.append(partial(set_rows, x=row_indices, v=v))
                 if use_row_indices:
                     changed_rows = True
                 if self.ndim == 2:
-                    if isinstance(row_indices, (int, np.integer)):
-                        if set_v.size > 1:
+                    if checks.is_int(row_indices):
+                        if v.size > 1:
                             changed_cols = True
                     else:
-                        if set_v.ndim == 2:
-                            if set_v.shape[1] > 1:
+                        if v.ndim == 2:
+                            if v.shape[1] > 1:
                                 changed_cols = True
+            else:
+                set_ops.append(partial(set_cols, y=col_indices, v=v))
+                if checks.is_int(col_indices):
+                    if v.size > 1:
+                        changed_rows = True
+                else:
+                    if v.ndim == 2:
+                        if v.shape[0] > 1:
+                            changed_rows = True
+                changed_cols = True
 
         if isinstance(fill_value, str):
             dtype = object
