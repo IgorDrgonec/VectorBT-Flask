@@ -1730,7 +1730,17 @@ class ArrayWrapper(Configured, PandasIndexer):
                 set_ops.append(partial(set_rows_and_cols, x=row_indices, y=col_indices, v=v))
                 changed_rows = True
                 changed_cols = True
-            elif use_row_indices:
+            elif use_col_indices:
+                set_ops.append(partial(set_cols, y=col_indices, v=v))
+                if checks.is_int(col_indices):
+                    if v.size > 1:
+                        changed_rows = True
+                else:
+                    if v.ndim == 2:
+                        if v.shape[0] > 1:
+                            changed_rows = True
+                changed_cols = True
+            else:
                 set_ops.append(partial(set_rows, x=row_indices, v=v))
                 if use_row_indices:
                     changed_rows = True
@@ -1742,16 +1752,6 @@ class ArrayWrapper(Configured, PandasIndexer):
                         if v.ndim == 2:
                             if v.shape[1] > 1:
                                 changed_cols = True
-            else:
-                set_ops.append(partial(set_cols, y=col_indices, v=v))
-                if checks.is_int(col_indices):
-                    if v.size > 1:
-                        changed_rows = True
-                else:
-                    if v.ndim == 2:
-                        if v.shape[0] > 1:
-                            changed_rows = True
-                changed_cols = True
 
         if isinstance(fill_value, str):
             dtype = object

@@ -2416,6 +2416,7 @@ class TestFactory:
             "equals",
             "file_exists",
             "get_ca_setup",
+            "get_setting",
             "get_settings",
             "get_writeable_attrs",
             "getsize",

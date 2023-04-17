@@ -636,7 +636,7 @@ class AutoIdxr(UniIdxr):
                     kind = "positions"
                 elif isinstance(self.value[0], (slice, hslice)):
                     kind = "positions"
-                elif checks.is_sequence(self.value[0]) and not np.isscalar(self.value[0][0]):
+                elif checks.is_sequence(self.value[0]) and checks.is_int(self.value[0][0]):
                     kind = "positions"
                 elif isinstance(index, pd.DatetimeIndex):
                     kind = "datetime"

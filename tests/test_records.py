@@ -5856,7 +5856,8 @@ class TestFSOrders:
                 "Stop Type Counts: TSL",
                 "Stop Type Counts: TTP",
                 "Stop Type Counts: TP",
-                "Stop Type Counts: T",
+                "Stop Type Counts: TD",
+                "Stop Type Counts: DT",
                 "Size: Min",
                 "Size: Median",
                 "Size: Max",
@@ -5884,6 +5885,7 @@ class TestFSOrders:
                     0.0,
                     1.5,
                     1.5,
+                    0.0,
                     0.0,
                     0.0,
                     0.0,
@@ -5923,6 +5925,7 @@ class TestFSOrders:
                     0,
                     0,
                     0,
+                    0,
                     1.0,
                     1.0,
                     1.0,
@@ -5957,6 +5960,7 @@ class TestFSOrders:
                     0,
                     0,
                     0,
+                    0,
                     1.0,
                     1.0,
                     1.0,
@@ -5978,7 +5982,7 @@ class TestFSOrders:
         assert_series_equal(fs_orders_grouped["g2"].stats(), fs_orders_grouped.stats(column="g2"))
         assert_series_equal(fs_orders_grouped["g2"].stats(), fs_orders.stats(column="g2", group_by=group_by))
         stats_df = fs_orders.stats(agg_func=None)
-        assert stats_df.shape == (4, 25)
+        assert stats_df.shape == (4, 26)
         assert_index_equal(stats_df.index, fs_orders.wrapper.columns)
         assert_index_equal(stats_df.columns, stats_index)
 

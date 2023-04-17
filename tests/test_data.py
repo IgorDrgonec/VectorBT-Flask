@@ -1658,6 +1658,8 @@ class TestData:
                 "Total Symbols",
                 "Last Index: 0",
                 "Last Index: 1",
+                "Delisted: 0",
+                "Delisted: 1",
                 "Null Counts: 0",
                 "Null Counts: 1",
             ],
@@ -1673,6 +1675,8 @@ class TestData:
                     2,
                     pd.Timestamp("2020-01-05 00:00:00+0000", tz="UTC"),
                     pd.Timestamp("2020-01-04 00:00:00+0000", tz="UTC"),
+                    0,
+                    0,
                     7,
                     7,
                 ],
@@ -1690,6 +1694,8 @@ class TestData:
                     2,
                     pd.Timestamp("2020-01-05 00:00:00+0000", tz="UTC"),
                     pd.Timestamp("2020-01-04 00:00:00+0000", tz="UTC"),
+                    False,
+                    False,
                     5,
                     1,
                 ],
@@ -1707,6 +1713,8 @@ class TestData:
                     2,
                     pd.Timestamp("2020-01-05 00:00:00+0000", tz="UTC"),
                     pd.Timestamp("2020-01-04 00:00:00+0000", tz="UTC"),
+                    False,
+                    False,
                     7,
                     7,
                 ],
@@ -1720,7 +1728,7 @@ class TestData:
             data.stats(group_by=True),
         )
         stats_df = data.stats(agg_func=None)
-        assert stats_df.shape == (3, 8)
+        assert stats_df.shape == (3, 10)
         assert_index_equal(stats_df.index, data.wrapper.columns)
         assert_index_equal(stats_df.columns, stats_index)
 
