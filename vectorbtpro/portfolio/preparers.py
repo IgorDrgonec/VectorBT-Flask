@@ -5,8 +5,7 @@
 import inspect
 import string
 import warnings
-from collections import defaultdict
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from datetime import timedelta, time
 from functools import cached_property as cachedproperty
 from pathlib import Path
@@ -16,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.indexing import index_dict
+from vectorbtpro.base.indexing import index_dict, IndexSetter
 from vectorbtpro.base.reshaping import BCO, Default, Ref
 from vectorbtpro.base.reshaping import (
     broadcast_array_to,
@@ -213,9 +212,12 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             return type(value)(**attr_dct)
         if isinstance(value, index_dict):
             return index_dict({k: cls.map_enum_value(v, **kwargs) for k, v in value.items()})
+        if isinstance(value, IndexSetter):
+            return IndexSetter([(k, cls.map_enum_value(v, **kwargs)) for k, v in value.set_items])
         return map_enum_fields(value, **kwargs)
 
-    def prepare_td_obj(self, td_obj: object) -> object:
+    @classmethod
+    def prepare_td_obj(cls, td_obj: object) -> object:
         """Prepare a timedelta object for broadcasting."""
         if isinstance(td_obj, (str, timedelta, pd.DateOffset, pd.Timedelta)):
             td_obj = freq_to_timedelta64(td_obj)
@@ -223,7 +225,8 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             td_obj = td_obj.values
         return td_obj
 
-    def prepare_dt_obj(self, dt_obj: object, ns_ago: int = 0) -> object:
+    @classmethod
+    def prepare_dt_obj(cls, dt_obj: object, ns_ago: int = 0) -> object:
         """Prepare a datetime object for broadcasting."""
         if isinstance(dt_obj, (str, time, timedelta, pd.DateOffset, pd.Timedelta)):
             dt_obj_dt_template = RepEval(
@@ -331,8 +334,8 @@ class BasePreparer(Configured, metaclass=MetaArgs):
     def __getitem__(self, arg_name) -> tp.Any:
         return self.get_arg(arg_name)
 
-    @staticmethod
-    def td_arr_to_ns(td_arr: tp.ArrayLike) -> tp.ArrayLike:
+    @classmethod
+    def td_arr_to_ns(cls, td_arr: tp.ArrayLike) -> tp.ArrayLike:
         """Prepare a timedelta array."""
         if td_arr.dtype == object:
             if td_arr.ndim in (0, 1):
@@ -349,8 +352,8 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                 td_arr = np.column_stack(td_arr_cols)
         return td_arr.astype(np.int64)
 
-    @staticmethod
-    def dt_arr_to_ns(dt_arr: tp.ArrayLike) -> tp.ArrayLike:
+    @classmethod
+    def dt_arr_to_ns(cls, dt_arr: tp.ArrayLike) -> tp.ArrayLike:
         """Prepare a datetime array."""
         if dt_arr.dtype == object:
             if dt_arr.ndim in (0, 1):

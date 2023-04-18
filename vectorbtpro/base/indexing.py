@@ -3,6 +3,7 @@
 """Classes and functions for indexing."""
 
 import attr
+from functools import partial
 from datetime import time
 
 import numpy as np
@@ -28,12 +29,14 @@ __all__ = [
     "hslice",
     "get_index_points",
     "get_index_ranges",
-    "index_dict",
+    "get_idxs",
     "pointidx",
     "rangeidx",
     "rowidx",
     "colidx",
     "idx",
+    "index_dict",
+    "IndexSetter",
 ]
 
 __pdoc__ = {}
@@ -195,7 +198,7 @@ class ParamLoc(LocBase):
         """Level name."""
         return self._level_name
 
-    def get_indices(self, key: tp.Any) -> tp.Array1d:
+    def get_idxs(self, key: tp.Any) -> tp.Array1d:
         """Get array of indices affected by this key."""
         if self.mapper.dtype == "O":
             # We must also cast the key to string
@@ -210,19 +213,19 @@ class ParamLoc(LocBase):
                 key = str(key)
         # Use pandas to perform indexing
         mapper = pd.Series(np.arange(len(self.mapper.index)), index=self.mapper.values)
-        indices = mapper.loc.__getitem__(key)
-        if isinstance(indices, pd.Series):
-            indices = indices.values
-        return indices
+        idxs = mapper.loc.__getitem__(key)
+        if isinstance(idxs, pd.Series):
+            idxs = idxs.values
+        return idxs
 
     def __getitem__(self, key: tp.Any) -> tp.Any:
-        indices = self.get_indices(key)
+        idxs = self.get_idxs(key)
         is_multiple = isinstance(key, (slice, hslice, list, np.ndarray))
 
         def pd_indexing_func(obj: tp.SeriesFrame) -> tp.MaybeSeriesFrame:
             from vectorbtpro.base.indexes import drop_levels
 
-            new_obj = obj.iloc[:, indices]
+            new_obj = obj.iloc[:, idxs]
             if not is_multiple:
                 # If we selected only one param, then remove its columns levels to keep it clean
                 if self.level_name is not None:
@@ -415,42 +418,47 @@ class IdxrBase:
             end = new_end
         return slice(start, end, slice_.step)
 
-    def check_indices(self, indices: tp.MaybeIndexArray) -> None:
+    def check_idxs(self, idxs: tp.MaybeIndexArray) -> None:
         """Check indices after resolving them."""
-        if isinstance(indices, slice):
-            if indices.start is not None and not checks.is_int(indices.start):
+        if isinstance(idxs, slice):
+            if idxs.start is not None and not checks.is_int(idxs.start):
                 raise TypeError("Start of a returned index slice must be an integer or None")
-            if indices.stop is not None and not checks.is_int(indices.stop):
+            if idxs.stop is not None and not checks.is_int(idxs.stop):
                 raise TypeError("Stop of a returned index slice must be an integer or None")
-            if indices.step is not None and not checks.is_int(indices.step):
+            if idxs.step is not None and not checks.is_int(idxs.step):
                 raise TypeError("Step of a returned index slice must be an integer or None")
-            if indices.start == -1:
+            if idxs.start == -1:
                 raise ValueError("Range start index couldn't be matched")
-            elif indices.stop == -1:
+            elif idxs.stop == -1:
                 raise ValueError("Range end index couldn't be matched")
-        elif checks.is_int(indices):
-            if indices == -1:
+        elif checks.is_int(idxs):
+            if idxs == -1:
                 raise ValueError("Index couldn't be matched")
-        elif checks.is_sequence(indices) and not np.isscalar(indices):
-            if not isinstance(indices, np.ndarray):
-                raise ValueError(f"Indices must be a NumPy array, not {type(indices)}")
-            if not np.issubdtype(indices.dtype, np.integer) or np.issubdtype(indices.dtype, np.bool_):
-                raise ValueError(f"Indices must be of integer data type, not {indices.dtype}")
-            if -1 in indices:
+        elif checks.is_sequence(idxs) and not np.isscalar(idxs):
+            if not isinstance(idxs, np.ndarray):
+                raise ValueError(f"Indices must be a NumPy array, not {type(idxs)}")
+            if not np.issubdtype(idxs.dtype, np.integer) or np.issubdtype(idxs.dtype, np.bool_):
+                raise ValueError(f"Indices must be of integer data type, not {idxs.dtype}")
+            if -1 in idxs:
                 raise ValueError("Some indices couldn't be matched")
-            if indices.ndim not in (1, 2):
+            if idxs.ndim not in (1, 2):
                 raise ValueError("Indices array must have either 1 or 2 dimensions")
-            if indices.ndim == 2 and indices.shape[1] != 2:
+            if idxs.ndim == 2 and idxs.shape[1] != 2:
                 raise ValueError("Indices array provided as ranges must have exactly two columns")
         else:
-            raise TypeError(f"Indices must be an integer, a slice, a NumPy array, or a tuple "
-                            f"of two NumPy arrays, not {type(indices)}")
+            raise TypeError(
+                f"Indices must be an integer, a slice, a NumPy array, or a tuple of two NumPy arrays, not {type(idxs)}"
+            )
 
 
 class UniIdxr(IdxrBase):
     """Abstract class for resolving indices."""
 
-    def get(self, index: tp.Index, freq: tp.Optional[tp.FrequencyLike] = None) -> tp.MaybeIndexArray:
+    def get(
+        self,
+        index: tp.Optional[tp.Index] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+    ) -> tp.MaybeIndexArray:
         raise NotImplementedError
 
 
@@ -461,16 +469,20 @@ class PosIdxr(UniIdxr):
     value: tp.Union[None, tp.MaybeSequence[tp.MaybeSequence[int]], tp.Slice] = attr.ib()
     """One or more integer positions."""
 
-    def get(self, index: tp.Index, freq: tp.Optional[tp.FrequencyLike] = None) -> tp.MaybeIndexArray:
+    def get(
+        self,
+        index: tp.Optional[tp.Index] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+    ) -> tp.MaybeIndexArray:
         if self.value is None:
             return slice(None, None, None)
-        indices = self.value
-        if checks.is_sequence(indices) and not np.isscalar(indices):
-            indices = np.asarray(indices)
-        if isinstance(indices, hslice):
-            indices = indices.to_slice()
-        self.check_indices(indices)
-        return indices
+        idxs = self.value
+        if checks.is_sequence(idxs) and not np.isscalar(idxs):
+            idxs = np.asarray(idxs)
+        if isinstance(idxs, hslice):
+            idxs = idxs.to_slice()
+        self.check_idxs(idxs)
+        return idxs
 
 
 @attr.s(frozen=True)
@@ -480,12 +492,16 @@ class MaskIdxr(UniIdxr):
     value: tp.Union[None, tp.Sequence[bool]] = attr.ib()
     """Mask."""
 
-    def get(self, index: tp.Index, freq: tp.Optional[tp.FrequencyLike] = None) -> tp.MaybeIndexArray:
+    def get(
+        self,
+        index: tp.Optional[tp.Index] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+    ) -> tp.MaybeIndexArray:
         if self.value is None:
             return slice(None, None, None)
-        indices = np.flatnonzero(self.value)
-        self.check_indices(indices)
-        return indices
+        idxs = np.flatnonzero(self.value)
+        self.check_idxs(idxs)
+        return idxs
 
 
 @attr.s(frozen=True)
@@ -501,27 +517,33 @@ class LabelIdxr(UniIdxr):
     level: tp.MaybeLevelSequence = attr.ib(default=None)
     """One or more levels."""
 
-    def get(self, index: tp.Index, freq: tp.Optional[tp.FrequencyLike] = None) -> tp.MaybeIndexArray:
+    def get(
+        self,
+        index: tp.Optional[tp.Index] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+    ) -> tp.MaybeIndexArray:
         if self.value is None:
             return slice(None, None, None)
+        if index is None:
+            raise ValueError("Index is required")
         if self.level is not None:
             from vectorbtpro.base.indexes import select_levels
 
             index = select_levels(index, self.level)
 
         if isinstance(self.value, (slice, hslice)):
-            indices = self.slice_indexer(index, self.value, closed_end=self.closed_end)
+            idxs = self.slice_indexer(index, self.value, closed_end=self.closed_end)
         elif (checks.is_sequence(self.value) and not np.isscalar(self.value)) and (
             not isinstance(index, pd.MultiIndex)
             or (isinstance(index, pd.MultiIndex) and isinstance(self.value[0], tuple))
         ):
-            indices = index.get_indexer_for(self.value)
+            idxs = index.get_indexer_for(self.value)
         else:
-            indices = index.get_loc(self.value)
-            if isinstance(indices, np.ndarray) and np.issubdtype(indices.dtype, np.bool_):
-                indices = np.flatnonzero(indices)
-        self.check_indices(indices)
-        return indices
+            idxs = index.get_loc(self.value)
+            if isinstance(idxs, np.ndarray) and np.issubdtype(idxs.dtype, np.bool_):
+                idxs = np.flatnonzero(idxs)
+        self.check_idxs(idxs)
+        return idxs
 
 
 @attr.s(frozen=True)
@@ -537,9 +559,15 @@ class DatetimeIdxr(UniIdxr):
     indexer_method: tp.Optional[str] = attr.ib(default="bfill")
     """Method for `pd.Index.get_indexer`."""
 
-    def get(self, index: tp.Index, freq: tp.Optional[tp.FrequencyLike] = None) -> tp.MaybeIndexArray:
+    def get(
+        self,
+        index: tp.Optional[tp.Index] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+    ) -> tp.MaybeIndexArray:
         if self.value is None:
             return slice(None, None, None)
+        if index is None:
+            raise ValueError("Index is required")
         index = try_to_datetime_index(index)
         checks.assert_instance_of(index, pd.DatetimeIndex)
         if not index.is_unique:
@@ -551,20 +579,20 @@ class DatetimeIdxr(UniIdxr):
             start = try_align_dt_to_index(self.value.start, index)
             stop = try_align_dt_to_index(self.value.stop, index)
             new_value = slice(start, stop, self.value.step)
-            indices = self.slice_indexer(index, new_value, closed_end=self.closed_end)
+            idxs = self.slice_indexer(index, new_value, closed_end=self.closed_end)
         elif checks.is_sequence(self.value) and not np.isscalar(self.value):
             new_value = try_align_to_dt_index(self.value, index)
-            indices = index.get_indexer(new_value, method=self.indexer_method)
+            idxs = index.get_indexer(new_value, method=self.indexer_method)
         else:
             new_value = try_align_dt_to_index(self.value, index)
             if self.indexer_method is None or new_value in index:
-                indices = index.get_loc(new_value)
-                if isinstance(indices, np.ndarray) and np.issubdtype(indices.dtype, np.bool_):
-                    indices = np.flatnonzero(indices)
+                idxs = index.get_loc(new_value)
+                if isinstance(idxs, np.ndarray) and np.issubdtype(idxs.dtype, np.bool_):
+                    idxs = np.flatnonzero(idxs)
             else:
-                indices = index.get_indexer([new_value], method=self.indexer_method)[0]
-        self.check_indices(indices)
-        return indices
+                idxs = index.get_indexer([new_value], method=self.indexer_method)[0]
+        self.check_idxs(idxs)
+        return idxs
 
 
 @attr.s(frozen=True)
@@ -603,13 +631,19 @@ class AutoIdxr(UniIdxr):
     
     If None, will (try to) determine automatically based on the type of indices."""
 
-    def get(self, index: tp.Index, freq: tp.Optional[tp.FrequencyLike] = None) -> tp.MaybeIndexArray:
+    def get(
+        self,
+        index: tp.Optional[tp.Index] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+    ) -> tp.MaybeIndexArray:
         if self.value is None:
             return slice(None, None, None)
         kind = self.kind
         if self.level is not None:
             from vectorbtpro.base.indexes import select_levels
 
+            if index is None:
+                raise ValueError("Index is required")
             index = select_levels(index, self.level)
             if kind is None:
                 kind = "labels"
@@ -620,37 +654,51 @@ class AutoIdxr(UniIdxr):
                     kind = "positions"
                 elif self.value.start is None and self.value.stop is None:
                     kind = "positions"
-                elif isinstance(index, pd.DatetimeIndex):
-                    kind = "datetime"
                 else:
-                    kind = "labels"
+                    if index is None:
+                        raise ValueError("Index is required")
+                    if isinstance(index, pd.DatetimeIndex):
+                        kind = "datetime"
+                    else:
+                        kind = "labels"
             elif (checks.is_sequence(self.value) and not np.isscalar(self.value)) and (
-                not isinstance(index, pd.MultiIndex)
-                or (isinstance(index, pd.MultiIndex) and isinstance(self.value[0], tuple))
+                index is None
+                or (
+                    not isinstance(index, pd.MultiIndex)
+                    or (isinstance(index, pd.MultiIndex) and isinstance(self.value[0], tuple))
+                )
             ):
-                if isinstance(index, pd.MultiIndex) and isinstance(self.value[0], tuple):
-                    kind = "labels"
-                elif checks.is_bool(self.value[0]):
+                if checks.is_bool(self.value[0]):
                     kind = "mask"
                 elif checks.is_int(self.value[0]):
                     kind = "positions"
-                elif isinstance(self.value[0], (slice, hslice)):
+                elif (
+                    (index is None or not isinstance(index, pd.MultiIndex) or not isinstance(self.value[0], tuple))
+                    and checks.is_sequence(self.value[0])
+                    and len(self.value[0]) == 2
+                    and checks.is_int(self.value[0][0])
+                    and checks.is_int(self.value[0][1])
+                ):
                     kind = "positions"
-                elif checks.is_sequence(self.value[0]) and checks.is_int(self.value[0][0]):
-                    kind = "positions"
-                elif isinstance(index, pd.DatetimeIndex):
-                    kind = "datetime"
                 else:
-                    kind = "labels"
+                    if index is None:
+                        raise ValueError("Index is required")
+                    elif isinstance(index, pd.DatetimeIndex):
+                        kind = "datetime"
+                    else:
+                        kind = "labels"
             else:
                 if checks.is_bool(self.value):
                     kind = "mask"
                 elif checks.is_int(self.value):
                     kind = "positions"
-                elif isinstance(index, pd.DatetimeIndex):
-                    kind = "datetime"
                 else:
-                    kind = "labels"
+                    if index is None:
+                        raise ValueError("Index is required")
+                    if isinstance(index, pd.DatetimeIndex):
+                        kind = "datetime"
+                    else:
+                        kind = "labels"
 
         if kind.lower() == "positions":
             idx = PosIdxr(self.value)
@@ -670,7 +718,7 @@ class AutoIdxr(UniIdxr):
             idx = DatetimeIdxr(self.value, **idxr_kwargs)
         else:
             raise ValueError(f"Invalid option kind='{kind}'")
-        return idx.get(index, freq=freq)
+        return idx.get(index=index, freq=freq)
 
 
 @attr.s(frozen=True)
@@ -748,10 +796,16 @@ class PointIdxr(UniIdxr):
     skip_minus_one: bool = attr.ib(default=True)
     """Whether to remove indices that are -1 (not found)."""
 
-    def get(self, index: tp.Index, freq: tp.Optional[tp.FrequencyLike] = None) -> tp.MaybeIndexArray:
-        indices = get_index_points(index, **attr.asdict(self))
-        self.check_indices(indices)
-        return indices
+    def get(
+        self,
+        index: tp.Optional[tp.Index] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+    ) -> tp.MaybeIndexArray:
+        if index is None:
+            raise ValueError("Index is required")
+        idxs = get_index_points(index, **attr.asdict(self))
+        self.check_idxs(idxs)
+        return idxs
 
 
 point_idxr_defaults = {a.name: a.default for a in PointIdxr.__attrs_attrs__}
@@ -841,29 +895,13 @@ def get_index_points(
         array([ 6, 13])
         ```
     """
-    import dateparser
-
+    index = try_to_datetime_index(index)
     if on is not None and isinstance(on, str):
-        try:
-            on = pd.Timestamp(on, tz=index.tzinfo)
-        except Exception as e:
-            on = dateparser.parse(on)
-            if index.tzinfo is not None:
-                on = on.replace(tzinfo=index.tzinfo)
+        on = try_align_dt_to_index(on, index)
     if start is not None and isinstance(start, str):
-        try:
-            start = pd.Timestamp(start, tz=index.tzinfo)
-        except Exception as e:
-            start = dateparser.parse(start)
-            if index.tzinfo is not None:
-                start = start.replace(tzinfo=index.tzinfo)
+        start = try_align_dt_to_index(start, index)
     if end is not None and isinstance(end, str):
-        try:
-            end = pd.Timestamp(end, tz=index.tzinfo)
-        except Exception as e:
-            end = dateparser.parse(end)
-            if index.tzinfo is not None:
-                end = end.replace(tzinfo=index.tzinfo)
+        end = try_align_dt_to_index(end, index)
 
     start_used = False
     end_used = False
@@ -1093,10 +1131,17 @@ class RangeIdxr(UniIdxr):
     jitted: tp.JittedOption = attr.ib(default=None)
     """Jitting option passed to `vectorbtpro.base.resampling.base.Resampler.map_bounds_to_source_ranges`."""
 
-    def get(self, index: tp.Index, freq: tp.Optional[tp.FrequencyLike] = None) -> tp.MaybeIndexArray:
-        start_indices, end_indices = get_index_ranges(index, index_freq=freq, **attr.asdict(self))
-        indices = np.column_stack((start_indices, end_indices))
-        return indices
+    def get(
+        self,
+        index: tp.Optional[tp.Index] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+    ) -> tp.MaybeIndexArray:
+        if index is None:
+            raise ValueError("Index is required")
+        start_idxs, end_idxs = get_index_ranges(index, index_freq=freq, **attr.asdict(self))
+        idxs = np.column_stack((start_idxs, end_idxs))
+        self.check_idxs(idxs)
+        return idxs
 
 
 range_idxr_defaults = {a.name: a.default for a in RangeIdxr.__attrs_attrs__}
@@ -1522,7 +1567,7 @@ def get_index_ranges(
         range_ends = np.empty(len(end), dtype=np.int_)
         range_index = pd.Series(np.arange(len(naive_index)), index=naive_index)
         for i in range(len(range_starts)):
-            selected_range = range_index[start[i]:end[i]]
+            selected_range = range_index[start[i] : end[i]]
             if len(selected_range) > 0 and not closed_start and selected_range.index[0] == start[i]:
                 selected_range = selected_range.iloc[1:]
             if len(selected_range) > 0 and not closed_end and selected_range.index[-1] == end[i]:
@@ -1572,7 +1617,7 @@ class RowIdxr(IdxrBase):
 
     def get(
         self,
-        index: tp.Index,
+        index: tp.Optional[tp.Index] = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         template_context: tp.KwargsLike = None,
     ) -> tp.MaybeIndexArray:
@@ -1584,7 +1629,7 @@ class RowIdxr(IdxrBase):
             if isinstance(idxr, IdxrBase):
                 raise TypeError(f"Indexer of {type(self)} must be an instance of UniIdxr")
             idxr = AutoIdxr(idxr, **self.idxr_kwargs)
-        return idxr.get(index, freq=freq)
+        return idxr.get(index=index, freq=freq)
 
 
 @attr.s(frozen=True, init=False)
@@ -1604,7 +1649,7 @@ class ColIdxr(IdxrBase):
 
     def get(
         self,
-        columns: tp.Index,
+        columns: tp.Optional[tp.Index] = None,
         template_context: tp.KwargsLike = None,
     ) -> tp.MaybeIndexArray:
         idxr = self.idxr
@@ -1615,7 +1660,7 @@ class ColIdxr(IdxrBase):
             if isinstance(idxr, IdxrBase):
                 raise TypeError(f"Indexer of {type(self)} must be an instance of UniIdxr")
             idxr = AutoIdxr(idxr, **self.idxr_kwargs)
-        return idxr.get(columns)
+        return idxr.get(index=columns)
 
 
 @attr.s(frozen=True, init=False)
@@ -1639,8 +1684,8 @@ class Idxr(IdxrBase):
 
     def get(
         self,
-        index: tp.Index,
-        columns: tp.Index,
+        index: tp.Optional[tp.Index] = None,
+        columns: tp.Optional[tp.Index] = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         template_context: tp.KwargsLike = None,
     ) -> tp.Tuple[tp.MaybeIndexArray, tp.MaybeIndexArray]:
@@ -1652,8 +1697,18 @@ class Idxr(IdxrBase):
                 _template_context = merge_dicts(dict(index=index, columns=columns, freq=freq), template_context)
                 idxr = idxr.substitute(_template_context, sub_id="idxr")
                 if isinstance(idxr, tuple):
-                    return type(self)(*idxr).get(index, columns, freq=freq, template_context=template_context)
-                return type(self)(idxr).get(index, columns, freq=freq, template_context=template_context)
+                    return type(self)(*idxr).get(
+                        index=index,
+                        columns=columns,
+                        freq=freq,
+                        template_context=template_context,
+                    )
+                return type(self)(idxr).get(
+                    index=index,
+                    columns=columns,
+                    freq=freq,
+                    template_context=template_context,
+                )
             if isinstance(idxr, ColIdxr):
                 row_idxr = None
                 col_idxr = idxr
@@ -1669,27 +1724,19 @@ class Idxr(IdxrBase):
             if isinstance(row_idxr, (ColIdxr, Idxr)):
                 raise TypeError(f"Indexer {type(row_idxr)} not supported as a row indexer")
             row_idxr = RowIdxr(row_idxr, **self.idxr_kwargs)
-        row_indices = row_idxr.get(index, freq=freq, template_context=template_context)
+        row_idxs = row_idxr.get(index=index, freq=freq, template_context=template_context)
         if not isinstance(col_idxr, ColIdxr):
             if isinstance(col_idxr, (RowIdxr, Idxr)):
                 raise TypeError(f"Indexer {type(col_idxr)} not supported as a column indexer")
             col_idxr = ColIdxr(col_idxr, **self.idxr_kwargs)
-        col_indices = col_idxr.get(columns, template_context=template_context)
-        return row_indices, col_indices
+        col_idxs = col_idxr.get(columns=columns, template_context=template_context)
+        return row_idxs, col_idxs
 
 
-class index_dict(pdict):
-    """Dict that contains indexer objects as keys.
-
-    Each indexer object must be hashable. To make a slice hashable, use `hslice`."""
-
-    pass
-
-
-def get_indices(
-    index: tp.Index,
-    columns: tp.Index,
+def get_idxs(
     idxr: object,
+    index: tp.Optional[tp.Index] = None,
+    columns: tp.Optional[tp.Index] = None,
     freq: tp.Optional[tp.FrequencyLike] = None,
     template_context: tp.KwargsLike = None,
     **kwargs,
@@ -1701,7 +1748,7 @@ def get_indices(
     Keyword arguments are passed when constructing a new `Idxr`."""
     if not isinstance(idxr, Idxr):
         idxr = Idxr(idxr, **kwargs)
-    return idxr.get(index, columns, freq=freq, template_context=template_context)
+    return idxr.get(index=index, columns=columns, freq=freq, template_context=template_context)
 
 
 pointidx = PointIdxr
@@ -1730,105 +1777,273 @@ idx = Idxr
 __pdoc__["idx"] = False
 
 
-def set_rows(a: tp.Array, x: tp.MaybeIndexArray, v: tp.Any) -> None:
-    """Set row indices in an array."""
-    from vectorbtpro.base.reshaping import broadcast_array_to
+class index_dict(pdict):
+    """Dict that contains indexer objects as keys and values to be set as values.
 
-    if not isinstance(v, np.ndarray):
-        v = np.asarray(v)
-    single_v = v.size == 1 or (v.ndim == 2 and v.shape[0] == 1)
-    if a.ndim == 2:
-        single_x = not isinstance(x, slice) and (np.isscalar(x) or x.size == 1)
-        if not single_x:
-            if v.ndim == 1 and v.size > 1:
-                v = v[:, None]
+    Each indexer object must be hashable. To make a slice hashable, use `hslice`.
 
-    if isinstance(x, np.ndarray) and x.ndim == 2:
-        if not single_v:
-            if a.ndim == 2:
-                v = broadcast_array_to(v, (len(x), a.shape[1]))
-            else:
-                v = broadcast_array_to(v, (len(x),))
-        for i in range(len(x)):
-            x_slice = slice(x[i, 0], x[i, 1])
-            if not single_v:
-                set_rows(a, x_slice, v[[i]])
-            else:
-                set_rows(a, x_slice, v)
-    else:
-        a[x] = v
+    To set a default value, use the `_def` key (case-sensitive!)."""
+
+    pass
 
 
-def set_cols(a: tp.Array, y: tp.MaybeIndexArray, v: tp.Any) -> None:
-    """Set column indices in an array."""
-    from vectorbtpro.base.reshaping import broadcast_array_to
+@attr.s(frozen=True, init=False)
+class IndexSetter:
+    """Class for setting values based on indexing.
 
-    if not isinstance(v, np.ndarray):
-        v = np.asarray(v)
-    single_v = v.size == 1 or (v.ndim == 2 and v.shape[1] == 1)
+    Accepts a list of tuples, or any object that has a method "items", such as dictionaries
+    and Pandas Series."""
 
-    if isinstance(y, np.ndarray) and y.ndim == 2:
-        if not single_v:
-            v = broadcast_array_to(v, (a.shape[0], len(y)))
-        for j in range(len(y)):
-            y_slice = slice(y[j, 0], y[j, 1])
-            if not single_v:
-                set_cols(a, y_slice, v[:, [j]])
-            else:
-                set_cols(a, y_slice, v)
-    else:
-        a[:, y] = v
+    set_items: tp.List[tp.Tuple[tp.Any, tp.Any]] = attr.ib()
+    """Items where the first element is an indexer and the second element is a value to be set."""
 
-
-def set_rows_and_cols(a: tp.Array, x: tp.MaybeIndexArray, y: tp.MaybeIndexArray, v: tp.Any) -> None:
-    """Set row and column indices in an array."""
-    from vectorbtpro.base.reshaping import broadcast_array_to
-
-    if not isinstance(v, np.ndarray):
-        v = np.asarray(v)
-    single_v = v.size == 1
-    if isinstance(x, np.ndarray) and x.ndim == 2 and isinstance(y, np.ndarray) and y.ndim == 2:
-        if not single_v:
-            v = broadcast_array_to(v, (len(x), len(y)))
-        for i in range(len(x)):
-            for j in range(len(y)):
-                x_slice = slice(x[i, 0], x[i, 1])
-                y_slice = slice(y[j, 0], y[j, 1])
-                if not single_v:
-                    set_rows_and_cols(a, x_slice, y_slice, v[i, j])
-                else:
-                    set_rows_and_cols(a, x_slice, y_slice, v)
-    elif isinstance(x, np.ndarray) and x.ndim == 2:
-        if not single_v:
-            if isinstance(y, slice):
-                y = np.arange(a.shape[1])[y]
-            v = broadcast_array_to(v, (len(x), len(y)))
-        for i in range(len(x)):
-            x_slice = slice(x[i, 0], x[i, 1])
-            if not single_v:
-                set_rows_and_cols(a, x_slice, y, v[[i]])
-            else:
-                set_rows_and_cols(a, x_slice, y, v)
-    elif isinstance(y, np.ndarray) and y.ndim == 2:
-        if not single_v:
-            if isinstance(x, slice):
-                x = np.arange(a.shape[0])[x]
-            v = broadcast_array_to(v, (len(x), len(y)))
-        for j in range(len(y)):
-            y_slice = slice(y[j, 0], y[j, 1])
-            if not single_v:
-                set_rows_and_cols(a, x, y_slice, v[:, [j]])
-            else:
-                set_rows_and_cols(a, x, y_slice, v)
-    else:
-        if np.isscalar(x) or np.isscalar(y):
-            a[x, y] = v
-        elif np.isscalar(v) and (isinstance(x, slice) or isinstance(y, slice)):
-            a[x, y] = v
-        elif np.isscalar(v):
-            a[np.ix_(x, y)] = v
+    def __init__(self, set_items: tp.Any) -> None:
+        if hasattr(set_items, "items"):
+            set_items = list(set_items.items())
         else:
-            x = np.arange(a.shape[0])[x]
-            y = np.arange(a.shape[1])[y]
-            v = broadcast_array_to(v, (len(x), len(y)))
-            a[np.ix_(x, y)] = v
+            set_items = list(set_items)
+        self.__attrs_init__(set_items=set_items)
+
+    @classmethod
+    def set_row_idxs(cls, arr: tp.Array, idxs: tp.MaybeIndexArray, v: tp.Any) -> None:
+        """Set row indices in an array."""
+        from vectorbtpro.base.reshaping import broadcast_array_to
+
+        if not isinstance(v, np.ndarray):
+            v = np.asarray(v)
+        single_v = v.size == 1 or (v.ndim == 2 and v.shape[0] == 1)
+        if arr.ndim == 2:
+            single_row = not isinstance(idxs, slice) and (np.isscalar(idxs) or idxs.size == 1)
+            if not single_row:
+                if v.ndim == 1 and v.size > 1:
+                    v = v[:, None]
+
+        if isinstance(idxs, np.ndarray) and idxs.ndim == 2:
+            if not single_v:
+                if arr.ndim == 2:
+                    v = broadcast_array_to(v, (len(idxs), arr.shape[1]))
+                else:
+                    v = broadcast_array_to(v, (len(idxs),))
+            for i in range(len(idxs)):
+                _slice = slice(idxs[i, 0], idxs[i, 1])
+                if not single_v:
+                    cls.set_row_idxs(arr, _slice, v[[i]])
+                else:
+                    cls.set_row_idxs(arr, _slice, v)
+        else:
+            arr[idxs] = v
+
+    @classmethod
+    def set_col_idxs(cls, arr: tp.Array, idxs: tp.MaybeIndexArray, v: tp.Any) -> None:
+        """Set column indices in an array."""
+        from vectorbtpro.base.reshaping import broadcast_array_to
+
+        if not isinstance(v, np.ndarray):
+            v = np.asarray(v)
+        single_v = v.size == 1 or (v.ndim == 2 and v.shape[1] == 1)
+
+        if isinstance(idxs, np.ndarray) and idxs.ndim == 2:
+            if not single_v:
+                v = broadcast_array_to(v, (arr.shape[0], len(idxs)))
+            for j in range(len(idxs)):
+                _slice = slice(idxs[j, 0], idxs[j, 1])
+                if not single_v:
+                    cls.set_col_idxs(arr, _slice, v[:, [j]])
+                else:
+                    cls.set_col_idxs(arr, _slice, v)
+        else:
+            arr[:, idxs] = v
+
+    @classmethod
+    def set_row_and_col_idxs(
+        cls,
+        arr: tp.Array,
+        row_idxs: tp.MaybeIndexArray,
+        col_idxs: tp.MaybeIndexArray,
+        v: tp.Any,
+    ) -> None:
+        """Set row and column indices in an array."""
+        from vectorbtpro.base.reshaping import broadcast_array_to
+
+        if not isinstance(v, np.ndarray):
+            v = np.asarray(v)
+        single_v = v.size == 1
+        if (
+            isinstance(row_idxs, np.ndarray)
+            and row_idxs.ndim == 2
+            and isinstance(col_idxs, np.ndarray)
+            and col_idxs.ndim == 2
+        ):
+            if not single_v:
+                v = broadcast_array_to(v, (len(row_idxs), len(col_idxs)))
+            for i in range(len(row_idxs)):
+                for j in range(len(col_idxs)):
+                    row_slice = slice(row_idxs[i, 0], row_idxs[i, 1])
+                    col_slice = slice(col_idxs[j, 0], col_idxs[j, 1])
+                    if not single_v:
+                        cls.set_row_and_col_idxs(arr, row_slice, col_slice, v[i, j])
+                    else:
+                        cls.set_row_and_col_idxs(arr, row_slice, col_slice, v)
+        elif isinstance(row_idxs, np.ndarray) and row_idxs.ndim == 2:
+            if not single_v:
+                if isinstance(col_idxs, slice):
+                    col_idxs = np.arange(arr.shape[1])[col_idxs]
+                v = broadcast_array_to(v, (len(row_idxs), len(col_idxs)))
+            for i in range(len(row_idxs)):
+                row_slice = slice(row_idxs[i, 0], row_idxs[i, 1])
+                if not single_v:
+                    cls.set_row_and_col_idxs(arr, row_slice, col_idxs, v[[i]])
+                else:
+                    cls.set_row_and_col_idxs(arr, row_slice, col_idxs, v)
+        elif isinstance(col_idxs, np.ndarray) and col_idxs.ndim == 2:
+            if not single_v:
+                if isinstance(row_idxs, slice):
+                    row_idxs = np.arange(arr.shape[0])[row_idxs]
+                v = broadcast_array_to(v, (len(row_idxs), len(col_idxs)))
+            for j in range(len(col_idxs)):
+                col_slice = slice(col_idxs[j, 0], col_idxs[j, 1])
+                if not single_v:
+                    cls.set_row_and_col_idxs(arr, row_idxs, col_slice, v[:, [j]])
+                else:
+                    cls.set_row_and_col_idxs(arr, row_idxs, col_slice, v)
+        else:
+            if np.isscalar(row_idxs) or np.isscalar(col_idxs):
+                arr[row_idxs, col_idxs] = v
+            elif np.isscalar(v) and (isinstance(row_idxs, slice) or isinstance(col_idxs, slice)):
+                arr[row_idxs, col_idxs] = v
+            elif np.isscalar(v):
+                arr[np.ix_(row_idxs, col_idxs)] = v
+            else:
+                row_idxs = np.arange(arr.shape[0])[row_idxs]
+                col_idxs = np.arange(arr.shape[1])[col_idxs]
+                v = broadcast_array_to(v, (len(row_idxs), len(col_idxs)))
+                arr[np.ix_(row_idxs, col_idxs)] = v
+
+    def get_set_meta(
+        self,
+        shape: tp.ShapeLike,
+        index: tp.Optional[tp.Index] = None,
+        columns: tp.Optional[tp.Index] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+        template_context: tp.KwargsLike = None,
+    ) -> tp.Kwargs:
+        """Get meta of setting operations in `IndexSetter.set_items`."""
+        from vectorbtpro.base.reshaping import to_tuple_shape
+
+        shape = to_tuple_shape(shape)
+        rows_changed = False
+        cols_changed = False
+        set_funcs = []
+        default = None
+
+        for idxr, v in self.set_items:
+            if idxr in ("_def", "def_"):
+                if default is None:
+                    default = v
+                continue
+            row_idxs, col_idxs = get_idxs(
+                idxr,
+                index=index,
+                columns=columns,
+                freq=freq,
+                template_context=template_context,
+            )
+            if isinstance(v, CustomTemplate):
+                _template_context = merge_dicts(
+                    dict(
+                        idxr=idxr,
+                        row_idxs=row_idxs,
+                        col_idxs=col_idxs,
+                    ),
+                    template_context,
+                )
+                v = v.substitute(_template_context, sub_id="set")
+            if not isinstance(v, np.ndarray):
+                v = np.asarray(v)
+
+            def _check_use_idxs(idxs):
+                use_idxs = True
+                if isinstance(idxs, slice):
+                    if idxs.start is None and idxs.stop is None:
+                        use_idxs = False
+                if isinstance(idxs, np.ndarray):
+                    if idxs.size == 0:
+                        use_idxs = False
+                return use_idxs
+
+            use_row_idxs = _check_use_idxs(row_idxs)
+            use_col_idxs = _check_use_idxs(col_idxs)
+
+            if use_row_idxs and use_col_idxs:
+                set_funcs.append(partial(self.set_row_and_col_idxs, row_idxs=row_idxs, col_idxs=col_idxs, v=v))
+                rows_changed = True
+                cols_changed = True
+            elif use_col_idxs:
+                set_funcs.append(partial(self.set_col_idxs, idxs=col_idxs, v=v))
+                if checks.is_int(col_idxs):
+                    if v.size > 1:
+                        rows_changed = True
+                else:
+                    if v.ndim == 2:
+                        if v.shape[0] > 1:
+                            rows_changed = True
+                cols_changed = True
+            else:
+                set_funcs.append(partial(self.set_row_idxs, idxs=row_idxs, v=v))
+                if use_row_idxs:
+                    rows_changed = True
+                if len(shape) == 2:
+                    if checks.is_int(row_idxs):
+                        if v.size > 1:
+                            cols_changed = True
+                    else:
+                        if v.ndim == 2:
+                            if v.shape[1] > 1:
+                                cols_changed = True
+        return dict(
+            default=default,
+            set_funcs=set_funcs,
+            rows_changed=rows_changed,
+            cols_changed=cols_changed,
+        )
+
+    def set(self, arr: tp.Array, set_funcs: tp.Optional[tp.Sequence[tp.Callable]] = None, **kwargs) -> tp.Array:
+        """Set values of an array based on `IndexSetter.get_set_meta`."""
+        if set_funcs is None:
+            set_meta = self.get_set_meta(arr.shape, **kwargs)
+            set_funcs = set_meta["set_funcs"]
+        for set_op in set_funcs:
+            set_op(arr)
+        return arr
+
+    def build_and_set(
+        self,
+        shape: tp.ShapeLike,
+        keep_flex: bool = False,
+        fill_value: tp.Scalar = np.nan,
+        **kwargs,
+    ) -> tp.Array:
+        """Build an array and set its values based on `IndexSetter.get_set_meta`.
+
+        If `keep_flex` is True, will return the most memory-efficient array representation
+        capable of flexible indexing.
+
+        If `fill_value` is None, will search for the `_def` or `def_` key in `IndexSetter.set_items`.
+        If there's none, will be set to NaN."""
+        set_meta = self.get_set_meta(shape, **kwargs)
+        if set_meta["default"] is not None:
+            fill_value = set_meta["default"]
+        if isinstance(fill_value, str):
+            dtype = object
+        else:
+            dtype = None
+        if keep_flex and not set_meta["cols_changed"] and not set_meta["rows_changed"]:
+            arr = np.full((1,) if len(shape) == 1 else (1, 1), fill_value, dtype=dtype)
+        elif keep_flex and not set_meta["cols_changed"]:
+            arr = np.full(shape if len(shape) == 1 else (shape[0], 1), fill_value, dtype=dtype)
+        elif keep_flex and not set_meta["rows_changed"]:
+            arr = np.full((1, shape[1]), fill_value, dtype=dtype)
+        else:
+            arr = np.full(shape, fill_value, dtype=dtype)
+        self.set(arr, set_funcs=set_meta["set_funcs"])
+        return arr
