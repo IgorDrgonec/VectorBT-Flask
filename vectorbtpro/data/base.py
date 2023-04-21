@@ -1599,7 +1599,12 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     ) -> None:
         """Save data into CSV file(s).
 
-        Any argument can be provided per symbol using `symbol_dict`."""
+        Any argument can be provided per symbol using `symbol_dict`.
+
+        Each symbol gets saved to a separate file, that's why the first argument is the path
+        to the directory, not file! If there's only one file, you can specify the file path via
+        `path_or_buf`. If there are multiple files, use the same argument but wrap the multiple paths
+        with `symbol_dict`."""
         for k, v in self.data.items():
             if path_or_buf is None:
                 if isinstance(dir_path, symbol_dict):
