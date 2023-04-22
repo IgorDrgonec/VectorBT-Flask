@@ -3689,7 +3689,7 @@ class TestPatternRanges:
         )
         pd.testing.assert_index_equal(
             new_pattern_ranges.wrapper.columns,
-            pd.Float64Index([0.0, 0.5], dtype="float64", name="min_similarity"),
+            pd.Index([0.0, 0.5], dtype="float64", name="min_similarity"),
         )
         assert new_pattern_ranges.search_configs == [
             vbt.PatternRanges.resolve_search_config(
@@ -5592,8 +5592,8 @@ class TestOrders:
             orders.stats(),
             pd.Series(
                 [
-                    pd.Timestamp("2020-01-01 00:00:00", freq="D"),
-                    pd.Timestamp("2020-01-08 00:00:00", freq="D"),
+                    pd.Timestamp("2020-01-01 00:00:00"),
+                    pd.Timestamp("2020-01-08 00:00:00"),
                     pd.Timedelta("8 days 00:00:00"),
                     5.25,
                     2.75,
@@ -5615,8 +5615,8 @@ class TestOrders:
             orders.stats(column="a"),
             pd.Series(
                 [
-                    pd.Timestamp("2020-01-01 00:00:00", freq="D"),
-                    pd.Timestamp("2020-01-08 00:00:00", freq="D"),
+                    pd.Timestamp("2020-01-01 00:00:00"),
+                    pd.Timestamp("2020-01-08 00:00:00"),
                     pd.Timedelta("8 days 00:00:00"),
                     7,
                     4,
@@ -5638,8 +5638,8 @@ class TestOrders:
             orders.stats(column="g1", group_by=group_by),
             pd.Series(
                 [
-                    pd.Timestamp("2020-01-01 00:00:00", freq="D"),
-                    pd.Timestamp("2020-01-08 00:00:00", freq="D"),
+                    pd.Timestamp("2020-01-01 00:00:00"),
+                    pd.Timestamp("2020-01-08 00:00:00"),
                     pd.Timedelta("8 days 00:00:00"),
                     14,
                     7,
@@ -5876,8 +5876,8 @@ class TestFSOrders:
             fs_orders.stats(),
             pd.Series(
                 [
-                    pd.Timestamp("2020-01-01 00:00:00", freq="D"),
-                    pd.Timestamp("2020-01-08 00:00:00", freq="D"),
+                    pd.Timestamp("2020-01-01 00:00:00"),
+                    pd.Timestamp("2020-01-08 00:00:00"),
                     pd.Timedelta("8 days 00:00:00"),
                     1.5,
                     0.0,
@@ -5911,8 +5911,8 @@ class TestFSOrders:
             fs_orders.stats(column="a"),
             pd.Series(
                 [
-                    pd.Timestamp("2020-01-01 00:00:00", freq="D"),
-                    pd.Timestamp("2020-01-08 00:00:00", freq="D"),
+                    pd.Timestamp("2020-01-01 00:00:00"),
+                    pd.Timestamp("2020-01-08 00:00:00"),
                     pd.Timedelta("8 days 00:00:00"),
                     2,
                     0,
@@ -5946,8 +5946,8 @@ class TestFSOrders:
             fs_orders.stats(column="g1", group_by=group_by),
             pd.Series(
                 [
-                    pd.Timestamp("2020-01-01 00:00:00", freq="D"),
-                    pd.Timestamp("2020-01-08 00:00:00", freq="D"),
+                    pd.Timestamp("2020-01-01 00:00:00"),
+                    pd.Timestamp("2020-01-08 00:00:00"),
                     pd.Timedelta("8 days 00:00:00"),
                     4,
                     0,

@@ -598,7 +598,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         new_data = symbol_dict()
         for symbol, obj in data.items():
             if checks.is_series(obj):
-                obj = obj.to_frame(name=obj.name)
+                obj = obj.to_frame()
             obj = obj.reindex(columns=columns)
             if not multiple_columns:
                 obj = obj[columns[0]]

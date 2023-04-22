@@ -228,7 +228,8 @@ class BaseIDXAccessor(Configured):
         if silence_warnings is None:
             silence_warnings = wrapping_cfg["silence_warnings"]
 
-        if self.freq is None:
+        freq = self.freq
+        if freq is None:
             if not silence_warnings:
                 warnings.warn(
                     "Couldn't parse the frequency of index. Pass it as `freq` or "
@@ -236,9 +237,12 @@ class BaseIDXAccessor(Configured):
                     stacklevel=2,
                 )
             return a
+
         if to_pd:
-            return pd.to_timedelta(a * self.freq)
-        return a * self.freq
+            out = pd.to_timedelta(a * freq)
+        else:
+            out = a * freq
+        return out
 
     # ############# Grouping ############# #
 

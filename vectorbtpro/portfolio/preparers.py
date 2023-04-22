@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.indexing import index_dict, IndexSetter
+from vectorbtpro.base.indexing import index_dict, IdxSetter
 from vectorbtpro.base.reshaping import BCO, Default, Ref
 from vectorbtpro.base.reshaping import (
     broadcast_array_to,
@@ -212,8 +212,8 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             return type(value)(**attr_dct)
         if isinstance(value, index_dict):
             return index_dict({k: cls.map_enum_value(v, **kwargs) for k, v in value.items()})
-        if isinstance(value, IndexSetter):
-            return IndexSetter([(k, cls.map_enum_value(v, **kwargs)) for k, v in value.set_items])
+        if isinstance(value, IdxSetter):
+            return IdxSetter([(k, cls.map_enum_value(v, **kwargs)) for k, v in value.set_items])
         return map_enum_fields(value, **kwargs)
 
     @classmethod

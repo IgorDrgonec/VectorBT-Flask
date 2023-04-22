@@ -90,22 +90,23 @@ def prepare_freq(freq: tp.FrequencyLike) -> tp.FrequencyLike:
 
 def freq_to_timedelta(freq: tp.FrequencyLike) -> pd.Timedelta:
     """Convert a frequency-like object to `pd.Timedelta`."""
-    if isinstance(freq, pd.Timedelta):
-        return freq
-    if isinstance(freq, str) and freq.startswith("-"):
-        neg_td = True
-        freq = freq[1:]
-    else:
-        neg_td = False
-    freq = prepare_freq(freq)
-    if isinstance(freq, str) and not freq[0].isdigit():
-        # Otherwise "ValueError: unit abbreviation w/o a number"
-        td = pd.Timedelta(1, unit=freq)
-    else:
-        td = pd.Timedelta(freq)
-    if neg_td:
-        return -td
-    return td
+    if not isinstance(freq, pd.Timedelta):
+        if isinstance(freq, str) and freq.startswith("-"):
+            neg_td = True
+            freq = freq[1:]
+        else:
+            neg_td = False
+        freq = prepare_freq(freq)
+        if isinstance(freq, str) and not freq[0].isdigit():
+            # Otherwise "ValueError: unit abbreviation w/o a number"
+            freq = pd.Timedelta(1, unit=freq)
+        else:
+            freq = pd.Timedelta(freq)
+        if neg_td:
+            freq = -freq
+    if freq.unit != "ns":
+        freq = freq.as_unit("ns", round_ok=False)
+    return freq
 
 
 def parse_timedelta(td: tp.TimedeltaLike) -> tp.Union[pd.Timedelta, pd.DateOffset]:
@@ -135,13 +136,15 @@ def time_to_timedelta(time: tp.TimeLike) -> pd.Timedelta:
 
 def freq_to_timedelta64(freq: tp.FrequencyLike) -> np.timedelta64:
     """Convert a frequency-like object to `np.timedelta64`."""
-    if isinstance(freq, np.timedelta64):
-        return freq
-    if not isinstance(freq, (pd.DateOffset, pd.Timedelta)):
-        freq = freq_to_timedelta(freq)
-    if isinstance(freq, pd.DateOffset):
-        freq = pd.Timedelta(freq)
-    return freq.to_timedelta64()
+    if not isinstance(freq, np.timedelta64):
+        if not isinstance(freq, (pd.DateOffset, pd.Timedelta)):
+            freq = freq_to_timedelta(freq)
+        if isinstance(freq, pd.DateOffset):
+            freq = pd.Timedelta(freq)
+        freq = freq.to_timedelta64()
+    if freq.dtype != np.dtype("timedelta64[ns]"):
+        return freq.astype("timedelta64[ns]")
+    return freq
 
 
 def try_to_datetime_index(index: tp.IndexLike, parser_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Index:

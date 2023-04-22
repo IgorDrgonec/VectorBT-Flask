@@ -36,7 +36,7 @@ __all__ = [
     "colidx",
     "idx",
     "index_dict",
-    "IndexSetter",
+    "IdxSetter",
 ]
 
 __pdoc__ = {}
@@ -1781,28 +1781,88 @@ class index_dict(pdict):
     """Dict that contains indexer objects as keys and values to be set as values.
 
     Each indexer object must be hashable. To make a slice hashable, use `hslice`.
+    To make an array hashable, convert it into a tuple.
 
     To set a default value, use the `_def` key (case-sensitive!)."""
 
     pass
 
 
-@attr.s(frozen=True, init=False)
-class IndexSetter:
+IdxSetterT = tp.TypeVar("IdxSetterT", bound="IdxSetter")
+
+
+@attr.s(frozen=True)
+class IdxSetter:
     """Class for setting values based on indexing.
 
     Accepts a list of tuples, or any object that has a method "items", such as dictionaries
     and Pandas Series."""
 
-    set_items: tp.List[tp.Tuple[tp.Any, tp.Any]] = attr.ib()
+    set_items: tp.List[tp.Tuple[object, tp.ArrayLike]] = attr.ib()
     """Items where the first element is an indexer and the second element is a value to be set."""
 
-    def __init__(self, set_items: tp.Any) -> None:
-        if hasattr(set_items, "items"):
-            set_items = list(set_items.items())
-        else:
-            set_items = list(set_items)
-        self.__attrs_init__(set_items=set_items)
+    @classmethod
+    def from_dict(cls: tp.Type[IdxSetterT], dct: dict) -> IdxSetterT:
+        """Create an index setter from a dictionary."""
+        return cls(list(dct.items()))
+
+    @classmethod
+    def from_series(cls: tp.Type[IdxSetterT], sr: tp.AnyArray1d, split: bool = False) -> IdxSetterT:
+        """Create an index setter from a Pandas Series.
+
+        If `split` is False, will set all values using a single operation.
+        Otherwise, will set each row individually."""
+        if not isinstance(sr, pd.Series):
+            sr = pd.Series(sr)
+        if split:
+            return cls(list(sr.items()))
+        return cls([(idx(sr.index), sr.values)])
+
+    @classmethod
+    def from_frame(cls: tp.Type[IdxSetterT], df: tp.AnyArray2d, split: tp.Union[bool, str] = False) -> IdxSetterT:
+        """Create an index setter from a Pandas DataFrame.
+
+        If `split` is False, will set all values using a single operation.
+        Otherwise, the following options are supported:
+
+        * True or 'columns': one operation per column
+        * 'rows': one operation per row
+        * 'elements': one operation per element"""
+        if not isinstance(df, pd.DataFrame):
+            df = pd.DataFrame(df)
+        if isinstance(split, bool):
+            if split:
+                split = "columns"
+            else:
+                split = None
+        if split is not None:
+            if split.lower() == "columns":
+                set_items = []
+                for col, sr in df.items():
+                    set_items.append((idx(sr.index, col), sr.values))
+                return cls(set_items)
+            elif split.lower() == "rows":
+                set_items = []
+                for row, sr in df.iterrows():
+                    set_items.append((idx(row, df.columns), sr.values))
+                return cls(set_items)
+            elif split.lower() == "elements":
+                set_items = []
+                for col, sr in df.items():
+                    for row, v in sr.items():
+                        set_items.append((idx(row, col), v))
+                return cls(set_items)
+            else:
+                raise ValueError(f"Invalid option split='{split}'")
+        return cls([(idx(df.index, df.columns), df.values)])
+
+    @classmethod
+    def from_records(
+        cls: tp.Type[IdxSetterT],
+        records: tp.Sequence[tp.MappingLike],
+    ) -> tp.Tuple[IdxSetterT, ...]:
+        """Create an index setter from each field in records."""
+        pass
 
     @classmethod
     def set_row_idxs(cls, arr: tp.Array, idxs: tp.MaybeIndexArray, v: tp.Any) -> None:
@@ -1914,8 +1974,10 @@ class IndexSetter:
             elif np.isscalar(v):
                 arr[np.ix_(row_idxs, col_idxs)] = v
             else:
-                row_idxs = np.arange(arr.shape[0])[row_idxs]
-                col_idxs = np.arange(arr.shape[1])[col_idxs]
+                if isinstance(row_idxs, slice):
+                    row_idxs = np.arange(arr.shape[0])[row_idxs]
+                if isinstance(col_idxs, slice):
+                    col_idxs = np.arange(arr.shape[1])[col_idxs]
                 v = broadcast_array_to(v, (len(row_idxs), len(col_idxs)))
                 arr[np.ix_(row_idxs, col_idxs)] = v
 
@@ -1927,7 +1989,7 @@ class IndexSetter:
         freq: tp.Optional[tp.FrequencyLike] = None,
         template_context: tp.KwargsLike = None,
     ) -> tp.Kwargs:
-        """Get meta of setting operations in `IndexSetter.set_items`."""
+        """Get meta of setting operations in `IdxSetter.set_items`."""
         from vectorbtpro.base.reshaping import to_tuple_shape
 
         shape = to_tuple_shape(shape)
@@ -1937,7 +1999,7 @@ class IndexSetter:
         default = None
 
         for idxr, v in self.set_items:
-            if idxr in ("_def", "def_"):
+            if idxr == "_def":
                 if default is None:
                     default = v
                 continue
@@ -1964,7 +2026,7 @@ class IndexSetter:
             def _check_use_idxs(idxs):
                 use_idxs = True
                 if isinstance(idxs, slice):
-                    if idxs.start is None and idxs.stop is None:
+                    if idxs.start is None and idxs.stop is None and idxs.step is None:
                         use_idxs = False
                 if isinstance(idxs, np.ndarray):
                     if idxs.size == 0:
@@ -2008,7 +2070,7 @@ class IndexSetter:
         )
 
     def set(self, arr: tp.Array, set_funcs: tp.Optional[tp.Sequence[tp.Callable]] = None, **kwargs) -> tp.Array:
-        """Set values of an array based on `IndexSetter.get_set_meta`."""
+        """Set values of an array based on `IdxSetter.get_set_meta`."""
         if set_funcs is None:
             set_meta = self.get_set_meta(arr.shape, **kwargs)
             set_funcs = set_meta["set_funcs"]
@@ -2016,19 +2078,19 @@ class IndexSetter:
             set_op(arr)
         return arr
 
-    def build_and_set(
+    def fill_and_set(
         self,
         shape: tp.ShapeLike,
         keep_flex: bool = False,
         fill_value: tp.Scalar = np.nan,
         **kwargs,
     ) -> tp.Array:
-        """Build an array and set its values based on `IndexSetter.get_set_meta`.
+        """Fill a new array and set its values based on `IdxSetter.get_set_meta`.
 
         If `keep_flex` is True, will return the most memory-efficient array representation
         capable of flexible indexing.
 
-        If `fill_value` is None, will search for the `_def` or `def_` key in `IndexSetter.set_items`.
+        If `fill_value` is None, will search for the `_def` key in `IdxSetter.set_items`.
         If there's none, will be set to NaN."""
         set_meta = self.get_set_meta(shape, **kwargs)
         if set_meta["default"] is not None:

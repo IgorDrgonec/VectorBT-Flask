@@ -3480,7 +3480,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         checks.assert_in(axis, (-1, 0, 1))
 
         mapping = self.resolve_mapping(mapping=mapping)
-        codes, uniques = pd.factorize(self.obj.values.flatten(), sort=False, na_sentinel=None)
+        codes, uniques = pd.factorize(self.obj.values.flatten(), sort=False, use_na_sentinel=False)
         if axis == 0:
             func = jit_reg.resolve_option(nb.value_counts_per_row_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)

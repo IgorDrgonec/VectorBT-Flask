@@ -340,18 +340,18 @@ class TestGrouper:
 
 class TestResampler:
     @pytest.mark.parametrize("test_freq", ["1h", "3d", "7d"])
-    @pytest.mark.parametrize("test_closed", ["left", "right"])
-    def test_date_range_nb(self, test_freq, test_closed):
+    @pytest.mark.parametrize("test_inclusive", ["left", "right"])
+    def test_date_range_nb(self, test_freq, test_inclusive):
         source_index = pd.date_range("2020-01-01", "2020-02-01")
         np.testing.assert_array_equal(
             resampling.nb.date_range_nb(
                 source_index[0].to_datetime64(),
                 source_index[-1].to_datetime64(),
                 pd.Timedelta(test_freq).to_timedelta64(),
-                incl_left=test_closed == "left",
-                incl_right=test_closed == "right",
+                incl_left=test_inclusive == "left",
+                incl_right=test_inclusive == "right",
             ),
-            pd.date_range(source_index[0], source_index[-1], freq=test_freq, closed=test_closed).values,
+            pd.date_range(source_index[0], source_index[-1], freq=test_freq, inclusive=test_inclusive).values,
         )
 
     def test_from_pd_resample(self):

@@ -13,7 +13,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping
 from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.resampling.base import Resampler
-from vectorbtpro.base.indexing import IndexingError, PandasIndexer, index_dict, IndexSetter
+from vectorbtpro.base.indexing import IndexingError, PandasIndexer, index_dict, IdxSetter
 from vectorbtpro.base.indexes import stack_indexes, concat_indexes
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
@@ -1380,16 +1380,16 @@ class ArrayWrapper(Configured, PandasIndexer):
 
     def fill_and_set(
         self,
-        index_setter: tp.Union[index_dict, IndexSetter],
+        idx_setter: tp.Union[index_dict, IdxSetter],
         keep_flex: bool = False,
         fill_value: tp.Scalar = np.nan,
         **kwargs,
     ) -> tp.AnyArray:
         """Fill a new array using an index object such as `vectorbtpro.base.indexing.index_dict`.
 
-        Will be wrapped with `vectorbtpro.base.indexing.IndexSetter` if not already.
+        Will be wrapped with `vectorbtpro.base.indexing.IdxSetter` if not already.
 
-        Will call `vectorbtpro.base.indexing.IndexSetter.build_and_set`.
+        Will call `vectorbtpro.base.indexing.IdxSetter.fill_and_set`.
 
         Usage:
             * Set a single row:
@@ -1672,9 +1672,9 @@ class ArrayWrapper(Configured, PandasIndexer):
             2020-01-05  NaN  NaN  NaN
             ```
         """
-        if isinstance(index_setter, index_dict):
-            index_setter = IndexSetter(index_setter)
-        arr = index_setter.build_and_set(
+        if isinstance(idx_setter, index_dict):
+            idx_setter = IdxSetter.from_dict(idx_setter)
+        arr = idx_setter.fill_and_set(
             self.shape,
             keep_flex=keep_flex,
             fill_value=fill_value,

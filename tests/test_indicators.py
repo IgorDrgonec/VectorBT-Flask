@@ -2074,7 +2074,7 @@ class TestFactory:
             ),
         )
         assert_frame_equal(obj.out_above([2, 3]), target)
-        columns = target.columns.rename("my_above", 0)
+        columns = target.columns.set_names("my_above", level=0)
         assert_frame_equal(
             obj.out_above([2, 3], level_name="my_above"),
             pd.DataFrame(target.values, index=target.index, columns=columns),
@@ -2221,7 +2221,7 @@ class TestFactory:
             ),
         )
         assert_frame_equal(obj.out_and([False, True]), target)
-        columns = target.columns.rename("my_and", 0)
+        columns = target.columns.set_names("my_and", level=0)
         assert_frame_equal(
             obj.out_and([False, True], level_name="my_and"),
             pd.DataFrame(target.values, index=target.index, columns=columns),

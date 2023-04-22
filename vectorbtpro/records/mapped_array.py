@@ -1003,7 +1003,7 @@ class MappedArray(Analyzable):
                 return pd.Index(new_values, name=self.wrapper.index.name)
             if isinstance(self.wrapper.index, pd.DatetimeIndex):
                 new_values = self.wrapper.index.values[values]
-                new_values[nan_mask] = np.datetime64('NaT')
+                new_values[nan_mask] = np.datetime64("NaT")
                 return pd.Index(new_values, name=self.wrapper.index.name)
             new_values = self.wrapper.index.values[values]
             new_values[nan_mask] = np.nan
