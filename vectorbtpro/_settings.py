@@ -1350,6 +1350,7 @@ portfolio = child_dict(
     jitted=None,
     chunked=None,
     staticized=False,
+    records=None,
     # Orders
     size=np.inf,
     size_type="amount",

@@ -989,14 +989,14 @@ class Trades(Ranges):
         )
         func = jit_reg.resolve_option(nb.mfe_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        drawdown = func(
+        mfe = func(
             self.get_field_arr("size"),
             self.get_field_arr("direction"),
             self.get_field_arr("entry_price"),
             best_price.values,
             use_returns=use_returns,
         )
-        return self.map_array(drawdown, **kwargs)
+        return self.map_array(mfe, **kwargs)
 
     def get_mae(
         self,
@@ -1021,14 +1021,14 @@ class Trades(Ranges):
         )
         func = jit_reg.resolve_option(nb.mae_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        drawdown = func(
+        mae = func(
             self.get_field_arr("size"),
             self.get_field_arr("direction"),
             self.get_field_arr("entry_price"),
             worst_price.values,
             use_returns=use_returns,
         )
-        return self.map_array(drawdown, **kwargs)
+        return self.map_array(mae, **kwargs)
 
     def get_expanding_mfe(
         self,

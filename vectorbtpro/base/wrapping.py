@@ -13,7 +13,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping
 from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.resampling.base import Resampler
-from vectorbtpro.base.indexing import IndexingError, PandasIndexer, index_dict, IdxSetter
+from vectorbtpro.base.indexing import IndexingError, PandasIndexer, index_dict, IdxSetter, IdxSetterFactory, IdxDict
 from vectorbtpro.base.indexes import stack_indexes, concat_indexes
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
@@ -1380,7 +1380,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
     def fill_and_set(
         self,
-        idx_setter: tp.Union[index_dict, IdxSetter],
+        idx_setter: tp.Union[index_dict, IdxSetter, IdxSetterFactory],
         keep_flex: bool = False,
         fill_value: tp.Scalar = np.nan,
         **kwargs,
@@ -1673,7 +1673,12 @@ class ArrayWrapper(Configured, PandasIndexer):
             ```
         """
         if isinstance(idx_setter, index_dict):
-            idx_setter = IdxSetter.from_dict(idx_setter)
+            idx_setter = IdxDict(idx_setter)
+        if isinstance(idx_setter, IdxSetterFactory):
+            idx_setter = idx_setter.get()
+            if not isinstance(idx_setter, IdxSetter):
+                raise ValueError("Index setter factory must return exactly one index setter")
+        checks.assert_instance_of(idx_setter, IdxSetter)
         arr = idx_setter.fill_and_set(
             self.shape,
             keep_flex=keep_flex,

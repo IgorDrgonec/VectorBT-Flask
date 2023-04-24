@@ -2375,3 +2375,15 @@ class TestFromOrders:
                 cash_sharing=test_cash_sharing,
             ).returns,
         )
+
+    def test_records(self):
+        assert_records_close(
+            from_orders_both(
+                close=price,
+                records=[
+                    dict(row=0, size=0.5, size_type="percent"),
+                    dict(row=4, size=-np.inf, direction="longonly"),
+                ]
+            ).order_records,
+            np.array([(0, 0, 0, 50.0, 1.0, 0.0, 0), (1, 0, 4, 50.0, 5.0, 0.0, 1)], dtype=order_dt),
+        )

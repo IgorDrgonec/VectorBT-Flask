@@ -208,6 +208,7 @@ Params = Sequence[Param]
 
 # Mappings
 MappingLike = Union[str, Mapping, NamedTuple, EnumMeta, IndexLike]
+RecordsLike = Union[SeriesFrame, RecordArray, Sequence[MappingLike]]
 
 # Parsing
 AnnArgs = Dict[str, Kwargs]

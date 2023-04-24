@@ -16,6 +16,7 @@ from vectorbtpro.base import (
     resampling,
     merging,
 )
+from vectorbtpro.utils import checks
 
 from tests.utils import *
 
@@ -5109,6 +5110,141 @@ class TestIndexing:
         np.testing.assert_array_equal(row_idxs, np.array([0, 18]))
         assert col_idxs == slice(None, None, None)
 
+    def test_idx_setter_factory(self):
+        idx_setter = indexing.IdxDict({0: 0, indexing.idx(1): 1}).get()
+        assert checks.is_deep_equal(
+            idx_setter.idx_items,
+            [(0, 0), (indexing.Idxr(1), 1)],
+        )
+        sr = pd.Series([3, 2, 1], index=["x", "y", "z"])
+        idx_setter = indexing.IdxSeries(sr).get()
+        assert checks.is_deep_equal(
+            idx_setter.idx_items,
+            [(indexing.Idxr(sr.index), sr.values)],
+        )
+        idx_setter = indexing.IdxSeries(sr, split=True).get()
+        assert checks.is_deep_equal(
+            idx_setter.idx_items,
+            [
+                (indexing.Idxr(sr.index[0]), sr.values[0].item()),
+                (indexing.Idxr(sr.index[1]), sr.values[1].item()),
+                (indexing.Idxr(sr.index[2]), sr.values[2].item()),
+            ],
+        )
+        df = pd.DataFrame([[6, 5], [4, 3], [2, 1]], index=["x", "y", "z"], columns=["a", "b"])
+        idx_setter = indexing.IdxFrame(df).get()
+        assert checks.is_deep_equal(
+            idx_setter.idx_items,
+            [(indexing.Idxr(indexing.RowIdxr(df.index), indexing.ColIdxr(df.columns)), df.values)],
+        )
+        idx_setter = indexing.IdxFrame(df, split="columns").get()
+        assert checks.is_deep_equal(
+            idx_setter.idx_items,
+            [
+                (indexing.Idxr(indexing.RowIdxr(df.index), indexing.ColIdxr(df.columns[0])), df.values[:, 0]),
+                (indexing.Idxr(indexing.RowIdxr(df.index), indexing.ColIdxr(df.columns[1])), df.values[:, 1]),
+            ],
+        )
+        idx_setter = indexing.IdxFrame(df, split="rows").get()
+        assert checks.is_deep_equal(
+            idx_setter.idx_items,
+            [
+                (indexing.Idxr(indexing.RowIdxr(df.index[0]), indexing.ColIdxr(df.columns)), df.values[0]),
+                (indexing.Idxr(indexing.RowIdxr(df.index[1]), indexing.ColIdxr(df.columns)), df.values[1]),
+                (indexing.Idxr(indexing.RowIdxr(df.index[2]), indexing.ColIdxr(df.columns)), df.values[2]),
+            ],
+        )
+        idx_setter = indexing.IdxFrame(df, split=True).get()
+        assert checks.is_deep_equal(
+            idx_setter.idx_items,
+            [
+                (indexing.Idxr(indexing.RowIdxr(df.index[0]), indexing.ColIdxr(df.columns[0])), df.values[0, 0].item()),
+                (indexing.Idxr(indexing.RowIdxr(df.index[1]), indexing.ColIdxr(df.columns[0])), df.values[1, 0].item()),
+                (indexing.Idxr(indexing.RowIdxr(df.index[2]), indexing.ColIdxr(df.columns[0])), df.values[2, 0].item()),
+                (indexing.Idxr(indexing.RowIdxr(df.index[0]), indexing.ColIdxr(df.columns[1])), df.values[0, 1].item()),
+                (indexing.Idxr(indexing.RowIdxr(df.index[1]), indexing.ColIdxr(df.columns[1])), df.values[1, 1].item()),
+                (indexing.Idxr(indexing.RowIdxr(df.index[2]), indexing.ColIdxr(df.columns[1])), df.values[2, 1].item()),
+            ],
+        )
+        records = pd.Series([3, 2, 1], index=["x", "y", "z"])
+        idx_setters = indexing.IdxRecords(records).get()
+        assert len(idx_setters) == 1
+        assert checks.is_deep_equal(
+            idx_setters["_1"].idx_items,
+            [
+                (indexing.Idxr(indexing.RowIdxr(records.index[0]), None), records.values[0].item()),
+                (indexing.Idxr(indexing.RowIdxr(records.index[1]), None), records.values[1].item()),
+                (indexing.Idxr(indexing.RowIdxr(records.index[2]), None), records.values[2].item()),
+            ],
+        )
+        records = pd.DataFrame([[9, 8, 7], [6, 5, 4], [3, 2, 1]], columns=["row", "col", "X"])
+        idx_setters = indexing.IdxRecords(records).get()
+        assert len(idx_setters) == 1
+        assert checks.is_deep_equal(
+            idx_setters["X"].idx_items,
+            [
+                (
+                    indexing.Idxr(
+                        indexing.RowIdxr(records["row"].values[0].item()),
+                        indexing.ColIdxr(records["col"].values[0].item()),
+                    ),
+                    records["X"].values[0].item(),
+                ),
+                (
+                    indexing.Idxr(
+                        indexing.RowIdxr(records["row"].values[1].item()),
+                        indexing.ColIdxr(records["col"].values[1].item()),
+                    ),
+                    records["X"].values[1].item(),
+                ),
+                (
+                    indexing.Idxr(
+                        indexing.RowIdxr(records["row"].values[2].item()),
+                        indexing.ColIdxr(records["col"].values[2].item()),
+                    ),
+                    records["X"].values[2].item(),
+                ),
+            ],
+        )
+        records1 = pd.DataFrame([[9, 8, 7], [6, 5, 4], [3, 2, 1]], columns=["row", "col", "X"])
+        idx_setters1 = indexing.IdxRecords(records1).get()
+        records2 = pd.DataFrame([[8, 7], [5, 4], [2, 1]], index=[9, 6, 3], columns=["col", "X"])
+        idx_setters2 = indexing.IdxRecords(records2).get()
+        assert checks.is_deep_equal(idx_setters1, idx_setters2)
+        records3 = pd.DataFrame([[9, 8, 7], [6, 5, 4], [3, 2, 1]], index=[20, 30, 40], columns=["row", "col", "X"])
+        with pytest.raises(Exception):
+            indexing.IdxRecords(records3).get()
+        idx_setters3 = indexing.IdxRecords(records3, row_field="row").get()
+        assert checks.is_deep_equal(idx_setters1, idx_setters3)
+        records = [
+            dict(row=1, X=2, Y=3),
+            dict(col=4, X=5),
+            dict(row=6, col=7, Y=8),
+            dict(Z=9),
+        ]
+        idx_setters = indexing.IdxRecords(records).get()
+        assert len(idx_setters) == 3
+        assert checks.is_deep_equal(
+            idx_setters["X"].idx_items,
+            [
+                (indexing.Idxr(indexing.RowIdxr(1), None), 2),
+                (indexing.Idxr(None, indexing.ColIdxr(4)), 5),
+            ],
+        )
+        assert checks.is_deep_equal(
+            idx_setters["Y"].idx_items,
+            [
+                (indexing.Idxr(indexing.RowIdxr(1), None), 3),
+                (indexing.Idxr(indexing.RowIdxr(6), indexing.ColIdxr(7)), 8),
+            ],
+        )
+        assert checks.is_deep_equal(
+            idx_setters["Z"].idx_items,
+            [
+                ("_def", 9),
+            ],
+        )
+
 
 # ############# flex_indexing ############# #
 
@@ -5122,14 +5258,8 @@ class TestFlexIndexing:
         assert flex_indexing.flex_select_1d_nb(arr_1d, 1) == arr_1d[1]
         with pytest.raises(Exception):
             flex_indexing.flex_select_nb(arr_1d, 100)
-        assert (
-            flex_indexing.flex_select_1d_pr_nb(arr_1d, 100, rotate_rows=True)
-            == arr_1d[100 % arr_1d.shape[0]]
-        )
-        assert (
-            flex_indexing.flex_select_1d_pc_nb(arr_1d, 100, rotate_cols=True)
-            == arr_1d[100 % arr_1d.shape[0]]
-        )
+        assert flex_indexing.flex_select_1d_pr_nb(arr_1d, 100, rotate_rows=True) == arr_1d[100 % arr_1d.shape[0]]
+        assert flex_indexing.flex_select_1d_pc_nb(arr_1d, 100, rotate_cols=True) == arr_1d[100 % arr_1d.shape[0]]
         assert flex_indexing.flex_select_nb(arr_2d, 0, 0) == arr_2d[0, 0]
         assert flex_indexing.flex_select_nb(arr_2d, 1, 0) == arr_2d[1, 0]
         assert flex_indexing.flex_select_nb(arr_2d, 0, 1) == arr_2d[0, 1]

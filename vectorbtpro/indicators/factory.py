@@ -62,7 +62,7 @@ from vectorbtpro.utils.decorators import classproperty, cacheable_property, clas
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.formatting import prettify
-from vectorbtpro.utils.mapping import to_mapping, apply_mapping
+from vectorbtpro.utils.mapping import to_value_mapping, apply_mapping
 from vectorbtpro.utils.params import to_typed_list, broadcast_params, create_param_product, params_to_list
 from vectorbtpro.utils.parsing import glob2re, get_expr_var_names, get_func_arg_names, get_func_kwargs, supress_stdout
 from vectorbtpro.utils.random_ import set_seed
@@ -220,9 +220,9 @@ def build_columns(
         dtype = _param_settings.get("dtype", None)
         if checks.is_mapping_like(dtype):
             if checks.is_namedtuple(dtype):
-                dtype = to_mapping(dtype, reverse=False)
+                dtype = to_value_mapping(dtype, reverse=False)
             else:
-                dtype = to_mapping(dtype, reverse=True)
+                dtype = to_value_mapping(dtype, reverse=True)
             p_values = apply_mapping(p_values, dtype)
         _per_column = _param_settings.get("per_column", False)
         _post_index_func = _param_settings.get("post_index_func", None)
@@ -1607,7 +1607,7 @@ class IndicatorFactory(Configured):
                     ```python
                     {dtype}
                     ```"""
-                ).format(attr_name=attr_name, dtype=prettify(to_mapping(dtype, enum_unkval=enum_unkval)))
+                ).format(attr_name=attr_name, dtype=prettify(to_value_mapping(dtype, enum_unkval=enum_unkval)))
                 setattr(Indicator, f"{attr_name}_readable", property(attr_readable))
 
                 def attr_stats(
@@ -1626,7 +1626,7 @@ class IndicatorFactory(Configured):
                     ```python
                     {dtype}
                     ```"""
-                ).format(attr_name=attr_name, dtype=prettify(to_mapping(dtype)))
+                ).format(attr_name=attr_name, dtype=prettify(to_value_mapping(dtype)))
                 setattr(Indicator, f"{attr_name}_stats", attr_stats)
 
             elif np.issubdtype(dtype, np.number):

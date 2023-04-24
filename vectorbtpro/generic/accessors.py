@@ -219,7 +219,7 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.decorators import class_or_instancemethod, class_or_instanceproperty
-from vectorbtpro.utils.mapping import apply_mapping, to_mapping
+from vectorbtpro.utils.mapping import apply_mapping, to_value_mapping
 from vectorbtpro.utils.template import substitute_templates
 from vectorbtpro.utils.datetime_ import freq_to_timedelta, freq_to_timedelta64, try_to_datetime_index, parse_timedelta
 from vectorbtpro.utils.colors import adjust_opacity, map_value_to_cmap
@@ -363,7 +363,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 mapping = self.wrapper.columns
             elif mapping.lower() == "groups":
                 mapping = self.wrapper.get_columns()
-            mapping = to_mapping(mapping)
+            mapping = to_value_mapping(mapping)
         return mapping
 
     def apply_mapping(self, mapping: tp.Union[None, bool, tp.MappingLike] = None, **kwargs) -> tp.SeriesFrame:

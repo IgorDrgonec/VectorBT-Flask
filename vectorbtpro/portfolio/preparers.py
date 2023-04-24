@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.indexing import index_dict, IdxSetter
+from vectorbtpro.base.indexing import index_dict, IdxSetter, IdxSetterFactory, IdxRecords
 from vectorbtpro.base.reshaping import BCO, Default, Ref
 from vectorbtpro.base.reshaping import (
     broadcast_array_to,
@@ -41,7 +41,7 @@ from vectorbtpro.utils.datetime_ import (
     try_align_to_dt_index,
 )
 from vectorbtpro.utils.enum_ import map_enum_fields
-from vectorbtpro.utils.mapping import to_mapping
+from vectorbtpro.utils.mapping import to_field_mapping
 from vectorbtpro.utils.module_ import import_module_from_path
 from vectorbtpro.utils.params import Param
 from vectorbtpro.utils.random_ import set_seed
@@ -141,6 +141,7 @@ base_arg_config = ReadonlyConfig(
         jitted=dict(),
         chunked=dict(),
         staticized=dict(),
+        records=dict(),
     )
 )
 """_"""
@@ -212,8 +213,12 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             return type(value)(**attr_dct)
         if isinstance(value, index_dict):
             return index_dict({k: cls.map_enum_value(v, **kwargs) for k, v in value.items()})
+        if isinstance(value, IdxSetterFactory):
+            value = value.get()
+            if not isinstance(value, IdxSetter):
+                raise ValueError("Index setter factory must return exactly one index setter")
         if isinstance(value, IdxSetter):
-            return IdxSetter([(k, cls.map_enum_value(v, **kwargs)) for k, v in value.set_items])
+            return IdxSetter([(k, cls.map_enum_value(v, **kwargs)) for k, v in value.idx_items])
         return map_enum_fields(value, **kwargs)
 
     @classmethod
@@ -279,30 +284,34 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             return self.get_raw_arg_default(arg_name)
         return value
 
-    def get_mapped_arg_default(self, arg_name: str, is_dict: bool = False, **kwargs) -> tp.Any:
-        """Get mapped argument default."""
-        raw_arg_default = self.get_raw_arg_default(arg_name, is_dict=is_dict)
-        return self.map_enum_value(raw_arg_default, **kwargs)
-
-    def get_mapped_arg(self, arg_name: str, is_dict: bool = False, has_default: bool = True, **kwargs) -> tp.Any:
-        """Get mapped argument."""
-        raw_arg = self.get_raw_arg(arg_name, is_dict=is_dict, has_default=has_default)
-        return self.map_enum_value(raw_arg, **kwargs)
+    @cachedproperty
+    def idx_setters(self) -> tp.Optional[tp.Dict[tp.Label, IdxSetter]]:
+        """Index setters from resolving the argument `records`."""
+        arg_config = self.arg_config["records"]
+        records = self.get_raw_arg(
+            "records",
+            is_dict=arg_config.get("is_dict", False),
+            has_default=arg_config.get("has_default", True),
+        )
+        if records is None:
+            return None
+        if not isinstance(records, IdxRecords):
+            records = IdxRecords(records)
+        idx_setters = records.get()
+        for k in idx_setters:
+            if k in self.arg_config and not self.arg_config[k].get("broadcast", False):
+                raise ValueError(f"Field {k} is not broadcastable and cannot be included in records")
+        return idx_setters
 
     def get_arg_default(self, arg_name: str) -> tp.Any:
         """Get argument default according to the argument config."""
         arg_config = self.arg_config[arg_name]
-        if "map_enum_kwargs" in arg_config:
-            arg = self.get_mapped_arg_default(
-                arg_name,
-                is_dict=arg_config.get("is_dict", False),
-                **arg_config["map_enum_kwargs"],
-            )
-        else:
-            arg = self.get_raw_arg_default(
-                arg_name,
-                is_dict=arg_config.get("is_dict", False),
-            )
+        arg = self.get_raw_arg_default(
+            arg_name,
+            is_dict=arg_config.get("is_dict", False),
+        )
+        if len(arg_config.get("map_enum_kwargs", {})) > 0:
+            arg = self.map_enum_value(arg, **arg_config["map_enum_kwargs"])
         if arg_config.get("is_td", False):
             arg = self.prepare_td_obj(arg)
         if arg_config.get("is_dt", False):
@@ -312,19 +321,16 @@ class BasePreparer(Configured, metaclass=MetaArgs):
     def get_arg(self, arg_name: str) -> tp.Any:
         """Get mapped argument according to the argument config."""
         arg_config = self.arg_config[arg_name]
-        if "map_enum_kwargs" in arg_config:
-            arg = self.get_mapped_arg(
-                arg_name,
-                is_dict=arg_config.get("is_dict", False),
-                has_default=arg_config.get("has_default", True),
-                **arg_config["map_enum_kwargs"],
-            )
+        if self.idx_setters is not None and arg_name in self.idx_setters:
+            arg = self.idx_setters[arg_name]
         else:
             arg = self.get_raw_arg(
                 arg_name,
                 is_dict=arg_config.get("is_dict", False),
                 has_default=arg_config.get("has_default", True),
             )
+        if len(arg_config.get("map_enum_kwargs", {})) > 0:
+            arg = self.map_enum_value(arg, **arg_config["map_enum_kwargs"])
         if arg_config.get("is_td", False):
             arg = self.prepare_td_obj(arg)
         if arg_config.get("is_dt", False):
@@ -582,7 +588,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             and not isinstance(in_outputs, CustomTemplate)
             and not checks.is_namedtuple(in_outputs)
         ):
-            in_outputs = to_mapping(in_outputs)
+            in_outputs = to_field_mapping(in_outputs)
             in_outputs = namedtuple("InOutputs", in_outputs)(**in_outputs)
         return in_outputs
 
@@ -633,10 +639,14 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         )
 
     @cachedproperty
+    def args_to_broadcast(self) -> dict:
+        """Arguments to broadcast."""
+        return merge_dicts(self.idx_setters, self.pre_args, self.broadcast_named_args)
+
+    @cachedproperty
     def broadcast_result(self) -> tp.Any:
         """Result of broadcasting."""
-        args_to_broadcast = merge_dicts(self.pre_args, self.broadcast_named_args)
-        return broadcast(args_to_broadcast, **self.broadcast_kwargs)
+        return broadcast(self.args_to_broadcast, **self.broadcast_kwargs)
 
     @cachedproperty
     def post_args(self) -> tp.Kwargs:

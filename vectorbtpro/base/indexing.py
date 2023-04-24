@@ -23,6 +23,7 @@ from vectorbtpro.utils.datetime_ import (
 )
 from vectorbtpro.utils.config import hdict, merge_dicts
 from vectorbtpro.utils.pickling import pdict
+from vectorbtpro.utils.mapping import to_field_mapping
 
 __all__ = [
     "PandasIndexer",
@@ -37,6 +38,11 @@ __all__ = [
     "idx",
     "index_dict",
     "IdxSetter",
+    "IdxSetterFactory",
+    "IdxDict",
+    "IdxSeries",
+    "IdxFrame",
+    "IdxRecords",
 ]
 
 __pdoc__ = {}
@@ -1793,76 +1799,10 @@ IdxSetterT = tp.TypeVar("IdxSetterT", bound="IdxSetter")
 
 @attr.s(frozen=True)
 class IdxSetter:
-    """Class for setting values based on indexing.
+    """Class for setting values based on indexing."""
 
-    Accepts a list of tuples, or any object that has a method "items", such as dictionaries
-    and Pandas Series."""
-
-    set_items: tp.List[tp.Tuple[object, tp.ArrayLike]] = attr.ib()
+    idx_items: tp.List[tp.Tuple[object, tp.ArrayLike]] = attr.ib()
     """Items where the first element is an indexer and the second element is a value to be set."""
-
-    @classmethod
-    def from_dict(cls: tp.Type[IdxSetterT], dct: dict) -> IdxSetterT:
-        """Create an index setter from a dictionary."""
-        return cls(list(dct.items()))
-
-    @classmethod
-    def from_series(cls: tp.Type[IdxSetterT], sr: tp.AnyArray1d, split: bool = False) -> IdxSetterT:
-        """Create an index setter from a Pandas Series.
-
-        If `split` is False, will set all values using a single operation.
-        Otherwise, will set each row individually."""
-        if not isinstance(sr, pd.Series):
-            sr = pd.Series(sr)
-        if split:
-            return cls(list(sr.items()))
-        return cls([(idx(sr.index), sr.values)])
-
-    @classmethod
-    def from_frame(cls: tp.Type[IdxSetterT], df: tp.AnyArray2d, split: tp.Union[bool, str] = False) -> IdxSetterT:
-        """Create an index setter from a Pandas DataFrame.
-
-        If `split` is False, will set all values using a single operation.
-        Otherwise, the following options are supported:
-
-        * True or 'columns': one operation per column
-        * 'rows': one operation per row
-        * 'elements': one operation per element"""
-        if not isinstance(df, pd.DataFrame):
-            df = pd.DataFrame(df)
-        if isinstance(split, bool):
-            if split:
-                split = "columns"
-            else:
-                split = None
-        if split is not None:
-            if split.lower() == "columns":
-                set_items = []
-                for col, sr in df.items():
-                    set_items.append((idx(sr.index, col), sr.values))
-                return cls(set_items)
-            elif split.lower() == "rows":
-                set_items = []
-                for row, sr in df.iterrows():
-                    set_items.append((idx(row, df.columns), sr.values))
-                return cls(set_items)
-            elif split.lower() == "elements":
-                set_items = []
-                for col, sr in df.items():
-                    for row, v in sr.items():
-                        set_items.append((idx(row, col), v))
-                return cls(set_items)
-            else:
-                raise ValueError(f"Invalid option split='{split}'")
-        return cls([(idx(df.index, df.columns), df.values)])
-
-    @classmethod
-    def from_records(
-        cls: tp.Type[IdxSetterT],
-        records: tp.Sequence[tp.MappingLike],
-    ) -> tp.Tuple[IdxSetterT, ...]:
-        """Create an index setter from each field in records."""
-        pass
 
     @classmethod
     def set_row_idxs(cls, arr: tp.Array, idxs: tp.MaybeIndexArray, v: tp.Any) -> None:
@@ -1989,7 +1929,7 @@ class IdxSetter:
         freq: tp.Optional[tp.FrequencyLike] = None,
         template_context: tp.KwargsLike = None,
     ) -> tp.Kwargs:
-        """Get meta of setting operations in `IdxSetter.set_items`."""
+        """Get meta of setting operations in `IdxSetter.idx_items`."""
         from vectorbtpro.base.reshaping import to_tuple_shape
 
         shape = to_tuple_shape(shape)
@@ -1998,7 +1938,7 @@ class IdxSetter:
         set_funcs = []
         default = None
 
-        for idxr, v in self.set_items:
+        for idxr, v in self.idx_items:
             if idxr == "_def":
                 if default is None:
                     default = v
@@ -2090,7 +2030,7 @@ class IdxSetter:
         If `keep_flex` is True, will return the most memory-efficient array representation
         capable of flexible indexing.
 
-        If `fill_value` is None, will search for the `_def` key in `IdxSetter.set_items`.
+        If `fill_value` is None, will search for the `_def` key in `IdxSetter.idx_items`.
         If there's none, will be set to NaN."""
         set_meta = self.get_set_meta(shape, **kwargs)
         if set_meta["default"] is not None:
@@ -2109,3 +2049,273 @@ class IdxSetter:
             arr = np.full(shape, fill_value, dtype=dtype)
         self.set(arr, set_funcs=set_meta["set_funcs"])
         return arr
+
+
+class IdxSetterFactory:
+    """Class for building index setters."""
+
+    def get(self) -> tp.Union[IdxSetter, tp.Dict[tp.Label, IdxSetter]]:
+        """Get an instance of `IdxSetter` or a dict of such instances - one per array name."""
+        raise NotImplementedError
+
+
+@attr.s(frozen=True)
+class IdxDict(IdxSetterFactory):
+    """Class for building an index setter from a dict."""
+
+    index_dct: dict = attr.ib()
+    """Dict that contains indexer objects as keys and values to be set as values."""
+
+    def get(self) -> tp.Union[IdxSetter, tp.Dict[tp.Label, IdxSetter]]:
+        return IdxSetter(list(self.index_dct.items()))
+
+
+@attr.s(frozen=True)
+class IdxSeries(IdxSetterFactory):
+    """Class for building an index setter from a Series."""
+
+    sr: tp.AnyArray1d = attr.ib()
+    """Series or any array-like object to create the Series from."""
+
+    split: bool = attr.ib(default=False)
+    """Whether to split the setting operation.
+        
+    If False, will set all values using a single operation.
+    Otherwise, will do one operation per element."""
+
+    idx_kwargs: tp.KwargsLike = attr.ib(default=None)
+    """Keyword arguments passed to `idx` if the indexer isn't an instance of `Idxr`."""
+
+    def get(self) -> tp.Union[IdxSetter, tp.Dict[tp.Label, IdxSetter]]:
+        sr = self.sr
+        split = self.split
+        idx_kwargs = self.idx_kwargs
+
+        if idx_kwargs is None:
+            idx_kwargs = {}
+        if not isinstance(sr, pd.Series):
+            sr = pd.Series(sr)
+        if split:
+            idx_items = list(sr.items())
+        else:
+            idx_items = [(sr.index, sr.values)]
+        new_idx_items = []
+        for idxr, v in idx_items:
+            if idxr is None:
+                raise ValueError("Indexer cannot be None")
+            if not isinstance(idxr, Idxr):
+                idxr = idx(idxr, **idx_kwargs)
+            new_idx_items.append((idxr, v))
+        return IdxSetter(new_idx_items)
+
+
+@attr.s(frozen=True)
+class IdxFrame(IdxSetterFactory):
+    """Class for building an index setter from a DataFrame."""
+
+    df: tp.AnyArray2d = attr.ib()
+    """DataFrame or any array-like object to create the DataFrame from."""
+
+    split: tp.Union[bool, str] = attr.ib(default=False)
+    """Whether to split the setting operation.
+    
+    If False, will set all values using a single operation.
+    Otherwise, the following options are supported:
+
+    * 'columns': one operation per column
+    * 'rows': one operation per row
+    * True or 'elements': one operation per element"""
+
+    rowidx_kwargs: tp.KwargsLike = attr.ib(default=None)
+    """Keyword arguments passed to `rowidx` if the indexer isn't an instance of `RowIdxr`."""
+
+    colidx_kwargs: tp.KwargsLike = attr.ib(default=None)
+    """Keyword arguments passed to `colidx` if the indexer isn't an instance of `ColIdxr`."""
+
+    def get(self) -> tp.Union[IdxSetter, tp.Dict[tp.Label, IdxSetter]]:
+        df = self.df
+        split = self.split
+        rowidx_kwargs = self.rowidx_kwargs
+        colidx_kwargs = self.colidx_kwargs
+
+        if rowidx_kwargs is None:
+            rowidx_kwargs = {}
+        if colidx_kwargs is None:
+            colidx_kwargs = {}
+        if not isinstance(df, pd.DataFrame):
+            df = pd.DataFrame(df)
+        if isinstance(split, bool):
+            if split:
+                split = "elements"
+            else:
+                split = None
+        if split is not None:
+            if split.lower() == "columns":
+                idx_items = []
+                for col, sr in df.items():
+                    idx_items.append((sr.index, col, sr.values))
+            elif split.lower() == "rows":
+                idx_items = []
+                for row, sr in df.iterrows():
+                    idx_items.append((row, df.columns, sr.values))
+            elif split.lower() == "elements":
+                idx_items = []
+                for col, sr in df.items():
+                    for row, v in sr.items():
+                        idx_items.append((row, col, v))
+            else:
+                raise ValueError(f"Invalid option split='{split}'")
+        else:
+            idx_items = [(df.index, df.columns, df.values)]
+        new_idx_items = []
+        for row_idxr, col_idxr, v in idx_items:
+            if row_idxr is None:
+                raise ValueError("Row indexer cannot be None")
+            if col_idxr is None:
+                raise ValueError("Column indexer cannot be None")
+            if row_idxr is not None and not isinstance(row_idxr, RowIdxr):
+                row_idxr = rowidx(row_idxr, **rowidx_kwargs)
+            if col_idxr is not None and not isinstance(col_idxr, ColIdxr):
+                col_idxr = colidx(col_idxr, **colidx_kwargs)
+            new_idx_items.append((idx(row_idxr, col_idxr), v))
+        return IdxSetter(new_idx_items)
+
+
+@attr.s(frozen=True)
+class IdxRecords(IdxSetterFactory):
+    """Class for building index setters from records - one per field."""
+
+    records: tp.RecordsLike = attr.ib()
+    """Series, DataFrame, or any sequence of mapping-like objects.
+    
+    If a Series or DataFrame and the index is not a default range, the index will become a row field.
+    If a custom row field is provided, the index will be ignored."""
+
+    row_field: tp.Union[None, bool, tp.Label] = attr.ib(default=None)
+    """Row field.
+    
+    If None or True, will search for `row` or `index` (case-insensitive).
+    If `IdxRecords.records` is a Series or DataFrame, will also include the index name
+    if the index is not a default range.
+    
+    If a record doesn't have a row field, all rows will be set.
+    If there's no row and column field, the field value will become the default of the entire array."""
+
+    col_field: tp.Union[None, bool, tp.Label] = attr.ib(default=None)
+    """Column field.
+
+    If None or True, will search for `col` or `column` (case-insensitive).
+    
+    If a record doesn't have a column field, all columns will be set.
+    If there's no row and column field, the field value will become the default of the entire array."""
+
+    rowidx_kwargs: tp.KwargsLike = attr.ib(default=None)
+    """Keyword arguments passed to `rowidx` if the indexer isn't an instance of `RowIdxr`."""
+
+    colidx_kwargs: tp.KwargsLike = attr.ib(default=None)
+    """Keyword arguments passed to `colidx` if the indexer isn't an instance of `ColIdxr`."""
+
+    def get(self) -> tp.Union[IdxSetter, tp.Dict[tp.Label, IdxSetter]]:
+        records = self.records
+        row_field = self.row_field
+        col_field = self.col_field
+        rowidx_kwargs = self.rowidx_kwargs
+        colidx_kwargs = self.colidx_kwargs
+
+        if rowidx_kwargs is None:
+            rowidx_kwargs = {}
+        if colidx_kwargs is None:
+            colidx_kwargs = {}
+        default_index = False
+        index_field = None
+        if isinstance(records, pd.Series):
+            records = records.to_frame()
+        if isinstance(records, pd.DataFrame):
+            records = records
+            if checks.is_default_index(records.index):
+                default_index = True
+            records = records.reset_index(drop=default_index)
+            if not default_index:
+                index_field = records.columns[0]
+            records = records.itertuples(index=False)
+
+        fields = set()
+        new_records = []
+        for r in records:
+            r = to_field_mapping(r)
+            new_records.append(r)
+            fields.update(r.keys())
+        records = new_records
+
+        row_fields = set()
+        col_fields = set()
+        for field in fields:
+            if isinstance(field, str) and index_field is not None and field == index_field:
+                row_fields.add(field)
+            if isinstance(field, str) and field.lower() in ("row", "index"):
+                row_fields.add(field)
+            if isinstance(field, str) and field.lower() in ("col", "column"):
+                col_fields.add(field)
+        if row_field in (None, True):
+            if len(row_fields) == 0:
+                if row_field is True:
+                    raise ValueError("Cannot find row field")
+                row_field = None
+            elif len(row_fields) == 1:
+                row_field = row_fields.pop()
+            else:
+                raise ValueError("Multiple row field candidates")
+        elif row_field is False:
+            row_field = None
+        if col_field in (None, True):
+            if len(col_fields) == 0:
+                if col_field is True:
+                    raise ValueError("Cannot find column field")
+                col_field = None
+            elif len(col_fields) == 1:
+                col_field = col_fields.pop()
+            else:
+                raise ValueError("Multiple column field candidates")
+        elif col_field is False:
+            col_field = None
+
+        idx_items = dict()
+        for r in records:
+            if row_field is None:
+                row_idxr = None
+            else:
+                row_idxr = r.get(row_field, None)
+            if row_idxr == "_def":
+                row_idxr = None
+            if row_idxr is not None and not isinstance(row_idxr, RowIdxr):
+                row_idxr = rowidx(row_idxr, **rowidx_kwargs)
+            if col_field is None:
+                col_idxr = None
+            else:
+                col_idxr = r.get(col_field, None)
+            if col_idxr is not None and not isinstance(col_idxr, ColIdxr):
+                col_idxr = colidx(col_idxr, **colidx_kwargs)
+            if col_idxr == "_def":
+                col_idxr = None
+            item_produced = False
+            for k, v in r.items():
+                if index_field is not None and k == index_field:
+                    continue
+                if row_field is not None and k == row_field:
+                    continue
+                if col_field is not None and k == col_field:
+                    continue
+                if k not in idx_items:
+                    idx_items[k] = []
+                if row_idxr is None and col_idxr is None:
+                    idx_items[k].append(("_def", v))
+                else:
+                    idx_items[k].append((idx(row_idxr, col_idxr), v))
+                item_produced = True
+            if not item_produced:
+                raise ValueError(f"Record {r} has no fields to set")
+
+        idx_setters = dict()
+        for k, v in idx_items.items():
+            idx_setters[k] = IdxSetter(v)
+        return idx_setters

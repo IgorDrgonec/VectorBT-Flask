@@ -10,7 +10,7 @@ from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import cacheable_property, cached_property
-from vectorbtpro.utils.mapping import to_mapping
+from vectorbtpro.utils.mapping import to_value_mapping
 
 __all__ = []
 
@@ -152,7 +152,7 @@ def attach_fields(*args, on_conflict: str = "raise") -> tp.FlexClassWrapper:
                         mapping = attach_filters
                     if mapping is None:
                         raise ValueError(f"Field '{field_name}': Mapping is required to attach filters")
-                    mapping = to_mapping(mapping)
+                    mapping = to_value_mapping(mapping)
 
                     for filter_value, target_filter_name in mapping.items():
                         if target_filter_name is None:

@@ -825,7 +825,8 @@ def broadcast(
             If the first and only argument is a mapping, will return a dict.
 
             Allows using `BCO`, `Ref`, `Default`, `vectorbtpro.utils.params.Param`,
-            `vectorbtpro.base.indexing.index_dict`, `vectorbtpro.base.indexing.IdxSetter`, and templates.
+            `vectorbtpro.base.indexing.index_dict`, `vectorbtpro.base.indexing.IdxSetter`,
+            `vectorbtpro.base.indexing.IdxSetterFactory`, and templates.
             If an index dictionary, fills using `vectorbtpro.base.wrapping.ArrayWrapper.fill_and_set`.
         to_shape (tuple of int): Target shape. If set, will broadcast every object in `args` to `to_shape`.
         align_index (bool): Whether to align index of Pandas objects using union.
@@ -1296,11 +1297,7 @@ def broadcast(
 
         if isinstance(value, Param):
             param_keys.add(k)
-        elif (
-            isinstance(value, indexing.index_dict)
-            or isinstance(value, indexing.IdxSetter)
-            or isinstance(value, CustomTemplate)
-        ):
+        elif isinstance(value, (indexing.index_dict, indexing.IdxSetter, indexing.IdxSetterFactory, CustomTemplate)):
             special_keys.add(k)
         else:
             value = to_any_array(value)
@@ -1581,7 +1578,7 @@ def broadcast(
             continue
         if k in special_keys:
             bco = bco_instances[k]
-            if isinstance(bco.value, indexing.index_dict) or isinstance(bco.value, indexing.IdxSetter):
+            if isinstance(bco.value, (indexing.index_dict, indexing.IdxSetter, indexing.IdxSetterFactory)):
                 # Index dict
                 _is_pd = bco.to_pd
                 if _is_pd is None:

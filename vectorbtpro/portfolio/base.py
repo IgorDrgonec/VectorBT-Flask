@@ -2343,6 +2343,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         chunked: tp.ChunkedOption = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
+        records: tp.Optional[tp.RecordsLike] = None,
         return_preparer: bool = False,
         return_prep_result: bool = False,
         return_sim_out: bool = False,
@@ -2551,6 +2552,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Will broadcast.
 
                 If not provided, will use `close`. If False, will not use any benchmark.
+            records (array_like): Records to construct arrays from.
+
+                See `vectorbtpro.base.indexing.IdxRecords`.
             return_preparer (bool): Whether to return the preparer of the type
                 `vectorbtpro.portfolio.preparers.FOPreparer`.
 
@@ -2876,6 +2880,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         staticized: tp.StaticizedOption = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
+        records: tp.Optional[tp.RecordsLike] = None,
         return_preparer: bool = False,
         return_prep_result: bool = False,
         return_sim_out: bool = False,
@@ -3173,6 +3178,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 `override` and `reload` to override and reload an already existing module respectively.
             freq (any): See `Portfolio.from_orders`.
             bm_close (array_like): See `Portfolio.from_orders`.
+            records (array_like): See `Portfolio.from_orders`.
             return_preparer (bool): See `Portfolio.from_orders`.
             return_prep_result (bool): See `Portfolio.from_orders`.
             return_sim_out (bool): See `Portfolio.from_orders`.
@@ -4017,6 +4023,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         staticized: tp.StaticizedOption = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
+        records: tp.Optional[tp.RecordsLike] = None,
         return_preparer: bool = False,
         return_prep_result: bool = False,
         return_sim_out: bool = False,
@@ -4177,6 +4184,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 `override` and `reload` to override and reload an already existing module respectively.
             freq (any): See `Portfolio.from_orders`.
             bm_close (array_like): See `Portfolio.from_orders`.
+            records (array_like): See `Portfolio.from_orders`.
             return_preparer (bool): See `Portfolio.from_orders`.
             return_prep_result (bool): See `Portfolio.from_orders`.
             return_sim_out (bool): See `Portfolio.from_orders`.

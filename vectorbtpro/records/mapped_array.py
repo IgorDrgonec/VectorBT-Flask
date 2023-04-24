@@ -427,7 +427,7 @@ from vectorbtpro.utils.array_ import index_repeating_rows_nb
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method
 from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, attach_unary_magic_methods
-from vectorbtpro.utils.mapping import to_mapping, apply_mapping
+from vectorbtpro.utils.mapping import to_value_mapping, apply_mapping
 
 __all__ = [
     "MappedArray",
@@ -972,7 +972,7 @@ class MappedArray(Analyzable):
                 mapping = self.wrapper.columns
             elif mapping.lower() == "groups":
                 mapping = self.wrapper.get_columns()
-            mapping = to_mapping(mapping)
+            mapping = to_value_mapping(mapping)
         return mapping
 
     def apply_mapping(
