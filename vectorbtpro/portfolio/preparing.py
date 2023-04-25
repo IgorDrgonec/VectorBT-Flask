@@ -685,6 +685,18 @@ fs_arg_config = ReadonlyConfig(
             subdtype=np.bool_,
             broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=False)),
         ),
+        long_entries=dict(
+            has_default=False,
+            broadcast=True,
+            subdtype=np.bool_,
+            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=False)),
+        ),
+        long_exits=dict(
+            has_default=False,
+            broadcast=True,
+            subdtype=np.bool_,
+            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=False)),
+        ),
         short_entries=dict(
             has_default=False,
             broadcast=True,
@@ -891,6 +903,8 @@ fs_arg_config = ReadonlyConfig(
             rename_fields=dict(
                 entry="entries",
                 exit="exits",
+                long_entry="long_entries",
+                long_exit="long_exits",
                 short_entry="short_entries",
                 short_exit="short_exits",
             )
@@ -954,14 +968,24 @@ class FSPreparer(BasePFPreparer):
         )
 
     @cachedproperty
+    def implicit_mode(self) -> bool:
+        """Whether the explicit mode is enabled."""
+        return self["entries"] is not None or self["exits"] is not None
+
+    @cachedproperty
+    def explicit_mode(self) -> bool:
+        """Whether the explicit mode is enabled."""
+        return self["long_entries"] is not None or self["long_exits"] is not None
+
+    @cachedproperty
     def _pre_ls_mode(self) -> bool:
         """Whether direction-aware mode is enabled before resolution."""
-        return self["short_entries"] is not None or self["short_exits"] is not None
+        return self.explicit_mode or self["short_entries"] is not None or self["short_exits"] is not None
 
     @cachedproperty
     def _pre_signals_mode(self) -> bool:
         """Whether signals mode is enabled before resolution."""
-        return self["entries"] is not None or self["exits"] is not None or self._pre_ls_mode
+        return self.implicit_mode or self._pre_ls_mode
 
     @cachedproperty
     def ls_mode(self) -> bool:
@@ -1093,6 +1117,16 @@ class FSPreparer(BasePFPreparer):
         return self["exits"] if self["exits"] is not None else False
 
     @cachedproperty
+    def _pre_long_entries(self) -> tp.ArrayLike:
+        """Argument `long_entries` before broadcasting."""
+        return self["long_entries"] if self["long_entries"] is not None else False
+
+    @cachedproperty
+    def _pre_long_exits(self) -> tp.ArrayLike:
+        """Argument `long_exits` before broadcasting."""
+        return self["long_exits"] if self["long_exits"] is not None else False
+
+    @cachedproperty
     def _pre_short_entries(self) -> tp.ArrayLike:
         """Argument `short_entries` before broadcasting."""
         return self["short_entries"] if self["short_entries"] is not None else False
@@ -1170,12 +1204,9 @@ class FSPreparer(BasePFPreparer):
     @cachedproperty
     def signals(self) -> tp.Tuple[tp.ArrayLike, tp.ArrayLike, tp.ArrayLike, tp.ArrayLike]:
         """Arguments `entries`, `exits`, `short_entries`, and `short_exits` after broadcasting."""
-        entries = self._post_entries
-        exits = self._post_exits
-        short_entries = self._post_short_entries
-        short_exits = self._post_short_exits
-
         if not self.dynamic_mode and not self.ls_mode:
+            entries = self._post_entries
+            exits = self._post_exits
             direction = self._post_direction
             if direction.size == 1:
                 _direction = direction.item(0)
@@ -1202,17 +1233,31 @@ class FSPreparer(BasePFPreparer):
                     direction=direction,
                 )
         else:
-            long_entries, long_exits = entries, exits
+            if self.explicit_mode and self.implicit_mode:
+                long_entries = self._post_entries | self._post_long_entries
+                long_exits = self._post_exits | self._post_long_exits
+                short_entries = self._post_entries | self._post_short_entries
+                short_exits = self._post_exits | self._post_short_exits
+            elif self.explicit_mode:
+                long_entries = self._post_long_entries
+                long_exits = self._post_long_exits
+                short_entries = self._post_short_entries
+                short_exits = self._post_short_exits
+            else:
+                long_entries = self._post_entries
+                long_exits = self._post_exits
+                short_entries = self._post_short_entries
+                short_exits = self._post_short_exits
         return long_entries, long_exits, short_entries, short_exits
 
     @cachedproperty
-    def entries(self) -> tp.ArrayLike:
-        """Argument `entries`."""
+    def long_entries(self) -> tp.ArrayLike:
+        """Argument `long_entries`."""
         return self.signals[0]
 
     @cachedproperty
-    def exits(self) -> tp.ArrayLike:
-        """Argument `exits`."""
+    def long_exits(self) -> tp.ArrayLike:
+        """Argument `long_exits`."""
         return self.signals[1]
 
     @cachedproperty
@@ -1322,8 +1367,8 @@ class FSPreparer(BasePFPreparer):
         if self.dynamic_mode:
             if self.ls_mode:
                 return (
-                    self.entries,
-                    self.exits,
+                    self.long_entries,
+                    self.long_exits,
                     self.short_entries,
                     self.short_exits,
                     self.from_ago,
@@ -1426,8 +1471,6 @@ class FSPreparer(BasePFPreparer):
                 target_arg_map["signal_func_nb"] = None
                 target_arg_map["post_segment_func_nb"] = None
         else:
-            target_arg_map["long_entries"] = "entries"
-            target_arg_map["long_exits"] = "exits"
             target_arg_map["group_lens"] = "cs_group_lens"
         return target_arg_map
 

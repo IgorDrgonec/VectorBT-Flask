@@ -2797,10 +2797,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         close: tp.Union[tp.ArrayLike, Data, FSPreparer, PFPrepResult],
         entries: tp.Optional[tp.ArrayLike] = None,
         exits: tp.Optional[tp.ArrayLike] = None,
-        short_entries: tp.Optional[tp.ArrayLike] = None,
-        short_exits: tp.Optional[tp.ArrayLike] = None,
         *,
         direction: tp.Optional[tp.ArrayLike] = None,
+        long_entries: tp.Optional[tp.ArrayLike] = None,
+        long_exits: tp.Optional[tp.ArrayLike] = None,
+        short_entries: tp.Optional[tp.ArrayLike] = None,
+        short_exits: tp.Optional[tp.ArrayLike] = None,
         adjust_func_nb: tp.Union[None, tp.PathLike, nb.AdjustFuncT] = None,
         adjust_args: tp.Args = (),
         signal_func_nb: tp.Union[None, tp.PathLike, nb.SignalFuncT] = None,
@@ -2924,13 +2926,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 * If `short_entries` and `short_exits` are not set: Acts as a short signal if `direction`
                     is 'all' or 'longonly', otherwise long.
                 * If `short_entries` or `short_exits` are set: Acts as `long_exits`.
+            direction (Direction or array_like): See `Portfolio.from_orders`.
+
+                Takes only effect if `short_entries` and `short_exits` are not set.
+            long_entries (array_like of bool): Boolean array of long entry signals.
+                Defaults to False. Will broadcast.
+            long_exits (array_like of bool): Boolean array of long exit signals.
+                Defaults to False. Will broadcast.
             short_entries (array_like of bool): Boolean array of short entry signals.
                 Defaults to False. Will broadcast.
             short_exits (array_like of bool): Boolean array of short exit signals.
                 Defaults to False. Will broadcast.
-            direction (Direction or array_like): See `Portfolio.from_orders`.
-
-                Takes only effect if `short_entries` and `short_exits` are not set.
             adjust_func_nb (path_like or callable): User-defined function to adjust the current simulation state.
                 Defaults to `vectorbtpro.portfolio.nb.from_signals.no_adjust_func_nb`.
 

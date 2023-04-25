@@ -424,7 +424,7 @@ class IdxrBase:
             end = new_end
         return slice(start, end, slice_.step)
 
-    def check_idxs(self, idxs: tp.MaybeIndexArray) -> None:
+    def check_idxs(self, idxs: tp.MaybeIndexArray, check_minus_one: bool = False) -> None:
         """Check indices after resolving them."""
         if isinstance(idxs, slice):
             if idxs.start is not None and not checks.is_int(idxs.start):
@@ -433,19 +433,19 @@ class IdxrBase:
                 raise TypeError("Stop of a returned index slice must be an integer or None")
             if idxs.step is not None and not checks.is_int(idxs.step):
                 raise TypeError("Step of a returned index slice must be an integer or None")
-            if idxs.start == -1:
+            if check_minus_one and idxs.start == -1:
                 raise ValueError("Range start index couldn't be matched")
-            elif idxs.stop == -1:
+            elif check_minus_one and idxs.stop == -1:
                 raise ValueError("Range end index couldn't be matched")
         elif checks.is_int(idxs):
-            if idxs == -1:
+            if check_minus_one and idxs == -1:
                 raise ValueError("Index couldn't be matched")
         elif checks.is_sequence(idxs) and not np.isscalar(idxs):
             if not isinstance(idxs, np.ndarray):
                 raise ValueError(f"Indices must be a NumPy array, not {type(idxs)}")
             if not np.issubdtype(idxs.dtype, np.integer) or np.issubdtype(idxs.dtype, np.bool_):
                 raise ValueError(f"Indices must be of integer data type, not {idxs.dtype}")
-            if -1 in idxs:
+            if check_minus_one and -1 in idxs:
                 raise ValueError("Some indices couldn't be matched")
             if idxs.ndim not in (1, 2):
                 raise ValueError("Indices array must have either 1 or 2 dimensions")
@@ -548,7 +548,7 @@ class LabelIdxr(UniIdxr):
             idxs = index.get_loc(self.value)
             if isinstance(idxs, np.ndarray) and np.issubdtype(idxs.dtype, np.bool_):
                 idxs = np.flatnonzero(idxs)
-        self.check_idxs(idxs)
+        self.check_idxs(idxs, check_minus_one=True)
         return idxs
 
 
@@ -597,7 +597,7 @@ class DatetimeIdxr(UniIdxr):
                     idxs = np.flatnonzero(idxs)
             else:
                 idxs = index.get_indexer([new_value], method=self.indexer_method)[0]
-        self.check_idxs(idxs)
+        self.check_idxs(idxs, check_minus_one=True)
         return idxs
 
 
@@ -810,7 +810,7 @@ class PointIdxr(UniIdxr):
         if index is None:
             raise ValueError("Index is required")
         idxs = get_index_points(index, **attr.asdict(self))
-        self.check_idxs(idxs)
+        self.check_idxs(idxs, check_minus_one=True)
         return idxs
 
 
@@ -1146,7 +1146,7 @@ class RangeIdxr(UniIdxr):
             raise ValueError("Index is required")
         start_idxs, end_idxs = get_index_ranges(index, index_freq=freq, **attr.asdict(self))
         idxs = np.column_stack((start_idxs, end_idxs))
-        self.check_idxs(idxs)
+        self.check_idxs(idxs, check_minus_one=True)
         return idxs
 
 
@@ -2239,71 +2239,86 @@ class IdxRecords(IdxSetterFactory):
                 index_field = records.columns[0]
             records = records.itertuples(index=False)
 
-        fields = set()
-        new_records = []
-        for r in records:
-            r = to_field_mapping(r)
-            new_records.append(r)
-            fields.update(r.keys())
-        records = new_records
-
-        row_fields = set()
-        col_fields = set()
-        for field in fields:
-            if isinstance(field, str) and index_field is not None and field == index_field:
-                row_fields.add(field)
-            if isinstance(field, str) and field.lower() in ("row", "index", "open time", "date", "datetime"):
-                row_fields.add(field)
-            if isinstance(field, str) and field.lower() in ("col", "column", "symbol"):
-                col_fields.add(field)
-        if row_field in (None, True):
-            if len(row_fields) == 0:
-                if row_field is True:
-                    raise ValueError("Cannot find row field")
-                row_field = None
-            elif len(row_fields) == 1:
-                row_field = row_fields.pop()
-            else:
-                raise ValueError("Multiple row field candidates")
-        elif row_field is False:
-            row_field = None
-        if col_field in (None, True):
-            if len(col_fields) == 0:
-                if col_field is True:
-                    raise ValueError("Cannot find column field")
-                col_field = None
-            elif len(col_fields) == 1:
-                col_field = col_fields.pop()
-            else:
-                raise ValueError("Multiple column field candidates")
-        elif col_field is False:
-            col_field = None
+        def _resolve_field_meta(fields):
+            _row_field = row_field
+            _row_kind = None
+            _col_field = col_field
+            _col_kind = None
+            row_fields = set()
+            col_fields = set()
+            for field in fields:
+                if isinstance(field, str) and index_field is not None and field == index_field:
+                    row_fields.add((field, None))
+                if isinstance(field, str) and field.lower() in ("row", "index"):
+                    row_fields.add((field, None))
+                if isinstance(field, str) and field.lower() in ("open time", "date", "datetime"):
+                    row_fields.add((field, "datetime"))
+                if isinstance(field, str) and field.lower() in ("col", "column"):
+                    col_fields.add((field, None))
+                if isinstance(field, str) and field.lower() == "symbol":
+                    col_fields.add((field, "labels"))
+            if _row_field in (None, True):
+                if len(row_fields) == 0:
+                    if _row_field is True:
+                        raise ValueError("Cannot find row field")
+                    _row_field = None
+                elif len(row_fields) == 1:
+                    _row_field, _row_kind = row_fields.pop()
+                else:
+                    raise ValueError("Multiple row field candidates")
+            elif _row_field is False:
+                _row_field = None
+            if _col_field in (None, True):
+                if len(col_fields) == 0:
+                    if _col_field is True:
+                        raise ValueError("Cannot find column field")
+                    _col_field = None
+                elif len(col_fields) == 1:
+                    _col_field, _col_kind = col_fields.pop()
+                else:
+                    raise ValueError("Multiple column field candidates")
+            elif _col_field is False:
+                _col_field = None
+            field_meta = dict()
+            field_meta["row_field"] = _row_field
+            field_meta["row_kind"] = _row_kind
+            field_meta["col_field"] = _col_field
+            field_meta["col_kind"] = _col_kind
+            return field_meta
 
         idx_items = dict()
         for r in records:
-            if row_field is None:
+            r = to_field_mapping(r)
+            field_meta = _resolve_field_meta(r.keys())
+            if field_meta["row_field"] is None:
                 row_idxr = None
             else:
-                row_idxr = r.get(row_field, None)
+                row_idxr = r.get(field_meta["row_field"], None)
             if row_idxr == "_def":
                 row_idxr = None
             if row_idxr is not None and not isinstance(row_idxr, RowIdxr):
-                row_idxr = rowidx(row_idxr, **rowidx_kwargs)
-            if col_field is None:
+                _rowidx_kwargs = dict(rowidx_kwargs)
+                if "kind" not in _rowidx_kwargs:
+                    _rowidx_kwargs["kind"] = field_meta["row_kind"]
+                row_idxr = rowidx(row_idxr, **_rowidx_kwargs)
+            if field_meta["col_field"] is None:
                 col_idxr = None
             else:
-                col_idxr = r.get(col_field, None)
+                col_idxr = r.get(field_meta["col_field"], None)
             if col_idxr is not None and not isinstance(col_idxr, ColIdxr):
-                col_idxr = colidx(col_idxr, **colidx_kwargs)
+                _colidx_kwargs = dict(colidx_kwargs)
+                if "kind" not in _colidx_kwargs:
+                    _colidx_kwargs["kind"] = field_meta["col_kind"]
+                col_idxr = colidx(col_idxr, **_colidx_kwargs)
             if col_idxr == "_def":
                 col_idxr = None
             item_produced = False
             for k, v in r.items():
                 if index_field is not None and k == index_field:
                     continue
-                if row_field is not None and k == row_field:
+                if field_meta["row_field"] is not None and k == field_meta["row_field"]:
                     continue
-                if col_field is not None and k == col_field:
+                if field_meta["col_field"] is not None and k == field_meta["col_field"]:
                     continue
                 if k not in idx_items:
                     idx_items[k] = []

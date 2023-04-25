@@ -40,9 +40,10 @@ def attach_arg_properties(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
     checks.assert_subclass_of(cls, "BasePreparer")
 
     for arg_name, settings in cls.arg_config.items():
+        attach = settings.get("attach", None)
         broadcast = settings.get("broadcast", False)
         substitute_templates = settings.get("substitute_templates", False)
-        if broadcast or substitute_templates:
+        if (isinstance(attach, bool) and attach) or (attach is None and (broadcast or substitute_templates)):
             if broadcast:
                 return_type = tp.ArrayLike
             else:
@@ -90,7 +91,7 @@ def attach_arg_properties(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
                 arg_prop.__doc__ = f"Argument `{arg_name}`."
                 setattr(cls, arg_prop.__name__, cachedproperty(arg_prop))
                 getattr(cls, arg_prop.__name__).__set_name__(cls, arg_prop.__name__)
-        else:
+        elif (isinstance(attach, bool) and attach) or attach is None:
             if not hasattr(cls, arg_name):
                 def arg_prop(self, _arg_name: str = arg_name) -> tp.Any:
                     return self.get_arg(_arg_name)

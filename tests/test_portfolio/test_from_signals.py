@@ -55,15 +55,15 @@ def from_signals_shortonly(close=price, entries=entries, exits=exits, **kwargs):
 
 
 def from_ls_signals_both(close=price, entries=entries, exits=exits, **kwargs):
-    return vbt.Portfolio.from_signals(close, entries, False, exits, False, **kwargs)
+    return vbt.Portfolio.from_signals(close, entries, False, short_entries=exits, short_exits=False, **kwargs)
 
 
 def from_ls_signals_longonly(close=price, entries=entries, exits=exits, **kwargs):
-    return vbt.Portfolio.from_signals(close, entries, exits, False, False, **kwargs)
+    return vbt.Portfolio.from_signals(close, entries, exits, short_entries=False, short_exits=False, **kwargs)
 
 
 def from_ls_signals_shortonly(close=price, entries=entries, exits=exits, **kwargs):
-    return vbt.Portfolio.from_signals(close, False, False, entries, exits, **kwargs)
+    return vbt.Portfolio.from_signals(close, False, False, short_entries=entries, short_exits=exits, **kwargs)
 
 
 @njit

@@ -436,28 +436,27 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                     broadcast_kwargs = {}
                 for k2, v2 in broadcast_kwargs.items():
                     arg_broadcast_kwargs[k2][k] = v2
-        if self.idx_setters is not None:
-            for k in self.args_to_broadcast:
-                new_fill_value = None
-                if k in self.pre_args:
-                    fill_default = self.arg_config[k].get("fill_default", True)
-                    if k in self.idx_setters:
-                        new_fill_value = self.get_arg(k, use_idx_setter=False, use_default=fill_default)
-                    elif fill_default and self.arg_config[k].get("has_default", True):
-                        new_fill_value = self.get_arg_default(k)
-                elif k in self.broadcast_named_args:
-                    if k in self.idx_setters:
-                        new_fill_value = self.broadcast_named_args[k]
-                if new_fill_value is not None:
-                    if not np.isscalar(new_fill_value):
-                        raise TypeError(
-                            f"Argument '{k}' (and its default) must be a scalar when also provided via records"
-                        )
-                    if "reindex_kwargs" not in arg_broadcast_kwargs:
-                        arg_broadcast_kwargs["reindex_kwargs"] = {}
-                    if k not in arg_broadcast_kwargs["reindex_kwargs"]:
-                        arg_broadcast_kwargs["reindex_kwargs"][k] = {}
-                    arg_broadcast_kwargs["reindex_kwargs"][k]["fill_value"] = new_fill_value
+        for k in self.args_to_broadcast:
+            new_fill_value = None
+            if k in self.pre_args:
+                fill_default = self.arg_config[k].get("fill_default", True)
+                if self.idx_setters is not None and k in self.idx_setters:
+                    new_fill_value = self.get_arg(k, use_idx_setter=False, use_default=fill_default)
+                elif fill_default and self.arg_config[k].get("has_default", True):
+                    new_fill_value = self.get_arg_default(k)
+            elif k in self.broadcast_named_args:
+                if self.idx_setters is not None and k in self.idx_setters:
+                    new_fill_value = self.broadcast_named_args[k]
+            if new_fill_value is not None:
+                if not np.isscalar(new_fill_value):
+                    raise TypeError(
+                        f"Argument '{k}' (and its default) must be a scalar when also provided via records"
+                    )
+                if "reindex_kwargs" not in arg_broadcast_kwargs:
+                    arg_broadcast_kwargs["reindex_kwargs"] = {}
+                if k not in arg_broadcast_kwargs["reindex_kwargs"]:
+                    arg_broadcast_kwargs["reindex_kwargs"][k] = {}
+                arg_broadcast_kwargs["reindex_kwargs"][k]["fill_value"] = new_fill_value
 
         return merge_dicts(
             self.def_broadcast_kwargs,
