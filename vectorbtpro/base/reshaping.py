@@ -1479,6 +1479,23 @@ def broadcast(
         ),
     )
 
+    def _adjust_dims(new_obj, _keep_flex, _min_ndim, _expand_axis):
+        if _min_ndim is None:
+            if _keep_flex:
+                _min_ndim = 2
+            else:
+                _min_ndim = 1
+        if _min_ndim not in (1, 2):
+            raise ValueError("Argument min_ndim must be either 1 or 2")
+        if _min_ndim in (1, 2) and new_obj.ndim == 0:
+            new_obj = new_obj[None]
+        if _min_ndim == 2 and new_obj.ndim == 1:
+            if len(to_shape) == 1:
+                new_obj = new_obj[:, None]
+            else:
+                new_obj = np.expand_dims(new_obj, _expand_axis)
+        return new_obj
+
     # Perform broadcasting
     aligned_objs2 = {}
     new_objs = {}
@@ -1553,21 +1570,7 @@ def broadcast(
                         new_obj = new_obj[:, None]  # product changes is_2d behavior
                     new_obj = np.tile(new_obj, (1, n_params))
 
-        if _min_ndim is None:
-            if _keep_flex:
-                _min_ndim = 2
-            else:
-                _min_ndim = 1
-        if _min_ndim not in (1, 2):
-            raise ValueError("Argument keep_flex must be either 1 or 2")
-        if _min_ndim in (1, 2) and new_obj.ndim == 0:
-            new_obj = new_obj[None]
-        if _min_ndim == 2 and new_obj.ndim == 1:
-            if len(to_shape) == 1:
-                new_obj = new_obj[:, None]
-            else:
-                new_obj = np.expand_dims(new_obj, _expand_axis)
-
+        new_obj = _adjust_dims(new_obj, _keep_flex, _min_ndim, _expand_axis)
         aligned_objs2[k] = old_obj
         new_objs[k] = new_obj
 
@@ -1584,6 +1587,8 @@ def broadcast(
                 if _is_pd is None:
                     _is_pd = is_pd
                 _keep_flex = bco.keep_flex
+                _min_ndim = bco.min_ndim
+                _expand_axis = bco.expand_axis
                 _reindex_kwargs = resolve_dict(bco.reindex_kwargs)
                 _fill_value = _reindex_kwargs.get("fill_value", np.nan)
                 new_obj = wrapper.fill_and_set(
@@ -1593,6 +1598,7 @@ def broadcast(
                 )
                 if not _is_pd and not _keep_flex:
                     new_obj = new_obj.values
+                new_obj = _adjust_dims(new_obj, _keep_flex, _min_ndim, _expand_axis)
             elif isinstance(bco.value, CustomTemplate):
                 # Template
                 context = dict(

@@ -2194,7 +2194,7 @@ class IdxRecords(IdxSetterFactory):
     row_field: tp.Union[None, bool, tp.Label] = attr.ib(default=None)
     """Row field.
     
-    If None or True, will search for `row` or `index` (case-insensitive).
+    If None or True, will search for "row", "index", "open time", and "date" (case-insensitive).
     If `IdxRecords.records` is a Series or DataFrame, will also include the index name
     if the index is not a default range.
     
@@ -2204,7 +2204,7 @@ class IdxRecords(IdxSetterFactory):
     col_field: tp.Union[None, bool, tp.Label] = attr.ib(default=None)
     """Column field.
 
-    If None or True, will search for `col` or `column` (case-insensitive).
+    If None or True, will search for "col", "column", and "symbol" (case-insensitive).
     
     If a record doesn't have a column field, all columns will be set.
     If there's no row and column field, the field value will become the default of the entire array."""
@@ -2252,9 +2252,9 @@ class IdxRecords(IdxSetterFactory):
         for field in fields:
             if isinstance(field, str) and index_field is not None and field == index_field:
                 row_fields.add(field)
-            if isinstance(field, str) and field.lower() in ("row", "index"):
+            if isinstance(field, str) and field.lower() in ("row", "index", "open time", "date", "datetime"):
                 row_fields.add(field)
-            if isinstance(field, str) and field.lower() in ("col", "column"):
+            if isinstance(field, str) and field.lower() in ("col", "column", "symbol"):
                 col_fields.add(field)
         if row_field in (None, True):
             if len(row_fields) == 0:

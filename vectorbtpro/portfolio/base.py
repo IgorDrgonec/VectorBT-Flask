@@ -32,7 +32,14 @@ from vectorbtpro.portfolio.logs import Logs
 from vectorbtpro.portfolio.orders import Orders
 from vectorbtpro.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
 from vectorbtpro.portfolio.pfopt.base import PortfolioOptimizer
-from vectorbtpro.portfolio.preparers import PrepResult, BasePreparer, FOPreparer, FSPreparer, FOFPreparer, FDOFPreparer
+from vectorbtpro.portfolio.preparing import (
+    PFPrepResult,
+    BasePFPreparer,
+    FOPreparer,
+    FSPreparer,
+    FOFPreparer,
+    FDOFPreparer,
+)
 from vectorbtpro.records.base import Records
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
@@ -402,7 +409,7 @@ __pdoc__[
 """
 
 PortfolioT = tp.TypeVar("PortfolioT", bound="Portfolio")
-PortfolioResultT = tp.Union[PortfolioT, BasePreparer, PrepResult, enums.SimulationOutput]
+PortfolioResultT = tp.Union[PortfolioT, BasePFPreparer, PFPrepResult, enums.SimulationOutput]
 
 
 class MetaInOutputs(type):
@@ -2297,7 +2304,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_orders(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data, FOPreparer, PrepResult],
+        close: tp.Union[tp.ArrayLike, Data, FOPreparer, PFPrepResult],
         size: tp.Optional[tp.ArrayLike] = None,
         size_type: tp.Optional[tp.ArrayLike] = None,
         direction: tp.Optional[tp.ArrayLike] = None,
@@ -2353,17 +2360,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         See `vectorbtpro.portfolio.nb.from_orders.from_orders_nb`.
 
-        Prepared by `vectorbtpro.portfolio.preparers.FOPreparer`.
+        Prepared by `vectorbtpro.portfolio.preparing.FOPreparer`.
 
         Args:
-            close (array_like, Data, FOPreparer, or PrepResult): Latest asset price at each time step.
+            close (array_like, Data, FOPreparer, or PFPrepResult): Latest asset price at each time step.
                 Will broadcast.
 
                 Used for calculating unrealized PnL and portfolio value.
 
                 If an instance of `vectorbtpro.data.base.Data`, will extract the open, high, low, and close price.
-                If an instance of `vectorbtpro.portfolio.preparers.FOPreparer`, will use it as a preparer.
-                If an instance of `vectorbtpro.portfolio.preparers.PrepResult`, will use it as a preparer result.
+                If an instance of `vectorbtpro.portfolio.preparing.FOPreparer`, will use it as a preparer.
+                If an instance of `vectorbtpro.portfolio.preparing.PFPrepResult`, will use it as a preparer result.
             size (float or array_like): Size to order.
                 See `vectorbtpro.portfolio.enums.Order.size`. Will broadcast.
             size_type (SizeType or array_like): See `vectorbtpro.portfolio.enums.SizeType` and
@@ -2556,12 +2563,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
                 See `vectorbtpro.base.indexing.IdxRecords`.
             return_preparer (bool): Whether to return the preparer of the type
-                `vectorbtpro.portfolio.preparers.FOPreparer`.
+                `vectorbtpro.portfolio.preparing.FOPreparer`.
 
                 !!! note
                     Seed won't be set in this case, you need to explicitly call `preparer.set_seed()`.
             return_prep_result (bool): Whether to return the preparer result of the type
-                `vectorbtpro.portfolio.preparers.PrepResult`.
+                `vectorbtpro.portfolio.preparing.PFPrepResult`.
             return_sim_out (bool): Whether to return the simulation output of the type
                 `vectorbtpro.portfolio.enums.SimulationOutput`.
             **kwargs: Keyword arguments passed to the `Portfolio` constructor.
@@ -2755,7 +2762,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if isinstance(close, FOPreparer):
             preparer = close
             prep_result = None
-        elif isinstance(close, PrepResult):
+        elif isinstance(close, PFPrepResult):
             preparer = None
             prep_result = close
         else:
@@ -2779,7 +2786,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             prep_result = preparer.result
         if return_prep_result:
             return prep_result
-        sim_out = prep_result.sim_func(**prep_result.sim_args)
+        sim_out = prep_result.target_func(**prep_result.target_args)
         if return_sim_out:
             return sim_out
         return cls(order_records=sim_out, **prep_result.pf_args)
@@ -2787,7 +2794,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_signals(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data, FSPreparer, PrepResult],
+        close: tp.Union[tp.ArrayLike, Data, FSPreparer, PFPrepResult],
         entries: tp.Optional[tp.ArrayLike] = None,
         exits: tp.Optional[tp.ArrayLike] = None,
         short_entries: tp.Optional[tp.ArrayLike] = None,
@@ -2901,10 +2908,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             Uses `vectorbtpro.portfolio.nb.from_signals.order_signal_func_nb` as `signal_func_nb` (not cacheable)
         4. `signal_func_nb` and `signal_args`: Custom signal function (not cacheable)
 
-        Prepared by `vectorbtpro.portfolio.preparers.FSPreparer`.
+        Prepared by `vectorbtpro.portfolio.preparing.FSPreparer`.
 
         Args:
-            close (array_like, Data, FSPreparer, or PrepResult): See `Portfolio.from_orders`.
+            close (array_like, Data, FSPreparer, or PFPrepResult): See `Portfolio.from_orders`.
             entries (array_like of bool): Boolean array of entry signals.
                 Defaults to True if all other signal arrays are not set, otherwise False. Will broadcast.
 
@@ -3636,7 +3643,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if isinstance(close, FSPreparer):
             preparer = close
             prep_result = None
-        elif isinstance(close, PrepResult):
+        elif isinstance(close, PFPrepResult):
             preparer = None
             prep_result = close
         else:
@@ -3660,7 +3667,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             prep_result = preparer.result
         if return_prep_result:
             return prep_result
-        sim_out = prep_result.sim_func(**prep_result.sim_args)
+        sim_out = prep_result.target_func(**prep_result.target_args)
         if return_sim_out:
             return sim_out
         return cls(order_records=sim_out, **prep_result.pf_args)
@@ -3966,7 +3973,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_order_func(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data, FOFPreparer, PrepResult],
+        close: tp.Union[tp.ArrayLike, Data, FOFPreparer, PFPrepResult],
         *,
         init_cash: tp.Optional[tp.ArrayLike] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
@@ -4041,10 +4048,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         * `flex_order_func_nb`: See `vectorbtpro.portfolio.nb.from_order_func.from_flex_order_func_nb`
         * `flex_order_func_nb` and `row_wise`: See `vectorbtpro.portfolio.nb.from_order_func.from_flex_order_func_rw_nb`
 
-        Prepared by `vectorbtpro.portfolio.preparers.FOFPreparer`.
+        Prepared by `vectorbtpro.portfolio.preparing.FOFPreparer`.
 
         Args:
-            close (array_like, Data, FOFPreparer, or PrepResult): Latest asset price at each time step.
+            close (array_like, Data, FOFPreparer, or PFPrepResult): Latest asset price at each time step.
                 Will broadcast.
 
                 If an instance of `vectorbtpro.data.base.Data`, will extract the open, high,
@@ -4545,7 +4552,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if isinstance(close, FOFPreparer):
             preparer = close
             prep_result = None
-        elif isinstance(close, PrepResult):
+        elif isinstance(close, PFPrepResult):
             preparer = None
             prep_result = close
         else:
@@ -4569,7 +4576,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             prep_result = preparer.result
         if return_prep_result:
             return prep_result
-        sim_out = prep_result.sim_func(**prep_result.sim_args)
+        sim_out = prep_result.target_func(**prep_result.target_args)
         if return_sim_out:
             return sim_out
         return cls(order_records=sim_out, **prep_result.pf_args)
@@ -4577,7 +4584,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_def_order_func(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data, FDOFPreparer, PrepResult],
+        close: tp.Union[tp.ArrayLike, Data, FDOFPreparer, PFPrepResult],
         size: tp.Optional[tp.ArrayLike] = None,
         size_type: tp.Optional[tp.ArrayLike] = None,
         direction: tp.Optional[tp.ArrayLike] = None,
@@ -4628,7 +4635,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         * `pre_segment_func_nb` is `vectorbtpro.portfolio.nb.from_order_func.def_pre_segment_func_nb`
         * `order_func_nb` is `vectorbtpro.portfolio.nb.from_order_func.def_order_func_nb`
 
-        Prepared by `vectorbtpro.portfolio.preparers.FDOFPreparer`.
+        Prepared by `vectorbtpro.portfolio.preparing.FDOFPreparer`.
 
         For details on other arguments, see `Portfolio.from_orders` and `Portfolio.from_order_func`.
 
@@ -4694,7 +4701,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if isinstance(close, FDOFPreparer):
             preparer = close
             prep_result = None
-        elif isinstance(close, PrepResult):
+        elif isinstance(close, PFPrepResult):
             preparer = None
             prep_result = close
         else:
@@ -4718,7 +4725,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             prep_result = preparer.result
         if return_prep_result:
             return prep_result
-        sim_out = prep_result.sim_func(**prep_result.sim_args)
+        sim_out = prep_result.target_func(**prep_result.target_args)
         if return_sim_out:
             return sim_out
         return cls(order_records=sim_out, **prep_result.pf_args)

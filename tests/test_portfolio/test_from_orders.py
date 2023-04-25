@@ -2383,7 +2383,8 @@ class TestFromOrders:
                 records=[
                     dict(row=0, size=0.5, size_type="percent"),
                     dict(row=4, size=-np.inf, direction="longonly"),
-                ]
+                ],
+                size=np.nan,
             ).order_records,
             np.array([(0, 0, 0, 50.0, 1.0, 0.0, 0), (1, 0, 4, 50.0, 5.0, 0.0, 1)], dtype=order_dt),
         )
