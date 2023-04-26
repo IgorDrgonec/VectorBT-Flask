@@ -1573,7 +1573,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                     returned_kwargs[new_s] = instance.returned_kwargs[s]
                 if s in instance.last_index:
                     last_index[new_s] = instance.last_index[s]
-                if s in instance.last_index:
+                if s in instance.delisted:
                     delisted[new_s] = instance.delisted[s]
 
         return cls.from_data(
