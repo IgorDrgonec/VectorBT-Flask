@@ -44,7 +44,7 @@ RUN pip install --quiet --no-cache-dir \
     'websocket-client' \
     'hyperopt' \
     'optuna' \
-    'yfinance>=0.2.10' \
+    'yfinance>=0.2.18' \
     'python-binance>=1.0.16' \
     'alpaca-py' \
     'ccxt>=1.89.14' \

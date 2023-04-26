@@ -1743,13 +1743,13 @@ Enum = namedtuple("Enum", ["Attr1", "Attr2"])(*range(2))
 
 
 class TestMapping:
-    def test_to_mapping(self):
-        assert mapping.to_mapping(Enum) == {0: "Attr1", 1: "Attr2", -1: None}
-        assert mapping.to_mapping(Enum, reverse=True) == {"Attr1": 0, "Attr2": 1, None: -1}
-        assert mapping.to_mapping({0: "Attr1", 1: "Attr2", -1: None}) == {0: "Attr1", 1: "Attr2", -1: None}
-        assert mapping.to_mapping(["Attr1", "Attr2"]) == {0: "Attr1", 1: "Attr2"}
-        assert mapping.to_mapping(pd.Index(["Attr1", "Attr2"])) == {0: "Attr1", 1: "Attr2"}
-        assert mapping.to_mapping(pd.Series(["Attr1", "Attr2"])) == {0: "Attr1", 1: "Attr2"}
+    def test_to_value_mapping(self):
+        assert mapping.to_value_mapping(Enum) == {0: "Attr1", 1: "Attr2", -1: None}
+        assert mapping.to_value_mapping(Enum, reverse=True) == {"Attr1": 0, "Attr2": 1, None: -1}
+        assert mapping.to_value_mapping({0: "Attr1", 1: "Attr2", -1: None}) == {0: "Attr1", 1: "Attr2", -1: None}
+        assert mapping.to_value_mapping(["Attr1", "Attr2"]) == {0: "Attr1", 1: "Attr2"}
+        assert mapping.to_value_mapping(pd.Index(["Attr1", "Attr2"])) == {0: "Attr1", 1: "Attr2"}
+        assert mapping.to_value_mapping(pd.Series(["Attr1", "Attr2"])) == {0: "Attr1", 1: "Attr2"}
 
     def test_apply_mapping(self):
         assert mapping.apply_mapping("Attr1", mapping_like=Enum, reverse=True) == 0

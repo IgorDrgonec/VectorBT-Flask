@@ -1,6 +1,6 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
-"""Plotly Express pandas accessors.
+"""Pandas accessors for Plotly Express.
 
 !!! note
     Accessors do not utilize caching."""
@@ -42,6 +42,7 @@ def attach_px_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
                 *args,
                 _px_func_name: str = px_func_name,
                 _px_func: tp.Callable = px_func,
+                layout: tp.KwargsLike = None,
                 **kwargs,
             ) -> tp.BaseFigure:
                 from vectorbtpro._settings import settings
@@ -53,6 +54,7 @@ def attach_px_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
                     width=kwargs.pop("width", layout_cfg["width"]),
                     height=kwargs.pop("height", layout_cfg["height"]),
                 )
+                layout = merge_dicts(layout_kwargs, layout)
                 # Fix category_orders
                 if "color" in kwargs:
                     if isinstance(kwargs["color"], str):
@@ -72,11 +74,8 @@ def attach_px_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
                 obj.index = clean_labels(obj.index)
 
                 if _px_func_name == "imshow":
-                    return make_figure(
-                        _px_func(to_2d_array(obj), *args, **layout_kwargs, **kwargs),
-                        layout=layout_kwargs,
-                    )
-                return make_figure(_px_func(obj, *args, **layout_kwargs, **kwargs), layout=layout_kwargs)
+                    return make_figure(_px_func(to_2d_array(obj), *args, **layout_kwargs, **kwargs), layout=layout)
+                return make_figure(_px_func(obj, *args, **layout_kwargs, **kwargs), layout=layout)
 
             setattr(cls, px_func_name, plot_func)
     return cls
@@ -97,7 +96,7 @@ class PXAccessor(BaseAccessor):
         >>> pd.Series([1, 2, 3]).vbt.px.bar().show()
         ```
 
-        ![](/assets/images/api/px_bar.svg){: .iimg }
+        ![](/assets/images/api/px_bar.svg){: .iimg loading=lazy }
     """
 
     def __init__(

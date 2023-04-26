@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Base class for working with mapped arrays.
 
@@ -389,7 +389,7 @@ We can build histograms and boxplots of `MappedArray` directly:
 >>> ma.boxplot().show()
 ```
 
-![](/assets/images/api/mapped_boxplot.svg){: .iimg }
+![](/assets/images/api/mapped_boxplot.svg){: .iimg loading=lazy }
 
 To use scatterplots or any other plots that require index, convert to pandas first:
 
@@ -397,7 +397,7 @@ To use scatterplots or any other plots that require index, convert to pandas fir
 >>> ma.to_pd().vbt.plot().show()
 ```
 
-![](/assets/images/api/mapped_to_pd_plot.svg){: .iimg }
+![](/assets/images/api/mapped_to_pd_plot.svg){: .iimg loading=lazy }
 
 !!! hint
     See `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots` and `MappedArray.subplots`.
@@ -427,7 +427,7 @@ from vectorbtpro.utils.array_ import index_repeating_rows_nb
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method
 from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, attach_unary_magic_methods
-from vectorbtpro.utils.mapping import to_mapping, apply_mapping
+from vectorbtpro.utils.mapping import to_value_mapping, apply_mapping
 
 __all__ = [
     "MappedArray",
@@ -972,7 +972,7 @@ class MappedArray(Analyzable):
                 mapping = self.wrapper.columns
             elif mapping.lower() == "groups":
                 mapping = self.wrapper.get_columns()
-            mapping = to_mapping(mapping)
+            mapping = to_value_mapping(mapping)
         return mapping
 
     def apply_mapping(
@@ -1003,7 +1003,7 @@ class MappedArray(Analyzable):
                 return pd.Index(new_values, name=self.wrapper.index.name)
             if isinstance(self.wrapper.index, pd.DatetimeIndex):
                 new_values = self.wrapper.index.values[values]
-                new_values[nan_mask] = np.datetime64('NaT')
+                new_values[nan_mask] = np.datetime64("NaT")
                 return pd.Index(new_values, name=self.wrapper.index.name)
             new_values = self.wrapper.index.values[values]
             new_values[nan_mask] = np.nan

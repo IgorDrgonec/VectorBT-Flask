@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Class decorators for records."""
 
@@ -10,47 +10,31 @@ from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.decorators import cacheable_property, cached_property
-from vectorbtpro.utils.mapping import to_mapping
+from vectorbtpro.utils.mapping import to_value_mapping
 
 __all__ = []
 
 
-def override_field_config(*args, merge_configs: bool = True) -> tp.FlexClassWrapper:
-    """Class decorator to override field configs of all base classes in MRO that subclass
+def override_field_config(config: Config, merge_configs: bool = True) -> tp.ClassWrapper:
+    """Class decorator to override the field config of a class subclassing
     `vectorbtpro.records.base.Records`.
 
     Instead of overriding `_field_config` class attribute, you can pass `config` directly to this decorator.
 
     Disable `merge_configs` to not merge, which will effectively disable field inheritance."""
 
-    def wrapper(cls: tp.Type[tp.T], config: tp.DictLike = None) -> tp.Type[tp.T]:
+    def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
         checks.assert_subclass_of(cls, "Records")
-
-        if config is None:
-            config = cls.field_config
         if merge_configs:
-            configs = []
-            for base_cls in cls.mro()[::-1]:
-                if base_cls is not cls:
-                    if checks.is_subclass_of(base_cls, "Records"):
-                        configs.append(base_cls.field_config)
-            configs.append(config)
-            config = merge_dicts(*configs)
-        if not isinstance(config, Config):
-            config = HybridConfig(config)
-
-        setattr(cls, "_field_config", config)
+            new_config = merge_dicts(cls.field_config, config)
+        else:
+            new_config = config
+        if not isinstance(new_config, Config):
+            new_config = HybridConfig(new_config)
+        setattr(cls, "_field_config", new_config)
         return cls
 
-    if len(args) == 0:
-        return wrapper
-    elif len(args) == 1:
-        if isinstance(args[0], type):
-            return wrapper(args[0])
-        return partial(wrapper, config=args[0])
-    elif len(args) == 2:
-        return wrapper(args[0], config=args[1])
-    raise ValueError("Either class, config, class and config, or keyword arguments must be passed")
+    return wrapper
 
 
 def attach_fields(*args, on_conflict: str = "raise") -> tp.FlexClassWrapper:
@@ -168,7 +152,7 @@ def attach_fields(*args, on_conflict: str = "raise") -> tp.FlexClassWrapper:
                         mapping = attach_filters
                     if mapping is None:
                         raise ValueError(f"Field '{field_name}': Mapping is required to attach filters")
-                    mapping = to_mapping(mapping)
+                    mapping = to_value_mapping(mapping)
 
                     for filter_value, target_filter_name in mapping.items():
                         if target_filter_name is None:

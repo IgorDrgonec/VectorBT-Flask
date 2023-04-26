@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Base class for working with order records.
 
@@ -97,7 +97,7 @@ Name: group, dtype: object
 >>> pf.orders['a'].plots().show()
 ```
 
-![](/assets/images/api/orders_plots.svg){: .iimg }
+![](/assets/images/api/orders_plots.svg){: .iimg loading=lazy }
 """
 
 import numpy as np
@@ -349,7 +349,7 @@ class Orders(PriceRecords):
             >>> orders.plot().show()
             ```
 
-            ![](/assets/images/api/orders_plot.svg){: .iimg }
+            ![](/assets/images/api/orders_plot.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 

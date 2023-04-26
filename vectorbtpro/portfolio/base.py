@@ -1,1629 +1,11 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
-"""Base class for simulating a portfolio and measuring its performance.
-
-Provides the class `vectorbtpro.portfolio.base.Portfolio` for simulating a portfolio
-and calculating various risk and performance metrics. It uses Numba-compiled
-functions from `vectorbtpro.portfolio.nb` for most computations and record classes based on
-`vectorbtpro.records.base.Records` for evaluating events such as orders, logs, trades, positions, and drawdowns.
-
-The job of the `Portfolio` class is to create a series of positions allocated 
-against a cash component, produce an equity curve, incorporate basic transaction costs
-and produce a set of statistics about its performance. In particular, it outputs
-position/profit metrics and drawdown information.
-
-Run for the examples below:
-
-```pycon
->>> import numpy as np
->>> import pandas as pd
->>> from datetime import datetime
->>> import talib
->>> from numba import njit
-
->>> import vectorbtpro as vbt
->>> from vectorbtpro.utils.colors import adjust_opacity
->>> from vectorbtpro.utils.enum_ import map_enum_fields
-```
-
-## Workflow
-
-`Portfolio` class does quite a few things to simulate our strategy.
-
-**Preparation** phase (in the particular class method):
-
-* Receives a set of inputs, such as signal arrays and other parameters
-* Resolves parameter defaults by searching for them in the global settings
-* Brings input arrays to a single shape
-* Does some basic validation of inputs and converts Pandas objects to NumPy arrays
-* Passes everything to a Numba-compiled simulation function
-
-**Simulation** phase (in the particular simulation function using Numba):
-
-* The simulation function traverses the broadcasted shape element by element, row by row (time dimension),
-    column by column (asset dimension)
-* For each asset and timestamp (= element):
-    * Gets all available information related to this element and executes the logic
-    * Generates an order or skips the element altogether
-    * If an order has been issued, processes the order and fills/ignores/rejects it
-    * If the order has been filled, registers the result by appending it to the order records
-    * Updates the current state such as the cash and asset balances
-
-**Construction** phase (in the particular class method):
-
-* Receives the returned order records and initializes a new `Portfolio` object
-
-**Analysis** phase (in the `Portfolio` object)
-
-* Offers a broad range of risk & performance metrics based on order records
-
-## Simulation modes
-
-There are three main simulation modes.
-
-### From orders
-
-`Portfolio.from_orders` is the most straightforward and the fastest out of all simulation modes.
-
-An order is a simple instruction that contains size, price, fees, and other information
-(see `vectorbtpro.portfolio.enums.Order` for details about what information a typical order requires).
-Instead of creating a `vectorbtpro.portfolio.enums.Order` tuple for each asset and timestamp (which may
-waste a lot of memory) and appending it to a (potentially huge) list for processing, `Portfolio.from_orders`
-takes each of those information pieces as an array, broadcasts them against each other, and creates a
-`vectorbtpro.portfolio.enums.Order` tuple out of each element for us.
-
-Thanks to broadcasting, we can pass any of the information as a 2-dim array, as a 1-dim array
-per column or row, and as a constant. And we don't even need to provide every piece of information -
-vectorbt fills the missing data with default constants, without wasting memory.
-
-Here's an example:
-
-```pycon
->>> size = pd.Series([1, -1, 1, -1])  # per row
->>> price = pd.DataFrame({'a': [1, 2, 3, 4], 'b': [4, 3, 2, 1]})  # per element
->>> direction = ['longonly', 'shortonly']  # per column
->>> fees = 0.01  # per frame
-
->>> pf = vbt.Portfolio.from_orders(price, size, direction=direction, fees=fees)
->>> pf.orders.records_readable
-   Order Id Column  Timestamp  Size  Price  Fees  Side
-0         0      a          0   1.0    1.0  0.01   Buy
-1         1      a          1   1.0    2.0  0.02  Sell
-2         2      a          2   1.0    3.0  0.03   Buy
-3         3      a          3   1.0    4.0  0.04  Sell
-4         0      b          0   1.0    4.0  0.04  Sell
-5         1      b          1   1.0    3.0  0.03   Buy
-6         2      b          2   1.0    2.0  0.02  Sell
-7         3      b          3   1.0    1.0  0.01   Buy
-```
-
-This method is particularly useful in situations where you don't need any further logic
-apart from filling orders at predefined timestamps. If you want to issue orders depending
-upon the previous performance, the current state, or other custom conditions, head over to
-`Portfolio.from_signals` or `Portfolio.from_order_func`.
-
-### From signals
-
-`Portfolio.from_signals` is centered around signals. It adds an abstraction layer on top of `Portfolio.from_orders`
-to automate some signaling processes. For example, by default, it won't let us execute another entry signal
-if we are already in the position. It also implements stop loss and take profit orders for exiting positions.
-Nevertheless, this method behaves similarly to `Portfolio.from_orders` and accepts most of its arguments;
-in fact, by setting `accumulate=True`, it behaves quite similarly to `Portfolio.from_orders`.
-
-Let's replicate the example above using signals:
-
-```pycon
->>> entries = pd.Series([True, False, True, False])
->>> exits = pd.Series([False, True, False, True])
-
->>> pf = vbt.Portfolio.from_signals(
-...     price,
-...     entries, exits,
-...     size=1, direction=direction, fees=fees)
->>> pf.orders.records_readable
-   Order Id Column  Timestamp  Size  Price  Fees  Side
-0         0      a          0   1.0    1.0  0.01   Buy
-1         1      a          1   1.0    2.0  0.02  Sell
-2         2      a          2   1.0    3.0  0.03   Buy
-3         3      a          3   1.0    4.0  0.04  Sell
-4         0      b          0   1.0    4.0  0.04  Sell
-5         1      b          1   1.0    3.0  0.03   Buy
-6         2      b          2   1.0    2.0  0.02  Sell
-7         3      b          3   1.0    1.0  0.01   Buy
-```
-
-In a nutshell: this method automates some procedures that otherwise would be only possible by using
-`Portfolio.from_order_func` while following the same broadcasting principles as `Portfolio.from_orders` -
-the best of both worlds, given you can express your strategy as a sequence of signals. But as soon as
-your strategy requires any signal to depend upon more complex conditions or to generate multiple orders at once,
-it's best to run your custom signaling logic using `Portfolio.from_order_func`.
-
-### From order function
-
-`Portfolio.from_order_func` is the most powerful form of simulation. Instead of pulling information
-from predefined arrays, it lets us define an arbitrary logic through callbacks. There are multiple
-kinds of callbacks, each called at some point while the simulation function traverses the shape.
-For example, apart from the main callback that returns an order (`order_func_nb`), there is a callback
-that does preprocessing on the entire group of columns at once. For more details on the general procedure
-and the callback zoo, see `vectorbtpro.portfolio.nb.from_order_func.from_order_func_nb`.
-
-Let's replicate our example using an order function:
-
-```pycon
->>> @njit
->>> def order_func_nb(c, size, direction, fees):
-...     return vbt.pf_nb.order_nb(
-...         price=c.close[c.i, c.col],
-...         size=size[c.i],
-...         direction=direction[c.col],
-...         fees=fees
-... )
-
->>> direction_num = map_enum_fields(direction, Direction)
->>> pf = vbt.Portfolio.from_order_func(
-...     price,
-...     order_func_nb=order_func_nb,
-...     order_args=(np.asarray(size), np.asarray(direction_num), fees)
-... )
->>> pf.orders.records_readable
-   Order Id Column  Timestamp  Size  Price  Fees  Side
-0         0      a          0   1.0    1.0  0.01   Buy
-1         1      a          1   1.0    2.0  0.02  Sell
-2         2      a          2   1.0    3.0  0.03   Buy
-3         3      a          3   1.0    4.0  0.04  Sell
-4         0      b          0   1.0    4.0  0.04  Sell
-5         1      b          1   1.0    3.0  0.03   Buy
-6         2      b          2   1.0    2.0  0.02  Sell
-7         3      b          3   1.0    1.0  0.01   Buy
-```
-
-There is an even more flexible version available - `vectorbtpro.portfolio.nb.from_order_func.from_flex_order_func_nb`
-(activated by passing `flexible=True` to `Portfolio.from_order_func`) - that allows creating multiple
-orders per symbol and bar.
-
-This method has many advantages:
-
-* Realistic simulation as it follows the event-driven approach - less risk of exposure to the look-ahead bias
-* Provides a lot of useful information during the runtime, such as the current position's PnL
-* Enables putting all logic including custom indicators into a single place, and running it as the data
- comes in, in a memory-friendly manner
-
-But there are drawbacks too:
-
-* Doesn't broadcast arrays - needs to be done by the user prior to the execution
-* Requires at least a basic knowledge of NumPy and Numba
-* Requires at least an intermediate knowledge of both to optimize for efficiency
-
-## Example
-
-To showcase the features of `Portfolio`, run the following example: it checks candlestick data of 6 major
-cryptocurrencies in 2020 against every single pattern found in TA-Lib, and translates them into orders.
-
-```pycon
->>> # Fetch price history
->>> symbols = ['BTC-USD', 'ETH-USD', 'XRP-USD', 'BNB-USD', 'BCH-USD', 'LTC-USD']
->>> start = '2020-01-01 UTC'  # crypto is UTC
->>> end = '2020-09-01 UTC'
->>> # OHLCV by column
->>> ohlcv = vbt.YFData.fetch(symbols, start=start, end=end).concat()
-```
-
-[=100% "100%"]{: .candystripe}
-
-```pycon
->>> ohlcv['Open']
-symbol                          BTC-USD     ETH-USD   XRP-USD    BNB-USD  \\
-Date
-2020-01-01 00:00:00+00:00   7194.892090  129.630661  0.192912  13.730962
-2020-01-02 00:00:00+00:00   7202.551270  130.820038  0.192708  13.698126
-2020-01-03 00:00:00+00:00   6984.428711  127.411263  0.187948  13.035329
-...                                 ...         ...       ...        ...
-2020-08-29 00:00:00+00:00  11541.054688  395.687592  0.272009  23.134024
-2020-08-30 00:00:00+00:00  11508.713867  399.616699  0.274568  23.009060
-2020-08-31 00:00:00+00:00  11713.306641  428.509003  0.283065  23.647858
-
-symbol                        BCH-USD    LTC-USD
-Date
-2020-01-01 00:00:00+00:00  204.671295  41.326534
-2020-01-02 00:00:00+00:00  204.354538  42.018085
-2020-01-03 00:00:00+00:00  196.007690  39.863129
-...                               ...        ...
-2020-08-29 00:00:00+00:00  269.112976  57.438873
-2020-08-30 00:00:00+00:00  268.842865  57.207737
-2020-08-31 00:00:00+00:00  279.280426  62.844059
-
-[243 rows x 6 columns]
-
->>> # Run every single pattern recognition indicator and combine the results
->>> result = vbt.pd_acc.empty_like(ohlcv['Open'], fill_value=0.)
->>> for pattern in talib.get_function_groups()['Pattern Recognition']:
-...     PRecognizer = vbt.IndicatorFactory.from_talib(pattern)
-...     pr = PRecognizer.run(ohlcv['Open'], ohlcv['High'], ohlcv['Low'], ohlcv['Close'])
-...     result = result + pr.integer
-
->>> # Don't look into the future
->>> result = result.vbt.fshift(1)
-
->>> # Treat each number as order value in USD
->>> size = result / ohlcv['Open']
-
->>> # Simulate portfolio
->>> pf = vbt.Portfolio.from_orders(
-...     ohlcv['Close'], size, price=ohlcv['Open'],
-...     init_cash='autoalign', fees=0.001, slippage=0.001)
-
->>> # Visualize portfolio value
->>> pf.value.vbt.plot().show()
-```
-
-![](/assets/images/api/portfolio_value.svg){: .iimg }
-
-## Broadcasting
-
-`Portfolio` is very flexible towards inputs:
-
-* Accepts both Series and DataFrames as inputs
-* Broadcasts inputs to the same shape using `vectorbtpro.base.reshaping.broadcast`
-* Many inputs (such as `fees`) can be passed as a single value, value per column/row, or as a matrix
-* Implements flexible indexing wherever possible to save memory
-
-## Defaults
-
-If you look at the arguments of each class method, you will notice that most of them default to None.
-`None` has a special meaning in vectorbt: it's a command to pull the default value from the global
-config with settings `vectorbtpro._settings.portfolio`. For example, the default size used in
-`Portfolio.from_signals` and `Portfolio.from_orders` is `np.inf`:
-
-```pycon
->>> vbt.settings.portfolio['size']
-inf
-```
-
-## Attributes
-
-Once a portfolio is built, it gives us the possibility to assess its performance from
-various angles. There are three main types of portfolio attributes:
-
-* time series in form of a Series/DataFrame (such as running cash balance),
-* time series reduced per column/group in form of a scalar/Series (such as total return), and
-* records in form of a structured NumPy array (such as order records).
-
-Time series take a lot of memory, especially when hyperparameter optimization is involved.
-To avoid wasting resources, they are not computed during the simulation but reconstructed
-from order records and other data (see `vectorbtpro.portfolio.enums.SimulationOutput`). This way,
-any attribute is only computed once the user actually needs it.
-
-Since most attributes of a portfolio must first be reconstructed, they have a getter method.
-For example, to reconstruct the cash balance at each time step, we call `Portfolio.get_cash`.
-Additionally, each attribute has a shortcut property (`Portfolio.cash` in our example)
-that calls the getter method with default arguments.
-
-```pycon
->>> pf.cash.equals(pf.get_cash())
-True
-```
-
-There are two main advantages of shortcut properties:
-
-1) They are cacheable
-2) They can return in-output arrays pre-computed during the simulation
-
-All of this makes them very fast to access. Moreover, attributes that need to call
-other attributes can utilize their shortcut properties by calling `Portfolio.resolve_shortcut_attr`,
-which calls the respective shortcut property whenever default arguments are passed.
-
-## Grouping
-
-One of the key features of `Portfolio` is the ability to group columns. Groups can be specified by
-`group_by`, which can be anything from positions or names of column levels, to a NumPy array with
-actual groups. Groups can be formed to share capital between columns (make sure to pass `cash_sharing=True`)
-or to compute metrics for a combined portfolio of multiple independent columns.
-
-For example, let's divide our portfolio into two groups sharing the same cash balance:
-
-```pycon
->>> # Simulate combined portfolio
->>> group_by = pd.Index([
-...     'first', 'first', 'first',
-...     'second', 'second', 'second'
-... ], name='group')
->>> comb_pf = vbt.Portfolio.from_orders(
-...     ohlcv['Close'], size, price=ohlcv['Open'],
-...     init_cash='autoalign', fees=0.001, slippage=0.001,
-...     group_by=group_by, cash_sharing=True)
-
->>> # Get total profit per group
->>> comb_pf.total_profit
-group
-first     22353.207762
-second     7634.297901
-Name: total_profit, dtype: float64
-```
-
-Not only can we analyze each group, but also each column in the group:
-
-```pycon
->>> # Get total profit per column
->>> comb_pf.get_total_profit(group_by=False)
-symbol
-BTC-USD     5233.981995
-ETH-USD    13814.978843
-XRP-USD     3304.246924
-BNB-USD     4725.737791
-BCH-USD     -255.652597
-LTC-USD     3164.212707
-Name: total_profit, dtype: float64
-```
-
-In the same way, we can introduce new grouping to the method itself:
-
-```pycon
->>> # Get total profit per group
->>> pf.get_total_profit(group_by=group_by)
-group
-first     22353.207762
-second     7634.297901
-Name: total_profit, dtype: float64
-```
-
-!!! note
-    If cash sharing is enabled, grouping can be disabled but cannot be modified.
-
-## Indexing
-
-Like any other class subclassing `vectorbtpro.base.wrapping.Wrapping`, we can do pandas indexing
-on a `Portfolio` instance, which forwards indexing operation to each object with columns:
-
-```pycon
->>> pf['BTC-USD']
-<vectorbtpro.portfolio.base.Portfolio at 0x7f7812364f98>
-
->>> pf['BTC-USD'].total_profit
-5233.981994880156
-```
-
-Grouped portfolio is indexed by group:
-
-```pycon
->>> comb_pf['first']
-<vectorbtpro.portfolio.base.Portfolio at 0x7f7811177400>
-
->>> comb_pf['first'].total_profit
-22353.207761869122
-```
-
-!!! note
-    Changing index (time axis) is not supported. The object should be treated as a Series
-    rather than a DataFrame; for example, use `pf.iloc[0]` instead of `pf.iloc[:, 0]`
-    to get the first column.
-
-    Indexing behavior depends solely upon `vectorbtpro.base.wrapping.ArrayWrapper`.
-    For example, if `group_select` is enabled indexing will be performed on groups,
-    otherwise on single columns. You can pass wrapper arguments in `broadcast_kwargs`.
-
-## Logging
-
-To collect more information on how a specific order was processed or to be able to track the whole
-simulation from the beginning to the end, we can turn on logging:
-
-```pycon
->>> # Simulate portfolio with logging
->>> pf = vbt.Portfolio.from_orders(
-...     ohlcv['Close'], size, price=ohlcv['Open'],
-...     init_cash='autoalign', fees=0.001, slippage=0.001, log=True)
-
->>> pf.logs.records
-       id  group  col  idx  open  high  low        close  cash    position  \\
-0       0      0    0    0   NaN   NaN  NaN  7200.174316   inf    0.000000
-1       1      0    0    1   NaN   NaN  NaN  6985.470215   inf    0.000000
-2       2      0    0    2   NaN   NaN  NaN  7344.884277   inf    0.000000
-...   ...    ...  ...  ...   ...   ...  ...          ...   ...         ...
-1455  240      5    5  240   NaN   NaN  NaN    57.291733   inf  268.907681
-1456  241      5    5  241   NaN   NaN  NaN    62.725342   inf  272.389644
-1457  242      5    5  242   NaN   NaN  NaN    61.113796   inf  274.137659
-
-      ...  new_free_cash  new_val_price  new_value  res_size    res_price  \\
-0     ...            inf    7194.892090        inf       NaN          NaN
-1     ...            inf    7202.551270        inf       NaN          NaN
-2     ...            inf    6984.428711        inf       NaN          NaN
-...   ...            ...            ...        ...       ...          ...
-1455  ...            inf      57.438873        inf  3.481962    57.496312
-1456  ...            inf      57.207737        inf  1.748015    57.264945
-1457  ...            inf      62.844059        inf  7.956202    62.906903
-
-      res_fees  res_side  res_status  res_status_info  order_id
-0          NaN        -1           1                0        -1
-1          NaN        -1           1                5        -1
-2          NaN        -1           1                5        -1
-...        ...       ...         ...              ...       ...
-1455    0.2002         0           0               -1       181
-1456    0.1001         0           0               -1       182
-1457    0.5005         0           0               -1       183
-
-[1458 rows x 43 columns]
-```
-
-Just as orders, logs are also records and thus can be easily analyzed:
-
-```pycon
->>> pf.logs.res_status.value_counts()
-symbol   BTC-USD  ETH-USD  XRP-USD  BNB-USD  BCH-USD  LTC-USD
-Filled       183      172      176      178      176      184
-Ignored       60       71       67       65       67       59
-```
-
-Logging can also be turned on just for one order, row, or column, since as many other
-variables it's specified per order and can broadcast automatically.
-
-!!! note
-    Logging can slow down simulation.
-
-## Caching
-
-`Portfolio` heavily relies upon caching. Most shortcut properties are wrapped with a
-cacheable decorator: reduced time series and records are automatically cached
-using `vectorbtpro.utils.decorators.cached_property`, while time-series are not cached
-automatically but are cacheable using `vectorbtpro.utils.decorators.cacheable_property`,
-meaning you must explicitly turn them on.
-
-!!! note
-    Shortcut properties are only triggered once default arguments are passed to a method.
-    Explicitly disabling/enabling grouping will not trigger them so the whole call hierarchy
-    cannot utilize caching anymore. To still utilize caching, we need to create a new
-    portfolio object with disabled/enabled grouping using `new_pf = pf.replace(group_by=my_group_by)`.
-
-Caching can be disabled globally via `vectorbtpro._settings.caching`.
-Alternatively, we can precisely point at attributes and methods that should or shouldn't
-be cached. For example, we can blacklist the entire `Portfolio` class:
-
-```pycon
->>> vbt.Portfolio.get_ca_setup().disable_caching()
-```
-
-Or a single instance of `Portfolio`:
-
-```pycon
->>> pf.get_ca_setup().disable_caching()
-```
-
-See `vectorbtpro.registries.ca_registry` for more details on caching.
-
-!!! note
-    Because of caching, class is meant to be immutable and all properties are read-only.
-    To change any attribute, use the `Portfolio.replace` method and pass changes as keyword arguments.
-
-## Performance and memory
-
-### Caching attributes manually
-
-If you're running out of memory when working with large arrays, disable caching.
-
-Also make sure to store most important time series manually if you're planning to re-use them.
-For example, if you're interested in Sharpe ratio or other metrics based on returns,
-run and save `Portfolio.returns` to a variable, delete the portfolio object, and then use the
-`vectorbtpro.returns.accessors.ReturnsAccessor` to analyze them. Do not use methods akin to
-`Portfolio.sharpe_ratio` because they will re-calculate returns each time (unless you turned
-on caching for time series).
-
-```pycon
->>> returns_acc = pf.returns_acc
->>> del pf
->>> returns_acc.sharpe_ratio()
-symbol
-BTC-USD    1.617912
-ETH-USD    2.568341
-XRP-USD    1.381798
-BNB-USD    1.525383
-BCH-USD   -0.013760
-LTC-USD    0.934991
-Name: sharpe_ratio, dtype: float64
-```
-
-Many methods such as `Portfolio.get_returns` are both instance and class methods. Running the instance method
-will trigger a waterfall of computations, such as getting cash flow, asset flow, etc. Some of these
-attributes are calculated more than once. For example, `Portfolio.get_net_exposure` must compute
-`Portfolio.get_gross_exposure` for long and short positions. Each call of `Portfolio.get_gross_exposure`
-must recalculate the cash series from scratch if caching for them is disabled. To avoid this, use class methods:
-
-```pycon
->>> free_cash = pf.free_cash  # reuse wherever possible
->>> long_exposure = vbt.Portfolio.get_gross_exposure(
-...     asset_value=pf.get_asset_value(direction='longonly'),
-...     free_cash=free_cash,
-...     wrapper=pf.wrapper
-... )
->>> short_exposure = vbt.Portfolio.get_gross_exposure(
-...     asset_value=pf.get_asset_value(direction='shortonly'),
-...     free_cash=free_cash,
-...     wrapper=pf.wrapper
-... )
->>> del free_cash  # release memory
->>> net_exposure = vbt.Portfolio.get_net_exposure(
-...     long_exposure=long_exposure,
-...     short_exposure=short_exposure,
-...     wrapper=pf.wrapper
-... )
->>> del long_exposure  # release memory
->>> del short_exposure  # release memory
-```
-
-### Pre-calculating attributes
-
-Instead of computing memory and CPU-expensive attributes such as `Portfolio.returns` retroactively,
-we can pre-calculate them during the simulation using `Portfolio.from_order_func` and its callbacks.
-For this, we need to pass `in_outputs` argument with an empty floating array, fill it in
-`post_segment_func_nb`, and `Portfolio` will automatically use it as long as we don't change grouping:
-
-```pycon
->>> pf_baseline = vbt.Portfolio.from_orders(
-...     ohlcv['Close'], size, price=ohlcv['Open'],
-...     init_cash='autoalign', fees=0.001, slippage=0.001, freq='d')
->>> pf_baseline.sharpe_ratio
-symbol
-BTC-USD    1.617912
-ETH-USD    2.568341
-XRP-USD    1.381798
-BNB-USD    1.525383
-BCH-USD   -0.013760
-LTC-USD    0.934991
-Name: sharpe_ratio, dtype: float64
-
->>> @njit
-... def order_func_nb(c, size, price, fees, slippage):
-...     return vbt.pf_nb.order_nb(
-...         size=vbt.pf_nb.select_nb(c, size),
-...         price=vbt.pf_nb.select_nb(c, price),
-...         fees=vbt.pf_nb.select_nb(c, fees),
-...         slippage=vbt.pf_nb.select_nb(c, slippage),
-...     )
-
->>> @njit
-... def post_segment_func_nb(c):
-...     if c.cash_sharing:
-...         c.in_outputs.returns[c.i, c.group] = c.last_return[c.group]
-...     else:
-...         for col in range(c.from_col, c.to_col):
-...             c.in_outputs.returns[c.i, col] = c.last_return[col]
-
->>> pf = vbt.Portfolio.from_order_func(
-...     ohlcv['Close'],
-...     order_func_nb=order_func_nb,
-...     order_args=(
-...         vbt.to_2d_array(size),
-...         vbt.to_2d_array(ohlcv['Open']),
-...         vbt.to_2d_array(0.001),
-...         vbt.to_2d_array(0.001)
-...     ),
-...     post_segment_func_nb=post_segment_func_nb,
-...     in_outputs=dict(returns=vbt.RepEval("np.empty_like(close, dtype=np.float_)")),
-...     init_cash=pf_baseline.init_cash,
-...     freq='d'
-... )
->>> pf.sharpe_ratio
-symbol
-BTC-USD    1.617912
-ETH-USD    2.568341
-XRP-USD    1.381798
-BNB-USD    1.525383
-BCH-USD   -0.013760
-LTC-USD    0.934991
-Name: sharpe_ratio, dtype: float64
-```
-
-To make sure that we used the pre-calculated array:
-
-```pycon
->>> vbt.settings.caching['disable'] = True
-
->>> # Reconstructed
->>> %timeit pf.get_returns()
-5.82 ms ± 58.2 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
-
->>> # Pre-computed
->>> %timeit pf.returns
-70.1 µs ± 219 ns per loop (mean ± std. dev. of 7 runs, 10000 loops each)
-```
-
-The only drawback of this approach is that you cannot use `init_cash='auto'` or `init_cash='autoalign'`
-because then, during the simulation, the portfolio value is `np.inf` and the returns are `np.nan`.
-
-You should also take care of grouping the pre-computed array during the simulation.
-For example, running the above function with grouping but without cash sharing will throw an error.
-To provide a hint to vectorbt that the array should only be used when cash sharing is enabled,
-add the suffix '_cs' to the name of the array (see `Portfolio.in_outputs_indexing_func` on supported suffixes).
-
-### Chunking simulation
-
-As most Numba-compiled functions in vectorbt, simulation procedure can also be chunked and run in parallel.
-For this, use the `chunked` argument (see `vectorbtpro.utils.chunking.resolve_chunked_option`).
-For example, let's simulate 1 million orders 1) without chunking, 2) sequentially, and 2) concurrently using Dask:
-
-```pycon
->>> size = np.full((1000, 1000), 1.)
->>> size[1::2] = -1
->>> %timeit vbt.Portfolio.from_orders(1, size)
-90.1 ms ± 8.15 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-
->>> %timeit vbt.Portfolio.from_orders(1, size, chunked=True)
-110 ms ± 10 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-
->>> %timeit vbt.Portfolio.from_orders(1, size, chunked='dask')
-43.6 ms ± 2.39 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
-```
-
-Since the chunking procedure is applied on the Numba-compiled function itself (see the source
-of the particular function), the fastest execution engine is always a multi-threaded one.
-Executing chunks sequentially does not result in a speedup and is pretty useless in this scenario
-because there is always an overhead of splitting and distributing the arguments and merging the results.
-
-Chunking happens (semi-)automatically by splitting each argument into chunks of columns.
-It does not break groups, thus chunking is safe on any portfolio regardless of its grouping.
-
-!!! warning
-    Additional arguments such as `signal_args` in `Portfolio.from_signals` are not split
-    automatically and require providing a specification, otherwise they are passed as-is.
-    See examples under `vectorbtpro.utils.chunking.chunked`.
-
-### Chunking everything
-
-Simulation in chunks improves performance but doesn't help with memory: every array needs to be loaded
-into memory in order to be split. A better idea is to keep one chunk in memory at a time. For example, we
-can build a chunkable pipeline that loads a chunk of data, performs the simulation on that chunk,
-calculates all relevant metrics, and merges the results across all chunks.
-
-Let's create a pipeline that tests various window combinations of a moving average crossover and
-concatenates their total returns:
-
-```pycon
->>> @vbt.chunked(
-...     size=vbt.LenSizer(arg_query='fast_windows'),
-...     arg_take_spec=dict(
-...         price=None,
-...         fast_windows=vbt.ChunkSlicer(),
-...         slow_windows=vbt.ChunkSlicer()
-...     ),
-...     merge_func=lambda x: pd.concat(x).sort_index()
-... )
-... def pipeline(price, fast_windows, slow_windows):
-...     fast_ma = vbt.MA.run(price, fast_windows, short_name='fast')
-...     slow_ma = vbt.MA.run(price, slow_windows, short_name='slow')
-...     entries = fast_ma.ma_crossed_above(slow_ma)
-...     exits = fast_ma.ma_crossed_below(slow_ma)
-...     pf = vbt.Portfolio.from_signals(price, entries, exits)
-...     return pf.total_return
-
->>> price = vbt.YFData.fetch(['BTC-USD', 'ETH-USD']).get('Close')
-```
-
-[=100% "100%"]{: .candystripe}
-
-```pycon
->>> pipeline(price, [10, 10, 10], [20, 30, 50])
-fast_window  slow_window  symbol
-10           20           BTC-USD      172.663535
-                          ETH-USD     2213.427388
-             30           BTC-USD      175.853073
-                          ETH-USD    16197.543067
-             50           BTC-USD      122.635872
-                          ETH-USD     2116.661012
-Name: total_return, dtype: float64
-```
-
-Let's find out how the function splits data into 2 chunks (this won't trigger the computation):
-
-```pycon
->>> chunk_meta, funcs_args = pipeline(
-...     price, [10, 10, 10], [20, 30, 50],
-...     _n_chunks=2, _return_raw_chunks=True
-... )
->>> chunk_meta
-[ChunkMeta(uuid='d87cee40-11ac-4e96-8e1d-ec1b613263a0', idx=0, start=0, end=2, indices=None),
- ChunkMeta(uuid='3eb4189e-3d70-4763-9cc2-35f3c91bc105', idx=1, start=2, end=3, indices=None)]
-
->>> list(funcs_args)
-[(<function __main__.pipeline(price, fast_windows, slow_windows)>,
-  (symbol                          BTC-USD      ETH-USD
-   Date
-   2014-09-17 00:00:00+00:00    457.334015          NaN
-   2014-09-18 00:00:00+00:00    424.440002          NaN
-   2014-09-19 00:00:00+00:00    394.795990          NaN
-   ...                                 ...          ...
-   2021-12-15 00:00:00+00:00  48896.722656  4018.388672
-   2021-12-16 00:00:00+00:00  47665.425781  3962.469727
-   2021-12-18 00:00:00+00:00  46725.929688  3940.733398
-
-   [2645 rows x 2 columns],                                         << price (unchanged)
-   [10, 10],                                                        << fast_windows (1st chunk)
-   [20, 30]),                                                       << slow_windows (1st chunk)
-  {}),
- (<function __main__.pipeline(price, fast_windows, slow_windows)>,
-  (symbol                          BTC-USD      ETH-USD
-   Date
-   2014-09-17 00:00:00+00:00    457.334015          NaN
-   2014-09-18 00:00:00+00:00    424.440002          NaN
-   2014-09-19 00:00:00+00:00    394.795990          NaN
-   ...                                 ...          ...
-   2021-12-15 00:00:00+00:00  48896.722656  4018.388672
-   2021-12-16 00:00:00+00:00  47665.425781  3962.469727
-   2021-12-18 00:00:00+00:00  46725.929688  3940.733398
-
-   [2645 rows x 2 columns],
-   [10],                                                            << price (unchanged)
-   [50]),                                                           << fast_windows (2nd chunk)
-  {})]                                                              << slow_windows (2nd chunk)
-```
-
-We see that the function correctly chunked `fast_windows` and `slow_windows` and left the data as it is.
-
-## Saving and loading
-
-Like any other class subclassing `vectorbtpro.utils.pickling.Pickleable`, we can save a `Portfolio`
-instance to the disk with `Portfolio.save` and load it with `Portfolio.load`:
-
-```pycon
->>> pf = vbt.Portfolio.from_orders(
-...     ohlcv['Close'], size, price=ohlcv['Open'],
-...     init_cash='autoalign', fees=0.001, slippage=0.001, freq='d')
->>> pf.sharpe_ratio
-symbol
-BTC-USD    1.617912
-ETH-USD    2.568341
-XRP-USD    1.381798
-BNB-USD    1.525383
-BCH-USD   -0.013760
-LTC-USD    0.934991
-Name: sharpe_ratio, dtype: float64
-
->>> pf.save('my_pf')
->>> pf = vbt.Portfolio.load('my_pf')
->>> pf.sharpe_ratio
-symbol
-BTC-USD    1.617912
-ETH-USD    2.568341
-XRP-USD    1.381798
-BNB-USD    1.525383
-BCH-USD   -0.013760
-LTC-USD    0.934991
-Name: sharpe_ratio, dtype: float64
-```
-
-!!! note
-    Save files won't include neither cached results nor global defaults. For example,
-    passing `fillna_close` as None will also use None when the portfolio is loaded from disk.
-    Make sure to either pass all arguments explicitly or to also save the `vectorbtpro._settings.portfolio` config.
-
-## Stats
-
-!!! hint
-    See `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats` and `Portfolio.metrics`.
-
-Let's simulate a portfolio with two columns:
-
-```pycon
->>> close = vbt.YFData.fetch(
-...     "BTC-USD",
-...     start='2020-01-01 UTC',
-...     end='2020-09-01 UTC'
-... ).get('Close')
-```
-
-[=100% "100%"]{: .candystripe}
-
-```pycon
->>> pf = vbt.Portfolio.from_random_signals(close, n=[10, 20], seed=42)
->>> pf.wrapper.columns
-Index([10, 20], dtype='int64', name='rand_n')
-```
-
-### Column, group, and tag selection
-
-To return the statistics for a particular column/group, use the `column` argument:
-
-```pycon
->>> pf.stats(column=10)
-UserWarning: Metric 'sharpe_ratio' requires frequency to be set
-UserWarning: Metric 'calmar_ratio' requires frequency to be set
-UserWarning: Metric 'omega_ratio' requires frequency to be set
-UserWarning: Metric 'sortino_ratio' requires frequency to be set
-UserWarning: Couldn't parse the frequency of index. Pass it as `freq` or define it globally under `settings.wrapping`.
-
-Start                         2020-01-01 00:00:00+00:00
-End                           2020-08-31 00:00:00+00:00
-Period                                              243
-Start Value                                       100.0
-End Value                                    139.876426
-Total Return [%]                              39.876426
-Benchmark Return [%]                          62.229688
-Max Gross Exposure [%]                            100.0
-Total Fees Paid                                     0.0
-Max Drawdown [%]                                12.7421
-Max Drawdown Duration                             109.0
-Total Trades                                         10
-Total Closed Trades                                  10
-Total Open Trades                                     0
-Open Trade PnL                                      0.0
-Win Rate [%]                                       70.0
-Best Trade [%]                                15.303446
-Worst Trade [%]                               -9.603504
-Avg Winning Trade [%]                          7.372146
-Avg Losing Trade [%]                          -4.943456
-Avg Winning Trade Duration                     7.571429
-Avg Losing Trade Duration                     12.333333
-Profit Factor                                  2.941353
-Expectancy                                     3.987643
-Name: 10, dtype: object
-```
-
-If vectorbt couldn't parse the frequency of `close`:
-
-1) it won't return any duration in time units,
-2) it won't return any metric that requires annualization, and
-3) it will throw a bunch of warnings (you can silence those by passing `silence_warnings=True`)
-
-We can provide the frequency as part of the settings dict:
-
-```pycon
->>> pf.stats(column=10, settings=dict(freq='d'))
-UserWarning: Changing the frequency will create a copy of this object.
-Consider setting the frequency upon object creation to re-use existing cache.
-
-Start                         2020-01-01 00:00:00+00:00
-End                           2020-08-31 00:00:00+00:00
-Period                                243 days 00:00:00
-Start Value                                       100.0
-End Value                                    139.876426
-Total Return [%]                              39.876426
-Benchmark Return [%]                          62.229688
-Max Gross Exposure [%]                            100.0
-Total Fees Paid                                     0.0
-Max Drawdown [%]                                12.7421
-Max Drawdown Duration                 109 days 00:00:00
-Total Trades                                         10
-Total Closed Trades                                  10
-Total Open Trades                                     0
-Open Trade PnL                                      0.0
-Win Rate [%]                                       70.0
-Best Trade [%]                                15.303446
-Worst Trade [%]                               -9.603504
-Avg Winning Trade [%]                          7.372146
-Avg Losing Trade [%]                          -4.943456
-Avg Winning Trade Duration    7 days 13:42:51.428571428
-Avg Losing Trade Duration              12 days 08:00:00
-Profit Factor                                  2.941353
-Expectancy                                     3.987643
-Sharpe Ratio                                   1.515967
-Calmar Ratio                                   5.117177
-Omega Ratio                                    1.495807
-Sortino Ratio                                  2.624107
-Name: 10, dtype: object
-```
-
-But in this case, our portfolio will be copied to set the new frequency and we wouldn't be
-able to re-use its cached attributes. Let's define the frequency upon the simulation instead:
-
-```pycon
->>> pf = vbt.Portfolio.from_random_signals(close, n=[10, 20], seed=42, freq='d')
-```
-
-We can change the grouping of the portfolio on the fly. Let's form a single group:
-
-```pycon
->>> pf.stats(group_by=True)
-Start                         2020-01-01 00:00:00+00:00
-End                           2020-08-31 00:00:00+00:00
-Period                                243 days 00:00:00
-Start Value                                       200.0
-End Value                                    344.850193
-Total Return [%]                              72.425097
-Benchmark Return [%]                          62.229688
-Max Gross Exposure [%]                            100.0
-Total Fees Paid                                     0.0
-Max Drawdown [%]                               9.849795
-Max Drawdown Duration                  60 days 00:00:00
-Total Trades                                         30
-Total Closed Trades                                  30
-Total Open Trades                                     0
-Open Trade PnL                                      0.0
-Win Rate [%]                                  66.666667
-Best Trade [%]                                20.650796
-Worst Trade [%]                               -9.603504
-Avg Winning Trade [%]                          7.074987
-Avg Losing Trade [%]                          -2.783814
-Avg Winning Trade Duration              9 days 01:12:00
-Avg Losing Trade Duration               5 days 19:12:00
-Profit Factor                                  4.730329
-Expectancy                                      4.82834
-Sharpe Ratio                                   2.309773
-Calmar Ratio                                  12.782774
-Omega Ratio                                    1.557084
-Sortino Ratio                                  3.945651
-Name: group, dtype: object
-```
-
-We can see how the initial cash has changed from $100 to $200, indicating that both columns now
-contribute to the performance.
-
-### Aggregation
-
-If the portfolio consists of multiple columns/groups and no column/group has been selected,
-each metric is aggregated across all columns/groups based on `agg_func`, which is `np.mean` by default.
-
-```pycon
->>> pf.stats()
-UserWarning: Object has multiple columns. Aggregating using <function mean at 0x7fc77152bb70>.
-Pass column to select a single column/group.
-
-Start                         2020-01-01 00:00:00+00:00
-End                           2020-08-31 00:00:00+00:00
-Period                                243 days 00:00:00
-Start Value                                       100.0
-End Value                                    172.425097
-Total Return [%]                              72.425097
-Benchmark Return [%]                          62.229688
-Max Gross Exposure [%]                            100.0
-Total Fees Paid                                     0.0
-Max Drawdown [%]                              13.935332
-Max Drawdown Duration                  97 days 00:00:00
-Total Trades                                       15.0
-Total Closed Trades                                15.0
-Total Open Trades                                   0.0
-Open Trade PnL                                      0.0
-Win Rate [%]                                       67.5
-Best Trade [%]                                17.977121
-Worst Trade [%]                               -7.432006
-Avg Winning Trade [%]                          7.143562
-Avg Losing Trade [%]                          -3.400855
-Avg Winning Trade Duration    8 days 17:00:39.560439560
-Avg Losing Trade Duration               7 days 16:00:00
-Profit Factor                                  4.840401
-Expectancy                                     4.618165
-Sharpe Ratio                                   1.936813
-Calmar Ratio                                   8.923935
-Omega Ratio                                     1.55757
-Sortino Ratio                                  3.440712
-Name: agg_stats, dtype: object
-```
-
-Here, the Sortino ratio of 2.624107 (column=10) and 4.257318 (column=20) lead to the avarage of 3.440712.
-
-We can also return a DataFrame with statistics per column/group by passing `agg_func=None`:
-
-```pycon
->>> pf.stats(agg_func=None)
-                             Start                       End   Period  ...  Sortino Ratio
-randnx_n                                                               ...
-10       2020-01-01 00:00:00+00:00 2020-08-31 00:00:00+00:00 243 days  ...       2.624107
-20       2020-01-01 00:00:00+00:00 2020-08-31 00:00:00+00:00 243 days  ...       4.257318
-
-[2 rows x 28 columns]
-```
-
-### Metric selection
-
-To select metrics, use the `metrics` argument (see `Portfolio.metrics` for supported metrics):
-
-```pycon
->>> pf.stats(metrics=['sharpe_ratio', 'sortino_ratio'], column=10)
-Sharpe Ratio     1.515967
-Sortino Ratio    2.624107
-Name: 10, dtype: float64
-```
-
-We can also select specific tags (see any metric from `Portfolio.metrics` that has the `tag` key):
-
-```pycon
->>> pf.stats(column=10, tags=['trades'])
-Total Trades                                         10
-Total Closed Trades                                  10
-Total Open Trades                                     0
-Open Trade PnL                                      0.0
-Win Rate [%]                                       70.0
-Best Trade [%]                                15.303446
-Worst Trade [%]                               -9.603504
-Avg Winning Trade [%]                          7.372146
-Avg Losing Trade [%]                          -4.943456
-Avg Winning Trade Duration    7 days 13:42:51.428571428
-Avg Losing Trade Duration              12 days 08:00:00
-Profit Factor                                  2.941353
-Expectancy                                     3.987643
-Name: 10, dtype: object
-```
-
-Or provide a boolean expression:
-
-```pycon
->>> pf.stats(column=10, tags='trades and open and not closed')
-Total Open Trades    0.0
-Open Trade PnL       0.0
-Name: 10, dtype: float64
-```
-
-The reason why we included "not closed" along with "open" is because some metrics such as the win rate
-have both tags attached since they are based upon both open and closed trades/positions
-(to see this, pass `settings=dict(incl_open=True)` and `tags='trades and open'`).
-
-### Passing parameters
-
-We can use `settings` to pass parameters used across multiple metrics.
-For example, let's pass required and risk-free return to all return metrics:
-
-```pycon
->>> pf.stats(column=10, settings=dict(required_return=0.1, risk_free=0.01))
-Start                         2020-01-01 00:00:00+00:00
-End                           2020-08-31 00:00:00+00:00
-Period                                243 days 00:00:00
-Start Value                                       100.0
-End Value                                    139.876426
-Total Return [%]                              39.876426
-Benchmark Return [%]                          62.229688
-Max Gross Exposure [%]                            100.0
-Total Fees Paid                                     0.0
-Max Drawdown [%]                                12.7421
-Max Drawdown Duration                 109 days 00:00:00
-Total Trades                                         10
-Total Closed Trades                                  10
-Total Open Trades                                     0
-Open Trade PnL                                      0.0
-Win Rate [%]                                       70.0
-Best Trade [%]                                15.303446
-Worst Trade [%]                               -9.603504
-Avg Winning Trade [%]                          7.372146
-Avg Losing Trade [%]                          -4.943456
-Avg Winning Trade Duration    7 days 13:42:51.428571428
-Avg Losing Trade Duration              12 days 08:00:00
-Profit Factor                                  2.941353
-Expectancy                                     3.987643
-Sharpe Ratio                                  -8.119004  << here
-Calmar Ratio                                   5.117177  << here
-Omega Ratio                                    0.264555  << here
-Sortino Ratio                                -18.734479  << here
-Name: 10, dtype: object
-```
-
-Passing any argument inside of `settings` either overrides an existing default, or acts as
-an optional argument that is passed to the calculation function upon resolution (see below).
-Both `required_return` and `risk_free` can be found in the signature of the 4 ratio methods,
-so vectorbt knows exactly it has to pass them.
-
-Let's imagine that the signature of `vectorbtpro.returns.accessors.ReturnsAccessor.sharpe_ratio`
-doesn't list those arguments: vectorbt would simply call this method without passing those two arguments.
-In such case, we have two options:
-
-1) Set parameters globally using `settings` and set `pass_{arg}=True` individually using `metric_settings`:
-
-```pycon
->>> pf.stats(
-...     column=10,
-...     settings=dict(required_return=0.1, risk_free=0.01),
-...     metric_settings=dict(
-...         sharpe_ratio=dict(pass_risk_free=True),
-...         omega_ratio=dict(pass_required_return=True, pass_risk_free=True),
-...         sortino_ratio=dict(pass_required_return=True)
-...     )
-... )
-```
-
-2) Set parameters individually using `metric_settings`:
-
-```pycon
->>> pf.stats(
-...     column=10,
-...     metric_settings=dict(
-...         sharpe_ratio=dict(risk_free=0.01),
-...         omega_ratio=dict(required_return=0.1, risk_free=0.01),
-...         sortino_ratio=dict(required_return=0.1)
-...     )
-... )
-```
-
-### Custom metrics
-
-To calculate a custom metric, we need to provide at least two things: short name and a settings
-dict with the title and calculation function (see arguments in `vectorbtpro.generic.stats_builder.StatsBuilderMixin`):
-
-```pycon
->>> max_winning_streak = (
-...     'max_winning_streak',
-...     dict(
-...         title='Max Winning Streak',
-...         calc_func=lambda trades: trades.winning_streak.max(),
-...         resolve_trades=True
-...     )
-... )
->>> pf.stats(metrics=max_winning_streak, column=10)
-Max Winning Streak    3.0
-Name: 10, dtype: float64
-```
-
-You might wonder how vectorbt knows which arguments to pass to `calc_func`?
-In the example above, the calculation function expects two arguments: `trades` and `group_by`.
-To automatically pass any of the them, vectorbt searches for each in the current settings.
-As `trades` cannot be found, it either throws an error or tries to resolve this argument if
-`resolve_{arg}=True` was passed. Argument resolution is the process of searching for property/method with
-the same name (also with prefix `get_`) in the attributes of the current portfolio, automatically passing the
-current settings such as `group_by` if they are present in the method's signature
-(a similar resolution procedure), and calling the method/property. The result of the resolution
-process is then passed as `arg` (or `trades` in our example).
-
-Here's an example without resolution of arguments:
-
-```pycon
->>> max_winning_streak = (
-...     'max_winning_streak',
-...     dict(
-...         title='Max Winning Streak',
-...         calc_func=lambda self, group_by:
-...         self.get_trades(group_by=group_by).winning_streak.max()
-...     )
-... )
->>> pf.stats(metrics=max_winning_streak, column=10)
-Max Winning Streak    3.0
-Name: 10, dtype: float64
-```
-
-And here's an example without resolution of the calculation function:
-
-```pycon
->>> max_winning_streak = (
-...     'max_winning_streak',
-...     dict(
-...         title='Max Winning Streak',
-...         calc_func=lambda self, settings:
-...         self.get_trades(group_by=settings['group_by']).winning_streak.max(),
-...         resolve_calc_func=False
-...     )
-... )
->>> pf.stats(metrics=max_winning_streak, column=10)
-Max Winning Streak    3.0
-Name: 10, dtype: float64
-```
-
-Since `max_winning_streak` method can be expressed as a path from this portfolio, we can simply write:
-
-```pycon
->>> max_winning_streak = (
-...     'max_winning_streak',
-...     dict(
-...         title='Max Winning Streak',
-...         calc_func='trades.winning_streak.max'
-...     )
-... )
-```
-
-In this case, we don't have to pass `resolve_trades=True` any more as vectorbt does it automatically.
-Another advantage is that vectorbt can access the signature of the last method in the path
-(`vectorbtpro.records.mapped_array.MappedArray.max` in our case) and resolve its arguments.
-
-To switch between entry trades, exit trades, and positions, use the `trades_type` setting.
-Additionally, you can pass `incl_open=True` to also include open trades.
-
-```pycon
->>> pf.stats(column=10, settings=dict(trades_type='positions', incl_open=True))
-Start                         2020-01-01 00:00:00+00:00
-End                           2020-08-31 00:00:00+00:00
-Period                                243 days 00:00:00
-Start Value                                       100.0
-End Value                                    139.876426
-Total Return [%]                              39.876426
-Benchmark Return [%]                          62.229688
-Max Gross Exposure [%]                            100.0
-Total Fees Paid                                     0.0
-Max Drawdown [%]                                12.7421
-Max Drawdown Duration                 109 days 00:00:00
-Total Trades                                         10
-Total Closed Trades                                  10
-Total Open Trades                                     0
-Open Trade PnL                                      0.0
-Win Rate [%]                                       70.0
-Best Trade [%]                                15.303446
-Worst Trade [%]                               -9.603504
-Avg Winning Trade [%]                          7.372146
-Avg Losing Trade [%]                          -4.943456
-Avg Winning Trade Duration    7 days 13:42:51.428571428
-Avg Losing Trade Duration              12 days 08:00:00
-Profit Factor                                  2.941353
-Expectancy                                     3.987643
-Sharpe Ratio                                   1.515967
-Calmar Ratio                                   5.117177
-Omega Ratio                                    1.495807
-Sortino Ratio                                  2.624107
-Name: 10, dtype: object
-```
-
-Any default metric setting or even global setting can be overridden by the user using metric-specific
-keyword arguments. Here, we override the global aggregation function for `max_dd_duration`:
-
-```pycon
->>> pf.stats(agg_func=lambda sr: sr.mean(),
-...     metric_settings=dict(
-...         max_dd_duration=dict(agg_func=lambda sr: sr.max())
-...     )
-... )
-UserWarning: Object has multiple columns. Aggregating using <function <lambda> at 0x7fbf6e77b268>.
-Pass column to select a single column/group.
-
-Start                         2020-01-01 00:00:00+00:00
-End                           2020-08-31 00:00:00+00:00
-Period                                243 days 00:00:00
-Start Value                                       100.0
-End Value                                    172.425097
-Total Return [%]                              72.425097
-Benchmark Return [%]                          62.229688
-Max Gross Exposure [%]                            100.0
-Total Fees Paid                                     0.0
-Max Drawdown [%]                              13.935332
-Max Drawdown Duration                 109 days 00:00:00  << here
-Total Trades                                       15.0
-Total Closed Trades                                15.0
-Total Open Trades                                   0.0
-Open Trade PnL                                      0.0
-Win Rate [%]                                       67.5
-Best Trade [%]                                17.977121
-Worst Trade [%]                               -7.432006
-Avg Winning Trade [%]                          7.143562
-Avg Losing Trade [%]                          -3.400855
-Avg Winning Trade Duration    8 days 17:00:39.560439560
-Avg Losing Trade Duration               7 days 16:00:00
-Profit Factor                                  4.840401
-Expectancy                                     4.618165
-Sharpe Ratio                                   1.936813
-Calmar Ratio                                   8.923935
-Omega Ratio                                     1.55757
-Sortino Ratio                                  3.440712
-Name: agg_func_<lambda>, dtype: object
-```
-
-Let's create a simple metric that returns a passed value to demonstrate how vectorbt overrides settings,
-from least to most important:
-
-```pycon
->>> # vbt.settings.portfolio.stats
->>> vbt.settings.portfolio.stats['settings']['my_arg'] = 100
->>> my_arg_metric = ('my_arg_metric', dict(title='My Arg', calc_func=lambda my_arg: my_arg))
->>> pf.stats(my_arg_metric, column=10)
-My Arg    100
-Name: 10, dtype: int64
-
->>> # settings >>> vbt.settings.portfolio.stats
->>> pf.stats(my_arg_metric, column=10, settings=dict(my_arg=200))
-My Arg    200
-Name: 10, dtype: int64
-
->>> # metric settings >>> settings
->>> my_arg_metric = ('my_arg_metric', dict(title='My Arg', my_arg=300, calc_func=lambda my_arg: my_arg))
->>> pf.stats(my_arg_metric, column=10, settings=dict(my_arg=200))
-My Arg    300
-Name: 10, dtype: int64
-
->>> # metric_settings >>> metric settings
->>> pf.stats(my_arg_metric, column=10, settings=dict(my_arg=200),
-...     metric_settings=dict(my_arg_metric=dict(my_arg=400)))
-My Arg    400
-Name: 10, dtype: int64
-```
-
-Here's an example of a parameterized metric. Let's get the number of trades with PnL over some amount:
-
-```pycon
->>> trade_min_pnl_cnt = (
-...     'trade_min_pnl_cnt',
-...     dict(
-...         title=vbt.Sub('Trades with PnL over $$${min_pnl}'),
-...         calc_func=lambda trades, min_pnl: trades.apply_mask(
-...             trades.pnl.values >= min_pnl).count(),
-...         resolve_trades=True
-...     )
-... )
->>> pf.stats(
-...     metrics=trade_min_pnl_cnt, column=10,
-...     metric_settings=dict(trade_min_pnl_cnt=dict(min_pnl=0)))
-Trades with PnL over $0    7
-Name: 10, dtype: int64
-
->>> pf.stats(
-...     metrics=trade_min_pnl_cnt, column=10,
-...     metric_settings=dict(trade_min_pnl_cnt=dict(min_pnl=10)))
-Trades with PnL over $10    2
-Name: stats, dtype: int64
-```
-
-If the same metric name was encountered more than once, vectorbt automatically appends an
-underscore and its position, so we can pass keyword arguments to each metric separately:
-
-```pycon
->>> pf.stats(
-...     metrics=[
-...         trade_min_pnl_cnt,
-...         trade_min_pnl_cnt,
-...         trade_min_pnl_cnt
-...     ],
-...     column=10,
-...     metric_settings=dict(
-...         trade_min_pnl_cnt_0=dict(min_pnl=0),
-...         trade_min_pnl_cnt_1=dict(min_pnl=10),
-...         trade_min_pnl_cnt_2=dict(min_pnl=20))
-...     )
-Trades with PnL over $0     7
-Trades with PnL over $10    2
-Trades with PnL over $20    0
-Name: stats, dtype: int64
-```
-
-To add a custom metric to the list of all metrics, we have three options.
-
-The first option is to change the `Portfolio.metrics` dict in-place (this will append to the end):
-
-```pycon
->>> pf.metrics['max_winning_streak'] = max_winning_streak[1]
->>> pf.stats(column=10)
-Start                         2020-01-01 00:00:00+00:00
-End                           2020-08-31 00:00:00+00:00
-Period                                243 days 00:00:00
-Start Value                                       100.0
-End Value                                    139.876426
-Total Return [%]                              39.876426
-Benchmark Return [%]                          62.229688
-Max Gross Exposure [%]                            100.0
-Total Fees Paid                                     0.0
-Max Drawdown [%]                                12.7421
-Max Drawdown Duration                 109 days 00:00:00
-Total Trades                                         10
-Total Closed Trades                                  10
-Total Open Trades                                     0
-Open Trade PnL                                      0.0
-Win Rate [%]                                       70.0
-Best Trade [%]                                15.303446
-Worst Trade [%]                               -9.603504
-Avg Winning Trade [%]                          7.372146
-Avg Losing Trade [%]                          -4.943456
-Avg Winning Trade Duration    7 days 13:42:51.428571428
-Avg Losing Trade Duration              12 days 08:00:00
-Profit Factor                                  2.941353
-Expectancy                                     3.987643
-Sharpe Ratio                                   1.515967
-Calmar Ratio                                   5.117177
-Omega Ratio                                    1.495807
-Sortino Ratio                                  2.624107
-Max Winning Streak                                  3.0  << here
-Name: 10, dtype: object
-```
-
-Since `Portfolio.metrics` is of type `vectorbtpro.utils.config.Config`, we can reset it at any time
-to get default metrics:
-
-```pycon
->>> pf.metrics.reset()
-```
-
-The second option is to copy `Portfolio.metrics`, append our metric, and pass as `metrics` argument:
-
-```pycon
->>> my_metrics = list(pf.metrics.items()) + [max_winning_streak]
->>> pf.stats(metrics=my_metrics, column=10)
-```
-
-The third option is to set `metrics` globally under `stats` in `vectorbtpro._settings.portfolio`.
-
-```pycon
->>> vbt.settings.portfolio['stats']['metrics'] = my_metrics
->>> pf.stats(column=10)
-```
-
-## Returns stats
-
-We can compute the stats solely based on the portfolio's returns using `Portfolio.returns_stats`,
-which calls `vectorbtpro.returns.accessors.ReturnsAccessor.stats`.
-
-```pycon
->>> pf.returns_stats(column=10)
-Start                        2020-01-01 00:00:00+00:00
-End                          2020-08-31 00:00:00+00:00
-Period                               243 days 00:00:00
-Total Return [%]                             39.876426
-Benchmark Return [%]                         62.229688
-Annualized Return [%]                        65.203589
-Annualized Volatility [%]                    37.882834
-Max Drawdown [%]                               12.7421
-Max Drawdown Duration                109 days 00:00:00
-Sharpe Ratio                                  1.515967
-Calmar Ratio                                  5.117177
-Omega Ratio                                   1.495807
-Sortino Ratio                                 2.624107
-Skew                                          1.817958
-Kurtosis                                     14.555089
-Tail Ratio                                    1.364631
-Common Sense Ratio                             2.25442
-Value at Risk                                -0.020681
-Alpha                                            0.385
-Beta                                          0.233771
-Name: 10, dtype: object
-```
-
-Most metrics defined in `vectorbtpro.returns.accessors.ReturnsAccessor` are also available
-as attributes of `Portfolio`:
-
-```pycon
->>> pf.sharpe_ratio
-randnx_n
-10    1.515967
-20    2.357659
-Name: sharpe_ratio, dtype: float64
-```
-
-Moreover, we can access quantstats functions using `vectorbtpro.returns.qs_adapter.QSAdapter`:
-
-```pycon
->>> pf.qs.sharpe()
-randnx_n
-10    1.515967
-20    2.357659
-dtype: float64
-```
-
-## Plots
-
-!!! hint
-    See `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots`.
-
-    The features implemented in this method are very similar to stats - see [Stats](#stats).
-
-Plot a single column of a portfolio:
-
-```pycon
->>> pf.plot(column=10).show()
-```
-
-![](/assets/images/api/portfolio_col_plot.svg){: .iimg }
-
-To plot a single column of a grouped portfolio:
-
-```pycon
->>> pf_grouped = vbt.Portfolio.from_random_signals(
-...     close, n=[10, 20, 30, 40], seed=42, freq='d',
-...     group_by=['group1', 'group1', 'group2', 'group2'])
-
->>> pf_grouped.plot(column=10, group_by=False)
-```
-
-To plot a single group of a grouped portfolio:
-
-```pycon
->>> pf_grouped.plot(column='group1').show()
-UserWarning: Subplot 'orders' does not support grouped data
-UserWarning: Subplot 'trade_pnl' does not support grouped data
-```
-
-![](/assets/images/api/portfolio_group_plot.svg){: .iimg }
-
-!!! note
-    Some subplots do not support plotting grouped data.
-    Pass `group_by=False` and select a regular column to plot.
-
-You can choose any of the subplots in `Portfolio.subplots`, in any order, and
-control their appearance using keyword arguments:
-
-```pycon
->>> pf.plot(
-...     subplots=['drawdowns', 'underwater'],
-...     column=10,
-...     subplot_settings=dict(
-...         drawdowns=dict(top_n=3),
-...         underwater=dict(
-...             trace_kwargs=dict(
-...                 line=dict(color='#FF6F00'),
-...                 fillcolor=adjust_opacity('#FF6F00', 0.3)
-...             )
-...         )
-...     )
-... ).show()
-```
-
-![](/assets/images/api/portfolio_plot_drawdowns.svg){: .iimg }
-
-### Custom subplots
-
-To create a new subplot, a preferred way is to pass a plotting function:
-
-```pycon
->>> def plot_order_size(pf, size, column=None, add_trace_kwargs=None, fig=None):
-...     size = pf.select_col_from_obj(size, column, wrapper=pf.wrapper.regroup(False))
-...     size.rename('Order Size').vbt.barplot(add_trace_kwargs=add_trace_kwargs, fig=fig)
-
->>> order_size = pf.orders.size.to_pd(fill_value=0.)
->>> pf.plot(subplots=[
-...     'orders',
-...     ('order_size', dict(
-...         title='Order Size',
-...         yaxis_kwargs=dict(title='Order size'),
-...         check_is_not_grouped=True,
-...         plot_func=plot_order_size
-...     ))
-... ],
-...     column=10,
-...     subplot_settings=dict(
-...         order_size=dict(
-...             size=order_size
-...         )
-...     )
-... )
-```
-
-Alternatively, you can create a placeholder and overwrite it manually later:
-
-```pycon
->>> fig = pf.plot(subplots=[
-...     'orders',
-...     ('order_size', dict(
-...         title='Order Size',
-...         yaxis_kwargs=dict(title='Order size'),
-...         check_is_not_grouped=True
-...     ))  # placeholder
-... ], column=10)
->>> order_size[10].rename('Order Size').vbt.barplot(
-...     add_trace_kwargs=dict(row=2, col=1),
-...     fig=fig
-... ).show()
-```
-
-![](/assets/images/api/portfolio_plot_custom.svg){: .iimg }
-
-If a plotting function can in any way be accessed from the current portfolio, you can pass
-the path to this function (see `vectorbtpro.utils.attr_.deep_getattr` for the path format).
-You can additionally use templates to make some parameters to depend upon passed keyword arguments:
-
-```pycon
->>> subplots = [
-...     ('cumulative_returns', dict(
-...         title='Cumulative Returns',
-...         yaxis_kwargs=dict(title='Cumulative returns'),
-...         plot_func='cumulative_returns.vbt.plot',
-...         select_col_cumulative_returns=True,
-...         pass_add_trace_kwargs=True
-...     )),
-...     ('rolling_drawdown', dict(
-...         title='Rolling Drawdown',
-...         yaxis_kwargs=dict(title='Rolling drawdown'),
-...         plot_func=[
-...             'returns_acc',  # returns accessor
-...             (
-...                 'rolling_max_drawdown',  # function name
-...                 (vbt.Rep('window'),)),  # positional arguments
-...             'vbt.plot'  # plotting function
-...         ],
-...         select_col_returns_acc=True,
-...         pass_add_trace_kwargs=True,
-...         trace_names=[vbt.Sub('rolling_drawdown(${window})')],  # add window to the trace name
-...     ))
-... ]
->>> pf.plot(
-...     subplots,
-...     column=10,
-...     subplot_settings=dict(
-...         rolling_drawdown=dict(
-...             template_context=dict(
-...                 window=10
-...             )
-...         )
-...     )
-... ).show_svg()
-```
-
-You can also replace templates across all subplots by using the global template mapping:
-
-```pycon
->>> pf.plot(subplots, column=10, template_context=dict(window=10)).show()
-```
-
-![](/assets/images/api/portfolio_plot_path.svg){: .iimg }
-"""
+"""Base class for simulating a portfolio and measuring its performance."""
 
 import string
 import inspect
 import warnings
-from collections import namedtuple
 from functools import partial
-from datetime import timedelta, time
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -1633,7 +15,6 @@ from vectorbtpro.base.reshaping import (
     to_1d_array,
     to_2d_array,
     broadcast_array_to,
-    broadcast,
     broadcast_to,
     to_pd_array,
     to_2d_shape,
@@ -1641,44 +22,37 @@ from vectorbtpro.base.reshaping import (
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.base.grouping.base import ExceptLevel
-from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.data.base import Data
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.drawdowns import Drawdowns
-from vectorbtpro.portfolio import nb
-from vectorbtpro.portfolio.call_seq import require_call_seq, build_call_seq
+from vectorbtpro.portfolio import nb, enums
 from vectorbtpro.portfolio.decorators import attach_shortcut_properties, attach_returns_acc_methods
-from vectorbtpro.portfolio.enums import *
 from vectorbtpro.portfolio.logs import Logs
-from vectorbtpro.portfolio.orders import Orders, FSOrders
+from vectorbtpro.portfolio.orders import Orders
 from vectorbtpro.portfolio.trades import Trades, EntryTrades, ExitTrades, Positions
 from vectorbtpro.portfolio.pfopt.base import PortfolioOptimizer
+from vectorbtpro.portfolio.preparing import (
+    PFPrepResult,
+    BasePFPreparer,
+    FOPreparer,
+    FSPreparer,
+    FOFPreparer,
+    FDOFPreparer,
+)
 from vectorbtpro.records.base import Records
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.returns.accessors import ReturnsAccessor
 from vectorbtpro.signals.generators import RANDNX, RPROBNX
 from vectorbtpro.utils import checks
-from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig, atomic_dict
-from vectorbtpro.utils.datetime_ import (
-    freq_to_timedelta64,
-    parse_timedelta,
-    time_to_timedelta,
-    try_align_to_datetime_index,
-)
 from vectorbtpro.utils.decorators import custom_property, cached_property, class_or_instancemethod
 from vectorbtpro.utils.enum_ import map_enum_fields
-from vectorbtpro.utils.mapping import to_mapping
 from vectorbtpro.utils.parsing import get_func_kwargs
-from vectorbtpro.utils.random_ import set_seed
-from vectorbtpro.utils.template import CustomTemplate, Rep, RepEval, RepFunc, substitute_templates
-from vectorbtpro.utils.chunking import ArgsTaker
-from vectorbtpro.utils.cutting import suggest_module_path, cut_and_save_func
-from vectorbtpro.utils.module_ import import_module_from_path
+from vectorbtpro.utils.template import Rep, RepEval, RepFunc
 
 try:
     if not tp.TYPE_CHECKING:
@@ -1693,66 +67,6 @@ __all__ = [
 ]
 
 __pdoc__ = {}
-
-
-def adapt_staticized_to_udf(staticized: tp.Kwargs, func: tp.Union[str, tp.Callable], func_name: str) -> None:
-    """Adapt `staticized` dictionary to a UDF."""
-    sim_func_module = inspect.getmodule(staticized["func"])
-    if isinstance(func, (str, Path)):
-        if isinstance(func, str) and not func.endswith(".py") and hasattr(sim_func_module, func):
-            staticized[f"{func_name}_block"] = func
-            return None
-        func = Path(func)
-        module_path = func.resolve()
-    else:
-        if inspect.getmodule(func) == sim_func_module:
-            staticized[f"{func_name}_block"] = func.__name__
-            return None
-        module = inspect.getmodule(func)
-        if not hasattr(module, "__file__"):
-            raise TypeError(f"{func_name} must be defined in a Python file")
-        module_path = Path(module.__file__).resolve()
-    if "import_lines" not in staticized:
-        staticized["import_lines"] = []
-    reload = staticized.get("reload", False)
-    staticized["import_lines"].extend(
-        [
-            f'{func_name}_path = r"{module_path}"',
-            f"globals().update(vbt.import_module_from_path({func_name}_path).__dict__, reload={reload})",
-        ]
-    )
-
-
-def resolve_dynamic_simulator(simulator_name: str, staticized: tp.KwargsLike) -> tp.Callable:
-    """Resolve a dynamic simulator."""
-    if staticized is None:
-        func = getattr(nb, simulator_name)
-    else:
-        if isinstance(staticized, dict):
-            staticized = dict(staticized)
-            module_path = suggest_module_path(
-                staticized.get("suggest_fname", simulator_name),
-                path=staticized.pop("path", None),
-                mkdir_kwargs=staticized.get("mkdir_kwargs", None),
-            )
-            if "new_func_name" not in staticized:
-                staticized["new_func_name"] = simulator_name
-
-            if staticized.pop("override", False) or not module_path.exists():
-                if "skip_func" not in staticized:
-
-                    def _skip_func(out_lines, func_name):
-                        to_skip = lambda x: f"def {func_name}" in x or x.startswith(f"{func_name}_path =")
-                        return any(map(to_skip, out_lines))
-
-                    staticized["skip_func"] = _skip_func
-                module_path = cut_and_save_func(path=module_path, **staticized)
-            reload = staticized.pop("reload", False)
-            module = import_module_from_path(module_path, reload=reload)
-            func = getattr(module, staticized["new_func_name"])
-        else:
-            func = staticized
-    return func
 
 
 def fix_wrapper_for_records(pf: "Portfolio") -> ArrayWrapper:
@@ -1839,9 +153,9 @@ returns_acc_config = ReadonlyConfig(
         "tail_ratio": dict(),
         "value_at_risk": dict(),
         "cond_value_at_risk": dict(),
-        "capture": dict(),
-        "up_capture": dict(),
-        "down_capture": dict(),
+        "capture_ratio": dict(),
+        "up_capture_ratio": dict(),
+        "down_capture_ratio": dict(),
         "drawdown": dict(),
         "max_drawdown": dict(),
     }
@@ -2076,9 +390,9 @@ shortcut_config = ReadonlyConfig(
         "tail_ratio": dict(obj_type="red_array"),
         "value_at_risk": dict(obj_type="red_array"),
         "cond_value_at_risk": dict(obj_type="red_array"),
-        "capture": dict(obj_type="red_array"),
-        "up_capture": dict(obj_type="red_array"),
-        "down_capture": dict(obj_type="red_array"),
+        "capture_ratio": dict(obj_type="red_array"),
+        "up_capture_ratio": dict(obj_type="red_array"),
+        "down_capture_ratio": dict(obj_type="red_array"),
         "drawdown": dict(),
         "max_drawdown": dict(obj_type="red_array"),
     }
@@ -2095,6 +409,7 @@ __pdoc__[
 """
 
 PortfolioT = tp.TypeVar("PortfolioT", bound="Portfolio")
+PortfolioResultT = tp.Union[PortfolioT, BasePFPreparer, PFPrepResult, enums.SimulationOutput]
 
 
 class MetaInOutputs(type):
@@ -2433,7 +748,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if "init_cash" not in kwargs:
             stack_init_cash_objs = False
             for obj in objs:
-                if not checks.is_int(obj._init_cash) or obj._init_cash not in InitCashMode:
+                if not checks.is_int(obj._init_cash) or obj._init_cash not in enums.InitCashMode:
                     stack_init_cash_objs = True
                     break
             if stack_init_cash_objs:
@@ -2819,7 +1134,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if "init_cash" not in kwargs:
             stack_init_cash_objs = False
             for obj in objs:
-                if not checks.is_int(obj._init_cash) or obj._init_cash not in InitCashMode:
+                if not checks.is_int(obj._init_cash) or obj._init_cash not in enums.InitCashMode:
                     stack_init_cash_objs = True
                     break
             if stack_init_cash_objs:
@@ -2957,7 +1272,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     def __init__(
         self,
         wrapper: ArrayWrapper,
-        order_records: tp.Union[tp.RecordArray, SimulationOutput],
+        order_records: tp.Union[tp.RecordArray, enums.SimulationOutput],
         *,
         close: tp.ArrayLike,
         open: tp.Optional[tp.ArrayLike] = None,
@@ -2993,7 +1308,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if cash_sharing:
             if wrapper.grouper.allow_enable or wrapper.grouper.allow_modify:
                 wrapper = wrapper.replace(allow_enable=False, allow_modify=False)
-        if isinstance(order_records, SimulationOutput):
+        if isinstance(order_records, enums.SimulationOutput):
             sim_out = order_records
             order_records = sim_out.order_records
             log_records = sim_out.log_records
@@ -3040,8 +1355,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if low is not None:
             low = to_2d_array(low)
         if isinstance(init_cash, str):
-            init_cash = map_enum_fields(init_cash, InitCashMode)
-        if not checks.is_int(init_cash) or init_cash not in InitCashMode:
+            init_cash = map_enum_fields(init_cash, enums.InitCashMode)
+        if not checks.is_int(init_cash) or init_cash not in enums.InitCashMode:
             init_cash = to_1d_array(init_cash)
         init_position = to_1d_array(init_position)
         init_price = to_1d_array(init_price)
@@ -3050,7 +1365,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if bm_close is not None and not isinstance(bm_close, bool):
             bm_close = to_2d_array(bm_close)
         if log_records is None:
-            log_records = np.array([], dtype=log_dt)
+            log_records = np.array([], dtype=enums.log_dt)
         if use_in_outputs is None:
             use_in_outputs = portfolio_cfg["use_in_outputs"]
         if fillna_close is None:
@@ -3058,7 +1373,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if trades_type is None:
             trades_type = portfolio_cfg["trades_type"]
         if isinstance(trades_type, str):
-            trades_type = map_enum_fields(trades_type, TradesType)
+            trades_type = map_enum_fields(trades_type, enums.TradesType)
 
         self._open = open
         self._high = high
@@ -3989,7 +2304,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_orders(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data],
+        close: tp.Union[tp.ArrayLike, Data, FOPreparer, PFPrepResult],
         size: tp.Optional[tp.ArrayLike] = None,
         size_type: tp.Optional[tp.ArrayLike] = None,
         direction: tp.Optional[tp.ArrayLike] = None,
@@ -4008,6 +2323,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         raise_reject: tp.Optional[tp.ArrayLike] = None,
         log: tp.Optional[tp.ArrayLike] = None,
         val_price: tp.Optional[tp.ArrayLike] = None,
+        from_ago: tp.Optional[tp.ArrayLike] = None,
         open: tp.Optional[tp.ArrayLike] = None,
         high: tp.Optional[tp.ArrayLike] = None,
         low: tp.Optional[tp.ArrayLike] = None,
@@ -4018,7 +2334,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cash_earnings: tp.Optional[tp.ArrayLike] = None,
         cash_dividends: tp.Optional[tp.ArrayLike] = None,
         cash_sharing: tp.Optional[bool] = None,
-        from_ago: tp.Optional[tp.ArrayLike] = None,
         call_seq: tp.Optional[tp.ArrayLike] = None,
         attach_call_seq: tp.Optional[bool] = None,
         ffill_val_price: tp.Optional[bool] = None,
@@ -4035,20 +2350,27 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         chunked: tp.ChunkedOption = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
+        records: tp.Optional[tp.RecordsLike] = None,
+        return_preparer: bool = False,
+        return_prep_result: bool = False,
+        return_sim_out: bool = False,
         **kwargs,
-    ) -> PortfolioT:
+    ) -> PortfolioResultT:
         """Simulate portfolio from orders - size, price, fees, and other information.
 
         See `vectorbtpro.portfolio.nb.from_orders.from_orders_nb`.
 
+        Prepared by `vectorbtpro.portfolio.preparing.FOPreparer`.
+
         Args:
-            close (array_like or Data): Latest asset price at each time step.
+            close (array_like, Data, FOPreparer, or PFPrepResult): Latest asset price at each time step.
                 Will broadcast.
 
-                If an instance of `vectorbtpro.data.base.Data`, will extract the open, high,
-                low, and close price.
-
                 Used for calculating unrealized PnL and portfolio value.
+
+                If an instance of `vectorbtpro.data.base.Data`, will extract the open, high, low, and close price.
+                If an instance of `vectorbtpro.portfolio.preparing.FOPreparer`, will use it as a preparer.
+                If an instance of `vectorbtpro.portfolio.preparing.PFPrepResult`, will use it as a preparer result.
             size (float or array_like): Size to order.
                 See `vectorbtpro.portfolio.enums.Order.size`. Will broadcast.
             size_type (SizeType or array_like): See `vectorbtpro.portfolio.enums.SizeType` and
@@ -4237,6 +2559,18 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Will broadcast.
 
                 If not provided, will use `close`. If False, will not use any benchmark.
+            records (array_like): Records to construct arrays from.
+
+                See `vectorbtpro.base.indexing.IdxRecords`.
+            return_preparer (bool): Whether to return the preparer of the type
+                `vectorbtpro.portfolio.preparing.FOPreparer`.
+
+                !!! note
+                    Seed won't be set in this case, you need to explicitly call `preparer.set_seed()`.
+            return_prep_result (bool): Whether to return the preparer result of the type
+                `vectorbtpro.portfolio.preparing.PFPrepResult`.
+            return_sim_out (bool): Whether to return the simulation output of the type
+                `vectorbtpro.portfolio.enums.SimulationOutput`.
             **kwargs: Keyword arguments passed to the `Portfolio` constructor.
 
         All broadcastable arguments will broadcast using `vectorbtpro.base.reshaping.broadcast`
@@ -4357,7 +2691,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> pf.get_asset_value(group_by=False).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg }
+            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg loading=lazy }
 
             * Test 10 random weight combinations:
 
@@ -4425,383 +2759,50 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             Name: total_return, dtype: float64
             ```
         """
-        # Get defaults
-        from vectorbtpro._settings import settings
-
-        portfolio_cfg = settings["portfolio"]
-
-        if isinstance(close, Data):
-            data = close
-            close = data.close
-            if close is None:
-                raise ValueError("Column for close couldn't be found in data")
-            if open is None:
-                open = data.open
-            if high is None:
-                high = data.high
-            if low is None:
-                low = data.low
-            if freq is None:
-                freq = data.freq
-        if open is None:
-            open_none = True
-            open = np.nan
+        if isinstance(close, FOPreparer):
+            preparer = close
+            prep_result = None
+        elif isinstance(close, PFPrepResult):
+            preparer = None
+            prep_result = close
         else:
-            open_none = False
-        if high is None:
-            high_none = True
-            high = np.nan
-        else:
-            high_none = False
-        if low is None:
-            low_none = True
-            low = np.nan
-        else:
-            low_none = False
-
-        if size is None:
-            size = portfolio_cfg["size"]
-        if size_type is None:
-            size_type = portfolio_cfg["size_type"]
-        if direction is None:
-            direction = portfolio_cfg["direction"]
-        if price is None:
-            price = portfolio_cfg["price"]
-        if size is None:
-            size = portfolio_cfg["size"]
-        if fees is None:
-            fees = portfolio_cfg["fees"]
-        if fixed_fees is None:
-            fixed_fees = portfolio_cfg["fixed_fees"]
-        if slippage is None:
-            slippage = portfolio_cfg["slippage"]
-        if min_size is None:
-            min_size = portfolio_cfg["min_size"]
-        if max_size is None:
-            max_size = portfolio_cfg["max_size"]
-        if size_granularity is None:
-            size_granularity = portfolio_cfg["size_granularity"]
-        if leverage is None:
-            leverage = portfolio_cfg["leverage"]
-        if leverage_mode is None:
-            leverage_mode = portfolio_cfg["leverage_mode"]
-        if reject_prob is None:
-            reject_prob = portfolio_cfg["reject_prob"]
-        if price_area_vio_mode is None:
-            price_area_vio_mode = portfolio_cfg["price_area_vio_mode"]
-        if allow_partial is None:
-            allow_partial = portfolio_cfg["allow_partial"]
-        if raise_reject is None:
-            raise_reject = portfolio_cfg["raise_reject"]
-        if log is None:
-            log = portfolio_cfg["log"]
-        if val_price is None:
-            val_price = portfolio_cfg["val_price"]
-        if init_cash is None:
-            init_cash = portfolio_cfg["init_cash"]
-        if isinstance(init_cash, str):
-            init_cash = map_enum_fields(init_cash, InitCashMode)
-        if checks.is_int(init_cash) and init_cash in InitCashMode:
-            init_cash_mode = init_cash
-            init_cash = np.inf
-        else:
-            init_cash_mode = None
-        if init_position is None:
-            init_position = portfolio_cfg["init_position"]
-        if init_price is None:
-            init_price = portfolio_cfg["init_price"]
-        if cash_deposits is None:
-            cash_deposits = portfolio_cfg["cash_deposits"]
-        if cash_earnings is None:
-            cash_earnings = portfolio_cfg["cash_earnings"]
-        if cash_dividends is None:
-            cash_dividends = portfolio_cfg["cash_dividends"]
-        if cash_sharing is None:
-            cash_sharing = portfolio_cfg["cash_sharing"]
-        if cash_sharing and group_by is None:
-            group_by = True
-        if from_ago is None:
-            from_ago = portfolio_cfg["from_ago"]
-        if from_ago is None:
-            from_ago = 0
-            from_ago_none = True
-        else:
-            from_ago_none = False
-        if call_seq is None:
-            call_seq = portfolio_cfg["call_seq"]
-        auto_call_seq = False
-        if isinstance(call_seq, str):
-            call_seq = map_enum_fields(call_seq, CallSeqType)
-        if checks.is_int(call_seq):
-            if call_seq == CallSeqType.Auto:
-                auto_call_seq = True
-                call_seq = None
-        if attach_call_seq is None:
-            attach_call_seq = portfolio_cfg["attach_call_seq"]
-        if ffill_val_price is None:
-            ffill_val_price = portfolio_cfg["ffill_val_price"]
-        if update_value is None:
-            update_value = portfolio_cfg["update_value"]
-        if save_state is None:
-            save_state = portfolio_cfg["save_state"]
-        if save_value is None:
-            save_value = portfolio_cfg["save_value"]
-        if save_returns is None:
-            save_returns = portfolio_cfg["save_returns"]
-        if seed is None:
-            seed = portfolio_cfg["seed"]
-        if seed is not None:
-            set_seed(seed)
-        if group_by is None:
-            group_by = portfolio_cfg["group_by"]
-        if freq is None:
-            freq = portfolio_cfg["freq"]
-        broadcast_kwargs = merge_dicts(portfolio_cfg["broadcast_kwargs"], broadcast_kwargs)
-        require_kwargs = broadcast_kwargs.get("require_kwargs", {})
-        if bm_close is None:
-            bm_close = portfolio_cfg["bm_close"]
-
-        # Prepare the simulation
-        # Only close is broadcast, others can remain unchanged thanks to flexible indexing
-        broadcastable_args = dict(
-            cash_earnings=cash_earnings,
-            cash_dividends=cash_dividends,
-            size=size,
-            price=price,
-            size_type=size_type,
-            direction=direction,
-            fees=fees,
-            fixed_fees=fixed_fees,
-            slippage=slippage,
-            min_size=min_size,
-            max_size=max_size,
-            size_granularity=size_granularity,
-            leverage=leverage,
-            leverage_mode=leverage_mode,
-            reject_prob=reject_prob,
-            price_area_vio_mode=price_area_vio_mode,
-            allow_partial=allow_partial,
-            raise_reject=raise_reject,
-            log=log,
-            val_price=val_price,
-            open=open,
-            high=high,
-            low=low,
-            close=close,
-            from_ago=from_ago,
-        )
-        if bm_close is not None and not isinstance(bm_close, bool):
-            broadcastable_args["bm_close"] = bm_close
-        else:
-            broadcastable_args["bm_close"] = None
-
-        broadcast_kwargs = merge_dicts(
-            dict(
-                to_pd=False,
-                keep_flex=True,
-                reindex_kwargs=dict(
-                    cash_earnings=dict(fill_value=0.0),
-                    cash_dividends=dict(fill_value=0.0),
-                    size=dict(fill_value=np.nan),
-                    price=dict(fill_value=np.nan),
-                    size_type=dict(fill_value=SizeType.Amount),
-                    direction=dict(fill_value=Direction.Both),
-                    fees=dict(fill_value=0.0),
-                    fixed_fees=dict(fill_value=0.0),
-                    slippage=dict(fill_value=0.0),
-                    min_size=dict(fill_value=np.nan),
-                    max_size=dict(fill_value=np.nan),
-                    size_granularity=dict(fill_value=np.nan),
-                    leverage=dict(fill_value=1.0),
-                    leverage_mode=dict(fill_value=LeverageMode.Lazy),
-                    reject_prob=dict(fill_value=0.0),
-                    price_area_vio_mode=dict(fill_value=PriceAreaVioMode.Ignore),
-                    allow_partial=dict(fill_value=True),
-                    raise_reject=dict(fill_value=False),
-                    log=dict(fill_value=False),
-                    val_price=dict(fill_value=np.nan),
-                    open=dict(fill_value=np.nan),
-                    high=dict(fill_value=np.nan),
-                    low=dict(fill_value=np.nan),
-                    close=dict(fill_value=np.nan),
-                    bm_close=dict(fill_value=np.nan),
-                    from_ago=dict(fill_value=0),
-                ),
-                wrapper_kwargs=dict(
-                    freq=freq,
-                    group_by=group_by,
-                ),
-            ),
-            broadcast_kwargs,
-        )
-        broadcasted_args, wrapper = broadcast(broadcastable_args, return_wrapper=True, **broadcast_kwargs)
-        if not wrapper.group_select and cash_sharing:
-            raise ValueError("group_select cannot be disabled if cash_sharing=True")
-        cash_earnings = broadcasted_args.pop("cash_earnings")
-        cash_dividends = broadcasted_args.pop("cash_dividends")
-        target_shape_2d = wrapper.shape_2d
-
-        cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
-        init_cash = np.require(broadcast_array_to(init_cash, len(cs_group_lens)), dtype=np.float_)
-        init_position = np.require(broadcast_array_to(init_position, target_shape_2d[1]), dtype=np.float_)
-        init_price = np.require(broadcast_array_to(init_price, target_shape_2d[1]), dtype=np.float_)
-        if (((init_position > 0) | (init_position < 0)) & np.isnan(init_price)).any():
-            warnings.warn(f"Initial position has undefined price. Set init_price.", stacklevel=2)
-        cash_deposits = broadcast(
-            cash_deposits,
-            to_shape=(target_shape_2d[0], len(cs_group_lens)),
-            to_pd=False,
-            keep_flex=True,
-            reindex_kwargs=dict(fill_value=0.0),
-            require_kwargs=require_kwargs,
-        )
-        group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-        if call_seq is None and attach_call_seq:
-            call_seq = CallSeqType.Default
-        if call_seq is not None:
-            if checks.is_any_array(call_seq):
-                call_seq = require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
-            else:
-                call_seq = build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
-        if max_orders is None:
-            _size = broadcasted_args["size"]
-            if _size.size == 1:
-                max_orders = target_shape_2d[0] * int(not np.isnan(_size.item(0)))
-            else:
-                if _size.shape[0] == 1 and target_shape_2d[0] > 1:
-                    max_orders = target_shape_2d[0] * int(np.any(~np.isnan(_size)))
-                else:
-                    max_orders = int(np.max(np.sum(~np.isnan(_size), axis=0)))
-        if max_logs is None:
-            _log = broadcasted_args["log"]
-            if _log.size == 1:
-                max_logs = target_shape_2d[0] * int(_log.item(0))
-            else:
-                if _log.shape[0] == 1 and target_shape_2d[0] > 1:
-                    max_logs = target_shape_2d[0] * int(np.any(_log))
-                else:
-                    max_logs = int(np.max(np.sum(_log, axis=0)))
-
-        # Convert strings to numbers
-        broadcasted_args["price"] = map_enum_fields(broadcasted_args["price"], PriceType, ignore_type=(int, float))
-        broadcasted_args["size_type"] = map_enum_fields(broadcasted_args["size_type"], SizeType)
-        broadcasted_args["direction"] = map_enum_fields(broadcasted_args["direction"], Direction)
-        broadcasted_args["leverage_mode"] = map_enum_fields(broadcasted_args["leverage_mode"], LeverageMode)
-        broadcasted_args["price_area_vio_mode"] = map_enum_fields(
-            broadcasted_args["price_area_vio_mode"],
-            PriceAreaVioMode,
-        )
-        broadcasted_args["val_price"] = map_enum_fields(
-            broadcasted_args["val_price"],
-            ValPriceType,
-            ignore_type=(int, float),
-        )
-
-        # Check data types
-        checks.assert_subdtype(cs_group_lens, np.integer, arg_name="cs_group_lens")
-        if call_seq is not None:
-            checks.assert_subdtype(call_seq, np.integer, arg_name="call_seq")
-        checks.assert_subdtype(init_cash, np.number, arg_name="init_cash")
-        checks.assert_subdtype(init_position, np.number, arg_name="init_position")
-        checks.assert_subdtype(init_price, np.number, arg_name="init_price")
-        checks.assert_subdtype(cash_deposits, np.number, arg_name="cash_deposits")
-        checks.assert_subdtype(cash_earnings, np.number, arg_name="cash_earnings")
-        checks.assert_subdtype(cash_dividends, np.number, arg_name="cash_dividends")
-        checks.assert_subdtype(broadcasted_args["size"], np.number, arg_name="size")
-        checks.assert_subdtype(broadcasted_args["price"], np.number, arg_name="price")
-        checks.assert_subdtype(broadcasted_args["size_type"], np.integer, arg_name="size_type")
-        checks.assert_subdtype(broadcasted_args["direction"], np.integer, arg_name="direction")
-        checks.assert_subdtype(broadcasted_args["fees"], np.number, arg_name="fees")
-        checks.assert_subdtype(broadcasted_args["fixed_fees"], np.number, arg_name="fixed_fees")
-        checks.assert_subdtype(broadcasted_args["slippage"], np.number, arg_name="slippage")
-        checks.assert_subdtype(broadcasted_args["min_size"], np.number, arg_name="min_size")
-        checks.assert_subdtype(broadcasted_args["max_size"], np.number, arg_name="max_size")
-        checks.assert_subdtype(broadcasted_args["size_granularity"], np.number, arg_name="size_granularity")
-        checks.assert_subdtype(broadcasted_args["leverage"], np.number, arg_name="leverage")
-        checks.assert_subdtype(broadcasted_args["leverage_mode"], np.integer, arg_name="leverage_mode")
-        checks.assert_subdtype(broadcasted_args["reject_prob"], np.number, arg_name="reject_prob")
-        checks.assert_subdtype(broadcasted_args["price_area_vio_mode"], np.integer, arg_name="price_area_vio_mode")
-        checks.assert_subdtype(broadcasted_args["allow_partial"], np.bool_, arg_name="allow_partial")
-        checks.assert_subdtype(broadcasted_args["raise_reject"], np.bool_, arg_name="raise_reject")
-        checks.assert_subdtype(broadcasted_args["log"], np.bool_, arg_name="log")
-        checks.assert_subdtype(broadcasted_args["val_price"], np.number, arg_name="val_price")
-        checks.assert_subdtype(broadcasted_args["open"], np.number, arg_name="open")
-        checks.assert_subdtype(broadcasted_args["high"], np.number, arg_name="high")
-        checks.assert_subdtype(broadcasted_args["low"], np.number, arg_name="low")
-        checks.assert_subdtype(broadcasted_args["close"], np.number, arg_name="close")
-        if bm_close is not None and not isinstance(bm_close, bool):
-            checks.assert_subdtype(broadcasted_args["bm_close"], np.number, arg_name="bm_close")
-        checks.assert_subdtype(broadcasted_args["from_ago"], np.integer, arg_name="from_ago")
-
-        # Prepare price
-        if from_ago_none:
-            price = broadcasted_args["price"]
-            if price.size == 1 or price.shape[0] == 1:
-                next_open_mask = price == PriceType.NextOpen
-                next_close_mask = price == PriceType.NextClose
-                if next_open_mask.any() or next_close_mask.any():
-                    price = price.astype(np.float_)
-                    price[next_open_mask] = PriceType.Open
-                    price[next_close_mask] = PriceType.Close
-                    from_ago = np.full(price.shape, 0, dtype=np.int_)
-                    from_ago[next_open_mask] = 1
-                    from_ago[next_close_mask] = 1
-                    broadcasted_args["price"] = price
-                    broadcasted_args["from_ago"] = from_ago
-
-        # Remove arguments
-        bm_close = broadcasted_args.pop("bm_close", None)
-
-        # Perform the simulation
-        func = jit_reg.resolve_option(nb.from_orders_nb, jitted)
-        func = ch_reg.resolve_option(func, chunked)
-        sim_out = func(
-            target_shape=target_shape_2d,
-            group_lens=cs_group_lens,  # group only if cash sharing is enabled to speed up
-            call_seq=call_seq,
-            init_cash=init_cash,
-            init_position=init_position,
-            init_price=init_price,
-            cash_deposits=cash_deposits,
-            cash_earnings=cash_earnings,
-            cash_dividends=cash_dividends,
-            **broadcasted_args,
-            auto_call_seq=auto_call_seq,
-            ffill_val_price=ffill_val_price,
-            update_value=update_value,
-            save_state=save_state,
-            save_value=save_value,
-            save_returns=save_returns,
-            max_orders=max_orders,
-            max_logs=max_logs,
-        )
-
-        # Create an instance
-        return cls(
-            wrapper,
-            sim_out,
-            open=broadcasted_args["open"] if not open_none else None,
-            high=broadcasted_args["high"] if not high_none else None,
-            low=broadcasted_args["low"] if not low_none else None,
-            close=broadcasted_args["close"],
-            cash_sharing=cash_sharing,
-            init_cash=init_cash if init_cash_mode is None else init_cash_mode,
-            init_position=init_position,
-            init_price=init_price,
-            bm_close=bm_close,
-            **kwargs,
-        )
+            local_kwargs = locals()
+            local_kwargs = {**local_kwargs, **local_kwargs["kwargs"]}
+            del local_kwargs["kwargs"]
+            del local_kwargs["cls"]
+            del local_kwargs["return_preparer"]
+            del local_kwargs["return_prep_result"]
+            del local_kwargs["return_sim_out"]
+            if isinstance(close, Data):
+                local_kwargs["data"] = close
+                local_kwargs["close"] = None
+            preparer = FOPreparer(**local_kwargs)
+            if not return_preparer:
+                preparer.set_seed()
+            prep_result = None
+        if return_preparer:
+            return preparer
+        if prep_result is None:
+            prep_result = preparer.result
+        if return_prep_result:
+            return prep_result
+        sim_out = prep_result.target_func(**prep_result.target_args)
+        if return_sim_out:
+            return sim_out
+        return cls(order_records=sim_out, **prep_result.pf_args)
 
     @classmethod
     def from_signals(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data],
+        close: tp.Union[tp.ArrayLike, Data, FSPreparer, PFPrepResult],
         entries: tp.Optional[tp.ArrayLike] = None,
         exits: tp.Optional[tp.ArrayLike] = None,
-        short_entries: tp.Optional[tp.ArrayLike] = None,
-        short_exits: tp.Optional[tp.ArrayLike] = None,
         *,
         direction: tp.Optional[tp.ArrayLike] = None,
+        long_entries: tp.Optional[tp.ArrayLike] = None,
+        long_exits: tp.Optional[tp.ArrayLike] = None,
+        short_entries: tp.Optional[tp.ArrayLike] = None,
+        short_exits: tp.Optional[tp.ArrayLike] = None,
         adjust_func_nb: tp.Union[None, tp.PathLike, nb.AdjustFuncT] = None,
         adjust_args: tp.Args = (),
         signal_func_nb: tp.Union[None, tp.PathLike, nb.SignalFuncT] = None,
@@ -4839,6 +2840,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         upon_adj_limit_conflict: tp.Optional[tp.ArrayLike] = None,
         upon_opp_limit_conflict: tp.Optional[tp.ArrayLike] = None,
         use_stops: tp.Optional[bool] = None,
+        stop_ladder: tp.Optional[bool] = None,
         sl_stop: tp.Optional[tp.ArrayLike] = None,
         tsl_stop: tp.Optional[tp.ArrayLike] = None,
         tsl_th: tp.Optional[tp.ArrayLike] = None,
@@ -4884,14 +2886,16 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         template_context: tp.Optional[tp.Mapping] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
-        staticized: tp.Union[None, bool, tp.Kwargs, tp.TaskId] = None,
+        staticized: tp.StaticizedOption = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
+        records: tp.Optional[tp.RecordsLike] = None,
+        return_preparer: bool = False,
+        return_prep_result: bool = False,
+        return_sim_out: bool = False,
         **kwargs,
-    ) -> PortfolioT:
+    ) -> PortfolioResultT:
         """Simulate portfolio from entry and exit signals.
-
-        See `vectorbtpro.portfolio.nb.from_signals.from_signal_func_nb`.
 
         Supports the following modes:
 
@@ -4906,8 +2910,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             Uses `vectorbtpro.portfolio.nb.from_signals.order_signal_func_nb` as `signal_func_nb` (not cacheable)
         4. `signal_func_nb` and `signal_args`: Custom signal function (not cacheable)
 
+        Prepared by `vectorbtpro.portfolio.preparing.FSPreparer`.
+
         Args:
-            close (array_like or Data): See `Portfolio.from_orders`.
+            close (array_like, Data, FSPreparer, or PFPrepResult): See `Portfolio.from_orders`.
             entries (array_like of bool): Boolean array of entry signals.
                 Defaults to True if all other signal arrays are not set, otherwise False. Will broadcast.
 
@@ -4920,13 +2926,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 * If `short_entries` and `short_exits` are not set: Acts as a short signal if `direction`
                     is 'all' or 'longonly', otherwise long.
                 * If `short_entries` or `short_exits` are set: Acts as `long_exits`.
+            direction (Direction or array_like): See `Portfolio.from_orders`.
+
+                Takes only effect if `short_entries` and `short_exits` are not set.
+            long_entries (array_like of bool): Boolean array of long entry signals.
+                Defaults to False. Will broadcast.
+            long_exits (array_like of bool): Boolean array of long exit signals.
+                Defaults to False. Will broadcast.
             short_entries (array_like of bool): Boolean array of short entry signals.
                 Defaults to False. Will broadcast.
             short_exits (array_like of bool): Boolean array of short exit signals.
                 Defaults to False. Will broadcast.
-            direction (Direction or array_like): See `Portfolio.from_orders`.
-
-                Takes only effect if `short_entries` and `short_exits` are not set.
             adjust_func_nb (path_like or callable): User-defined function to adjust the current simulation state.
                 Defaults to `vectorbtpro.portfolio.nb.from_signals.no_adjust_func_nb`.
 
@@ -5050,6 +3060,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 the adjustment function is not the default one.
 
                 Disable this to make simulation a bit faster for simple use cases.
+            stop_ladder (bool or StopLadderMode): Whether and which kind of stop laddering to use.
+                See `vectorbtpro.portfolio.enums.StopLadderMode`.
+
+                If so, rows in the supplied arrays will become ladder steps. Make sure that
+                they are increasing. If one column should have less steps, pad it with NaN
+                for price-based stops and -1 for time-based stops.
+
+                Rows in each array can be of an arbitrary length but columns must broadcast against
+                the number of columns in the data. Applied on all stop types.
             sl_stop (array_like of float): Stop loss.
                 Will broadcast.
 
@@ -5172,6 +3191,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 `override` and `reload` to override and reload an already existing module respectively.
             freq (any): See `Portfolio.from_orders`.
             bm_close (array_like): See `Portfolio.from_orders`.
+            records (array_like): See `Portfolio.from_orders`.
+            return_preparer (bool): See `Portfolio.from_orders`.
+            return_prep_result (bool): See `Portfolio.from_orders`.
+            return_sim_out (bool): See `Portfolio.from_orders`.
             **kwargs: Keyword arguments passed to the `Portfolio` constructor.
 
         All broadcastable arguments will broadcast using `vectorbtpro.base.reshaping.broadcast`
@@ -5623,1018 +3646,37 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             Passing both arrays as `broadcast_named_args` broadcasts them internally as any other array,
             so we don't have to worry about their dimensions every time we change our data.
         """
-        # Get defaults
-        from vectorbtpro._settings import settings
-
-        portfolio_cfg = settings["portfolio"]
-
-        if isinstance(close, Data):
-            data = close
-            close = data.close
-            if close is None:
-                raise ValueError("Column for close couldn't be found in data")
-            if open is None:
-                open = data.open
-            if high is None:
-                high = data.high
-            if low is None:
-                low = data.low
-            if freq is None:
-                freq = data.freq
-        if open is None:
-            open_none = True
-            open = np.nan
+        if isinstance(close, FSPreparer):
+            preparer = close
+            prep_result = None
+        elif isinstance(close, PFPrepResult):
+            preparer = None
+            prep_result = close
         else:
-            open_none = False
-        if high is None:
-            high_none = True
-            high = np.nan
-        else:
-            high_none = False
-        if low is None:
-            low_none = True
-            low = np.nan
-        else:
-            low_none = False
-
-        if staticized is None:
-            staticized = portfolio_cfg["staticized"]
-        if isinstance(staticized, bool):
-            if staticized:
-                staticized = dict()
-            else:
-                staticized = None
-        if isinstance(staticized, dict):
-            staticized = dict(staticized)
-            if "func" not in staticized:
-                staticized["func"] = nb.from_signal_func_nb
-        flexible_mode = (
-            (adjust_func_nb is not None)
-            or (signal_func_nb is not None)
-            or (post_segment_func_nb is not None)
-            or order_mode
-            or staticized is not None
-        )
-        ls_mode = short_entries is not None or short_exits is not None
-        signals_mode = entries is not None or exits is not None or ls_mode
-        signal_func_mode = flexible_mode and not signals_mode and not order_mode
-        if direction is not None and ls_mode:
-            raise ValueError("Direction and short signal arrays cannot be used together")
-        if signals_mode and order_mode:
-            raise ValueError("Signal arrays and order mode cannot be used together")
-        if flexible_mode:
-            if signal_func_nb is None:
-                if ls_mode:
-                    signal_func_nb = nb.ls_signal_func_nb
-                    if isinstance(staticized, dict):
-                        adapt_staticized_to_udf(staticized, "ls_signal_func_nb", "signal_func_nb")
-                        staticized["suggest_fname"] = "from_ls_signal_func_nb"
-                elif signals_mode:
-                    signal_func_nb = nb.dir_signal_func_nb
-                    if isinstance(staticized, dict):
-                        adapt_staticized_to_udf(staticized, "dir_signal_func_nb", "signal_func_nb")
-                        staticized["suggest_fname"] = "from_dir_signal_func_nb"
-                elif order_mode:
-                    signal_func_nb = nb.order_signal_func_nb
-                    if isinstance(staticized, dict):
-                        adapt_staticized_to_udf(staticized, "order_signal_func_nb", "signal_func_nb")
-                        staticized["suggest_fname"] = "from_order_signal_func_nb"
-            elif isinstance(staticized, dict):
-                adapt_staticized_to_udf(staticized, signal_func_nb, "signal_func_nb")
-            if adjust_func_nb is None:
-                adjust_func_nb = nb.no_adjust_func_nb
-            elif isinstance(staticized, dict):
-                adapt_staticized_to_udf(staticized, adjust_func_nb, "adjust_func_nb")
-            if post_segment_func_nb is None:
-                post_segment_func_nb = nb.no_post_func_nb
-            elif isinstance(staticized, dict):
-                adapt_staticized_to_udf(staticized, post_segment_func_nb, "post_segment_func_nb")
-
-        if entries is None:
-            entries = False
-        if exits is None:
-            exits = False
-        if short_entries is None:
-            short_entries = False
-        if short_exits is None:
-            short_exits = False
-        if direction is None:
-            direction = portfolio_cfg["signal_direction"]
-        if size is None:
-            size = portfolio_cfg["size"]
-        if size_type is None:
-            size_type = portfolio_cfg["size_type"]
-        if price is None:
-            price = portfolio_cfg["price"]
-        if fees is None:
-            fees = portfolio_cfg["fees"]
-        if fixed_fees is None:
-            fixed_fees = portfolio_cfg["fixed_fees"]
-        if slippage is None:
-            slippage = portfolio_cfg["slippage"]
-        if min_size is None:
-            min_size = portfolio_cfg["min_size"]
-        if max_size is None:
-            max_size = portfolio_cfg["max_size"]
-        if size_granularity is None:
-            size_granularity = portfolio_cfg["size_granularity"]
-        if leverage is None:
-            leverage = portfolio_cfg["leverage"]
-        if leverage_mode is None:
-            leverage_mode = portfolio_cfg["leverage_mode"]
-        if reject_prob is None:
-            reject_prob = portfolio_cfg["reject_prob"]
-        if price_area_vio_mode is None:
-            price_area_vio_mode = portfolio_cfg["price_area_vio_mode"]
-        if allow_partial is None:
-            allow_partial = portfolio_cfg["allow_partial"]
-        if raise_reject is None:
-            raise_reject = portfolio_cfg["raise_reject"]
-        if log is None:
-            log = portfolio_cfg["log"]
-        if val_price is None:
-            val_price = portfolio_cfg["val_price"]
-        if accumulate is None:
-            accumulate = portfolio_cfg["accumulate"]
-        if upon_long_conflict is None:
-            upon_long_conflict = portfolio_cfg["upon_long_conflict"]
-        if upon_short_conflict is None:
-            upon_short_conflict = portfolio_cfg["upon_short_conflict"]
-        if upon_dir_conflict is None:
-            upon_dir_conflict = portfolio_cfg["upon_dir_conflict"]
-        if upon_opposite_entry is None:
-            upon_opposite_entry = portfolio_cfg["upon_opposite_entry"]
-        if order_type is None:
-            order_type = portfolio_cfg["order_type"]
-        if limit_delta is None:
-            limit_delta = portfolio_cfg["limit_delta"]
-        if limit_tif is None:
-            limit_tif = portfolio_cfg["limit_tif"]
-        if isinstance(limit_tif, (str, timedelta, pd.DateOffset, pd.Timedelta)):
-            limit_tif = freq_to_timedelta64(limit_tif)
-        elif isinstance(limit_tif, pd.Index):
-            limit_tif = limit_tif.values
-        if limit_expiry is None:
-            limit_expiry = portfolio_cfg["limit_expiry"]
-        if isinstance(limit_expiry, (str, time, timedelta, pd.DateOffset, pd.Timedelta)):
-            limit_expiry_dt_template = RepEval(
-                "try_align_to_datetime_index([limit_expiry], wrapper.index).vbt.to_ns()",
-                context=dict(try_align_to_datetime_index=try_align_to_datetime_index, limit_expiry=limit_expiry),
-            )
-            limit_expiry_td_template = RepEval(
-                "wrapper.index.vbt.to_period_ns(parse_timedelta(limit_expiry))",
-                context=dict(parse_timedelta=parse_timedelta, limit_expiry=limit_expiry),
-            )
-            limit_expiry_time_template = RepEval(
-                "(wrapper.index.floor(\"1d\") + time_to_timedelta(limit_expiry)).vbt.to_ns()",
-                context=dict(time_to_timedelta=time_to_timedelta, limit_expiry=limit_expiry),
-            )
-            if isinstance(limit_expiry, str):
-                try:
-                    time.fromisoformat(limit_expiry)
-                    limit_expiry = limit_expiry_time_template
-                except Exception as e:
-                    try:
-                        parse_timedelta(limit_expiry)
-                        limit_expiry = limit_expiry_td_template
-                    except Exception as e:
-                        limit_expiry = limit_expiry_dt_template
-            elif isinstance(limit_expiry, time):
-                limit_expiry = limit_expiry_time_template
-            else:
-                limit_expiry = limit_expiry_td_template
-        elif isinstance(limit_expiry, pd.Index):
-            limit_expiry = limit_expiry.values
-        if limit_reverse is None:
-            limit_reverse = portfolio_cfg["limit_reverse"]
-        if upon_adj_limit_conflict is None:
-            upon_adj_limit_conflict = portfolio_cfg["upon_adj_limit_conflict"]
-        if upon_opp_limit_conflict is None:
-            upon_opp_limit_conflict = portfolio_cfg["upon_opp_limit_conflict"]
-        if sl_stop is None:
-            sl_stop = portfolio_cfg["sl_stop"]
-        if tsl_stop is None:
-            tsl_stop = portfolio_cfg["tsl_stop"]
-        if tsl_th is None:
-            tsl_th = portfolio_cfg["tsl_th"]
-        if tp_stop is None:
-            tp_stop = portfolio_cfg["tp_stop"]
-        if td_stop is None:
-            td_stop = portfolio_cfg["td_stop"]
-        if isinstance(td_stop, (str, timedelta, pd.DateOffset, pd.Timedelta)):
-            td_stop = freq_to_timedelta64(td_stop)
-        elif isinstance(td_stop, pd.Index):
-            td_stop = td_stop.values
-        if dt_stop is None:
-            dt_stop = portfolio_cfg["dt_stop"]
-        if isinstance(dt_stop, (str, time, timedelta, pd.DateOffset, pd.Timedelta)):
-            dt_stop_dt_template = RepEval(
-                "try_align_to_datetime_index([dt_stop], wrapper.index).vbt.to_ns() - 1",
-                context=dict(try_align_to_datetime_index=try_align_to_datetime_index, dt_stop=dt_stop),
-            )
-            dt_stop_td_template = RepEval(
-                "wrapper.index.vbt.to_period_ns(parse_timedelta(dt_stop)) - 1",
-                context=dict(parse_timedelta=parse_timedelta, dt_stop=dt_stop),
-            )
-            dt_stop_time_template = RepEval(
-                "(wrapper.index.floor(\"1d\") + time_to_timedelta(dt_stop)).vbt.to_ns() - 1",
-                context=dict(time_to_timedelta=time_to_timedelta, dt_stop=dt_stop),
-            )
-            if isinstance(dt_stop, str):
-                try:
-                    time.fromisoformat(dt_stop)
-                    dt_stop = dt_stop_time_template
-                except Exception as e:
-                    try:
-                        parse_timedelta(dt_stop)
-                        dt_stop = dt_stop_td_template
-                    except Exception as e:
-                        dt_stop = dt_stop_dt_template
-            elif isinstance(dt_stop, time):
-                dt_stop = dt_stop_time_template
-            else:
-                dt_stop = dt_stop_td_template
-        elif isinstance(dt_stop, pd.Index):
-            dt_stop = dt_stop.values
-        if use_stops is None:
-            use_stops = portfolio_cfg["use_stops"]
-        if stop_entry_price is None:
-            stop_entry_price = portfolio_cfg["stop_entry_price"]
-        if stop_exit_price is None:
-            stop_exit_price = portfolio_cfg["stop_exit_price"]
-        if stop_exit_type is None:
-            stop_exit_type = portfolio_cfg["stop_exit_type"]
-        if stop_order_type is None:
-            stop_order_type = portfolio_cfg["stop_order_type"]
-        if stop_limit_delta is None:
-            stop_limit_delta = portfolio_cfg["stop_limit_delta"]
-        if upon_stop_update is None:
-            upon_stop_update = portfolio_cfg["upon_stop_update"]
-        if upon_adj_stop_conflict is None:
-            upon_adj_stop_conflict = portfolio_cfg["upon_adj_stop_conflict"]
-        if upon_opp_stop_conflict is None:
-            upon_opp_stop_conflict = portfolio_cfg["upon_opp_stop_conflict"]
-        if delta_format is None:
-            delta_format = portfolio_cfg["delta_format"]
-        if time_delta_format is None:
-            time_delta_format = portfolio_cfg["time_delta_format"]
-
-        if init_cash is None:
-            init_cash = portfolio_cfg["init_cash"]
-        if isinstance(init_cash, str):
-            init_cash = map_enum_fields(init_cash, InitCashMode)
-        if checks.is_int(init_cash) and init_cash in InitCashMode:
-            init_cash_mode = init_cash
-            init_cash = np.inf
-        else:
-            init_cash_mode = None
-        if init_position is None:
-            init_position = portfolio_cfg["init_position"]
-        if init_price is None:
-            init_price = portfolio_cfg["init_price"]
-        if cash_deposits is None:
-            cash_deposits = portfolio_cfg["cash_deposits"]
-        if cash_earnings is None:
-            cash_earnings = portfolio_cfg["cash_earnings"]
-        if cash_dividends is None:
-            cash_dividends = portfolio_cfg["cash_dividends"]
-        if cash_sharing is None:
-            cash_sharing = portfolio_cfg["cash_sharing"]
-        if cash_sharing and group_by is None:
-            group_by = True
-        if from_ago is None:
-            from_ago = portfolio_cfg["from_ago"]
-        if from_ago is None:
-            from_ago = 0
-            from_ago_none = True
-        else:
-            from_ago_none = False
-        if call_seq is None:
-            call_seq = portfolio_cfg["call_seq"]
-        auto_call_seq = False
-        if isinstance(call_seq, str):
-            call_seq = map_enum_fields(call_seq, CallSeqType)
-        if checks.is_int(call_seq):
-            if call_seq == CallSeqType.Auto:
-                auto_call_seq = True
-                call_seq = None
-        if attach_call_seq is None:
-            attach_call_seq = portfolio_cfg["attach_call_seq"]
-        if ffill_val_price is None:
-            ffill_val_price = portfolio_cfg["ffill_val_price"]
-        if update_value is None:
-            update_value = portfolio_cfg["update_value"]
-        if fill_pos_info is None:
-            fill_pos_info = portfolio_cfg["fill_pos_info"]
-        if save_state is None:
-            save_state = portfolio_cfg["save_state"]
-        if save_value is None:
-            save_value = portfolio_cfg["save_value"]
-        if save_returns is None:
-            save_returns = portfolio_cfg["save_returns"]
-        if seed is None:
-            seed = portfolio_cfg["seed"]
-        if seed is not None:
-            set_seed(seed)
-        if flexible_mode:
-            if save_state:
-                raise ValueError("Argument save_state cannot be used in flexible mode")
-            if save_value:
-                raise ValueError("Argument save_value cannot be used in flexible mode")
-            if save_returns:
-                raise ValueError("Argument save_returns cannot be used in flexible mode")
-            if (
-                in_outputs is not None
-                and not isinstance(in_outputs, CustomTemplate)
-                and not checks.is_namedtuple(in_outputs)
-            ):
-                in_outputs = to_mapping(in_outputs)
-                in_outputs = namedtuple("InOutputs", in_outputs)(**in_outputs)
-        else:
-            if in_outputs is not None:
-                raise ValueError("Argument in_outputs cannot be used in fixed mode")
-        if group_by is None:
-            group_by = portfolio_cfg["group_by"]
-        if freq is None:
-            freq = portfolio_cfg["freq"]
-        if broadcast_named_args is None:
-            broadcast_named_args = {}
-        broadcast_kwargs = merge_dicts(portfolio_cfg["broadcast_kwargs"], broadcast_kwargs)
-        require_kwargs = broadcast_kwargs.get("require_kwargs", {})
-        template_context = merge_dicts(portfolio_cfg["template_context"], template_context)
-        if bm_close is None:
-            bm_close = portfolio_cfg["bm_close"]
-
-        # Prepare the simulation
-        broadcastable_args = dict(
-            entries=entries,
-            exits=exits,
-            short_entries=short_entries,
-            short_exits=short_exits,
-            direction=direction,
-            cash_earnings=cash_earnings,
-            cash_dividends=cash_dividends,
-            size=size,
-            price=price,
-            size_type=size_type,
-            fees=fees,
-            fixed_fees=fixed_fees,
-            slippage=slippage,
-            min_size=min_size,
-            max_size=max_size,
-            size_granularity=size_granularity,
-            leverage=leverage,
-            leverage_mode=leverage_mode,
-            reject_prob=reject_prob,
-            price_area_vio_mode=price_area_vio_mode,
-            allow_partial=allow_partial,
-            raise_reject=raise_reject,
-            log=log,
-            val_price=val_price,
-            accumulate=accumulate,
-            upon_long_conflict=upon_long_conflict,
-            upon_short_conflict=upon_short_conflict,
-            upon_dir_conflict=upon_dir_conflict,
-            upon_opposite_entry=upon_opposite_entry,
-            order_type=order_type,
-            limit_delta=limit_delta,
-            limit_tif=limit_tif,
-            limit_expiry=limit_expiry,
-            limit_reverse=limit_reverse,
-            upon_adj_limit_conflict=upon_adj_limit_conflict,
-            upon_opp_limit_conflict=upon_opp_limit_conflict,
-            sl_stop=sl_stop,
-            tsl_stop=tsl_stop,
-            tsl_th=tsl_th,
-            tp_stop=tp_stop,
-            td_stop=td_stop,
-            dt_stop=dt_stop,
-            stop_entry_price=stop_entry_price,
-            stop_exit_price=stop_exit_price,
-            stop_exit_type=stop_exit_type,
-            stop_order_type=stop_order_type,
-            stop_limit_delta=stop_limit_delta,
-            upon_stop_update=upon_stop_update,
-            upon_adj_stop_conflict=upon_adj_stop_conflict,
-            upon_opp_stop_conflict=upon_opp_stop_conflict,
-            delta_format=delta_format,
-            time_delta_format=time_delta_format,
-            open=open,
-            high=high,
-            low=low,
-            close=close,
-            from_ago=from_ago,
-        )
-        if bm_close is not None and not isinstance(bm_close, bool):
-            broadcastable_args["bm_close"] = bm_close
-        else:
-            broadcastable_args["bm_close"] = None
-        broadcastable_args = {**broadcastable_args, **broadcast_named_args}
-        def_broadcast_kwargs = dict(
-            to_pd=False,
-            keep_flex=True,
-            reindex_kwargs=dict(
-                entries=dict(fill_value=False),
-                exits=dict(fill_value=False),
-                short_entries=dict(fill_value=False),
-                short_exits=dict(fill_value=False),
-                direction=dict(fill_value=Direction.Both),
-                cash_earnings=dict(fill_value=0.0),
-                cash_dividends=dict(fill_value=0.0),
-                size=dict(fill_value=np.nan),
-                price=dict(fill_value=np.nan),
-                size_type=dict(fill_value=SizeType.Amount),
-                fees=dict(fill_value=0.0),
-                fixed_fees=dict(fill_value=0.0),
-                slippage=dict(fill_value=0.0),
-                min_size=dict(fill_value=np.nan),
-                max_size=dict(fill_value=np.nan),
-                size_granularity=dict(fill_value=np.nan),
-                leverage=dict(fill_value=1.0),
-                leverage_mode=dict(fill_value=LeverageMode.Lazy),
-                reject_prob=dict(fill_value=0.0),
-                price_area_vio_mode=dict(fill_value=PriceAreaVioMode.Ignore),
-                allow_partial=dict(fill_value=True),
-                raise_reject=dict(fill_value=False),
-                log=dict(fill_value=False),
-                val_price=dict(fill_value=np.nan),
-                accumulate=dict(fill_value=False),
-                upon_long_conflict=dict(fill_value=ConflictMode.Ignore),
-                upon_short_conflict=dict(fill_value=ConflictMode.Ignore),
-                upon_dir_conflict=dict(fill_value=DirectionConflictMode.Ignore),
-                upon_opposite_entry=dict(fill_value=OppositeEntryMode.ReverseReduce),
-                order_type=dict(fill_value=OrderType.Market),
-                limit_delta=dict(fill_value=np.nan),
-                limit_tif=dict(fill_value=-1),
-                limit_expiry=dict(fill_value=-1),
-                limit_reverse=dict(fill_value=False),
-                upon_adj_limit_conflict=dict(fill_value=PendingConflictMode.KeepIgnore),
-                upon_opp_limit_conflict=dict(fill_value=PendingConflictMode.CancelExecute),
-                sl_stop=dict(fill_value=np.nan),
-                tsl_stop=dict(fill_value=np.nan),
-                tsl_th=dict(fill_value=np.nan),
-                tp_stop=dict(fill_value=np.nan),
-                td_stop=dict(fill_value=-1),
-                dt_stop=dict(fill_value=-1),
-                stop_entry_price=dict(fill_value=StopEntryPrice.Close),
-                stop_exit_price=dict(fill_value=StopExitPrice.Stop),
-                stop_exit_type=dict(fill_value=StopExitType.Close),
-                stop_order_type=dict(fill_value=OrderType.Market),
-                stop_limit_delta=dict(fill_value=np.nan),
-                upon_stop_update=dict(fill_value=StopUpdateMode.Override),
-                upon_adj_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
-                upon_opp_stop_conflict=dict(fill_value=PendingConflictMode.KeepExecute),
-                delta_format=dict(fill_value=DeltaFormat.Percent),
-                time_delta_format=dict(fill_value=TimeDeltaFormat.Index),
-                open=dict(fill_value=np.nan),
-                high=dict(fill_value=np.nan),
-                low=dict(fill_value=np.nan),
-                close=dict(fill_value=np.nan),
-                bm_close=dict(fill_value=np.nan),
-                from_ago=dict(fill_value=0),
-            ),
-            wrapper_kwargs=dict(
-                freq=freq,
-                group_by=group_by,
-            ),
-        )
-        if order_mode:
-            def_broadcast_kwargs["keep_flex"] = dict(
-                size=False,
-                size_type=False,
-                min_size=False,
-                max_size=False,
-                _def=True,
-            )
-            def_broadcast_kwargs["min_ndim"] = dict(
-                size=2,
-                size_type=2,
-                min_size=2,
-                max_size=2,
-                _def=None,
-            )
-            def_broadcast_kwargs["require_kwargs"] = dict(
-                size=dict(requirements="O"),
-                size_type=dict(requirements="O"),
-                min_size=dict(requirements="O"),
-                max_size=dict(requirements="O"),
-            )
-        broadcast_kwargs = merge_dicts(def_broadcast_kwargs, broadcast_kwargs)
-        broadcasted_args, wrapper = broadcast(broadcastable_args, return_wrapper=True, **broadcast_kwargs)
-        if not wrapper.group_select and cash_sharing:
-            raise ValueError("group_select cannot be disabled if cash_sharing=True")
-        cash_earnings = broadcasted_args.pop("cash_earnings")
-        cash_dividends = broadcasted_args.pop("cash_dividends")
-        target_shape_2d = wrapper.shape_2d
-        index = wrapper.ns_index
-        freq = wrapper.ns_freq
-
-        cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
-        init_cash = np.require(broadcast_array_to(init_cash, len(cs_group_lens)), dtype=np.float_)
-        init_position = np.require(broadcast_array_to(init_position, target_shape_2d[1]), dtype=np.float_)
-        init_price = np.require(broadcast_array_to(init_price, target_shape_2d[1]), dtype=np.float_)
-        if (((init_position > 0) | (init_position < 0)) & np.isnan(init_price)).any():
-            warnings.warn(f"Initial position has undefined price. Set init_price.", stacklevel=2)
-        cash_deposits = broadcast(
-            cash_deposits,
-            to_shape=(target_shape_2d[0], len(cs_group_lens)),
-            to_pd=False,
-            keep_flex=True,
-            reindex_kwargs=dict(fill_value=0.0),
-            require_kwargs=require_kwargs,
-        )
-        group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-        if call_seq is None and attach_call_seq:
-            call_seq = CallSeqType.Default
-        if call_seq is not None:
-            if checks.is_any_array(call_seq):
-                call_seq = require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
-            else:
-                call_seq = build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
-        if max_logs is None:
-            _log = broadcasted_args["log"]
-            if _log.size == 1:
-                max_logs = target_shape_2d[0] * int(_log.item(0))
-            else:
-                if _log.shape[0] == 1 and target_shape_2d[0] > 1:
-                    max_logs = target_shape_2d[0] * int(np.any(_log))
-                else:
-                    max_logs = int(np.max(np.sum(_log, axis=0)))
-        if use_stops is None:
-            if flexible_mode:
-                use_stops = True
-            else:
-                if (
-                    not np.any(broadcasted_args["sl_stop"])
-                    and not np.any(broadcasted_args["tsl_stop"])
-                    and not np.any(broadcasted_args["tp_stop"])
-                    and not np.any(broadcasted_args["td_stop"] != -1)
-                    and not np.any(broadcasted_args["dt_stop"] != -1)
-                ):
-                    use_stops = False
-                else:
-                    use_stops = True
-
-        # Convert strings to numbers
-        if "direction" in broadcasted_args:
-            broadcasted_args["direction"] = map_enum_fields(broadcasted_args["direction"], Direction)
-        broadcasted_args["price"] = map_enum_fields(broadcasted_args["price"], PriceType, ignore_type=(int, float))
-        broadcasted_args["size_type"] = map_enum_fields(broadcasted_args["size_type"], SizeType)
-        broadcasted_args["leverage_mode"] = map_enum_fields(broadcasted_args["leverage_mode"], LeverageMode)
-        broadcasted_args["price_area_vio_mode"] = map_enum_fields(
-            broadcasted_args["price_area_vio_mode"],
-            PriceAreaVioMode,
-        )
-        broadcasted_args["val_price"] = map_enum_fields(
-            broadcasted_args["val_price"],
-            ValPriceType,
-            ignore_type=(int, float),
-        )
-        broadcasted_args["accumulate"] = map_enum_fields(
-            broadcasted_args["accumulate"],
-            AccumulationMode,
-            ignore_type=(int, bool),
-        )
-        broadcasted_args["upon_long_conflict"] = map_enum_fields(broadcasted_args["upon_long_conflict"], ConflictMode)
-        broadcasted_args["upon_short_conflict"] = map_enum_fields(broadcasted_args["upon_short_conflict"], ConflictMode)
-        broadcasted_args["upon_dir_conflict"] = map_enum_fields(
-            broadcasted_args["upon_dir_conflict"],
-            DirectionConflictMode,
-        )
-        broadcasted_args["upon_opposite_entry"] = map_enum_fields(
-            broadcasted_args["upon_opposite_entry"],
-            OppositeEntryMode,
-        )
-        broadcasted_args["order_type"] = map_enum_fields(broadcasted_args["order_type"], OrderType)
-        limit_tif = broadcasted_args["limit_tif"]
-        if limit_tif.dtype == object:
-            if limit_tif.ndim in (0, 1):
-                limit_tif = pd.to_timedelta(limit_tif)
-                if isinstance(limit_tif, pd.Timedelta):
-                    limit_tif = limit_tif.to_timedelta64()
-                else:
-                    limit_tif = limit_tif.values
-            else:
-                limit_tif_cols = []
-                for col in range(limit_tif.shape[1]):
-                    limit_tif_col = pd.to_timedelta(limit_tif[:, col])
-                    limit_tif_cols.append(limit_tif_col.values)
-                limit_tif = np.column_stack(limit_tif_cols)
-        broadcasted_args["limit_tif"] = limit_tif.astype(np.int64)
-        limit_expiry = broadcasted_args["limit_expiry"]
-        if limit_expiry.dtype == object:
-            if limit_expiry.ndim in (0, 1):
-                limit_expiry = pd.to_datetime(limit_expiry).tz_localize(None)
-                if isinstance(limit_expiry, pd.Timestamp):
-                    limit_expiry = limit_expiry.to_datetime64()
-                else:
-                    limit_expiry = limit_expiry.values
-            else:
-                limit_expiry_cols = []
-                for col in range(limit_expiry.shape[1]):
-                    limit_expiry_col = pd.to_datetime(limit_expiry[:, col]).tz_localize(None)
-                    limit_expiry_cols.append(limit_expiry_col.values)
-                limit_expiry = np.column_stack(limit_expiry_cols)
-        broadcasted_args["limit_expiry"] = limit_expiry.astype(np.int64)
-        td_stop = broadcasted_args["td_stop"]
-        if td_stop.dtype == object:
-            if td_stop.ndim in (0, 1):
-                td_stop = pd.to_timedelta(td_stop)
-                if isinstance(td_stop, pd.Timedelta):
-                    td_stop = td_stop.to_timedelta64()
-                else:
-                    td_stop = td_stop.values
-            else:
-                td_stop_cols = []
-                for col in range(td_stop.shape[1]):
-                    td_stop_col = pd.to_timedelta(td_stop[:, col])
-                    td_stop_cols.append(td_stop_col.values)
-                td_stop = np.column_stack(td_stop_cols)
-        broadcasted_args["td_stop"] = td_stop.astype(np.int64)
-        dt_stop = broadcasted_args["dt_stop"]
-        if dt_stop.dtype == object:
-            if dt_stop.ndim in (0, 1):
-                dt_stop = pd.to_datetime(dt_stop).tz_localize(None)
-                if isinstance(dt_stop, pd.Timestamp):
-                    dt_stop = dt_stop.to_datetime64()
-                else:
-                    dt_stop = dt_stop.values
-            else:
-                dt_stop_cols = []
-                for col in range(dt_stop.shape[1]):
-                    dt_stop_col = pd.to_datetime(dt_stop[:, col]).tz_localize(None)
-                    dt_stop_cols.append(dt_stop_col.values)
-                dt_stop = np.column_stack(dt_stop_cols)
-        broadcasted_args["dt_stop"] = dt_stop.astype(np.int64)
-        broadcasted_args["upon_adj_limit_conflict"] = map_enum_fields(
-            broadcasted_args["upon_adj_limit_conflict"],
-            PendingConflictMode,
-        )
-        broadcasted_args["upon_opp_limit_conflict"] = map_enum_fields(
-            broadcasted_args["upon_opp_limit_conflict"],
-            PendingConflictMode,
-        )
-        broadcasted_args["stop_entry_price"] = map_enum_fields(
-            broadcasted_args["stop_entry_price"],
-            StopEntryPrice,
-            ignore_type=(int, float),
-        )
-        broadcasted_args["stop_exit_price"] = map_enum_fields(
-            broadcasted_args["stop_exit_price"],
-            StopExitPrice,
-            ignore_type=(int, float),
-        )
-        broadcasted_args["stop_exit_type"] = map_enum_fields(broadcasted_args["stop_exit_type"], StopExitType)
-        broadcasted_args["stop_order_type"] = map_enum_fields(broadcasted_args["stop_order_type"], OrderType)
-        broadcasted_args["upon_stop_update"] = map_enum_fields(broadcasted_args["upon_stop_update"], StopUpdateMode)
-        broadcasted_args["upon_adj_stop_conflict"] = map_enum_fields(
-            broadcasted_args["upon_adj_stop_conflict"],
-            PendingConflictMode,
-        )
-        broadcasted_args["upon_opp_stop_conflict"] = map_enum_fields(
-            broadcasted_args["upon_opp_stop_conflict"],
-            PendingConflictMode,
-        )
-        broadcasted_args["delta_format"] = map_enum_fields(broadcasted_args["delta_format"], DeltaFormat)
-        broadcasted_args["time_delta_format"] = map_enum_fields(broadcasted_args["time_delta_format"], TimeDeltaFormat)
-
-        # Check data types
-        checks.assert_subdtype(broadcasted_args["entries"], np.bool_, arg_name="entries")
-        checks.assert_subdtype(broadcasted_args["exits"], np.bool_, arg_name="exits")
-        checks.assert_subdtype(broadcasted_args["short_entries"], np.bool_, arg_name="short_entries")
-        checks.assert_subdtype(broadcasted_args["short_exits"], np.bool_, arg_name="short_exits")
-        checks.assert_subdtype(broadcasted_args["direction"], np.integer, arg_name="direction")
-        checks.assert_subdtype(broadcasted_args["size"], np.number, arg_name="size")
-        checks.assert_subdtype(broadcasted_args["price"], np.number, arg_name="price")
-        checks.assert_subdtype(broadcasted_args["size_type"], np.integer, arg_name="size_type")
-        checks.assert_subdtype(broadcasted_args["fees"], np.number, arg_name="fees")
-        checks.assert_subdtype(broadcasted_args["fixed_fees"], np.number, arg_name="fixed_fees")
-        checks.assert_subdtype(broadcasted_args["slippage"], np.number, arg_name="slippage")
-        checks.assert_subdtype(broadcasted_args["min_size"], np.number, arg_name="min_size")
-        checks.assert_subdtype(broadcasted_args["max_size"], np.number, arg_name="max_size")
-        checks.assert_subdtype(broadcasted_args["size_granularity"], np.number, arg_name="size_granularity")
-        checks.assert_subdtype(broadcasted_args["leverage"], np.number, arg_name="leverage")
-        checks.assert_subdtype(broadcasted_args["leverage_mode"], np.integer, arg_name="leverage_mode")
-        checks.assert_subdtype(broadcasted_args["reject_prob"], np.number, arg_name="reject_prob")
-        checks.assert_subdtype(broadcasted_args["price_area_vio_mode"], np.integer, arg_name="price_area_vio_mode")
-        checks.assert_subdtype(broadcasted_args["allow_partial"], np.bool_, arg_name="allow_partial")
-        checks.assert_subdtype(broadcasted_args["raise_reject"], np.bool_, arg_name="raise_reject")
-        checks.assert_subdtype(broadcasted_args["log"], np.bool_, arg_name="log")
-        checks.assert_subdtype(broadcasted_args["val_price"], np.number, arg_name="val_price")
-        checks.assert_subdtype(broadcasted_args["accumulate"], (np.integer, np.bool_), arg_name="accumulate")
-        checks.assert_subdtype(broadcasted_args["upon_long_conflict"], np.integer, arg_name="upon_long_conflict")
-        checks.assert_subdtype(broadcasted_args["upon_short_conflict"], np.integer, arg_name="upon_short_conflict")
-        checks.assert_subdtype(broadcasted_args["upon_dir_conflict"], np.integer, arg_name="upon_dir_conflict")
-        checks.assert_subdtype(broadcasted_args["upon_opposite_entry"], np.integer, arg_name="upon_opposite_entry")
-        checks.assert_subdtype(broadcasted_args["order_type"], np.integer, arg_name="order_type")
-        checks.assert_subdtype(broadcasted_args["limit_delta"], np.number, arg_name="limit_delta")
-        checks.assert_subdtype(broadcasted_args["limit_tif"], np.integer, arg_name="limit_tif")
-        checks.assert_subdtype(broadcasted_args["limit_expiry"], np.integer, arg_name="limit_expiry")
-        checks.assert_subdtype(broadcasted_args["limit_reverse"], np.bool_, arg_name="limit_reverse")
-        checks.assert_subdtype(
-            broadcasted_args["upon_adj_limit_conflict"], np.integer, arg_name="upon_adj_limit_conflict"
-        )
-        checks.assert_subdtype(
-            broadcasted_args["upon_opp_limit_conflict"], np.integer, arg_name="upon_opp_limit_conflict"
-        )
-        checks.assert_subdtype(broadcasted_args["sl_stop"], np.number, arg_name="sl_stop")
-        checks.assert_subdtype(broadcasted_args["tsl_stop"], np.number, arg_name="tsl_stop")
-        checks.assert_subdtype(broadcasted_args["tsl_th"], np.number, arg_name="tsl_th")
-        checks.assert_subdtype(broadcasted_args["tp_stop"], np.number, arg_name="tp_stop")
-        checks.assert_subdtype(broadcasted_args["td_stop"], np.integer, arg_name="td_stop")
-        checks.assert_subdtype(broadcasted_args["dt_stop"], np.integer, arg_name="dt_stop")
-        checks.assert_subdtype(broadcasted_args["stop_entry_price"], np.number, arg_name="stop_entry_price")
-        checks.assert_subdtype(broadcasted_args["stop_exit_price"], np.number, arg_name="stop_exit_price")
-        checks.assert_subdtype(broadcasted_args["stop_exit_type"], np.integer, arg_name="stop_exit_type")
-        checks.assert_subdtype(broadcasted_args["stop_order_type"], np.integer, arg_name="stop_order_type")
-        checks.assert_subdtype(broadcasted_args["stop_limit_delta"], np.number, arg_name="stop_limit_delta")
-        checks.assert_subdtype(broadcasted_args["upon_stop_update"], np.integer, arg_name="upon_stop_update")
-        checks.assert_subdtype(
-            broadcasted_args["upon_adj_stop_conflict"], np.integer, arg_name="upon_adj_stop_conflict"
-        )
-        checks.assert_subdtype(
-            broadcasted_args["upon_opp_stop_conflict"], np.integer, arg_name="upon_opp_stop_conflict"
-        )
-        checks.assert_subdtype(broadcasted_args["delta_format"], np.integer, arg_name="delta_format")
-        checks.assert_subdtype(broadcasted_args["time_delta_format"], np.integer, arg_name="time_delta_format")
-        checks.assert_subdtype(broadcasted_args["open"], np.number, arg_name="open")
-        checks.assert_subdtype(broadcasted_args["high"], np.number, arg_name="high")
-        checks.assert_subdtype(broadcasted_args["low"], np.number, arg_name="low")
-        checks.assert_subdtype(broadcasted_args["close"], np.number, arg_name="close")
-        if bm_close is not None and not isinstance(bm_close, bool):
-            checks.assert_subdtype(broadcasted_args["bm_close"], np.number, arg_name="bm_close")
-        checks.assert_subdtype(cs_group_lens, np.integer, arg_name="cs_group_lens")
-        checks.assert_subdtype(broadcasted_args["from_ago"], np.integer, arg_name="from_ago")
-        if call_seq is not None:
-            checks.assert_subdtype(call_seq, np.integer, arg_name="call_seq")
-        checks.assert_subdtype(init_cash, np.number, arg_name="init_cash")
-        checks.assert_subdtype(init_position, np.number, arg_name="init_position")
-        checks.assert_subdtype(init_price, np.number, arg_name="init_price")
-        checks.assert_subdtype(cash_deposits, np.number, arg_name="cash_deposits")
-        checks.assert_subdtype(cash_earnings, np.number, arg_name="cash_earnings")
-        checks.assert_subdtype(cash_dividends, np.number, arg_name="cash_dividends")
-
-        # Prepare price
-        if from_ago_none:
-            price = broadcasted_args["price"]
-            if price.size == 1 or price.shape[0] == 1:
-                next_open_mask = price == PriceType.NextOpen
-                next_close_mask = price == PriceType.NextClose
-                if next_open_mask.any() or next_close_mask.any():
-                    price = price.astype(np.float_)
-                    price[next_open_mask] = PriceType.Open
-                    price[next_close_mask] = PriceType.Close
-                    from_ago = np.full(price.shape, 0, dtype=np.int_)
-                    from_ago[next_open_mask] = 1
-                    from_ago[next_close_mask] = 1
-                    broadcasted_args["price"] = price
-                    broadcasted_args["from_ago"] = from_ago
-
-        # Prepare arguments
-        template_context = merge_dicts(
-            broadcasted_args,
-            dict(
-                target_shape=target_shape_2d,
-                index=index,
-                freq=freq,
-                group_lens=group_lens if flexible_mode else cs_group_lens,
-                cs_group_lens=cs_group_lens,
-                call_seq=call_seq,
-                init_cash=init_cash,
-                init_position=init_position,
-                init_price=init_price,
-                cash_deposits=cash_deposits,
-                cash_earnings=cash_earnings,
-                cash_dividends=cash_dividends,
-                use_stops=use_stops,
-                adjust_func_nb=adjust_func_nb,
-                adjust_args=adjust_args,
-                auto_call_seq=auto_call_seq,
-                ffill_val_price=ffill_val_price,
-                update_value=update_value,
-                fill_pos_info=fill_pos_info,
-                save_state=save_state,
-                save_value=save_value,
-                save_returns=save_returns,
-                max_orders=max_orders,
-                max_logs=max_logs,
-                in_outputs=in_outputs,
-                wrapper=wrapper,
-            ),
-            template_context,
-        )
-        entries = broadcasted_args.pop("entries")
-        exits = broadcasted_args.pop("exits")
-        short_entries = broadcasted_args.pop("short_entries")
-        short_exits = broadcasted_args.pop("short_exits")
-        direction = broadcasted_args.pop("direction")
-
-        if flexible_mode:
-            in_outputs = substitute_templates(in_outputs, template_context, sub_id="in_outputs")
-            post_segment_args = substitute_templates(post_segment_args, template_context, sub_id="post_segment_args")
-            if signal_func_mode:
-                signal_args = substitute_templates(signal_args, template_context, sub_id="signal_args")
-            else:
-                adjust_args = substitute_templates(adjust_args, template_context, sub_id="adjust_args")
-                if ls_mode:
-                    signal_args = (
-                        entries,
-                        exits,
-                        short_entries,
-                        short_exits,
-                        broadcasted_args["from_ago"],
-                        *((adjust_func_nb,) if staticized is None else ()),
-                        adjust_args,
-                    )
-                    chunked = ch.specialize_chunked_option(
-                        chunked,
-                        arg_take_spec=dict(
-                            signal_args=ch.ArgsTaker(
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                *((None,) if staticized is None else ()),
-                                ArgsTaker(),
-                            )
-                        ),
-                    )
-                elif order_mode:
-                    adjust_args = substitute_templates(adjust_args, template_context, sub_id="adjust_args")
-                    signal_args = (
-                        broadcasted_args["size"],
-                        broadcasted_args["price"],
-                        broadcasted_args["size_type"],
-                        direction,
-                        broadcasted_args["min_size"],
-                        broadcasted_args["max_size"],
-                        broadcasted_args["val_price"],
-                        broadcasted_args["from_ago"],
-                        *((adjust_func_nb,) if staticized is None else ()),
-                        adjust_args,
-                    )
-                    chunked = ch.specialize_chunked_option(
-                        chunked,
-                        arg_take_spec=dict(
-                            signal_args=ch.ArgsTaker(
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                *((None,) if staticized is None else ()),
-                                ArgsTaker(),
-                            )
-                        ),
-                    )
-                else:
-                    signal_args = (
-                        entries,
-                        exits,
-                        direction,
-                        broadcasted_args["from_ago"],
-                        *((adjust_func_nb,) if staticized is None else ()),
-                        adjust_args,
-                    )
-                    chunked = ch.specialize_chunked_option(
-                        chunked,
-                        arg_take_spec=dict(
-                            signal_args=ch.ArgsTaker(
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                base_ch.flex_array_gl_slicer,
-                                *((None,) if staticized is None else ()),
-                                ArgsTaker(),
-                            )
-                        ),
-                    )
-            for k in broadcast_named_args:
-                if k in broadcasted_args:
-                    broadcasted_args.pop(k)
-            bm_close = broadcasted_args.pop("bm_close", None)
-
-            # Perform the simulation
-            func = resolve_dynamic_simulator("from_signal_func_nb", staticized)
-            func = jit_reg.resolve_option(func, jitted)
-            func = ch_reg.resolve_option(func, chunked)
-            callbacks = dict(
-                signal_func_nb=signal_func_nb,
-                post_segment_func_nb=post_segment_func_nb,
-            )
-            sim_out = func(
-                target_shape=target_shape_2d,
-                group_lens=group_lens,
-                cash_sharing=cash_sharing,
-                index=index,
-                freq=freq,
-                init_cash=init_cash,
-                init_position=init_position,
-                init_price=init_price,
-                cash_deposits=cash_deposits,
-                cash_earnings=cash_earnings,
-                cash_dividends=cash_dividends,
-                signal_args=signal_args,
-                post_segment_args=post_segment_args,
-                use_stops=use_stops,
-                call_seq=call_seq,
-                auto_call_seq=auto_call_seq,
-                ffill_val_price=ffill_val_price,
-                update_value=update_value,
-                fill_pos_info=fill_pos_info,
-                max_orders=max_orders,
-                max_logs=max_logs,
-                in_outputs=in_outputs,
-                **broadcasted_args,
-                **(callbacks if staticized is None else {}),
-            )
-        else:
-            if ls_mode:
-                long_entries = entries
-                long_exits = exits
-            else:
-                if direction.size == 1:
-                    _direction = direction.item(0)
-                    if _direction == Direction.LongOnly:
-                        long_entries = entries
-                        long_exits = exits
-                        short_entries = np.array([[False]])
-                        short_exits = np.array([[False]])
-                    elif _direction == Direction.ShortOnly:
-                        long_entries = np.array([[False]])
-                        long_exits = np.array([[False]])
-                        short_entries = entries
-                        short_exits = exits
-                    else:
-                        long_entries = entries
-                        long_exits = np.array([[False]])
-                        short_entries = exits
-                        short_exits = np.array([[False]])
-                else:
-                    long_entries, long_exits, short_entries, short_exits = nb.dir_to_ls_signals_nb(
-                        target_shape=target_shape_2d,
-                        entries=entries,
-                        exits=exits,
-                        direction=direction,
-                    )
-
-            for k in broadcast_named_args:
-                if k in broadcasted_args:
-                    broadcasted_args.pop(k)
-            bm_close = broadcasted_args.pop("bm_close", None)
-
-            # Perform the simulation
-            func = jit_reg.resolve_option(nb.from_signals_nb, jitted)
-            func = ch_reg.resolve_option(func, chunked)
-            sim_out = func(
-                target_shape=target_shape_2d,
-                group_lens=cs_group_lens,  # group only if cash sharing is enabled to speed up
-                index=index,
-                freq=freq,
-                init_cash=init_cash,
-                init_position=init_position,
-                init_price=init_price,
-                cash_deposits=cash_deposits,
-                cash_earnings=cash_earnings,
-                cash_dividends=cash_dividends,
-                long_entries=long_entries,
-                long_exits=long_exits,
-                short_entries=short_entries,
-                short_exits=short_exits,
-                use_stops=use_stops,
-                call_seq=call_seq,
-                auto_call_seq=auto_call_seq,
-                ffill_val_price=ffill_val_price,
-                update_value=update_value,
-                save_state=save_state,
-                save_value=save_value,
-                save_returns=save_returns,
-                max_orders=max_orders,
-                max_logs=max_logs,
-                **broadcasted_args,
-            )
-
-        # Create an instance
-        if "orders_cls" not in kwargs:
-            kwargs["orders_cls"] = FSOrders
-        return cls(
-            wrapper,
-            sim_out,
-            open=broadcasted_args["open"] if not open_none else None,
-            high=broadcasted_args["high"] if not high_none else None,
-            low=broadcasted_args["low"] if not low_none else None,
-            close=broadcasted_args["close"],
-            cash_sharing=cash_sharing,
-            init_cash=init_cash if init_cash_mode is None else init_cash_mode,
-            init_position=init_position,
-            init_price=init_price,
-            bm_close=bm_close,
-            **kwargs,
-        )
+            local_kwargs = locals()
+            local_kwargs = {**local_kwargs, **local_kwargs["kwargs"]}
+            del local_kwargs["kwargs"]
+            del local_kwargs["cls"]
+            del local_kwargs["return_preparer"]
+            del local_kwargs["return_prep_result"]
+            del local_kwargs["return_sim_out"]
+            if isinstance(close, Data):
+                local_kwargs["data"] = close
+                local_kwargs["close"] = None
+            preparer = FSPreparer(**local_kwargs)
+            if not return_preparer:
+                preparer.set_seed()
+            prep_result = None
+        if return_preparer:
+            return preparer
+        if prep_result is None:
+            prep_result = preparer.result
+        if return_prep_result:
+            return prep_result
+        sim_out = prep_result.target_func(**prep_result.target_args)
+        if return_sim_out:
+            return sim_out
+        return cls(order_records=sim_out, **prep_result.pf_args)
 
     @classmethod
     def from_holding(
@@ -6645,7 +3687,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         close_at_end: tp.Optional[bool] = None,
         dynamic_mode: bool = False,
         **kwargs,
-    ) -> PortfolioT:
+    ) -> PortfolioResultT:
         """Simulate portfolio from plain holding using signals.
 
         If `close_at_end` is True, will place an opposite signal at the very end.
@@ -6657,7 +3699,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         if direction is None:
             direction = portfolio_cfg["hold_direction"]
-        direction = map_enum_fields(direction, Direction)
+        direction = map_enum_fields(direction, enums.Direction)
         if not checks.is_int(direction):
             raise TypeError("Direction must be a scalar")
         if close_at_end is None:
@@ -6718,7 +3760,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         seed: tp.Optional[int] = None,
         run_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ) -> PortfolioT:
+    ) -> PortfolioResultT:
         """Simulate portfolio from random entry and exit signals.
 
         Generates signals based either on the number of signals `n` or the probability
@@ -6835,13 +3877,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         fill_value: tp.Scalar = np.nan,
         size_type: tp.ArrayLike = "targetpercent",
         direction: tp.Optional[tp.ArrayLike] = None,
-        adjust_func_nb: nb.AdjustFuncT = nb.no_adjust_func_nb,
-        adjust_args: tp.Args = (),
         cash_sharing: tp.Optional[bool] = True,
         call_seq: tp.Optional[tp.ArrayLike] = "auto",
         group_by: tp.GroupByLike = None,
         **kwargs,
-    ) -> PortfolioT:
+    ) -> PortfolioResultT:
         """Build portfolio from an optimizer of type `vectorbtpro.portfolio.pfopt.base.PortfolioOptimizer`.
 
         Uses `Portfolio.from_orders` as the base simulation method.
@@ -6939,7 +3979,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_order_func(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data],
+        close: tp.Union[tp.ArrayLike, Data, FOFPreparer, PFPrepResult],
         *,
         init_cash: tp.Optional[tp.ArrayLike] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
@@ -6990,14 +4030,18 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
         template_context: tp.Optional[tp.Mapping] = None,
-        keep_inout_raw: tp.Optional[bool] = None,
+        keep_inout_flex: tp.Optional[bool] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
-        staticized: tp.Union[None, bool, tp.Kwargs, tp.TaskId] = None,
+        staticized: tp.StaticizedOption = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
+        records: tp.Optional[tp.RecordsLike] = None,
+        return_preparer: bool = False,
+        return_prep_result: bool = False,
+        return_sim_out: bool = False,
         **kwargs,
-    ) -> PortfolioT:
+    ) -> PortfolioResultT:
         """Build portfolio from a custom order function.
 
         !!! hint
@@ -7010,8 +4054,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         * `flex_order_func_nb`: See `vectorbtpro.portfolio.nb.from_order_func.from_flex_order_func_nb`
         * `flex_order_func_nb` and `row_wise`: See `vectorbtpro.portfolio.nb.from_order_func.from_flex_order_func_rw_nb`
 
+        Prepared by `vectorbtpro.portfolio.preparing.FOFPreparer`.
+
         Args:
-            close (array_like or Data): Latest asset price at each time step.
+            close (array_like, Data, FOFPreparer, or PFPrepResult): Latest asset price at each time step.
                 Will broadcast.
 
                 If an instance of `vectorbtpro.data.base.Data`, will extract the open, high,
@@ -7126,7 +4172,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             broadcast_named_args (dict): See `Portfolio.from_signals`.
             broadcast_kwargs (dict): See `Portfolio.from_orders`.
             template_context (mapping): See `Portfolio.from_signals`.
-            keep_inout_raw (bool): Whether to keep arrays that can be edited in-place raw when broadcasting.
+            keep_inout_flex (bool): Whether to keep arrays that can be edited in-place raw when broadcasting.
 
                 Disable this to be able to edit `segment_mask`, `cash_deposits`, and
                 `cash_earnings` during the simulation.
@@ -7151,6 +4197,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 `override` and `reload` to override and reload an already existing module respectively.
             freq (any): See `Portfolio.from_orders`.
             bm_close (array_like): See `Portfolio.from_orders`.
+            records (array_like): See `Portfolio.from_orders`.
+            return_preparer (bool): See `Portfolio.from_orders`.
+            return_prep_result (bool): See `Portfolio.from_orders`.
+            return_sim_out (bool): See `Portfolio.from_orders`.
             **kwargs: Keyword arguments passed to the `Portfolio` constructor.
 
         For defaults, see `vectorbtpro._settings.portfolio`. Those defaults are not used to fill
@@ -7310,7 +4360,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> pf.get_asset_value(group_by=False).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg }
+            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg loading=lazy }
 
             Templates are a very powerful tool to prepare any custom arguments after they are broadcast and
             before they are passed to the simulation function. In the example above, we use `broadcast_named_args`
@@ -7331,9 +4381,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> pf['g2'].get_asset_value(group_by=False).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/from_order_func_g1.svg){: .iimg }
+            ![](/assets/images/api/from_order_func_g1.svg){: .iimg loading=lazy }
 
-            ![](/assets/images/api/from_order_func_g2.svg){: .iimg }
+            ![](/assets/images/api/from_order_func_g2.svg){: .iimg loading=lazy }
 
             * Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit:
 
@@ -7505,593 +4555,42 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 Since trades should come in an order that closely replicates that of the real world, the only
                 pieces of information that always remain in the correct order are the opening and closing price.
         """
-        # Get defaults
-        from vectorbtpro._settings import settings
-
-        portfolio_cfg = settings["portfolio"]
-
-        if isinstance(close, Data):
-            data = close
-            close = data.close
-            if close is None:
-                raise ValueError("Column for close couldn't be found in data")
-            if open is None:
-                open = data.open
-            if high is None:
-                high = data.high
-            if low is None:
-                low = data.low
-            if freq is None:
-                freq = data.freq
-        if open is None:
-            open_none = True
-            open = np.nan
+        if isinstance(close, FOFPreparer):
+            preparer = close
+            prep_result = None
+        elif isinstance(close, PFPrepResult):
+            preparer = None
+            prep_result = close
         else:
-            open_none = False
-        if high is None:
-            high_none = True
-            high = np.nan
-        else:
-            high_none = False
-        if low is None:
-            low_none = True
-            low = np.nan
-        else:
-            low_none = False
-
-        flexible = flex_order_func_nb is not None
-        if flexible and order_func_nb is not None:
-            raise ValueError("Either order_func_nb or flex_order_func_nb must be provided")
-        if not flexible and order_func_nb is None:
-            raise ValueError("Either order_func_nb or flex_order_func_nb must be provided")
-        if row_wise and pre_group_func_nb is not None:
-            raise ValueError("Cannot use pre_group_func_nb in a row-wise simulation")
-        if row_wise and post_group_func_nb is not None:
-            raise ValueError("Cannot use post_group_func_nb in a row-wise simulation")
-        if not row_wise and pre_row_func_nb is not None:
-            raise ValueError("Cannot use pre_row_func_nb in a column-wise simulation")
-        if not row_wise and post_row_func_nb is not None:
-            raise ValueError("Cannot use post_row_func_nb in a column-wise simulation")
-
-        if staticized is None:
-            staticized = portfolio_cfg["staticized"]
-        if isinstance(staticized, bool):
-            if staticized:
-                staticized = dict()
-            else:
-                staticized = None
-        if isinstance(staticized, dict):
-            staticized = dict(staticized)
-            if "func" not in staticized:
-                if not flexible and not row_wise:
-                    staticized["func"] = nb.from_order_func_nb
-                elif not flexible and row_wise:
-                    staticized["func"] = nb.from_order_func_rw_nb
-                elif flexible and not row_wise:
-                    staticized["func"] = nb.from_flex_order_func_nb
-                else:
-                    staticized["func"] = nb.from_flex_order_func_rw_nb
-
-        if pre_sim_func_nb is None:
-            pre_sim_func_nb = nb.no_pre_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, pre_sim_func_nb, "pre_sim_func_nb")
-        if post_sim_func_nb is None:
-            post_sim_func_nb = nb.no_post_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, post_sim_func_nb, "post_sim_func_nb")
-        if pre_group_func_nb is None:
-            pre_group_func_nb = nb.no_pre_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, pre_group_func_nb, "pre_group_func_nb")
-        if post_group_func_nb is None:
-            post_group_func_nb = nb.no_post_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, post_group_func_nb, "post_group_func_nb")
-        if pre_row_func_nb is None:
-            pre_row_func_nb = nb.no_pre_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, pre_row_func_nb, "pre_row_func_nb")
-        if post_row_func_nb is None:
-            post_row_func_nb = nb.no_post_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, post_row_func_nb, "post_row_func_nb")
-        if pre_segment_func_nb is None:
-            pre_segment_func_nb = nb.no_pre_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, pre_segment_func_nb, "pre_segment_func_nb")
-        if post_segment_func_nb is None:
-            post_segment_func_nb = nb.no_post_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, post_segment_func_nb, "post_segment_func_nb")
-        if order_func_nb is None:
-            order_func_nb = nb.no_order_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, order_func_nb, "order_func_nb")
-        if flex_order_func_nb is None:
-            flex_order_func_nb = nb.no_flex_order_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, flex_order_func_nb, "flex_order_func_nb")
-        if post_order_func_nb is None:
-            post_order_func_nb = nb.no_post_func_nb
-        elif isinstance(staticized, dict):
-            adapt_staticized_to_udf(staticized, post_order_func_nb, "post_order_func_nb")
-
-        if init_cash is None:
-            init_cash = portfolio_cfg["init_cash"]
-        if isinstance(init_cash, str):
-            init_cash = map_enum_fields(init_cash, InitCashMode)
-        if checks.is_int(init_cash) and init_cash in InitCashMode:
-            init_cash_mode = init_cash
-            init_cash = np.inf
-        else:
-            init_cash_mode = None
-        if init_position is None:
-            init_position = portfolio_cfg["init_position"]
-        if init_price is None:
-            init_price = portfolio_cfg["init_price"]
-        if cash_deposits is None:
-            cash_deposits = portfolio_cfg["cash_deposits"]
-        if cash_earnings is None:
-            cash_earnings = portfolio_cfg["cash_earnings"]
-        if cash_sharing is None:
-            cash_sharing = portfolio_cfg["cash_sharing"]
-        if cash_sharing and group_by is None:
-            group_by = True
-        if not flexible:
-            if call_seq is None:
-                call_seq = portfolio_cfg["call_seq"]
-            if call_seq is not None:
-                call_seq = map_enum_fields(call_seq, CallSeqType)
-                if checks.is_int(call_seq):
-                    if call_seq == CallSeqType.Auto:
-                        raise ValueError(
-                            "CallSeqType.Auto must be implemented manually. "
-                            "Use sort_call_seq_1d_nb in pre_segment_func_nb."
-                        )
-        if attach_call_seq is None:
-            attach_call_seq = portfolio_cfg["attach_call_seq"]
-        if segment_mask is None:
-            segment_mask = True
-        if call_pre_segment is None:
-            call_pre_segment = portfolio_cfg["call_pre_segment"]
-        if call_post_segment is None:
-            call_post_segment = portfolio_cfg["call_post_segment"]
-        if ffill_val_price is None:
-            ffill_val_price = portfolio_cfg["ffill_val_price"]
-        if update_value is None:
-            update_value = portfolio_cfg["update_value"]
-        if fill_pos_info is None:
-            fill_pos_info = portfolio_cfg["fill_pos_info"]
-        if track_value is None:
-            track_value = portfolio_cfg["track_value"]
-        if row_wise is None:
-            row_wise = portfolio_cfg["row_wise"]
-        if seed is None:
-            seed = portfolio_cfg["seed"]
-        if seed is not None:
-            set_seed(seed)
-        if (
-            in_outputs is not None
-            and not isinstance(in_outputs, CustomTemplate)
-            and not checks.is_namedtuple(in_outputs)
-        ):
-            in_outputs = to_mapping(in_outputs)
-            in_outputs = namedtuple("InOutputs", in_outputs)(**in_outputs)
-        if group_by is None:
-            group_by = portfolio_cfg["group_by"]
-        if freq is None:
-            freq = portfolio_cfg["freq"]
-        if broadcast_named_args is None:
-            broadcast_named_args = {}
-        broadcast_kwargs = merge_dicts(portfolio_cfg["broadcast_kwargs"], broadcast_kwargs)
-        require_kwargs = broadcast_kwargs.get("require_kwargs", {})
-        template_context = merge_dicts(portfolio_cfg["template_context"], template_context)
-        if keep_inout_raw is None:
-            keep_inout_raw = portfolio_cfg["keep_inout_raw"]
-        if template_context is None:
-            template_context = {}
-        if bm_close is None:
-            bm_close = portfolio_cfg["bm_close"]
-
-        # Prepare the simulation
-        broadcastable_args = dict(cash_earnings=cash_earnings, open=open, high=high, low=low, close=close)
-        if bm_close is not None and not isinstance(bm_close, bool):
-            broadcastable_args["bm_close"] = bm_close
-        else:
-            broadcastable_args["bm_close"] = np.nan
-        broadcastable_args = {**broadcastable_args, **broadcast_named_args}
-        broadcast_kwargs = merge_dicts(
-            dict(
-                to_pd=False,
-                keep_flex=True,
-                reindex_kwargs=dict(
-                    cash_earnings=dict(fill_value=0.0),
-                    open=dict(fill_value=np.nan),
-                    high=dict(fill_value=np.nan),
-                    low=dict(fill_value=np.nan),
-                    close=dict(fill_value=np.nan),
-                    bm_close=dict(fill_value=np.nan),
-                ),
-                wrapper_kwargs=dict(
-                    freq=freq,
-                    group_by=group_by,
-                ),
-            ),
-            broadcast_kwargs,
-        )
-        broadcasted_args, wrapper = broadcast(broadcastable_args, return_wrapper=True, **broadcast_kwargs)
-        if not wrapper.group_select and cash_sharing:
-            raise ValueError("group_select cannot be disabled if cash_sharing=True")
-        cash_earnings = broadcasted_args.pop("cash_earnings")
-        target_shape_2d = wrapper.shape_2d
-        index = wrapper.ns_index
-        freq = wrapper.ns_freq
-
-        cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
-        init_cash = np.require(broadcast_array_to(init_cash, len(cs_group_lens)), dtype=np.float_)
-        init_position = np.require(broadcast_array_to(init_position, target_shape_2d[1]), dtype=np.float_)
-        init_price = np.require(broadcast_array_to(init_price, target_shape_2d[1]), dtype=np.float_)
-        if (((init_position > 0) | (init_position < 0)) & np.isnan(init_price)).any():
-            warnings.warn(f"Initial position has undefined price. Set init_price.", stacklevel=2)
-        cash_deposits = broadcast(
-            cash_deposits,
-            to_shape=(target_shape_2d[0], len(cs_group_lens)),
-            to_pd=False,
-            keep_flex=keep_inout_raw,
-            reindex_kwargs=dict(fill_value=0.0),
-            require_kwargs=require_kwargs,
-        )
-        group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-        if checks.is_int(segment_mask):
-            if keep_inout_raw:
-                _segment_mask = np.full((target_shape_2d[0], 1), False)
-            else:
-                _segment_mask = np.full((target_shape_2d[0], len(group_lens)), False)
-            _segment_mask[0::segment_mask] = True
-            segment_mask = _segment_mask
-        else:
-            segment_mask = broadcast(
-                segment_mask,
-                to_shape=(target_shape_2d[0], len(group_lens)),
-                to_pd=False,
-                keep_flex=keep_inout_raw,
-                reindex_kwargs=dict(fill_value=False),
-                require_kwargs=require_kwargs,
-            )
-        if not flexible:
-            if call_seq is None and attach_call_seq:
-                call_seq = CallSeqType.Default
-            if call_seq is not None:
-                if checks.is_any_array(call_seq):
-                    call_seq = require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
-                else:
-                    call_seq = build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
-
-        # Check data types
-        checks.assert_subdtype(cs_group_lens, np.integer, arg_name="cs_group_lens")
-        if call_seq is not None:
-            checks.assert_subdtype(call_seq, np.integer, arg_name="call_seq")
-        checks.assert_subdtype(init_cash, np.number, arg_name="init_cash")
-        checks.assert_subdtype(init_position, np.number, arg_name="init_position")
-        checks.assert_subdtype(init_price, np.number, arg_name="init_price")
-        checks.assert_subdtype(cash_deposits, np.number, arg_name="cash_deposits")
-        checks.assert_subdtype(cash_earnings, np.number, arg_name="cash_earnings")
-        checks.assert_subdtype(segment_mask, np.bool_, arg_name="segment_mask")
-        checks.assert_subdtype(broadcasted_args["open"], np.number, arg_name="open")
-        checks.assert_subdtype(broadcasted_args["high"], np.number, arg_name="high")
-        checks.assert_subdtype(broadcasted_args["low"], np.number, arg_name="low")
-        checks.assert_subdtype(broadcasted_args["close"], np.number, arg_name="close")
-        if bm_close is not None and not isinstance(bm_close, bool):
-            checks.assert_subdtype(broadcasted_args["bm_close"], np.number, arg_name="bm_close")
-
-        # Prepare arguments
-        template_context = merge_dicts(
-            broadcasted_args,
-            dict(
-                target_shape=target_shape_2d,
-                index=index,
-                freq=freq,
-                group_lens=group_lens,
-                cs_group_lens=cs_group_lens,
-                cash_sharing=cash_sharing,
-                init_cash=init_cash,
-                init_position=init_position,
-                init_price=init_price,
-                cash_deposits=cash_deposits,
-                cash_earnings=cash_earnings,
-                segment_mask=segment_mask,
-                call_pre_segment=call_pre_segment,
-                call_post_segment=call_post_segment,
-                pre_sim_func_nb=pre_sim_func_nb,
-                pre_sim_args=pre_sim_args,
-                post_sim_func_nb=post_sim_func_nb,
-                post_sim_args=post_sim_args,
-                pre_group_func_nb=pre_group_func_nb,
-                pre_group_args=pre_group_args,
-                post_group_func_nb=post_group_func_nb,
-                post_group_args=post_group_args,
-                pre_row_func_nb=pre_row_func_nb,
-                pre_row_args=pre_row_args,
-                post_row_func_nb=post_row_func_nb,
-                post_row_args=post_row_args,
-                pre_segment_func_nb=pre_segment_func_nb,
-                pre_segment_args=pre_segment_args,
-                post_segment_func_nb=post_segment_func_nb,
-                post_segment_args=post_segment_args,
-                order_func_nb=order_func_nb,
-                order_args=order_args,
-                flex_order_func_nb=flex_order_func_nb,
-                flex_order_args=flex_order_args,
-                post_order_func_nb=post_order_func_nb,
-                post_order_args=post_order_args,
-                ffill_val_price=ffill_val_price,
-                update_value=update_value,
-                fill_pos_info=fill_pos_info,
-                track_value=track_value,
-                max_orders=max_orders,
-                max_logs=max_logs,
-                in_outputs=in_outputs,
-                wrapper=wrapper,
-            ),
-            template_context,
-        )
-        pre_sim_args = substitute_templates(pre_sim_args, template_context, sub_id="pre_sim_args")
-        post_sim_args = substitute_templates(post_sim_args, template_context, sub_id="post_sim_args")
-        pre_group_args = substitute_templates(pre_group_args, template_context, sub_id="pre_group_args")
-        post_group_args = substitute_templates(post_group_args, template_context, sub_id="post_group_args")
-        pre_row_args = substitute_templates(pre_row_args, template_context, sub_id="pre_row_args")
-        post_row_args = substitute_templates(post_row_args, template_context, sub_id="post_row_args")
-        pre_segment_args = substitute_templates(pre_segment_args, template_context, sub_id="pre_segment_args")
-        post_segment_args = substitute_templates(post_segment_args, template_context, sub_id="post_segment_args")
-        order_args = substitute_templates(order_args, template_context, sub_id="order_args")
-        flex_order_args = substitute_templates(flex_order_args, template_context, sub_id="flex_order_args")
-        post_order_args = substitute_templates(post_order_args, template_context, sub_id="post_order_args")
-        in_outputs = substitute_templates(in_outputs, template_context, sub_id="in_outputs")
-        for k in broadcast_named_args:
-            if k in broadcasted_args:
-                broadcasted_args.pop(k)
-
-        # Perform the simulation
-        if row_wise:
-            if flexible:
-                func = resolve_dynamic_simulator("from_flex_order_func_rw_nb", staticized)
-                func = jit_reg.resolve_option(func, jitted)
-                func = ch_reg.resolve_option(func, chunked)
-                sim_out = func(
-                    target_shape=target_shape_2d,
-                    group_lens=group_lens,
-                    cash_sharing=cash_sharing,
-                    init_cash=init_cash,
-                    init_position=init_position,
-                    init_price=init_price,
-                    cash_deposits=cash_deposits,
-                    cash_earnings=cash_earnings,
-                    segment_mask=segment_mask,
-                    call_pre_segment=call_pre_segment,
-                    call_post_segment=call_post_segment,
-                    pre_sim_args=pre_sim_args,
-                    post_sim_args=post_sim_args,
-                    pre_row_args=pre_row_args,
-                    post_row_args=post_row_args,
-                    pre_segment_args=pre_segment_args,
-                    post_segment_args=post_segment_args,
-                    flex_order_args=flex_order_args,
-                    post_order_args=post_order_args,
-                    index=index,
-                    freq=freq,
-                    open=broadcasted_args["open"],
-                    high=broadcasted_args["high"],
-                    low=broadcasted_args["low"],
-                    close=broadcasted_args["close"],
-                    bm_close=broadcasted_args["bm_close"],
-                    ffill_val_price=ffill_val_price,
-                    update_value=update_value,
-                    fill_pos_info=fill_pos_info,
-                    track_value=track_value,
-                    max_orders=max_orders,
-                    max_logs=max_logs,
-                    in_outputs=in_outputs,
-                    **(
-                        dict(
-                            pre_sim_func_nb=pre_sim_func_nb,
-                            post_sim_func_nb=post_sim_func_nb,
-                            pre_row_func_nb=pre_row_func_nb,
-                            post_row_func_nb=post_row_func_nb,
-                            pre_segment_func_nb=pre_segment_func_nb,
-                            post_segment_func_nb=post_segment_func_nb,
-                            flex_order_func_nb=flex_order_func_nb,
-                            post_order_func_nb=post_order_func_nb,
-                        )
-                        if staticized is None
-                        else {}
-                    ),
-                )
-            else:
-                func = resolve_dynamic_simulator("from_order_func_rw_nb", staticized)
-                func = jit_reg.resolve_option(func, jitted)
-                func = ch_reg.resolve_option(func, chunked)
-                sim_out = func(
-                    target_shape=target_shape_2d,
-                    group_lens=group_lens,
-                    cash_sharing=cash_sharing,
-                    call_seq=call_seq,
-                    init_cash=init_cash,
-                    init_position=init_position,
-                    init_price=init_price,
-                    cash_deposits=cash_deposits,
-                    cash_earnings=cash_earnings,
-                    segment_mask=segment_mask,
-                    call_pre_segment=call_pre_segment,
-                    call_post_segment=call_post_segment,
-                    pre_sim_args=pre_sim_args,
-                    post_sim_args=post_sim_args,
-                    pre_row_args=pre_row_args,
-                    post_row_args=post_row_args,
-                    pre_segment_args=pre_segment_args,
-                    post_segment_args=post_segment_args,
-                    order_args=order_args,
-                    post_order_args=post_order_args,
-                    index=index,
-                    freq=freq,
-                    open=broadcasted_args["open"],
-                    high=broadcasted_args["high"],
-                    low=broadcasted_args["low"],
-                    close=broadcasted_args["close"],
-                    bm_close=broadcasted_args["bm_close"],
-                    ffill_val_price=ffill_val_price,
-                    update_value=update_value,
-                    fill_pos_info=fill_pos_info,
-                    track_value=track_value,
-                    max_orders=max_orders,
-                    max_logs=max_logs,
-                    in_outputs=in_outputs,
-                    **(
-                        dict(
-                            pre_sim_func_nb=pre_sim_func_nb,
-                            post_sim_func_nb=post_sim_func_nb,
-                            pre_row_func_nb=pre_row_func_nb,
-                            post_row_func_nb=post_row_func_nb,
-                            pre_segment_func_nb=pre_segment_func_nb,
-                            post_segment_func_nb=post_segment_func_nb,
-                            order_func_nb=order_func_nb,
-                            post_order_func_nb=post_order_func_nb,
-                        )
-                        if staticized is None
-                        else {}
-                    ),
-                )
-        else:
-            if flexible:
-                func = resolve_dynamic_simulator("from_flex_order_func_nb", staticized)
-                func = jit_reg.resolve_option(func, jitted)
-                func = ch_reg.resolve_option(func, chunked)
-                sim_out = func(
-                    target_shape=target_shape_2d,
-                    group_lens=group_lens,
-                    cash_sharing=cash_sharing,
-                    init_cash=init_cash,
-                    init_position=init_position,
-                    init_price=init_price,
-                    cash_deposits=cash_deposits,
-                    cash_earnings=cash_earnings,
-                    segment_mask=segment_mask,
-                    call_pre_segment=call_pre_segment,
-                    call_post_segment=call_post_segment,
-                    pre_sim_args=pre_sim_args,
-                    post_sim_args=post_sim_args,
-                    pre_group_args=pre_group_args,
-                    post_group_args=post_group_args,
-                    pre_segment_args=pre_segment_args,
-                    post_segment_args=post_segment_args,
-                    flex_order_args=flex_order_args,
-                    post_order_args=post_order_args,
-                    index=index,
-                    freq=freq,
-                    open=broadcasted_args["open"],
-                    high=broadcasted_args["high"],
-                    low=broadcasted_args["low"],
-                    close=broadcasted_args["close"],
-                    bm_close=broadcasted_args["bm_close"],
-                    ffill_val_price=ffill_val_price,
-                    update_value=update_value,
-                    fill_pos_info=fill_pos_info,
-                    track_value=track_value,
-                    max_orders=max_orders,
-                    max_logs=max_logs,
-                    in_outputs=in_outputs,
-                    **(
-                        dict(
-                            pre_sim_func_nb=pre_sim_func_nb,
-                            post_sim_func_nb=post_sim_func_nb,
-                            pre_group_func_nb=pre_group_func_nb,
-                            post_group_func_nb=post_group_func_nb,
-                            pre_segment_func_nb=pre_segment_func_nb,
-                            post_segment_func_nb=post_segment_func_nb,
-                            flex_order_func_nb=flex_order_func_nb,
-                            post_order_func_nb=post_order_func_nb,
-                        )
-                        if staticized is None
-                        else {}
-                    ),
-                )
-            else:
-                func = resolve_dynamic_simulator("from_order_func_nb", staticized)
-                func = jit_reg.resolve_option(func, jitted)
-                func = ch_reg.resolve_option(func, chunked)
-                sim_out = func(
-                    target_shape=target_shape_2d,
-                    group_lens=group_lens,
-                    cash_sharing=cash_sharing,
-                    call_seq=call_seq,
-                    init_cash=init_cash,
-                    init_position=init_position,
-                    init_price=init_price,
-                    cash_deposits=cash_deposits,
-                    cash_earnings=cash_earnings,
-                    segment_mask=segment_mask,
-                    call_pre_segment=call_pre_segment,
-                    call_post_segment=call_post_segment,
-                    pre_sim_args=pre_sim_args,
-                    post_sim_args=post_sim_args,
-                    pre_group_args=pre_group_args,
-                    post_group_args=post_group_args,
-                    pre_segment_args=pre_segment_args,
-                    post_segment_args=post_segment_args,
-                    order_args=order_args,
-                    post_order_args=post_order_args,
-                    index=index,
-                    freq=freq,
-                    open=broadcasted_args["open"],
-                    high=broadcasted_args["high"],
-                    low=broadcasted_args["low"],
-                    close=broadcasted_args["close"],
-                    bm_close=broadcasted_args["bm_close"],
-                    ffill_val_price=ffill_val_price,
-                    update_value=update_value,
-                    fill_pos_info=fill_pos_info,
-                    track_value=track_value,
-                    max_orders=max_orders,
-                    max_logs=max_logs,
-                    in_outputs=in_outputs,
-                    **(
-                        dict(
-                            pre_sim_func_nb=pre_sim_func_nb,
-                            post_sim_func_nb=post_sim_func_nb,
-                            pre_group_func_nb=pre_group_func_nb,
-                            post_group_func_nb=post_group_func_nb,
-                            pre_segment_func_nb=pre_segment_func_nb,
-                            post_segment_func_nb=post_segment_func_nb,
-                            order_func_nb=order_func_nb,
-                            post_order_func_nb=post_order_func_nb,
-                        )
-                        if staticized is None
-                        else {}
-                    ),
-                )
-
-        # Create an instance
-        if bm_close is not None and not isinstance(bm_close, bool):
-            bm_close = broadcasted_args["bm_close"]
-        return cls(
-            wrapper,
-            sim_out,
-            open=broadcasted_args["open"] if not open_none else None,
-            high=broadcasted_args["high"] if not high_none else None,
-            low=broadcasted_args["low"] if not low_none else None,
-            close=broadcasted_args["close"],
-            cash_sharing=cash_sharing,
-            init_cash=init_cash if init_cash_mode is None else init_cash_mode,
-            init_position=init_position,
-            init_price=init_price,
-            bm_close=bm_close,
-            **kwargs,
-        )
+            local_kwargs = locals()
+            local_kwargs = {**local_kwargs, **local_kwargs["kwargs"]}
+            del local_kwargs["kwargs"]
+            del local_kwargs["cls"]
+            del local_kwargs["return_preparer"]
+            del local_kwargs["return_prep_result"]
+            del local_kwargs["return_sim_out"]
+            if isinstance(close, Data):
+                local_kwargs["data"] = close
+                local_kwargs["close"] = None
+            preparer = FOFPreparer(**local_kwargs)
+            if not return_preparer:
+                preparer.set_seed()
+            prep_result = None
+        if return_preparer:
+            return preparer
+        if prep_result is None:
+            prep_result = preparer.result
+        if return_prep_result:
+            return prep_result
+        sim_out = prep_result.target_func(**prep_result.target_args)
+        if return_sim_out:
+            return sim_out
+        return cls(order_records=sim_out, **prep_result.pf_args)
 
     @classmethod
     def from_def_order_func(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data],
+        close: tp.Union[tp.ArrayLike, Data, FDOFPreparer, PFPrepResult],
         size: tp.Optional[tp.ArrayLike] = None,
         size_type: tp.Optional[tp.ArrayLike] = None,
         direction: tp.Optional[tp.ArrayLike] = None,
@@ -8118,8 +4617,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
         chunked: tp.ChunkedOption = None,
+        return_preparer: bool = False,
+        return_prep_result: bool = False,
+        return_sim_out: bool = False,
         **kwargs,
-    ) -> PortfolioT:
+    ) -> PortfolioResultT:
         """Build portfolio from the default order function.
 
         Default order function takes size, price, fees, and other available information, and issues
@@ -8138,6 +4640,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         * `pre_segment_func_nb` is `vectorbtpro.portfolio.nb.from_order_func.def_pre_segment_func_nb`
         * `order_func_nb` is `vectorbtpro.portfolio.nb.from_order_func.def_order_func_nb`
+
+        Prepared by `vectorbtpro.portfolio.preparing.FDOFPreparer`.
 
         For details on other arguments, see `Portfolio.from_orders` and `Portfolio.from_order_func`.
 
@@ -8198,253 +4702,39 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> asset_value.vbt.plot().show()
             ```
 
-            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg }
+            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg loading=lazy }
         """
-        # Get defaults
-        from vectorbtpro._settings import settings
-
-        portfolio_cfg = settings["portfolio"]
-
-        if size is None:
-            size = portfolio_cfg["size"]
-        if size_type is None:
-            size_type = portfolio_cfg["size_type"]
-        if direction is None:
-            direction = portfolio_cfg["direction"]
-        if price is None:
-            price = portfolio_cfg["price"]
-        if size is None:
-            size = portfolio_cfg["size"]
-        if fees is None:
-            fees = portfolio_cfg["fees"]
-        if fixed_fees is None:
-            fixed_fees = portfolio_cfg["fixed_fees"]
-        if slippage is None:
-            slippage = portfolio_cfg["slippage"]
-        if min_size is None:
-            min_size = portfolio_cfg["min_size"]
-        if max_size is None:
-            max_size = portfolio_cfg["max_size"]
-        if size_granularity is None:
-            size_granularity = portfolio_cfg["size_granularity"]
-        if leverage is None:
-            leverage = portfolio_cfg["leverage"]
-        if leverage_mode is None:
-            leverage_mode = portfolio_cfg["leverage_mode"]
-        if reject_prob is None:
-            reject_prob = portfolio_cfg["reject_prob"]
-        if price_area_vio_mode is None:
-            price_area_vio_mode = portfolio_cfg["price_area_vio_mode"]
-        if allow_partial is None:
-            allow_partial = portfolio_cfg["allow_partial"]
-        if raise_reject is None:
-            raise_reject = portfolio_cfg["raise_reject"]
-        if log is None:
-            log = portfolio_cfg["log"]
-        if val_price is None:
-            val_price = portfolio_cfg["val_price"]
-        if call_seq is None:
-            call_seq = portfolio_cfg["call_seq"]
-        auto_call_seq = False
-        if isinstance(call_seq, str):
-            call_seq = map_enum_fields(call_seq, CallSeqType)
-        if checks.is_int(call_seq):
-            if call_seq == CallSeqType.Auto:
-                auto_call_seq = True
-                call_seq = None
-        if broadcast_named_args is None:
-            broadcast_named_args = {}
-        broadcast_named_args = merge_dicts(
-            dict(
-                size=size,
-                size_type=size_type,
-                direction=direction,
-                price=price,
-                fees=fees,
-                fixed_fees=fixed_fees,
-                slippage=slippage,
-                min_size=min_size,
-                max_size=max_size,
-                size_granularity=size_granularity,
-                leverage=leverage,
-                leverage_mode=leverage_mode,
-                reject_prob=reject_prob,
-                price_area_vio_mode=price_area_vio_mode,
-                allow_partial=allow_partial,
-                raise_reject=raise_reject,
-                log=log,
-                val_price=val_price,
-            ),
-            broadcast_named_args,
-        )
-        broadcast_kwargs = merge_dicts(
-            portfolio_cfg["broadcast_kwargs"],
-            dict(
-                reindex_kwargs=dict(
-                    size=dict(fill_value=np.nan),
-                    price=dict(fill_value=np.nan),
-                    size_type=dict(fill_value=SizeType.Amount),
-                    direction=dict(fill_value=Direction.Both),
-                    fees=dict(fill_value=0.0),
-                    fixed_fees=dict(fill_value=0.0),
-                    slippage=dict(fill_value=0.0),
-                    min_size=dict(fill_value=np.nan),
-                    max_size=dict(fill_value=np.nan),
-                    size_granularity=dict(fill_value=np.nan),
-                    leverage=dict(fill_value=1.0),
-                    leverage_mode=dict(fill_value=LeverageMode.Lazy),
-                    reject_prob=dict(fill_value=0.0),
-                    price_area_vio_mode=dict(fill_value=PriceAreaVioMode.Ignore),
-                    allow_partial=dict(fill_value=True),
-                    raise_reject=dict(fill_value=False),
-                    log=dict(fill_value=False),
-                    val_price=dict(val_price=np.nan),
-                )
-            ),
-            broadcast_kwargs,
-        )
-
-        # Prepare arguments and pass to from_order_func
-
-        def _prepare_size(size):
-            checks.assert_subdtype(size, np.number, arg_name="size")
-            return size
-
-        def _prepare_price(price):
-            price = map_enum_fields(price, PriceType, ignore_type=(int, float))
-            checks.assert_subdtype(price, np.number, arg_name="price")
-            return price
-
-        def _prepare_size_type(size_type):
-            size_type = map_enum_fields(size_type, SizeType)
-            checks.assert_subdtype(size_type, np.integer, arg_name="size_type")
-            return size_type
-
-        def _prepare_direction(direction):
-            direction = map_enum_fields(direction, Direction)
-            checks.assert_subdtype(direction, np.integer, arg_name="direction")
-            return direction
-
-        def _prepare_fees(fees):
-            checks.assert_subdtype(fees, np.number, arg_name="fees")
-            return fees
-
-        def _prepare_fixed_fees(fixed_fees):
-            checks.assert_subdtype(fixed_fees, np.number, arg_name="fixed_fees")
-            return fixed_fees
-
-        def _prepare_slippage(slippage):
-            checks.assert_subdtype(slippage, np.number, arg_name="slippage")
-            return slippage
-
-        def _prepare_min_size(min_size):
-            checks.assert_subdtype(min_size, np.number, arg_name="min_size")
-            return min_size
-
-        def _prepare_max_size(max_size):
-            checks.assert_subdtype(max_size, np.number, arg_name="max_size")
-            return max_size
-
-        def _prepare_size_granularity(size_granularity):
-            checks.assert_subdtype(size_granularity, np.number, arg_name="size_granularity")
-            return size_granularity
-
-        def _prepare_reject_prob(reject_prob):
-            checks.assert_subdtype(reject_prob, np.number, arg_name="reject_prob")
-            return reject_prob
-
-        def _prepare_price_area_vio_mode(price_area_vio_mode):
-            price_area_vio_mode = map_enum_fields(price_area_vio_mode, PriceAreaVioMode)
-            checks.assert_subdtype(price_area_vio_mode, np.integer, arg_name="price_area_vio_mode")
-            return price_area_vio_mode
-
-        def _prepare_leverage(leverage):
-            checks.assert_subdtype(leverage, np.number, arg_name="leverage")
-            return leverage
-
-        def _prepare_leverage_mode(leverage_mode):
-            leverage_mode = map_enum_fields(leverage_mode, LeverageMode)
-            checks.assert_subdtype(leverage_mode, np.integer, arg_name="leverage_mode")
-            return leverage_mode
-
-        def _prepare_allow_partial(allow_partial):
-            checks.assert_subdtype(allow_partial, np.bool_, arg_name="allow_partial")
-            return allow_partial
-
-        def _prepare_raise_reject(raise_reject):
-            checks.assert_subdtype(raise_reject, np.bool_, arg_name="raise_reject")
-            return raise_reject
-
-        def _prepare_log(log):
-            checks.assert_subdtype(log, np.bool_, arg_name="log")
-            return log
-
-        def _prepare_val_price(val_price):
-            val_price = map_enum_fields(val_price, ValPriceType, ignore_type=(int, float))
-            checks.assert_subdtype(val_price, np.number, arg_name="val_price")
-            return val_price
-
-        _order_args = (
-            RepFunc(_prepare_size),
-            RepFunc(_prepare_price),
-            RepFunc(_prepare_size_type),
-            RepFunc(_prepare_direction),
-            RepFunc(_prepare_fees),
-            RepFunc(_prepare_fixed_fees),
-            RepFunc(_prepare_slippage),
-            RepFunc(_prepare_min_size),
-            RepFunc(_prepare_max_size),
-            RepFunc(_prepare_size_granularity),
-            RepFunc(_prepare_leverage),
-            RepFunc(_prepare_leverage_mode),
-            RepFunc(_prepare_reject_prob),
-            RepFunc(_prepare_price_area_vio_mode),
-            RepFunc(_prepare_allow_partial),
-            RepFunc(_prepare_raise_reject),
-            RepFunc(_prepare_log),
-        )
-        _order_args_taker = ch.ArgsTaker(
-            *[base_ch.flex_array_gl_slicer if isinstance(x, RepFunc) else None for x in _order_args],
-        )
-        pre_segment_args = (
-            RepFunc(_prepare_val_price),
-            RepFunc(_prepare_price),
-            RepFunc(_prepare_size),
-            RepFunc(_prepare_size_type),
-            RepFunc(_prepare_direction),
-            auto_call_seq,
-        )
-        arg_take_spec = dict(
-            pre_segment_args=ch.ArgsTaker(
-                *[base_ch.flex_array_gl_slicer if isinstance(x, RepFunc) else None for x in pre_segment_args],
-            )
-        )
-        if flexible:
-            if pre_segment_func_nb is None:
-                pre_segment_func_nb = nb.def_flex_pre_segment_func_nb
-            if flex_order_func_nb is None:
-                flex_order_func_nb = nb.def_flex_order_func_nb
-            kwargs["flex_order_func_nb"] = flex_order_func_nb
-            kwargs["flex_order_args"] = _order_args
-            arg_take_spec["flex_order_args"] = _order_args_taker
+        if isinstance(close, FDOFPreparer):
+            preparer = close
+            prep_result = None
+        elif isinstance(close, PFPrepResult):
+            preparer = None
+            prep_result = close
         else:
-            if pre_segment_func_nb is None:
-                pre_segment_func_nb = nb.def_pre_segment_func_nb
-            if order_func_nb is None:
-                order_func_nb = nb.def_order_func_nb
-            kwargs["order_func_nb"] = order_func_nb
-            kwargs["order_args"] = _order_args
-            arg_take_spec["order_args"] = _order_args_taker
-        chunked = ch.specialize_chunked_option(chunked, arg_take_spec=arg_take_spec)
-        return cls.from_order_func(
-            close,
-            pre_segment_func_nb=pre_segment_func_nb,
-            pre_segment_args=pre_segment_args,
-            call_seq=call_seq,
-            broadcast_named_args=broadcast_named_args,
-            chunked=chunked,
-            **kwargs,
-        )
+            local_kwargs = locals()
+            local_kwargs = {**local_kwargs, **local_kwargs["kwargs"]}
+            del local_kwargs["kwargs"]
+            del local_kwargs["cls"]
+            del local_kwargs["return_preparer"]
+            del local_kwargs["return_prep_result"]
+            del local_kwargs["return_sim_out"]
+            if isinstance(close, Data):
+                local_kwargs["data"] = close
+                local_kwargs["close"] = None
+            preparer = FDOFPreparer(**local_kwargs)
+            if not return_preparer:
+                preparer.set_seed()
+            prep_result = None
+        if return_preparer:
+            return preparer
+        if prep_result is None:
+            prep_result = preparer.result
+        if return_prep_result:
+            return prep_result
+        sim_out = prep_result.target_func(**prep_result.target_args)
+        if return_sim_out:
+            return sim_out
+        return cls(order_records=sim_out, **prep_result.pf_args)
 
     # ############# Grouping ############# #
 
@@ -8865,11 +5155,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
     def get_trades(self, group_by: tp.GroupByLike = None, **kwargs) -> Trades:
         """Get trade/position records depending upon `Portfolio.trades_type`."""
-        if self.trades_type == TradesType.Trades:
+        if self.trades_type == enums.TradesType.Trades:
             raise NotImplementedError
-        if self.trades_type == TradesType.EntryTrades:
+        if self.trades_type == enums.TradesType.EntryTrades:
             return self.resolve_shortcut_attr("entry_trades", group_by=group_by, **kwargs)
-        if self.trades_type == TradesType.ExitTrades:
+        if self.trades_type == enums.TradesType.ExitTrades:
             return self.resolve_shortcut_attr("exit_trades", group_by=group_by, **kwargs)
         return self.resolve_shortcut_attr("positions", group_by=group_by, **kwargs)
 
@@ -8999,7 +5289,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = orders.wrapper
 
-        direction = map_enum_fields(direction, Direction)
+        direction = map_enum_fields(direction, enums.Direction)
         func = jit_reg.resolve_option(nb.asset_flow_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         asset_flow = func(
@@ -9029,7 +5319,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if asset_flow is None:
                 asset_flow = cls_or_self.resolve_shortcut_attr(
                     "asset_flow",
-                    direction=Direction.Both,
+                    direction=enums.Direction.Both,
                     jitted=jitted,
                     chunked=chunked,
                 )
@@ -9043,14 +5333,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 init_position = 0.0
             checks.assert_not_none(wrapper)
 
-        direction = map_enum_fields(direction, Direction)
+        direction = map_enum_fields(direction, enums.Direction)
         func = jit_reg.resolve_option(nb.assets_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         assets = func(to_2d_array(asset_flow), init_position=to_1d_array(init_position))
-        if direction == Direction.LongOnly:
+        if direction == enums.Direction.LongOnly:
             func = jit_reg.resolve_option(nb.long_assets_nb, jitted)
             assets = func(assets)
-        elif direction == Direction.ShortOnly:
+        elif direction == enums.Direction.ShortOnly:
             func = jit_reg.resolve_option(nb.short_assets_nb, jitted)
             assets = func(assets)
         return wrapper.wrap(assets, group_by=False, **resolve_dict(wrap_kwargs))
@@ -9311,7 +5601,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             checks.assert_not_none(cash_sharing)
             checks.assert_not_none(wrapper)
 
-        if checks.is_int(init_cash_raw) and init_cash_raw in InitCashMode:
+        if checks.is_int(init_cash_raw) and init_cash_raw in enums.InitCashMode:
             if not isinstance(cls_or_self, type):
                 if free_cash_flow is None:
                     free_cash_flow = cls_or_self.resolve_shortcut_attr(
@@ -9358,7 +5648,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cls_or_self,
         group_by: tp.GroupByLike = None,
         free: bool = False,
-        cash_sharing: tp.Optional[bool] = None,
         init_cash: tp.Optional[tp.ArrayLike] = None,
         cash_deposits: tp.Optional[tp.ArrayLike] = None,
         cash_flow: tp.Optional[tp.SeriesFrame] = None,
@@ -9371,8 +5660,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         For `free`, see `Portfolio.get_cash_flow`."""
         if not isinstance(cls_or_self, type):
-            if cash_sharing is None:
-                cash_sharing = cls_or_self.cash_sharing
             if cash_flow is None:
                 cash_flow = cls_or_self.resolve_shortcut_attr(
                     "cash_flow",
@@ -9384,7 +5671,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(cash_sharing)
             checks.assert_not_none(init_cash)
             if cash_deposits is None:
                 cash_deposits = 0.0
@@ -9653,11 +5939,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         !!! note
             When both directions, `asset_value` must include the addition of the absolute long-only
             and short-only asset values."""
-        direction = map_enum_fields(direction, Direction)
+        direction = map_enum_fields(direction, enums.Direction)
 
         if not isinstance(cls_or_self, type):
             if asset_value is None:
-                if direction == Direction.Both and cls_or_self.wrapper.grouper.is_grouped(group_by=group_by):
+                if direction == enums.Direction.Both and cls_or_self.wrapper.grouper.is_grouped(group_by=group_by):
                     long_asset_value = cls_or_self.resolve_shortcut_attr(
                         "asset_value",
                         direction="longonly",
@@ -9716,7 +6002,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if long_exposure is None:
                 long_exposure = cls_or_self.resolve_shortcut_attr(
                     "gross_exposure",
-                    direction=Direction.LongOnly,
+                    direction=enums.Direction.LongOnly,
                     group_by=group_by,
                     jitted=jitted,
                     chunked=chunked,
@@ -9724,7 +6010,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if short_exposure is None:
                 short_exposure = cls_or_self.resolve_shortcut_attr(
                     "gross_exposure",
-                    direction=Direction.ShortOnly,
+                    direction=enums.Direction.ShortOnly,
                     group_by=group_by,
                     jitted=jitted,
                     chunked=chunked,
@@ -10509,11 +6795,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if "trades_type" in final_kwargs:
             trades_type = final_kwargs["trades_type"]
             if isinstance(final_kwargs["trades_type"], str):
-                trades_type = map_enum_fields(trades_type, TradesType)
+                trades_type = map_enum_fields(trades_type, enums.TradesType)
             if attr == "trades" and trades_type != self.trades_type:
-                if trades_type == TradesType.EntryTrades:
+                if trades_type == enums.TradesType.EntryTrades:
                     attr = "entry_trades"
-                elif trades_type == TradesType.ExitTrades:
+                elif trades_type == enums.TradesType.ExitTrades:
                     attr = "exit_trades"
                 else:
                     attr = "positions"
@@ -10552,10 +6838,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 if _kwargs.pop("free"):
                     prop_name = "free_" + naked_attr_name
             if "direction" in _kwargs:
-                direction = map_enum_fields(_kwargs.pop("direction"), Direction)
-                if direction == Direction.LongOnly:
+                direction = map_enum_fields(_kwargs.pop("direction"), enums.Direction)
+                if direction == enums.Direction.LongOnly:
                     prop_name = "long_" + naked_attr_name
-                elif direction == Direction.ShortOnly:
+                elif direction == enums.Direction.ShortOnly:
                     prop_name = "short_" + naked_attr_name
 
             if prop_name in self.cls_dir:

@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Base plotting functions.
 
@@ -120,7 +120,7 @@ class Gauge(Configured, TraceUpdater):
             >>> gauge.fig.show()
             ```
 
-            ![](/assets/images/api/Gauge.svg){: .iimg }
+            ![](/assets/images/api/Gauge.svg){: .iimg loading=lazy }
         """
         Configured.__init__(
             self,
@@ -248,7 +248,7 @@ class Bar(Configured, TraceUpdater):
             >>> bar.fig.show()
             ```
 
-            ![](/assets/images/api/Bar.svg){: .iimg }
+            ![](/assets/images/api/Bar.svg){: .iimg loading=lazy }
         """
         Configured.__init__(
             self,
@@ -361,7 +361,7 @@ class Scatter(Configured, TraceUpdater):
             >>> scatter.fig.show()
             ```
 
-            ![](/assets/images/api/Scatter.svg){: .iimg }
+            ![](/assets/images/api/Scatter.svg){: .iimg loading=lazy }
         """
         Configured.__init__(
             self,
@@ -508,7 +508,7 @@ class Histogram(Configured, TraceUpdater):
             >>> hist.fig.show()
             ```
 
-            ![](/assets/images/api/Histogram.svg){: .iimg }
+            ![](/assets/images/api/Histogram.svg){: .iimg loading=lazy }
         """
         Configured.__init__(
             self,
@@ -673,7 +673,7 @@ class Box(Configured, TraceUpdater):
             >>> box.fig.show()
             ```
 
-            ![](/assets/images/api/Box.svg){: .iimg }
+            ![](/assets/images/api/Box.svg){: .iimg loading=lazy }
         """
         Configured.__init__(
             self,
@@ -845,7 +845,7 @@ class Heatmap(Configured, TraceUpdater):
             >>> heatmap.fig.show()
             ```
 
-            ![](/assets/images/api/Heatmap.svg){: .iimg }
+            ![](/assets/images/api/Heatmap.svg){: .iimg loading=lazy }
         """
         Configured.__init__(
             self,
@@ -980,7 +980,7 @@ class Volume(Configured, TraceUpdater):
             >>> volume.fig.show()
             ```
 
-            ![](/assets/images/api/Volume.svg){: .iimg }
+            ![](/assets/images/api/Volume.svg){: .iimg loading=lazy }
         """
         Configured.__init__(
             self,

@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Utilities for working with dates and time."""
 
@@ -90,22 +90,23 @@ def prepare_freq(freq: tp.FrequencyLike) -> tp.FrequencyLike:
 
 def freq_to_timedelta(freq: tp.FrequencyLike) -> pd.Timedelta:
     """Convert a frequency-like object to `pd.Timedelta`."""
-    if isinstance(freq, pd.Timedelta):
-        return freq
-    if isinstance(freq, str) and freq.startswith("-"):
-        neg_td = True
-        freq = freq[1:]
-    else:
-        neg_td = False
-    freq = prepare_freq(freq)
-    if isinstance(freq, str) and not freq[0].isdigit():
-        # Otherwise "ValueError: unit abbreviation w/o a number"
-        td = pd.Timedelta(1, unit=freq)
-    else:
-        td = pd.Timedelta(freq)
-    if neg_td:
-        return -td
-    return td
+    if not isinstance(freq, pd.Timedelta):
+        if isinstance(freq, str) and freq.startswith("-"):
+            neg_td = True
+            freq = freq[1:]
+        else:
+            neg_td = False
+        freq = prepare_freq(freq)
+        if isinstance(freq, str) and not freq[0].isdigit():
+            # Otherwise "ValueError: unit abbreviation w/o a number"
+            freq = pd.Timedelta(1, unit=freq)
+        else:
+            freq = pd.Timedelta(freq)
+        if neg_td:
+            freq = -freq
+    if freq.unit != "ns":
+        freq = freq.as_unit("ns", round_ok=False)
+    return freq
 
 
 def parse_timedelta(td: tp.TimedeltaLike) -> tp.Union[pd.Timedelta, pd.DateOffset]:
@@ -113,7 +114,7 @@ def parse_timedelta(td: tp.TimedeltaLike) -> tp.Union[pd.Timedelta, pd.DateOffse
     if isinstance(td, (pd.Timedelta, pd.DateOffset)):
         return td
     try:
-        return to_offset(td)
+        return to_offset(prepare_freq(td))
     except Exception as e:
         return freq_to_timedelta(td)
 
@@ -135,13 +136,15 @@ def time_to_timedelta(time: tp.TimeLike) -> pd.Timedelta:
 
 def freq_to_timedelta64(freq: tp.FrequencyLike) -> np.timedelta64:
     """Convert a frequency-like object to `np.timedelta64`."""
-    if isinstance(freq, np.timedelta64):
-        return freq
-    if not isinstance(freq, (pd.DateOffset, pd.Timedelta)):
-        freq = freq_to_timedelta(freq)
-    if isinstance(freq, pd.DateOffset):
-        freq = pd.Timedelta(freq)
-    return freq.to_timedelta64()
+    if not isinstance(freq, np.timedelta64):
+        if not isinstance(freq, (pd.DateOffset, pd.Timedelta)):
+            freq = freq_to_timedelta(freq)
+        if isinstance(freq, pd.DateOffset):
+            freq = pd.Timedelta(freq)
+        freq = freq.to_timedelta64()
+    if freq.dtype != np.dtype("timedelta64[ns]"):
+        return freq.astype("timedelta64[ns]")
+    return freq
 
 
 def try_to_datetime_index(index: tp.IndexLike, parser_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Index:
@@ -197,7 +200,7 @@ def try_to_datetime_index(index: tp.IndexLike, parser_kwargs: tp.KwargsLike = No
     return index
 
 
-def try_align_to_datetime_index(source_index: tp.IndexLike, target_index: tp.Index, **kwargs) -> tp.Index:
+def try_align_to_dt_index(source_index: tp.IndexLike, target_index: tp.Index, **kwargs) -> tp.Index:
     """Try aligning an index to another datetime index.
 
     Keyword arguments are passed to `try_to_datetime_index`."""
@@ -208,6 +211,20 @@ def try_align_to_datetime_index(source_index: tp.IndexLike, target_index: tp.Ind
         elif source_index.tzinfo is not None and target_index.tzinfo is not None:
             source_index = source_index.tz_convert(target_index.tzinfo)
     return source_index
+
+
+def try_align_dt_to_index(dt_like: tp.DatetimeLike, target_index: tp.Index, **kwargs) -> tp.DatetimeLike:
+    """Try aligning a datetime-like object to another datetime index.
+
+    Keyword arguments are passed to `to_timestamp`."""
+    if not isinstance(target_index, pd.DatetimeIndex):
+        return dt_like
+    dt = to_timestamp(dt_like, **kwargs)
+    if dt.tzinfo is None and target_index.tzinfo is not None:
+        dt = dt.tz_localize(target_index.tzinfo)
+    elif dt.tzinfo is not None and target_index.tzinfo is not None:
+        dt = dt.tz_convert(target_index.tzinfo)
+    return dt
 
 
 def infer_index_freq(
@@ -247,14 +264,18 @@ def infer_index_freq(
     return freq_to_timedelta(freq)
 
 
-def get_utc_tz() -> timezone:
+def get_utc_tz(**kwargs) -> tzinfo:
     """Get UTC timezone."""
-    return timezone.utc
+    from dateutil.tz import tzutc
+
+    return to_timezone(tzutc(), **kwargs)
 
 
-def get_local_tz() -> timezone:
+def get_local_tz(**kwargs) -> tzinfo:
     """Get local timezone."""
-    return timezone(datetime.now(timezone.utc).astimezone().utcoffset())
+    from dateutil.tz import tzlocal
+
+    return to_timezone(tzlocal(), **kwargs)
 
 
 def convert_tzaware_time(t: time, tz_out: tp.Optional[tzinfo]) -> time:

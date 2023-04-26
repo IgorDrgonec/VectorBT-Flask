@@ -1,6 +1,6 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
-"""Custom pandas accessors for base operations with pandas objects."""
+"""Custom Pandas accessors for base operations with Pandas objects."""
 
 import inspect
 import ast
@@ -16,7 +16,7 @@ from pandas.tseries.frequencies import to_offset
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import combining, reshaping, indexes
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.base.indexing import row_points_defaults, row_ranges_defaults, get_index_points, get_index_ranges
+from vectorbtpro.base.indexing import point_idxr_defaults, range_idxr_defaults, get_index_points, get_index_ranges
 from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.utils import checks
@@ -228,7 +228,8 @@ class BaseIDXAccessor(Configured):
         if silence_warnings is None:
             silence_warnings = wrapping_cfg["silence_warnings"]
 
-        if self.freq is None:
+        freq = self.freq
+        if freq is None:
             if not silence_warnings:
                 warnings.warn(
                     "Couldn't parse the frequency of index. Pass it as `freq` or "
@@ -236,9 +237,12 @@ class BaseIDXAccessor(Configured):
                     stacklevel=2,
                 )
             return a
+
         if to_pd:
-            return pd.to_timedelta(a * self.freq)
-        return a * self.freq
+            out = pd.to_timedelta(a * freq)
+        else:
+            out = a * freq
+        return out
 
     # ############# Grouping ############# #
 
@@ -813,7 +817,7 @@ class BaseAccessor(Wrapping):
         template_context: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.Optional[tp.SeriesFrame]:
-        """Set value at each index point using `vectorbtpro.base.wrapping.ArrayWrapper.get_index_points`.
+        """Set value at each index point using `vectorbtpro.base.indexing.get_index_points`.
 
         If `value_or_func` is a function, selects all keyword arguments that were not passed
         to the `get_index_points` method, substitutes any templates, and passes everything to the function.
@@ -823,10 +827,10 @@ class BaseAccessor(Wrapping):
             obj = self.obj
         else:
             obj = self.obj.copy()
-        index_points = self.wrapper.get_index_points(**kwargs)
+        index_points = get_index_points(self.wrapper.index, **kwargs)
 
         if callable(value_or_func):
-            func_kwargs = {k: v for k, v in kwargs.items() if k not in row_points_defaults}
+            func_kwargs = {k: v for k, v in kwargs.items() if k not in point_idxr_defaults}
             template_context = merge_dicts(kwargs, template_context)
         else:
             func_kwargs = None
@@ -883,7 +887,7 @@ class BaseAccessor(Wrapping):
         template_context: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.Optional[tp.SeriesFrame]:
-        """Set value at each index range using `vectorbtpro.base.wrapping.ArrayWrapper.get_index_ranges`.
+        """Set value at each index range using `vectorbtpro.base.indexing.get_index_ranges`.
 
         If `value_or_func` is a function, selects all keyword arguments that were not passed
         to the `get_index_points` method, substitutes any templates, and passes everything to the function.
@@ -893,10 +897,10 @@ class BaseAccessor(Wrapping):
             obj = self.obj
         else:
             obj = self.obj.copy()
-        index_ranges = self.wrapper.get_index_ranges(**kwargs)
+        index_ranges = get_index_ranges(self.wrapper.index, **kwargs)
 
         if callable(value_or_func):
-            func_kwargs = {k: v for k, v in kwargs.items() if k not in row_ranges_defaults}
+            func_kwargs = {k: v for k, v in kwargs.items() if k not in range_idxr_defaults}
             template_context = merge_dicts(kwargs, template_context)
         else:
             func_kwargs = None
@@ -1058,9 +1062,9 @@ class BaseAccessor(Wrapping):
             return reshaping.broadcast_combs(*others, **kwargs)
         return reshaping.broadcast_combs(cls_or_self.obj, *others, **kwargs)
 
-    def make_symmetric(self) -> tp.Frame:
+    def make_symmetric(self, *args, **kwargs) -> tp.Frame:
         """See `vectorbtpro.base.reshaping.make_symmetric`."""
-        return reshaping.make_symmetric(self.obj)
+        return reshaping.make_symmetric(self.obj, *args, **kwargs)
 
     def unstack_to_array(self, *args, **kwargs) -> tp.Array:
         """See `vectorbtpro.base.reshaping.unstack_to_array`."""

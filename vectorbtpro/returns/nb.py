@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for returns.
 
@@ -607,7 +607,7 @@ def cond_value_at_risk_nb(rets: tp.Array2d, cutoff: float = 0.05) -> tp.Array1d:
 
 
 @register_jitted(cache=True)
-def capture_1d_nb(
+def capture_ratio_1d_nb(
     rets: tp.Array1d,
     bm_returns: tp.Array1d,
     ann_factor: float,
@@ -636,22 +636,28 @@ def capture_1d_nb(
     merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def capture_nb(
+def capture_ratio_nb(
     rets: tp.Array2d,
     bm_returns: tp.Array2d,
     ann_factor: float,
     period: tp.Optional[float] = None,
     log_returns: bool = False,
 ) -> tp.Array1d:
-    """2-dim version of `capture_1d_nb`."""
+    """2-dim version of `capture_ratio_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
-        out[col] = capture_1d_nb(rets[:, col], bm_returns[:, col], ann_factor, period=period, log_returns=log_returns)
+        out[col] = capture_ratio_1d_nb(
+            rets[:, col],
+            bm_returns[:, col],
+            ann_factor,
+            period=period,
+            log_returns=log_returns,
+        )
     return out
 
 
 @register_jitted(cache=True)
-def capture_rollmeta_nb(
+def capture_ratio_rollmeta_nb(
     from_i: int,
     to_i: int,
     col: int,
@@ -661,8 +667,8 @@ def capture_rollmeta_nb(
     period: tp.Optional[float] = None,
     log_returns: bool = False,
 ) -> float:
-    """Rolling apply meta function based on `capture_1d_nb`."""
-    return capture_1d_nb(
+    """Rolling apply meta function based on `capture_ratio_1d_nb`."""
+    return capture_ratio_1d_nb(
         rets[from_i:to_i, col],
         bm_returns[from_i:to_i, col],
         ann_factor,
@@ -672,7 +678,7 @@ def capture_rollmeta_nb(
 
 
 @register_jitted(cache=True)
-def up_capture_1d_nb(
+def up_capture_ratio_1d_nb(
     rets: tp.Array1d,
     bm_returns: tp.Array1d,
     ann_factor: float,
@@ -722,17 +728,17 @@ def up_capture_1d_nb(
     merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def up_capture_nb(
+def up_capture_ratio_nb(
     rets: tp.Array2d,
     bm_returns: tp.Array2d,
     ann_factor: float,
     period: tp.Optional[float] = None,
     log_returns: bool = False,
 ) -> tp.Array1d:
-    """2-dim version of `up_capture_1d_nb`."""
+    """2-dim version of `up_capture_ratio_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
-        out[col] = up_capture_1d_nb(
+        out[col] = up_capture_ratio_1d_nb(
             rets[:, col],
             bm_returns[:, col],
             ann_factor,
@@ -743,7 +749,7 @@ def up_capture_nb(
 
 
 @register_jitted(cache=True)
-def up_capture_rollmeta_nb(
+def up_capture_ratio_rollmeta_nb(
     from_i: int,
     to_i: int,
     col: int,
@@ -753,8 +759,8 @@ def up_capture_rollmeta_nb(
     period: tp.Optional[float] = None,
     log_returns: bool = False,
 ) -> float:
-    """Rolling apply meta function based on `up_capture_1d_nb`."""
-    return up_capture_1d_nb(
+    """Rolling apply meta function based on `up_capture_ratio_1d_nb`."""
+    return up_capture_ratio_1d_nb(
         rets[from_i:to_i, col],
         bm_returns[from_i:to_i, col],
         ann_factor,
@@ -764,7 +770,7 @@ def up_capture_rollmeta_nb(
 
 
 @register_jitted(cache=True)
-def down_capture_1d_nb(
+def down_capture_ratio_1d_nb(
     rets: tp.Array1d,
     bm_returns: tp.Array1d,
     ann_factor: float,
@@ -814,17 +820,17 @@ def down_capture_1d_nb(
     merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def down_capture_nb(
+def down_capture_ratio_nb(
     rets: tp.Array2d,
     bm_returns: tp.Array2d,
     ann_factor: float,
     period: tp.Optional[float] = None,
     log_returns: bool = False,
 ) -> tp.Array1d:
-    """2-dim version of `down_capture_1d_nb`."""
+    """2-dim version of `down_capture_ratio_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
-        out[col] = down_capture_1d_nb(
+        out[col] = down_capture_ratio_1d_nb(
             rets[:, col],
             bm_returns[:, col],
             ann_factor,
@@ -835,7 +841,7 @@ def down_capture_nb(
 
 
 @register_jitted(cache=True)
-def down_capture_rollmeta_nb(
+def down_capture_ratio_rollmeta_nb(
     from_i: int,
     to_i: int,
     col: int,
@@ -845,8 +851,8 @@ def down_capture_rollmeta_nb(
     period: tp.Optional[float] = None,
     log_returns: bool = False,
 ) -> float:
-    """Rolling apply meta function based on `down_capture_1d_nb`."""
-    return down_capture_1d_nb(
+    """Rolling apply meta function based on `down_capture_ratio_1d_nb`."""
+    return down_capture_ratio_1d_nb(
         rets[from_i:to_i, col],
         bm_returns[from_i:to_i, col],
         ann_factor,
@@ -871,7 +877,7 @@ def rolling_sharpe_acc_nb(in_state: RollSharpeAIS) -> RollSharpeAOS:
         cumsum=in_state.cumsum,
         nancnt=in_state.nancnt,
         window=in_state.window,
-        minp=in_state.minp
+        minp=in_state.minp,
     )
     mean_out_state = generic_nb.rolling_mean_acc_nb(mean_in_state)
     std_in_state = generic_enums.RollStdAIS(
@@ -883,7 +889,7 @@ def rolling_sharpe_acc_nb(in_state: RollSharpeAIS) -> RollSharpeAOS:
         nancnt=in_state.nancnt,
         window=in_state.window,
         minp=in_state.minp,
-        ddof=in_state.ddof
+        ddof=in_state.ddof,
     )
     std_out_state = generic_nb.rolling_std_acc_nb(std_in_state)
     mean = mean_out_state.value
@@ -894,10 +900,7 @@ def rolling_sharpe_acc_nb(in_state: RollSharpeAIS) -> RollSharpeAOS:
         sharpe = mean / std * np.sqrt(in_state.ann_factor)
 
     return RollSharpeAOS(
-        cumsum=std_out_state.cumsum,
-        cumsum_sq=std_out_state.cumsum_sq,
-        nancnt=std_out_state.nancnt,
-        value=sharpe
+        cumsum=std_out_state.cumsum, cumsum_sq=std_out_state.cumsum_sq, nancnt=std_out_state.nancnt, value=sharpe
     )
 
 
@@ -908,11 +911,7 @@ def rolling_sharpe_acc_nb(in_state: RollSharpeAIS) -> RollSharpeAOS:
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def rolling_sharpe_ratio_nb(
-    returns: tp.Array2d,
-    window: int,
-    ann_factor: float,
-    minp: tp.Optional[int] = None,
-    ddof: int = 0
+    returns: tp.Array2d, window: int, ann_factor: float, minp: tp.Optional[int] = None, ddof: int = 0
 ) -> tp.Array2d:
     """Calculate rolling Sharpe ratio.
 
@@ -925,8 +924,8 @@ def rolling_sharpe_ratio_nb(
     if returns.shape[0] == 0:
         return out
     for col in prange(returns.shape[1]):
-        cumsum = 0.
-        cumsum_sq = 0.
+        cumsum = 0.0
+        cumsum_sq = 0.0
         nancnt = 0
         for i in range(returns.shape[0]):
             in_state = RollSharpeAIS(
@@ -939,7 +938,7 @@ def rolling_sharpe_ratio_nb(
                 window=window,
                 minp=minp,
                 ddof=ddof,
-                ann_factor=ann_factor
+                ann_factor=ann_factor,
             )
             out_state = rolling_sharpe_acc_nb(in_state)
             cumsum = out_state.cumsum

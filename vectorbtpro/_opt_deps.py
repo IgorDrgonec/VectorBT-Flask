@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Optional dependencies."""
 
@@ -12,7 +12,7 @@ opt_dep_config = HybridConfig(
     dict(
         yfinance=dict(
             link="https://github.com/ranaroussi/yfinance",
-            version=">=0.2.10",
+            version=">=0.2.18",
         ),
         binance=dict(
             dist_name="python-binance",

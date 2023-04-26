@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Modules for working with portfolio."""
 
@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from vectorbtpro.portfolio.decorators import *
     from vectorbtpro.portfolio.logs import *
     from vectorbtpro.portfolio.orders import *
+    from vectorbtpro.portfolio.preparing import *
     from vectorbtpro.portfolio.trades import *
 
 __exclude_from__all__ = [

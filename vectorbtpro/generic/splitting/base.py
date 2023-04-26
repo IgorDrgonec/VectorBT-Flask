@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Base class for splitting."""
 
@@ -18,7 +18,12 @@ from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.template import CustomTemplate, Rep, RepFunc, substitute_templates
 from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.parsing import get_func_arg_names
-from vectorbtpro.utils.datetime_ import try_to_datetime_index, try_align_to_datetime_index, parse_timedelta
+from vectorbtpro.utils.datetime_ import (
+    try_to_datetime_index,
+    try_align_dt_to_index,
+    try_align_to_dt_index,
+    parse_timedelta,
+)
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.indexing import hslice, PandasIndexer, get_index_ranges
@@ -290,7 +295,7 @@ class RelRange:
 
 
 _DEF = object()
-"""Use as a default value for optional arguments in `Takeable`."""
+"""Default value for internal purposes."""
 
 
 @attr.s(frozen=True)
@@ -312,6 +317,9 @@ class Takeable:
 
     freq: tp.Optional[tp.FrequencyLike] = attr.ib(default=_DEF)
     """Frequency of `Takeable.index`."""
+
+    point_wise: bool = attr.ib(default=_DEF)
+    """Whether to select one range point at a time and return a tuple."""
 
 
 class Splitter(Analyzable):
@@ -527,7 +535,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_rolling_1.svg){: .iimg }
+            ![](/assets/images/api/from_rolling_1.svg){: .iimg loading=lazy }
 
             * Divide a range into ranges, each split into 1/2:
 
@@ -541,7 +549,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_rolling_2.svg){: .iimg }
+            ![](/assets/images/api/from_rolling_2.svg){: .iimg loading=lazy }
 
             * Make the ranges above non-overlapping by using the right bound of the last
             set as an offset anchor:
@@ -557,7 +565,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_rolling_3.svg){: .iimg }
+            ![](/assets/images/api/from_rolling_3.svg){: .iimg loading=lazy }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -685,7 +693,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_n_rolling.svg){: .iimg }
+            ![](/assets/images/api/from_n_rolling.svg){: .iimg loading=lazy }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -793,7 +801,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_expanding.svg){: .iimg }
+            ![](/assets/images/api/from_expanding.svg){: .iimg loading=lazy }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -897,7 +905,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_n_expanding.svg){: .iimg }
+            ![](/assets/images/api/from_n_expanding.svg){: .iimg loading=lazy }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -982,7 +990,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_ranges_1.svg){: .iimg }
+            ![](/assets/images/api/from_ranges_1.svg){: .iimg loading=lazy }
 
             * In addition to the above, reserve the last month for testing purposes:
 
@@ -996,7 +1004,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_ranges_2.svg){: .iimg }
+            ![](/assets/images/api/from_ranges_2.svg){: .iimg loading=lazy }
         """
         index = try_to_datetime_index(index)
         if split_range_kwargs is None:
@@ -1070,7 +1078,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_grouper.svg){: .iimg }
+            ![](/assets/images/api/from_grouper.svg){: .iimg loading=lazy }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -1170,7 +1178,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_n_random.svg){: .iimg }
+            ![](/assets/images/api/from_n_random.svg){: .iimg loading=lazy }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -1196,7 +1204,7 @@ class Splitter(Analyzable):
             else:
                 if not isinstance(index, pd.DatetimeIndex):
                     raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
-                min_start = try_align_to_datetime_index([min_start], index)[0]
+                min_start = try_align_dt_to_index(min_start, index)
                 if not isinstance(min_start, pd.Timestamp):
                     raise ValueError(f"Minimum start ({min_start}) could not be parsed")
                 if min_start < index[0] or min_start > index[-1]:
@@ -1217,7 +1225,7 @@ class Splitter(Analyzable):
         else:
             if not isinstance(index, pd.DatetimeIndex):
                 raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
-            max_end = try_align_to_datetime_index([max_end], index)[0]
+            max_end = try_align_dt_to_index(max_end, index)
             if not isinstance(max_end, pd.Timestamp):
                 raise ValueError(f"Maximum end ({max_end}) could not be parsed")
             if freq is None:
@@ -1427,7 +1435,7 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_split_func.svg){: .iimg }
+            ![](/assets/images/api/from_split_func.svg){: .iimg loading=lazy }
         """
         index = try_to_datetime_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -1942,14 +1950,14 @@ class Splitter(Analyzable):
             if not checks.is_int(start):
                 if not isinstance(index, pd.DatetimeIndex):
                     raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
-                start = try_align_to_datetime_index([start], index)[0]
+                start = try_align_dt_to_index(start, index)
                 if not isinstance(start, pd.Timestamp):
                     raise ValueError(f"Range start ({start}) could not be parsed")
                 meta["was_datetime"] = True
             if not checks.is_int(stop):
                 if not isinstance(index, pd.DatetimeIndex):
                     raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
-                stop = try_align_to_datetime_index([stop], index)[0]
+                stop = try_align_dt_to_index(stop, index)
                 if not isinstance(stop, pd.Timestamp):
                     raise ValueError(f"Range start ({stop}) could not be parsed")
                 meta["was_datetime"] = True
@@ -2016,7 +2024,7 @@ class Splitter(Analyzable):
                         range_ = slice(meta["start"], meta["stop"])
             else:
                 if not np.issubdtype(range_.dtype, np.integer):
-                    range_ = try_align_to_datetime_index(range_, index)
+                    range_ = try_align_to_dt_index(range_, index)
                     if not isinstance(range_, pd.DatetimeIndex):
                         raise ValueError("Range array could not be parsed")
                     range_ = index.get_indexer(range_, method=None)
@@ -2543,10 +2551,16 @@ class Splitter(Analyzable):
         return ready_range_or_meta
 
     @classmethod
-    def take_range(cls, obj: tp.Any, ready_range: tp.ReadyRangeLike) -> tp.Any:
-        """Take a ready range from an array-like object."""
+    def take_range(cls, obj: tp.Any, ready_range: tp.ReadyRangeLike, point_wise: bool = False) -> tp.Any:
+        """Take a ready range from an array-like object.
+
+        Set `point_wise` to True to select one range point at a time and return a tuple."""
         if isinstance(obj, (pd.Series, pd.DataFrame, PandasIndexer)):
+            if point_wise:
+                return tuple(obj.iloc[i] for i in np.arange(len(obj))[ready_range])
             return obj.iloc[ready_range]
+        if point_wise:
+            return tuple(obj[i] for i in np.arange(len(obj))[ready_range])
         return obj[ready_range]
 
     def take(
@@ -2565,6 +2579,7 @@ class Splitter(Analyzable):
         obj_index: tp.Optional[tp.IndexLike] = None,
         obj_freq: tp.Optional[tp.FrequencyLike] = None,
         range_format: str = "slice_or_any",
+        point_wise: bool = False,
         attach_bounds: tp.Union[bool, str] = False,
         right_inclusive: bool = False,
         template_context: tp.KwargsLike = None,
@@ -2583,6 +2598,7 @@ class Splitter(Analyzable):
         For each index pair, resolves the source range using `Splitter.select_range` and
         `Splitter.get_ready_range`. Then, remaps this range into the object index using
         `Splitter.get_ready_obj_range` and takes the slice from the object using `Splitter.take_range`.
+        If the object is a custom template, substitutes its instead of calling `Splitter.take_range`.
         Finally, uses `vectorbtpro.base.merging.column_stack_merge` (`stack_axis=1`) or
         `vectorbtpro.base.merging.row_stack_merge` (`stack_axis=0`) with `stack_kwargs` to merge the taken slices.
 
@@ -2780,7 +2796,20 @@ class Splitter(Analyzable):
                 return_obj_meta=True,
                 return_meta=True,
             )
-            obj_slice = self.take_range(obj, obj_range_meta["range_"])
+            if isinstance(obj, CustomTemplate):
+                _template_context = merge_dicts(
+                    dict(
+                        split_idx=split_idx,
+                        set_idx=set_idx,
+                        range_=obj_range_meta["range_"],
+                        range_meta=obj_range_meta,
+                        point_wise=point_wise,
+                    ),
+                    template_context,
+                )
+                obj_slice = substitute_templates(obj, _template_context, sub_id="take_range")
+            else:
+                obj_slice = self.take_range(obj, obj_range_meta["range_"], point_wise=point_wise)
             bounds = _get_bounds(range_meta, obj_meta, obj_range_meta)
             return dict(
                 split_idx=split_idx,
@@ -2958,6 +2987,7 @@ class Splitter(Analyzable):
         obj_index: tp.Optional[tp.IndexLike] = None,
         obj_freq: tp.Optional[tp.FrequencyLike] = None,
         range_format: str = "slice_or_any",
+        point_wise: bool = False,
         attach_bounds: tp.Union[bool, str] = False,
         right_inclusive: bool = False,
         template_context: tp.KwargsLike = None,
@@ -3084,7 +3114,7 @@ class Splitter(Analyzable):
             ... ).T.vbt.drop_levels("split", axis=0).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/Splitter_apply.svg){: .iimg }
+            ![](/assets/images/api/Splitter_apply.svg){: .iimg loading=lazy }
         """
         if isinstance(attach_bounds, bool):
             if attach_bounds:
@@ -3182,7 +3212,22 @@ class Splitter(Analyzable):
                 return_obj_meta=True,
                 return_meta=True,
             )
-            obj_slice = self.take_range(takeable.obj, obj_range_meta["range_"])
+            if isinstance(takeable.obj, CustomTemplate):
+                _template_context = merge_dicts(
+                    dict(
+                        range_=obj_range_meta["range_"],
+                        range_meta=obj_range_meta,
+                        point_wise=takeable.point_wise if takeable.point_wise is not _DEF else point_wise,
+                    ),
+                    _template_context,
+                )
+                obj_slice = substitute_templates(takeable.obj, _template_context, sub_id="take_range")
+            else:
+                obj_slice = self.take_range(
+                    takeable.obj,
+                    obj_range_meta["range_"],
+                    point_wise=takeable.point_wise if takeable.point_wise is not _DEF else point_wise,
+                )
             return obj_meta, obj_range_meta, obj_slice
 
         def _take_args(args, range_, _template_context):
@@ -4601,7 +4646,7 @@ class Splitter(Analyzable):
         >>> splitter.plot().show()
         ```
 
-        ![](/assets/images/api/Splitter.svg){: .iimg }
+        ![](/assets/images/api/Splitter.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -4695,7 +4740,7 @@ class Splitter(Analyzable):
             >>> splitter.plot_coverage().show()
             ```
 
-            ![](/assets/images/api/Splitter_coverage_area.svg){: .iimg }
+            ![](/assets/images/api/Splitter_coverage_area.svg){: .iimg loading=lazy }
 
             * Line plot:
 
@@ -4703,7 +4748,7 @@ class Splitter(Analyzable):
             >>> splitter.plot_coverage(stacked=False).show()
             ```
 
-            ![](/assets/images/api/Splitter_coverage_line.svg){: .iimg }
+            ![](/assets/images/api/Splitter_coverage_line.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 

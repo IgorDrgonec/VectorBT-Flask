@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Functions for merging arrays."""
 
@@ -11,7 +11,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import resolve_dict, merge_dicts
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.base.reshaping import column_stack
+from vectorbtpro.base.reshaping import column_stack, to_2d_array
 
 __all__ = [
     "concat_merge",
@@ -205,6 +205,7 @@ def row_stack_merge(
 def column_stack_merge(
     *objs,
     reset_index: tp.Union[None, bool, str] = None,
+    fill_value: tp.Scalar = np.nan,
     keys: tp.Optional[tp.Index] = None,
     wrap: tp.Union[None, str, bool] = None,
     wrapper: tp.Optional[ArrayWrapper] = None,
@@ -326,18 +327,31 @@ def column_stack_merge(
             objs = new_objs
         else:
             if reset_index is not None:
-                min_length = min(map(len, objs))
-                max_length = max(map(len, objs))
-                if min_length == max_length:
-                    return column_stack(objs)
-                new_obj = np.full((max_length, len(objs)), np.nan, dtype=np.float_)
-                for i, obj in enumerate(objs):
+                min_n_rows = None
+                max_n_rows = None
+                n_cols = 0
+                new_objs = []
+                for obj in objs:
+                    new_obj = to_2d_array(obj)
+                    new_objs.append(new_obj)
+                    if min_n_rows is None or new_obj.shape[0] < min_n_rows:
+                        min_n_rows = new_obj.shape[0]
+                    if max_n_rows is None or new_obj.shape[0] > min_n_rows:
+                        max_n_rows = new_obj.shape[0]
+                    n_cols += new_obj.shape[1]
+                if min_n_rows == max_n_rows:
+                    return column_stack(new_objs)
+                new_obj = np.full((max_n_rows, n_cols), fill_value)
+                start_col = 0
+                for obj in new_objs:
+                    end_col = start_col + obj.shape[1]
                     if isinstance(reset_index, str) and reset_index.lower() == "from_start":
-                        new_obj[:len(obj), i] = np.asarray(obj)
+                        new_obj[:len(obj), start_col:end_col] = obj
                     elif isinstance(reset_index, str) and reset_index.lower() == "from_end":
-                        new_obj[-len(obj):, i] = np.asarray(obj)
+                        new_obj[-len(obj):, start_col:end_col] = obj
                     else:
                         raise ValueError(f"Invalid index resetting option '{reset_index}'")
+                    start_col = end_col
                 return new_obj
             return column_stack(objs)
     if reset_index is not None:
@@ -378,28 +392,30 @@ def mixed_merge(
     outputs = []
     for i, obj_kind in enumerate(zip(*objs)):
         func_name = func_names[i]
-        if func_name.lower() == "reset_column_stack":
-            kwargs["reset_index"] = True
-            func_name = "column_stack"
-        elif func_name.lower() == "from_start_column_stack":
-            kwargs["reset_index"] = "from_start"
-            func_name = "column_stack"
-        elif func_name.lower() == "from_end_column_stack":
-            kwargs["reset_index"] = "from_end"
-            func_name = "column_stack"
-        outputs.append(resolve_merge_func(func_name)(
+        merge_func = resolve_merge_func(func_name)
+        output = merge_func(
             obj_kind,
             keys=keys,
             wrap=wrap,
             wrapper=wrapper,
             wrap_kwargs=wrap_kwargs,
             **kwargs,
-        ))
+        )
+        outputs.append(output)
     return tuple(outputs)
 
 
 def resolve_merge_func(func_name: tp.MaybeTuple[str]) -> tp.Callable:
-    """Resolve merging function based on name."""
+    """Resolve merging function based on name.
+
+    * Tuple of strings: `mixed_merge` with `func_names=func_name`
+    * String "concat": `concat_merge`
+    * String "row_stack": `column_stack_merge`
+    * String "column_stack": `column_stack_merge`
+    * String "reset_column_stack": `column_stack_merge` with `reset_index=True`
+    * String "from_start_column_stack": `column_stack_merge` with `reset_index="from_start"`
+    * String "from_end_column_stack": `column_stack_merge` with `reset_index="from_end"`
+    """
     if isinstance(func_name, tuple):
         return partial(mixed_merge, func_names=func_name)
     if func_name.lower() == "concat":
@@ -408,4 +424,10 @@ def resolve_merge_func(func_name: tp.MaybeTuple[str]) -> tp.Callable:
         return row_stack_merge
     if func_name.lower() == "column_stack":
         return column_stack_merge
+    if func_name.lower() == "reset_column_stack":
+        return partial(column_stack_merge, reset_index=True)
+    if func_name.lower() == "from_start_column_stack":
+        return partial(column_stack_merge, reset_index="from_start")
+    if func_name.lower() == "from_end_column_stack":
+        return partial(column_stack_merge, reset_index="from_end")
     raise ValueError(f"Invalid merging function name '{func_name}'")

@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for portfolio analysis."""
 
@@ -306,7 +306,7 @@ def align_init_cash_nb(
         if min_req_cash < 0:
             out[col] = np.abs(min_req_cash)
         else:
-            out[col] = 0.0
+            out[col] = 1.0
     if init_cash_raw == InitCashMode.AutoAlign:
         out = np.full(out.shape, np.max(out))
     return out

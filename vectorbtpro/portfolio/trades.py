@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Base class for working with trade records.
 
@@ -483,7 +483,7 @@ Name: group, dtype: object
 >>> pf.trades['a'].plots().show()
 ```
 
-![](/assets/images/api/trades_plots.svg){: .iimg }
+![](/assets/images/api/trades_plots.svg){: .iimg loading=lazy }
 """
 
 from functools import partialmethod
@@ -989,14 +989,14 @@ class Trades(Ranges):
         )
         func = jit_reg.resolve_option(nb.mfe_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        drawdown = func(
+        mfe = func(
             self.get_field_arr("size"),
             self.get_field_arr("direction"),
             self.get_field_arr("entry_price"),
             best_price.values,
             use_returns=use_returns,
         )
-        return self.map_array(drawdown, **kwargs)
+        return self.map_array(mfe, **kwargs)
 
     def get_mae(
         self,
@@ -1021,14 +1021,14 @@ class Trades(Ranges):
         )
         func = jit_reg.resolve_option(nb.mae_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        drawdown = func(
+        mae = func(
             self.get_field_arr("size"),
             self.get_field_arr("direction"),
             self.get_field_arr("entry_price"),
             worst_price.values,
             use_returns=use_returns,
         )
-        return self.map_array(drawdown, **kwargs)
+        return self.map_array(mae, **kwargs)
 
     def get_expanding_mfe(
         self,
@@ -1415,7 +1415,7 @@ class Trades(Ranges):
             >>> pf.trades.plot_pnl().show()
             ```
 
-            ![](/assets/images/api/trades_plot_pnl.svg){: .iimg }
+            ![](/assets/images/api/trades_plot_pnl.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -1608,7 +1608,7 @@ class Trades(Ranges):
             >>> trades.plot_against_pnl("MFE").show()
             ```
 
-            ![](/assets/images/api/trades_plot_against_pnl.svg){: .iimg }
+            ![](/assets/images/api/trades_plot_against_pnl.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -1839,7 +1839,7 @@ class Trades(Ranges):
             >>> pf.trades.plot_expanding("MFE").show()
             ```
 
-            ![](/assets/images/api/trades_plot_expanding.svg){: .iimg }
+            ![](/assets/images/api/trades_plot_expanding.svg){: .iimg loading=lazy }
         """
         if column is not None:
             self_col = self.select_col(column=column, group_by=False)
@@ -1956,7 +1956,7 @@ class Trades(Ranges):
             >>> trades.plot_against_pnl("MFE").show()
             ```
 
-            ![](/assets/images/api/trades_plot_against_pnl.svg){: .iimg }
+            ![](/assets/images/api/trades_plot_against_pnl.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -2126,7 +2126,6 @@ class Trades(Ranges):
         incl_shorter: bool = False,
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
-        chunked: tp.ChunkedOption = None,
         xref: str = "x",
         yref: str = "y",
         hline_shape_kwargs: tp.KwargsLike = None,
@@ -2146,7 +2145,6 @@ class Trades(Ranges):
             incl_shorter=incl_shorter,
             group_by=group_by,
             jitted=jitted,
-            chunked=chunked,
         )
         running_edge_ratio = self.select_col_from_obj(
             running_edge_ratio, column, wrapper=self.wrapper.regroup(group_by)
@@ -2245,7 +2243,7 @@ class Trades(Ranges):
             >>> pf.trades.plot().show()
             ```
 
-            ![](/assets/images/api/trades_plot.svg){: .iimg }
+            ![](/assets/images/api/trades_plot.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -2670,7 +2668,7 @@ class EntryTrades(Trades):
             >>> pf.entry_trades.plot_signals().show()
             ```
 
-            ![](/assets/images/api/entry_trades_plot_signals.svg){: .iimg }
+            ![](/assets/images/api/entry_trades_plot_signals.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -2905,7 +2903,7 @@ class ExitTrades(Trades):
             >>> pf.exit_trades.plot_signals().show()
             ```
 
-            ![](/assets/images/api/exit_trades_plot_signals.svg){: .iimg }
+            ![](/assets/images/api/exit_trades_plot_signals.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 

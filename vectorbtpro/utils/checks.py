@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Utilities for validation during runtime."""
 
@@ -29,6 +29,11 @@ class Comparable:
 
 
 # ############# Checks ############# #
+
+def is_bool(arg: tp.Any) -> bool:
+    """Check whether the argument is a bool."""
+    return isinstance(arg, (bool, np.bool_))
+
 
 def is_int(arg: tp.Any) -> bool:
     """Check whether the argument is an integer (and not a timedelta, for example)."""
@@ -199,17 +204,22 @@ def is_default_index(arg: tp.Any, check_names: bool = True) -> bool:
     return is_index_equal(arg, pd.RangeIndex(start=0, stop=len(arg), step=1), check_names=check_names)
 
 
-def is_namedtuple(x: tp.Any) -> bool:
+def is_namedtuple(arg: tp.Any) -> bool:
     """Check whether object is an instance of namedtuple."""
-    if not isinstance(x, type):
-        x = type(x)
-    b = x.__bases__
-    if len(b) != 1 or b[0] != tuple:
+    if not isinstance(arg, type):
+        arg = type(arg)
+    bases = arg.__bases__
+    if len(bases) != 1 or bases[0] != tuple:
         return False
-    f = getattr(x, "_fields", None)
-    if not isinstance(f, tuple):
+    fields = getattr(arg, "_fields", None)
+    if not isinstance(fields, tuple):
         return False
-    return all(type(n) == str for n in f)
+    return all(type(field) == str for field in fields)
+
+
+def is_record(arg: tp.Any) -> bool:
+    """Check whether object is a NumPy record."""
+    return isinstance(arg, (np.void, np.record)) and hasattr(arg.dtype, "names") and arg.dtype.names is not None
 
 
 def func_accepts_arg(func: tp.Callable, arg_name: str, arg_kind: tp.Optional[tp.MaybeTuple[int]] = None) -> bool:

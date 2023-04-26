@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Mapping utilities."""
 
@@ -20,8 +20,23 @@ def reverse_mapping(mapping: tp.Mapping) -> dict:
     return {v: k for k, v in mapping.items()}
 
 
-def to_mapping(mapping_like: tp.MappingLike, reverse: bool = False, enum_unkval: tp.Any = -1) -> dict:
-    """Convert mapping-like object to a mapping.
+def to_field_mapping(mapping_like: tp.MappingLike) -> dict:
+    """Convert mapping-like object to a field mapping."""
+    if isinstance(mapping_like, tp.EnumMeta):
+        mapping = {i.name: i.value for i in mapping_like}
+    elif checks.is_namedtuple(mapping_like):
+        mapping = dict(mapping_like._asdict())
+    elif checks.is_record(mapping_like):
+        mapping = dict(zip(mapping_like.dtype.names, mapping_like))
+    elif checks.is_series(mapping_like):
+        mapping = mapping_like.to_dict()
+    else:
+        mapping = dict(mapping_like)
+    return mapping
+
+
+def to_value_mapping(mapping_like: tp.MappingLike, reverse: bool = False, enum_unkval: tp.Any = -1) -> dict:
+    """Convert mapping-like object to a value mapping.
 
     Enable `reverse` to apply `reverse_mapping` on the result dict."""
     if isinstance(mapping_like, tp.EnumMeta):
@@ -30,6 +45,8 @@ def to_mapping(mapping_like: tp.MappingLike, reverse: bool = False, enum_unkval:
         mapping = {v: k for k, v in mapping_like._asdict().items()}
         if enum_unkval not in mapping_like:
             mapping[enum_unkval] = None
+    elif checks.is_record(mapping_like):
+        mapping = dict(zip(mapping_like, mapping_like.dtype.names))
     elif not checks.is_mapping(mapping_like):
         if checks.is_index(mapping_like):
             mapping_like = mapping_like.to_series().reset_index(drop=True)
@@ -64,9 +81,9 @@ def apply_mapping(
             Can take a scalar, tuple, list, set, frozenset, NumPy array, Index, Series, and DataFrame.
         mapping_like (mapping_like): Any mapping-like object.
 
-            See `to_mapping`.
+            See `to_value_mapping`.
         enum_unkval (any): Missing value for enumerated types.
-        reverse (bool): See `reverse` in `to_mapping`.
+        reverse (bool): See `reverse` in `to_value_mapping`.
         ignore_case (bool): Whether to ignore the case if the key is a string.
         ignore_underscores (bool): Whether to ignore underscores if the key is a string.
         ignore_invalid (bool): Whether to remove any character that is not allowed in a Python variable.
@@ -89,7 +106,7 @@ def apply_mapping(
     if not isinstance(ignore_type, tuple):
         ignore_type = (ignore_type,)
 
-    mapping = to_mapping(mapping_like, enum_unkval=enum_unkval, reverse=reverse)
+    mapping = to_value_mapping(mapping_like, enum_unkval=enum_unkval, reverse=reverse)
 
     new_mapping = dict()
     for k, v in mapping.items():
@@ -174,7 +191,7 @@ def apply_mapping(
         if obj.size == 0:
             return obj
         series = []
-        for sr_name, sr in obj.iteritems():
+        for sr_name, sr in obj.items():
             if ignore_type is None or not _compatible_types(sr.dtype, sr.iloc[0]):
                 series.append(sr.map(_converter))
             else:

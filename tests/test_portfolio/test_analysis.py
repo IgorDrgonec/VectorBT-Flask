@@ -4948,7 +4948,6 @@ class TestPortfolio:
             vbt.Portfolio.get_cash(
                 init_cash=pf.init_cash,
                 cash_deposits=pf.cash_deposits,
-                cash_sharing=pf.cash_sharing,
                 cash_flow=pf.cash_flow,
                 wrapper=pf.wrapper,
             ),
@@ -4958,7 +4957,6 @@ class TestPortfolio:
             vbt.Portfolio.get_cash(
                 init_cash=pf_grouped.init_cash,
                 cash_deposits=pf_grouped.cash_deposits,
-                cash_sharing=pf_grouped.cash_sharing,
                 cash_flow=pf_grouped.cash_flow,
                 wrapper=pf_grouped.wrapper,
             ),

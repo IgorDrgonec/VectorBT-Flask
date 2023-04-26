@@ -1,6 +1,6 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
-"""Custom pandas accessors for signals.
+"""Custom Pandas accessors for signals.
 
 Methods can be accessed as follows:
 
@@ -2267,7 +2267,7 @@ class SignalsAccessor(GenericAccessor):
             >>> mask[['a', 'c']].vbt.signals.plot().show()
             ```
 
-            ![](/assets/images/api/signals_df_plot.svg){: .iimg }
+            ![](/assets/images/api/signals_df_plot.svg){: .iimg loading=lazy }
         """
         if column is not None:
             _self = self.select_col(column=column)
@@ -2298,7 +2298,7 @@ class SignalsAccessor(GenericAccessor):
             >>> (~mask['b']).vbt.signals.plot_as_exits(y=ts, fig=fig).show()
             ```
 
-            ![](/assets/images/api/signals_plot_as_markers.svg){: .iimg }
+            ![](/assets/images/api/signals_plot_as_markers.svg){: .iimg loading=lazy }
         """
         from vectorbtpro._settings import settings
 

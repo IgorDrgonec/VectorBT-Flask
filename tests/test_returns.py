@@ -810,23 +810,23 @@ class TestAccessors:
             ret_acc.rolling_cond_value_at_risk(chunked=False),
         )
 
-    def test_capture(self):
-        assert isclose(ret_acc["a"].capture(), np.inf)
+    def test_capture_ratio(self):
+        assert isclose(ret_acc["a"].capture_ratio(), np.inf)
         assert_series_equal(
-            ret_acc.capture(),
-            pd.Series([np.inf, -0.05870045316931919, -0.0], index=rets.columns, name="capture"),
+            ret_acc.capture_ratio(),
+            pd.Series([np.inf, -0.05870045316931919, -0.0], index=rets.columns, name="capture_ratio"),
         )
         assert_series_equal(
-            log_ret_acc.capture(),
-            ret_acc.capture(),
+            log_ret_acc.capture_ratio(),
+            ret_acc.capture_ratio(),
         )
         assert_series_equal(
-            ret_acc.capture(jitted=dict(parallel=True)),
-            ret_acc.capture(jitted=dict(parallel=False)),
+            ret_acc.capture_ratio(jitted=dict(parallel=True)),
+            ret_acc.capture_ratio(jitted=dict(parallel=False)),
         )
-        assert_series_equal(ret_acc.capture(chunked=True), ret_acc.capture(chunked=False))
+        assert_series_equal(ret_acc.capture_ratio(chunked=True), ret_acc.capture_ratio(chunked=False))
         assert_frame_equal(
-            ret_acc.rolling_capture(),
+            ret_acc.rolling_capture_ratio(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -840,32 +840,32 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
-            log_ret_acc.rolling_capture(),
-            ret_acc.rolling_capture(),
+            log_ret_acc.rolling_capture_ratio(),
+            ret_acc.rolling_capture_ratio(),
         )
         assert_frame_equal(
-            ret_acc.rolling_capture(jitted=dict(parallel=True)),
-            ret_acc.rolling_capture(jitted=dict(parallel=False)),
+            ret_acc.rolling_capture_ratio(jitted=dict(parallel=True)),
+            ret_acc.rolling_capture_ratio(jitted=dict(parallel=False)),
         )
-        assert_frame_equal(ret_acc.rolling_capture(chunked=True), ret_acc.rolling_capture(chunked=False))
+        assert_frame_equal(ret_acc.rolling_capture_ratio(chunked=True), ret_acc.rolling_capture_ratio(chunked=False))
 
-    def test_up_capture(self):
-        assert isclose(ret_acc["a"].up_capture(), 5.035323109391956)
+    def test_up_capture_ratio(self):
+        assert isclose(ret_acc["a"].up_capture_ratio(), 5.035323109391956)
         assert_series_equal(
-            ret_acc.up_capture(),
-            pd.Series([5.035323109391956, np.nan, np.nan], index=rets.columns, name="up_capture"),
+            ret_acc.up_capture_ratio(),
+            pd.Series([5.035323109391956, np.nan, np.nan], index=rets.columns, name="up_capture_ratio"),
         )
         assert_series_equal(
-            log_ret_acc.up_capture(),
-            ret_acc.up_capture(),
+            log_ret_acc.up_capture_ratio(),
+            ret_acc.up_capture_ratio(),
         )
         assert_series_equal(
-            ret_acc.up_capture(jitted=dict(parallel=True)),
-            ret_acc.up_capture(jitted=dict(parallel=False)),
+            ret_acc.up_capture_ratio(jitted=dict(parallel=True)),
+            ret_acc.up_capture_ratio(jitted=dict(parallel=False)),
         )
-        assert_series_equal(ret_acc.up_capture(chunked=True), ret_acc.up_capture(chunked=False))
+        assert_series_equal(ret_acc.up_capture_ratio(chunked=True), ret_acc.up_capture_ratio(chunked=False))
         assert_frame_equal(
-            ret_acc.rolling_up_capture(),
+            ret_acc.rolling_up_capture_ratio(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -879,35 +879,35 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
-            log_ret_acc.rolling_up_capture(),
-            ret_acc.rolling_up_capture(),
+            log_ret_acc.rolling_up_capture_ratio(),
+            ret_acc.rolling_up_capture_ratio(),
         )
         assert_frame_equal(
-            ret_acc.rolling_up_capture(jitted=dict(parallel=True)),
-            ret_acc.rolling_up_capture(jitted=dict(parallel=False)),
+            ret_acc.rolling_up_capture_ratio(jitted=dict(parallel=True)),
+            ret_acc.rolling_up_capture_ratio(jitted=dict(parallel=False)),
         )
         assert_frame_equal(
-            ret_acc.rolling_up_capture(chunked=True),
-            ret_acc.rolling_up_capture(chunked=False),
+            ret_acc.rolling_up_capture_ratio(chunked=True),
+            ret_acc.rolling_up_capture_ratio(chunked=False),
         )
 
-    def test_down_capture(self):
-        assert isclose(ret_acc["a"].down_capture(), np.nan)
+    def test_down_capture_ratio(self):
+        assert isclose(ret_acc["a"].down_capture_ratio(), np.nan)
         assert_series_equal(
-            ret_acc.down_capture(),
-            pd.Series([np.nan, np.nan, 0.8084889429645409], index=rets.columns, name="down_capture"),
+            ret_acc.down_capture_ratio(),
+            pd.Series([np.nan, np.nan, 0.8084889429645409], index=rets.columns, name="down_capture_ratio"),
         )
         assert_series_equal(
-            log_ret_acc.down_capture(),
-            ret_acc.down_capture(),
+            log_ret_acc.down_capture_ratio(),
+            ret_acc.down_capture_ratio(),
         )
         assert_series_equal(
-            ret_acc.down_capture(jitted=dict(parallel=True)),
-            ret_acc.down_capture(jitted=dict(parallel=False)),
+            ret_acc.down_capture_ratio(jitted=dict(parallel=True)),
+            ret_acc.down_capture_ratio(jitted=dict(parallel=False)),
         )
-        assert_series_equal(ret_acc.down_capture(chunked=True), ret_acc.down_capture(chunked=False))
+        assert_series_equal(ret_acc.down_capture_ratio(chunked=True), ret_acc.down_capture_ratio(chunked=False))
         assert_frame_equal(
-            ret_acc.rolling_down_capture(),
+            ret_acc.rolling_down_capture_ratio(),
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan],
@@ -921,16 +921,16 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
-            log_ret_acc.rolling_down_capture(),
-            ret_acc.rolling_down_capture(),
+            log_ret_acc.rolling_down_capture_ratio(),
+            ret_acc.rolling_down_capture_ratio(),
         )
         assert_frame_equal(
-            ret_acc.rolling_down_capture(jitted=dict(parallel=True)),
-            ret_acc.rolling_down_capture(jitted=dict(parallel=False)),
+            ret_acc.rolling_down_capture_ratio(jitted=dict(parallel=True)),
+            ret_acc.rolling_down_capture_ratio(jitted=dict(parallel=False)),
         )
         assert_frame_equal(
-            ret_acc.rolling_down_capture(chunked=True),
-            ret_acc.rolling_down_capture(chunked=False),
+            ret_acc.rolling_down_capture_ratio(chunked=True),
+            ret_acc.rolling_down_capture_ratio(chunked=False),
         )
 
     def test_drawdown(self):

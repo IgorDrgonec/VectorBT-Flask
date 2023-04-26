@@ -1,9 +1,10 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Utilities for hashing."""
 
+from functools import cached_property as cachedproperty
+
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.decorators import cachedproperty
 
 __all__ = []
 

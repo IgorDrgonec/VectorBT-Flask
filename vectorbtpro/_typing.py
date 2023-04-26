@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """General types used across vectorbtpro."""
 
@@ -104,7 +104,7 @@ RecordArray = np.ndarray
 RecordArray2d = np.ndarray
 RecArray = np.recarray
 MaybeArray = Union[Scalar, Array]
-MaybeIndexArray = Union[int, Array1d, slice, Tuple[Array1d, Array1d]]
+MaybeIndexArray = Union[int, slice, Array1d, Array2d]
 SeriesFrame = Union[Series, Frame]
 MaybeSeries = Union[Scalar, Series]
 MaybeSeriesFrame = Union[T, Series, Frame]
@@ -208,6 +208,7 @@ Params = Sequence[Param]
 
 # Mappings
 MappingLike = Union[str, Mapping, NamedTuple, EnumMeta, IndexLike]
+RecordsLike = Union[SeriesFrame, RecordArray, Sequence[MappingLike]]
 
 # Parsing
 AnnArgs = Dict[str, Kwargs]
@@ -253,3 +254,6 @@ Splits = Sequence[SplitLike]
 SplitsArray = Array2d
 SplitsMask = Array3d
 BoundsArray = Array3d
+
+# Staticization
+StaticizedOption = Union[None, bool, Kwargs, TaskId]

@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Named tuples and enumerated types for signals.
 
@@ -27,7 +27,8 @@ class StopTypeT(tp.NamedTuple):
     TSL: int = 1
     TTP: int = 2
     TP: int = 3
-    T: int = 4
+    TD: int = 4
+    DT: int = 5
 
 
 StopType = StopTypeT()

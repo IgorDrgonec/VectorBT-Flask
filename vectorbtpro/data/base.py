@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Base class for working with data sources.
 
@@ -162,6 +162,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             kwargs["returned_kwargs"] = objs[-1].returned_kwargs
         if "last_index" not in kwargs:
             kwargs["last_index"] = objs[-1].last_index
+        if "delisted" not in kwargs:
+            kwargs["delisted"] = objs[-1].delisted
 
         kwargs = cls.resolve_row_stack_kwargs(*objs, **kwargs)
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
@@ -217,6 +219,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         "fetch_kwargs",
         "returned_kwargs",
         "last_index",
+        "delisted",
         "tz_localize",
         "tz_convert",
         "missing_index",
@@ -232,6 +235,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         fetch_kwargs: tp.Optional[symbol_dict] = None,
         returned_kwargs: tp.Optional[symbol_dict] = None,
         last_index: tp.Optional[symbol_dict] = None,
+        delisted: tp.Optional[symbol_dict] = None,
         tz_localize: tp.Union[None, bool, tp.TimezoneLike] = None,
         tz_convert: tp.Union[None, bool, tp.TimezoneLike] = None,
         missing_index: tp.Optional[str] = None,
@@ -247,6 +251,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             fetch_kwargs=fetch_kwargs,
             returned_kwargs=returned_kwargs,
             last_index=last_index,
+            delisted=delisted,
             tz_localize=tz_localize,
             tz_convert=tz_convert,
             missing_index=missing_index,
@@ -262,11 +267,14 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             returned_kwargs = {}
         if last_index is None:
             last_index = {}
+        if delisted is None:
+            delisted = {}
         checks.assert_instance_of(data, dict)
         checks.assert_instance_of(symbol_classes, dict)
         checks.assert_instance_of(fetch_kwargs, dict)
         checks.assert_instance_of(returned_kwargs, dict)
         checks.assert_instance_of(last_index, dict)
+        checks.assert_instance_of(delisted, dict)
         for symbol, obj in data.items():
             checks.assert_meta_equal(obj, data[list(data.keys())[0]])
         if len(data) > 1:
@@ -278,6 +286,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         self._fetch_kwargs = symbol_dict(fetch_kwargs)
         self._returned_kwargs = symbol_dict(returned_kwargs)
         self._last_index = symbol_dict(last_index)
+        self._delisted = symbol_dict(delisted)
         self._tz_localize = tz_localize
         self._tz_convert = tz_convert
         self._missing_index = missing_index
@@ -292,19 +301,25 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         Replaces the data's index and/or columns if they were changed in the wrapper."""
         if "wrapper" in kwargs and "data" not in kwargs:
             wrapper = kwargs["wrapper"]
+            if isinstance(wrapper, dict):
+                new_index = wrapper.get("index", self.wrapper.index)
+                new_columns = wrapper.get("columns", self.wrapper.columns)
+            else:
+                new_index = wrapper.index
+                new_columns = wrapper.columns
             data = self.config["data"]
             new_data = symbol_dict()
             data_changed = False
             for k, v in data.items():
                 if isinstance(v, (pd.Series, pd.DataFrame)):
-                    if not v.index.equals(wrapper.index):
+                    if not v.index.equals(new_index):
                         v = v.copy(deep=False)
-                        v.index = wrapper.index
+                        v.index = new_index
                         data_changed = True
                     if isinstance(v, pd.DataFrame):
-                        if not v.columns.equals(wrapper.columns):
+                        if not v.columns.equals(new_columns):
                             v = v.copy(deep=False)
-                            v.columns = wrapper.columns
+                            v.columns = new_columns
                             data_changed = True
                 new_data[k] = v
             if data_changed:
@@ -362,6 +377,11 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     def last_index(self) -> symbol_dict:
         """Last fetched index per symbol of type `symbol_dict`."""
         return self._last_index
+
+    @property
+    def delisted(self) -> symbol_dict:
+        """Delisted flag per symbol of type `symbol_dict`."""
+        return self._delisted
 
     @property
     def tz_localize(self) -> tp.Union[None, bool, tp.TimezoneLike]:
@@ -578,7 +598,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         new_data = symbol_dict()
         for symbol, obj in data.items():
             if checks.is_series(obj):
-                obj = obj.to_frame(name=obj.name)
+                obj = obj.to_frame()
             obj = obj.reindex(columns=columns)
             if not multiple_columns:
                 obj = obj[columns[0]]
@@ -658,6 +678,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         fetch_kwargs: tp.Optional[symbol_dict] = None,
         returned_kwargs: tp.Optional[symbol_dict] = None,
         last_index: tp.Optional[symbol_dict] = None,
+        delisted: tp.Optional[symbol_dict] = None,
         silence_warnings: tp.Optional[bool] = None,
         **kwargs,
     ) -> DataT:
@@ -678,6 +699,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             fetch_kwargs (symbol_dict): Keyword arguments initially passed to `Data.fetch_symbol`.
             returned_kwargs (symbol_dict): Keyword arguments returned by `Data.fetch_symbol`.
             last_index (symbol_dict): Last fetched index per symbol.
+            delisted (symbol_dict): Whether symbol has been delisted.
             silence_warnings (bool): Whether to silence all warnings.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
@@ -705,6 +727,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             returned_kwargs = symbol_dict()
         if last_index is None:
             last_index = symbol_dict()
+        if delisted is None:
+            delisted = symbol_dict()
 
         if isinstance(data, (pd.Series, pd.DataFrame)):
             data = dict(symbol=data)
@@ -719,6 +743,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             data[symbol] = obj
             if symbol not in last_index:
                 last_index[symbol] = obj.index[-1]
+            if symbol not in delisted:
+                delisted[symbol] = False
 
         data = cls.align_index(data, missing=missing_index, silence_warnings=silence_warnings)
         data = cls.align_columns(data, missing=missing_columns, silence_warnings=silence_warnings)
@@ -737,6 +763,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             fetch_kwargs=fetch_kwargs,
             returned_kwargs=returned_kwargs,
             last_index=last_index,
+            delisted=delisted,
             tz_localize=tz_localize,
             tz_convert=tz_convert,
             missing_index=missing_index,
@@ -814,7 +841,9 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         That is, it can be distributed and parallelized when needed.
 
         Args:
-            symbols (hashable or sequence of hashable): One or multiple symbols.
+            symbols (hashable, sequence of hashable, or dict): One or multiple symbols.
+
+                If provided as a dictionary, will use keys as symbols and values as keyword arguments.
 
                 !!! note
                     Tuple is considered as a single symbol (tuple is a hashable).
@@ -843,9 +872,17 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         """
         data_cfg = cls.get_settings(key_id="base")
 
+        fetch_kwargs = symbol_dict()
         if checks.is_hashable(symbols):
             single_symbol = True
             symbols = [symbols]
+        elif isinstance(symbols, dict):
+            new_symbols = []
+            for symbol, symbol_fetch_kwargs in symbols.items():
+                new_symbols.append(symbol)
+                fetch_kwargs[symbol] = symbol_fetch_kwargs
+            symbols = new_symbols
+            single_symbol = False
         elif checks.is_iterable(symbols):
             symbols = list(symbols)
             single_symbol = False
@@ -878,12 +915,13 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             execute_kwargs["show_progress"] = True
 
         funcs_args = []
-        fetch_kwargs = symbol_dict()
         func_arg_names = get_func_arg_names(cls.fetch_symbol)
         for symbol in symbols:
             symbol_fetch_kwargs = cls.select_symbol_kwargs(symbol, kwargs)
             if "silence_warnings" in func_arg_names:
                 symbol_fetch_kwargs["silence_warnings"] = silence_warnings
+            if symbol in fetch_kwargs:
+                symbol_fetch_kwargs = merge_dicts(symbol_fetch_kwargs, fetch_kwargs[symbol])
             funcs_args.append(
                 (
                     cls.try_fetch_symbol,
@@ -1028,30 +1066,37 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             kwargs["show_progress"] = False
 
         funcs_args = []
-        for symbol in self.symbols:
-            symbol_update_kwargs = self.select_symbol_kwargs(symbol, kwargs)
-            if "silence_warnings" in func_arg_names:
-                symbol_update_kwargs["silence_warnings"] = silence_warnings
-            funcs_args.append(
-                (
-                    self.try_update_symbol,
-                    (symbol,),
-                    dict(
-                        skip_on_error=skip_on_error,
-                        silence_warnings=silence_warnings,
-                        update_kwargs=symbol_update_kwargs,
-                    ),
+        symbol_indices = []
+        for i, symbol in enumerate(self.symbols):
+            if not self.delisted.get(symbol, False):
+                symbol_update_kwargs = self.select_symbol_kwargs(symbol, kwargs)
+                if "silence_warnings" in func_arg_names:
+                    symbol_update_kwargs["silence_warnings"] = silence_warnings
+                funcs_args.append(
+                    (
+                        self.try_update_symbol,
+                        (symbol,),
+                        dict(
+                            skip_on_error=skip_on_error,
+                            silence_warnings=silence_warnings,
+                            update_kwargs=symbol_update_kwargs,
+                        ),
+                    )
                 )
-            )
+                symbol_indices.append(i)
 
         outputs = execute(funcs_args, n_calls=len(self.symbols), progress_desc=self.symbols, **execute_kwargs)
 
         new_data = symbol_dict()
         new_last_index = symbol_dict()
         new_returned_kwargs = symbol_dict()
-        for i, out in enumerate(outputs):
-            symbol = self.symbols[i]
-            obj = self.data[symbol]
+        i = 0
+        for symbol, obj in self.data.items():
+            if self.delisted.get(symbol, False):
+                out = None
+            else:
+                out = outputs[i]
+                i += 1
             skip_symbol = False
             if out is not None:
                 if isinstance(out, tuple):
@@ -1467,6 +1512,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 {k: v for k, v in self.returned_kwargs.items() if k in symbols},
             ),
             last_index=symbol_dict({k: v for k, v in self.last_index.items() if k in symbols}),
+            delisted=symbol_dict({k: v for k, v in self.delisted.items() if k in symbols}),
             **kwargs,
         )
 
@@ -1480,6 +1526,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             fetch_kwargs={rename.get(k, k): v for k, v in self.fetch_kwargs.items()},
             returned_kwargs={rename.get(k, k): v for k, v in self.returned_kwargs.items()},
             last_index={rename.get(k, k): v for k, v in self.last_index.items()},
+            delisted={rename.get(k, k): v for k, v in self.delisted.items()},
         )
 
     # ############# Merging ############# #
@@ -1505,6 +1552,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         fetch_kwargs = symbol_dict()
         returned_kwargs = symbol_dict()
         last_index = symbol_dict()
+        delisted = symbol_dict()
         for instance in datas:
             if not instance.single_symbol:
                 single_symbol = False
@@ -1525,6 +1573,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                     returned_kwargs[new_s] = instance.returned_kwargs[s]
                 if s in instance.last_index:
                     last_index[new_s] = instance.last_index[s]
+                if s in instance.last_index:
+                    delisted[new_s] = instance.delisted[s]
 
         return cls.from_data(
             data=data,
@@ -1533,6 +1583,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             fetch_kwargs=fetch_kwargs,
             returned_kwargs=returned_kwargs,
             last_index=last_index,
+            delisted=delisted,
             **kwargs,
         )
 
@@ -1548,7 +1599,12 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     ) -> None:
         """Save data into CSV file(s).
 
-        Any argument can be provided per symbol using `symbol_dict`."""
+        Any argument can be provided per symbol using `symbol_dict`.
+
+        Each symbol gets saved to a separate file, that's why the first argument is the path
+        to the directory, not file! If there's only one file, you can specify the file path via
+        `path_or_buf`. If there are multiple files, use the same argument but wrap the multiple paths
+        with `symbol_dict`."""
         for k, v in self.data.items():
             if path_or_buf is None:
                 if isinstance(dir_path, symbol_dict):
@@ -1803,7 +1859,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         `func` can be one of the following:
 
-        * Location to compute all indicators from. See `vectorbtpro.indicators.factory.IndicatorFactory.get_locations`.
+        * Location to compute all indicators from. See `vectorbtpro.indicators.factory.IndicatorFactory.list_locations`.
         * Indicator name. See `vectorbtpro.indicators.factory.IndicatorFactory.get_indicator`.
         * Simulation method. See `vectorbtpro.portfolio.base.Portfolio`.
         * Any callable object
@@ -2010,6 +2066,12 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 agg_func=None,
                 tags="data",
             ),
+            delisted=dict(
+                title="Delisted",
+                calc_func="delisted",
+                agg_func=None,
+                tags="data",
+            ),
             null_counts=dict(
                 title="Null Counts",
                 calc_func=lambda self, group_by: {
@@ -2076,13 +2138,13 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
             * Plot OHLC(V) of one symbol (only if data contains the respective columns):
 
-            ![](/assets/images/api/data_plot.svg){: .iimg }
+            ![](/assets/images/api/data_plot.svg){: .iimg loading=lazy }
 
             ```pycon
             >>> data.plot(symbol='BTC-USD').show()
             ```
 
-            ![](/assets/images/api/data_plot_ohlcv.svg){: .iimg }
+            ![](/assets/images/api/data_plot_ohlcv.svg){: .iimg loading=lazy }
         """
         if column is None:
             first_data = self.data[self.symbols[0]]

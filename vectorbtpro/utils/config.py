@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Utilities for configuration."""
 
@@ -14,7 +14,9 @@ from vectorbtpro.utils.formatting import Prettified, prettify_dict, prettify_ini
 from vectorbtpro.utils.pickling import RecState, Pickleable, pdict
 
 __all__ = [
+    "hdict",
     "atomic_dict",
+    "unsetkey",
     "merge_dicts",
     "child_dict",
     "Config",
@@ -24,6 +26,13 @@ __all__ = [
     "Configured",
     "AtomicConfig",
 ]
+
+
+class hdict(dict):
+    """Hashable dict."""
+
+    def __hash__(self):
+        return hash(frozenset(self.items()))
 
 
 def resolve_dict(dct: tp.DictLikeSequence, i: tp.Optional[int] = None) -> dict:
@@ -85,8 +94,8 @@ def get_dict_item(dct: dict, k: tp.Hashable) -> tp.Any:
         k = tuple(k.split("."))
     if isinstance(k, tuple):
         if len(k) == 1:
-            return dct[k[0]]
-        return get_dict_item(dct[k[0]], k[1:])
+            return get_dict_item(dct, k[0])
+        return get_dict_item(get_dict_item(dct, k[0]), k[1:])
     return dct[k]
 
 
@@ -98,6 +107,16 @@ def set_dict_item(dct: dict, k: tp.Any, v: tp.Any, force: bool = False) -> None:
         dct.__setitem__(k, v, force=force)
     else:
         dct[k] = v
+
+
+def del_dict_item(dct: dict, k: tp.Any, force: bool = False) -> None:
+    """Delete dict item.
+
+    If the dict is of the type `Config`, also passes `force` keyword to override blocking flags."""
+    if isinstance(dct, Config):
+        dct.__delitem__(k, force=force)
+    else:
+        del dct[k]
 
 
 def copy_dict(dct: InConfigLikeT, copy_mode: str = "shallow", nested: bool = True) -> OutConfigLikeT:
@@ -146,9 +165,13 @@ def update_dict(
     """Update dict with keys and values from other dict.
 
     Set `nested` to True to update all child dicts in recursive manner.
+
     For `force`, see `set_dict_item`.
 
     If you want to treat any dict as a single value, wrap it with `atomic_dict`.
+
+    If `nested` is True, a value in `x` is an instance of `Configured`, and the corresponding
+    value in `y` is a dictionary, calls `Configured.replace`.
 
     !!! note
         If the child dict is not atomic, it will copy only its values, not its meta."""
@@ -160,12 +183,48 @@ def update_dict(
     assert_instance_of(y, dict)
 
     for k, v in y.items():
-        if nested and k in x and isinstance(x[k], dict) and isinstance(v, dict) and not isinstance(v, atomic_dict):
-            update_dict(x[k], v, force=force)
+        if (
+            nested
+            and k in x
+            and isinstance(x[k], (dict, Configured))
+            and isinstance(v, dict)
+            and not isinstance(v, atomic_dict)
+        ):
+            if isinstance(x[k], Configured):
+                set_dict_item(x, k, x[k].replace(**v), force=force)
+            else:
+                update_dict(x[k], v, force=force)
         else:
             if same_keys and k not in x:
                 continue
             set_dict_item(x, k, v, force=force)
+
+
+class _unsetkey:
+    pass
+
+
+unsetkey = _unsetkey()
+"""When passed as a value, the corresponding key will be unset.
+
+It can still be overridden by another dict."""
+
+
+def unset_keys(
+    dct: InConfigLikeT,
+    nested: bool = True,
+    force: bool = False,
+) -> None:
+    """Unset the keys that have the value `unsetkey`."""
+    if dct is None:
+        return
+    assert_instance_of(dct, dict)
+
+    for k, v in list(dct.items()):
+        if isinstance(v, _unsetkey):
+            del_dict_item(dct, k, force=force)
+        elif nested and isinstance(v, dict) and not isinstance(v, atomic_dict):
+            unset_keys(v, nested=nested, force=force)
 
 
 def merge_dicts(
@@ -185,6 +244,9 @@ def merge_dicts(
 
             If None, checks whether any dict is nested.
         same_keys (bool): Whether to merge on the overlapping keys only."""
+    if len(dicts) == 1:
+        dicts = (None, dicts[0])
+
     # Shortcut when both dicts are None
     if dicts[0] is None and dicts[1] is None:
         if len(dicts) > 2:
@@ -212,11 +274,14 @@ def merge_dicts(
     # Convert dict-like objects to regular dicts
     if to_dict:
         # Shortcut when all dicts are already regular
-        if not nested and copy_mode in {"none", "shallow"}:  # shortcut
+        if not nested and not same_keys and copy_mode in {"none", "shallow"}:
             out = {}
             for dct in dicts:
                 if dct is not None:
                     out.update(dct)
+            for k, v in list(out.items()):
+                if isinstance(v, _unsetkey):
+                    del out[k]
             return out
         dicts = tuple([convert_to_dict(dct, nested=True) for dct in dicts])
 
@@ -236,6 +301,9 @@ def merge_dicts(
         should_update = False
     if should_update:
         update_dict(x, y, nested=nested, force=True, same_keys=same_keys)
+
+    # Unset keys
+    unset_keys(x, nested=nested, force=True)
 
     # Merge resulting dict with remaining dicts
     if len(dicts) > 2:
@@ -408,7 +476,7 @@ class Config(pdict):
                             nested=nested,
                             convert_children=convert_children,
                             as_attrs=as_attrs,
-                        )
+                        ),
                     )
 
         # Copy initial config
@@ -918,12 +986,43 @@ class Configured(Cacheable, Comparable, Pickleable, Prettified):
                     cls_cfgs.append(get_dict_item(settings, c_settings_key))
         if len(cls_cfgs) == 0:
             if key_id is None:
-                raise KeyError(f"No settings associated with the class {cls.__name__}")
+                raise KeyError(f"No settings associated with the class '{cls.__name__}'")
             else:
                 raise KeyError(f"Key id '{key_id}' not found among registered setting keys")
         if len(cls_cfgs) == 1:
             return cls_cfgs[0]
         return merge_dicts(*cls_cfgs)
+
+    @classmethod
+    def get_setting(cls, k: str, key_id: tp.Optional[str] = None) -> dict:
+        """Get class-related settings from `vectorbtpro._settings`."""
+        from vectorbtpro._settings import settings
+
+        found_settings = False
+        for c in cls.__mro__:
+            if hasattr(c, "_setting_keys"):
+                c_setting_keys = getattr(c, "_setting_keys")
+                if c_setting_keys is not None:
+                    if isinstance(c_setting_keys, dict):
+                        if key_id is None:
+                            raise ValueError("Must specify key_id")
+                        if key_id not in c_setting_keys:
+                            continue
+                        c_settings_key = c_setting_keys[key_id]
+                        if c_settings_key is None:
+                            continue
+                    else:
+                        c_settings_key = c_setting_keys
+                    try:
+                        return get_dict_item(settings, (c_settings_key, k))
+                    except Exception as e:
+                        found_settings = True
+        if not found_settings:
+            if key_id is None:
+                raise KeyError(f"No settings associated with the class '{cls.__name__}'")
+            else:
+                raise KeyError(f"Key id '{key_id}' not found among registered setting keys")
+        raise KeyError(f"Key '{k}' not found among registered settings")
 
     @classmethod
     def set_settings(cls, key_id: tp.Optional[str] = None, **kwargs) -> None:
@@ -939,7 +1038,7 @@ class Configured(Cacheable, Comparable, Pickleable, Prettified):
         else:
             cls_settings_key = cls._setting_keys
         if cls_settings_key is None:
-            raise ValueError(f"No settings associated with the class {cls.__name__}")
+            raise ValueError(f"No settings associated with the class '{cls.__name__}'")
         cls_cfg = get_dict_item(settings, cls_settings_key)
         for k, v in kwargs.items():
             if k not in cls_cfg:
@@ -963,7 +1062,7 @@ class Configured(Cacheable, Comparable, Pickleable, Prettified):
         else:
             cls_settings_key = cls._setting_keys
         if cls_settings_key is None:
-            raise ValueError(f"No settings associated with the class {cls.__name__}")
+            raise ValueError(f"No settings associated with the class '{cls.__name__}'")
         cls_cfg = get_dict_item(settings, cls_settings_key)
         cls_cfg.reset(force=True)
 

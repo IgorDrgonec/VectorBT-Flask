@@ -1,6 +1,6 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
-"""Custom pandas accessors for OHLC(V) data.
+"""Custom Pandas accessors for OHLC(V) data.
 
 Methods can be accessed as follows:
 
@@ -82,7 +82,7 @@ Name: agg_stats, dtype: object
 >>> ohlcv_acc.plots(settings=dict(ohlc_type='candlestick')).show()
 ```
 
-![](/assets/images/api/ohlcv_plots.svg){: .iimg }
+![](/assets/images/api/ohlcv_plots.svg){: .iimg loading=lazy }
 """
 
 import numpy as np
@@ -386,7 +386,7 @@ class OHLCVDFAccessor(GenericDFAccessor):
 
             [=100% "100%"]{: .candystripe}
 
-            ![](/assets/images/api/ohlcv_plot.svg){: .iimg }
+            ![](/assets/images/api/ohlcv_plot.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 

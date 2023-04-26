@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Custom data source classes.
 
@@ -742,7 +742,6 @@ class CSVData(FileData):
         index_col: tp.Optional[int] = None,
         parse_dates: tp.Optional[bool] = None,
         squeeze: tp.Optional[bool] = None,
-        date_parser: tp.Optional[tp.Callable] = None,
         chunk_func: tp.Optional[tp.Callable] = None,
         **read_csv_kwargs,
     ) -> tp.SymbolData:
@@ -772,9 +771,6 @@ class CSVData(FileData):
             index_col (int): See `pd.read_csv`.
             parse_dates (bool): See `pd.read_csv`.
             squeeze (int): Whether to squeeze a DataFrame with one column into a Series.
-            date_parser (callable): Date parser function.
-
-                If `tz` is not None, will use a parser that localizes/converts each date to `tz`.
             chunk_func (callable): Function to select and concatenate chunks from `TextFileReader`.
 
                 Gets called only if `iterator` or `chunksize` are set.
@@ -842,9 +838,6 @@ class CSVData(FileData):
         if sep is None:
             sep = ","
 
-        if tz is not None and date_parser is None:
-            date_parser = lambda x: pd.Timestamp(x, tz=tz)
-
         obj = pd.read_csv(
             path,
             sep=sep,
@@ -853,9 +846,9 @@ class CSVData(FileData):
             parse_dates=parse_dates,
             skiprows=skiprows,
             nrows=nrows,
-            date_parser=date_parser,
             **read_csv_kwargs,
         )
+
         if isinstance(obj, TextFileReader):
             if chunk_func is None:
                 obj = pd.concat(list(obj), axis=0)
@@ -865,6 +858,10 @@ class CSVData(FileData):
             obj = obj.squeeze("columns")
         if isinstance(obj, pd.Series) and obj.name == "0":
             obj.name = None
+        if parse_dates and obj.index.is_object():
+            obj.index = pd.to_datetime(obj.index, utc=True)
+            if tz is not None:
+                obj.index = obj.index.tz_convert(tz)
         if isinstance(obj.index, pd.DatetimeIndex) and tz is None:
             tz = obj.index.tzinfo
         if start is not None or end is not None:
@@ -1723,6 +1720,7 @@ class CCXTData(RemoteData):
         if exchange is None:
             exchange = ccxt_cfg["exchange"]
         if isinstance(exchange, str):
+            exchange = exchange.lower()
             exchange_name = exchange
         elif isinstance(exchange, ccxt.Exchange):
             exchange_name = type(exchange).__name__
@@ -1827,6 +1825,8 @@ class CCXTData(RemoteData):
 
         Args:
             symbol (str): Symbol.
+
+                Symbol can be in the `EXCHANGE:SYMBOL` format, in this case `exchange` argument will be ignored.
             exchange (str or object): Exchange identifier or an exchange object.
 
                 See `CCXTData.resolve_exchange`.
@@ -1868,6 +1868,8 @@ class CCXTData(RemoteData):
 
         ccxt_cfg = cls.get_settings(key_id="custom")
 
+        if ":" in symbol:
+            exchange, symbol = symbol.split(":")
         if exchange_config is None:
             exchange_config = {}
         exchange = cls.resolve_exchange(exchange=exchange, **exchange_config)
@@ -2812,15 +2814,15 @@ class AVData(RemoteData):
         ```
     """
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.alpha_vantage")
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.av")
 
     @classmethod
     def list_symbols(cls, keywords: str, apikey: tp.Optional[str] = None) -> tp.List[str]:
         """List all symbols."""
-        alpha_vantage_cfg = cls.get_settings(key_id="custom")
+        av_cfg = cls.get_settings(key_id="custom")
 
         if apikey is None:
-            apikey = alpha_vantage_cfg["apikey"]
+            apikey = av_cfg["apikey"]
         query = dict()
         query["function"] = "SYMBOL_SEARCH"
         query["keywords"] = keywords
@@ -2958,40 +2960,40 @@ class AVData(RemoteData):
             read_csv_kwargs (dict): Keyword arguments passed to `pd.read_csv`.
             silence_warnings (bool): Whether to silence all warnings.
 
-        For defaults, see `custom.alpha_vantage` in `vectorbtpro._settings.data`.
+        For defaults, see `custom.av` in `vectorbtpro._settings.data`.
         """
-        alpha_vantage_cfg = cls.get_settings(key_id="custom")
+        av_cfg = cls.get_settings(key_id="custom")
 
         if apikey is None:
-            apikey = alpha_vantage_cfg["apikey"]
+            apikey = av_cfg["apikey"]
         if api_meta is None:
-            api_meta = alpha_vantage_cfg["api_meta"]
+            api_meta = av_cfg["api_meta"]
         if category is None:
-            category = alpha_vantage_cfg["category"]
+            category = av_cfg["category"]
         if function is None:
-            function = alpha_vantage_cfg["function"]
+            function = av_cfg["function"]
         if timeframe is None:
-            timeframe = alpha_vantage_cfg["timeframe"]
+            timeframe = av_cfg["timeframe"]
         if tz is None:
-            tz = alpha_vantage_cfg["tz"]
+            tz = av_cfg["tz"]
         if adjusted is None:
-            adjusted = alpha_vantage_cfg["adjusted"]
+            adjusted = av_cfg["adjusted"]
         if extended is None:
-            extended = alpha_vantage_cfg["extended"]
+            extended = av_cfg["extended"]
         if slice is None:
-            slice = alpha_vantage_cfg["slice"]
+            slice = av_cfg["slice"]
         if series_type is None:
-            series_type = alpha_vantage_cfg["series_type"]
+            series_type = av_cfg["series_type"]
         if time_period is None:
-            time_period = alpha_vantage_cfg["time_period"]
+            time_period = av_cfg["time_period"]
         if outputsize is None:
-            outputsize = alpha_vantage_cfg["outputsize"]
-        read_csv_kwargs = merge_dicts(alpha_vantage_cfg["read_csv_kwargs"], read_csv_kwargs)
+            outputsize = av_cfg["outputsize"]
+        read_csv_kwargs = merge_dicts(av_cfg["read_csv_kwargs"], read_csv_kwargs)
         if match_params is None:
-            match_params = alpha_vantage_cfg["match_params"]
-        params = merge_dicts(alpha_vantage_cfg["params"], params)
+            match_params = av_cfg["match_params"]
+        params = merge_dicts(av_cfg["params"], params)
         if silence_warnings is None:
-            silence_warnings = alpha_vantage_cfg["silence_warnings"]
+            silence_warnings = av_cfg["silence_warnings"]
 
         if api_meta is None and (function is None or match_params):
             if not silence_warnings and cls.parse_api_meta.cache_info().misses == 0:
@@ -3331,7 +3333,8 @@ class TVData(RemoteData):
         >>> vbt.TVData.set_custom_settings(
         ...     client_config=dict(
         ...         username="YOUR_USERNAME",
-        ...         password="YOUR_PASSWORD"
+        ...         password="YOUR_PASSWORD",
+        ...         user_agent="YOUR_USER_AGENT"  # optional, see https://useragentstring.com/
         ...     )
         ... )
         ```
@@ -3358,11 +3361,16 @@ class TVData(RemoteData):
         exchange: tp.Optional[str] = None,
         client: tp.Optional[PolygonClientT] = None,
         client_config: tp.DictLike = None,
+        delay: tp.Optional[int] = None,
+        show_progress: tp.Optional[bool] = None,
+        pbar_kwargs: tp.KwargsLike = None,
     ) -> tp.List[str]:
         """List all symbols.
 
         Uses market scanner when `market` is provided (returns all symbols, big payload)
         Uses symbol search when either `text` or `exchange` is provided (returns a subset of symbols)."""
+        tv_cfg = cls.get_settings(key_id="custom")
+
         if market is None and text is None and exchange is None:
             raise ValueError("Please provide either market, or text and/or exchange")
         if market is not None and (text is not None or exchange is not None):
@@ -3370,8 +3378,20 @@ class TVData(RemoteData):
         if client_config is None:
             client_config = {}
         client = cls.resolve_client(client=client, **client_config)
+        if delay is None:
+            delay = tv_cfg["delay"]
+        if show_progress is None:
+            show_progress = tv_cfg["show_progress"]
+        pbar_kwargs = merge_dicts(tv_cfg["pbar_kwargs"], pbar_kwargs)
+
         if market is None:
-            data = client.search_symbol(text=text, exchange=exchange)
+            data = client.search_symbol(
+                text=text,
+                exchange=exchange,
+                delay=delay,
+                show_progress=show_progress,
+                pbar_kwargs=pbar_kwargs,
+            )
             all_symbols = map(lambda x: x["exchange"] + ":" + x["symbol"], data)
         else:
             data = client.scan_symbols(market.lower())

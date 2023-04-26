@@ -1,17 +1,17 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
 """Utilities for working with class/instance attributes."""
 
 import re
 import inspect
 from collections.abc import Iterable
+from functools import cached_property as cachedproperty
 
 import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.decorators import cachedproperty
 from vectorbtpro.utils.parsing import get_func_arg_names
 
 __all__ = [

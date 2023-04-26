@@ -1,6 +1,6 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
-"""Custom pandas accessors for generic data.
+"""Custom Pandas accessors for generic data.
 
 Methods can be accessed as follows:
 
@@ -187,7 +187,7 @@ Name: 0, dtype: object
 >>> df2.vbt.plots().show()
 ```
 
-![](/assets/images/api/generic_plots.svg){: .iimg }
+![](/assets/images/api/generic_plots.svg){: .iimg loading=lazy }
 """
 
 import warnings
@@ -219,7 +219,7 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.decorators import class_or_instancemethod, class_or_instanceproperty
-from vectorbtpro.utils.mapping import apply_mapping, to_mapping
+from vectorbtpro.utils.mapping import apply_mapping, to_value_mapping
 from vectorbtpro.utils.template import substitute_templates
 from vectorbtpro.utils.datetime_ import freq_to_timedelta, freq_to_timedelta64, try_to_datetime_index, parse_timedelta
 from vectorbtpro.utils.colors import adjust_opacity, map_value_to_cmap
@@ -363,7 +363,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 mapping = self.wrapper.columns
             elif mapping.lower() == "groups":
                 mapping = self.wrapper.get_columns()
-            mapping = to_mapping(mapping)
+            mapping = to_value_mapping(mapping)
         return mapping
 
     def apply_mapping(self, mapping: tp.Union[None, bool, tp.MappingLike] = None, **kwargs) -> tp.SeriesFrame:
@@ -3480,7 +3480,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         checks.assert_in(axis, (-1, 0, 1))
 
         mapping = self.resolve_mapping(mapping=mapping)
-        codes, uniques = pd.factorize(self.obj.values.flatten(), sort=False, na_sentinel=None)
+        codes, uniques = pd.factorize(self.obj.values.flatten(), sort=False, use_na_sentinel=False)
         if axis == 0:
             func = jit_reg.resolve_option(nb.value_counts_per_row_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
@@ -3945,7 +3945,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.plot().show()
             ```
 
-            ![](/assets/images/api/df_plot.svg){: .iimg }
+            ![](/assets/images/api/df_plot.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.generic.plotting import Scatter
 
@@ -3971,7 +3971,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.lineplot().show()
             ```
 
-            ![](/assets/images/api/df_lineplot.svg){: .iimg }
+            ![](/assets/images/api/df_lineplot.svg){: .iimg loading=lazy }
         """
         return self.plot(column=column, **merge_dicts(dict(trace_kwargs=dict(mode="lines")), kwargs))
 
@@ -3983,7 +3983,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.scatterplot().show()
             ```
 
-            ![](/assets/images/api/df_scatterplot.svg){: .iimg }
+            ![](/assets/images/api/df_scatterplot.svg){: .iimg loading=lazy }
         """
         return self.plot(column=column, **merge_dicts(dict(trace_kwargs=dict(mode="markers")), kwargs))
 
@@ -4002,7 +4002,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.barplot().show()
             ```
 
-            ![](/assets/images/api/df_barplot.svg){: .iimg }
+            ![](/assets/images/api/df_barplot.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.generic.plotting import Bar
 
@@ -4036,7 +4036,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.histplot().show()
             ```
 
-            ![](/assets/images/api/df_histplot.svg){: .iimg }
+            ![](/assets/images/api/df_histplot.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.generic.plotting import Histogram
 
@@ -4081,7 +4081,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.boxplot().show()
             ```
 
-            ![](/assets/images/api/df_boxplot.svg){: .iimg }
+            ![](/assets/images/api/df_boxplot.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.generic.plotting import Box
 
@@ -4144,7 +4144,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df['a'].vbt.plot_against(df['b']).show()
             ```
 
-            ![](/assets/images/api/sr_plot_against.svg){: .iimg }
+            ![](/assets/images/api/sr_plot_against.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
 
@@ -4289,7 +4289,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df['a'].vbt.overlay_with_heatmap(df['b']).show()
             ```
 
-            ![](/assets/images/api/sr_overlay_with_heatmap.svg){: .iimg }
+            ![](/assets/images/api/sr_overlay_with_heatmap.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_subplots
         from vectorbtpro._settings import settings
@@ -4368,7 +4368,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.heatmap().show()
             ```
 
-            ![](/assets/images/api/df_heatmap.svg){: .iimg }
+            ![](/assets/images/api/df_heatmap.svg){: .iimg loading=lazy }
 
             * Plotting a figure based on a multi-index:
 
@@ -4388,7 +4388,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> sr.vbt.heatmap().show()
             ```
 
-            ![](/assets/images/api/sr_heatmap.svg){: .iimg }
+            ![](/assets/images/api/sr_heatmap.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.generic.plotting import Heatmap
 
@@ -4533,7 +4533,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> sr.vbt.volume().show()
             ```
 
-            ![](/assets/images/api/sr_volume.svg){: .iimg }
+            ![](/assets/images/api/sr_volume.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.generic.plotting import Volume
 
@@ -4656,7 +4656,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> pd.Series(np.random.standard_normal(100)).vbt.qqplot().show()
             ```
 
-            ![](/assets/images/api/sr_qqplot.svg){: .iimg }
+            ![](/assets/images/api/sr_qqplot.svg){: .iimg loading=lazy }
         """
         import scipy.stats as st
 
@@ -4700,7 +4700,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> df.vbt.areaplot().show()
             ```
 
-            ![](/assets/images/api/df_areaplot.svg){: .iimg }
+            ![](/assets/images/api/df_areaplot.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -4810,7 +4810,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> sr.vbt.plot_pattern([1, 2, 3, 2, 1]).show()
             ```
 
-            ![](/assets/images/api/sr_plot_pattern.svg){: .iimg }"""
+            ![](/assets/images/api/sr_plot_pattern.svg){: .iimg loading=lazy }"""
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -5118,6 +5118,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         relative: tp.ArrayLike = False,
         start_value: tp.Optional[float] = None,
         max_out_len: tp.Optional[int] = None,
+        reset_index: bool = False,
         return_uptrend: bool = False,
         jitted: tp.JittedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
@@ -5131,7 +5132,10 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             start_value=start_value,
             max_out_len=max_out_len,
         )
-        new_index = self.wrapper.index[idx_out]
+        if reset_index:
+            new_index = pd.RangeIndex(stop=len(idx_out))
+        else:
+            new_index = self.wrapper.index[idx_out]
         wrap_kwargs = merge_dicts(
             dict(index=new_index),
             wrap_kwargs,
@@ -5141,6 +5145,35 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             uptrend_out = self.wrapper.wrap(uptrend_out, group_by=False, **wrap_kwargs)
             return sr_out, uptrend_out
         return sr_out
+
+    def to_renko_ohlc(
+        self,
+        brick_size: tp.ArrayLike,
+        relative: tp.ArrayLike = False,
+        start_value: tp.Optional[float] = None,
+        max_out_len: tp.Optional[int] = None,
+        reset_index: bool = False,
+        jitted: tp.JittedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.Frame:
+        """See `vectorbtpro.generic.nb.base.to_renko_ohlc_1d_nb`."""
+        func = jit_reg.resolve_option(nb.to_renko_ohlc_1d_nb, jitted)
+        arr_out, idx_out = func(
+            self.to_1d_array(),
+            reshaping.broadcast_array_to(brick_size, self.wrapper.shape[0]),
+            relative=reshaping.broadcast_array_to(relative, self.wrapper.shape[0]),
+            start_value=start_value,
+            max_out_len=max_out_len,
+        )
+        if reset_index:
+            new_index = pd.RangeIndex(stop=len(idx_out))
+        else:
+            new_index = self.wrapper.index[idx_out]
+        wrap_kwargs = merge_dicts(
+            dict(index=new_index, columns=["Open", "High", "Low", "Close"]),
+            wrap_kwargs,
+        )
+        return self.wrapper.wrap(arr_out, group_by=False, **wrap_kwargs)
 
 
 class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
@@ -5231,7 +5264,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
             >>> df.vbt.plot_projections().show()
             ```
 
-            ![](/assets/images/api/df_plot_projections.svg){: .iimg }
+            ![](/assets/images/api/df_plot_projections.svg){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings

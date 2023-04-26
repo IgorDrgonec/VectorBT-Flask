@@ -16,6 +16,7 @@ from vectorbtpro.base import (
     resampling,
     merging,
 )
+from vectorbtpro.utils import checks
 
 from tests.utils import *
 
@@ -340,18 +341,18 @@ class TestGrouper:
 
 class TestResampler:
     @pytest.mark.parametrize("test_freq", ["1h", "3d", "7d"])
-    @pytest.mark.parametrize("test_closed", ["left", "right"])
-    def test_date_range_nb(self, test_freq, test_closed):
+    @pytest.mark.parametrize("test_inclusive", ["left", "right"])
+    def test_date_range_nb(self, test_freq, test_inclusive):
         source_index = pd.date_range("2020-01-01", "2020-02-01")
         np.testing.assert_array_equal(
             resampling.nb.date_range_nb(
                 source_index[0].to_datetime64(),
                 source_index[-1].to_datetime64(),
                 pd.Timedelta(test_freq).to_timedelta64(),
-                incl_left=test_closed == "left",
-                incl_right=test_closed == "right",
+                incl_left=test_inclusive == "left",
+                incl_right=test_inclusive == "right",
             ),
-            pd.date_range(source_index[0], source_index[-1], freq=test_freq, closed=test_closed).values,
+            pd.date_range(source_index[0], source_index[-1], freq=test_freq, inclusive=test_inclusive).values,
         )
 
     def test_from_pd_resample(self):
@@ -1856,7 +1857,7 @@ class TestArrayWrapper:
         )
         assert ts.vbt.wrapper.resample(test_freq).freq == ts.resample(test_freq).last().vbt.wrapper.freq
 
-    def test_fill_using_index_dict(self):
+    def test_fill_and_set(self):
         i = pd.date_range("2020-01-01", "2020-01-05")
         c = pd.Index(["a", "b", "c"], name="c")
         sr = pd.Series(np.nan, index=i, name=c[0])
@@ -1864,10 +1865,10 @@ class TestArrayWrapper:
         df = pd.DataFrame(np.nan, index=i, columns=c)
         df_wrapper = wrapping.ArrayWrapper.from_obj(df)
 
-        obj = sr_wrapper.fill_using_index_dict(
+        obj = sr_wrapper.fill_and_set(
             indexing.index_dict(
                 {
-                    vbt.RowIdx(0): 100,
+                    vbt.rowidx(0): 100,
                     "_def": 0,
                 }
             )
@@ -1876,10 +1877,10 @@ class TestArrayWrapper:
             obj,
             pd.Series([100, 0, 0, 0, 0], index=i, name=c[0]),
         )
-        obj = df_wrapper.fill_using_index_dict(
+        obj = df_wrapper.fill_and_set(
             indexing.index_dict(
                 {
-                    vbt.ElemIdx(1, 1): 100,
+                    vbt.idx(1, 1): 100,
                     "_def": 1,
                 }
             )
@@ -1900,7 +1901,7 @@ class TestArrayWrapper:
         )
 
         def _sr_assert_flex_index_dct(index_dct, target_arr):
-            arr = sr_wrapper.fill_using_index_dict(indexing.index_dict(index_dct), keep_flex=True)
+            arr = sr_wrapper.fill_and_set(indexing.index_dict(index_dct), keep_flex=True)
             np.testing.assert_array_equal(arr, target_arr)
 
         _sr_assert_flex_index_dct({indexing.hslice(None, None, None): 0}, np.array([0.0]))
@@ -1908,28 +1909,28 @@ class TestArrayWrapper:
         _sr_assert_flex_index_dct({(0, 2): 0}, np.array([0.0, np.nan, 0.0, np.nan, np.nan]))
         _sr_assert_flex_index_dct({(0, 2): [0, 1]}, np.array([0.0, np.nan, 1.0, np.nan, np.nan]))
         _sr_assert_flex_index_dct(
-            {(0, 2): vbt.RepEval("np.arange(len(row_indices))")}, np.array([0.0, np.nan, 1.0, np.nan, np.nan])
+            {(0, 2): vbt.RepEval("np.arange(len(row_idxs))")}, np.array([0.0, np.nan, 1.0, np.nan, np.nan])
         )
         _sr_assert_flex_index_dct(
-            {indexing.ElemIdx(0, indexing.hslice(None, None, None)): 0}, np.array([0, np.nan, np.nan, np.nan, np.nan])
+            {indexing.idx(0, indexing.hslice(None, None, None)): 0}, np.array([0, np.nan, np.nan, np.nan, np.nan])
         )
 
         def _df_assert_flex_index_dct(index_dct, target_arr):
-            arr = df_wrapper.fill_using_index_dict(indexing.index_dict(index_dct), keep_flex=True)
+            arr = df_wrapper.fill_and_set(indexing.index_dict(index_dct), keep_flex=True)
             np.testing.assert_array_equal(arr, target_arr)
 
-        _df_assert_flex_index_dct({indexing.RowIdx(indexing.hslice(None, None, None)): 0}, np.array([0.0])[:, None])
-        _df_assert_flex_index_dct({indexing.RowIdx(0): 0}, np.array([0.0, np.nan, np.nan, np.nan, np.nan])[:, None])
-        _df_assert_flex_index_dct({indexing.RowIdx((0, 2)): 0}, np.array([0.0, np.nan, 0.0, np.nan, np.nan])[:, None])
+        _df_assert_flex_index_dct({indexing.rowidx(indexing.hslice(None, None, None)): 0}, np.array([0.0])[:, None])
+        _df_assert_flex_index_dct({indexing.rowidx(0): 0}, np.array([0.0, np.nan, np.nan, np.nan, np.nan])[:, None])
+        _df_assert_flex_index_dct({indexing.rowidx((0, 2)): 0}, np.array([0.0, np.nan, 0.0, np.nan, np.nan])[:, None])
         _df_assert_flex_index_dct(
-            {indexing.RowIdx((0, 2)): [0, 1]}, np.array([0.0, np.nan, 1.0, np.nan, np.nan])[:, None]
+            {indexing.rowidx((0, 2)): [0, 1]}, np.array([0.0, np.nan, 1.0, np.nan, np.nan])[:, None]
         )
         _df_assert_flex_index_dct(
-            {indexing.RowIdx((0, 2)): vbt.RepEval("np.arange(len(row_indices))")},
+            {indexing.rowidx((0, 2)): vbt.RepEval("np.arange(len(row_idxs))")},
             np.array([0.0, np.nan, 1.0, np.nan, np.nan])[:, None],
         )
         _df_assert_flex_index_dct(
-            {indexing.RowIdx(0): [0, 1, 2]},
+            {indexing.rowidx(0): [0, 1, 2]},
             np.array(
                 [
                     [0, 1, 2],
@@ -1941,7 +1942,7 @@ class TestArrayWrapper:
             ),
         )
         _df_assert_flex_index_dct(
-            {indexing.RowIdx((0, 2)): [[0, 1, 2]]},
+            {indexing.rowidx((0, 2)): [[0, 1, 2]]},
             np.array(
                 [
                     [0, 1, 2],
@@ -1953,7 +1954,7 @@ class TestArrayWrapper:
             ),
         )
         _df_assert_flex_index_dct(
-            {indexing.RowIdx((0, 2)): [[0, 1, 2], [0, 1, 2]]},
+            {indexing.rowidx((0, 2)): [[0, 1, 2], [0, 1, 2]]},
             np.array(
                 [
                     [0, 1, 2],
@@ -1964,16 +1965,16 @@ class TestArrayWrapper:
                 ]
             ),
         )
-        _df_assert_flex_index_dct({indexing.RowIdx((0, 2)): 0}, np.array([0.0, np.nan, 0.0, np.nan, np.nan])[:, None])
-        _df_assert_flex_index_dct({indexing.ColIdx(indexing.hslice(None, None, None)): 0}, np.array([0.0])[None])
-        _df_assert_flex_index_dct({indexing.ColIdx(0): 0}, np.array([0.0, np.nan, np.nan])[None])
-        _df_assert_flex_index_dct({indexing.ColIdx((0, 2)): 0}, np.array([0.0, np.nan, 0.0])[None])
-        _df_assert_flex_index_dct({indexing.ColIdx((0, 2)): [0, 1]}, np.array([0.0, np.nan, 1.0])[None])
+        _df_assert_flex_index_dct({indexing.rowidx((0, 2)): 0}, np.array([0.0, np.nan, 0.0, np.nan, np.nan])[:, None])
+        _df_assert_flex_index_dct({indexing.colidx(indexing.hslice(None, None, None)): 0}, np.array([0.0])[None])
+        _df_assert_flex_index_dct({indexing.colidx(0): 0}, np.array([0.0, np.nan, np.nan])[None])
+        _df_assert_flex_index_dct({indexing.colidx((0, 2)): 0}, np.array([0.0, np.nan, 0.0])[None])
+        _df_assert_flex_index_dct({indexing.colidx((0, 2)): [0, 1]}, np.array([0.0, np.nan, 1.0])[None])
         _df_assert_flex_index_dct(
-            {indexing.ColIdx((0, 2)): vbt.RepEval("np.arange(len(col_indices))")}, np.array([0.0, np.nan, 1.0])[None]
+            {indexing.colidx((0, 2)): vbt.RepEval("np.arange(len(col_idxs))")}, np.array([0.0, np.nan, 1.0])[None]
         )
         _df_assert_flex_index_dct(
-            {indexing.ColIdx(0): [0, 1, 2, 3, 4]},
+            {indexing.colidx(0): [0, 1, 2, 3, 4]},
             np.array(
                 [
                     [0, np.nan, np.nan],
@@ -1985,7 +1986,7 @@ class TestArrayWrapper:
             ),
         )
         _df_assert_flex_index_dct(
-            {indexing.ColIdx((0, 2)): [[0], [1], [2], [3], [4]]},
+            {indexing.colidx((0, 2)): [[0], [1], [2], [3], [4]]},
             np.array(
                 [
                     [0, np.nan, 0],
@@ -1997,7 +1998,7 @@ class TestArrayWrapper:
             ),
         )
         _df_assert_flex_index_dct(
-            {indexing.ColIdx((0, 2)): [[0, 0], [1, 1], [2, 2], [3, 3], [4, 4]]},
+            {indexing.colidx((0, 2)): [[0, 0], [1, 1], [2, 2], [3, 3], [4, 4]]},
             np.array(
                 [
                     [0, np.nan, 0],
@@ -2009,11 +2010,11 @@ class TestArrayWrapper:
             ),
         )
         _df_assert_flex_index_dct(
-            {indexing.ElemIdx(indexing.hslice(None, None, None), indexing.hslice(None, None, None)): 0},
+            {indexing.idx(indexing.hslice(None, None, None), indexing.hslice(None, None, None)): 0},
             np.array([0.0])[None],
         )
         _df_assert_flex_index_dct(
-            {indexing.ElemIdx(0, 0): 0},
+            {indexing.idx(0, 0): 0},
             np.array(
                 [
                     [0, np.nan, np.nan],
@@ -2025,7 +2026,7 @@ class TestArrayWrapper:
             ),
         )
         _df_assert_flex_index_dct(
-            {indexing.ElemIdx((0, 2), 0): 0},
+            {indexing.idx((0, 2), 0): 0},
             np.array(
                 [
                     [0, np.nan, np.nan],
@@ -2037,7 +2038,7 @@ class TestArrayWrapper:
             ),
         )
         _df_assert_flex_index_dct(
-            {indexing.ElemIdx(0, (0, 2)): 0},
+            {indexing.idx(0, (0, 2)): 0},
             np.array(
                 [
                     [0, np.nan, 0],
@@ -2049,7 +2050,7 @@ class TestArrayWrapper:
             ),
         )
         _df_assert_flex_index_dct(
-            {indexing.ElemIdx((0, 2), (0, 2)): 0},
+            {indexing.idx((0, 2), (0, 2)): 0},
             np.array(
                 [
                     [0, np.nan, 0],
@@ -2061,7 +2062,7 @@ class TestArrayWrapper:
             ),
         )
         _df_assert_flex_index_dct(
-            {indexing.ElemIdx((0, 2), (0, 2)): [0, 1]},
+            {indexing.idx((0, 2), (0, 2)): [0, 1]},
             np.array(
                 [
                     [0, np.nan, 0],
@@ -2073,7 +2074,7 @@ class TestArrayWrapper:
             ),
         )
         _df_assert_flex_index_dct(
-            {indexing.ElemIdx((0, 2), (0, 2)): [[0], [1]]},
+            {indexing.idx((0, 2), (0, 2)): [[0], [1]]},
             np.array(
                 [
                     [0, np.nan, 0],
@@ -2085,7 +2086,7 @@ class TestArrayWrapper:
             ),
         )
         _df_assert_flex_index_dct(
-            {indexing.ElemIdx((0, 2), (0, 2)): [[0, 1]]},
+            {indexing.idx((0, 2), (0, 2)): [[0, 1]]},
             np.array(
                 [
                     [0, np.nan, 1],
@@ -2097,7 +2098,7 @@ class TestArrayWrapper:
             ),
         )
         _df_assert_flex_index_dct(
-            {indexing.ElemIdx((0, 2), (0, 2)): [[0, 1], [2, 3]]},
+            {indexing.idx((0, 2), (0, 2)): [[0, 1], [2, 3]]},
             np.array(
                 [
                     [0, np.nan, 1],
@@ -2869,6 +2870,20 @@ class TestReshaping:
         for i in range(len(broadcasted)):
             np.testing.assert_array_equal(broadcasted[i], broadcasted_arrs[i])
 
+    def test_broadcast_axis(self):
+        x1 = np.array([1])
+        x2 = np.array([[1, 2, 3]])
+        x3 = np.array([[1], [2], [3]])
+        dct = dict(x1=x1, x2=x2, x3=x3)
+        out_dct = reshaping.broadcast(dct, axis=0)
+        np.testing.assert_array_equal(out_dct["x1"], np.array([[1], [1], [1]]))
+        np.testing.assert_array_equal(out_dct["x2"], np.array([[1, 2, 3], [1, 2, 3], [1, 2, 3]]))
+        np.testing.assert_array_equal(out_dct["x3"], np.array([[1], [2], [3]]))
+        out_dct = reshaping.broadcast(dct, axis=1)
+        np.testing.assert_array_equal(out_dct["x1"], np.array([[1, 1, 1]]))
+        np.testing.assert_array_equal(out_dct["x2"], np.array([[1, 2, 3]]))
+        np.testing.assert_array_equal(out_dct["x3"], np.array([[1, 1, 1], [2, 2, 2], [3, 3, 3]]))
+
     def test_broadcast_stack(self):
         # 1d
         to_broadcast = 0, a1, a2, sr_none, sr1, sr2
@@ -3493,49 +3508,6 @@ class TestReshaping:
         np.testing.assert_array_equal(_sr2_p, _df2)
         np.testing.assert_array_equal(_p, np.repeat(p.values, 3)[None])
 
-        _, _, _, _p1 = reshaping.broadcast(
-            0,
-            a2,
-            sr2,
-            vbt.Param(p),
-            repeat_param=False,
-            align_index=False,
-        )
-        _, _, _, _, _, _p2 = reshaping.broadcast(
-            0,
-            a2,
-            a3,
-            sr2,
-            df2,
-            vbt.Param(p),
-            repeat_param=False,
-            align_index=False,
-        )
-        _, _, _, _p3 = reshaping.broadcast(
-            0,
-            a2,
-            sr2,
-            vbt.Param(p),
-            keep_flex=True,
-            repeat_param=False,
-            align_index=False,
-        )
-        _, _, _, _, _df2_p, _p4 = reshaping.broadcast(
-            0,
-            a2,
-            a3,
-            sr2,
-            df2,
-            vbt.Param(p),
-            keep_flex=True,
-            repeat_param=False,
-            align_index=False,
-        )
-
-        np.testing.assert_array_equal(_p1.values, _p2.values)
-        np.testing.assert_array_equal(_p1.columns, _p2.columns)
-        np.testing.assert_array_equal(_p3, _p4)
-
     def test_broadcast_tile(self):
         p = pd.Index([1, 2, 3], name="p")
 
@@ -3698,51 +3670,6 @@ class TestReshaping:
         np.testing.assert_array_equal(_sr2_p, _sr2)
         np.testing.assert_array_equal(_sr2_p, _df2)
         np.testing.assert_array_equal(_p, np.tile(np.repeat(p.values, 3), 3)[None])
-
-        _, _, _, _p1 = reshaping.broadcast(
-            0,
-            a2,
-            sr2,
-            vbt.Param(p),
-            tile=p,
-            repeat_param=False,
-            align_index=False,
-        )
-        _, _, _, _, _p2 = reshaping.broadcast(
-            0,
-            a2,
-            sr2,
-            df2,
-            vbt.Param(p),
-            tile=p,
-            repeat_param=False,
-            align_index=False,
-        )
-        _, _, _, _p3 = reshaping.broadcast(
-            0,
-            a2,
-            sr2,
-            vbt.Param(p),
-            tile=p,
-            keep_flex=True,
-            repeat_param=False,
-            align_index=False,
-        )
-        _, _, _, _, _p4 = reshaping.broadcast(
-            0,
-            a2,
-            sr2,
-            df2,
-            vbt.Param(p),
-            tile=p,
-            keep_flex=True,
-            repeat_param=False,
-            align_index=False,
-        )
-
-        np.testing.assert_array_equal(_p1.values, _p2.values)
-        np.testing.assert_array_equal(_p1.columns, _p2.columns)
-        np.testing.assert_array_equal(_p3, _p4)
 
     def test_broadcast_level(self):
         result, wrapper = reshaping.broadcast(
@@ -4093,7 +4020,7 @@ class TestReshaping:
             sr,
             indexing.index_dict(
                 {
-                    vbt.RowIdx(0): 100,
+                    vbt.rowidx(0): 100,
                     "_def": 0,
                 }
             ),
@@ -4106,7 +4033,7 @@ class TestReshaping:
             df,
             indexing.index_dict(
                 {
-                    vbt.ElemIdx(1, 1): 100,
+                    vbt.idx(1, 1): 100,
                     "_def": 1,
                 }
             ),
@@ -4129,7 +4056,7 @@ class TestReshaping:
             df,
             indexing.index_dict(
                 {
-                    vbt.ElemIdx(1, 1): 100,
+                    vbt.idx(1, 1): 100,
                     "_def": 1,
                 }
             ),
@@ -4963,243 +4890,360 @@ class TestIndexing:
             np.array([[5, 10]]),
         )
 
-    def test_get_indices(self):
+    def test_get_idxs(self):
         i = pd.Index([1, 2, 3, 4, 5, 6], name="i")
         c = pd.Index([1, 2, 3, 4], name="c")
         dti = pd.date_range("2020-01-01", "2020-01-02", freq="1h", tz="Europe/Berlin")
         mi = pd.MultiIndex.from_arrays([[1, 1, 2, 2, 3, 3], [4, 5, 4, 5, 4, 5]], names=["i1", "i2"])
         mc = pd.MultiIndex.from_arrays([[1, 1, 2, 2], [3, 4, 3, 4]], names=["c1", "c2"])
 
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.RowIdx(0, is_labels=False))
-        assert row_indices == 0
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.RowIdx((0, 2), is_labels=False))
-        np.testing.assert_array_equal(row_indices, np.array([0, 2]))
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.RowIdx(((0, 2),), is_labels=False))
-        np.testing.assert_array_equal(row_indices[0], np.array([0]))
-        np.testing.assert_array_equal(row_indices[1], np.array([2]))
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.RowIdx(slice(0, 2), is_labels=False))
-        assert row_indices == slice(0, 2, None)
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.RowIdx(slice(0, 2, 2), is_labels=False))
-        assert row_indices == slice(0, 2, 2)
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.RowIdx(slice(None, None, None), is_labels=False))
-        assert row_indices == slice(None, None, None)
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(dti, c, indexing.RowIdx(0))
-        assert row_indices == 0
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(dti, c, indexing.RowIdx((0, 2)))
-        np.testing.assert_array_equal(row_indices, np.array([0, 2]))
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(dti, c, indexing.RowIdx(((0, 2),)))
-        np.testing.assert_array_equal(row_indices[0], np.array([0]))
-        np.testing.assert_array_equal(row_indices[1], np.array([2]))
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(dti, c, indexing.RowIdx(slice(0, 2)))
-        assert row_indices == slice(0, 2, None)
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(dti, c, indexing.RowIdx(slice(0, 2, 2)))
-        assert row_indices == slice(0, 2, 2)
-        assert col_indices == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx(0), i, c)
+        assert row_idxs == 0
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx((0, 2)), i, c)
+        np.testing.assert_array_equal(row_idxs, np.array([0, 2]))
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx(((0, 2),)), i, c)
+        np.testing.assert_array_equal(row_idxs, np.array([[0, 2]]))
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx(slice(0, 2)), i, c)
+        assert row_idxs == slice(0, 2, None)
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx(slice(0, 2, 2)), i, c)
+        assert row_idxs == slice(0, 2, 2)
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx(slice(None, None, None)), i, c)
+        assert row_idxs == slice(None, None, None)
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx(0), dti, c)
+        assert row_idxs == 0
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx((0, 2)), dti, c)
+        np.testing.assert_array_equal(row_idxs, np.array([0, 2]))
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx(((0, 2),)), dti, c)
+        np.testing.assert_array_equal(row_idxs, np.array([[0, 2]]))
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx(slice(0, 2)), dti, c)
+        assert row_idxs == slice(0, 2, None)
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx(slice(0, 2, 2)), dti, c)
+        assert row_idxs == slice(0, 2, 2)
+        assert col_idxs == slice(None, None, None)
 
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.ColIdx(0, is_labels=False))
-        assert row_indices == slice(None, None, None)
-        assert col_indices == 0
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.ColIdx((0, 2), is_labels=False))
-        assert row_indices == slice(None, None, None)
-        np.testing.assert_array_equal(col_indices, np.array([0, 2]))
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.ColIdx(slice(0, 2), is_labels=False))
-        assert row_indices == slice(None, None, None)
-        assert col_indices == slice(0, 2, None)
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.ColIdx(slice(0, 2, 2), is_labels=False))
-        assert row_indices == slice(None, None, None)
-        assert col_indices == slice(0, 2, 2)
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.ColIdx(slice(None, None, None), is_labels=False))
-        assert row_indices == slice(None, None, None)
-        assert col_indices == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx(0), i, c)
+        assert row_idxs == slice(None, None, None)
+        assert col_idxs == 0
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx((0, 2)), i, c)
+        assert row_idxs == slice(None, None, None)
+        np.testing.assert_array_equal(col_idxs, np.array([0, 2]))
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx(slice(0, 2)), i, c)
+        assert row_idxs == slice(None, None, None)
+        assert col_idxs == slice(0, 2, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx(slice(0, 2, 2)), i, c)
+        assert row_idxs == slice(None, None, None)
+        assert col_idxs == slice(0, 2, 2)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx(slice(None, None, None)), i, c)
+        assert row_idxs == slice(None, None, None)
+        assert col_idxs == slice(None, None, None)
 
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.RowIdx(1))
-        assert row_indices == 0
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.RowIdx((1, 3)))
-        np.testing.assert_array_equal(row_indices, np.array([0, 2]))
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.RowIdx(slice(1, 3)))
-        assert row_indices == slice(0, 3, None)
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.RowIdx(slice(1, 3, 2)))
-        assert row_indices == slice(0, 3, 2)
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.RowIdx(slice(0, 10)))
-        assert row_indices == slice(0, 6, None)
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(dti, c, indexing.RowIdx("2020-01-01 17:00"))
-        assert row_indices == 17
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(dti, c, indexing.RowIdx(("2020-01-01", "2020-01-01 17:30")))
-        np.testing.assert_array_equal(row_indices, np.array([0, 18]))
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(mi, mc, indexing.RowIdx((1, 4)))
-        assert row_indices == 0
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(mi, mc, indexing.RowIdx((1, 3)))
-        assert row_indices == 0
-        assert col_indices == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx(1, kind="labels"), i, c)
+        assert row_idxs == 0
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx((1, 3), kind="labels"), i, c)
+        np.testing.assert_array_equal(row_idxs, np.array([0, 2]))
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx(slice(1, 3), kind="labels"), i, c)
+        assert row_idxs == slice(0, 3, None)
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx(slice(1, 3, 2), kind="labels"), i, c)
+        assert row_idxs == slice(0, 3, 2)
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx(slice(0, 10), kind="labels"), i, c)
+        assert row_idxs == slice(0, 6, None)
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx("2020-01-01 17:00"), dti, c)
+        assert row_idxs == 17
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx(("2020-01-01", "2020-01-01 17:30")), dti, c)
+        np.testing.assert_array_equal(row_idxs, np.array([0, 18]))
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx((1, 4)), mi, mc)
+        assert row_idxs == 0
+        assert col_idxs == slice(None, None, None)
         with pytest.raises(Exception):
-            indexing.get_indices(mi, mc, indexing.RowIdx((3, 6)))
-        with pytest.raises(Exception):
-            indexing.get_indices(mi, mc, indexing.RowIdx((1, 3), method="ffill"))
-        row_indices, col_indices = indexing.get_indices(mi, mc, indexing.RowIdx((3, 6), method="ffill"))
-        assert row_indices == 5
-        assert col_indices == slice(None, None, None)
-        with pytest.raises(Exception):
-            indexing.get_indices(mi, mc, indexing.RowIdx((1, 3), method=None))
-        with pytest.raises(Exception):
-            indexing.get_indices(mi, mc, indexing.RowIdx((3, 6), method=None))
-        row_indices, col_indices = indexing.get_indices(mi, mc, indexing.RowIdx(((1, 4), (2, 4))))
-        np.testing.assert_array_equal(row_indices, np.array([0, 2]))
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(mi, mc, indexing.RowIdx(slice((1, 4), (2, 4))))
-        assert row_indices == slice(0, 3, None)
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(mi, mc, indexing.RowIdx(slice((1, 4), (2, 4), 2)))
-        assert row_indices == slice(0, 3, 2)
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(mi, mc, indexing.RowIdx(slice(None, None, None)))
-        assert row_indices == slice(None, None, None)
-        assert col_indices == slice(None, None, None)
+            indexing.get_idxs(indexing.rowidx((1, 3)), mi, mc)
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx(slice((1, 4), (2, 4))), mi, mc)
+        assert row_idxs == slice(0, 3, None)
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx(slice((1, 4), (2, 4), 2)), mi, mc)
+        assert row_idxs == slice(0, 3, 2)
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rowidx(slice(None, None, None)), mi, mc)
+        assert row_idxs == slice(None, None, None)
+        assert col_idxs == slice(None, None, None)
 
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.ColIdx(1))
-        assert row_indices == slice(None, None, None)
-        assert col_indices == 0
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.ColIdx((1, 3)))
-        assert row_indices == slice(None, None, None)
-        np.testing.assert_array_equal(col_indices, np.array([0, 2]))
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.ColIdx(slice(1, 3)))
-        assert row_indices == slice(None, None, None)
-        assert col_indices == slice(0, 3, None)
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.ColIdx(slice(1, 3, 2)))
-        assert row_indices == slice(None, None, None)
-        assert col_indices == slice(0, 3, 2)
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.ColIdx(slice(0, 10)))
-        assert row_indices == slice(None, None, None)
-        assert col_indices == slice(0, 4, None)
-        row_indices, col_indices = indexing.get_indices(mi, mc, indexing.ColIdx((1, 3)))
-        assert row_indices == slice(None, None, None)
-        assert col_indices == 0
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx(1, kind="labels"), i, c)
+        assert row_idxs == slice(None, None, None)
+        assert col_idxs == 0
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx((1, 3), kind="labels"), i, c)
+        assert row_idxs == slice(None, None, None)
+        np.testing.assert_array_equal(col_idxs, np.array([0, 2]))
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx(slice(1, 3), kind="labels"), i, c)
+        assert row_idxs == slice(None, None, None)
+        assert col_idxs == slice(0, 3, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx(slice(1, 3, 2), kind="labels"), i, c)
+        assert row_idxs == slice(None, None, None)
+        assert col_idxs == slice(0, 3, 2)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx(slice(0, 10), kind="labels"), i, c)
+        assert row_idxs == slice(None, None, None)
+        assert col_idxs == slice(0, 4, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx((1, 3), kind="labels"), mi, mc)
+        assert row_idxs == slice(None, None, None)
+        assert col_idxs == 0
         with pytest.raises(Exception):
-            indexing.get_indices(mi, mc, indexing.ColIdx((1, 2)))
+            indexing.get_idxs(indexing.colidx((1, 2)), mi, mc)
         with pytest.raises(Exception):
-            indexing.get_indices(mi, mc, indexing.ColIdx((2, 5)))
-        row_indices, col_indices = indexing.get_indices(mi, mc, indexing.ColIdx(((1, 3), (2, 3))))
-        assert row_indices == slice(None, None, None)
-        np.testing.assert_array_equal(col_indices, np.array([0, 2]))
-        row_indices, col_indices = indexing.get_indices(mi, mc, indexing.ColIdx(slice((1, 3), (2, 3))))
-        assert row_indices == slice(None, None, None)
-        assert col_indices == slice(0, 3, None)
-        row_indices, col_indices = indexing.get_indices(mi, mc, indexing.ColIdx(slice((1, 3), (2, 3), 2)))
-        assert row_indices == slice(None, None, None)
-        assert col_indices == slice(0, 3, 2)
-        row_indices, col_indices = indexing.get_indices(mi, mc, indexing.ColIdx(slice((0, 0), (10, 10))))
-        assert row_indices == slice(None, None, None)
-        assert col_indices == slice(0, 4, None)
-        row_indices, col_indices = indexing.get_indices(mi, mc, indexing.ColIdx(slice(None, None, None)))
-        assert row_indices == slice(None, None, None)
-        assert col_indices == slice(None, None, None)
+            indexing.get_idxs(indexing.colidx((2, 5)), mi, mc)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx(((1, 3), (2, 3))), mi, mc)
+        assert row_idxs == slice(None, None, None)
+        np.testing.assert_array_equal(col_idxs, np.array([0, 2]))
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx(slice((1, 3), (2, 3))), mi, mc)
+        assert row_idxs == slice(None, None, None)
+        assert col_idxs == slice(0, 3, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx(slice((1, 3), (2, 3), 2)), mi, mc)
+        assert row_idxs == slice(None, None, None)
+        assert col_idxs == slice(0, 3, 2)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx(slice((0, 0), (10, 10))), mi, mc)
+        assert row_idxs == slice(None, None, None)
+        assert col_idxs == slice(0, 4, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx(slice(None, None, None)), mi, mc)
+        assert row_idxs == slice(None, None, None)
+        assert col_idxs == slice(None, None, None)
 
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.ColIdx(1, level="c"))
-        assert row_indices == slice(None, None, None)
-        assert col_indices == 0
-        row_indices, col_indices = indexing.get_indices(i, c, indexing.ColIdx((1, 2), level="c"))
-        assert row_indices == slice(None, None, None)
-        np.testing.assert_array_equal(col_indices, np.array([0, 1]))
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx(1, level="c"), i, c)
+        assert row_idxs == slice(None, None, None)
+        assert col_idxs == 0
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx((1, 2), level="c"), i, c)
+        assert row_idxs == slice(None, None, None)
+        np.testing.assert_array_equal(col_idxs, np.array([0, 1]))
         with pytest.raises(Exception):
-            indexing.get_indices(i, c, indexing.ColIdx((1, 2, 0), level="c"))
-        row_indices, col_indices = indexing.get_indices(mi, mc, indexing.ColIdx(1, level="c1"))
-        assert row_indices == slice(None, None, None)
-        np.testing.assert_array_equal(col_indices, np.array([0, 1]))
+            indexing.get_idxs(indexing.colidx((1, 2, 0), level="c"), i, c)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx(1, level="c1"), mi, mc)
+        assert row_idxs == slice(None, None, None)
+        assert col_idxs == slice(0, 2, None)
         with pytest.raises(Exception):
-            indexing.get_indices(mi, mc, indexing.ColIdx(0, level="c1"))
-        row_indices, col_indices = indexing.get_indices(mi, mc, indexing.ColIdx(3, level="c2"))
-        assert row_indices == slice(None, None, None)
-        np.testing.assert_array_equal(col_indices, np.array([0, 2]))
-        row_indices, col_indices = indexing.get_indices(mi, mc, indexing.ColIdx((3, 4), level="c2"))
-        assert row_indices == slice(None, None, None)
-        np.testing.assert_array_equal(col_indices, np.array([0, 2, 1, 3]))
+            indexing.get_idxs(indexing.colidx(0, level="c1"), mi, mc)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx(3, level="c2"), mi, mc)
+        assert row_idxs == slice(None, None, None)
+        np.testing.assert_array_equal(col_idxs, np.array([0, 2]))
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx((3, 4), level="c2"), mi, mc)
+        assert row_idxs == slice(None, None, None)
+        np.testing.assert_array_equal(col_idxs, np.array([0, 2, 1, 3]))
         with pytest.raises(Exception):
-            indexing.get_indices(mi, mc, indexing.ColIdx((3, 4, 0), level="c2"))
+            indexing.get_idxs(indexing.colidx((3, 4, 0), level="c2"), mi, mc)
         with pytest.raises(Exception):
-            indexing.get_indices(mi, mc, indexing.ColIdx(slice(0, 10), level="c2"))
-        row_indices, col_indices = indexing.get_indices(mi, mc, indexing.ColIdx(((1, 3), (2, 3)), level=("c1", "c2")))
-        assert row_indices == slice(None, None, None)
-        np.testing.assert_array_equal(col_indices, np.array([0, 2]))
+            indexing.get_idxs(indexing.colidx(slice(0, 10), level="c2"), mi, mc)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.colidx(((1, 3), (2, 3)), level=("c1", "c2")), mi, mc)
+        assert row_idxs == slice(None, None, None)
+        np.testing.assert_array_equal(col_idxs, np.array([0, 2]))
 
-        row_indices, col_indices = indexing.get_indices(dti, c, indexing.RowPoints(on="2020"))
-        np.testing.assert_array_equal(row_indices, np.array([0]))
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(dti, c, indexing.RowPoints(on=(1, 3, 5)))
-        np.testing.assert_array_equal(row_indices, np.array([1, 3, 5]))
-        assert col_indices == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.pointidx(on="2020"), dti, c)
+        np.testing.assert_array_equal(row_idxs, np.array([0]))
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.pointidx(on=(1, 3, 5)), dti, c)
+        np.testing.assert_array_equal(row_idxs, np.array([1, 3, 5]))
+        assert col_idxs == slice(None, None, None)
 
-        row_indices, col_indices = indexing.get_indices(
-            dti, c, indexing.RowRanges(start="2020-01-01 12:00", end="2020-01-01 17:00")
+        row_idxs, col_idxs = indexing.get_idxs(
+            indexing.rangeidx(start="2020-01-01 12:00", end="2020-01-01 17:00"), dti, c
         )
-        np.testing.assert_array_equal(row_indices[0], np.array([12]))
-        np.testing.assert_array_equal(row_indices[1], np.array([17]))
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(dti, c, indexing.RowRanges(start=(0, 4), end=(2, 6)))
-        np.testing.assert_array_equal(row_indices[0], np.array([0, 4]))
-        np.testing.assert_array_equal(row_indices[1], np.array([2, 6]))
-        assert col_indices == slice(None, None, None)
+        np.testing.assert_array_equal(row_idxs, np.array([[12, 17]]))
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(indexing.rangeidx(start=(0, 4), end=(2, 6)), dti, c)
+        np.testing.assert_array_equal(row_idxs, np.array([[0, 2], [4, 6]]))
+        assert col_idxs == slice(None, None, None)
 
-        row_indices, col_indices = indexing.get_indices(
+        row_idxs, col_idxs = indexing.get_idxs(
+            indexing.idx(
+                indexing.rowidx(1),
+                indexing.colidx(2),
+            ),
             i,
             c,
-            indexing.ElemIdx(
-                indexing.RowIdx(1, is_labels=False),
-                indexing.ColIdx(2, is_labels=False),
-            ),
         )
-        assert row_indices == 1
-        assert col_indices == 2
+        assert row_idxs == 1
+        assert col_idxs == 2
         with pytest.raises(Exception):
-            indexing.get_indices(
+            indexing.get_idxs(
+                indexing.idx(
+                    indexing.colidx(1),
+                    indexing.colidx(2),
+                ),
                 i,
                 c,
-                indexing.ElemIdx(
-                    indexing.ColIdx(1, is_labels=False),
-                    indexing.ColIdx(2, is_labels=False),
-                ),
             )
         with pytest.raises(Exception):
-            indexing.get_indices(
+            indexing.get_idxs(
+                indexing.idx(
+                    indexing.rowidx(1),
+                    indexing.rowidx(2),
+                ),
                 i,
                 c,
-                indexing.ElemIdx(
-                    indexing.RowIdx(1, is_labels=False),
-                    indexing.RowIdx(2, is_labels=False),
-                ),
             )
 
-        row_indices, col_indices = indexing.get_indices(i, c, 1)
-        assert row_indices == 0
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(i, c, (1, 3))
-        np.testing.assert_array_equal(row_indices, np.array([0, 2]))
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(i, c, slice(1, 2))
-        assert row_indices == slice(0, 2, None)
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(dti, c, "2020-01-01 17:00")
-        assert row_indices == 17
-        assert col_indices == slice(None, None, None)
-        row_indices, col_indices = indexing.get_indices(dti, c, ("2020-01-01", "2020-01-01 17:30"))
-        np.testing.assert_array_equal(row_indices, np.array([0, 18]))
-        assert col_indices == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(1, i, c, kind="labels")
+        assert row_idxs == 0
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs((1, 3), i, c, kind="labels")
+        np.testing.assert_array_equal(row_idxs, np.array([0, 2]))
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(slice(1, 2), i, c, kind="labels")
+        assert row_idxs == slice(0, 2, None)
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs("2020-01-01 17:00", dti, c)
+        assert row_idxs == 17
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(("2020-01-01", "2020-01-01 17:30"), dti, c)
+        np.testing.assert_array_equal(row_idxs, np.array([0, 18]))
+        assert col_idxs == slice(None, None, None)
+
+    def test_idx_setter_factory(self):
+        idx_setter = indexing.IdxDict({0: 0, indexing.idx(1): 1}).get()
+        assert checks.is_deep_equal(
+            idx_setter.idx_items,
+            [(0, 0), (indexing.Idxr(1), 1)],
+        )
+        sr = pd.Series([3, 2, 1], index=["x", "y", "z"])
+        idx_setter = indexing.IdxSeries(sr).get()
+        assert checks.is_deep_equal(
+            idx_setter.idx_items,
+            [(indexing.Idxr(sr.index), sr.values)],
+        )
+        idx_setter = indexing.IdxSeries(sr, split=True).get()
+        assert checks.is_deep_equal(
+            idx_setter.idx_items,
+            [
+                (indexing.Idxr(sr.index[0]), sr.values[0].item()),
+                (indexing.Idxr(sr.index[1]), sr.values[1].item()),
+                (indexing.Idxr(sr.index[2]), sr.values[2].item()),
+            ],
+        )
+        df = pd.DataFrame([[6, 5], [4, 3], [2, 1]], index=["x", "y", "z"], columns=["a", "b"])
+        idx_setter = indexing.IdxFrame(df).get()
+        assert checks.is_deep_equal(
+            idx_setter.idx_items,
+            [(indexing.Idxr(indexing.RowIdxr(df.index), indexing.ColIdxr(df.columns)), df.values)],
+        )
+        idx_setter = indexing.IdxFrame(df, split="columns").get()
+        assert checks.is_deep_equal(
+            idx_setter.idx_items,
+            [
+                (indexing.Idxr(indexing.RowIdxr(df.index), indexing.ColIdxr(df.columns[0])), df.values[:, 0]),
+                (indexing.Idxr(indexing.RowIdxr(df.index), indexing.ColIdxr(df.columns[1])), df.values[:, 1]),
+            ],
+        )
+        idx_setter = indexing.IdxFrame(df, split="rows").get()
+        assert checks.is_deep_equal(
+            idx_setter.idx_items,
+            [
+                (indexing.Idxr(indexing.RowIdxr(df.index[0]), indexing.ColIdxr(df.columns)), df.values[0]),
+                (indexing.Idxr(indexing.RowIdxr(df.index[1]), indexing.ColIdxr(df.columns)), df.values[1]),
+                (indexing.Idxr(indexing.RowIdxr(df.index[2]), indexing.ColIdxr(df.columns)), df.values[2]),
+            ],
+        )
+        idx_setter = indexing.IdxFrame(df, split=True).get()
+        assert checks.is_deep_equal(
+            idx_setter.idx_items,
+            [
+                (indexing.Idxr(indexing.RowIdxr(df.index[0]), indexing.ColIdxr(df.columns[0])), df.values[0, 0].item()),
+                (indexing.Idxr(indexing.RowIdxr(df.index[1]), indexing.ColIdxr(df.columns[0])), df.values[1, 0].item()),
+                (indexing.Idxr(indexing.RowIdxr(df.index[2]), indexing.ColIdxr(df.columns[0])), df.values[2, 0].item()),
+                (indexing.Idxr(indexing.RowIdxr(df.index[0]), indexing.ColIdxr(df.columns[1])), df.values[0, 1].item()),
+                (indexing.Idxr(indexing.RowIdxr(df.index[1]), indexing.ColIdxr(df.columns[1])), df.values[1, 1].item()),
+                (indexing.Idxr(indexing.RowIdxr(df.index[2]), indexing.ColIdxr(df.columns[1])), df.values[2, 1].item()),
+            ],
+        )
+        records = pd.Series([3, 2, 1], index=["x", "y", "z"])
+        idx_setters = indexing.IdxRecords(records).get()
+        assert len(idx_setters) == 1
+        assert checks.is_deep_equal(
+            idx_setters["_1"].idx_items,
+            [
+                (indexing.Idxr(indexing.RowIdxr(records.index[0]), None), records.values[0].item()),
+                (indexing.Idxr(indexing.RowIdxr(records.index[1]), None), records.values[1].item()),
+                (indexing.Idxr(indexing.RowIdxr(records.index[2]), None), records.values[2].item()),
+            ],
+        )
+        records = pd.DataFrame([[9, 8, 7], [6, 5, 4], [3, 2, 1]], columns=["row", "col", "X"])
+        idx_setters = indexing.IdxRecords(records).get()
+        assert len(idx_setters) == 1
+        assert checks.is_deep_equal(
+            idx_setters["X"].idx_items,
+            [
+                (
+                    indexing.Idxr(
+                        indexing.RowIdxr(records["row"].values[0].item()),
+                        indexing.ColIdxr(records["col"].values[0].item()),
+                    ),
+                    records["X"].values[0].item(),
+                ),
+                (
+                    indexing.Idxr(
+                        indexing.RowIdxr(records["row"].values[1].item()),
+                        indexing.ColIdxr(records["col"].values[1].item()),
+                    ),
+                    records["X"].values[1].item(),
+                ),
+                (
+                    indexing.Idxr(
+                        indexing.RowIdxr(records["row"].values[2].item()),
+                        indexing.ColIdxr(records["col"].values[2].item()),
+                    ),
+                    records["X"].values[2].item(),
+                ),
+            ],
+        )
+        records1 = pd.DataFrame([[9, 8, 7], [6, 5, 4], [3, 2, 1]], columns=["row", "col", "X"])
+        idx_setters1 = indexing.IdxRecords(records1).get()
+        records2 = pd.DataFrame([[8, 7], [5, 4], [2, 1]], index=[9, 6, 3], columns=["col", "X"])
+        idx_setters2 = indexing.IdxRecords(records2).get()
+        assert checks.is_deep_equal(idx_setters1, idx_setters2)
+        records3 = pd.DataFrame([[9, 8, 7], [6, 5, 4], [3, 2, 1]], index=[20, 30, 40], columns=["row", "col", "X"])
+        with pytest.raises(Exception):
+            indexing.IdxRecords(records3).get()
+        idx_setters3 = indexing.IdxRecords(records3, row_field="row").get()
+        assert checks.is_deep_equal(idx_setters1, idx_setters3)
+        records = [
+            dict(row=1, X=2, Y=3),
+            dict(col=4, X=5),
+            dict(row=6, col=7, Y=8),
+            dict(Z=9),
+        ]
+        idx_setters = indexing.IdxRecords(records).get()
+        assert len(idx_setters) == 3
+        assert checks.is_deep_equal(
+            idx_setters["X"].idx_items,
+            [
+                (indexing.Idxr(indexing.RowIdxr(1), None), 2),
+                (indexing.Idxr(None, indexing.ColIdxr(4)), 5),
+            ],
+        )
+        assert checks.is_deep_equal(
+            idx_setters["Y"].idx_items,
+            [
+                (indexing.Idxr(indexing.RowIdxr(1), None), 3),
+                (indexing.Idxr(indexing.RowIdxr(6), indexing.ColIdxr(7)), 8),
+            ],
+        )
+        assert checks.is_deep_equal(
+            idx_setters["Z"].idx_items,
+            [
+                ("_def", 9),
+            ],
+        )
 
 
 # ############# flex_indexing ############# #
@@ -5214,14 +5258,8 @@ class TestFlexIndexing:
         assert flex_indexing.flex_select_1d_nb(arr_1d, 1) == arr_1d[1]
         with pytest.raises(Exception):
             flex_indexing.flex_select_nb(arr_1d, 100)
-        assert (
-            flex_indexing.flex_select_1d_pr_nb(arr_1d, 100, rotate_rows=True)
-            == arr_1d[100 % arr_1d.shape[0]]
-        )
-        assert (
-            flex_indexing.flex_select_1d_pc_nb(arr_1d, 100, rotate_cols=True)
-            == arr_1d[100 % arr_1d.shape[0]]
-        )
+        assert flex_indexing.flex_select_1d_pr_nb(arr_1d, 100, rotate_rows=True) == arr_1d[100 % arr_1d.shape[0]]
+        assert flex_indexing.flex_select_1d_pc_nb(arr_1d, 100, rotate_cols=True) == arr_1d[100 % arr_1d.shape[0]]
         assert flex_indexing.flex_select_nb(arr_2d, 0, 0) == arr_2d[0, 0]
         assert flex_indexing.flex_select_nb(arr_2d, 1, 0) == arr_2d[1, 0]
         assert flex_indexing.flex_select_nb(arr_2d, 0, 1) == arr_2d[0, 1]

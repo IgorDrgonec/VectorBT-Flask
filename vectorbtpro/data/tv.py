@@ -1,6 +1,6 @@
-# Copyright (c) 2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
-"""Client for TradingView."""
+"""Classes for communicating with TradingView."""
 
 import datetime
 import enum
@@ -10,15 +10,12 @@ import string
 import pandas as pd
 import requests
 import json
+import time
+from websocket import WebSocket
 
 from vectorbtpro import _typing as tp
-
-try:
-    if not tp.TYPE_CHECKING:
-        raise ImportError
-    from websocket import WebSocket as WebSocketT
-except ImportError:
-    WebSocketT = tp.Any
+from vectorbtpro.utils.config import Configured
+from vectorbtpro.utils.pbar import get_pbar
 
 __all__ = [
     "TVClient",
@@ -42,9 +39,7 @@ class Interval(enum.Enum):
 
 
 SIGNIN_URL = "https://www.tradingview.com/accounts/signin/"
-SEARCH_URL = (
-    "https://symbol-search.tradingview.com/symbol_search/?text={}&hl=2&exchange={}&lang=en&type=&domain=production"
-)
+SEARCH_URL = "https://symbol-search.tradingview.com/symbol_search/v3/?text={}&exchange={}&start={}&hl=2&lang=en&domain=production"
 SCAN_URL = "https://scanner.tradingview.com/{}/scan"
 ORIGIN_URL = "https://data.tradingview.com"
 REFERER_URL = "https://www.tradingview.com"
@@ -53,16 +48,39 @@ PRO_WS_URL = "wss://prodata.tradingview.com/socket.io/websocket"
 WS_TIMEOUT = 5
 
 
-class TVClient:
+class TVClient(Configured):
+    """Client for TradingView."""
+
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Configured._expected_keys or set()) | {
+        "username",
+        "password",
+        "user_agent",
+        "token",
+    }
+
     def __init__(
         self,
         username: tp.Optional[str] = None,
         password: tp.Optional[str] = None,
+        user_agent: tp.Optional[str] = None,
         token: tp.Optional[str] = None,
+        **kwargs,
     ) -> None:
         """Client for TradingView."""
+        Configured.__init__(
+            self,
+            username=username,
+            password=password,
+            user_agent=user_agent,
+            token=token,
+            **kwargs,
+        )
+
         if token is None:
-            token = self.auth(username, password)
+            token = self.auth(username, password, user_agent=user_agent)
+        elif username is not None or password is not None:
+            raise ValueError("Either username and password, or token must be provided")
+
         self._token = token
         self._ws = None
         self._session = self.generate_session()
@@ -74,7 +92,7 @@ class TVClient:
         return self._token
 
     @property
-    def ws(self) -> WebSocketT:
+    def ws(self) -> WebSocket:
         """Instance of `websocket.Websocket`."""
         return self._ws
 
@@ -88,15 +106,23 @@ class TVClient:
         """Chart session."""
         return self._chart_session
 
-    def auth(self, username: tp.Optional[str] = None, password: tp.Optional[str] = None) -> str:
+    def auth(
+        self,
+        username: tp.Optional[str] = None,
+        password: tp.Optional[str] = None,
+        user_agent: tp.Optional[str] = None,
+    ) -> str:
         """Authenticate."""
         if username is not None and password is not None:
             data = {"username": username, "password": password, "remember": "on"}
-            response = requests.post(url=SIGNIN_URL, data=data, headers={"Referer": REFERER_URL})
-            token = response.json()["user"]["auth_token"]
-        else:
-            token = "unauthorized_user_token"
-        return token
+            headers = {"Referer": REFERER_URL}
+            if user_agent is not None:
+                headers["User-Agent"] = user_agent
+            response = requests.post(url=SIGNIN_URL, data=data, headers=headers)
+            return response.json()["user"]["auth_token"]
+        if username is not None or password is not None:
+            raise ValueError("Both username and password must be provided")
+        return "unauthorized_user_token"
 
     @staticmethod
     def generate_session() -> str:
@@ -271,19 +297,48 @@ class TVClient:
         return self.convert_raw_data(raw_data, symbol)
 
     @staticmethod
-    def search_symbol(text: tp.Optional[str] = None, exchange: tp.Optional[str] = None) -> tp.List[dict]:
+    def search_symbol(
+        text: tp.Optional[str] = None,
+        exchange: tp.Optional[str] = None,
+        delay: tp.Optional[int] = None,
+        show_progress: bool = True,
+        pbar_kwargs: tp.KwargsLike = None,
+    ) -> tp.List[dict]:
         """Search for a symbol."""
         if text is None:
             text = ""
         if exchange is None:
             exchange = ""
-        url = SEARCH_URL.format(text, exchange.upper())
-        resp = requests.get(url)
-        symbols_list = json.loads(resp.text)
+        if pbar_kwargs is None:
+            pbar_kwargs = {}
+        symbols_remaining = None
+        symbols_list = []
+        pbar = None
+
+        while symbols_remaining is None or symbols_remaining > 0:
+            url = SEARCH_URL.format(text, exchange.upper(), len(symbols_list))
+            resp = requests.get(url)
+            symbols_data = json.loads(resp.text)
+            symbols_remaining = symbols_data.get("symbols_remaining", 0)
+            new_symbols = symbols_data.get("symbols", [])
+            symbols_list.extend(new_symbols)
+            if pbar is None and symbols_remaining > 0:
+                pbar = get_pbar(
+                    total=len(new_symbols) + symbols_remaining,
+                    show_progress=show_progress,
+                    **pbar_kwargs,
+                )
+            if pbar is not None:
+                pbar.update(len(new_symbols))
+            if delay is not None:
+                time.sleep(delay / 1000)
+        if pbar is not None:
+            pbar.close()
         return symbols_list
 
     @staticmethod
     def scan_symbols(market: str) -> tp.List[dict]:
+        """Scan symbols in a region/market."""
         url = SCAN_URL.format(market.lower())
         resp = requests.get(url)
         symbols_list = json.loads(resp.text)["data"]

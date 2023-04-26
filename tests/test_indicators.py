@@ -2074,7 +2074,7 @@ class TestFactory:
             ),
         )
         assert_frame_equal(obj.out_above([2, 3]), target)
-        columns = target.columns.rename("my_above", 0)
+        columns = target.columns.set_names("my_above", level=0)
         assert_frame_equal(
             obj.out_above([2, 3], level_name="my_above"),
             pd.DataFrame(target.values, index=target.index, columns=columns),
@@ -2221,7 +2221,7 @@ class TestFactory:
             ),
         )
         assert_frame_equal(obj.out_and([False, True]), target)
-        columns = target.columns.rename("my_and", 0)
+        columns = target.columns.set_names("my_and", level=0)
         assert_frame_equal(
             obj.out_and([False, True], level_name="my_and"),
             pd.DataFrame(target.values, index=target.index, columns=columns),
@@ -2416,6 +2416,7 @@ class TestFactory:
             "equals",
             "file_exists",
             "get_ca_setup",
+            "get_setting",
             "get_settings",
             "get_writeable_attrs",
             "getsize",
@@ -4703,7 +4704,7 @@ class TestBasic:
         assert_frame_equal(
             vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).modes,
             pd.DataFrame(
-                np.array([[-1, -1], [1, 1], [1, 1], [1, 1], [-1, -1], [-1, -1], [-1, -1]]),
+                np.array([[1, 1], [1, 1], [1, 1], [-1, -1], [-1, -1], [-1, -1], [1, 1]]),
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
             ),
@@ -4731,13 +4732,13 @@ class TestBasic:
             pd.DataFrame(
                 np.array(
                     [
-                        ["Downtrend", "Downtrend"],
                         ["Uptrend", "Uptrend"],
                         ["Uptrend", "Uptrend"],
                         ["Uptrend", "Uptrend"],
                         ["Downtrend", "Downtrend"],
                         ["Downtrend", "Downtrend"],
                         ["Downtrend", "Downtrend"],
+                        ["Uptrend", "Uptrend"],
                     ]
                 ),
                 index=close_ts.index,
