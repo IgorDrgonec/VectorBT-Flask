@@ -2298,7 +2298,7 @@ class IdxRecords(IdxSetterFactory):
                 row_idxr = None
             if row_idxr is not None and not isinstance(row_idxr, RowIdxr):
                 _rowidx_kwargs = dict(rowidx_kwargs)
-                if "kind" not in _rowidx_kwargs:
+                if field_meta["row_kind"] is not None and "kind" not in _rowidx_kwargs:
                     _rowidx_kwargs["kind"] = field_meta["row_kind"]
                 row_idxr = rowidx(row_idxr, **_rowidx_kwargs)
             if field_meta["col_field"] is None:
@@ -2307,7 +2307,7 @@ class IdxRecords(IdxSetterFactory):
                 col_idxr = r.get(field_meta["col_field"], None)
             if col_idxr is not None and not isinstance(col_idxr, ColIdxr):
                 _colidx_kwargs = dict(colidx_kwargs)
-                if "kind" not in _colidx_kwargs:
+                if field_meta["col_kind"] is not None and "kind" not in _colidx_kwargs:
                     _colidx_kwargs["kind"] = field_meta["col_kind"]
                 col_idxr = colidx(col_idxr, **_colidx_kwargs)
             if col_idxr == "_def":

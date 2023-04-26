@@ -104,7 +104,7 @@ def freq_to_timedelta(freq: tp.FrequencyLike) -> pd.Timedelta:
             freq = pd.Timedelta(freq)
         if neg_td:
             freq = -freq
-    if freq.unit != "ns":
+    if hasattr(freq, "unit") and freq.unit != "ns":
         freq = freq.as_unit("ns", round_ok=False)
     return freq
 
