@@ -182,7 +182,7 @@ class Param:
     `vectorbtpro.base.indexes.index_from_values`."""
 
     hide: bool = attr.ib(default=False)
-    """Whether to hid the parameter from the parameter index.
+    """Whether to hide the parameter from the parameter index.
     
     At least one parameter must be displayed per level."""
 

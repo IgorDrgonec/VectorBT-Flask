@@ -1859,7 +1859,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
         `func` can be one of the following:
 
-        * Location to compute all indicators from. See `vectorbtpro.indicators.factory.IndicatorFactory.get_locations`.
+        * Location to compute all indicators from. See `vectorbtpro.indicators.factory.IndicatorFactory.list_locations`.
         * Indicator name. See `vectorbtpro.indicators.factory.IndicatorFactory.get_indicator`.
         * Simulation method. See `vectorbtpro.portfolio.base.Portfolio`.
         * Any callable object
