@@ -24,7 +24,13 @@ from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import Configured
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.cutting import suggest_module_path, cut_and_save_func
-from vectorbtpro.utils.datetime_ import freq_to_timedelta64, parse_timedelta, time_to_timedelta, try_align_to_dt_index
+from vectorbtpro.utils.datetime_ import (
+    freq_to_timedelta64,
+    parse_timedelta,
+    time_to_timedelta,
+    try_align_to_dt_index,
+    to_ns,
+)
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.module_ import import_module_from_path
 from vectorbtpro.utils.params import Param
@@ -275,7 +281,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                     td_arr_col = pd.to_timedelta(td_arr[:, col])
                     td_arr_cols.append(td_arr_col.values)
                 td_arr = np.column_stack(td_arr_cols)
-        return td_arr.astype(np.int64)
+        return to_ns(td_arr)
 
     @classmethod
     def dt_arr_to_ns(cls, dt_arr: tp.ArrayLike) -> tp.ArrayLike:
@@ -293,7 +299,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                     dt_arr_col = pd.to_datetime(dt_arr[:, col]).tz_localize(None)
                     dt_arr_cols.append(dt_arr_col.values)
                 dt_arr = np.column_stack(dt_arr_cols)
-        return dt_arr.astype(np.int64)
+        return to_ns(dt_arr)
 
     def prepare_post_arg(self, arg_name: str, value: tp.Optional[tp.ArrayLike] = None) -> object:
         """Prepare an argument after broadcasting and/or template substitution."""
@@ -449,9 +455,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                     new_fill_value = self.broadcast_named_args[k]
             if new_fill_value is not None:
                 if not np.isscalar(new_fill_value):
-                    raise TypeError(
-                        f"Argument '{k}' (and its default) must be a scalar when also provided via records"
-                    )
+                    raise TypeError(f"Argument '{k}' (and its default) must be a scalar when also provided via records")
                 if "reindex_kwargs" not in arg_broadcast_kwargs:
                     arg_broadcast_kwargs["reindex_kwargs"] = {}
                 if k not in arg_broadcast_kwargs["reindex_kwargs"]:

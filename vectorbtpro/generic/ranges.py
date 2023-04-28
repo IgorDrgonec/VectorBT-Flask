@@ -142,7 +142,7 @@ from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
-from vectorbtpro.utils.datetime_ import freq_to_timedelta, freq_to_timedelta64
+from vectorbtpro.utils.datetime_ import freq_to_timedelta, freq_to_timedelta64, to_ns
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.params import combine_params, Param
@@ -318,11 +318,11 @@ class Ranges(PriceRecords):
             delta_use_index = False
             index = None
         else:
-            delta = freq_to_timedelta64(delta).astype(np.int64)
+            delta = to_ns(freq_to_timedelta64(delta))
             if isinstance(records_or_mapped.wrapper.index, pd.DatetimeIndex):
-                index = records_or_mapped.wrapper.index.values.astype(np.int64)
+                index = to_ns(records_or_mapped.wrapper.index)
             else:
-                freq = freq_to_timedelta64(records_or_mapped.wrapper.freq).astype(np.int64)
+                freq = to_ns(freq_to_timedelta64(records_or_mapped.wrapper.freq))
                 index = np.arange(records_or_mapped.wrapper.shape[0]) * freq
             delta_use_index = True
         if shift is None:
@@ -479,10 +479,10 @@ class Ranges(PriceRecords):
         func = jit_reg.resolve_option(nb.range_duration_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         duration = func(
-            self.get_map_field_to_index("start_idx").values.astype(np.int64),
-            self.get_map_field_to_index("end_idx").values.astype(np.int64),
+            to_ns(self.get_map_field_to_index("start_idx")),
+            to_ns(self.get_map_field_to_index("end_idx")),
             self.get_field_arr("status"),
-            freq=freq_to_timedelta64(self.wrapper.freq).astype(np.int64),
+            freq=to_ns(freq_to_timedelta64(self.wrapper.freq)),
         ).astype("timedelta64[ns]")
         return self.map_array(duration, **kwargs)
 
@@ -498,7 +498,7 @@ class Ranges(PriceRecords):
         """Get average range duration (as timedelta)."""
         if real:
             duration = self.real_duration
-            duration = duration.replace(mapped_arr=duration.mapped_arr.astype(np.int64))
+            duration = duration.replace(mapped_arr=to_ns(duration.mapped_arr))
             wrap_kwargs = merge_dicts(dict(name_or_index="avg_real_duration", dtype="timedelta64[ns]"), wrap_kwargs)
         else:
             duration = self.duration
@@ -517,7 +517,7 @@ class Ranges(PriceRecords):
         """Get maximum range duration (as timedelta)."""
         if real:
             duration = self.real_duration
-            duration = duration.replace(mapped_arr=duration.mapped_arr.astype(np.int64))
+            duration = duration.replace(mapped_arr=to_ns(duration.mapped_arr))
             wrap_kwargs = merge_dicts(dict(name_or_index="max_real_duration", dtype="timedelta64[ns]"), wrap_kwargs)
         else:
             duration = self.duration
@@ -613,23 +613,23 @@ class Ranges(PriceRecords):
             proj_start_use_index = False
             index = None
         else:
-            proj_start = freq_to_timedelta64(proj_start).astype(np.int64)
+            proj_start = to_ns(freq_to_timedelta64(proj_start))
             if isinstance(self.wrapper.index, pd.DatetimeIndex):
-                index = self.wrapper.index.values.astype(np.int64)
+                index = to_ns(self.wrapper.index)
             else:
-                freq = freq_to_timedelta64(self.wrapper.freq).astype(np.int64)
+                freq = to_ns(freq_to_timedelta64(self.wrapper.freq))
                 index = np.arange(self.wrapper.shape[0]) * freq
             proj_start_use_index = True
         if proj_period is not None:
             if isinstance(proj_period, int):
                 proj_period_use_index = False
             else:
-                proj_period = freq_to_timedelta64(proj_period).astype(np.int64)
+                proj_period = to_ns(freq_to_timedelta64(proj_period))
                 if index is None:
                     if isinstance(self.wrapper.index, pd.DatetimeIndex):
-                        index = self.wrapper.index.values.astype(np.int64)
+                        index = to_ns(self.wrapper.index)
                     else:
-                        freq = freq_to_timedelta64(self.wrapper.freq).astype(np.int64)
+                        freq = to_ns(freq_to_timedelta64(self.wrapper.freq))
                         index = np.arange(self.wrapper.shape[0]) * freq
                 proj_period_use_index = True
         else:

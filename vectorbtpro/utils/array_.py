@@ -254,6 +254,8 @@ def cast_to_min_precision(
     or one of 'half', 'single', and 'double'."""
     if min_precision is None:
         return arr
+    if np.issubdtype(arr.dtype, np.datetime64) or np.issubdtype(arr.dtype, np.timedelta64):
+        return arr
     if float_only and np.issubdtype(arr.dtype, np.integer):
         return arr
     if np.issubdtype(arr.dtype, np.integer) or np.issubdtype(arr.dtype, np.floating):
@@ -291,6 +293,8 @@ def cast_to_max_precision(
     Argument must be either an integer denoting the number of bits,
     or one of 'half', 'single', and 'double'."""
     if max_precision is None:
+        return arr
+    if np.issubdtype(arr.dtype, np.datetime64) or np.issubdtype(arr.dtype, np.timedelta64):
         return arr
     if float_only and np.issubdtype(arr.dtype, np.integer):
         return arr

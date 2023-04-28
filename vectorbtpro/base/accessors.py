@@ -25,15 +25,16 @@ from vectorbtpro.utils.decorators import class_or_instanceproperty, class_or_ins
 from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, attach_unary_magic_methods
 from vectorbtpro.utils.parsing import get_context_vars
 from vectorbtpro.utils.template import substitute_templates
-from vectorbtpro.utils.datetime_ import infer_index_freq, freq_to_timedelta64, parse_timedelta, try_to_datetime_index
+from vectorbtpro.utils.datetime_ import (
+    infer_index_freq,
+    freq_to_timedelta64,
+    parse_timedelta,
+    try_to_datetime_index,
+    to_ns,
+)
 from vectorbtpro.utils.eval_ import multiline_eval
 
-__all__ = [
-    "BaseIDXAccessor",
-    "BaseAccessor",
-    "BaseSRAccessor",
-    "BaseDFAccessor"
-]
+__all__ = ["BaseIDXAccessor", "BaseAccessor", "BaseSRAccessor", "BaseDFAccessor"]
 
 
 class BaseIDXAccessor(Configured):
@@ -65,10 +66,7 @@ class BaseIDXAccessor(Configured):
         """Convert index to an 64-bit integer array.
 
         Timestamps will be converted to nanoseconds."""
-        index = self.obj
-        if isinstance(index, pd.DatetimeIndex):
-            index = index.tz_localize(None).tz_localize("utc")
-        return index.values.astype(np.int64)
+        return to_ns(self.obj)
 
     def to_period_ns(self, freq: tp.FrequencyLike, shift: bool = True) -> tp.Array1d:
         """Convert index to period and then to an 64-bit integer array.
@@ -79,7 +77,7 @@ class BaseIDXAccessor(Configured):
             index = index.tz_localize(None).to_period(freq)
             if shift:
                 index = index.shift()
-        return index.to_timestamp().values.astype(np.int64)
+        return to_ns(index)
 
     @classmethod
     def from_values(cls, *args, **kwargs) -> tp.Index:
@@ -179,7 +177,7 @@ class BaseIDXAccessor(Configured):
         Timedelta will be converted to nanoseconds."""
         freq = self.get_freq(allow_date_offset=False, allow_numeric=True)
         if freq is not None:
-            freq = freq_to_timedelta64(freq).astype(np.int64)
+            freq = to_ns(freq_to_timedelta64(freq))
         return freq
 
     @property

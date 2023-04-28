@@ -503,3 +503,34 @@ def interval_to_ms(interval: str) -> tp.Optional[int]:
         return int(interval[:-1]) * seconds_per_unit[interval[-1]] * 1000
     except (ValueError, KeyError):
         return None
+
+
+def to_ns(obj: tp.ArrayLike) -> tp.ArrayLike:
+    """Convert a datetime, timedelta, integer, or any array-like object to nanoseconds since Unix Epoch."""
+    if isinstance(obj, pd.Timestamp):
+        obj = obj.to_datetime64()
+    if isinstance(obj, pd.Timedelta):
+        obj = obj.to_timedelta64()
+    if isinstance(obj, datetime):
+        obj = np.datetime64(obj)
+    if isinstance(obj, timedelta):
+        obj = np.timedelta64(obj)
+    if isinstance(obj, pd.DatetimeIndex):
+        obj = obj.tz_localize(None).tz_localize("utc")
+    if isinstance(obj, pd.PeriodIndex):
+        obj = obj.to_timestamp()
+    if isinstance(obj, pd.Index):
+        obj = obj.values
+
+    if not isinstance(obj, np.ndarray):
+        new_obj = np.asarray(obj)
+    else:
+        new_obj = obj
+    if np.issubdtype(new_obj.dtype, np.datetime64) and new_obj.dtype != np.dtype("datetime64[ns]"):
+        new_obj = new_obj.astype("datetime64[ns]")
+    if np.issubdtype(new_obj.dtype, np.timedelta64) and new_obj.dtype != np.dtype("timedelta64[ns]"):
+        new_obj = new_obj.astype("timedelta64[ns]")
+    new_obj = new_obj.astype(np.int64)
+    if new_obj.ndim == 0 and (not isinstance(obj, np.ndarray) or obj.ndim != 0):
+        return new_obj.item()
+    return new_obj
