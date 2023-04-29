@@ -2151,14 +2151,7 @@ class PortfolioOptimizer(Analyzable):
                     else:
                         _allocations = _allocations[list(wrapper.columns)].values
 
-                notna_mask = ~np.isnan(_allocations).all(axis=1)
-                _allocations = _allocations[notna_mask]
-                _index_points = _index_points[notna_mask]
-
-                _alloc_points = np.empty(len(_allocations), alloc_point_dt)
-                _alloc_points["id"] = np.arange(len(_allocations))
-                _alloc_points["col"] = g
-                _alloc_points["alloc_idx"] = _index_points
+                _alloc_points, _allocations = nb.prepare_alloc_points_nb(_index_points, _allocations, g)
                 alloc_points.append(_alloc_points)
                 allocations.append(_allocations)
 
@@ -2948,9 +2941,6 @@ class PortfolioOptimizer(Analyzable):
                     else:
                         _allocations = _allocations[list(wrapper.columns)].values
 
-                notna_mask = ~np.isnan(_allocations).all(axis=1)
-                _allocations = _allocations[notna_mask]
-                _index_ranges = (_index_ranges[0][notna_mask], _index_ranges[1][notna_mask])
                 if _index_loc is None:
                     _alloc_wait = substitute_templates(
                         _alloc_wait,
@@ -2960,18 +2950,19 @@ class PortfolioOptimizer(Analyzable):
                     )
                     alloc_idx = _index_ranges[1] - 1 + _alloc_wait
                 else:
-                    alloc_idx = _index_loc[notna_mask]
-
-                _alloc_ranges = np.empty(len(_allocations), alloc_range_dt)
-                _alloc_ranges["id"] = np.arange(len(_allocations))
-                _alloc_ranges["col"] = g
-                _alloc_ranges["start_idx"] = _index_ranges[0]
-                _alloc_ranges["end_idx"] = _index_ranges[1]
-                _alloc_ranges["alloc_idx"] = alloc_idx
-                _alloc_ranges["status"] = np.where(
+                    alloc_idx = _index_loc
+                status = np.where(
                     alloc_idx >= len(wrapper.index),
                     RangeStatus.Open,
                     RangeStatus.Closed,
+                )
+                _alloc_ranges, _allocations = nb.prepare_alloc_ranges_nb(
+                    _index_ranges[0],
+                    _index_ranges[1],
+                    alloc_idx,
+                    status,
+                    _allocations,
+                    g,
                 )
                 alloc_ranges.append(_alloc_ranges)
                 allocations.append(_allocations)

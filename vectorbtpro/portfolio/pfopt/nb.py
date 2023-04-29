@@ -9,7 +9,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch
-from vectorbtpro.portfolio.enums import Direction
+from vectorbtpro.portfolio.enums import Direction, alloc_point_dt, alloc_range_dt
 
 __all__ = []
 
@@ -168,3 +168,67 @@ def random_allocate_func_nb(
         else:
             weights[c] = 0.0
     return weights
+
+
+@register_jitted(cache=True)
+def prepare_alloc_points_nb(
+    index_points: tp.Array1d,
+    allocations: tp.Array2d,
+    group: int,
+) -> tp.Tuple[tp.RecordArray, tp.Array2d]:
+    """Prepare allocation points."""
+    alloc_points = np.empty_like(index_points, dtype=alloc_point_dt)
+    new_allocations = np.empty_like(allocations)
+    k = 0
+    for i in range(allocations.shape[0]):
+        all_nan = True
+        for col in range(allocations.shape[1]):
+            if not np.isnan(allocations[i, col]):
+                all_nan = False
+                break
+        if all_nan:
+            continue
+        if k > 0 and alloc_points["alloc_idx"][k - 1] == index_points[i]:
+            new_allocations[k - 1] = allocations[i]
+        else:
+            alloc_points["id"][k] = k
+            alloc_points["col"][k] = group
+            alloc_points["alloc_idx"][k] = index_points[i]
+            new_allocations[k] = allocations[i]
+            k += 1
+    return alloc_points[:k], new_allocations[:k]
+
+
+@register_jitted(cache=True)
+def prepare_alloc_ranges_nb(
+    start_idx: tp.Array1d,
+    end_idx: tp.Array1d,
+    alloc_idx: tp.Array1d,
+    status: tp.Array1d,
+    allocations: tp.Array2d,
+    group: int,
+) -> tp.Tuple[tp.RecordArray, tp.Array2d]:
+    """Prepare allocation ranges."""
+    alloc_ranges = np.empty_like(alloc_idx, dtype=alloc_range_dt)
+    new_allocations = np.empty_like(allocations)
+    k = 0
+    for i in range(allocations.shape[0]):
+        all_nan = True
+        for col in range(allocations.shape[1]):
+            if not np.isnan(allocations[i, col]):
+                all_nan = False
+                break
+        if all_nan:
+            continue
+        if k > 0 and alloc_ranges["alloc_idx"][k - 1] == alloc_idx[i]:
+            new_allocations[k - 1] = allocations[i]
+        else:
+            alloc_ranges["id"][k] = k
+            alloc_ranges["col"][k] = group
+            alloc_ranges["start_idx"][k] = start_idx[i]
+            alloc_ranges["end_idx"][k] = end_idx[i]
+            alloc_ranges["alloc_idx"][k] = alloc_idx[i]
+            alloc_ranges["status"][k] = status[i]
+            new_allocations[k] = allocations[i]
+            k += 1
+    return alloc_ranges[:k], new_allocations[:k]

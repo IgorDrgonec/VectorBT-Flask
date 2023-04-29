@@ -5,6 +5,8 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from vectorbtpro.portfolio.nb import *
+    from vectorbtpro.portfolio.pfopt import *
     from vectorbtpro.portfolio.base import *
     from vectorbtpro.portfolio.call_seq import *
     from vectorbtpro.portfolio.chunking import *
