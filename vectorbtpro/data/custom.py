@@ -784,6 +784,7 @@ class CSVData(FileData):
 
         For defaults, see `custom.csv` in `vectorbtpro._settings.data`."""
         from pandas.io.parsers import TextFileReader
+        from pandas.api.types import is_object_dtype
 
         csv_cfg = cls.get_settings(key_id="custom")
 
@@ -803,6 +804,8 @@ class CSVData(FileData):
             header = csv_cfg["header"]
         if index_col is None:
             index_col = csv_cfg["index_col"]
+        if checks.is_int(index_col) and index_col is False:
+            index_col = None
         if parse_dates is None:
             parse_dates = csv_cfg["parse_dates"]
         if squeeze is None:
@@ -858,7 +861,7 @@ class CSVData(FileData):
             obj = obj.squeeze("columns")
         if isinstance(obj, pd.Series) and obj.name == "0":
             obj.name = None
-        if parse_dates and obj.index.is_object():
+        if index_col is not None and parse_dates and is_object_dtype(obj.index.dtype):
             obj.index = pd.to_datetime(obj.index, utc=True)
             if tz is not None:
                 obj.index = obj.index.tz_convert(tz)
