@@ -1560,9 +1560,13 @@ class IndicatorFactory(Configured):
                     for i in range(len(other)):
                         if isinstance(other[i], IndicatorBase):
                             other[i] = getattr(other[i], attr_name)
+                        elif isinstance(other[i], str):
+                            other[i] = getattr(self, other[i])
                 else:
                     if isinstance(other, IndicatorBase):
                         other = getattr(other, attr_name)
+                    elif isinstance(other, str):
+                        other = getattr(self, other)
                 if level_name is None:
                     if _prepend_name:
                         if attr_name == self.short_name:
