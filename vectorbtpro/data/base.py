@@ -1724,20 +1724,44 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
     # ############# Transforming ############# #
 
-    def transform(self: DataT, transform_func: tp.Callable, *args, **kwargs) -> DataT:
+    def transform(
+        self: DataT,
+        transform_func: tp.Callable,
+        *args,
+        per_symbol: bool = False,
+        wrapper_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> DataT:
         """Transform data.
 
-        Concatenates all the data into a single DataFrame and calls `transform_func` on it.
-        Then, splits the data by symbol and builds a new `Data` instance."""
-        if self.single_symbol:
+        If one symbol, directly passes the Series/DataFrame to `transform_func`.
+        If multiple symbols and `per_symbol` is True, passes each Series/DataFrame to `transform_func` in a loop.
+        If multiple symbols and `per_symbol` is False, concatenates all the data into a single DataFrame
+        and calls `transform_func` on it. Then, splits the data by symbol and builds a new `Data` instance."""
+        if wrapper_kwargs is None:
+            wrapper_kwargs = {}
+        if len(self.symbols) == 1:
             concat_data = self.data[self.symbols[0]]
+            new_concat_data = transform_func(concat_data, *args, **kwargs)
+            new_wrapper = ArrayWrapper.from_obj(new_concat_data, **wrapper_kwargs)
+            new_data = symbol_dict({self.symbols[0]: new_concat_data})
+        elif per_symbol:
+            new_wrapper = None
+            new_data = symbol_dict()
+            for k in self.symbols:
+                new_v = transform_func(self.data[k], *args, **kwargs)
+                _new_wrapper = ArrayWrapper.from_obj(new_v, **wrapper_kwargs)
+                if new_wrapper is None:
+                    new_wrapper = _new_wrapper
+                else:
+                    if not checks.is_index_equal(new_wrapper.index, _new_wrapper.index):
+                        raise ValueError("Transformed symbols must have the same index")
+                    if not checks.is_index_equal(new_wrapper.columns, _new_wrapper.columns):
+                        raise ValueError("Transformed symbols must have the same columns")
+                new_data[k] = new_v
         else:
             concat_data = pd.concat(self.data.values(), axis=1, keys=pd.Index(self.symbols, name="symbol"))
-        new_concat_data = transform_func(concat_data, *args, **kwargs)
-        if self.single_symbol:
-            new_wrapper = ArrayWrapper.from_obj(new_concat_data)
-            new_data = symbol_dict({self.symbols[0]: new_concat_data})
-        else:
+            new_concat_data = transform_func(concat_data, *args, **kwargs)
             new_wrapper = None
             new_data = symbol_dict()
             for k in self.symbols:
@@ -1748,10 +1772,12 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                         new_v = new_concat_data[k].rename(self.wrapper.columns[0])
                     else:
                         new_v = new_concat_data[k].rename(None)
-                _new_wrapper = ArrayWrapper.from_obj(new_v)
+                _new_wrapper = ArrayWrapper.from_obj(new_v, **wrapper_kwargs)
                 if new_wrapper is None:
                     new_wrapper = _new_wrapper
                 else:
+                    if not checks.is_index_equal(new_wrapper.index, _new_wrapper.index):
+                        raise ValueError("Transformed symbols must have the same index")
                     if not checks.is_index_equal(new_wrapper.columns, _new_wrapper.columns):
                         raise ValueError("Transformed symbols must have the same columns")
                 new_data[k] = new_v

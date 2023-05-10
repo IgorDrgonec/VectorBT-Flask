@@ -804,7 +804,7 @@ class CSVData(FileData):
             header = csv_cfg["header"]
         if index_col is None:
             index_col = csv_cfg["index_col"]
-        if checks.is_int(index_col) and index_col is False:
+        if index_col is False:
             index_col = None
         if parse_dates is None:
             parse_dates = csv_cfg["parse_dates"]
