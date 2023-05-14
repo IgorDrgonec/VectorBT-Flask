@@ -4,8 +4,9 @@
 
 import numpy as np
 from numba import prange
-from numba.core.types import Omitted
+from numba.core.types import Type, Omitted
 from numba.np.numpy_support import as_dtype
+from numba.extending import overload
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
@@ -16,10 +17,8 @@ from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch
 
 
-@register_jitted(cache=True, is_generated_jit=True)
-def select_indices_1d_nb(arr: tp.Array1d, indices: tp.Array1d, fill_value: tp.Scalar) -> tp.Array1d:
-    """Set each element to a value by boolean mask."""
-    nb_enabled = not isinstance(arr, np.ndarray)
+def _select_indices_1d_nb(arr, indices, fill_value):
+    nb_enabled = isinstance(arr, Type)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
         value_dtype = as_dtype(fill_value)
@@ -28,7 +27,7 @@ def select_indices_1d_nb(arr: tp.Array1d, indices: tp.Array1d, fill_value: tp.Sc
         value_dtype = np.array(fill_value).dtype
     dtype = np.promote_types(a_dtype, value_dtype)
 
-    def _select_indices_1d_nb(arr, indices, fill_value):
+    def impl(arr, indices, fill_value):
         out = np.empty(indices.shape, dtype=dtype)
         for i in range(indices.shape[0]):
             if 0 <= indices[i] <= arr.shape[0] - 1:
@@ -38,15 +37,22 @@ def select_indices_1d_nb(arr: tp.Array1d, indices: tp.Array1d, fill_value: tp.Sc
         return out
 
     if not nb_enabled:
-        return _select_indices_1d_nb(arr, indices, fill_value)
+        return impl(arr, indices, fill_value)
 
-    return _select_indices_1d_nb
+    return impl
 
 
-@register_jitted(cache=True, is_generated_jit=True)
-def select_indices_nb(arr: tp.Array2d, indices: tp.Array2d, fill_value: tp.Scalar) -> tp.Array2d:
+ol_select_indices_1d_nb = overload(_select_indices_1d_nb)(_select_indices_1d_nb)
+
+
+@register_jitted(cache=True)
+def select_indices_1d_nb(arr: tp.Array1d, indices: tp.Array1d, fill_value: tp.Scalar) -> tp.Array1d:
     """Set each element to a value by boolean mask."""
-    nb_enabled = not isinstance(arr, np.ndarray)
+    return _select_indices_1d_nb(arr, indices, fill_value)
+
+
+def _select_indices_nb(arr, indices, fill_value):
+    nb_enabled = isinstance(arr, Type)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
         value_dtype = as_dtype(fill_value)
@@ -55,7 +61,7 @@ def select_indices_nb(arr: tp.Array2d, indices: tp.Array2d, fill_value: tp.Scala
         value_dtype = np.array(fill_value).dtype
     dtype = np.promote_types(a_dtype, value_dtype)
 
-    def _select_indices_nb(arr, indices, fill_value):
+    def impl(arr, indices, fill_value):
         out = np.empty(indices.shape, dtype=dtype)
         for col in range(indices.shape[1]):
             for i in range(indices.shape[0]):
@@ -66,9 +72,18 @@ def select_indices_nb(arr: tp.Array2d, indices: tp.Array2d, fill_value: tp.Scala
         return out
 
     if not nb_enabled:
-        return _select_indices_nb(arr, indices, fill_value)
+        return impl(arr, indices, fill_value)
 
-    return _select_indices_nb
+    return impl
+
+
+ol_select_indices_nb = overload(_select_indices_nb)(_select_indices_nb)
+
+
+@register_jitted(cache=True)
+def select_indices_nb(arr: tp.Array2d, indices: tp.Array2d, fill_value: tp.Scalar) -> tp.Array2d:
+    """2-dim version of `select_indices_1d_nb`."""
+    return _select_indices_nb(arr, indices, fill_value)
 
 
 @register_jitted(cache=True)
@@ -98,10 +113,8 @@ def shuffle_nb(arr: tp.Array2d, seed: tp.Optional[int] = None) -> tp.Array2d:
     return out
 
 
-@register_jitted(cache=True, is_generated_jit=True)
-def set_by_mask_1d_nb(arr: tp.Array1d, mask: tp.Array1d, value: tp.Scalar) -> tp.Array1d:
-    """Set each element to a value by boolean mask."""
-    nb_enabled = not isinstance(arr, np.ndarray)
+def _set_by_mask_1d_nb(arr, mask, value):
+    nb_enabled = isinstance(arr, Type)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
         value_dtype = as_dtype(value)
@@ -110,21 +123,28 @@ def set_by_mask_1d_nb(arr: tp.Array1d, mask: tp.Array1d, value: tp.Scalar) -> tp
         value_dtype = np.array(value).dtype
     dtype = np.promote_types(a_dtype, value_dtype)
 
-    def _set_by_mask_1d_nb(arr, mask, value):
+    def impl(arr, mask, value):
         out = arr.astype(dtype)
         out[mask] = value
         return out
 
     if not nb_enabled:
-        return _set_by_mask_1d_nb(arr, mask, value)
+        return impl(arr, mask, value)
 
-    return _set_by_mask_1d_nb
+    return impl
 
 
-@register_jitted(cache=True, is_generated_jit=True)
-def set_by_mask_nb(arr: tp.Array2d, mask: tp.Array2d, value: tp.Scalar) -> tp.Array2d:
-    """2-dim version of `set_by_mask_1d_nb`."""
-    nb_enabled = not isinstance(arr, np.ndarray)
+ol_set_by_mask_1d_nb = overload(_set_by_mask_1d_nb)(_set_by_mask_1d_nb)
+
+
+@register_jitted(cache=True)
+def set_by_mask_1d_nb(arr: tp.Array1d, mask: tp.Array1d, value: tp.Scalar) -> tp.Array1d:
+    """Set each element to a value by boolean mask."""
+    return _set_by_mask_1d_nb(arr, mask, value)
+
+
+def _set_by_mask_nb(arr, mask, value):
+    nb_enabled = isinstance(arr, Type)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
         value_dtype = as_dtype(value)
@@ -133,24 +153,29 @@ def set_by_mask_nb(arr: tp.Array2d, mask: tp.Array2d, value: tp.Scalar) -> tp.Ar
         value_dtype = np.array(value).dtype
     dtype = np.promote_types(a_dtype, value_dtype)
 
-    def _set_by_mask_nb(arr, mask, value):
+    def impl(arr, mask, value):
         out = arr.astype(dtype)
         for col in range(arr.shape[1]):
             out[mask[:, col], col] = value
         return out
 
     if not nb_enabled:
-        return _set_by_mask_nb(arr, mask, value)
+        return impl(arr, mask, value)
 
-    return _set_by_mask_nb
+    return impl
 
 
-@register_jitted(cache=True, is_generated_jit=True)
-def set_by_mask_mult_1d_nb(arr: tp.Array1d, mask: tp.Array1d, values: tp.Array1d) -> tp.Array1d:
-    """Set each element in one array to the corresponding element in another by boolean mask.
+ol_set_by_mask_nb = overload(_set_by_mask_nb)(_set_by_mask_nb)
 
-    `values` must be of the same shape as in the array."""
-    nb_enabled = not isinstance(arr, np.ndarray)
+
+@register_jitted(cache=True)
+def set_by_mask_nb(arr: tp.Array2d, mask: tp.Array2d, value: tp.Scalar) -> tp.Array2d:
+    """2-dim version of `set_by_mask_1d_nb`."""
+    return _set_by_mask_nb(arr, mask, value)
+
+
+def _set_by_mask_mult_1d_nb(arr, mask, values):
+    nb_enabled = isinstance(arr, Type)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
         value_dtype = as_dtype(values.dtype)
@@ -159,21 +184,30 @@ def set_by_mask_mult_1d_nb(arr: tp.Array1d, mask: tp.Array1d, values: tp.Array1d
         value_dtype = values.dtype
     dtype = np.promote_types(a_dtype, value_dtype)
 
-    def _set_by_mask_mult_1d_nb(arr, mask, values):
+    def impl(arr, mask, values):
         out = arr.astype(dtype)
         out[mask] = values[mask]
         return out
 
     if not nb_enabled:
-        return _set_by_mask_mult_1d_nb(arr, mask, values)
+        return impl(arr, mask, values)
 
-    return _set_by_mask_mult_1d_nb
+    return impl
 
 
-@register_jitted(cache=True, is_generated_jit=True)
-def set_by_mask_mult_nb(arr: tp.Array2d, mask: tp.Array2d, values: tp.Array2d) -> tp.Array2d:
-    """2-dim version of `set_by_mask_mult_1d_nb`."""
-    nb_enabled = not isinstance(arr, np.ndarray)
+ol_set_by_mask_mult_1d_nb = overload(_set_by_mask_mult_1d_nb)(_set_by_mask_mult_1d_nb)
+
+
+@register_jitted(cache=True)
+def set_by_mask_mult_1d_nb(arr: tp.Array1d, mask: tp.Array1d, values: tp.Array1d) -> tp.Array1d:
+    """Set each element in one array to the corresponding element in another by boolean mask.
+
+    `values` must be of the same shape as in the array."""
+    return _set_by_mask_mult_1d_nb(arr, mask, values)
+
+
+def _set_by_mask_mult_nb(arr, mask, values):
+    nb_enabled = isinstance(arr, Type)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
         value_dtype = as_dtype(values.dtype)
@@ -182,16 +216,25 @@ def set_by_mask_mult_nb(arr: tp.Array2d, mask: tp.Array2d, values: tp.Array2d) -
         value_dtype = values.dtype
     dtype = np.promote_types(a_dtype, value_dtype)
 
-    def _set_by_mask_mult_nb(arr, mask, values):
+    def impl(arr, mask, values):
         out = arr.astype(dtype)
         for col in range(arr.shape[1]):
             out[mask[:, col], col] = values[mask[:, col], col]
         return out
 
     if not nb_enabled:
-        return _set_by_mask_mult_nb(arr, mask, values)
+        return impl(arr, mask, values)
 
-    return _set_by_mask_mult_nb
+    return impl
+
+
+ol_set_by_mask_mult_nb = overload(_set_by_mask_mult_nb)(_set_by_mask_mult_nb)
+
+
+@register_jitted(cache=True)
+def set_by_mask_mult_nb(arr: tp.Array2d, mask: tp.Array2d, values: tp.Array2d) -> tp.Array2d:
+    """2-dim version of `set_by_mask_mult_1d_nb`."""
+    return _set_by_mask_mult_nb(arr, mask, values)
 
 
 @register_jitted(cache=True)
@@ -290,15 +333,8 @@ def fbfill_nb(arr: tp.Array2d) -> tp.Array2d:
     return out
 
 
-@register_jitted(cache=True, is_generated_jit=True)
-def bshift_1d_nb(arr: tp.Array1d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp.Array1d:
-    """Shift backward by `n` positions.
-
-    Numba equivalent to `pd.Series(arr).shift(-n)`.
-
-    !!! warning
-        This operation looks ahead."""
-    nb_enabled = not isinstance(arr, np.ndarray)
+def _bshift_1d_nb(arr, n, fill_value):
+    nb_enabled = isinstance(arr, Type)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
         if isinstance(fill_value, Omitted):
@@ -310,7 +346,7 @@ def bshift_1d_nb(arr: tp.Array1d, n: int = 1, fill_value: tp.Scalar = np.nan) ->
         fill_value_dtype = np.array(fill_value).dtype
     dtype = np.promote_types(a_dtype, fill_value_dtype)
 
-    def _bshift_1d_nb(arr, n, fill_value):
+    def impl(arr, n, fill_value):
         out = np.empty(arr.shape[0], dtype=dtype)
         for i in range(out.shape[0]):
             if i + n <= out.shape[0] - 1:
@@ -320,9 +356,51 @@ def bshift_1d_nb(arr: tp.Array1d, n: int = 1, fill_value: tp.Scalar = np.nan) ->
         return out
 
     if not nb_enabled:
-        return _bshift_1d_nb(arr, n, fill_value)
+        return impl(arr, n, fill_value)
 
-    return _bshift_1d_nb
+    return impl
+
+
+ol_bshift_1d_nb = overload(_bshift_1d_nb)(_bshift_1d_nb)
+
+
+@register_jitted(cache=True)
+def bshift_1d_nb(arr: tp.Array1d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp.Array1d:
+    """Shift backward by `n` positions.
+
+    Numba equivalent to `pd.Series(arr).shift(-n)`.
+
+    !!! warning
+        This operation looks ahead."""
+    return _bshift_1d_nb(arr, n, fill_value)
+
+
+def _bshift_nb(arr, n, fill_value):
+    nb_enabled = isinstance(arr, Type)
+    if nb_enabled:
+        a_dtype = as_dtype(arr.dtype)
+        if isinstance(fill_value, Omitted):
+            fill_value_dtype = np.asarray(fill_value.value).dtype
+        else:
+            fill_value_dtype = as_dtype(fill_value)
+    else:
+        a_dtype = arr.dtype
+        fill_value_dtype = np.array(fill_value).dtype
+    dtype = np.promote_types(a_dtype, fill_value_dtype)
+
+    def impl(arr, n, fill_value):
+        out = np.empty_like(arr, dtype=dtype)
+        for col in range(arr.shape[1]):
+            out[:, col] = bshift_1d_nb(arr[:, col], n=n, fill_value=fill_value)
+        return out
+
+    if not nb_enabled:
+        return impl(arr, n, fill_value)
+
+    return impl
+
+
+ol_bshift_nb = overload(_bshift_nb)(_bshift_nb)
 
 
 @register_chunkable(
@@ -330,10 +408,14 @@ def bshift_1d_nb(arr: tp.Array1d, n: int = 1, fill_value: tp.Scalar = np.nan) ->
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), n=None, fill_value=None),
     merge_func="column_stack",
 )
-@register_jitted(cache=True, is_generated_jit=True)
+@register_jitted(cache=True)
 def bshift_nb(arr: tp.Array2d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp.Array2d:
     """2-dim version of `bshift_1d_nb`."""
-    nb_enabled = not isinstance(arr, np.ndarray)
+    return _bshift_nb(arr, n, fill_value)
+
+
+def _fshift_1d_nb(arr, n, fill_value):
+    nb_enabled = isinstance(arr, Type)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
         if isinstance(fill_value, Omitted):
@@ -345,36 +427,7 @@ def bshift_nb(arr: tp.Array2d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp
         fill_value_dtype = np.array(fill_value).dtype
     dtype = np.promote_types(a_dtype, fill_value_dtype)
 
-    def _bshift_nb(arr, n, fill_value):
-        out = np.empty_like(arr, dtype=dtype)
-        for col in range(arr.shape[1]):
-            out[:, col] = bshift_1d_nb(arr[:, col], n=n, fill_value=fill_value)
-        return out
-
-    if not nb_enabled:
-        return _bshift_nb(arr, n, fill_value)
-
-    return _bshift_nb
-
-
-@register_jitted(cache=True, is_generated_jit=True)
-def fshift_1d_nb(arr: tp.Array1d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp.Array1d:
-    """Shift forward by `n` positions.
-
-    Numba equivalent to `pd.Series(arr).shift(n)`."""
-    nb_enabled = not isinstance(arr, np.ndarray)
-    if nb_enabled:
-        a_dtype = as_dtype(arr.dtype)
-        if isinstance(fill_value, Omitted):
-            fill_value_dtype = np.asarray(fill_value.value).dtype
-        else:
-            fill_value_dtype = as_dtype(fill_value)
-    else:
-        a_dtype = arr.dtype
-        fill_value_dtype = np.array(fill_value).dtype
-    dtype = np.promote_types(a_dtype, fill_value_dtype)
-
-    def _fshift_1d_nb(arr, n, fill_value):
+    def impl(arr, n, fill_value):
         out = np.empty(arr.shape[0], dtype=dtype)
         for i in range(out.shape[0]):
             if i - n >= 0:
@@ -384,20 +437,24 @@ def fshift_1d_nb(arr: tp.Array1d, n: int = 1, fill_value: tp.Scalar = np.nan) ->
         return out
 
     if not nb_enabled:
-        return _fshift_1d_nb(arr, n, fill_value)
+        return impl(arr, n, fill_value)
 
-    return _fshift_1d_nb
+    return impl
 
 
-@register_chunkable(
-    size=ch.ArraySizer(arg_query="arr", axis=1),
-    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), n=None, fill_value=None),
-    merge_func="column_stack",
-)
-@register_jitted(cache=True, is_generated_jit=True)
-def fshift_nb(arr: tp.Array2d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp.Array2d:
-    """2-dim version of `fshift_1d_nb`."""
-    nb_enabled = not isinstance(arr, np.ndarray)
+ol_fshift_1d_nb = overload(_fshift_1d_nb)(_fshift_1d_nb)
+
+
+@register_jitted(cache=True)
+def fshift_1d_nb(arr: tp.Array1d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp.Array1d:
+    """Shift forward by `n` positions.
+
+    Numba equivalent to `pd.Series(arr).shift(n)`."""
+    return _fshift_1d_nb(arr, n, fill_value)
+
+
+def _fshift_nb(arr, n, fill_value):
+    nb_enabled = isinstance(arr, Type)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
         if isinstance(fill_value, Omitted):
@@ -409,16 +466,30 @@ def fshift_nb(arr: tp.Array2d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp
         fill_value_dtype = np.array(fill_value).dtype
     dtype = np.promote_types(a_dtype, fill_value_dtype)
 
-    def _fshift_nb(arr, n, fill_value):
+    def impl(arr, n, fill_value):
         out = np.empty_like(arr, dtype=dtype)
         for col in range(arr.shape[1]):
             out[:, col] = fshift_1d_nb(arr[:, col], n=n, fill_value=fill_value)
         return out
 
     if not nb_enabled:
-        return _fshift_nb(arr, n, fill_value)
+        return impl(arr, n, fill_value)
 
-    return _fshift_nb
+    return impl
+
+
+ol_fshift_nb = overload(_fshift_nb)(_fshift_nb)
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr", axis=1),
+    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1), n=None, fill_value=None),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True)
+def fshift_nb(arr: tp.Array2d, n: int = 1, fill_value: tp.Scalar = np.nan) -> tp.Array2d:
+    """2-dim version of `fshift_1d_nb`."""
+    return _fshift_nb(arr, n, fill_value)
 
 
 @register_jitted(cache=True)
@@ -538,58 +609,61 @@ def ffill_nb(arr: tp.Array2d) -> tp.Array2d:
     return out
 
 
-@register_chunkable(
-    size=ch.ArraySizer(arg_query="arr", axis=1),
-    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
-    merge_func="concat",
-)
-@register_jitted(cache=True, is_generated_jit=True, tags={"can_parallel"})
-def nanprod_nb(arr: tp.Array2d) -> tp.Array1d:
-    """Numba equivalent of `np.nanprod` along axis 0."""
-    nb_enabled = not isinstance(arr, np.ndarray)
+def _nanprod_nb(arr):
+    nb_enabled = isinstance(arr, Type)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
     else:
         a_dtype = arr.dtype
     dtype = np.promote_types(a_dtype, int)
 
-    def _nanprod_nb(arr):
+    def impl(arr):
         out = np.empty(arr.shape[1], dtype=dtype)
         for col in prange(arr.shape[1]):
             out[col] = np.nanprod(arr[:, col])
         return out
 
     if not nb_enabled:
-        return _nanprod_nb(arr)
+        return impl(arr)
 
-    return _nanprod_nb
+    return impl
+
+
+ol_nanprod_nb = overload(_nanprod_nb)(_nanprod_nb)
 
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr", axis=1),
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
-    merge_func="column_stack",
+    merge_func="concat",
 )
-@register_jitted(cache=True, is_generated_jit=True, tags={"can_parallel"})
-def nancumsum_nb(arr: tp.Array2d) -> tp.Array2d:
-    """Numba equivalent of `np.nancumsum` along axis 0."""
-    nb_enabled = not isinstance(arr, np.ndarray)
+@register_jitted(cache=True, tags={"can_parallel"})
+def nanprod_nb(arr: tp.Array2d) -> tp.Array1d:
+    """Numba equivalent of `np.nanprod` along axis 0."""
+    return _nanprod_nb(arr)
+
+
+def _nancumsum_nb(arr):
+    nb_enabled = isinstance(arr, Type)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
     else:
         a_dtype = arr.dtype
     dtype = np.promote_types(a_dtype, int)
 
-    def _nancumsum_nb(arr):
+    def impl(arr):
         out = np.empty(arr.shape, dtype=dtype)
         for col in prange(arr.shape[1]):
             out[:, col] = np.nancumsum(arr[:, col])
         return out
 
     if not nb_enabled:
-        return _nancumsum_nb(arr)
+        return impl(arr)
 
-    return _nancumsum_nb
+    return impl
+
+
+ol_nancumsum_nb = overload(_nancumsum_nb)(_nancumsum_nb)
 
 
 @register_chunkable(
@@ -597,26 +671,44 @@ def nancumsum_nb(arr: tp.Array2d) -> tp.Array2d:
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
     merge_func="column_stack",
 )
-@register_jitted(cache=True, is_generated_jit=True, tags={"can_parallel"})
-def nancumprod_nb(arr: tp.Array2d) -> tp.Array2d:
-    """Numba equivalent of `np.nancumprod` along axis 0."""
-    nb_enabled = not isinstance(arr, np.ndarray)
+@register_jitted(cache=True, tags={"can_parallel"})
+def nancumsum_nb(arr: tp.Array2d) -> tp.Array2d:
+    """Numba equivalent of `np.nancumsum` along axis 0."""
+    return _nancumsum_nb(arr)
+
+
+def _nancumprod_nb(arr):
+    nb_enabled = isinstance(arr, Type)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
     else:
         a_dtype = arr.dtype
     dtype = np.promote_types(a_dtype, int)
 
-    def _nancumprod_nb(arr):
+    def impl(arr):
         out = np.empty(arr.shape, dtype=dtype)
         for col in prange(arr.shape[1]):
             out[:, col] = np.nancumprod(arr[:, col])
         return out
 
     if not nb_enabled:
-        return _nancumprod_nb(arr)
+        return impl(arr)
 
-    return _nancumprod_nb
+    return impl
+
+
+ol_nancumprod_nb = overload(_nancumprod_nb)(_nancumprod_nb)
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr", axis=1),
+    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def nancumprod_nb(arr: tp.Array2d) -> tp.Array2d:
+    """Numba equivalent of `np.nancumprod` along axis 0."""
+    return _nancumprod_nb(arr)
 
 
 @register_jitted(cache=True)
@@ -643,31 +735,38 @@ def nancnt_nb(arr: tp.Array2d) -> tp.Array1d:
     return out
 
 
-@register_chunkable(
-    size=ch.ArraySizer(arg_query="arr", axis=1),
-    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
-    merge_func="concat",
-)
-@register_jitted(cache=True, is_generated_jit=True, tags={"can_parallel"})
-def nansum_nb(arr: tp.Array2d) -> tp.Array1d:
-    """Numba equivalent of `np.nansum` along axis 0."""
-    nb_enabled = not isinstance(arr, np.ndarray)
+def _nansum_nb(arr):
+    nb_enabled = isinstance(arr, Type)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
     else:
         a_dtype = arr.dtype
     dtype = np.promote_types(a_dtype, int)
 
-    def _nansum_nb(arr):
+    def impl(arr):
         out = np.empty(arr.shape[1], dtype=dtype)
         for col in prange(arr.shape[1]):
             out[col] = np.nansum(arr[:, col])
         return out
 
     if not nb_enabled:
-        return _nansum_nb(arr)
+        return impl(arr)
 
-    return _nansum_nb
+    return impl
+
+
+ol_nansum_nb = overload(_nansum_nb)(_nansum_nb)
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr", axis=1),
+    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
+    merge_func="concat",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def nansum_nb(arr: tp.Array2d) -> tp.Array1d:
+    """Numba equivalent of `np.nansum` along axis 0."""
+    return _nansum_nb(arr)
 
 
 @register_chunkable(
@@ -1222,7 +1321,7 @@ def to_renko_1d_nb(
     brick_size: tp.FlexArray1dLike,
     relative: tp.FlexArray1dLike = False,
     start_value: tp.Optional[float] = None,
-    max_out_len: tp.Optional[int] = None
+    max_out_len: tp.Optional[int] = None,
 ) -> tp.Tuple[tp.Array1d, tp.Array1d, tp.Array1d]:
     """Convert to Renko format."""
     brick_size_ = to_1d_array_nb(np.asarray(brick_size))
@@ -1294,7 +1393,7 @@ def to_renko_ohlc_1d_nb(
     brick_size: tp.FlexArray1dLike,
     relative: tp.FlexArray1dLike = False,
     start_value: tp.Optional[float] = None,
-    max_out_len: tp.Optional[int] = None
+    max_out_len: tp.Optional[int] = None,
 ) -> tp.Tuple[tp.Array2d, tp.Array1d]:
     """Convert to Renko OHLC format."""
     brick_size_ = to_1d_array_nb(np.asarray(brick_size))
@@ -1371,29 +1470,19 @@ def to_renko_ohlc_1d_nb(
 
 # ############# Resampling ############# #
 
-@register_jitted(cache=True, is_generated_jit=True)
-def latest_at_index_1d_nb(
-    arr: tp.Array1d,
-    source_index: tp.Array1d,
-    target_index: tp.Array1d,
-    source_freq: tp.Optional[tp.Scalar] = None,
-    target_freq: tp.Optional[tp.Scalar] = None,
-    source_rbound: bool = False,
-    target_rbound: bool = None,
-    nan_value: tp.Scalar = np.nan,
-    ffill: bool = True,
-) -> tp.Array1d:
-    """Get the latest in `arr` at each index in `target_index` based on `source_index`.
 
-    If `source_rbound` is True, then each element in `source_index` is effectively located at
-    the right bound, which is the frequency or the next element (excluding) if the frequency is None.
-    The same for `target_rbound` and `target_index`.
-
-    !!! note
-        Both index arrays must be increasing. Repeating values are allowed.
-
-        If `arr` contains bar data, both indexes must represent the opening time."""
-    nb_enabled = not isinstance(arr, np.ndarray)
+def _latest_at_index_1d_nb(
+    arr,
+    source_index,
+    target_index,
+    source_freq,
+    target_freq,
+    source_rbound,
+    target_rbound,
+    nan_value,
+    ffill,
+):
+    nb_enabled = isinstance(arr, Type)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
         value_dtype = as_dtype(nan_value)
@@ -1402,7 +1491,7 @@ def latest_at_index_1d_nb(
         value_dtype = np.array(nan_value).dtype
     dtype = np.promote_types(a_dtype, value_dtype)
 
-    def _latest_at_index_1d_nb(
+    def impl(
         arr,
         source_index,
         target_index,
@@ -1493,7 +1582,7 @@ def latest_at_index_1d_nb(
         return out
 
     if not nb_enabled:
-        return _latest_at_index_1d_nb(
+        return impl(
             arr,
             source_index,
             target_index,
@@ -1505,38 +1594,59 @@ def latest_at_index_1d_nb(
             ffill,
         )
 
-    return _latest_at_index_1d_nb
+    return impl
 
 
-@register_chunkable(
-    size=ch.ArraySizer(arg_query="arr", axis=1),
-    arg_take_spec=dict(
-        arr=ch.ArraySlicer(axis=1),
-        source_index=None,
-        target_index=None,
-        source_freq=None,
-        target_freq=None,
-        source_rbound=None,
-        target_rbound=None,
-        nan_value=None,
-        ffill=None,
-    ),
-    merge_func="column_stack",
-)
-@register_jitted(cache=True, tags={"can_parallel"}, is_generated_jit=True)
-def latest_at_index_nb(
-    arr: tp.Array2d,
+ol_latest_at_index_1d_nb = overload(_latest_at_index_1d_nb)(_latest_at_index_1d_nb)
+
+
+@register_jitted(cache=True)
+def latest_at_index_1d_nb(
+    arr: tp.Array1d,
     source_index: tp.Array1d,
     target_index: tp.Array1d,
     source_freq: tp.Optional[tp.Scalar] = None,
     target_freq: tp.Optional[tp.Scalar] = None,
     source_rbound: bool = False,
-    target_rbound: bool = False,
+    target_rbound: bool = None,
     nan_value: tp.Scalar = np.nan,
     ffill: bool = True,
-) -> tp.Array2d:
-    """2-dim version of `latest_at_index_1d_nb`."""
-    nb_enabled = not isinstance(arr, np.ndarray)
+) -> tp.Array1d:
+    """Get the latest in `arr` at each index in `target_index` based on `source_index`.
+
+    If `source_rbound` is True, then each element in `source_index` is effectively located at
+    the right bound, which is the frequency or the next element (excluding) if the frequency is None.
+    The same for `target_rbound` and `target_index`.
+
+    !!! note
+        Both index arrays must be increasing. Repeating values are allowed.
+
+        If `arr` contains bar data, both indexes must represent the opening time."""
+    return _latest_at_index_1d_nb(
+        arr,
+        source_index,
+        target_index,
+        source_freq,
+        target_freq,
+        source_rbound,
+        target_rbound,
+        nan_value,
+        ffill,
+    )
+
+
+def _latest_at_index_nb(
+    arr,
+    source_index,
+    target_index,
+    source_freq,
+    target_freq,
+    source_rbound,
+    target_rbound,
+    nan_value,
+    ffill,
+):
+    nb_enabled = isinstance(arr, Type)
     if nb_enabled:
         a_dtype = as_dtype(arr.dtype)
         value_dtype = as_dtype(nan_value)
@@ -1545,7 +1655,7 @@ def latest_at_index_nb(
         value_dtype = np.array(nan_value).dtype
     dtype = np.promote_types(a_dtype, value_dtype)
 
-    def _latest_at_index_nb(
+    def impl(
         arr,
         source_index,
         target_index,
@@ -1572,7 +1682,7 @@ def latest_at_index_nb(
         return out
 
     if not nb_enabled:
-        return _latest_at_index_nb(
+        return impl(
             arr,
             source_index,
             target_index,
@@ -1584,4 +1694,48 @@ def latest_at_index_nb(
             ffill,
         )
 
-    return _latest_at_index_nb
+    return impl
+
+
+ol_latest_at_index_nb = overload(_latest_at_index_nb)(_latest_at_index_nb)
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr", axis=1),
+    arg_take_spec=dict(
+        arr=ch.ArraySlicer(axis=1),
+        source_index=None,
+        target_index=None,
+        source_freq=None,
+        target_freq=None,
+        source_rbound=None,
+        target_rbound=None,
+        nan_value=None,
+        ffill=None,
+    ),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def latest_at_index_nb(
+    arr: tp.Array2d,
+    source_index: tp.Array1d,
+    target_index: tp.Array1d,
+    source_freq: tp.Optional[tp.Scalar] = None,
+    target_freq: tp.Optional[tp.Scalar] = None,
+    source_rbound: bool = False,
+    target_rbound: bool = False,
+    nan_value: tp.Scalar = np.nan,
+    ffill: bool = True,
+) -> tp.Array2d:
+    """2-dim version of `latest_at_index_1d_nb`."""
+    return _latest_at_index_nb(
+        arr,
+        source_index,
+        target_index,
+        source_freq,
+        target_freq,
+        source_rbound,
+        target_rbound,
+        nan_value,
+        ffill,
+    )

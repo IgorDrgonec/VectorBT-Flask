@@ -848,13 +848,6 @@ def chunked(
     can be disabled by using the global setting `disable_wrapping` (=> returns the wrapped function).
 
     For defaults, see `vectorbtpro._settings.chunking`.
-    For example, to change the engine globally:
-
-    ```pycon
-    >>> import vectorbtpro as vbt
-
-    >>> vbt.settings.chunking["execute_kwargs"]["engine"] = 'dask'
-    ```
 
     !!! note
         If less than two chunks were generated and `skip_one_chunk` is True,

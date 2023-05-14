@@ -2,7 +2,7 @@
 
 """Utilities for jitting."""
 
-from numba import jit as nb_jit, generated_jit as nb_generated_jit
+from numba import jit as nb_jit
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import merge_dicts, Configured
@@ -56,7 +56,6 @@ class NumbaJitter(Jitter):
 
     def __init__(
         self,
-        is_generated_jit: bool = False,
         fix_cannot_parallel: bool = True,
         nopython: bool = True,
         nogil: bool = True,
@@ -67,7 +66,6 @@ class NumbaJitter(Jitter):
     ) -> None:
         Jitter.__init__(
             self,
-            is_generated_jit=is_generated_jit,
             fix_cannot_parallel=fix_cannot_parallel,
             nopython=nopython,
             nogil=nogil,
@@ -77,7 +75,6 @@ class NumbaJitter(Jitter):
             **options,
         )
 
-        self._is_generated_jit = is_generated_jit
         self._fix_cannot_parallel = fix_cannot_parallel
         self._nopython = nopython
         self._nogil = nogil
@@ -85,11 +82,6 @@ class NumbaJitter(Jitter):
         self._cache = cache
         self._boundscheck = boundscheck
         self._options = options
-
-    @property
-    def is_generated_jit(self) -> bool:
-        """Whether to use `numba.generated_jit`, otherwise `numba.jit`."""
-        return self._is_generated_jit
 
     @property
     def fix_cannot_parallel(self) -> bool:
@@ -132,10 +124,6 @@ class NumbaJitter(Jitter):
 
         if tags is None:
             tags = set()
-        if self.is_generated_jit:
-            decorator = nb_generated_jit
-        else:
-            decorator = nb_jit
         options = dict(self.options)
         parallel = self.parallel
         if self.fix_cannot_parallel and parallel and "can_parallel" not in tags:
@@ -143,7 +131,7 @@ class NumbaJitter(Jitter):
         cache = self.cache
         if parallel and cache:
             cache = False
-        return decorator(
+        return nb_jit(
             nopython=self.nopython,
             nogil=self.nogil,
             parallel=parallel,

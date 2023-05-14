@@ -45,7 +45,7 @@ def save_animation(
     show_progress: bool = True,
     pbar_kwargs: tp.KwargsLike = None,
     to_image_kwargs: tp.KwargsLike = None,
-    **kwargs
+    **kwargs,
 ) -> None:
     """Save animation to a file.
 

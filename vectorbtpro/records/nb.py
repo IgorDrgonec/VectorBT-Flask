@@ -12,6 +12,8 @@ These only accept NumPy arrays and other Numba-compatible types.
 
 import numpy as np
 from numba import prange
+from numba.core.types import Type
+from numba.extending import overload
 from numba.np.numpy_support import as_dtype
 
 from vectorbtpro import _typing as tp
@@ -902,7 +904,39 @@ def mapped_coverage_map_nb(col_arr: tp.Array1d, idx_arr: tp.Array1d, target_shap
 # ############# Unstacking ############# #
 
 
-@register_jitted(cache=True, is_generated_jit=True)
+def _unstack_mapped_nb(
+    mapped_arr,
+    col_arr,
+    idx_arr,
+    target_shape,
+    fill_value,
+):
+    nb_enabled = not isinstance(mapped_arr, np.ndarray)
+    if nb_enabled:
+        mapped_arr_dtype = as_dtype(mapped_arr.dtype)
+        fill_value_dtype = as_dtype(fill_value)
+    else:
+        mapped_arr_dtype = mapped_arr.dtype
+        fill_value_dtype = np.array(fill_value).dtype
+    dtype = np.promote_types(mapped_arr_dtype, fill_value_dtype)
+
+    def impl(mapped_arr, col_arr, idx_arr, target_shape, fill_value):
+        out = np.full(target_shape, fill_value, dtype=dtype)
+
+        for r in range(mapped_arr.shape[0]):
+            out[idx_arr[r], col_arr[r]] = mapped_arr[r]
+        return out
+
+    if not nb_enabled:
+        return impl(mapped_arr, col_arr, idx_arr, target_shape, fill_value)
+
+    return impl
+
+
+ol_unstack_mapped_nb = overload(_unstack_mapped_nb)(_unstack_mapped_nb)
+
+
+@register_jitted(cache=True)
 def unstack_mapped_nb(
     mapped_arr: tp.Array1d,
     col_arr: tp.Array1d,
@@ -911,6 +945,10 @@ def unstack_mapped_nb(
     fill_value: float,
 ) -> tp.Array2d:
     """Unstack mapped array using index data."""
+    return _unstack_mapped_nb(mapped_arr, col_arr, idx_arr, target_shape, fill_value)
+
+
+def _ignore_unstack_mapped_nb(mapped_arr, col_map, fill_value):
     nb_enabled = not isinstance(mapped_arr, np.ndarray)
     if nb_enabled:
         mapped_arr_dtype = as_dtype(mapped_arr.dtype)
@@ -920,32 +958,7 @@ def unstack_mapped_nb(
         fill_value_dtype = np.array(fill_value).dtype
     dtype = np.promote_types(mapped_arr_dtype, fill_value_dtype)
 
-    def _unstack_mapped_nb(mapped_arr, col_arr, idx_arr, target_shape, fill_value):
-        out = np.full(target_shape, fill_value, dtype=dtype)
-
-        for r in range(mapped_arr.shape[0]):
-            out[idx_arr[r], col_arr[r]] = mapped_arr[r]
-        return out
-
-    if not nb_enabled:
-        return _unstack_mapped_nb(mapped_arr, col_arr, idx_arr, target_shape, fill_value)
-
-    return _unstack_mapped_nb
-
-
-@register_jitted(cache=True, is_generated_jit=True)
-def ignore_unstack_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.GroupMap, fill_value: float) -> tp.Array2d:
-    """Unstack mapped array by ignoring index data."""
-    nb_enabled = not isinstance(mapped_arr, np.ndarray)
-    if nb_enabled:
-        mapped_arr_dtype = as_dtype(mapped_arr.dtype)
-        fill_value_dtype = as_dtype(fill_value)
-    else:
-        mapped_arr_dtype = mapped_arr.dtype
-        fill_value_dtype = np.array(fill_value).dtype
-    dtype = np.promote_types(mapped_arr_dtype, fill_value_dtype)
-
-    def _ignore_unstack_mapped_nb(mapped_arr, col_map, fill_value):
+    def impl(mapped_arr, col_map, fill_value):
         col_idxs, col_lens = col_map
         col_start_idxs = np.cumsum(col_lens) - col_lens
         out = np.full((np.max(col_lens), col_lens.shape[0]), fill_value, dtype=dtype)
@@ -961,9 +974,18 @@ def ignore_unstack_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.GroupMap, fill_
         return out
 
     if not nb_enabled:
-        return _ignore_unstack_mapped_nb(mapped_arr, col_map, fill_value)
+        return impl(mapped_arr, col_map, fill_value)
 
-    return _ignore_unstack_mapped_nb
+    return impl
+
+
+ol_ignore_unstack_mapped_nb = overload(_ignore_unstack_mapped_nb)(_ignore_unstack_mapped_nb)
+
+
+@register_jitted(cache=True)
+def ignore_unstack_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.GroupMap, fill_value: float) -> tp.Array2d:
+    """Unstack mapped array by ignoring index data."""
+    return _ignore_unstack_mapped_nb(mapped_arr, col_map, fill_value)
 
 
 @register_jitted(cache=True)
@@ -980,16 +1002,14 @@ def unstack_index_nb(repeat_cnt_arr: tp.Array1d) -> tp.Array1d:
     return out
 
 
-@register_jitted(cache=True, is_generated_jit=True)
-def repeat_unstack_mapped_nb(
-    mapped_arr: tp.Array1d,
-    col_arr: tp.Array1d,
-    idx_arr: tp.Array1d,
-    repeat_cnt_arr: tp.Array1d,
-    n_cols: int,
-    fill_value: float,
-) -> tp.Array2d:
-    """Unstack mapped array using repeated index data."""
+def _repeat_unstack_mapped_nb(
+    mapped_arr,
+    col_arr,
+    idx_arr,
+    repeat_cnt_arr,
+    n_cols,
+    fill_value,
+):
     nb_enabled = not isinstance(mapped_arr, np.ndarray)
     if nb_enabled:
         mapped_arr_dtype = as_dtype(mapped_arr.dtype)
@@ -999,7 +1019,7 @@ def repeat_unstack_mapped_nb(
         fill_value_dtype = np.array(fill_value).dtype
     dtype = np.promote_types(mapped_arr_dtype, fill_value_dtype)
 
-    def _repeat_unstack_mapped_nb(mapped_arr, col_arr, idx_arr, repeat_cnt_arr, n_cols, fill_value):
+    def impl(mapped_arr, col_arr, idx_arr, repeat_cnt_arr, n_cols, fill_value):
         index_start_arr = np.cumsum(repeat_cnt_arr) - repeat_cnt_arr
         out = np.full((np.sum(repeat_cnt_arr), n_cols), fill_value, dtype=dtype)
         temp = np.zeros((len(repeat_cnt_arr), n_cols), dtype=np.int_)
@@ -1010,6 +1030,22 @@ def repeat_unstack_mapped_nb(
         return out
 
     if not nb_enabled:
-        return _repeat_unstack_mapped_nb(mapped_arr, col_arr, idx_arr, repeat_cnt_arr, n_cols, fill_value)
+        return impl(mapped_arr, col_arr, idx_arr, repeat_cnt_arr, n_cols, fill_value)
 
-    return _repeat_unstack_mapped_nb
+    return impl
+
+
+ol_repeat_unstack_mapped_nb = overload(_repeat_unstack_mapped_nb)(_repeat_unstack_mapped_nb)
+
+
+@register_jitted(cache=True)
+def repeat_unstack_mapped_nb(
+    mapped_arr: tp.Array1d,
+    col_arr: tp.Array1d,
+    idx_arr: tp.Array1d,
+    repeat_cnt_arr: tp.Array1d,
+    n_cols: int,
+    fill_value: float,
+) -> tp.Array2d:
+    """Unstack mapped array using repeated index data."""
+    return _repeat_unstack_mapped_nb(mapped_arr, col_arr, idx_arr, repeat_cnt_arr, n_cols, fill_value)
