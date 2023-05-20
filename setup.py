@@ -49,8 +49,9 @@ setup(
     install_requires=[
         "numpy>=1.20.0",
         "pandas>=1.5.0",
-        "numba>=0.53.1,<0.57.0; python_version < '3.10'",
-        "numba>=0.56.0,<0.57.0; python_version >= '3.10'",
+        "numba>=0.53.1, <0.57.0; python_version<'3.10'",
+        "numba>=0.56.0, <0.57.0; python_version>='3.10' and python_version<'3.11'",
+        "numba>=0.57.0; python_version>='3.11'",
         "scipy",
         "scikit-learn",
         "schedule",
@@ -63,7 +64,7 @@ setup(
         "humanize",
         "attrs>=21.1.0",
         "websocket-client",
-        "graphlib_backport; python_version < '3.9'",
+        "graphlib_backport; python_version<'3.9'",
     ],
     extras_require=get_extra_requires("extra-requirements.txt"),
     classifiers=[
@@ -76,6 +77,7 @@ setup(
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
         "Operating System :: OS Independent",
         "Topic :: Software Development",
         "Topic :: Office/Business :: Financial",
