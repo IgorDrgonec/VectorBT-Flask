@@ -4479,7 +4479,7 @@ class TestDrawdowns:
         assert_frame_equal(drawdowns2.close, drawdowns.close.loc["2020-01-02":"2020-01-05", ["a", "c"]])
         assert_records_close(
             drawdowns2.values,
-            np.array([(1, 0, 1, 2, 2, 3, 3.0, 1.0, 4.0, 1)], dtype=drawdown_dt),
+            np.array([(1, 0, 1, 2, 3, 3.0, 1.0, 4.0, 1)], dtype=drawdown_dt),
         )
 
     def test_mapped_fields(self):
@@ -4497,12 +4497,12 @@ class TestDrawdowns:
             drawdowns.values,
             np.array(
                 [
-                    (0, 0, 0, 1, 1, 2, 2.0, 1.0, 3.0, 1),
-                    (1, 0, 2, 3, 3, 4, 3.0, 1.0, 4.0, 1),
-                    (2, 0, 4, 5, 5, 5, 4.0, 1.0, 1.0, 0),
-                    (0, 1, 1, 2, 2, 3, 2.0, 1.0, 3.0, 1),
-                    (1, 1, 3, 4, 4, 5, 3.0, 1.0, 4.0, 1),
-                    (0, 2, 2, 3, 4, 5, 3.0, 1.0, 2.0, 0),
+                    (0, 0, 0, 1, 2, 2.0, 1.0, 3.0, 1),
+                    (1, 0, 2, 3, 4, 3.0, 1.0, 4.0, 1),
+                    (2, 0, 4, 5, 5, 4.0, 1.0, 1.0, 0),
+                    (0, 1, 1, 2, 3, 2.0, 1.0, 3.0, 1),
+                    (1, 1, 3, 4, 5, 3.0, 1.0, 4.0, 1),
+                    (0, 2, 2, 4, 5, 3.0, 1.0, 2.0, 0),
                 ],
                 dtype=drawdown_dt,
             ),
@@ -4524,7 +4524,7 @@ class TestDrawdowns:
         np.testing.assert_array_equal(records_readable["Drawdown Id"].values, np.array([0, 1, 2, 0, 1, 0]))
         np.testing.assert_array_equal(records_readable["Column"].values, np.array(["a", "a", "a", "b", "b", "c"]))
         np.testing.assert_array_equal(
-            records_readable["Peak Index"].values,
+            records_readable["Start Index"].values,
             np.array(
                 [
                     "2020-01-01T00:00:00.000000000",
@@ -4533,20 +4533,6 @@ class TestDrawdowns:
                     "2020-01-02T00:00:00.000000000",
                     "2020-01-04T00:00:00.000000000",
                     "2020-01-03T00:00:00.000000000",
-                ],
-                dtype="datetime64[ns]",
-            ),
-        )
-        np.testing.assert_array_equal(
-            records_readable["Start Index"].values,
-            np.array(
-                [
-                    "2020-01-02T00:00:00.000000000",
-                    "2020-01-04T00:00:00.000000000",
-                    "2020-01-06T00:00:00.000000000",
-                    "2020-01-03T00:00:00.000000000",
-                    "2020-01-05T00:00:00.000000000",
-                    "2020-01-04T00:00:00.000000000",
                 ],
                 dtype="datetime64[ns]",
             ),
@@ -4579,7 +4565,7 @@ class TestDrawdowns:
                 dtype="datetime64[ns]",
             ),
         )
-        np.testing.assert_array_equal(records_readable["Peak Value"].values, np.array([2.0, 3.0, 4.0, 2.0, 3.0, 3.0]))
+        np.testing.assert_array_equal(records_readable["Start Value"].values, np.array([2.0, 3.0, 4.0, 2.0, 3.0, 3.0]))
         np.testing.assert_array_equal(records_readable["Valley Value"].values, np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0]))
         np.testing.assert_array_equal(records_readable["End Value"].values, np.array([3.0, 4.0, 1.0, 3.0, 4.0, 2.0]))
         np.testing.assert_array_equal(
@@ -4763,39 +4749,39 @@ class TestDrawdowns:
         )
 
     def test_duration(self):
-        np.testing.assert_array_almost_equal(drawdowns["a"].duration.values, np.array([1, 1, 1]))
-        np.testing.assert_array_almost_equal(drawdowns.duration.values, np.array([1, 1, 1, 1, 1, 3]))
+        np.testing.assert_array_almost_equal(drawdowns["a"].duration.values, np.array([2, 2, 2]))
+        np.testing.assert_array_almost_equal(drawdowns.duration.values, np.array([2, 2, 2, 2, 2, 4]))
 
     def test_avg_duration(self):
-        assert drawdowns["a"].avg_duration == pd.Timedelta("1 days 00:00:00")
+        assert drawdowns["a"].avg_duration == pd.Timedelta("2 days 00:00:00")
         assert_series_equal(
             drawdowns.avg_duration,
             pd.Series(
-                np.array([86400000000000, 86400000000000, 259200000000000, "NaT"], dtype="timedelta64[ns]"),
+                np.array([172800000000000, 172800000000000, 345600000000000, "NaT"], dtype="timedelta64[ns]"),
                 index=wrapper.columns,
             ).rename("avg_duration"),
         )
         assert_series_equal(
             drawdowns_grouped.avg_duration,
             pd.Series(
-                np.array([86400000000000, 259200000000000], dtype="timedelta64[ns]"),
+                np.array([172800000000000, 345600000000000], dtype="timedelta64[ns]"),
                 index=pd.Index(["g1", "g2"], dtype="object"),
             ).rename("avg_duration"),
         )
 
     def test_get_mask_duration(self):
-        assert drawdowns["a"].max_duration == pd.Timedelta("1 days 00:00:00")
+        assert drawdowns["a"].max_duration == pd.Timedelta("2 days 00:00:00")
         assert_series_equal(
             drawdowns.max_duration,
             pd.Series(
-                np.array([86400000000000, 86400000000000, 259200000000000, "NaT"], dtype="timedelta64[ns]"),
+                np.array([172800000000000, 172800000000000, 345600000000000, "NaT"], dtype="timedelta64[ns]"),
                 index=wrapper.columns,
             ).rename("max_duration"),
         )
         assert_series_equal(
             drawdowns_grouped.max_duration,
             pd.Series(
-                np.array([86400000000000, 259200000000000], dtype="timedelta64[ns]"),
+                np.array([172800000000000, 345600000000000], dtype="timedelta64[ns]"),
                 index=pd.Index(["g1", "g2"], dtype="object"),
             ).rename("max_duration"),
         )
@@ -4809,14 +4795,16 @@ class TestDrawdowns:
         )
 
     def test_coverage(self):
-        assert drawdowns["a"].coverage == 0.5
+        assert drawdowns["a"].coverage == 1.0
         assert_series_equal(
             drawdowns.coverage,
-            pd.Series(np.array([0.5, 0.3333333333333333, 0.5, np.nan]), index=ts2.columns).rename("coverage"),
+            pd.Series(np.array([1.0, 0.6666666666666666, 0.6666666666666666, np.nan]), index=ts2.columns).rename(
+                "coverage"
+            ),
         )
         assert_series_equal(
             drawdowns_grouped.coverage,
-            pd.Series(np.array([0.4166666666666667, 0.25]), index=pd.Index(["g1", "g2"], dtype="object")).rename(
+            pd.Series(np.array([0.5, 0.3333333333333333]), index=pd.Index(["g1", "g2"], dtype="object")).rename(
                 "coverage"
             ),
         )
@@ -4860,12 +4848,12 @@ class TestDrawdowns:
         assert drawdowns.status_active.wrapper == drawdowns.wrapper
         assert_records_close(
             drawdowns["a"].status_active.values,
-            np.array([(2, 0, 4, 5, 5, 5, 4.0, 1.0, 1.0, 0)], dtype=drawdown_dt),
+            np.array([(2, 0, 4, 5, 5, 4.0, 1.0, 1.0, 0)], dtype=drawdown_dt),
         )
         assert_records_close(drawdowns["a"].status_active.values, drawdowns.status_active["a"].values)
         assert_records_close(
             drawdowns.status_active.values,
-            np.array([(2, 0, 4, 5, 5, 5, 4.0, 1.0, 1.0, 0), (0, 2, 2, 3, 4, 5, 3.0, 1.0, 2.0, 0)], dtype=drawdown_dt),
+            np.array([(2, 0, 4, 5, 5, 4.0, 1.0, 1.0, 0), (0, 2, 2, 4, 5, 3.0, 1.0, 2.0, 0)], dtype=drawdown_dt),
         )
 
     def test_recovered_records(self):
@@ -4873,17 +4861,17 @@ class TestDrawdowns:
         assert drawdowns.status_recovered.wrapper == drawdowns.wrapper
         assert_records_close(
             drawdowns["a"].status_recovered.values,
-            np.array([(0, 0, 0, 1, 1, 2, 2.0, 1.0, 3.0, 1), (1, 0, 2, 3, 3, 4, 3.0, 1.0, 4.0, 1)], dtype=drawdown_dt),
+            np.array([(0, 0, 0, 1, 2, 2.0, 1.0, 3.0, 1), (1, 0, 2, 3, 4, 3.0, 1.0, 4.0, 1)], dtype=drawdown_dt),
         )
         assert_records_close(drawdowns["a"].status_recovered.values, drawdowns.status_recovered["a"].values)
         assert_records_close(
             drawdowns.status_recovered.values,
             np.array(
                 [
-                    (0, 0, 0, 1, 1, 2, 2.0, 1.0, 3.0, 1),
-                    (1, 0, 2, 3, 3, 4, 3.0, 1.0, 4.0, 1),
-                    (0, 1, 1, 2, 2, 3, 2.0, 1.0, 3.0, 1),
-                    (1, 1, 3, 4, 4, 5, 3.0, 1.0, 4.0, 1),
+                    (0, 0, 0, 1, 2, 2.0, 1.0, 3.0, 1),
+                    (1, 0, 2, 3, 4, 3.0, 1.0, 4.0, 1),
+                    (0, 1, 1, 2, 3, 2.0, 1.0, 3.0, 1),
+                    (1, 1, 3, 4, 5, 3.0, 1.0, 4.0, 1),
                 ],
                 dtype=drawdown_dt,
             ),
@@ -4909,11 +4897,11 @@ class TestDrawdowns:
         )
 
     def test_active_duration(self):
-        assert drawdowns["a"].active_duration == np.timedelta64(86400000000000)
+        assert drawdowns["a"].active_duration == pd.Timedelta("2 days 00:00:00")
         assert_series_equal(
             drawdowns.active_duration,
             pd.Series(
-                np.array([86400000000000, "NaT", 259200000000000, "NaT"], dtype="timedelta64[ns]"),
+                np.array([172800000000000, "NaT", 345600000000000, "NaT"], dtype="timedelta64[ns]"),
                 index=wrapper.columns,
             ).rename("active_duration"),
         )
@@ -5016,19 +5004,19 @@ class TestDrawdowns:
                     pd.Timestamp("2020-01-01 00:00:00"),
                     pd.Timestamp("2020-01-06 00:00:00"),
                     pd.Timedelta("6 days 00:00:00"),
-                    44.444444444444436,
+                    77.77777777777777,
                     1.5,
                     1.0,
                     0.5,
                     54.166666666666664,
-                    pd.Timedelta("2 days 00:00:00"),
+                    pd.Timedelta("3 days 00:00:00"),
                     25.0,
                     50.0,
                     pd.Timedelta("0 days 12:00:00"),
                     66.66666666666666,
                     58.33333333333333,
-                    pd.Timedelta("1 days 00:00:00"),
-                    pd.Timedelta("1 days 00:00:00"),
+                    pd.Timedelta("2 days 00:00:00"),
+                    pd.Timedelta("2 days 00:00:00"),
                     300.0,
                     250.0,
                     pd.Timedelta("1 days 00:00:00"),
@@ -5046,19 +5034,19 @@ class TestDrawdowns:
                     pd.Timestamp("2020-01-01 00:00:00"),
                     pd.Timestamp("2020-01-06 00:00:00"),
                     pd.Timedelta("6 days 00:00:00"),
-                    44.444444444444436,
+                    77.77777777777777,
                     1.5,
                     1.0,
                     0.5,
                     54.166666666666664,
-                    pd.Timedelta("2 days 00:00:00"),
+                    pd.Timedelta("3 days 00:00:00"),
                     25.0,
                     50.0,
                     pd.Timedelta("0 days 12:00:00"),
                     69.44444444444444,
                     62.962962962962955,
-                    pd.Timedelta("1 days 16:00:00"),
-                    pd.Timedelta("1 days 16:00:00"),
+                    pd.Timedelta("2 days 16:00:00"),
+                    pd.Timedelta("2 days 16:00:00"),
                     300.0,
                     250.0,
                     pd.Timedelta("1 days 00:00:00"),
@@ -5076,19 +5064,19 @@ class TestDrawdowns:
                     pd.Timestamp("2020-01-01 00:00:00"),
                     pd.Timestamp("2020-01-06 00:00:00"),
                     pd.Timedelta("6 days 00:00:00"),
-                    50.0,
+                    100.0,
                     3,
                     2,
                     1,
                     75.0,
-                    pd.Timedelta("1 days 00:00:00"),
+                    pd.Timedelta("2 days 00:00:00"),
                     0.0,
                     0.0,
                     pd.Timedelta("0 days 00:00:00"),
                     66.66666666666666,
                     58.33333333333333,
-                    pd.Timedelta("1 days 00:00:00"),
-                    pd.Timedelta("1 days 00:00:00"),
+                    pd.Timedelta("2 days 00:00:00"),
+                    pd.Timedelta("2 days 00:00:00"),
                     300.0,
                     250.0,
                     pd.Timedelta("1 days 00:00:00"),
@@ -5106,14 +5094,14 @@ class TestDrawdowns:
                     pd.Timestamp("2020-01-01 00:00:00"),
                     pd.Timestamp("2020-01-06 00:00:00"),
                     pd.Timedelta("6 days 00:00:00"),
-                    41.66666666666667,
+                    50.0,
                     5,
                     4,
                     1,
                     66.66666666666666,
                     58.33333333333333,
-                    pd.Timedelta("1 days 00:00:00"),
-                    pd.Timedelta("1 days 00:00:00"),
+                    pd.Timedelta("2 days 00:00:00"),
+                    pd.Timedelta("2 days 00:00:00"),
                     300.0,
                     250.0,
                     pd.Timedelta("1 days 00:00:00"),
@@ -5156,7 +5144,7 @@ class TestDrawdowns:
     def test_resample(self):
         np.testing.assert_array_equal(
             drawdowns.resample("1h").start_idx.values,
-            np.array([24, 72, 120, 48, 96, 72]),
+            np.array([0, 48, 96, 24, 72, 48]),
         )
         np.testing.assert_array_equal(
             drawdowns.resample("1h").end_idx.values,
@@ -5164,7 +5152,7 @@ class TestDrawdowns:
         )
         np.testing.assert_array_equal(
             drawdowns.resample("10h").start_idx.values,
-            np.array([2, 7, 12, 4, 9, 7]),
+            np.array([0, 4, 9, 2, 7, 4]),
         )
         np.testing.assert_array_equal(
             drawdowns.resample("10h").end_idx.values,
@@ -5172,7 +5160,7 @@ class TestDrawdowns:
         )
         np.testing.assert_array_equal(
             drawdowns.resample("3d").start_idx.values,
-            np.array([0, 1, 1, 0, 1, 1]),
+            np.array([0, 0, 1, 0, 1, 0]),
         )
         np.testing.assert_array_equal(
             drawdowns.resample("3d").end_idx.values,

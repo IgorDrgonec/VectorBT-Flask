@@ -781,9 +781,9 @@ def fill_drawdown_record_nb(
     counts: tp.Array2d,
     i: int,
     col: int,
-    peak_idx: int,
+    start_idx: int,
     valley_idx: int,
-    peak_val: float,
+    start_val: float,
     valley_val: float,
     end_val: float,
     status: int,
@@ -792,11 +792,10 @@ def fill_drawdown_record_nb(
     r = counts[col]
     new_records["id"][r, col] = r
     new_records["col"][r, col] = col
-    new_records["peak_idx"][r, col] = peak_idx
-    new_records["start_idx"][r, col] = peak_idx + 1
+    new_records["start_idx"][r, col] = start_idx
     new_records["valley_idx"][r, col] = valley_idx
     new_records["end_idx"][r, col] = i
-    new_records["peak_val"][r, col] = peak_val
+    new_records["start_val"][r, col] = start_val
     new_records["valley_val"][r, col] = valley_val
     new_records["end_val"][r, col] = end_val
     new_records["status"][r, col] = status
@@ -841,15 +840,15 @@ def get_drawdowns_nb(
         >>> records = get_drawdowns_nb(None, None, None, close)
 
         >>> pd.DataFrame.from_records(records)
-           id  col  peak_idx  start_idx  valley_idx  end_idx  peak_val  valley_val  \\
-        0   0    1         0          1           4        4       5.0         1.0
-        1   0    2         2          3           4        4       3.0         1.0
-        2   0    3         0          1           2        4       3.0         1.0
+           id  col  start_idx  valley_idx  end_idx  start_val  valley_val  end_val  \\
+        0   0    1          0           4        4        5.0         1.0      1.0
+        1   0    2          2           4        4        3.0         1.0      1.0
+        2   0    3          0           2        4        3.0         1.0      3.0
 
-           end_val  status
-        0      1.0       0
-        1      1.0       0
-        2      3.0       1
+           status
+        0       0
+        1       0
+        2       1
         ```
     """
     new_records = np.empty(close.shape, dtype=drawdown_dt)
@@ -862,9 +861,9 @@ def get_drawdowns_nb(
             _open = np.nan
         else:
             _open = open[0, col]
-        peak_idx = 0
+        start_idx = 0
         valley_idx = 0
-        peak_val = _open
+        start_val = _open
         valley_val = _open
 
         for i in range(close.shape[0]):
@@ -897,52 +896,52 @@ def get_drawdowns_nb(
                     _low = min(_open, _close)
 
             if drawdown_started:
-                if _open >= peak_val:
+                if _open >= start_val:
                     drawdown_started = False
                     fill_drawdown_record_nb(
                         new_records=new_records,
                         counts=counts,
                         i=i,
                         col=col,
-                        peak_idx=peak_idx,
+                        start_idx=start_idx,
                         valley_idx=valley_idx,
-                        peak_val=peak_val,
+                        start_val=start_val,
                         valley_val=valley_val,
                         end_val=_open,
                         status=DrawdownStatus.Recovered,
                     )
-                    peak_idx = i
+                    start_idx = i
                     valley_idx = i
-                    peak_val = _open
+                    start_val = _open
                     valley_val = _open
 
             if drawdown_started:
                 if _low < valley_val:
                     valley_idx = i
                     valley_val = _low
-                if _high >= peak_val:
+                if _high >= start_val:
                     drawdown_started = False
                     fill_drawdown_record_nb(
                         new_records=new_records,
                         counts=counts,
                         i=i,
                         col=col,
-                        peak_idx=peak_idx,
+                        start_idx=start_idx,
                         valley_idx=valley_idx,
-                        peak_val=peak_val,
+                        start_val=start_val,
                         valley_val=valley_val,
                         end_val=_high,
                         status=DrawdownStatus.Recovered,
                     )
-                    peak_idx = i
+                    start_idx = i
                     valley_idx = i
-                    peak_val = _high
+                    start_val = _high
                     valley_val = _high
             else:
-                if np.isnan(peak_val) or _high >= peak_val:
-                    peak_idx = i
+                if np.isnan(start_val) or _high >= start_val:
+                    start_idx = i
                     valley_idx = i
-                    peak_val = _high
+                    start_val = _high
                     valley_val = _high
                 elif _low < valley_val:
                     if not np.isnan(valley_val):
@@ -958,9 +957,9 @@ def get_drawdowns_nb(
                         counts=counts,
                         i=i,
                         col=col,
-                        peak_idx=peak_idx,
+                        start_idx=start_idx,
                         valley_idx=valley_idx,
-                        peak_val=peak_val,
+                        start_val=start_val,
                         valley_val=valley_val,
                         end_val=_close,
                         status=DrawdownStatus.Active,
@@ -970,19 +969,19 @@ def get_drawdowns_nb(
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query="peak_val_arr", axis=0),
-    arg_take_spec=dict(peak_val_arr=ch.ArraySlicer(axis=0), valley_val_arr=ch.ArraySlicer(axis=0)),
+    size=ch.ArraySizer(arg_query="start_val_arr", axis=0),
+    arg_take_spec=dict(start_val_arr=ch.ArraySlicer(axis=0), valley_val_arr=ch.ArraySlicer(axis=0)),
     merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def dd_drawdown_nb(peak_val_arr: tp.Array1d, valley_val_arr: tp.Array1d) -> tp.Array1d:
+def dd_drawdown_nb(start_val_arr: tp.Array1d, valley_val_arr: tp.Array1d) -> tp.Array1d:
     """Compute the drawdown of each drawdown record."""
     out = np.empty(valley_val_arr.shape[0], dtype=np.float_)
     for r in prange(valley_val_arr.shape[0]):
-        if peak_val_arr[r] == 0:
+        if start_val_arr[r] == 0:
             out[r] = np.nan
         else:
-            out[r] = (valley_val_arr[r] - peak_val_arr[r]) / peak_val_arr[r]
+            out[r] = (valley_val_arr[r] - start_val_arr[r]) / start_val_arr[r]
     return out
 
 
@@ -996,7 +995,7 @@ def dd_decline_duration_nb(start_idx_arr: tp.Array1d, valley_idx_arr: tp.Array1d
     """Compute the duration of the peak-to-valley phase of each drawdown record."""
     out = np.empty(valley_idx_arr.shape[0], dtype=np.float_)
     for r in prange(valley_idx_arr.shape[0]):
-        out[r] = valley_idx_arr[r] - start_idx_arr[r] + 1
+        out[r] = valley_idx_arr[r] - start_idx_arr[r]
     return out
 
 
@@ -1032,10 +1031,10 @@ def dd_recovery_duration_ratio_nb(
     """Compute the ratio of the recovery duration to the decline duration of each drawdown record."""
     out = np.empty(start_idx_arr.shape[0], dtype=np.float_)
     for r in prange(start_idx_arr.shape[0]):
-        if valley_idx_arr[r] - start_idx_arr[r] + 1 == 0:
+        if valley_idx_arr[r] - start_idx_arr[r] == 0:
             out[r] = np.nan
         else:
-            out[r] = (end_idx_arr[r] - valley_idx_arr[r]) / (valley_idx_arr[r] - start_idx_arr[r] + 1)
+            out[r] = (end_idx_arr[r] - valley_idx_arr[r]) / (valley_idx_arr[r] - start_idx_arr[r])
     return out
 
 

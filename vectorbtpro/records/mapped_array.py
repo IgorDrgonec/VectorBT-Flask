@@ -816,6 +816,11 @@ class MappedArray(Analyzable):
         columns.append(values)
         return pd.concat(columns, axis=1)
 
+    @property
+    def mapped_readable(self) -> tp.SeriesFrame:
+        """`MappedArray.to_readable` with default arguments."""
+        return self.to_readable()
+
     def __len__(self) -> int:
         return len(self.values)
 

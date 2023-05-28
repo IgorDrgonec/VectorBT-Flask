@@ -14,12 +14,13 @@ Using `Drawdowns.from_price`, you can generate drawdown records for any time ser
 ```pycon
 >>> import numpy as np
 >>> import pandas as pd
->>> from datetime import datetime, timedelta
 >>> import vectorbtpro as vbt
 
->>> start = '2019-10-01 UTC'  # crypto is in UTC
->>> end = '2020-01-01 UTC'
->>> price = vbt.YFData.fetch('BTC-USD', start=start, end=end).get('Close')
+>>> price = vbt.YFData.fetch(
+...     "BTC-USD",
+...     start="2019-10 UTC",
+...     end="2020-01 UTC"
+... ).get('Close')
 ```
 
 [=100% "100%"]{: .candystripe}
@@ -30,20 +31,15 @@ Using `Drawdowns.from_price`, you can generate drawdown records for any time ser
 >>> drawdowns = vbt.Drawdowns.from_price(price, wrapper_kwargs=dict(freq='d'))
 
 >>> drawdowns.records_readable
-   Drawdown Id  Column            Peak Timestamp           Start Timestamp  \\
-0            0       0 2019-10-02 00:00:00+00:00 2019-10-03 00:00:00+00:00
-1            1       0 2019-10-09 00:00:00+00:00 2019-10-10 00:00:00+00:00
-2            2       0 2019-10-27 00:00:00+00:00 2019-10-28 00:00:00+00:00
+   Drawdown Id  Column               Start Index              Valley Index  \\
+0            0       0 2019-10-02 00:00:00+00:00 2019-10-06 00:00:00+00:00
+1            1       0 2019-10-09 00:00:00+00:00 2019-10-24 00:00:00+00:00
+2            2       0 2019-10-27 00:00:00+00:00 2019-12-17 00:00:00+00:00
 
-           Valley Timestamp             End Timestamp   Peak Value  \\
-0 2019-10-06 00:00:00+00:00 2019-10-09 00:00:00+00:00  8393.041992
-1 2019-10-24 00:00:00+00:00 2019-10-25 00:00:00+00:00  8595.740234
-2 2019-12-17 00:00:00+00:00 2020-01-01 00:00:00+00:00  9551.714844
-
-   Valley Value    End Value     Status
-0   7988.155762  8393.041992  Recovered
-1   7493.488770  8595.740234  Recovered
-2   6640.515137  7200.174316     Active
+                  End Index   Peak Value  Valley Value    End Value     Status
+0 2019-10-09 00:00:00+00:00  8393.041992   7988.155762  8595.740234  Recovered
+1 2019-10-25 00:00:00+00:00  8595.740234   7493.488770  8660.700195  Recovered
+2 2019-12-31 00:00:00+00:00  9551.714844   6640.515137  7193.599121     Active
 
 >>> drawdowns.duration.max(wrap_kwargs=dict(to_timedelta=True))
 Timedelta('66 days 00:00:00')
@@ -56,7 +52,7 @@ Moreover, all generic accessors have a property `drawdowns` and a method `get_dr
 ```pycon
 >>> # vectorbtpro.generic.accessors.GenericAccessor.drawdowns.coverage
 >>> price.vbt.drawdowns.coverage
-0.9354838709677419
+0.967391304347826
 ```
 
 ## Stats
@@ -76,19 +72,19 @@ Moreover, all generic accessors have a property `drawdowns` and a method `get_dr
 Start                                        0
 End                                          4
 Period                         5 days 00:00:00
-Coverage [%]                              40.0
+Coverage [%]                              80.0
 Total Records                                2
 Total Recovered Drawdowns                    1
 Total Active Drawdowns                       1
 Active Drawdown [%]                  33.333333
-Active Duration                1 days 00:00:00
+Active Duration                2 days 00:00:00
 Active Recovery [%]                        0.0
 Active Recovery Return [%]                 0.0
 Active Recovery Duration       0 days 00:00:00
 Max Drawdown [%]                          50.0
 Avg Drawdown [%]                          50.0
-Max Drawdown Duration          1 days 00:00:00
-Avg Drawdown Duration          1 days 00:00:00
+Max Drawdown Duration          2 days 00:00:00
+Avg Drawdown Duration          2 days 00:00:00
 Max Recovery Return [%]                  200.0
 Avg Recovery Return [%]                  200.0
 Max Recovery Duration          1 days 00:00:00
@@ -105,19 +101,19 @@ not include active drawdowns. To change that, pass `incl_active=True`:
 Start                                        0
 End                                          4
 Period                         5 days 00:00:00
-Coverage [%]                              40.0
+Coverage [%]                              80.0
 Total Records                                2
 Total Recovered Drawdowns                    1
 Total Active Drawdowns                       1
 Active Drawdown [%]                  33.333333
-Active Duration                1 days 00:00:00
+Active Duration                2 days 00:00:00
 Active Recovery [%]                        0.0
 Active Recovery Return [%]                 0.0
 Active Recovery Duration       0 days 00:00:00
 Max Drawdown [%]                          50.0
 Avg Drawdown [%]                     41.666667
-Max Drawdown Duration          1 days 00:00:00
-Avg Drawdown Duration          1 days 00:00:00
+Max Drawdown Duration          2 days 00:00:00
+Avg Drawdown Duration          2 days 00:00:00
 Max Recovery Return [%]                  200.0
 Avg Recovery Return [%]                  200.0
 Max Recovery Duration          1 days 00:00:00
@@ -139,14 +135,14 @@ UserWarning: Metric 'active_recovery_duration' does not support grouped data
 Start                                        0
 End                                          4
 Period                         5 days 00:00:00
-Coverage [%]                              40.0
+Coverage [%]                              80.0
 Total Records                                2
 Total Recovered Drawdowns                    1
 Total Active Drawdowns                       1
 Max Drawdown [%]                          50.0
 Avg Drawdown [%]                          50.0
-Max Drawdown Duration          1 days 00:00:00
-Avg Drawdown Duration          1 days 00:00:00
+Max Drawdown Duration          2 days 00:00:00
+Avg Drawdown Duration          2 days 00:00:00
 Max Recovery Return [%]                  200.0
 Avg Recovery Return [%]                  200.0
 Max Recovery Duration          1 days 00:00:00
@@ -197,10 +193,9 @@ dd_field_config = ReadonlyConfig(
         dtype=drawdown_dt,
         settings=dict(
             id=dict(title="Drawdown Id"),
-            peak_idx=dict(title="Peak Index", mapping="index"),
             valley_idx=dict(title="Valley Index", mapping="index"),
-            peak_val=dict(
-                title="Peak Value",
+            start_val=dict(
+                title="Start Value",
             ),
             valley_val=dict(
                 title="Valley Value",
@@ -323,7 +318,7 @@ class Drawdowns(Ranges):
         new_records_arr = np.empty(self.values.shape, dtype=range_dt)
         new_records_arr["id"][:] = self.get_field_arr("id").copy()
         new_records_arr["col"][:] = self.get_field_arr("col").copy()
-        new_records_arr["start_idx"][:] = self.get_field_arr("peak_idx").copy()
+        new_records_arr["start_idx"][:] = self.get_field_arr("start_idx").copy()
         new_records_arr["end_idx"][:] = self.get_field_arr("end_idx").copy()
         new_records_arr["status"][:] = self.get_field_arr("status").copy()
         return Ranges.from_records(
@@ -341,7 +336,7 @@ class Drawdowns(Ranges):
         new_records_arr = np.empty(self.values.shape, dtype=range_dt)
         new_records_arr["id"][:] = self.get_field_arr("id").copy()
         new_records_arr["col"][:] = self.get_field_arr("col").copy()
-        new_records_arr["start_idx"][:] = self.get_field_arr("peak_idx").copy()
+        new_records_arr["start_idx"][:] = self.get_field_arr("start_idx").copy()
         new_records_arr["end_idx"][:] = self.get_field_arr("valley_idx").copy()
         new_records_arr["status"][:] = self.get_field_arr("status").copy()
         return Ranges.from_records(
@@ -380,7 +375,7 @@ class Drawdowns(Ranges):
         Takes into account both recovered and active drawdowns."""
         func = jit_reg.resolve_option(nb.dd_drawdown_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        drawdown = func(self.get_field_arr("peak_val"), self.get_field_arr("valley_val"))
+        drawdown = func(self.get_field_arr("start_val"), self.get_field_arr("valley_val"))
         return self.map_array(drawdown, **kwargs)
 
     def get_avg_drawdown(
@@ -534,8 +529,8 @@ class Drawdowns(Ranges):
         wrap_kwargs = merge_dicts(dict(name_or_index="active_drawdown"), wrap_kwargs)
         active = self.status_active
         curr_end_val = active.end_val.nth(-1, group_by=group_by, jitted=jitted, chunked=chunked)
-        curr_peak_val = active.peak_val.nth(-1, group_by=group_by, jitted=jitted, chunked=chunked)
-        curr_drawdown = (curr_end_val - curr_peak_val) / curr_peak_val
+        curr_start_val = active.start_val.nth(-1, group_by=group_by, jitted=jitted, chunked=chunked)
+        curr_drawdown = (curr_end_val - curr_start_val) / curr_start_val
         return self.wrapper.wrap_reduced(curr_drawdown, group_by=group_by, **wrap_kwargs)
 
     def get_active_duration(
@@ -575,10 +570,10 @@ class Drawdowns(Ranges):
             raise ValueError("Grouping is not supported by this method")
         wrap_kwargs = merge_dicts(dict(name_or_index="active_recovery"), wrap_kwargs)
         active = self.status_active
-        curr_peak_val = active.peak_val.nth(-1, group_by=group_by, jitted=jitted, chunked=chunked)
+        curr_start_val = active.start_val.nth(-1, group_by=group_by, jitted=jitted, chunked=chunked)
         curr_end_val = active.end_val.nth(-1, group_by=group_by, jitted=jitted, chunked=chunked)
         curr_valley_val = active.valley_val.nth(-1, group_by=group_by, jitted=jitted, chunked=chunked)
-        curr_recovery = (curr_end_val - curr_valley_val) / (curr_peak_val - curr_valley_val)
+        curr_recovery = (curr_end_val - curr_valley_val) / (curr_start_val - curr_valley_val)
         return self.wrapper.wrap_reduced(curr_recovery, group_by=group_by, **wrap_kwargs)
 
     def get_active_recovery_return(
@@ -905,11 +900,11 @@ class Drawdowns(Ranges):
         if self_col.count() > 0:
             # Extract information
             id_ = self_col.get_field_arr("id")
-            peak_idx = self_col.get_map_field_to_index("peak_idx")
+            start_idx = self_col.get_map_field_to_index("start_idx")
             if not plotting_ohlc and self_col._close is not None:
-                peak_val = self_col.close.loc[peak_idx]
+                start_val = self_col.close.loc[start_idx]
             else:
-                peak_val = self_col.get_field_arr("peak_val")
+                start_val = self_col.get_field_arr("start_val")
             valley_idx = self_col.get_map_field_to_index("valley_idx")
             if not plotting_ohlc and self_col._close is not None:
                 valley_val = self_col.close.loc[valley_idx]
@@ -941,17 +936,17 @@ class Drawdowns(Ranges):
             ).astype(str))
 
             # Peak and recovery at same time -> recovery wins
-            peak_mask = (peak_val != np.roll(end_val, 1)) | (peak_idx != np.roll(end_idx, 1))
+            peak_mask = (start_val != np.roll(end_val, 1)) | (start_idx != np.roll(end_idx, 1))
             if peak_mask.any():
                 if plot_markers:
                     # Plot peak markers
                     peak_customdata, peak_hovertemplate = self_col.prepare_customdata(
-                        incl_fields=["id", "peak_idx", "peak_val"], mask=peak_mask
+                        incl_fields=["id", "start_idx", "start_val"], mask=peak_mask
                     )
                     _peak_trace_kwargs = merge_dicts(
                         dict(
-                            x=peak_idx[peak_mask],
-                            y=peak_val[peak_mask],
+                            x=start_idx[peak_mask],
+                            y=start_val[peak_mask],
                             mode="markers",
                             marker=dict(
                                 symbol="diamond",
@@ -1079,7 +1074,7 @@ class Drawdowns(Ranges):
                     plot_close=False,
                     shape_kwargs=merge_dicts(
                         dict(
-                            x0=RepFunc(lambda i: peak_idx[recovered_mask][i]),
+                            x0=RepFunc(lambda i: start_idx[recovered_mask][i]),
                             x1=RepFunc(lambda i: valley_idx[recovered_mask][i]),
                             fillcolor=plotting_cfg["contrast_color_schema"]["red"],
                         ),
@@ -1115,7 +1110,7 @@ class Drawdowns(Ranges):
                     plot_close=False,
                     shape_kwargs=merge_dicts(
                         dict(
-                            x0=RepFunc(lambda i: peak_idx[active_mask][i]),
+                            x0=RepFunc(lambda i: start_idx[active_mask][i]),
                             x1=RepFunc(lambda i: end_idx[active_mask][i]),
                             fillcolor=plotting_cfg["contrast_color_schema"]["orange"],
                         ),
