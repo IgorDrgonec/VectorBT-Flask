@@ -238,7 +238,7 @@ __pdoc__[
 dd_shortcut_config = ReadonlyConfig(
     dict(
         ranges=dict(),
-        drawdown_ranges=dict(),
+        decline_ranges=dict(),
         recovery_ranges=dict(),
         drawdown=dict(obj_type="mapped_array"),
         avg_drawdown=dict(obj_type="red_array"),
@@ -336,7 +336,7 @@ class Drawdowns(Ranges):
             **kwargs,
         )
 
-    def get_drawdown_ranges(self, **kwargs) -> Ranges:
+    def get_decline_ranges(self, **kwargs) -> Ranges:
         """Get records of type `vectorbtpro.generic.ranges.Ranges` for peak-to-valley ranges."""
         new_records_arr = np.empty(self.values.shape, dtype=range_dt)
         new_records_arr["id"][:] = self.get_field_arr("id").copy()
