@@ -7,6 +7,7 @@ They perform operations on index objects, such as stacking, combining, and clean
 !!! note
     "Index" in pandas context is referred to both index and columns."""
 
+import attr
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -17,11 +18,20 @@ from vectorbtpro.registries.jit_registry import jit_reg, register_jitted
 from vectorbtpro.utils import checks
 
 __all__ = [
+    "ExceptLevel",
     "repeat_index",
     "tile_index",
     "stack_indexes",
     "combine_indexes",
 ]
+
+
+@attr.s(frozen=True)
+class ExceptLevel:
+    """Class for grouping except one or more levels."""
+
+    value: tp.MaybeLevelSequence = attr.ib()
+    """One or more level positions or names."""
 
 
 def to_any_index(index_like: tp.IndexLike) -> tp.Index:
@@ -224,7 +234,7 @@ def combine_index_with_keys(index: tp.IndexLike, keys: tp.IndexLike, lens: tp.Se
     new_keys = None
     start_idx = 0
     for i in range(len(keys)):
-        _index = index[start_idx:start_idx + lens[i]]
+        _index = index[start_idx : start_idx + lens[i]]
         if new_index is None:
             new_index = _index
         else:
@@ -247,7 +257,7 @@ def concat_indexes(
     axis: int = 1,
 ) -> tp.Index:
     """Concatenate indexes.
-    
+
     The following index concatenation methods are supported:
 
     * 'append': append one index to another
@@ -399,55 +409,150 @@ def concat_indexes(
                     for index in indexes:
                         if len_sum > 0:
                             prev_index = new_index[:len_sum]
-                            this_index = new_index[len_sum:len_sum + len(index)]
+                            this_index = new_index[len_sum : len_sum + len(index)]
                             if len(prev_index.intersection(this_index)) > 0:
                                 raise ValueError("Concatenated groups contain duplicates")
                         len_sum += len(index)
     return new_index
 
 
-def drop_levels(index: tp.Index, levels: tp.MaybeLevelSequence, strict: bool = True) -> tp.Index:
-    """Drop `levels` in `index` by their name/position."""
-    if not isinstance(index, pd.MultiIndex):
-        return index
-    if strict:
-        return index.droplevel(levels)
+def drop_levels(
+    index: tp.Index,
+    levels: tp.Union[ExceptLevel, tp.MaybeLevelSequence],
+    strict: bool = True,
+) -> tp.Index:
+    """Drop `levels` in `index` by their name(s)/position(s).
 
+    Provide `levels` as an instance of `ExceptLevel` to drop everything apart from the specified levels."""
+    if not isinstance(index, pd.MultiIndex):
+        if strict:
+            raise TypeError("Index must be a multi-index")
+        return index
+    if isinstance(levels, ExceptLevel):
+        levels = levels.value
+        except_mode = True
+    else:
+        except_mode = False
     levels_to_drop = set()
-    if isinstance(levels, (int, str)):
-        levels = (levels,)
+    if isinstance(levels, str) or not checks.is_sequence(levels):
+        levels = [levels]
+
     for level in levels:
         if level in index.names:
-            levels_to_drop.add(level)
-        elif isinstance(level, int) and 0 <= level < index.nlevels or level == -1:
-            levels_to_drop.add(level)
-    if len(levels_to_drop) < index.nlevels:
-        # Drop only if there will be some indexes left
-        return index.droplevel(list(levels_to_drop))
-    return index
+            for level_pos in [i for i, x in enumerate(index.names) if x == level]:
+                levels_to_drop.add(level_pos)
+        elif checks.is_int(level):
+            if level < 0:
+                new_level = index.nlevels + level
+                if new_level < 0:
+                    raise KeyError(f"Level {level} not found")
+                level = new_level
+            if 0 <= level < index.nlevels:
+                levels_to_drop.add(level)
+            else:
+                raise KeyError(f"Level {level} not found")
+        elif strict:
+            raise KeyError(f"Level {level} not found")
+    if except_mode:
+        levels_to_drop = set(range(index.nlevels)).difference(levels_to_drop)
+    if len(levels_to_drop) == 0:
+        if strict:
+            raise ValueError("No levels to drop")
+        return index
+    if len(levels_to_drop) >= index.nlevels:
+        if strict:
+            raise ValueError(
+                f"Cannot remove {len(levels_to_drop)} levels from an index with {index.nlevels} levels: "
+                "at least one level must be left"
+            )
+        return index
+    return index.droplevel(list(levels_to_drop))
 
 
-def rename_levels(index: tp.Index, name_dict: tp.Dict[str, tp.Any], strict: bool = True) -> tp.Index:
+def rename_levels(index: tp.Index, name_dict: tp.Dict[tp.Level, tp.Any], strict: bool = True) -> tp.Index:
     """Rename levels in `index` by `name_dict`."""
+    if isinstance(index, pd.MultiIndex):
+        nlevels = index.nlevels
+    else:
+        nlevels = 1
+
     for k, v in name_dict.items():
-        if isinstance(index, pd.MultiIndex):
-            if k in index.names:
+        if k in index.names:
+            if isinstance(index, pd.MultiIndex):
                 index = index.rename(v, level=k)
-            elif strict:
-                raise KeyError(f"Level '{k}' not found")
-        else:
-            if index.name == k:
-                index.name = v
-            elif strict:
-                raise KeyError(f"Level '{k}' not found")
+            else:
+                index = index.rename(v)
+        elif checks.is_int(k):
+            if k < 0:
+                new_k = nlevels + k
+                if new_k < 0:
+                    raise KeyError(f"Level {k} not found")
+                k = new_k
+            if 0 <= k < nlevels:
+                if isinstance(index, pd.MultiIndex):
+                    index = index.rename(v, level=k)
+                else:
+                    index = index.rename(v)
+            else:
+                raise KeyError(f"Level {k} not found")
+        elif strict:
+            raise KeyError(f"Level {k} not found")
     return index
 
 
-def select_levels(index: tp.Index, level_names: tp.MaybeLevelSequence) -> tp.Index:
-    """Build a new index by selecting one or multiple `level_names` from `index`."""
-    if isinstance(level_names, (int, str)):
-        return index.get_level_values(level_names)
-    levels = [index.get_level_values(level_name) for level_name in level_names]
+def select_levels(
+    index: tp.Index,
+    levels: tp.Union[ExceptLevel, tp.MaybeLevelSequence],
+    strict: bool = True,
+) -> tp.Index:
+    """Build a new index by selecting one or multiple `level_names` from `index`.
+
+    Provide `levels` as an instance of `ExceptLevel` to select everything apart from the specified levels."""
+    was_multiindex = True
+    if not isinstance(index, pd.MultiIndex):
+        was_multiindex = False
+        index = pd.MultiIndex.from_arrays([index])
+    if isinstance(levels, ExceptLevel):
+        levels = levels.value
+        except_mode = True
+    else:
+        except_mode = False
+    levels_to_select = list()
+    if isinstance(levels, str) or not checks.is_sequence(levels):
+        levels = [levels]
+        single_mode = True
+    else:
+        single_mode = False
+
+    for level in levels:
+        if level in index.names:
+            for level_pos in [i for i, x in enumerate(index.names) if x == level]:
+                if level_pos not in levels_to_select:
+                    levels_to_select.append(level_pos)
+        elif checks.is_int(level):
+            if level < 0:
+                new_level = index.nlevels + level
+                if new_level < 0:
+                    raise KeyError(f"Level {level} not found")
+                level = new_level
+            if 0 <= level < index.nlevels:
+                if level not in levels_to_select:
+                    levels_to_select.append(level)
+            else:
+                raise KeyError(f"Level {level} not found")
+        elif strict:
+            raise KeyError(f"Level {level} not found")
+    if except_mode:
+        levels_to_select = list(set(range(index.nlevels)).difference(levels_to_select))
+    if len(levels_to_select) == 0:
+        if strict:
+            raise ValueError("No levels to select")
+        if not was_multiindex:
+            return index.get_level_values(0)
+        return index
+    if len(levels_to_select) == 1 and single_mode:
+        return index.get_level_values(levels_to_select[0])
+    levels = [index.get_level_values(level) for level in levels_to_select]
     return pd.MultiIndex.from_arrays(levels)
 
 
@@ -462,7 +567,6 @@ def drop_redundant_levels(index: tp.Index) -> tp.Index:
             levels_to_drop.append(i)
         elif checks.is_default_index(index.get_level_values(i)):
             levels_to_drop.append(i)
-    # Remove redundant levels only if there are some non-redundant levels left
     if len(levels_to_drop) < index.nlevels:
         return index.droplevel(levels_to_drop)
     return index
@@ -524,7 +628,6 @@ def align_index_to(index1: tp.Index, index2: tp.Index, jitted: tp.JittedOption =
     if pd.Index.equals(index1, index2):
         return pd.IndexSlice[:]
 
-    # Build map between levels in first and second index
     mapper = {}
     for i in range(index1.nlevels):
         for j in range(index2.nlevels):
@@ -541,13 +644,17 @@ def align_index_to(index1: tp.Index, index2: tp.Index, jitted: tp.JittedOption =
     if len(mapper) == 0:
         raise ValueError("Can't find common levels to align both indexes")
 
-    # Factorize first to be accepted by Numba
     factorized = []
     for k, v in mapper.items():
         factorized.append(
-            pd.factorize(pd.concat((index1.get_level_values(k).to_series(), index2.get_level_values(v).to_series())))[
-                0
-            ],
+            pd.factorize(
+                pd.concat(
+                    (
+                        index1.get_level_values(k).to_series(),
+                        index2.get_level_values(v).to_series(),
+                    )
+                )
+            )[0],
         )
     stacked = np.transpose(np.stack(factorized))
     indices1 = stacked[: len(index1)]
@@ -555,14 +662,12 @@ def align_index_to(index1: tp.Index, index2: tp.Index, jitted: tp.JittedOption =
     if len(np.unique(indices1, axis=0)) != len(indices1):
         raise ValueError("Duplicated values in first index are not allowed")
 
-    # Try to tile
     if len(index2) % len(index1) == 0:
         tile_times = len(index2) // len(index1)
         index1_tiled = np.tile(indices1, (tile_times, 1))
         if np.array_equal(index1_tiled, indices2):
             return pd.IndexSlice[np.tile(np.arange(len(index1)), tile_times)]
 
-    # Do element-wise comparison
     unique_indices = np.unique(stacked, axis=0, return_inverse=True)[1]
     unique1 = unique_indices[: len(index1)]
     unique2 = unique_indices[len(index1) :]
@@ -623,7 +728,6 @@ def pick_levels(
 
     levels_left = list(range(index.nlevels))
 
-    # Pick optional levels
     _optional_levels = []
     for level in optional_levels:
         level_pos = None
@@ -638,7 +742,6 @@ def pick_levels(
             levels_left.remove(level_pos)
         _optional_levels.append(level_pos)
 
-    # Pick required levels
     _required_levels = []
     for level in required_levels:
         level_pos = None
@@ -669,3 +772,17 @@ def find_first_occurrence(index_value: tp.Any, index: tp.Index) -> int:
     elif isinstance(loc, np.ndarray):
         return np.flatnonzero(loc)[0]
     return loc
+
+
+def cross_indexes(*indexes: tp.MaybeTuple[tp.Index]) -> tp.List[tp.IndexSlice]:
+    """Build a Cartesian product of indexes.
+
+    Takes into account any levels they have in common.
+
+    Returns index slice for each index."""
+    if len(indexes) == 1:
+        indexes = indexes[0]
+    indexes = list(indexes)
+
+    common_levels = set()
+

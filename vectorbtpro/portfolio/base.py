@@ -21,7 +21,7 @@ from vectorbtpro.base.reshaping import (
 )
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.base.grouping.base import ExceptLevel
+from vectorbtpro.base.indexes import ExceptLevel
 from vectorbtpro.data.base import Data
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.analyzable import Analyzable

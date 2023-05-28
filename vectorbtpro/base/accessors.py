@@ -730,7 +730,7 @@ class BaseAccessor(Wrapping):
 
     def drop_levels(
         self,
-        levels: tp.MaybeLevelSequence,
+        levels: tp.Union[indexes.ExceptLevel, tp.MaybeLevelSequence],
         axis: tp.Optional[int] = None,
         copy_data: bool = False,
         strict: bool = True,
@@ -762,16 +762,17 @@ class BaseAccessor(Wrapping):
 
     def select_levels(
         self,
-        level_names: tp.MaybeLevelSequence,
+        level_names: tp.Union[indexes.ExceptLevel, tp.MaybeLevelSequence],
         axis: tp.Optional[int] = None,
         copy_data: bool = False,
+        strict: bool = True,
     ) -> tp.Optional[tp.SeriesFrame]:
         """See `vectorbtpro.base.indexes.select_levels`.
 
         See `BaseAccessor.apply_on_index` for other keyword arguments."""
 
         def apply_func(obj_index: tp.Index) -> tp.Index:
-            return indexes.select_levels(obj_index, level_names)
+            return indexes.select_levels(obj_index, level_names, strict=strict)
 
         return self.apply_on_index(apply_func, axis=axis, copy_data=copy_data)
 

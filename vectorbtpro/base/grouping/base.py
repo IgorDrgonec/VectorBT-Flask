@@ -7,8 +7,6 @@ the number of groups, the start indices of groups, and other information useful 
 operations that utilize grouping. It also allows to dynamically enable/disable/modify groups
 and checks whether a certain operation is permitted."""
 
-import attr
-
 import numpy as np
 import pandas as pd
 from pandas.core.groupby import GroupBy as PandasGroupBy
@@ -22,21 +20,13 @@ from vectorbtpro.utils.config import Configured
 from vectorbtpro.utils.decorators import cached_method
 from vectorbtpro.utils.template import CustomTemplate
 from vectorbtpro.base.grouping import nb
+from vectorbtpro.base.indexes import ExceptLevel
 
 __all__ = [
     "Grouper",
-    "ExceptLevel",
 ]
 
 GroupByT = tp.Union[None, bool, tp.Index]
-
-
-@attr.s(frozen=True)
-class ExceptLevel:
-    """Class for grouping except one or more levels."""
-
-    level: tp.MaybeLevelSequence = attr.ib()
-    """Level position or name."""
 
 
 def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike, def_lvl_name: tp.Hashable = "group") -> GroupByT:
@@ -49,28 +39,29 @@ def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike, def_lvl_name: t
     if isinstance(group_by, CustomTemplate):
         group_by = group_by.substitute(context=dict(index=index), strict=True, sub_id="group_by")
     if group_by is True:
-        group_by = pd.Index(["group"] * len(index), name=def_lvl_name)  # one group
-    elif isinstance(group_by, ExceptLevel):
-        except_levels = group_by.level
-        if isinstance(except_levels, (int, str)):
-            except_levels = [except_levels]
-        new_group_by = []
-        for i, name in enumerate(index.names):
-            if i not in except_levels and name not in except_levels:
-                new_group_by.append(name)
-        if len(new_group_by) == 0:
-            group_by = pd.Index(["group"] * len(index), name=def_lvl_name)
-        else:
-            if len(new_group_by) == 1:
-                new_group_by = new_group_by[0]
-            group_by = indexes.select_levels(index, new_group_by)
-    elif isinstance(group_by, (int, str)):
-        group_by = indexes.select_levels(index, group_by)
-    elif isinstance(group_by, (tuple, list)) and len(group_by) <= len(index.names):
-        try:
+        group_by = pd.Index(["group"] * len(index), name=def_lvl_name)
+    elif isinstance(index, pd.MultiIndex):
+        if isinstance(group_by, ExceptLevel):
+            except_levels = group_by.value
+            if isinstance(except_levels, (int, str)):
+                except_levels = [except_levels]
+            new_group_by = []
+            for i, name in enumerate(index.names):
+                if i not in except_levels and name not in except_levels:
+                    new_group_by.append(name)
+            if len(new_group_by) == 0:
+                group_by = pd.Index(["group"] * len(index), name=def_lvl_name)
+            else:
+                if len(new_group_by) == 1:
+                    new_group_by = new_group_by[0]
+                group_by = indexes.select_levels(index, new_group_by)
+        elif isinstance(group_by, (int, str)):
             group_by = indexes.select_levels(index, group_by)
-        except (IndexError, KeyError):
-            pass
+        elif isinstance(group_by, (tuple, list)) and len(group_by) <= len(index.names):
+            try:
+                group_by = indexes.select_levels(index, group_by)
+            except (IndexError, KeyError):
+                pass
     if not isinstance(group_by, pd.Index):
         group_by = pd.Index(group_by, name=def_lvl_name)
     if len(group_by) != len(index):

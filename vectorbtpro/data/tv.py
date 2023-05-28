@@ -106,8 +106,8 @@ class TVClient(Configured):
         """Chart session."""
         return self._chart_session
 
+    @staticmethod
     def auth(
-        self,
         username: tp.Optional[str] = None,
         password: tp.Optional[str] = None,
         user_agent: tp.Optional[str] = None,
