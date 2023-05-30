@@ -3,7 +3,6 @@
 """Classes for wrapping NumPy arrays into Series/DataFrames."""
 
 import warnings
-from functools import partial
 
 import numpy as np
 import pandas as pd
@@ -13,7 +12,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping
 from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.resampling.base import Resampler
-from vectorbtpro.base.indexing import IndexingError, PandasIndexer, index_dict, IdxSetter, IdxSetterFactory, IdxDict
+from vectorbtpro.base.indexing import IndexingError, ExtPandasIndexer, index_dict, IdxSetter, IdxSetterFactory, IdxDict
 from vectorbtpro.base.indexes import stack_indexes, concat_indexes
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
@@ -22,7 +21,6 @@ from vectorbtpro.utils.datetime_ import infer_index_freq, try_to_datetime_index
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method, cached_property
 from vectorbtpro.utils.array_ import is_range, cast_to_min_precision, cast_to_max_precision
-from vectorbtpro.utils.template import CustomTemplate
 
 if tp.TYPE_CHECKING:
     from vectorbtpro.base.accessors import BaseIDXAccessor as BaseIDXAccessorT
@@ -39,7 +37,7 @@ __all__ = [
 ArrayWrapperT = tp.TypeVar("ArrayWrapperT", bound="ArrayWrapper")
 
 
-class ArrayWrapper(Configured, PandasIndexer):
+class ArrayWrapper(Configured, ExtPandasIndexer):
     """Class that stores index, columns, and shape metadata for wrapping NumPy arrays.
     Tightly integrated with `vectorbtpro.base.grouping.base.Grouper` for grouping columns.
 
@@ -470,7 +468,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         elif not checks.is_index_equal(columns, grouper.index) or len(grouper_kwargs) > 0:
             grouper = grouper.replace(index=columns, **grouper_kwargs)
 
-        PandasIndexer.__init__(self)
+        ExtPandasIndexer.__init__(self)
         Configured.__init__(
             self,
             index=index,
@@ -1715,7 +1713,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 WrappingT = tp.TypeVar("WrappingT", bound="Wrapping")
 
 
-class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
+class Wrapping(Configured, ExtPandasIndexer, AttrResolverMixin):
     """Class that uses `ArrayWrapper` globally."""
 
     @classmethod
@@ -1797,7 +1795,7 @@ class Wrapping(Configured, PandasIndexer, AttrResolverMixin):
         self._wrapper = wrapper
 
         Configured.__init__(self, wrapper=wrapper, **kwargs)
-        PandasIndexer.__init__(self)
+        ExtPandasIndexer.__init__(self)
         AttrResolverMixin.__init__(self)
 
     def indexing_func(self: WrappingT, *args, **kwargs) -> WrappingT:

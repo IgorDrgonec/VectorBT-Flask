@@ -13,20 +13,14 @@ from pandas.tseries.frequencies import to_offset
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.template import CustomTemplate
-from vectorbtpro.utils.datetime_ import (
-    try_to_datetime_index,
-    try_align_to_dt_index,
-    try_align_dt_to_index,
-    time_to_timedelta,
-    infer_index_freq,
-    prepare_freq,
-)
+from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import hdict, merge_dicts
 from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.utils.mapping import to_field_mapping
 
 __all__ = [
     "PandasIndexer",
+    "ExtPandasIndexer",
     "hslice",
     "get_index_points",
     "get_index_ranges",
@@ -86,20 +80,34 @@ class LocBase:
         raise NotImplementedError
 
 
-class iLoc(LocBase):
+class pdLoc(LocBase):
+    """Forwards a Pandas-like indexing operation to each Series/DataFrame and returns a new class instance."""
+
+    @staticmethod
+    def pd_indexing_func(obj: tp.SeriesFrame, key: tp.Any) -> tp.MaybeSeriesFrame:
+        """Pandas-like indexing operation."""
+        raise NotImplementedError
+
+    def __getitem__(self, key: tp.Any) -> tp.Any:
+        return self.indexing_func(partial(self.pd_indexing_func, key=key), **self.indexing_kwargs)
+
+
+class iLoc(pdLoc):
     """Forwards `pd.Series.iloc`/`pd.DataFrame.iloc` operation to each
     Series/DataFrame and returns a new class instance."""
 
-    def __getitem__(self, key: tp.Any) -> tp.Any:
-        return self.indexing_func(lambda x: x.iloc.__getitem__(key), **self.indexing_kwargs)
+    @staticmethod
+    def pd_indexing_func(obj: tp.SeriesFrame, key: tp.Any) -> tp.MaybeSeriesFrame:
+        return obj.iloc.__getitem__(key)
 
 
-class Loc(LocBase):
+class Loc(pdLoc):
     """Forwards `pd.Series.loc`/`pd.DataFrame.loc` operation to each
     Series/DataFrame and returns a new class instance."""
 
-    def __getitem__(self, key: tp.Any) -> tp.Any:
-        return self.indexing_func(lambda x: x.loc.__getitem__(key), **self.indexing_kwargs)
+    @staticmethod
+    def pd_indexing_func(obj: tp.SeriesFrame, key: tp.Any) -> tp.MaybeSeriesFrame:
+        return obj.loc.__getitem__(key)
 
 
 PandasIndexerT = tp.TypeVar("PandasIndexerT", bound="PandasIndexer")
@@ -175,6 +183,44 @@ class PandasIndexer(IndexingBase):
 
     def __getitem__(self: PandasIndexerT, key: tp.Any) -> PandasIndexerT:
         return self.indexing_func(lambda x: x.__getitem__(key), **self.indexing_kwargs)
+
+
+class idxLoc(iLoc):
+    """Subclass of `iLoc` that transforms an `Idxr`-based operation with
+    `get_idxs` to an `iLoc` operation."""
+
+    @staticmethod
+    def pd_indexing_func(obj: tp.SeriesFrame, key: tp.Any) -> tp.MaybeSeriesFrame:
+        from vectorbtpro.base.indexes import get_index
+
+        if isinstance(key, tuple):
+            key = Idxr(*key)
+        index = get_index(obj, 0)
+        columns = get_index(obj, 1)
+        freq = dt.infer_index_freq(index)
+        row_idxs, col_idxs = get_idxs(key, index=index, columns=columns, freq=freq)
+        if isinstance(obj, pd.Series):
+            if not isinstance(col_idxs, (slice, hslice)) or (
+                col_idxs.start is not None or col_idxs.stop is not None or col_idxs.step is not None
+            ):
+                raise IndexingError("Too many indexers")
+            return obj.iloc.__getitem__(row_idxs)
+        return obj.iloc.__getitem__((row_idxs, col_idxs))
+
+
+class ExtPandasIndexer(PandasIndexer):
+    """Extension of `PandasIndexer` that also implements indexing using `idxloc`."""
+
+    def __init__(self, **kwargs) -> None:
+        self._idxloc = idxLoc(self.indexing_func, **kwargs)
+        PandasIndexer.__init__(self, **kwargs)
+
+    @property
+    def idxloc(self) -> idxLoc:
+        """`Idxr`-based indexing."""
+        return self._idxloc
+
+    idxloc.__doc__ = idxLoc.__doc__
 
 
 class ParamLoc(LocBase):
@@ -574,7 +620,7 @@ class DatetimeIdxr(UniIdxr):
             return slice(None, None, None)
         if index is None:
             raise ValueError("Index is required")
-        index = try_to_datetime_index(index)
+        index = dt.try_to_datetime_index(index)
         checks.assert_instance_of(index, pd.DatetimeIndex)
         if not index.is_unique:
             raise ValueError("Datetime index must be unique")
@@ -582,15 +628,15 @@ class DatetimeIdxr(UniIdxr):
             raise ValueError("Datetime index must be monotonically increasing")
 
         if isinstance(self.value, (slice, hslice)):
-            start = try_align_dt_to_index(self.value.start, index)
-            stop = try_align_dt_to_index(self.value.stop, index)
+            start = dt.try_align_dt_to_index(self.value.start, index)
+            stop = dt.try_align_dt_to_index(self.value.stop, index)
             new_value = slice(start, stop, self.value.step)
             idxs = self.slice_indexer(index, new_value, closed_end=self.closed_end)
         elif checks.is_sequence(self.value) and not np.isscalar(self.value):
-            new_value = try_align_to_dt_index(self.value, index)
+            new_value = dt.try_align_to_dt_index(self.value, index)
             idxs = index.get_indexer(new_value, method=self.indexer_method)
         else:
-            new_value = try_align_dt_to_index(self.value, index)
+            new_value = dt.try_align_dt_to_index(self.value, index)
             if self.indexer_method is None or new_value in index:
                 idxs = index.get_loc(new_value)
                 if isinstance(idxs, np.ndarray) and np.issubdtype(idxs.dtype, np.bool_):
@@ -599,132 +645,6 @@ class DatetimeIdxr(UniIdxr):
                 idxs = index.get_indexer([new_value], method=self.indexer_method)[0]
         self.check_idxs(idxs, check_minus_one=True)
         return idxs
-
-
-@attr.s(frozen=True)
-class AutoIdxr(UniIdxr):
-    """Class for resolving indices, labels, or datetime-like objects for one axis."""
-
-    value: tp.Union[
-        None,
-        tp.MaybeSequence[tp.MaybeSequence[int]],
-        tp.MaybeSequence[tp.Label],
-        tp.MaybeSequence[tp.DatetimeLike],
-        tp.Slice,
-    ] = attr.ib()
-    """One or more integer indices, datetime-like objects, or labels."""
-
-    closed_end: bool = attr.ib(default=_DEF)
-    """Whether `end` should be inclusive."""
-
-    indexer_method: tp.Optional[str] = attr.ib(default=_DEF)
-    """Method for `pd.Index.get_indexer`."""
-
-    level: tp.MaybeLevelSequence = attr.ib(default=None)
-    """One or more levels.
-    
-    If `level` is not None and `kind` is None, `kind` becomes "labels"."""
-
-    kind: tp.Optional[str] = attr.ib(default=None)
-    """Kind of value.
-
-    Allowed are
-    
-    * "positions" for `PosIdxr`, 
-    * "mask" for `MaskIdxr`, 
-    * "labels" for `LabelIdxr`, and 
-    * "datetime" for `DatetimeIdxr`.
-    
-    If None, will (try to) determine automatically based on the type of indices."""
-
-    def get(
-        self,
-        index: tp.Optional[tp.Index] = None,
-        freq: tp.Optional[tp.FrequencyLike] = None,
-    ) -> tp.MaybeIndexArray:
-        if self.value is None:
-            return slice(None, None, None)
-        kind = self.kind
-        if self.level is not None:
-            from vectorbtpro.base.indexes import select_levels
-
-            if index is None:
-                raise ValueError("Index is required")
-            index = select_levels(index, self.level)
-            if kind is None:
-                kind = "labels"
-
-        if kind is None:
-            if isinstance(self.value, (slice, hslice)):
-                if checks.is_int(self.value.start) or checks.is_int(self.value.stop):
-                    kind = "positions"
-                elif self.value.start is None and self.value.stop is None:
-                    kind = "positions"
-                else:
-                    if index is None:
-                        raise ValueError("Index is required")
-                    if isinstance(index, pd.DatetimeIndex):
-                        kind = "datetime"
-                    else:
-                        kind = "labels"
-            elif (checks.is_sequence(self.value) and not np.isscalar(self.value)) and (
-                index is None
-                or (
-                    not isinstance(index, pd.MultiIndex)
-                    or (isinstance(index, pd.MultiIndex) and isinstance(self.value[0], tuple))
-                )
-            ):
-                if checks.is_bool(self.value[0]):
-                    kind = "mask"
-                elif checks.is_int(self.value[0]):
-                    kind = "positions"
-                elif (
-                    (index is None or not isinstance(index, pd.MultiIndex) or not isinstance(self.value[0], tuple))
-                    and checks.is_sequence(self.value[0])
-                    and len(self.value[0]) == 2
-                    and checks.is_int(self.value[0][0])
-                    and checks.is_int(self.value[0][1])
-                ):
-                    kind = "positions"
-                else:
-                    if index is None:
-                        raise ValueError("Index is required")
-                    elif isinstance(index, pd.DatetimeIndex):
-                        kind = "datetime"
-                    else:
-                        kind = "labels"
-            else:
-                if checks.is_bool(self.value):
-                    kind = "mask"
-                elif checks.is_int(self.value):
-                    kind = "positions"
-                else:
-                    if index is None:
-                        raise ValueError("Index is required")
-                    if isinstance(index, pd.DatetimeIndex):
-                        kind = "datetime"
-                    else:
-                        kind = "labels"
-
-        if kind.lower() == "positions":
-            idx = PosIdxr(self.value)
-        elif kind.lower() == "mask":
-            idx = MaskIdxr(self.value)
-        elif kind.lower() == "labels":
-            idxr_kwargs = dict()
-            if self.closed_end is not _DEF:
-                idxr_kwargs["closed_end"] = self.closed_end
-            idx = LabelIdxr(self.value, **idxr_kwargs)
-        elif kind.lower() == "datetime":
-            idxr_kwargs = dict()
-            if self.closed_end is not _DEF:
-                idxr_kwargs["closed_end"] = self.closed_end
-            if self.indexer_method is not _DEF:
-                idxr_kwargs["indexer_method"] = self.indexer_method
-            idx = DatetimeIdxr(self.value, **idxr_kwargs)
-        else:
-            raise ValueError(f"Invalid option kind='{kind}'")
-        return idx.get(index=index, freq=freq)
 
 
 @attr.s(frozen=True)
@@ -901,13 +821,13 @@ def get_index_points(
         array([ 6, 13])
         ```
     """
-    index = try_to_datetime_index(index)
+    index = dt.try_to_datetime_index(index)
     if on is not None and isinstance(on, str):
-        on = try_align_dt_to_index(on, index)
+        on = dt.try_align_dt_to_index(on, index)
     if start is not None and isinstance(start, str):
-        start = try_align_dt_to_index(start, index)
+        start = dt.try_align_dt_to_index(start, index)
     if end is not None and isinstance(end, str):
-        end = try_align_dt_to_index(end, index)
+        end = dt.try_align_dt_to_index(end, index)
 
     start_used = False
     end_used = False
@@ -939,7 +859,7 @@ def get_index_points(
             on = pd.date_range(
                 start_date,
                 end_date,
-                freq=every,
+                freq=dt.parse_timedelta(every),
                 tz=index.tzinfo,
                 normalize=normalize_every,
             )
@@ -957,7 +877,7 @@ def get_index_points(
             else:
                 kind = "indices"
         else:
-            on = try_to_datetime_index(on)
+            on = dt.try_to_datetime_index(on)
             if on.is_integer():
                 kind = "indices"
             else:
@@ -972,12 +892,12 @@ def get_index_points(
                 on = index[0]
             else:
                 on = 0
-    on = try_to_datetime_index(on)
+    on = dt.try_to_datetime_index(on)
 
     if at_time is not None:
         checks.assert_instance_of(on, pd.DatetimeIndex)
         on = on.floor("D")
-        add_time_delta = time_to_timedelta(at_time)
+        add_time_delta = dt.time_to_timedelta(at_time)
         if indexer_tolerance is None:
             if indexer_method in ("pad", "ffill"):
                 indexer_tolerance = add_time_delta
@@ -990,7 +910,7 @@ def get_index_points(
 
     if add_delta is not None:
         if isinstance(add_delta, str):
-            add_delta = prepare_freq(add_delta)
+            add_delta = dt.prepare_freq(add_delta)
             try:
                 add_delta = to_offset(add_delta)
             except Exception as e:
@@ -998,7 +918,7 @@ def get_index_points(
         on += add_delta
 
     if kind.lower() == "labels":
-        on = try_align_to_dt_index(on, index)
+        on = dt.try_align_to_dt_index(on, index)
         index_points = index.get_indexer(on, method=indexer_method, tolerance=indexer_tolerance)
     else:
         index_points = np.asarray(on)
@@ -1359,14 +1279,14 @@ def get_index_ranges(
     from vectorbtpro.base.indexes import repeat_index
     from vectorbtpro.base.resampling.base import Resampler
 
-    index = try_to_datetime_index(index)
+    index = dt.try_to_datetime_index(index)
     if isinstance(index, pd.DatetimeIndex):
         if start is not None:
-            start = try_align_to_dt_index(start, index)
+            start = dt.try_align_to_dt_index(start, index)
             if isinstance(start, pd.DatetimeIndex):
                 start = start.tz_localize(None)
         if end is not None:
-            end = try_align_to_dt_index(end, index)
+            end = dt.try_align_to_dt_index(end, index)
             if isinstance(end, pd.DatetimeIndex):
                 end = end.tz_localize(None)
         naive_index = index.tz_localize(None)
@@ -1455,7 +1375,7 @@ def get_index_ranges(
                 new_index = pd.date_range(
                     start_date,
                     end_date,
-                    freq=every,
+                    freq=dt.parse_timedelta(every),
                     normalize=normalize_every,
                 )
                 if exact_start and new_index[0] > start_date:
@@ -1470,11 +1390,11 @@ def get_index_ranges(
                     end = new_index[1:]
             else:
                 if checks.is_int(lookback_period):
-                    lookback_period *= infer_index_freq(naive_index, freq=index_freq)
+                    lookback_period *= dt.infer_index_freq(naive_index, freq=index_freq)
                 end = pd.date_range(
                     start_date + lookback_period,
                     end_date,
-                    freq=every,
+                    freq=dt.parse_timedelta(every),
                     normalize=normalize_every,
                 )
                 start = end - lookback_period
@@ -1511,7 +1431,7 @@ def get_index_ranges(
                 start = pd.Index([0])
         else:
             if checks.is_int(lookback_period) and not end.is_integer():
-                lookback_period *= infer_index_freq(naive_index, freq=index_freq)
+                lookback_period *= dt.infer_index_freq(naive_index, freq=index_freq)
             start = end - lookback_period
     if len(start) == 1 and len(end) > 1:
         start = repeat_index(start, len(end))
@@ -1522,7 +1442,7 @@ def get_index_ranges(
     if start_time is not None:
         checks.assert_instance_of(start, pd.DatetimeIndex)
         start = start.floor("D")
-        add_start_time_delta = time_to_timedelta(start_time)
+        add_start_time_delta = dt.time_to_timedelta(start_time)
         if add_start_delta is None:
             add_start_delta = add_start_time_delta
         else:
@@ -1532,7 +1452,7 @@ def get_index_ranges(
     if end_time is not None:
         checks.assert_instance_of(end, pd.DatetimeIndex)
         end = end.floor("D")
-        add_end_time_delta = time_to_timedelta(end_time)
+        add_end_time_delta = dt.time_to_timedelta(end_time)
         if add_start_time_delta is not None:
             if add_end_time_delta < add_start_delta:
                 add_end_time_delta += pd.Timedelta(days=1)
@@ -1543,7 +1463,7 @@ def get_index_ranges(
 
     if add_start_delta is not None:
         if isinstance(add_start_delta, str):
-            add_start_delta = prepare_freq(add_start_delta)
+            add_start_delta = dt.prepare_freq(add_start_delta)
             try:
                 add_start_delta = to_offset(add_start_delta)
             except Exception as e:
@@ -1551,7 +1471,7 @@ def get_index_ranges(
         start += add_start_delta
     if add_end_delta is not None:
         if isinstance(add_end_delta, str):
-            add_end_delta = prepare_freq(add_end_delta)
+            add_end_delta = dt.prepare_freq(add_end_delta)
             try:
                 add_end_delta = to_offset(add_end_delta)
             except Exception as e:
@@ -1604,6 +1524,153 @@ def get_index_ranges(
         raise ValueError("Some start indices are equal to or higher than end indices")
 
     return range_starts, range_ends
+
+
+@attr.s(frozen=True)
+class AutoIdxr(UniIdxr):
+    """Class for resolving indices, datetime-like objects, frequency-like objects, and labels for one axis."""
+
+    value: tp.Union[
+        None,
+        tp.MaybeSequence[tp.MaybeSequence[int]],
+        tp.MaybeSequence[tp.Label],
+        tp.MaybeSequence[tp.DatetimeLike],
+        tp.FrequencyLike,
+        tp.Slice,
+    ] = attr.ib()
+    """One or more integer indices, datetime-like objects, frequency-like objects, or labels."""
+
+    closed_end: bool = attr.ib(default=_DEF)
+    """Whether `end` should be inclusive."""
+
+    indexer_method: tp.Optional[str] = attr.ib(default=_DEF)
+    """Method for `pd.Index.get_indexer`."""
+
+    level: tp.MaybeLevelSequence = attr.ib(default=None)
+    """One or more levels.
+
+    If `level` is not None and `kind` is None, `kind` becomes "labels"."""
+
+    kind: tp.Optional[str] = attr.ib(default=None)
+    """Kind of value.
+
+    Allowed are
+
+    * "positions" for `PosIdxr`
+    * "mask" for `MaskIdxr`
+    * "labels" for `LabelIdxr`
+    * "datetime" for `DatetimeIdxr`
+    * "frequency" for `PointIdxr`
+
+    If None, will (try to) determine automatically based on the type of indices."""
+
+    def get(
+        self,
+        index: tp.Optional[tp.Index] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+    ) -> tp.MaybeIndexArray:
+        if self.value is None:
+            return slice(None, None, None)
+        kind = self.kind
+        if self.level is not None:
+            from vectorbtpro.base.indexes import select_levels
+
+            if index is None:
+                raise ValueError("Index is required")
+            index = select_levels(index, self.level)
+            if kind is None:
+                kind = "labels"
+
+        if kind is None:
+            if isinstance(self.value, (slice, hslice)):
+                if checks.is_int(self.value.start) or checks.is_int(self.value.stop):
+                    kind = "positions"
+                elif self.value.start is None and self.value.stop is None:
+                    kind = "positions"
+                else:
+                    if index is None:
+                        raise ValueError("Index is required")
+                    if isinstance(index, pd.DatetimeIndex):
+                        kind = "datetime"
+                    else:
+                        kind = "labels"
+            elif (checks.is_sequence(self.value) and not np.isscalar(self.value)) and (
+                index is None
+                or (
+                    not isinstance(index, pd.MultiIndex)
+                    or (isinstance(index, pd.MultiIndex) and isinstance(self.value[0], tuple))
+                )
+            ):
+                if checks.is_bool(self.value[0]):
+                    kind = "mask"
+                elif checks.is_int(self.value[0]):
+                    kind = "positions"
+                elif (
+                    (index is None or not isinstance(index, pd.MultiIndex) or not isinstance(self.value[0], tuple))
+                    and checks.is_sequence(self.value[0])
+                    and len(self.value[0]) == 2
+                    and checks.is_int(self.value[0][0])
+                    and checks.is_int(self.value[0][1])
+                ):
+                    kind = "positions"
+                else:
+                    if index is None:
+                        raise ValueError("Index is required")
+                    elif isinstance(index, pd.DatetimeIndex):
+                        kind = "datetime"
+                    else:
+                        kind = "labels"
+            else:
+                if checks.is_bool(self.value):
+                    kind = "mask"
+                elif checks.is_int(self.value):
+                    kind = "positions"
+                else:
+                    if index is None:
+                        raise ValueError("Index is required")
+                    if isinstance(index, pd.DatetimeIndex):
+                        if isinstance(self.value, str):
+                            try:
+                                _ = dt.parse_timedelta(self.value)
+                                kind = "frequency"
+                            except Exception as e:
+                                try:
+                                    _ = dt.to_timestamp(self.value)
+                                    kind = "datetime"
+                                except Exception as e:
+                                    raise ValueError(f"'{self.value}' is neither a frequency nor a datetime")
+                        elif checks.is_frequency(self.value):
+                            kind = "frequency"
+                        else:
+                            kind = "datetime"
+                    else:
+                        kind = "labels"
+
+        if kind.lower() == "positions":
+            idx = PosIdxr(self.value)
+        elif kind.lower() == "mask":
+            idx = MaskIdxr(self.value)
+        elif kind.lower() == "labels":
+            idxr_kwargs = dict()
+            if self.closed_end is not _DEF:
+                idxr_kwargs["closed_end"] = self.closed_end
+            idx = LabelIdxr(self.value, **idxr_kwargs)
+        elif kind.lower() == "datetime":
+            idxr_kwargs = dict()
+            if self.closed_end is not _DEF:
+                idxr_kwargs["closed_end"] = self.closed_end
+            if self.indexer_method is not _DEF:
+                idxr_kwargs["indexer_method"] = self.indexer_method
+            idx = DatetimeIdxr(self.value, **idxr_kwargs)
+        elif kind.lower() == "frequency":
+            idxr_kwargs = dict()
+            if self.indexer_method is not _DEF:
+                idxr_kwargs["indexer_method"] = self.indexer_method
+            idxr_kwargs["skip_minus_one"] = False
+            idx = PointIdxr(every=self.value, **idxr_kwargs)
+        else:
+            raise ValueError(f"Invalid option kind='{kind}'")
+        return idx.get(index=index, freq=freq)
 
 
 @attr.s(frozen=True, init=False)

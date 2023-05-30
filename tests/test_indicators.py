@@ -2365,6 +2365,7 @@ class TestFactory:
             "__weakref__",
             "_config",
             "_expected_keys",
+            "_idxloc",
             "_iloc",
             "_in_out",
             "_in_output_names",
@@ -2421,6 +2422,7 @@ class TestFactory:
             "get_writeable_attrs",
             "getsize",
             "group_select",
+            "idxloc",
             "iloc",
             "in_out",
             "in_out_readable",
@@ -2722,8 +2724,7 @@ class TestFactory:
             vbt.IF.from_talib("MACD", fastperiod=2, slowperiod=3, signalperiod=4).run(ts["a"]).macdsignal,
         )
 
-        I = vbt.IndicatorFactory.from_expr(
-            """
+        I = vbt.IndicatorFactory.from_expr("""
         @settings({
             'factory_kwargs': {
                 'input_names': ['ts1', 'ts2'], 
@@ -2736,8 +2737,7 @@ class TestFactory:
         o1 = rolling_mean(ts1, window1)
         o2 = rolling_mean(ts2, window2)
         o1, o2
-        """
-        )
+        """)
         assert I.input_names == ("ts1", "ts2")
         assert I.param_names == ("window1", "window2")
         assert_frame_equal(I.run(ts, ts * 2).o3, ts.vbt.rolling_mean(2))
@@ -2763,8 +2763,7 @@ class TestFactory:
         assert I.param_names == ("window1", "window2")
         assert_frame_equal(I.run(ts, ts * 2).o1, ts.vbt.rolling_mean(2))
         assert_frame_equal(I.run(ts, ts * 2).o2, (ts * 2).vbt.rolling_mean(3))
-        I = vbt.IndicatorFactory.from_expr(
-            """
+        I = vbt.IndicatorFactory.from_expr("""
         @settings({
             'factory_kwargs': {
                 'input_names': ['ts1', 'ts2'], 
@@ -2783,8 +2782,7 @@ class TestFactory:
         o1 = rolling_mean(ts1, window1)
         o2 = rolling_mean(ts2, window2)
         o1, o2
-        """
-        )
+        """)
         assert I.input_names == ("ts1", "ts2")
         assert I.param_names == ("window1", "window2")
         assert_frame_equal(I.run(ts, ts * 2).o1, ts.vbt.rolling_mean(2))

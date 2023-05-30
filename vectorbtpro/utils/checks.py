@@ -60,6 +60,16 @@ def is_td_like(arg: tp.Any) -> bool:
     return is_td(arg) or is_number(arg) or isinstance(arg, str)
 
 
+def is_frequency(arg: tp.Any) -> bool:
+    """Check whether the argument is a frequency object."""
+    return is_td(arg) or isinstance(arg, pd.DateOffset)
+
+
+def is_frequency_like(arg: tp.Any) -> bool:
+    """Check whether the argument is a frequency-like object."""
+    return is_frequency(arg) or is_number(arg) or isinstance(arg, str)
+
+
 def is_dt(arg: tp.Any) -> bool:
     """Check whether the argument is a datetime object."""
     return isinstance(arg, (pd.Timestamp, datetime.datetime, np.datetime64))
