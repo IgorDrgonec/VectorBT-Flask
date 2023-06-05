@@ -60,6 +60,8 @@ def save_animation(
         delta (int): Window size of each iteration.
         step (int): Step of each iteration.
         fps (int): Frames per second.
+
+            Will be translated to `duration` by `1000 / fps`.
         writer_kwargs (dict): Keyword arguments passed to `imageio.get_writer`.
         show_progress (bool): Whether to show the progress bar.
         pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
@@ -73,6 +75,8 @@ def save_animation(
 
     if writer_kwargs is None:
         writer_kwargs = {}
+    if "duration" not in writer_kwargs:
+        writer_kwargs["duration"] = 1000 / fps
     if pbar_kwargs is None:
         pbar_kwargs = {}
     if to_image_kwargs is None:
@@ -80,7 +84,7 @@ def save_animation(
     if delta is None:
         delta = len(index) // 2
 
-    with imageio.get_writer(fname, fps=fps, **writer_kwargs) as writer:
+    with imageio.get_writer(fname, **writer_kwargs) as writer:
         pbar = get_pbar(range(0, len(index) - delta + 1, step), show_progress=show_progress, **pbar_kwargs)
         for i in pbar:
             pbar.set_description("{} - {}".format(str(index[i]), str(index[i + delta - 1])))
