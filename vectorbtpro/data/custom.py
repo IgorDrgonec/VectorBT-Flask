@@ -1277,7 +1277,6 @@ class YFData(RemoteData):
         ticker = yf.Ticker(symbol)
         def_history_kwargs = get_func_kwargs(ticker.history)
         ticker_tz = ticker._get_ticker_tz(
-            history_kwargs.get("debug", def_history_kwargs["debug"]),
             history_kwargs.get("proxy", def_history_kwargs["proxy"]),
             history_kwargs.get("timeout", def_history_kwargs["timeout"]),
         )
