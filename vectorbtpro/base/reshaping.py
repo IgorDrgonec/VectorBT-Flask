@@ -313,11 +313,21 @@ def column_stack(*arrs: tp.MaybeSequence[tp.AnyArray]) -> tp.Array2d:
         arrs = arrs[0]
     arrs = list(arrs)
 
-    first_arr = arrs[0]
-    if not hasattr(first_arr, "ndim"):
-        first_arr = np.asarray(first_arr)
-    if first_arr.ndim == 1 or (first_arr.ndim == 2 and first_arr.shape[1] == 1):
-        return np.concatenate(arrs).reshape((len(arrs), len(first_arr))).T
+    arrs = list(map(np.asarray, arrs))
+    common_shape = None
+    can_concatenate = True
+    for arr in arrs:
+        if common_shape is None:
+            common_shape = arr.shape
+        if arr.shape != common_shape:
+            can_concatenate = False
+            continue
+        if not (arr.ndim == 1 or (arr.ndim == 2 and arr.shape[1] == 1)):
+            can_concatenate = False
+            continue
+
+    if can_concatenate:
+        return np.concatenate(arrs).reshape((len(arrs), common_shape[0])).T
     return np.column_stack(arrs)
 
 
@@ -736,7 +746,7 @@ class BCO:
     reindex_kwargs: tp.Optional[tp.Kwargs] = attr.ib(default=None)
     """Keyword arguments passed to `pd.DataFrame.reindex`."""
 
-    merge_kwargs: tp.Optional[int] = attr.ib(default=None)
+    merge_kwargs: tp.Optional[tp.Kwargs] = attr.ib(default=None)
     """Keyword arguments passed to `vectorbtpro.base.merging.column_stack_merge`."""
 
 
@@ -1507,6 +1517,9 @@ def broadcast(
         _axis = bco_instances[k].axis
         _expand_axis = bco_instances[k].expand_axis
         _merge_kwargs = bco_instances[k].merge_kwargs
+        must_reset_index = _merge_kwargs.get("reset_index", None) not in (None, False)
+        _reindex_kwargs = resolve_dict(bco_instances[k].reindex_kwargs)
+        _fill_value = _reindex_kwargs.get("fill_value", np.nan)
 
         if k in param_keys:
             # Broadcast parameters
@@ -1519,6 +1532,20 @@ def broadcast(
             any_needs_broadcasting = False
             all_forced_broadcast = True
             for o in obj:
+                if isinstance(o, (indexing.index_dict, indexing.IdxSetter, indexing.IdxSetterFactory)):
+                    o = wrapper.fill_and_set(
+                        o,
+                        fill_value=_fill_value,
+                        keep_flex=_keep_flex,
+                    )
+                elif isinstance(o, CustomTemplate):
+                    context = dict(
+                        bco_instances=bco_instances,
+                        wrapper=wrapper,
+                        obj_name=k,
+                        bco=bco_instances[k],
+                    )
+                    o = o.substitute(context, sub_id="broadcast")
                 o = to_2d_array(o)
                 if not _keep_flex:
                     needs_broadcasting = True
@@ -1540,7 +1567,7 @@ def broadcast(
             if any_needs_broadcasting and not all_forced_broadcast:
                 new_obj2 = []
                 for o in new_obj:
-                    if o.shape[1] != to_shape_2d[1]:
+                    if o.shape[1] != to_shape_2d[1] or (not must_reset_index and o.shape[0] != to_shape_2d[0]):
                         o = broadcast_array_to(o, to_shape_2d, axis=_axis)
                     new_obj2.append(o)
                 new_obj = new_obj2
@@ -1582,7 +1609,6 @@ def broadcast(
         if k in special_keys:
             bco = bco_instances[k]
             if isinstance(bco.value, (indexing.index_dict, indexing.IdxSetter, indexing.IdxSetterFactory)):
-                # Index dict
                 _is_pd = bco.to_pd
                 if _is_pd is None:
                     _is_pd = is_pd
@@ -1600,7 +1626,6 @@ def broadcast(
                     new_obj = new_obj.values
                 new_obj = _adjust_dims(new_obj, _keep_flex, _min_ndim, _expand_axis)
             elif isinstance(bco.value, CustomTemplate):
-                # Template
                 context = dict(
                     bco_instances=bco_instances,
                     new_objs=new_objs,

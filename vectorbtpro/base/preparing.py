@@ -6,7 +6,7 @@ import inspect
 import string
 from collections import defaultdict
 from datetime import timedelta, time
-from functools import cached_property as cachedproperty
+from functools import partial, cached_property as cachedproperty
 from pathlib import Path
 
 import attr
@@ -137,6 +137,9 @@ class BasePreparer(Configured, metaclass=MetaArgs):
     @classmethod
     def prepare_td_obj(cls, td_obj: object) -> object:
         """Prepare a timedelta object for broadcasting."""
+        if isinstance(td_obj, Param):
+            return td_obj.map_value(cls.prepare_td_obj)
+
         if isinstance(td_obj, (str, timedelta, pd.DateOffset, pd.Timedelta)):
             td_obj = freq_to_timedelta64(td_obj)
         elif isinstance(td_obj, pd.Index):
@@ -146,6 +149,9 @@ class BasePreparer(Configured, metaclass=MetaArgs):
     @classmethod
     def prepare_dt_obj(cls, dt_obj: object, ns_ago: int = 0) -> object:
         """Prepare a datetime object for broadcasting."""
+        if isinstance(dt_obj, Param):
+            return dt_obj.map_value(partial(cls.prepare_dt_obj, ns_ago=ns_ago))
+
         if isinstance(dt_obj, (str, time, timedelta, pd.DateOffset, pd.Timedelta)):
             dt_obj_dt_template = RepEval(
                 "try_align_to_dt_index([dt_obj], wrapper.index).vbt.to_ns() - ns_ago",

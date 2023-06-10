@@ -130,6 +130,9 @@ def params_to_list(params: tp.Params, is_tuple: bool, is_array_like: bool) -> li
     return new_params
 
 
+ParamT = tp.TypeVar("ParamT", bound="Param")
+
+
 @attr.s(frozen=True)
 class Param:
     """Class that represents a parameter."""
@@ -191,6 +194,19 @@ class Param:
     
     If None, defaults to the name of the index in `Param.keys`, or to the key in 
     `param_dct` passed to `combine_params`."""
+
+    def map_value(self: ParamT, func: tp.Callable) -> ParamT:
+        """Execute a function on each value in `Param.value` and create a new `Param` instance."""
+        attr_dct = attr.asdict(self)
+        if isinstance(attr_dct["value"], dict):
+            attr_dct["value"] = {k: v for k, v in attr_dct["value"].items()}
+        elif isinstance(attr_dct["value"], pd.Index):
+            attr_dct["value"] = pd.Index(map(func, attr_dct["value"]))
+        elif isinstance(attr_dct["value"], pd.Series):
+            attr_dct["value"] = pd.Series(map(func, attr_dct["value"].values), index=attr_dct["value"].index)
+        else:
+            attr_dct["value"] = list(map(func, attr_dct["value"]))
+        return type(self)(**attr_dct)
 
 
 def combine_params(
