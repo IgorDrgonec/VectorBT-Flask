@@ -54,6 +54,14 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
     def from_obj(cls: tp.Type[ArrayWrapperT], obj: tp.ArrayLike, *args, **kwargs) -> ArrayWrapperT:
         """Derive metadata from an object."""
         from vectorbtpro.base.reshaping import to_pd_array
+        from vectorbtpro.data.base import Data
+
+        if isinstance(obj, Data):
+            obj = obj.symbol_wrapper
+        if isinstance(obj, Wrapping):
+            obj = obj.wrapper
+        if isinstance(obj, ArrayWrapper):
+            return obj.replace(**kwargs)
 
         pd_obj = to_pd_array(obj)
         index = indexes.get_index(pd_obj, 0)

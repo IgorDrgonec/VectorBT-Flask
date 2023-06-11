@@ -271,6 +271,9 @@ class BasePreparer(Configured, metaclass=MetaArgs):
     def __getitem__(self, arg_name) -> tp.Any:
         return self.get_arg(arg_name)
 
+    def __iter__(self):
+        raise TypeError(f"'{type(self).__name__}' object is not iterable")
+
     @classmethod
     def td_arr_to_ns(cls, td_arr: tp.ArrayLike) -> tp.ArrayLike:
         """Prepare a timedelta array."""

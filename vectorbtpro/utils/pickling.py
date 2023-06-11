@@ -28,6 +28,8 @@ __all__ = [
     "RecInfo",
     "Pickleable",
     "pdict",
+    "get_id_from_class",
+    "get_class_from_id",
 ]
 
 
@@ -252,7 +254,7 @@ rec_info_registry = {}
 Populate with the required information if any instance cannot be unpickled."""
 
 
-def to_class_id(obj: tp.Any) -> tp.Optional[str]:
+def get_id_from_class(obj: tp.Any) -> tp.Optional[str]:
     """Get the class id from a class.
 
     If the object is an instance or a subclass of `Pickleable` and `Pickleable._rec_id` is not None,
@@ -275,7 +277,7 @@ def to_class_id(obj: tp.Any) -> tp.Optional[str]:
     return None
 
 
-def from_class_id(class_id: str) -> tp.Optional[tp.Type]:
+def get_class_from_id(class_id: str) -> tp.Optional[tp.Type]:
     """Get the class from a class id."""
     from vectorbtpro.utils.module_ import find_class
 
@@ -396,7 +398,7 @@ class Pickleable:
             The initial order of keys can be preserved only by using references.
 
         If `use_class_ids` is True, substitutes any class defined as a value by its id instead of
-        pickling its definition. If `to_class_id` returns None, will pickle the definition.
+        pickling its definition. If `get_id_from_class` returns None, will pickle the definition.
 
         If the instance is nested, set `nested` to True to represent each sub-dict as a section.
 
@@ -462,7 +464,7 @@ class Pickleable:
                     i += 1
             else:
                 if (unpack_objects or k == "top") and isinstance(v, Pickleable):
-                    class_id = to_class_id(v)
+                    class_id = get_id_from_class(v)
                     if class_id is None:
                         raise ValueError(f"Class {type(v)} cannot be found. Set reconstruction id.")
                     rec_state = v.rec_state
@@ -495,7 +497,7 @@ class Pickleable:
                     if not (k2 == "_" and v2 == "_") and not v2.startswith("&"):
                         v2 = repr(v2)
                 elif use_class_ids and isinstance(v2, type):
-                    class_id = to_class_id(v2)
+                    class_id = get_id_from_class(v2)
                     if class_id is not None:
                         v2 = "@" + class_id
                 elif isinstance(v2, float) and np.isnan(v2):
@@ -703,7 +705,7 @@ class Pickleable:
                         ref_edges.add((k, (k, k2)))
                         ref_edges.add(((k, k2), ref_node))
                     elif use_class_ids and v2.startswith("@"):
-                        v2 = from_class_id(v2[1:])
+                        v2 = get_class_from_id(v2[1:])
                     elif run_code and v2.startswith("!"):
                         if v2.startswith("!vbt.loads(") and v2.endswith(")"):
                             v2 = multiline_eval(v2[5:], context=code_context)
@@ -1036,7 +1038,7 @@ class Pickleable:
         rec_state = self.rec_state
         if rec_state is None:
             return object.__reduce__(self)
-        class_id = to_class_id(self)
+        class_id = get_id_from_class(self)
         if class_id is None:
             cls = type(self)
         else:

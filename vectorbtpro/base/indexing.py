@@ -79,6 +79,9 @@ class LocBase:
     def __getitem__(self, key: tp.Any) -> tp.Any:
         raise NotImplementedError
 
+    def __iter__(self):
+        raise TypeError(f"'{type(self).__name__}' object is not iterable")
+
 
 class pdLoc(LocBase):
     """Forwards a Pandas-like indexing operation to each Series/DataFrame and returns a new class instance."""
@@ -183,6 +186,9 @@ class PandasIndexer(IndexingBase):
 
     def __getitem__(self: PandasIndexerT, key: tp.Any) -> PandasIndexerT:
         return self.indexing_func(lambda x: x.__getitem__(key), **self.indexing_kwargs)
+
+    def __iter__(self):
+        raise TypeError(f"'{type(self).__name__}' object is not iterable")
 
 
 class idxLoc(iLoc):

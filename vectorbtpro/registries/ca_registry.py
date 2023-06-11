@@ -1227,17 +1227,35 @@ class CABaseSetup(CAMetrics, Hashable):
                 minimum_unit = "seconds" if total_saved.total_seconds() >= 1 else "milliseconds"
                 total_saved = humanize.precisedelta(total_saved, minimum_unit)
             if first_run_time is not None:
-                first_run_time = humanize.naturaltime(to_naive_datetime(first_run_time))
+                first_run_time = humanize.naturaltime(
+                    to_naive_datetime(first_run_time),
+                    when=to_naive_datetime(datetime.now(timezone.utc)),
+                )
             if last_run_time is not None:
-                last_run_time = humanize.naturaltime(to_naive_datetime(last_run_time))
+                last_run_time = humanize.naturaltime(
+                    to_naive_datetime(last_run_time),
+                    when=to_naive_datetime(datetime.now(timezone.utc)),
+                )
             if first_hit_time is not None:
-                first_hit_time = humanize.naturaltime(to_naive_datetime(first_hit_time))
+                first_hit_time = humanize.naturaltime(
+                    to_naive_datetime(first_hit_time),
+                    when=to_naive_datetime(datetime.now(timezone.utc)),
+                )
             if last_hit_time is not None:
-                last_hit_time = humanize.naturaltime(to_naive_datetime(last_hit_time))
+                last_hit_time = humanize.naturaltime(
+                    to_naive_datetime(last_hit_time),
+                    when=to_naive_datetime(datetime.now(timezone.utc)),
+                )
             if creation_time is not None:
-                creation_time = humanize.naturaltime(to_naive_datetime(creation_time))
+                creation_time = humanize.naturaltime(
+                    to_naive_datetime(creation_time),
+                    when=to_naive_datetime(datetime.now(timezone.utc)),
+                )
             if last_update_time is not None:
-                last_update_time = humanize.naturaltime(to_naive_datetime(last_update_time))
+                last_update_time = humanize.naturaltime(
+                    to_naive_datetime(last_update_time),
+                    when=to_naive_datetime(datetime.now(timezone.utc)),
+                )
 
         return dict(
             hash=hash(self),
