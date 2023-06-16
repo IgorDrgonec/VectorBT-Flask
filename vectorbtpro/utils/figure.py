@@ -54,11 +54,17 @@ class FigureMixin:
         if index is None:
             for d in self.data:
                 if "x" in d:
-                    index = pd.Index(self.data[0].x)
-                    break
+                    d_index = pd.Index(self.data[0].x)
+                    if not isinstance(d_index, pd.DatetimeIndex):
+                        continue
+                    if index is None:
+                        index = d_index
+                    elif not index.equals(d_index):
+                        index = index.union(d_index)
             if index is None:
                 raise ValueError("Couldn't extract x-axis values, please provide index")
-        return self.update_xaxes(rangebreaks=get_rangebreaks(index, **kwargs))
+        rangebreaks = get_rangebreaks(index, **kwargs)
+        return self.update_xaxes(rangebreaks=rangebreaks)
 
 
 class Figure(_Figure, FigureMixin):

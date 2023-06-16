@@ -268,6 +268,7 @@ def infer_index_freq(
 def get_dt_index_gaps(
     index: tp.IndexLike,
     freq: tp.Optional[tp.FrequencyLike] = None,
+    skip_index: tp.Optional[tp.IndexLike] = None,
     **kwargs,
 ) -> tp.Tuple[tp.Index, tp.Index]:
     """Get gaps in a datetime index.
@@ -282,10 +283,27 @@ def get_dt_index_gaps(
     if not index.is_monotonic_increasing:
         raise ValueError("Datetime index must be monotonically increasing")
     freq = infer_index_freq(index, freq=freq, allow_numeric=False, detect_via_diff=True)
+    if skip_index is not None:
+        skip_index = try_to_datetime_index(skip_index, **kwargs)
+        checks.assert_instance_of(skip_index, pd.DatetimeIndex)
+        skip_bound_start = skip_index.min()
+        skip_bound_end = skip_index.max()
+        index = index.difference(skip_index)
+    else:
+        skip_bound_start = None
+        skip_bound_end = None
     start_index = index[:-1]
     end_index = index[1:]
     gap_mask = start_index + freq < end_index
-    return start_index[gap_mask] + freq, end_index[gap_mask]
+    bound_starts = start_index[gap_mask] + freq
+    bound_ends = end_index[gap_mask]
+    if skip_bound_start is not None and skip_bound_start < index[0]:
+        bound_starts = pd.Index([skip_bound_start]).union(bound_starts)
+        bound_ends = pd.Index([index[0]]).union(bound_ends)
+    if skip_bound_end is not None and skip_bound_end >= index[-1] + freq:
+        bound_starts = pd.Index([index[-1] + freq]).union(bound_starts)
+        bound_ends = pd.Index([skip_bound_end + freq]).union(bound_ends)
+    return bound_starts, bound_ends
 
 
 def get_rangebreaks(index: tp.IndexLike, **kwargs) -> list:
