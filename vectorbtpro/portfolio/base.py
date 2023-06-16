@@ -162,9 +162,7 @@ returns_acc_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__[
-    "returns_acc_config"
-] = f"""Config of returns accessor methods to be attached to `Portfolio`.
+__pdoc__["returns_acc_config"] = f"""Config of returns accessor methods to be attached to `Portfolio`.
 
 ```python
 {returns_acc_config.prettify()}
@@ -399,9 +397,7 @@ shortcut_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__[
-    "shortcut_config"
-] = f"""Config of shortcut properties to be attached to `Portfolio`.
+__pdoc__["shortcut_config"] = f"""Config of shortcut properties to be attached to `Portfolio`.
 
 ```python
 {shortcut_config.prettify()}
@@ -1300,7 +1296,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         drawdowns_cls: tp.Optional[type] = None,
         **kwargs,
     ) -> None:
-
         from vectorbtpro._settings import settings
 
         portfolio_cfg = settings["portfolio"]
@@ -7543,6 +7538,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         bm_returns: tp.Union[None, bool, tp.ArrayLike] = None,
         log_returns: bool = False,
         use_asset_returns: bool = False,
+        pct_scale: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         **kwargs,
@@ -7605,7 +7601,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ),
             kwargs,
         )
-        return returns.vbt.returns(log_returns=log_returns).plot_cumulative(**kwargs)
+        return returns.vbt.returns(log_returns=log_returns).plot_cumulative(pct_scale=pct_scale, **kwargs)
 
     def plot_drawdowns(
         self,
@@ -7645,19 +7641,24 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         plotting_cfg = settings["plotting"]
 
-        drawdown = self.resolve_shortcut_attr("drawdown", group_by=group_by, jitted=jitted, chunked=chunked)
-        drawdown = self.select_col_from_obj(drawdown, column, wrapper=self.wrapper.regroup(group_by))
-        kwargs = merge_dicts(
-            dict(
-                trace_kwargs=dict(
-                    line=dict(color=plotting_cfg["color_schema"]["red"]),
-                    fillcolor=adjust_opacity(plotting_cfg["color_schema"]["red"], 0.3),
-                    fill="tozeroy",
-                    name="Drawdown",
-                )
-            ),
-            kwargs,
+        drawdown = self.resolve_shortcut_attr(
+            "drawdown",
+            group_by=group_by,
+            jitted=jitted,
+            chunked=chunked,
         )
+        drawdown = self.select_col_from_obj(drawdown, column, wrapper=self.wrapper.regroup(group_by))
+        default_kwargs = dict(
+            trace_kwargs=dict(
+                line=dict(color=plotting_cfg["color_schema"]["red"]),
+                fillcolor=adjust_opacity(plotting_cfg["color_schema"]["red"], 0.3),
+                fill="tozeroy",
+                name="Drawdown",
+            )
+        )
+        yaxis = "yaxis" + yref[1:]
+        default_kwargs[yaxis] = dict(tickformat=".2%")
+        kwargs = merge_dicts(default_kwargs, kwargs)
         fig = drawdown.vbt.lineplot(**kwargs)
         x_domain = get_domain(xref, fig)
         fig.add_shape(
@@ -7678,8 +7679,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 hline_shape_kwargs,
             )
         )
-        yaxis = "yaxis" + yref[1:]
-        fig.layout[yaxis]["tickformat"] = "%"
         return fig
 
     def plot_gross_exposure(

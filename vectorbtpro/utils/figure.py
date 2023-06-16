@@ -23,6 +23,29 @@ __all__ = [
 ]
 
 
+def resolve_axis_refs(
+    add_trace_kwargs: tp.KwargsLike = None,
+    xref: tp.Optional[str] = None,
+    yref: tp.Optional[str] = None,
+) -> tp.Tuple[str, str]:
+    """Get x-axis and y-axis references."""
+    if add_trace_kwargs is None:
+        add_trace_kwargs = {}
+    row = add_trace_kwargs.get("row", 1)
+    col = add_trace_kwargs.get("col", 1)
+    if xref is None:
+        if col == 1:
+            xref = "x"
+        else:
+            xref = "x" + str(col)
+    if yref is None:
+        if row == 1:
+            yref = "y"
+        else:
+            yref = "y" + str(row)
+    return xref, yref
+
+
 def get_domain(ref: str, fig: tp.BaseFigure) -> tp.Tuple[int, int]:
     """Get domain of a coordinate axis."""
     axis = ref[0] + "axis" + ref[1:]

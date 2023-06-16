@@ -136,6 +136,7 @@ from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, HybridConfig, Config
 from vectorbtpro.utils.datetime_ import freq_to_timedelta, PandasDatetimeIndex
 from vectorbtpro.utils.decorators import class_or_instanceproperty
+from vectorbtpro.utils.colors import adjust_opacity
 
 __all__ = [
     "ReturnsAccessor",
@@ -1796,6 +1797,7 @@ class ReturnsAccessor(GenericAccessor):
         fill_to_benchmark: bool = False,
         main_kwargs: tp.KwargsLike = None,
         bm_kwargs: tp.KwargsLike = None,
+        pct_scale: bool = False,
         hline_shape_kwargs: tp.KwargsLike = None,
         add_trace_kwargs: tp.KwargsLike = None,
         xref: str = "x",
@@ -1813,6 +1815,7 @@ class ReturnsAccessor(GenericAccessor):
             fill_to_benchmark (bool): Whether to fill between main and benchmark, or between main and `start_value`.
             main_kwargs (dict): Keyword arguments passed to `vectorbtpro.generic.accessors.GenericSRAccessor.plot` for main.
             bm_kwargs (dict): Keyword arguments passed to `vectorbtpro.generic.accessors.GenericSRAccessor.plot` for benchmark.
+            pct_scale (bool): Whether to use the percentage scale for the y-axis.
             hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for `start_value` line.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             xref (str): X coordinate axis.
@@ -1838,10 +1841,19 @@ class ReturnsAccessor(GenericAccessor):
 
         plotting_cfg = settings["plotting"]
 
+        xaxis = "xaxis" + xref[1:]
+        yaxis = "yaxis" + yref[1:]
+        def_layout_kwargs = {xaxis: {}, yaxis: {}}
+        if pct_scale:
+            start_value = 0
+            def_layout_kwargs[yaxis]["tickformat"] = ".2%"
         if fig is None:
             fig = make_figure()
+        fig.update_layout(**def_layout_kwargs)
         fig.update_layout(**layout_kwargs)
         x_domain = get_domain(xref, fig)
+        y_domain = get_domain(yref, fig)
+
         if bm_returns is None:
             bm_returns = self.bm_returns
         fill_to_benchmark = fill_to_benchmark and bm_returns is not None
@@ -1864,6 +1876,8 @@ class ReturnsAccessor(GenericAccessor):
         # Plot main
         if main_kwargs is None:
             main_kwargs = {}
+        cumrets = self.cumulative(start_value=start_value)
+        cumrets = self.select_col_from_obj(cumrets, column, wrapper=self.wrapper.regroup(False))
         main_kwargs = merge_dicts(
             dict(
                 trace_kwargs=dict(line=dict(color=plotting_cfg["color_schema"]["purple"])),
@@ -1871,12 +1885,10 @@ class ReturnsAccessor(GenericAccessor):
             ),
             main_kwargs,
         )
-        cumrets = self.cumulative(start_value=start_value)
-        cumrets = self.select_col_from_obj(cumrets, column, wrapper=self.wrapper.regroup(False))
         if fill_to_benchmark:
-            cumrets.vbt.plot_against(bm_cumrets, **main_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+            cumrets.vbt.plot_against(bm_cumrets, add_trace_kwargs=add_trace_kwargs, fig=fig, **main_kwargs)
         else:
-            cumrets.vbt.plot_against(start_value, **main_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+            cumrets.vbt.plot_against(start_value, add_trace_kwargs=add_trace_kwargs, fig=fig, **main_kwargs)
 
         # Plot hline
         if hline_shape_kwargs is None:
