@@ -7628,6 +7628,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         group_by: tp.GroupByLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
+        pct_scale: bool = True,
         xref: str = "x",
         yref: str = "y",
         hline_shape_kwargs: tp.KwargsLike = None,
@@ -7648,6 +7649,17 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             chunked=chunked,
         )
         drawdown = self.select_col_from_obj(drawdown, column, wrapper=self.wrapper.regroup(group_by))
+        if not pct_scale:
+            cumret = self.resolve_shortcut_attr(
+                "cumulative_returns",
+                group_by=group_by,
+                jitted=jitted,
+                chunked=chunked,
+            )
+            cumret = self.select_col_from_obj(cumret, column, wrapper=self.wrapper.regroup(group_by))
+            init_value = self.resolve_shortcut_attr("init_value", group_by=group_by, jitted=jitted, chunked=chunked)
+            init_value = self.select_col_from_obj(init_value, column, wrapper=self.wrapper.regroup(group_by))
+            drawdown = cumret * init_value * drawdown / (1 + drawdown)
         default_kwargs = dict(
             trace_kwargs=dict(
                 line=dict(color=plotting_cfg["color_schema"]["red"]),
@@ -7656,8 +7668,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 name="Drawdown",
             )
         )
-        yaxis = "yaxis" + yref[1:]
-        default_kwargs[yaxis] = dict(tickformat=".2%")
+        if pct_scale:
+            yaxis = "yaxis" + yref[1:]
+            default_kwargs[yaxis] = dict(tickformat=".2%")
         kwargs = merge_dicts(default_kwargs, kwargs)
         fig = drawdown.vbt.lineplot(**kwargs)
         x_domain = get_domain(xref, fig)
