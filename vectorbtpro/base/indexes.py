@@ -785,4 +785,3 @@ def cross_indexes(*indexes: tp.MaybeTuple[tp.Index]) -> tp.List[tp.IndexSlice]:
     indexes = list(indexes)
 
     common_levels = set()
-

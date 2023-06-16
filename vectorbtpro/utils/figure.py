@@ -11,6 +11,7 @@ from plotly.subplots import make_subplots as _make_subplots
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import merge_dicts
+from vectorbtpro.utils.datetime_ import get_rangebreaks
 
 __all__ = [
     "Figure",
@@ -30,6 +31,9 @@ def get_domain(ref: str, fig: tp.BaseFigure) -> tp.Tuple[int, int]:
     return 0, 1
 
 
+FigureMixinT = tp.TypeVar("FigureMixinT", bound="FigureMixin")
+
+
 class FigureMixin:
     def show(self, *args, **kwargs) -> None:
         """Display the figure in PNG format."""
@@ -42,6 +46,10 @@ class FigureMixin:
     def show_svg(self, **kwargs) -> None:
         """Display the figure in SVG format."""
         self.show(renderer="svg", **kwargs)
+
+    def auto_rangebreaks(self: FigureMixinT, *args, **kwargs) -> FigureMixinT:
+        """Set range breaks automatically based on `vectorbtpro.utils.dt.get_rangebreaks`."""
+        return self.update_xaxes(rangebreaks=get_rangebreaks(*args, **kwargs))
 
 
 class Figure(_Figure, FigureMixin):

@@ -11,6 +11,7 @@ from pandas.tseries.frequencies import to_offset
 import re
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts
 
@@ -262,6 +263,35 @@ def infer_index_freq(
             if allow_date_offset:
                 return freq
     return freq_to_timedelta(freq)
+
+
+def get_dt_index_gaps(
+    index: tp.IndexLike,
+    freq: tp.Optional[tp.FrequencyLike] = None,
+    **kwargs,
+) -> tp.Tuple[tp.Index, tp.Index]:
+    """Get gaps in a datetime index.
+
+    Returns two indexes: start indexes (inclusive) and end indexes (exclusive).
+
+    Keyword arguments are passed to `try_to_datetime_index`."""
+    index = try_to_datetime_index(index, **kwargs)
+    checks.assert_instance_of(index, pd.DatetimeIndex)
+    if not index.is_unique:
+        raise ValueError("Datetime index must be unique")
+    if not index.is_monotonic_increasing:
+        raise ValueError("Datetime index must be monotonically increasing")
+    freq = infer_index_freq(index, freq=freq, allow_numeric=False, detect_via_diff=True)
+    start_index = index[:-1]
+    end_index = index[1:]
+    gap_mask = start_index + freq < end_index
+    return start_index[gap_mask] + freq, end_index[gap_mask]
+
+
+def get_rangebreaks(*args, **kwargs) -> list:
+    """Get `rangebreaks` based on `get_dt_index_gaps`."""
+    start_index, end_index = get_dt_index_gaps(*args, **kwargs)
+    return [dict(bounds=x) for x in zip(start_index, end_index)]
 
 
 def get_utc_tz(**kwargs) -> tzinfo:
