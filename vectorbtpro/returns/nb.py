@@ -86,7 +86,7 @@ def returns_nb(
 
 
 @register_jitted(cache=True)
-def cum_returns_1d_nb(rets: tp.Array1d, start_value: float = 0.0, log_returns: bool = False) -> tp.Array1d:
+def cum_returns_1d_nb(rets: tp.Array1d, start_value: float = 1.0, log_returns: bool = False) -> tp.Array1d:
     """Cumulative returns."""
     out = np.empty_like(rets, dtype=np.float_)
     if log_returns:
@@ -116,7 +116,7 @@ def cum_returns_1d_nb(rets: tp.Array1d, start_value: float = 0.0, log_returns: b
     merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def cum_returns_nb(rets: tp.Array2d, start_value: float = 0.0, log_returns: bool = False) -> tp.Array2d:
+def cum_returns_nb(rets: tp.Array2d, start_value: float = 1.0, log_returns: bool = False) -> tp.Array2d:
     """2-dim version of `cum_returns_1d_nb`."""
     out = np.empty_like(rets, dtype=np.float_)
     for col in prange(rets.shape[1]):
@@ -125,7 +125,7 @@ def cum_returns_nb(rets: tp.Array2d, start_value: float = 0.0, log_returns: bool
 
 
 @register_jitted(cache=True)
-def cum_returns_final_1d_nb(rets: tp.Array1d, start_value: float = 0.0, log_returns: bool = False) -> float:
+def cum_returns_final_1d_nb(rets: tp.Array1d, start_value: float = 1.0, log_returns: bool = False) -> float:
     """Total return."""
     if log_returns:
         cumsum = 0
@@ -151,7 +151,7 @@ def cum_returns_final_1d_nb(rets: tp.Array1d, start_value: float = 0.0, log_retu
     merge_func="concat",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def cum_returns_final_nb(rets: tp.Array2d, start_value: float = 0.0, log_returns: bool = False) -> tp.Array1d:
+def cum_returns_final_nb(rets: tp.Array2d, start_value: float = 1.0, log_returns: bool = False) -> tp.Array1d:
     """2-dim version of `cum_returns_final_1d_nb`."""
     out = np.empty(rets.shape[1], dtype=np.float_)
     for col in prange(rets.shape[1]):
