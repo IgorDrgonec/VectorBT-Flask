@@ -288,9 +288,9 @@ def get_dt_index_gaps(
     return start_index[gap_mask] + freq, end_index[gap_mask]
 
 
-def get_rangebreaks(*args, **kwargs) -> list:
+def get_rangebreaks(index: tp.IndexLike, **kwargs) -> list:
     """Get `rangebreaks` based on `get_dt_index_gaps`."""
-    start_index, end_index = get_dt_index_gaps(*args, **kwargs)
+    start_index, end_index = get_dt_index_gaps(index, **kwargs)
     return [dict(bounds=x) for x in zip(start_index, end_index)]
 
 

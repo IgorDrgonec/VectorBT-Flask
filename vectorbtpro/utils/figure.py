@@ -6,6 +6,8 @@ from vectorbtpro.utils.module_ import assert_can_import
 
 assert_can_import("plotly")
 
+import pandas as pd
+
 from plotly.graph_objects import Figure as _Figure, FigureWidget as _FigureWidget
 from plotly.subplots import make_subplots as _make_subplots
 
@@ -47,9 +49,16 @@ class FigureMixin:
         """Display the figure in SVG format."""
         self.show(renderer="svg", **kwargs)
 
-    def auto_rangebreaks(self: FigureMixinT, *args, **kwargs) -> FigureMixinT:
+    def auto_rangebreaks(self: FigureMixinT, index: tp.Optional[tp.IndexLike] = None, **kwargs) -> FigureMixinT:
         """Set range breaks automatically based on `vectorbtpro.utils.dt.get_rangebreaks`."""
-        return self.update_xaxes(rangebreaks=get_rangebreaks(*args, **kwargs))
+        if index is None:
+            for d in self.data:
+                if "x" in d:
+                    index = pd.Index(self.data[0].x)
+                    break
+            if index is None:
+                raise ValueError("Couldn't extract x-axis values, please provide index")
+        return self.update_xaxes(rangebreaks=get_rangebreaks(index, **kwargs))
 
 
 class Figure(_Figure, FigureMixin):
