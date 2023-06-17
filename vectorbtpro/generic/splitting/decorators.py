@@ -356,9 +356,9 @@ def cv_split(
             )
             selection = kwargs.pop("_selection", wrapper.options["selection"])
             if isinstance(selection, str) and selection.lower() == "min":
-                selection = RepEval("[np.argmin(grid_results)]")
+                selection = RepEval("[np.nanargmin(grid_results)]")
             if isinstance(selection, str) and selection.lower() == "max":
-                selection = RepEval("[np.argmax(grid_results)]")
+                selection = RepEval("[np.nanargmax(grid_results)]")
             return_grid = kwargs.pop("_return_grid", wrapper.options["return_grid"])
             if isinstance(return_grid, bool):
                 if return_grid:

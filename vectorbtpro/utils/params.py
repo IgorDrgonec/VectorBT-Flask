@@ -1045,6 +1045,8 @@ def parameterized(
                         _selection.remove(i)
                         if len(_selection) == 0:
                             break
+                if len(_selection) > 0:
+                    raise ValueError(f"Selection {_selection} couldn't be matched")
                 template_context["param_configs"] = new_param_configs
                 new_funcs_args = []
                 _selection = selection.copy()
@@ -1054,6 +1056,8 @@ def parameterized(
                         _selection.remove(i)
                         if len(_selection) == 0:
                             break
+                if len(_selection) > 0:
+                    raise ValueError(f"Selection {_selection} couldn't be matched")
                 template_context["funcs_args"] = new_funcs_args
 
             if skip_single_param and template_context["single_param"]:
