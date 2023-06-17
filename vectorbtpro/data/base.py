@@ -154,8 +154,6 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             for s in symbols:
                 new_data[s] = kwargs["wrapper"].row_stack_arrs(*[obj.data[s] for obj in objs], group_by=False)
             kwargs["data"] = new_data
-        if "symbol_classes" not in kwargs:
-            kwargs["symbol_classes"] = objs[-1].symbol_classes
         if "fetch_kwargs" not in kwargs:
             kwargs["fetch_kwargs"] = objs[-1].fetch_kwargs
         if "returned_kwargs" not in kwargs:
@@ -216,6 +214,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         "data",
         "single_symbol",
         "symbol_classes",
+        "level_name",
         "fetch_kwargs",
         "returned_kwargs",
         "last_index",
@@ -232,6 +231,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         data: symbol_dict,
         single_symbol: bool = True,
         symbol_classes: tp.Optional[symbol_dict] = None,
+        level_name: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
         fetch_kwargs: tp.Optional[symbol_dict] = None,
         returned_kwargs: tp.Optional[symbol_dict] = None,
         last_index: tp.Optional[symbol_dict] = None,
@@ -248,6 +248,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             data=data,
             single_symbol=single_symbol,
             symbol_classes=symbol_classes,
+            level_name=level_name,
             fetch_kwargs=fetch_kwargs,
             returned_kwargs=returned_kwargs,
             last_index=last_index,
@@ -283,6 +284,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         self._data = symbol_dict(data)
         self._single_symbol = single_symbol
         self._symbol_classes = symbol_dict(symbol_classes)
+        self._level_name = level_name
         self._fetch_kwargs = symbol_dict(fetch_kwargs)
         self._returned_kwargs = symbol_dict(returned_kwargs)
         self._last_index = symbol_dict(last_index)
@@ -362,6 +364,22 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     def symbol_classes(self) -> symbol_dict:
         """Symbol classes of type `symbol_dict`."""
         return self._symbol_classes
+
+    @property
+    def level_name(self) -> tp.MaybeIterable[tp.Hashable]:
+        """Level name(s) for symbols.
+
+        Must be a sequence if symbols are tuples, otherwise a string."""
+        level_name = self._level_name
+        if any(map(lambda x: isinstance(x, tuple), self.symbols)):
+            if level_name is None:
+                level_name = ["symbol_%d" % i for i in range(len(self.symbols[0]))]
+            if not checks.is_iterable(level_name) or isinstance(level_name, str):
+                raise TypeError("Level name should be list-like for a MultiIndex")
+            return tuple(level_name)
+        if level_name is None:
+            level_name = "symbol"
+        return level_name
 
     @property
     def fetch_kwargs(self) -> symbol_dict:
@@ -670,6 +688,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         symbol_oriented: bool = False,
         single_symbol: bool = True,
         symbol_classes: tp.Optional[symbol_dict] = None,
+        level_name: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
         tz_localize: tp.Union[None, bool, tp.TimezoneLike] = None,
         tz_convert: tp.Union[None, bool, tp.TimezoneLike] = None,
         missing_index: tp.Optional[str] = None,
@@ -691,6 +710,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 Uses `Data.invert_data`.
             single_symbol (bool): Whether there is only one symbol in `data`.
             symbol_classes (symbol_dict): See `Data.symbol_classes`.
+            level_name (hashable or iterable of hashable): See `Data.level_name`.
             tz_localize (timezone_like): See `Data.prepare_tzaware_index`.
             tz_convert (timezone_like): See `Data.prepare_tzaware_index`.
             missing_index (str): See `Data.align_index`.
@@ -760,6 +780,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             data,
             single_symbol=single_symbol,
             symbol_classes=symbol_classes,
+            level_name=level_name,
             fetch_kwargs=fetch_kwargs,
             returned_kwargs=returned_kwargs,
             last_index=last_index,
@@ -825,6 +846,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         symbols: tp.Union[tp.Symbol, tp.Symbols] = None,
         *,
         symbol_classes: tp.Optional[tp.MaybeSequence[tp.Union[tp.Hashable, dict]]] = None,
+        level_name: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
         tz_localize: tp.Union[None, bool, tp.TimezoneLike] = None,
         tz_convert: tp.Union[None, bool, tp.TimezoneLike] = None,
         missing_index: tp.Optional[str] = None,
@@ -854,6 +876,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
                 !!! note
                     Tuple is considered as a single class (tuple is a hashable).
+            level_name (hashable or iterable of hashable): See `Data.level_name`.
             tz_localize (any): See `Data.from_data`.
             tz_convert (any): See `Data.from_data`.
             missing_index (str): See `Data.from_data`.
@@ -973,6 +996,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             data,
             single_symbol=single_symbol,
             symbol_classes=symbol_classes,
+            level_name=level_name,
             tz_localize=tz_localize,
             tz_convert=tz_convert,
             missing_index=missing_index,
@@ -1239,7 +1263,6 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     def get_symbol_wrapper(
         self,
         symbols: tp.Optional[tp.Symbols] = None,
-        level_name: str = "symbol",
         index_stack_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> ArrayWrapper:
@@ -1255,7 +1278,10 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             else:
                 symbols = [symbols]
                 ndim = 1
-        symbol_columns = pd.Index(symbols, name=level_name)
+        if isinstance(self.level_name, tuple):
+            symbol_columns = pd.MultiIndex.from_tuples(symbols, names=self.level_name)
+        else:
+            symbol_columns = pd.Index(symbols, name=self.level_name)
         symbol_classes = []
         all_have_symbol_classes = True
         for symbol in symbols:
@@ -1291,15 +1317,10 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
     def concat(
         self,
         symbols: tp.Optional[tp.Symbols] = None,
-        level_name: str = "symbol",
         index_stack_kwargs: tp.KwargsLike = None,
     ) -> dict:
         """Return a dict of Series/DataFrames with symbols as columns, keyed by column name."""
-        symbol_wrapper = self.get_symbol_wrapper(
-            symbols=symbols,
-            level_name=level_name,
-            index_stack_kwargs=index_stack_kwargs,
-        )
+        symbol_wrapper = self.get_symbol_wrapper(symbols=symbols, index_stack_kwargs=index_stack_kwargs)
         if symbols is None:
             symbols = self.symbols
 
@@ -1760,13 +1781,17 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                         raise ValueError("Transformed symbols must have the same columns")
                 new_data[k] = new_v
         else:
-            concat_data = pd.concat(self.data.values(), axis=1, keys=pd.Index(self.symbols, name="symbol"))
+            if isinstance(self.level_name, tuple):
+                keys = pd.MultiIndex.from_tuples(self.symbols, names=self.level_name)
+            else:
+                keys = pd.Index(self.symbols, name=self.level_name)
+            concat_data = pd.concat(self.data.values(), axis=1, keys=keys)
             new_concat_data = transform_func(concat_data, *args, **kwargs)
             new_wrapper = None
             new_data = symbol_dict()
             for k in self.symbols:
                 if isinstance(new_concat_data.columns, pd.MultiIndex):
-                    new_v = new_concat_data.xs(k, axis=1, level="symbol")
+                    new_v = new_concat_data.xs(k, axis=1, level=self.level_name)
                 else:
                     if len(self.wrapper.columns) == 1 and self.wrapper.columns[0] != 0:
                         new_v = new_concat_data[k].rename(self.wrapper.columns[0])
