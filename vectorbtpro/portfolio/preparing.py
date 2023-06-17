@@ -376,7 +376,7 @@ class BasePFPreparer(BasePreparer):
             init_cash=self.init_cash if self.init_cash_mode is None else self.init_cash_mode,
             init_position=self.init_position,
             init_price=self.init_price,
-            bm_close=self.bm_close,
+            bm_close=self.bm_close if not isinstance(self["bm_close"], bool) else self["bm_close"],
             **kwargs,
         )
 
