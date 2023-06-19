@@ -784,16 +784,16 @@ def resolve_dyn_stop_entry_price_nb(val_price: float, price: float, stop_entry_p
     """Resolve stop entry price dynamically.
 
     Uses the valuation/open price as the left bound and order price as the right bound."""
+    if np.isinf(stop_entry_price):
+        if stop_entry_price < 0:
+            return float(val_price)
+        return float(price)
     if stop_entry_price < 0:
         if stop_entry_price == StopEntryPrice.ValPrice:
             return float(val_price)
         if stop_entry_price == StopEntryPrice.Price:
             return float(price)
         raise ValueError("Only valuation and order price are supported when setting stop entry price dynamically")
-    if np.isinf(stop_entry_price):
-        if stop_entry_price < 0:
-            return float(val_price)
-        return float(price)
     return float(stop_entry_price)
 
 
