@@ -627,6 +627,8 @@ def align_index_to(index1: tp.Index, index2: tp.Index, jitted: tp.JittedOption =
         index2 = pd.MultiIndex.from_arrays([index2])
     if pd.Index.equals(index1, index2):
         return pd.IndexSlice[:]
+    if len(index1) > len(index2):
+        raise ValueError("Longer index cannot be aligned to shorter index")
 
     mapper = {}
     for i in range(index1.nlevels):
@@ -642,7 +644,9 @@ def align_index_to(index1: tp.Index, index2: tp.Index, jitted: tp.JittedOption =
                 if name1 is not None:
                     raise ValueError(f"Level {name1} in second index contains values not in first index")
     if len(mapper) == 0:
-        raise ValueError("Can't find common levels to align both indexes")
+        if len(index1) == len(index2):
+            return pd.IndexSlice[:]
+        raise ValueError("Cannot find common levels to align indexes")
 
     factorized = []
     for k, v in mapper.items():
@@ -659,46 +663,207 @@ def align_index_to(index1: tp.Index, index2: tp.Index, jitted: tp.JittedOption =
     stacked = np.transpose(np.stack(factorized))
     indices1 = stacked[: len(index1)]
     indices2 = stacked[len(index1) :]
-    if len(np.unique(indices1, axis=0)) != len(indices1):
-        raise ValueError("Duplicated values in first index are not allowed")
 
-    if len(index2) % len(index1) == 0:
-        tile_times = len(index2) // len(index1)
-        index1_tiled = np.tile(indices1, (tile_times, 1))
-        if np.array_equal(index1_tiled, indices2):
-            return pd.IndexSlice[np.tile(np.arange(len(index1)), tile_times)]
+    if len(indices1) < len(indices2):
+        if len(np.unique(indices1, axis=0)) != len(indices1):
+            raise ValueError("Cannot align indexes")
+        if len(index2) % len(index1) == 0:
+            tile_times = len(index2) // len(index1)
+            index1_tiled = np.tile(indices1, (tile_times, 1))
+            if np.array_equal(index1_tiled, indices2):
+                return pd.IndexSlice[np.tile(np.arange(len(index1)), tile_times)]
 
     unique_indices = np.unique(stacked, axis=0, return_inverse=True)[1]
     unique1 = unique_indices[: len(index1)]
     unique2 = unique_indices[len(index1) :]
+    if len(indices1) == len(indices2):
+        if np.array_equal(unique1, unique2):
+            return pd.IndexSlice[:]
     func = jit_reg.resolve_option(align_arr_indices_nb, jitted)
     return pd.IndexSlice[func(unique1, unique2)]
 
 
-def align_indexes(*indexes: tp.MaybeTuple[tp.Index]) -> tp.List[tp.IndexSlice]:
-    """Align multiple indexes to each other."""
+def align_indexes(
+    *indexes: tp.MaybeTuple[tp.Index],
+    return_new_index: bool = False,
+    **kwargs,
+) -> tp.Union[tp.Tuple[tp.IndexSlice, ...], tp.Tuple[tp.Tuple[tp.IndexSlice, ...], tp.Index]]:
+    """Align multiple indexes to each other with `align_index_to`."""
     if len(indexes) == 1:
         indexes = indexes[0]
     indexes = list(indexes)
 
-    max_len = max(map(len, indexes))
-    indices = []
-    for i in range(len(indexes)):
-        index_i = indexes[i]
-        if len(index_i) == max_len:
-            indices.append(pd.IndexSlice[:])
+    index_items = sorted([(i, indexes[i]) for i in range(len(indexes))], key=lambda x: len(x[1]))
+    index_slices = []
+    for i in range(len(index_items)):
+        index_slice = align_index_to(index_items[i][1], index_items[-1][1], **kwargs)
+        index_slices.append((index_items[i][0], index_slice))
+    index_slices = list(map(lambda x: x[1], sorted(index_slices, key=lambda x: x[0])))
+    if return_new_index:
+        new_index = stack_indexes(
+            *[indexes[i][index_slices[i]] for i in range(len(indexes))],
+            drop_duplicates=True,
+        )
+        return tuple(index_slices), new_index
+    return tuple(index_slices)
+
+
+@register_jitted(cache=True)
+def block_index_product_nb(
+    block_group_map1: tp.GroupMap,
+    block_group_map2: tp.GroupMap,
+    factorized1: tp.Array1d,
+    factorized2: tp.Array1d,
+) -> tp.Tuple[tp.Array1d, tp.Array1d]:
+    """Return indices required for building a block-wise Cartesian product of two factorized indexes."""
+    group_idxs1, group_lens1 = block_group_map1
+    group_idxs2, group_lens2 = block_group_map2
+    group_start_idxs1 = np.cumsum(group_lens1) - group_lens1
+    group_start_idxs2 = np.cumsum(group_lens2) - group_lens2
+
+    matched1 = np.empty(len(factorized1), dtype=np.bool_)
+    matched2 = np.empty(len(factorized2), dtype=np.bool_)
+    indices1 = np.empty(len(factorized1) * len(factorized2), dtype=np.int_)
+    indices2 = np.empty(len(factorized1) * len(factorized2), dtype=np.int_)
+    k1 = 0
+    k2 = 0
+
+    for g1 in range(len(group_lens1)):
+        group_len1 = group_lens1[g1]
+        group_start1 = group_start_idxs1[g1]
+
+        for g2 in range(len(group_lens2)):
+            group_len2 = group_lens2[g2]
+            group_start2 = group_start_idxs2[g2]
+
+            for c1 in range(group_len1):
+                i = group_idxs1[group_start1 + c1]
+
+                for c2 in range(group_len2):
+                    j = group_idxs2[group_start2 + c2]
+
+                    if factorized1[i] == factorized2[j]:
+                        matched1[i] = True
+                        matched2[j] = True
+                        indices1[k1] = i
+                        indices2[k2] = j
+                        k1 += 1
+                        k2 += 1
+
+    if not np.all(matched1) or not np.all(matched2):
+        raise ValueError("Cannot match some block level values")
+    return indices1[:k1], indices2[:k2]
+
+
+def cross_index_with(
+    index1: tp.Index,
+    index2: tp.Index,
+    return_new_index: bool = False,
+) -> tp.Union[tp.Tuple[tp.IndexSlice, tp.IndexSlice], tp.Tuple[tp.Tuple[tp.IndexSlice, tp.IndexSlice], tp.Index]]:
+    """Build a Cartesian product of one index with another while taking into account levels they have in common.
+
+    Returns index slices for the aligning."""
+    from vectorbtpro.base.grouping.nb import get_group_map_nb
+
+    if not isinstance(index1, pd.MultiIndex):
+        index1 = pd.MultiIndex.from_arrays([index1])
+    if not isinstance(index2, pd.MultiIndex):
+        index2 = pd.MultiIndex.from_arrays([index2])
+    if index1.equals(index2):
+        if return_new_index:
+            new_index = stack_indexes(index1, index2, drop_duplicates=True)
+            return (pd.IndexSlice[:], pd.IndexSlice[:]), new_index
+        return pd.IndexSlice[:], pd.IndexSlice[:]
+
+    levels1 = []
+    levels2 = []
+    for i in range(index1.nlevels):
+        for j in range(index2.nlevels):
+            name1 = index1.names[i]
+            name2 = index2.names[j]
+            if name1 == name2:
+                if set(index2.levels[j]) == set(index1.levels[i]):
+                    if i in levels1 or j in levels2:
+                        raise ValueError(f"There are multiple candidate block levels with name {name1}")
+                    levels1.append(i)
+                    levels2.append(j)
+                    continue
+                if name1 is not None:
+                    raise ValueError(f"Candidate block level {name1} in both indexes has different values")
+
+    if len(levels1) == 0:
+        # Regular index product
+        indices1 = np.repeat(np.arange(len(index1)), len(index2))
+        indices2 = np.tile(np.arange(len(index2)), len(index1))
+    else:
+        # Block index product
+        index_levels1 = select_levels(index1, levels1)
+        index_levels2 = select_levels(index2, levels2)
+
+        block_levels1 = list(set(range(index1.nlevels)).difference(levels1))
+        block_levels2 = list(set(range(index2.nlevels)).difference(levels2))
+        if len(block_levels1) > 0:
+            index_block_levels1 = select_levels(index1, block_levels1)
         else:
-            for j in range(len(indexes)):
-                index_j = indexes[j]
-                if len(index_j) == max_len:
-                    try:
-                        indices.append(align_index_to(index_i, index_j))
-                        break
-                    except ValueError:
-                        pass
-            if len(indices) < i + 1:
-                raise ValueError(f"Index at position {i} could not be aligned")
-    return indices
+            index_block_levels1 = pd.Index(np.full(len(index1), 0))
+        if len(block_levels2) > 0:
+            index_block_levels2 = select_levels(index2, block_levels2)
+        else:
+            index_block_levels2 = pd.Index(np.full(len(index2), 0))
+
+        factorized = pd.factorize(pd.concat((index_levels1.to_series(), index_levels2.to_series())))[0]
+        factorized1 = factorized[: len(index_levels1)]
+        factorized2 = factorized[len(index_levels1) :]
+
+        block_factorized1, block_unique1 = pd.factorize(index_block_levels1)
+        block_factorized2, block_unique2 = pd.factorize(index_block_levels2)
+        block_group_map1 = get_group_map_nb(block_factorized1, len(block_unique1))
+        block_group_map2 = get_group_map_nb(block_factorized2, len(block_unique2))
+
+        indices1, indices2 = block_index_product_nb(
+            block_group_map1,
+            block_group_map2,
+            factorized1,
+            factorized2,
+        )
+    if return_new_index:
+        new_index = stack_indexes(index1[indices1], index2[indices2], drop_duplicates=True)
+        return (pd.IndexSlice[indices1], pd.IndexSlice[indices2]), new_index
+    return pd.IndexSlice[indices1], pd.IndexSlice[indices2]
+
+
+def cross_indexes(
+    *indexes: tp.MaybeTuple[tp.Index],
+    return_new_index: bool = False,
+) -> tp.Union[tp.Tuple[tp.IndexSlice, ...], tp.Tuple[tp.Tuple[tp.IndexSlice, ...], tp.Index]]:
+    """Cross multiple indexes with `cross_index_with`."""
+    if len(indexes) == 1:
+        indexes = indexes[0]
+    indexes = list(indexes)
+    if len(indexes) == 2:
+        return cross_index_with(indexes[0], indexes[1], return_new_index=return_new_index)
+
+    index = None
+    index_slices = []
+    for i in range(len(indexes) - 2, -1, -1):
+        index1 = indexes[i]
+        if i == len(indexes) - 2:
+            index2 = indexes[i + 1]
+        else:
+            index2 = index
+        (index_slice1, index_slice2), index = cross_index_with(index1, index2, return_new_index=True)
+        if i == len(indexes) - 2:
+            index_slices.append(index_slice2)
+        else:
+            for j in range(len(index_slices)):
+                if isinstance(index_slices[j], slice):
+                    index_slices[j] = np.arange(len(index2))[index_slices[j]]
+                index_slices[j] = index_slices[j][index_slice2]
+        index_slices.append(index_slice1)
+
+    if return_new_index:
+        return tuple(index_slices[::-1]), index
+    return tuple(index_slices[::-1])
 
 
 OptionalLevelSequence = tp.Optional[tp.Sequence[tp.Union[None, tp.Level]]]
@@ -772,16 +937,3 @@ def find_first_occurrence(index_value: tp.Any, index: tp.Index) -> int:
     elif isinstance(loc, np.ndarray):
         return np.flatnonzero(loc)[0]
     return loc
-
-
-def cross_indexes(*indexes: tp.MaybeTuple[tp.Index]) -> tp.List[tp.IndexSlice]:
-    """Build a Cartesian product of indexes.
-
-    Takes into account any levels they have in common.
-
-    Returns index slice for each index."""
-    if len(indexes) == 1:
-        indexes = indexes[0]
-    indexes = list(indexes)
-
-    common_levels = set()

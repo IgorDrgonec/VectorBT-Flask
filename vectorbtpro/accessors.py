@@ -58,6 +58,7 @@ __all__ = [
     "Vbt_Accessor",
     "Vbt_SRAccessor",
     "Vbt_DFAccessor",
+    "idx_acc",
     "pd_acc",
     "sr_acc",
     "df_acc",
@@ -163,6 +164,12 @@ class Vbt_IDXAccessor(DirNamesMixin, BaseIDXAccessor):
 
         DirNamesMixin.__init__(self)
         BaseIDXAccessor.__init__(self, obj, **kwargs)
+
+
+idx_acc = Vbt_IDXAccessor
+"""Shortcut for `Vbt_IDXAccessor`."""
+
+__pdoc__["idx_acc"] = False
 
 
 class Vbt_Accessor(DirNamesMixin, GenericAccessor):

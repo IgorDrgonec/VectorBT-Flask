@@ -97,24 +97,30 @@ class BaseIDXAccessor(Configured):
         """See `vectorbtpro.base.indexes.stack_indexes`."""
         others = tuple(map(lambda x: x.obj if isinstance(x, BaseIDXAccessor) else x, others))
         if isinstance(cls_or_self, type):
-            return indexes.stack_indexes(*others, **kwargs)
-        return indexes.stack_indexes(cls_or_self.obj, *others, **kwargs)
+            objs = others
+        else:
+            objs = (cls_or_self.obj, *others)
+        return indexes.stack_indexes(*objs, **kwargs)
 
     @class_or_instancemethod
     def combine(cls_or_self, *others: tp.Union[tp.IndexLike, "BaseIDXAccessor"], **kwargs) -> tp.Index:
         """See `vectorbtpro.base.indexes.combine_indexes`."""
         others = tuple(map(lambda x: x.obj if isinstance(x, BaseIDXAccessor) else x, others))
         if isinstance(cls_or_self, type):
-            return indexes.combine_indexes(*others, **kwargs)
-        return indexes.combine_indexes(cls_or_self.obj, *others, **kwargs)
+            objs = others
+        else:
+            objs = (cls_or_self.obj, *others)
+        return indexes.combine_indexes(*objs, **kwargs)
 
     @class_or_instancemethod
     def concat(cls_or_self, *others: tp.Union[tp.IndexLike, "BaseIDXAccessor"], **kwargs) -> tp.Index:
         """See `vectorbtpro.base.indexes.concat_indexes`."""
         others = tuple(map(lambda x: x.obj if isinstance(x, BaseIDXAccessor) else x, others))
         if isinstance(cls_or_self, type):
-            return indexes.concat_indexes(*others, **kwargs)
-        return indexes.concat_indexes(cls_or_self.obj, *others, **kwargs)
+            objs = others
+        else:
+            objs = (cls_or_self.obj, *others)
+        return indexes.concat_indexes(*objs, **kwargs)
 
     def drop_levels(self, *args, **kwargs) -> tp.Index:
         """See `vectorbtpro.base.indexes.drop_levels`."""
@@ -139,6 +145,40 @@ class BaseIDXAccessor(Configured):
     def align_to(self, *args, **kwargs) -> tp.IndexSlice:
         """See `vectorbtpro.base.indexes.align_index_to`."""
         return indexes.align_index_to(self.obj, *args, **kwargs)
+
+    @class_or_instancemethod
+    def align(
+        cls_or_self,
+        *others: tp.Union[tp.IndexLike, "BaseIDXAccessor"],
+        **kwargs,
+    ) -> tp.Tuple[tp.IndexSlice, ...]:
+        """See `vectorbtpro.base.indexes.align_indexes`."""
+        others = tuple(map(lambda x: x.obj if isinstance(x, BaseIDXAccessor) else x, others))
+        if isinstance(cls_or_self, type):
+            objs = others
+        else:
+            objs = (cls_or_self.obj, *others)
+        return indexes.align_indexes(*objs, **kwargs)
+
+    def cross_with(self, *args, **kwargs) -> tp.Tuple[tp.IndexSlice, tp.IndexSlice]:
+        """See `vectorbtpro.base.indexes.cross_index_with`."""
+        return indexes.cross_index_with(self.obj, *args, **kwargs)
+
+    @class_or_instancemethod
+    def cross(
+        cls_or_self,
+        *others: tp.Union[tp.IndexLike, "BaseIDXAccessor"],
+        **kwargs,
+    ) -> tp.Tuple[tp.IndexSlice, ...]:
+        """See `vectorbtpro.base.indexes.cross_indexes`."""
+        others = tuple(map(lambda x: x.obj if isinstance(x, BaseIDXAccessor) else x, others))
+        if isinstance(cls_or_self, type):
+            objs = others
+        else:
+            objs = (cls_or_self.obj, *others)
+        return indexes.cross_indexes(*objs, **kwargs)
+
+    x = cross
 
     def find_first_occurrence(self, *args, **kwargs) -> int:
         """See `vectorbtpro.base.indexes.find_first_occurrence`."""
@@ -202,8 +242,10 @@ class BaseIDXAccessor(Configured):
                 return (self.obj[-1] - self.obj[0]) / self.freq + 1
             if not wrapping_cfg["silence_warnings"]:
                 warnings.warn(
-                    "Couldn't parse the frequency of index. Pass it as `freq` or "
-                    "define it globally under `settings.wrapping`.",
+                    (
+                        "Couldn't parse the frequency of index. Pass it as `freq` or "
+                        "define it globally under `settings.wrapping`."
+                    ),
                     stacklevel=2,
                 )
         if isinstance(self.obj[0], int) and isinstance(self.obj[-1], int):
@@ -230,8 +272,10 @@ class BaseIDXAccessor(Configured):
         if freq is None:
             if not silence_warnings:
                 warnings.warn(
-                    "Couldn't parse the frequency of index. Pass it as `freq` or "
-                    "define it globally under `settings.wrapping`.",
+                    (
+                        "Couldn't parse the frequency of index. Pass it as `freq` or "
+                        "define it globally under `settings.wrapping`."
+                    ),
                     stacklevel=2,
                 )
             return a
@@ -1000,19 +1044,26 @@ class BaseAccessor(Wrapping):
                 )
         return repeated
 
-    def align_to(self, other: tp.SeriesFrame, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """Align to `other` on their axes.
+    def align_to(self, other: tp.SeriesFrame, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
+        """Align to `other` on their axes using `vectorbtpro.base.indexes.align_index_to`.
 
         Usage:
             ```pycon
-            >>> df1 = pd.DataFrame([[1, 2], [3, 4]], index=['x', 'y'], columns=['a', 'b'])
+            >>> df1 = pd.DataFrame(
+            ...     [[1, 2], [3, 4]],
+            ...     index=['x', 'y'],
+            ...     columns=['a', 'b']
+            ... )
             >>> df1
                a  b
             x  1  2
             y  3  4
 
-            >>> df2 = pd.DataFrame([[5, 6, 7, 8], [9, 10, 11, 12]], index=['x', 'y'],
-            ...     columns=pd.MultiIndex.from_arrays([[1, 1, 2, 2], ['a', 'b', 'a', 'b']]))
+            >>> df2 = pd.DataFrame(
+            ...     [[5, 6, 7, 8], [9, 10, 11, 12]],
+            ...     index=['x', 'y'],
+            ...     columns=pd.MultiIndex.from_arrays([[1, 1, 2, 2], ['a', 'b', 'a', 'b']])
+            ... )
             >>> df2
                    1       2
                a   b   a   b
@@ -1030,8 +1081,8 @@ class BaseAccessor(Wrapping):
         obj = reshaping.to_2d(self.obj)
         other = reshaping.to_2d(other)
 
-        aligned_index = indexes.align_index_to(obj.index, other.index)
-        aligned_columns = indexes.align_index_to(obj.columns, other.columns)
+        aligned_index = indexes.align_index_to(obj.index, other.index, **kwargs)
+        aligned_columns = indexes.align_index_to(obj.columns, other.columns, **kwargs)
         obj = obj.iloc[aligned_index, aligned_columns]
         return self.wrapper.wrap(
             obj.values,
@@ -1040,12 +1091,132 @@ class BaseAccessor(Wrapping):
         )
 
     @class_or_instancemethod
+    def align(
+        cls_or_self,
+        *others: tp.Union[tp.SeriesFrame, "BaseAccessor"],
+        **kwargs,
+    ) -> tp.Tuple[tp.SeriesFrame, ...]:
+        """Align objects using `vectorbtpro.base.indexes.align_indexes`."""
+        others = tuple(map(lambda x: x.obj if isinstance(x, BaseAccessor) else x, others))
+        if isinstance(cls_or_self, type):
+            objs = others
+        else:
+            objs = (cls_or_self.obj, *others)
+        objs_2d = list(map(reshaping.to_2d, objs))
+        index_slices, new_index = indexes.align_indexes(
+            *map(lambda x: x.index, objs_2d),
+            return_new_index=True,
+            **kwargs,
+        )
+        column_slices, new_columns = indexes.align_indexes(
+            *map(lambda x: x.columns, objs_2d),
+            return_new_index=True,
+            **kwargs,
+        )
+        new_objs = []
+        for i in range(len(objs_2d)):
+            new_obj = objs_2d[i].iloc[index_slices[i], column_slices[i]].copy(deep=False)
+            if objs[i].ndim == 1 and new_obj.shape[1] == 1:
+                new_obj = new_obj.iloc[:, 0].rename(objs[i].name)
+            new_obj.index = new_index
+            new_obj.columns = new_columns
+            new_objs.append(new_obj)
+        return tuple(new_objs)
+
+    def cross_with(self, other: tp.SeriesFrame, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """Align to `other` on their axes using `vectorbtpro.base.indexes.cross_index_with`.
+
+        Usage:
+            ```pycon
+            >>> df1 = pd.DataFrame(
+            ...     [[1, 2, 3, 4], [5, 6, 7, 8]],
+            ...     index=['x', 'y'],
+            ...     columns=pd.MultiIndex.from_arrays([[1, 1, 2, 2], ['a', 'b', 'a', 'b']])
+            ... )
+            >>> df1
+               1     2
+               a  b  a  b
+            x  1  2  3  4
+            y  5  6  7  8
+
+            >>> df2 = pd.DataFrame(
+            ...     [[9, 10, 11, 12], [13, 14, 15, 16]],
+            ...     index=['x', 'y'],
+            ...     columns=pd.MultiIndex.from_arrays([[3, 3, 4, 4], ['a', 'b', 'a', 'b']])
+            ... )
+            >>> df2
+                3       4
+                a   b   a   b
+            x   9  10  11  12
+            y  13  14  15  16
+
+            >>> df1.vbt.cross_with(df2)
+               1           2
+               3     4     3     4
+               a  b  a  b  a  b  a  b
+            x  1  2  1  2  3  4  3  4
+            y  5  6  5  6  7  8  7  8
+            ```
+        """
+        checks.assert_instance_of(other, (pd.Series, pd.DataFrame))
+        obj = reshaping.to_2d(self.obj)
+        other = reshaping.to_2d(other)
+
+        index_slices, new_index = indexes.cross_index_with(
+            obj.index,
+            other.index,
+            return_new_index=True,
+        )
+        column_slices, new_columns = indexes.cross_index_with(
+            obj.columns,
+            other.columns,
+            return_new_index=True,
+        )
+        obj = obj.iloc[index_slices[0], column_slices[0]]
+        return self.wrapper.wrap(
+            obj.values,
+            group_by=False,
+            **merge_dicts(dict(index=new_index, columns=new_columns), wrap_kwargs),
+        )
+
+    @class_or_instancemethod
+    def cross(cls_or_self, *others: tp.Union[tp.SeriesFrame, "BaseAccessor"]) -> tp.Tuple[tp.SeriesFrame, ...]:
+        """Align objects using `vectorbtpro.base.indexes.cross_indexes`."""
+        others = tuple(map(lambda x: x.obj if isinstance(x, BaseAccessor) else x, others))
+        if isinstance(cls_or_self, type):
+            objs = others
+        else:
+            objs = (cls_or_self.obj, *others)
+        objs_2d = list(map(reshaping.to_2d, objs))
+        index_slices, new_index = indexes.cross_indexes(
+            *map(lambda x: x.index, objs_2d),
+            return_new_index=True,
+        )
+        column_slices, new_columns = indexes.cross_indexes(
+            *map(lambda x: x.columns, objs_2d),
+            return_new_index=True,
+        )
+        new_objs = []
+        for i in range(len(objs_2d)):
+            new_obj = objs_2d[i].iloc[index_slices[i], column_slices[i]].copy(deep=False)
+            if objs[i].ndim == 1 and new_obj.shape[1] == 1:
+                new_obj = new_obj.iloc[:, 0].rename(objs[i].name)
+            new_obj.index = new_index
+            new_obj.columns = new_columns
+            new_objs.append(new_obj)
+        return tuple(new_objs)
+
+    x = cross
+
+    @class_or_instancemethod
     def broadcast(cls_or_self, *others: tp.Union[tp.ArrayLike, "BaseAccessor"], **kwargs) -> tp.Any:
         """See `vectorbtpro.base.reshaping.broadcast`."""
         others = tuple(map(lambda x: x.obj if isinstance(x, BaseAccessor) else x, others))
         if isinstance(cls_or_self, type):
-            return reshaping.broadcast(*others, **kwargs)
-        return reshaping.broadcast(cls_or_self.obj, *others, **kwargs)
+            objs = others
+        else:
+            objs = (cls_or_self.obj, *others)
+        return reshaping.broadcast(*objs, **kwargs)
 
     def broadcast_to(self, other: tp.Union[tp.ArrayLike, "BaseAccessor"], **kwargs) -> tp.Any:
         """See `vectorbtpro.base.reshaping.broadcast_to`."""
@@ -1058,8 +1229,10 @@ class BaseAccessor(Wrapping):
         """See `vectorbtpro.base.reshaping.broadcast_combs`."""
         others = tuple(map(lambda x: x.obj if isinstance(x, BaseAccessor) else x, others))
         if isinstance(cls_or_self, type):
-            return reshaping.broadcast_combs(*others, **kwargs)
-        return reshaping.broadcast_combs(cls_or_self.obj, *others, **kwargs)
+            objs = others
+        else:
+            objs = (cls_or_self.obj, *others)
+        return reshaping.broadcast_combs(*objs, **kwargs)
 
     def make_symmetric(self, *args, **kwargs) -> tp.Frame:
         """See `vectorbtpro.base.reshaping.make_symmetric`."""

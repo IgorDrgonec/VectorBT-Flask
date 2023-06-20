@@ -6411,6 +6411,145 @@ class TestAccessors:
             ),
         )
 
+    def test_align(self):
+        index1 = pd.MultiIndex.from_arrays([pd.Index(["a1", "a2"], name="a")])
+        index2 = pd.MultiIndex.from_arrays([pd.Index(["b1", "b2"], name="b")])
+        index3 = pd.MultiIndex.from_arrays(
+            [
+                pd.Index(["b2", "b2", "b1", "b1"], name="b"),
+                pd.Index(["a2", "a1", "a2", "a1"], name="a"),
+            ]
+        )
+        index4 = pd.MultiIndex.from_arrays(
+            [
+                pd.Index(["e1", "e1", "e1", "e1", "e2", "e2", "e2", "e2"], name="e"),
+                pd.Index(["b1", "b1", "b2", "b2", "b1", "b1", "b2", "b2"], name="b"),
+                pd.Index(["a1", "a2", "a1", "a2", "a1", "a2", "a1", "a2"], name="a"),
+            ]
+        )
+        df1 = pd.DataFrame([range(len(index1))], columns=index1)
+        df2 = pd.DataFrame([range(len(index2))], columns=index2)
+        df3 = pd.DataFrame([range(len(index3))], columns=index3)
+        df4 = pd.DataFrame([range(len(index4))], columns=index4)
+        new_df1, new_df2, new_df3, new_df4 = df1.vbt.align(df2, df3, df4)
+        new_columns = pd.MultiIndex.from_tuples(
+            [
+                ("e1", "b1", "a1"),
+                ("e1", "b1", "a2"),
+                ("e1", "b2", "a1"),
+                ("e1", "b2", "a2"),
+                ("e2", "b1", "a1"),
+                ("e2", "b1", "a2"),
+                ("e2", "b2", "a1"),
+                ("e2", "b2", "a2"),
+            ],
+            names=["e", "b", "a"],
+        )
+        assert_index_equal(new_df1.columns, new_columns)
+        assert_index_equal(new_df2.columns, new_columns)
+        assert_index_equal(new_df3.columns, new_columns)
+        assert_index_equal(new_df4.columns, new_columns)
+        np.testing.assert_array_equal(
+            new_df1.values,
+            np.array([[0, 1, 0, 1, 0, 1, 0, 1]]),
+        )
+        np.testing.assert_array_equal(
+            new_df2.values,
+            np.array([[0, 0, 1, 1, 0, 0, 1, 1]]),
+        )
+        np.testing.assert_array_equal(
+            new_df3.values,
+            np.array([[3, 2, 1, 0, 3, 2, 1, 0]]),
+        )
+        np.testing.assert_array_equal(
+            new_df4.values,
+            np.array([[0, 1, 2, 3, 4, 5, 6, 7]]),
+        )
+
+    def test_cross(self):
+        index1 = pd.MultiIndex.from_arrays([pd.Index(["a1", "a2"], name="a")])
+        index2 = pd.MultiIndex.from_arrays([pd.Index(["b1", "b2"], name="b")])
+        index3 = pd.MultiIndex.from_arrays(
+            [
+                pd.Index(["b2", "b2", "b1", "b1"], name="b"),
+                pd.Index(["a2", "a1", "a2", "a1"], name="a"),
+            ]
+        )
+        index4 = pd.MultiIndex.from_arrays(
+            [
+                pd.Index(["e1", "e1", "e1", "e1", "e2", "e2", "e2", "e2"], name="e"),
+                pd.Index(["b1", "b1", "b2", "b2", "b1", "b1", "b2", "b2"], name="b"),
+                pd.Index(["a1", "a2", "a1", "a2", "a1", "a2", "a1", "a2"], name="a"),
+            ]
+        )
+        index5 = pd.MultiIndex.from_arrays(
+            [
+                pd.Index(["c1", "c1", "c1", "c1", "c2", "c2", "c2", "c2", "c3", "c3", "c3", "c3"], name="c"),
+                pd.Index(["b1", "b1", "b2", "b2", "b1", "b1", "b2", "b2", "b1", "b1", "b2", "b2"], name="b"),
+                pd.Index(["a1", "a2", "a1", "a2", "a1", "a2", "a1", "a2", "a1", "a2", "a1", "a2"], name="a"),
+            ]
+        )
+        df1 = pd.DataFrame([range(len(index1))], columns=index1)
+        df2 = pd.DataFrame([range(len(index2))], columns=index2)
+        df3 = pd.DataFrame([range(len(index3))], columns=index3)
+        df4 = pd.DataFrame([range(len(index4))], columns=index4)
+        df5 = pd.DataFrame([range(len(index5))], columns=index5)
+        new_df1, new_df2, new_df3, new_df4, new_df5 = df1.vbt.x(df2, df3, df4, df5)
+        new_columns = pd.MultiIndex.from_tuples(
+            [
+                ("e1", "c1", "b1", "a1"),
+                ("e1", "c1", "b1", "a2"),
+                ("e1", "c1", "b2", "a1"),
+                ("e1", "c1", "b2", "a2"),
+                ("e1", "c2", "b1", "a1"),
+                ("e1", "c2", "b1", "a2"),
+                ("e1", "c2", "b2", "a1"),
+                ("e1", "c2", "b2", "a2"),
+                ("e1", "c3", "b1", "a1"),
+                ("e1", "c3", "b1", "a2"),
+                ("e1", "c3", "b2", "a1"),
+                ("e1", "c3", "b2", "a2"),
+                ("e2", "c1", "b1", "a1"),
+                ("e2", "c1", "b1", "a2"),
+                ("e2", "c1", "b2", "a1"),
+                ("e2", "c1", "b2", "a2"),
+                ("e2", "c2", "b1", "a1"),
+                ("e2", "c2", "b1", "a2"),
+                ("e2", "c2", "b2", "a1"),
+                ("e2", "c2", "b2", "a2"),
+                ("e2", "c3", "b1", "a1"),
+                ("e2", "c3", "b1", "a2"),
+                ("e2", "c3", "b2", "a1"),
+                ("e2", "c3", "b2", "a2"),
+            ],
+            names=["e", "c", "b", "a"],
+        )
+        assert_index_equal(new_df1.columns, new_columns)
+        assert_index_equal(new_df2.columns, new_columns)
+        assert_index_equal(new_df3.columns, new_columns)
+        assert_index_equal(new_df4.columns, new_columns)
+        assert_index_equal(new_df5.columns, new_columns)
+        np.testing.assert_array_equal(
+            new_df1.values,
+            np.array([[0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]]),
+        )
+        np.testing.assert_array_equal(
+            new_df2.values,
+            np.array([[0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1]]),
+        )
+        np.testing.assert_array_equal(
+            new_df3.values,
+            np.array([[3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0]]),
+        )
+        np.testing.assert_array_equal(
+            new_df4.values,
+            np.array([[0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7]]),
+        )
+        np.testing.assert_array_equal(
+            new_df5.values,
+            np.array([[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]]),
+        )
+
     def test_broadcast(self):
         a, b = pd.Series.vbt.broadcast(sr2, 10)
         b_target = pd.Series(np.full(sr2.shape, 10), index=sr2.index, name=sr2.name)
