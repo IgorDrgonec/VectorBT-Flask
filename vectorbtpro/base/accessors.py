@@ -56,9 +56,13 @@ class BaseIDXAccessor(Configured):
         self._freq = freq
 
     @property
-    def obj(self):
+    def obj(self) -> tp.Index:
         """Pandas object."""
         return self._obj
+
+    def get(self) -> tp.Index:
+        """Get `IDXAccessor.obj`."""
+        return self.obj
 
     # ############# Index ############# #
 
@@ -673,6 +677,12 @@ class BaseAccessor(Wrapping):
                     if isinstance(self._obj, pd.DataFrame) and self._obj.columns is self.wrapper.columns:
                         return self._obj
         return self.wrapper.wrap(self._obj, group_by=False)
+
+    def get(self, key: tp.Optional[tp.Hashable] = None, default: tp.Optional[tp.Any] = None) -> tp.SeriesFrame:
+        """Get `BaseAccessor.obj`."""
+        if key is None:
+            return self.obj
+        return self.obj.get(key, default=default)
 
     @class_or_instanceproperty
     def ndim(cls_or_self) -> tp.Optional[int]:

@@ -205,6 +205,10 @@ class idxLoc(iLoc):
         columns = get_index(obj, 1)
         freq = dt.infer_index_freq(index)
         row_idxs, col_idxs = get_idxs(key, index=index, columns=columns, freq=freq)
+        if isinstance(row_idxs, np.ndarray) and row_idxs.ndim == 2:
+            row_idxs = np.concatenate(tuple(map(lambda x: np.arange(x[0], x[1]), row_idxs)))
+        if isinstance(col_idxs, np.ndarray) and col_idxs.ndim == 2:
+            col_idxs = np.concatenate(tuple(map(lambda x: np.arange(x[0], x[1]), col_idxs)))
         if isinstance(obj, pd.Series):
             if not isinstance(col_idxs, (slice, hslice)) or (
                 col_idxs.start is not None or col_idxs.stop is not None or col_idxs.step is not None
@@ -1542,6 +1546,7 @@ class AutoIdxr(UniIdxr):
         tp.MaybeSequence[tp.Label],
         tp.MaybeSequence[tp.DatetimeLike],
         tp.FrequencyLike,
+        tp.TimeLike,
         tp.Slice,
     ] = attr.ib()
     """One or more integer indices, datetime-like objects, frequency-like objects, or labels."""
@@ -1566,7 +1571,7 @@ class AutoIdxr(UniIdxr):
     * "mask" for `MaskIdxr`
     * "labels" for `LabelIdxr`
     * "datetime" for `DatetimeIdxr`
-    * "frequency" for `PointIdxr`
+    * "frequency" for `PointIdxr` or `RangeIdxr`
 
     If None, will (try to) determine automatically based on the type of indices."""
 
@@ -1577,6 +1582,7 @@ class AutoIdxr(UniIdxr):
     ) -> tp.MaybeIndexArray:
         if self.value is None:
             return slice(None, None, None)
+        value = self.value
         kind = self.kind
         if self.level is not None:
             from vectorbtpro.base.indexes import select_levels
@@ -1586,12 +1592,14 @@ class AutoIdxr(UniIdxr):
             index = select_levels(index, self.level)
             if kind is None:
                 kind = "labels"
+        idxr_kwargs = dict()
+        use_range_idxr = False
 
         if kind is None:
-            if isinstance(self.value, (slice, hslice)):
-                if checks.is_int(self.value.start) or checks.is_int(self.value.stop):
+            if isinstance(value, (slice, hslice)):
+                if checks.is_int(value.start) or checks.is_int(value.stop):
                     kind = "positions"
-                elif self.value.start is None and self.value.stop is None:
+                elif value.start is None and value.stop is None:
                     kind = "positions"
                 else:
                     if index is None:
@@ -1600,23 +1608,23 @@ class AutoIdxr(UniIdxr):
                         kind = "datetime"
                     else:
                         kind = "labels"
-            elif (checks.is_sequence(self.value) and not np.isscalar(self.value)) and (
+            elif (checks.is_sequence(value) and not np.isscalar(value)) and (
                 index is None
                 or (
                     not isinstance(index, pd.MultiIndex)
-                    or (isinstance(index, pd.MultiIndex) and isinstance(self.value[0], tuple))
+                    or (isinstance(index, pd.MultiIndex) and isinstance(value[0], tuple))
                 )
             ):
-                if checks.is_bool(self.value[0]):
+                if checks.is_bool(value[0]):
                     kind = "mask"
-                elif checks.is_int(self.value[0]):
+                elif checks.is_int(value[0]):
                     kind = "positions"
                 elif (
-                    (index is None or not isinstance(index, pd.MultiIndex) or not isinstance(self.value[0], tuple))
-                    and checks.is_sequence(self.value[0])
-                    and len(self.value[0]) == 2
-                    and checks.is_int(self.value[0][0])
-                    and checks.is_int(self.value[0][1])
+                    (index is None or not isinstance(index, pd.MultiIndex) or not isinstance(value[0], tuple))
+                    and checks.is_sequence(value[0])
+                    and len(value[0]) == 2
+                    and checks.is_int(value[0][0])
+                    and checks.is_int(value[0][1])
                 ):
                     kind = "positions"
                 else:
@@ -1627,25 +1635,43 @@ class AutoIdxr(UniIdxr):
                     else:
                         kind = "labels"
             else:
-                if checks.is_bool(self.value):
+                if checks.is_bool(value):
                     kind = "mask"
-                elif checks.is_int(self.value):
+                elif checks.is_int(value):
                     kind = "positions"
                 else:
                     if index is None:
                         raise ValueError("Index is required")
                     if isinstance(index, pd.DatetimeIndex):
-                        if isinstance(self.value, str):
+                        if isinstance(value, str):
                             try:
-                                _ = dt.parse_timedelta(self.value)
+                                _ = dt.parse_timedelta(value)
                                 kind = "frequency"
                             except Exception as e:
                                 try:
-                                    _ = dt.to_timestamp(self.value)
-                                    kind = "datetime"
+                                    start_time, end_time = value.split("-")
+                                    start_time = start_time.strip()
+                                    end_time = end_time.strip()
+                                    _ = dt.time_to_timedelta(start_time)
+                                    _ = dt.time_to_timedelta(end_time)
+                                    idxr_kwargs["start_time"] = start_time
+                                    idxr_kwargs["end_time"] = end_time
+                                    value = None
+                                    kind = "frequency"
+                                    use_range_idxr = True
                                 except Exception as e:
-                                    raise ValueError(f"'{self.value}' is neither a frequency nor a datetime")
-                        elif checks.is_frequency(self.value):
+                                    try:
+                                        _ = dt.time_to_timedelta(value)
+                                        idxr_kwargs["at_time"] = value
+                                        value = None
+                                        kind = "frequency"
+                                    except Exception as e:
+                                        try:
+                                            _ = dt.to_timestamp(value)
+                                            kind = "datetime"
+                                        except Exception as e:
+                                            raise ValueError(f"'{value}' is neither a frequency nor a datetime")
+                        elif checks.is_frequency(value):
                             kind = "frequency"
                         else:
                             kind = "datetime"
@@ -1653,27 +1679,26 @@ class AutoIdxr(UniIdxr):
                         kind = "labels"
 
         if kind.lower() == "positions":
-            idx = PosIdxr(self.value)
+            idx = PosIdxr(value)
         elif kind.lower() == "mask":
-            idx = MaskIdxr(self.value)
+            idx = MaskIdxr(value)
         elif kind.lower() == "labels":
-            idxr_kwargs = dict()
             if self.closed_end is not _DEF:
                 idxr_kwargs["closed_end"] = self.closed_end
-            idx = LabelIdxr(self.value, **idxr_kwargs)
+            idx = LabelIdxr(value, **idxr_kwargs)
         elif kind.lower() == "datetime":
-            idxr_kwargs = dict()
             if self.closed_end is not _DEF:
                 idxr_kwargs["closed_end"] = self.closed_end
             if self.indexer_method is not _DEF:
                 idxr_kwargs["indexer_method"] = self.indexer_method
-            idx = DatetimeIdxr(self.value, **idxr_kwargs)
+            idx = DatetimeIdxr(value, **idxr_kwargs)
         elif kind.lower() == "frequency":
-            idxr_kwargs = dict()
-            if self.indexer_method is not _DEF:
-                idxr_kwargs["indexer_method"] = self.indexer_method
-            idxr_kwargs["skip_minus_one"] = False
-            idx = PointIdxr(every=self.value, **idxr_kwargs)
+            if use_range_idxr:
+                idx = RangeIdxr(every=value, **idxr_kwargs)
+            else:
+                if self.indexer_method is not _DEF:
+                    idxr_kwargs["indexer_method"] = self.indexer_method
+                idx = PointIdxr(every=value, **idxr_kwargs)
         else:
             raise ValueError(f"Invalid option kind='{kind}'")
         return idx.get(index=index, freq=freq)
