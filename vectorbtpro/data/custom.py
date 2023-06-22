@@ -1275,7 +1275,7 @@ class YFData(RemoteData):
         history_kwargs = merge_dicts(yf_cfg["history_kwargs"], history_kwargs)
 
         ticker = yf.Ticker(symbol)
-        def_history_kwargs = get_func_kwargs(ticker.history)
+        def_history_kwargs = get_func_kwargs(yf.Tickers.history)
         ticker_tz = ticker._get_ticker_tz(
             history_kwargs.get("proxy", def_history_kwargs["proxy"]),
             history_kwargs.get("timeout", def_history_kwargs["timeout"]),
