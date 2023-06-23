@@ -818,7 +818,7 @@ def broadcast(
     ignore_sr_names: tp.Optional[bool] = None,
     ignore_ranges: tp.Optional[bool] = None,
     check_index_names: tp.Optional[bool] = None,
-    **index_stack_kwargs,
+    index_stack_kwargs: tp.KwargsLike = None,
 ) -> tp.Any:
     """Bring any array-like object in `args` to the same shape by using NumPy-like broadcasting.
 
@@ -887,7 +887,7 @@ def broadcast(
         ignore_sr_names (bool): See `broadcast_index`.
         ignore_ranges (bool): See `broadcast_index`.
         check_index_names (bool): See `broadcast_index`.
-        **index_stack_kwargs: Keyword arguments passed to `vectorbtpro.base.indexes.stack_indexes`.
+        index_stack_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.indexes.stack_indexes`.
 
     For defaults, see `vectorbtpro._settings.broadcasting`.
 
@@ -1195,6 +1195,8 @@ def broadcast(
         merge_arg_names = get_func_arg_names(pd.DataFrame.merge)
         if set(merge_kwargs) <= set(merge_arg_names):
             merge_kwargs_per_obj = False
+    if index_stack_kwargs is None:
+        index_stack_kwargs = {}
     if checks.is_mapping(args[0]) and not isinstance(args[0], indexing.index_dict):
         if len(args) > 1:
             raise ValueError("Only one argument is allowed when passing a mapping")

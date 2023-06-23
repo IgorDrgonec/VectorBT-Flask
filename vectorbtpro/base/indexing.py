@@ -41,6 +41,7 @@ __all__ = [
     "dtcidx",
     "pointidx",
     "rangeidx",
+    "autoidx",
     "rowidx",
     "colidx",
     "idx",
@@ -213,9 +214,9 @@ class idxLoc(iLoc):
         freq = dt.infer_index_freq(index)
         row_idxs, col_idxs = get_idxs(key, index=index, columns=columns, freq=freq)
         if isinstance(row_idxs, np.ndarray) and row_idxs.ndim == 2:
-            row_idxs = np.concatenate(tuple(map(lambda x: np.arange(x[0], x[1]), row_idxs)))
+            row_idxs = normalize_idxs(row_idxs, target_len=len(index))
         if isinstance(col_idxs, np.ndarray) and col_idxs.ndim == 2:
-            col_idxs = np.concatenate(tuple(map(lambda x: np.arange(x[0], x[1]), col_idxs)))
+            col_idxs = normalize_idxs(col_idxs, target_len=len(columns))
         if isinstance(obj, pd.Series):
             if not isinstance(col_idxs, (slice, hslice)) or (
                 col_idxs.start is not None or col_idxs.stop is not None or col_idxs.step is not None
@@ -522,8 +523,23 @@ class IdxrBase:
             )
 
 
+def normalize_idxs(idxs: tp.MaybeIndexArray, target_len: int) -> tp.Array1d:
+    """Normalize indexes into a 1-dim integer array."""
+    if isinstance(idxs, hslice):
+        idxs = idxs.to_slice()
+    if isinstance(idxs, slice):
+        idxs = np.arange(target_len)[idxs]
+    if checks.is_int(idxs):
+        idxs = np.array([idxs])
+    if idxs.ndim == 2:
+        idxs = np.concatenate(tuple(map(lambda x: np.arange(x[0], x[1]), idxs)))
+    if (idxs < 0).any():
+        idxs = np.where(idxs >= 0, idxs, target_len + idxs)
+    return idxs
+
+
 class UniIdxr(IdxrBase):
-    """Abstract class for resolving indices."""
+    """Abstract class for resolving indices based on a single index."""
 
     def get(
         self,
@@ -531,6 +547,112 @@ class UniIdxr(IdxrBase):
         freq: tp.Optional[tp.FrequencyLike] = None,
     ) -> tp.MaybeIndexArray:
         raise NotImplementedError
+
+    def __invert__(self):
+        def _op_func(x, index=None, freq=None):
+            if index is None:
+                raise ValueError("Index is required")
+            x = normalize_idxs(x, len(index))
+            return np.setdiff1d(np.arange(len(index)), x)
+
+        return UniIdxrOp(_op_func, self)
+
+    def __and__(self, other):
+        def _op_func(x, y, index=None, freq=None):
+            if index is None:
+                raise ValueError("Index is required")
+            x = normalize_idxs(x, len(index))
+            y = normalize_idxs(y, len(index))
+            return np.intersect1d(x, y)
+
+        return UniIdxrOp(_op_func, self, other)
+
+    def __or__(self, other):
+        def _op_func(x, y, index=None, freq=None):
+            if index is None:
+                raise ValueError("Index is required")
+            x = normalize_idxs(x, len(index))
+            y = normalize_idxs(y, len(index))
+            return np.union1d(x, y)
+
+        return UniIdxrOp(_op_func, self, other)
+
+    def __sub__(self, other):
+        def _op_func(x, y, index=None, freq=None):
+            if index is None:
+                raise ValueError("Index is required")
+            x = normalize_idxs(x, len(index))
+            y = normalize_idxs(y, len(index))
+            return np.setdiff1d(x, y)
+
+        return UniIdxrOp(_op_func, self, other)
+
+    def __xor__(self, other):
+        def _op_func(x, y, index=None, freq=None):
+            if index is None:
+                raise ValueError("Index is required")
+            x = normalize_idxs(x, len(index))
+            y = normalize_idxs(y, len(index))
+            return np.setxor1d(x, y)
+
+        return UniIdxrOp(_op_func, self, other)
+
+    def __lshift__(self, other):
+        def _op_func(x, y, index=None, freq=None):
+            if not checks.is_int(y):
+                raise TypeError("Second operand in __lshift__ must be an integer")
+            if index is None:
+                raise ValueError("Index is required")
+            x = normalize_idxs(x, len(index))
+            shifted = x - y
+            return shifted[shifted >= 0]
+
+        return UniIdxrOp(_op_func, self, other)
+
+    def __rshift__(self, other):
+        def _op_func(x, y, index=None, freq=None):
+            if not checks.is_int(y):
+                raise TypeError("Second operand in __rshift__ must be an integer")
+            if index is None:
+                raise ValueError("Index is required")
+            x = normalize_idxs(x, len(index))
+            shifted = x + y
+            return shifted[shifted >= 0]
+
+        return UniIdxrOp(_op_func, self, other)
+
+
+@attr.s(frozen=True, init=False)
+class UniIdxrOp(UniIdxr):
+    """Class for applying an operation to one or more indexers.
+
+    Produces a single set of indices."""
+
+    op_func: tp.Callable = attr.ib()
+    """Operation function that takes the indices of each indexer (as `*args`), `index` (keyword argument), 
+    and `freq` (keyword argument), and returns new indices."""
+
+    idxrs: tp.Tuple[object, ...] = attr.ib()
+    """A tuple of one or more indexers."""
+
+    def __init__(self, op_func: tp.Callable, *idxrs) -> None:
+        if len(idxrs) == 1 and checks.is_iterable(idxrs[0]):
+            idxrs = idxrs[0]
+        self.__attrs_init__(op_func=op_func, idxrs=idxrs)
+
+    def get(
+        self,
+        index: tp.Optional[tp.Index] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+    ) -> tp.MaybeIndexArray:
+        idxr_indices = []
+        for idxr in self.idxrs:
+            if isinstance(idxr, IdxrBase):
+                checks.assert_instance_of(idxr, UniIdxr)
+                idxr_indices.append(idxr.get(index=index, freq=freq))
+            else:
+                idxr_indices.append(idxr)
+        return self.op_func(*idxr_indices, index=index, freq=freq)
 
 
 @attr.s(frozen=True)
@@ -1614,7 +1736,7 @@ def get_index_ranges(
     return range_starts, range_ends
 
 
-@attr.s(frozen=True)
+@attr.s(frozen=True, init=False)
 class AutoIdxr(UniIdxr):
     """Class for resolving indices, datetime-like objects, frequency-like objects, and labels for one axis."""
 
@@ -1657,6 +1779,21 @@ class AutoIdxr(UniIdxr):
 
     If None, will (try to) determine automatically based on the type of indices."""
 
+    idxr_kwargs: tp.KwargsLike = attr.ib(default=None)
+    """Keyword arguments passed to the selected indexer."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        idxr_kwargs = kwargs.pop("idxr_kwargs", None)
+        if idxr_kwargs is None:
+            idxr_kwargs = {}
+        else:
+            idxr_kwargs = dict(idxr_kwargs)
+        builtin_keys = {a.name for a in self.__attrs_attrs__}
+        for k in list(kwargs.keys()):
+            if k not in builtin_keys:
+                idxr_kwargs[k] = kwargs.pop(k)
+        self.__attrs_init__(*args, idxr_kwargs=idxr_kwargs, **kwargs)
+
     def get(
         self,
         index: tp.Optional[tp.Index] = None,
@@ -1674,7 +1811,12 @@ class AutoIdxr(UniIdxr):
             index = select_levels(index, self.level)
             if kind is None:
                 kind = "labels"
-        idxr_kwargs = dict()
+        if self.idxr_kwargs is None:
+            idxr_kwargs = self.idxr_kwargs
+        else:
+            idxr_kwargs = None
+        if idxr_kwargs is None:
+            idxr_kwargs = {}
         if self.closed_start is not _DEF:
             idxr_kwargs["closed_start"] = self.closed_start
         if self.closed_end is not _DEF:
@@ -2512,6 +2654,11 @@ rangeidx = RangeIdxr
 """Shortcut for `RangeIdxr`."""
 
 __pdoc__["rangeidx"] = False
+
+autoidx = AutoIdxr
+"""Shortcut for `AutoIdxr`."""
+
+__pdoc__["autoidx"] = False
 
 rowidx = RowIdxr
 """Shortcut for `RowIdxr`."""

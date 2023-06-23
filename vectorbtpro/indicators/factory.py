@@ -3081,7 +3081,8 @@ Other keyword arguments are passed to `{0}.run`.
                 if wrapper.freq is None:
                     if not silence_warnings:
                         warnings.warn(
-                            "Couldn't parse the frequency of index. Set freq in broadcast_kwargs or globally.",
+                            "Couldn't parse the frequency of index. "
+                            "Set freq in wrapper_kwargs via broadcast_kwargs, or globally.",
                             stacklevel=2,
                         )
                 new_input_tuple = ()
