@@ -3,7 +3,7 @@
 """General types used across vectorbtpro."""
 
 from enum import EnumMeta
-from datetime import datetime, timedelta, tzinfo, time
+from datetime import datetime, timedelta, tzinfo, date, time
 from pathlib import Path
 from typing import *
 
@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from vectorbtpro.utils.chunking import Sizer, ChunkTaker, ChunkMeta, ChunkMetaGenerator
     from vectorbtpro.utils.jitting import Jitter
     from vectorbtpro.utils.template import CustomTemplate
+    from vectorbtpro.utils.datetime_ import DTC, DTCNT
     from vectorbtpro.base.indexing import hslice
     from vectorbtpro.base.grouping.base import Grouper
     from vectorbtpro.base.resampling.base import Resampler
@@ -57,6 +58,8 @@ else:
     Resampler = "Resampler"
     FixRange = "FixRange"
     RelRange = "RelRange"
+    DTC = "DTC"
+    DTCNT = "DTCNT"
 
 __all__ = []
 
@@ -138,6 +141,7 @@ TimeLike = Union[str, time]
 PandasFrequency = Union[pd.Timedelta, pd.DateOffset]
 PandasDatetimeIndex = Union[pd.DatetimeIndex, pd.PeriodIndex]
 AnyPandasFrequency = Union[None, int, float, PandasFrequency]
+DTCLike = Union[None, str, int, time, date, Datetime, DTC, DTCNT]
 
 # Indexing
 Slice = Union[slice, hslice]

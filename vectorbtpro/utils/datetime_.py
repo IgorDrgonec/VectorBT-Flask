@@ -2,8 +2,10 @@
 
 """Utilities for working with dates and time."""
 
+import attr
 import warnings
-from datetime import datetime, timezone, timedelta, tzinfo, time
+from datetime import datetime, timezone, timedelta, tzinfo, date, time
+from collections import namedtuple
 
 import numpy as np
 import pandas as pd
@@ -11,11 +13,12 @@ from pandas.tseries.frequencies import to_offset
 import re
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts
 
-__all__ = []
+__all__ = [
+    "DTC",
+]
 
 PandasDatetimeIndex = (pd.DatetimeIndex, pd.PeriodIndex)
 
@@ -120,18 +123,219 @@ def parse_timedelta(td: tp.TimedeltaLike) -> tp.Union[pd.Timedelta, pd.DateOffse
         return freq_to_timedelta(td)
 
 
-def time_to_timedelta(time: tp.TimeLike) -> pd.Timedelta:
-    """Convert a time-like object into `pd.Timedelta`."""
-    from dateutil.parser import parse
+DTCNT = namedtuple("DTCNT", ["year", "month", "day", "weekday", "hour", "minute", "second", "nanosecond"])
+"""Named tuple version of `DTC`."""
 
-    if isinstance(time, str):
-        time = parse(time).time()
+
+DTCT = tp.TypeVar("DTCT", bound="DTC")
+
+
+@attr.s(frozen=True)
+class DTC:
+    """Class representing one or more datetime components."""
+
+    year: tp.Optional[int] = attr.ib(default=None)
+    """Year."""
+
+    month: tp.Optional[int] = attr.ib(default=None)
+    """Month."""
+
+    day: tp.Optional[int] = attr.ib(default=None)
+    """Day of month."""
+
+    weekday: tp.Optional[int] = attr.ib(default=None)
+    """Day of week."""
+
+    hour: tp.Optional[int] = attr.ib(default=None)
+    """Hour."""
+
+    minute: tp.Optional[int] = attr.ib(default=None)
+    """Minute."""
+
+    second: tp.Optional[int] = attr.ib(default=None)
+    """Second."""
+
+    nanosecond: tp.Optional[int] = attr.ib(default=None)
+    """Nanosecond."""
+
+    @classmethod
+    def from_datetime(cls: tp.Type[DTCT], dt: tp.Datetime) -> DTCT:
+        """Get `DTC` instance from a `datetime.datetime` object."""
+        if isinstance(dt, np.datetime64):
+            dt = pd.Timestamp(dt)
+        if isinstance(dt, pd.Timestamp):
+            nanosecond = dt.microsecond * 1000 + dt.nanosecond
+            dt = dt.to_pydatetime(warn=False)
+        else:
+            nanosecond = dt.microsecond * 1000
+        return cls(
+            year=dt.year,
+            month=dt.month,
+            day=dt.day,
+            weekday=dt.weekday(),
+            hour=dt.hour,
+            minute=dt.minute,
+            second=dt.second,
+            nanosecond=nanosecond,
+        )
+
+    @classmethod
+    def from_date(cls: tp.Type[DTCT], d: date) -> DTCT:
+        """Get `DTC` instance from a `datetime.date` object."""
+        return cls(year=d.year, month=d.month, day=d.day, weekday=d.weekday())
+
+    @classmethod
+    def from_time(cls: tp.Type[DTCT], t: time) -> DTCT:
+        """Get `DTC` instance from a `datetime.time` object."""
+        return cls(hour=t.hour, minute=t.minute, second=t.second, nanosecond=t.microsecond * 1000)
+
+    @classmethod
+    def parse_time_str(cls: tp.Type[DTCT], time_str: str, **parse_kwargs) -> DTCT:
+        """Parse `DTC` instance from a time string."""
+        from dateutil.parser import parser
+
+        result = parser()._parse(time_str, **parse_kwargs)[0]
+        if result.microsecond is None:
+            nanosecond = None
+        else:
+            nanosecond = result.microsecond * 1000
+        return cls(
+            year=result.year,
+            month=result.month,
+            day=result.day,
+            weekday=result.weekday,
+            hour=result.hour,
+            minute=result.minute,
+            second=result.second,
+            nanosecond=nanosecond,
+        )
+
+    @classmethod
+    def from_namedtuple(cls: tp.Type[DTCT], dtc: DTCNT) -> DTCT:
+        """Get `DTC` instance from a named tuple of the type `DTCNT`."""
+        return cls(
+            year=dtc.year,
+            month=dtc.month,
+            day=dtc.day,
+            weekday=dtc.weekday,
+            hour=dtc.hour,
+            minute=dtc.minute,
+            second=dtc.second,
+            nanosecond=dtc.nanosecond,
+        )
+
+    @classmethod
+    def parse(cls: tp.Type[DTCT], dtc_like: tp.DTCLike, **parse_kwargs) -> DTCT:
+        """Parse `DTC` instance from a datetime-component-like object."""
+        if checks.is_namedtuple(dtc_like):
+            return cls.from_namedtuple(dtc_like)
+        if isinstance(dtc_like, np.datetime64):
+            dtc_like = pd.Timestamp(dtc_like)
+        if isinstance(dtc_like, pd.Timestamp):
+            if dtc_like.tzinfo is not None:
+                raise ValueError("DTC doesn't support timezones")
+            dtc_like = dtc_like.to_pydatetime()
+        if isinstance(dtc_like, datetime):
+            if dtc_like.tzinfo is not None:
+                raise ValueError("DTC doesn't support timezones")
+            return cls.from_datetime(dtc_like)
+        if isinstance(dtc_like, date):
+            return cls.from_date(dtc_like)
+        if isinstance(dtc_like, time):
+            return cls.from_time(dtc_like)
+        if isinstance(dtc_like, (int, str)):
+            return cls.parse_time_str(str(dtc_like), **parse_kwargs)
+        raise TypeError(f"Invalid type {type(dtc_like)}")
+
+    @classmethod
+    def is_parsable(
+        cls: tp.Type[DTCT],
+        dtc_like: tp.DTCLike,
+        check_func: tp.Optional[tp.Callable] = None,
+        **parse_kwargs,
+    ) -> bool:
+        """Check whether a datetime-component-like object is parsable."""
+        try:
+            if isinstance(dtc_like, DTC):
+                return True
+            dtc = cls.parse(dtc_like, **parse_kwargs)
+            if check_func is not None and not check_func(dtc):
+                return False
+            return True
+        except Exception as e:
+            pass
+        return False
+
+    def has_date(self) -> bool:
+        """Whether any date component is set."""
+        return self.year is not None or self.month is not None or self.day is not None
+
+    def has_full_date(self) -> bool:
+        """Whether all date components are set."""
+        return self.year is not None and self.month is not None and self.day is not None
+
+    def has_weekday(self) -> bool:
+        """Whether the weekday component is set."""
+        return self.weekday is not None
+
+    def has_time(self) -> bool:
+        """Whether any time component is set."""
+        return (
+            self.hour is not None or self.minute is not None or self.second is not None or self.nanosecond is not None
+        )
+
+    def has_full_time(self) -> bool:
+        """Whether all time components are set."""
+        return (
+            self.hour is not None
+            and self.minute is not None
+            and self.second is not None
+            and self.nanosecond is not None
+        )
+
+    def has_full_datetime(self) -> bool:
+        """Whether all components are set."""
+        return self.has_full_date() and self.has_full_time()
+
+    def is_not_none(self) -> bool:
+        """Check whether any component is set."""
+        return self.has_date() or self.has_weekday() or self.has_time()
+
+    def to_time(self) -> time:
+        """Convert to a `datetime.time` instance.
+
+        Fields that are None will become 0."""
+        return time(
+            hour=self.hour if self.hour is not None else 0,
+            minute=self.minute if self.minute is not None else 0,
+            second=self.second if self.second is not None else 0,
+            microsecond=self.nanosecond // 1000 if self.nanosecond is not None else 0,
+        )
+
+    def to_namedtuple(self) -> namedtuple:
+        """Convert to a named tuple."""
+        return DTCNT(*attr.asdict(self).values())
+
+
+def time_to_timedelta(t: tp.Union[tp.TimeLike, DTC], **kwargs) -> pd.Timedelta:
+    """Convert a time-like object into `pd.Timedelta`."""
+    if isinstance(t, str):
+        t = DTC.parse_time_str(t, **kwargs)
+    if isinstance(t, DTC):
+        if t.has_date():
+            raise ValueError("Time string has a date component")
+        if t.has_weekday():
+            raise ValueError("Time string has a weekday component")
+        if not t.has_time():
+            raise ValueError("Time string doesn't have a time component")
+        t = t.to_time()
+
     return pd.Timedelta(
-        hours=time.hour,
-        minutes=time.minute,
-        seconds=time.second,
-        milliseconds=time.microsecond // 1000,
-        microseconds=time.microsecond % 1000,
+        hours=t.hour if t.hour is not None else 0,
+        minutes=t.minute if t.minute is not None else 0,
+        seconds=t.second if t.second is not None else 0,
+        milliseconds=(t.microsecond // 1000) if t.microsecond is not None else 0,
+        microseconds=(t.microsecond % 1000) if t.microsecond is not None else 0,
     )
 
 
@@ -555,11 +759,13 @@ def interval_to_ms(interval: str) -> tp.Optional[int]:
 
 def to_ns(obj: tp.ArrayLike) -> tp.ArrayLike:
     """Convert a datetime, timedelta, integer, or any array-like object to nanoseconds since Unix Epoch."""
+    if isinstance(obj, time):
+        obj = time_to_timedelta(obj)
     if isinstance(obj, pd.Timestamp):
         obj = obj.to_datetime64()
     if isinstance(obj, pd.Timedelta):
         obj = obj.to_timedelta64()
-    if isinstance(obj, datetime):
+    if isinstance(obj, (datetime, date)):
         obj = np.datetime64(obj)
     if isinstance(obj, timedelta):
         obj = np.timedelta64(obj)

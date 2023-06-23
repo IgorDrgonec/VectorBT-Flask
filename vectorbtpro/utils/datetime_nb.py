@@ -5,6 +5,7 @@
 import numpy as np
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils.datetime_ import DTCNT
 from vectorbtpro.registries.jit_registry import register_jitted
 
 __all__ = []
@@ -56,6 +57,12 @@ w_td = w_ns * ns_td
 
 unix_epoch_dt = np.datetime64(0, "ns")
 """Unix epoch (datetime)."""
+
+
+@register_jitted(cache=True)
+def second_remainder_nb(ts: int) -> int:
+    """Get the nanosecond remainder after the second."""
+    return ts % 1000000000
 
 
 @register_jitted(cache=True)
@@ -303,3 +310,270 @@ def last_day_of_month_nb(y: int, m: int) -> int:
     if m == 11:
         return 30
     return 31
+
+
+@register_jitted(cache=True)
+def matches_dtc_nb(dtc: DTCNT, other_dtc: DTCNT) -> bool:
+    """Return whether one or more datetime components match other components."""
+    if dtc.year is not None and other_dtc.year is not None and dtc.year != other_dtc.year:
+        return False
+    if dtc.month is not None and other_dtc.month is not None and dtc.month != other_dtc.month:
+        return False
+    if dtc.day is not None and other_dtc.day is not None and dtc.day != other_dtc.day:
+        return False
+    if dtc.weekday is not None and other_dtc.weekday is not None and dtc.weekday != other_dtc.weekday:
+        return False
+    if dtc.hour is not None and other_dtc.hour is not None and dtc.hour != other_dtc.hour:
+        return False
+    if dtc.minute is not None and other_dtc.minute is not None and dtc.minute != other_dtc.minute:
+        return False
+    if dtc.second is not None and other_dtc.second is not None and dtc.second != other_dtc.second:
+        return False
+    if dtc.nanosecond is not None and other_dtc.nanosecond is not None and dtc.nanosecond != other_dtc.nanosecond:
+        return False
+    return True
+
+
+@register_jitted(cache=True)
+def index_matches_dtc_nb(index: tp.Array1d, other_dtc: DTCNT) -> tp.Array1d:
+    """Run `matches_dtc_nb` on each element in an index and return a mask."""
+    out = np.empty_like(index, dtype=np.bool_)
+    for i in range(len(index)):
+        ns = index[i]
+        dtc = DTCNT(
+            year=year_nb(ns),
+            month=month_nb(ns),
+            day=day_nb(ns),
+            weekday=weekday_nb(ns),
+            hour=hour_nb(ns),
+            minute=minute_nb(ns),
+            second=second_nb(ns),
+            nanosecond=second_remainder_nb(ns),
+        )
+        out[i] = matches_dtc_nb(dtc, other_dtc)
+    return out
+
+
+@register_jitted(cache=True)
+def within_fixed_dtc_nb(
+    c: int,
+    start_c: tp.Optional[int] = None,
+    end_c: tp.Optional[int] = None,
+    closed_end: bool = False,
+    is_last: bool = False,
+) -> int:
+    """Return whether a single datetime component is within a fixed range.
+
+    Returns either -1 (not within), 0 (within, continue matching), or 1 (within, stop matching)."""
+    if start_c is not None:
+        if c < start_c:
+            return -1
+    if end_c is not None:
+        if c > end_c:
+            return -1
+        if not closed_end and is_last and c == end_c:
+            return -1
+        if c < end_c:
+            return 1
+    return 0
+
+
+@register_jitted(cache=True)
+def within_periodic_dtc_nb(
+    c: int,
+    start_c: tp.Optional[int] = None,
+    end_c: tp.Optional[int] = None,
+    closed_end: bool = False,
+    is_last: bool = False,
+) -> int:
+    """Return whether a single datetime component is within a periodic range.
+
+    Returns either -1 (not within), 0 (within, continue matching), or 1 (within, stop matching)."""
+    if start_c is not None:
+        if c < start_c:
+            if end_c is not None and end_c < start_c:
+                if c > end_c:
+                    return -1
+                if not closed_end and is_last and c == end_c:
+                    return -1
+                if c < end_c:
+                    return 1
+            else:
+                return -1
+    if end_c is not None:
+        if c > end_c:
+            if start_c is not None and start_c > end_c:
+                if c < start_c:
+                    return -1
+                return 1
+            else:
+                return -1
+        if not closed_end and is_last and c == end_c:
+            return -1
+        if c < end_c:
+            return 1
+    return 0
+
+
+@register_jitted(cache=True)
+def within_dtc_range_nb(
+    dtc: DTCNT,
+    start_dtc: DTCNT,
+    end_dtc: DTCNT,
+    closed_start: bool = True,
+    closed_end: bool = False,
+) -> bool:
+    """Return whether one or more datetime components are within a range."""
+    if not closed_start and matches_dtc_nb(dtc, start_dtc):
+        return False
+
+    last = -1
+    if dtc.year is not None and (start_dtc.year is not None or end_dtc.year is not None):
+        last = 0
+    if dtc.month is not None and (start_dtc.month is not None or end_dtc.month is not None):
+        last = 1
+    if dtc.day is not None and (start_dtc.day is not None or end_dtc.day is not None):
+        last = 2
+    if dtc.weekday is not None and (start_dtc.weekday is not None or end_dtc.weekday is not None):
+        last = 3
+    if dtc.hour is not None and (start_dtc.hour is not None or end_dtc.hour is not None):
+        last = 4
+    if dtc.minute is not None and (start_dtc.minute is not None or end_dtc.minute is not None):
+        last = 5
+    if dtc.second is not None and (start_dtc.second is not None or end_dtc.second is not None):
+        last = 6
+    if dtc.nanosecond is not None and (start_dtc.nanosecond is not None or end_dtc.nanosecond is not None):
+        last = 7
+    if last == -1:
+        return True
+
+    if dtc.year is not None:
+        year_status = within_fixed_dtc_nb(
+            dtc.year,
+            start_dtc.year,
+            end_dtc.year,
+            closed_end=closed_end,
+            is_last=last == 0,
+        )
+        if year_status == -1:
+            return False
+        if year_status == 1:
+            return True
+    if dtc.month is not None:
+        month_status = within_periodic_dtc_nb(
+            dtc.month,
+            start_dtc.month,
+            end_dtc.month,
+            closed_end=closed_end,
+            is_last=last == 1,
+        )
+        if month_status == -1:
+            return False
+        if month_status == 1:
+            return True
+    if dtc.day is not None:
+        day_status = within_periodic_dtc_nb(
+            dtc.day,
+            start_dtc.day,
+            end_dtc.day,
+            closed_end=closed_end,
+            is_last=last == 2,
+        )
+        if day_status == -1:
+            return False
+        if day_status == 1:
+            return True
+    if dtc.weekday is not None:
+        weekday_status = within_periodic_dtc_nb(
+            dtc.weekday,
+            start_dtc.weekday,
+            end_dtc.weekday,
+            closed_end=closed_end,
+            is_last=last == 3,
+        )
+        if weekday_status == -1:
+            return False
+        if weekday_status == 1:
+            return True
+    if dtc.hour is not None:
+        hour_status = within_periodic_dtc_nb(
+            dtc.hour,
+            start_dtc.hour,
+            end_dtc.hour,
+            closed_end=closed_end,
+            is_last=last == 4,
+        )
+        if hour_status == -1:
+            return False
+        if hour_status == 1:
+            return True
+    if dtc.minute is not None:
+        minute_status = within_periodic_dtc_nb(
+            dtc.minute,
+            start_dtc.minute,
+            end_dtc.minute,
+            closed_end=closed_end,
+            is_last=last == 5,
+        )
+        if minute_status == -1:
+            return False
+        if minute_status == 1:
+            return True
+    if dtc.second is not None:
+        second_status = within_periodic_dtc_nb(
+            dtc.second,
+            start_dtc.second,
+            end_dtc.second,
+            closed_end=closed_end,
+            is_last=last == 6,
+        )
+        if second_status == -1:
+            return False
+        if second_status == 1:
+            return True
+    if dtc.nanosecond is not None:
+        nanosecond_status = within_periodic_dtc_nb(
+            dtc.nanosecond,
+            start_dtc.nanosecond,
+            end_dtc.nanosecond,
+            closed_end=closed_end,
+            is_last=last == 7,
+        )
+        if nanosecond_status == -1:
+            return False
+        if nanosecond_status == 1:
+            return True
+
+    return True
+
+
+@register_jitted(cache=True)
+def index_within_dtc_range_nb(
+    index: tp.Array1d,
+    start_dtc: DTCNT,
+    end_dtc: DTCNT,
+    closed_start: bool = True,
+    closed_end: bool = False,
+) -> tp.Array1d:
+    """Run `within_dtc_range_nb` on each element in an index and return a mask."""
+    out = np.empty_like(index, dtype=np.bool_)
+    for i in range(len(index)):
+        ns = index[i]
+        dtc = DTCNT(
+            year=year_nb(ns),
+            month=month_nb(ns),
+            day=day_nb(ns),
+            weekday=weekday_nb(ns),
+            hour=hour_nb(ns),
+            minute=minute_nb(ns),
+            second=second_nb(ns),
+            nanosecond=second_remainder_nb(ns),
+        )
+        out[i] = within_dtc_range_nb(
+            dtc,
+            start_dtc,
+            end_dtc,
+            closed_start=closed_start,
+            closed_end=closed_end,
+        )
+    return out

@@ -4,6 +4,7 @@
 
 import attr
 from functools import partial
+import functools
 from datetime import time
 
 import numpy as np
@@ -13,10 +14,11 @@ from pandas.tseries.frequencies import to_offset
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.template import CustomTemplate
-from vectorbtpro.utils import datetime_ as dt
+from vectorbtpro.utils import datetime_ as dt, datetime_nb as dt_nb
 from vectorbtpro.utils.config import hdict, merge_dicts
 from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.utils.mapping import to_field_mapping
+from vectorbtpro.registries.jit_registry import jit_reg
 
 __all__ = [
     "PandasIndexer",
@@ -25,11 +27,6 @@ __all__ = [
     "get_index_points",
     "get_index_ranges",
     "get_idxs",
-    "pointidx",
-    "rangeidx",
-    "rowidx",
-    "colidx",
-    "idx",
     "index_dict",
     "IdxSetter",
     "IdxSetterFactory",
@@ -37,6 +34,16 @@ __all__ = [
     "IdxSeries",
     "IdxFrame",
     "IdxRecords",
+    "posidx",
+    "maskidx",
+    "lbidx",
+    "dtidx",
+    "dtcidx",
+    "pointidx",
+    "rangeidx",
+    "rowidx",
+    "colidx",
+    "idx",
 ]
 
 __pdoc__ = {}
@@ -219,18 +226,18 @@ class idxLoc(iLoc):
 
 
 class ExtPandasIndexer(PandasIndexer):
-    """Extension of `PandasIndexer` that also implements indexing using `idxloc`."""
+    """Extension of `PandasIndexer` that also implements indexing using `xloc`."""
 
     def __init__(self, **kwargs) -> None:
-        self._idxloc = idxLoc(self.indexing_func, **kwargs)
+        self._xloc = idxLoc(self.indexing_func, **kwargs)
         PandasIndexer.__init__(self, **kwargs)
 
     @property
-    def idxloc(self) -> idxLoc:
+    def xloc(self) -> idxLoc:
         """`Idxr`-based indexing."""
-        return self._idxloc
+        return self._xloc
 
-    idxloc.__doc__ = idxLoc.__doc__
+    xloc.__doc__ = idxLoc.__doc__
 
 
 class ParamLoc(LocBase):
@@ -497,6 +504,8 @@ class IdxrBase:
             if check_minus_one and idxs == -1:
                 raise ValueError("Index couldn't be matched")
         elif checks.is_sequence(idxs) and not np.isscalar(idxs):
+            if len(idxs) == 0:
+                raise ValueError("No indices could be matched")
             if not isinstance(idxs, np.ndarray):
                 raise ValueError(f"Indices must be a NumPy array, not {type(idxs)}")
             if not np.issubdtype(idxs.dtype, np.integer) or np.issubdtype(idxs.dtype, np.bool_):
@@ -574,7 +583,7 @@ class LabelIdxr(UniIdxr):
     """One or more labels."""
 
     closed_end: bool = attr.ib(default=True)
-    """Whether `end` should be inclusive."""
+    """Whether slice end should be inclusive."""
 
     level: tp.MaybeLevelSequence = attr.ib(default=None)
     """One or more levels."""
@@ -616,7 +625,7 @@ class DatetimeIdxr(UniIdxr):
     """One or more datetime-like objects."""
 
     closed_end: bool = attr.ib(default=False)
-    """Whether `end` should be inclusive."""
+    """Whether slice end should be inclusive."""
 
     indexer_method: tp.Optional[str] = attr.ib(default="bfill")
     """Method for `pd.Index.get_indexer`."""
@@ -655,6 +664,78 @@ class DatetimeIdxr(UniIdxr):
                 idxs = index.get_indexer([new_value], method=self.indexer_method)[0]
         self.check_idxs(idxs, check_minus_one=True)
         return idxs
+
+
+@attr.s(frozen=True)
+class DTCIdxr(UniIdxr):
+    """Class for resolving indices provided as datetime-like components."""
+
+    value: tp.Union[None, tp.MaybeSequence[tp.DTCLike], tp.Slice] = attr.ib()
+    """One or more datetime-like components."""
+
+    parse_kwargs: tp.KwargsLike = attr.ib(default=None)
+    """Keyword arguments passed to `vectorbtpro.utils.datetime_.parse_time_str`."""
+
+    closed_start: bool = attr.ib(default=True)
+    """Whether slice start should be inclusive."""
+
+    closed_end: bool = attr.ib(default=False)
+    """Whether slice end should be inclusive."""
+
+    jitted: tp.JittedOption = attr.ib(default=None)
+    """Jitting option passed to `vectorbtpro.utils.datetime_nb.index_matches_dtc_nb`
+    and `vectorbtpro.utils.datetime_nb.index_within_dtc_range_nb`."""
+
+    @staticmethod
+    def get_dtc_namedtuple(value: tp.Optional[tp.DTCLike] = None, **parse_kwargs) -> dt.DTCNT:
+        """Convert a value to a `vectorbtpro.utils.datetime_.DTCNT` instance."""
+        if value is None:
+            return dt.DTC().to_namedtuple()
+        if isinstance(value, dt.DTC):
+            return value.to_namedtuple()
+        if isinstance(value, dt.DTCNT):
+            return value
+        return dt.DTC.parse(value, **parse_kwargs).to_namedtuple()
+
+    def get(
+        self,
+        index: tp.Optional[tp.Index] = None,
+        freq: tp.Optional[tp.FrequencyLike] = None,
+    ) -> tp.MaybeIndexArray:
+        if self.value is None:
+            return slice(None, None, None)
+        parse_kwargs = self.parse_kwargs
+        if parse_kwargs is None:
+            parse_kwargs = {}
+        if index is None:
+            raise ValueError("Index is required")
+        index = dt.try_to_datetime_index(index)
+        ns_index = dt.to_ns(index)
+        checks.assert_instance_of(index, pd.DatetimeIndex)
+        if not index.is_unique:
+            raise ValueError("Datetime index must be unique")
+        if not index.is_monotonic_increasing:
+            raise ValueError("Datetime index must be monotonically increasing")
+
+        if isinstance(self.value, (slice, hslice)):
+            if self.value.step is not None:
+                raise ValueError("Step must be None")
+            if self.value.start is None and self.value.step is None:
+                return slice(None, None, None)
+            start_dtc = self.get_dtc_namedtuple(self.value.start, **parse_kwargs)
+            end_dtc = self.get_dtc_namedtuple(self.value.stop, **parse_kwargs)
+            func = jit_reg.resolve_option(dt_nb.index_within_dtc_range_nb, self.jitted)
+            mask = func(ns_index, start_dtc, end_dtc, closed_start=self.closed_start, closed_end=self.closed_end)
+        elif checks.is_sequence(self.value) and not np.isscalar(self.value):
+            func = jit_reg.resolve_option(dt_nb.index_matches_dtc_nb, self.jitted)
+            dtcs = map(lambda x: self.get_dtc_namedtuple(x, **parse_kwargs), self.value)
+            masks = map(lambda x: func(ns_index, x), dtcs)
+            mask = functools.reduce(np.logical_or, masks)
+        else:
+            dtc = self.get_dtc_namedtuple(self.value, **parse_kwargs)
+            func = jit_reg.resolve_option(dt_nb.index_matches_dtc_nb, self.jitted)
+            mask = func(ns_index, dtc)
+        return MaskIdxr(mask).get(index=index, freq=freq)
 
 
 @attr.s(frozen=True)
@@ -1033,10 +1114,7 @@ class RangeIdxr(UniIdxr):
     """Whether `start` should be inclusive."""
 
     closed_end: bool = attr.ib(default=False)
-    """Whether `end` should be inclusive.
-
-    !!! note
-        Indices will still be exclusive."""
+    """Whether `end` should be inclusive."""
 
     add_start_delta: tp.Optional[tp.FrequencyLike] = attr.ib(default=None)
     """Offset to be added to each in `start`.
@@ -1545,14 +1623,17 @@ class AutoIdxr(UniIdxr):
         tp.MaybeSequence[tp.MaybeSequence[int]],
         tp.MaybeSequence[tp.Label],
         tp.MaybeSequence[tp.DatetimeLike],
+        tp.MaybeSequence[tp.DTCLike],
         tp.FrequencyLike,
-        tp.TimeLike,
         tp.Slice,
     ] = attr.ib()
     """One or more integer indices, datetime-like objects, frequency-like objects, or labels."""
 
+    closed_start: bool = attr.ib(default=_DEF)
+    """Whether slice start should be inclusive."""
+
     closed_end: bool = attr.ib(default=_DEF)
-    """Whether `end` should be inclusive."""
+    """Whether slice end should be inclusive."""
 
     indexer_method: tp.Optional[str] = attr.ib(default=_DEF)
     """Method for `pd.Index.get_indexer`."""
@@ -1567,11 +1648,12 @@ class AutoIdxr(UniIdxr):
 
     Allowed are
 
-    * "positions" for `PosIdxr`
+    * "position(s)" for `PosIdxr`
     * "mask" for `MaskIdxr`
-    * "labels" for `LabelIdxr`
+    * "label(s)" for `LabelIdxr`
     * "datetime" for `DatetimeIdxr`
-    * "frequency" for `PointIdxr` or `RangeIdxr`
+    * "dtc": for `DTCIdxr`
+    * "frequency" for `PointIdxr`
 
     If None, will (try to) determine automatically based on the type of indices."""
 
@@ -1593,7 +1675,12 @@ class AutoIdxr(UniIdxr):
             if kind is None:
                 kind = "labels"
         idxr_kwargs = dict()
-        use_range_idxr = False
+        if self.closed_start is not _DEF:
+            idxr_kwargs["closed_start"] = self.closed_start
+        if self.closed_end is not _DEF:
+            idxr_kwargs["closed_end"] = self.closed_end
+        if self.indexer_method is not _DEF:
+            idxr_kwargs["indexer_method"] = self.indexer_method
 
         if kind is None:
             if isinstance(value, (slice, hslice)):
@@ -1605,7 +1692,12 @@ class AutoIdxr(UniIdxr):
                     if index is None:
                         raise ValueError("Index is required")
                     if isinstance(index, pd.DatetimeIndex):
-                        kind = "datetime"
+                        if dt.DTC.is_parsable(
+                            value.start, check_func=lambda dtc: not dtc.has_full_datetime()
+                        ) or dt.DTC.is_parsable(value.stop, check_func=lambda dtc: not dtc.has_full_datetime()):
+                            kind = "dtc"
+                        else:
+                            kind = "datetime"
                     else:
                         kind = "labels"
             elif (checks.is_sequence(value) and not np.isscalar(value)) and (
@@ -1631,7 +1723,10 @@ class AutoIdxr(UniIdxr):
                     if index is None:
                         raise ValueError("Index is required")
                     elif isinstance(index, pd.DatetimeIndex):
-                        kind = "datetime"
+                        if dt.DTC.is_parsable(value[0], check_func=lambda dtc: not dtc.has_full_datetime()):
+                            kind = "dtc"
+                        else:
+                            kind = "datetime"
                     else:
                         kind = "labels"
             else:
@@ -1643,34 +1738,18 @@ class AutoIdxr(UniIdxr):
                     if index is None:
                         raise ValueError("Index is required")
                     if isinstance(index, pd.DatetimeIndex):
-                        if isinstance(value, str):
+                        if dt.DTC.is_parsable(value, check_func=lambda dtc: not dtc.has_full_datetime()):
+                            kind = "dtc"
+                        elif isinstance(value, str):
                             try:
                                 _ = dt.parse_timedelta(value)
                                 kind = "frequency"
                             except Exception as e:
                                 try:
-                                    start_time, end_time = value.split("-")
-                                    start_time = start_time.strip()
-                                    end_time = end_time.strip()
-                                    _ = dt.time_to_timedelta(start_time)
-                                    _ = dt.time_to_timedelta(end_time)
-                                    idxr_kwargs["start_time"] = start_time
-                                    idxr_kwargs["end_time"] = end_time
-                                    value = None
-                                    kind = "frequency"
-                                    use_range_idxr = True
+                                    _ = dt.to_timestamp(value)
+                                    kind = "datetime"
                                 except Exception as e:
-                                    try:
-                                        _ = dt.time_to_timedelta(value)
-                                        idxr_kwargs["at_time"] = value
-                                        value = None
-                                        kind = "frequency"
-                                    except Exception as e:
-                                        try:
-                                            _ = dt.to_timestamp(value)
-                                            kind = "datetime"
-                                        except Exception as e:
-                                            raise ValueError(f"'{value}' is neither a frequency nor a datetime")
+                                    raise ValueError(f"'{value}' is neither a frequency nor a datetime")
                         elif checks.is_frequency(value):
                             kind = "frequency"
                         else:
@@ -1678,27 +1757,18 @@ class AutoIdxr(UniIdxr):
                     else:
                         kind = "labels"
 
-        if kind.lower() == "positions":
-            idx = PosIdxr(value)
+        if kind.lower() in ("position", "positions"):
+            idx = PosIdxr(value, **idxr_kwargs)
         elif kind.lower() == "mask":
-            idx = MaskIdxr(value)
-        elif kind.lower() == "labels":
-            if self.closed_end is not _DEF:
-                idxr_kwargs["closed_end"] = self.closed_end
+            idx = MaskIdxr(value, **idxr_kwargs)
+        elif kind.lower() in ("label", "labels"):
             idx = LabelIdxr(value, **idxr_kwargs)
         elif kind.lower() == "datetime":
-            if self.closed_end is not _DEF:
-                idxr_kwargs["closed_end"] = self.closed_end
-            if self.indexer_method is not _DEF:
-                idxr_kwargs["indexer_method"] = self.indexer_method
             idx = DatetimeIdxr(value, **idxr_kwargs)
+        elif kind.lower() == "dtc":
+            idx = DTCIdxr(value, **idxr_kwargs)
         elif kind.lower() == "frequency":
-            if use_range_idxr:
-                idx = RangeIdxr(every=value, **idxr_kwargs)
-            else:
-                if self.indexer_method is not _DEF:
-                    idxr_kwargs["indexer_method"] = self.indexer_method
-                idx = PointIdxr(every=value, **idxr_kwargs)
+            idx = PointIdxr(every=value, **idxr_kwargs)
         else:
             raise ValueError(f"Invalid option kind='{kind}'")
         return idx.get(index=index, freq=freq)
@@ -1853,32 +1923,6 @@ def get_idxs(
     if not isinstance(idxr, Idxr):
         idxr = Idxr(idxr, **kwargs)
     return idxr.get(index=index, columns=columns, freq=freq, template_context=template_context)
-
-
-pointidx = PointIdxr
-"""Shortcut for `PointIdxr`."""
-
-__pdoc__["pointidx"] = False
-
-rangeidx = RangeIdxr
-"""Shortcut for `RangeIdxr`."""
-
-__pdoc__["rangeidx"] = False
-
-rowidx = RowIdxr
-"""Shortcut for `RowIdxr`."""
-
-__pdoc__["rowidx"] = False
-
-colidx = ColIdxr
-"""Shortcut for `ColIdxr`."""
-
-__pdoc__["colidx"] = False
-
-idx = Idxr
-"""Shortcut for `Idxr`."""
-
-__pdoc__["idx"] = False
 
 
 class index_dict(pdict):
@@ -2432,3 +2476,54 @@ class IdxRecords(IdxSetterFactory):
         for k, v in idx_items.items():
             idx_setters[k] = IdxSetter(v)
         return idx_setters
+
+
+posidx = PosIdxr
+"""Shortcut for `PosIdxr`."""
+
+__pdoc__["posidx"] = False
+
+maskidx = MaskIdxr
+"""Shortcut for `MaskIdxr`."""
+
+__pdoc__["maskidx"] = False
+
+lbidx = LabelIdxr
+"""Shortcut for `LabelIdxr`."""
+
+__pdoc__["lbidx"] = False
+
+dtidx = DatetimeIdxr
+"""Shortcut for `DatetimeIdxr`."""
+
+__pdoc__["dtidx"] = False
+
+dtcidx = DTCIdxr
+"""Shortcut for `DTCIdxr`."""
+
+__pdoc__["dtcidx"] = False
+
+pointidx = PointIdxr
+"""Shortcut for `PointIdxr`."""
+
+__pdoc__["pointidx"] = False
+
+rangeidx = RangeIdxr
+"""Shortcut for `RangeIdxr`."""
+
+__pdoc__["rangeidx"] = False
+
+rowidx = RowIdxr
+"""Shortcut for `RowIdxr`."""
+
+__pdoc__["rowidx"] = False
+
+colidx = ColIdxr
+"""Shortcut for `ColIdxr`."""
+
+__pdoc__["colidx"] = False
+
+idx = Idxr
+"""Shortcut for `Idxr`."""
+
+__pdoc__["idx"] = False
