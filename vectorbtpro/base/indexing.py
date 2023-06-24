@@ -617,7 +617,9 @@ class UniIdxr(IdxrBase):
             if index is None:
                 raise ValueError("Index is required")
             x = normalize_idxs(x, len(index))
-            return np.setdiff1d(np.arange(len(index)), x)
+            idxs = np.setdiff1d(np.arange(len(index)), x)
+            self.check_idxs(idxs)
+            return idxs
 
         return UniIdxrOp(_op_func, self)
 
@@ -627,7 +629,9 @@ class UniIdxr(IdxrBase):
                 raise ValueError("Index is required")
             x = normalize_idxs(x, len(index))
             y = normalize_idxs(y, len(index))
-            return np.intersect1d(x, y)
+            idxs = np.intersect1d(x, y)
+            self.check_idxs(idxs)
+            return idxs
 
         return UniIdxrOp(_op_func, self, other)
 
@@ -637,7 +641,9 @@ class UniIdxr(IdxrBase):
                 raise ValueError("Index is required")
             x = normalize_idxs(x, len(index))
             y = normalize_idxs(y, len(index))
-            return np.union1d(x, y)
+            idxs = np.union1d(x, y)
+            self.check_idxs(idxs)
+            return idxs
 
         return UniIdxrOp(_op_func, self, other)
 
@@ -647,7 +653,9 @@ class UniIdxr(IdxrBase):
                 raise ValueError("Index is required")
             x = normalize_idxs(x, len(index))
             y = normalize_idxs(y, len(index))
-            return np.setdiff1d(x, y)
+            idxs = np.setdiff1d(x, y)
+            self.check_idxs(idxs)
+            return idxs
 
         return UniIdxrOp(_op_func, self, other)
 
@@ -657,7 +665,9 @@ class UniIdxr(IdxrBase):
                 raise ValueError("Index is required")
             x = normalize_idxs(x, len(index))
             y = normalize_idxs(y, len(index))
-            return np.setxor1d(x, y)
+            idxs = np.setxor1d(x, y)
+            self.check_idxs(idxs)
+            return idxs
 
         return UniIdxrOp(_op_func, self, other)
 
@@ -669,7 +679,9 @@ class UniIdxr(IdxrBase):
                 raise ValueError("Index is required")
             x = normalize_idxs(x, len(index))
             shifted = x - y
-            return shifted[shifted >= 0]
+            idxs = shifted[shifted >= 0]
+            self.check_idxs(idxs)
+            return idxs
 
         return UniIdxrOp(_op_func, self, other)
 
@@ -681,7 +693,9 @@ class UniIdxr(IdxrBase):
                 raise ValueError("Index is required")
             x = normalize_idxs(x, len(index))
             shifted = x + y
-            return shifted[shifted >= 0]
+            idxs = shifted[shifted >= 0]
+            self.check_idxs(idxs)
+            return idxs
 
         return UniIdxrOp(_op_func, self, other)
 
@@ -988,7 +1002,9 @@ class PointIdxr(UniIdxr):
     `on` gets wrapped with NumPy."""
 
     indexer_method: str = attr.ib(default="bfill")
-    """Method for `pd.Index.get_indexer`."""
+    """Method for `pd.Index.get_indexer`.
+    
+    Allows two additional values "before" and "after"."""
 
     indexer_tolerance: tp.Optional[tp.Union[int, tp.TimedeltaLike, tp.IndexLike]] = attr.ib(default=None)
     """Tolerance for `pd.Index.get_indexer`.
@@ -1196,6 +1212,12 @@ def get_index_points(
 
     if kind.lower() == "labels":
         on = dt.try_align_to_dt_index(on, index)
+        if indexer_method == "before":
+            on = on - pd.Timedelta(1, "ns")
+            indexer_method = "ffill"
+        elif indexer_method == "after":
+            on = on + pd.Timedelta(1, "ns")
+            indexer_method = "bfill"
         index_points = index.get_indexer(on, method=indexer_method, tolerance=indexer_tolerance)
     else:
         index_points = np.asarray(on)
