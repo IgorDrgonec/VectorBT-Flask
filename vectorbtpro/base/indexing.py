@@ -66,18 +66,35 @@ class IndexingBase:
         Should be overridden."""
         raise NotImplementedError
 
+    def indexing_setter_func(self, pd_indexing_setter_func: tp.Callable, **kwargs) -> None:
+        """Apply `pd_indexing_setter_func` on all pandas objects in question.
+
+        Should be overridden."""
+        raise NotImplementedError
+
 
 class LocBase:
     """Class that implements location-based indexing."""
 
-    def __init__(self, indexing_func: tp.Callable, **kwargs) -> None:
+    def __init__(
+        self,
+        indexing_func: tp.Callable,
+        indexing_setter_func: tp.Optional[tp.Callable] = None,
+        **kwargs,
+    ) -> None:
         self._indexing_func = indexing_func
+        self._indexing_setter_func = indexing_setter_func
         self._indexing_kwargs = kwargs
 
     @property
     def indexing_func(self) -> tp.Callable:
         """Indexing function."""
         return self._indexing_func
+
+    @property
+    def indexing_setter_func(self) -> tp.Optional[tp.Callable]:
+        """Indexing setter function."""
+        return self._indexing_setter_func
 
     @property
     def indexing_kwargs(self) -> dict:
@@ -87,6 +104,9 @@ class LocBase:
     def __getitem__(self, key: tp.Any) -> tp.Any:
         raise NotImplementedError
 
+    def __setitem__(self, key: tp.Any, value: tp.Any) -> None:
+        raise NotImplementedError
+
     def __iter__(self):
         raise TypeError(f"'{type(self).__name__}' object is not iterable")
 
@@ -94,31 +114,47 @@ class LocBase:
 class pdLoc(LocBase):
     """Forwards a Pandas-like indexing operation to each Series/DataFrame and returns a new class instance."""
 
-    @staticmethod
-    def pd_indexing_func(obj: tp.SeriesFrame, key: tp.Any) -> tp.MaybeSeriesFrame:
+    @classmethod
+    def pd_indexing_func(cls, obj: tp.SeriesFrame, key: tp.Any) -> tp.MaybeSeriesFrame:
         """Pandas-like indexing operation."""
+        raise NotImplementedError
+
+    @classmethod
+    def pd_indexing_setter_func(cls, obj: tp.SeriesFrame, key: tp.Any, value: tp.Any) -> None:
+        """Pandas-like indexing setter operation."""
         raise NotImplementedError
 
     def __getitem__(self, key: tp.Any) -> tp.Any:
         return self.indexing_func(partial(self.pd_indexing_func, key=key), **self.indexing_kwargs)
+
+    def __setitem__(self, key: tp.Any, value: tp.Any) -> None:
+        self.indexing_setter_func(partial(self.pd_indexing_setter_func, key=key, value=value), **self.indexing_kwargs)
 
 
 class iLoc(pdLoc):
     """Forwards `pd.Series.iloc`/`pd.DataFrame.iloc` operation to each
     Series/DataFrame and returns a new class instance."""
 
-    @staticmethod
-    def pd_indexing_func(obj: tp.SeriesFrame, key: tp.Any) -> tp.MaybeSeriesFrame:
+    @classmethod
+    def pd_indexing_func(cls, obj: tp.SeriesFrame, key: tp.Any) -> tp.MaybeSeriesFrame:
         return obj.iloc.__getitem__(key)
+
+    @classmethod
+    def pd_indexing_setter_func(cls, obj: tp.SeriesFrame, key: tp.Any, value: tp.Any) -> None:
+        obj.iloc.__setitem__(key, value)
 
 
 class Loc(pdLoc):
     """Forwards `pd.Series.loc`/`pd.DataFrame.loc` operation to each
     Series/DataFrame and returns a new class instance."""
 
-    @staticmethod
-    def pd_indexing_func(obj: tp.SeriesFrame, key: tp.Any) -> tp.MaybeSeriesFrame:
+    @classmethod
+    def pd_indexing_func(cls, obj: tp.SeriesFrame, key: tp.Any) -> tp.MaybeSeriesFrame:
         return obj.loc.__getitem__(key)
+
+    @classmethod
+    def pd_indexing_setter_func(cls, obj: tp.SeriesFrame, key: tp.Any, value: tp.Any) -> None:
+        obj.loc.__setitem__(key, value)
 
 
 PandasIndexerT = tp.TypeVar("PandasIndexerT", bound="PandasIndexer")
@@ -164,8 +200,8 @@ class PandasIndexer(IndexingBase):
     """
 
     def __init__(self, **kwargs) -> None:
-        self._iloc = iLoc(self.indexing_func, **kwargs)
-        self._loc = Loc(self.indexing_func, **kwargs)
+        self._iloc = iLoc(self.indexing_func, indexing_setter_func=self.indexing_setter_func, **kwargs)
+        self._loc = Loc(self.indexing_func, indexing_setter_func=self.indexing_setter_func, **kwargs)
         self._indexing_kwargs = kwargs
 
     @property
@@ -193,7 +229,16 @@ class PandasIndexer(IndexingBase):
         return self.indexing_func(lambda x: x.xs(*args, **kwargs), **self.indexing_kwargs)
 
     def __getitem__(self: PandasIndexerT, key: tp.Any) -> PandasIndexerT:
-        return self.indexing_func(lambda x: x.__getitem__(key), **self.indexing_kwargs)
+        def __getitem__func(x, _key=key):
+            return x.__getitem__(_key)
+
+        return self.indexing_func(__getitem__func, **self.indexing_kwargs)
+
+    def __setitem__(self, key: tp.Any, value: tp.Any) -> None:
+        def __setitem__func(x, _key=key, _value=value):
+            return x.__setitem__(_key, _value)
+
+        self.indexing_setter_func(__setitem__func, **self.indexing_kwargs)
 
     def __iter__(self):
         raise TypeError(f"'{type(self).__name__}' object is not iterable")
@@ -203,8 +248,8 @@ class idxLoc(iLoc):
     """Subclass of `iLoc` that transforms an `Idxr`-based operation with
     `get_idxs` to an `iLoc` operation."""
 
-    @staticmethod
-    def pd_indexing_func(obj: tp.SeriesFrame, key: tp.Any) -> tp.MaybeSeriesFrame:
+    @classmethod
+    def pd_indexing_func(cls, obj: tp.SeriesFrame, key: tp.Any) -> tp.MaybeSeriesFrame:
         from vectorbtpro.base.indexes import get_index
 
         if isinstance(key, tuple):
@@ -225,12 +270,16 @@ class idxLoc(iLoc):
             return obj.iloc.__getitem__(row_idxs)
         return obj.iloc.__getitem__((row_idxs, col_idxs))
 
+    @classmethod
+    def pd_indexing_setter_func(cls, obj: tp.SeriesFrame, key: tp.Any, value: tp.Any) -> None:
+        IdxSetter([(key, value)]).set_pd(obj)
+
 
 class ExtPandasIndexer(PandasIndexer):
     """Extension of `PandasIndexer` that also implements indexing using `xloc`."""
 
     def __init__(self, **kwargs) -> None:
-        self._xloc = idxLoc(self.indexing_func, **kwargs)
+        self._xloc = idxLoc(self.indexing_func, indexing_setter_func=self.indexing_setter_func, **kwargs)
         PandasIndexer.__init__(self, **kwargs)
 
     @property
@@ -246,7 +295,14 @@ class ParamLoc(LocBase):
 
     Uses `mapper` to establish link between columns and parameter values."""
 
-    def __init__(self, mapper: tp.Series, indexing_func: tp.Callable, level_name: tp.Level = None, **kwargs) -> None:
+    def __init__(
+        self,
+        mapper: tp.Series,
+        indexing_func: tp.Callable,
+        indexing_setter_func: tp.Optional[tp.Callable] = None,
+        level_name: tp.Level = None,
+        **kwargs,
+    ) -> None:
         checks.assert_instance_of(mapper, pd.Series)
 
         if mapper.dtype == "O":
@@ -256,7 +312,7 @@ class ParamLoc(LocBase):
         self._mapper = mapper
         self._level_name = level_name
 
-        LocBase.__init__(self, indexing_func, **kwargs)
+        LocBase.__init__(self, indexing_func, indexing_setter_func=indexing_setter_func, **kwargs)
 
     @property
     def mapper(self) -> tp.Series:
@@ -305,6 +361,14 @@ class ParamLoc(LocBase):
             return new_obj
 
         return self.indexing_func(pd_indexing_func, **self.indexing_kwargs)
+
+    def __setitem__(self, key: tp.Any, value: tp.Any) -> None:
+        idxs = self.get_idxs(key)
+
+        def pd_indexing_setter_func(obj: tp.SeriesFrame) -> None:
+            obj.iloc[:, idxs] = value
+
+        return self.indexing_setter_func(pd_indexing_setter_func, **self.indexing_kwargs)
 
 
 def indexing_on_mapper(
@@ -2293,14 +2357,22 @@ class IdxSetter:
             cols_changed=cols_changed,
         )
 
-    def set(self, arr: tp.Array, set_funcs: tp.Optional[tp.Sequence[tp.Callable]] = None, **kwargs) -> tp.Array:
-        """Set values of an array based on `IdxSetter.get_set_meta`."""
+    def set(self, arr: tp.Array, set_funcs: tp.Optional[tp.Sequence[tp.Callable]] = None, **kwargs) -> None:
+        """Set values of a NumPy array based on `IdxSetter.get_set_meta`."""
         if set_funcs is None:
             set_meta = self.get_set_meta(arr.shape, **kwargs)
             set_funcs = set_meta["set_funcs"]
         for set_op in set_funcs:
             set_op(arr)
-        return arr
+
+    def set_pd(self, pd_arr: tp.SeriesFrame, **kwargs) -> None:
+        """Set values of a Pandas array based on `IdxSetter.get_set_meta`."""
+        from vectorbtpro.base.indexes import get_index
+
+        index = get_index(pd_arr, 0)
+        columns = get_index(pd_arr, 1)
+        freq = dt.infer_index_freq(index)
+        self.set(pd_arr.values, index=index, columns=columns, freq=freq, **kwargs)
 
     def fill_and_set(
         self,

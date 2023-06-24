@@ -785,7 +785,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         )
 
     def indexing_func(self: ArrayWrapperT, *args, **kwargs) -> ArrayWrapperT:
-        """Perform indexing on `ArrayWrapper`"""
+        """Perform indexing on `ArrayWrapper`."""
         return self.indexing_func_meta(*args, **kwargs)["new_wrapper"]
 
     @staticmethod

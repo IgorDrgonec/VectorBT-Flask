@@ -666,6 +666,10 @@ class BaseAccessor(Wrapping):
             return self.replace(cls_=self.sr_accessor_cls, wrapper=wrapper_meta["new_wrapper"], obj=new_obj)
         return self.replace(cls_=self.df_accessor_cls, wrapper=wrapper_meta["new_wrapper"], obj=new_obj)
 
+    def indexing_setter_func(self, pd_indexing_setter_func: tp.Callable, **kwargs) -> None:
+        """Perform indexing setter on `BaseAccessor`."""
+        pd_indexing_setter_func(self._obj)
+
     @property
     def obj(self) -> tp.SeriesFrame:
         """Pandas object."""
