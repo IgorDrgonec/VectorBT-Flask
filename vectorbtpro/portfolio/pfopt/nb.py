@@ -9,6 +9,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch
+from vectorbtpro.utils.array_ import rescale_nb
 from vectorbtpro.portfolio.enums import Direction, alloc_point_dt, alloc_range_dt
 
 __all__ = []
@@ -232,3 +233,65 @@ def prepare_alloc_ranges_nb(
             new_allocations[k] = allocations[i]
             k += 1
     return alloc_ranges[:k], new_allocations[:k]
+
+
+@register_jitted(cache=True)
+def rescale_allocations_nb(allocations: tp.Array2d, to_range: tp.Tuple[float, float]) -> tp.Array2d:
+    """Rescale allocations to a new scale.
+
+    Positive and negative weights are rescaled separately from each other."""
+    new_min, new_max = to_range
+    if np.isnan(new_min) or np.isinf(new_min):
+        raise ValueError("Minimum of the new scale must be finite")
+    if np.isnan(new_max) or np.isinf(new_max):
+        raise ValueError("Maximum of the new scale must be finite")
+    if new_min >= new_max:
+        raise ValueError("Minimum cannot be equal to or higher than maximum")
+    out = np.empty_like(allocations, dtype=np.float_)
+
+    for i in range(allocations.shape[0]):
+        all_nan = True
+        all_zero = True
+        pos_sum = 0.0
+        neg_sum = 0.0
+        for col in range(allocations.shape[1]):
+            if np.isnan(allocations[i, col]):
+                continue
+            all_nan = False
+            if allocations[i, col] > 0:
+                all_zero = False
+                pos_sum += allocations[i, col]
+            elif allocations[i, col] < 0:
+                all_zero = False
+                neg_sum += abs(allocations[i, col])
+        if all_nan:
+            out[i] = np.nan
+            continue
+        if all_zero:
+            out[i] = 0.0
+            continue
+        if new_max <= 0 and pos_sum > 0:
+            raise ValueError("Cannot rescale positive weights to a negative scale")
+        if new_min >= 0 and neg_sum > 0:
+            raise ValueError("Cannot rescale negative weights to a positive scale")
+
+        for col in range(allocations.shape[1]):
+            if np.isnan(allocations[i, col]):
+                out[i, col] = np.nan
+                continue
+            if allocations[i, col] > 0:
+                out[i, col] = rescale_nb(
+                    allocations[i, col] / pos_sum,
+                    (0.0, 1.0),
+                    (max(0.0, new_min), new_max)
+                )
+            elif allocations[i, col] < 0:
+                out[i, col] = rescale_nb(
+                    abs(allocations[i, col]) / neg_sum,
+                    (0.0, 1.0),
+                    (min(new_max, 0.0), new_min)
+                )
+            else:
+                out[i, col] = 0.0
+
+    return out

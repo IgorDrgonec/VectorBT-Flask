@@ -765,11 +765,13 @@ def cross_index_with(
     Returns index slices for the aligning."""
     from vectorbtpro.base.grouping.nb import get_group_map_nb
 
+    index1_default = checks.is_default_index(index1, check_names=True)
+    index2_default = checks.is_default_index(index2, check_names=True)
     if not isinstance(index1, pd.MultiIndex):
         index1 = pd.MultiIndex.from_arrays([index1])
     if not isinstance(index2, pd.MultiIndex):
         index2 = pd.MultiIndex.from_arrays([index2])
-    if index1.equals(index2):
+    if not index1_default and not index2_default and index1.equals(index2):
         if return_new_index:
             new_index = stack_indexes(index1, index2, drop_duplicates=True)
             return (pd.IndexSlice[:], pd.IndexSlice[:]), new_index
@@ -778,7 +780,11 @@ def cross_index_with(
     levels1 = []
     levels2 = []
     for i in range(index1.nlevels):
+        if checks.is_default_index(index1.get_level_values(i), check_names=True):
+            continue
         for j in range(index2.nlevels):
+            if checks.is_default_index(index2.get_level_values(j), check_names=True):
+                continue
             name1 = index1.names[i]
             name2 = index2.names[j]
             if name1 == name2:

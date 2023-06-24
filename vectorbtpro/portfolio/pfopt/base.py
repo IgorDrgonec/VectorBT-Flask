@@ -1726,6 +1726,7 @@ class PortfolioOptimizer(Analyzable):
         indexer_tolerance: tp.Union[None, str, Param] = point_idxr_defaults["indexer_tolerance"],
         skip_minus_one: tp.Union[bool, Param] = point_idxr_defaults["skip_minus_one"],
         index_points: tp.Union[None, tp.MaybeSequence[int], Param] = None,
+        rescale_to: tp.Union[None, tp.Tuple[float, float], Param] = None,
         search_max_len: tp.Optional[int] = None,
         search_max_depth: tp.Optional[int] = None,
         name_tuple_to_str: tp.Union[None, bool, tp.Callable] = None,
@@ -1934,6 +1935,7 @@ class PortfolioOptimizer(Analyzable):
             "indexer_tolerance": indexer_tolerance,
             "skip_minus_one": skip_minus_one,
             "index_points": index_points,
+            "rescale_to": rescale_to,
             **{f"args_{i}": args[i] for i in range(len(args))},
             **kwargs,
         }
@@ -2037,6 +2039,7 @@ class PortfolioOptimizer(Analyzable):
                 _indexer_tolerance = group_config.pop("indexer_tolerance")
                 _skip_minus_one = group_config.pop("skip_minus_one")
                 _index_points = group_config.pop("index_points")
+                _rescale_to = group_config.pop("rescale_to")
                 _jitted_loop = group_config.pop("jitted_loop")
                 _jitted = group_config.pop("jitted")
                 _chunked = group_config.pop("chunked")
@@ -2065,6 +2068,7 @@ class PortfolioOptimizer(Analyzable):
                         indexer_tolerance=_indexer_tolerance,
                         skip_minus_one=_skip_minus_one,
                         index_points=_index_points,
+                        rescale_to=_rescale_to,
                         jitted_loop=_jitted_loop,
                         jitted=_jitted,
                         chunked=_chunked,
@@ -2150,6 +2154,8 @@ class PortfolioOptimizer(Analyzable):
                         _allocations = _allocations.values
                     else:
                         _allocations = _allocations[list(wrapper.columns)].values
+                    if _rescale_to is not None:
+                        _allocations = nb.rescale_allocations_nb(_allocations, _rescale_to)
 
                 _alloc_points, _allocations = nb.prepare_alloc_points_nb(_index_points, _allocations, g)
                 alloc_points.append(_alloc_points)
@@ -2406,6 +2412,7 @@ class PortfolioOptimizer(Analyzable):
         skip_minus_one: tp.Union[bool, Param] = range_idxr_defaults["skip_minus_one"],
         index_ranges: tp.Union[None, tp.MaybeSequence[tp.MaybeSequence[int]], Param] = None,
         index_loc: tp.Union[None, tp.MaybeSequence[int], Param] = None,
+        rescale_to: tp.Union[None, tp.Tuple[float, float], Param] = None,
         alloc_wait: tp.Union[int, Param] = 1,
         search_max_len: tp.Optional[int] = None,
         search_max_depth: tp.Optional[int] = None,
@@ -2686,6 +2693,7 @@ class PortfolioOptimizer(Analyzable):
             "skip_minus_one": skip_minus_one,
             "index_ranges": index_ranges,
             "index_loc": index_loc,
+            "rescale_to": rescale_to,
             "alloc_wait": alloc_wait,
             **{f"args_{i}": args[i] for i in range(len(args))},
             **kwargs,
@@ -2794,6 +2802,7 @@ class PortfolioOptimizer(Analyzable):
                 _skip_minus_one = group_config.pop("skip_minus_one")
                 _index_ranges = group_config.pop("index_ranges")
                 _index_loc = group_config.pop("index_loc")
+                _rescale_to = group_config.pop("rescale_to")
                 _alloc_wait = group_config.pop("alloc_wait")
                 _jitted_loop = group_config.pop("jitted_loop")
                 _jitted = group_config.pop("jitted")
@@ -2828,6 +2837,7 @@ class PortfolioOptimizer(Analyzable):
                         skip_minus_one=_skip_minus_one,
                         index_ranges=_index_ranges,
                         index_loc=_index_loc,
+                        rescale_to=_rescale_to,
                         alloc_wait=_alloc_wait,
                         jitted_loop=_jitted_loop,
                         jitted=_jitted,
@@ -2940,6 +2950,8 @@ class PortfolioOptimizer(Analyzable):
                         _allocations = _allocations.values
                     else:
                         _allocations = _allocations[list(wrapper.columns)].values
+                    if _rescale_to is not None:
+                        _allocations = nb.rescale_allocations_nb(_allocations, _rescale_to)
 
                 if _index_loc is None:
                     _alloc_wait = substitute_templates(
