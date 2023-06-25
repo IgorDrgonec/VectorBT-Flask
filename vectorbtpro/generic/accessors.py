@@ -3752,7 +3752,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
     def crossed_above(
         self,
-        other: tp.SeriesFrame,
+        other: tp.ArrayLike,
         wait: int = 0,
         dropna: bool = False,
         broadcast_kwargs: tp.KwargsLike = None,
@@ -3789,20 +3789,28 @@ class GenericAccessor(BaseAccessor, Analyzable):
             dtype: bool
             ```
         """
-        self_obj, other_obj = reshaping.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
+        broadcastable_args = dict(obj=self.obj, other=other)
+        broadcast_kwargs = merge_dicts(dict(keep_flex=dict(obj=False, other=True)), broadcast_kwargs)
+        broadcasted_args, wrapper = reshaping.broadcast(
+            broadcastable_args,
+            to_pd=False,
+            min_ndim=2,
+            return_wrapper=True,
+            **broadcast_kwargs,
+        )
         func = jit_reg.resolve_option(nb.crossed_above_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(
-            reshaping.to_2d_array(self_obj),
-            reshaping.to_2d_array(other_obj),
+            broadcasted_args["obj"],
+            broadcasted_args["other"],
             wait=wait,
             dropna=dropna,
         )
-        return ArrayWrapper.from_obj(self_obj).wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+        return wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
     def crossed_below(
         self,
-        other: tp.SeriesFrame,
+        other: tp.ArrayLike,
         wait: int = 0,
         dropna: bool = True,
         broadcast_kwargs: tp.KwargsLike = None,
@@ -3813,16 +3821,24 @@ class GenericAccessor(BaseAccessor, Analyzable):
         """See `vectorbtpro.generic.nb.base.crossed_below_nb`.
 
         Also, see `GenericAccessor.crossed_above` for similar examples."""
-        self_obj, other_obj = reshaping.broadcast(self.obj, other, **resolve_dict(broadcast_kwargs))
+        broadcastable_args = dict(obj=self.obj, other=other)
+        broadcast_kwargs = merge_dicts(dict(keep_flex=dict(obj=False, other=True)), broadcast_kwargs)
+        broadcasted_args, wrapper = reshaping.broadcast(
+            broadcastable_args,
+            to_pd=False,
+            min_ndim=2,
+            return_wrapper=True,
+            **broadcast_kwargs,
+        )
         func = jit_reg.resolve_option(nb.crossed_below_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(
-            reshaping.to_2d_array(self_obj),
-            reshaping.to_2d_array(other_obj),
+            broadcasted_args["obj"],
+            broadcasted_args["other"],
             wait=wait,
             dropna=dropna,
         )
-        return ArrayWrapper.from_obj(self_obj).wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+        return wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
     # ############# Resolution ############# #
 

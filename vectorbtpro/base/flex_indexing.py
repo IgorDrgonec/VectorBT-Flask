@@ -19,7 +19,7 @@ _rotate_cols = settings["indexing"]["rotate_cols"]
 
 
 @register_jitted(cache=True)
-def flex_choose_i_1d_nb(arr: tp.Array2d, i: int) -> int:
+def flex_choose_i_1d_nb(arr: tp.FlexArray1d, i: int) -> int:
     """Choose a position in an array as if it has been broadcast against rows or columns.
 
     !!! note
@@ -32,7 +32,7 @@ def flex_choose_i_1d_nb(arr: tp.Array2d, i: int) -> int:
 
 
 @register_jitted(cache=True)
-def flex_select_1d_nb(arr: tp.Array2d, i: int) -> tp.Scalar:
+def flex_select_1d_nb(arr: tp.FlexArray1d, i: int) -> tp.Scalar:
     """Select an element of an array as if it has been broadcast against rows or columns.
 
     !!! note
@@ -42,7 +42,7 @@ def flex_select_1d_nb(arr: tp.Array2d, i: int) -> tp.Scalar:
 
 
 @register_jitted(cache=True)
-def flex_choose_i_pr_1d_nb(arr: tp.Array2d, i: int, rotate_rows: bool = _rotate_rows) -> int:
+def flex_choose_i_pr_1d_nb(arr: tp.FlexArray1d, i: int, rotate_rows: bool = _rotate_rows) -> int:
     """Choose a position in an array as if it has been broadcast against rows.
 
     Can use rotational indexing along rows.
@@ -59,7 +59,7 @@ def flex_choose_i_pr_1d_nb(arr: tp.Array2d, i: int, rotate_rows: bool = _rotate_
 
 
 @register_jitted(cache=True)
-def flex_select_1d_pr_nb(arr: tp.Array2d, i: int, rotate_rows: bool = _rotate_rows) -> tp.Scalar:
+def flex_select_1d_pr_nb(arr: tp.FlexArray1d, i: int, rotate_rows: bool = _rotate_rows) -> tp.Scalar:
     """Select an element of an array as if it has been broadcast against rows.
 
     Can use rotational indexing along rows.
@@ -71,7 +71,7 @@ def flex_select_1d_pr_nb(arr: tp.Array2d, i: int, rotate_rows: bool = _rotate_ro
 
 
 @register_jitted(cache=True)
-def flex_choose_i_pc_1d_nb(arr: tp.Array2d, col: int, rotate_cols: bool = _rotate_cols) -> int:
+def flex_choose_i_pc_1d_nb(arr: tp.FlexArray1d, col: int, rotate_cols: bool = _rotate_cols) -> int:
     """Choose a position in an array as if it has been broadcast against columns.
 
     Can use rotational indexing along columns.
@@ -88,7 +88,7 @@ def flex_choose_i_pc_1d_nb(arr: tp.Array2d, col: int, rotate_cols: bool = _rotat
 
 
 @register_jitted(cache=True)
-def flex_select_1d_pc_nb(arr: tp.Array2d, col: int, rotate_cols: bool = _rotate_cols) -> tp.Scalar:
+def flex_select_1d_pc_nb(arr: tp.FlexArray1d, col: int, rotate_cols: bool = _rotate_cols) -> tp.Scalar:
     """Select an element of an array as if it has been broadcast against columns.
 
     Can use rotational indexing along columns.
@@ -101,7 +101,7 @@ def flex_select_1d_pc_nb(arr: tp.Array2d, col: int, rotate_cols: bool = _rotate_
 
 @register_jitted(cache=True)
 def flex_choose_i_and_col_nb(
-    arr: tp.Array2d,
+    arr: tp.FlexArray2d,
     i: int,
     col: int,
     rotate_rows: bool = _rotate_rows,
@@ -132,13 +132,13 @@ def flex_choose_i_and_col_nb(
 
 @register_jitted(cache=True)
 def flex_select_nb(
-    arr: tp.Array2d,
+    arr: tp.FlexArray2d,
     i: int,
     col: int,
     rotate_rows: bool = _rotate_rows,
     rotate_cols: bool = _rotate_cols,
 ) -> tp.Scalar:
-    """Select element of an array as if it has been  broadcast rows and columns.
+    """Select element of an array as if it has been broadcast rows and columns.
 
     Can use rotational indexing along rows and columns.
 
@@ -152,3 +152,23 @@ def flex_select_nb(
         rotate_cols=rotate_cols,
     )
     return arr[flex_i, flex_col]
+
+
+@register_jitted(cache=True)
+def flex_select_row_nb(arr: tp.FlexArray2d, i: int, rotate_rows: bool = _rotate_rows) -> tp.Array1d:
+    """Select a row from a flexible 2-dim array. Returns a 1-dim array.
+
+    !!! note
+        Array must be two-dimensional."""
+    flex_i = flex_choose_i_pr_1d_nb(arr, i, rotate_rows=rotate_rows)
+    return arr[flex_i]
+
+
+@register_jitted(cache=True)
+def flex_select_col_nb(arr: tp.FlexArray2d, col: int, rotate_cols: bool = _rotate_cols) -> tp.Array1d:
+    """Select a column from a flexible 2-dim array. Returns a 1-dim array.
+
+    !!! note
+        Array must be two-dimensional."""
+    flex_col = flex_choose_i_pc_1d_nb(arr, col, rotate_cols=rotate_cols)
+    return arr[:, flex_col]

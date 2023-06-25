@@ -10,8 +10,8 @@ from numba.extending import overload
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.base.reshaping import to_1d_array_nb
-from vectorbtpro.base.flex_indexing import flex_select_1d_nb
+from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
+from vectorbtpro.base.flex_indexing import flex_select_1d_nb, flex_select_col_nb
 from vectorbtpro.registries.ch_registry import register_chunkable
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.utils import chunking as ch
@@ -1198,32 +1198,35 @@ def repartition_nb(arr: tp.Array2d, counts: tp.Array1d) -> tp.Array1d:
 
 
 @register_jitted(cache=True)
-def crossed_above_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d, wait: int = 0, dropna: bool = False) -> tp.Array1d:
+def crossed_above_1d_nb(arr1: tp.Array1d, arr2: tp.FlexArray1dLike, wait: int = 0, dropna: bool = False) -> tp.Array1d:
     """Get the crossover of the first array going above the second array.
 
     If `dropna` is True, produces the same results as if all rows with at least one NaN were dropped."""
+    arr2_ = to_1d_array_nb(np.asarray(arr2))
     out = np.empty(arr1.shape, dtype=np.bool_)
     was_below = False
     confirmed = 0
 
     for i in range(arr1.shape[0]):
-        if np.isnan(arr1[i]) or np.isnan(arr2[i]):
+        _arr1 = arr1[i]
+        _arr2 = flex_select_1d_nb(arr2_, i)
+        if np.isnan(_arr1) or np.isnan(_arr2):
             if not dropna:
                 was_below = False
                 confirmed = 0
             out[i] = False
-        elif arr1[i] > arr2[i]:
+        elif _arr1 > _arr2:
             if was_below:
                 confirmed += 1
                 out[i] = confirmed == wait + 1
             else:
                 out[i] = False
-        elif arr1[i] == arr2[i]:
+        elif _arr1 == _arr2:
             if confirmed > 0:
                 was_below = False
             confirmed = 0
             out[i] = False
-        elif arr1[i] < arr2[i]:
+        elif _arr1 < _arr2:
             confirmed = 0
             was_below = True
             out[i] = False
@@ -1234,45 +1237,77 @@ def crossed_above_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d, wait: int = 0, dropn
     size=ch.ArraySizer(arg_query="arr1", axis=1),
     arg_take_spec=dict(
         arr1=ch.ArraySlicer(axis=1),
-        arr2=ch.ArraySlicer(axis=1),
+        arr2=base_ch.FlexArraySlicer(axis=1),
         wait=None,
         dropna=None,
     ),
     merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def crossed_above_nb(arr1: tp.Array2d, arr2: tp.Array2d, wait: int = 0, dropna: bool = False) -> tp.Array2d:
+def crossed_above_nb(arr1: tp.Array2d, arr2: tp.FlexArray2dLike, wait: int = 0, dropna: bool = False) -> tp.Array2d:
     """2-dim version of `crossed_above_1d_nb`."""
+    arr2_ = to_2d_array_nb(np.asarray(arr2))
     out = np.empty(arr1.shape, dtype=np.bool_)
     for col in prange(arr1.shape[1]):
-        out[:, col] = crossed_above_1d_nb(arr1[:, col], arr2[:, col], wait=wait, dropna=dropna)
+        _arr2 = flex_select_col_nb(arr2_, col)
+        out[:, col] = crossed_above_1d_nb(arr1[:, col], _arr2, wait=wait, dropna=dropna)
     return out
 
 
 @register_jitted(cache=True)
-def crossed_below_1d_nb(arr1: tp.Array1d, arr2: tp.Array1d, wait: int = 0, dropna: bool = False) -> tp.Array1d:
+def crossed_below_1d_nb(arr1: tp.Array1d, arr2: tp.FlexArray1dLike, wait: int = 0, dropna: bool = False) -> tp.Array1d:
     """Get the crossover of the first array going below the second array.
 
-    Calls `crossed_above_1d_nb` but with the arguments switched."""
-    return crossed_above_1d_nb(arr2, arr1, wait=wait, dropna=dropna)
+    If `dropna` is True, produces the same results as if all rows with at least one NaN were dropped."""
+    arr2_ = to_1d_array_nb(np.asarray(arr2))
+    out = np.empty(arr1.shape, dtype=np.bool_)
+    was_above = False
+    confirmed = 0
+
+    for i in range(arr1.shape[0]):
+        _arr1 = arr1[i]
+        _arr2 = flex_select_1d_nb(arr2_, i)
+        if np.isnan(_arr1) or np.isnan(_arr2):
+            if not dropna:
+                was_above = False
+                confirmed = 0
+            out[i] = False
+        elif _arr1 < _arr2:
+            if was_above:
+                confirmed += 1
+                out[i] = confirmed == wait + 1
+            else:
+                out[i] = False
+        elif _arr1 == _arr2:
+            if confirmed > 0:
+                was_above = False
+            confirmed = 0
+            out[i] = False
+        elif _arr1 > _arr2:
+            confirmed = 0
+            was_above = True
+            out[i] = False
+    return out
 
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="arr1", axis=1),
     arg_take_spec=dict(
         arr1=ch.ArraySlicer(axis=1),
-        arr2=ch.ArraySlicer(axis=1),
+        arr2=base_ch.FlexArraySlicer(axis=1),
         wait=None,
         dropna=None,
     ),
     merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def crossed_below_nb(arr1: tp.Array2d, arr2: tp.Array2d, wait: int = 0, dropna: bool = False) -> tp.Array2d:
+def crossed_below_nb(arr1: tp.Array2d, arr2: tp.FlexArray2dLike, wait: int = 0, dropna: bool = False) -> tp.Array2d:
     """2-dim version of `crossed_below_1d_nb`."""
+    arr2_ = to_2d_array_nb(np.asarray(arr2))
     out = np.empty(arr1.shape, dtype=np.bool_)
     for col in prange(arr1.shape[1]):
-        out[:, col] = crossed_below_1d_nb(arr1[:, col], arr2[:, col], wait=wait, dropna=dropna)
+        _arr2 = flex_select_col_nb(arr2_, col)
+        out[:, col] = crossed_below_1d_nb(arr1[:, col], _arr2, wait=wait, dropna=dropna)
     return out
 
 
