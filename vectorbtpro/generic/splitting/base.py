@@ -2364,7 +2364,7 @@ class Splitter(Analyzable):
                 groups, group_index = split_group_by.get_groups_and_index()
                 mask = None
                 for g in split:
-                    if checks.is_int(g) and (split_as_indices or not group_index.is_integer()):
+                    if checks.is_int(g) and (split_as_indices or not pd.api.types.is_integer_dtype(group_index)):
                         i = g
                     else:
                         i = group_index.get_indexer([g])[0]
@@ -2380,7 +2380,7 @@ class Splitter(Analyzable):
             else:
                 split_indices = []
                 for s in split:
-                    if checks.is_int(s) and (split_as_indices or not self.split_labels.is_integer()):
+                    if checks.is_int(s) and (split_as_indices or not pd.api.types.is_integer_dtype(self.split_labels)):
                         i = s
                     else:
                         i = self.split_labels.get_indexer([s])[0]
@@ -2399,7 +2399,7 @@ class Splitter(Analyzable):
                 groups, group_index = set_group_by.get_groups_and_index()
                 mask = None
                 for g in set_:
-                    if checks.is_int(g) and (set_as_indices or not group_index.is_integer()):
+                    if checks.is_int(g) and (set_as_indices or not pd.api.types.is_integer_dtype(group_index)):
                         i = g
                     else:
                         i = group_index.get_indexer([g])[0]
@@ -2415,7 +2415,7 @@ class Splitter(Analyzable):
             else:
                 set_indices = []
                 for s in set_:
-                    if checks.is_int(s) and (set_as_indices or not self.set_labels.is_integer()):
+                    if checks.is_int(s) and (set_as_indices or not pd.api.types.is_integer_dtype(self.set_labels)):
                         i = s
                     else:
                         i = self.set_labels.get_indexer([s])[0]

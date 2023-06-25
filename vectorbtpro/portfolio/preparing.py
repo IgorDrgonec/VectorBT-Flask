@@ -114,9 +114,7 @@ base_arg_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__[
-    "base_arg_config"
-] = f"""Argument config for `BasePFPreparer`.
+__pdoc__["base_arg_config"] = f"""Argument config for `BasePFPreparer`.
 
 ```python
 {base_arg_config.prettify()}
@@ -211,7 +209,7 @@ class BasePFPreparer(BasePreparer):
         bm_close = self["bm_close"]
         if bm_close is not None and not isinstance(bm_close, bool):
             return bm_close
-        return None
+        return np.nan
 
     @cachedproperty
     def _pre_init_cash(self) -> tp.ArrayLike:
@@ -376,7 +374,11 @@ class BasePFPreparer(BasePreparer):
             init_cash=self.init_cash if self.init_cash_mode is None else self.init_cash_mode,
             init_position=self.init_position,
             init_price=self.init_price,
-            bm_close=self.bm_close if not isinstance(self["bm_close"], bool) else self["bm_close"],
+            bm_close=(
+                self.bm_close
+                if (self["bm_close"] is not None and not isinstance(self["bm_close"], bool))
+                else self["bm_close"]
+            ),
             **kwargs,
         )
 
@@ -485,9 +487,7 @@ order_arg_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__[
-    "order_arg_config"
-] = f"""Argument config for order-related information.
+__pdoc__["order_arg_config"] = f"""Argument config for order-related information.
 
 ```python
 {order_arg_config.prettify()}
@@ -523,9 +523,7 @@ fo_arg_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__[
-    "fo_arg_config"
-] = f"""Argument config for `FOPreparer`.
+__pdoc__["fo_arg_config"] = f"""Argument config for `FOPreparer`.
 
 ```python
 {fo_arg_config.prettify()}
@@ -913,9 +911,7 @@ fs_arg_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__[
-    "fs_arg_config"
-] = f"""Argument config for `FSPreparer`.
+__pdoc__["fs_arg_config"] = f"""Argument config for `FSPreparer`.
 
 ```python
 {fs_arg_config.prettify()}
@@ -1522,9 +1518,7 @@ fof_arg_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__[
-    "fof_arg_config"
-] = f"""Argument config for `FOFPreparer`.
+__pdoc__["fof_arg_config"] = f"""Argument config for `FOFPreparer`.
 
 ```python
 {fof_arg_config.prettify()}
@@ -1826,9 +1820,7 @@ fdof_arg_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__[
-    "fdof_arg_config"
-] = f"""Argument config for `FDOFPreparer`.
+__pdoc__["fdof_arg_config"] = f"""Argument config for `FDOFPreparer`.
 
 ```python
 {fdof_arg_config.prettify()}

@@ -1002,7 +1002,7 @@ class MappedArray(Analyzable):
             values[nan_mask] = 0
             if minus_one_to_zero:
                 return self.wrapper.index[values]
-            if self.wrapper.index.is_integer():
+            if pd.api.types.is_integer_dtype(self.wrapper.index):
                 new_values = self.wrapper.index.values[values]
                 new_values[nan_mask] = -1
                 return pd.Index(new_values, name=self.wrapper.index.name)

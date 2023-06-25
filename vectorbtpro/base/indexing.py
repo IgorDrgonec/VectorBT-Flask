@@ -1171,7 +1171,7 @@ def get_index_points(
                 kind = "indices"
         else:
             on = dt.try_to_datetime_index(on)
-            if on.is_integer():
+            if pd.api.types.is_integer_dtype(on):
                 kind = "indices"
             else:
                 kind = "labels"
@@ -1705,7 +1705,7 @@ def get_index_ranges(
                 ref_index = start
             if end is not None:
                 ref_index = end
-            if ref_index.is_integer():
+            if pd.api.types.is_integer_dtype(ref_index):
                 kind = "indices"
             elif isinstance(ref_index, pd.DatetimeIndex) and isinstance(naive_index, pd.DatetimeIndex):
                 kind = "bounds"
@@ -1726,7 +1726,7 @@ def get_index_ranges(
             else:
                 start = pd.Index([0])
         else:
-            if checks.is_int(lookback_period) and not end.is_integer():
+            if checks.is_int(lookback_period) and not pd.api.types.is_integer_dtype(end):
                 lookback_period *= dt.infer_index_freq(naive_index, freq=index_freq)
             start = end - lookback_period
     if len(start) == 1 and len(end) > 1:
