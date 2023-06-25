@@ -40,7 +40,7 @@ def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike, def_lvl_name: t
         group_by = group_by.substitute(context=dict(index=index), strict=True, sub_id="group_by")
     if group_by is True:
         group_by = pd.Index(["group"] * len(index), name=def_lvl_name)
-    elif isinstance(index, pd.MultiIndex):
+    elif isinstance(index, pd.MultiIndex) or isinstance(group_by, (ExceptLevel, int, str)):
         if isinstance(group_by, ExceptLevel):
             except_levels = group_by.value
             if isinstance(except_levels, (int, str)):
