@@ -7,6 +7,7 @@ import inspect
 from collections import defaultdict, OrderedDict
 from collections.abc import Callable
 from functools import wraps
+import multiprocessing
 
 import numpy as np
 import pandas as pd
@@ -17,7 +18,7 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import Config, merge_dicts
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.template import CustomTemplate, substitute_templates
-from vectorbtpro.utils.parsing import annotate_args, ann_args_to_args
+from vectorbtpro.utils.parsing import annotate_args, flatten_ann_args, ann_args_to_args
 
 __all__ = [
     "generate_param_combs",
@@ -185,15 +186,22 @@ class Param:
     `vectorbtpro.base.indexes.index_from_values`."""
 
     hide: bool = attr.ib(default=False)
-    """Whether to hide the parameter from the parameter index.
-    
-    At least one parameter must be displayed per level."""
+    """Whether to hide the parameter from the parameter index."""
 
     name: tp.Optional[tp.Hashable] = attr.ib(default=None)
     """Name of the parameter.
     
     If None, defaults to the name of the index in `Param.keys`, or to the key in 
     `param_dct` passed to `combine_params`."""
+
+    mono_reduce: bool = attr.ib(default=False)
+    """Whether to reduce a mono-chunk of the same values into one value."""
+
+    mono_merge_func: tp.Optional[tp.Callable] = attr.ib(default=None)
+    """Merge function to apply when building a mono-chunk."""
+
+    mono_merge_kwargs: tp.KwargsLike = attr.ib(default=None)
+    """Keyword arguments passed to `Param.mono_merge_func`."""
 
     def map_value(self: ParamT, func: tp.Callable) -> ParamT:
         """Execute a function on each value in `Param.value` and create a new `Param` instance."""
@@ -347,6 +355,8 @@ def combine_params(
     op_tree_operands = []
     param_keys = []
     new_product_indexes = []
+    shown_levels = []
+    hidden_levels = []
     for level in range(max_idx + 1):
         if level not in level_values:
             raise ValueError("Levels must come in a strict order starting with 0 and without gaps")
@@ -368,14 +378,22 @@ def combine_params(
                     levels.append(product_indexes[k])
             if len(levels) > 1:
                 _param_index = indexes.stack_indexes(levels, **index_stack_kwargs)
+                shown_levels.append(level)
             elif len(levels) == 1:
                 _param_index = levels[0]
+                shown_levels.append(level)
             else:
-                raise ValueError("At least one parameter must be displayed per level")
+                _param_index = range(len(param_lists[0]))
+                hidden_levels.append(level)
             new_product_indexes.append(_param_index)
-    if build_index:
+    if build_index and len(shown_levels) > 0:
         if len(new_product_indexes) > 1:
             param_index = indexes.combine_indexes(new_product_indexes, **index_stack_kwargs)
+            if len(hidden_levels) > 0:
+                if len(shown_levels) > 1:
+                    param_index = indexes.select_levels(param_index, shown_levels)
+                else:
+                    param_index = indexes.select_levels(param_index, shown_levels[0])
         else:
             param_index = new_product_indexes[0]
     else:
@@ -429,7 +447,7 @@ def combine_params(
                 keep_indices = np.sort(keep_indices)
             param_product = {k: [v[i] for i in keep_indices] for k, v in param_product.items()}
             ncombs = len(keep_indices)
-            if build_index:
+            if build_index and len(shown_levels) > 0:
                 param_index = param_index[keep_indices]
     else:
         pre_random_subset = False
@@ -440,11 +458,11 @@ def combine_params(
             random_subset = int(random_subset * ncombs)
         random_indices = np.sort(rng.permutation(np.arange(ncombs))[:random_subset])
         param_product = {k: [v[i] for i in random_indices] for k, v in param_product.items()}
-        if build_index:
+        if build_index and len(shown_levels) > 0:
             param_index = param_index[random_indices]
 
     # Stringify index names
-    if build_index:
+    if build_index and len(shown_levels) > 0:
         if isinstance(name_tuple_to_str, bool):
             if name_tuple_to_str:
                 name_tuple_to_str = lambda name_tuple: "_".join(map(lambda x: str(x).strip().lower(), name_tuple))
@@ -608,10 +626,16 @@ def parameterized(
     name_tuple_to_str: tp.Union[None, bool, tp.Callable] = None,
     merge_func: tp.Union[None, str, tuple, tp.Callable] = None,
     merge_kwargs: tp.KwargsLike = None,
-    return_meta: bool = False,
-    use_meta: tp.KwargsLike = None,
     selection: tp.Union[None, tp.MaybeIterable[tp.Hashable]] = None,
     forward_kwargs_as: tp.KwargsLike = None,
+    mono_n_chunks: tp.Optional[tp.Union[str, int]] = None,
+    mono_min_size: tp.Optional[int] = None,
+    mono_chunk_len: tp.Optional[tp.Union[str, int]] = None,
+    mono_chunk_meta: tp.Optional[tp.Iterable[tp.ChunkMeta]] = None,
+    mono_merge_func: tp.Union[tp.Callable, tp.Kwargs] = None,
+    mono_merge_kwargs: tp.KwargsLike = None,
+    mono_reduce: tp.Union[bool, tp.Kwargs] = None,
+    return_meta: bool = False,
     execute_kwargs: tp.KwargsLike = None,
     **kwargs,
 ) -> tp.Callable:
@@ -625,10 +649,10 @@ def parameterized(
     3. Maps parameter combinations to configs using `param_product_to_objs`
     4. Generates and resolves parameter configs by combining combinations from the step above with
     `param_configs` that is optionally passed by the user. User-defined `param_configs` have more priority.
-    5. Extracts arguments and keyword arguments from each parameter config and substitutes any templates (lazily)
-    6. If `return_meta` is True, returns all the objects generated above as a dictionary
-    7. If `selection` is not None, substitutes it as a template, translates it into indices that
+    5. If `selection` is not None, substitutes it as a template, translates it into indices that
     can be mapped to `param_index`, and selects them from all the objects generated above
+    6. Builds mono-chunks if `mono_n_chunks`, `mono_chunk_len`, or `mono_chunk_meta` is not None
+    7. Extracts arguments and keyword arguments from each parameter config and substitutes any templates (lazily)
     8. Passes each set of the function and its arguments to `vectorbtpro.utils.execution.execute` for execution
     9. Optionally, post-processes and merges the results by passing them and `**merge_kwargs` to `merge_func`
 
@@ -642,6 +666,14 @@ def parameterized(
         Defining a parameter and listing the same argument in `param_configs` will prioritize
         the config over the parameter, even though the parameter will still be visible in the final columns.
         There are no checks implemented to raise an error when this happens!
+
+    If mono-chunking is enabled, parameter configs will be distributed over chunks. Any argument that
+    is wrapped with `Param` or appears in `mono_merge_func` will be aggregated into a list. It will
+    be merged using either `Param.mono_merge_func` or `mono_merge_func` in the same way as `merge_func`.
+    If an argument satisfies neither of the above requirements and all its values within a chunk are same,
+    this value will be passed as a scalar. Arguments `mono_merge_func` and `mono_merge_kwargs`
+    must be dictionaries where keys are argument names in the flattened signature and values are
+    functions and keyword arguments respectively.
 
     Any template in both `execute_kwargs` and `merge_kwargs` will be substituted. You can use
     the keys `param_configs`, `param_index`, all keys in `template_context`, and all arguments as found
@@ -801,7 +833,9 @@ def parameterized(
             if skip_single_param is None:
                 skip_single_param = params_cfg["skip_single_param"]
             template_context = merge_dicts(
-                params_cfg["template_context"], wrapper.options["template_context"], kwargs.pop("_template_context", {})
+                params_cfg["template_context"],
+                wrapper.options["template_context"],
+                kwargs.pop("_template_context", {}),
             )
             random_subset = kwargs.pop("_random_subset", wrapper.options["random_subset"])
             if random_subset is None:
@@ -819,13 +853,24 @@ def parameterized(
                 name_tuple_to_str = params_cfg["name_tuple_to_str"]
             merge_func = kwargs.pop("_merge_func", wrapper.options["merge_func"])
             merge_kwargs = merge_dicts(wrapper.options["merge_kwargs"], kwargs.pop("_merge_kwargs", {}))
-            return_meta = kwargs.pop("_return_meta", wrapper.options["return_meta"])
-            use_meta = kwargs.pop("_use_meta", wrapper.options["use_meta"])
             selection = kwargs.pop("_selection", wrapper.options["selection"])
+            mono_n_chunks = kwargs.pop("_mono_n_chunks", wrapper.options["mono_n_chunks"])
+            mono_min_size = kwargs.pop("_mono_min_size", wrapper.options["mono_min_size"])
+            mono_chunk_len = kwargs.pop("_mono_chunk_len", wrapper.options["mono_chunk_len"])
+            mono_chunk_meta = kwargs.pop("_mono_chunk_meta", wrapper.options["mono_chunk_meta"])
+            mono_merge_func = kwargs.pop("_mono_merge_func", wrapper.options["mono_merge_func"])
+            mono_merge_kwargs = kwargs.pop("_mono_merge_kwargs", wrapper.options["mono_merge_kwargs"])
+            mono_reduce = kwargs.pop("_mono_reduce", wrapper.options["mono_reduce"])
+            return_meta = kwargs.pop("_return_meta", wrapper.options["return_meta"])
             execute_kwargs = merge_dicts(
-                params_cfg["execute_kwargs"], wrapper.options["execute_kwargs"], kwargs.pop("_execute_kwargs", {})
+                params_cfg["execute_kwargs"],
+                wrapper.options["execute_kwargs"],
+                kwargs.pop("_execute_kwargs", {}),
             )
-            forward_kwargs_as = merge_dicts(wrapper.options["forward_kwargs_as"], kwargs.pop("_forward_kwargs_as", {}))
+            forward_kwargs_as = merge_dicts(
+                wrapper.options["forward_kwargs_as"],
+                kwargs.pop("_forward_kwargs_as", {}),
+            )
             if len(forward_kwargs_as) > 0:
                 new_kwargs = dict()
                 for k, v in kwargs.items():
@@ -842,174 +887,157 @@ def parameterized(
             if param_configs is None:
                 param_configs = []
 
-            if use_meta is None:
-                # Annotate arguments
-                ann_args = annotate_args(func, args, kwargs, allow_partial=True)
-                var_args_name = None
-                var_kwargs_name = None
-                for k, v in ann_args.items():
-                    if v["kind"] == inspect.Parameter.VAR_POSITIONAL:
-                        var_args_name = k
-                    if v["kind"] == inspect.Parameter.VAR_KEYWORD:
-                        var_kwargs_name = k
+            # Annotate arguments
+            template_context["ann_args"] = annotate_args(func, args, kwargs, allow_partial=True)
+            template_context["flat_ann_args"] = flatten_ann_args(template_context["ann_args"])
+            var_args_name = None
+            var_kwargs_name = None
+            for k, v in template_context["ann_args"].items():
+                if v["kind"] == inspect.Parameter.VAR_POSITIONAL:
+                    var_args_name = k
+                if v["kind"] == inspect.Parameter.VAR_KEYWORD:
+                    var_kwargs_name = k
 
-                # Unroll parameter configs
-                pc_names = []
-                pc_names_none = True
-                n_param_configs = 0
-                if isinstance(param_configs, dict):
-                    new_param_configs = []
-                    for k, v in param_configs.items():
-                        v = dict(v)
-                        v["_name"] = k
-                        new_param_configs.append(v)
-                    param_configs = new_param_configs
-                else:
-                    param_configs = list(param_configs)
-                for i, param_config in enumerate(param_configs):
-                    param_config = dict(param_config)
-                    if var_args_name is not None and var_args_name in param_config:
-                        for k, arg in enumerate(param_config.pop(var_args_name)):
-                            param_config[f"{var_args_name}_{k}"] = arg
-                    if var_kwargs_name is not None and var_kwargs_name in param_config:
-                        for k, v in param_config.pop(var_kwargs_name).items():
-                            param_config[k] = v
-                    if "_name" in param_config and param_config["_name"] is not None:
-                        pc_names.append(param_config.pop("_name"))
-                        pc_names_none = False
-                    else:
-                        pc_names.append(n_param_configs)
-                    param_configs[i] = param_config
-                    n_param_configs += 1
+            # # Check for single parameter
+            # if skip_single_param and len(param_configs) == 0:
+            #     found_param = False
+            #     for k, v in template_context["flat_ann_args"].items():
+            #         if "value" in v and isinstance(v["value"], Param):
+            #             found_param = True
+            #             break
+            #     if not found_param:
+            #         return func(*args, **kwargs)
 
-                # Combine parameters
-                paramable_kwargs = {}
-                for k, v in ann_args.items():
-                    if "value" in v:
-                        if v["kind"] == inspect.Parameter.VAR_POSITIONAL:
-                            for i, arg in enumerate(v["value"]):
-                                paramable_kwargs[f"{var_args_name}_{i}"] = arg
-                        elif v["kind"] == inspect.Parameter.VAR_KEYWORD:
-                            for k2, v2 in v["value"].items():
-                                paramable_kwargs[k2] = v2
-                        else:
-                            paramable_kwargs[k] = v["value"]
-                param_dct = find_params_in_obj(
-                    paramable_kwargs,
-                    search_except_types=search_except_types,
-                    search_max_len=search_max_len,
-                    search_max_depth=search_max_depth,
-                )
-                param_columns = None
-                if len(param_dct) > 0:
-                    param_product, param_columns = combine_params(
-                        param_dct,
-                        random_subset=random_subset,
-                        seed=seed,
-                        index_stack_kwargs=index_stack_kwargs,
-                        name_tuple_to_str=name_tuple_to_str,
-                    )
-                    product_param_configs = param_product_to_objs(paramable_kwargs, param_product)
-                    if len(param_configs) == 0:
-                        param_configs = product_param_configs
-                    else:
-                        new_param_configs = []
-                        for i in range(len(product_param_configs)):
-                            for param_config in param_configs:
-                                new_param_config = merge_dicts(product_param_configs[i], param_config)
-                                new_param_configs.append(new_param_config)
-                        param_configs = new_param_configs
+            # Unroll parameter configs
 
-                # Build param index
-                n_config_params = len(pc_names)
-                if param_columns is not None:
-                    if n_config_params == 0 or (n_config_params == 1 and pc_names_none):
-                        param_index = param_columns
-                    else:
-                        from vectorbtpro.base.indexes import combine_indexes
+            def _unroll_param_config(param_config):
+                new_param_config = dict(param_config)
+                if var_args_name is not None and var_args_name in new_param_config:
+                    for i, arg in enumerate(new_param_config.pop(var_args_name)):
+                        new_param_config[f"{var_args_name}_{i}"] = arg
+                if var_kwargs_name is not None and var_kwargs_name in new_param_config:
+                    for k, v in new_param_config.pop(var_kwargs_name).items():
+                        new_param_config[k] = v
+                return new_param_config
 
-                        param_index = combine_indexes(
-                            (
-                                param_columns,
-                                pd.Index(pc_names, name="param_config"),
-                            ),
-                            **index_stack_kwargs,
-                        )
-                else:
-                    if n_config_params == 0 or (n_config_params == 1 and pc_names_none):
-                        param_index = pd.Index([0], name="param_config")
-                    else:
-                        param_index = pd.Index(pc_names, name="param_config")
-
-                # Create parameter config from arguments if empty
-                if len(param_configs) == 0:
-                    single_param = True
-                    param_configs.append(dict())
-                else:
-                    single_param = False
-                template_context["single_param"] = single_param
-
-                # Roll parameter configs
+            pc_names = []
+            pc_names_none = True
+            n_param_configs = 0
+            if isinstance(param_configs, dict):
                 new_param_configs = []
-                for param_config in param_configs:
-                    new_param_config = merge_dicts(paramable_kwargs, param_config)
-                    if var_args_name is not None:
-                        _args = ()
-                        while True:
-                            if f"{var_args_name}_{len(_args)}" in new_param_config:
-                                _args += (new_param_config.pop(f"{var_args_name}_{len(_args)}"),)
-                            else:
-                                break
-                        new_param_config[var_args_name] = _args
-                    if var_kwargs_name is not None:
-                        new_param_config[var_kwargs_name] = {}
-                        for k in list(new_param_config.keys()):
-                            if k not in ann_args:
-                                new_param_config[var_kwargs_name][k] = new_param_config.pop(k)
-                    new_param_configs.append(new_param_config)
+                for k, v in param_configs.items():
+                    v = dict(v)
+                    v["_name"] = k
+                    new_param_configs.append(v)
                 param_configs = new_param_configs
-                template_context["param_configs"] = param_configs
-                template_context["param_index"] = param_index
-
-                # Prepare function and arguments
-
-                def _prepare_args(
-                    _ann_args=ann_args,
-                    _param_configs=param_configs,
-                    _template_context=template_context,
-                ):
-                    for p, param_config in enumerate(_param_configs):
-                        __template_context = dict(_template_context)
-                        __template_context["config_idx"] = p
-                        __ann_args = dict()
-                        for k, v in _ann_args.items():
-                            v = dict(v)
-                            v["value"] = param_config[k]
-                            __ann_args[k] = v
-                        _args, _kwargs = ann_args_to_args(__ann_args)
-                        _args = substitute_templates(_args, __template_context, sub_id="args")
-                        _kwargs = substitute_templates(_kwargs, __template_context, sub_id="kwargs")
-                        yield func, _args, _kwargs
-
-                funcs_args = _prepare_args()
-                template_context["funcs_args"] = funcs_args
-                use_meta = dict(
-                    single_param=single_param,
-                    param_configs=param_configs,
-                    param_index=param_index,
-                    funcs_args=funcs_args,
-                )
             else:
-                template_context["single_param"] = use_meta["single_param"]
-                template_context["param_configs"] = use_meta["param_configs"]
-                template_context["param_index"] = use_meta["param_index"]
-                template_context["funcs_args"] = use_meta["funcs_args"]
-            del single_param
-            del param_configs
-            del param_index
-            del funcs_args
-            if return_meta:
-                return use_meta
+                param_configs = list(param_configs)
+            for i, param_config in enumerate(param_configs):
+                param_config = _unroll_param_config(param_config)
+                if "_name" in param_config and param_config["_name"] is not None:
+                    pc_names.append(param_config.pop("_name"))
+                    pc_names_none = False
+                else:
+                    pc_names.append(n_param_configs)
+                param_configs[i] = param_config
+                n_param_configs += 1
+
+            # Combine parameters
+            paramable_kwargs = {}
+            for k, v in template_context["ann_args"].items():
+                if "value" in v:
+                    if v["kind"] == inspect.Parameter.VAR_POSITIONAL:
+                        for i, arg in enumerate(v["value"]):
+                            paramable_kwargs[f"{var_args_name}_{i}"] = arg
+                    elif v["kind"] == inspect.Parameter.VAR_KEYWORD:
+                        for k2, v2 in v["value"].items():
+                            paramable_kwargs[k2] = v2
+                    else:
+                        paramable_kwargs[k] = v["value"]
+            param_dct = find_params_in_obj(
+                paramable_kwargs,
+                search_except_types=search_except_types,
+                search_max_len=search_max_len,
+                search_max_depth=search_max_depth,
+            )
+            param_columns = None
+            if len(param_dct) > 0:
+                param_product, param_columns = combine_params(
+                    param_dct,
+                    random_subset=random_subset,
+                    seed=seed,
+                    index_stack_kwargs=index_stack_kwargs,
+                    name_tuple_to_str=name_tuple_to_str,
+                )
+                product_param_configs = param_product_to_objs(paramable_kwargs, param_product)
+                if len(param_configs) == 0:
+                    param_configs = product_param_configs
+                else:
+                    new_param_configs = []
+                    for i in range(len(product_param_configs)):
+                        for param_config in param_configs:
+                            new_param_config = merge_dicts(product_param_configs[i], param_config)
+                            new_param_configs.append(new_param_config)
+                    param_configs = new_param_configs
+
+            # Build param index
+            n_config_params = len(pc_names)
+            if param_columns is not None:
+                if n_config_params == 0 or (n_config_params == 1 and pc_names_none):
+                    new_param_index = param_columns
+                else:
+                    from vectorbtpro.base.indexes import combine_indexes
+
+                    new_param_index = combine_indexes(
+                        (
+                            param_columns,
+                            pd.Index(pc_names, name="param_config"),
+                        ),
+                        **index_stack_kwargs,
+                    )
+            else:
+                if n_config_params == 0 or (n_config_params == 1 and pc_names_none):
+                    new_param_index = None
+                else:
+                    new_param_index = pd.Index(pc_names, name="param_config")
+            template_context["param_index"] = new_param_index
+
+            # Create parameter config from arguments if empty
+            if len(param_configs) == 0:
+                template_context["single_param"] = True
+                param_configs.append(dict())
+            else:
+                template_context["single_param"] = False
+
+            # Roll parameter configs
+
+            def _roll_param_config(param_config):
+                new_param_config = dict(param_config)
+                if var_args_name is not None:
+                    _args = ()
+                    while True:
+                        k = f"{var_args_name}_{len(_args)}"
+                        if k in new_param_config:
+                            _args += (new_param_config.pop(k),)
+                        else:
+                            break
+                    new_param_config[var_args_name] = _args
+                if var_kwargs_name is not None:
+                    new_param_config[var_kwargs_name] = {}
+                    for k in list(new_param_config.keys()):
+                        if k not in template_context["ann_args"]:
+                            new_param_config[var_kwargs_name][k] = new_param_config.pop(k)
+                return new_param_config
+
+            param_config_keys = set()
+            new_param_configs = []
+            for param_config in param_configs:
+                new_param_config = merge_dicts(paramable_kwargs, param_config)
+                for k in new_param_config:
+                    param_config_keys.add(k)
+                new_param_config = _roll_param_config(new_param_config)
+                new_param_configs.append(new_param_config)
+            template_context["param_configs"] = new_param_configs
 
             if selection is not None:
                 selection = substitute_templates(selection, template_context, sub_id="selection")
@@ -1019,7 +1047,7 @@ def parameterized(
                         selection = {selection}
                         found_param = True
                         template_context["single_param"] = True
-                    elif selection in template_context["param_index"]:
+                    elif template_context["param_index"] is not None and selection in template_context["param_index"]:
                         selection = {template_context["param_index"].get_loc(selection)}
                         found_param = True
                         template_context["single_param"] = True
@@ -1029,14 +1057,15 @@ def parameterized(
                         for s in selection:
                             if checks.is_int(s):
                                 new_selection.add(s)
-                            elif s in template_context["param_index"]:
+                            elif template_context["param_index"] is not None and s in template_context["param_index"]:
                                 new_selection.add(template_context["param_index"].get_loc(s))
                             else:
                                 raise ValueError(f"Selection {selection} couldn't be matched with parameter index")
                         selection = new_selection
                     else:
                         raise ValueError(f"Selection {selection} couldn't be matched with parameter index")
-                template_context["param_index"] = template_context["param_index"][list(selection)]
+                if template_context["param_index"] is not None:
+                    template_context["param_index"] = template_context["param_index"][list(selection)]
                 new_param_configs = []
                 _selection = selection.copy()
                 for i, x in enumerate(template_context["param_configs"]):
@@ -1048,21 +1077,157 @@ def parameterized(
                 if len(_selection) > 0:
                     raise ValueError(f"Selection {_selection} couldn't be matched")
                 template_context["param_configs"] = new_param_configs
-                new_funcs_args = []
-                _selection = selection.copy()
-                for i, x in enumerate(template_context["funcs_args"]):
-                    if i in _selection:
-                        new_funcs_args.append(x)
-                        _selection.remove(i)
-                        if len(_selection) == 0:
-                            break
-                if len(_selection) > 0:
-                    raise ValueError(f"Selection {_selection} couldn't be matched")
-                template_context["funcs_args"] = new_funcs_args
+
+            # Prepare function and arguments
+
+            def _prepare_args(_template_context=template_context):
+                for p, param_config in enumerate(_template_context["param_configs"]):
+                    __template_context = dict(_template_context)
+                    __template_context["config_idx"] = p
+                    __ann_args = dict()
+                    for k, v in _template_context["ann_args"].items():
+                        v = dict(v)
+                        v["value"] = param_config[k]
+                        __ann_args[k] = v
+                    _args, _kwargs = ann_args_to_args(__ann_args)
+                    _args = substitute_templates(_args, __template_context, sub_id="args")
+                    _kwargs = substitute_templates(_kwargs, __template_context, sub_id="kwargs")
+                    yield func, _args, _kwargs
 
             if skip_single_param and template_context["single_param"]:
-                funcs_args = list(template_context["funcs_args"])
+                funcs_args = list(_prepare_args())
                 return funcs_args[0][0](*funcs_args[0][1], **funcs_args[0][2])
+
+            if mono_n_chunks is not None or mono_chunk_len is not None or mono_chunk_meta is not None:
+                # Prepare mono-chunks
+                from vectorbtpro.utils.chunking import yield_chunk_meta
+
+                if mono_chunk_meta is None:
+                    if isinstance(mono_n_chunks, str) and mono_n_chunks.lower() == "auto":
+                        n_chunks = multiprocessing.cpu_count()
+                    if isinstance(mono_chunk_len, str) and mono_chunk_len.lower() == "auto":
+                        chunk_len = multiprocessing.cpu_count()
+                    mono_chunk_meta = yield_chunk_meta(
+                        n_chunks=mono_n_chunks,
+                        size=len(template_context["param_configs"]),
+                        min_size=mono_min_size,
+                        chunk_len=mono_chunk_len,
+                    )
+
+                # Get indices of each mono-chunk and whether they are sorted
+                last_idx = -1
+                indices_sorted = True
+                mono_chunk_indices = []
+                for _chunk_meta in mono_chunk_meta:
+                    if _chunk_meta.indices is not None:
+                        chunk_indices = list(_chunk_meta.indices)
+                    else:
+                        if _chunk_meta.start is None or _chunk_meta.end is None:
+                            raise ValueError("Each chunk must have a start and an end index")
+                        chunk_indices = list(range(_chunk_meta.start, _chunk_meta.end))
+                    if indices_sorted:
+                        for idx in chunk_indices:
+                            if idx != last_idx + 1:
+                                indices_sorted = False
+                                break
+                            last_idx = idx
+                    mono_chunk_indices.append(chunk_indices)
+                template_context["mono_chunk_indices"] = mono_chunk_indices
+
+                # Iterate over mono-chunks and merge arguments
+                new_param_configs = []
+                new_param_index = []
+                for chunk_indices in mono_chunk_indices:
+                    if template_context["param_index"] is not None:
+                        new_param_index.append(template_context["param_index"][chunk_indices])
+                    new_param_config = dict()
+                    all_same = dict()
+                    for j, i in enumerate(chunk_indices):
+                        param_config = template_context["param_configs"][i]
+                        param_config = _unroll_param_config(param_config)
+                        for k, v in param_config.items():
+                            if j == 0:
+                                new_param_config[k] = [v]
+                                all_same[k] = True
+                            else:
+                                if k not in new_param_config:
+                                    raise ValueError(f"Mono-chunks cannot be built because key '{k}' "
+                                                     f"is not present in all parameter configs")
+                                if v is not new_param_config[k][-1]:
+                                    all_same[k] = False
+                                new_param_config[k].append(v)
+
+                    for k, v in new_param_config.items():
+                        k_merge_func = None
+                        k_merge_kwargs = None
+                        k_reduce = None
+                        if mono_merge_func is not None:
+                            if isinstance(mono_merge_func, dict):
+                                if k in mono_merge_func:
+                                    k_merge_func = mono_merge_func[k]
+                            else:
+                                k_merge_func = mono_merge_func
+                        if mono_merge_kwargs is not None:
+                            if set(mono_merge_kwargs.keys()) <= param_config_keys:
+                                if k in mono_merge_kwargs:
+                                    k_merge_kwargs = mono_merge_kwargs[k]
+                            else:
+                                k_merge_kwargs = mono_merge_kwargs
+                        if mono_reduce is not None:
+                            if isinstance(mono_reduce, dict):
+                                if k in mono_reduce:
+                                    k_reduce = mono_reduce[k]
+                            else:
+                                k_reduce = mono_reduce
+                        if k in template_context["flat_ann_args"]:
+                            ann_arg = template_context["flat_ann_args"][k]
+                            if "value" in ann_arg and isinstance(ann_arg["value"], Param):
+                                if k_merge_func is None and ann_arg["value"].mono_merge_func is not None:
+                                    k_merge_func = ann_arg["value"].mono_merge_func
+                                if k_merge_kwargs is None and ann_arg["value"].mono_merge_kwargs is not None:
+                                    k_merge_kwargs = ann_arg["value"].mono_merge_kwargs
+                                if k_reduce is None and ann_arg["value"].mono_reduce is not None:
+                                    k_reduce = ann_arg["value"].mono_reduce
+                        if k_reduce is None:
+                            k_reduce = all_same[k]
+                        elif k_reduce and not all_same[k]:
+                            k_reduce = False
+
+                        if k_reduce:
+                            new_param_config[k] = new_param_config[k][0]
+                        elif k_merge_func is not None:
+                            if isinstance(k_merge_func, (str, tuple)):
+                                from vectorbtpro.base.merging import resolve_merge_func
+
+                                k_merge_func = resolve_merge_func(k_merge_func)
+                            k_merge_kwargs = substitute_templates(
+                                k_merge_kwargs,
+                                template_context,
+                                sub_id="mono_merge_kwargs",
+                            )
+                            if k_merge_kwargs is None:
+                                k_merge_kwargs = {}
+                            new_param_config[k] = k_merge_func(v, **k_merge_kwargs)
+
+                    new_param_configs.append(_roll_param_config(new_param_config))
+                template_context["param_configs"] = new_param_configs
+                if template_context["param_index"] is not None:
+                    template_context["param_index"] = new_param_index
+            else:
+                template_context["mono_chunk_indices"] = None
+
+            template_context["funcs_args"] = _prepare_args()
+
+            if return_meta:
+                return dict(
+                    ann_args=template_context["ann_args"],
+                    flat_ann_args=template_context["flat_ann_args"],
+                    single_param=template_context["single_param"],
+                    param_configs=template_context["param_configs"],
+                    param_index=template_context["param_index"],
+                    mono_chunk_indices=template_context["mono_chunk_indices"],
+                    funcs_args=template_context["funcs_args"],
+                )
 
             # Execute function on each parameter combination
             execute_kwargs = substitute_templates(execute_kwargs, template_context, sub_id="execute_kwargs")
@@ -1097,10 +1262,16 @@ def parameterized(
                 name_tuple_to_str=name_tuple_to_str,
                 merge_func=merge_func,
                 merge_kwargs=merge_kwargs,
-                return_meta=return_meta,
-                use_meta=use_meta,
                 selection=selection,
                 forward_kwargs_as=forward_kwargs_as,
+                mono_n_chunks=mono_n_chunks,
+                mono_min_size=mono_min_size,
+                mono_chunk_len=mono_chunk_len,
+                mono_chunk_meta=mono_chunk_meta,
+                mono_merge_func=mono_merge_func,
+                mono_merge_kwargs=mono_merge_kwargs,
+                mono_reduce=mono_reduce,
+                return_meta=return_meta,
                 execute_kwargs=merge_dicts(kwargs, execute_kwargs),
             ),
             options_=dict(

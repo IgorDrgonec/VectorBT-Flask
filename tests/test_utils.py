@@ -2015,22 +2015,22 @@ class TestParams:
 
         param_configs = [dict(a=1)]
         assert fp(param_configs=param_configs)[0] == [(1, (), 2, {})]
-        assert_index_equal(fp(param_configs=param_configs)[1], pd.Index([0], dtype="int64", name="param_config"))
+        assert fp(param_configs=param_configs)[1] is None
         param_configs = [dict(a=1, my_args=(2, 3))]
         assert fp(param_configs=param_configs)[0] == [(1, (2, 3), 2, {})]
-        assert_index_equal(fp(param_configs=param_configs)[1], pd.Index([0], dtype="int64", name="param_config"))
+        assert fp(param_configs=param_configs)[1] is None
         param_configs = [dict(a=1, my_args_0=2, my_args_1=3)]
         assert fp(param_configs=param_configs)[0] == [(1, (2, 3), 2, {})]
-        assert_index_equal(fp(param_configs=param_configs)[1], pd.Index([0], dtype="int64", name="param_config"))
+        assert fp(param_configs=param_configs)[1] is None
         param_configs = [dict(a=1, b=3)]
         assert fp(param_configs=param_configs)[0] == [(1, (), 3, {})]
-        assert_index_equal(fp(param_configs=param_configs)[1], pd.Index([0], dtype="int64", name="param_config"))
+        assert fp(param_configs=param_configs)[1] is None
         param_configs = [dict(a=1, my_kwargs=dict(c=3))]
         assert fp(param_configs=param_configs)[0] == [(1, (), 2, {"c": 3})]
-        assert_index_equal(fp(param_configs=param_configs)[1], pd.Index([0], dtype="int64", name="param_config"))
+        assert fp(param_configs=param_configs)[1] is None
         param_configs = [dict(a=1, c=3)]
         assert fp(param_configs=param_configs)[0] == [(1, (), 2, {"c": 3})]
-        assert_index_equal(fp(param_configs=param_configs)[1], pd.Index([0], dtype="int64", name="param_config"))
+        assert fp(param_configs=param_configs)[1] is None
         param_configs = [dict(a=2, my_args=(3, 4)), dict(b=5, my_kwargs=dict(c=6))]
         assert fp(1, 1, 1, param_configs=param_configs)[0] == [(2, (3, 4), 2, {}), (1, (1, 1), 5, {"c": 6})]
         assert_index_equal(
@@ -2070,7 +2070,106 @@ class TestParams:
             fp(vbt.Param([1, 2]), param_configs=param_configs)[1],
             pd.MultiIndex.from_tuples([(1, 0), (1, 1), (2, 0), (2, 1)], names=["a", "param_config"]),
         )
-
+        assert fp(vbt.Param([1, 2]), param_configs=param_configs, _mono_chunk_len=2)[0] == [
+            ([1, 1], (), [3, 4], {}),
+            ([2, 2], (), [3, 4], {}),
+        ]
+        assert_index_equal(
+            fp(vbt.Param([1, 2]), param_configs=param_configs, _mono_chunk_len=2)[1][0],
+            pd.MultiIndex.from_tuples([(1, 0), (1, 1)], names=["a", "param_config"]),
+        )
+        assert_index_equal(
+            fp(vbt.Param([1, 2]), param_configs=param_configs, _mono_chunk_len=2)[1][1],
+            pd.MultiIndex.from_tuples([(2, 0), (2, 1)], names=["a", "param_config"]),
+        )
+        assert fp(vbt.Param([1, 2], mono_reduce=True), param_configs=param_configs, _mono_chunk_len=2)[0] == [
+            (1, (), [3, 4], {}),
+            (2, (), [3, 4], {}),
+        ]
+        assert_index_equal(
+            fp(vbt.Param([1, 2]), param_configs=param_configs, _mono_chunk_len=2)[1][0],
+            pd.MultiIndex.from_tuples([(1, 0), (1, 1)], names=["a", "param_config"]),
+        )
+        assert_index_equal(
+            fp(vbt.Param([1, 2]), param_configs=param_configs, _mono_chunk_len=2)[1][1],
+            pd.MultiIndex.from_tuples([(2, 0), (2, 1)], names=["a", "param_config"]),
+        )
+        assert fp(vbt.Param([1, 2]), hello="world", param_configs=param_configs, _mono_chunk_len=2)[0] == [
+            ([1, 1], (), [3, 4], {"hello": "world"}),
+            ([2, 2], (), [3, 4], {"hello": "world"}),
+        ]
+        assert_index_equal(
+            fp(vbt.Param([1, 2]), param_configs=param_configs, _mono_chunk_len=2)[1][0],
+            pd.MultiIndex.from_tuples([(1, 0), (1, 1)], names=["a", "param_config"]),
+        )
+        assert_index_equal(
+            fp(vbt.Param([1, 2]), param_configs=param_configs, _mono_chunk_len=2)[1][1],
+            pd.MultiIndex.from_tuples([(2, 0), (2, 1)], names=["a", "param_config"]),
+        )
+        assert fp(
+            vbt.Param([1, 2]),
+            hello="world",
+            param_configs=param_configs,
+            _mono_chunk_len=2,
+            _mono_reduce=dict(hello=False),
+        )[0] == [
+            ([1, 1], (), [3, 4], {"hello": ["world", "world"]}),
+            ([2, 2], (), [3, 4], {"hello": ["world", "world"]}),
+        ]
+        assert_index_equal(
+            fp(vbt.Param([1, 2]), param_configs=param_configs, _mono_chunk_len=2)[1][0],
+            pd.MultiIndex.from_tuples([(1, 0), (1, 1)], names=["a", "param_config"]),
+        )
+        assert_index_equal(
+            fp(vbt.Param([1, 2]), param_configs=param_configs, _mono_chunk_len=2)[1][1],
+            pd.MultiIndex.from_tuples([(2, 0), (2, 1)], names=["a", "param_config"]),
+        )
+        assert fp(
+            vbt.Param([1, 2]),
+            hello="world",
+            param_configs=param_configs,
+            _mono_chunk_len=2,
+            _mono_reduce=True,
+        )[0] == [
+            (1, (), [3, 4], {"hello": "world"}),
+            (2, (), [3, 4], {"hello": "world"}),
+        ]
+        assert_index_equal(
+            fp(vbt.Param([1, 2]), param_configs=param_configs, _mono_chunk_len=2)[1][0],
+            pd.MultiIndex.from_tuples([(1, 0), (1, 1)], names=["a", "param_config"]),
+        )
+        assert_index_equal(
+            fp(vbt.Param([1, 2]), param_configs=param_configs, _mono_chunk_len=2)[1][1],
+            pd.MultiIndex.from_tuples([(2, 0), (2, 1)], names=["a", "param_config"]),
+        )
+        assert fp(
+            vbt.Param([1, 2], mono_merge_func=sum),
+            param_configs=param_configs,
+            _mono_chunk_len=2,
+            _mono_merge_func=dict(b=sum),
+        )[0] == [
+            (2, (), 7, {}),
+            (4, (), 7, {}),
+        ]
+        assert_index_equal(
+            fp(vbt.Param([1, 2]), param_configs=param_configs, _mono_chunk_len=2)[1][0],
+            pd.MultiIndex.from_tuples([(1, 0), (1, 1)], names=["a", "param_config"]),
+        )
+        assert_index_equal(
+            fp(vbt.Param([1, 2]), param_configs=param_configs, _mono_chunk_len=2)[1][1],
+            pd.MultiIndex.from_tuples([(2, 0), (2, 1)], names=["a", "param_config"]),
+        )
+        assert fp(
+            vbt.Param([1, 2]),
+            param_configs=param_configs,
+            _mono_chunk_len=2,
+            _mono_merge_func=sum,
+        )[0] == fp(
+            vbt.Param([1, 2], mono_merge_func=sum),
+            param_configs=param_configs,
+            _mono_chunk_len=2,
+            _mono_merge_func=dict(b=sum),
+        )[0]
 
 # ############# datetime_ ############# #
 
@@ -2304,7 +2403,9 @@ class TestTemplate:
         assert template.substitute_templates(template.Rep("hello"), {"hello": 100}) == 100
         with pytest.raises(Exception):
             template.substitute_templates(template.Rep("hello2"), {"hello": 100})
-        assert isinstance(template.substitute_templates(template.Rep("hello2"), {"hello": 100}, strict=False), template.Rep)
+        assert isinstance(
+            template.substitute_templates(template.Rep("hello2"), {"hello": 100}, strict=False), template.Rep
+        )
         assert template.substitute_templates(template.Sub("$hello"), {"hello": 100}) == "100"
         with pytest.raises(Exception):
             template.substitute_templates(template.Sub("$hello2"), {"hello": 100})
@@ -2685,6 +2786,7 @@ class TestPickling:
 
 
 # ############# chunking ############# #
+
 
 class TestChunking:
     def test_arg_getter_mixin(self):

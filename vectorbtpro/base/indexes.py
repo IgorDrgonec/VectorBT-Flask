@@ -278,8 +278,6 @@ def concat_indexes(
     if len(indexes) == 1:
         indexes = indexes[0]
     indexes = list(indexes)
-    if keys is not None and not isinstance(keys, pd.Index):
-        keys = pd.Index(keys)
     if index_stack_kwargs is None:
         index_stack_kwargs = {}
     if axis == 0:
@@ -359,6 +357,7 @@ def concat_indexes(
         new_index = concat_indexes(
             *indexes,
             index_concat_method="append",
+            index_stack_kwargs=index_stack_kwargs,
             verify_integrity=False,
             axis=axis,
         )
@@ -382,6 +381,19 @@ def concat_indexes(
             raise ValueError(f"Invalid column concatenation method '{index_concat_method}'")
         else:
             raise ValueError(f"Invalid group concatenation method '{index_concat_method}'")
+    if keys is not None:
+        if isinstance(keys[0], pd.Index):
+            keys = concat_indexes(
+                *keys,
+                index_concat_method="append",
+                index_stack_kwargs=index_stack_kwargs,
+                verify_integrity=False,
+                axis=axis,
+            )
+            new_index = stack_indexes((keys, new_index), **index_stack_kwargs)
+            keys = None
+        elif not isinstance(keys, pd.Index):
+            keys = pd.Index(keys)
     if keys is not None:
         top_index = None
         for i, index in enumerate(indexes):

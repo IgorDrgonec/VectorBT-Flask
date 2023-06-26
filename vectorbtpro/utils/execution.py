@@ -609,6 +609,7 @@ def execute(
     engine: tp.EngineLike = "serial",
     n_calls: tp.Optional[int] = None,
     n_chunks: tp.Optional[tp.Union[str, int]] = None,
+    min_size: tp.Optional[int] = None,
     chunk_len: tp.Optional[tp.Union[str, int]] = None,
     chunk_meta: tp.Optional[tp.Iterable[tp.ChunkMeta]] = None,
     distribute: tp.Optional[str] = None,
@@ -693,6 +694,8 @@ def execute(
 
     if n_chunks is None:
         n_chunks = engine_cfg.get("n_chunks", execution_cfg["n_chunks"])
+    if min_size is None:
+        min_size = engine_cfg.get("min_size", execution_cfg["min_size"])
     if chunk_len is None:
         chunk_len = engine_cfg.get("chunk_len", execution_cfg["chunk_len"])
     if distribute is None:
@@ -732,7 +735,12 @@ def execute(
             n_chunks = multiprocessing.cpu_count()
         if isinstance(chunk_len, str) and chunk_len.lower() == "auto":
             chunk_len = multiprocessing.cpu_count()
-        chunk_meta = yield_chunk_meta(n_chunks=n_chunks, size=_n_calls, chunk_len=chunk_len)
+        chunk_meta = yield_chunk_meta(
+            n_chunks=n_chunks,
+            size=_n_calls,
+            min_size=min_size,
+            chunk_len=chunk_len,
+        )
 
     # Substitute templates
     if isinstance(funcs_args, CustomTemplate):

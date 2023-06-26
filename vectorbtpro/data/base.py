@@ -972,15 +972,17 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                     _returned_kwargs = {}
                 _data = to_any_array(_data)
                 _tz_localize = _returned_kwargs.pop("tz_localize", None)
-                if tz_localize is None:
-                    tz_localize = _tz_localize
-                elif tz_localize != _tz_localize:
-                    raise ValueError("Cannot localize using different timezones")
+                if _tz_localize is not None:
+                    if tz_localize is None:
+                        tz_localize = _tz_localize
+                    elif tz_localize != _tz_localize:
+                        raise ValueError("Cannot localize using different timezones")
                 _tz_convert = _returned_kwargs.pop("tz_convert", None)
-                if tz_convert is None:
-                    tz_convert = _tz_convert
-                elif tz_convert != _tz_convert:
-                    tz_convert = "utc"
+                if _tz_convert is not None:
+                    if tz_convert is None:
+                        tz_convert = _tz_convert
+                    elif tz_convert != _tz_convert:
+                        tz_convert = "utc"
                 if wrapper_kwargs.get("freq", None) is None:
                     wrapper_kwargs["freq"] = _returned_kwargs.pop("freq", None)
                 if _data.size == 0:

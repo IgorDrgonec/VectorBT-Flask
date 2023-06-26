@@ -12,6 +12,7 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import resolve_dict, merge_dicts
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.base.reshaping import column_stack, to_2d_array
+from vectorbtpro.base.indexes import stack_indexes, concat_indexes
 
 __all__ = [
     "concat_merge",
@@ -26,6 +27,7 @@ def concat_merge(
     wrap: tp.Optional[bool] = None,
     wrapper: tp.Optional[ArrayWrapper] = None,
     wrap_kwargs: tp.KwargsLikeSequence = None,
+    index_stack_kwargs: tp.KwargsLike = None,
     **kwargs,
 ) -> tp.MaybeTuple[tp.AnyArray]:
     """Merge multiple array-like objects through concatenation.
@@ -102,6 +104,18 @@ def concat_merge(
             objs = new_objs
         else:
             return np.concatenate(objs)
+    if keys is not None and isinstance(keys[0], pd.Index):
+        new_obj = pd.concat(objs, axis=0, **kwargs)
+        if index_stack_kwargs is None:
+            index_stack_kwargs = {}
+        keys = concat_indexes(
+            *keys,
+            index_concat_method="append",
+            index_stack_kwargs=index_stack_kwargs,
+            verify_integrity=False,
+            axis=0,
+        )
+        new_obj.index = stack_indexes((keys, new_obj.index), **index_stack_kwargs)
     return pd.concat(objs, axis=0, keys=keys, **kwargs)
 
 
@@ -111,6 +125,7 @@ def row_stack_merge(
     wrap: tp.Union[None, str, bool] = None,
     wrapper: tp.Optional[ArrayWrapper] = None,
     wrap_kwargs: tp.KwargsLikeSequence = None,
+    index_stack_kwargs: tp.KwargsLikeSequence = None,
     **kwargs,
 ) -> tp.MaybeTuple[tp.AnyArray]:
     """Merge multiple array-like or `vectorbtpro.base.wrapping.Wrapping` objects through row stacking.
@@ -199,6 +214,18 @@ def row_stack_merge(
             objs = new_objs
         else:
             return np.row_stack(objs)
+    if keys is not None and isinstance(keys[0], pd.Index):
+        new_obj = pd.concat(objs, axis=0, **kwargs)
+        if index_stack_kwargs is None:
+            index_stack_kwargs = {}
+        keys = concat_indexes(
+            *keys,
+            index_concat_method="append",
+            index_stack_kwargs=index_stack_kwargs,
+            verify_integrity=False,
+            axis=0,
+        )
+        new_obj.index = stack_indexes((keys, new_obj.index), **index_stack_kwargs)
     return pd.concat(objs, axis=0, keys=keys, **kwargs)
 
 
@@ -210,6 +237,7 @@ def column_stack_merge(
     wrap: tp.Union[None, str, bool] = None,
     wrapper: tp.Optional[ArrayWrapper] = None,
     wrap_kwargs: tp.KwargsLikeSequence = None,
+    index_stack_kwargs: tp.KwargsLikeSequence = None,
     **kwargs,
 ) -> tp.MaybeTuple[tp.AnyArray]:
     """Merge multiple array-like or `vectorbtpro.base.wrapping.Wrapping` objects through column stacking.
@@ -368,6 +396,18 @@ def column_stack_merge(
             new_objs.append(new_obj)
         objs = new_objs
         kwargs = merge_dicts(dict(sort=True), kwargs)
+    if keys is not None and isinstance(keys[0], pd.Index):
+        new_obj = pd.concat(objs, axis=1, **kwargs)
+        if index_stack_kwargs is None:
+            index_stack_kwargs = {}
+        keys = concat_indexes(
+            *keys,
+            index_concat_method="append",
+            index_stack_kwargs=index_stack_kwargs,
+            verify_integrity=False,
+            axis=1,
+        )
+        new_obj.columns = stack_indexes((keys, new_obj.columns), **index_stack_kwargs)
     return pd.concat(objs, axis=1, keys=keys, **kwargs)
 
 

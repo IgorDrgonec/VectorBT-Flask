@@ -180,8 +180,6 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         for wrapper in wrappers:
             if not checks.is_instance_of(wrapper, ArrayWrapper):
                 raise TypeError("Each object to be merged must be an instance of ArrayWrapper")
-        if keys is not None and not isinstance(keys, pd.Index):
-            keys = pd.Index(keys)
 
         if index is None:
             index = concat_indexes(
@@ -302,8 +300,6 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         for wrapper in wrappers:
             if not checks.is_instance_of(wrapper, ArrayWrapper):
                 raise TypeError("Each object to be merged must be an instance of ArrayWrapper")
-        if keys is not None and not isinstance(keys, pd.Index):
-            keys = pd.Index(keys)
 
         for wrapper in wrappers:
             if wrapper.index.has_duplicates:

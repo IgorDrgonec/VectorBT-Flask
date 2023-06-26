@@ -287,6 +287,7 @@ _settings["math"] = math
 
 execution = child_dict(
     n_chunks=None,
+    min_size=None,
     chunk_len=None,
     distribute="calls",
     show_progress=True,

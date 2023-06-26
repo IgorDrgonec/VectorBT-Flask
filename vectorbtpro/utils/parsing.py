@@ -203,7 +203,9 @@ def flatten_ann_args(ann_args: tp.AnnArgs) -> tp.FlatAnnArgs:
             for var_arg_name, var_value in ann_arg["value"].items():
                 flat_ann_args[var_arg_name] = dict(var_name=arg_name, kind=ann_arg["kind"], value=var_value)
         else:
-            flat_ann_args[arg_name] = dict(kind=ann_arg["kind"], value=ann_arg["value"])
+            flat_ann_args[arg_name] = dict(kind=ann_arg["kind"])
+            if "value" in ann_arg:
+                flat_ann_args[arg_name]["value"] = ann_arg["value"]
     return flat_ann_args
 
 
