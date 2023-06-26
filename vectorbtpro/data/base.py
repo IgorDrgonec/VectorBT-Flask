@@ -31,7 +31,6 @@ from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig, copy_dic
 from vectorbtpro.utils.datetime_ import is_tz_aware, to_timezone, try_to_datetime_index
 from vectorbtpro.utils.parsing import get_func_arg_names, extend_args
 from vectorbtpro.utils.path_ import check_mkdir
-from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.template import RepEval
 from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.utils.execution import execute
@@ -972,10 +971,16 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                     _data = out
                     _returned_kwargs = {}
                 _data = to_any_array(_data)
+                _tz_localize = _returned_kwargs.pop("tz_localize", None)
                 if tz_localize is None:
-                    tz_localize = _returned_kwargs.pop("tz_localize", None)
+                    tz_localize = _tz_localize
+                elif tz_localize != _tz_localize:
+                    raise ValueError("Cannot localize using different timezones")
+                _tz_convert = _returned_kwargs.pop("tz_convert", None)
                 if tz_convert is None:
-                    tz_convert = _returned_kwargs.pop("tz_convert", None)
+                    tz_convert = _tz_convert
+                elif tz_convert != _tz_convert:
+                    tz_convert = "utc"
                 if wrapper_kwargs.get("freq", None) is None:
                     wrapper_kwargs["freq"] = _returned_kwargs.pop("freq", None)
                 if _data.size == 0:
@@ -1876,6 +1881,56 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                         )
                     else:
                         raise ValueError(f"Cannot resample column '{c}'. Specify resample_func in column_config.")
+            if checks.is_series(v):
+                new_v = new_v[0]
+            else:
+                new_v = pd.concat(new_v, axis=1)
+            new_data[k] = new_v
+        return self.replace(
+            wrapper=wrapper_meta["new_wrapper"],
+            data=new_data,
+        )
+
+    def realign(
+        self: DataT,
+        rule: tp.Optional[tp.AnyRuleLike] = None,
+        *args,
+        wrapper_meta: tp.DictLike = None,
+        ffill: bool = True,
+        **kwargs,
+    ) -> DataT:
+        """Perform realigning on `Data`.
+
+        Looks for `realign_func` of each column in `Data.column_config`. If no function provided,
+        resamples column "open" with `vectorbtpro.generic.accessors.GenericAccessor.resample_opening`
+        and other columns with `vectorbtpro.generic.accessors.GenericAccessor.resample_closing`."""
+        if rule is None:
+            rule = self.wrapper.freq
+        if wrapper_meta is None:
+            wrapper_meta = self.wrapper.resample_meta(rule, *args, **kwargs)
+        new_data = symbol_dict()
+        for k, v in self.data.items():
+            if checks.is_series(v):
+                columns = [v.name]
+            else:
+                columns = v.columns
+            new_v = []
+            for c in columns:
+                if checks.is_series(v):
+                    obj = v
+                else:
+                    obj = v[c]
+                realign_func = self.column_config.get(c, {}).get("realign_func", None)
+                if realign_func is not None:
+                    if isinstance(realign_func, str):
+                        new_v.append(getattr(obj.vbt, realign_func)(wrapper_meta["resampler"], ffill=ffill))
+                    else:
+                        new_v.append(realign_func(wrapper_meta["resampler"], ffill=ffill))
+                else:
+                    if isinstance(c, str) and c.lower() == "open":
+                        new_v.append(obj.vbt.resample_opening(wrapper_meta["resampler"], ffill=ffill))
+                    else:
+                        new_v.append(obj.vbt.resample_closing(wrapper_meta["resampler"], ffill=ffill))
             if checks.is_series(v):
                 new_v = new_v[0]
             else:
