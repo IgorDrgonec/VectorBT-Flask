@@ -210,6 +210,8 @@ def split(
                 **apply_kwargs,
             )
 
+        wrapper.func = func
+        wrapper.name = func.__name__
         wrapper.is_split = True
         wrapper.options = Config(
             dict(
@@ -416,6 +418,8 @@ def cv_split(
             split_func = split(apply_wrapper, template_context=template_context, **split_kwargs)
             return split_func(*args, __template_context=Rep("context", sub_id="apply_kwargs"), **kwargs)
 
+        wrapper.func = func
+        wrapper.name = func.__name__
         wrapper.is_parameterized = True
         wrapper.is_split = True
         wrapper.options = Config(

@@ -1136,6 +1136,8 @@ def chunked(
                 return merge_func(results, **merge_kwargs)
             return results
 
+        wrapper.func = func
+        wrapper.name = func.__name__
         wrapper.is_chunked = True
         wrapper.options = Config(
             dict(

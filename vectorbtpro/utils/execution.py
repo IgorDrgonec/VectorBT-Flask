@@ -613,6 +613,7 @@ def execute(
     chunk_len: tp.Optional[tp.Union[str, int]] = None,
     chunk_meta: tp.Optional[tp.Iterable[tp.ChunkMeta]] = None,
     distribute: tp.Optional[str] = None,
+    warmup: tp.Optional[bool] = None,
     in_chunk_order: bool = False,
     show_progress: tp.Optional[bool] = None,
     progress_desc: tp.Optional[tp.Sequence] = None,
@@ -700,6 +701,12 @@ def execute(
         chunk_len = engine_cfg.get("chunk_len", execution_cfg["chunk_len"])
     if distribute is None:
         distribute = engine_cfg.get("distribute", execution_cfg["distribute"])
+    if warmup is None:
+        warmup = engine_cfg.get("warmup", execution_cfg["warmup"])
+    if warmup:
+        if not hasattr(funcs_args, "__getitem__"):
+            funcs_args = list(funcs_args)
+        funcs_args[0][0](*funcs_args[0][1], **funcs_args[0][2])
     if show_progress is None:
         show_progress = engine_cfg.get("show_progress", execution_cfg["show_progress"])
     pbar_kwargs = merge_dicts(execution_cfg["pbar_kwargs"], engine_cfg.get("pbar_kwargs", None), pbar_kwargs)

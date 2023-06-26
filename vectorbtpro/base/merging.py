@@ -88,6 +88,7 @@ def concat_merge(
         return np.asarray(objs)
     if isinstance(objs[0], pd.Index):
         objs = list(map(lambda x: x.to_series(), objs))
+    default_index = True
     if not isinstance(objs[0], pd.Series):
         if isinstance(objs[0], pd.DataFrame):
             raise ValueError("Use row stacking for concatenating DataFrames")
@@ -101,6 +102,8 @@ def concat_merge(
                     new_objs.append(wrapper.wrap_reduced(obj, **_wrap_kwargs))
                 else:
                     new_objs.append(pd.Series(obj, **_wrap_kwargs))
+                if default_index and not checks.is_default_index(new_objs[-1].index, check_names=True):
+                    default_index = False
             objs = new_objs
         else:
             return np.concatenate(objs)
@@ -115,7 +118,11 @@ def concat_merge(
             verify_integrity=False,
             axis=0,
         )
-        new_obj.index = stack_indexes((keys, new_obj.index), **index_stack_kwargs)
+        if default_index:
+            new_obj.index = keys
+        else:
+            new_obj.index = stack_indexes((keys, new_obj.index), **index_stack_kwargs)
+        return new_obj
     return pd.concat(objs, axis=0, keys=keys, **kwargs)
 
 
@@ -187,6 +194,7 @@ def row_stack_merge(
         wrap = wrapper is not None or keys is not None or len(wrap_kwargs) > 0
     if isinstance(objs[0], pd.Index):
         objs = list(map(lambda x: x.to_series(), objs))
+    default_index = True
     if not isinstance(objs[0], (pd.Series, pd.DataFrame)):
         if isinstance(wrap, str) or wrap:
             new_objs = []
@@ -211,6 +219,8 @@ def row_stack_merge(
                             new_objs.append(pd.DataFrame(obj, **_wrap_kwargs))
                         else:
                             raise ValueError(f"Invalid wrapping option '{wrap}'")
+                if default_index and not checks.is_default_index(new_objs[-1].index, check_names=True):
+                    default_index = False
             objs = new_objs
         else:
             return np.row_stack(objs)
@@ -225,7 +235,11 @@ def row_stack_merge(
             verify_integrity=False,
             axis=0,
         )
-        new_obj.index = stack_indexes((keys, new_obj.index), **index_stack_kwargs)
+        if default_index:
+            new_obj.index = keys
+        else:
+            new_obj.index = stack_indexes((keys, new_obj.index), **index_stack_kwargs)
+        return new_obj
     return pd.concat(objs, axis=0, keys=keys, **kwargs)
 
 
@@ -328,6 +342,7 @@ def column_stack_merge(
         wrap = wrapper is not None or keys is not None or len(wrap_kwargs) > 0
     if isinstance(objs[0], pd.Index):
         objs = list(map(lambda x: x.to_series(), objs))
+    default_columns = True
     if not isinstance(objs[0], (pd.Series, pd.DataFrame)):
         if isinstance(wrap, str) or wrap:
             new_objs = []
@@ -352,6 +367,12 @@ def column_stack_merge(
                             new_objs.append(pd.DataFrame(obj, **_wrap_kwargs))
                         else:
                             raise ValueError(f"Invalid wrapping option '{wrap}'")
+                if (
+                    default_columns
+                    and isinstance(new_objs[-1], pd.DataFrame)
+                    and not checks.is_default_index(new_objs[-1].columns, check_names=True)
+                ):
+                    default_columns = False
             objs = new_objs
         else:
             if reset_index is not None:
@@ -374,9 +395,9 @@ def column_stack_merge(
                 for obj in new_objs:
                     end_col = start_col + obj.shape[1]
                     if isinstance(reset_index, str) and reset_index.lower() == "from_start":
-                        new_obj[:len(obj), start_col:end_col] = obj
+                        new_obj[: len(obj), start_col:end_col] = obj
                     elif isinstance(reset_index, str) and reset_index.lower() == "from_end":
-                        new_obj[-len(obj):, start_col:end_col] = obj
+                        new_obj[-len(obj) :, start_col:end_col] = obj
                     else:
                         raise ValueError(f"Invalid index resetting option '{reset_index}'")
                     start_col = end_col
@@ -407,7 +428,11 @@ def column_stack_merge(
             verify_integrity=False,
             axis=1,
         )
-        new_obj.columns = stack_indexes((keys, new_obj.columns), **index_stack_kwargs)
+        if default_columns:
+            new_obj.columns = keys
+        else:
+            new_obj.columns = stack_indexes((keys, new_obj.columns), **index_stack_kwargs)
+        return new_obj
     return pd.concat(objs, axis=1, keys=keys, **kwargs)
 
 

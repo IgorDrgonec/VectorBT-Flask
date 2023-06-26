@@ -128,31 +128,41 @@ def annotate_args(
     only_passed: bool = False,
     allow_partial: bool = False,
 ) -> tp.AnnArgs:
-    """Annotate arguments and keyword arguments using the function's signature."""
+    """Annotate arguments and keyword arguments using the function's signature.
+
+    If `allow_partial` is True, required arguments that weren't provided won't raise an error.
+    But regardless of `allow_partial`, arguments that aren't in the signature will still raise an error."""
     kwargs = dict(kwargs)
     signature = inspect.signature(func)
     if not allow_partial:
         signature.bind(*args, **kwargs)
     ann_args = dict()
 
+    last_pos = None
+    var_positional = False
+    var_keyword = False
     for p in signature.parameters.values():
         if p.kind == p.POSITIONAL_ONLY:
             if len(args) > 0:
                 ann_args[p.name] = dict(kind=p.kind, value=args[0])
                 args = args[1:]
+                last_pos = p.name
             elif not only_passed:
                 if allow_partial:
                     ann_args[p.name] = dict(kind=p.kind)
                 else:
                     raise TypeError(f"missing a required argument: '{p.name}'")
         elif p.kind == p.VAR_POSITIONAL:
+            var_positional = True
             if len(args) > 0 or not only_passed:
                 ann_args[p.name] = dict(kind=p.kind, value=args)
                 args = ()
+                last_pos = p.name
         elif p.kind == p.POSITIONAL_OR_KEYWORD:
             if len(args) > 0:
                 ann_args[p.name] = dict(kind=p.kind, value=args[0])
                 args = args[1:]
+                last_pos = p.name
             elif p.name in kwargs:
                 ann_args[p.name] = dict(kind=p.kind, value=kwargs.pop(p.name))
             elif not only_passed:
@@ -169,8 +179,19 @@ def annotate_args(
             elif not only_passed:
                 ann_args[p.name] = dict(kind=p.kind, value=p.default)
         else:
+            var_keyword = True
             if not only_passed or len(kwargs) > 0:
                 ann_args[p.name] = dict(kind=p.kind, value=kwargs)
+    if not var_positional:
+        if len(args) == 1:
+            raise TypeError(f"{func.__name__}() got an unexpected positional argument after '{last_pos}'")
+        if len(args) > 1:
+            raise TypeError(f"{func.__name__}() got {len(args)} unexpected positional arguments after '{last_pos}'")
+    if not var_keyword:
+        if len(kwargs) == 1:
+            raise TypeError(f"{func.__name__}() got an unexpected keyword argument '{list(kwargs.keys())[0]}'")
+        if len(kwargs) > 1:
+            raise TypeError(f"{func.__name__}() got unexpected keyword arguments {list(kwargs.keys())}")
     return ann_args
 
 

@@ -290,6 +290,7 @@ execution = child_dict(
     min_size=None,
     chunk_len=None,
     distribute="calls",
+    warmup=False,
     show_progress=True,
     pbar_kwargs=Config(),
     engines=Config(

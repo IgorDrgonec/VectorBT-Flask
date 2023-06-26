@@ -898,16 +898,6 @@ def parameterized(
                 if v["kind"] == inspect.Parameter.VAR_KEYWORD:
                     var_kwargs_name = k
 
-            # # Check for single parameter
-            # if skip_single_param and len(param_configs) == 0:
-            #     found_param = False
-            #     for k, v in template_context["flat_ann_args"].items():
-            #         if "value" in v and isinstance(v["value"], Param):
-            #             found_param = True
-            #             break
-            #     if not found_param:
-            #         return func(*args, **kwargs)
-
             # Unroll parameter configs
 
             def _unroll_param_config(param_config):
@@ -1248,6 +1238,8 @@ def parameterized(
                 return merge_func(results, **merge_kwargs)
             return results
 
+        wrapper.func = func
+        wrapper.name = func.__name__
         wrapper.is_parameterized = True
         wrapper.options = Config(
             dict(
