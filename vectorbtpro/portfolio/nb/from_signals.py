@@ -3473,6 +3473,7 @@ PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
 # % </skip>
 # % </block>
 
+
 # % <section from_signal_func_nb>
 # % <uncomment>
 # import vectorbtpro as vbt
@@ -5969,6 +5970,7 @@ def no_adjust_func_nb(c: SignalContext, *args) -> None:
 # % </uncomment>
 # % </skip>
 # % </block>
+
 
 # % <block dir_signal_func_nb>
 # % blocks["adjust_func_nb"]

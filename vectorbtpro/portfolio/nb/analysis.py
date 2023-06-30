@@ -925,6 +925,7 @@ def market_value_grouped_nb(
     check_group_lens_nb(group_lens, close.shape[1])
     out = np.empty((close.shape[0], len(group_lens)), dtype=np.float_)
     temp = np.empty(close.shape[1], dtype=np.float_)
+    last_value = np.empty(close.shape[1], dtype=np.float_)
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
 
@@ -936,8 +937,19 @@ def market_value_grouped_nb(
             for col in range(from_col, to_col):
                 if i == 0:
                     temp[col] = flex_select_1d_pc_nb(init_value, col)
+                    last_value[col] = temp[col]
                 else:
-                    temp[col] *= close[i, col] / close[i - 1, col]
+                    if not np.isnan(close[i - 1, col]):
+                        prev_close = close[i - 1, col]
+                        last_value[col] = prev_close
+                    else:
+                        prev_close = last_value[col]
+                    if not np.isnan(close[i, col]):
+                        this_close = close[i, col]
+                        last_value[col] = this_close
+                    else:
+                        this_close = last_value[col]
+                    temp[col] *= this_close / prev_close
                 temp[col] += flex_select_nb(cash_deposits_, i, col)
             out[i, group] = np.sum(temp[from_col:to_col])
     return out

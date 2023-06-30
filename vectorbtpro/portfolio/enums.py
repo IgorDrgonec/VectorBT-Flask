@@ -1433,7 +1433,7 @@ __pdoc__[
     "SimulationContext.last_value"
 ] = """Latest value per column (or per group with cash sharing).
 
-Calculated by multiplying valuation price by the current position.
+Calculated by multiplying the valuation price by the current position and adding the cash.
 The value in each column in a group with cash sharing is summed to get the value of the entire group.
 
 Gets updated right before `pre_segment_func_nb`. Then, gets updated right after `pre_segment_func_nb`.

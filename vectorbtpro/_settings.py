@@ -119,8 +119,10 @@ default_theme = dark
 import json
 import os
 import pkgutil
+from pathlib import Path
 
 import numpy as np
+from numba import config as nb_config
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.checks import is_instance_of
@@ -246,6 +248,7 @@ ${config_doc}
 _settings["jitting"] = jitting
 
 numba = child_dict(
+    disable=False,
     parallel=None,
     silence_warnings=False,
     check_func_type=True,
@@ -366,7 +369,7 @@ __pdoc__["chunking"] = Sub(
 and `vectorbtpro.utils.chunking`.
 
 !!! note
-    Options (with `_options` suffix) and setting `disable_machinery` are applied only on import.
+    Options (with `_options` suffix) and setting `disable_wrapping` are applied only on import.
 
 ```python
 ${config_doc}
@@ -1729,3 +1732,6 @@ except ImportError:
 settings.make_checkpoint()
 
 settings.substitute_sub_config_docs(__pdoc__)
+
+if settings["numba"]["disable"]:
+    nb_config.DISABLE_JIT = True

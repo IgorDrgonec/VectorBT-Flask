@@ -368,6 +368,7 @@ class Pickleable:
 
     def encode_config(
         self,
+        top_name: tp.Optional[str] = None,
         unpack_objects: bool = True,
         compress_unpacked: bool = True,
         use_refs: bool = True,
@@ -429,7 +430,9 @@ class Pickleable:
             return True
 
         # Flatten nested dicts
-        stack = [(None, "top", self)]
+        if top_name is None:
+            top_name = "top"
+        stack = [(None, top_name, self)]
         dct = dict()
         id_paths = dict()
         id_objs = dict()
@@ -463,7 +466,7 @@ class Pickleable:
                     stack.insert(i, (_k, k2, v2))
                     i += 1
             else:
-                if (unpack_objects or k == "top") and isinstance(v, Pickleable):
+                if (unpack_objects or k == top_name) and isinstance(v, Pickleable):
                     class_id = get_id_from_class(v)
                     if class_id is None:
                         raise ValueError(f"Class {type(v)} cannot be found. Set reconstruction id.")

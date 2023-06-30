@@ -31,7 +31,7 @@ from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig, copy_dic
 from vectorbtpro.utils.datetime_ import is_tz_aware, to_timezone, try_to_datetime_index
 from vectorbtpro.utils.parsing import get_func_arg_names, extend_args
 from vectorbtpro.utils.path_ import check_mkdir
-from vectorbtpro.utils.template import RepEval
+from vectorbtpro.utils.template import RepEval, CustomTemplate
 from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.utils.execution import execute
 
@@ -1649,7 +1649,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 _path_or_buf = path_or_buf[k]
             else:
                 _path_or_buf = path_or_buf
-
+            if isinstance(_path_or_buf, CustomTemplate):
+                _path_or_buf = _path_or_buf.substitute(dict(symbol=k, data=v), sub_id="path_or_buf")
             _kwargs = self.select_symbol_kwargs(k, kwargs)
             sep = _kwargs.pop("sep", None)
             if isinstance(_path_or_buf, (str, Path)):
@@ -1709,12 +1710,16 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 _path_or_buf = path_or_buf[k]
             else:
                 _path_or_buf = path_or_buf
+            if isinstance(_path_or_buf, CustomTemplate):
+                _path_or_buf = _path_or_buf.substitute(dict(symbol=k, data=v), sub_id="path_or_buf")
             if key is None:
                 _key = str(k)
             elif isinstance(key, symbol_dict):
                 _key = key[k]
             else:
                 _key = key
+            if isinstance(_key, CustomTemplate):
+                _key = _key.substitute(dict(symbol=k, data=v), sub_id="path_or_buf")
             _kwargs = self.select_symbol_kwargs(k, kwargs)
             v.to_hdf(path_or_buf=_path_or_buf, key=_key, format=format, **_kwargs)
 

@@ -16,7 +16,9 @@ import numba
 
 from vectorbtpro import _typing as tp
 
-__all__ = []
+__all__ = [
+    "is_numba_enabled",
+]
 
 
 class Comparable:
