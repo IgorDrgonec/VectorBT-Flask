@@ -636,6 +636,7 @@ def parameterized(
     mono_merge_kwargs: tp.KwargsLike = None,
     mono_reduce: tp.Union[bool, tp.Kwargs] = None,
     return_meta: bool = False,
+    return_param_index: bool = False,
     execute_kwargs: tp.KwargsLike = None,
     **kwargs,
 ) -> tp.Callable:
@@ -862,6 +863,7 @@ def parameterized(
             mono_merge_kwargs = kwargs.pop("_mono_merge_kwargs", wrapper.options["mono_merge_kwargs"])
             mono_reduce = kwargs.pop("_mono_reduce", wrapper.options["mono_reduce"])
             return_meta = kwargs.pop("_return_meta", wrapper.options["return_meta"])
+            return_param_index = kwargs.pop("_return_param_index", wrapper.options["return_param_index"])
             execute_kwargs = merge_dicts(
                 params_cfg["execute_kwargs"],
                 wrapper.options["execute_kwargs"],
@@ -1235,7 +1237,11 @@ def parameterized(
                     merge_func = resolve_merge_func(merge_func)
                     merge_kwargs = {**dict(keys=template_context["param_index"]), **merge_kwargs}
                 merge_kwargs = substitute_templates(merge_kwargs, template_context, sub_id="merge_kwargs")
+                if return_param_index:
+                    return merge_func(results, **merge_kwargs), template_context["param_index"]
                 return merge_func(results, **merge_kwargs)
+            if return_param_index:
+                return results, template_context["param_index"]
             return results
 
         wrapper.func = func
@@ -1264,6 +1270,7 @@ def parameterized(
                 mono_merge_kwargs=mono_merge_kwargs,
                 mono_reduce=mono_reduce,
                 return_meta=return_meta,
+                return_param_index=return_param_index,
                 execute_kwargs=merge_dicts(kwargs, execute_kwargs),
             ),
             options_=dict(

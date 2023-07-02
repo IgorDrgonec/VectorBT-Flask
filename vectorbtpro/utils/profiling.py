@@ -4,7 +4,7 @@
 
 import tracemalloc
 from datetime import timedelta
-from timeit import default_timer
+from timeit import default_timer, Timer as Timer_timeit
 
 import humanize
 
@@ -12,6 +12,7 @@ from vectorbtpro import _typing as tp
 
 __all__ = [
     "Timer",
+    "timeit",
     "MemTracer",
 ]
 
@@ -71,6 +72,19 @@ class Timer:
 
     def __exit__(self, *args) -> None:
         self._end_time = default_timer()
+
+
+def timeit(func: tp.Callable, readable: bool = True, **kwargs) -> tp.Union[str, timedelta]:
+    """Run `timeit` on a function."""
+    timer = Timer_timeit(stmt=func)
+    number, time_taken = timer.autorange()
+    elapsed = time_taken / number
+    elapsed_delta = timedelta(seconds=elapsed)
+    if readable:
+        if "minimum_unit" not in kwargs:
+            kwargs["minimum_unit"] = "seconds" if elapsed >= 1 else "milliseconds"
+        return humanize.precisedelta(elapsed_delta, **kwargs)
+    return elapsed_delta
 
 
 MemTracerT = tp.TypeVar("MemTracerT", bound="MemTracer")

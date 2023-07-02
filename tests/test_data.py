@@ -1460,6 +1460,8 @@ class TestData:
         assert data.select([0]) != MyData.fetch(0, shape=(5, 3), columns=["feat0", "feat1", "feat2"])
         assert data.select([0, 2]) == MyData.fetch([0, 2], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
         assert data.select([0, 2]) != MyData.fetch([0, 1], shape=(5, 3), columns=["feat0", "feat1", "feat2"])
+        with pytest.raises(Exception):
+            data.select(3)
 
     def test_rename(self):
         data = MyData.fetch([0, 1, 2], shape=(5, 3), columns=["feat0", "feat1", "feat2"])

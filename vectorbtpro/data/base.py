@@ -35,7 +35,12 @@ from vectorbtpro.utils.template import RepEval, CustomTemplate
 from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.utils.execution import execute
 
-__all__ = ["symbol_dict", "run_func_dict", "Data"]
+__all__ = [
+    "symbol_dict",
+    "run_func_dict",
+    "run_arg_dict",
+    "Data",
+]
 
 __pdoc__ = {}
 
@@ -48,6 +53,12 @@ class symbol_dict(pdict):
 
 class run_func_dict(pdict):
     """Dict that contains function names as keys for `Data.run`."""
+
+    pass
+
+
+class run_arg_dict(pdict):
+    """Dict that contains argument names as keys for `Data.run`."""
 
     pass
 
@@ -1389,7 +1400,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             return concat_data[columns]
         return tuple(concat_data.values())
 
-    def get_column_index(self, label: tp.Hashable) -> tp.MaybeList[int]:
+    def get_column_index(self, label: tp.Hashable, raise_error: bool = False) -> tp.MaybeList[int]:
         """Return one or more indexes of the columns that match the label."""
 
         def _prepare_label(x):
@@ -1407,6 +1418,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             if label == c:
                 found_indices.append(i)
         if len(found_indices) == 0:
+            if raise_error:
+                raise ValueError(f"Column {label} not found")
             return -1
         if len(found_indices) == 1:
             return found_indices[0]
@@ -1416,10 +1429,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         """Get column(s) that match a column index or label."""
         if checks.is_int(idx_or_label):
             return self.get(columns=self.wrapper.columns[idx_or_label])
-        column_idx = self.get_column_index(idx_or_label)
+        column_idx = self.get_column_index(idx_or_label, raise_error=raise_error)
         if column_idx == -1:
-            if raise_error:
-                raise ValueError(f"Column(s) {idx_or_label} not found")
             return None
         return self.get(columns=self.wrapper.columns[column_idx])
 
@@ -1474,6 +1485,25 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         low = self.get_column("Low", raise_error=True)
         close = self.get_column("Close", raise_error=True)
         return (open + high + low + close) / 4
+
+    @property
+    def ohlc(self: DataT) -> DataT:
+        """Return the `Data` instance with the OHLC columns only."""
+        open_idx = self.get_column_index("Open", raise_error=True)
+        high_idx = self.get_column_index("High", raise_error=True)
+        low_idx = self.get_column_index("Low", raise_error=True)
+        close_idx = self.get_column_index("Close", raise_error=True)
+        return self.iloc[:, [open_idx, high_idx, low_idx, close_idx]]
+
+    @property
+    def ohlcv(self: DataT) -> DataT:
+        """Return the `Data` instance with the OHLCV columns only."""
+        open_idx = self.get_column_index("Open", raise_error=True)
+        high_idx = self.get_column_index("High", raise_error=True)
+        low_idx = self.get_column_index("Low", raise_error=True)
+        close_idx = self.get_column_index("Close", raise_error=True)
+        volume_idx = self.get_column_index("Volume", raise_error=True)
+        return self.iloc[:, [open_idx, high_idx, low_idx, close_idx, volume_idx]]
 
     @property
     def returns_acc(self) -> tp.Optional[tp.SeriesFrame]:
@@ -1532,15 +1562,13 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             single_symbol = True
             symbols = [symbols]
         return self.replace(
-            data=symbol_dict({k: v for k, v in self.data.items() if k in symbols}),
+            data=symbol_dict({k: self.data[k] for k in symbols}),
             single_symbol=single_symbol,
-            symbol_classes=symbol_dict({k: v for k, v in self.symbol_classes.items() if k in symbols}),
-            fetch_kwargs=symbol_dict({k: v for k, v in self.fetch_kwargs.items() if k in symbols}),
-            returned_kwargs=symbol_dict(
-                {k: v for k, v in self.returned_kwargs.items() if k in symbols},
-            ),
-            last_index=symbol_dict({k: v for k, v in self.last_index.items() if k in symbols}),
-            delisted=symbol_dict({k: v for k, v in self.delisted.items() if k in symbols}),
+            symbol_classes=symbol_dict({k: self.symbol_classes[k] for k in symbols if k in self.symbol_classes}),
+            fetch_kwargs=symbol_dict({k: self.fetch_kwargs[k] for k in symbols if k in self.fetch_kwargs}),
+            returned_kwargs=symbol_dict({k: self.returned_kwargs[k] for k in symbols if k in self.returned_kwargs}),
+            last_index=symbol_dict({k: self.last_index[k] for k in symbols if k in self.last_index}),
+            delisted=symbol_dict({k: self.delisted[k] for k in symbols if k in self.delisted}),
             **kwargs,
         )
 
@@ -1960,6 +1988,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         pass_as_first: bool = False,
         rename_args: tp.DictLike = None,
         unpack: tp.Union[bool, str] = False,
+        concat: bool = True,
         silence_warnings: bool = False,
         **kwargs,
     ) -> tp.Any:
@@ -1989,8 +2018,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         `vectorbtpro.indicators.factory.IndicatorBase.to_dict`, and
         `vectorbtpro.indicators.factory.IndicatorBase.to_frame` respectively.
 
-        Any argument in `*args` and `**kwargs` can be wrapped with `run_func_dict` to specify
-        the value per function name or index when `func` is iterable."""
+        Any argument in `*args` and `**kwargs` can be wrapped with `run_func_dict`/`run_arg_dict`
+        to specify the value per function/argument name or index when `func` is iterable."""
         from vectorbtpro.indicators.factory import IndicatorBase, IndicatorFactory
         from vectorbtpro.portfolio.base import Portfolio
 
@@ -2029,6 +2058,9 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                         _kwargs[k] = v[i]
                     elif "_def" in v:
                         _kwargs[k] = v["_def"]
+                elif isinstance(v, run_arg_dict):
+                    if func_name == k or i == k:
+                        _kwargs.update(v)
                 else:
                     _kwargs[k] = v
             return _kwargs
@@ -2053,15 +2085,17 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                         unpack=unpack,
                         **_select_func_kwargs(i, f_name, kwargs),
                     )
-                    if isinstance(out, pd.Series):
+                    if concat and isinstance(out, pd.Series):
                         out = out.to_frame()
-                    if isinstance(out, IndicatorBase):
+                    if concat and isinstance(out, IndicatorBase):
                         out = out.to_frame()
                     outputs.append(out)
                     keys.append(str(f_name))
                 except Exception as e:
                     if not silence_warnings:
                         warnings.warn(f_name + ": " + str(e), stacklevel=2)
+            if not concat:
+                return outputs
             return pd.concat(outputs, keys=pd.Index(keys, name="run_func"), axis=1)
         if isinstance(func, str):
             func = func.lower().strip()

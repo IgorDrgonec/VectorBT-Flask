@@ -1361,90 +1361,92 @@ class FSPreparer(BasePFPreparer):
     def signal_args(self) -> tp.Args:
         """Argument `signal_args`."""
         if self.dynamic_mode:
-            if self.ls_mode:
-                return (
-                    self.long_entries,
-                    self.long_exits,
-                    self.short_entries,
-                    self.short_exits,
-                    self.from_ago,
-                    *((self.adjust_func_nb,) if self.staticized is None else ()),
-                    self.adjust_args,
-                )
-            if self.signals_mode:
-                return (
-                    self.entries,
-                    self.exits,
-                    self.direction,
-                    self.from_ago,
-                    *((self.adjust_func_nb,) if self.staticized is None else ()),
-                    self.adjust_args,
-                )
-            if self.order_mode:
-                return (
-                    self.size,
-                    self.price,
-                    self.size_type,
-                    self.direction,
-                    self.min_size,
-                    self.max_size,
-                    self.val_price,
-                    self.from_ago,
-                    *((self.adjust_func_nb,) if self.staticized is None else ()),
-                    self.adjust_args,
-                )
+            if self["signal_func_nb"] is None:
+                if self.ls_mode:
+                    return (
+                        self.long_entries,
+                        self.long_exits,
+                        self.short_entries,
+                        self.short_exits,
+                        self.from_ago,
+                        *((self.adjust_func_nb,) if self.staticized is None else ()),
+                        self.adjust_args,
+                    )
+                if self.signals_mode:
+                    return (
+                        self.entries,
+                        self.exits,
+                        self.direction,
+                        self.from_ago,
+                        *((self.adjust_func_nb,) if self.staticized is None else ()),
+                        self.adjust_args,
+                    )
+                if self.order_mode:
+                    return (
+                        self.size,
+                        self.price,
+                        self.size_type,
+                        self.direction,
+                        self.min_size,
+                        self.max_size,
+                        self.val_price,
+                        self.from_ago,
+                        *((self.adjust_func_nb,) if self.staticized is None else ()),
+                        self.adjust_args,
+                    )
         return self._post_signal_args
 
     @cachedproperty
     def chunked(self) -> tp.ChunkedOption:
         if self.dynamic_mode:
-            if self.ls_mode:
-                return ch.specialize_chunked_option(
-                    self._pre_chunked,
-                    arg_take_spec=dict(
-                        signal_args=ch.ArgsTaker(
-                            base_ch.flex_array_gl_slicer,
-                            base_ch.flex_array_gl_slicer,
-                            base_ch.flex_array_gl_slicer,
-                            base_ch.flex_array_gl_slicer,
-                            base_ch.flex_array_gl_slicer,
-                            *((None,) if self.staticized is None else ()),
-                            ch.ArgsTaker(),
-                        )
-                    ),
-                )
-            if self.signals_mode:
-                return ch.specialize_chunked_option(
-                    self._pre_chunked,
-                    arg_take_spec=dict(
-                        signal_args=ch.ArgsTaker(
-                            base_ch.flex_array_gl_slicer,
-                            base_ch.flex_array_gl_slicer,
-                            base_ch.flex_array_gl_slicer,
-                            base_ch.flex_array_gl_slicer,
-                            *((None,) if self.staticized is None else ()),
-                            ch.ArgsTaker(),
-                        )
-                    ),
-                )
-            if self.order_mode:
-                return ch.specialize_chunked_option(
-                    self._pre_chunked,
-                    arg_take_spec=dict(
-                        signal_args=ch.ArgsTaker(
-                            base_ch.flex_array_gl_slicer,
-                            base_ch.flex_array_gl_slicer,
-                            base_ch.flex_array_gl_slicer,
-                            base_ch.flex_array_gl_slicer,
-                            base_ch.flex_array_gl_slicer,
-                            base_ch.flex_array_gl_slicer,
-                            base_ch.flex_array_gl_slicer,
-                            base_ch.flex_array_gl_slicer,
-                            *((None,) if self.staticized is None else ()),
-                            ch.ArgsTaker(),
-                        )
-                    ),
-                )
+            if self["signal_func_nb"] is None:
+                if self.ls_mode:
+                    return ch.specialize_chunked_option(
+                        self._pre_chunked,
+                        arg_take_spec=dict(
+                            signal_args=ch.ArgsTaker(
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                *((None,) if self.staticized is None else ()),
+                                ch.ArgsTaker(),
+                            )
+                        ),
+                    )
+                if self.signals_mode:
+                    return ch.specialize_chunked_option(
+                        self._pre_chunked,
+                        arg_take_spec=dict(
+                            signal_args=ch.ArgsTaker(
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                *((None,) if self.staticized is None else ()),
+                                ch.ArgsTaker(),
+                            )
+                        ),
+                    )
+                if self.order_mode:
+                    return ch.specialize_chunked_option(
+                        self._pre_chunked,
+                        arg_take_spec=dict(
+                            signal_args=ch.ArgsTaker(
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                base_ch.flex_array_gl_slicer,
+                                *((None,) if self.staticized is None else ()),
+                                ch.ArgsTaker(),
+                            )
+                        ),
+                    )
         return self._pre_chunked
 
     # ############# Result ############# #
