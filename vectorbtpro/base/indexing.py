@@ -244,7 +244,7 @@ class PandasIndexer(IndexingBase):
         raise TypeError(f"'{type(self).__name__}' object is not iterable")
 
 
-class idxLoc(iLoc):
+class xLoc(iLoc):
     """Subclass of `iLoc` that transforms an `Idxr`-based operation with
     `get_idxs` to an `iLoc` operation."""
 
@@ -276,18 +276,18 @@ class idxLoc(iLoc):
 
 
 class ExtPandasIndexer(PandasIndexer):
-    """Extension of `PandasIndexer` that also implements indexing using `xloc`."""
+    """Extension of `PandasIndexer` that also implements indexing using `xLoc`."""
 
     def __init__(self, **kwargs) -> None:
-        self._xloc = idxLoc(self.indexing_func, indexing_setter_func=self.indexing_setter_func, **kwargs)
+        self._xloc = xLoc(self.indexing_func, indexing_setter_func=self.indexing_setter_func, **kwargs)
         PandasIndexer.__init__(self, **kwargs)
 
     @property
-    def xloc(self) -> idxLoc:
+    def xloc(self) -> xLoc:
         """`Idxr`-based indexing."""
         return self._xloc
 
-    xloc.__doc__ = idxLoc.__doc__
+    xloc.__doc__ = xLoc.__doc__
 
 
 class ParamLoc(LocBase):
