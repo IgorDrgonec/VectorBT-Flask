@@ -1747,7 +1747,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             else:
                 _key = key
             if isinstance(_key, CustomTemplate):
-                _key = _key.substitute(dict(symbol=k, data=v), sub_id="path_or_buf")
+                _key = _key.substitute(dict(symbol=k, data=v), sub_id="key")
             _kwargs = self.select_symbol_kwargs(k, kwargs)
             v.to_hdf(path_or_buf=_path_or_buf, key=_key, format=format, **_kwargs)
 
