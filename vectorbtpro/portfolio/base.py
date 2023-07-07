@@ -1074,7 +1074,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         for i in range(1, len(objs)):
             if objs[i].cash_sharing != objs[0].cash_sharing:
                 raise ValueError("Objects to be merged must have the same 'cash_sharing'")
-        kwargs["cash_sharing"] = objs[0].cash_sharing
+        if "cash_sharing" not in kwargs:
+            kwargs["cash_sharing"] = objs[0].cash_sharing
         cs_group_by = None if kwargs["cash_sharing"] else False
 
         if "close" not in kwargs:
