@@ -19,6 +19,7 @@ from glob import glob
 import re
 import requests
 import urllib.parse
+import fnmatch
 
 import numpy as np
 import pandas as pd
@@ -45,7 +46,7 @@ from vectorbtpro.utils.datetime_ import (
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.enum_ import map_enum_fields
-from vectorbtpro.utils.parsing import glob2re, get_func_arg_names, get_func_kwargs
+from vectorbtpro.utils.parsing import get_func_arg_names, get_func_kwargs
 from vectorbtpro.utils.template import substitute_templates
 
 try:
@@ -125,7 +126,7 @@ class CustomData(Data):
         Otherwise, checks against a glob-style pattern."""
         if use_regex:
             return re.match(pattern, symbol)
-        return re.match(glob2re(pattern), symbol)
+        return re.match(fnmatch.translate(pattern), symbol)
 
 
 # ############# Synthetic ############# #
