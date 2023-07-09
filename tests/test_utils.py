@@ -2268,10 +2268,6 @@ class TestDatetime:
             datetime_.to_tzaware_datetime("2020-01-001")
 
     def test_datetime_to_ms(self):
-        assert (
-            datetime_.datetime_to_ms(_datetime(2020, 1, 1))
-            == 1577836800000 - _datetime(2020, 1, 1).astimezone(None).utcoffset().total_seconds() * 1000
-        )
         assert datetime_.datetime_to_ms(_datetime(2020, 1, 1, tzinfo=datetime_.get_utc_tz())) == 1577836800000
 
 

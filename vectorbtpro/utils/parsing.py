@@ -33,42 +33,6 @@ class Regex:
         return re.match(self.pattern, string, self.flags) is not None
 
 
-def glob2re(pat):
-    """Translate a shell pattern to a regular expression.
-
-    Based on https://stackoverflow.com/a/29820981"""
-    i, n = 0, len(pat)
-    res = ""
-    while i < n:
-        c = pat[i]
-        i = i + 1
-        if c == "*":
-            res = res + "[^/]*"
-        elif c == "?":
-            res = res + "[^/]"
-        elif c == "[":
-            j = i
-            if j < n and pat[j] == "!":
-                j = j + 1
-            if j < n and pat[j] == "]":
-                j = j + 1
-            while j < n and pat[j] != "]":
-                j = j + 1
-            if j >= n:
-                res = res + "\\["
-            else:
-                stuff = pat[i:j].replace("\\", "\\\\")
-                i = j + 1
-                if stuff[0] == "!":
-                    stuff = "^" + stuff[1:]
-                elif stuff[0] == "^":
-                    stuff = "\\" + stuff
-                res = "%s[%s]" % (res, stuff)
-        else:
-            res = res + re.escape(c)
-    return res + r"\Z(?ms)"
-
-
 def get_func_kwargs(func: tp.Callable) -> dict:
     """Get keyword arguments with defaults of a function."""
     signature = inspect.signature(func)

@@ -119,7 +119,11 @@ class TVClient(Configured):
             if user_agent is not None:
                 headers["User-Agent"] = user_agent
             response = requests.post(url=SIGNIN_URL, data=data, headers=headers)
-            return response.json()["user"]["auth_token"]
+            response.raise_for_status()
+            json = response.json()
+            if "user" not in json or "auth_token" not in json["user"]:
+                raise ValueError(json)
+            return json["user"]["auth_token"]
         if username is not None or password is not None:
             raise ValueError("Both username and password must be provided")
         return "unauthorized_user_token"

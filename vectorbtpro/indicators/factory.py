@@ -38,6 +38,7 @@ import warnings
 from collections import Counter, OrderedDict
 from datetime import datetime, timedelta
 from types import ModuleType
+import fnmatch
 
 import numpy as np
 import pandas as pd
@@ -64,7 +65,7 @@ from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.mapping import to_value_mapping, apply_mapping
 from vectorbtpro.utils.params import to_typed_list, broadcast_params, create_param_product, params_to_list
-from vectorbtpro.utils.parsing import glob2re, get_expr_var_names, get_func_arg_names, get_func_kwargs, supress_stdout
+from vectorbtpro.utils.parsing import get_expr_var_names, get_func_arg_names, get_func_kwargs, supress_stdout
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import has_templates, substitute_templates
 from vectorbtpro.utils.datetime_ import freq_to_timedelta64, infer_index_freq
@@ -2883,10 +2884,10 @@ Other keyword arguments are passed to `{0}.run`.
                             continue
                 else:
                     if location is not None:
-                        if not re.match(glob2re(pattern), indicator_name):
+                        if not re.match(fnmatch.translate(pattern), indicator_name):
                             continue
                     else:
-                        if not re.match(glob2re(pattern), indicator_name.split(":")[1]):
+                        if not re.match(fnmatch.translate(pattern), indicator_name.split(":")[1]):
                             continue
             found_indicators.append(indicator)
         return found_indicators

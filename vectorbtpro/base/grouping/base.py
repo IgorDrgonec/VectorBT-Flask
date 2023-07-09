@@ -312,6 +312,13 @@ class Grouper(Configured):
         """Return grouped index."""
         return self.get_groups_and_index(**kwargs)[1]
 
+    get_grouped_index = get_index
+
+    @property
+    def grouped_index(self) -> tp.Index:
+        """Grouped index."""
+        return self.get_grouped_index()
+
     def get_stretched_index(self, **kwargs) -> tp.Index:
         """Return stretched index."""
         groups, index = self.get_groups_and_index(**kwargs)

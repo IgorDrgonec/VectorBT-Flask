@@ -917,15 +917,6 @@ def get_diraware_size_nb(size: float, direction: int) -> float:
 
 
 @register_jitted(cache=True)
-def get_mn_val_price_nb(position: float, debt: float, val_price: float) -> float:
-    """Get market-neutral asset valuation price."""
-    if position < 0:
-        avg_entry_price = debt / abs(position)
-        return 2 * avg_entry_price - val_price
-    return val_price
-
-
-@register_jitted(cache=True)
 def resolve_size_nb(
     size: float,
     size_type: int,
@@ -938,23 +929,6 @@ def resolve_size_nb(
     """Resolve size into an absolute amount of assets and percentage of resources.
 
     Percentage is only set if the option `SizeType.Percent(100)` is used."""
-    market_neutral = False
-    if size_type == SizeType.MNTargetPercent100:
-        market_neutral = True
-        size_type = SizeType.TargetPercent100
-    if size_type == SizeType.MNTargetPercent:
-        market_neutral = True
-        size_type = SizeType.TargetPercent
-    if size_type == SizeType.MNTargetValue:
-        market_neutral = True
-        size_type = SizeType.TargetValue
-    if market_neutral:
-        val_price = get_mn_val_price_nb(
-            position=position,
-            debt=debt,
-            val_price=val_price,
-        )
-
     if size_type == SizeType.ValuePercent100:
         size /= 100
         size_type = SizeType.ValuePercent

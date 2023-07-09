@@ -23,6 +23,7 @@ from vectorbtpro.utils.config import Configured
 from vectorbtpro.utils.config import merge_dicts, ReadonlyConfig
 from vectorbtpro.utils.mapping import to_field_mapping
 from vectorbtpro.utils.template import CustomTemplate, substitute_templates
+from vectorbtpro.data.base import Data
 
 __all__ = [
     "PFPrepResult",
@@ -156,6 +157,16 @@ class BasePFPreparer(BasePreparer):
         """Whether automatic call sequence is enabled."""
         call_seq = self["call_seq"]
         return checks.is_int(call_seq) and call_seq == enums.CallSeqType.Auto
+
+    @cachedproperty
+    def data(self) -> tp.Optional[Data]:
+        """Argument `data`."""
+        data = self["data"]
+        if data is None:
+            return None
+        if isinstance(data, str):
+            return Data.from_data_str(data)
+        return data
 
     # ############# Before broadcasting ############# #
 

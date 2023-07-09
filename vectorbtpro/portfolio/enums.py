@@ -593,9 +593,6 @@ class SizeTypeT(tp.NamedTuple):
     TargetValue: int = 7
     TargetPercent: int = 8
     TargetPercent100: int = 9
-    MNTargetValue: int = 10
-    MNTargetPercent: int = 11
-    MNTargetPercent100: int = 12
 
 
 SizeType = SizeTypeT()
