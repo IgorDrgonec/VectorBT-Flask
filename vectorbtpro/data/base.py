@@ -1025,6 +1025,21 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             silence_warnings=silence_warnings,
         )
 
+    @classmethod
+    def from_data_str(cls: tp.Type[DataT], data_str: str) -> DataT:
+        """Parse a `Data` instance from a string.
+
+        For example: `YFData:BTC-USD` or just `BTC-USD` where the data class is
+        `vectorbtpro.data.custom.YFData` by default."""
+        from vectorbtpro.data import custom
+
+        if ":" in data_str:
+            cls_name, symbol = data_str.split(":")
+            cls_name = cls_name.strip()
+            symbol = symbol.strip()
+            return getattr(custom, cls_name).fetch(symbol)
+        return custom.YFData.fetch(data_str.strip())
+
     # ############# Updating ############# #
 
     def update_symbol(

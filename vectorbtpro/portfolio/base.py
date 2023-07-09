@@ -2769,7 +2769,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             del local_kwargs["return_preparer"]
             del local_kwargs["return_prep_result"]
             del local_kwargs["return_sim_out"]
-            if isinstance(close, Data):
+            if isinstance(close, (Data, str)):
                 local_kwargs["data"] = close
                 local_kwargs["close"] = None
             preparer = FOPreparer(**local_kwargs)
@@ -3656,7 +3656,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             del local_kwargs["return_preparer"]
             del local_kwargs["return_prep_result"]
             del local_kwargs["return_sim_out"]
-            if isinstance(close, Data):
+            if isinstance(close, (Data, str)):
                 local_kwargs["data"] = close
                 local_kwargs["close"] = None
             preparer = FSPreparer(**local_kwargs)
@@ -3812,7 +3812,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         portfolio_cfg = settings["portfolio"]
 
-        if isinstance(close, Data):
+        if isinstance(close, (Data, str)):
+            if isinstance(close, str):
+                close = Data.from_data_str(close)
             data = close
             close = data.close
             if close is None:
@@ -4565,7 +4567,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             del local_kwargs["return_preparer"]
             del local_kwargs["return_prep_result"]
             del local_kwargs["return_sim_out"]
-            if isinstance(close, Data):
+            if isinstance(close, (Data, str)):
                 local_kwargs["data"] = close
                 local_kwargs["close"] = None
             preparer = FOFPreparer(**local_kwargs)
@@ -4714,7 +4716,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             del local_kwargs["return_preparer"]
             del local_kwargs["return_prep_result"]
             del local_kwargs["return_sim_out"]
-            if isinstance(close, Data):
+            if isinstance(close, (Data, str)):
                 local_kwargs["data"] = close
                 local_kwargs["close"] = None
             preparer = FDOFPreparer(**local_kwargs)
