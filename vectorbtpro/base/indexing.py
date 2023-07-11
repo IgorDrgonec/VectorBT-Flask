@@ -874,7 +874,7 @@ class DTCIdxr(UniIdxr):
     """One or more datetime-like components."""
 
     parse_kwargs: tp.KwargsLike = attr.ib(default=None)
-    """Keyword arguments passed to `vectorbtpro.utils.datetime_.parse_time_str`."""
+    """Keyword arguments passed to `vectorbtpro.utils.datetime_.DTC.parse`."""
 
     closed_start: bool = attr.ib(default=True)
     """Whether slice start should be inclusive."""

@@ -900,13 +900,13 @@ class CSVData(FileData):
         return self.fetch_symbol(symbol, **kwargs)
 
 
-class HDFPathNotFoundError(Exception):
+class _HDFPathNotFoundError(Exception):
     """Gets raised if the path to an HDF file could not be found."""
 
     pass
 
 
-class HDFKeyNotFoundError(Exception):
+class _HDFKeyNotFoundError(Exception):
     """Gets raised if the key to an HDF object could not be found."""
 
     pass
@@ -946,7 +946,7 @@ class HDFData(FileData):
             _full_path = path
         if path.exists():
             if path.is_dir():
-                raise HDFPathNotFoundError(f"No HDF files could be matched with {_full_path}")
+                raise _HDFPathNotFoundError(f"No HDF files could be matched with {_full_path}")
             return path, key
         new_path = path.parent
         if key is None:
@@ -990,9 +990,9 @@ class HDFData(FileData):
                         if k.startswith(key) or PurePath("/" + str(k)).match("/" + str(key)):
                             matching_keys.append(k)
                     if len(matching_keys) == 0:
-                        raise HDFKeyNotFoundError(f"No HDF keys could be matched with {key}")
+                        raise _HDFKeyNotFoundError(f"No HDF keys could be matched with {key}")
                     key_paths = [file_path / k for k in matching_keys]
-            except HDFPathNotFoundError:
+            except _HDFPathNotFoundError:
                 sub_paths = list([Path(p) for p in glob(str(path), recursive=recursive)])
                 if len(sub_paths) == 0 and re.match(r".+\..+", str(path)):
                     base_path = None

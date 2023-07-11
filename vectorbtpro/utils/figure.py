@@ -73,7 +73,7 @@ class FigureMixin:
         self.show(renderer="svg", **kwargs)
 
     def auto_rangebreaks(self: FigureMixinT, index: tp.Optional[tp.IndexLike] = None, **kwargs) -> FigureMixinT:
-        """Set range breaks automatically based on `vectorbtpro.utils.dt.get_rangebreaks`."""
+        """Set range breaks automatically based on `vectorbtpro.utils.datetime_.get_rangebreaks`."""
         if index is None:
             for d in self.data:
                 if "x" in d:
