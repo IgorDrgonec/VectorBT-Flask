@@ -1323,23 +1323,40 @@ class FSPreparer(BasePFPreparer):
     @cachedproperty
     def use_stops(self) -> bool:
         """Argument `use_stops`."""
-        if self.stop_ladder:
-            use_stops = True
-        else:
-            if self.dynamic_mode:
+        if self["use_stops"] is None:
+            if self.stop_ladder:
                 use_stops = True
             else:
-                if (
-                    not np.any(self.sl_stop)
-                    and not np.any(self.tsl_stop)
-                    and not np.any(self.tp_stop)
-                    and not np.any(self.td_stop != -1)
-                    and not np.any(self.dt_stop != -1)
-                ):
-                    use_stops = False
-                else:
+                if self.dynamic_mode:
                     use_stops = True
+                else:
+                    if (
+                        not np.all(np.isnan(self.sl_stop))
+                        or not np.all(np.isnan(self.tsl_stop))
+                        or not np.all(np.isnan(self.tp_stop))
+                        or np.any(self.td_stop != -1)
+                        or np.any(self.dt_stop != -1)
+                    ):
+                        use_stops = True
+                    else:
+                        use_stops = False
+        else:
+            use_stops = self["use_stops"]
         return use_stops
+
+    @cachedproperty
+    def use_limit_orders(self) -> bool:
+        """Whether to use limit orders."""
+        if np.any(self.order_type == enums.OrderType.Limit):
+            return True
+        if self.use_stops and np.any(self.stop_order_type == enums.OrderType.Limit):
+            return True
+        return False
+
+    @cachedproperty
+    def basic_mode(self) -> bool:
+        """Whether the basic mode is enabled."""
+        return not self.use_stops and not self.use_limit_orders
 
     # ############# Template substitution ############# #
 
@@ -1466,8 +1483,10 @@ class FSPreparer(BasePFPreparer):
     def target_func(self) -> tp.Optional[tp.Callable]:
         if self.dynamic_mode:
             func = self.resolve_dynamic_target_func("from_signal_func_nb", self.staticized)
-        else:
+        elif not self.basic_mode:
             func = nb.from_signals_nb
+        else:
+            func = nb.from_basic_signals_nb
         func = jit_reg.resolve_option(func, self.jitted)
         func = ch_reg.resolve_option(func, self.chunked)
         return func

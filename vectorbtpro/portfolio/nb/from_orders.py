@@ -173,24 +173,33 @@ def from_orders_nb(
     from_ago_ = to_2d_array_nb(np.asarray(from_ago))
 
     order_records, log_records = prepare_records_nb(target_shape, max_orders, max_logs)
-    last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)
-    last_position = prepare_last_position_nb(target_shape, init_position_)
+    order_counts = np.full(target_shape[1], 0, dtype=np.int_)
+    log_counts = np.full(target_shape[1], 0, dtype=np.int_)
+    last_cash = prepare_last_cash_nb(
+        target_shape=target_shape,
+        group_lens=group_lens,
+        cash_sharing=cash_sharing,
+        init_cash=init_cash_,
+    )
+    last_position = prepare_last_position_nb(
+        target_shape=target_shape,
+        init_position=init_position_,
+    )
     last_value = prepare_last_value_nb(
-        target_shape,
-        group_lens,
-        cash_sharing,
-        init_cash_,
+        target_shape=target_shape,
+        group_lens=group_lens,
+        cash_sharing=cash_sharing,
+        init_cash=init_cash_,
         init_position=init_position_,
         init_price=init_price_,
     )
-
+    last_cash_deposits = np.full_like(last_cash, 0.0)
     last_val_price = np.full_like(last_position, np.nan)
     last_debt = np.full(target_shape[1], 0.0, dtype=np.float_)
     last_locked_cash = np.full(target_shape[1], 0.0, dtype=np.float_)
+    last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
-    order_counts = np.full(target_shape[1], 0, dtype=np.int_)
-    log_counts = np.full(target_shape[1], 0, dtype=np.int_)
     track_cash_deposits = np.any(cash_deposits_)
     if track_cash_deposits:
         cash_deposits_out = np.full((target_shape[0], len(group_lens)), 0.0, dtype=np.float_)
@@ -201,7 +210,6 @@ def from_orders_nb(
         cash_earnings_out = np.full(target_shape, 0.0, dtype=np.float_)
     else:
         cash_earnings_out = np.full((1, 1), 0.0, dtype=np.float_)
-
     if save_state:
         cash = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
         position = np.full(target_shape, np.nan, dtype=np.float_)
@@ -242,206 +250,203 @@ def from_orders_nb(
         from_col = group_start_idxs[group]
         to_col = group_end_idxs[group]
         group_len = to_col - from_col
-        cash_now = last_cash[group]
-        free_cash_now = cash_now
 
         for i in range(target_shape[0]):
-            skip = not ffill_val_price and not save_state and not save_value and not save_returns
-            if skip:
-                if flex_select_nb(cash_deposits_, i, group) != 0:
-                    skip = False
-            if skip:
-                for c in range(group_len):
-                    col = from_col + c
-                    if flex_select_nb(cash_earnings_, i, col) != 0:
-                        skip = False
-                        break
-                    if flex_select_nb(cash_dividends_, i, col) != 0:
-                        skip = False
-                        break
-                    _i = i - abs(flex_select_nb(from_ago_, i, col))
-                    if _i < 0:
-                        continue
-                    if not np.isnan(flex_select_nb(size_, _i, col)):
-                        if not np.isnan(flex_select_nb(price_, _i, col)):
-                            skip = False
-                            break
-            if skip:
-                continue
-
             # Add cash
             _cash_deposits = flex_select_nb(cash_deposits_, i, group)
             if _cash_deposits < 0:
-                _cash_deposits = max(_cash_deposits, -cash_now)
-            cash_now += _cash_deposits
-            free_cash_now += _cash_deposits
+                _cash_deposits = max(_cash_deposits, -last_cash[group])
+            last_cash[group] += _cash_deposits
+            last_free_cash[group] += _cash_deposits
+            last_cash_deposits[group] = _cash_deposits
             if track_cash_deposits:
                 cash_deposits_out[i, group] += _cash_deposits
 
+            skip = True
             for c in range(group_len):
                 col = from_col + c
-
-                # Update valuation price using current open
-                _open = flex_select_nb(open_, i, col)
-                if not np.isnan(_open) or not ffill_val_price:
-                    last_val_price[col] = _open
-
-                # Resolve valuation price
-                _val_price = flex_select_nb(val_price_, i, col)
-                if np.isinf(_val_price):
-                    if _val_price > 0:
-                        _i = i - abs(flex_select_nb(from_ago_, i, col))
-                        if _i < 0:
-                            _price = np.nan
-                        else:
-                            _price = flex_select_nb(price_, _i, col)
-                        if np.isinf(_price):
-                            if _price > 0:
-                                _price = flex_select_nb(close_, i, col)
-                            else:
-                                _price = _open
-                        _val_price = _price
-                    else:
-                        _val_price = last_val_price[col]
-                if not np.isnan(_val_price) or not ffill_val_price:
-                    last_val_price[col] = _val_price
-
-            # Calculate group value and rearrange if cash sharing is enabled
-            if cash_sharing:
-                # Same as get_ctx_group_value_nb but with flexible indexing
-                value_now = cash_now
-                for c in range(group_len):
-                    col = from_col + c
-
-                    if last_position[col] != 0:
-                        value_now += last_position[col] * last_val_price[col]
-
-                # Dynamically sort by order value -> selling comes first to release funds early
-                if call_seq is None:
-                    for c in range(group_len):
-                        temp_call_seq[c] = c
-                    call_seq_now = temp_call_seq[:group_len]
-                else:
-                    call_seq_now = call_seq[i, from_col:to_col]
-                if auto_call_seq:
-                    # Same as sort_by_order_value_ctx_nb but with flexible indexing
-                    for c in range(group_len):
-                        col = from_col + c
-                        exec_state = ExecState(
-                            cash=cash_now,
-                            position=last_position[col],
-                            debt=last_debt[col],
-                            locked_cash=last_locked_cash[col],
-                            free_cash=free_cash_now,
-                            val_price=last_val_price[col],
-                            value=value_now,
-                        )
-                        _i = i - abs(flex_select_nb(from_ago_, i, col))
-                        if _i < 0:
-                            temp_order_value[c] = 0.0
-                        else:
-                            temp_order_value[c] = approx_order_value_nb(
-                                exec_state,
-                                flex_select_nb(size_, _i, col),
-                                flex_select_nb(size_type_, _i, col),
-                                flex_select_nb(direction_, _i, col),
-                            )
-                        if call_seq_now[c] != c:
-                            raise ValueError("Call sequence must follow CallSeqType.Default")
-
-                    # Sort by order value
-                    insert_argsort_nb(temp_order_value[:group_len], call_seq_now)
-
-            for k in range(group_len):
-                if cash_sharing:
-                    c = call_seq_now[k]
-                    if c >= group_len:
-                        raise ValueError("Call index out of bounds of the group")
-                else:
-                    c = k
-                col = from_col + c
-
-                # Get current values per column
-                position_now = last_position[col]
-                debt_now = last_debt[col]
-                locked_cash_now = last_locked_cash[col]
-                val_price_now = last_val_price[col]
-                if not cash_sharing:
-                    value_now = cash_now
-                    if position_now != 0:
-                        value_now += position_now * val_price_now
-
-                # Generate the next order
                 _i = i - abs(flex_select_nb(from_ago_, i, col))
                 if _i < 0:
                     continue
-                order = order_nb(
-                    size=flex_select_nb(size_, _i, col),
-                    price=flex_select_nb(price_, _i, col),
-                    size_type=flex_select_nb(size_type_, _i, col),
-                    direction=flex_select_nb(direction_, _i, col),
-                    fees=flex_select_nb(fees_, _i, col),
-                    fixed_fees=flex_select_nb(fixed_fees_, _i, col),
-                    slippage=flex_select_nb(slippage_, _i, col),
-                    min_size=flex_select_nb(min_size_, _i, col),
-                    max_size=flex_select_nb(max_size_, _i, col),
-                    size_granularity=flex_select_nb(size_granularity_, _i, col),
-                    leverage=flex_select_nb(leverage_, _i, col),
-                    leverage_mode=flex_select_nb(leverage_mode_, _i, col),
-                    reject_prob=flex_select_nb(reject_prob_, _i, col),
-                    price_area_vio_mode=flex_select_nb(price_area_vio_mode_, _i, col),
-                    allow_partial=flex_select_nb(allow_partial_, _i, col),
-                    raise_reject=flex_select_nb(raise_reject_, _i, col),
-                    log=flex_select_nb(log_, _i, col),
+                if flex_select_nb(log_, i, col):
+                    skip = False
+                    break
+                if not np.isnan(flex_select_nb(size_, _i, col)):
+                    if not np.isnan(flex_select_nb(price_, _i, col)):
+                        skip = False
+                        break
+
+            if not skip or ffill_val_price:
+                for c in range(group_len):
+                    col = from_col + c
+
+                    # Update valuation price using current open
+                    _open = flex_select_nb(open_, i, col)
+                    if not np.isnan(_open) or not ffill_val_price:
+                        last_val_price[col] = _open
+
+                    # Resolve valuation price
+                    _val_price = flex_select_nb(val_price_, i, col)
+                    if np.isinf(_val_price):
+                        if _val_price > 0:
+                            _i = i - abs(flex_select_nb(from_ago_, i, col))
+                            if _i < 0:
+                                _price = np.nan
+                            else:
+                                _price = flex_select_nb(price_, _i, col)
+                            if np.isinf(_price):
+                                if _price > 0:
+                                    _price = flex_select_nb(close_, i, col)
+                                else:
+                                    _price = _open
+                            _val_price = _price
+                        else:
+                            _val_price = last_val_price[col]
+                    if not np.isnan(_val_price) or not ffill_val_price:
+                        last_val_price[col] = _val_price
+
+            if not skip:
+                # Update value and return
+                group_value = last_cash[group]
+                for col in range(from_col, to_col):
+                    if last_position[col] != 0:
+                        group_value += last_position[col] * last_val_price[col]
+                last_value[group] = group_value
+                last_return[group] = get_return_nb(
+                    input_value=prev_close_value[group],
+                    output_value=last_value[group] - _cash_deposits,
                 )
 
-                # Process the order
-                price_area = PriceArea(
-                    open=flex_select_nb(open_, i, col),
-                    high=flex_select_nb(high_, i, col),
-                    low=flex_select_nb(low_, i, col),
-                    close=flex_select_nb(close_, i, col),
-                )
-                exec_state = ExecState(
-                    cash=cash_now,
-                    position=position_now,
-                    debt=debt_now,
-                    locked_cash=locked_cash_now,
-                    free_cash=free_cash_now,
-                    val_price=val_price_now,
-                    value=value_now,
-                )
-                order_result, new_exec_state = process_order_nb(
-                    group=group,
-                    col=col,
-                    i=i,
-                    exec_state=exec_state,
-                    order=order,
-                    price_area=price_area,
-                    update_value=update_value,
-                    order_records=order_records,
-                    order_counts=order_counts,
-                    log_records=log_records,
-                    log_counts=log_counts,
-                )
+                if cash_sharing:
+                    # Dynamically sort by order value -> selling comes first to release funds early
+                    if call_seq is None:
+                        for c in range(group_len):
+                            temp_call_seq[c] = c
+                        call_seq_now = temp_call_seq[:group_len]
+                    else:
+                        call_seq_now = call_seq[i, from_col:to_col]
+                    if auto_call_seq:
+                        # Same as sort_by_order_value_ctx_nb but with flexible indexing
+                        for c in range(group_len):
+                            col = from_col + c
+                            exec_state = ExecState(
+                                cash=last_cash[group] if cash_sharing else last_cash[col],
+                                position=last_position[col],
+                                debt=last_debt[col],
+                                locked_cash=last_locked_cash[col],
+                                free_cash=last_free_cash[group] if cash_sharing else last_free_cash[col],
+                                val_price=last_val_price[col],
+                                value=last_value[group] if cash_sharing else last_value[col],
+                            )
+                            _i = i - abs(flex_select_nb(from_ago_, i, col))
+                            if _i < 0:
+                                temp_order_value[c] = 0.0
+                            else:
+                                temp_order_value[c] = approx_order_value_nb(
+                                    exec_state,
+                                    flex_select_nb(size_, _i, col),
+                                    flex_select_nb(size_type_, _i, col),
+                                    flex_select_nb(direction_, _i, col),
+                                )
+                            if call_seq_now[c] != c:
+                                raise ValueError("Call sequence must follow CallSeqType.Default")
 
-                # Update execution state
-                cash_now = new_exec_state.cash
-                position_now = new_exec_state.position
-                debt_now = new_exec_state.debt
-                locked_cash_now = new_exec_state.locked_cash
-                free_cash_now = new_exec_state.free_cash
-                val_price_now = new_exec_state.val_price
-                value_now = new_exec_state.value
+                        # Sort by order value
+                        insert_argsort_nb(temp_order_value[:group_len], call_seq_now)
 
-                # Now becomes last
-                last_position[col] = position_now
-                last_debt[col] = debt_now
-                last_locked_cash[col] = locked_cash_now
-                if not np.isnan(val_price_now) or not ffill_val_price:
-                    last_val_price[col] = val_price_now
+                for k in range(group_len):
+                    if cash_sharing:
+                        c = call_seq_now[k]
+                        if c >= group_len:
+                            raise ValueError("Call index out of bounds of the group")
+                    else:
+                        c = k
+                    col = from_col + c
 
-            group_value = cash_now
+                    # Get current values per column
+                    position_now = last_position[col]
+                    debt_now = last_debt[col]
+                    locked_cash_now = last_locked_cash[col]
+                    val_price_now = last_val_price[col]
+                    cash_now = last_cash[group]
+                    free_cash_now = last_free_cash[group]
+                    value_now = last_value[group]
+                    return_now = last_return[group]
+
+                    # Generate the next order
+                    _i = i - abs(flex_select_nb(from_ago_, i, col))
+                    if _i < 0:
+                        continue
+                    order = order_nb(
+                        size=flex_select_nb(size_, _i, col),
+                        price=flex_select_nb(price_, _i, col),
+                        size_type=flex_select_nb(size_type_, _i, col),
+                        direction=flex_select_nb(direction_, _i, col),
+                        fees=flex_select_nb(fees_, _i, col),
+                        fixed_fees=flex_select_nb(fixed_fees_, _i, col),
+                        slippage=flex_select_nb(slippage_, _i, col),
+                        min_size=flex_select_nb(min_size_, _i, col),
+                        max_size=flex_select_nb(max_size_, _i, col),
+                        size_granularity=flex_select_nb(size_granularity_, _i, col),
+                        leverage=flex_select_nb(leverage_, _i, col),
+                        leverage_mode=flex_select_nb(leverage_mode_, _i, col),
+                        reject_prob=flex_select_nb(reject_prob_, _i, col),
+                        price_area_vio_mode=flex_select_nb(price_area_vio_mode_, _i, col),
+                        allow_partial=flex_select_nb(allow_partial_, _i, col),
+                        raise_reject=flex_select_nb(raise_reject_, _i, col),
+                        log=flex_select_nb(log_, _i, col),
+                    )
+
+                    # Process the order
+                    price_area = PriceArea(
+                        open=flex_select_nb(open_, i, col),
+                        high=flex_select_nb(high_, i, col),
+                        low=flex_select_nb(low_, i, col),
+                        close=flex_select_nb(close_, i, col),
+                    )
+                    exec_state = ExecState(
+                        cash=cash_now,
+                        position=position_now,
+                        debt=debt_now,
+                        locked_cash=locked_cash_now,
+                        free_cash=free_cash_now,
+                        val_price=val_price_now,
+                        value=value_now,
+                    )
+                    order_result, new_exec_state = process_order_nb(
+                        group=group,
+                        col=col,
+                        i=i,
+                        exec_state=exec_state,
+                        order=order,
+                        price_area=price_area,
+                        update_value=update_value,
+                        order_records=order_records,
+                        order_counts=order_counts,
+                        log_records=log_records,
+                        log_counts=log_counts,
+                    )
+
+                    # Update execution state
+                    cash_now = new_exec_state.cash
+                    position_now = new_exec_state.position
+                    debt_now = new_exec_state.debt
+                    locked_cash_now = new_exec_state.locked_cash
+                    free_cash_now = new_exec_state.free_cash
+                    val_price_now = new_exec_state.val_price
+                    value_now = new_exec_state.value
+
+                    # Now becomes last
+                    last_position[col] = position_now
+                    last_debt[col] = debt_now
+                    last_locked_cash[col] = locked_cash_now
+                    if not np.isnan(val_price_now) or not ffill_val_price:
+                        last_val_price[col] = val_price_now
+                    last_cash[group] = cash_now
+                    last_free_cash[group] = free_cash_now
+                    last_value[group] = value_now
+                    last_return[group] = return_now
+
             for col in range(from_col, to_col):
                 # Update valuation price using current close
                 _close = flex_select_nb(close_, i, col)
@@ -452,55 +457,33 @@ def from_orders_nb(
                 _cash_dividends = flex_select_nb(cash_dividends_, i, col)
                 _cash_earnings += _cash_dividends * last_position[col]
                 if _cash_earnings < 0:
-                    _cash_earnings = max(_cash_earnings, -cash_now)
-                cash_now += _cash_earnings
-                free_cash_now += _cash_earnings
+                    _cash_earnings = max(_cash_earnings, -last_cash[group])
+                last_cash[group] += _cash_earnings
+                last_free_cash[group] += _cash_earnings
                 if track_cash_earnings:
                     cash_earnings_out[i, col] += _cash_earnings
                 if save_state:
                     position[i, col] = last_position[col]
                     debt[i, col] = last_debt[col]
                     locked_cash[i, col] = last_locked_cash[col]
-                    if not cash_sharing:
-                        cash[i, col] = cash_now
-                        free_cash[i, col] = free_cash_now
+                    cash[i, group] = last_cash[group]
+                    free_cash[i, group] = last_free_cash[group]
 
-                # Update previous value, current value, and return
-                if save_value or save_returns:
-                    if cash_sharing:
-                        if last_position[col] != 0:
-                            group_value += last_position[col] * last_val_price[col]
-                    else:
-                        if last_position[col] == 0:
-                            last_value[col] = cash_now
-                        else:
-                            last_value[col] = cash_now + last_position[col] * last_val_price[col]
-                        last_return[col] = get_return_nb(
-                            prev_close_value[col],
-                            last_value[col] - _cash_deposits,
-                        )
-                        prev_close_value[col] = last_value[col]
-                        if save_value:
-                            in_outputs.value[i, group] = last_value[col]
-                        if save_returns:
-                            in_outputs.returns[i, group] = last_return[col]
-
-            # Fill group state and returns
-            if cash_sharing:
-                if save_state:
-                    cash[i, group] = cash_now
-                    free_cash[i, group] = free_cash_now
-                if save_value or save_returns:
-                    last_value[group] = group_value
-                    last_return[group] = get_return_nb(
-                        prev_close_value[group],
-                        last_value[group] - _cash_deposits,
-                    )
-                    prev_close_value[group] = last_value[group]
-                    if save_value:
-                        in_outputs.value[i, group] = last_value[group]
-                    if save_returns:
-                        in_outputs.returns[i, group] = last_return[group]
+            # Update value and return
+            group_value = last_cash[group]
+            for col in range(from_col, to_col):
+                if last_position[col] != 0:
+                    group_value += last_position[col] * last_val_price[col]
+            last_value[group] = group_value
+            last_return[group] = get_return_nb(
+                input_value=prev_close_value[group],
+                output_value=last_value[group] - _cash_deposits,
+            )
+            prev_close_value[group] = last_value[group]
+            if save_value:
+                in_outputs.value[i, group] = last_value[group]
+            if save_returns:
+                in_outputs.returns[i, group] = last_return[group]
 
     return prepare_simout_nb(
         order_records=order_records,
