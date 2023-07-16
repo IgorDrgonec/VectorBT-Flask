@@ -784,8 +784,8 @@ data = child_dict(
             client_config=dict(
                 username=None,
                 password=None,
+                auth_token=None,
                 user_agent=None,
-                token=None,
             ),
             exchange=None,
             timeframe="D",

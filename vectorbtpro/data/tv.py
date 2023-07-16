@@ -54,16 +54,16 @@ class TVClient(Configured):
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Configured._expected_keys or set()) | {
         "username",
         "password",
+        "auth_token",
         "user_agent",
-        "token",
     }
 
     def __init__(
         self,
         username: tp.Optional[str] = None,
         password: tp.Optional[str] = None,
+        auth_token: tp.Optional[str] = None,
         user_agent: tp.Optional[str] = None,
-        token: tp.Optional[str] = None,
         **kwargs,
     ) -> None:
         """Client for TradingView."""
@@ -71,25 +71,25 @@ class TVClient(Configured):
             self,
             username=username,
             password=password,
+            auth_token=auth_token,
             user_agent=user_agent,
-            token=token,
             **kwargs,
         )
 
-        if token is None:
-            token = self.auth(username, password, user_agent=user_agent)
+        if auth_token is None:
+            auth_token = self.auth(username, password, user_agent=user_agent)
         elif username is not None or password is not None:
-            raise ValueError("Either username and password, or token must be provided")
+            raise ValueError("Either username and password, or auth_token must be provided")
 
-        self._token = token
+        self._auth_token = auth_token
         self._ws = None
         self._session = self.generate_session()
         self._chart_session = self.generate_chart_session()
 
     @property
-    def token(self) -> str:
-        """Token."""
-        return self._token
+    def auth_token(self) -> str:
+        """Authentication token."""
+        return self._auth_token
 
     @property
     def ws(self) -> WebSocket:
@@ -236,7 +236,7 @@ class TVClient(Configured):
         interval = interval.value
 
         self.create_connection(pro_data=pro_data)
-        self.send_message("set_auth_token", [self.token])
+        self.send_message("set_auth_token", [self.auth_token])
         self.send_message("chart_create_session", [self.chart_session, ""])
         self.send_message("quote_create_session", [self.session])
         self.send_message(

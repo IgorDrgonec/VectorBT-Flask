@@ -3324,8 +3324,9 @@ class TVData(RemoteData):
 
     !!! note
         If you're getting the error "Please confirm that you are not a robot by clicking the captcha box."
-        when attempting to authenticate, use `token` instead of `username` and `password`. To get the
-        token, see [this issue](https://github.com/StreamAlpha/tvdatafeed/issues/96).
+        when attempting to authenticate, use `auth_token` instead of `username` and `password`.
+        To get the authentication token, go to TradingView, log in, visit any chart, open your console's
+        developer tools, and search for "auth_token".
 
     Usage:
         * Set up the credentials globally (optional):
@@ -3337,6 +3338,7 @@ class TVData(RemoteData):
         ...     client_config=dict(
         ...         username="YOUR_USERNAME",
         ...         password="YOUR_PASSWORD",
+        ...         auth_token="YOUR_AUTH_TOKEN",  # optional, instead of username and password
         ...         user_agent="YOUR_USER_AGENT"  # optional, see https://useragentstring.com/
         ...     )
         ... )
