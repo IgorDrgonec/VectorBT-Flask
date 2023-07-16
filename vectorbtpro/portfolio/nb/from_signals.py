@@ -6853,7 +6853,6 @@ def order_signal_func_nb(  # % line.replace("order_signal_func_nb", "signal_func
             size=order_size,
             size_type=order_size_type,
             position=c.last_position[c.col],
-            debt=c.last_debt[c.col],
             val_price=order_val_price,
             value=c.last_value[c.group] if c.cash_sharing else c.last_value[c.col],
         )
@@ -6862,7 +6861,6 @@ def order_signal_func_nb(  # % line.replace("order_signal_func_nb", "signal_func
                 size=min_order_size,
                 size_type=order_size_type,
                 position=c.last_position[c.col],
-                debt=c.last_debt[c.col],
                 val_price=order_val_price,
                 value=c.last_value[c.group] if c.cash_sharing else c.last_value[c.col],
                 as_requirement=True,
@@ -6872,7 +6870,6 @@ def order_signal_func_nb(  # % line.replace("order_signal_func_nb", "signal_func
                 size=max_order_size,
                 size_type=order_size_type,
                 position=c.last_position[c.col],
-                debt=c.last_debt[c.col],
                 val_price=order_val_price,
                 value=c.last_value[c.group] if c.cash_sharing else c.last_value[c.col],
                 as_requirement=True,
