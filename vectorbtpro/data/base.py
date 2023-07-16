@@ -23,6 +23,7 @@ from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.indexes import stack_indexes
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic import nb as generic_nb
+from vectorbtpro.generic.drawdowns import Drawdowns
 from vectorbtpro.returns.accessors import ReturnsAccessor
 from vectorbtpro.data.decorators import attach_symbol_dict_methods
 from vectorbtpro.utils import checks
@@ -63,6 +64,235 @@ class run_arg_dict(pdict):
     pass
 
 
+DataMixinT = tp.TypeVar("DataMixinT", bound="DataMixin")
+
+
+class DataMixin:
+    """Mixin class for managing data."""
+
+    @property
+    def column_wrapper(self) -> ArrayWrapper:
+        """Column wrapper."""
+        raise NotImplementedError
+
+    @property
+    def symbol_wrapper(self) -> ArrayWrapper:
+        """Symbol wrapper."""
+        raise NotImplementedError
+
+    def get(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        symbol: tp.Optional[tp.Symbol] = None,
+        columns: tp.Optional[tp.Labels] = None,
+        symbols: tp.Optional[tp.Symbols] = None,
+        **kwargs,
+    ) -> tp.MaybeTuple[tp.SeriesFrame]:
+        """Get one or more columns of one or more symbols of data."""
+        raise NotImplementedError
+
+    def get_column_index(self, label: tp.Hashable, raise_error: bool = False) -> int:
+        """Return the position of the column that matches the label."""
+
+        def _prepare_label(x):
+            if isinstance(x, tuple):
+                return tuple([_prepare_label(_x) for _x in x])
+            if isinstance(x, str):
+                return x.lower().strip().replace(" ", "_")
+            return x
+
+        label = _prepare_label(label)
+
+        found_indices = []
+        for i, c in enumerate(self.column_wrapper.columns):
+            c = _prepare_label(c)
+            if label == c:
+                found_indices.append(i)
+        if len(found_indices) == 0:
+            if raise_error:
+                raise ValueError(f"No columns match the label '{str(label)}'")
+            return -1
+        if len(found_indices) == 1:
+            return found_indices[0]
+        raise ValueError(f"Multiple columns match the label '{str(label)}'")
+
+    def get_column(self, idx_or_label: tp.Hashable, raise_error: bool = False) -> tp.Optional[tp.SeriesFrame]:
+        """Get column(s) that match a column index or label."""
+        if checks.is_int(idx_or_label):
+            return self.get(column=self.column_wrapper.columns[idx_or_label])
+        column_idx = self.get_column_index(idx_or_label, raise_error=raise_error)
+        if column_idx == -1:
+            return None
+        return self.get(column=self.column_wrapper.columns[column_idx])
+
+
+OHLCDataMixinT = tp.TypeVar("OHLCDataMixinT", bound="OHLCDataMixin")
+
+
+class OHLCDataMixin(DataMixin):
+    """Mixin class for managing OHLC data."""
+
+    @property
+    def open(self) -> tp.Optional[tp.SeriesFrame]:
+        """Open."""
+        return self.get_column("Open")
+
+    @property
+    def high(self) -> tp.Optional[tp.SeriesFrame]:
+        """High."""
+        return self.get_column("High")
+
+    @property
+    def low(self) -> tp.Optional[tp.SeriesFrame]:
+        """Low."""
+        return self.get_column("Low")
+
+    @property
+    def close(self) -> tp.Optional[tp.SeriesFrame]:
+        """Close."""
+        return self.get_column("Close")
+
+    @property
+    def volume(self) -> tp.Optional[tp.SeriesFrame]:
+        """Volume."""
+        return self.get_column("Volume")
+
+    @property
+    def trade_count(self) -> tp.Optional[tp.SeriesFrame]:
+        """Trade count."""
+        return self.get_column("Trade count")
+
+    @property
+    def vwap(self) -> tp.Optional[tp.SeriesFrame]:
+        """VWAP."""
+        return self.get_column("VWAP")
+
+    @property
+    def hlc3(self) -> tp.Optional[tp.SeriesFrame]:
+        """HLC/3."""
+        high = self.get_column("High", raise_error=True)
+        low = self.get_column("Low", raise_error=True)
+        close = self.get_column("Close", raise_error=True)
+        return (high + low + close) / 3
+
+    @property
+    def ohlc4(self) -> tp.Optional[tp.SeriesFrame]:
+        """OHLC/4."""
+        open = self.get_column("Open", raise_error=True)
+        high = self.get_column("High", raise_error=True)
+        low = self.get_column("Low", raise_error=True)
+        close = self.get_column("Close", raise_error=True)
+        return (open + high + low + close) / 4
+
+    @property
+    def ohlc(self: OHLCDataMixinT) -> OHLCDataMixinT:
+        """Return a `DataMixin` instance with the OHLC columns only."""
+        open_idx = self.get_column_index("Open", raise_error=True)
+        high_idx = self.get_column_index("High", raise_error=True)
+        low_idx = self.get_column_index("Low", raise_error=True)
+        close_idx = self.get_column_index("Close", raise_error=True)
+        return self.iloc[:, [open_idx, high_idx, low_idx, close_idx]]
+
+    @property
+    def ohlcv(self: OHLCDataMixinT) -> OHLCDataMixinT:
+        """Return a `DataMixin` instance with the OHLCV columns only."""
+        open_idx = self.get_column_index("Open", raise_error=True)
+        high_idx = self.get_column_index("High", raise_error=True)
+        low_idx = self.get_column_index("Low", raise_error=True)
+        close_idx = self.get_column_index("Close", raise_error=True)
+        volume_idx = self.get_column_index("Volume", raise_error=True)
+        return self.iloc[:, [open_idx, high_idx, low_idx, close_idx, volume_idx]]
+
+    def get_returns_acc(self, **kwargs) -> tp.Optional[tp.SeriesFrame]:
+        """Return accessor of type `vectorbtpro.returns.accessors.ReturnsAccessor`."""
+        return ReturnsAccessor.from_value(
+            self.get_column("Close", raise_error=True),
+            wrapper=self.symbol_wrapper,
+            return_values=False,
+            **kwargs,
+        )
+
+    @property
+    def returns_acc(self) -> tp.Optional[tp.SeriesFrame]:
+        """`OHLCDataMixin.get_returns_acc` with default arguments."""
+        return self.get_returns_acc()
+
+    def get_returns(self, **kwargs) -> tp.Optional[tp.SeriesFrame]:
+        """Returns."""
+        return ReturnsAccessor.from_value(
+            self.get_column("Close", raise_error=True),
+            wrapper=self.symbol_wrapper,
+            return_values=True,
+            **kwargs,
+        )
+
+    @property
+    def returns(self) -> tp.Optional[tp.SeriesFrame]:
+        """`OHLCDataMixin.get_returns` with default arguments."""
+        return self.get_returns()
+
+    def get_log_returns(self, **kwargs) -> tp.Optional[tp.SeriesFrame]:
+        """Log returns."""
+        return ReturnsAccessor.from_value(
+            self.get_column("Close", raise_error=True),
+            wrapper=self.symbol_wrapper,
+            return_values=True,
+            log_returns=True,
+            **kwargs,
+        )
+
+    @property
+    def log_returns(self) -> tp.Optional[tp.SeriesFrame]:
+        """`OHLCDataMixin.get_log_returns` with default arguments."""
+        return self.get_log_returns()
+
+    def get_daily_returns(self, **kwargs) -> tp.Optional[tp.SeriesFrame]:
+        """Daily returns."""
+        return ReturnsAccessor.from_value(
+            self.get_column("Close", raise_error=True),
+            wrapper=self.symbol_wrapper,
+            return_values=False,
+            **kwargs,
+        ).daily()
+
+    @property
+    def daily_returns(self) -> tp.Optional[tp.SeriesFrame]:
+        """`OHLCDataMixin.get_daily_returns` with default arguments."""
+        return self.get_daily_returns()
+
+    def get_daily_log_returns(self, **kwargs) -> tp.Optional[tp.SeriesFrame]:
+        """Daily log returns."""
+        return ReturnsAccessor.from_value(
+            self.get_column("Close", raise_error=True),
+            wrapper=self.symbol_wrapper,
+            return_values=False,
+            log_returns=True,
+            **kwargs,
+        ).daily()
+
+    @property
+    def daily_log_returns(self) -> tp.Optional[tp.SeriesFrame]:
+        """`OHLCDataMixin.get_daily_log_returns` with default arguments."""
+        return self.get_daily_log_returns()
+
+    def get_drawdowns(self, **kwargs) -> Drawdowns:
+        """Generate drawdown records.
+
+        See `vectorbtpro.generic.drawdowns.Drawdowns`."""
+        return Drawdowns.from_price(
+            open=self.get_column("Open", raise_error=True),
+            high=self.get_column("High", raise_error=True),
+            low=self.get_column("Low", raise_error=True),
+            close=self.get_column("Close", raise_error=True),
+            **kwargs,
+        )
+
+    @property
+    def drawdowns(self) -> Drawdowns:
+        """`OHLCDataMixin.get_drawdowns` with default arguments."""
+        return self.get_drawdowns()
+
+
 DataT = tp.TypeVar("DataT", bound="Data")
 
 
@@ -98,9 +328,11 @@ class MetaData(type(Analyzable), type(DataWithColumns)):
         "symbol_classes",
         "fetch_kwargs",
         "returned_kwargs",
+        "last_index",
+        "delisted",
     ]
 )
-class Data(Analyzable, DataWithColumns, metaclass=MetaData):
+class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
     """Class that downloads, updates, and manages data coming from a data source."""
 
     _setting_keys: tp.SettingsKeys = dict(base="data")
@@ -865,8 +1097,9 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         skip_on_error: tp.Optional[bool] = None,
         silence_warnings: tp.Optional[bool] = None,
         execute_kwargs: tp.KwargsLike = None,
+        return_raw: bool = False,
         **kwargs,
-    ) -> DataT:
+    ) -> tp.Union[DataT, tp.List[tp.Any]]:
         """Fetch data of each symbol using `Data.fetch_symbol` and pass to `Data.from_data`.
 
         Iteration over symbols is done using `vectorbtpro.utils.execution.execute`.
@@ -897,6 +1130,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
                 Will also forward this argument to `Data.fetch_symbol` if in the signature.
             execute_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.execution.execute`.
+            return_raw (bool): Whether to return the raw outputs.
             **kwargs: Passed to `Data.fetch_symbol`.
 
                 If two symbols require different keyword arguments, pass `symbol_dict` for each argument.
@@ -969,6 +1203,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             fetch_kwargs[symbol] = symbol_fetch_kwargs
 
         outputs = execute(funcs_args, n_calls=len(symbols), progress_desc=symbols, **execute_kwargs)
+        if return_raw:
+            return outputs
 
         data = symbol_dict()
         returned_kwargs = symbol_dict()
@@ -1091,8 +1327,9 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         skip_on_error: tp.Optional[bool] = None,
         silence_warnings: tp.Optional[bool] = None,
         execute_kwargs: tp.KwargsLike = None,
+        return_raw: bool = False,
         **kwargs,
-    ) -> DataT:
+    ) -> tp.Union[DataT, tp.List[tp.Any]]:
         """Fetch additional data of each symbol using `Data.update_symbol`.
 
         Args:
@@ -1102,6 +1339,7 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
 
                 Will also forward this argument to `Data.update_symbol` if accepted by `Data.fetch_symbol`.
             execute_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.execution.execute`.
+            return_raw (bool): Whether to return the raw outputs.
             **kwargs: Passed to `Data.update_symbol`.
 
                 If two symbols require different keyword arguments, pass `symbol_dict` for each argument.
@@ -1143,6 +1381,8 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 symbol_indices.append(i)
 
         outputs = execute(funcs_args, n_calls=len(self.symbols), progress_desc=self.symbols, **execute_kwargs)
+        if return_raw:
+            return outputs
 
         new_data = symbol_dict()
         new_last_index = symbol_dict()
@@ -1291,7 +1531,47 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
             last_index=new_last_index,
         )
 
+    # ############# Concatenation ############# #
+
+    def concat(
+        self,
+        symbols: tp.Optional[tp.Symbols] = None,
+        index_stack_kwargs: tp.KwargsLike = None,
+    ) -> dict:
+        """Return a dict of Series/DataFrames with symbols as columns, keyed by column name."""
+        symbol_wrapper = self.get_symbol_wrapper(symbols=symbols, index_stack_kwargs=index_stack_kwargs)
+        if symbols is None:
+            symbols = self.symbols
+
+        new_data = {}
+        first_data = self.data[symbols[0]]
+        if self.single_symbol:
+            if checks.is_series(first_data):
+                new_data[first_data.name] = symbol_wrapper.wrap(first_data.values, zero_to_none=False)
+            else:
+                for c in first_data.columns:
+                    new_data[c] = symbol_wrapper.wrap(first_data[c].values, zero_to_none=False)
+        else:
+            if checks.is_series(first_data):
+                columns = pd.Index([first_data.name])
+            else:
+                columns = first_data.columns
+            for c in columns:
+                col_data = []
+                for s in symbols:
+                    if checks.is_series(self.data[s]):
+                        col_data.append(self.data[s].values)
+                    else:
+                        col_data.append(self.data[s][c].values)
+                new_data[c] = symbol_wrapper.wrap(np.column_stack(col_data), zero_to_none=False)
+
+        return new_data
+
     # ############# Getting ############# #
+
+    @property
+    def column_wrapper(self) -> ArrayWrapper:
+        return self.wrapper
 
     def get_symbol_wrapper(
         self,
@@ -1343,54 +1623,25 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
         )
 
     @property
-    def symbol_wrapper(self):
-        """`Data.get_symbol_wrapper` with default arguments."""
+    def symbol_wrapper(self) -> ArrayWrapper:
         return self.get_symbol_wrapper()
-
-    def concat(
-        self,
-        symbols: tp.Optional[tp.Symbols] = None,
-        index_stack_kwargs: tp.KwargsLike = None,
-    ) -> dict:
-        """Return a dict of Series/DataFrames with symbols as columns, keyed by column name."""
-        symbol_wrapper = self.get_symbol_wrapper(symbols=symbols, index_stack_kwargs=index_stack_kwargs)
-        if symbols is None:
-            symbols = self.symbols
-
-        new_data = {}
-        first_data = self.data[symbols[0]]
-        if self.single_symbol:
-            if checks.is_series(first_data):
-                new_data[first_data.name] = symbol_wrapper.wrap(first_data.values, zero_to_none=False)
-            else:
-                for c in first_data.columns:
-                    new_data[c] = symbol_wrapper.wrap(first_data[c].values, zero_to_none=False)
-        else:
-            if checks.is_series(first_data):
-                columns = pd.Index([first_data.name])
-            else:
-                columns = first_data.columns
-            for c in columns:
-                col_data = []
-                for s in symbols:
-                    if checks.is_series(self.data[s]):
-                        col_data.append(self.data[s].values)
-                    else:
-                        col_data.append(self.data[s][c].values)
-                new_data[c] = symbol_wrapper.wrap(np.column_stack(col_data), zero_to_none=False)
-
-        return new_data
 
     def get(
         self,
-        columns: tp.Optional[tp.Union[tp.Label, tp.Labels]] = None,
-        symbols: tp.Union[None, tp.Symbol, tp.Symbols] = None,
+        column: tp.Optional[tp.Label] = None,
+        symbol: tp.Optional[tp.Symbol] = None,
+        columns: tp.Optional[tp.Labels] = None,
+        symbols: tp.Optional[tp.Symbols] = None,
         **kwargs,
     ) -> tp.MaybeTuple[tp.SeriesFrame]:
-        """Get one or more columns of one or more symbols of data.
-
-        If one symbol, returns data for that symbol. If multiple symbols, performs concatenation
-        first and returns a DataFrame if one column and a tuple of DataFrames if a list of columns passed."""
+        if column is not None and columns is not None:
+            raise ValueError("Cannot provide both column and columns")
+        if symbol is not None and symbols is not None:
+            raise ValueError("Cannot provide both symbol and symbols")
+        if column is not None:
+            columns = column
+        if symbol is not None:
+            symbols = symbol
         if symbols is None:
             single_symbol = self.single_symbol
             symbols = self.symbols
@@ -1414,158 +1665,6 @@ class Data(Analyzable, DataWithColumns, metaclass=MetaData):
                 return tuple([concat_data[c] for c in columns])
             return concat_data[columns]
         return tuple(concat_data.values())
-
-    def get_column_index(self, label: tp.Hashable, raise_error: bool = False) -> tp.MaybeList[int]:
-        """Return one or more indexes of the columns that match the label."""
-
-        def _prepare_label(x):
-            if isinstance(x, tuple):
-                return tuple([_prepare_label(_x) for _x in x])
-            if isinstance(x, str):
-                return x.lower().strip().replace(" ", "_")
-            return x
-
-        label = _prepare_label(label)
-
-        found_indices = []
-        for i, c in enumerate(self.wrapper.columns):
-            c = _prepare_label(c)
-            if label == c:
-                found_indices.append(i)
-        if len(found_indices) == 0:
-            if raise_error:
-                raise ValueError(f"Column {label} not found")
-            return -1
-        if len(found_indices) == 1:
-            return found_indices[0]
-        return found_indices
-
-    def get_column(self, idx_or_label: tp.Hashable, raise_error: bool = False) -> tp.Optional[tp.SeriesFrame]:
-        """Get column(s) that match a column index or label."""
-        if checks.is_int(idx_or_label):
-            return self.get(columns=self.wrapper.columns[idx_or_label])
-        column_idx = self.get_column_index(idx_or_label, raise_error=raise_error)
-        if column_idx == -1:
-            return None
-        return self.get(columns=self.wrapper.columns[column_idx])
-
-    @property
-    def open(self) -> tp.Optional[tp.SeriesFrame]:
-        """Open."""
-        return self.get_column("Open")
-
-    @property
-    def high(self) -> tp.Optional[tp.SeriesFrame]:
-        """High."""
-        return self.get_column("High")
-
-    @property
-    def low(self) -> tp.Optional[tp.SeriesFrame]:
-        """Low."""
-        return self.get_column("Low")
-
-    @property
-    def close(self) -> tp.Optional[tp.SeriesFrame]:
-        """Close."""
-        return self.get_column("Close")
-
-    @property
-    def volume(self) -> tp.Optional[tp.SeriesFrame]:
-        """Volume."""
-        return self.get_column("Volume")
-
-    @property
-    def trade_count(self) -> tp.Optional[tp.SeriesFrame]:
-        """Trade count."""
-        return self.get_column("Trade count")
-
-    @property
-    def vwap(self) -> tp.Optional[tp.SeriesFrame]:
-        """VWAP."""
-        return self.get_column("VWAP")
-
-    @property
-    def hlc3(self) -> tp.Optional[tp.SeriesFrame]:
-        """HLC/3."""
-        high = self.get_column("High", raise_error=True)
-        low = self.get_column("Low", raise_error=True)
-        close = self.get_column("Close", raise_error=True)
-        return (high + low + close) / 3
-
-    @property
-    def ohlc4(self) -> tp.Optional[tp.SeriesFrame]:
-        """OHLC/4."""
-        open = self.get_column("Open", raise_error=True)
-        high = self.get_column("High", raise_error=True)
-        low = self.get_column("Low", raise_error=True)
-        close = self.get_column("Close", raise_error=True)
-        return (open + high + low + close) / 4
-
-    @property
-    def ohlc(self: DataT) -> DataT:
-        """Return the `Data` instance with the OHLC columns only."""
-        open_idx = self.get_column_index("Open", raise_error=True)
-        high_idx = self.get_column_index("High", raise_error=True)
-        low_idx = self.get_column_index("Low", raise_error=True)
-        close_idx = self.get_column_index("Close", raise_error=True)
-        return self.iloc[:, [open_idx, high_idx, low_idx, close_idx]]
-
-    @property
-    def ohlcv(self: DataT) -> DataT:
-        """Return the `Data` instance with the OHLCV columns only."""
-        open_idx = self.get_column_index("Open", raise_error=True)
-        high_idx = self.get_column_index("High", raise_error=True)
-        low_idx = self.get_column_index("Low", raise_error=True)
-        close_idx = self.get_column_index("Close", raise_error=True)
-        volume_idx = self.get_column_index("Volume", raise_error=True)
-        return self.iloc[:, [open_idx, high_idx, low_idx, close_idx, volume_idx]]
-
-    @property
-    def returns_acc(self) -> tp.Optional[tp.SeriesFrame]:
-        """Return accessor of type `vectorbtpro.returns.accessors.ReturnsAccessor`."""
-        return ReturnsAccessor.from_value(
-            self.get_column("Close", raise_error=True),
-            wrapper=self.symbol_wrapper,
-            return_values=False,
-        )
-
-    @property
-    def returns(self) -> tp.Optional[tp.SeriesFrame]:
-        """Returns."""
-        return ReturnsAccessor.from_value(
-            self.get_column("Close", raise_error=True),
-            wrapper=self.symbol_wrapper,
-            return_values=True,
-        )
-
-    @property
-    def log_returns(self) -> tp.Optional[tp.SeriesFrame]:
-        """Log returns."""
-        return ReturnsAccessor.from_value(
-            self.get_column("Close", raise_error=True),
-            wrapper=self.symbol_wrapper,
-            return_values=True,
-            log_returns=True,
-        )
-
-    @property
-    def daily_returns(self) -> tp.Optional[tp.SeriesFrame]:
-        """Daily returns."""
-        return ReturnsAccessor.from_value(
-            self.get_column("Close", raise_error=True),
-            wrapper=self.symbol_wrapper,
-            return_values=False,
-        ).daily()
-
-    @property
-    def daily_log_returns(self) -> tp.Optional[tp.SeriesFrame]:
-        """Daily log returns."""
-        return ReturnsAccessor.from_value(
-            self.get_column("Close", raise_error=True),
-            wrapper=self.symbol_wrapper,
-            return_values=False,
-            log_returns=True,
-        ).daily()
 
     # ############# Selecting ############# #
 

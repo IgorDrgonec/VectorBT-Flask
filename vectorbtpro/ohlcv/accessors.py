@@ -14,8 +14,8 @@ The accessors inherit `vectorbtpro.generic.accessors`.
 ## Column names
 
 By default, vectorbt searches for columns with names 'open', 'high', 'low', 'close', and 'volume'
-(case doesn't matter). You can change the naming either using `column_names` in
-`vectorbtpro._settings.ohlcv`, or by providing `column_names` directly to the accessor.
+(case doesn't matter). You can change the naming either using `column_map` in
+`vectorbtpro._settings.ohlcv`, or by providing `column_map` directly to the accessor.
 
 ```pycon
 >>> import pandas as pd
@@ -33,14 +33,14 @@ By default, vectorbt searches for columns with names 'open', 'high', 'low', 'clo
 >>> df.vbt.ohlcv.get_column('open')
 None
 
->>> my_column_names = dict(
-...     open='my_open1',
-...     high='my_high2',
-...     low='my_low3',
-...     close='my_close4',
-...     volume='my_volume5',
-... )
->>> ohlcv_acc = df.vbt.ohlcv(freq='d', column_names=my_column_names)
+>>> my_column_map = {
+...     "my_open1": "Open",
+...     "my_high2": "High",
+...     "my_low3": "Low",
+...     "my_close4": "Close",
+...     "my_volume5": "Volume",
+... }
+>>> ohlcv_acc = df.vbt.ohlcv(freq='d', column_map=my_column_map)
 >>> ohlcv_acc.get_column('open')
 0    2.0
 1    3.0
@@ -93,8 +93,9 @@ from vectorbtpro.accessors import register_df_vbt_accessor
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import GenericAccessor, GenericDFAccessor
-from vectorbtpro.generic.drawdowns import Drawdowns
+from vectorbtpro.utils.decorators import class_or_instanceproperty
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
+from vectorbtpro.data.base import OHLCDataMixin
 
 __all__ = [
     "OHLCVDFAccessor",
@@ -107,93 +108,73 @@ OHLCVDFAccessorT = tp.TypeVar("OHLCVDFAccessorT", bound="OHLCVDFAccessor")
 
 
 @register_df_vbt_accessor("ohlcv")
-class OHLCVDFAccessor(GenericDFAccessor):
+class OHLCVDFAccessor(OHLCDataMixin, GenericDFAccessor):
     """Accessor on top of OHLCV data. For DataFrames only.
 
     Accessible via `pd.DataFrame.vbt.ohlcv`."""
 
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (GenericDFAccessor._expected_keys or set()) | {
-        "column_names",
+        "column_map",
     }
 
     def __init__(
         self,
         wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
         obj: tp.Optional[tp.ArrayLike] = None,
-        column_names: tp.KwargsLike = None,
+        column_map: tp.KwargsLike = None,
         **kwargs,
     ) -> None:
-        GenericDFAccessor.__init__(self, wrapper, obj=obj, column_names=column_names, **kwargs)
+        GenericDFAccessor.__init__(self, wrapper, obj=obj, column_map=column_map, **kwargs)
 
-        self._column_names = column_names
+        self._column_map = column_map
+
+    @class_or_instanceproperty
+    def df_accessor_cls(cls_or_self) -> tp.Type["OHLCVDFAccessor"]:
+        """Accessor class for `pd.DataFrame`."""
+        return OHLCVDFAccessor
 
     @property
-    def column_names(self) -> tp.Kwargs:
+    def column_map(self) -> tp.Kwargs:
         """Column names."""
         from vectorbtpro._settings import settings
 
         ohlcv_cfg = settings["ohlcv"]
 
-        return merge_dicts(ohlcv_cfg["column_names"], self._column_names)
-
-    def get_column(self, col_name: str) -> tp.Optional[tp.Series]:
-        """Get column from `OHLCVDFAccessor.column_names`."""
-        df_column_names = self.obj.columns.str.lower().tolist()
-        col_name = self.column_names[col_name].lower()
-        if col_name not in df_column_names:
-            return None
-        return self.obj.iloc[:, df_column_names.index(col_name)]
+        return merge_dicts(ohlcv_cfg["column_map"], self._column_map)
 
     @property
-    def open(self) -> tp.Optional[tp.Series]:
-        """Open."""
-        return self.get_column("open")
+    def column_wrapper(self) -> ArrayWrapper:
+        new_columns = self.wrapper.columns.map(lambda x: self.column_map[x] if x in self.column_map else x)
+        return self.wrapper.replace(columns=new_columns)
 
     @property
-    def high(self) -> tp.Optional[tp.Series]:
-        """High."""
-        return self.get_column("high")
+    def symbol_wrapper(self) -> ArrayWrapper:
+        return ArrayWrapper([None], [None], 1)
 
-    @property
-    def low(self) -> tp.Optional[tp.Series]:
-        """Low."""
-        return self.get_column("low")
-
-    @property
-    def close(self) -> tp.Optional[tp.Series]:
-        """Close."""
-        return self.get_column("close")
-
-    @property
-    def volume(self) -> tp.Optional[tp.Series]:
-        """Volume."""
-        return self.get_column("volume")
-
-    @property
-    def hlc3(self) -> tp.Optional[tp.Series]:
-        """HLC/3."""
-        return (self.high + self.low + self.close) / 3
-
-    @property
-    def ohlc4(self) -> tp.Optional[tp.Series]:
-        """OHLC/4."""
-        return (self.open + self.high + self.low + self.close) / 4
-
-    @property
-    def ohlc(self) -> tp.Optional[tp.Frame]:
-        """Open, high, low, and close series."""
-        to_concat = []
-        if self.open is not None:
-            to_concat.append(self.open)
-        if self.high is not None:
-            to_concat.append(self.high)
-        if self.low is not None:
-            to_concat.append(self.low)
-        if self.close is not None:
-            to_concat.append(self.close)
-        if len(to_concat) == 0:
-            return None
-        return pd.concat(to_concat, axis=1)
+    def get(
+        self,
+        column: tp.Optional[tp.Label] = None,
+        symbol: tp.Optional[tp.Symbol] = None,
+        columns: tp.Optional[tp.Labels] = None,
+        symbols: tp.Optional[tp.Symbols] = None,
+        **kwargs,
+    ) -> tp.MaybeTuple[tp.SeriesFrame]:
+        if column is not None and columns is not None:
+            raise ValueError("Cannot provide both column and columns")
+        if symbol is not None or symbols is not None:
+            raise ValueError("Cannot provide symbol or symbols")
+        if column is not None:
+            columns = column
+        if columns is None:
+            return self.obj
+        if isinstance(columns, list):
+            new_columns = []
+            for x in columns:
+                new_columns.append(self.wrapper.columns[self.get_column_index(x, raise_error=True)])
+            columns = new_columns
+        else:
+            columns = self.wrapper.columns[self.get_column_index(columns, raise_error=True)]
+        return self.obj[columns]
 
     # ############# Resampling ############# #
 
@@ -202,62 +183,38 @@ class OHLCVDFAccessor(GenericDFAccessor):
         if wrapper_meta is None:
             wrapper_meta = self.wrapper.resample_meta(*args, **kwargs)
         sr_dct = {}
-        for column in self.obj.columns:
-            found = False
-            for k, v in self.column_names.items():
-                if column.lower() == v.lower():
-                    if k == "open":
-                        sr_dct[column] = self.obj[column].vbt.resample_apply(
-                            wrapper_meta["resampler"],
-                            generic_nb.first_reduce_nb,
-                        )
-                    elif k == "high":
-                        sr_dct[column] = self.obj[column].vbt.resample_apply(
-                            wrapper_meta["resampler"],
-                            generic_nb.max_reduce_nb,
-                        )
-                    elif k == "low":
-                        sr_dct[column] = self.obj[column].vbt.resample_apply(
-                            wrapper_meta["resampler"],
-                            generic_nb.min_reduce_nb,
-                        )
-                    elif k == "close":
-                        sr_dct[column] = self.obj[column].vbt.resample_apply(
-                            wrapper_meta["resampler"],
-                            generic_nb.last_reduce_nb,
-                        )
-                    elif k == "volume":
-                        sr_dct[column] = self.obj[column].vbt.resample_apply(
-                            wrapper_meta["resampler"],
-                            generic_nb.sum_reduce_nb,
-                        )
-                    else:
-                        raise ValueError(f"Unknown key '{k}' in column_names")
-                    found = True
-                    break
-            if not found:
+        for column in self.column_wrapper.columns:
+            if isinstance(column, str) and column.lower() == "open":
+                sr_dct[column] = self.obj[column].vbt.resample_apply(
+                    wrapper_meta["resampler"],
+                    generic_nb.first_reduce_nb,
+                )
+            elif isinstance(column, str) and column.lower() == "high":
+                sr_dct[column] = self.obj[column].vbt.resample_apply(
+                    wrapper_meta["resampler"],
+                    generic_nb.max_reduce_nb,
+                )
+            elif isinstance(column, str) and column.lower() == "low":
+                sr_dct[column] = self.obj[column].vbt.resample_apply(
+                    wrapper_meta["resampler"],
+                    generic_nb.min_reduce_nb,
+                )
+            elif isinstance(column, str) and column.lower() == "close":
+                sr_dct[column] = self.obj[column].vbt.resample_apply(
+                    wrapper_meta["resampler"],
+                    generic_nb.last_reduce_nb,
+                )
+            elif isinstance(column, str) and column.lower() == "volume":
+                sr_dct[column] = self.obj[column].vbt.resample_apply(
+                    wrapper_meta["resampler"],
+                    generic_nb.sum_reduce_nb,
+                )
+            else:
                 raise ValueError(f"Cannot match column '{column}'")
         new_obj = pd.DataFrame(sr_dct)
         return self.replace(
             wrapper=wrapper_meta["new_wrapper"],
             obj=new_obj,
-        )
-
-    @property
-    def drawdowns(self) -> Drawdowns:
-        """`OHLCVDFAccessor.get_drawdowns` with default arguments."""
-        return self.get_drawdowns()
-
-    def get_drawdowns(self, **kwargs) -> Drawdowns:
-        """Generate drawdown records.
-
-        See `vectorbtpro.generic.drawdowns.Drawdowns`."""
-        return Drawdowns.from_price(
-            open=self.open,
-            high=self.high,
-            low=self.low,
-            close=self.close,
-            **kwargs,
         )
 
     # ############# Stats ############# #

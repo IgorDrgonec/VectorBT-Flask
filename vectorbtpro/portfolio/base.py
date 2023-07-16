@@ -22,7 +22,7 @@ from vectorbtpro.base.reshaping import (
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.base.indexes import ExceptLevel
-from vectorbtpro.data.base import Data
+from vectorbtpro.data.base import OHLCDataMixin, Data
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.drawdowns import Drawdowns
@@ -2300,7 +2300,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_orders(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data, FOPreparer, PFPrepResult],
+        close: tp.Union[tp.ArrayLike, OHLCDataMixin, FOPreparer, PFPrepResult],
         size: tp.Optional[tp.ArrayLike] = None,
         size_type: tp.Optional[tp.ArrayLike] = None,
         direction: tp.Optional[tp.ArrayLike] = None,
@@ -2359,12 +2359,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         Prepared by `vectorbtpro.portfolio.preparing.FOPreparer`.
 
         Args:
-            close (array_like, Data, FOPreparer, or PFPrepResult): Latest asset price at each time step.
+            close (array_like, OHLCDataMixin, FOPreparer, or PFPrepResult): Latest asset price at each time step.
                 Will broadcast.
 
                 Used for calculating unrealized PnL and portfolio value.
 
-                If an instance of `vectorbtpro.data.base.Data`, will extract the open, high, low, and close price.
+                If an instance of `vectorbtpro.data.base.OHLCDataMixin`, will extract the open, high, low, and close price.
                 If an instance of `vectorbtpro.portfolio.preparing.FOPreparer`, will use it as a preparer.
                 If an instance of `vectorbtpro.portfolio.preparing.PFPrepResult`, will use it as a preparer result.
             size (float or array_like): Size to order.
@@ -2769,7 +2769,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             del local_kwargs["return_preparer"]
             del local_kwargs["return_prep_result"]
             del local_kwargs["return_sim_out"]
-            if isinstance(close, (Data, str)):
+            if isinstance(close, (OHLCDataMixin, str)):
                 local_kwargs["data"] = close
                 local_kwargs["close"] = None
             preparer = FOPreparer(**local_kwargs)
@@ -2790,7 +2790,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_signals(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data, FSPreparer, PFPrepResult],
+        close: tp.Union[tp.ArrayLike, OHLCDataMixin, FSPreparer, PFPrepResult],
         entries: tp.Optional[tp.ArrayLike] = None,
         exits: tp.Optional[tp.ArrayLike] = None,
         *,
@@ -2909,7 +2909,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         Prepared by `vectorbtpro.portfolio.preparing.FSPreparer`.
 
         Args:
-            close (array_like, Data, FSPreparer, or PFPrepResult): See `Portfolio.from_orders`.
+            close (array_like, OHLCDataMixin, FSPreparer, or PFPrepResult): See `Portfolio.from_orders`.
             entries (array_like of bool): Boolean array of entry signals.
                 Defaults to True if all other signal arrays are not set, otherwise False. Will broadcast.
 
@@ -3656,7 +3656,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             del local_kwargs["return_preparer"]
             del local_kwargs["return_prep_result"]
             del local_kwargs["return_sim_out"]
-            if isinstance(close, (Data, str)):
+            if isinstance(close, (OHLCDataMixin, str)):
                 local_kwargs["data"] = close
                 local_kwargs["close"] = None
             preparer = FSPreparer(**local_kwargs)
@@ -3677,7 +3677,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_holding(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data],
+        close: tp.Union[tp.ArrayLike, OHLCDataMixin],
         direction: tp.Optional[int] = None,
         at_first_valid_in: tp.Optional[str] = "close",
         close_at_end: tp.Optional[bool] = None,
@@ -3747,7 +3747,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_random_signals(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data],
+        close: tp.Union[tp.ArrayLike, OHLCDataMixin],
         n: tp.Optional[tp.ArrayLike] = None,
         prob: tp.Optional[tp.ArrayLike] = None,
         entry_prob: tp.Optional[tp.ArrayLike] = None,
@@ -3812,7 +3812,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         portfolio_cfg = settings["portfolio"]
 
-        if isinstance(close, (Data, str)):
+        if isinstance(close, (OHLCDataMixin, str)):
             if isinstance(close, str):
                 close = Data.from_data_str(close)
             data = close
@@ -3867,7 +3867,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_optimizer(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data],
+        close: tp.Union[tp.ArrayLike, OHLCDataMixin],
         optimizer: PortfolioOptimizer,
         pf_method: str = "from_orders",
         squeeze_groups: bool = True,
@@ -3977,7 +3977,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_order_func(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data, FOFPreparer, PFPrepResult],
+        close: tp.Union[tp.ArrayLike, OHLCDataMixin, FOFPreparer, PFPrepResult],
         *,
         init_cash: tp.Optional[tp.ArrayLike] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
@@ -4055,10 +4055,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         Prepared by `vectorbtpro.portfolio.preparing.FOFPreparer`.
 
         Args:
-            close (array_like, Data, FOFPreparer, or PFPrepResult): Latest asset price at each time step.
+            close (array_like, OHLCDataMixin, FOFPreparer, or PFPrepResult): Latest asset price at each time step.
                 Will broadcast.
 
-                If an instance of `vectorbtpro.data.base.Data`, will extract the open, high,
+                If an instance of `vectorbtpro.data.base.OHLCDataMixin`, will extract the open, high,
                 low, and close price.
 
                 Used for calculating unrealized PnL and portfolio value.
@@ -4567,7 +4567,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             del local_kwargs["return_preparer"]
             del local_kwargs["return_prep_result"]
             del local_kwargs["return_sim_out"]
-            if isinstance(close, (Data, str)):
+            if isinstance(close, (OHLCDataMixin, str)):
                 local_kwargs["data"] = close
                 local_kwargs["close"] = None
             preparer = FOFPreparer(**local_kwargs)
@@ -4588,7 +4588,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_def_order_func(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data, FDOFPreparer, PFPrepResult],
+        close: tp.Union[tp.ArrayLike, OHLCDataMixin, FDOFPreparer, PFPrepResult],
         size: tp.Optional[tp.ArrayLike] = None,
         size_type: tp.Optional[tp.ArrayLike] = None,
         direction: tp.Optional[tp.ArrayLike] = None,
@@ -4716,7 +4716,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             del local_kwargs["return_preparer"]
             del local_kwargs["return_prep_result"]
             del local_kwargs["return_sim_out"]
-            if isinstance(close, (Data, str)):
+            if isinstance(close, (OHLCDataMixin, str)):
                 local_kwargs["data"] = close
                 local_kwargs["close"] = None
             preparer = FDOFPreparer(**local_kwargs)
@@ -7962,7 +7962,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
     @classmethod
     def override_in_output_config_doc(cls, __pdoc__: dict, source_cls: tp.Optional[type] = None) -> None:
-        """Call this method on each subclass that overrides `Data.in_output_config`."""
+        """Call this method on each subclass that overrides `Portfolio.in_output_config`."""
         __pdoc__[cls.__name__ + ".in_output_config"] = cls.build_in_output_config_doc(source_cls=source_cls)
 
 
