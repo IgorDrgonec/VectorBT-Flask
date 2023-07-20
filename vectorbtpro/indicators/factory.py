@@ -4826,6 +4826,11 @@ Args:
             **kwargs,
         )
 
+    @classmethod
+    def list_wqa101_indicators(cls) -> tp.List[str]:
+        """List all WorldQuant's 101 alpha indicators."""
+        return [str(i) for i in range(1, 102)]
+
 
 IF = IndicatorFactory
 """Shortcut for `IndicatorFactory`."""
