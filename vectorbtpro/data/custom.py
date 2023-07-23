@@ -141,7 +141,7 @@ class SyntheticData(CustomData):
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.synthetic")
 
     @classmethod
-    def generate_symbol(cls, symbol: tp.Symbol, index: tp.Index, **kwargs) -> tp.SeriesFrame:
+    def generate_symbol(cls, symbol: tp.Symbol, index: tp.Index, **kwargs) -> tp.SymbolData:
         """Abstract method to generate data of a symbol."""
         raise NotImplementedError
 
@@ -218,7 +218,7 @@ class SyntheticData(CustomData):
             raise ValueError("Date range is empty")
         return cls.generate_symbol(symbol, index, **kwargs), dict(tz_convert=tz, freq=freq)
 
-    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SymbolData:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
         fetch_kwargs["start"] = self.last_index[symbol]
         kwargs = merge_dicts(fetch_kwargs, kwargs)
@@ -235,7 +235,7 @@ class RandomData(SyntheticData):
         cls,
         symbol: tp.Symbol,
         index: tp.Index,
-        columns: tp.Union[tp.Hashable, tp.IndexLike] = None,
+        features: tp.Union[tp.Hashable, tp.IndexLike] = None,
         start_value: tp.Optional[float] = None,
         mean: tp.Optional[float] = None,
         std: tp.Optional[float] = None,
@@ -243,13 +243,13 @@ class RandomData(SyntheticData):
         seed: tp.Optional[int] = None,
         jitted: tp.JittedOption = None,
         **kwargs,
-    ) -> tp.SeriesFrame:
+    ) -> tp.SymbolData:
         """Generate a symbol.
 
         Args:
             symbol (str): Symbol.
             index (pd.Index): Pandas index.
-            columns (hashable or index_like): Column labels.
+            features (hashable or index_like): Feature names.
 
                 Provide a single value (hashable) to make a Series.
             start_value (float): Value at time 0.
@@ -268,13 +268,13 @@ class RandomData(SyntheticData):
         """
         random_cfg = cls.get_settings(key_id="custom")
 
-        if checks.is_hashable(columns):
-            columns = [columns]
+        if checks.is_hashable(features):
+            features = [features]
             make_series = True
         else:
             make_series = False
-        if not isinstance(columns, pd.Index):
-            columns = pd.Index(columns)
+        if not isinstance(features, pd.Index):
+            features = pd.Index(features)
         if start_value is None:
             start_value = random_cfg["start_value"]
         if mean is None:
@@ -290,17 +290,17 @@ class RandomData(SyntheticData):
 
         func = jit_reg.resolve_option(nb.generate_random_data_nb, jitted)
         out = func(
-            (len(index), len(columns)),
+            (len(index), len(features)),
             start_value=to_1d_array(start_value),
             mean=to_1d_array(mean),
             std=to_1d_array(std),
             symmetric=to_1d_array(symmetric),
         )
         if make_series:
-            return pd.Series(out[:, 0], index=index, name=columns[0])
-        return pd.DataFrame(out, index=index, columns=columns)
+            return pd.Series(out[:, 0], index=index, name=features[0])
+        return pd.DataFrame(out, index=index, columns=features)
 
-    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SymbolData:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
         fetch_kwargs["start"] = self.last_index[symbol]
         _ = fetch_kwargs.pop("start_value", None)
@@ -330,7 +330,7 @@ class RandomOHLCData(RandomData):
         jitted: tp.JittedOption = None,
         template_context: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.SeriesFrame:
+    ) -> tp.SymbolData:
         """Generate a symbol.
 
         Args:
@@ -380,7 +380,7 @@ class RandomOHLCData(RandomData):
         out = func(ticks, n_ticks)
         return pd.DataFrame(out, index=index, columns=["Open", "High", "Low", "Close"])
 
-    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SymbolData:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
         fetch_kwargs["start"] = self.last_index[symbol]
         _ = fetch_kwargs.pop("start_value", None)
@@ -400,7 +400,7 @@ class GBMData(SyntheticData):
         cls,
         symbol: tp.Symbol,
         index: tp.Index,
-        columns: tp.Union[tp.Hashable, tp.IndexLike] = None,
+        features: tp.Union[tp.Hashable, tp.IndexLike] = None,
         start_value: tp.Optional[float] = None,
         mean: tp.Optional[float] = None,
         std: tp.Optional[float] = None,
@@ -408,13 +408,13 @@ class GBMData(SyntheticData):
         seed: tp.Optional[int] = None,
         jitted: tp.JittedOption = None,
         **kwargs,
-    ) -> tp.SeriesFrame:
+    ) -> tp.SymbolData:
         """Generate a symbol.
 
         Args:
             symbol (str): Symbol.
             index (pd.Index): Pandas index.
-            columns (hashable or index_like): Column labels.
+            features (hashable or index_like): Feature names.
 
                 Provide a single value (hashable) to make a Series.
             start_value (float): Value at time 0.
@@ -433,13 +433,13 @@ class GBMData(SyntheticData):
         """
         gbm_cfg = cls.get_settings(key_id="custom")
 
-        if checks.is_hashable(columns):
-            columns = [columns]
+        if checks.is_hashable(features):
+            features = [features]
             make_series = True
         else:
             make_series = False
-        if not isinstance(columns, pd.Index):
-            columns = pd.Index(columns)
+        if not isinstance(features, pd.Index):
+            features = pd.Index(features)
         if start_value is None:
             start_value = gbm_cfg["start_value"]
         if mean is None:
@@ -455,15 +455,15 @@ class GBMData(SyntheticData):
 
         func = jit_reg.resolve_option(nb.generate_gbm_data_nb, jitted)
         out = func(
-            (len(index), len(columns)),
+            (len(index), len(features)),
             start_value=to_1d_array(start_value),
             mean=to_1d_array(mean),
             std=to_1d_array(std),
             dt=to_1d_array(dt),
         )
         if make_series:
-            return pd.Series(out[:, 0], index=index, name=columns[0])
-        return pd.DataFrame(out, index=index, columns=columns)
+            return pd.Series(out[:, 0], index=index, name=features[0])
+        return pd.DataFrame(out, index=index, columns=features)
 
 
 class GBMOHLCData(GBMData):
@@ -486,7 +486,7 @@ class GBMOHLCData(GBMData):
         jitted: tp.JittedOption = None,
         template_context: tp.KwargsLike = None,
         **kwargs,
-    ) -> tp.SeriesFrame:
+    ) -> tp.SymbolData:
         """Generate a symbol.
 
         Args:
@@ -542,7 +542,7 @@ class GBMOHLCData(GBMData):
         out = func(ticks, n_ticks)
         return pd.DataFrame(out, index=index, columns=["Open", "High", "Low", "Close"])
 
-    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SymbolData:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
         fetch_kwargs["start"] = self.last_index[symbol]
         _ = fetch_kwargs.pop("start_value", None)
@@ -893,7 +893,7 @@ class CSVData(FileData):
             start_row += mask_indices[0]
         return obj, dict(last_row=start_row - header_rows + len(obj.index) - 1, tz_convert=tz)
 
-    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Tuple[tp.SeriesFrame, dict]:
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Tuple[tp.SymbolData, dict]:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
         fetch_kwargs["start_row"] = self.returned_kwargs[symbol]["last_row"]
         kwargs = merge_dicts(fetch_kwargs, kwargs)
@@ -1147,7 +1147,7 @@ class HDFData(FileData):
             tz = obj.index.tzinfo
         return obj, dict(last_row=start_row + len(obj.index) - 1, tz_convert=tz)
 
-    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Tuple[tp.SeriesFrame, dict]:
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Tuple[tp.SymbolData, dict]:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
         fetch_kwargs["start_row"] = self.returned_kwargs[symbol]["last_row"]
         kwargs = merge_dicts(fetch_kwargs, kwargs)
@@ -1198,7 +1198,7 @@ class YFData(RemoteData):
 
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.yf")
 
-    _column_config: tp.ClassVar[Config] = HybridConfig(
+    _feature_config: tp.ClassVar[Config] = HybridConfig(
         {
             "Dividends": dict(
                 resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(
@@ -1216,8 +1216,8 @@ class YFData(RemoteData):
     )
 
     @property
-    def column_config(self) -> Config:
-        return self._column_config
+    def feature_config(self) -> Config:
+        return self._feature_config
 
     @classmethod
     def fetch_symbol(
@@ -1313,7 +1313,7 @@ class YFData(RemoteData):
         return df, dict(tz_convert=tz, freq=freq)
 
 
-YFData.override_column_config_doc(__pdoc__)
+YFData.override_feature_config_doc(__pdoc__)
 
 BinanceDataT = tp.TypeVar("BinanceDataT", bound="BinanceData")
 
@@ -1357,7 +1357,7 @@ class BinanceData(RemoteData):
 
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.binance")
 
-    _column_config: tp.ClassVar[Config] = HybridConfig(
+    _feature_config: tp.ClassVar[Config] = HybridConfig(
         {
             "Quote volume": dict(
                 resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(
@@ -1381,8 +1381,8 @@ class BinanceData(RemoteData):
     )
 
     @property
-    def column_config(self) -> Config:
-        return self._column_config
+    def feature_config(self) -> Config:
+        return self._feature_config
 
     @classmethod
     def resolve_client(cls, client: tp.Optional[BinanceClientT] = None, **client_config) -> BinanceClientT:
@@ -1638,7 +1638,7 @@ class BinanceData(RemoteData):
         return df, dict(tz_convert=tz, freq=freq)
 
 
-BinanceData.override_column_config_doc(__pdoc__)
+BinanceData.override_feature_config_doc(__pdoc__)
 
 
 class CCXTData(RemoteData):
@@ -1823,7 +1823,7 @@ class CCXTData(RemoteData):
         pbar_kwargs: tp.KwargsLike = None,
         silence_warnings: tp.Optional[bool] = None,
         return_fetch_method: bool = False,
-    ) -> tp.SymbolData:
+    ) -> tp.Union[dict, tp.SymbolData]:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from CCXT.
 
         Args:
@@ -2377,7 +2377,7 @@ class AlpacaData(RemoteData):
         return df, dict(tz_convert=tz, freq=freq)
 
 
-AlpacaData.override_column_config_doc(__pdoc__)
+AlpacaData.override_feature_config_doc(__pdoc__)
 
 PolygonDataT = tp.TypeVar("PolygonDataT", bound="PolygonData")
 
@@ -2752,7 +2752,7 @@ class PolygonData(RemoteData):
         return df, dict(tz_convert=tz, freq=freq)
 
 
-PolygonData.override_column_config_doc(__pdoc__)
+PolygonData.override_feature_config_doc(__pdoc__)
 
 AVDataT = tp.TypeVar("AVDataT", bound="AVData")
 
@@ -3565,10 +3565,10 @@ class TVData(RemoteData):
 
         return df, dict(tz_convert=tz, freq=freq)
 
-    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
+    def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)
 
 
-TVData.override_column_config_doc(__pdoc__)
+TVData.override_feature_config_doc(__pdoc__)

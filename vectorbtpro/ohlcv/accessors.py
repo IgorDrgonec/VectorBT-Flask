@@ -14,8 +14,8 @@ The accessors inherit `vectorbtpro.generic.accessors`.
 ## Column names
 
 By default, vectorbt searches for columns with names 'open', 'high', 'low', 'close', and 'volume'
-(case doesn't matter). You can change the naming either using `column_map` in
-`vectorbtpro._settings.ohlcv`, or by providing `column_map` directly to the accessor.
+(case doesn't matter). You can change the naming either using `feature_map` in
+`vectorbtpro._settings.ohlcv`, or by providing `feature_map` directly to the accessor.
 
 ```pycon
 >>> import pandas as pd
@@ -33,14 +33,14 @@ By default, vectorbt searches for columns with names 'open', 'high', 'low', 'clo
 >>> df.vbt.ohlcv.get_column('open')
 None
 
->>> my_column_map = {
+>>> my_feature_map = {
 ...     "my_open1": "Open",
 ...     "my_high2": "High",
 ...     "my_low3": "Low",
 ...     "my_close4": "Close",
 ...     "my_volume5": "Volume",
 ... }
->>> ohlcv_acc = df.vbt.ohlcv(freq='d', column_map=my_column_map)
+>>> ohlcv_acc = df.vbt.ohlcv(freq='d', feature_map=my_feature_map)
 >>> ohlcv_acc.get_column('open')
 0    2.0
 1    3.0
@@ -114,19 +114,19 @@ class OHLCVDFAccessor(OHLCDataMixin, GenericDFAccessor):
     Accessible via `pd.DataFrame.vbt.ohlcv`."""
 
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (GenericDFAccessor._expected_keys or set()) | {
-        "column_map",
+        "feature_map",
     }
 
     def __init__(
         self,
         wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
         obj: tp.Optional[tp.ArrayLike] = None,
-        column_map: tp.KwargsLike = None,
+        feature_map: tp.KwargsLike = None,
         **kwargs,
     ) -> None:
-        GenericDFAccessor.__init__(self, wrapper, obj=obj, column_map=column_map, **kwargs)
+        GenericDFAccessor.__init__(self, wrapper, obj=obj, feature_map=feature_map, **kwargs)
 
-        self._column_map = column_map
+        self._feature_map = feature_map
 
     @class_or_instanceproperty
     def df_accessor_cls(cls_or_self) -> tp.Type["OHLCVDFAccessor"]:
@@ -134,47 +134,47 @@ class OHLCVDFAccessor(OHLCDataMixin, GenericDFAccessor):
         return OHLCVDFAccessor
 
     @property
-    def column_map(self) -> tp.Kwargs:
+    def feature_map(self) -> tp.Kwargs:
         """Column names."""
         from vectorbtpro._settings import settings
 
         ohlcv_cfg = settings["ohlcv"]
 
-        return merge_dicts(ohlcv_cfg["column_map"], self._column_map)
+        return merge_dicts(ohlcv_cfg["feature_map"], self._feature_map)
 
     @property
-    def column_wrapper(self) -> ArrayWrapper:
-        new_columns = self.wrapper.columns.map(lambda x: self.column_map[x] if x in self.column_map else x)
+    def feature_wrapper(self) -> ArrayWrapper:
+        new_columns = self.wrapper.columns.map(lambda x: self.feature_map[x] if x in self.feature_map else x)
         return self.wrapper.replace(columns=new_columns)
 
     @property
     def symbol_wrapper(self) -> ArrayWrapper:
-        return ArrayWrapper([None], [None], 1)
+        return ArrayWrapper(self.wrapper.index, [None], 1)
+
+    def select_feature_idxs(self: OHLCVDFAccessorT, idxs: tp.MaybeSequence[int], **kwargs) -> OHLCVDFAccessorT:
+        return self.iloc[:, idxs]
+
+    def select_symbol_idxs(self: OHLCVDFAccessorT, idxs: tp.MaybeSequence[int], **kwargs) -> OHLCVDFAccessorT:
+        raise NotImplementedError
 
     def get(
         self,
-        column: tp.Optional[tp.Label] = None,
-        symbol: tp.Optional[tp.Symbol] = None,
-        columns: tp.Optional[tp.Labels] = None,
-        symbols: tp.Optional[tp.Symbols] = None,
+        features: tp.Union[None, tp.Feature, tp.Features] = None,
+        symbols: tp.Union[None, tp.Symbol, tp.Symbols] = None,
         **kwargs,
     ) -> tp.MaybeTuple[tp.SeriesFrame]:
-        if column is not None and columns is not None:
-            raise ValueError("Cannot provide both column and columns")
-        if symbol is not None or symbols is not None:
-            raise ValueError("Cannot provide symbol or symbols")
-        if column is not None:
-            columns = column
-        if columns is None:
+        if symbols is not None:
+            raise ValueError("Cannot provide symbols")
+        if features is None:
             return self.obj
-        if isinstance(columns, list):
-            new_columns = []
-            for x in columns:
-                new_columns.append(self.wrapper.columns[self.get_column_index(x, raise_error=True)])
-            columns = new_columns
+        if isinstance(features, list):
+            new_features = []
+            for x in features:
+                new_features.append(self.wrapper.columns[self.get_feature_idxs(x, raise_error=True)])
+            features = new_features
         else:
-            columns = self.wrapper.columns[self.get_column_index(columns, raise_error=True)]
-        return self.obj[columns]
+            features = self.wrapper.columns[self.get_feature_idxs(features, raise_error=True)]
+        return self.obj[features]
 
     # ############# Resampling ############# #
 
@@ -183,34 +183,34 @@ class OHLCVDFAccessor(OHLCDataMixin, GenericDFAccessor):
         if wrapper_meta is None:
             wrapper_meta = self.wrapper.resample_meta(*args, **kwargs)
         sr_dct = {}
-        for column in self.column_wrapper.columns:
-            if isinstance(column, str) and column.lower() == "open":
-                sr_dct[column] = self.obj[column].vbt.resample_apply(
+        for feature in self.feature_wrapper.columns:
+            if isinstance(feature, str) and feature.lower() == "open":
+                sr_dct[feature] = self.obj[feature].vbt.resample_apply(
                     wrapper_meta["resampler"],
                     generic_nb.first_reduce_nb,
                 )
-            elif isinstance(column, str) and column.lower() == "high":
-                sr_dct[column] = self.obj[column].vbt.resample_apply(
+            elif isinstance(feature, str) and feature.lower() == "high":
+                sr_dct[feature] = self.obj[feature].vbt.resample_apply(
                     wrapper_meta["resampler"],
                     generic_nb.max_reduce_nb,
                 )
-            elif isinstance(column, str) and column.lower() == "low":
-                sr_dct[column] = self.obj[column].vbt.resample_apply(
+            elif isinstance(feature, str) and feature.lower() == "low":
+                sr_dct[feature] = self.obj[feature].vbt.resample_apply(
                     wrapper_meta["resampler"],
                     generic_nb.min_reduce_nb,
                 )
-            elif isinstance(column, str) and column.lower() == "close":
-                sr_dct[column] = self.obj[column].vbt.resample_apply(
+            elif isinstance(feature, str) and feature.lower() == "close":
+                sr_dct[feature] = self.obj[feature].vbt.resample_apply(
                     wrapper_meta["resampler"],
                     generic_nb.last_reduce_nb,
                 )
-            elif isinstance(column, str) and column.lower() == "volume":
-                sr_dct[column] = self.obj[column].vbt.resample_apply(
+            elif isinstance(feature, str) and feature.lower() == "volume":
+                sr_dct[feature] = self.obj[feature].vbt.resample_apply(
                     wrapper_meta["resampler"],
                     generic_nb.sum_reduce_nb,
                 )
             else:
-                raise ValueError(f"Cannot match column '{column}'")
+                raise ValueError(f"Cannot match feature '{feature}'")
         new_obj = pd.DataFrame(sr_dct)
         return self.replace(
             wrapper=wrapper_meta["new_wrapper"],

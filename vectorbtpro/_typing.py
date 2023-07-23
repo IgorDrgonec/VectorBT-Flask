@@ -171,8 +171,8 @@ PathLike = Union[str, Path]
 SettingsKeys = ClassVar[Union[None, Hashable, Dict[Hashable, Hashable]]]
 
 # Data
-Symbol = Hashable
-Symbols = Sequence[Symbol]
+Key = Feature = Symbol = Hashable
+Keys = Features = Symbols = Sequence[Hashable]
 SymbolData = Union[None, SeriesFrame, Tuple[SeriesFrame, Kwargs]]
 
 # Plotting

@@ -427,18 +427,36 @@ def assert_instance_of(arg: tp.Any, types: tp.TypeLike) -> None:
     """Raise exception if the argument is none of types `types`."""
     if not is_instance_of(arg, types):
         if isinstance(types, tuple):
-            raise AssertionError(f"Instance must be of one of {types}")
+            raise AssertionError(f"Instance must be of one of the types {types}")
         else:
-            raise AssertionError(f"Instance must be of {types}")
+            raise AssertionError(f"Instance must be of the type {types}")
+
+
+def assert_not_instance_of(arg: tp.Any, types: tp.TypeLike) -> None:
+    """Raise exception if the argument is one of types `types`."""
+    if is_instance_of(arg, types):
+        if isinstance(types, tuple):
+            raise AssertionError(f"Instance cannot be of one of the types {types}")
+        else:
+            raise AssertionError(f"Instance cannot be of the type {types}")
 
 
 def assert_subclass_of(arg: tp.Type, classes: tp.TypeLike) -> None:
     """Raise exception if the argument is not a subclass of classes `classes`."""
     if not is_subclass_of(arg, classes):
         if isinstance(classes, tuple):
-            raise AssertionError(f"Class must be a subclass of one of {classes}")
+            raise AssertionError(f"Class must be a subclass of one of the types {classes}")
         else:
-            raise AssertionError(f"Class must be a subclass of {classes}")
+            raise AssertionError(f"Class must be a subclass of the type {classes}")
+
+
+def assert_not_subclass_of(arg: tp.Type, classes: tp.TypeLike) -> None:
+    """Raise exception if the argument is a subclass of classes `classes`."""
+    if is_subclass_of(arg, classes):
+        if isinstance(classes, tuple):
+            raise AssertionError(f"Class cannot be a subclass of one of the types {classes}")
+        else:
+            raise AssertionError(f"Class cannot be a subclass of the type {classes}")
 
 
 def assert_type_equal(arg1: tp.Any, arg2: tp.Any) -> None:

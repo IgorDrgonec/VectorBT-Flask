@@ -4,7 +4,7 @@
 
 Class `Data` allows storing, downloading, updating, and managing data. It stores data
 as a dictionary of Series/DataFrames keyed by symbol, and makes sure that
-all pandas objects have the same index and columns by aligning them.
+all Pandas objects have the same index and columns by aligning them.
 """
 
 import warnings
@@ -35,9 +35,11 @@ from vectorbtpro.utils.path_ import check_mkdir
 from vectorbtpro.utils.template import RepEval, CustomTemplate
 from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.decorators import cached_property
 
 __all__ = [
     "symbol_dict",
+    "feature_dict",
     "run_func_dict",
     "run_arg_dict",
     "Data",
@@ -48,6 +50,12 @@ __pdoc__ = {}
 
 class symbol_dict(pdict):
     """Dict that contains symbols as keys."""
+
+    pass
+
+
+class feature_dict(pdict):
+    """Dict that contains features as keys."""
 
     pass
 
@@ -64,14 +72,14 @@ class run_arg_dict(pdict):
     pass
 
 
-DataMixinT = tp.TypeVar("DataMixinT", bound="DataMixin")
+BaseDataMixinT = tp.TypeVar("BaseDataMixinT", bound="BaseDataMixin")
 
 
-class DataMixin:
-    """Mixin class for managing data."""
+class BaseDataMixin:
+    """Base mixin class for working with data."""
 
     @property
-    def column_wrapper(self) -> ArrayWrapper:
+    def feature_wrapper(self) -> ArrayWrapper:
         """Column wrapper."""
         raise NotImplementedError
 
@@ -80,133 +88,257 @@ class DataMixin:
         """Symbol wrapper."""
         raise NotImplementedError
 
-    def get(
-        self,
-        column: tp.Optional[tp.Label] = None,
-        symbol: tp.Optional[tp.Symbol] = None,
-        columns: tp.Optional[tp.Labels] = None,
-        symbols: tp.Optional[tp.Symbols] = None,
-        **kwargs,
-    ) -> tp.MaybeTuple[tp.SeriesFrame]:
-        """Get one or more columns of one or more symbols of data."""
-        raise NotImplementedError
+    @property
+    def features(self) -> tp.List[tp.Feature]:
+        """List of features."""
+        return self.feature_wrapper.columns.tolist()
 
-    def get_column_index(self, label: tp.Hashable, raise_error: bool = False) -> int:
-        """Return the position of the column that matches the label."""
+    @property
+    def symbols(self) -> tp.List[tp.Symbol]:
+        """List of symbols."""
+        return self.symbol_wrapper.columns.tolist()
 
-        def _prepare_label(x):
+    @classmethod
+    def has_multiple_keys(cls, keys: tp.Union[tp.Key, tp.Keys]) -> bool:
+        """Check whether there are one or multiple keys."""
+        if checks.is_hashable(keys):
+            return False
+        elif checks.is_sequence(keys):
+            return True
+        raise TypeError("Keys must be either a hashable or a sequence of hashable")
+
+    def get_feature_idx(self, feature: tp.Feature, raise_error: bool = False) -> int:
+        """Return the index of a feature."""
+
+        def _prepare_feature(x):
             if isinstance(x, tuple):
-                return tuple([_prepare_label(_x) for _x in x])
+                return tuple([_prepare_feature(_x) for _x in x])
             if isinstance(x, str):
                 return x.lower().strip().replace(" ", "_")
             return x
 
-        label = _prepare_label(label)
+        feature = _prepare_feature(feature)
 
         found_indices = []
-        for i, c in enumerate(self.column_wrapper.columns):
-            c = _prepare_label(c)
-            if label == c:
+        for i, c in enumerate(self.features):
+            c = _prepare_feature(c)
+            if feature == c:
                 found_indices.append(i)
         if len(found_indices) == 0:
             if raise_error:
-                raise ValueError(f"No columns match the label '{str(label)}'")
+                raise ValueError(f"No features match the feature '{str(feature)}'")
             return -1
         if len(found_indices) == 1:
             return found_indices[0]
-        raise ValueError(f"Multiple columns match the label '{str(label)}'")
+        raise ValueError(f"Multiple features match the feature '{str(feature)}'")
 
-    def get_column(self, idx_or_label: tp.Hashable, raise_error: bool = False) -> tp.Optional[tp.SeriesFrame]:
-        """Get column(s) that match a column index or label."""
-        if checks.is_int(idx_or_label):
-            return self.get(column=self.column_wrapper.columns[idx_or_label])
-        column_idx = self.get_column_index(idx_or_label, raise_error=raise_error)
-        if column_idx == -1:
+    def get_symbol_idx(self, symbol: tp.Symbol, raise_error: bool = False) -> int:
+        """Return the index of a symbol."""
+
+        def _prepare_symbol(x):
+            if isinstance(x, tuple):
+                return tuple([_prepare_symbol(_x) for _x in x])
+            if isinstance(x, str):
+                return x.lower().strip().replace(" ", "_")
+            return x
+
+        symbol = _prepare_symbol(symbol)
+
+        found_indices = []
+        for i, c in enumerate(self.symbols):
+            c = _prepare_symbol(c)
+            if symbol == c:
+                found_indices.append(i)
+        if len(found_indices) == 0:
+            if raise_error:
+                raise ValueError(f"No symbols match the symbol '{str(symbol)}'")
+            return -1
+        if len(found_indices) == 1:
+            return found_indices[0]
+        raise ValueError(f"Multiple symbols match the symbol '{str(symbol)}'")
+
+    def select_feature_idxs(self: BaseDataMixinT, idxs: tp.MaybeSequence[int], **kwargs) -> BaseDataMixinT:
+        """Select one or more features by index.
+
+        Returns a new instance."""
+        raise NotImplementedError
+
+    def select_symbol_idxs(self: BaseDataMixinT, idxs: tp.MaybeSequence[int], **kwargs) -> BaseDataMixinT:
+        """Select one or more symbols by index.
+
+        Returns a new instance."""
+        raise NotImplementedError
+
+    def select_features(self: BaseDataMixinT, features: tp.Union[tp.Feature, tp.Features], **kwargs) -> BaseDataMixinT:
+        """Select one or more features.
+
+        Returns a new instance."""
+        if not self.has_multiple_keys(features):
+            feature_idx = self.get_feature_idx(features, raise_error=True)
+            return self.select_feature_idxs(feature_idx, **kwargs)
+        feature_idxs = [self.get_feature_idx(k, raise_error=True) for k in features]
+        return self.select_feature_idxs(feature_idxs, **kwargs)
+
+    def select_symbols(self: BaseDataMixinT, symbols: tp.Union[tp.Symbol, tp.Symbols], **kwargs) -> BaseDataMixinT:
+        """Select one or more symbols.
+
+        Returns a new instance."""
+        if not self.has_multiple_keys(symbols):
+            symbol_idx = self.get_symbol_idx(symbols, raise_error=True)
+            return self.select_symbol_idxs(symbol_idx, **kwargs)
+        symbol_idxs = [self.get_symbol_idx(k, raise_error=True) for k in symbols]
+        return self.select_symbol_idxs(symbol_idxs, **kwargs)
+
+    def get(
+        self,
+        features: tp.Union[None, tp.Feature, tp.Features] = None,
+        symbols: tp.Union[None, tp.Symbol, tp.Symbols] = None,
+        **kwargs,
+    ) -> tp.MaybeTuple[tp.SeriesFrame]:
+        """Get one or more features of one or more symbols of data."""
+        raise NotImplementedError
+
+    def has_feature(self, feature: tp.Feature) -> bool:
+        """Whether feature exists."""
+        feature_idx = self.get_feature_idx(feature, raise_error=False)
+        return feature_idx != -1
+
+    def has_symbol(self, symbol: tp.Symbol) -> bool:
+        """Whether symbol exists."""
+        symbol_idx = self.get_symbol_idx(symbol, raise_error=False)
+        return symbol_idx != -1
+
+    def assert_has_feature(self, feature: tp.Feature) -> None:
+        """Assert that feature exists."""
+        self.get_feature_idx(feature, raise_error=True)
+
+    def assert_has_symbol(self, symbol: tp.Symbol) -> None:
+        """Assert that symbol exists."""
+        self.get_symbol_idx(symbol, raise_error=True)
+
+    def get_feature(
+        self,
+        feature: tp.Union[int, tp.Feature],
+        raise_error: bool = False,
+    ) -> tp.Optional[tp.SeriesFrame]:
+        """Get feature that match a feature index or label."""
+        if checks.is_int(feature):
+            return self.get(features=self.features[feature])
+        feature_idx = self.get_feature_idx(feature, raise_error=raise_error)
+        if feature_idx == -1:
             return None
-        return self.get(column=self.column_wrapper.columns[column_idx])
+        return self.get(features=self.features[feature_idx])
+
+    def get_symbol(
+        self,
+        symbol: tp.Union[int, tp.Symbol],
+        raise_error: bool = False,
+    ) -> tp.Optional[tp.SeriesFrame]:
+        """Get symbol that match a symbol index or label."""
+        if checks.is_int(symbol):
+            return self.get(symbol=self.symbols[symbol])
+        symbol_idx = self.get_symbol_idx(symbol, raise_error=raise_error)
+        if symbol_idx == -1:
+            return None
+        return self.get(symbol=self.symbols[symbol_idx])
 
 
 OHLCDataMixinT = tp.TypeVar("OHLCDataMixinT", bound="OHLCDataMixin")
 
 
-class OHLCDataMixin(DataMixin):
-    """Mixin class for managing OHLC data."""
+class OHLCDataMixin(BaseDataMixin):
+    """Mixin class for working with OHLC data."""
 
     @property
     def open(self) -> tp.Optional[tp.SeriesFrame]:
         """Open."""
-        return self.get_column("Open")
+        return self.get_feature("Open")
 
     @property
     def high(self) -> tp.Optional[tp.SeriesFrame]:
         """High."""
-        return self.get_column("High")
+        return self.get_feature("High")
 
     @property
     def low(self) -> tp.Optional[tp.SeriesFrame]:
         """Low."""
-        return self.get_column("Low")
+        return self.get_feature("Low")
 
     @property
     def close(self) -> tp.Optional[tp.SeriesFrame]:
         """Close."""
-        return self.get_column("Close")
+        return self.get_feature("Close")
 
     @property
     def volume(self) -> tp.Optional[tp.SeriesFrame]:
         """Volume."""
-        return self.get_column("Volume")
+        return self.get_feature("Volume")
 
     @property
     def trade_count(self) -> tp.Optional[tp.SeriesFrame]:
         """Trade count."""
-        return self.get_column("Trade count")
+        return self.get_feature("Trade count")
 
     @property
     def vwap(self) -> tp.Optional[tp.SeriesFrame]:
         """VWAP."""
-        return self.get_column("VWAP")
+        return self.get_feature("VWAP")
 
     @property
     def hlc3(self) -> tp.Optional[tp.SeriesFrame]:
         """HLC/3."""
-        high = self.get_column("High", raise_error=True)
-        low = self.get_column("Low", raise_error=True)
-        close = self.get_column("Close", raise_error=True)
+        high = self.get_feature("High", raise_error=True)
+        low = self.get_feature("Low", raise_error=True)
+        close = self.get_feature("Close", raise_error=True)
         return (high + low + close) / 3
 
     @property
     def ohlc4(self) -> tp.Optional[tp.SeriesFrame]:
         """OHLC/4."""
-        open = self.get_column("Open", raise_error=True)
-        high = self.get_column("High", raise_error=True)
-        low = self.get_column("Low", raise_error=True)
-        close = self.get_column("Close", raise_error=True)
+        open = self.get_feature("Open", raise_error=True)
+        high = self.get_feature("High", raise_error=True)
+        low = self.get_feature("Low", raise_error=True)
+        close = self.get_feature("Close", raise_error=True)
         return (open + high + low + close) / 4
 
     @property
+    def has_ohlc(self) -> bool:
+        """Whether the instance has all the OHLC features."""
+        return (
+            self.has_feature("Open")
+            and self.has_feature("High")
+            and self.has_feature("Low")
+            and self.has_feature("Close")
+        )
+
+    @property
+    def has_ohlcv(self) -> bool:
+        """Whether the instance has all the OHLCV features."""
+        return self.has_ohlc and self.has_feature("Volume")
+
+    @property
     def ohlc(self: OHLCDataMixinT) -> OHLCDataMixinT:
-        """Return a `DataMixin` instance with the OHLC columns only."""
-        open_idx = self.get_column_index("Open", raise_error=True)
-        high_idx = self.get_column_index("High", raise_error=True)
-        low_idx = self.get_column_index("Low", raise_error=True)
-        close_idx = self.get_column_index("Close", raise_error=True)
-        return self.iloc[:, [open_idx, high_idx, low_idx, close_idx]]
+        """Return a `OHLCDataMixin` instance with the OHLC features only."""
+        open_idx = self.get_feature_idx("Open", raise_error=True)
+        high_idx = self.get_feature_idx("High", raise_error=True)
+        low_idx = self.get_feature_idx("Low", raise_error=True)
+        close_idx = self.get_feature_idx("Close", raise_error=True)
+        return self.select_feature_idxs([open_idx, high_idx, low_idx, close_idx])
 
     @property
     def ohlcv(self: OHLCDataMixinT) -> OHLCDataMixinT:
-        """Return a `DataMixin` instance with the OHLCV columns only."""
-        open_idx = self.get_column_index("Open", raise_error=True)
-        high_idx = self.get_column_index("High", raise_error=True)
-        low_idx = self.get_column_index("Low", raise_error=True)
-        close_idx = self.get_column_index("Close", raise_error=True)
-        volume_idx = self.get_column_index("Volume", raise_error=True)
-        return self.iloc[:, [open_idx, high_idx, low_idx, close_idx, volume_idx]]
+        """Return a `OHLCDataMixin` instance with the OHLCV features only."""
+        open_idx = self.get_feature_idx("Open", raise_error=True)
+        high_idx = self.get_feature_idx("High", raise_error=True)
+        low_idx = self.get_feature_idx("Low", raise_error=True)
+        close_idx = self.get_feature_idx("Close", raise_error=True)
+        volume_idx = self.get_feature_idx("Volume", raise_error=True)
+        return self.select_feature_idxs([open_idx, high_idx, low_idx, close_idx, volume_idx])
 
     def get_returns_acc(self, **kwargs) -> tp.Optional[tp.SeriesFrame]:
         """Return accessor of type `vectorbtpro.returns.accessors.ReturnsAccessor`."""
         return ReturnsAccessor.from_value(
-            self.get_column("Close", raise_error=True),
+            self.get_feature("Close", raise_error=True),
             wrapper=self.symbol_wrapper,
             return_values=False,
             **kwargs,
@@ -220,7 +352,7 @@ class OHLCDataMixin(DataMixin):
     def get_returns(self, **kwargs) -> tp.Optional[tp.SeriesFrame]:
         """Returns."""
         return ReturnsAccessor.from_value(
-            self.get_column("Close", raise_error=True),
+            self.get_feature("Close", raise_error=True),
             wrapper=self.symbol_wrapper,
             return_values=True,
             **kwargs,
@@ -234,7 +366,7 @@ class OHLCDataMixin(DataMixin):
     def get_log_returns(self, **kwargs) -> tp.Optional[tp.SeriesFrame]:
         """Log returns."""
         return ReturnsAccessor.from_value(
-            self.get_column("Close", raise_error=True),
+            self.get_feature("Close", raise_error=True),
             wrapper=self.symbol_wrapper,
             return_values=True,
             log_returns=True,
@@ -249,7 +381,7 @@ class OHLCDataMixin(DataMixin):
     def get_daily_returns(self, **kwargs) -> tp.Optional[tp.SeriesFrame]:
         """Daily returns."""
         return ReturnsAccessor.from_value(
-            self.get_column("Close", raise_error=True),
+            self.get_feature("Close", raise_error=True),
             wrapper=self.symbol_wrapper,
             return_values=False,
             **kwargs,
@@ -263,7 +395,7 @@ class OHLCDataMixin(DataMixin):
     def get_daily_log_returns(self, **kwargs) -> tp.Optional[tp.SeriesFrame]:
         """Daily log returns."""
         return ReturnsAccessor.from_value(
-            self.get_column("Close", raise_error=True),
+            self.get_feature("Close", raise_error=True),
             wrapper=self.symbol_wrapper,
             return_values=False,
             log_returns=True,
@@ -280,10 +412,10 @@ class OHLCDataMixin(DataMixin):
 
         See `vectorbtpro.generic.drawdowns.Drawdowns`."""
         return Drawdowns.from_price(
-            open=self.get_column("Open", raise_error=True),
-            high=self.get_column("High", raise_error=True),
-            low=self.get_column("Low", raise_error=True),
-            close=self.get_column("Close", raise_error=True),
+            open=self.get_feature("Open", raise_error=True),
+            high=self.get_feature("High", raise_error=True),
+            low=self.get_feature("Low", raise_error=True),
+            close=self.get_feature("Close", raise_error=True),
             **kwargs,
         )
 
@@ -296,70 +428,71 @@ class OHLCDataMixin(DataMixin):
 DataT = tp.TypeVar("DataT", bound="Data")
 
 
-class MetaColumns(type):
-    """Meta class that exposes a read-only class property `MetaColumns.column_config`."""
+class MetaFeatures(type):
+    """Meta class that exposes a read-only class property `MetaFeatures.feature_config`."""
 
     @property
-    def column_config(cls) -> Config:
+    def feature_config(cls) -> Config:
         """Column config."""
-        return cls._column_config
+        return cls._feature_config
 
 
-class DataWithColumns(metaclass=MetaColumns):
-    """Class exposes a read-only class property `DataWithColumns.field_config`."""
+class DataWithFeatures(metaclass=MetaFeatures):
+    """Class exposes a read-only class property `DataWithFeatures.field_config`."""
 
     @property
-    def column_config(self) -> Config:
+    def feature_config(self) -> Config:
         """Column config of `${cls_name}`.
 
         ```python
-        ${column_config}
+        ${feature_config}
         ```
         """
-        return self._column_config
+        return self._feature_config
 
 
-class MetaData(type(Analyzable), type(DataWithColumns)):
+class MetaData(type(Analyzable), type(DataWithFeatures)):
     pass
 
 
-@attach_symbol_dict_methods(
-    [
-        "symbol_classes",
-        "fetch_kwargs",
-        "returned_kwargs",
-        "last_index",
-        "delisted",
-    ]
-)
-class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
+symbol_attrs = [
+    "symbol_classes",
+    "fetch_kwargs",
+    "returned_kwargs",
+    "last_index",
+    "delisted",
+]
+
+
+@attach_symbol_dict_methods(symbol_attrs)
+class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     """Class that downloads, updates, and manages data coming from a data source."""
 
     _setting_keys: tp.SettingsKeys = dict(base="data")
 
-    _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {"_column_config"}
+    _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {"_feature_config"}
 
-    _column_config: tp.ClassVar[Config] = HybridConfig()
+    _feature_config: tp.ClassVar[Config] = HybridConfig()
 
     @property
-    def column_config(self) -> Config:
+    def feature_config(self) -> Config:
         """Column config of `${cls_name}`.
 
         ```python
-        ${column_config}
+        ${feature_config}
         ```
 
-        Returns `${cls_name}._column_config`, which gets (hybrid-) copied upon creation of each instance.
+        Returns `${cls_name}._feature_config`, which gets (hybrid-) copied upon creation of each instance.
         Thus, changing this config won't affect the class.
 
         To change fields, you can either change the config in-place, override this property,
-        or overwrite the instance variable `${cls_name}._column_config`.
+        or overwrite the instance variable `${cls_name}._feature_config`.
         """
-        return self._column_config
+        return self._feature_config
 
-    def use_column_config_of(self, cls: tp.Type[DataT]) -> None:
-        """Copy column config from another `Data` class."""
-        self._column_config = cls.column_config.copy()
+    def use_feature_config_of(self, cls: tp.Type[DataT]) -> None:
+        """Copy feature config from another `Data` class."""
+        self._feature_config = cls.feature_config.copy()
 
     @classmethod
     def row_stack(
@@ -370,31 +503,35 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
     ) -> DataT:
         """Stack multiple `Data` instances along rows.
 
-        Uses `vectorbtpro.base.wrapping.ArrayWrapper.row_stack` to stack the wrappers.
-
-        All objects to be merged must have the same symbols. Metadata such as the last index,
-        fetching and returned keyword arguments, are taken from the last object."""
+        Uses `vectorbtpro.base.wrapping.ArrayWrapper.row_stack` to stack the wrappers."""
         if len(objs) == 1:
             objs = objs[0]
         objs = list(objs)
         for obj in objs:
             if not checks.is_instance_of(obj, Data):
                 raise TypeError("Each object to be merged must be an instance of Records")
+            if checks.is_instance_of(obj.data, feature_dict):
+                raise TypeError("This operation doesn't support symbol-oriented data")
         if "wrapper" not in kwargs:
             if wrapper_kwargs is None:
                 wrapper_kwargs = {}
             kwargs["wrapper"] = ArrayWrapper.row_stack(*[obj.wrapper for obj in objs], **wrapper_kwargs)
 
-        symbols = set()
+        keys = set()
         for obj in objs:
-            symbols = symbols.union(set(obj.data.keys()))
+            keys = keys.union(set(obj.data.keys()))
+        data_type = None
         for obj in objs:
-            if len(symbols.difference(set(obj.data.keys()))) > 0:
-                raise ValueError("Objects to be merged must have the same symbols")
+            if len(keys.difference(set(obj.data.keys()))) > 0:
+                raise ValueError("Objects to be merged must have the same keys")
+            if data_type is None:
+                data_type = type(obj.data)
+            elif not isinstance(obj.data, data_type):
+                raise TypeError("Objects to be merged must have the same data dictionary type")
         if "data" not in kwargs:
-            new_data = symbol_dict()
-            for s in symbols:
-                new_data[s] = kwargs["wrapper"].row_stack_arrs(*[obj.data[s] for obj in objs], group_by=False)
+            new_data = data_type()
+            for k in keys:
+                new_data[k] = kwargs["wrapper"].row_stack_arrs(*[obj.data[k] for obj in objs], group_by=False)
             kwargs["data"] = new_data
         if "fetch_kwargs" not in kwargs:
             kwargs["fetch_kwargs"] = objs[-1].fetch_kwargs
@@ -418,16 +555,15 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
     ) -> DataT:
         """Stack multiple `Data` instances along columns.
 
-        Uses `vectorbtpro.base.wrapping.ArrayWrapper.column_stack` to stack the wrappers.
-
-        All objects to be merged must have the same symbols and index. Metadata such as the last index,
-        fetching and returned keyword arguments, must be the same in all objects."""
+        Uses `vectorbtpro.base.wrapping.ArrayWrapper.column_stack` to stack the wrappers."""
         if len(objs) == 1:
             objs = objs[0]
         objs = list(objs)
         for obj in objs:
             if not checks.is_instance_of(obj, Data):
                 raise TypeError("Each object to be merged must be an instance of Records")
+            if checks.is_instance_of(obj.data, feature_dict):
+                raise TypeError("This operation doesn't support symbol-oriented data")
         if "wrapper" not in kwargs:
             if wrapper_kwargs is None:
                 wrapper_kwargs = {}
@@ -436,17 +572,33 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
                 **wrapper_kwargs,
             )
 
-        symbols = set()
+        keys = set()
         for obj in objs:
-            symbols = symbols.union(set(obj.data.keys()))
+            keys = keys.union(set(obj.data.keys()))
+        data_type = None
         for obj in objs:
-            if len(symbols.difference(set(obj.data.keys()))) > 0:
-                raise ValueError("Objects to be merged must have the same symbols")
+            if len(keys.difference(set(obj.data.keys()))) > 0:
+                raise ValueError("Objects to be merged must have the same keys")
+            if data_type is None:
+                data_type = type(obj.data)
+            elif not isinstance(obj.data, data_type):
+                raise TypeError("Objects to be merged must have the same data dictionary type")
         if "data" not in kwargs:
-            new_data = symbol_dict()
-            for s in symbols:
-                new_data[s] = kwargs["wrapper"].column_stack_arrs(*[obj.data[s] for obj in objs], group_by=False)
+            new_data = data_type()
+            for k in keys:
+                new_data[k] = kwargs["wrapper"].column_stack_arrs(*[obj.data[k] for obj in objs], group_by=False)
             kwargs["data"] = new_data
+        if issubclass(data_type, feature_dict):
+            if "symbol_classes" not in kwargs:
+                kwargs["symbol_classes"] = merge_dicts(*[obj.symbol_classes for obj in objs], nested=False)
+            if "fetch_kwargs" not in kwargs:
+                kwargs["fetch_kwargs"] = merge_dicts(*[obj.fetch_kwargs for obj in objs], nested=False)
+            if "returned_kwargs" not in kwargs:
+                kwargs["returned_kwargs"] = merge_dicts(*[obj.returned_kwargs for obj in objs], nested=False)
+            if "last_index" not in kwargs:
+                kwargs["last_index"] = merge_dicts(*[obj.last_index for obj in objs], nested=False)
+            if "delisted" not in kwargs:
+                kwargs["delisted"] = merge_dicts(*[obj.delisted for obj in objs], nested=False)
 
         kwargs = cls.resolve_column_stack_kwargs(*objs, **kwargs)
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
@@ -455,6 +607,7 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Analyzable._expected_keys or set()) | {
         "data",
         "single_symbol",
+        "single_feature",
         "symbol_classes",
         "level_name",
         "fetch_kwargs",
@@ -470,8 +623,9 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
     def __init__(
         self,
         wrapper: ArrayWrapper,
-        data: symbol_dict,
+        data: tp.Union[symbol_dict, feature_dict],
         single_symbol: bool = True,
+        single_feature: bool = True,
         symbol_classes: tp.Optional[symbol_dict] = None,
         level_name: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
         fetch_kwargs: tp.Optional[symbol_dict] = None,
@@ -489,6 +643,7 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
             wrapper,
             data=data,
             single_symbol=single_symbol,
+            single_feature=single_feature,
             symbol_classes=symbol_classes,
             level_name=level_name,
             fetch_kwargs=fetch_kwargs,
@@ -512,32 +667,56 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
             last_index = {}
         if delisted is None:
             delisted = {}
+
         checks.assert_instance_of(data, dict)
+        if not isinstance(data, (symbol_dict, feature_dict)):
+            data = symbol_dict(data)
         checks.assert_instance_of(symbol_classes, dict)
+        checks.assert_not_instance_of(symbol_classes, feature_dict)
+        if not isinstance(symbol_classes, symbol_dict):
+            symbol_classes = symbol_dict(symbol_classes)
         checks.assert_instance_of(fetch_kwargs, dict)
+        checks.assert_not_instance_of(fetch_kwargs, feature_dict)
+        if not isinstance(fetch_kwargs, symbol_dict):
+            fetch_kwargs = symbol_dict(fetch_kwargs)
         checks.assert_instance_of(returned_kwargs, dict)
+        checks.assert_not_instance_of(returned_kwargs, feature_dict)
+        if not isinstance(returned_kwargs, symbol_dict):
+            returned_kwargs = symbol_dict(returned_kwargs)
         checks.assert_instance_of(last_index, dict)
+        checks.assert_not_instance_of(last_index, feature_dict)
+        if not isinstance(last_index, symbol_dict):
+            last_index = symbol_dict(last_index)
         checks.assert_instance_of(delisted, dict)
+        checks.assert_not_instance_of(delisted, feature_dict)
+        if not isinstance(delisted, symbol_dict):
+            delisted = symbol_dict(delisted)
+
         for symbol, obj in data.items():
             checks.assert_meta_equal(obj, data[list(data.keys())[0]])
-        if len(data) > 1:
-            single_symbol = False
+        if isinstance(data, feature_dict):
+            if len(data) > 1:
+                single_feature = False
+        else:
+            if len(data) > 1:
+                single_symbol = False
 
-        self._data = symbol_dict(data)
+        self._data = data
         self._single_symbol = single_symbol
-        self._symbol_classes = symbol_dict(symbol_classes)
+        self._single_feature = single_feature
+        self._symbol_classes = symbol_classes
         self._level_name = level_name
-        self._fetch_kwargs = symbol_dict(fetch_kwargs)
-        self._returned_kwargs = symbol_dict(returned_kwargs)
-        self._last_index = symbol_dict(last_index)
-        self._delisted = symbol_dict(delisted)
+        self._fetch_kwargs = fetch_kwargs
+        self._returned_kwargs = returned_kwargs
+        self._last_index = last_index
+        self._delisted = delisted
         self._tz_localize = tz_localize
         self._tz_convert = tz_convert
         self._missing_index = missing_index
         self._missing_columns = missing_columns
 
         # Copy writeable attrs
-        self._column_config = type(self)._column_config.copy()
+        self._feature_config = type(self)._feature_config.copy()
 
     def replace(self: DataT, **kwargs) -> DataT:
         """See `vectorbtpro.utils.config.Configured.replace`.
@@ -552,22 +731,38 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
                 new_index = wrapper.index
                 new_columns = wrapper.columns
             data = self.config["data"]
-            new_data = symbol_dict()
-            data_changed = False
+            new_data = {}
+            index_changed = False
+            columns_changed = False
             for k, v in data.items():
                 if isinstance(v, (pd.Series, pd.DataFrame)):
                     if not v.index.equals(new_index):
                         v = v.copy(deep=False)
                         v.index = new_index
-                        data_changed = True
+                        index_changed = True
                     if isinstance(v, pd.DataFrame):
                         if not v.columns.equals(new_columns):
                             v = v.copy(deep=False)
                             v.columns = new_columns
-                            data_changed = True
+                            columns_changed = True
                 new_data[k] = v
-            if data_changed:
+            if index_changed or columns_changed:
                 kwargs["data"] = new_data
+                if columns_changed and self.feature_oriented:
+                    rename = dict(zip(self.keys, new_columns))
+                    if "symbol_classes" not in kwargs:
+                        kwargs["symbol_classes"] = self.rename_in_dict(self.symbol_classes, rename)
+                    if "fetch_kwargs" not in kwargs:
+                        kwargs["fetch_kwargs"] = self.rename_in_dict(self.fetch_kwargs, rename)
+                    if "returned_kwargs" not in kwargs:
+                        kwargs["returned_kwargs"] = self.rename_in_dict(self.returned_kwargs, rename)
+                    if "last_index" not in kwargs:
+                        kwargs["last_index"] = self.rename_in_dict(self.last_index, rename)
+                    if "delisted" not in kwargs:
+                        kwargs["delisted"] = self.rename_in_dict(self.delisted, rename)
+        for k in symbol_attrs:
+            if k in kwargs and not isinstance(kwargs[k], (symbol_dict, feature_dict)):
+                kwargs[k] = symbol_dict(kwargs[k])
         return Analyzable.replace(self, **kwargs)
 
     def indexing_func(self: DataT, *args, **kwargs) -> DataT:
@@ -581,26 +776,65 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
             if wrapper_meta["columns_changed"]:
                 v = v.iloc[:, wrapper_meta["col_idxs"]]
             new_data[k] = v
-        new_last_index = dict()
-        for s, obj in self.data.items():
-            if s in self.last_index:
-                new_last_index[s] = min([self.last_index[s], new_wrapper.index[-1]])
+        new_last_index = {}
+        for k in self.symbols:
+            if k in self.last_index:
+                new_last_index[k] = min([self.last_index[k], new_wrapper.index[-1]])
+        if self.feature_oriented:
+            new_data = feature_dict(new_data)
+            if wrapper_meta["columns_changed"]:
+                new_symbols = new_wrapper.columns
+                return self.replace(
+                    wrapper=new_wrapper,
+                    data=new_data,
+                    single_symbol=checks.is_int(wrapper_meta["col_idxs"]),
+                    symbol_classes=self.select_from_dict(self.symbol_classes, new_symbols),
+                    fetch_kwargs=self.select_from_dict(self.fetch_kwargs, new_symbols),
+                    returned_kwargs=self.select_from_dict(self.returned_kwargs, new_symbols),
+                    last_index=self.select_from_dict(new_last_index, new_symbols),
+                    delisted=self.select_from_dict(self.delisted, new_symbols),
+                )
+        else:
+            new_data = symbol_dict(new_data)
         return self.replace(wrapper=new_wrapper, data=new_data, last_index=new_last_index)
 
     @property
-    def data(self) -> symbol_dict:
-        """Data dictionary keyed by symbol of type `symbol_dict`."""
+    def data(self) -> tp.Union[symbol_dict, feature_dict]:
+        """Data dictionary.
+
+        Has the type `symbol_dict` for symbol-oriented data or `feature_dict` for feature-oriented data."""
         return self._data
+
+    @property
+    def symbol_oriented(self) -> bool:
+        """Whether data has symbols as keys."""
+        return isinstance(self.data, symbol_dict)
+
+    @property
+    def feature_oriented(self) -> bool:
+        """Whether data has features as keys."""
+        return isinstance(self.data, feature_dict)
+
+    @property
+    def keys(self) -> tp.List[tp.Union[tp.Feature, tp.Symbol]]:
+        """Keys in data.
+
+        Columns if `feature_dict` and symbols if `symbol_dict`."""
+        return list(self.data.keys())
 
     @property
     def single_symbol(self) -> bool:
         """Whether there is only one symbol in `Data.data`."""
+        if self.feature_oriented:
+            return self.wrapper.ndim == 1
         return self._single_symbol
 
     @property
-    def symbols(self) -> tp.List[tp.Symbol]:
-        """List of symbols."""
-        return list(self.data.keys())
+    def single_feature(self) -> bool:
+        """Whether there is only one feature in `Data.data`."""
+        if self.feature_oriented:
+            return self._single_feature
+        return self.wrapper.ndim == 1
 
     @property
     def symbol_classes(self) -> symbol_dict:
@@ -609,18 +843,25 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
 
     @property
     def level_name(self) -> tp.MaybeIterable[tp.Hashable]:
-        """Level name(s) for symbols.
+        """Level name(s) for keys.
 
-        Must be a sequence if symbols are tuples, otherwise a string."""
+        Keys are symbols or features depending on the data dictionary type.
+
+        Must be a sequence if keys are tuples, otherwise a hashable."""
         level_name = self._level_name
-        if any(map(lambda x: isinstance(x, tuple), self.symbols)):
+        first_key = self.keys[0]
+        if self.feature_oriented:
+            key_prefix = "feature"
+        else:
+            key_prefix = "symbol"
+        if isinstance(first_key, tuple):
             if level_name is None:
-                level_name = ["symbol_%d" % i for i in range(len(self.symbols[0]))]
+                level_name = ["%s_%d" % (key_prefix, i) for i in range(len(first_key))]
             if not checks.is_iterable(level_name) or isinstance(level_name, str):
                 raise TypeError("Level name should be list-like for a MultiIndex")
             return tuple(level_name)
         if level_name is None:
-            level_name = "symbol"
+            level_name = key_prefix
         return level_name
 
     @property
@@ -645,22 +886,22 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
 
     @property
     def tz_localize(self) -> tp.Union[None, bool, tp.TimezoneLike]:
-        """`tz_localize` initially passed to `Data.fetch_symbol`."""
+        """Timezone to localize a datetime-naive index to, which is initially passed to `Data.fetch`."""
         return self._tz_localize
 
     @property
     def tz_convert(self) -> tp.Union[None, bool, tp.TimezoneLike]:
-        """`tz_convert` initially passed to `Data.fetch_symbol`."""
+        """Timezone to convert a datetime-aware to, which is initially passed to `Data.fetch`."""
         return self._tz_convert
 
     @property
     def missing_index(self) -> tp.Optional[str]:
-        """`missing_index` initially passed to `Data.fetch_symbol`."""
+        """Argument `missing` passed to `Data.align_index`."""
         return self._missing_index
 
     @property
     def missing_columns(self) -> tp.Optional[str]:
-        """`missing_columns` initially passed to `Data.fetch_symbol`."""
+        """Argument `missing` passed to `Data.align_columns`."""
         return self._missing_columns
 
     @property
@@ -704,6 +945,198 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
 
         Based on the default symbol wrapper."""
         return self.symbol_wrapper.freq
+
+    def get_feature_wrapper(self, features: tp.Optional[tp.Features] = None, **kwargs) -> ArrayWrapper:
+        """Get wrapper with features as columns."""
+        if self.feature_oriented:
+            if features is None:
+                features = self.features
+                ndim = 1 if self.single_feature else 2
+            else:
+                if self.has_multiple_keys(features):
+                    ndim = 2
+                else:
+                    features = [features]
+                    ndim = 1
+                for feature in features:
+                    self.assert_has_feature(feature)
+            if isinstance(self.level_name, tuple):
+                feature_columns = pd.MultiIndex.from_tuples(features, names=self.level_name)
+            else:
+                feature_columns = pd.Index(features, name=self.level_name)
+            wrapper = self.wrapper.replace(
+                columns=feature_columns,
+                ndim=ndim,
+                grouper=None,
+                **kwargs,
+            )
+        else:
+            wrapper = self.wrapper
+        return wrapper
+
+    @cached_property
+    def feature_wrapper(self) -> ArrayWrapper:
+        return self.get_feature_wrapper()
+
+    def get_symbol_wrapper(
+        self,
+        symbols: tp.Optional[tp.Symbols] = None,
+        index_stack_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> ArrayWrapper:
+        """Get wrapper with symbols as columns."""
+        if self.feature_oriented:
+            wrapper = self.wrapper
+        else:
+            if index_stack_kwargs is None:
+                index_stack_kwargs = {}
+            if symbols is None:
+                symbols = self.symbols
+                ndim = 1 if self.single_symbol else 2
+            else:
+                if self.has_multiple_keys(symbols):
+                    ndim = 2
+                else:
+                    symbols = [symbols]
+                    ndim = 1
+                for symbol in symbols:
+                    self.assert_has_symbol(symbol)
+            if isinstance(self.level_name, tuple):
+                symbol_columns = pd.MultiIndex.from_tuples(symbols, names=self.level_name)
+            else:
+                symbol_columns = pd.Index(symbols, name=self.level_name)
+            wrapper = self.wrapper.replace(
+                columns=symbol_columns,
+                ndim=ndim,
+                grouper=None,
+                **kwargs,
+            )
+
+        symbol_classes = []
+        all_have_symbol_classes = True
+        for symbol in symbols:
+            if symbol in self.symbol_classes:
+                classes = self.symbol_classes[symbol]
+                if len(classes) > 0:
+                    symbol_classes.append(classes)
+                else:
+                    all_have_symbol_classes = False
+            else:
+                all_have_symbol_classes = False
+        if len(symbol_classes) > 0 and not all_have_symbol_classes:
+            raise ValueError("Some symbols have symbol classes while others not")
+        if len(symbol_classes) > 0:
+            symbol_classes_frame = pd.DataFrame(symbol_classes)
+            if len(symbol_classes_frame.columns) == 1:
+                symbol_classes_columns = pd.Index(symbol_classes_frame.iloc[:, 0])
+            else:
+                symbol_classes_columns = pd.MultiIndex.from_frame(symbol_classes_frame)
+            symbol_columns = stack_indexes((symbol_classes_columns, wrapper.columns), **index_stack_kwargs)
+            wrapper = wrapper.replace(columns=symbol_columns)
+        return wrapper
+
+    @cached_property
+    def symbol_wrapper(self) -> ArrayWrapper:
+        return self.get_symbol_wrapper()
+
+    @property
+    def features(self) -> tp.List[tp.Feature]:
+        if self.feature_oriented:
+            return self.keys
+        return self.wrapper.columns.tolist()
+
+    @property
+    def symbols(self) -> tp.List[tp.Symbol]:
+        if self.feature_oriented:
+            return self.wrapper.columns.tolist()
+        return self.keys
+
+    def select_feature_idxs(self: DataT, idxs: tp.MaybeSequence[int], **kwargs) -> DataT:
+        if self.feature_oriented:
+            return self.select(self.keys[idxs], **kwargs)
+
+        return self.iloc[:, idxs]
+
+    def select_symbol_idxs(self: DataT, idxs: tp.MaybeSequence[int], **kwargs) -> DataT:
+        if self.feature_oriented:
+            return self.iloc[:, idxs]
+
+        return self.select(self.keys[idxs], **kwargs)
+
+    def concat(self, keys: tp.Optional[tp.Symbols] = None) -> dict:
+        """Concatenate keys along columns."""
+        if self.feature_oriented:
+            single_key = self.single_feature
+            if keys is None:
+                key_wrapper = self.feature_wrapper
+            else:
+                key_wrapper = self.get_feature_wrapper(features=keys)
+        else:
+            single_key = self.single_symbol
+            if keys is None:
+                key_wrapper = self.symbol_wrapper
+            else:
+                key_wrapper = self.get_symbol_wrapper(symbols=keys)
+        if keys is None:
+            keys = self.keys
+
+        new_data = {}
+        first_data = self.data[keys[0]]
+        if single_key:
+            if checks.is_series(first_data):
+                new_data[first_data.name] = key_wrapper.wrap(first_data.values, zero_to_none=False)
+            else:
+                for c in first_data.columns:
+                    new_data[c] = key_wrapper.wrap(first_data[c].values, zero_to_none=False)
+        else:
+            if checks.is_series(first_data):
+                columns = pd.Index([first_data.name])
+            else:
+                columns = first_data.columns
+            for c in columns:
+                col_data = []
+                for k in keys:
+                    if checks.is_series(self.data[k]):
+                        col_data.append(self.data[k].values)
+                    else:
+                        col_data.append(self.data[k][c].values)
+                new_data[c] = key_wrapper.wrap(np.column_stack(col_data), zero_to_none=False)
+
+        return new_data
+
+    def get(
+        self,
+        features: tp.Union[None, tp.Feature, tp.Features] = None,
+        symbols: tp.Union[None, tp.Symbol, tp.Symbols] = None,
+        **kwargs,
+    ) -> tp.MaybeTuple[tp.SeriesFrame]:
+        if symbols is None:
+            single_symbol = self.single_symbol
+            symbols = self.keys
+        else:
+            if self.has_multiple_keys(symbols):
+                single_symbol = False
+            else:
+                single_symbol = True
+                symbols = [symbols]
+
+        if single_symbol:
+            if features is None:
+                return self.data[symbols[0]]
+            if self.has_multiple_keys(features):
+                feature_idxs = [self.get_feature_idx(k, raise_error=True) for k in features]
+                return self.data[symbols[0]].iloc[:, feature_idxs]
+            feature_idx = self.get_feature_idx(features, raise_error=True)
+            return self.data[symbols[0]].iloc[:, feature_idx]
+
+        concat_data = self.concat(symbols, **kwargs)
+        if len(concat_data) == 1:
+            return tuple(concat_data.values())[0]
+        if features is not None:
+            if self.has_multiple_keys(features):
+                return tuple([concat_data[c] for c in features])
+            return concat_data[features]
+        return tuple(concat_data.values())
 
     # ############# Pre- and post-processing ############# #
 
@@ -750,10 +1183,10 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
     @classmethod
     def align_index(
         cls,
-        data: symbol_dict,
+        data: dict,
         missing: tp.Optional[str] = None,
         silence_warnings: tp.Optional[bool] = None,
-    ) -> symbol_dict:
+    ) -> dict:
         """Align data to have the same index.
 
         The argument `missing` accepts the following values:
@@ -796,17 +1229,16 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
                     else:
                         raise ValueError(f"Invalid option missing='{missing}'")
 
-        # reindex
-        new_data = symbol_dict({symbol: obj.reindex(index=index) for symbol, obj in data.items()})
-        return new_data
+        new_data = {symbol: obj.reindex(index=index) for symbol, obj in data.items()}
+        return type(data)(new_data)
 
     @classmethod
     def align_columns(
         cls,
-        data: symbol_dict,
+        data: dict,
         missing: tp.Optional[str] = None,
         silence_warnings: tp.Optional[bool] = None,
-    ) -> symbol_dict:
+    ) -> dict:
         """Align data to have the same columns.
 
         See `Data.align_index` for `missing`."""
@@ -854,8 +1286,7 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
                     else:
                         raise ValueError(f"Invalid option missing='{missing}'")
 
-        # reindex
-        new_data = symbol_dict()
+        new_data = {}
         for symbol, obj in data.items():
             if checks.is_series(obj):
                 obj = obj.to_frame()
@@ -865,25 +1296,7 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
                 if name_is_none:
                     obj = obj.rename(None)
             new_data[symbol] = obj
-        return new_data
-
-    @staticmethod
-    def select_symbol_kwargs(symbol: tp.Symbol, kwargs: tp.DictLike) -> dict:
-        """Select keyword arguments belonging to `symbol`."""
-        if kwargs is None:
-            return {}
-        if isinstance(kwargs, symbol_dict):
-            if symbol not in kwargs:
-                return {}
-            kwargs = kwargs[symbol]
-        _kwargs = {}
-        for k, v in kwargs.items():
-            if isinstance(v, symbol_dict):
-                if symbol in v:
-                    _kwargs[k] = v[symbol]
-            else:
-                _kwargs[k] = v
-        return _kwargs
+        return type(data)(new_data)
 
     def switch_class(
         self,
@@ -894,52 +1307,62 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
     ) -> DataT:
         """Switch the class of the data instance."""
         if clear_fetch_kwargs:
-            new_fetch_kwargs = symbol_dict({k: dict() for k in self.symbols})
+            new_fetch_kwargs = symbol_dict({k: {} for k in self.symbols})
         else:
             new_fetch_kwargs = copy_dict(self.fetch_kwargs)
         if clear_returned_kwargs:
-            new_returned_kwargs = symbol_dict({k: dict() for k in self.symbols})
+            new_returned_kwargs = symbol_dict({k: {} for k in self.symbols})
         else:
             new_returned_kwargs = copy_dict(self.returned_kwargs)
         return self.replace(cls_=new_cls, fetch_kwargs=new_fetch_kwargs, returned_kwargs=new_returned_kwargs, **kwargs)
 
+    # ############# Inverting ############# #
+
     @classmethod
-    def invert_data(cls, pd_dict: tp.Dict[tp.Hashable, tp.SeriesFrame]) -> tp.Dict[tp.Hashable, tp.SeriesFrame]:
+    def invert_data(cls, dct: tp.Dict[tp.Hashable, tp.SeriesFrame]) -> tp.Dict[tp.Hashable, tp.SeriesFrame]:
         """Invert data by swapping keys and columns."""
-        if len(pd_dict) == 0:
-            return pd_dict
-        new_pd_dict = defaultdict(list)
-        for k, v in pd_dict.items():
+        if len(dct) == 0:
+            return dct
+        new_dct = defaultdict(list)
+        for k, v in dct.items():
             if isinstance(v, pd.Series):
-                new_pd_dict[v.name].append(v.rename(k))
+                new_dct[v.name].append(v.rename(k))
             else:
                 for c in v.columns:
-                    new_pd_dict[c].append(v[c].rename(k))
-        new_pd_dict2 = {}
-        for k, v in new_pd_dict.items():
+                    new_dct[c].append(v[c].rename(k))
+        new_dct2 = {}
+        for k, v in new_dct.items():
             if len(v) == 1:
-                new_pd_dict2[k] = v[0]
+                new_dct2[k] = v[0]
             else:
-                new_pd_dict2[k] = pd.concat(v, axis=1)
-        return new_pd_dict2
+                new_dct2[k] = pd.concat(v, axis=1)
+        return new_dct2
+
+    def invert(self: DataT, index_stack_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
+        """Invert the data using `Data.invert_data` and return a new `Data` instance.
+
+        The data will become feature-oriented if it's symbol-oriented and vice versa."""
+        pass
+
+    # ############# Creation ############# #
 
     @classmethod
     def from_data(
         cls: tp.Type[DataT],
-        data: tp.Union[symbol_dict, tp.SeriesFrame],
-        symbol_oriented: bool = False,
+        data: tp.Union[dict, tp.SeriesFrame],
+        symbol_columns: bool = False,
         single_symbol: bool = True,
-        symbol_classes: tp.Optional[symbol_dict] = None,
+        symbol_classes: tp.Optional[dict] = None,
         level_name: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
         tz_localize: tp.Union[None, bool, tp.TimezoneLike] = None,
         tz_convert: tp.Union[None, bool, tp.TimezoneLike] = None,
         missing_index: tp.Optional[str] = None,
         missing_columns: tp.Optional[str] = None,
         wrapper_kwargs: tp.KwargsLike = None,
-        fetch_kwargs: tp.Optional[symbol_dict] = None,
-        returned_kwargs: tp.Optional[symbol_dict] = None,
-        last_index: tp.Optional[symbol_dict] = None,
-        delisted: tp.Optional[symbol_dict] = None,
+        fetch_kwargs: tp.Optional[dict] = None,
+        returned_kwargs: tp.Optional[dict] = None,
+        last_index: tp.Optional[dict] = None,
+        delisted: tp.Optional[dict] = None,
         silence_warnings: tp.Optional[bool] = None,
         **kwargs,
     ) -> DataT:
@@ -947,7 +1370,7 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
 
         Args:
             data (dict): Dictionary of array-like objects keyed by symbol.
-            symbol_oriented (bool): Whether columns are symbols and should be swapped.
+            symbol_columns (bool): Whether columns are symbols and should be swapped.
 
                 Uses `Data.invert_data`.
             single_symbol (bool): Whether there is only one symbol in `data`.
@@ -982,19 +1405,19 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
         if symbol_classes is None:
-            symbol_classes = symbol_dict()
+            symbol_classes = {}
         if fetch_kwargs is None:
-            fetch_kwargs = symbol_dict()
+            fetch_kwargs = {}
         if returned_kwargs is None:
-            returned_kwargs = symbol_dict()
+            returned_kwargs = {}
         if last_index is None:
-            last_index = symbol_dict()
+            last_index = {}
         if delisted is None:
-            delisted = symbol_dict()
+            delisted = {}
 
         if isinstance(data, (pd.Series, pd.DataFrame)):
             data = dict(symbol=data)
-        if symbol_oriented:
+        if symbol_columns:
             data = cls.invert_data(data)
 
         data = symbol_dict(data)
@@ -1019,20 +1442,35 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
         wrapper = ArrayWrapper.from_obj(data[symbols[0]], **wrapper_kwargs)
         return cls(
             wrapper,
-            data,
+            symbol_dict(data),
             single_symbol=single_symbol,
-            symbol_classes=symbol_classes,
+            symbol_classes=symbol_dict(symbol_classes),
             level_name=level_name,
-            fetch_kwargs=fetch_kwargs,
-            returned_kwargs=returned_kwargs,
-            last_index=last_index,
-            delisted=delisted,
+            fetch_kwargs=symbol_dict(fetch_kwargs),
+            returned_kwargs=symbol_dict(returned_kwargs),
+            last_index=symbol_dict(last_index),
+            delisted=symbol_dict(delisted),
             tz_localize=tz_localize,
             tz_convert=tz_convert,
             missing_index=missing_index,
             missing_columns=missing_columns,
             **kwargs,
         )
+
+    @classmethod
+    def from_data_str(cls: tp.Type[DataT], data_str: str) -> DataT:
+        """Parse a `Data` instance from a string.
+
+        For example: `YFData:BTC-USD` or just `BTC-USD` where the data class is
+        `vectorbtpro.data.custom.YFData` by default."""
+        from vectorbtpro.data import custom
+
+        if ":" in data_str:
+            cls_name, symbol = data_str.split(":")
+            cls_name = cls_name.strip()
+            symbol = symbol.strip()
+            return getattr(custom, cls_name).fetch(symbol)
+        return custom.YFData.fetch(data_str.strip())
 
     # ############# Fetching ############# #
 
@@ -1139,25 +1577,23 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
         """
         data_cfg = cls.get_settings(key_id="base")
 
-        fetch_kwargs = symbol_dict()
-        if checks.is_hashable(symbols):
-            single_symbol = True
-            symbols = [symbols]
-        elif isinstance(symbols, dict):
+        fetch_kwargs = {}
+        if isinstance(symbols, dict):
             new_symbols = []
             for symbol, symbol_fetch_kwargs in symbols.items():
                 new_symbols.append(symbol)
                 fetch_kwargs[symbol] = symbol_fetch_kwargs
             symbols = new_symbols
             single_symbol = False
-        elif checks.is_iterable(symbols):
+        elif cls.has_multiple_keys(symbols):
             symbols = list(symbols)
             single_symbol = False
         else:
-            raise TypeError("Symbols must be either a hashable or a sequence of hashable")
+            single_symbol = True
+            symbols = [symbols]
         if symbol_classes is not None:
             if not isinstance(symbol_classes, symbol_dict):
-                new_symbol_classes = symbol_dict()
+                new_symbol_classes = {}
                 single_class = checks.is_hashable(symbol_classes) or isinstance(symbol_classes, dict)
                 if single_class:
                     for symbol in symbols:
@@ -1206,8 +1642,8 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
         if return_raw:
             return outputs
 
-        data = symbol_dict()
-        returned_kwargs = symbol_dict()
+        data = {}
+        returned_kwargs = {}
         for i, out in enumerate(outputs):
             symbol = symbols[i]
             if out is not None:
@@ -1260,21 +1696,6 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
             returned_kwargs=returned_kwargs,
             silence_warnings=silence_warnings,
         )
-
-    @classmethod
-    def from_data_str(cls: tp.Type[DataT], data_str: str) -> DataT:
-        """Parse a `Data` instance from a string.
-
-        For example: `YFData:BTC-USD` or just `BTC-USD` where the data class is
-        `vectorbtpro.data.custom.YFData` by default."""
-        from vectorbtpro.data import custom
-
-        if ":" in data_str:
-            cls_name, symbol = data_str.split(":")
-            cls_name = cls_name.strip()
-            symbol = symbol.strip()
-            return getattr(custom, cls_name).fetch(symbol)
-        return custom.YFData.fetch(data_str.strip())
 
     # ############# Updating ############# #
 
@@ -1347,6 +1768,9 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
         !!! note
             Returns a new `Data` instance instead of changing the data in place.
         """
+        if self.feature_oriented:
+            raise TypeError("This operation doesn't support feature-oriented data")
+
         data_cfg = self.get_settings(key_id="base")
 
         if skip_on_error is None:
@@ -1384,9 +1808,9 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
         if return_raw:
             return outputs
 
-        new_data = symbol_dict()
-        new_last_index = symbol_dict()
-        new_returned_kwargs = symbol_dict()
+        new_data = {}
+        new_last_index = {}
+        new_returned_kwargs = {}
         i = 0
         for symbol, obj in self.data.items():
             if self.delisted.get(symbol, False):
@@ -1506,9 +1930,9 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
             new_index = new_data[self.symbols[0]].index
             return self.replace(
                 wrapper=self.wrapper.replace(index=new_index),
-                data=new_data,
-                returned_kwargs=new_returned_kwargs,
-                last_index=new_last_index,
+                data=symbol_dict(new_data),
+                returned_kwargs=symbol_dict(new_returned_kwargs),
+                last_index=symbol_dict(new_last_index),
             )
 
         # Append the new data to the old data
@@ -1526,177 +1950,104 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
 
         return self.replace(
             wrapper=self.wrapper.replace(index=new_index),
-            data=new_data,
-            returned_kwargs=new_returned_kwargs,
-            last_index=new_last_index,
+            data=symbol_dict(new_data),
+            returned_kwargs=symbol_dict(new_returned_kwargs),
+            last_index=symbol_dict(new_last_index),
         )
-
-    # ############# Concatenation ############# #
-
-    def concat(
-        self,
-        symbols: tp.Optional[tp.Symbols] = None,
-        index_stack_kwargs: tp.KwargsLike = None,
-    ) -> dict:
-        """Return a dict of Series/DataFrames with symbols as columns, keyed by column name."""
-        symbol_wrapper = self.get_symbol_wrapper(symbols=symbols, index_stack_kwargs=index_stack_kwargs)
-        if symbols is None:
-            symbols = self.symbols
-
-        new_data = {}
-        first_data = self.data[symbols[0]]
-        if self.single_symbol:
-            if checks.is_series(first_data):
-                new_data[first_data.name] = symbol_wrapper.wrap(first_data.values, zero_to_none=False)
-            else:
-                for c in first_data.columns:
-                    new_data[c] = symbol_wrapper.wrap(first_data[c].values, zero_to_none=False)
-        else:
-            if checks.is_series(first_data):
-                columns = pd.Index([first_data.name])
-            else:
-                columns = first_data.columns
-            for c in columns:
-                col_data = []
-                for s in symbols:
-                    if checks.is_series(self.data[s]):
-                        col_data.append(self.data[s].values)
-                    else:
-                        col_data.append(self.data[s][c].values)
-                new_data[c] = symbol_wrapper.wrap(np.column_stack(col_data), zero_to_none=False)
-
-        return new_data
-
-    # ############# Getting ############# #
-
-    @property
-    def column_wrapper(self) -> ArrayWrapper:
-        return self.wrapper
-
-    def get_symbol_wrapper(
-        self,
-        symbols: tp.Optional[tp.Symbols] = None,
-        index_stack_kwargs: tp.KwargsLike = None,
-        **kwargs,
-    ) -> ArrayWrapper:
-        """Get wrapper where columns are symbols."""
-        if index_stack_kwargs is None:
-            index_stack_kwargs = {}
-        if symbols is None:
-            symbols = self.symbols
-            ndim = 1 if self.single_symbol else 2
-        else:
-            if isinstance(symbols, list):
-                ndim = 2
-            else:
-                symbols = [symbols]
-                ndim = 1
-        if isinstance(self.level_name, tuple):
-            symbol_columns = pd.MultiIndex.from_tuples(symbols, names=self.level_name)
-        else:
-            symbol_columns = pd.Index(symbols, name=self.level_name)
-        symbol_classes = []
-        all_have_symbol_classes = True
-        for symbol in symbols:
-            if symbol in self.symbol_classes:
-                classes = self.symbol_classes[symbol]
-                if len(classes) > 0:
-                    symbol_classes.append(classes)
-                else:
-                    all_have_symbol_classes = False
-            else:
-                all_have_symbol_classes = False
-        if len(symbol_classes) > 0 and not all_have_symbol_classes:
-            raise ValueError("Some symbols have symbol classes while others not")
-        if len(symbol_classes) > 0:
-            symbol_classes_frame = pd.DataFrame(symbol_classes)
-            if len(symbol_classes_frame.columns) == 1:
-                symbol_classes_columns = pd.Index(symbol_classes_frame.iloc[:, 0])
-            else:
-                symbol_classes_columns = pd.MultiIndex.from_frame(symbol_classes_frame)
-            symbol_columns = stack_indexes((symbol_classes_columns, symbol_columns), **index_stack_kwargs)
-        return self.wrapper.replace(
-            columns=symbol_columns,
-            ndim=ndim,
-            grouper=None,
-            **kwargs,
-        )
-
-    @property
-    def symbol_wrapper(self) -> ArrayWrapper:
-        return self.get_symbol_wrapper()
-
-    def get(
-        self,
-        column: tp.Optional[tp.Label] = None,
-        symbol: tp.Optional[tp.Symbol] = None,
-        columns: tp.Optional[tp.Labels] = None,
-        symbols: tp.Optional[tp.Symbols] = None,
-        **kwargs,
-    ) -> tp.MaybeTuple[tp.SeriesFrame]:
-        if column is not None and columns is not None:
-            raise ValueError("Cannot provide both column and columns")
-        if symbol is not None and symbols is not None:
-            raise ValueError("Cannot provide both symbol and symbols")
-        if column is not None:
-            columns = column
-        if symbol is not None:
-            symbols = symbol
-        if symbols is None:
-            single_symbol = self.single_symbol
-            symbols = self.symbols
-        else:
-            if isinstance(symbols, list):
-                single_symbol = False
-            else:
-                single_symbol = True
-                symbols = [symbols]
-
-        if single_symbol:
-            if columns is None:
-                return self.data[symbols[0]]
-            return self.data[symbols[0]][columns]
-
-        concat_data = self.concat(symbols=symbols, **kwargs)
-        if len(concat_data) == 1:
-            return tuple(concat_data.values())[0]
-        if columns is not None:
-            if isinstance(columns, list):
-                return tuple([concat_data[c] for c in columns])
-            return concat_data[columns]
-        return tuple(concat_data.values())
 
     # ############# Selecting ############# #
 
-    def select(self: DataT, symbols: tp.Union[tp.Symbol, tp.Symbols], **kwargs) -> DataT:
-        """Create a new `Data` instance with one or more symbols from this instance."""
-        if isinstance(symbols, list):
-            single_symbol = False
+    @classmethod
+    def select_symbol_kwargs(cls, symbol: tp.Symbol, kwargs: tp.DictLike) -> dict:
+        """Select keyword arguments belonging to a symbol."""
+        if kwargs is None:
+            return {}
+        if isinstance(kwargs, symbol_dict):
+            if symbol not in kwargs:
+                return {}
+            kwargs = kwargs[symbol]
+        _kwargs = {}
+        for k, v in kwargs.items():
+            if isinstance(v, symbol_dict):
+                if symbol in v:
+                    _kwargs[k] = v[symbol]
+            else:
+                _kwargs[k] = v
+        return _kwargs
+
+    @classmethod
+    def select_feature_kwargs(cls, feature: tp.Feature, kwargs: tp.DictLike) -> dict:
+        """Select keyword arguments belonging to a feature."""
+        if kwargs is None:
+            return {}
+        if isinstance(kwargs, feature_dict):
+            if feature not in kwargs:
+                return {}
+            kwargs = kwargs[feature]
+        _kwargs = {}
+        for k, v in kwargs.items():
+            if isinstance(v, feature_dict):
+                if feature in v:
+                    _kwargs[k] = v[feature]
+            else:
+                _kwargs[k] = v
+        return _kwargs
+
+    @classmethod
+    def select_from_dict(cls, dct: dict, keys: tp.Keys, raise_error: bool = False) -> dict:
+        """Select keys from a dict."""
+        if raise_error:
+            return type(dct)({k: dct[k] for k in keys})
+        return type(dct)({k: dct[k] for k in keys if k in dct})
+
+    def select(self: DataT, keys: tp.Union[tp.Key, tp.Keys], **kwargs) -> DataT:
+        """Create a new `Data` instance with one or more keys from this instance.
+
+        Applies to symbols if data has the type `symbol_dict` and features if `feature_dict`."""
+        if self.has_multiple_keys(keys):
+            single_key = False
         else:
-            single_symbol = True
-            symbols = [symbols]
+            single_key = True
+            keys = [keys]
+
+        if self.feature_oriented:
+            return self.replace(
+                data=self.select_from_dict(self.data, keys, raise_error=True),
+                single_feature=single_key,
+                **kwargs,
+            )
         return self.replace(
-            data=symbol_dict({k: self.data[k] for k in symbols}),
-            single_symbol=single_symbol,
-            symbol_classes=symbol_dict({k: self.symbol_classes[k] for k in symbols if k in self.symbol_classes}),
-            fetch_kwargs=symbol_dict({k: self.fetch_kwargs[k] for k in symbols if k in self.fetch_kwargs}),
-            returned_kwargs=symbol_dict({k: self.returned_kwargs[k] for k in symbols if k in self.returned_kwargs}),
-            last_index=symbol_dict({k: self.last_index[k] for k in symbols if k in self.last_index}),
-            delisted=symbol_dict({k: self.delisted[k] for k in symbols if k in self.delisted}),
+            data=self.select_from_dict(self.data, keys, raise_error=True),
+            single_symbol=single_key,
+            symbol_classes=self.select_from_dict(self.symbol_classes, keys),
+            fetch_kwargs=self.select_from_dict(self.fetch_kwargs, keys),
+            returned_kwargs=self.select_from_dict(self.returned_kwargs, keys),
+            last_index=self.select_from_dict(self.last_index, keys),
+            delisted=self.select_from_dict(self.delisted, keys),
             **kwargs,
         )
 
     # ############# Renaming ############# #
 
-    def rename(self: DataT, rename: tp.Dict[tp.Hashable, tp.Hashable]) -> DataT:
-        """Rename symbols using `rename` dict that maps old symbols and new symbols."""
+    @classmethod
+    def rename_in_dict(cls, dct: dict, rename_dct: tp.Dict[tp.Key, tp.Key]) -> dict:
+        """Rename keys in a dict."""
+        return type(dct)({rename_dct.get(k, k): v for k, v in dct.items()})
+
+    def rename(self: DataT, rename_dct: tp.Dict[tp.Hashable, tp.Hashable]) -> DataT:
+        """Rename symbols using `rename` dict that maps old keys to new keys.
+
+        Applies to symbols if data has the type `symbol_dict` and features if `feature_dict`."""
+        if self.feature_oriented:
+            return self.replace(data=self.rename_in_dict(self.data, rename_dct))
+
         return self.replace(
-            data={rename.get(k, k): v for k, v in self.data.items()},
-            symbol_classes={rename.get(k, k): v for k, v in self.symbol_classes.items()},
-            fetch_kwargs={rename.get(k, k): v for k, v in self.fetch_kwargs.items()},
-            returned_kwargs={rename.get(k, k): v for k, v in self.returned_kwargs.items()},
-            last_index={rename.get(k, k): v for k, v in self.last_index.items()},
-            delisted={rename.get(k, k): v for k, v in self.delisted.items()},
+            data=self.rename_in_dict(self.data, rename_dct),
+            symbol_classes=self.rename_in_dict(self.symbol_classes, rename_dct),
+            fetch_kwargs=self.rename_in_dict(self.fetch_kwargs, rename_dct),
+            returned_kwargs=self.rename_in_dict(self.returned_kwargs, rename_dct),
+            last_index=self.rename_in_dict(self.last_index, rename_dct),
+            delisted=self.rename_in_dict(self.delisted, rename_dct),
         )
 
     # ############# Merging ############# #
@@ -1716,14 +2067,16 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
             datas = datas[0]
         datas = list(datas)
 
-        data = symbol_dict()
+        data = {}
         single_symbol = True
-        symbol_classes = symbol_dict()
-        fetch_kwargs = symbol_dict()
-        returned_kwargs = symbol_dict()
-        last_index = symbol_dict()
-        delisted = symbol_dict()
+        symbol_classes = {}
+        fetch_kwargs = {}
+        returned_kwargs = {}
+        last_index = {}
+        delisted = {}
         for instance in datas:
+            if instance.feature_oriented:
+                raise TypeError("This operation doesn't support feature-oriented data")
             if not instance.single_symbol:
                 single_symbol = False
             for s in instance.symbols:
@@ -1775,6 +2128,9 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
         to the directory, not file! If there's only one file, you can specify the file path via
         `path_or_buf`. If there are multiple files, use the same argument but wrap the multiple paths
         with `symbol_dict`."""
+        if self.feature_oriented:
+            raise TypeError("This operation doesn't support feature-oriented data")
+
         for k, v in self.data.items():
             if path_or_buf is None:
                 if isinstance(dir_path, symbol_dict):
@@ -1828,6 +2184,9 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
         If `file_path` exists, and it's a directory, will create inside it a file named
         after this class. This won't work with directories that do not exist, otherwise
         they could be confused with file names."""
+        if self.feature_oriented:
+            raise TypeError("This operation doesn't support feature-oriented data")
+
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("tables")
@@ -1913,6 +2272,9 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
         If multiple symbols and `per_symbol` is True, passes each Series/DataFrame to `transform_func` in a loop.
         If multiple symbols and `per_symbol` is False, concatenates all the data into a single DataFrame
         and calls `transform_func` on it. Then, splits the data by symbol and builds a new `Data` instance."""
+        if self.feature_oriented:
+            raise TypeError("This operation doesn't support feature-oriented data")
+
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
         if len(self.symbols) == 1:
@@ -1922,7 +2284,7 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
             new_data = symbol_dict({self.symbols[0]: new_concat_data})
         elif per_symbol:
             new_wrapper = None
-            new_data = symbol_dict()
+            new_data = {}
             for k in self.symbols:
                 new_v = transform_func(self.data[k], *args, **kwargs)
                 _new_wrapper = ArrayWrapper.from_obj(new_v, **wrapper_kwargs)
@@ -1966,13 +2328,16 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
         )
 
     def resample(self: DataT, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> DataT:
-        """Perform resampling on `Data` based on `Data.column_config`.
+        """Perform resampling on `Data` based on `Data.feature_config`.
 
         Columns "open", "high", "low", "close", "volume", "trade count", and "vwap" (case-insensitive)
         are recognized and resampled automatically.
 
-        Looks for `resample_func` of each column in `Data.column_config`. The function must
+        Looks for `resample_func` of each feature in `Data.feature_config`. The function must
         accept the `Data` instance, object, and resampler."""
+        if self.feature_oriented:
+            raise TypeError("This operation doesn't support feature-oriented data")
+
         if wrapper_meta is None:
             wrapper_meta = self.wrapper.resample_meta(*args, **kwargs)
         new_data = symbol_dict()
@@ -1987,7 +2352,7 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
                     obj = v
                 else:
                     obj = v[c]
-                resample_func = self.column_config.get(c, {}).get("resample_func", None)
+                resample_func = self.feature_config.get(c, {}).get("resample_func", None)
                 if resample_func is not None:
                     if isinstance(resample_func, str):
                         new_v.append(obj.vbt.resample_apply(wrapper_meta["resampler"], resample_func))
@@ -2029,7 +2394,7 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
                             )
                         )
                     else:
-                        raise ValueError(f"Cannot resample column '{c}'. Specify resample_func in column_config.")
+                        raise ValueError(f"Cannot resample feature '{c}'. Specify resample_func in feature_config.")
             if checks.is_series(v):
                 new_v = new_v[0]
             else:
@@ -2050,14 +2415,17 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
     ) -> DataT:
         """Perform realigning on `Data`.
 
-        Looks for `realign_func` of each column in `Data.column_config`. If no function provided,
-        resamples column "open" with `vectorbtpro.generic.accessors.GenericAccessor.resample_opening`
-        and other columns with `vectorbtpro.generic.accessors.GenericAccessor.resample_closing`."""
+        Looks for `realign_func` of each feature in `Data.feature_config`. If no function provided,
+        resamples feature "open" with `vectorbtpro.generic.accessors.GenericAccessor.resample_opening`
+        and other features with `vectorbtpro.generic.accessors.GenericAccessor.resample_closing`."""
+        if self.feature_oriented:
+            raise TypeError("This operation doesn't support feature-oriented data")
+
         if rule is None:
             rule = self.wrapper.freq
         if wrapper_meta is None:
             wrapper_meta = self.wrapper.resample_meta(rule, *args, **kwargs)
-        new_data = symbol_dict()
+        new_data = {}
         for k, v in self.data.items():
             if checks.is_series(v):
                 columns = [v.name]
@@ -2069,7 +2437,7 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
                     obj = v
                 else:
                     obj = v[c]
-                realign_func = self.column_config.get(c, {}).get("realign_func", None)
+                realign_func = self.feature_config.get(c, {}).get("realign_func", None)
                 if realign_func is not None:
                     if isinstance(realign_func, str):
                         new_v.append(getattr(obj.vbt, realign_func)(wrapper_meta["resampler"], ffill=ffill))
@@ -2109,7 +2477,7 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
         """Run a function on data.
 
         Looks into the signature of the function and searches for arguments with the name `data` or
-        those found among columns or attributes.
+        those found among features or attributes.
 
         For example, the argument `open` will be substituted by `Data.open`.
 
@@ -2134,6 +2502,9 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
 
         Any argument in `*args` and `**kwargs` can be wrapped with `run_func_dict`/`run_arg_dict`
         to specify the value per function/argument name or index when `func` is iterable."""
+        if self.feature_oriented:
+            raise TypeError("This operation doesn't support feature-oriented data")
+
         from vectorbtpro.indicators.factory import IndicatorBase, IndicatorFactory
         from vectorbtpro.portfolio.base import Portfolio
 
@@ -2237,7 +2608,7 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
         if isinstance(func, type) and issubclass(func, IndicatorBase):
             func = func.run
 
-        with_kwargs = dict()
+        with_kwargs = {}
         for arg_name in get_func_arg_names(func):
             real_arg_name = arg_name
             if rename_args is not None:
@@ -2265,9 +2636,9 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
                 elif arg_name == "returns":
                     with_kwargs[real_arg_name] = _self.returns
                 else:
-                    column_idx = _self.get_column_index(arg_name)
-                    if column_idx != -1:
-                        with_kwargs[real_arg_name] = _self.get_column(column_idx)
+                    feature_idx = _self.get_feature_idx(arg_name)
+                    if feature_idx != -1:
+                        with_kwargs[real_arg_name] = _self.get_feature(feature_idx)
         new_args, new_kwargs = extend_args(func, args, kwargs, **with_kwargs)
         out = func(*new_args, **new_kwargs)
         if isinstance(out, IndicatorBase):
@@ -2353,35 +2724,35 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
 
     def plot(
         self,
-        column: tp.Optional[tp.Label] = None,
+        feature: tp.Optional[tp.Label] = None,
         symbol: tp.Optional[tp.Symbol] = None,
-        column_names: tp.KwargsLike = None,
+        feature_map: tp.KwargsLike = None,
         plot_volume: tp.Optional[bool] = None,
         base: tp.Optional[float] = None,
         **kwargs,
     ) -> tp.Union[tp.BaseFigure, tp.TraceUpdater]:
-        """Plot either one column of multiple symbols, or OHLC(V) of one symbol.
+        """Plot either one feature of multiple symbols, or OHLC(V) of one symbol.
 
         Args:
-            column (str): Name of the column to plot.
+            feature (str): Name of the feature to plot.
             symbol (str): Symbol to plot.
-            column_names (sequence of str): Dictionary mapping the column names to OHLCV.
+            feature_map (sequence of str): Dictionary mapping the feature names to OHLCV.
 
                 Applied only if OHLC(V) is plotted.
             plot_volume (bool): Whether to plot volume beneath.
 
                 Applied only if OHLC(V) is plotted.
-            base (float): Rebase all series of a column to a given initial base.
+            base (float): Rebase all series of a feature to a given initial base.
 
                 !!! note
-                    The column must contain prices.
+                    The feature must contain prices.
 
                 Applied only if lines are plotted.
             kwargs (dict): Keyword arguments passed to `vectorbtpro.generic.accessors.GenericAccessor.plot`
                 for lines and to `vectorbtpro.ohlcv.accessors.OHLCVDFAccessor.plot` for OHLC(V).
 
         Usage:
-            * Plot the lines of one column across all symbols:
+            * Plot the lines of one feature across all symbols:
 
             ```pycon
             >>> import vectorbtpro as vbt
@@ -2394,10 +2765,10 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
             [=100% "100%"]{: .candystripe}
 
             ```pycon
-            >>> data.plot(column='Close', base=1).show()
+            >>> data.plot(feature='Close', base=1).show()
             ```
 
-            * Plot OHLC(V) of one symbol (only if data contains the respective columns):
+            * Plot OHLC(V) of one symbol (only if data contains the respective features):
 
             ![](/assets/images/api/data_plot.svg){: .iimg loading=lazy }
 
@@ -2407,29 +2778,26 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
 
             ![](/assets/images/api/data_plot_ohlcv.svg){: .iimg loading=lazy }
         """
-        if column is None:
-            first_data = self.data[self.symbols[0]]
-            if checks.is_frame(first_data):
-                ohlc = first_data.vbt.ohlcv(column_names=column_names).ohlc
-                if ohlc is not None and len(ohlc.columns) == 4:
-                    if symbol is None:
-                        if self.single_symbol or len(self.symbols) == 1:
-                            symbol = self.symbols[0]
-                        else:
-                            raise ValueError("Only one symbol is allowed. Use indexing or symbol argument.")
-                    return (
-                        self.get(
-                            symbols=symbol,
-                        )
-                        .vbt.ohlcv(
-                            column_names=column_names,
-                        )
-                        .plot(
-                            plot_volume=plot_volume,
-                            **kwargs,
-                        )
+        if feature is None:
+            if self.has_ohlc:
+                if symbol is None:
+                    if self.single_symbol or len(self.symbols) == 1:
+                        symbol = self.symbols[0]
+                    else:
+                        raise ValueError("Only one symbol is allowed. Use indexing or symbol argument.")
+                return (
+                    self.get(
+                        symbols=symbol,
                     )
-        self_col = self.select_col(column=column, group_by=False)
+                    .vbt.ohlcv(
+                        feature_map=feature_map,
+                    )
+                    .plot(
+                        plot_volume=plot_volume,
+                        **kwargs,
+                    )
+                )
+        self_col = self.select_col(column=feature, group_by=False)
         if symbol is not None:
             self_col = self_col.select(symbol)
         data = self_col.get()
@@ -2453,7 +2821,7 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
                 """
                 if symbols is None:
                     symbols = self.symbols
-                if not isinstance(symbols, list):
+                if self.has_multiple_keys(symbols):
                     symbols = [symbols]
                 [
                     dict(
@@ -2481,20 +2849,20 @@ class Data(Analyzable, DataWithColumns, OHLCDataMixin, metaclass=MetaData):
     # ############# Docs ############# #
 
     @classmethod
-    def build_column_config_doc(cls, source_cls: tp.Optional[type] = None) -> str:
-        """Build column config documentation."""
+    def build_feature_config_doc(cls, source_cls: tp.Optional[type] = None) -> str:
+        """Build feature config documentation."""
         if source_cls is None:
             source_cls = Data
-        return string.Template(inspect.cleandoc(get_dict_attr(source_cls, "column_config").__doc__)).substitute(
-            {"column_config": cls.column_config.prettify(), "cls_name": cls.__name__},
+        return string.Template(inspect.cleandoc(get_dict_attr(source_cls, "feature_config").__doc__)).substitute(
+            {"feature_config": cls.feature_config.prettify(), "cls_name": cls.__name__},
         )
 
     @classmethod
-    def override_column_config_doc(cls, __pdoc__: dict, source_cls: tp.Optional[type] = None) -> None:
-        """Call this method on each subclass that overrides `Data.column_config`."""
-        __pdoc__[cls.__name__ + ".column_config"] = cls.build_column_config_doc(source_cls=source_cls)
+    def override_feature_config_doc(cls, __pdoc__: dict, source_cls: tp.Optional[type] = None) -> None:
+        """Call this method on each subclass that overrides `Data.feature_config`."""
+        __pdoc__[cls.__name__ + ".feature_config"] = cls.build_feature_config_doc(source_cls=source_cls)
 
 
-Data.override_column_config_doc(__pdoc__)
+Data.override_feature_config_doc(__pdoc__)
 Data.override_metrics_doc(__pdoc__)
 Data.override_subplots_doc(__pdoc__)

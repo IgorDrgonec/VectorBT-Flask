@@ -249,7 +249,7 @@ class BasePFPreparer(BasePreparer):
         """Argument `freq` before casting to nanosecond format."""
         freq = self["freq"]
         if freq is None and self.data is not None:
-            return self.data.freq
+            return self.data.symbol_wrapper.freq
         return freq
 
     @cachedproperty

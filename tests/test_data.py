@@ -1760,7 +1760,7 @@ class TestData:
             ),
             single_symbol=True,
         )
-        ohlcv_data.column_config["Other"] = dict(
+        ohlcv_data.feature_config["Other"] = dict(
             resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(resampler, vbt.nb.mean_reduce_nb)
         )
         assert_frame_equal(
@@ -2182,7 +2182,7 @@ class TestCustom:
         )
         assert_frame_equal(
             vbt.RandomData.fetch(
-                columns=pd.Index([0, 1], name="path"), start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42
+                features=pd.Index([0, 1], name="path"), start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42
             ).get(),
             pd.DataFrame(
                 [
@@ -2282,7 +2282,7 @@ class TestCustom:
         )
         assert_frame_equal(
             vbt.GBMData.fetch(
-                columns=pd.Index([0, 1], name="path"), start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42
+                features=pd.Index([0, 1], name="path"), start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42
             ).get(),
             pd.DataFrame(
                 [

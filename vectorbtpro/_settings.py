@@ -1108,7 +1108,7 @@ _settings["drawdowns"] = drawdowns
 
 ohlcv = child_dict(
     ohlc_type="candlestick",
-    column_map=Config(),
+    feature_map=Config(),
     stats=Config(),
     plots=Config(),
 )
