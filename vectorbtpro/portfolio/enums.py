@@ -2775,8 +2775,8 @@ limit_info_fields = [
     ("init_stop_type", np.int_),
     ("delta", np.float_),
     ("delta_format", np.int_),
-    ("tif", int),
-    ("expiry", int),
+    ("tif", np.int64),
+    ("expiry", np.int64),
     ("time_delta_format", np.int_),
     ("reverse", np.float_),
 ]
@@ -2957,7 +2957,7 @@ Attributes:
 time_info_fields = [
     ("init_idx", np.int_),
     ("init_position", np.float_),
-    ("stop", np.int_),
+    ("stop", np.int64),
     ("exit_price", np.float_),
     ("exit_size", np.float_),
     ("exit_size_type", np.int_),
