@@ -4,6 +4,7 @@
 
 import attr
 import warnings
+import math
 
 import numpy as np
 import pandas as pd
@@ -661,7 +662,8 @@ class Splitter(Analyzable):
         cls: tp.Type[SplitterT],
         index: tp.IndexLike,
         n: int,
-        length: tp.Union[None, int, float, tp.TimedeltaLike] = None,
+        length: tp.Union[None, str, int, float, tp.TimedeltaLike] = None,
+        optimize_anchor_set: int = 1,
         split: tp.Optional[tp.SplitLike] = None,
         split_range_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
@@ -673,6 +675,9 @@ class Splitter(Analyzable):
         If `length` is None, splits the index evenly into `n` non-overlapping ranges
         using `Splitter.from_rolling`. Otherwise, picks `n` evenly-spaced, potentially overlapping
         ranges of a fixed length. For other arguments, see `Splitter.from_rolling`.
+
+        If `length` is "optimize", searches for a length to cover the most of the index.
+        Use `optimize_anchor_set` to provide the index of a set that should become non-overlapping.
 
         Usage:
             * Roll 10 ranges with 100 elements, and split it into 3/4:
@@ -709,6 +714,50 @@ class Splitter(Analyzable):
                 length=len(index) // n,
                 offset=0,
                 offset_anchor="prev_end",
+                offset_anchor_set=None,
+                split=split,
+                split_range_kwargs=split_range_kwargs,
+                template_context=template_context,
+                **kwargs,
+            )
+
+        if isinstance(length, str) and length.lower() == "optimize":
+            from scipy.optimize import minimize_scalar
+
+            if split is not None and not checks.is_float(split):
+                raise TypeError("Split must be a float when length='optimize'")
+            checks.assert_in(optimize_anchor_set, (0, 1))
+
+            if split is None:
+                ratio = 1.0
+            else:
+                ratio = split
+
+            def empty_len_objective(length):
+                if split is None or optimize_anchor_set == 0:
+                    length = int(length)
+                    first_len = int(ratio * length)
+                    second_len = length - first_len
+                    empty_len = len(index) - (n * first_len + second_len)
+                else:
+                    length = int(length)
+                    first_len = int(ratio * length)
+                    second_len = length - first_len
+                    empty_len = len(index) - (n * second_len + first_len)
+                if empty_len >= 0:
+                    return empty_len
+                return len(index)
+
+            length = int(minimize_scalar(empty_len_objective).x)
+            if split is None or optimize_anchor_set == 0:
+                offset = int(ratio * length)
+            else:
+                offset = length - int(ratio * length)
+            return cls.from_rolling(
+                index,
+                length=length,
+                offset=offset,
+                offset_anchor="prev_start",
                 offset_anchor_set=None,
                 split=split,
                 split_range_kwargs=split_range_kwargs,
