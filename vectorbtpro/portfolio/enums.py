@@ -57,6 +57,7 @@ __pdoc__all__ = __all__ = [
     "OrderResult",
     "SignalSegmentContext",
     "SignalContext",
+    "PostSignalContext",
     "FSInOutputs",
     "FOInOutputs",
     "order_fields",
@@ -2370,6 +2371,86 @@ for field in SignalContext._fields:
     if field in SignalSegmentContext._fields:
         __pdoc__["SignalContext." + field] = f"See `SignalSegmentContext.{field}`."
 __pdoc__["SignalContext.col"] = "See `OrderContext.col`."
+
+
+class PostSignalContext(tp.NamedTuple):
+    target_shape: tp.Shape
+    group_lens: tp.Array1d
+    cash_sharing: bool
+    index: tp.Optional[tp.Array1d]
+    freq: tp.Optional[int]
+    open: tp.FlexArray2d
+    high: tp.FlexArray2d
+    low: tp.FlexArray2d
+    close: tp.FlexArray2d
+    init_cash: tp.FlexArray1d
+    init_position: tp.FlexArray1d
+    init_price: tp.FlexArray1d
+
+    order_records: tp.RecordArray2d
+    order_counts: tp.Array1d
+    log_records: tp.RecordArray2d
+    log_counts: tp.Array1d
+
+    track_cash_deposits: bool
+    cash_deposits_out: tp.Array2d
+    track_cash_earnings: bool
+    cash_earnings_out: tp.Array2d
+    in_outputs: tp.Optional[tp.NamedTuple]
+
+    last_cash: tp.Array1d
+    last_position: tp.Array1d
+    last_debt: tp.Array1d
+    last_locked_cash: tp.Array1d
+    last_free_cash: tp.Array1d
+    last_val_price: tp.Array1d
+    last_value: tp.Array1d
+    last_return: tp.Array1d
+
+    last_pos_info: tp.Array1d
+    last_limit_info: tp.Array1d
+    last_sl_info: tp.Array1d
+    last_tsl_info: tp.Array1d
+    last_tp_info: tp.Array1d
+    last_td_info: tp.Array1d
+    last_dt_info: tp.Array1d
+
+    group: int
+    group_len: int
+    from_col: int
+    to_col: int
+    i: int
+    col: int
+
+    cash_before: float
+    position_before: float
+    debt_before: float
+    locked_cash_before: float
+    free_cash_before: float
+    val_price_before: float
+    value_before: float
+
+    order_result: "OrderResult"
+
+
+__pdoc__[
+    "PostSignalContext"
+] = """A named tuple representing the context after an order has been processed in a from-signals simulation.
+
+Contains all fields from `SignalContext` plus the previous balances and order result.
+
+Passed to `post_signal_func_nb`.
+"""
+for field in PostSignalContext._fields:
+    if field in SignalContext._fields:
+        __pdoc__["PostSignalContext." + field] = f"See `SignalContext.{field}`."
+__pdoc__["PostSignalContext.cash_before"] = "`ExecState.cash` before execution."
+__pdoc__["PostSignalContext.position_before"] = "`ExecState.position` before execution."
+__pdoc__["PostSignalContext.debt_before"] = "`ExecState.debt` before execution."
+__pdoc__["PostSignalContext.locked_cash_before"] = "`ExecState.free_cash` before execution."
+__pdoc__["PostSignalContext.free_cash_before"] = "`ExecState.val_price` before execution."
+__pdoc__["PostSignalContext.val_price_before"] = "`ExecState.value` before execution."
+__pdoc__["PostSignalContext.order_result"] = "`PostOrderContext.order_result`."
 
 
 # ############# In-outputs ############# #

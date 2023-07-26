@@ -566,12 +566,12 @@ def from_basic_signals_nb(
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
-    track_cash_deposits = np.any(cash_deposits_)
+    track_cash_deposits = cash_deposits_.size > 1
     if track_cash_deposits:
         cash_deposits_out = np.full((target_shape[0], len(group_lens)), 0.0, dtype=np.float_)
     else:
         cash_deposits_out = np.full((1, 1), 0.0, dtype=np.float_)
-    track_cash_earnings = np.any(cash_earnings_) or np.any(cash_dividends_)
+    track_cash_earnings = cash_earnings_.size > 1 or cash_dividends_.size > 1
     if track_cash_earnings:
         cash_earnings_out = np.full(target_shape, 0.0, dtype=np.float_)
     else:
@@ -1867,12 +1867,12 @@ def from_signals_nb(
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
-    track_cash_deposits = np.any(cash_deposits_)
+    track_cash_deposits = cash_deposits_.size > 1
     if track_cash_deposits:
         cash_deposits_out = np.full((target_shape[0], len(group_lens)), 0.0, dtype=np.float_)
     else:
         cash_deposits_out = np.full((1, 1), 0.0, dtype=np.float_)
-    track_cash_earnings = np.any(cash_earnings_) or np.any(cash_dividends_)
+    track_cash_earnings = cash_earnings_.size > 1 or cash_dividends_.size > 1
     if track_cash_earnings:
         cash_earnings_out = np.full(target_shape, 0.0, dtype=np.float_)
     else:
@@ -4161,6 +4161,7 @@ def no_signal_func_nb(c: SignalContext, *args) -> tp.Tuple[bool, bool, bool, boo
 
 
 SignalFuncT = tp.Callable[[SignalContext, tp.VarArg()], tp.Tuple[bool, bool, bool, bool]]
+PostSignalFuncT = tp.Callable[[PostSignalContext, tp.VarArg()], None]
 PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
 
 
@@ -4173,6 +4174,21 @@ PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
 # ) -> tp.Tuple[bool, bool, bool, bool]:
 #     """Custom signal function."""
 #     return False, False, False, False
+#
+#
+# % </uncomment>
+# % </skip>
+# % </block>
+
+# % <block post_signal_func_nb>
+# % <skip? skip_func(out_lines, "post_signal_func_nb")>
+# % <uncomment>
+# @register_jitted
+# def post_signal_func_nb(
+#     c: PostSignalContext,
+# ) -> None:
+#     """Custom post-signal function."""
+#     return None
 #
 #
 # % </uncomment>
@@ -4205,6 +4221,8 @@ PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
 # % </uncomment>
 # %? blocks[signal_func_nb_block]
 # % blocks["signal_func_nb"]
+# %? blocks[post_signal_func_nb_block]
+# % blocks["post_signal_func_nb"]
 # %? blocks[post_segment_func_nb_block]
 # % blocks["post_segment_func_nb"]
 @register_chunkable(
@@ -4227,6 +4245,8 @@ PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
         cash_dividends=base_ch.flex_array_gl_slicer,
         signal_func_nb=None,  # % None
         signal_args=ch.ArgsTaker(),
+        post_signal_func_nb=None,  # % None
+        post_signal_args=ch.ArgsTaker(),
         post_segment_func_nb=None,  # % None
         post_segment_args=ch.ArgsTaker(),
         size=base_ch.flex_array_gl_slicer,
@@ -4312,6 +4332,8 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     cash_dividends: tp.FlexArray2dLike = 0.0,
     signal_func_nb: SignalFuncT = no_signal_func_nb,  # % None
     signal_args: tp.ArgsLike = (),
+    post_signal_func_nb: PostSignalFuncT = no_post_func_nb,  # % None
+    post_signal_args: tp.ArgsLike = (),
     post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,  # % None
     post_segment_args: tp.ArgsLike = (),
     size: tp.FlexArray2dLike = np.inf,
@@ -4378,6 +4400,9 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     `signal_func_nb` is a user-defined signal generation function that is called at each row and column
     (= element). It must accept the context of the type `vectorbtpro.portfolio.enums.SignalContext`
     and return 4 signals: long entry, long exit, short entry, and short exit.
+
+    `post_signal_func_nb` is a user-defined post-signal function that is called after an order has been processed.
+    It must accept the context of the type `vectorbtpro.portfolio.enums.PostSignalContext` and return nothing.
 
     `post_segment_func_nb` is a user-defined post-segment function that is called after each row and group
     (= segment). It must accept the context of the type `vectorbtpro.portfolio.enums.SignalSegmentContext`
@@ -4490,12 +4515,12 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     last_free_cash = last_cash.copy()
     prev_close_value = last_value.copy()
     last_return = np.full_like(last_cash, np.nan)
-    track_cash_deposits = np.any(cash_deposits_)
+    track_cash_deposits = cash_deposits_.size > 1
     if track_cash_deposits:
         cash_deposits_out = np.full((target_shape[0], len(group_lens)), 0.0, dtype=np.float_)
     else:
         cash_deposits_out = np.full((1, 1), 0.0, dtype=np.float_)
-    track_cash_earnings = np.any(cash_earnings_) or np.any(cash_dividends_)
+    track_cash_earnings = cash_earnings_.size > 1 or cash_dividends_.size > 1
     if track_cash_earnings:
         cash_earnings_out = np.full(target_shape, 0.0, dtype=np.float_)
     else:
@@ -5960,14 +5985,14 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                             continue
 
                         # Get current values per column
-                        position_now = last_position[col]
-                        debt_now = last_debt[col]
-                        locked_cash_now = last_locked_cash[col]
-                        val_price_now = last_val_price[col]
-                        cash_now = last_cash[group] if cash_sharing else last_cash[col]
-                        free_cash_now = last_free_cash[group] if cash_sharing else last_free_cash[col]
-                        value_now = last_value[group] if cash_sharing else last_value[col]
-                        return_now = last_return[group] if cash_sharing else last_return[col]
+                        position_before = position_now = last_position[col]
+                        debt_before = debt_now = last_debt[col]
+                        locked_cash_before = locked_cash_now = last_locked_cash[col]
+                        val_price_before = val_price_now = last_val_price[col]
+                        cash_before = cash_now = last_cash[group] if cash_sharing else last_cash[col]
+                        free_cash_before = free_cash_now = last_free_cash[group] if cash_sharing else last_free_cash[col]
+                        value_before = value_now = last_value[group] if cash_sharing else last_value[col]
+                        return_before = return_now = last_return[group] if cash_sharing else last_return[col]
 
                         # Generate the next order
                         _i = main_info["idx"][col]
@@ -6516,6 +6541,61 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                             last_free_cash[col] = free_cash_now
                             last_value[col] = value_now
                             last_return[col] = return_now
+
+                        # Call post-signal function
+                        post_signal_ctx = PostSignalContext(
+                            target_shape=target_shape,
+                            group_lens=group_lens,
+                            cash_sharing=cash_sharing,
+                            index=index,
+                            freq=freq,
+                            open=open_,
+                            high=high_,
+                            low=low_,
+                            close=close_,
+                            init_cash=init_cash_,
+                            init_position=init_position_,
+                            init_price=init_price_,
+                            order_records=order_records,
+                            order_counts=order_counts,
+                            log_records=log_records,
+                            log_counts=log_counts,
+                            track_cash_deposits=track_cash_deposits,
+                            cash_deposits_out=cash_deposits_out,
+                            track_cash_earnings=track_cash_earnings,
+                            cash_earnings_out=cash_earnings_out,
+                            in_outputs=in_outputs,
+                            last_cash=last_cash,
+                            last_position=last_position,
+                            last_debt=last_debt,
+                            last_locked_cash=last_locked_cash,
+                            last_free_cash=last_free_cash,
+                            last_val_price=last_val_price,
+                            last_value=last_value,
+                            last_return=last_return,
+                            last_pos_info=last_pos_info,
+                            last_limit_info=last_limit_info,
+                            last_sl_info=last_sl_info,
+                            last_tsl_info=last_tsl_info,
+                            last_tp_info=last_tp_info,
+                            last_td_info=last_td_info,
+                            last_dt_info=last_dt_info,
+                            group=group,
+                            group_len=group_len,
+                            from_col=from_col,
+                            to_col=to_col,
+                            i=i,
+                            col=col,
+                            cash_before=cash_before,
+                            position_before=position_before,
+                            debt_before=debt_before,
+                            locked_cash_before=locked_cash_before,
+                            free_cash_before=free_cash_before,
+                            val_price_before=val_price_before,
+                            value_before=value_before,
+                            order_result=order_result,
+                        )
+                        post_signal_func_nb(post_signal_ctx, *post_signal_args)
 
             for col in range(from_col, to_col):
                 # Update valuation price using current close

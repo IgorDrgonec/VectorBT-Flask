@@ -342,7 +342,7 @@ def map_ranges_to_projections_nb(
     incl_end_idx: bool = True,
     extend: bool = False,
     rebase: bool = True,
-    start_value: tp.FlexArray1dLike = np.nan,
+    start_value: tp.FlexArray1dLike = 1.0,
     ffill: bool = False,
     remove_empty: bool = False,
 ) -> tp.Tuple[tp.Array1d, tp.Array2d]:

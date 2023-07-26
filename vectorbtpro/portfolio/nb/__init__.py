@@ -49,6 +49,7 @@ other Numba-compatible types.
 
 from vectorbtpro.portfolio.nb.analysis import *
 from vectorbtpro.portfolio.nb.core import *
+from vectorbtpro.portfolio.nb.ctx_helpers import *
 from vectorbtpro.portfolio.nb.from_order_func import *
 from vectorbtpro.portfolio.nb.from_orders import *
 from vectorbtpro.portfolio.nb.from_signals import *

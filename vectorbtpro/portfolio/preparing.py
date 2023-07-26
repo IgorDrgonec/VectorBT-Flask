@@ -140,7 +140,7 @@ class BasePFPreparer(BasePreparer):
     def init_cash_mode(self) -> tp.Optional[int]:
         """Initial cash mode."""
         init_cash = self["init_cash"]
-        if init_cash in enums.InitCashMode:
+        if checks.is_int(init_cash) and init_cash in enums.InitCashMode:
             return init_cash
         return None
 
@@ -722,6 +722,8 @@ fs_arg_config = ReadonlyConfig(
         adjust_args=dict(substitute_templates=True),
         signal_func_nb=dict(),
         signal_args=dict(substitute_templates=True),
+        post_signal_func_nb=dict(),
+        post_signal_args=dict(substitute_templates=True),
         post_segment_func_nb=dict(),
         post_segment_args=dict(substitute_templates=True),
         order_mode=dict(),
@@ -969,6 +971,7 @@ class FSPreparer(BasePFPreparer):
         return (
             self["adjust_func_nb"] is not None
             or self["signal_func_nb"] is not None
+            or self["post_signal_func_nb"] is not None
             or self["post_segment_func_nb"] is not None
             or self.order_mode
             or self._pre_staticized is not None
@@ -1044,6 +1047,15 @@ class FSPreparer(BasePFPreparer):
         return None
 
     @cachedproperty
+    def post_signal_func_nb(self) -> tp.Optional[tp.Callable]:
+        """Argument `post_signal_func_nb`."""
+        if self.dynamic_mode:
+            if self["post_signal_func_nb"] is None:
+                return nb.no_post_func_nb
+            return self["post_signal_func_nb"]
+        return None
+
+    @cachedproperty
     def post_segment_func_nb(self) -> tp.Optional[tp.Callable]:
         """Argument `post_segment_func_nb`."""
         if self.dynamic_mode:
@@ -1076,6 +1088,8 @@ class FSPreparer(BasePFPreparer):
                 self.adapt_staticized_to_udf(staticized, self["signal_func_nb"], "signal_func_nb")
             if self["adjust_func_nb"] is not None and isinstance(staticized, dict):
                 self.adapt_staticized_to_udf(staticized, self["adjust_func_nb"], "adjust_func_nb")
+            if self["post_signal_func_nb"] is not None and isinstance(staticized, dict):
+                self.adapt_staticized_to_udf(staticized, self["post_signal_func_nb"], "post_signal_func_nb")
             if self["post_segment_func_nb"] is not None and isinstance(staticized, dict):
                 self.adapt_staticized_to_udf(staticized, self["post_segment_func_nb"], "post_segment_func_nb")
         return staticized
@@ -1371,6 +1385,8 @@ class FSPreparer(BasePFPreparer):
                 adjust_args=self._pre_adjust_args,
                 signal_func_nb=self.signal_func_nb,
                 signal_args=self._pre_signal_args,
+                post_signal_func_nb=self.post_signal_func_nb,
+                post_signal_args=self._pre_post_signal_args,
                 post_segment_func_nb=self.post_segment_func_nb,
                 post_segment_args=self._pre_post_segment_args,
                 ffill_val_price=self.ffill_val_price,
@@ -1497,6 +1513,7 @@ class FSPreparer(BasePFPreparer):
         if self.dynamic_mode:
             if self.staticized is not None:
                 target_arg_map["signal_func_nb"] = None
+                target_arg_map["post_signal_func_nb"] = None
                 target_arg_map["post_segment_func_nb"] = None
         else:
             target_arg_map["group_lens"] = "cs_group_lens"
