@@ -177,7 +177,7 @@ class Param:
     denotes the name of other parameter(s)."""
 
     context: tp.KwargsLike = attr.ib(default=None)
-    """Context used in evaluation of `Param.condition`."""
+    """Context used in evaluation of `Param.condition` and `Param.map_template`."""
 
     keys: tp.Optional[tp.IndexLike] = attr.ib(default=None)
     """Keys acting as an index level.

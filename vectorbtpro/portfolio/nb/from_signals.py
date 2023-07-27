@@ -6752,28 +6752,6 @@ def dir_to_ls_signals_nb(
     return long_entries_out, long_exits_out, short_entries_out, short_exits_out
 
 
-# % <block holding_enex_signal_func_nb>
-@register_jitted
-def holding_enex_signal_func_nb(  # % line.replace("holding_enex_signal_func_nb", "signal_func_nb")
-    c: SignalContext,
-    direction: int,
-    close_at_end: bool,
-) -> tp.Tuple[bool, bool, bool, bool]:
-    """Resolve direction-aware signals for holding."""
-    if c.last_position[c.col] == 0:
-        if direction == Direction.ShortOnly:
-            return False, False, True, False
-        return True, False, False, False
-    if close_at_end and c.i == c.target_shape[0] - 1:
-        if c.last_position[c.col] < 0:
-            return False, False, False, True
-        return False, True, False, False
-    return False, False, False, False
-
-
-# % </block>
-
-
 AdjustFuncT = tp.Callable[[SignalContext, tp.VarArg()], None]
 
 
@@ -6796,6 +6774,34 @@ def no_adjust_func_nb(c: SignalContext, *args) -> None:
 #
 # % </uncomment>
 # % </skip>
+# % </block>
+
+
+# % <block holding_enex_signal_func_nb>
+# % blocks["adjust_func_nb"]
+@register_jitted
+def holding_enex_signal_func_nb(  # % line.replace("holding_enex_signal_func_nb", "signal_func_nb")
+    c: SignalContext,
+    direction: int,
+    close_at_end: bool,
+    adjust_func_nb: AdjustFuncT = no_adjust_func_nb,  # % None
+    adjust_args: tp.Args = (),
+) -> tp.Tuple[bool, bool, bool, bool]:
+    """Resolve direction-aware signals for holding."""
+    adjust_func_nb(c, *adjust_args)
+
+    if c.last_position[c.col] == 0:
+        if c.order_counts[c.col] == 0:
+            if direction == Direction.ShortOnly:
+                return False, False, True, False
+            return True, False, False, False
+    elif close_at_end and c.i == c.target_shape[0] - 1:
+        if c.last_position[c.col] < 0:
+            return False, False, False, True
+        return False, True, False, False
+    return False, False, False, False
+
+
 # % </block>
 
 

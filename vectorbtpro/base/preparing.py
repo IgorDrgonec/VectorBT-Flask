@@ -438,6 +438,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                 group_by=self.group_by,
             ),
             return_wrapper=True,
+            template_context=self._pre_template_context,
         )
 
     @cachedproperty

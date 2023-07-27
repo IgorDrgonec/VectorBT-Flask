@@ -116,7 +116,7 @@ def assert_can_import(pkg_name: str) -> None:
     version = version_str = opt_dep_config[pkg_name].get("version", "")
     link = opt_dep_config[pkg_name]["link"]
     if not check_installed(pkg_name):
-        raise ImportError(f"Please install {dist_name}{version_str} (see {link})")
+        raise ImportError(f"Please install {dist_name}{version_str}, see {link}")
     if version != "":
         actual_version = "(" + get_version(dist_name).replace(".", ",") + ")"
         if version[0].isdigit():
@@ -126,7 +126,7 @@ def assert_can_import(pkg_name: str) -> None:
             version = version[2:]
             version = "(" + version.replace(".", ",") + ")"
         if not eval(f"{actual_version} {operator} {version}"):
-            raise ImportError(f"Please install {dist_name}{version_str} (see {link})")
+            raise ImportError(f"Please install {dist_name}{version_str}, see {link}")
 
 
 def warn_cannot_import(pkg_name: str) -> bool:

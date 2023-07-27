@@ -52,7 +52,7 @@ from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, Readonly
 from vectorbtpro.utils.decorators import custom_property, cached_property, class_or_instancemethod
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.parsing import get_func_kwargs
-from vectorbtpro.utils.template import Rep, RepEval, RepFunc
+from vectorbtpro.utils.template import Rep, RepEval, RepFunc, substitute_templates
 
 try:
     if not tp.TYPE_CHECKING:
@@ -3702,10 +3702,18 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             close_at_end = portfolio_cfg["close_at_end"]
 
         if dynamic_mode:
+            def _substitute_signal_args(preparer):
+                return (
+                    direction,
+                    close_at_end,
+                    *((preparer.adjust_func_nb,) if preparer.staticized is None else ()),
+                    preparer.adjust_args,
+                )
+
             return cls.from_signals(
                 close,
                 signal_func_nb=nb.holding_enex_signal_func_nb,
-                signal_args=(direction, close_at_end),
+                signal_args=RepFunc(_substitute_signal_args),
                 accumulate=False,
                 **kwargs,
             )
