@@ -1072,11 +1072,30 @@ class pdict(Comparable, Pickleable, Prettified, dict):
                 init_args[0][k] = init_kwargs.pop(k)
         return RecState(init_args=init_args, init_kwargs=init_kwargs)
 
-    def equals(self, other: tp.Any, check_types: bool = True) -> bool:
+    def equals(
+        self,
+        other: tp.Any,
+        check_types: bool = True,
+        _key: tp.Optional[str] = None,
+        **kwargs,
+    ) -> bool:
         """Check two objects for equality."""
-        if check_types and type(self) != type(other):
+        if _key is None:
+            _key = type(self).__name__
+        if check_types and not is_deep_equal(
+            self,
+            other,
+            _key=_key,
+            only_types=True,
+            **kwargs,
+        ):
             return False
-        return is_deep_equal(dict(self), dict(other))
+        return is_deep_equal(
+            dict(self),
+            dict(other),
+            _key=_key,
+            **kwargs,
+        )
 
     def prettify(self, **kwargs) -> str:
         return prettify_dict(self, **kwargs)

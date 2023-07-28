@@ -754,12 +754,37 @@ class Config(pdict):
             )
         return prettify_dict(self, replace=replace, path=path, htchar=htchar, lfchar=lfchar, indent=indent)
 
-    def equals(self, other: tp.Any, check_types: bool = True, check_options: bool = False) -> bool:
-        if check_types and type(self) != type(other):
+    def equals(
+        self,
+        other: tp.Any,
+        check_types: bool = True,
+        check_options: bool = False,
+        _key: tp.Optional[str] = None,
+        **kwargs,
+    ) -> bool:
+        if _key is None:
+            _key = type(self).__name__
+        if check_types and not is_deep_equal(
+            self,
+            other,
+            _key=_key,
+            only_types=True,
+            **kwargs,
+        ):
             return False
-        if check_options and not is_deep_equal(self.options_, other.options_):
+        if check_options and not is_deep_equal(
+            self.options_,
+            other.options_,
+            _key=_key + ".options_",
+            **kwargs,
+        ):
             return False
-        return is_deep_equal(dict(self), dict(other))
+        return is_deep_equal(
+            dict(self),
+            dict(other),
+            _key=_key,
+            **kwargs,
+        )
 
     @property
     def rec_state(self) -> tp.Optional[RecState]:
@@ -947,17 +972,43 @@ class Configured(Cacheable, Comparable, Pickleable, Prettified):
         check_types: bool = True,
         check_attrs: bool = True,
         check_options: bool = False,
+        _key: tp.Optional[str] = None,
+        **kwargs,
     ) -> bool:
         """Check two objects for equality."""
-        if check_types and type(self) != type(other):
+        if _key is None:
+            _key = type(self).__name__
+        if check_types and not is_deep_equal(
+            self,
+            other,
+            _key=_key,
+            only_types=True,
+            **kwargs,
+        ):
             return False
         if check_attrs:
-            if self.get_writeable_attrs() != other.get_writeable_attrs():
+            if not is_deep_equal(
+                self.get_writeable_attrs(),
+                other.get_writeable_attrs(),
+                _key=_key + ".get_writeable_attrs()",
+                **kwargs,
+            ):
                 return False
             for attr in self.get_writeable_attrs():
-                if not is_deep_equal(getattr(self, attr), getattr(other, attr)):
+                if not is_deep_equal(
+                    getattr(self, attr),
+                    getattr(other, attr),
+                    _key=_key + f".{attr}",
+                    **kwargs,
+                ):
                     return False
-        return self.config.equals(other.config, check_types=check_types, check_options=check_options)
+        return self.config.equals(
+            other.config,
+            check_types=check_types,
+            check_options=check_options,
+            _key=_key + ".config",
+            **kwargs,
+        )
 
     def update_config(self, *args, **kwargs) -> None:
         """Force-update the config."""

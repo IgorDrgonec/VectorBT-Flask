@@ -7,6 +7,8 @@ from collections.abc import Hashable, Mapping
 from inspect import signature, getmro
 from keyword import iskeyword
 import datetime
+import warnings
+import traceback
 
 import numpy as np
 import pandas as pd
@@ -18,12 +20,17 @@ from vectorbtpro import _typing as tp
 
 __all__ = [
     "is_numba_enabled",
+    "is_deep_equal",
 ]
 
 
 class Comparable:
-    def equals(self, other: tp.Any) -> bool:
-        """Check two objects for equality."""
+    """Class representing an object that can be compared to another object."""
+
+    def equals(self, other: tp.Any, *args, **kwargs) -> bool:
+        """Check two objects for (deep) equality.
+
+        Should accept the keyword arguments accepted by `is_deep_equal`."""
         raise NotImplementedError
 
     def __eq__(self, other: tp.Any) -> bool:
@@ -31,6 +38,7 @@ class Comparable:
 
 
 # ############# Checks ############# #
+
 
 def is_bool(arg: tp.Any) -> bool:
     """Check whether the argument is a bool."""
@@ -263,7 +271,15 @@ def is_equal(
     return False
 
 
-def is_deep_equal(arg1: tp.Any, arg2: tp.Any, check_exact: bool = False, **kwargs) -> bool:
+def is_deep_equal(
+    arg1: tp.Any,
+    arg2: tp.Any,
+    check_exact: bool = False,
+    debug: bool = False,
+    _key: tp.Optional[str] = None,
+    only_types: bool = False,
+    **kwargs,
+) -> bool:
     """Check whether two objects are equal (deep check)."""
 
     def _select_kwargs(_method, _kwargs):
@@ -276,22 +292,37 @@ def is_deep_equal(arg1: tp.Any, arg2: tp.Any, check_exact: bool = False, **kwarg
 
     def _check_array(assert_method):
         __kwargs = _select_kwargs(assert_method, kwargs)
-        safe_assert(arg1.dtype == arg2.dtype)
+        if arg1.dtype != arg2.dtype:
+            raise AssertionError(f"Dtypes {arg1.dtype} and {arg2.dtype} do not match")
         if arg1.dtype.fields is not None:
             for field in arg1.dtype.names:
-                assert_method(arg1[field], arg2[field], **__kwargs)
+                try:
+                    assert_method(arg1[field], arg2[field], **__kwargs)
+                except Exception as e:
+                    raise AssertionError(f"Dtype field '{field}'") from e
         else:
             assert_method(arg1, arg2, **__kwargs)
 
     try:
+        if only_types:
+            if type(arg1) != type(arg2):
+                raise AssertionError(f"Types {type(arg1)} and {type(arg2)} do not match")
+            return True
         if id(arg1) == id(arg2):
             return True
         if isinstance(arg1, Comparable):
-            return arg1.equals(arg2)
+            return arg1.equals(arg2, check_exact=check_exact, debug=debug, _key=_key, **kwargs)
         if type(arg1) != type(arg2):
-            return False
+            raise AssertionError(f"Types {type(arg1)} and {type(arg2)} do not match")
         if attr.has(type(arg1)):
-            return is_deep_equal(attr.asdict(arg1), attr.asdict(arg2), check_exact=check_exact, **kwargs)
+            return is_deep_equal(
+                attr.asdict(arg1),
+                attr.asdict(arg2),
+                check_exact=check_exact,
+                debug=debug,
+                _key=_key,
+                **kwargs,
+            )
         if isinstance(arg1, pd.Series):
             _kwargs = _select_kwargs(pd.testing.assert_series_equal, kwargs)
             pd.testing.assert_series_equal(arg1, arg2, check_exact=check_exact, **_kwargs)
@@ -304,16 +335,32 @@ def is_deep_equal(arg1: tp.Any, arg2: tp.Any, check_exact: bool = False, **kwarg
         elif isinstance(arg1, np.ndarray):
             try:
                 _check_array(np.testing.assert_array_equal)
-            except:
+            except Exception as e:
                 if check_exact:
-                    return False
+                    raise e
                 _check_array(np.testing.assert_allclose)
         elif isinstance(arg1, (tuple, list)):
             for i in range(len(arg1)):
-                safe_assert(is_deep_equal(arg1[i], arg2[i], check_exact=check_exact, **kwargs))
+                if not is_deep_equal(
+                    arg1[i],
+                    arg2[i],
+                    check_exact=check_exact,
+                    debug=debug,
+                    _key=f"[{i}]" if _key is None else _key + f"[{i}]",
+                    **kwargs,
+                ):
+                    return False
         elif isinstance(arg1, dict):
             for k in arg1.keys():
-                safe_assert(is_deep_equal(arg1[k], arg2[k], check_exact=check_exact, **kwargs))
+                if not is_deep_equal(
+                    arg1[k],
+                    arg2[k],
+                    check_exact=check_exact,
+                    debug=debug,
+                    _key=f"['{k}']" if _key is None else _key + f"['{k}']",
+                    **kwargs,
+                ):
+                    return False
         else:
             try:
                 if arg1 == arg2:
@@ -328,8 +375,21 @@ def is_deep_equal(arg1: tp.Any, arg2: tp.Any, check_exact: bool = False, **kwarg
                     return True
             except:
                 pass
+            if debug:
+                warnings.warn(
+                    f"\n>>>>>>>>>>>>>>>>>>>> {_key} <<<<<<<<<<<<<<<<<<<<\nObjects do not match",
+                    stacklevel=2,
+                )
             return False
-    except:
+    except Exception as e:
+        if debug:
+            if _key is None:
+                warnings.warn(traceback.format_exc(), stacklevel=2)
+            else:
+                warnings.warn(
+                    f"\n>>>>>>>>>>>>>>>>>>>> {_key} <<<<<<<<<<<<<<<<<<<<\n" + traceback.format_exc(),
+                    stacklevel=2,
+                )
         return False
     return True
 
@@ -400,7 +460,7 @@ def is_valid_variable_name(arg: str) -> bool:
 # ############# Asserts ############# #
 
 
-def safe_assert(arg: tp.Any, msg: tp.Optional[str] = None) -> None:
+def safe_assert(arg: bool, msg: tp.Optional[str] = None) -> None:
     if not arg:
         raise AssertionError(msg)
 
