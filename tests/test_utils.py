@@ -2731,6 +2731,48 @@ class TestExecution:
         assert execution.execute(iter(funcs_args), chunk_len=3) == [10, 35, 60]
         assert execution.execute(iter(funcs_args), chunk_len="auto") == [10, 35, 60]
 
+        last_chunk_idx_lst = []
+        indices_per_chunk_lst = []
+        outputs_per_chunk_lst = []
+
+        def post_chunk_func(last_chunk_idx, indices_per_chunk, outputs_per_chunk):
+            last_chunk_idx_lst.append(last_chunk_idx)
+            indices_per_chunk_lst.append(indices_per_chunk[last_chunk_idx])
+            outputs_per_chunk_lst.append(outputs_per_chunk[last_chunk_idx])
+
+        execution.execute(
+            [(lambda _i=i: _i, (), {}) for i in range(10)],
+            chunk_len=2,
+            post_chunk_func=post_chunk_func,
+            post_chunk_kwargs=dict(
+                last_chunk_idx=vbt.Rep("last_chunk_idx"),
+                indices_per_chunk=vbt.Rep("indices_per_chunk"),
+                outputs_per_chunk=vbt.Rep("outputs_per_chunk"),
+            ),
+        )
+        assert last_chunk_idx_lst == [0, 1, 2, 3, 4]
+        assert indices_per_chunk_lst == [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]
+        assert outputs_per_chunk_lst == [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]
+
+        last_chunk_idx_lst.clear()
+        indices_per_chunk_lst.clear()
+        outputs_per_chunk_lst.clear()
+
+        execution.execute(
+            [(lambda _i=i: _i, (), {}) for i in range(10)],
+            chunk_len=2,
+            post_chunk_func=post_chunk_func,
+            post_chunk_kwargs=dict(
+                last_chunk_idx=vbt.Rep("last_chunk_idx"),
+                indices_per_chunk=vbt.Rep("indices_per_chunk"),
+                outputs_per_chunk=vbt.Rep("outputs_per_chunk"),
+            ),
+            post_chunk_every=2,
+        )
+        assert last_chunk_idx_lst == [1, 3]
+        assert indices_per_chunk_lst == [[2, 3], [6, 7]]
+        assert outputs_per_chunk_lst == [[2, 3], [6, 7]]
+
 
 # ############# pickling ############# #
 

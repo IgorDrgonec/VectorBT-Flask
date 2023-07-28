@@ -615,6 +615,9 @@ def execute(
     distribute: tp.Optional[str] = None,
     warmup: tp.Optional[bool] = None,
     in_chunk_order: bool = False,
+    post_chunk_func: tp.Optional[tp.Callable] = None,
+    post_chunk_kwargs: tp.KwargsLike = None,
+    post_chunk_every: tp.Optional[int] = None,
     show_progress: tp.Optional[bool] = None,
     progress_desc: tp.Optional[tp.Sequence] = None,
     pbar_kwargs: tp.KwargsLike = None,
@@ -649,6 +652,12 @@ def execute(
     If `funcs_args` is a custom template, substitutes it once `chunk_meta` is established.
     Use `template_context` as an additional context. All the resolved functions and arguments
     will be immediately passed to the executor.
+
+    If `post_chunk_func` is not None, calls the function after processing every `post_chunk_every` chunks.
+    Effective only when `distribute` is "calls". Will substitute any templates in `post_chunk_kwargs`
+    and pass them as keyword arguments. The following additional arguments are available in the context:
+    the index of the last chunk `last_chunk_idx`, nested list of call indices within each chunk `indices_per_chunk`,
+    nested list of outputs from each chunk `outputs_per_chunk`. Both latter arguments are continuously extended.
 
     !!! info
         Chunks are processed sequentially, while functions within each chunk can be processed distributively.
@@ -709,16 +718,54 @@ def execute(
         funcs_args[0][0](*funcs_args[0][1], **funcs_args[0][2])
     if show_progress is None:
         show_progress = engine_cfg.get("show_progress", execution_cfg["show_progress"])
-    pbar_kwargs = merge_dicts(execution_cfg["pbar_kwargs"], engine_cfg.get("pbar_kwargs", None), pbar_kwargs)
+    if post_chunk_func is None:
+        post_chunk_func = engine_cfg.get("post_chunk_func", execution_cfg["post_chunk_func"])
+    post_chunk_kwargs = merge_dicts(
+        execution_cfg["post_chunk_kwargs"],
+        engine_cfg.get("post_chunk_kwargs", None),
+        post_chunk_kwargs,
+    )
+    if post_chunk_every is None:
+        post_chunk_every = engine_cfg.get("post_chunk_every", execution_cfg["post_chunk_every"])
+    if post_chunk_every < 1:
+        raise ValueError("Argument post_chunk_every must be 1 or greater")
+    pbar_kwargs = merge_dicts(
+        execution_cfg["pbar_kwargs"],
+        engine_cfg.get("pbar_kwargs", None),
+        pbar_kwargs,
+    )
 
-    def _execute(_funcs_args, _n_calls):
+    def _execute(funcs_args, n_calls):
         if isinstance(engine, ExecutionEngine):
-            return engine.execute(_funcs_args, n_calls=_n_calls)
+            return engine.execute(funcs_args, n_calls=n_calls)
         if callable(engine):
             if "n_calls" in func_arg_names:
-                return engine(_funcs_args, n_calls=_n_calls, **engine_kwargs)
-            return engine(_funcs_args, **engine_kwargs)
+                return engine(funcs_args, n_calls=n_calls, **engine_kwargs)
+            return engine(funcs_args, **engine_kwargs)
         raise TypeError(f"Engine of type {type(engine)} is not supported")
+
+    def _call_post_chunk_func(last_chunk_idx, indices_per_chunk, outputs_per_chunk):
+        if post_chunk_func is not None:
+            if post_chunk_every == 1 or (last_chunk_idx > 0 and (last_chunk_idx + 1) % post_chunk_every == 0):
+                _template_context = merge_dicts(
+                    dict(
+                        last_chunk_idx=last_chunk_idx,
+                        indices_per_chunk=indices_per_chunk,
+                        outputs_per_chunk=outputs_per_chunk,
+                    ),
+                    template_context,
+                )
+                _post_chunk_func = substitute_templates(
+                    post_chunk_func,
+                    _template_context,
+                    sub_id="post_chunk_func",
+                )
+                _post_chunk_kwargs = substitute_templates(
+                    post_chunk_kwargs,
+                    _template_context,
+                    sub_id="post_chunk_kwargs",
+                )
+                _post_chunk_func(**_post_chunk_kwargs)
 
     if n_chunks is None and chunk_len is None and chunk_meta is None:
         n_chunks = 1
@@ -781,35 +828,48 @@ def execute(
     if distribute.lower() == "calls":
         if indices_sorted and not hasattr(funcs_args, "__len__"):
             # Iterate over funcs_args
+            outputs_per_chunk = []
             outputs = []
-            chunk_idx = 0
+            last_chunk_idx = 0
             _funcs_args = []
 
             with get_pbar(total=len(all_chunk_indices), show_progress=show_progress, **pbar_kwargs) as pbar:
                 for i, func_args in enumerate(funcs_args):
-                    if i > all_chunk_indices[chunk_idx][-1]:
-                        chunk_indices = all_chunk_indices[chunk_idx]
-                        outputs.extend(_execute(_funcs_args, len(chunk_indices)))
-                        chunk_idx += 1
+                    if i > all_chunk_indices[last_chunk_idx][-1]:
+                        chunk_indices = all_chunk_indices[last_chunk_idx]
+                        chunk_output = _execute(_funcs_args, len(chunk_indices))
+                        outputs_per_chunk.append(chunk_output)
+                        indices_per_chunk = all_chunk_indices[:last_chunk_idx + 1]
+                        _call_post_chunk_func(last_chunk_idx, indices_per_chunk, outputs_per_chunk)
+                        outputs.extend(chunk_output)
+                        last_chunk_idx += 1
                         _funcs_args = []
                         pbar.update(1)
                     _funcs_args.append(func_args)
                 if len(_funcs_args) > 0:
-                    chunk_indices = all_chunk_indices[chunk_idx]
-                    outputs.extend(_execute(_funcs_args, len(chunk_indices)))
+                    chunk_indices = all_chunk_indices[last_chunk_idx]
+                    chunk_output = _execute(_funcs_args, len(chunk_indices))
+                    outputs_per_chunk.append(chunk_output)
+                    indices_per_chunk = all_chunk_indices[:last_chunk_idx + 1]
+                    _call_post_chunk_func(last_chunk_idx, indices_per_chunk, outputs_per_chunk)
+                    outputs.extend(chunk_output)
                     pbar.update(1)
             return outputs
         else:
             # Iterate over chunks
             funcs_args = list(funcs_args)
+            outputs_per_chunk = []
             outputs = []
 
             with get_pbar(total=len(all_chunk_indices), show_progress=show_progress, **pbar_kwargs) as pbar:
-                for chunk_indices in all_chunk_indices:
+                for last_chunk_idx, chunk_indices in enumerate(all_chunk_indices):
                     _funcs_args = []
                     for idx in chunk_indices:
                         _funcs_args.append(funcs_args[idx])
                     chunk_output = _execute(_funcs_args, len(chunk_indices))
+                    outputs_per_chunk.append(chunk_output)
+                    indices_per_chunk = all_chunk_indices[:last_chunk_idx + 1]
+                    _call_post_chunk_func(last_chunk_idx, indices_per_chunk, outputs_per_chunk)
                     if in_chunk_order or indices_sorted:
                         outputs.extend(chunk_output)
                     else:
@@ -821,14 +881,14 @@ def execute(
     elif distribute.lower() == "chunks":
         if indices_sorted and not hasattr(funcs_args, "__len__"):
             # Iterate over funcs_args
-            chunk_idx = 0
+            last_chunk_idx = 0
             _funcs_args = []
             funcs_args_chunks = []
 
             for i, func_args in enumerate(funcs_args):
-                if i > all_chunk_indices[chunk_idx][-1]:
+                if i > all_chunk_indices[last_chunk_idx][-1]:
                     funcs_args_chunks.append(build_serial_chunk(_funcs_args))
-                    chunk_idx += 1
+                    last_chunk_idx += 1
                     _funcs_args = []
                 _funcs_args.append(func_args)
             if len(_funcs_args) > 0:

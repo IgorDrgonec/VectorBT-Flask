@@ -377,7 +377,7 @@ def is_deep_equal(
                 pass
             if debug:
                 warnings.warn(
-                    f"\n>>>>>>>>>>>>>>>>>>>> {_key} <<<<<<<<<<<<<<<<<<<<\nObjects do not match",
+                    f"\n############### {_key} ###############\nObjects do not match",
                     stacklevel=2,
                 )
             return False
@@ -387,7 +387,7 @@ def is_deep_equal(
                 warnings.warn(traceback.format_exc(), stacklevel=2)
             else:
                 warnings.warn(
-                    f"\n>>>>>>>>>>>>>>>>>>>> {_key} <<<<<<<<<<<<<<<<<<<<\n" + traceback.format_exc(),
+                    f"\n############### {_key} ###############\n" + traceback.format_exc(),
                     stacklevel=2,
                 )
         return False
