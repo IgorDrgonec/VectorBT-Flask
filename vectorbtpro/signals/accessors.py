@@ -669,8 +669,10 @@ class SignalsAccessor(GenericAccessor):
             ```
         """
         if isinstance(shape, ArrayWrapper):
-            wrapper = shape
-            shape = wrapper.shape
+            if "wrapper" in kwargs:
+                raise ValueError("Wrapper must be provided either via shape or wrapper, not both")
+            kwargs["wrapper"] = shape
+            shape = kwargs["wrapper"].shape
         shape_2d = cls.resolve_shape(shape)
         if n is not None and prob is not None:
             raise ValueError("Either n or prob must be provided, not both")
