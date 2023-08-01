@@ -6,7 +6,7 @@ import vectorbtpro as vbt
 
 from tests.utils import *
 
-ohlcv_ts = pd.DataFrame(
+ohlcv_df = pd.DataFrame(
     {
         "open": [1, 2, 3, 4, 5],
         "high": [2.5, 3.5, 4.5, 5.5, 6.5],
@@ -15,7 +15,13 @@ ohlcv_ts = pd.DataFrame(
         "volume": [1, 2, 3, 2, 1],
     },
     index=pd.Index(
-        [datetime(2020, 1, 1), datetime(2020, 1, 2), datetime(2020, 1, 3), datetime(2020, 1, 4), datetime(2020, 1, 5)],
+        [
+            datetime(2020, 1, 1),
+            datetime(2020, 1, 2),
+            datetime(2020, 1, 3),
+            datetime(2020, 1, 4),
+            datetime(2020, 1, 5),
+        ],
     ),
 )
 
@@ -42,8 +48,8 @@ class TestAccessors:
     @pytest.mark.parametrize("test_freq", ["1h", "10h", "3d"])
     def test_resample(self, test_freq):
         assert_frame_equal(
-            ohlcv_ts.vbt.ohlcv.resample(test_freq).obj,
-            ohlcv_ts.resample(test_freq).agg(
+            ohlcv_df.vbt.ohlcv.resample(test_freq).obj,
+            ohlcv_df.resample(test_freq).agg(
                 {
                     "open": lambda x: float(x[0] if len(x) > 0 else np.nan),
                     "high": lambda x: float(x.max() if len(x) > 0 else np.nan),

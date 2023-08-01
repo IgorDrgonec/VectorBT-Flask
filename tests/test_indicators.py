@@ -3,6 +3,7 @@ from collections import namedtuple
 from datetime import datetime
 from itertools import product
 
+import numpy as np
 import pytest
 from numba import njit
 
@@ -3032,1982 +3033,1435 @@ class TestFactory:
                     self.evaluate_sma(period=2)
                     self.evaluate_sma(period=3)
 
-            consensus = vbt.IF.from_custom_techcon(CustomConsensus).run(open_ts, high_ts, low_ts, close_ts, volume_ts)
+            consensus = vbt.IF.from_custom_techcon(CustomConsensus).run(open, high, low, close, volume)
+            assert_series_equal(consensus.buy, pd.Series([0.0, 50.0, 100.0, 100.0, 0.0, 0.0, 0.0], index=close.index))
+            assert_series_equal(consensus.sell, pd.Series([0.0, 0.0, 0.0, 0.0, 100.0, 100.0, 100.0], index=close.index))
             assert_series_equal(
-                consensus.buy, pd.Series([0.0, 50.0, 100.0, 100.0, 0.0, 0.0, 0.0], index=close_ts.index)
+                consensus.buy_agreement, pd.Series([0.0, 1.0, 2.0, 2.0, 0.0, 0.0, 0.0], index=close.index)
             )
             assert_series_equal(
-                consensus.sell, pd.Series([0.0, 0.0, 0.0, 0.0, 100.0, 100.0, 100.0], index=close_ts.index)
+                consensus.sell_agreement, pd.Series([0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 2.0], index=close.index)
             )
             assert_series_equal(
-                consensus.buy_agreement, pd.Series([0.0, 1.0, 2.0, 2.0, 0.0, 0.0, 0.0], index=close_ts.index)
+                consensus.buy_disagreement, pd.Series([2.0, 1.0, 0.0, 0.0, 2.0, 2.0, 2.0], index=close.index)
             )
             assert_series_equal(
-                consensus.sell_agreement, pd.Series([0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 2.0], index=close_ts.index)
-            )
-            assert_series_equal(
-                consensus.buy_disagreement, pd.Series([2.0, 1.0, 0.0, 0.0, 2.0, 2.0, 2.0], index=close_ts.index)
-            )
-            assert_series_equal(
-                consensus.sell_disagreement, pd.Series([2.0, 2.0, 2.0, 2.0, 0.0, 0.0, 0.0], index=close_ts.index)
+                consensus.sell_disagreement, pd.Series([2.0, 2.0, 2.0, 2.0, 0.0, 0.0, 0.0], index=close.index)
             )
 
 
 # ############# custom ############# #
 
-close_ts = pd.Series(
-    [1, 2, 3, 4, 3, 2, 1],
-    index=pd.DatetimeIndex(
+ohlcv_df = pd.DataFrame(
+    {
+        "open": [1, 2, 3, 4, 5],
+        "high": [2.5, 3.5, 4.5, 5.5, 6.5],
+        "low": [0.5, 1.5, 2.5, 3.5, 4.5],
+        "close": [2, 3, 4, 5, 6],
+        "volume": [1, 2, 3, 2, 1],
+    },
+    index=pd.Index(
         [
             datetime(2020, 1, 1),
             datetime(2020, 1, 2),
             datetime(2020, 1, 3),
             datetime(2020, 1, 4),
             datetime(2020, 1, 5),
-            datetime(2020, 1, 6),
-            datetime(2020, 1, 7),
-        ]
+        ],
     ),
 )
-open_ts = close_ts
-high_ts = close_ts * 1.1
-low_ts = close_ts * 0.9
-volume_ts = pd.Series([4, 3, 2, 1, 2, 3, 4], index=close_ts.index)
+open = pd.DataFrame(
+    {
+        "a": [1, 2, 3, 4, 5],
+        "b": [6, 5, 4, 3, 2],
+    },
+    index=pd.date_range("2023", periods=5),
+)
+high = pd.DataFrame(
+    {
+        "a": [2.5, 3.5, 4.5, 5.5, 6.5],
+        "b": [6.5, 5.5, 4.5, 3.5, 2.5],
+    },
+    index=pd.date_range("2023", periods=5),
+)
+low = pd.DataFrame(
+    {
+        "a": [0.5, 1.5, 2.5, 3.5, 4.5],
+        "b": [4.5, 3.5, 2.5, 1.5, 0.5],
+    },
+    index=pd.date_range("2023", periods=5),
+)
+close = pd.DataFrame(
+    {
+        "a": [2, 3, 4, 5, 6],
+        "b": [5, 4, 3, 2, 1],
+    },
+    index=pd.date_range("2023", periods=5),
+)
+volume = pd.DataFrame(
+    {
+        "a": [1, 2, 3, 2, 1],
+        "b": [3, 2, 1, 2, 3],
+    },
+    index=pd.date_range("2023", periods=5),
+)
 
 
 class TestBasic:
     def test_MA(self):
+        ma = vbt.MA.run(close, window=3, wtype="simple", hide_params=True)
         assert_frame_equal(
-            vbt.MA.run(close_ts, window=(2, 3), wtype=("simple", "exp"), param_product=True).ma,
+            ma.ma,
             pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan],
-                        [1.5, 1.66666667, np.nan, np.nan],
-                        [2.5, 2.55555556, 2.0, 2.25],
-                        [3.5, 3.51851852, 3.0, 3.125],
-                        [3.5, 3.17283951, 3.33333333, 3.0625],
-                        [2.5, 2.3909465, 3.0, 2.53125],
-                        [1.5, 1.46364883, 2.0, 1.765625],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples(
-                    [(2, "simple"), (2, "exp"), (3, "simple"), (3, "exp")],
-                    names=["ma_window", "ma_wtype"],
-                ),
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [3.0, 4.0],
+                    [4.0, 3.0],
+                    [5.0, 2.0],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
-        assert_frame_equal(
-            vbt.MA.run(
-                close_ts.vbt.tile(4), window=(2, 3), wtype=("simple", "exp"), param_product=True, per_column=True
-            ).ma,
-            vbt.MA.run(close_ts, window=(2, 3), wtype=("simple", "exp"), param_product=True, per_column=False).ma,
+        np.testing.assert_array_equal(
+            vbt.ind_nb.ma_nb(close.values, window=np.array([2, 3]), wtype=np.array([0, 1])),
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [2.5, np.nan],
+                    [3.5, 3.6666666666666665],
+                    [4.5, 2.6666666666666665],
+                    [5.5, 1.6666666666666667],
+                ]
+            ),
+        )
+        chunked_func = vbt.ch_reg.resolve_option(vbt.ind_nb.ma_nb, dict(n_chunks=2))
+        np.testing.assert_array_equal(
+            chunked_func(close.values, window=np.array([2, 3]), wtype=np.array([0, 1])),
+            vbt.ind_nb.ma_nb(close.values, window=np.array([2, 3]), wtype=np.array([0, 1])),
         )
 
     def test_MSD(self):
+        msd = vbt.MSD.run(close, window=3, wtype="simple", hide_params=True)
         assert_frame_equal(
-            vbt.MSD.run(close_ts, window=(2, 3), wtype=("simple", "exp"), param_product=True).msd,
+            msd.msd,
             pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan],
-                        [0.5, 0.70710678, np.nan, np.nan],
-                        [0.5, 0.97467943, 0.81649658, 1.04880885],
-                        [0.5, 1.11434207, 0.81649658, 1.30018314],
-                        [0.5, 0.73001838, 0.47140452, 0.91715673],
-                        [0.5, 0.88824841, 0.81649658, 0.9182094],
-                        [0.5, 1.05965735, 0.81649658, 1.14049665],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples(
-                    [(2, "simple"), (2, "exp"), (3, "simple"), (3, "exp")],
-                    names=["msd_window", "msd_wtype"],
-                ),
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [0.816496580927726, 0.816496580927726],
+                    [0.816496580927726, 0.816496580927726],
+                    [0.816496580927726, 0.816496580927726],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
-        assert_frame_equal(
-            vbt.MSD.run(
-                close_ts.vbt.tile(4),
-                window=(2, 3),
-                wtype=("simple", "exp"),
-                param_product=True,
-                per_column=True,
-            ).msd,
-            vbt.MSD.run(close_ts, window=(2, 3), wtype=("simple", "exp"), param_product=True, per_column=False).msd,
+        np.testing.assert_array_equal(
+            vbt.ind_nb.msd_nb(close.values, window=np.array([2, 3]), wtype=np.array([0, 2])),
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [0.5, np.nan],
+                    [0.5, 1.0488088481701516],
+                    [0.5, 1.300183137283433],
+                    [0.5, 1.46929354773366],
+                ]
+            ),
+        )
+        chunked_func = vbt.ch_reg.resolve_option(vbt.ind_nb.msd_nb, dict(n_chunks=2))
+        np.testing.assert_array_equal(
+            chunked_func(close.values, window=np.array([2, 3]), wtype=np.array([0, 2])),
+            vbt.ind_nb.msd_nb(close.values, window=np.array([2, 3]), wtype=np.array([0, 2])),
         )
 
     def test_BBANDS(self):
-        columns = pd.MultiIndex.from_tuples(
-            [
-                (2, "simple", 2.0),
-                (2, "simple", 3.0),
-                (2, "exp", 2.0),
-                (2, "exp", 3.0),
-                (3, "simple", 2.0),
-                (3, "simple", 3.0),
-                (3, "exp", 2.0),
-                (3, "exp", 3.0),
-            ],
-            names=["bb_window", "bb_wtype", "bb_alpha"],
-        )
-        bbands = vbt.BBANDS.run(close_ts, window=(2, 3), alpha=(2.0, 3.0), wtype=("simple", "exp"), param_product=True)
-        assert_frame_equal(
-            bbands.middle,
-            pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [1.5, 1.5, 1.66666667, 1.66666667, np.nan, np.nan, np.nan, np.nan],
-                        [2.5, 2.5, 2.55555556, 2.55555556, 2.0, 2.0, 2.25, 2.25],
-                        [3.5, 3.5, 3.51851852, 3.51851852, 3.0, 3.0, 3.125, 3.125],
-                        [3.5, 3.5, 3.17283951, 3.17283951, 3.33333333, 3.33333333, 3.0625, 3.0625],
-                        [2.5, 2.5, 2.3909465, 2.3909465, 3.0, 3.0, 2.53125, 2.53125],
-                        [1.5, 1.5, 1.46364883, 1.46364883, 2.0, 2.0, 1.765625, 1.765625],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
-            ),
-        )
+        bbands = vbt.BBANDS.run(close, window=3, wtype="simple", alpha=2.0, hide_params=True)
         assert_frame_equal(
             bbands.upper,
             pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [2.5, 3.0, 3.08088023, 3.78798701, np.nan, np.nan, np.nan, np.nan],
-                        [3.5, 4.0, 4.50491442, 5.47959386, 3.63299316, 4.44948974, 4.3476177, 5.39642654],
-                        [4.5, 5.0, 5.74720265, 6.86154472, 4.63299316, 5.44948974, 5.72536627, 7.02554941],
-                        [4.5, 5.0, 4.63287626, 5.36289463, 4.27614237, 4.7475469, 4.89681346, 5.8139702],
-                        [3.5, 4.0, 4.16744332, 5.05569172, 4.63299316, 5.44948974, 4.3676688, 5.2858782],
-                        [2.5, 3.0, 3.58296354, 4.64262089, 3.63299316, 4.44948974, 4.04661829, 5.18711494],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [4.6329931618554525, 5.6329931618554525],
+                    [5.6329931618554525, 4.6329931618554525],
+                    [6.6329931618554525, 3.632993161855452],
+                ],
+                index=close.index,
+                columns=close.columns,
+            ),
+        )
+        assert_frame_equal(
+            bbands.middle,
+            pd.DataFrame(
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [3.0, 4.0],
+                    [4.0, 3.0],
+                    [5.0, 2.0],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
             bbands.lower,
             pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [0.5, 0.0, 0.2524531, -0.45465368, np.nan, np.nan, np.nan, np.nan],
-                        [1.5, 1.0, 0.60619669, -0.36848275, 0.36700684, -0.44948974, 0.1523823, -0.89642654],
-                        [2.5, 2.0, 1.28983438, 0.17549232, 1.36700684, 0.55051026, 0.52463373, -0.77554941],
-                        [2.5, 2.0, 1.71280275, 0.98278438, 2.39052429, 1.91911977, 1.22818654, 0.3110298],
-                        [1.5, 1.0, 0.61444969, -0.27379872, 1.36700684, 0.55051026, 0.6948312, -0.2233782],
-                        [0.5, 0.0, -0.65566587, -1.71532322, 0.36700684, -0.44948974, -0.51536829, -1.65586494],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [1.367006838144548, 2.367006838144548],
+                    [2.367006838144548, 1.367006838144548],
+                    [3.367006838144548, 0.36700683814454793],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
             bbands.percent_b,
             pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [0.75, 0.66666667, 0.61785113, 0.57856742, np.nan, np.nan, np.nan, np.nan],
-                        [0.75, 0.66666667, 0.61399759, 0.5759984, 0.80618622, 0.70412415, 0.67877424, 0.61918282],
-                        [0.75, 0.66666667, 0.60801923, 0.57201282, 0.80618622, 0.70412415, 0.66824553, 0.61216369],
-                        [0.25, 0.33333333, 0.44080988, 0.46053992, 0.3232233, 0.38214887, 0.48296365, 0.48864244],
-                        [0.25, 0.33333333, 0.38996701, 0.42664468, 0.19381378, 0.29587585, 0.35535707, 0.40357138],
-                        [0.25, 0.33333333, 0.3906135, 0.42707567, 0.19381378, 0.29587585, 0.3321729, 0.38811526],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [0.8061862178478971, 0.1938137821521027],
+                    [0.8061862178478971, 0.1938137821521027],
+                    [0.8061862178478971, 0.19381378215210274],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
             bbands.bandwidth,
             pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [1.33333333, 2.0, 1.69705627, 2.54558441, np.nan, np.nan, np.nan, np.nan],
-                        [0.8, 1.2, 1.5255852, 2.2883778, 1.63299316, 2.44948974, 1.86454906, 2.7968236],
-                        [
-                            0.57142857,
-                            0.85714286,
-                            1.26683098,
-                            1.90024647,
-                            1.08866211,
-                            1.63299316,
-                            1.66423442,
-                            2.49635162,
-                        ],
-                        [0.57142857, 0.85714286, 0.92033445, 1.38050168, 0.56568542, 0.84852814, 1.197919, 1.79687849],
-                        [0.8, 1.2, 1.48601971, 2.22902956, 1.08866211, 1.63299316, 1.45099757, 2.17649636],
-                        [1.33333333, 2.0, 2.8959333, 4.34389996, 1.63299316, 2.44948974, 2.58378001, 3.87567002],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [1.088662107903635, 0.8164965809277261],
+                    [0.8164965809277261, 1.088662107903635],
+                    [0.6531972647421809, 1.632993161855452],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
-        assert_frame_equal(
-            vbt.BBANDS.run(
-                close_ts.vbt.tile(8),
-                window=(2, 3),
-                alpha=(2.0, 3.0),
-                wtype=("simple", "exp"),
-                param_product=True,
-                per_column=True,
-            ).middle,
-            bbands.middle,
+        outputs = vbt.ind_nb.bbands_nb(
+            close.values,
+            window=np.array([2, 3]),
+            wtype=np.array([0, 2]),
+            alpha=np.array([1.0, 2.0]),
         )
-        assert_frame_equal(
-            vbt.BBANDS.run(
-                close_ts.vbt.tile(8),
-                window=(2, 3),
-                alpha=(2.0, 3.0),
-                wtype=("simple", "exp"),
-                param_product=True,
-                per_column=True,
-            ).upper,
-            bbands.upper,
+        np.testing.assert_array_equal(
+            outputs[0],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [3.0, np.nan],
+                    [4.0, 5.847617696340303],
+                    [5.0, 5.475366274566866],
+                    [6.0, 4.876087095467319],
+                ]
+            ),
         )
-        assert_frame_equal(
-            vbt.BBANDS.run(
-                close_ts.vbt.tile(8),
-                window=(2, 3),
-                alpha=(2.0, 3.0),
-                wtype=("simple", "exp"),
-                param_product=True,
-                per_column=True,
-            ).lower,
-            bbands.lower,
+        np.testing.assert_array_equal(
+            outputs[1],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [2.5, np.nan],
+                    [3.5, 3.75],
+                    [4.5, 2.875],
+                    [5.5, 1.9375],
+                ]
+            ),
         )
-        assert_frame_equal(
-            vbt.BBANDS.run(
-                close_ts.vbt.tile(8),
-                window=(2, 3),
-                alpha=(2.0, 3.0),
-                wtype=("simple", "exp"),
-                param_product=True,
-                per_column=True,
-            ).percent_b,
-            bbands.percent_b,
+        np.testing.assert_array_equal(
+            outputs[2],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [2.0, np.nan],
+                    [3.0, 1.6523823036596967],
+                    [4.0, 0.27463372543313413],
+                    [5.0, -1.0010870954673199],
+                ]
+            ),
         )
-        assert_frame_equal(
-            vbt.BBANDS.run(
-                close_ts.vbt.tile(8),
-                window=(2, 3),
-                alpha=(2.0, 3.0),
-                wtype=("simple", "exp"),
-                param_product=True,
-                per_column=True,
-            ).bandwidth,
-            bbands.bandwidth,
-        )
+        chunked_func = vbt.ch_reg.resolve_option(vbt.ind_nb.bbands_nb, dict(n_chunks=2))
+        for i in range(3):
+            np.testing.assert_array_equal(
+                chunked_func(
+                    close.values,
+                    window=np.array([2, 3]),
+                    wtype=np.array([0, 2]),
+                    alpha=np.array([1.0, 2.0]),
+                )[i],
+                vbt.ind_nb.bbands_nb(
+                    close.values,
+                    window=np.array([2, 3]),
+                    wtype=np.array([0, 2]),
+                    alpha=np.array([1.0, 2.0]),
+                )[i],
+            )
 
     def test_RSI(self):
+        rsi = vbt.RSI.run(close, window=3, wtype="simple", hide_params=True)
         assert_frame_equal(
-            vbt.RSI.run(close_ts, window=(2, 3), wtype=("simple", "exp"), param_product=True).rsi,
+            rsi.rsi,
             pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan],
-                        [np.nan, np.nan, np.nan, np.nan],
-                        [100.0, 100.0, np.nan, np.nan],
-                        [100.0, 100.0, 100.0, 100.0],
-                        [50.0, 33.33333333, 66.66666667, 50.0],
-                        [0.0, 11.11111111, 33.33333333, 25.0],
-                        [0.0, 3.7037037, 0.0, 12.5],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples(
-                    [(2, "simple"), (2, "exp"), (3, "simple"), (3, "exp")],
-                    names=["rsi_window", "rsi_wtype"],
-                ),
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [100.0, 0.0],
+                    [100.0, 0.0],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
-        assert_frame_equal(
-            vbt.RSI.run(
-                close_ts.vbt.tile(4),
-                window=(2, 3),
-                wtype=("simple", "exp"),
-                param_product=True,
-                per_column=True,
-            ).rsi,
-            vbt.RSI.run(close_ts, window=(2, 3), wtype=("simple", "exp"), param_product=True, per_column=False).rsi,
+        np.testing.assert_array_equal(
+            vbt.ind_nb.rsi_nb(close.values, window=np.array([2, 3]), wtype=np.array([0, 1])),
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [100.0, np.nan],
+                    [100.0, 0.0],
+                    [100.0, 0.0],
+                ]
+            ),
+        )
+        chunked_func = vbt.ch_reg.resolve_option(vbt.ind_nb.rsi_nb, dict(n_chunks=2))
+        np.testing.assert_array_equal(
+            chunked_func(close.values, window=np.array([2, 3]), wtype=np.array([0, 1])),
+            vbt.ind_nb.rsi_nb(close.values, window=np.array([2, 3]), wtype=np.array([0, 1])),
         )
 
     def test_STOCH(self):
-        columns = pd.MultiIndex.from_tuples(
-            [
-                (2, 2, "simple"),
-                (2, 2, "exp"),
-                (2, 3, "simple"),
-                (2, 3, "exp"),
-                (3, 2, "simple"),
-                (3, 2, "exp"),
-                (3, 3, "simple"),
-                (3, 3, "exp"),
-            ],
-            names=["stoch_fast_k_window", "stoch_slow_d_window", "stoch_wtype"],
-        )
         stoch = vbt.STOCH.run(
-            high_ts,
-            low_ts,
-            close_ts,
-            fast_k_window=(2, 3),
-            slow_d_window=(2, 3),
-            wtype=("simple", "exp"),
-            param_product=True,
+            high,
+            low,
+            close,
+            fast_k_window=3,
+            slow_k_window=2,
+            slow_d_window=2,
+            wtype="simple",
+            hide_params=True,
         )
         assert_frame_equal(
             stoch.fast_k,
             pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [84.61538462, 84.61538462, 84.61538462, 84.61538462, np.nan, np.nan, np.nan, np.nan],
-                        [80.0, 80.0, 80.0, 80.0, 87.5, 87.5, 87.5, 87.5],
-                        [
-                            76.47058824,
-                            76.47058824,
-                            76.47058824,
-                            76.47058824,
-                            84.61538462,
-                            84.61538462,
-                            84.61538462,
-                            84.61538462,
-                        ],
-                        [
-                            17.64705882,
-                            17.64705882,
-                            17.64705882,
-                            17.64705882,
-                            17.64705882,
-                            17.64705882,
-                            17.64705882,
-                            17.64705882,
-                        ],
-                        [
-                            13.33333333,
-                            13.33333333,
-                            13.33333333,
-                            13.33333333,
-                            7.69230769,
-                            7.69230769,
-                            7.69230769,
-                            7.69230769,
-                        ],
-                        [
-                            7.69230769,
-                            7.69230769,
-                            7.69230769,
-                            7.69230769,
-                            4.16666667,
-                            4.16666667,
-                            4.16666667,
-                            4.16666667,
-                        ],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [87.5, 12.5],
+                    [87.5, 12.5],
+                    [87.5, 12.5],
+                ],
+                index=close.index,
+                columns=close.columns,
+            ),
+        )
+        assert_frame_equal(
+            stoch.slow_k,
+            pd.DataFrame(
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [87.5, 12.5],
+                    [87.5, 12.5],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
             stoch.slow_d,
             pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [69.20060331825036, 58.80844645550526, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                        [
-                            46.92810457516338,
-                            40.2199597787833,
-                            58.072733366851,
-                            47.43966817496228,
-                            49.952865761689274,
-                            37.132352941176464,
-                            np.nan,
-                            np.nan,
-                        ],
-                        [
-                            24.35394670688788,
-                            26.279327970504433,
-                            35.58236970001674,
-                            33.37434012066364,
-                            23.243464052287564,
-                            23.6904537456008,
-                            36.58035863918215,
-                            28.890931372549012,
-                        ],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [87.5, 12.5],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
-        assert_frame_equal(
-            vbt.STOCH.run(
-                high_ts.vbt.tile(8),
-                low_ts.vbt.tile(8),
-                close_ts.vbt.tile(8),
-                fast_k_window=(2, 3),
-                slow_d_window=(2, 3),
-                wtype=("simple", "exp"),
-                param_product=True,
-                per_column=True,
-            ).fast_k,
-            stoch.fast_k,
+        outputs = vbt.ind_nb.stoch_nb(
+            high.values,
+            low.values,
+            close.values,
+            fast_k_window=np.array([2, 3]),
+            slow_k_window=np.array([1, 2]),
+            slow_d_window=np.array([1, 2]),
+            wtype=np.array([0, 1]),
         )
-        assert_frame_equal(
-            vbt.STOCH.run(
-                high_ts.vbt.tile(8),
-                low_ts.vbt.tile(8),
-                close_ts.vbt.tile(8),
-                fast_k_window=(2, 3),
-                slow_d_window=(2, 3),
-                wtype=("simple", "exp"),
-                param_product=True,
-                per_column=True,
-            ).slow_d,
-            stoch.slow_d,
+        np.testing.assert_array_equal(
+            outputs[0],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [83.33333333333333, np.nan],
+                    [83.33333333333333, 12.5],
+                    [83.33333333333333, 12.5],
+                    [83.33333333333333, 12.5],
+                ]
+            ),
         )
+        np.testing.assert_array_equal(
+            outputs[1],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [83.33333333333333, np.nan],
+                    [83.33333333333333, np.nan],
+                    [83.33333333333333, 12.5],
+                    [83.33333333333333, 12.5],
+                ]
+            ),
+        )
+        np.testing.assert_array_equal(
+            outputs[2],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [83.33333333333333, np.nan],
+                    [83.33333333333333, np.nan],
+                    [83.33333333333333, np.nan],
+                    [83.33333333333333, 12.5],
+                ]
+            ),
+        )
+        for i in range(3):
+            chunked_func = vbt.ch_reg.resolve_option(vbt.ind_nb.stoch_nb, dict(n_chunks=2))
+            np.testing.assert_array_equal(
+                chunked_func(
+                    high.values,
+                    low.values,
+                    close.values,
+                    fast_k_window=3,
+                    slow_k_window=2,
+                    slow_d_window=2,
+                    wtype=[0, 1],
+                )[i],
+                vbt.ind_nb.stoch_nb(
+                    high.values,
+                    low.values,
+                    close.values,
+                    fast_k_window=3,
+                    slow_k_window=2,
+                    slow_d_window=2,
+                    slow_k_wtype=[0, 1],
+                    slow_d_wtype=[0, 1],
+                )[i],
+            )
 
     def test_MACD(self):
-        columns = pd.MultiIndex.from_tuples(
-            [
-                (2, 3, 2, "simple", "simple"),
-                (2, 3, 2, "simple", "exp"),
-                (2, 3, 2, "exp", "simple"),
-                (2, 3, 2, "exp", "exp"),
-                (2, 3, 3, "simple", "simple"),
-                (2, 3, 3, "simple", "exp"),
-                (2, 3, 3, "exp", "simple"),
-                (2, 3, 3, "exp", "exp"),
-                (2, 4, 2, "simple", "simple"),
-                (2, 4, 2, "simple", "exp"),
-                (2, 4, 2, "exp", "simple"),
-                (2, 4, 2, "exp", "exp"),
-                (2, 4, 3, "simple", "simple"),
-                (2, 4, 3, "simple", "exp"),
-                (2, 4, 3, "exp", "simple"),
-                (2, 4, 3, "exp", "exp"),
-                (3, 3, 2, "simple", "simple"),
-                (3, 3, 2, "simple", "exp"),
-                (3, 3, 2, "exp", "simple"),
-                (3, 3, 2, "exp", "exp"),
-                (3, 3, 3, "simple", "simple"),
-                (3, 3, 3, "simple", "exp"),
-                (3, 3, 3, "exp", "simple"),
-                (3, 3, 3, "exp", "exp"),
-                (3, 4, 2, "simple", "simple"),
-                (3, 4, 2, "simple", "exp"),
-                (3, 4, 2, "exp", "simple"),
-                (3, 4, 2, "exp", "exp"),
-                (3, 4, 3, "simple", "simple"),
-                (3, 4, 3, "simple", "exp"),
-                (3, 4, 3, "exp", "simple"),
-                (3, 4, 3, "exp", "exp"),
-            ],
-            names=[
-                "macd_fast_window",
-                "macd_slow_window",
-                "macd_signal_window",
-                "macd_macd_wtype",
-                "macd_signal_wtype",
-            ],
-        )
-
         macd = vbt.MACD.run(
-            close_ts,
-            fast_window=(2, 3),
-            slow_window=(3, 4),
-            signal_window=(2, 3),
-            macd_wtype=("simple", "exp"),
-            signal_wtype=("simple", "exp"),
-            param_product="exp",
+            close,
+            fast_window=2,
+            slow_window=3,
+            signal_window=2,
+            wtype="exp",
+            hide_params=True,
         )
         assert_frame_equal(
             macd.macd,
             pd.DataFrame(
-                np.array(
-                    [
-                        [
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                        ],
-                        [
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                        ],
-                        [
-                            0.5,
-                            0.5,
-                            0.30555556,
-                            0.30555556,
-                            0.5,
-                            0.5,
-                            0.30555556,
-                            0.30555556,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                        ],
-                        [
-                            0.5,
-                            0.5,
-                            0.39351852,
-                            0.39351852,
-                            0.5,
-                            0.5,
-                            0.39351852,
-                            0.39351852,
-                            1.0,
-                            1.0,
-                            0.69451852,
-                            0.69451852,
-                            1.0,
-                            1.0,
-                            0.69451852,
-                            0.69451852,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.5,
-                            0.5,
-                            0.301,
-                            0.301,
-                            0.5,
-                            0.5,
-                            0.301,
-                            0.301,
-                        ],
-                        [
-                            0.16666667,
-                            0.16666667,
-                            0.11033951,
-                            0.11033951,
-                            0.16666667,
-                            0.16666667,
-                            0.11033951,
-                            0.11033951,
-                            0.5,
-                            0.5,
-                            0.27843951,
-                            0.27843951,
-                            0.5,
-                            0.5,
-                            0.27843951,
-                            0.27843951,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.33333333,
-                            0.33333333,
-                            0.1681,
-                            0.1681,
-                            0.33333333,
-                            0.33333333,
-                            0.1681,
-                            0.1681,
-                        ],
-                        [
-                            -0.5,
-                            -0.5,
-                            -0.1403035,
-                            -0.1403035,
-                            -0.5,
-                            -0.5,
-                            -0.1403035,
-                            -0.1403035,
-                            -0.5,
-                            -0.5,
-                            -0.1456935,
-                            -0.1456935,
-                            -0.5,
-                            -0.5,
-                            -0.1456935,
-                            -0.1456935,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            -0.00539,
-                            -0.00539,
-                            0.0,
-                            0.0,
-                            -0.00539,
-                            -0.00539,
-                        ],
-                        [
-                            -0.5,
-                            -0.5,
-                            -0.30197617,
-                            -0.30197617,
-                            -0.5,
-                            -0.5,
-                            -0.30197617,
-                            -0.30197617,
-                            -1.0,
-                            -1.0,
-                            -0.45833517,
-                            -0.45833517,
-                            -1.0,
-                            -1.0,
-                            -0.45833517,
-                            -0.45833517,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            -0.5,
-                            -0.5,
-                            -0.156359,
-                            -0.156359,
-                            -0.5,
-                            -0.5,
-                            -0.156359,
-                            -0.156359,
-                        ],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [0.30555555555555536, -0.30555555555555536],
+                    [0.39351851851851816, -0.39351851851851816],
+                    [0.4436728395061724, -0.44367283950617264],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
             macd.signal,
             pd.DataFrame(
-                np.array(
-                    [
-                        [
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                        ],
-                        [
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                        ],
-                        [
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                        ],
-                        [
-                            0.5,
-                            0.5,
-                            0.34953704,
-                            0.36419753,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                        ],
-                        [
-                            0.33333333,
-                            0.27777778,
-                            0.25192901,
-                            0.19495885,
-                            0.38888889,
-                            0.33333333,
-                            0.26980453,
-                            0.22993827,
-                            0.75,
-                            0.66666667,
-                            0.48647901,
-                            0.41713251,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.41666667,
-                            0.38888889,
-                            0.23455,
-                            0.2124,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                        ],
-                        [
-                            -0.16666667,
-                            -0.24074074,
-                            -0.014982,
-                            -0.02854938,
-                            0.05555556,
-                            -0.08333333,
-                            0.12118484,
-                            0.04481739,
-                            0.0,
-                            -0.11111111,
-                            0.066373,
-                            0.04191517,
-                            0.33333333,
-                            0.125,
-                            0.27575484,
-                            0.17039276,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.16666667,
-                            0.12962963,
-                            0.081355,
-                            0.06720667,
-                            0.27777778,
-                            0.20833333,
-                            0.15457,
-                            0.11458,
-                        ],
-                        [
-                            -0.5,
-                            -0.41358025,
-                            -0.22113983,
-                            -0.2108339,
-                            -0.27777778,
-                            -0.29166667,
-                            -0.11064672,
-                            -0.12857939,
-                            -0.75,
-                            -0.7037037,
-                            -0.30201433,
-                            -0.29158505,
-                            -0.33333333,
-                            -0.4375,
-                            -0.10852972,
-                            -0.1439712,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            -0.25,
-                            -0.29012346,
-                            -0.0808745,
-                            -0.08183711,
-                            -0.05555556,
-                            -0.14583333,
-                            0.002117,
-                            -0.0208895,
-                        ],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [0.3641975308641972, -0.3641975308641972],
+                    [0.41718106995884735, -0.41718106995884746],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
             macd.hist,
             pd.DataFrame(
-                np.array(
-                    [
-                        [
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                        ],
-                        [
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                        ],
-                        [
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                        ],
-                        [
-                            0.0,
-                            0.0,
-                            0.04398148,
-                            0.02932099,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                        ],
-                        [
-                            -0.16666667,
-                            -0.11111111,
-                            -0.14158951,
-                            -0.08461934,
-                            -0.22222222,
-                            -0.16666667,
-                            -0.15946502,
-                            -0.11959877,
-                            -0.25,
-                            -0.16666667,
-                            -0.20803951,
-                            -0.138693,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            -0.08333333,
-                            -0.05555556,
-                            -0.06645,
-                            -0.0443,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                            np.nan,
-                        ],
-                        [
-                            -0.33333333,
-                            -0.25925926,
-                            -0.1253215,
-                            -0.11175412,
-                            -0.55555556,
-                            -0.41666667,
-                            -0.26148834,
-                            -0.18512088,
-                            -0.5,
-                            -0.38888889,
-                            -0.2120665,
-                            -0.18760867,
-                            -0.83333333,
-                            -0.625,
-                            -0.42144834,
-                            -0.31608626,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            -0.16666667,
-                            -0.12962963,
-                            -0.086745,
-                            -0.07259667,
-                            -0.27777778,
-                            -0.20833333,
-                            -0.15996,
-                            -0.11997,
-                        ],
-                        [
-                            0.0,
-                            -0.08641975,
-                            -0.08083633,
-                            -0.09114226,
-                            -0.22222222,
-                            -0.20833333,
-                            -0.19132945,
-                            -0.17339678,
-                            -0.25,
-                            -0.2962963,
-                            -0.15632083,
-                            -0.16675011,
-                            -0.66666667,
-                            -0.5625,
-                            -0.34980545,
-                            -0.31436396,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            0.0,
-                            -0.25,
-                            -0.20987654,
-                            -0.0754845,
-                            -0.07452189,
-                            -0.44444444,
-                            -0.35416667,
-                            -0.158476,
-                            -0.1354695,
-                        ],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [0.02932098765432095, -0.02932098765432095],
+                    [0.026491769547325072, -0.026491769547325184],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
-        assert_frame_equal(
-            vbt.MACD.run(
-                close_ts.vbt.tile(32),
-                fast_window=(2, 3),
-                slow_window=(3, 4),
-                signal_window=(2, 3),
-                macd_wtype=("simple", "exp"),
-                signal_wtype=("simple", "exp"),
-                param_product=True,
-                per_column=True,
-            ).macd,
-            macd.macd,
+        outputs = vbt.ind_nb.macd_nb(
+            close.values,
+            fast_window=np.array([2, 3]),
+            slow_window=np.array([3, 4]),
+            signal_window=np.array([1, 2]),
+            wtype=np.array([0, 2]),
         )
-        assert_frame_equal(
-            vbt.MACD.run(
-                close_ts.vbt.tile(32),
-                fast_window=(2, 3),
-                slow_window=(3, 4),
-                signal_window=(2, 3),
-                macd_wtype=("simple", "exp"),
-                signal_wtype=("simple", "exp"),
-                param_product=True,
-                per_column=True,
-            ).signal,
-            macd.signal,
+        np.testing.assert_array_equal(
+            outputs[0],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [0.5, np.nan],
+                    [0.5, -0.30100000000000016],
+                    [0.5, -0.3681000000000001],
+                ]
+            ),
         )
-        assert_frame_equal(
-            vbt.MACD.run(
-                close_ts.vbt.tile(32),
-                fast_window=(2, 3),
-                slow_window=(3, 4),
-                signal_window=(2, 3),
-                macd_wtype=("simple", "exp"),
-                signal_wtype=("simple", "exp"),
-                param_product=True,
-                per_column=True,
-            ).hist,
-            macd.hist,
+        np.testing.assert_array_equal(
+            outputs[1],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [0.5, np.nan],
+                    [0.5, np.nan],
+                    [0.5, -0.34573333333333345],
+                ]
+            ),
         )
+        for i in range(2):
+            chunked_func = vbt.ch_reg.resolve_option(vbt.ind_nb.macd_nb, dict(n_chunks=2))
+            np.testing.assert_array_equal(
+                chunked_func(
+                    close.values,
+                    fast_window=2,
+                    slow_window=3,
+                    signal_window=2,
+                    wtype=np.array([0, 2]),
+                )[i],
+                vbt.ind_nb.macd_nb(
+                    close.values,
+                    fast_window=2,
+                    slow_window=3,
+                    signal_window=2,
+                    macd_wtype=np.array([0, 2]),
+                    signal_wtype=np.array([0, 2]),
+                )[i],
+            )
 
     def test_ATR(self):
-        columns = pd.MultiIndex.from_tuples(
-            [(2, "simple"), (2, "exp"), (3, "simple"), (3, "exp")],
-            names=["atr_window", "atr_wtype"],
+        atr = vbt.ATR.run(
+            high,
+            low,
+            close,
+            window=3,
+            wtype="wilder",
+            hide_params=True,
         )
-        atr = vbt.ATR.run(high_ts, low_ts, close_ts, window=(2, 3), wtype=("simple", "exp"), param_product=True)
         assert_frame_equal(
             atr.tr,
             pd.DataFrame(
-                np.array(
-                    [
-                        [0.2, 0.2, 0.2, 0.2],
-                        [1.2, 1.2, 1.2, 1.2],
-                        [1.3, 1.3, 1.3, 1.3],
-                        [1.4, 1.4, 1.4, 1.4],
-                        [1.3, 1.3, 1.3, 1.3],
-                        [1.2, 1.2, 1.2, 1.2],
-                        [1.1, 1.1, 1.1, 1.1],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
+                [
+                    [np.nan, np.nan],
+                    [2.0, 2.0],
+                    [2.0, 2.0],
+                    [2.0, 2.0],
+                    [2.0, 2.0],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
             atr.atr,
             pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan],
-                        [0.7, 0.86666667, np.nan, np.nan],
-                        [1.25, 1.15555556, 0.9, 1.0],
-                        [1.35, 1.31851852, 1.3, 1.2],
-                        [1.35, 1.30617284, 1.33333333, 1.25],
-                        [1.25, 1.23539095, 1.3, 1.225],
-                        [1.15, 1.14513032, 1.2, 1.1625],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [2.0, 2.0],
+                    [2.0, 2.0],
+                ],
+                index=close.index,
+                columns=close.columns,
+            ),
+        )
+        outputs = vbt.ind_nb.atr_nb(
+            high.values,
+            low.values,
+            close.values,
+            window=np.array([2, 3]),
+            wtype=np.array([0, 1]),
+        )
+        np.testing.assert_array_equal(
+            outputs[0],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [2.0, 2.0],
+                    [2.0, 2.0],
+                    [2.0, 2.0],
+                    [2.0, 2.0],
+                ]
+            ),
+        )
+        np.testing.assert_array_equal(
+            outputs[1],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [2.0, np.nan],
+                    [2.0, 2.0],
+                    [2.0, 2.0],
+                ]
+            ),
+        )
+        chunked_func = vbt.ch_reg.resolve_option(vbt.ind_nb.atr_nb, dict(n_chunks=2))
+        for i in range(2):
+            np.testing.assert_array_equal(
+                chunked_func(
+                    high.values,
+                    low.values,
+                    close.values,
+                    window=np.array([2, 3]),
+                    wtype=np.array([0, 1]),
+                )[i],
+                vbt.ind_nb.atr_nb(
+                    high.values,
+                    low.values,
+                    close.values,
+                    window=np.array([2, 3]),
+                    wtype=np.array([0, 1]),
+                )[i],
+            )
+
+    def test_ADX(self):
+        adx = vbt.ADX.run(
+            high,
+            low,
+            close,
+            window=2,
+            wtype="wilder",
+            hide_params=True,
+        )
+        assert_frame_equal(
+            adx.plus_di,
+            pd.DataFrame(
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [37.5, 0.0],
+                    [43.75, 0.0],
+                    [46.875, 0.0],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
-            vbt.ATR.run(
-                high_ts.vbt.tile(4),
-                low_ts.vbt.tile(4),
-                close_ts.vbt.tile(4),
-                window=(2, 3),
-                wtype=("simple", "exp"),
-                param_product=True,
-                per_column=True,
-            ).tr,
-            atr.tr,
+            adx.minus_di,
+            pd.DataFrame(
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [0.0, 37.5],
+                    [0.0, 43.75],
+                    [0.0, 46.875],
+                ],
+                index=close.index,
+                columns=close.columns,
+            ),
         )
         assert_frame_equal(
-            vbt.ATR.run(
-                high_ts.vbt.tile(4),
-                low_ts.vbt.tile(4),
-                close_ts.vbt.tile(4),
-                window=(2, 3),
-                wtype=("simple", "exp"),
-                param_product=True,
-                per_column=True,
-            ).atr,
-            atr.atr,
+            adx.dx,
+            pd.DataFrame(
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [100.0, 100.0],
+                    [100.0, 100.0],
+                    [100.0, 100.0],
+                ],
+                index=close.index,
+                columns=close.columns,
+            ),
         )
+        assert_frame_equal(
+            adx.adx,
+            pd.DataFrame(
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [100.0, 100.0],
+                    [100.0, 100.0],
+                ],
+                index=close.index,
+                columns=close.columns,
+            ),
+        )
+        outputs = vbt.ind_nb.adx_nb(
+            high.values,
+            low.values,
+            close.values,
+            window=np.array([2, 3]),
+            wtype=np.array([0, 1]),
+        )
+        np.testing.assert_array_equal(
+            outputs[0],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [50.0, np.nan],
+                    [50.0, 0.0],
+                    [50.0, 0.0],
+                ]
+            ),
+        )
+        np.testing.assert_array_equal(
+            outputs[1],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [0.0, np.nan],
+                    [0.0, 50.0],
+                    [0.0, 50.0],
+                ]
+            ),
+        )
+        np.testing.assert_array_equal(
+            outputs[2],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [100.0, np.nan],
+                    [100.0, 100.0],
+                    [100.0, 100.0],
+                ]
+            ),
+        )
+        np.testing.assert_array_equal(
+            outputs[3],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [100.0, np.nan],
+                    [100.0, np.nan],
+                ]
+            ),
+        )
+        chunked_func = vbt.ch_reg.resolve_option(vbt.ind_nb.adx_nb, dict(n_chunks=2))
+        for i in range(4):
+            np.testing.assert_array_equal(
+                chunked_func(
+                    high.values,
+                    low.values,
+                    close.values,
+                    window=np.array([2, 3]),
+                    wtype=np.array([0, 1]),
+                )[i],
+                vbt.ind_nb.adx_nb(
+                    high.values,
+                    low.values,
+                    close.values,
+                    window=np.array([2, 3]),
+                    wtype=np.array([0, 1]),
+                )[i],
+            )
 
     def test_OBV(self):
-        assert_series_equal(
-            vbt.OBV.run(close_ts, volume_ts).obv,
-            pd.Series(np.array([4.0, 7.0, 9.0, 10.0, 8.0, 5.0, 1.0]), index=close_ts.index, name=close_ts.name),
+        obv = vbt.OBV.run(close, volume)
+        assert_frame_equal(
+            obv.obv,
+            pd.DataFrame(
+                [
+                    [1.0, 3.0],
+                    [3.0, 1.0],
+                    [6.0, 0.0],
+                    [8.0, -2.0],
+                    [9.0, -5.0],
+                ],
+                index=close.index,
+                columns=close.columns,
+            ),
         )
-        with pytest.raises(Exception):
-            vbt.OBV.run(close_ts, volume_ts, per_column=True)
+        chunked_func = vbt.ch_reg.resolve_option(vbt.ind_nb.obv_nb, dict(n_chunks=2))
+        np.testing.assert_array_equal(
+            chunked_func(close.values, volume.values),
+            vbt.ind_nb.obv_nb(close.values, volume.values),
+        )
 
     def test_OLS(self):
+        ols = vbt.OLS.run(np.arange(len(close)), close, window=2, with_zscore=True, hide_params=True)
         assert_frame_equal(
-            vbt.OLS.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).slope,
+            ols.slope,
             pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan],
-                        [1.0, np.nan],
-                        [1.0, 1.0],
-                        [1.0, 1.0],
-                        [-1.0, 0.0],
-                        [-1.0, -1.0],
-                        [-1.0, -1.0],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=pd.Index([2, 3], name="ols_window"),
+                [
+                    [np.nan, np.nan],
+                    [1.0, -1.0],
+                    [1.0, -1.0],
+                    [1.0, -1.0],
+                    [1.0, -1.0],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
-            vbt.OLS.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).intercept,
+            ols.intercept,
             pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan],
-                        [1.0, np.nan],
-                        [1.0, 1.0],
-                        [1.0, 1.0],
-                        [7.0, 3.3333333333333335],
-                        [7.0, 7.0],
-                        [7.0, 7.0],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=pd.Index([2, 3], name="ols_window"),
+                [
+                    [np.nan, np.nan],
+                    [2.0, 5.0],
+                    [2.0, 5.0],
+                    [2.0, 5.0],
+                    [2.0, 5.0],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
-            vbt.OLS.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).zscore,
+            ols.zscore,
             pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan],
-                        [np.nan, np.nan],
-                        [np.nan, np.nan],
-                        [np.nan, np.nan],
-                        [np.nan, -1.414213562373095],
-                        [np.nan, 0.7071067811865475],
-                        [np.nan, 0.7071067811865475],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=pd.Index([2, 3], name="ols_window"),
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
-            vbt.OLS.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).pred,
+            ols.pred,
             pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan],
-                        [2.0, np.nan],
-                        [3.0, 3.0],
-                        [4.0, 4.0],
-                        [3.0, 3.3333333333333335],
-                        [2.0, 2.0],
-                        [1.0, 1.0],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=pd.Index([2, 3], name="ols_window"),
+                [
+                    [np.nan, np.nan],
+                    [3.0, 4.0],
+                    [4.0, 3.0],
+                    [5.0, 2.0],
+                    [6.0, 1.0],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
-            vbt.OLS.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).error,
+            ols.error,
             pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan],
-                        [0.0, np.nan],
-                        [0.0, 0.0],
-                        [0.0, 0.0],
-                        [0.0, -0.3333333333333335],
-                        [0.0, 0.0],
-                        [0.0, 0.0],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=pd.Index([2, 3], name="ols_window"),
+                [
+                    [np.nan, np.nan],
+                    [0.0, 0.0],
+                    [0.0, 0.0],
+                    [0.0, 0.0],
+                    [0.0, 0.0],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
-            vbt.OLS.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3)).angle,
+            ols.angle,
             pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan],
-                        [45.0, np.nan],
-                        [45.0, 45.0],
-                        [45.0, 45.0],
-                        [-45.0, 0.0],
-                        [-45.0, -45.0],
-                        [-45.0, -45.0],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=pd.Index([2, 3], name="ols_window"),
+                [
+                    [np.nan, np.nan],
+                    [45.0, -45.0],
+                    [45.0, -45.0],
+                    [45.0, -45.0],
+                    [45.0, -45.0],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
-        assert_frame_equal(
-            vbt.OLS.run(np.arange(len(close_ts))[:, None], close_ts, window=(2, 3), with_zscore=False).zscore,
-            pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan],
-                        [np.nan, np.nan],
-                        [np.nan, np.nan],
-                        [np.nan, np.nan],
-                        [np.nan, np.nan],
-                        [np.nan, np.nan],
-                        [np.nan, np.nan],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=pd.Index([2, 3], name="ols_window"),
+        outputs = vbt.ind_nb.ols_nb(
+            np.column_stack((np.arange(len(close)), np.arange(len(close)))),
+            close.values,
+            window=np.array([2, 3]),
+            with_zscore=True,
+        )
+        np.testing.assert_array_equal(
+            outputs[0],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [1.0, np.nan],
+                    [1.0, -1.0],
+                    [1.0, -1.0],
+                    [1.0, -1.0],
+                ]
             ),
         )
-        assert_frame_equal(
-            vbt.OLS.run(
-                np.arange(len(close_ts))[:, None],
-                close_ts.vbt.tile(2),
-                window=(2, 3),
-                per_column=True,
-            ).slope,
-            vbt.OLS.run(
-                np.arange(len(close_ts))[:, None],
-                close_ts,
-                window=(2, 3),
-                per_column=False,
-            ).slope,
+        np.testing.assert_array_equal(
+            outputs[1],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [2.0, np.nan],
+                    [2.0, 5.0],
+                    [2.0, 5.0],
+                    [2.0, 5.0],
+                ]
+            ),
         )
-        assert_frame_equal(
-            vbt.OLS.run(
-                np.arange(len(close_ts))[:, None],
-                close_ts.vbt.tile(2),
-                window=(2, 3),
-                per_column=True,
-            ).intercept,
-            vbt.OLS.run(
-                np.arange(len(close_ts))[:, None],
-                close_ts,
-                window=(2, 3),
-                per_column=False,
-            ).intercept,
+        np.testing.assert_array_equal(
+            outputs[2],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                ]
+            ),
         )
+        chunked_func = vbt.ch_reg.resolve_option(vbt.ind_nb.ols_nb, dict(n_chunks=2))
+        for i in range(3):
+            np.testing.assert_array_equal(
+                chunked_func(
+                    np.column_stack((np.arange(len(close)), np.arange(len(close)))),
+                    close.values,
+                    window=np.array([2, 3]),
+                    with_zscore=True,
+                )[i],
+                vbt.ind_nb.ols_nb(
+                    np.column_stack((np.arange(len(close)), np.arange(len(close)))),
+                    close.values,
+                    window=np.array([2, 3]),
+                    with_zscore=True,
+                )[i]
+            )
+
+    def test_VWAP(self):
+        vwap = vbt.VWAP.run(high, low, close, volume)
         assert_frame_equal(
-            vbt.OLS.run(
-                np.arange(len(close_ts))[:, None],
-                close_ts.vbt.tile(2),
-                window=(2, 3),
-                per_column=True,
-            ).zscore,
-            vbt.OLS.run(
-                np.arange(len(close_ts))[:, None],
-                close_ts,
-                window=(2, 3),
-                per_column=False,
-            ).zscore,
+            vwap.vwap,
+            pd.DataFrame(
+                [
+                    [1.6666666666666667, 5.333333333333333],
+                    [2.6666666666666665, 4.333333333333333],
+                    [3.6666666666666665, 3.3333333333333335],
+                    [4.666666666666667, 2.3333333333333335],
+                    [5.666666666666667, 1.3333333333333333],
+                ],
+                index=close.index,
+                columns=close.columns,
+            ),
         )
-        assert_frame_equal(
-            vbt.OLS.run(
-                np.arange(len(close_ts))[:, None],
-                close_ts.vbt.tile(2),
-                window=(2, 3),
-                per_column=True,
-            ).error,
-            vbt.OLS.run(
-                np.arange(len(close_ts))[:, None],
-                close_ts,
-                window=(2, 3),
-                per_column=False,
-            ).error,
-        )
-        assert_frame_equal(
-            vbt.OLS.run(
-                np.arange(len(close_ts))[:, None],
-                close_ts.vbt.tile(2),
-                window=(2, 3),
-                per_column=True,
-            ).angle,
-            vbt.OLS.run(
-                np.arange(len(close_ts))[:, None],
-                close_ts,
-                window=(2, 3),
-                per_column=False,
-            ).angle,
+        chunked_func = vbt.ch_reg.resolve_option(vbt.ind_nb.vwap_nb, dict(n_chunks=2))
+        np.testing.assert_array_equal(
+            chunked_func(
+                high.values,
+                low.values,
+                close.values,
+                volume.values,
+                np.array([close.shape[0]]),
+            ),
+            vbt.ind_nb.vwap_nb(
+                high.values,
+                low.values,
+                close.values,
+                volume.values,
+                np.array([close.shape[0]]),
+            ),
         )
 
     def test_PATSIM(self):
-        assert_frame_equal(
-            vbt.PATSIM.run(
-                close_ts,
-                [np.array([1, 2, 1]), np.array([1, 2, 1, 2])],
-                rescale_mode=["minmax", "rebase"],
-                max_error=[np.nan, 0.1],
-                max_error_interp_mode=[None, "discrete"],
-            ).sim,
-            pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan],
-                        [np.nan, np.nan],
-                        [0.5, np.nan],
-                        [0.5, 0.5],
-                        [1.0, 0.25],
-                        [0.5, 0.4285714285714286],
-                        [0.5, 0.18181818181818177],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples(
-                    [("array_0", "minmax", np.nan, None), ("array_1", "rebase", 0.1, "discrete")],
-                    names=["patsim_pattern", "patsim_rescale_mode", "patsim_max_error", "patsim_max_error_interp_mode"],
-                ),
-            ),
+        patsim = vbt.PATSIM.run(
+            close,
+            np.array([1, 2]),
+            hide_params=True,
         )
         assert_frame_equal(
-            vbt.PATSIM.run(
-                close_ts.vbt.tile(2),
-                [np.array([1, 2, 1]), np.array([1, 2, 1, 2])],
-                rescale_mode=["minmax", "rebase"],
-                max_error=[np.nan, 0.1],
-                max_error_interp_mode=[None, "discrete"],
-                per_column=True,
-            ).sim,
-            vbt.PATSIM.run(
-                close_ts,
-                [np.array([1, 2, 1]), np.array([1, 2, 1, 2])],
-                rescale_mode=["minmax", "rebase"],
-                max_error=[np.nan, 0.1],
-                max_error_interp_mode=[None, "discrete"],
-                per_column=False,
-            ).sim,
+            patsim.similarity,
+            pd.DataFrame(
+                [
+                    [np.nan, np.nan],
+                    [1.0, 0.0],
+                    [1.0, 0.0],
+                    [1.0, 0.0],
+                    [1.0, 0.0],
+                ],
+                index=close.index,
+                columns=close.columns,
+            ),
         )
 
     def test_PIVOTINFO(self):
+        pivot_info = vbt.PIVOTINFO.run(high, low, up_th=0.5, down_th=0.5, hide_params=True)
         assert_frame_equal(
-            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).conf_pivot,
+            pivot_info.conf_pivot,
             pd.DataFrame(
-                np.array([[0, 0], [-1, 0], [-1, -1], [-1, -1], [-1, -1], [1, 1], [1, 1]]),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+                [
+                    [1, 0],
+                    [-1, 0],
+                    [-1, 1],
+                    [-1, 1],
+                    [-1, -1],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
-            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).conf_idx,
+            pivot_info.conf_idx,
             pd.DataFrame(
-                np.array([[-1, -1], [0, -1], [0, 0], [0, 0], [0, 0], [3, 3], [3, 3]]),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+                [
+                    [0, -1],
+                    [0, -1],
+                    [0, 0],
+                    [0, 0],
+                    [0, 3],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
-            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).conf_value,
+            pivot_info.last_pivot,
             pd.DataFrame(
-                np.array([[np.nan, np.nan], [1.0, np.nan], [1.0, 1.0], [1.0, 1.0], [1.0, 1.0], [4.0, 4.0], [4.0, 4.0]]),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+                [
+                    [-1, 0],
+                    [1, 0],
+                    [1, -1],
+                    [1, -1],
+                    [1, 1],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
-            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).last_pivot,
+            pivot_info.last_idx,
             pd.DataFrame(
-                np.array([[0, 0], [1, 0], [1, 1], [1, 1], [1, 1], [-1, -1], [-1, -1]]),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+                [
+                    [0, -1],
+                    [1, -1],
+                    [2, 2],
+                    [3, 3],
+                    [4, 4],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
-            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).last_idx,
+            pivot_info.conf_value,
             pd.DataFrame(
-                np.array([[-1, -1], [1, -1], [2, 2], [3, 3], [3, 3], [5, 5], [6, 6]]),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+                [
+                    [2.5, np.nan],
+                    [0.5, np.nan],
+                    [0.5, 6.5],
+                    [0.5, 6.5],
+                    [0.5, 1.5],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
-            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).last_value,
+            pivot_info.last_value,
             pd.DataFrame(
-                np.array([[np.nan, np.nan], [2.0, np.nan], [3.0, 3.0], [4.0, 4.0], [4.0, 4.0], [2.0, 2.0], [1.0, 1.0]]),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+                [
+                    [0.5, np.nan],
+                    [3.5, np.nan],
+                    [4.5, 2.5],
+                    [5.5, 1.5],
+                    [6.5, 2.5],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
-            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).pivots,
+            pivot_info.pivots,
             pd.DataFrame(
-                np.array([[-1, -1], [0, 0], [0, 0], [1, 1], [0, 0], [0, 0], [-1, -1]]),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+                [
+                    [-1, 1],
+                    [0, 0],
+                    [0, 0],
+                    [0, 0],
+                    [1, 1],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
-            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).modes,
+            pivot_info.modes,
             pd.DataFrame(
-                np.array([[1, 1], [1, 1], [1, 1], [-1, -1], [-1, -1], [-1, -1], [1, 1]]),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+                [
+                    [1, -1],
+                    [1, -1],
+                    [1, -1],
+                    [1, -1],
+                    [-1, -1],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
-        assert_frame_equal(
-            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).pivots_readable,
-            pd.DataFrame(
-                np.array(
-                    [
-                        ["Valley", "Valley"],
-                        [None, None],
-                        [None, None],
-                        ["Peak", "Peak"],
-                        [None, None],
-                        [None, None],
-                        ["Valley", "Valley"],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+        outputs = vbt.ind_nb.pivot_info_nb(
+            high.values,
+            low.values,
+            up_th=high.values * 0.1,
+            down_th=low.values * 0.1,
+        )
+        np.testing.assert_array_equal(
+            outputs[0],
+            np.array(
+                [
+                    [1, 0],
+                    [-1, 1],
+                    [1, 1],
+                    [-1, -1],
+                    [-1, 1],
+                ]
             ),
         )
-        assert_frame_equal(
-            vbt.PIVOTINFO.run(close_ts, close_ts, up_th=[1, 2], down_th=0.5).modes_readable,
-            pd.DataFrame(
-                np.array(
-                    [
-                        ["Uptrend", "Uptrend"],
-                        ["Uptrend", "Uptrend"],
-                        ["Uptrend", "Uptrend"],
-                        ["Downtrend", "Downtrend"],
-                        ["Downtrend", "Downtrend"],
-                        ["Downtrend", "Downtrend"],
-                        ["Uptrend", "Uptrend"],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=pd.MultiIndex.from_tuples([(1, 0.5), (2, 0.5)], names=["pivotinfo_up_th", "pivotinfo_down_th"]),
+        np.testing.assert_array_equal(
+            outputs[1],
+            np.array(
+                [
+                    [0, -1],
+                    [0, 0],
+                    [1, 0],
+                    [2, 2],
+                    [2, 3],
+                ]
             ),
         )
+        np.testing.assert_array_equal(
+            outputs[2],
+            np.array(
+                [
+                    [-1, 0],
+                    [1, -1],
+                    [-1, -1],
+                    [1, 1],
+                    [1, -1],
+                ]
+            ),
+        )
+        np.testing.assert_array_equal(
+            outputs[3],
+            np.array(
+                [
+                    [0, -1],
+                    [1, 1],
+                    [2, 2],
+                    [3, 3],
+                    [4, 4],
+                ]
+            ),
+        )
+        for i in range(4):
+            chunked_func = vbt.ch_reg.resolve_option(vbt.ind_nb.pivot_info_nb, dict(n_chunks=2))
+            np.testing.assert_array_equal(
+                chunked_func(
+                    high.values,
+                    low.values,
+                    up_th=high.values * 0.1,
+                    down_th=low.values * 0.1,
+                )[i],
+                vbt.ind_nb.pivot_info_nb(
+                    high.values,
+                    low.values,
+                    up_th=high.values * 0.1,
+                    down_th=low.values * 0.1,
+                )[i],
+            )
 
     def test_SUPERTREND(self):
-        columns = pd.MultiIndex.from_tuples(
-            [(2, 2), (2, 3), (3, 2), (3, 3)], names=["supertrend_period", "supertrend_multiplier"]
-        )
+        supertrend = vbt.SUPERTREND.run(high, low, close, period=3, multiplier=2, hide_params=True)
         assert_frame_equal(
-            vbt.SUPERTREND.run(high_ts, low_ts, close_ts, period=[2, 3], multiplier=[2, 3], param_product=True).supert,
+            supertrend.trend,
             pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan],
-                        [np.nan, np.nan, np.nan, np.nan],
-                        [0.49999999999999956, -0.7500000000000009, np.nan, np.nan],
-                        [1.3499999999999996, 0.024999999999999467, 1.4222222222222216, 0.13333333333333242],
-                        [1.3499999999999996, 0.024999999999999467, 1.4222222222222216, 0.13333333333333242],
-                        [1.3499999999999996, 0.024999999999999467, 1.4222222222222216, 0.13333333333333242],
-                        [3.35625, 0.024999999999999467, 3.415637860082305, 0.13333333333333242],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [0.5, -1.5],
+                    [1.5, -1.5],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
-            vbt.SUPERTREND.run(high_ts, low_ts, close_ts, period=[2, 3], multiplier=[2, 3], param_product=True).superd,
+            supertrend.direction,
             pd.DataFrame(
-                np.array(
-                    [[1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [-1, 1, -1, 1]]
-                ),
-                index=close_ts.index,
-                columns=columns,
+                [
+                    [1, 1],
+                    [1, 1],
+                    [1, 1],
+                    [1, 1],
+                    [1, 1],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
-            vbt.SUPERTREND.run(high_ts, low_ts, close_ts, period=[2, 3], multiplier=[2, 3], param_product=True).superl,
+            supertrend.long,
             pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan],
-                        [np.nan, np.nan, np.nan, np.nan],
-                        [0.49999999999999956, -0.7500000000000009, np.nan, np.nan],
-                        [1.3499999999999996, 0.024999999999999467, 1.4222222222222216, 0.13333333333333242],
-                        [1.3499999999999996, 0.024999999999999467, 1.4222222222222216, 0.13333333333333242],
-                        [1.3499999999999996, 0.024999999999999467, 1.4222222222222216, 0.13333333333333242],
-                        [np.nan, 0.024999999999999467, np.nan, 0.13333333333333242],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [0.5, -1.5],
+                    [1.5, -1.5],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
         assert_frame_equal(
-            vbt.SUPERTREND.run(high_ts, low_ts, close_ts, period=[2, 3], multiplier=[2, 3], param_product=True).supers,
+            supertrend.short,
             pd.DataFrame(
-                np.array(
-                    [
-                        [np.nan, np.nan, np.nan, np.nan],
-                        [np.nan, np.nan, np.nan, np.nan],
-                        [np.nan, np.nan, np.nan, np.nan],
-                        [np.nan, np.nan, np.nan, np.nan],
-                        [np.nan, np.nan, np.nan, np.nan],
-                        [np.nan, np.nan, np.nan, np.nan],
-                        [3.35625, np.nan, 3.415637860082305, np.nan],
-                    ]
-                ),
-                index=close_ts.index,
-                columns=columns,
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                ],
+                index=close.index,
+                columns=close.columns,
             ),
         )
+        outputs = vbt.ind_nb.supertrend_nb(
+            high.values,
+            low.values,
+            close.values,
+            period=np.array([2, 3]),
+            multiplier=np.array([2, 3]),
+        )
+        np.testing.assert_array_equal(
+            outputs[0],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [-0.5, np.nan],
+                    [0.5, -3.5],
+                    [1.5, -3.5],
+                ]
+            ),
+        )
+        np.testing.assert_array_equal(
+            outputs[1],
+            np.array(
+                [
+                    [1, 1],
+                    [1, 1],
+                    [1, 1],
+                    [1, 1],
+                    [1, 1],
+                ]
+            ),
+        )
+        np.testing.assert_array_equal(
+            outputs[2],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [-0.5, np.nan],
+                    [0.5, -3.5],
+                    [1.5, -3.5],
+                ]
+            ),
+        )
+        np.testing.assert_array_equal(
+            outputs[3],
+            np.array(
+                [
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                ]
+            ),
+        )
+        for i in range(4):
+            chunked_func = vbt.ch_reg.resolve_option(vbt.ind_nb.supertrend_nb, dict(n_chunks=2))
+            np.testing.assert_array_equal(
+                chunked_func(
+                    high.values,
+                    low.values,
+                    close.values,
+                    period=np.array([2, 3]),
+                    multiplier=np.array([2, 3]),
+                )[i],
+                vbt.ind_nb.supertrend_nb(
+                    high.values,
+                    low.values,
+                    close.values,
+                    period=np.array([2, 3]),
+                    multiplier=np.array([2, 3]),
+                )[i]
+            )
 
     def test_SIGDET(self):
         sr = pd.Series([10, 10, 11, 12, 11, 10, 9, 8, 9, 10, 10])
-        columns = pd.MultiIndex.from_tuples(
-            [(3, 1, 0), (3, 1, 1), (3, 2, 0), (3, 2, 1), (4, 1, 0), (4, 1, 1), (4, 2, 0), (4, 2, 1)],
-            names=["sigdet_lag", "sigdet_factor", "sigdet_influence"],
-        )
-        assert_frame_equal(
-            vbt.SIGDET.run(sr, [3, 4], [1, 2], [0, 1], param_product=True).signal,
-            pd.DataFrame(
+        sigdet = vbt.SIGDET.run(sr, lag=3, factor=1, influence=1, hide_params=True)
+        assert_series_equal(
+            sigdet.signal,
+            pd.Series(
                 [
-                    [0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0],
-                    [1, 1, 1, 1, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0],
-                    [-1, -1, -1, -1, -1, -1, 0, 0],
-                    [-1, -1, -1, -1, -1, -1, -1, -1],
-                    [-1, -1, -1, -1, -1, -1, -1, -1],
-                    [-1, 0, -1, 0, -1, 0, -1, 0],
-                    [-1, 1, -1, 1, -1, 1, 1, 0],
-                    [-1, 1, -1, 0, -1, 1, 1, 0],
-                ],
-                columns=columns,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    -1,
+                    -1,
+                    -1,
+                    0,
+                    1,
+                    1,
+                ]
             ),
         )
-        assert_frame_equal(
-            vbt.SIGDET.run(sr, [3, 4], [1, 2], [0, 1], param_product=True).upper_band,
-            pd.DataFrame(
+        assert_series_equal(
+            sigdet.upper_band,
+            pd.Series(
                 [
-                    [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                    [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                    [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                    [
-                        11.138071187457697,
-                        11.471404520791031,
-                        11.609475708248729,
-                        11.942809041582063,
-                        np.nan,
-                        np.nan,
-                        np.nan,
-                        np.nan,
-                    ],
-                    [
-                        11.471404520791031,
-                        12.14982991426106,
-                        11.942809041582063,
-                        12.966326495188786,
-                        11.82915619758885,
-                        11.82915619758885,
-                        12.658312395177699,
-                        12.658312395177699,
-                    ],
-                    [
-                        11.0,
-                        11.471404520791031,
-                        11.0,
-                        11.942809041582063,
-                        11.957106781186548,
-                        11.707106781186548,
-                        12.414213562373096,
-                        12.414213562373096,
-                    ],
-                    [
-                        11.0,
-                        10.816496580927726,
-                        11.0,
-                        11.632993161855453,
-                        11.683012701892219,
-                        11.207106781186548,
-                        12.164213562373096,
-                        11.914213562373096,
-                    ],
-                    [
-                        11.0,
-                        9.816496580927726,
-                        11.0,
-                        10.632993161855453,
-                        11.433012701892219,
-                        10.618033988749895,
-                        11.908312395177699,
-                        11.73606797749979,
-                    ],
-                    [
-                        11.0,
-                        9.483163247594392,
-                        11.0,
-                        10.299659828522119,
-                        11.0,
-                        10.118033988749895,
-                        10.86602540378444,
-                        11.23606797749979,
-                    ],
-                    [
-                        11.0,
-                        9.471404520791031,
-                        11.0,
-                        9.942809041582063,
-                        11.0,
-                        9.707106781186548,
-                        10.0,
-                        10.414213562373096,
-                    ],
-                    [
-                        11.0,
-                        10.483163247594392,
-                        11.0,
-                        11.299659828522119,
-                        11.0,
-                        9.957106781186548,
-                        10.0,
-                        10.664213562373096,
-                    ],
-                ],
-                columns=columns,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    11.471404520791031,
+                    12.14982991426106,
+                    11.471404520791031,
+                    10.816496580927726,
+                    9.816496580927726,
+                    9.483163247594392,
+                    9.471404520791031,
+                    10.483163247594392,
+                ]
             ),
         )
-        assert_frame_equal(
-            vbt.SIGDET.run(sr, [3, 4], [1, 2], [0, 1], param_product=True).lower_band,
-            pd.DataFrame(
+        assert_series_equal(
+            sigdet.lower_band,
+            pd.Series(
                 [
-                    [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                    [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                    [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                    [
-                        10.195262145875635,
-                        10.528595479208969,
-                        9.723857625084603,
-                        10.057190958417937,
-                        np.nan,
-                        np.nan,
-                        np.nan,
-                        np.nan,
-                    ],
-                    [
-                        10.528595479208969,
-                        10.516836752405608,
-                        10.057190958417937,
-                        9.700340171477881,
-                        10.17084380241115,
-                        10.17084380241115,
-                        9.341687604822301,
-                        9.341687604822301,
-                    ],
-                    [
-                        11.0,
-                        10.528595479208969,
-                        11.0,
-                        10.057190958417937,
-                        10.542893218813452,
-                        10.292893218813452,
-                        9.585786437626904,
-                        9.585786437626904,
-                    ],
-                    [
-                        11.0,
-                        9.183503419072274,
-                        11.0,
-                        8.367006838144547,
-                        10.816987298107781,
-                        9.792893218813452,
-                        9.335786437626904,
-                        9.085786437626904,
-                    ],
-                    [
-                        11.0,
-                        8.183503419072274,
-                        11.0,
-                        7.3670068381445475,
-                        10.566987298107781,
-                        8.381966011250105,
-                        8.591687604822301,
-                        7.26393202250021,
-                    ],
-                    [
-                        11.0,
-                        7.85017008573894,
-                        11.0,
-                        7.033673504811214,
-                        11.0,
-                        7.881966011250105,
-                        9.13397459621556,
-                        6.76393202250021,
-                    ],
-                    [
-                        11.0,
-                        8.528595479208969,
-                        11.0,
-                        8.057190958417937,
-                        11.0,
-                        8.292893218813452,
-                        10.0,
-                        7.585786437626905,
-                    ],
-                    [11.0, 8.85017008573894, 11.0, 8.033673504811214, 11.0, 8.542893218813452, 10.0, 7.835786437626905],
-                ],
-                columns=columns,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    10.528595479208969,
+                    10.516836752405608,
+                    10.528595479208969,
+                    9.183503419072274,
+                    8.183503419072274,
+                    7.85017008573894,
+                    8.528595479208969,
+                    8.85017008573894,
+                ]
             ),
         )
+        outputs = vbt.ind_nb.signal_detection_nb(
+            sr.values[:, None],
+            lag=np.array([2, 3]),
+            factor=sr.values[:, None],
+            influence=sr.values[:, None],
+        )
+        np.testing.assert_array_equal(
+            outputs[0],
+            np.array(
+                [
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                ]
+            ),
+        )
+        np.testing.assert_array_equal(
+            outputs[1],
+            np.array(
+                [
+                    np.nan,
+                    np.nan,
+                    15.5,
+                    82.5,
+                    61.0,
+                    15.5,
+                    14.0,
+                    12.5,
+                    13.0,
+                    14.5,
+                    15.0,
+                ]
+            ),
+        )
+        np.testing.assert_array_equal(
+            outputs[2],
+            np.array(
+                [
+                    np.nan,
+                    np.nan,
+                    15.5,
+                    -49.5,
+                    -38.0,
+                    5.5,
+                    5.0,
+                    4.5,
+                    4.0,
+                    4.5,
+                    5.0,
+                ]
+            ),
+        )
+        for i in range(3):
+            chunked_func = vbt.ch_reg.resolve_option(vbt.ind_nb.signal_detection_nb, dict(n_chunks=2))
+            np.testing.assert_array_equal(
+                chunked_func(
+                    sr.values[:, None],
+                    lag=np.array([2, 3]),
+                    factor=sr.values[:, None],
+                    influence=sr.values[:, None],
+                )[i],
+                vbt.ind_nb.signal_detection_nb(
+                    sr.values[:, None],
+                    lag=np.array([2, 3]),
+                    up_factor=sr.values[:, None],
+                    down_factor=sr.values[:, None],
+                    mean_influence=sr.values[:, None],
+                    std_influence=sr.values[:, None],
+                )[i],
+            )

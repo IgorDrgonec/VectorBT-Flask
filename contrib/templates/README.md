@@ -1,1 +1,0 @@
-This folder contains custom templates involving multiple vectorbt components.

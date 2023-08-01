@@ -65,7 +65,7 @@ class SuperTrendAIS(tp.NamedTuple):
     prev_close: float
     prev_upper: float
     prev_lower: float
-    prev_dir_: int
+    prev_direction: int
     nobs: int
     weighted_avg: float
     old_wt: float
@@ -86,7 +86,7 @@ class SuperTrendAOS(tp.NamedTuple):
     upper: float
     lower: float
     trend: float
-    dir_: int
+    direction: int
     long: float
     short: float
 

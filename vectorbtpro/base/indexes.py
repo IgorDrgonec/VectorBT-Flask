@@ -517,7 +517,7 @@ def select_levels(
     levels: tp.Union[ExceptLevel, tp.MaybeLevelSequence],
     strict: bool = True,
 ) -> tp.Index:
-    """Build a new index by selecting one or multiple `level_names` from `index`.
+    """Build a new index by selecting one or multiple `levels` from `index`.
 
     Provide `levels` as an instance of `ExceptLevel` to select everything apart from the specified levels."""
     was_multiindex = True

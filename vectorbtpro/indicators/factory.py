@@ -126,10 +126,13 @@ def prepare_params(
         is_tuple = _param_settings.get("is_tuple", False)
         dtype = _param_settings.get("dtype", None)
         if checks.is_mapping_like(dtype):
+            dtype_kwargs = _param_settings.get("dtype_kwargs", None)
+            if dtype_kwargs is None:
+                dtype_kwargs = {}
             if checks.is_namedtuple(dtype):
-                p_values = map_enum_fields(p_values, dtype)
+                p_values = map_enum_fields(p_values, dtype, **dtype_kwargs)
             else:
-                p_values = apply_mapping(p_values, dtype)
+                p_values = apply_mapping(p_values, dtype, **dtype_kwargs)
         is_array_like = _param_settings.get("is_array_like", False)
         min_one_dim = _param_settings.get("min_one_dim", False)
         bc_to_input = _param_settings.get("bc_to_input", False)
@@ -418,6 +421,8 @@ class IndicatorBase(Analyzable):
 
                 * `dtype`: If data type is an enumerated type or other mapping, and a string as parameter
                     value was passed, will convert it first.
+                * `dtype_kwargs`: Keyword arguments passed to the function processing the data type.
+                    If data type is enumerated, it will be `vectorbtpro.utils.enum_.map_enum_fields`.
                 * `is_tuple`: If tuple was passed, it will be considered as a single value.
                     To treat it as multiple values, pack it into a list.
                 * `is_array_like`: If array-like object was passed, it will be considered as a single value.
@@ -532,6 +537,7 @@ class IndicatorBase(Analyzable):
                     param_names,
                     [
                         "dtype",
+                        "dtype_kwargs",
                         "is_tuple",
                         "is_array_like",
                         "template",
