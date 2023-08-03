@@ -11,6 +11,8 @@ __all__ = [
     "flex_select_1d_pr_nb",
     "flex_select_1d_pc_nb",
     "flex_select_nb",
+    "flex_select_row_nb",
+    "flex_select_col_nb",
 ]
 
 

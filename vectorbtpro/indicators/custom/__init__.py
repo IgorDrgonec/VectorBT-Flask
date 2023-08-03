@@ -1,6 +1,19 @@
 # Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
-"""Modules with custom indicators built with the indicator factory."""
+"""Modules with custom indicators built with the indicator factory.
+
+You can access all the indicators by `vbt.*`.
+
+Run for the examples:
+
+```pycon
+>>> ohlcv = vbt.YFData.fetch(
+...     "BTC-USD",
+...     start="2019-03-01",
+...     end="2019-09-01"
+... ).get()
+```
+"""
 
 from typing import TYPE_CHECKING
 
