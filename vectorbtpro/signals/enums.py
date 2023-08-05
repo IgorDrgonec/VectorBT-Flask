@@ -168,7 +168,7 @@ __pdoc__["GenExContext.col"] = "Column of the segment."
 
 class RankContext(tp.NamedTuple):
     mask: tp.Array2d
-    reset_by_mask: tp.Optional[tp.Array2d]
+    reset_by: tp.Optional[tp.Array2d]
     after_false: bool
     after_reset: bool
     reset_wait: int
@@ -189,7 +189,7 @@ class RankContext(tp.NamedTuple):
 
 __pdoc__["RankContext"] = "Context of a ranker."
 __pdoc__["RankContext.mask"] = "Source mask."
-__pdoc__["RankContext.reset_by_mask"] = "Resetting mask."
+__pdoc__["RankContext.reset_by"] = "Resetting mask."
 __pdoc__[
     "RankContext.after_false"
 ] = """Whether to disregard the first partition of True values if there is no False value before them."""

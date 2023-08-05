@@ -1054,6 +1054,8 @@ def parameterized(
                             else:
                                 raise ValueError(f"Selection {selection} couldn't be matched with parameter index")
                         selection = new_selection
+                        if len(selection) == 0:
+                            raise ValueError(f"Selection {selection} is empty")
                     else:
                         raise ValueError(f"Selection {selection} couldn't be matched with parameter index")
                 if template_context["param_index"] is not None:

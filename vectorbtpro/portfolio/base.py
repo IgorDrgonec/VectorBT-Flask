@@ -44,7 +44,6 @@ from vectorbtpro.records.base import Records
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.returns.accessors import ReturnsAccessor
-from vectorbtpro.signals.generators import RANDNX, RPROBNX
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.colors import adjust_opacity
@@ -3844,6 +3843,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if n is not None and (entry_prob is not None or exit_prob is not None):
             raise ValueError("Either n or entry_prob and exit_prob must be provided")
         if n is not None:
+            from vectorbtpro.signals.generators.randnx import RANDNX
+
             rand = RANDNX.run(
                 n=n,
                 input_shape=close_wrapper.shape,
@@ -3855,6 +3856,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             entries = rand.entries
             exits = rand.exits
         elif entry_prob is not None and exit_prob is not None:
+            from vectorbtpro.signals.generators.rprobnx import RPROBNX
+
             rprobnx = RPROBNX.run(
                 entry_prob=entry_prob,
                 exit_prob=exit_prob,

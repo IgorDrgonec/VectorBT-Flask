@@ -6,15 +6,6 @@ Provides an arsenal of Numba-compiled functions that are used by accessors
 and in many other parts of the backtesting pipeline, such as technical indicators.
 These only accept NumPy arrays and other Numba-compatible types.
 
-```pycon
->>> import numpy as np
->>> import vectorbtpro as vbt
-
->>> # vectorbtpro.signals.nb.pos_rank_nb
->>> vbt.signals.nb.pos_rank_nb(np.array([False, True, True, True, False])[:, None])[:, 0]
-[-1  0  1  2 -1]
-```
-
 !!! note
     vectorbt treats matrices as first-class citizens and expects input arrays to be
     2-dim, unless function has suffix `_1d` or is meant to be input to another function. 
@@ -48,26 +39,32 @@ __all__ = []
     size=ch.ShapeSizer(arg_query="target_shape", axis=1),
     arg_take_spec=dict(
         target_shape=ch.ShapeSlicer(axis=1),
+        place_func_nb=None,
+        place_args=ch.ArgsTaker(),
         only_once=None,
         wait=None,
-        place_func_nb=None,
-        args=ch.ArgsTaker(),
     ),
     merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
-def generate_nb(target_shape: tp.Shape, only_once: bool, wait: int, place_func_nb: tp.PlaceFunc, *args) -> tp.Array2d:
+def generate_nb(
+    target_shape: tp.Shape,
+    place_func_nb: tp.PlaceFunc,
+    place_args: tp.Args = (),
+    only_once: bool = True,
+    wait: int = 1,
+) -> tp.Array2d:
     """Create a boolean matrix of `target_shape` and place signals using `place_func_nb`.
 
     Args:
         target_shape (array): Target shape.
-        only_once (bool): Whether to run the placement function only once.
-        wait (int): Number of ticks to wait before placing the next entry.
         place_func_nb (callable): Signal placement function.
-
+        
             `place_func_nb` must accept a context of type `vectorbtpro.signals.enums.GenEnContext`,
             and return the index of the last signal (-1 to break the loop).
-        *args: Arguments passed to `place_func_nb`.
+        place_args: Arguments passed to `place_func_nb`.
+        only_once (bool): Whether to run the placement function only once.
+        wait (int): Number of ticks to wait before placing the next entry.
 
     !!! note
         The first argument is always a 1-dimensional boolean array that contains only those
@@ -91,7 +88,7 @@ def generate_nb(target_shape: tp.Shape, only_once: bool, wait: int, place_func_n
                 to_i=target_shape[0],
                 col=col,
             )
-            _last_i = place_func_nb(c, *args)
+            _last_i = place_func_nb(c, *place_args)
             if _last_i == -1:
                 break
             last_i = from_i + _last_i
@@ -109,27 +106,32 @@ def generate_nb(target_shape: tp.Shape, only_once: bool, wait: int, place_func_n
     size=ch.ArraySizer(arg_query="entries", axis=1),
     arg_take_spec=dict(
         entries=ch.ArraySlicer(axis=1),
+        exit_place_func_nb=None,
+        exit_place_args=ch.ArgsTaker(),
         wait=None,
         until_next=None,
         skip_until_exit=None,
-        exit_place_func_nb=None,
-        args=ch.ArgsTaker(),
     ),
     merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def generate_ex_nb(
     entries: tp.Array2d,
-    wait: int,
-    until_next: bool,
-    skip_until_exit: bool,
     exit_place_func_nb: tp.PlaceFunc,
-    *args,
+    exit_place_args: tp.Args = (),
+    wait: int = 1,
+    until_next: bool = True,
+    skip_until_exit: bool = False,
 ) -> tp.Array2d:
     """Place exit signals using `exit_place_func_nb` after each signal in `entries`.
 
     Args:
         entries (array): Boolean array with entry signals.
+        exit_place_func_nb (callable): Exit place function.
+
+            `exit_place_func_nb` must accept a context of type `vectorbtpro.signals.enums.GenExContext`,
+            and return the index of the last signal (-1 to break the loop).
+        exit_place_args (callable): Arguments passed to `exit_place_func_nb`.
         wait (int): Number of ticks to wait before placing exits.
 
             !!! note
@@ -144,11 +146,6 @@ def generate_ex_nb(
 
             !!! note
                 Setting it to True makes it impossible to tell which exit belongs to which entry.
-        exit_place_func_nb (callable): Exit place function.
-
-            `exit_place_func_nb` must accept a context of type `vectorbtpro.signals.enums.GenExContext`,
-            and return the index of the last signal (-1 to break the loop).
-        *args (callable): Arguments passed to `exit_place_func_nb`.
     """
     if wait < 0:
         raise ValueError("wait must be zero or greater")
@@ -173,7 +170,7 @@ def generate_ex_nb(
                     to_i=to_i,
                     col=col,
                 )
-                _last_exit_i = exit_place_func_nb(c, *args)
+                _last_exit_i = exit_place_func_nb(c, *exit_place_args)
                 if _last_exit_i != -1:
                     last_exit_i = from_i + _last_exit_i
                     if last_exit_i < from_i or last_exit_i >= entries.shape[0]:
@@ -205,30 +202,40 @@ def generate_ex_nb(
     size=ch.ShapeSizer(arg_query="target_shape", axis=1),
     arg_take_spec=dict(
         target_shape=ch.ShapeSlicer(axis=1),
+        entry_place_func_nb=None,
+        entry_place_args=ch.ArgsTaker(),
+        exit_place_func_nb=None,
+        exit_place_args=ch.ArgsTaker(),
         entry_wait=None,
         exit_wait=None,
-        entry_place_func_nb=None,
-        entry_args=ch.ArgsTaker(),
-        exit_place_func_nb=None,
-        exit_args=ch.ArgsTaker(),
     ),
     merge_func="column_stack",
 )
 @register_jitted
 def generate_enex_nb(
     target_shape: tp.Shape,
-    entry_wait: int,
-    exit_wait: int,
     entry_place_func_nb: tp.PlaceFunc,
-    entry_args: tp.Args,
+    entry_place_args: tp.Args,
     exit_place_func_nb: tp.PlaceFunc,
-    exit_args: tp.Args,
+    exit_place_args: tp.Args,
+    entry_wait: int = 1,
+    exit_wait: int = 1,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Place entry signals using `entry_place_func_nb` and exit signals using
     `exit_place_func_nb` one after another.
 
     Args:
         target_shape (array): Target shape.
+        entry_place_func_nb (callable): Entry place function.
+
+            `entry_place_func_nb` must accept a context of type `vectorbtpro.signals.enums.GenEnExContext`,
+            and return the index of the last signal (-1 to break the loop).
+        entry_place_args (tuple): Arguments unpacked and passed to `entry_place_func_nb`.
+        exit_place_func_nb (callable): Exit place function.
+
+            `exit_place_func_nb` must accept a context of type `vectorbtpro.signals.enums.GenEnExContext`,
+            and return the index of the last signal (-1 to break the loop).
+        exit_place_args (tuple): Arguments unpacked and passed to `exit_place_func_nb`.
         entry_wait (int): Number of ticks to wait before placing entries.
 
             !!! note
@@ -239,16 +246,6 @@ def generate_enex_nb(
             !!! note
                 Setting `exit_wait` to 0 or False assumes that both entry and exit can be processed
                 within the same bar, and entry can be processed before exit.
-        entry_place_func_nb (callable): Entry place function.
-
-            `entry_place_func_nb` must accept a context of type `vectorbtpro.signals.enums.GenEnExContext`,
-            and return the index of the last signal (-1 to break the loop).
-        entry_args (tuple): Arguments unpacked and passed to `entry_place_func_nb`.
-        exit_place_func_nb (callable): Exit place function.
-
-            `exit_place_func_nb` must accept a context of type `vectorbtpro.signals.enums.GenEnExContext`,
-            and return the index of the last signal (-1 to break the loop).
-        exit_args (tuple): Arguments unpacked and passed to `exit_place_func_nb`.
     """
     if entry_wait < 0:
         raise ValueError("entry_wait must be zero or greater")
@@ -301,7 +298,7 @@ def generate_enex_nb(
                     col,
                     entry_wait,
                     entry_place_func_nb,
-                    entry_args,
+                    entry_place_args,
                 )
                 entries_turn = False
             else:
@@ -313,7 +310,7 @@ def generate_enex_nb(
                     col,
                     exit_wait,
                     exit_place_func_nb,
-                    exit_args,
+                    exit_place_args,
                 )
                 entries_turn = True
             first_signal = False
@@ -346,7 +343,7 @@ def rand_place_nb(c: tp.Union[GenEnContext, GenExContext, GenEnExContext], n: tp
 def rand_by_prob_place_nb(
     c: tp.Union[GenEnContext, GenExContext, GenEnExContext],
     prob: tp.FlexArray2d,
-    pick_first: bool,
+    pick_first: bool = False,
 ) -> int:
     """`place_func_nb` to randomly place signals with probability `prob`.
 
@@ -375,8 +372,8 @@ def rand_by_prob_place_nb(
 def generate_rand_enex_nb(
     target_shape: tp.Shape,
     n: tp.FlexArray1d,
-    entry_wait: int,
-    exit_wait: int,
+    entry_wait: int = 1,
+    exit_wait: int = 1,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Pick a number of entries and the same number of exits one after another.
 
@@ -396,7 +393,7 @@ def generate_rand_enex_nb(
 
     if entry_wait == 1 and exit_wait == 1:
         # Basic case
-        both = generate_nb(target_shape, True, 1, rand_place_nb, n * 2)
+        both = generate_nb(target_shape, rand_place_nb, (n * 2,), only_once=True, wait=1)
         for col in prange(both.shape[1]):
             both_idxs = np.flatnonzero(both[:, col])
             entries[both_idxs[0::2], col] = True
@@ -471,11 +468,11 @@ def generate_rand_enex_nb(
 def rand_enex_apply_nb(
     target_shape: tp.Shape,
     n: tp.FlexArray1d,
-    entry_wait: int,
-    exit_wait: int,
+    entry_wait: int = 1,
+    exit_wait: int = 1,
 ) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """`apply_func_nb` that calls `generate_rand_enex_nb`."""
-    return generate_rand_enex_nb(target_shape, n, entry_wait, exit_wait)
+    return generate_rand_enex_nb(target_shape, n, entry_wait=entry_wait, exit_wait=exit_wait)
 
 
 # ############# Stop signals ############# #
@@ -812,22 +809,24 @@ def ohlc_stop_place_nb(
     size=ch.ArraySizer(arg_query="mask", axis=1),
     arg_take_spec=dict(
         mask=ch.ArraySlicer(axis=1),
-        reset_by_mask=None,
-        after_false=None,
         rank_func_nb=None,
-        args=ch.ArgsTaker(),
+        rank_args=ch.ArgsTaker(),
+        reset_by=None,
+        after_false=None,
+        after_reset=None,
+        reset_wait=None,
     ),
     merge_func="column_stack",
 )
 @register_jitted(tags={"can_parallel"})
 def rank_nb(
     mask: tp.Array2d,
-    reset_by_mask: tp.Optional[tp.Array2d],
-    after_false: bool,
-    after_reset: bool,
-    reset_wait: int,
     rank_func_nb: tp.RankFunc,
-    *args,
+    rank_args: tp.Args = (),
+    reset_by: tp.Optional[tp.Array2d] = None,
+    after_false: bool = False,
+    after_reset: bool = False,
+    reset_wait: int = 1,
 ) -> tp.Array2d:
     """Rank each signal using `rank_func_nb`.
 
@@ -844,7 +843,7 @@ def rank_nb(
     for col in prange(mask.shape[1]):
         in_partition = False
         false_seen = not after_false
-        reset_seen = reset_by_mask is None
+        reset_seen = reset_by is None
         last_false_i = -1
         last_reset_i = -1
         all_sig_cnt = 0
@@ -858,7 +857,7 @@ def rank_nb(
         sig_in_part_cnt = 0
 
         for i in range(mask.shape[0]):
-            if reset_by_mask is not None and reset_by_mask[i, col]:
+            if reset_by is not None and reset_by[i, col]:
                 last_reset_i = i
             if last_reset_i > -1 and i - last_reset_i == reset_wait:
                 reset_seen = True
@@ -883,7 +882,7 @@ def rank_nb(
                     in_partition = True
                     c = RankContext(
                         mask=mask,
-                        reset_by_mask=reset_by_mask,
+                        reset_by=reset_by,
                         after_false=after_false,
                         after_reset=after_reset,
                         reset_wait=reset_wait,
@@ -901,7 +900,7 @@ def rank_nb(
                         part_cnt=part_cnt,
                         sig_in_part_cnt=sig_in_part_cnt,
                     )
-                    out[i, col] = rank_func_nb(c, *args)
+                    out[i, col] = rank_func_nb(c, *rank_args)
             else:
                 all_sig_in_part_cnt = 0
                 nonres_sig_in_part_cnt = 0
@@ -1059,7 +1058,12 @@ def between_ranges_nb(mask: tp.Array2d, incl_open: bool = False) -> tp.RecordArr
 
 @register_chunkable(
     size=ch.ArraySizer(arg_query="mask", axis=1),
-    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1), other_mask=ch.ArraySlicer(axis=1), from_other=None, incl_open=None),
+    arg_take_spec=dict(
+        mask=ch.ArraySlicer(axis=1),
+        other_mask=ch.ArraySlicer(axis=1),
+        from_other=None,
+        incl_open=None,
+    ),
     merge_func=records_ch.merge_records,
     merge_kwargs=dict(chunk_meta=Rep("chunk_meta")),
 )

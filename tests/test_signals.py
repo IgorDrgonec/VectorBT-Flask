@@ -368,9 +368,9 @@ class TestAccessors:
         en, ex = pd.Series.vbt.signals.generate_both(
             5,
             entry_place_func_nb=entry_place_func3_nb,
-            entry_args=(vbt.Rep("temp"),),
+            entry_place_args=(vbt.Rep("temp"),),
             exit_place_func_nb=exit_place_func3_nb,
-            exit_args=(vbt.Rep("temp"),),
+            exit_place_args=(vbt.Rep("temp"),),
             broadcast_named_args=dict(temp=0),
             wrap_kwargs=dict(index=mask["a"].index, columns=["a"]),
         )
@@ -2980,8 +2980,8 @@ class TestFactory:
             [0, 1],
             [1, 0],
             cache_args=(0,),
-            entry_args=(100,),
-            exit_args=(100,),
+            entry_place_args=(100,),
+            exit_place_args=(100,),
         )
         assert_frame_equal(
             my_sig.entries,
@@ -3033,8 +3033,8 @@ class TestFactory:
             [0, 1],
             [1, 0],
             cache_args=(0,),
-            entry_args=(100,),
-            exit_args=(100,),
+            entry_place_args=(100,),
+            exit_place_args=(100,),
             entry_kwargs=dict(wait=2),
             exit_kwargs=dict(wait=2),
         )
