@@ -2731,47 +2731,73 @@ class TestExecution:
         assert execution.execute(iter(funcs_args), chunk_len=3) == [10, 35, 60]
         assert execution.execute(iter(funcs_args), chunk_len="auto") == [10, 35, 60]
 
-        last_chunk_idx_lst = []
-        indices_per_chunk_lst = []
-        outputs_per_chunk_lst = []
+        pre_execute_arg_lst = []
+        pre_chunk_idx_lst = []
+        pre_call_indices_lst = []
+        pre_chunk_arg_lst = []
+        post_chunk_idx_lst = []
+        post_call_indices_lst = []
+        post_call_outputs_lst = []
+        post_chunk_arg_lst = []
+        post_outputs_lst = []
+        post_execute_arg_lst = []
 
-        def post_chunk_func(last_chunk_idx, indices_per_chunk, outputs_per_chunk):
-            last_chunk_idx_lst.append(last_chunk_idx)
-            indices_per_chunk_lst.append(indices_per_chunk[last_chunk_idx])
-            outputs_per_chunk_lst.append(outputs_per_chunk[last_chunk_idx])
+        def pre_execute_func(pre_execute_arg):
+            pre_execute_arg_lst.append(pre_execute_arg)
 
-        execution.execute(
+        def pre_chunk_func(chunk_idx, call_indices, pre_chunk_arg):
+            pre_chunk_idx_lst.append(chunk_idx)
+            pre_call_indices_lst.append(call_indices)
+            pre_chunk_arg_lst.append(pre_chunk_arg)
+
+        def post_chunk_func(chunk_idx, call_indices, call_outputs, post_chunk_arg):
+            post_chunk_idx_lst.append(chunk_idx)
+            post_call_indices_lst.append(call_indices)
+            post_call_outputs_lst.append(call_outputs)
+            post_chunk_arg_lst.append(post_chunk_arg)
+
+        def post_execute_func(outputs, post_execute_arg):
+            post_outputs_lst.append(outputs)
+            post_execute_arg_lst.append(post_execute_arg)
+            return [output + 1 for output in outputs]
+
+        outputs = execution.execute(
             [(lambda _i=i: _i, (), {}) for i in range(10)],
             chunk_len=2,
+            pre_execute_func=pre_execute_func,
+            pre_execute_kwargs=dict(
+                pre_execute_arg=100,
+            ),
+            pre_chunk_func=pre_chunk_func,
+            pre_chunk_kwargs=dict(
+                chunk_idx=vbt.Rep("chunk_idx"),
+                call_indices=vbt.Rep("call_indices"),
+                pre_chunk_arg=101,
+            ),
             post_chunk_func=post_chunk_func,
             post_chunk_kwargs=dict(
-                last_chunk_idx=vbt.Rep("last_chunk_idx"),
-                indices_per_chunk=vbt.Rep("indices_per_chunk"),
-                outputs_per_chunk=vbt.Rep("outputs_per_chunk"),
+                chunk_idx=vbt.Rep("chunk_idx"),
+                call_indices=vbt.Rep("call_indices"),
+                call_outputs=vbt.Rep("call_outputs"),
+                post_chunk_arg=102,
+            ),
+            post_execute_func=post_execute_func,
+            post_execute_kwargs=dict(
+                outputs=vbt.Rep("outputs"),
+                post_execute_arg=103,
             ),
         )
-        assert last_chunk_idx_lst == [0, 1, 2, 3, 4]
-        assert indices_per_chunk_lst == [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]
-        assert outputs_per_chunk_lst == [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]
-
-        last_chunk_idx_lst.clear()
-        indices_per_chunk_lst.clear()
-        outputs_per_chunk_lst.clear()
-
-        execution.execute(
-            [(lambda _i=i: _i, (), {}) for i in range(10)],
-            chunk_len=2,
-            post_chunk_func=post_chunk_func,
-            post_chunk_kwargs=dict(
-                last_chunk_idx=vbt.Rep("last_chunk_idx"),
-                indices_per_chunk=vbt.Rep("indices_per_chunk"),
-                outputs_per_chunk=vbt.Rep("outputs_per_chunk"),
-            ),
-            post_chunk_every=2,
-        )
-        assert last_chunk_idx_lst == [1, 3]
-        assert indices_per_chunk_lst == [[2, 3], [6, 7]]
-        assert outputs_per_chunk_lst == [[2, 3], [6, 7]]
+        assert pre_execute_arg_lst == [100]
+        assert pre_chunk_idx_lst == [0, 1, 2, 3, 4]
+        assert pre_call_indices_lst == [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]
+        assert pre_chunk_arg_lst == [101, 101, 101, 101, 101]
+        assert post_chunk_idx_lst == [0, 1, 2, 3, 4]
+        assert post_call_indices_lst == [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]
+        assert post_call_outputs_lst == [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]
+        assert post_chunk_arg_lst == [102, 102, 102, 102, 102]
+        assert post_outputs_lst == [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]
+        assert post_execute_arg_lst == [103]
+        assert outputs == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 
 # ############# pickling ############# #
