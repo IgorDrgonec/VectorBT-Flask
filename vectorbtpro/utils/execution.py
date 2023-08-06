@@ -661,12 +661,13 @@ def execute(
     If `pre_chunk_func` is not None, calls the function before processing a chunk. If it returns anything
     other than None, the returned object will be appended to the outputs and the chunk won't be executed.
     This enables use cases such as caching. If `post_chunk_func` is not None, calls the function after
-    processing the chunk. It should return nothing (None). Will also substitute any templates in
-    `pre_chunk_kwargs` and `post_chunk_kwargs` and pass them as keyword arguments. The following
-    additional arguments are available in the contexts: the index of the current chunk `chunk_idx`,
-    the list of call indices `call_indices` in the chunk, the list of call outputs `call_outputs`
-    returned by executing the chunk (only for `post_chunk_func`), and whether the chunk
-    was executed `chunk_executed` or otherwise returned by `pre_chunk_func` (only for `post_chunk_func`).
+    processing the chunk. It should return either None to keep the old call outputs, or return new ones.
+    Will also substitute any templates in `pre_chunk_kwargs` and `post_chunk_kwargs` and pass them as
+    keyword arguments. The following additional arguments are available in the contexts: the index of
+    the current chunk `chunk_idx`, the list of call indices `call_indices` in the chunk, the list of
+    call outputs `call_outputs` returned by executing the chunk (only for `post_chunk_func`), and
+    whether the chunk was executed `chunk_executed` or otherwise returned by `pre_chunk_func`
+    (only for `post_chunk_func`).
 
     !!! note
         The both callbacks above are effective only when `distribute` is "calls" and chunking is enabled.
@@ -912,9 +913,7 @@ def execute(
                     _template_context,
                     sub_id="pre_chunk_kwargs",
                 )
-                outputs = _pre_chunk_func(**_pre_chunk_kwargs)
-                if outputs is not None:
-                    return outputs
+                return _pre_chunk_func(**_pre_chunk_kwargs)
             return None
 
         def _call_post_chunk_func(chunk_idx, call_indices, call_outputs, chunk_executed):
@@ -938,7 +937,10 @@ def execute(
                     _template_context,
                     sub_id="post_chunk_kwargs",
                 )
-                _post_chunk_func(**_post_chunk_kwargs)
+                new_call_outputs = _post_chunk_func(**_post_chunk_kwargs)
+                if new_call_outputs is not None:
+                    return new_call_outputs
+            return call_outputs
 
         if indices_sorted and not hasattr(funcs_args, "__len__"):
             # Iterate over funcs_args
@@ -957,7 +959,7 @@ def execute(
                             chunk_executed = True
                         else:
                             chunk_executed = False
-                        _call_post_chunk_func(chunk_idx, call_indices, call_outputs, chunk_executed)
+                        call_outputs = _call_post_chunk_func(chunk_idx, call_indices, call_outputs, chunk_executed)
                         outputs.extend(call_outputs)
                         chunk_idx += 1
                         _funcs_args = []
@@ -971,7 +973,7 @@ def execute(
                         chunk_executed = True
                     else:
                         chunk_executed = False
-                    _call_post_chunk_func(chunk_idx, call_indices, call_outputs, chunk_executed)
+                    call_outputs = _call_post_chunk_func(chunk_idx, call_indices, call_outputs, chunk_executed)
                     outputs.extend(call_outputs)
                     pbar.update(1)
             return _call_post_execute_func(outputs)
@@ -993,7 +995,7 @@ def execute(
                         chunk_executed = True
                     else:
                         chunk_executed = False
-                    _call_post_chunk_func(chunk_idx, call_indices, call_outputs, chunk_executed)
+                    call_outputs = _call_post_chunk_func(chunk_idx, call_indices, call_outputs, chunk_executed)
                     outputs.extend(call_outputs)
                     output_indices.extend(call_indices)
                     pbar.update(1)
