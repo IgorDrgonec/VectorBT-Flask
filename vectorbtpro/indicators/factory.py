@@ -3080,6 +3080,8 @@ Other keyword arguments are passed to `{0}.run`.
                 param_tuple = param_tuple[:-1]
             elif len(param_tuple) > len(param_names):
                 raise ValueError("Provided more parameters than registered")
+            one_output = len(output_names) == 1
+            input_shape = input_tuple[0].shape
 
             new_index = None
             if timeframe is not None:
@@ -3110,38 +3112,60 @@ Other keyword arguments are passed to `{0}.run`.
                     new_input_tuple += (new_input.values,)
                 input_tuple = new_input_tuple
 
+            def _build_nan_outputs():
+                nan_outputs = []
+                for i in range(len(output_names)):
+                    nan_outputs.append(np.full(input_shape, np.nan, dtype=np.double))
+                if len(nan_outputs) == 1:
+                    return nan_outputs[0]
+                return nan_outputs
+
+            all_nan = False
             if skipna:
                 nan_mask = build_nan_mask(*input_tuple)
-                input_tuple = squeeze_nan(*input_tuple, nan_mask=nan_mask)
+                if nan_mask.all():
+                    all_nan = True
+                else:
+                    input_tuple = squeeze_nan(*input_tuple, nan_mask=nan_mask)
             else:
                 nan_mask = None
-
-            input_tuple = tuple([arr.astype(np.double) for arr in input_tuple])
-            outputs = talib_func(*input_tuple, *param_tuple, **_kwargs)
-            one_output = not isinstance(outputs, tuple)
-            if one_output:
-                outputs = unsqueeze_nan(outputs, nan_mask=nan_mask)
+            if all_nan:
+                outputs = _build_nan_outputs()
             else:
-                outputs = unsqueeze_nan(*outputs, nan_mask=nan_mask)
-            if timeframe is not None:
-                new_outputs = ()
-                for output in outputs:
-                    source_freq = infer_index_freq(new_index, allow_date_offset=False, allow_numeric=False)
-                    source_freq = freq_to_timedelta64(source_freq) if source_freq is not None else None
-                    target_freq = freq_to_timedelta64(wrapper.freq) if wrapper.freq is not None else None
-                    new_output = generic_nb.latest_at_index_1d_nb(
-                        output,
-                        new_index.values,
-                        wrapper.index.values,
-                        source_freq=source_freq,
-                        target_freq=target_freq,
-                        source_rbound=True,
-                        target_rbound=True,
-                        nan_value=np.nan,
-                        ffill=True,
-                    )
-                    new_outputs += (new_output,)
-                outputs = new_outputs
+                input_tuple = tuple([arr.astype(np.double) for arr in input_tuple])
+                try:
+                    outputs = talib_func(*input_tuple, *param_tuple, **_kwargs)
+                except Exception as e:
+                    if "inputs are all NaN" in str(e):
+                        print(1)
+                        outputs = _build_nan_outputs()
+                        all_nan = True
+                    else:
+                        raise e
+                if not all_nan:
+                    if one_output:
+                        outputs = unsqueeze_nan(outputs, nan_mask=nan_mask)
+                    else:
+                        outputs = unsqueeze_nan(*outputs, nan_mask=nan_mask)
+                    if timeframe is not None:
+                        new_outputs = ()
+                        for output in outputs:
+                            source_freq = infer_index_freq(new_index, allow_date_offset=False, allow_numeric=False)
+                            source_freq = freq_to_timedelta64(source_freq) if source_freq is not None else None
+                            target_freq = freq_to_timedelta64(wrapper.freq) if wrapper.freq is not None else None
+                            new_output = generic_nb.latest_at_index_1d_nb(
+                                output,
+                                new_index.values,
+                                wrapper.index.values,
+                                source_freq=source_freq,
+                                target_freq=target_freq,
+                                source_rbound=True,
+                                target_rbound=True,
+                                nan_value=np.nan,
+                                ffill=True,
+                            )
+                            new_outputs += (new_output,)
+                        outputs = new_outputs
             if one_output:
                 return outputs[0]
             return outputs

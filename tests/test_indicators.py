@@ -3034,19 +3034,53 @@ class TestFactory:
                     self.evaluate_sma(period=3)
 
             consensus = vbt.IF.from_custom_techcon(CustomConsensus).run(open, high, low, close, volume)
-            assert_series_equal(consensus.buy, pd.Series([0.0, 50.0, 100.0, 100.0, 0.0, 0.0, 0.0], index=close.index))
-            assert_series_equal(consensus.sell, pd.Series([0.0, 0.0, 0.0, 0.0, 100.0, 100.0, 100.0], index=close.index))
-            assert_series_equal(
-                consensus.buy_agreement, pd.Series([0.0, 1.0, 2.0, 2.0, 0.0, 0.0, 0.0], index=close.index)
+            assert_frame_equal(
+                consensus.buy,
+                pd.DataFrame(
+                    [[0.0, 0.0], [50.0, 0.0], [100.0, 0.0], [100.0, 0.0], [100.0, 0.0]],
+                    index=close.index,
+                    columns=close.columns,
+                ),
             )
-            assert_series_equal(
-                consensus.sell_agreement, pd.Series([0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 2.0], index=close.index)
+            assert_frame_equal(
+                consensus.sell,
+                pd.DataFrame(
+                    [[0.0, 0.0], [0.0, 50.0], [0.0, 100.0], [0.0, 100.0], [0.0, 100.0]],
+                    index=close.index,
+                    columns=close.columns,
+                ),
             )
-            assert_series_equal(
-                consensus.buy_disagreement, pd.Series([2.0, 1.0, 0.0, 0.0, 2.0, 2.0, 2.0], index=close.index)
+            assert_frame_equal(
+                consensus.buy_agreement,
+                pd.DataFrame(
+                    [[0.0, 0.0], [1.0, 0.0], [2.0, 0.0], [2.0, 0.0], [2.0, 0.0]],
+                    index=close.index,
+                    columns=close.columns,
+                ),
             )
-            assert_series_equal(
-                consensus.sell_disagreement, pd.Series([2.0, 2.0, 2.0, 2.0, 0.0, 0.0, 0.0], index=close.index)
+            assert_frame_equal(
+                consensus.sell_agreement,
+                pd.DataFrame(
+                    [[0.0, 0.0], [0.0, 1.0], [0.0, 2.0], [0.0, 2.0], [0.0, 2.0]],
+                    index=close.index,
+                    columns=close.columns,
+                ),
+            )
+            assert_frame_equal(
+                consensus.buy_disagreement,
+                pd.DataFrame(
+                    [[2.0, 2.0], [1.0, 2.0], [0.0, 2.0], [0.0, 2.0], [0.0, 2.0]],
+                    index=close.index,
+                    columns=close.columns,
+                ),
+            )
+            assert_frame_equal(
+                consensus.sell_disagreement,
+                pd.DataFrame(
+                    [[2.0, 2.0], [2.0, 1.0], [2.0, 0.0], [2.0, 0.0], [2.0, 0.0]],
+                    index=close.index,
+                    columns=close.columns,
+                ),
             )
 
 
@@ -3955,7 +3989,7 @@ class TestBasic:
                     close.values,
                     window=np.array([2, 3]),
                     with_zscore=True,
-                )[i]
+                )[i],
             )
 
     def test_VWAP(self):
@@ -4019,7 +4053,7 @@ class TestBasic:
             pivot_info.conf_pivot,
             pd.DataFrame(
                 [
-                    [1, 0],
+                    [0, 0],
                     [-1, 0],
                     [-1, 1],
                     [-1, 1],
@@ -4033,7 +4067,7 @@ class TestBasic:
             pivot_info.conf_idx,
             pd.DataFrame(
                 [
-                    [0, -1],
+                    [-1, -1],
                     [0, -1],
                     [0, 0],
                     [0, 0],
@@ -4047,7 +4081,7 @@ class TestBasic:
             pivot_info.last_pivot,
             pd.DataFrame(
                 [
-                    [-1, 0],
+                    [0, 0],
                     [1, 0],
                     [1, -1],
                     [1, -1],
@@ -4061,7 +4095,7 @@ class TestBasic:
             pivot_info.last_idx,
             pd.DataFrame(
                 [
-                    [0, -1],
+                    [-1, -1],
                     [1, -1],
                     [2, 2],
                     [3, 3],
@@ -4075,7 +4109,7 @@ class TestBasic:
             pivot_info.conf_value,
             pd.DataFrame(
                 [
-                    [2.5, np.nan],
+                    [np.nan, np.nan],
                     [0.5, np.nan],
                     [0.5, 6.5],
                     [0.5, 6.5],
@@ -4089,7 +4123,7 @@ class TestBasic:
             pivot_info.last_value,
             pd.DataFrame(
                 [
-                    [0.5, np.nan],
+                    [np.nan, np.nan],
                     [3.5, np.nan],
                     [4.5, 2.5],
                     [5.5, 1.5],
@@ -4137,11 +4171,11 @@ class TestBasic:
             outputs[0],
             np.array(
                 [
-                    [1, 0],
+                    [0, 0],
+                    [0, 1],
                     [-1, 1],
-                    [1, 1],
+                    [-1, 1],
                     [-1, -1],
-                    [-1, 1],
                 ]
             ),
         )
@@ -4149,11 +4183,11 @@ class TestBasic:
             outputs[1],
             np.array(
                 [
-                    [0, -1],
+                    [-1, -1],
+                    [-1, 0],
                     [0, 0],
-                    [1, 0],
-                    [2, 2],
-                    [2, 3],
+                    [0, 0],
+                    [0, 3],
                 ]
             ),
         )
@@ -4161,11 +4195,11 @@ class TestBasic:
             outputs[2],
             np.array(
                 [
-                    [-1, 0],
+                    [0, 0],
+                    [0, -1],
                     [1, -1],
-                    [-1, -1],
+                    [1, -1],
                     [1, 1],
-                    [1, -1],
                 ]
             ),
         )
@@ -4173,8 +4207,8 @@ class TestBasic:
             outputs[3],
             np.array(
                 [
-                    [0, -1],
-                    [1, 1],
+                    [-1, -1],
+                    [-1, 1],
                     [2, 2],
                     [3, 3],
                     [4, 4],
@@ -4327,7 +4361,7 @@ class TestBasic:
                     close.values,
                     period=np.array([2, 3]),
                     multiplier=np.array([2, 3]),
-                )[i]
+                )[i],
             )
 
     def test_SIGDET(self):

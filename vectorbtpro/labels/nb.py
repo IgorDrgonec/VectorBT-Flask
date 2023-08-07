@@ -371,47 +371,58 @@ def pivots_1d_nb(
 
     pivots = np.full(high.shape, 0, dtype=np.int_)
 
+    last_pivot = 0
     last_i = -1
     last_value = np.nan
-    last_pivot = 0
+    first_valid_i = -1
     for i in range(high.shape[0]):
         if not np.isnan(high[i]) and not np.isnan(low[i]):
+            if first_valid_i == -1:
+                first_valid_i = 0
             if last_i == -1:
-                last_i = 0
-            _up_th = 1 + abs(flex_select_1d_nb(up_th_, last_i))
-            _down_th = 1 - abs(flex_select_1d_nb(down_th_, last_i))
-
-            if last_pivot == Pivot.Valley:
-                if not np.isnan(last_value) and not np.isnan(_up_th) and high[i] >= last_value * _up_th:
-                    pivots[last_i] = last_pivot
-                    last_i = i
-                    last_value = high[i]
-                    last_pivot = Pivot.Peak
-                elif np.isnan(last_value) or low[i] < last_value:
-                    last_i = i
-                    last_value = low[i]
-            elif last_pivot == Pivot.Peak:
-                if not np.isnan(last_value) and not np.isnan(_down_th) and low[i] <= last_value * _down_th:
-                    pivots[last_i] = last_pivot
-                    last_i = i
-                    last_value = low[i]
-                    last_pivot = Pivot.Valley
-                elif np.isnan(last_value) or high[i] > last_value:
-                    last_i = i
-                    last_value = high[i]
+                _up_th = 1 + abs(flex_select_1d_nb(up_th_, first_valid_i))
+                _down_th = 1 - abs(flex_select_1d_nb(down_th_, first_valid_i))
+                if not np.isnan(_up_th) and high[i] >= low[first_valid_i] * _up_th:
+                    if not np.isnan(_down_th) and low[i] <= high[first_valid_i] * _down_th:
+                        pass  # wait
+                    else:
+                        pivots[first_valid_i] = Pivot.Valley
+                        last_i = i
+                        last_value = high[i]
+                        last_pivot = Pivot.Peak
+                if not np.isnan(_down_th) and low[i] <= high[first_valid_i] * _down_th:
+                    if not np.isnan(_up_th) and high[i] >= low[first_valid_i] * _up_th:
+                        pass  # wait
+                    else:
+                        pivots[first_valid_i] = Pivot.Peak
+                        last_i = i
+                        last_value = low[i]
+                        last_pivot = Pivot.Valley
             else:
-                if not np.isnan(_up_th) and high[i] >= low[last_i] * _up_th:
-                    pivots[last_i] = Pivot.Valley
-                    last_i = i
-                    last_value = high[i]
-                    last_pivot = Pivot.Peak
-                if not np.isnan(_down_th) and low[i] <= high[last_i] * _down_th:
-                    pivots[last_i] = Pivot.Peak
-                    last_i = i
-                    last_value = low[i]
-                    last_pivot = Pivot.Valley
+                _up_th = 1 + abs(flex_select_1d_nb(up_th_, last_i))
+                _down_th = 1 - abs(flex_select_1d_nb(down_th_, last_i))
+                if last_pivot == Pivot.Valley:
+                    if not np.isnan(last_value) and not np.isnan(_up_th) and high[i] >= last_value * _up_th:
+                        pivots[last_i] = last_pivot
+                        last_i = i
+                        last_value = high[i]
+                        last_pivot = Pivot.Peak
+                    elif np.isnan(last_value) or low[i] < last_value:
+                        last_i = i
+                        last_value = low[i]
+                elif last_pivot == Pivot.Peak:
+                    if not np.isnan(last_value) and not np.isnan(_down_th) and low[i] <= last_value * _down_th:
+                        pivots[last_i] = last_pivot
+                        last_i = i
+                        last_value = low[i]
+                        last_pivot = Pivot.Valley
+                    elif np.isnan(last_value) or high[i] > last_value:
+                        last_i = i
+                        last_value = high[i]
+
         if last_i != -1 and i == high.shape[0] - 1:
             pivots[last_i] = last_pivot
+
     return pivots
 
 

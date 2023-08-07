@@ -1221,50 +1221,59 @@ def pivot_info_1d_nb(
     _last_pivot = 0
     _last_idx = -1
     _last_value = np.nan
+    first_valid_idx = -1
     for i in range(high.shape[0]):
         if not np.isnan(high[i]) and not np.isnan(low[i]):
+            if first_valid_idx == -1:
+                first_valid_idx = i
             if _last_idx == -1:
-                _last_idx = 0
-            _up_th = 1 + abs(flex_select_1d_nb(up_th_, _last_idx))
-            _down_th = 1 - abs(flex_select_1d_nb(down_th_, _last_idx))
-
-            if _last_pivot == Pivot.Valley:
-                if not np.isnan(_last_value) and not np.isnan(_up_th) and high[i] >= _last_value * _up_th:
-                    _conf_pivot = _last_pivot
-                    _conf_idx = _last_idx
-                    _conf_value = _last_value
-                    _last_pivot = Pivot.Peak
-                    _last_idx = i
-                    _last_value = high[i]
-                elif np.isnan(_last_value) or low[i] < _last_value:
-                    _last_idx = i
-                    _last_value = low[i]
-            elif _last_pivot == Pivot.Peak:
-                if not np.isnan(_last_value) and not np.isnan(_down_th) and low[i] <= _last_value * _down_th:
-                    _conf_pivot = _last_pivot
-                    _conf_idx = _last_idx
-                    _conf_value = _last_value
-                    _last_pivot = Pivot.Valley
-                    _last_idx = i
-                    _last_value = low[i]
-                elif np.isnan(_last_value) or high[i] > _last_value:
-                    _last_idx = i
-                    _last_value = high[i]
+                _up_th = 1 + abs(flex_select_1d_nb(up_th_, first_valid_idx))
+                _down_th = 1 - abs(flex_select_1d_nb(down_th_, first_valid_idx))
+                if not np.isnan(_up_th) and high[i] >= low[first_valid_idx] * _up_th:
+                    if not np.isnan(_down_th) and low[i] <= high[first_valid_idx] * _down_th:
+                        pass  # wait
+                    else:
+                        _conf_pivot = Pivot.Valley
+                        _conf_idx = first_valid_idx
+                        _conf_value = low[first_valid_idx]
+                        _last_pivot = Pivot.Peak
+                        _last_idx = i
+                        _last_value = high[i]
+                if not np.isnan(_down_th) and low[i] <= high[first_valid_idx] * _down_th:
+                    if not np.isnan(_up_th) and high[i] >= low[first_valid_idx] * _up_th:
+                        pass  # wait
+                    else:
+                        _conf_pivot = Pivot.Peak
+                        _conf_idx = first_valid_idx
+                        _conf_value = high[first_valid_idx]
+                        _last_pivot = Pivot.Valley
+                        _last_idx = i
+                        _last_value = low[i]
             else:
-                if not np.isnan(_up_th) and high[i] >= low[_last_idx] * _up_th:
-                    _conf_pivot = Pivot.Valley
-                    _conf_idx = _last_idx
-                    _conf_value = low[_last_idx]
-                    _last_pivot = Pivot.Peak
-                    _last_idx = i
-                    _last_value = high[i]
-                if not np.isnan(_down_th) and low[i] <= high[_last_idx] * _down_th:
-                    _conf_pivot = Pivot.Peak
-                    _conf_idx = _last_idx
-                    _conf_value = high[_last_idx]
-                    _last_pivot = Pivot.Valley
-                    _last_idx = i
-                    _last_value = low[i]
+                _up_th = 1 + abs(flex_select_1d_nb(up_th_, _last_idx))
+                _down_th = 1 - abs(flex_select_1d_nb(down_th_, _last_idx))
+                if _last_pivot == Pivot.Valley:
+                    if not np.isnan(_last_value) and not np.isnan(_up_th) and high[i] >= _last_value * _up_th:
+                        _conf_pivot = _last_pivot
+                        _conf_idx = _last_idx
+                        _conf_value = _last_value
+                        _last_pivot = Pivot.Peak
+                        _last_idx = i
+                        _last_value = high[i]
+                    elif np.isnan(_last_value) or low[i] < _last_value:
+                        _last_idx = i
+                        _last_value = low[i]
+                elif _last_pivot == Pivot.Peak:
+                    if not np.isnan(_last_value) and not np.isnan(_down_th) and low[i] <= _last_value * _down_th:
+                        _conf_pivot = _last_pivot
+                        _conf_idx = _last_idx
+                        _conf_value = _last_value
+                        _last_pivot = Pivot.Valley
+                        _last_idx = i
+                        _last_value = low[i]
+                    elif np.isnan(_last_value) or high[i] > _last_value:
+                        _last_idx = i
+                        _last_value = high[i]
 
         conf_pivot[i] = _conf_pivot
         conf_idx[i] = _conf_idx
