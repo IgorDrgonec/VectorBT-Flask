@@ -16,6 +16,7 @@ from vectorbtpro.utils.parsing import (
     match_ann_arg,
 )
 from vectorbtpro.utils.params import parameterized
+from vectorbtpro.utils.selection import _NoResult, NoResult, NoResultsException
 from vectorbtpro.utils.template import Rep, RepEval, substitute_templates
 from vectorbtpro.generic.splitting.base import Splitter, Takeable
 
@@ -142,7 +143,10 @@ def split(
             if splitter is None:
                 raise ValueError("Must provide splitter")
             splitter_cls = kwargs.pop("_splitter_cls", wrapper.options["splitter_cls"])
-            splitter_kwargs = merge_dicts(wrapper.options["splitter_kwargs"], kwargs.pop("_splitter_kwargs", {}))
+            splitter_kwargs = merge_dicts(
+                wrapper.options["splitter_kwargs"],
+                kwargs.pop("_splitter_kwargs", {}),
+            )
             index = kwargs.pop("_index", wrapper.options["index"])
             index_from = kwargs.pop("_index_from", wrapper.options["index_from"])
             takeable_args = kwargs.pop("_takeable_args", wrapper.options["takeable_args"])
@@ -152,10 +156,19 @@ def split(
                 takeable_args = set(takeable_args)
             else:
                 takeable_args = {takeable_args}
-            template_context = merge_dicts(wrapper.options["template_context"], kwargs.pop("_template_context", {}))
-            apply_kwargs = merge_dicts(wrapper.options["apply_kwargs"], kwargs.pop("_apply_kwargs", {}))
+            template_context = merge_dicts(
+                wrapper.options["template_context"],
+                kwargs.pop("_template_context", {}),
+            )
+            apply_kwargs = merge_dicts(
+                wrapper.options["apply_kwargs"],
+                kwargs.pop("_apply_kwargs", {}),
+            )
             return_splitter = kwargs.pop("_return_splitter", wrapper.options["return_splitter"])
-            forward_kwargs_as = merge_dicts(wrapper.options["forward_kwargs_as"], kwargs.pop("_forward_kwargs_as", {}))
+            forward_kwargs_as = merge_dicts(
+                wrapper.options["forward_kwargs_as"],
+                kwargs.pop("_forward_kwargs_as", {}),
+            )
             if len(forward_kwargs_as) > 0:
                 new_kwargs = dict()
                 for k, v in kwargs.items():
@@ -229,7 +242,7 @@ def split(
             options_=dict(
                 frozen_keys=True,
                 as_attrs=True,
-            )
+            ),
         )
         signature = inspect.signature(wrapper)
         lists_var_kwargs = False
@@ -254,8 +267,9 @@ def split(
 def cv_split(
     *args,
     parameterized_kwargs: tp.KwargsLike = None,
-    selection: tp.Union[tp.MaybeIterable[tp.Hashable]] = "max",
+    selection: tp.Union[str, tp.Selection] = "max",
     return_grid: tp.Union[bool, str] = False,
+    skip_errored: bool = False,
     template_context: tp.KwargsLike = None,
     **split_kwargs,
 ) -> tp.Callable:
@@ -279,6 +293,9 @@ def cv_split(
     If `return_grid` is True or 'first', returns both the grid and the selection. If `return_grid`
     is 'all', executes the grid on each set and returns along with the selection.
     Otherwise, returns only the selection.
+
+    If `vectorbtpro.utils.selection.NoResultException` is raised or `skip_errored` is True and
+    any exception is raised, will skip the current iteration and remove it from the final index.
 
     Usage:
         * Permutate a series and pick the first value. Make the seed parameterizable.
@@ -347,6 +364,7 @@ def cv_split(
          dtype: int64)
         ```
     """
+
     def decorator(func: tp.Callable) -> tp.Callable:
         if getattr(func, "is_split", False) or getattr(func, "is_parameterized", False):
             raise ValueError("Function is already decorated with split or parameterized")
@@ -354,7 +372,8 @@ def cv_split(
         @wraps(func)
         def wrapper(*args, **kwargs) -> tp.Any:
             parameterized_kwargs = merge_dicts(
-                wrapper.options["parameterized_kwargs"], kwargs.pop("_parameterized_kwargs", {})
+                wrapper.options["parameterized_kwargs"],
+                kwargs.pop("_parameterized_kwargs", {}),
             )
             selection = kwargs.pop("_selection", wrapper.options["selection"])
             if isinstance(selection, str) and selection.lower() == "min":
@@ -367,8 +386,15 @@ def cv_split(
                     return_grid = "first"
                 else:
                     return_grid = None
-            template_context = merge_dicts(wrapper.options["template_context"], kwargs.pop("_template_context", {}))
-            split_kwargs = merge_dicts(wrapper.options["split_kwargs"], kwargs.pop("_split_kwargs", {}))
+            skip_errored = kwargs.pop("_skip_errored", wrapper.options["skip_errored"])
+            template_context = merge_dicts(
+                wrapper.options["template_context"],
+                kwargs.pop("_template_context", {}),
+            )
+            split_kwargs = merge_dicts(
+                wrapper.options["split_kwargs"],
+                kwargs.pop("_split_kwargs", {}),
+            )
             if "merge_func" in split_kwargs and "merge_func" not in parameterized_kwargs:
                 parameterized_kwargs["merge_func"] = split_kwargs["merge_func"]
 
@@ -376,34 +402,52 @@ def cv_split(
 
             @wraps(func)
             def apply_wrapper(*_args, __template_context=None, **_kwargs):
-                __template_context = dict(__template_context)
-                __template_context["all_grid_results"] = all_grid_results
-                _parameterized_kwargs = substitute_templates(
-                    parameterized_kwargs, __template_context, sub_id="parameterized_kwargs"
-                )
-                parameterized_func = parameterized(func, template_context=__template_context, **_parameterized_kwargs)
-                if __template_context["set_idx"] == 0:
-                    grid_results = parameterized_func(*_args, **_kwargs)
-                    all_grid_results.append(grid_results)
-                result = parameterized_func(
-                    *_args,
-                    _selection=selection,
-                    _template_context=dict(grid_results=all_grid_results[-1]),
-                    **_kwargs,
-                )
-                if return_grid is not None:
-                    if return_grid.lower() == "first":
-                        return all_grid_results[-1], result
-                    if return_grid.lower() == "all":
-                        grid_results = parameterized_func(
-                            *_args,
-                            _template_context=dict(grid_results=all_grid_results[-1]),
-                            **_kwargs,
-                        )
-                        return grid_results, result
-                    else:
-                        raise ValueError(f"Invalid option return_grid='{return_grid}'")
-                return result
+                try:
+                    __template_context = dict(__template_context)
+                    __template_context["all_grid_results"] = all_grid_results
+                    _parameterized_kwargs = substitute_templates(
+                        parameterized_kwargs,
+                        __template_context,
+                        sub_id="parameterized_kwargs",
+                    )
+                    parameterized_func = parameterized(
+                        func,
+                        template_context=__template_context,
+                        **_parameterized_kwargs,
+                    )
+                    if __template_context["set_idx"] == 0:
+                        try:
+                            grid_results = parameterized_func(*_args, **_kwargs)
+                            all_grid_results.append(grid_results)
+                        except Exception as e:
+                            if skip_errored or isinstance(e, NoResultsException):
+                                all_grid_results.append(NoResult)
+                            raise e
+                    if isinstance(all_grid_results[-1], _NoResult):
+                        raise NoResultsException
+                    result = parameterized_func(
+                        *_args,
+                        _selection=selection,
+                        _template_context=dict(grid_results=all_grid_results[-1]),
+                        **_kwargs,
+                    )
+                    if return_grid is not None:
+                        if return_grid.lower() == "first":
+                            return all_grid_results[-1], result
+                        if return_grid.lower() == "all":
+                            grid_results = parameterized_func(
+                                *_args,
+                                _template_context=dict(grid_results=all_grid_results[-1]),
+                                **_kwargs,
+                            )
+                            return grid_results, result
+                        else:
+                            raise ValueError(f"Invalid option return_grid='{return_grid}'")
+                    return result
+                except Exception as e:
+                    if skip_errored or isinstance(e, NoResultsException):
+                        return NoResult
+                    raise e
 
             signature = inspect.signature(apply_wrapper)
             lists_var_kwargs = False
@@ -427,13 +471,14 @@ def cv_split(
                 parameterized_kwargs=parameterized_kwargs,
                 selection=selection,
                 return_grid=return_grid,
+                skip_errored=skip_errored,
                 template_context=template_context,
                 split_kwargs=split_kwargs,
             ),
             options_=dict(
                 frozen_keys=True,
                 as_attrs=True,
-            )
+            ),
         )
         signature = inspect.signature(wrapper)
         lists_var_kwargs = False

@@ -960,13 +960,13 @@ class TestSplitter:
 
         with pytest.raises(Exception):
             splitter.select_range(split=0, set_=0)
-        assert splitter.select_range(split=0, set_=0, split_as_indices=True) == slice(5, 15)
-        assert splitter.select_range(split=-1, set_=-1, split_as_indices=True) == slice(20, 31)
-        assert splitter.select_range(split=[0], set_=0, split_as_indices=True) == slice(5, 15)
-        assert splitter.select_range(split=0, set_=[0, 1], split_as_indices=True) == slice(5, 20)
-        assert splitter.select_range(split=[0, 1, 2], set_=0, split_as_indices=True) == slice(5, 25)
-        assert splitter.select_range(split=0, split_as_indices=True) == slice(5, 20)
-        assert splitter.select_range(split=None, set_=0, split_as_indices=True) == slice(5, 25)
+        assert splitter.select_range(split=vbt.PosSel(0), set_=0) == slice(5, 15)
+        assert splitter.select_range(split=vbt.PosSel(-1), set_=-1) == slice(20, 31)
+        assert splitter.select_range(split=vbt.PosSel([0]), set_=0) == slice(5, 15)
+        assert splitter.select_range(split=vbt.PosSel(0), set_=[0, 1]) == slice(5, 20)
+        assert splitter.select_range(split=vbt.PosSel([0, 1, 2]), set_=0) == slice(5, 25)
+        assert splitter.select_range(split=[vbt.PosSel(0), vbt.PosSel(1), vbt.PosSel(2)], set_=0) == slice(5, 25)
+        assert splitter.select_range(split=vbt.PosSel(0)) == slice(5, 20)
 
         split_group_by = [10, 11, 10]
         set_group_by = [12, 13]
@@ -1016,78 +1016,72 @@ class TestSplitter:
 
         with pytest.raises(Exception):
             splitter.select_range(
-                split=10,
-                set_=0,
+                split=vbt.PosSel(10),
+                set_=vbt.PosSel(0),
                 split_group_by=split_group_by,
                 set_group_by=set_group_by,
-                split_as_indices=True,
-                set_as_indices=True,
             )
         with pytest.raises(Exception):
             splitter.select_range(
-                split=0,
-                set_=12,
+                split=vbt.PosSel(0),
+                set_=vbt.PosSel(12),
                 split_group_by=split_group_by,
                 set_group_by=set_group_by,
-                split_as_indices=True,
-                set_as_indices=True,
             )
 
         assert splitter.select_range(
-            split=0,
-            set_=0,
+            split=vbt.PosSel(0),
+            set_=vbt.PosSel(0),
             split_group_by=split_group_by,
             set_group_by=set_group_by,
-            split_as_indices=True,
-            set_as_indices=True,
         ) == slice(5, 25, None)
         assert splitter.select_range(
-            split=[0],
-            set_=0,
+            split=vbt.PosSel([0]),
+            set_=vbt.PosSel(0),
             split_group_by=split_group_by,
             set_group_by=set_group_by,
-            split_as_indices=True,
-            set_as_indices=True,
         ) == slice(5, 25, None)
         assert splitter.select_range(
-            split=[0, 1],
-            set_=0,
+            split=vbt.PosSel([0, 1]),
+            set_=vbt.PosSel(0),
             split_group_by=split_group_by,
             set_group_by=set_group_by,
-            split_as_indices=True,
-            set_as_indices=True,
+        ) == slice(5, 25, None)
+        assert splitter.select_range(
+            split=[vbt.PosSel(0), vbt.PosSel(1)],
+            set_=vbt.PosSel(0),
+            split_group_by=split_group_by,
+            set_group_by=set_group_by,
         ) == slice(5, 25, None)
         assert splitter.select_range(
             split=None,
-            set_=0,
+            set_=vbt.PosSel(0),
             split_group_by=split_group_by,
             set_group_by=set_group_by,
-            split_as_indices=True,
-            set_as_indices=True,
         ) == slice(5, 25, None)
         assert splitter.select_range(
-            split=0,
-            set_=[0],
+            split=vbt.PosSel(0),
+            set_=vbt.PosSel([0]),
             split_group_by=split_group_by,
             set_group_by=set_group_by,
-            split_as_indices=True,
-            set_as_indices=True,
         ) == slice(5, 25, None)
         assert splitter.select_range(
-            split=0,
-            set_=[0, 1],
+            split=vbt.PosSel(0),
+            set_=vbt.PosSel([0, 1]),
             split_group_by=split_group_by,
             set_group_by=set_group_by,
-            split_as_indices=True,
-            set_as_indices=True,
         ) == slice(5, 31, None)
         assert splitter.select_range(
-            split=0,
+            split=vbt.PosSel(0),
+            set_=[vbt.PosSel(0), vbt.PosSel(1)],
+            split_group_by=split_group_by,
+            set_group_by=set_group_by,
+        ) == slice(5, 31, None)
+        assert splitter.select_range(
+            split=vbt.PosSel(0),
             set_=None,
             split_group_by=split_group_by,
             set_group_by=set_group_by,
-            split_as_indices=True,
-            set_as_indices=True,
         ) == slice(5, 31, None)
 
     def test_get_ready_range(self):

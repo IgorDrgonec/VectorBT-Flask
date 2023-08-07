@@ -48,6 +48,8 @@ def concat_merge(
     if len(objs) == 1:
         objs = objs[0]
     objs = list(objs)
+    if len(objs) == 0:
+        raise ValueError("No objects to be merged")
 
     if isinstance(objs[0], tuple):
         if len(objs[0]) == 1:
@@ -165,6 +167,8 @@ def row_stack_merge(
     if len(objs) == 1:
         objs = objs[0]
     objs = list(objs)
+    if len(objs) == 0:
+        raise ValueError("No objects to be merged")
 
     if isinstance(objs[0], tuple):
         if len(objs[0]) == 1:
@@ -298,6 +302,8 @@ def column_stack_merge(
     if len(objs) == 1:
         objs = objs[0]
     objs = list(objs)
+    if len(objs) == 0:
+        raise ValueError("No objects to be merged")
     if isinstance(reset_index, bool):
         if reset_index:
             reset_index = "from_start"
@@ -469,6 +475,8 @@ def mixed_merge(
     if len(objs) == 1:
         objs = objs[0]
     objs = list(objs)
+    if len(objs) == 0:
+        raise ValueError("No objects to be merged")
     if func_names is None:
         raise ValueError("Merging function names are required")
     if not isinstance(objs[0], tuple):

@@ -18,6 +18,7 @@ from vectorbtpro.utils import datetime_ as dt, datetime_nb as dt_nb
 from vectorbtpro.utils.config import hdict, merge_dicts
 from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.utils.mapping import to_field_mapping
+from vectorbtpro.utils.selection import PosSel, LabelSel
 from vectorbtpro.registries.jit_registry import jit_reg
 
 __all__ = [
@@ -1828,6 +1829,8 @@ class AutoIdxr(UniIdxr):
 
     value: tp.Union[
         None,
+        tp.PosSel,
+        tp.LabelSel,
         tp.MaybeSequence[tp.MaybeSequence[int]],
         tp.MaybeSequence[tp.Label],
         tp.MaybeSequence[tp.DatetimeLike],
@@ -1835,7 +1838,10 @@ class AutoIdxr(UniIdxr):
         tp.FrequencyLike,
         tp.Slice,
     ] = attr.ib()
-    """One or more integer indices, datetime-like objects, frequency-like objects, or labels."""
+    """One or more integer indices, datetime-like objects, frequency-like objects, or labels.
+    
+    Can also be an instance of `vectorbtpro.utils.selection.PosSel` holding position(s)
+    and `vectorbtpro.utils.selection.LabelSel` holding label(s)."""
 
     closed_start: bool = attr.ib(default=_DEF)
     """Whether slice start should be inclusive."""
@@ -1911,7 +1917,13 @@ class AutoIdxr(UniIdxr):
             idxr_kwargs["indexer_method"] = self.indexer_method
 
         if kind is None:
-            if isinstance(value, (slice, hslice)):
+            if isinstance(value, PosSel):
+                kind = "positions"
+                value = value.value
+            elif isinstance(value, LabelSel):
+                kind = "labels"
+                value = value.value
+            elif isinstance(value, (slice, hslice)):
                 if checks.is_int(value.start) or checks.is_int(value.stop):
                     kind = "positions"
                 elif value.start is None and value.stop is None:
