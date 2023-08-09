@@ -1526,6 +1526,7 @@ pfopt = child_dict(
         allocation_method="lp_portfolio",
         silence_warnings=True,
         ignore_opt_errors=True,
+        ignore_errors=False,
     ),
     riskfolio=Config(
         nan_to_zero=True,
@@ -1553,6 +1554,7 @@ pfopt = child_dict(
         func_kwargs=Config(),
         silence_warnings=True,
         return_port=False,
+        ignore_errors=False,
     ),
     stats=Config(
         filters=dict(
