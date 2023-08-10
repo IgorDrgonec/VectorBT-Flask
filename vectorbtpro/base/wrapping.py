@@ -1961,7 +1961,9 @@ class Wrapping(Configured, ExtPandasIndexer, AttrResolverMixin):
         """Select one column/group from a pandas object.
 
         `column` can be a label-based position as well as an integer position (if label fails)."""
-        if not isinstance(cls_or_self, type) and wrapper is None:
+        if wrapper is None:
+            if isinstance(cls_or_self, type):
+                raise ValueError("Wrapper must be provided")
             wrapper = cls_or_self.wrapper
         if obj is None:
             return None

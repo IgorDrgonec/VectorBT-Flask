@@ -56,8 +56,6 @@ from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.indicators.expr import expr_func_config, expr_res_func_config, wqa101_expr_config
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.array_ import build_nan_mask, squeeze_nan, unsqueeze_nan
-from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, Configured
 from vectorbtpro.utils.decorators import classproperty, cacheable_property, class_or_instancemethod
 from vectorbtpro.utils.enum_ import map_enum_fields
@@ -68,7 +66,6 @@ from vectorbtpro.utils.params import to_typed_list, broadcast_params, create_par
 from vectorbtpro.utils.parsing import get_expr_var_names, get_func_arg_names, get_func_kwargs, supress_stdout
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import has_templates, substitute_templates
-from vectorbtpro.utils.datetime_ import freq_to_timedelta64, infer_index_freq
 from vectorbtpro.utils.module_ import search_package_for_funcs
 
 __all__ = [
@@ -845,7 +842,8 @@ class IndicatorBase(Analyzable):
                             "All outputs must have the same number of columns as inputs when per_column=True"
                         )
                     else:
-                        raise ValueError("All outputs must have the number of columns = #input columns x #parameters")
+                        raise ValueError("All outputs must have the same number of columns as there "
+                                         "are input columns times parameter combinations")
             raw = output_list, param_map, n_input_cols, other_list
             if return_raw:
                 if use_run_unique and not silence_warnings:
@@ -2825,6 +2823,7 @@ Other keyword arguments are passed to `{0}.run`.
         """List supported locations."""
         return [
             "vbt",
+            "talib_func",
             "talib",
             "pandas_ta",
             "ta",
@@ -2899,17 +2898,15 @@ Other keyword arguments are passed to `{0}.run`.
         return found_indicators
 
     @classmethod
-    def get_indicator(cls, name: str) -> tp.Type[IndicatorBase]:
-        """Get the indicator class by its name.
-
-        The name can contain a location suffix followed by a colon. For example, "talib:sma"
-        or "talib_sma" will return the TA-Lib's SMA. Without a location, the indicator will be
-        searched throughout all indicators, including the vectorbt's ones."""
+    def split_indicator_name(cls, name: str) -> tp.Tuple[tp.Optional[str], tp.Optional[str]]:
+        """Split an indicator name into location and actual name."""
         locations = cls.list_locations()
 
+        if name.lower().strip() in locations:
+            return name.lower().strip(), None
         if ":" in name:
             location = name.split(":")[0].lower().strip()
-            name = name.split(":")[1].upper().strip()
+            name = name.split(":")[1].strip()
         else:
             location = None
             name = name.lower().strip()
@@ -2920,47 +2917,58 @@ Other keyword arguments are passed to `{0}.run`.
                         found_location = True
                         break
             if found_location:
-                name = name[len(location) + 1:].upper()
+                name = name[len(location) + 1:]
             else:
                 location = None
-                name = name.upper()
+        return location, name
 
-        if location is not None:
-            if location == "vbt":
+    @classmethod
+    def get_indicator(cls, name: str, location: tp.Optional[str] = None) -> tp.Type[IndicatorBase]:
+        """Get the indicator class by its name.
+
+        The name can contain a location suffix followed by a colon. For example, "talib:sma"
+        or "talib_sma" will return the TA-Lib's SMA. Without a location, the indicator will be
+        searched throughout all indicators, including the vectorbt's ones."""
+        if location is None:
+            location, name = cls.split_indicator_name(name)
+        if name is not None:
+            name = name.upper().strip()
+            if location is not None:
+                if location == "vbt":
+                    import vectorbtpro as vbt
+
+                    return getattr(vbt, name.upper())
+                if location == "talib":
+                    return cls.from_talib(name)
+                if location == "pandas_ta":
+                    return cls.from_pandas_ta(name)
+                if location == "ta":
+                    return cls.from_ta(name)
+                if location == "technical":
+                    return cls.from_technical(name)
+                if location == "techcon":
+                    return cls.from_techcon(name)
+                if location == "wqa101":
+                    return cls.from_wqa101(int(name))
+                raise ValueError(f"Location '{location}' not found")
+            else:
                 import vectorbtpro as vbt
+                from vectorbtpro.utils.module_ import check_installed
 
-                return getattr(vbt, name.upper())
-            if location == "talib":
-                return cls.from_talib(name)
-            if location == "pandas_ta":
-                return cls.from_pandas_ta(name)
-            if location == "ta":
-                return cls.from_ta(name)
-            if location == "technical":
-                return cls.from_technical(name)
-            if location == "techcon":
-                return cls.from_techcon(name)
-            if location == "wqa101":
-                return cls.from_wqa101(int(name))
-            raise ValueError(f"Location '{location}' not found")
-        else:
-            import vectorbtpro as vbt
-            from vectorbtpro.utils.module_ import check_installed
-
-            if hasattr(vbt, name):
-                return getattr(vbt, name)
-            if str(name).isnumeric():
-                return cls.from_wqa101(int(name))
-            if check_installed("technical") and name in IndicatorFactory.list_techcon_indicators():
-                return cls.from_techcon(name)
-            if check_installed("talib") and name in IndicatorFactory.list_talib_indicators():
-                return cls.from_talib(name)
-            if check_installed("ta") and name in IndicatorFactory.list_ta_indicators(uppercase=True):
-                return cls.from_ta(name)
-            if check_installed("pandas_ta") and name in IndicatorFactory.list_pandas_ta_indicators():
-                return cls.from_pandas_ta(name)
-            if check_installed("technical") and name in IndicatorFactory.list_technical_indicators():
-                return cls.from_technical(name)
+                if hasattr(vbt, name):
+                    return getattr(vbt, name)
+                if str(name).isnumeric():
+                    return cls.from_wqa101(int(name))
+                if check_installed("technical") and name in IndicatorFactory.list_techcon_indicators():
+                    return cls.from_techcon(name)
+                if check_installed("talib") and name in IndicatorFactory.list_talib_indicators():
+                    return cls.from_talib(name)
+                if check_installed("ta") and name in IndicatorFactory.list_ta_indicators(uppercase=True):
+                    return cls.from_ta(name)
+                if check_installed("pandas_ta") and name in IndicatorFactory.list_pandas_ta_indicators():
+                    return cls.from_pandas_ta(name)
+                if check_installed("technical") and name in IndicatorFactory.list_technical_indicators():
+                    return cls.from_technical(name)
         raise ValueError(f"Indicator '{name}' not found")
 
     # ############# Third party ############# #
@@ -3044,9 +3052,9 @@ Other keyword arguments are passed to `{0}.run`.
         assert_can_import("talib")
         import talib
         from talib import abstract
+        from vectorbtpro.indicators.talib_ import talib_func, talib_plot_func
 
         func_name = func_name.upper()
-        talib_func = getattr(talib, func_name)
         info = abstract.Function(func_name).info
         input_names = []
         for in_names in info["input_names"].values():
@@ -3060,19 +3068,16 @@ Other keyword arguments are passed to `{0}.run`.
         output_names = info["output_names"]
         output_flags = info["output_flags"]
 
-        def apply_func_1d(
-            input_tuple: tp.Tuple[tp.Array1d, ...],
-            in_output_tuple: tp.Tuple[tp.Array1d, ...],
+        _talib_func = talib_func(func_name)
+        _talib_plot_func = talib_plot_func(func_name)
+
+        def apply_func(
+            input_tuple: tp.Tuple[tp.Array2d, ...],
+            in_output_tuple: tp.Tuple[tp.Array2d, ...],
             param_tuple: tp.Tuple[tp.Param, ...],
             timeframe: tp.Optional[tp.FrequencyLike] = None,
-            wrapper: tp.Optional[ArrayWrapper] = None,
-            skipna: bool = False,
-            silence_warnings: bool = False,
             **_kwargs,
-        ) -> tp.Union[tp.Array1d, tp.Tuple[tp.Array1d]]:
-            """1-dim apply function wrapping a TA-Lib function.
-
-            Set `skipna` to True to run the TA-Lib function on non-NA values only."""
+        ) -> tp.MaybeTuple[tp.Array2d]:
             if len(param_tuple) == len(param_names):
                 if timeframe is not None:
                     raise ValueError("Time frame is set both as a parameter and as a keyword argument")
@@ -3080,95 +3085,15 @@ Other keyword arguments are passed to `{0}.run`.
                 param_tuple = param_tuple[:-1]
             elif len(param_tuple) > len(param_names):
                 raise ValueError("Provided more parameters than registered")
-            one_output = len(output_names) == 1
-            input_shape = input_tuple[0].shape
 
-            new_index = None
-            if timeframe is not None:
-                if wrapper is None:
-                    raise ValueError("Resampling requires a wrapper")
-                if wrapper.freq is None:
-                    if not silence_warnings:
-                        warnings.warn(
-                            "Couldn't parse the frequency of index. "
-                            "Set freq in wrapper_kwargs via broadcast_kwargs, or globally.",
-                            stacklevel=2,
-                        )
-                new_input_tuple = ()
-                for i, input in enumerate(input_tuple):
-                    if input_names[i] == "open":
-                        new_input = pd.Series(input, index=wrapper.index).resample(timeframe).first()
-                    elif input_names[i] == "high":
-                        new_input = pd.Series(input, index=wrapper.index).resample(timeframe).max()
-                    elif input_names[i] == "low":
-                        new_input = pd.Series(input, index=wrapper.index).resample(timeframe).min()
-                    elif input_names[i] == "close":
-                        new_input = pd.Series(input, index=wrapper.index).resample(timeframe).last()
-                    elif input_names[i] == "volume":
-                        new_input = pd.Series(input, index=wrapper.index).resample(timeframe).sum()
-                    else:
-                        raise ValueError(f"Can't resample '{input_names[i]}'")
-                    new_index = new_input.index
-                    new_input_tuple += (new_input.values,)
-                input_tuple = new_input_tuple
+            return _talib_func(
+                *input_tuple,
+                *param_tuple,
+                timeframe=timeframe,
+                **_kwargs,
+            )
 
-            def _build_nan_outputs():
-                nan_outputs = []
-                for i in range(len(output_names)):
-                    nan_outputs.append(np.full(input_shape, np.nan, dtype=np.double))
-                if len(nan_outputs) == 1:
-                    return nan_outputs[0]
-                return nan_outputs
-
-            all_nan = False
-            if skipna:
-                nan_mask = build_nan_mask(*input_tuple)
-                if nan_mask.all():
-                    all_nan = True
-                else:
-                    input_tuple = squeeze_nan(*input_tuple, nan_mask=nan_mask)
-            else:
-                nan_mask = None
-            if all_nan:
-                outputs = _build_nan_outputs()
-            else:
-                input_tuple = tuple([arr.astype(np.double) for arr in input_tuple])
-                try:
-                    outputs = talib_func(*input_tuple, *param_tuple, **_kwargs)
-                except Exception as e:
-                    if "inputs are all NaN" in str(e):
-                        print(1)
-                        outputs = _build_nan_outputs()
-                        all_nan = True
-                    else:
-                        raise e
-                if not all_nan:
-                    if one_output:
-                        outputs = unsqueeze_nan(outputs, nan_mask=nan_mask)
-                    else:
-                        outputs = unsqueeze_nan(*outputs, nan_mask=nan_mask)
-                    if timeframe is not None:
-                        new_outputs = ()
-                        for output in outputs:
-                            source_freq = infer_index_freq(new_index, allow_date_offset=False, allow_numeric=False)
-                            source_freq = freq_to_timedelta64(source_freq) if source_freq is not None else None
-                            target_freq = freq_to_timedelta64(wrapper.freq) if wrapper.freq is not None else None
-                            new_output = generic_nb.latest_at_index_1d_nb(
-                                output,
-                                new_index.values,
-                                wrapper.index.values,
-                                source_freq=source_freq,
-                                target_freq=target_freq,
-                                source_rbound=True,
-                                target_rbound=True,
-                                nan_value=np.nan,
-                                ffill=True,
-                            )
-                            new_outputs += (new_output,)
-                        outputs = new_outputs
-            if one_output:
-                return outputs[0]
-            return outputs
+        apply_func.__doc__ = f"""Apply function based on `vbt.talib_func("{func_name}")`."""
 
         kwargs = merge_dicts({k: Default(v) for k, v in info["parameters"].items()}, dict(timeframe=None), kwargs)
         Indicator = cls(
@@ -3184,151 +3109,28 @@ Other keyword arguments are passed to `{0}.run`.
                 ),
                 factory_kwargs,
             )
-        ).with_apply_func(apply_func_1d, pass_packed=True, takes_1d=True, pass_wrapper=True, **kwargs)
+        ).with_apply_func(apply_func, pass_packed=True, pass_wrapper=True, **kwargs)
 
         def plot(
             self,
             column: tp.Optional[tp.Label] = None,
-            limits: tp.Optional[tp.Tuple[float, float]] = None,
             add_shape_kwargs: tp.KwargsLike = None,
             add_trace_kwargs: tp.KwargsLike = None,
             fig: tp.Optional[tp.BaseFigure] = None,
             **kwargs,
         ) -> tp.BaseFigure:
-            from vectorbtpro._settings import settings
-
-            plotting_cfg = settings["plotting"]
-
             self_col = self.select_col(column=column)
 
-            output_trace_kwargs = {}
-            for output_name in output_names:
-                output_trace_kwargs[output_name] = kwargs.pop(output_name + "_trace_kwargs", {})
-            priority_outputs = []
-            other_outputs = []
-            for output_name in output_names:
-                flags = set(output_flags.get(output_name))
-                found_priority = False
-                if talib.abstract.TA_OUTPUT_FLAGS[2048] in flags:
-                    priority_outputs = priority_outputs + [output_name]
-                    found_priority = True
-                if talib.abstract.TA_OUTPUT_FLAGS[4096] in flags:
-                    priority_outputs = [output_name] + priority_outputs
-                    found_priority = True
-                if not found_priority:
-                    other_outputs.append(output_name)
-
-            for output_name in priority_outputs + other_outputs:
-                output = getattr(self_col, output_name).rename(output_name)
-                flags = set(output_flags.get(output_name))
-                trace_kwargs = {}
-                plot_func_name = "lineplot"
-
-                if talib.abstract.TA_OUTPUT_FLAGS[2] in flags:
-                    # Dotted Line
-                    if "line" not in trace_kwargs:
-                        trace_kwargs["line"] = dict()
-                    trace_kwargs["line"]["dash"] = "dashdot"
-                if talib.abstract.TA_OUTPUT_FLAGS[4] in flags:
-                    # Dashed Line
-                    if "line" not in trace_kwargs:
-                        trace_kwargs["line"] = dict()
-                    trace_kwargs["line"]["dash"] = "dash"
-                if talib.abstract.TA_OUTPUT_FLAGS[8] in flags:
-                    # Dot
-                    if "line" not in trace_kwargs:
-                        trace_kwargs["line"] = dict()
-                    trace_kwargs["line"]["dash"] = "dot"
-                if talib.abstract.TA_OUTPUT_FLAGS[16] in flags:
-                    # Histogram
-                    hist = np.asarray(output)
-                    hist_diff = generic_nb.diff_1d_nb(hist)
-                    marker_colors = np.full(hist.shape, adjust_opacity("silver", 0.75), dtype=object)
-                    marker_colors[(hist > 0) & (hist_diff > 0)] = adjust_opacity("green", 0.75)
-                    marker_colors[(hist > 0) & (hist_diff <= 0)] = adjust_opacity("lightgreen", 0.75)
-                    marker_colors[(hist < 0) & (hist_diff < 0)] = adjust_opacity("red", 0.75)
-                    marker_colors[(hist < 0) & (hist_diff >= 0)] = adjust_opacity("lightcoral", 0.75)
-                    if "marker" not in trace_kwargs:
-                        trace_kwargs["marker"] = {}
-                    trace_kwargs["marker"]["color"] = marker_colors
-                    if "line" not in trace_kwargs["marker"]:
-                        trace_kwargs["marker"]["line"] = {}
-                    trace_kwargs["marker"]["line"]["width"] = 0
-                    kwargs["bargap"] = 0
-                    plot_func_name = "barplot"
-                if talib.abstract.TA_OUTPUT_FLAGS[2048] in flags:
-                    # Values represent an upper limit
-                    if "line" not in trace_kwargs:
-                        trace_kwargs["line"] = {}
-                    trace_kwargs["line"]["color"] = adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.75)
-                    trace_kwargs["fill"] = "tonexty"
-                    trace_kwargs["fillcolor"] = "rgba(128, 128, 128, 0.2)"
-                if talib.abstract.TA_OUTPUT_FLAGS[4096] in flags:
-                    # Values represent a lower limit
-                    if "line" not in trace_kwargs:
-                        trace_kwargs["line"] = {}
-                    trace_kwargs["line"]["color"] = adjust_opacity(plotting_cfg["color_schema"]["gray"], 0.75)
-
-                trace_kwargs = merge_dicts(trace_kwargs, output_trace_kwargs[output_name])
-                plot_func = getattr(output.vbt, plot_func_name)
-                fig = plot_func(trace_kwargs=trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig, **kwargs)
-
-            if limits is not None:
-                xaxis = getattr(fig.data[-1], "xaxis", None)
-                if xaxis is None:
-                    xaxis = "x"
-                yaxis = getattr(fig.data[-1], "yaxis", None)
-                if yaxis is None:
-                    yaxis = "y"
-                add_shape_kwargs = merge_dicts(
-                    dict(
-                        type="rect",
-                        xref=xaxis,
-                        yref=yaxis,
-                        x0=self_col.wrapper.index[0],
-                        y0=limits[0],
-                        x1=self_col.wrapper.index[-1],
-                        y1=limits[1],
-                        fillcolor="mediumslateblue",
-                        opacity=0.2,
-                        layer="below",
-                        line_width=0,
-                    ),
-                    add_shape_kwargs,
-                )
-                fig.add_shape(**add_shape_kwargs)
-
-            return fig
-
-        signature = inspect.signature(plot)
-        new_parameters = list(signature.parameters.values())[:-1]
-        for output_name in output_names:
-            new_parameters.append(
-                inspect.Parameter(
-                    output_name + "_trace_kwargs",
-                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                    default=None,
-                    annotation=tp.KwargsLike,
-                )
+            return _talib_plot_func(
+                *[getattr(self_col, output_name) for output_name in output_names],
+                add_shape_kwargs=add_shape_kwargs,
+                add_trace_kwargs=add_trace_kwargs,
+                fig=fig,
+                **kwargs,
             )
-        new_parameters.append(inspect.Parameter("layout_kwargs", inspect.Parameter.VAR_KEYWORD))
-        plot.__signature__ = signature.replace(parameters=new_parameters)
-        output_trace_kwargs_docstring = "\n    ".join(
-            [
-                f"{output_name}_trace_kwargs (dict): Keyword arguments passed to the trace of `{output_name}`."
-                for output_name in output_names
-            ]
-        )
-        plot.__doc__ = f"""Plot the outputs of the indicator based on their flags.
-        
-Args:
-    column (str): Name of the column to plot.
-    limits (tuple of float): Tuple of the lower and upper limit.
-    add_shape_kwargs (dict): Keyword arguments passed to `fig.add_shape` when adding the range between both limits.
-    add_trace_kwargs (dict): Keyword arguments passed to `fig.add_trace` when adding each trace.
-    {output_trace_kwargs_docstring}
-    fig (Figure or FigureWidget): Figure to add the traces to.
-    **layout_kwargs: Keyword arguments passed to `fig.update_layout`."""
+
+        plot.__qualname__ = f"{Indicator.__name__}.plot"
+        plot.__doc__ = f"""Plot function based on `vbt.talib_plot_func("{func_name}")`."""
         setattr(Indicator, "plot", plot)
 
         return Indicator
@@ -3372,10 +3174,7 @@ Args:
             index=[datetime(2020, 1, 1) + timedelta(days=i) for i in range(test_index_len)],
         )
         new_args = merge_dicts({c: test_df[c] for c in input_names}, kwargs)
-        try:
-            result = supress_stdout(func)(**new_args)
-        except Exception as e:
-            raise ValueError("Couldn't parse the indicator: " + str(e))
+        result = supress_stdout(func)(**new_args)
 
         # Concatenate Series/DataFrames if the result is a tuple
         if isinstance(result, tuple):
@@ -3560,7 +3359,7 @@ Args:
             in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
             param_tuple: tp.Tuple[tp.Param, ...],
             **_kwargs,
-        ) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
+        ) -> tp.MaybeTuple[tp.Array2d]:
             is_series = isinstance(input_tuple[0], pd.Series)
             n_input_cols = 1 if is_series else len(input_tuple[0].columns)
             outputs = []
@@ -3589,7 +3388,7 @@ Args:
                 outputs.append(output)
             if isinstance(outputs[0], tuple):  # multiple outputs
                 outputs = list(zip(*outputs))
-                return list(map(column_stack, outputs))
+                return tuple(map(column_stack, outputs))
             return column_stack(outputs)
 
         kwargs = merge_dicts({k: Default(v) for k, v in config.pop("defaults").items()}, kwargs)
@@ -3755,7 +3554,7 @@ Args:
             in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
             param_tuple: tp.Tuple[tp.Param, ...],
             **_kwargs,
-        ) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
+        ) -> tp.MaybeTuple[tp.Array2d]:
             is_series = isinstance(input_tuple[0], pd.Series)
             n_input_cols = 1 if is_series else len(input_tuple[0].columns)
             outputs = []
@@ -3778,7 +3577,7 @@ Args:
                 outputs.append(output)
             if isinstance(outputs[0], tuple):  # multiple outputs
                 outputs = list(zip(*outputs))
-                return list(map(column_stack, outputs))
+                return tuple(map(column_stack, outputs))
             return column_stack(outputs)
 
         kwargs = merge_dicts({k: Default(v) for k, v in config.pop("defaults").items()}, kwargs)
@@ -3991,7 +3790,7 @@ Args:
             param_tuple: tp.Tuple[tp.Param, ...],
             *_args,
             **_kwargs,
-        ) -> tp.Union[tp.Array1d, tp.List[tp.Array1d]]:
+        ) -> tp.MaybeTuple[tp.Array1d]:
             input_series = {name: input_tuple[i] for i, name in enumerate(config["input_names"])}
             _kwargs = {**{name: param_tuple[i] for i, name in enumerate(config["param_names"])}, **_kwargs}
             __args = ()
@@ -4021,7 +3820,7 @@ Args:
                         outputs.append(out[c].values)
                     elif c not in ("open", "high", "low", "close", "volume", "data"):
                         outputs.append(out[c].values)
-                return outputs
+                return tuple(outputs)
             return out.values
 
         kwargs = merge_dicts({k: Default(v) for k, v in config.pop("defaults").items()}, kwargs)
@@ -4699,7 +4498,7 @@ Args:
             in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
             param_tuple: tp.Tuple[tp.Param, ...],
             **_kwargs,
-        ) -> tp.Union[tp.Array2d, tp.List[tp.Array2d]]:
+        ) -> tp.MaybeTuple[tp.Array2d]:
             import vectorbtpro as vbt
 
             input_context = dict(np=np, pd=pd, vbt=vbt)
@@ -4723,43 +4522,11 @@ Args:
                 elif var_name.startswith("__p_"):
                     var = merged_context[var_name[4:]]
                 elif var_name.startswith("__talib_"):
-                    from vectorbtpro.utils.module_ import assert_can_import
-
-                    assert_can_import("talib")
-                    import talib
-                    from talib import abstract
+                    from vectorbtpro.indicators.talib_ import talib_func
 
                     talib_func_name = var_name[8:].upper()
-                    talib_ind = cls_or_self.from_talib(talib_func_name)
-
-                    def _talib_func(*__args, _talib_ind=talib_ind, wrapper=_kwargs["wrapper"], **__kwargs) -> tp.Any:
-                        inputs = {}
-                        other_args = []
-                        input_names = _talib_ind.input_names
-                        for k in range(len(__args)):
-                            if k < len(input_names) and len(inputs) < len(input_names):
-                                inputs[input_names[k]] = __args[k]
-                            else:
-                                other_args.append(__args[k])
-                        if len(inputs) < len(input_names):
-                            for k in __kwargs:
-                                if k in input_names:
-                                    inputs[k] = __kwargs.pop(k)
-
-                        bc_inputs = broadcast_arrays(*inputs.values())
-                        if bc_inputs[0].ndim == 1:
-                            return _talib_ind.apply_func(bc_inputs, (), other_args, wrapper=wrapper, **__kwargs)
-                        outputs = []
-                        for col in range(bc_inputs[0].shape[1]):
-                            col_inputs = [input[:, col] for input in bc_inputs]
-                            output = _talib_ind.apply_func(col_inputs, (), other_args, wrapper=wrapper, **__kwargs)
-                            outputs.append(output)
-                        if isinstance(outputs[0], tuple):  # multiple outputs
-                            outputs = list(zip(*outputs))
-                            return list(map(column_stack, outputs))
-                        return column_stack(outputs)
-
-                    var = _talib_func
+                    _talib_func = talib_func(talib_func_name)
+                    var = functools.partial(_talib_func, wrapper=_kwargs["wrapper"])
                 elif var_name in res_func_mapping:
                     var = res_func_mapping[var_name]["func"]
                 elif var_name in func_mapping:

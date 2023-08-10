@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from vectorbtpro.indicators.expr import *
     from vectorbtpro.indicators.factory import *
     from vectorbtpro.indicators.nb import *
+    from vectorbtpro.indicators.talib_ import *
 
 __exclude_from__all__ = [
     "enums",
