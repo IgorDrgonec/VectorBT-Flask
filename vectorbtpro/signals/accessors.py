@@ -1992,19 +1992,21 @@ class SignalsAccessor(GenericAccessor):
             to_attach = self.obj
         else:
             # Two input arrays
-            broadcasted_args = reshaping.broadcast(dict(obj=self.obj, other=other), **broadcast_kwargs)
-            obj = broadcasted_args["obj"]
-            other = broadcasted_args["other"]
+            broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
+            broadcasted_args, wrapper = reshaping.broadcast(
+                dict(obj=self.obj, other=other),
+                return_wrapper=True,
+                **broadcast_kwargs,
+            )
             func = jit_reg.resolve_option(nb.between_two_ranges_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             range_records = func(
-                reshaping.to_2d_array(obj),
-                reshaping.to_2d_array(other),
+                broadcasted_args["obj"],
+                broadcasted_args["other"],
                 from_other=from_other,
                 incl_open=incl_open,
             )
-            wrapper = ArrayWrapper.from_obj(obj)
-            to_attach = other if attach_other else obj
+            to_attach = broadcasted_args["other"] if attach_other else broadcasted_args["obj"]
         kwargs = merge_dicts(dict(close=to_attach), kwargs)
         return Ranges.from_records(wrapper, range_records, **kwargs).regroup(group_by)
 

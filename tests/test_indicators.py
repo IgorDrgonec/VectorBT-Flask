@@ -1799,6 +1799,61 @@ class TestFactory:
         assert_frame_equal(ind3.out, ind3_2.out)
         assert_frame_equal(ind4.out, ind4_2.out)
 
+    def test_skipna(self):
+        F = vbt.IndicatorFactory(input_names=["in1", "in2"], param_names=["p"], output_names=["o1", "o2"])
+
+        def apply_func(in1, in2, p):
+            return in1 * p, in2 * p
+
+        Ind = F.with_apply_func(apply_func)
+        in1 = np.arange(0, 20).reshape((10, 2)).astype(np.float_)
+        in1[1:3, 0] = np.nan
+        in1[2:4, 1] = np.nan
+        in2 = np.arange(20, 40).reshape((10, 2)).astype(np.float_)
+        in2[5:7, 0] = np.nan
+        in2[6:8, 1] = np.nan
+        ind_1d = Ind.run(in1[:, 0], in2[:, 0], [1, 2, 3], skipna=True)
+        ind_12d = Ind.run(in1[:, [0]], in2[:, [0]], [1, 2, 3], skipna=True)
+        np.testing.assert_array_equal(ind_12d.o1.values, ind_1d.o1.values)
+        np.testing.assert_array_equal(ind_12d.o2.values, ind_1d.o2.values)
+        ind_2d = Ind.run(in1, in2, [1, 2, 3], skipna=True, split_columns=True)
+        np.testing.assert_array_equal(ind_2d.o1.values[:, [0, 2, 4]], ind_12d.o1.values)
+        np.testing.assert_array_equal(ind_2d.o2.values[:, [0, 2, 4]], ind_12d.o2.values)
+        np.testing.assert_array_equal(
+            ind_2d.o1.values,
+            np.array(
+                [
+                    [0.0, 1.0, 0.0, 2.0, 0.0, 3.0],
+                    [np.nan, 3.0, np.nan, 6.0, np.nan, 9.0],
+                    [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+                    [6.0, np.nan, 12.0, np.nan, 18.0, np.nan],
+                    [8.0, 9.0, 16.0, 18.0, 24.0, 27.0],
+                    [np.nan, 11.0, np.nan, 22.0, np.nan, 33.0],
+                    [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+                    [14.0, np.nan, 28.0, np.nan, 42.0, np.nan],
+                    [16.0, 17.0, 32.0, 34.0, 48.0, 51.0],
+                    [18.0, 19.0, 36.0, 38.0, 54.0, 57.0],
+                ]
+            ),
+        )
+        np.testing.assert_array_equal(
+            ind_2d.o2.values,
+            np.array(
+                [
+                    [20.0, 21.0, 40.0, 42.0, 60.0, 63.0],
+                    [np.nan, 23.0, np.nan, 46.0, np.nan, 69.0],
+                    [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+                    [26.0, np.nan, 52.0, np.nan, 78.0, np.nan],
+                    [28.0, 29.0, 56.0, 58.0, 84.0, 87.0],
+                    [np.nan, 31.0, np.nan, 62.0, np.nan, 93.0],
+                    [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+                    [34.0, np.nan, 68.0, np.nan, 102.0, np.nan],
+                    [36.0, 37.0, 72.0, 74.0, 108.0, 111.0],
+                    [38.0, 39.0, 76.0, 78.0, 114.0, 117.0],
+                ]
+            ),
+        )
+
     def test_wrapper(self):
         F = vbt.IndicatorFactory(input_names=["ts"], param_names=["p1", "p2"], output_names=["out"])
 

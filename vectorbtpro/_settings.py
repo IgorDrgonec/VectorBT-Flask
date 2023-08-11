@@ -302,6 +302,7 @@ execution = child_dict(
     post_chunk_kwargs=None,
     post_execute_func=None,
     post_execute_kwargs=None,
+    post_execute_on_sorted=False,
     show_progress=True,
     pbar_kwargs=Config(),
     template_context=Config(),

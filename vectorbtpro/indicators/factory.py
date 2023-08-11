@@ -48,7 +48,7 @@ from numba.typed import List
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping, combining
 from vectorbtpro.base.indexing import build_param_indexer
-from vectorbtpro.base.reshaping import broadcast_array_to, broadcast_arrays, Default, resolve_ref, column_stack
+from vectorbtpro.base.reshaping import broadcast_array_to, Default, resolve_ref, column_stack
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import BaseAccessor
@@ -65,8 +65,9 @@ from vectorbtpro.utils.mapping import to_value_mapping, apply_mapping
 from vectorbtpro.utils.params import to_typed_list, broadcast_params, create_param_product, params_to_list
 from vectorbtpro.utils.parsing import get_expr_var_names, get_func_arg_names, get_func_kwargs, supress_stdout
 from vectorbtpro.utils.random_ import set_seed
-from vectorbtpro.utils.template import has_templates, substitute_templates
+from vectorbtpro.utils.template import has_templates, substitute_templates, Rep
 from vectorbtpro.utils.module_ import search_package_for_funcs
+from vectorbtpro.utils.array_ import build_nan_mask, squeeze_nan, unsqueeze_nan
 
 __all__ = [
     "IndicatorBase",
@@ -810,8 +811,10 @@ class IndicatorBase(Analyzable):
                     other_list = output_list[num_ret_outputs:]
                     if use_run_unique and not silence_warnings:
                         warnings.warn(
-                            "Additional output objects are produced by unique parameter combinations when"
-                            " run_unique=True",
+                            (
+                                "Additional output objects are produced by unique parameter combinations when"
+                                " run_unique=True"
+                            ),
                             stacklevel=2,
                         )
                 else:
@@ -842,8 +845,10 @@ class IndicatorBase(Analyzable):
                             "All outputs must have the same number of columns as inputs when per_column=True"
                         )
                     else:
-                        raise ValueError("All outputs must have the same number of columns as there "
-                                         "are input columns times parameter combinations")
+                        raise ValueError(
+                            "All outputs must have the same number of columns as there "
+                            "are input columns times parameter combinations"
+                        )
             raw = output_list, param_map, n_input_cols, other_list
             if return_raw:
                 if use_run_unique and not silence_warnings:
@@ -1629,13 +1634,11 @@ class IndicatorFactory(Configured):
                     return getattr(self, _attr_name).vbt(mapping=_mapping).stats(*args, **kwargs)
 
                 attr_stats.__qualname__ = f"{Indicator.__name__}.{attr_name}_stats"
-                attr_stats.__doc__ = inspect.cleandoc(
-                    """Stats of `{attr_name}` based on the following mapping: 
+                attr_stats.__doc__ = inspect.cleandoc("""Stats of `{attr_name}` based on the following mapping: 
 
                     ```python
                     {dtype}
-                    ```"""
-                ).format(attr_name=attr_name, dtype=prettify(to_value_mapping(dtype)))
+                    ```""").format(attr_name=attr_name, dtype=prettify(to_value_mapping(dtype)))
                 setattr(Indicator, f"{attr_name}_stats", attr_stats)
 
             elif np.issubdtype(dtype, np.number):
@@ -2331,6 +2334,7 @@ Other keyword arguments are passed to `{0}.run`.
         cache_pass_packed: tp.Optional[bool] = None,
         pass_per_column: bool = False,
         cache_pass_per_column: tp.Optional[bool] = None,
+        forward_skipna: bool = False,
         kwargs_as_args: tp.Optional[tp.Iterable[str]] = None,
         jit_kwargs: tp.KwargsLike = None,
         **kwargs,
@@ -2346,7 +2350,7 @@ Other keyword arguments are passed to `{0}.run`.
         While this approach is simpler, it's also less flexible, since we can only work with
         one parameter selection at a time and can't view all parameters.
 
-        The execution and concatenation is performed using `vectorbtpro.base.combining.apply_and_concat`.
+        The execution and concatenation is performed using `vectorbtpro.base.combining.apply_and_concat_each`.
 
         !!! note
             If `apply_func` is a Numba-compiled function:
@@ -2411,6 +2415,7 @@ Other keyword arguments are passed to `{0}.run`.
             cache_pass_packed (bool): Overrides `pass_packed` for the caching function.
             pass_per_column (bool): Whether to pass `per_column`.
             cache_pass_per_column (bool): Overrides `pass_per_column` for the caching function.
+            forward_skipna (bool): Whether to forward `skipna` to the apply function.
             kwargs_as_args (iterable of str): Keyword arguments from `kwargs` dict to pass as
                 positional arguments to the apply function.
 
@@ -2422,7 +2427,7 @@ Other keyword arguments are passed to `{0}.run`.
 
                 By default, has `nogil` set to True.
             **kwargs: Keyword arguments passed to `IndicatorFactory.with_custom_func`, all the way down
-                to `vectorbtpro.base.combining.apply_and_concat`.
+                to `vectorbtpro.base.combining.apply_and_concat_each`.
 
         Returns:
             Indicator
@@ -2558,7 +2563,9 @@ Other keyword arguments are passed to `{0}.run`.
             param_tuple: tp.Tuple[tp.List[tp.Param], ...],
             *_args,
             input_shape: tp.Optional[tp.Shape] = None,
-            per_column: tp.Optional[bool] = None,
+            per_column: bool = False,
+            split_columns: bool = False,
+            skipna: bool = False,
             return_cache: bool = False,
             use_cache: tp.Union[bool, CacheOutputT] = True,
             jitted_loop: bool = False,
@@ -2569,6 +2576,17 @@ Other keyword arguments are passed to `{0}.run`.
             """Custom function that forwards inputs and parameters to `apply_func`."""
             if jitted_loop and not checks.is_numba_func(apply_func):
                 raise ValueError("Apply function must be Numba-compiled for jitted_loop=True")
+            if skipna and len(in_output_tuple) > 1:
+                raise ValueError("NaNs cannot be skipped for in-outputs")
+            if skipna and jitted_loop:
+                raise ValueError("NaNs cannot be skipped when jitted_loop=True")
+            if forward_skipna:
+                _kwargs["skipna"] = skipna
+                skipna = False
+            if execute_kwargs is None:
+                execute_kwargs = {}
+            else:
+                execute_kwargs = dict(execute_kwargs)
 
             _cache_pass_packed = cache_pass_packed
             _cache_pass_per_column = cache_pass_per_column
@@ -2576,8 +2594,10 @@ Other keyword arguments are passed to `{0}.run`.
             # Prepend positional arguments
             args_before = ()
             if input_shape is not None and "input_shape" not in kwargs_as_args:
-                if per_column:
-                    args_before += (input_shape[0],)
+                if per_column or takes_1d:
+                    args_before += ((input_shape[0],),)
+                elif split_columns and len(input_shape) == 2:
+                    args_before += ((input_shape[0], 1),)
                 else:
                     args_before += (input_shape,)
 
@@ -2587,6 +2607,8 @@ Other keyword arguments are passed to `{0}.run`.
                 if key == "per_column":
                     value = per_column
                 elif key == "takes_1d":
+                    value = per_column
+                elif key == "split_columns":
                     value = per_column
                 else:
                     value = _kwargs.pop(key)  # important: remove from kwargs
@@ -2705,13 +2727,19 @@ Other keyword arguments are passed to `{0}.run`.
                             _input = input[p]
                         else:
                             _input = input
-                        if takes_1d:
+                        if takes_1d or split_columns:
                             if isinstance(_input, pd.DataFrame):
                                 for i in range(_input.shape[1]):
-                                    _inputs.append(_input.iloc[:, i])
+                                    if takes_1d:
+                                        _inputs.append(_input.iloc[:, i])
+                                    else:
+                                        _inputs.append(_input.iloc[:, i : i + 1])
                             elif _input.ndim == 2:
                                 for i in range(_input.shape[1]):
-                                    _inputs.append(_input[:, i])
+                                    if takes_1d:
+                                        _inputs.append(_input[:, i])
+                                    else:
+                                        _inputs.append(_input[:, i : i + 1])
                             else:
                                 _inputs.append(_input)
                         else:
@@ -2722,14 +2750,59 @@ Other keyword arguments are passed to `{0}.run`.
             for input in input_tuple:
                 _inputs = _expand_input(input)
                 _input_tuple += (_inputs,)
+            if skipna and len(_input_tuple) > 0:
+                new_input_tuple = tuple([[] for _ in range(len(_input_tuple))])
+                nan_masks = []
+                any_nan = False
+                for i in range(len(_input_tuple[0])):
+                    inputs = []
+                    for k in range(len(_input_tuple)):
+                        input = _input_tuple[k][i]
+                        if input.ndim == 2 and input.shape[1] > 1:
+                            raise ValueError(
+                                "NaNs cannot be skipped for multi-columnar inputs. Use split_columns=True."
+                            )
+                        inputs.append(input)
+                    nan_mask = build_nan_mask(*inputs)
+                    nan_masks.append(nan_mask)
+                    if not any_nan and nan_mask is not None and np.any(nan_mask):
+                        any_nan = True
+                    if any_nan:
+                        inputs = squeeze_nan(*inputs, nan_mask=nan_mask)
+                    for k in range(len(_input_tuple)):
+                        new_input_tuple[k].append(inputs[k])
+                _input_tuple = new_input_tuple
+                if any_nan:
+
+                    def post_execute_func(outputs, nan_masks):
+                        new_outputs = []
+                        for i, output in enumerate(outputs):
+                            if isinstance(output, (tuple, list, List)):
+                                output = unsqueeze_nan(*output, nan_mask=nan_masks[i])
+                            else:
+                                output = unsqueeze_nan(output, nan_mask=nan_masks[i])
+                            new_outputs.append(output)
+                        return new_outputs
+
+                    if "post_execute_func" in execute_kwargs:
+                        raise ValueError("Cannot use custom post_execute_func when skipna=True")
+                    execute_kwargs["post_execute_func"] = post_execute_func
+                    if "post_execute_kwargs" in execute_kwargs:
+                        raise ValueError("Cannot use custom post_execute_kwargs when skipna=True")
+                    execute_kwargs["post_execute_kwargs"] = dict(outputs=Rep("outputs"), nan_masks=nan_masks)
+                    if "post_execute_on_sorted" in execute_kwargs:
+                        raise ValueError("Cannot use custom post_execute_on_sorted when skipna=True")
+                    execute_kwargs["post_execute_on_sorted"] = True
+
             _in_output_tuple = ()
             for in_outputs in in_output_tuple:
                 _in_outputs = _expand_input(in_outputs, multiple=True)
                 _in_output_tuple += (_in_outputs,)
+
             _param_tuple = ()
             for params in param_tuple:
-                if takes_1d and not per_column:
-                    _params = [params[p] for p in range(len(params)) for i in range(n_cols)]
+                if not per_column and (takes_1d or split_columns):
+                    _params = [params[p] for p in range(len(params)) for _ in range(n_cols)]
                 else:
                     _params = params
                 if jitted_loop:
@@ -2738,7 +2811,7 @@ Other keyword arguments are passed to `{0}.run`.
                     else:
                         _params = to_typed_list(_params)
                 _param_tuple += (_params,)
-            if takes_1d and not per_column:
+            if not per_column and (takes_1d or split_columns):
                 _n_params = n_params * n_cols
             else:
                 _n_params = n_params
@@ -2813,8 +2886,8 @@ Other keyword arguments are passed to `{0}.run`.
                 attr
                 for attr in dir(vbt)
                 if not attr.startswith("_")
-                   and isinstance(getattr(vbt, attr), type)
-                   and issubclass(getattr(vbt, attr), IndicatorBase)
+                and isinstance(getattr(vbt, attr), type)
+                and issubclass(getattr(vbt, attr), IndicatorBase)
             ]
         )
 
@@ -2917,7 +2990,7 @@ Other keyword arguments are passed to `{0}.run`.
                         found_location = True
                         break
             if found_location:
-                name = name[len(location) + 1:]
+                name = name[len(location) + 1 :]
             else:
                 location = None
         return location, name
@@ -3109,7 +3182,13 @@ Other keyword arguments are passed to `{0}.run`.
                 ),
                 factory_kwargs,
             )
-        ).with_apply_func(apply_func, pass_packed=True, pass_wrapper=True, **kwargs)
+        ).with_apply_func(
+            apply_func,
+            pass_packed=True,
+            pass_wrapper=True,
+            forward_skipna=True,
+            **kwargs,
+        )
 
         def plot(
             self,

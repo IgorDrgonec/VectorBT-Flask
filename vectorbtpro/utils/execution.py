@@ -623,6 +623,7 @@ def execute(
     post_chunk_kwargs: tp.KwargsLike = None,
     post_execute_func: tp.Optional[tp.Callable] = None,
     post_execute_kwargs: tp.KwargsLike = None,
+    post_execute_on_sorted: bool = False,
     show_progress: tp.Optional[bool] = None,
     progress_desc: tp.Optional[tp.Sequence] = None,
     pbar_kwargs: tp.KwargsLike = None,
@@ -680,6 +681,7 @@ def execute(
     any templates in `post_execute_kwargs` and pass them as keyword arguments. Should return either None
     to keep the default outputs or return the new ones. The following additional arguments are available
     in the context: the number of chunks `n_chunks` and the generated flattened list of outputs `outputs`.
+    If `post_execute_on_sorted` is True, will run the callback after sorting the call indices.
 
     !!! info
         Chunks are processed sequentially, while functions within each chunk can be processed distributively.
@@ -768,6 +770,8 @@ def execute(
         engine_cfg.get("post_execute_kwargs", None),
         post_execute_kwargs,
     )
+    if post_execute_on_sorted is None:
+        post_execute_on_sorted = engine_cfg.get("post_execute_on_sorted", execution_cfg["post_execute_on_sorted"])
     pbar_kwargs = merge_dicts(
         execution_cfg["pbar_kwargs"],
         engine_cfg.get("pbar_kwargs", None),
@@ -999,9 +1003,12 @@ def execute(
                     outputs.extend(call_outputs)
                     output_indices.extend(call_indices)
                     pbar.update(1)
-            outputs = _call_post_execute_func(outputs)
+            if not post_execute_on_sorted:
+                outputs = _call_post_execute_func(outputs)
             if not in_chunk_order and not indices_sorted:
                 outputs = [x for _, x in sorted(zip(output_indices, outputs))]
+            if post_execute_on_sorted:
+                outputs = _call_post_execute_func(outputs)
             return outputs
 
     elif distribute.lower() == "chunks":
@@ -1038,9 +1045,12 @@ def execute(
                 output_indices.extend(call_indices)
             outputs = _execute(funcs_args_chunks, len(funcs_args_chunks))
             outputs = [x for o in outputs for x in o]
-            outputs = _call_post_execute_func(outputs)
+            if not post_execute_on_sorted:
+                outputs = _call_post_execute_func(outputs)
             if not in_chunk_order and not indices_sorted:
                 outputs = [x for _, x in sorted(zip(output_indices, outputs))]
+            if post_execute_on_sorted:
+                outputs = _call_post_execute_func(outputs)
             return outputs
     else:
         raise ValueError(f"Invalid option distribute='{distribute}'")
