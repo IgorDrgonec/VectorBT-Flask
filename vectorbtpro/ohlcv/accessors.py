@@ -159,22 +159,19 @@ class OHLCVDFAccessor(OHLCDataMixin, GenericDFAccessor):
 
     def get(
         self,
-        features: tp.Union[None, tp.Feature, tp.Features] = None,
-        symbols: tp.Union[None, tp.Symbol, tp.Symbols] = None,
+        features: tp.Union[None, tp.MaybeFeatures] = None,
+        symbols: tp.Union[None, tp.MaybeSymbols] = None,
         **kwargs,
-    ) -> tp.MaybeTuple[tp.SeriesFrame]:
+    ) -> tp.SeriesFrame:
         if symbols is not None:
             raise ValueError("Cannot provide symbols")
         if features is None:
             return self.obj
-        if isinstance(features, list):
-            new_features = []
-            for x in features:
-                new_features.append(self.wrapper.columns[self.get_feature_idxs(x, raise_error=True)])
-            features = new_features
+        if self.has_multiple_keys(features):
+            feature_idxs = [self.get_feature_idx(k, raise_error=True) for k in features]
         else:
-            features = self.wrapper.columns[self.get_feature_idxs(features, raise_error=True)]
-        return self.obj[features]
+            feature_idxs = self.get_feature_idx(features, raise_error=True)
+        return self.obj.iloc[:, feature_idxs]
 
     # ############# Resampling ############# #
 

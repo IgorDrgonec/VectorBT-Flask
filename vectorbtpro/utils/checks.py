@@ -624,29 +624,46 @@ def assert_shape_equal(
             raise AssertionError(f"Shapes {arg1.shape} and {arg2.shape} do not match")
     else:
         if isinstance(axis, tuple):
+            if axis[0] >= arg1.ndim and axis[1] >= arg2.ndim:
+                return
             if arg1.shape[axis[0]] != arg2.shape[axis[1]]:
                 raise AssertionError(f"Axis {axis[0]} of {arg1.shape} and axis {axis[1]} of {arg2.shape} do not match")
         else:
+            if axis >= arg1.ndim and axis >= arg2.ndim:
+                return
             if arg1.shape[axis] != arg2.shape[axis]:
                 raise AssertionError(f"Axis {axis} of {arg1.shape} and {arg2.shape} do not match")
 
 
 def assert_index_equal(arg1: pd.Index, arg2: pd.Index, check_names: bool = True) -> None:
-    """Raise exception if the first argument and the second argument have different index/columns."""
+    """Raise exception if the first argument and the second argument have different index."""
     if not is_index_equal(arg1, arg2, check_names=check_names):
         raise AssertionError(f"Indexes {arg1} and {arg2} do not match")
 
 
-def assert_meta_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> None:
+def assert_columns_equal(arg1: pd.Index, arg2: pd.Index, check_names: bool = True) -> None:
+    """Raise exception if the first argument and the second argument have different columns."""
+    if not is_index_equal(arg1, arg2, check_names=check_names):
+        raise AssertionError(f"Columns {arg1} and {arg2} do not match")
+
+
+def assert_meta_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike, axis: tp.Optional[int] = None) -> None:
     """Raise exception if the first argument and the second argument have different metadata."""
     arg1 = _to_any_array(arg1)
     arg2 = _to_any_array(arg2)
     assert_type_equal(arg1, arg2)
-    assert_shape_equal(arg1, arg2)
+    if axis is not None:
+        assert_shape_equal(arg1, arg2, axis=axis)
+    else:
+        assert_shape_equal(arg1, arg2)
     if is_pandas(arg1) and is_pandas(arg2):
-        assert_index_equal(arg1.index, arg2.index)
-        if is_frame(arg1) and is_frame(arg2):
-            assert_index_equal(arg1.columns, arg2.columns)
+        if axis is None or axis == 0:
+            assert_index_equal(arg1.index, arg2.index)
+        if axis is None or axis == 1:
+            if is_series(arg1) and is_series(arg2):
+                assert_columns_equal(pd.Index([arg1.name]), pd.Index([arg2.name]))
+            else:
+                assert_columns_equal(arg1.columns, arg2.columns)
 
 
 def assert_array_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> None:

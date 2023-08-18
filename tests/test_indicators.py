@@ -3337,12 +3337,9 @@ class TestBasic:
                 columns=close.columns,
             ),
         )
-        outputs = vbt.ind_nb.bbands_nb(
-            close.values,
-            window=np.array([2, 3]),
-            wtype=np.array([0, 2]),
-            alpha=np.array([1.0, 2.0]),
-        )
+
+        outputs = vbt.ind_nb.bbands_nb(close.values, window=np.array([14, 28]))
+
         np.testing.assert_array_equal(
             outputs[0],
             np.array(

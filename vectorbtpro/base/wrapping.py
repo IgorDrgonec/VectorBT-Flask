@@ -216,7 +216,10 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
                     if not checks.is_index_equal(new_columns, wrapper.columns):
                         if not stack_columns:
                             raise ValueError("Objects to be merged must have the same columns")
-                        new_columns = stack_indexes((new_columns, wrapper.columns), **resolve_dict(index_stack_kwargs))
+                        new_columns = stack_indexes(
+                            (new_columns, wrapper.columns),
+                            **resolve_dict(index_stack_kwargs),
+                        )
             columns = new_columns
         elif not isinstance(columns, pd.Index):
             columns = pd.Index(columns)

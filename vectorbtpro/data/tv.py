@@ -182,12 +182,12 @@ class TVClient(Configured):
     @staticmethod
     def convert_raw_data(raw_data: str, symbol: str) -> pd.DataFrame:
         """Process raw data into a DataFrame."""
-        out = re.search('"s":\[(.+?)\}\]', raw_data).group(1)
+        out = re.search(r'"s":\[(.+?)\}\]', raw_data).group(1)
         x = out.split(',{"')
         data = list()
         volume_data = True
         for xi in x:
-            xi = re.split("\[|:|,|\]", xi)
+            xi = re.split(r"\[|:|,|\]", xi)
             ts = datetime.datetime.utcfromtimestamp(float(xi[4]))
             row = [ts]
             for i in range(5, 10):
