@@ -103,9 +103,8 @@ def order_opened_position_nb(c: tp.Union[PostOrderContext, PostSignalContext]) -
 @register_jitted
 def order_increased_position_nb(c: tp.Union[PostOrderContext, PostSignalContext]) -> bool:
     """Check whether the order has increased an existing position."""
-    return (
-        np.sign(c.last_position[c.col]) == np.sign(c.position_before)
-        and abs(c.last_position[c.col]) > abs(c.position_before)
+    return np.sign(c.last_position[c.col]) == np.sign(c.position_before) and abs(c.last_position[c.col]) > abs(
+        c.position_before
     )
 
 
@@ -136,3 +135,39 @@ def order_reversed_position_nb(c: tp.Union[PostOrderContext, PostSignalContext])
         and c.last_position[c.col] != 0
         and np.sign(c.position_before) != np.sign(c.last_position[c.col])
     )
+
+
+@register_jitted
+def get_limit_target_price_nb(c: tp.Union[SignalContext, PostSignalContext]) -> float:
+    """Get limit target price."""
+    if not in_position_nb(c):
+        return np.nan
+    limit_info = c.last_limit_info[c.col]
+    return get_limit_info_target_price_nb(limit_info)
+
+
+@register_jitted
+def get_sl_target_price_nb(c: tp.Union[SignalContext, PostSignalContext]) -> float:
+    """Get SL target price."""
+    if not in_position_nb(c):
+        return np.nan
+    sl_info = c.last_sl_info[c.col]
+    return get_sl_info_target_price_nb(sl_info, c.last_position[c.col])
+
+
+@register_jitted
+def get_tsl_target_price_nb(c: tp.Union[SignalContext, PostSignalContext]) -> float:
+    """Get TSL/TTP target price."""
+    if not in_position_nb(c):
+        return np.nan
+    tsl_info = c.last_tsl_info[c.col]
+    return get_tsl_info_target_price_nb(tsl_info, c.last_position[c.col])
+
+
+@register_jitted
+def get_tp_target_price_nb(c: tp.Union[SignalContext, PostSignalContext]) -> float:
+    """Get TP target price."""
+    if not in_position_nb(c):
+        return np.nan
+    tp_info = c.last_tp_info[c.col]
+    return get_tp_info_target_price_nb(tp_info, c.last_position[c.col])

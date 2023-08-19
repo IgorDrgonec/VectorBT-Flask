@@ -5,7 +5,7 @@
 import numpy as np
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.flex_indexing import flex_select_1d_pc_nb
+from vectorbtpro.base.flex_indexing import flex_select_1d_pc_nb, flex_select_nb
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.portfolio.enums import *
 from vectorbtpro.registries.jit_registry import register_jitted
@@ -1916,3 +1916,938 @@ def check_price_hit_nb(
     if close >= price or (can_use_ohlc and high >= price):
         return price, False, True
     return price, False, False
+
+
+@register_jitted(cache=True)
+def resolve_stop_exit_price_nb(
+    stop_price: float,
+    close: float,
+    stop_exit_price: float,
+) -> float:
+    """Resolve the exit price of a stop order."""
+    if stop_exit_price == StopExitPrice.Stop:
+        return float(stop_price)
+    elif stop_exit_price == StopExitPrice.Close:
+        return float(close)
+    elif stop_exit_price < 0:
+        raise ValueError("Invalid StopExitPrice option")
+    return float(stop_exit_price)
+
+
+@register_jitted(cache=True)
+def is_limit_active_nb(init_idx: int, init_price: float) -> bool:
+    """Check whether a limit order is active."""
+    return init_idx != -1 and not np.isnan(init_price)
+
+
+@register_jitted(cache=True)
+def is_stop_active_nb(init_idx: int, stop: float) -> bool:
+    """Check whether a stop order is active."""
+    return init_idx != -1 and not np.isnan(stop)
+
+
+@register_jitted(cache=True)
+def is_time_stop_active_nb(init_idx: int, stop: int) -> bool:
+    """Check whether a time stop order is active."""
+    return init_idx != -1 and stop != -1
+
+
+@register_jitted(cache=True)
+def should_update_stop_nb(new_stop: float, upon_stop_update: int) -> bool:
+    """Whether to update stop."""
+    if upon_stop_update == StopUpdateMode.Keep:
+        return False
+    if upon_stop_update == StopUpdateMode.Override or upon_stop_update == StopUpdateMode.OverrideNaN:
+        if not np.isnan(new_stop) or upon_stop_update == StopUpdateMode.OverrideNaN:
+            return True
+        return False
+    raise ValueError("Invalid StopUpdateMode option")
+
+
+@register_jitted(cache=True)
+def should_update_time_stop_nb(new_stop: int, upon_stop_update: int) -> bool:
+    """Whether to update time stop."""
+    if upon_stop_update == StopUpdateMode.Keep:
+        return False
+    if upon_stop_update == StopUpdateMode.Override or upon_stop_update == StopUpdateMode.OverrideNaN:
+        if new_stop != -1 or upon_stop_update == StopUpdateMode.OverrideNaN:
+            return True
+        return False
+    raise ValueError("Invalid StopUpdateMode option")
+
+
+@register_jitted(cache=True)
+def check_limit_expired_nb(
+    creation_idx: int,
+    i: int,
+    tif: int = -1,
+    expiry: int = -1,
+    time_delta_format: int = TimeDeltaFormat.Index,
+    index: tp.Optional[tp.Array1d] = None,
+    freq: tp.Optional[int] = None,
+) -> tp.Tuple[bool, bool]:
+    """Check whether limit is expired by comparing the current index with the creation index.
+
+    Returns whether the limit expires already on open, and whether the limit expires during this bar."""
+    if tif == -1 and expiry == -1:
+        return False, False
+    if time_delta_format == TimeDeltaFormat.Rows:
+        is_expired_on_open = False
+        is_expired = False
+        if tif != -1:
+            if creation_idx + tif <= i:
+                is_expired_on_open = True
+                is_expired = True
+            elif i < creation_idx + tif < i + 1:
+                is_expired = True
+        if expiry != -1:
+            if expiry <= i:
+                is_expired_on_open = True
+                is_expired = True
+            elif i < expiry < i + 1:
+                is_expired = True
+        return is_expired_on_open, is_expired
+    elif time_delta_format == TimeDeltaFormat.Index:
+        if index is None:
+            raise ValueError("Index must be provided for TimeDeltaFormat.Index")
+        if freq is None:
+            raise ValueError("Frequency must be provided for TimeDeltaFormat.Index")
+        is_expired_on_open = False
+        is_expired = False
+        if tif != -1:
+            if index[creation_idx] + tif <= index[i]:
+                is_expired_on_open = True
+                is_expired = True
+            elif index[i] < index[creation_idx] + tif < index[i] + freq:
+                is_expired = True
+        if expiry != -1:
+            if expiry <= index[i]:
+                is_expired_on_open = True
+                is_expired = True
+            elif index[i] < expiry < index[i] + freq:
+                is_expired = True
+        return is_expired_on_open, is_expired
+    else:
+        raise ValueError("Invalid TimeDeltaFormat option")
+
+
+@register_jitted(cache=True)
+def resolve_limit_price_nb(
+    price: float,
+    limit_delta: float = np.nan,
+    delta_format: int = DeltaFormat.Percent,
+    hit_below: bool = True,
+) -> float:
+    """Resolve the limit price."""
+    if delta_format == DeltaFormat.Percent100:
+        limit_delta /= 100
+        delta_format = DeltaFormat.Percent
+    if not np.isnan(limit_delta):
+        if hit_below:
+            if np.isinf(limit_delta) and delta_format != DeltaFormat.Target:
+                if limit_delta > 0:
+                    limit_price = -np.inf
+                else:
+                    limit_price = np.inf
+            else:
+                if delta_format == DeltaFormat.Absolute:
+                    limit_price = price - limit_delta
+                elif delta_format == DeltaFormat.Percent:
+                    limit_price = price * (1 - limit_delta)
+                elif delta_format == DeltaFormat.Target:
+                    limit_price = limit_delta
+                else:
+                    raise ValueError("Invalid DeltaFormat option")
+        else:
+            if np.isinf(limit_delta) and delta_format != DeltaFormat.Target:
+                if limit_delta < 0:
+                    limit_price = -np.inf
+                else:
+                    limit_price = np.inf
+            else:
+                if delta_format == DeltaFormat.Absolute:
+                    limit_price = price + limit_delta
+                elif delta_format == DeltaFormat.Percent:
+                    limit_price = price * (1 + limit_delta)
+                elif delta_format == DeltaFormat.Target:
+                    limit_price = limit_delta
+                else:
+                    raise ValueError("Invalid DeltaFormat option")
+    else:
+        limit_price = price
+    return limit_price
+
+
+@register_jitted(cache=True)
+def check_limit_hit_nb(
+    open: float,
+    high: float,
+    low: float,
+    close: float,
+    price: float,
+    size: float,
+    direction: int = Direction.Both,
+    limit_delta: float = np.nan,
+    delta_format: int = DeltaFormat.Percent,
+    limit_reverse: bool = False,
+    can_use_ohlc: bool = True,
+    check_open: bool = True,
+) -> tp.Tuple[float, bool, bool]:
+    """Resolve the limit price using `resolve_limit_price_nb` and check whether it was hit.
+
+    Returns the limit price, whether it was hit before open, and whether it was hit during this bar.
+
+    If `can_use_ohlc` and `check_open` is True and the stop is hit before open, returns open."""
+    if size == 0:
+        raise ValueError("Limit order size cannot be zero")
+    _size = get_diraware_size_nb(size, direction)
+    hit_below = (_size > 0 and not limit_reverse) or (_size < 0 and limit_reverse)
+    limit_price = resolve_limit_price_nb(
+        price=price,
+        limit_delta=limit_delta,
+        delta_format=delta_format,
+        hit_below=hit_below,
+    )
+    hit_on_open = False
+
+    if can_use_ohlc:
+        high, low = resolve_hl_nb(
+            open=open,
+            high=high,
+            low=low,
+            close=close,
+        )
+        if hit_below:
+            if check_open and open <= limit_price:
+                hit_on_open = True
+                hit = True
+                limit_price = open
+            else:
+                hit = low <= limit_price
+                if hit and np.isinf(limit_price):
+                    limit_price = low
+        else:
+            if check_open and open >= limit_price:
+                hit_on_open = True
+                hit = True
+                limit_price = open
+            else:
+                hit = high >= limit_price
+                if hit and np.isinf(limit_price):
+                    limit_price = high
+    else:
+        if hit_below:
+            hit = close <= limit_price
+        else:
+            hit = close >= limit_price
+        if hit and np.isinf(limit_price):
+            limit_price = close
+    return limit_price, hit_on_open, hit
+
+
+@register_jitted(cache=True)
+def resolve_stop_price_nb(
+    init_price: float,
+    stop: float,
+    delta_format: int = DeltaFormat.Percent,
+    hit_below: bool = True,
+) -> float:
+    """Resolve the stop price."""
+    if delta_format == DeltaFormat.Percent100:
+        stop /= 100
+        delta_format = DeltaFormat.Percent
+    if hit_below:
+        if delta_format == DeltaFormat.Absolute:
+            stop_price = init_price - abs(stop)
+        elif delta_format == DeltaFormat.Percent:
+            stop_price = init_price * (1 - abs(stop))
+        elif delta_format == DeltaFormat.Target:
+            stop_price = stop
+        else:
+            raise ValueError("Invalid DeltaFormat option")
+    else:
+        if delta_format == DeltaFormat.Absolute:
+            stop_price = init_price + abs(stop)
+        elif delta_format == DeltaFormat.Percent:
+            stop_price = init_price * (1 + abs(stop))
+        elif delta_format == DeltaFormat.Target:
+            stop_price = stop
+        else:
+            raise ValueError("Invalid DeltaFormat option")
+    return stop_price
+
+
+@register_jitted(cache=True)
+def check_stop_hit_nb(
+    open: float,
+    high: float,
+    low: float,
+    close: float,
+    is_position_long: bool,
+    init_price: float,
+    stop: float,
+    delta_format: int = DeltaFormat.Percent,
+    hit_below: bool = True,
+    can_use_ohlc: bool = True,
+    check_open: bool = True,
+) -> tp.Tuple[float, bool, bool]:
+    """Resolve the stop price using `resolve_stop_price_nb` and check whether it was hit.
+
+    If `can_use_ohlc` and `check_open` is True and the stop is hit before open, returns open.
+
+    Returns the stop price, whether it was hit before open, and whether it was hit during this bar."""
+    hit_below = (is_position_long and hit_below) or (not is_position_long and not hit_below)
+    stop_price = resolve_stop_price_nb(
+        init_price=init_price,
+        stop=stop,
+        delta_format=delta_format,
+        hit_below=hit_below,
+    )
+    return check_price_hit_nb(
+        open=open,
+        high=high,
+        low=low,
+        close=close,
+        price=stop_price,
+        hit_below=hit_below,
+        can_use_ohlc=can_use_ohlc,
+        check_open=check_open,
+    )
+
+
+@register_jitted(cache=True)
+def check_td_stop_hit_nb(
+    init_idx: int,
+    i: int,
+    stop: int = -1,
+    time_delta_format: int = TimeDeltaFormat.Index,
+    index: tp.Optional[tp.Array1d] = None,
+    freq: tp.Optional[int] = None,
+) -> tp.Tuple[bool, bool]:
+    """Check whether TD stop was hit by comparing the current index with the initial index.
+
+    Returns whether the stop was hit already on open, and whether the stop was hit during this bar.
+
+    Identical mechanics to `check_limit_hit_nb`."""
+    if stop == -1:
+        return False, False
+    if time_delta_format == TimeDeltaFormat.Rows:
+        is_hit_on_open = False
+        is_hit = False
+        if stop != -1:
+            if init_idx + stop <= i:
+                is_hit_on_open = True
+                is_hit = True
+            elif i < init_idx + stop < i + 1:
+                is_hit = True
+        return is_hit_on_open, is_hit
+    elif time_delta_format == TimeDeltaFormat.Index:
+        if index is None:
+            raise ValueError("Index must be provided for TimeDeltaFormat.Index")
+        if freq is None:
+            raise ValueError("Frequency must be provided for TimeDeltaFormat.Index")
+        is_hit_on_open = False
+        is_hit = False
+        if stop != -1:
+            if index[init_idx] + stop <= index[i]:
+                is_hit_on_open = True
+                is_hit = True
+            elif index[i] < index[init_idx] + stop < index[i] + freq:
+                is_hit = True
+        return is_hit_on_open, is_hit
+    else:
+        raise ValueError("Invalid TimeDeltaFormat option")
+
+
+@register_jitted(cache=True)
+def check_dt_stop_hit_nb(
+    i: int,
+    stop: int = -1,
+    time_delta_format: int = TimeDeltaFormat.Index,
+    index: tp.Optional[tp.Array1d] = None,
+    freq: tp.Optional[int] = None,
+) -> tp.Tuple[bool, bool]:
+    """Check whether DT stop was hit by comparing the current index with the initial index.
+
+    Returns whether the stop was hit already on open, and whether the stop was hit during this bar.
+
+    Identical mechanics to `check_limit_hit_nb`."""
+    if stop == -1:
+        return False, False
+    if time_delta_format == TimeDeltaFormat.Rows:
+        is_hit_on_open = False
+        is_hit = False
+        if stop != -1:
+            if stop <= i:
+                is_hit_on_open = True
+                is_hit = True
+            elif i < stop < i + 1:
+                is_hit = True
+        return is_hit_on_open, is_hit
+    elif time_delta_format == TimeDeltaFormat.Index:
+        if index is None:
+            raise ValueError("Index must be provided for TimeDeltaFormat.Index")
+        if freq is None:
+            raise ValueError("Frequency must be provided for TimeDeltaFormat.Index")
+        is_hit_on_open = False
+        is_hit = False
+        if stop != -1:
+            if stop <= index[i]:
+                is_hit_on_open = True
+                is_hit = True
+            elif index[i] < stop < index[i] + freq:
+                is_hit = True
+        return is_hit_on_open, is_hit
+    else:
+        raise ValueError("Invalid TimeDeltaFormat option")
+
+
+@register_jitted(cache=True)
+def check_tsl_th_hit_nb(
+    is_position_long: bool,
+    init_price: float,
+    peak_price: float,
+    threshold: float,
+    delta_format: int = DeltaFormat.Percent,
+) -> bool:
+    """Resolve the TSL threshold price using `resolve_stop_price_nb` and check whether it was hit."""
+    hit_below = not is_position_long
+    tsl_th_price = resolve_stop_price_nb(
+        init_price=init_price,
+        stop=threshold,
+        delta_format=delta_format,
+        hit_below=hit_below,
+    )
+    if hit_below:
+        return peak_price <= tsl_th_price
+    else:
+        return peak_price >= tsl_th_price
+
+
+@register_jitted(cache=True)
+def resolve_dyn_limit_price_nb(val_price: float, price: float, limit_price: float) -> float:
+    """Resolve price dynamically.
+
+    Uses the valuation price as the left bound and order price as the right bound."""
+    if np.isinf(limit_price):
+        if limit_price < 0:
+            return float(val_price)
+        return float(price)
+    return float(limit_price)
+
+
+@register_jitted(cache=True)
+def resolve_dyn_stop_entry_price_nb(val_price: float, price: float, stop_entry_price: float) -> float:
+    """Resolve stop entry price dynamically.
+
+    Uses the valuation/open price as the left bound and order price as the right bound."""
+    if np.isinf(stop_entry_price):
+        if stop_entry_price < 0:
+            return float(val_price)
+        return float(price)
+    if stop_entry_price < 0:
+        if stop_entry_price == StopEntryPrice.ValPrice:
+            return float(val_price)
+        if stop_entry_price == StopEntryPrice.Price:
+            return float(price)
+        raise ValueError("Only valuation and order price are supported when setting stop entry price dynamically")
+    return float(stop_entry_price)
+
+
+@register_jitted(cache=True)
+def get_stop_ladder_exit_size_nb(
+    stop_: tp.FlexArray2d,
+    step: int,
+    col: int,
+    init_price: float,
+    init_position: float,
+    position_now: float,
+    ladder: int = StopLadderMode.Disabled,
+    delta_format: int = DeltaFormat.Percent,
+    hit_below: bool = True,
+) -> float:
+    """Get the exit size corresponding to the current step in the ladder."""
+    if ladder == StopLadderMode.Disabled:
+        raise ValueError("Stop ladder must be enabled to select exit size")
+    if ladder == StopLadderMode.Dynamic:
+        raise ValueError("Stop ladder must be static to select exit size")
+    stop = flex_select_nb(stop_, step, col)
+    if np.isnan(stop):
+        return np.nan
+    last_step = -1
+    for i in range(step, stop_.shape[0]):
+        if not np.isnan(flex_select_nb(stop_, i, col)):
+            last_step = i
+        else:
+            break
+    if last_step == -1:
+        return np.nan
+    if step == last_step:
+        return abs(position_now)
+
+    if ladder == StopLadderMode.Uniform:
+        exit_fraction = 1 / (last_step + 1)
+        return exit_fraction * abs(init_position)
+    if ladder == StopLadderMode.AdaptUniform:
+        exit_fraction = 1 / (last_step + 1 - step)
+        return exit_fraction * abs(position_now)
+    hit_below = (init_position >= 0 and hit_below) or (init_position < 0 and not hit_below)
+    price = resolve_stop_price_nb(
+        init_price=init_price,
+        stop=stop,
+        delta_format=delta_format,
+        hit_below=hit_below,
+    )
+    last_stop = flex_select_nb(stop_, last_step, col)
+    last_price = resolve_stop_price_nb(
+        init_price=init_price,
+        stop=last_stop,
+        delta_format=delta_format,
+        hit_below=hit_below,
+    )
+    if step == 0:
+        prev_price = init_price
+    else:
+        prev_stop = flex_select_nb(stop_, step - 1, col)
+        prev_price = resolve_stop_price_nb(
+            init_price=init_price,
+            stop=prev_stop,
+            delta_format=delta_format,
+            hit_below=hit_below,
+        )
+    if ladder == StopLadderMode.Weighted:
+        exit_fraction = (price - prev_price) / (last_price - init_price)
+        return exit_fraction * abs(init_position)
+    if ladder == StopLadderMode.AdaptWeighted:
+        exit_fraction = (price - prev_price) / (last_price - prev_price)
+        return exit_fraction * abs(position_now)
+    raise ValueError("Invalid StopLadderMode option")
+
+
+@register_jitted(cache=True)
+def get_time_stop_ladder_exit_size_nb(
+    stop_: tp.FlexArray2d,
+    step: int,
+    col: int,
+    init_idx: int,
+    init_position: float,
+    position_now: float,
+    ladder: int = StopLadderMode.Disabled,
+    time_delta_format: int = TimeDeltaFormat.Index,
+    index: tp.Optional[tp.Array1d] = None,
+) -> float:
+    """Get the exit size corresponding to the current step in the ladder."""
+    if ladder == StopLadderMode.Disabled:
+        raise ValueError("Stop ladder must be enabled to select exit size")
+    if ladder == StopLadderMode.Dynamic:
+        raise ValueError("Stop ladder must be static to select exit size")
+    if init_idx == -1:
+        raise ValueError("Initial index of the ladder must be known")
+    if time_delta_format == TimeDeltaFormat.Index:
+        if index is None:
+            raise ValueError("Index must be provided for TimeDeltaFormat.Index")
+        init_idx = index[init_idx]
+    idx = flex_select_nb(stop_, step, col)
+    if idx == -1:
+        return np.nan
+    last_step = -1
+    for i in range(step, stop_.shape[0]):
+        if flex_select_nb(stop_, i, col) != -1:
+            last_step = i
+        else:
+            break
+    if last_step == -1:
+        return np.nan
+    if step == last_step:
+        return abs(position_now)
+
+    if ladder == StopLadderMode.Uniform:
+        exit_fraction = 1 / (last_step + 1)
+        return exit_fraction * abs(init_position)
+    if ladder == StopLadderMode.AdaptUniform:
+        exit_fraction = 1 / (last_step + 1 - step)
+        return exit_fraction * abs(position_now)
+    last_idx = flex_select_nb(stop_, last_step, col)
+    if step == 0:
+        prev_idx = init_idx
+    else:
+        prev_idx = flex_select_nb(stop_, step - 1, col)
+    if ladder == StopLadderMode.Weighted:
+        exit_fraction = (idx - prev_idx) / (last_idx - init_idx)
+        return exit_fraction * abs(init_position)
+    if ladder == StopLadderMode.AdaptWeighted:
+        exit_fraction = (idx - prev_idx) / (last_idx - prev_idx)
+        return exit_fraction * abs(position_now)
+    raise ValueError("Invalid StopLadderMode option")
+
+
+@register_jitted(cache=True)
+def is_limit_info_active_nb(limit_info: tp.Record) -> bool:
+    """Check whether information record for a limit order is active."""
+    return is_limit_active_nb(limit_info["init_idx"], limit_info["init_price"])
+
+
+@register_jitted(cache=True)
+def is_stop_info_active_nb(stop_info: tp.Record) -> bool:
+    """Check whether information record for a stop order is active."""
+    return is_stop_active_nb(stop_info["init_idx"], stop_info["stop"])
+
+
+@register_jitted(cache=True)
+def is_time_stop_info_active_nb(time_stop_info: tp.Record) -> bool:
+    """Check whether information record for a time stop order is active."""
+    return is_time_stop_active_nb(time_stop_info["init_idx"], time_stop_info["stop"])
+
+
+@register_jitted(cache=True)
+def is_stop_info_ladder_active_nb(info: tp.Record) -> bool:
+    """Check whether information record for a stop ladder is active."""
+    return info["step"] != -1
+
+
+@register_jitted(cache=True)
+def set_limit_info_nb(
+    limit_info: tp.Record,
+    signal_idx: int,
+    creation_idx: tp.Optional[int] = None,
+    init_idx: tp.Optional[int] = None,
+    init_price: float = -np.inf,
+    init_size: float = np.inf,
+    init_size_type: int = SizeType.Amount,
+    init_direction: int = Direction.Both,
+    init_stop_type: int = -1,
+    delta: float = np.nan,
+    delta_format: int = DeltaFormat.Percent,
+    tif: int = -1,
+    expiry: int = -1,
+    time_delta_format: int = TimeDeltaFormat.Index,
+    reverse: bool = False,
+) -> None:
+    """Set limit order information.
+
+    See `vectorbtpro.portfolio.enums.limit_info_dt`."""
+    limit_info["signal_idx"] = signal_idx
+    limit_info["creation_idx"] = creation_idx if creation_idx is not None else signal_idx
+    limit_info["init_idx"] = init_idx if init_idx is not None else signal_idx
+    limit_info["init_price"] = init_price
+    limit_info["init_size"] = init_size
+    limit_info["init_size_type"] = init_size_type
+    limit_info["init_direction"] = init_direction
+    limit_info["init_stop_type"] = init_stop_type
+    limit_info["delta"] = delta
+    limit_info["delta_format"] = delta_format
+    limit_info["tif"] = tif
+    limit_info["expiry"] = expiry
+    limit_info["time_delta_format"] = time_delta_format
+    limit_info["reverse"] = reverse
+
+
+@register_jitted(cache=True)
+def clear_limit_info_nb(limit_info: tp.Record) -> None:
+    """Clear limit order information."""
+    limit_info["signal_idx"] = -1
+    limit_info["creation_idx"] = -1
+    limit_info["init_idx"] = -1
+    limit_info["init_price"] = np.nan
+    limit_info["init_size"] = np.nan
+    limit_info["init_size_type"] = -1
+    limit_info["init_direction"] = -1
+    limit_info["init_stop_type"] = -1
+    limit_info["delta"] = np.nan
+    limit_info["delta_format"] = -1
+    limit_info["tif"] = -1
+    limit_info["expiry"] = -1
+    limit_info["time_delta_format"] = -1
+    limit_info["reverse"] = False
+
+
+@register_jitted(cache=True)
+def set_sl_info_nb(
+    sl_info: tp.Record,
+    init_idx: int,
+    init_price: float = -np.inf,
+    init_position: float = np.nan,
+    stop: float = np.nan,
+    exit_price: float = StopExitPrice.Stop,
+    exit_size: float = np.nan,
+    exit_size_type: int = -1,
+    exit_type: int = StopExitType.Close,
+    order_type: int = OrderType.Market,
+    limit_delta: float = np.nan,
+    delta_format: int = DeltaFormat.Percent,
+    ladder: int = StopLadderMode.Disabled,
+    step: int = -1,
+    step_idx: int = -1,
+) -> None:
+    """Set SL order information.
+
+    See `vectorbtpro.portfolio.enums.sl_info_dt`."""
+    sl_info["init_idx"] = init_idx
+    sl_info["init_price"] = init_price
+    sl_info["init_position"] = init_position
+    sl_info["stop"] = stop
+    sl_info["exit_price"] = exit_price
+    sl_info["exit_size"] = exit_size
+    sl_info["exit_size_type"] = exit_size_type
+    sl_info["exit_type"] = exit_type
+    sl_info["order_type"] = order_type
+    sl_info["limit_delta"] = limit_delta
+    sl_info["delta_format"] = delta_format
+    sl_info["ladder"] = ladder
+    sl_info["step"] = step
+    sl_info["step_idx"] = step_idx
+
+
+@register_jitted(cache=True)
+def clear_sl_info_nb(sl_info: tp.Record) -> None:
+    """Clear SL order information."""
+    sl_info["init_idx"] = -1
+    sl_info["init_price"] = np.nan
+    sl_info["init_position"] = np.nan
+    sl_info["stop"] = np.nan
+    sl_info["exit_price"] = -1
+    sl_info["exit_size"] = np.nan
+    sl_info["exit_size_type"] = -1
+    sl_info["exit_type"] = -1
+    sl_info["order_type"] = -1
+    sl_info["limit_delta"] = np.nan
+    sl_info["delta_format"] = -1
+    sl_info["ladder"] = -1
+    sl_info["step"] = -1
+    sl_info["step_idx"] = -1
+
+
+@register_jitted(cache=True)
+def set_tsl_info_nb(
+    tsl_info: tp.Record,
+    init_idx: int,
+    init_price: float = -np.inf,
+    init_position: float = np.nan,
+    peak_idx: tp.Optional[int] = None,
+    peak_price: tp.Optional[float] = None,
+    stop: float = np.nan,
+    th: float = np.nan,
+    exit_price: float = StopExitPrice.Stop,
+    exit_size: float = np.nan,
+    exit_size_type: int = -1,
+    exit_type: int = StopExitType.Close,
+    order_type: int = OrderType.Market,
+    limit_delta: float = np.nan,
+    delta_format: int = DeltaFormat.Percent,
+    ladder: int = StopLadderMode.Disabled,
+    step: int = -1,
+    step_idx: int = -1,
+) -> None:
+    """Set TSL/TTP order information.
+
+    See `vectorbtpro.portfolio.enums.tsl_info_dt`."""
+    tsl_info["init_idx"] = init_idx
+    tsl_info["init_price"] = init_price
+    tsl_info["init_position"] = init_position
+    tsl_info["peak_idx"] = peak_idx if peak_idx is not None else init_idx
+    tsl_info["peak_price"] = peak_price if peak_price is not None else init_price
+    tsl_info["stop"] = stop
+    tsl_info["th"] = th
+    tsl_info["exit_price"] = exit_price
+    tsl_info["exit_size"] = exit_size
+    tsl_info["exit_size_type"] = exit_size_type
+    tsl_info["exit_type"] = exit_type
+    tsl_info["order_type"] = order_type
+    tsl_info["limit_delta"] = limit_delta
+    tsl_info["delta_format"] = delta_format
+    tsl_info["ladder"] = ladder
+    tsl_info["step"] = step
+    tsl_info["step_idx"] = step_idx
+
+
+@register_jitted(cache=True)
+def clear_tsl_info_nb(tsl_info: tp.Record) -> None:
+    """Clear TSL/TTP order information."""
+    tsl_info["init_idx"] = -1
+    tsl_info["init_price"] = np.nan
+    tsl_info["init_position"] = np.nan
+    tsl_info["peak_idx"] = -1
+    tsl_info["peak_price"] = np.nan
+    tsl_info["stop"] = np.nan
+    tsl_info["th"] = np.nan
+    tsl_info["exit_price"] = -1
+    tsl_info["exit_size"] = np.nan
+    tsl_info["exit_size_type"] = -1
+    tsl_info["exit_type"] = -1
+    tsl_info["order_type"] = -1
+    tsl_info["limit_delta"] = np.nan
+    tsl_info["delta_format"] = -1
+    tsl_info["ladder"] = -1
+    tsl_info["step"] = -1
+    tsl_info["step_idx"] = -1
+
+
+@register_jitted(cache=True)
+def set_tp_info_nb(
+    tp_info: tp.Record,
+    init_idx: int,
+    init_price: float = -np.inf,
+    init_position: float = np.nan,
+    stop: float = np.nan,
+    exit_price: float = StopExitPrice.Stop,
+    exit_size: float = np.nan,
+    exit_size_type: int = -1,
+    exit_type: int = StopExitType.Close,
+    order_type: int = OrderType.Market,
+    limit_delta: float = np.nan,
+    delta_format: int = DeltaFormat.Percent,
+    ladder: int = StopLadderMode.Disabled,
+    step: int = -1,
+    step_idx: int = -1,
+) -> None:
+    """Set TP order information.
+
+    See `vectorbtpro.portfolio.enums.tp_info_dt`."""
+    tp_info["init_idx"] = init_idx
+    tp_info["init_price"] = init_price
+    tp_info["init_position"] = init_position
+    tp_info["stop"] = stop
+    tp_info["exit_price"] = exit_price
+    tp_info["exit_size"] = exit_size
+    tp_info["exit_size_type"] = exit_size_type
+    tp_info["exit_type"] = exit_type
+    tp_info["order_type"] = order_type
+    tp_info["limit_delta"] = limit_delta
+    tp_info["delta_format"] = delta_format
+    tp_info["ladder"] = ladder
+    tp_info["step"] = step
+    tp_info["step_idx"] = step_idx
+
+
+@register_jitted(cache=True)
+def clear_tp_info_nb(tp_info: tp.Record) -> None:
+    """Clear TP order information."""
+    tp_info["init_idx"] = -1
+    tp_info["init_price"] = np.nan
+    tp_info["init_position"] = np.nan
+    tp_info["stop"] = np.nan
+    tp_info["exit_price"] = -1
+    tp_info["exit_size"] = np.nan
+    tp_info["exit_size_type"] = -1
+    tp_info["exit_type"] = -1
+    tp_info["order_type"] = -1
+    tp_info["limit_delta"] = np.nan
+    tp_info["delta_format"] = -1
+    tp_info["ladder"] = -1
+    tp_info["step"] = -1
+    tp_info["step_idx"] = -1
+
+
+@register_jitted(cache=True)
+def set_time_info_nb(
+    time_info: tp.Record,
+    init_idx: int,
+    init_position: float = np.nan,
+    stop: int = -1,
+    exit_price: float = StopExitPrice.Stop,
+    exit_size: float = np.nan,
+    exit_size_type: int = -1,
+    exit_type: int = StopExitType.Close,
+    order_type: int = OrderType.Market,
+    limit_delta: float = np.nan,
+    delta_format: int = DeltaFormat.Percent,
+    time_delta_format: int = TimeDeltaFormat.Index,
+    ladder: int = StopLadderMode.Disabled,
+    step: int = -1,
+    step_idx: int = -1,
+) -> None:
+    """Set time order information.
+
+    See `vectorbtpro.portfolio.enums.time_info_dt`."""
+    time_info["init_idx"] = init_idx
+    time_info["init_position"] = init_position
+    time_info["stop"] = stop
+    time_info["exit_price"] = exit_price
+    time_info["exit_size"] = exit_size
+    time_info["exit_size_type"] = exit_size_type
+    time_info["exit_type"] = exit_type
+    time_info["order_type"] = order_type
+    time_info["limit_delta"] = limit_delta
+    time_info["delta_format"] = delta_format
+    time_info["time_delta_format"] = time_delta_format
+    time_info["ladder"] = ladder
+    time_info["step"] = step
+    time_info["step_idx"] = step_idx
+
+
+@register_jitted(cache=True)
+def clear_time_info_nb(time_info: tp.Record) -> None:
+    """Clear time order information."""
+    time_info["init_idx"] = -1
+    time_info["init_position"] = np.nan
+    time_info["stop"] = -1
+    time_info["exit_price"] = -1
+    time_info["exit_size"] = np.nan
+    time_info["exit_size_type"] = -1
+    time_info["exit_type"] = -1
+    time_info["order_type"] = -1
+    time_info["limit_delta"] = np.nan
+    time_info["delta_format"] = -1
+    time_info["time_delta_format"] = -1
+    time_info["ladder"] = -1
+    time_info["step"] = -1
+    time_info["step_idx"] = -1
+
+
+@register_jitted(cache=True)
+def get_limit_info_target_price_nb(limit_info: tp.Record) -> float:
+    """Get target price from limit order information."""
+    if not is_limit_info_active_nb(limit_info):
+        return np.nan
+    if limit_info["init_size"] == 0:
+        raise ValueError("Limit order size cannot be zero")
+    size = get_diraware_size_nb(limit_info["init_size"], limit_info["init_direction"])
+    hit_below = (size > 0 and not limit_info["reverse"]) or (size < 0 and limit_info["reverse"])
+    return resolve_limit_price_nb(
+        init_price=limit_info["init_price"],
+        limit_delta=limit_info["delta"],
+        delta_format=limit_info["delta_format"],
+        hit_below=hit_below,
+    )
+
+
+@register_jitted
+def get_sl_info_target_price_nb(sl_info: tp.Record, position_now: float) -> float:
+    """Get target price from SL order information."""
+    if not is_stop_info_active_nb(sl_info):
+        return np.nan
+    hit_below = position_now > 0
+    return resolve_stop_price_nb(
+        init_price=sl_info["init_price"],
+        stop=sl_info["stop"],
+        delta_format=sl_info["delta_format"],
+        hit_below=hit_below,
+    )
+
+
+@register_jitted
+def get_tsl_info_target_price_nb(tsl_info: tp.Record, position_now: float) -> float:
+    """Get target price from TSL/TTP order information."""
+    if not is_stop_info_active_nb(tsl_info):
+        return np.nan
+    hit_below = position_now > 0
+    return resolve_stop_price_nb(
+        init_price=tsl_info["init_price"],
+        stop=tsl_info["stop"],
+        delta_format=tsl_info["delta_format"],
+        hit_below=hit_below,
+    )
+
+
+@register_jitted
+def get_tp_info_target_price_nb(tp_info: tp.Record, position_now: float) -> float:
+    """Get target price from TP order information."""
+    if not is_stop_info_active_nb(tp_info):
+        return np.nan
+    hit_below = position_now < 0
+    return resolve_stop_price_nb(
+        init_price=tp_info["init_price"],
+        stop=tp_info["stop"],
+        delta_format=tp_info["delta_format"],
+        hit_below=hit_below,
+    )
