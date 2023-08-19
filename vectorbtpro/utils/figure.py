@@ -61,7 +61,7 @@ FigureMixinT = tp.TypeVar("FigureMixinT", bound="FigureMixin")
 
 class FigureMixin:
     def show(self, *args, **kwargs) -> None:
-        """Display the figure in PNG format."""
+        """Display the figure."""
         raise NotImplementedError
 
     def show_png(self, **kwargs) -> None:
@@ -79,7 +79,7 @@ class FigureMixin:
                 if "x" in d:
                     d_index = pd.Index(self.data[0].x)
                     if not isinstance(d_index, pd.DatetimeIndex):
-                        continue
+                        return self
                     if index is None:
                         index = d_index
                     elif not index.equals(d_index):
@@ -109,6 +109,9 @@ class Figure(_Figure, FigureMixin):
 
         plotting_cfg = settings["plotting"]
 
+        pre_show_func = plotting_cfg.get("pre_show_func", None)
+        if pre_show_func is not None:
+            pre_show_func(self)
         fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
         show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
         _Figure.show(self, *args, **show_kwargs)
@@ -133,6 +136,9 @@ class FigureWidget(_FigureWidget, FigureMixin):
 
         plotting_cfg = settings["plotting"]
 
+        pre_show_func = plotting_cfg.get("pre_show_func", None)
+        if pre_show_func is not None:
+            pre_show_func(self)
         fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
         show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
         _Figure.show(self, *args, **show_kwargs)
@@ -160,6 +166,9 @@ try:
 
             plotting_cfg = settings["plotting"]
 
+            pre_show_func = plotting_cfg.get("pre_show_func", None)
+            if pre_show_func is not None:
+                pre_show_func(self)
             fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
             show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
             _Figure.show(self, *args, **show_kwargs)
@@ -183,6 +192,9 @@ try:
 
             plotting_cfg = settings["plotting"]
 
+            pre_show_func = plotting_cfg.get("pre_show_func", None)
+            if pre_show_func is not None:
+                pre_show_func(self)
             fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
             show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
             _Figure.show(self, *args, **show_kwargs)

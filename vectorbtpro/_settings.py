@@ -811,6 +811,7 @@ _settings["data"] = data
 plotting = child_dict(
     use_widgets=True,
     use_resampler=False,
+    pre_show_func=None,
     show_kwargs=Config(),
     use_gl=False,
     color_schema=Config(
