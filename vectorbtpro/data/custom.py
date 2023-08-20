@@ -3476,8 +3476,6 @@ class TVData(RemoteData):
 
         For defaults, see `custom.tv` in `vectorbtpro._settings.data`.
         """
-        from vectorbtpro.data.tv import Interval
-
         tv_cfg = cls.get_settings(key_id="custom")
 
         if client_config is None:
@@ -3508,21 +3506,15 @@ class TVData(RemoteData):
             raise ValueError(f"Invalid timeframe '{timeframe}'")
         multiplier, unit = split
         if unit == "t":
-            interval = getattr(Interval, f"in_{str(multiplier)}_minute")
+            interval = str(multiplier)
         elif unit == "h":
-            interval = getattr(Interval, f"in_{str(multiplier)}_hour")
+            interval = f"{str(multiplier)}H"
         elif unit == "d":
-            if multiplier > 1:
-                raise ValueError("Multiplier cannot be greater than 1 for daily")
-            interval = getattr(Interval, "in_daily")
+            interval = f"{str(multiplier)}D"
         elif unit == "W":
-            if multiplier > 1:
-                raise ValueError("Multiplier cannot be greater than 1 for weekly")
-            interval = getattr(Interval, "in_weekly")
+            interval = f"{str(multiplier)}W"
         elif unit == "M":
-            if multiplier > 1:
-                raise ValueError("Multiplier cannot be greater than 1 for monthly")
-            interval = getattr(Interval, "in_monthly")
+            interval = f"{str(multiplier)}M"
         else:
             raise ValueError(f"Invalid timeframe '{timeframe}'")
 

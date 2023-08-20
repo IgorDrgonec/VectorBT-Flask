@@ -48,13 +48,19 @@ __all__ = [
 __pdoc__ = {}
 
 
-class feature_dict(pdict):
+class key_dict(pdict):
+    """Dict that contains features or symbols as keys."""
+
+    pass
+
+
+class feature_dict(key_dict):
     """Dict that contains features as keys."""
 
     pass
 
 
-class symbol_dict(pdict):
+class symbol_dict(key_dict):
     """Dict that contains symbols as keys."""
 
     pass
@@ -625,7 +631,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     def __init__(
         self,
         wrapper: ArrayWrapper,
-        data: tp.Union[feature_dict, symbol_dict],
+        data: key_dict,
         single_feature: bool = True,
         single_symbol: bool = True,
         symbol_classes: tp.Optional[symbol_dict] = None,
@@ -660,16 +666,20 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         )
 
         checks.assert_instance_of(data, dict)
-        if not isinstance(data, (feature_dict, symbol_dict)):
+        if not isinstance(data, key_dict):
             data = symbol_dict(data)
         for obj in data.values():
             checks.assert_meta_equal(obj, data[list(data.keys())[0]])
         if isinstance(data, feature_dict):
             if len(data) > 1:
                 single_feature = False
+            if wrapper.ndim == 2:
+                single_symbol = False
         else:
             if len(data) > 1:
                 single_symbol = False
+            if wrapper.ndim == 2:
+                single_feature = False
 
         self._data = data
         self._single_feature = single_feature
@@ -747,6 +757,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         for k in self.symbols:
             if k in self.last_index:
                 symbol_dicts["last_index"][k] = min([self.last_index[k], new_wrapper.index[-1]])
+        replace_kwargs = dict()
         if self.feature_oriented:
             new_data = feature_dict(new_data)
             if wrapper_meta["columns_changed"]:
@@ -756,18 +767,15 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                         symbol_dicts[attr] = self.select_from_dict(symbol_dicts[attr], new_symbols)
                     else:
                         symbol_dicts[attr] = self.select_from_dict(getattr(self, attr), new_symbols)
-                return self.replace(
-                    wrapper=new_wrapper,
-                    data=new_data,
-                    single_symbol=checks.is_int(wrapper_meta["col_idxs"]),
-                    **symbol_dicts,
-                )
+                replace_kwargs["single_symbol"] = checks.is_int(wrapper_meta["col_idxs"])
         else:
             new_data = symbol_dict(new_data)
-        return self.replace(wrapper=new_wrapper, data=new_data, **symbol_dicts)
+            if wrapper_meta["columns_changed"]:
+                replace_kwargs["single_feature"] = checks.is_int(wrapper_meta["col_idxs"])
+        return self.replace(wrapper=new_wrapper, data=new_data, **symbol_dicts, **replace_kwargs)
 
     @property
-    def data(self) -> tp.Union[feature_dict, symbol_dict]:
+    def data(self) -> key_dict:
         """Data dictionary.
 
         Has the type `symbol_dict` for symbol-oriented data or `feature_dict` for feature-oriented data."""
@@ -1503,7 +1511,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             else:
                 data = symbol_dict(symbol=data)
         checks.assert_instance_of(data, dict)
-        if not isinstance(data, (feature_dict, symbol_dict)):
+        if not isinstance(data, key_dict):
             if symbol_columns:
                 data = feature_dict(data)
             else:
@@ -1530,6 +1538,12 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             silence_warnings=silence_warnings,
         )
         wrapper = ArrayWrapper.from_obj(data[list(data.keys())[0]], **wrapper_kwargs)
+        if isinstance(data, feature_dict):
+            if wrapper.ndim == 2:
+                single_symbol = False
+        else:
+            if wrapper.ndim == 2:
+                single_feature = False
         return cls(
             wrapper,
             data,
@@ -1554,13 +1568,9 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         if self.feature_oriented:
             new_wrapper = self.feature_wrapper
             new_data = symbol_dict(new_data)
-            if "single_symbol" not in kwargs and self.wrapper.ndim == 2:
-                kwargs["single_symbol"] = False
         else:
             new_wrapper = self.symbol_wrapper
             new_data = feature_dict(new_data)
-            if "single_feature" not in kwargs and self.wrapper.ndim == 2:
-                kwargs["single_feature"] = False
         if "level_name" not in kwargs:
             if isinstance(self.wrapper.columns, pd.MultiIndex):
                 if self.wrapper.columns.names == [None] * self.wrapper.columns.nlevels:
@@ -1594,41 +1604,63 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             return self
         return self.invert(**kwargs)
 
-    @classmethod
-    def select_feature_kwargs(cls, feature: tp.Feature, kwargs: tp.DictLike) -> dict:
-        """Select keyword arguments belonging to a feature."""
+    @class_or_instancemethod
+    def check_dict_type(
+        cls_or_self,
+        arg: tp.Any,
+        arg_name: str,
+        dict_type: tp.Optional[tp.Type[key_dict]] = None,
+    ) -> None:
+        if isinstance(cls_or_self, type):
+            checks.assert_not_none(dict_type)
+        if dict_type is None:
+            dict_type = cls_or_self.dict_type
+        if issubclass(dict_type, feature_dict) and isinstance(arg, symbol_dict):
+            raise TypeError(f"Argument '{arg_name}' must be an instance of feature_dict, not symbol_dict")
+        if issubclass(dict_type, symbol_dict) and isinstance(arg, feature_dict):
+            raise TypeError(f"Argument '{arg_name}' must be an instance of symbol_dict, not feature_dict")
+
+    @class_or_instancemethod
+    def select_key_kwargs(
+        cls_or_self,
+        key: tp.Key,
+        kwargs: tp.DictLike,
+        dict_type: tp.Optional[tp.Type[key_dict]] = None,
+        check_dict_type: bool = True,
+    ) -> dict:
+        """Select keyword arguments belonging to a feature or symbol."""
+        if isinstance(cls_or_self, type):
+            checks.assert_not_none(dict_type)
+        if dict_type is None:
+            dict_type = cls_or_self.dict_type
         if kwargs is None:
             return {}
-        if isinstance(kwargs, feature_dict):
-            if feature not in kwargs:
+        if check_dict_type:
+            cls_or_self.check_dict_type(kwargs, "kwargs", dict_type=dict_type)
+        if isinstance(kwargs, dict_type):
+            if key not in kwargs:
                 return {}
-            kwargs = kwargs[feature]
+            kwargs = kwargs[key]
         _kwargs = {}
         for k, v in kwargs.items():
-            if isinstance(v, feature_dict):
-                if feature in v:
-                    _kwargs[k] = v[feature]
+            if check_dict_type:
+                cls_or_self.check_dict_type(v, k, dict_type=dict_type)
+            if isinstance(v, dict_type):
+                if key in v:
+                    _kwargs[k] = v[key]
             else:
                 _kwargs[k] = v
         return _kwargs
 
     @classmethod
-    def select_symbol_kwargs(cls, symbol: tp.Symbol, kwargs: tp.DictLike) -> dict:
+    def select_feature_kwargs(cls, feature: tp.Feature, kwargs: tp.DictLike, check_dict_type: bool = True) -> dict:
+        """Select keyword arguments belonging to a feature."""
+        return cls.select_key_kwargs(feature, kwargs, feature_dict, check_dict_type=check_dict_type)
+
+    @classmethod
+    def select_symbol_kwargs(cls, symbol: tp.Symbol, kwargs: tp.DictLike, check_dict_type: bool = True) -> dict:
         """Select keyword arguments belonging to a symbol."""
-        if kwargs is None:
-            return {}
-        if isinstance(kwargs, symbol_dict):
-            if symbol not in kwargs:
-                return {}
-            kwargs = kwargs[symbol]
-        _kwargs = {}
-        for k, v in kwargs.items():
-            if isinstance(v, symbol_dict):
-                if symbol in v:
-                    _kwargs[k] = v[symbol]
-            else:
-                _kwargs[k] = v
-        return _kwargs
+        return cls.select_key_kwargs(symbol, kwargs, symbol_dict, check_dict_type=check_dict_type)
 
     @classmethod
     def select_from_dict(cls, dct: dict, keys: tp.Keys, raise_error: bool = False) -> dict:
@@ -1736,13 +1768,17 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 for attr in cls._symbol_dict_attrs:
                     symbol_dicts[attr] = merge_dicts(symbol_dicts[attr], getattr(instance, attr), nested=False)
 
-        return cls.from_data(
+        kwargs = cls.resolve_merge_kwargs(
+            *[instance.config for instance in datas],
+            wrapper=None,
             data=data_type(data),
             single_feature=single_feature,
             single_symbol=single_symbol,
             **symbol_dicts,
             **kwargs,
         )
+        kwargs.pop("wrapper", None)
+        return cls.from_data(**kwargs)
 
     # ############# Fetching ############# #
 
@@ -2245,150 +2281,6 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             last_index=symbol_dict(new_last_index),
         )
 
-    # ############# Persisting ############# #
-
-    def to_csv(
-        self,
-        dir_path: tp.Union[tp.PathLike, symbol_dict] = ".",
-        ext: tp.Union[str, symbol_dict] = "csv",
-        path_or_buf: tp.Optional[tp.Union[str, symbol_dict]] = None,
-        mkdir_kwargs: tp.Union[tp.KwargsLike, symbol_dict] = None,
-        **kwargs,
-    ) -> None:
-        """Save data into CSV file(s).
-
-        Any argument can be provided per symbol using `symbol_dict`.
-
-        Each symbol gets saved to a separate file, that's why the first argument is the path
-        to the directory, not file! If there's only one file, you can specify the file path via
-        `path_or_buf`. If there are multiple files, use the same argument but wrap the multiple paths
-        with `symbol_dict`."""
-        if self.feature_oriented:
-            raise TypeError("This operation doesn't support feature-oriented data")
-
-        for k, v in self.data.items():
-            if path_or_buf is None:
-                if isinstance(dir_path, symbol_dict):
-                    _dir_path = dir_path[k]
-                else:
-                    _dir_path = dir_path
-                _dir_path = Path(_dir_path)
-                if isinstance(ext, symbol_dict):
-                    _ext = ext[k]
-                else:
-                    _ext = ext
-                _path_or_buf = str(Path(_dir_path) / f"{k}.{_ext}")
-            elif isinstance(path_or_buf, symbol_dict):
-                _path_or_buf = path_or_buf[k]
-            else:
-                _path_or_buf = path_or_buf
-            if isinstance(_path_or_buf, CustomTemplate):
-                _path_or_buf = _path_or_buf.substitute(dict(symbol=k, data=v), sub_id="path_or_buf")
-            _kwargs = self.select_symbol_kwargs(k, kwargs)
-            sep = _kwargs.pop("sep", None)
-            if isinstance(_path_or_buf, (str, Path)):
-                _path_or_buf = Path(_path_or_buf)
-                if isinstance(mkdir_kwargs, symbol_dict):
-                    _mkdir_kwargs = mkdir_kwargs[k]
-                else:
-                    _mkdir_kwargs = self.select_symbol_kwargs(k, mkdir_kwargs)
-                check_mkdir(_path_or_buf.parent, **_mkdir_kwargs)
-                if _path_or_buf.suffix.lower() == ".csv":
-                    if sep is None:
-                        sep = ","
-                if _path_or_buf.suffix.lower() == ".tsv":
-                    if sep is None:
-                        sep = "\t"
-            if sep is None:
-                sep = ","
-            v.to_csv(path_or_buf=_path_or_buf, sep=sep, **_kwargs)
-
-    def to_hdf(
-        self,
-        file_path: tp.Union[tp.PathLike, symbol_dict] = ".",
-        key: tp.Optional[tp.Union[str, symbol_dict]] = None,
-        path_or_buf: tp.Optional[tp.Union[str, symbol_dict]] = None,
-        mkdir_kwargs: tp.Union[tp.KwargsLike, symbol_dict] = None,
-        format: str = "table",
-        **kwargs,
-    ) -> None:
-        """Save data into an HDF file.
-
-        Any argument can be provided per symbol using `symbol_dict`.
-
-        If `file_path` exists, and it's a directory, will create inside it a file named
-        after this class. This won't work with directories that do not exist, otherwise
-        they could be confused with file names."""
-        if self.feature_oriented:
-            raise TypeError("This operation doesn't support feature-oriented data")
-
-        from vectorbtpro.utils.module_ import assert_can_import
-
-        assert_can_import("tables")
-
-        for k, v in self.data.items():
-            if path_or_buf is None:
-                if isinstance(file_path, symbol_dict):
-                    _file_path = file_path[k]
-                else:
-                    _file_path = file_path
-                _file_path = Path(_file_path)
-                if _file_path.exists() and _file_path.is_dir():
-                    _file_path /= type(self).__name__ + ".h5"
-                _dir_path = _file_path.parent
-                if isinstance(mkdir_kwargs, symbol_dict):
-                    _mkdir_kwargs = mkdir_kwargs[k]
-                else:
-                    _mkdir_kwargs = self.select_symbol_kwargs(k, mkdir_kwargs)
-                check_mkdir(_dir_path, **_mkdir_kwargs)
-                _path_or_buf = str(_file_path)
-            elif isinstance(path_or_buf, symbol_dict):
-                _path_or_buf = path_or_buf[k]
-            else:
-                _path_or_buf = path_or_buf
-            if isinstance(_path_or_buf, CustomTemplate):
-                _path_or_buf = _path_or_buf.substitute(dict(symbol=k, data=v), sub_id="path_or_buf")
-            if key is None:
-                _key = str(k)
-            elif isinstance(key, symbol_dict):
-                _key = key[k]
-            else:
-                _key = key
-            if isinstance(_key, CustomTemplate):
-                _key = _key.substitute(dict(symbol=k, data=v), sub_id="key")
-            _kwargs = self.select_symbol_kwargs(k, kwargs)
-            v.to_hdf(path_or_buf=_path_or_buf, key=_key, format=format, **_kwargs)
-
-    @classmethod
-    def from_csv(cls: tp.Type[DataT], *args, fetch_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
-        """Use `CSVData` to load data from CSV and switch the class back to this class.
-
-        Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
-        from vectorbtpro.data.custom import CSVData
-
-        if fetch_kwargs is None:
-            fetch_kwargs = {}
-        data = CSVData.fetch(*args, **kwargs)
-        data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
-        data = data.update_fetch_kwargs(**fetch_kwargs)
-        return data
-
-    @classmethod
-    def from_hdf(cls: tp.Type[DataT], *args, fetch_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
-        """Use `HDFData` to load data from HDF and switch the class back to this class.
-
-        Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
-        from vectorbtpro.data.custom import HDFData
-
-        if fetch_kwargs is None:
-            fetch_kwargs = {}
-        if len(args) == 0 and "symbols" not in kwargs:
-            args = (cls.__name__ + ".h5",)
-        data = HDFData.fetch(*args, **kwargs)
-        data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
-        data = data.update_fetch_kwargs(**fetch_kwargs)
-        return data
-
     # ############# Transforming ############# #
 
     def transform(
@@ -2844,6 +2736,164 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             else:
                 raise ValueError(f"Invalid option unpack='{unpack}'")
         return out
+
+    # ############# Persisting ############# #
+
+    def to_csv(
+        self,
+        dir_path: tp.Union[tp.PathLike, key_dict] = ".",
+        ext: tp.Union[str, key_dict] = "csv",
+        path_or_buf: tp.Optional[tp.Union[str, key_dict]] = None,
+        mkdir_kwargs: tp.Union[tp.KwargsLike, key_dict] = None,
+        check_dict_type: bool = True,
+        **kwargs,
+    ) -> None:
+        """Save data into CSV file(s).
+
+        Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
+        depending on the format of the data dictionary.
+
+        Each feature/symbol gets saved to a separate file, that's why the first argument is the path
+        to the directory, not file! If there's only one file, you can specify the file path via
+        `path_or_buf`. If there are multiple files, use the same argument but wrap the multiple paths
+        with `feature_dict`/`symbol_dict`."""
+        for k, v in self.data.items():
+            if check_dict_type:
+                self.check_dict_type(path_or_buf, "path_or_buf")
+            if path_or_buf is None:
+                if check_dict_type:
+                    self.check_dict_type(dir_path, "dir_path")
+                if isinstance(dir_path, key_dict):
+                    _dir_path = dir_path[k]
+                else:
+                    _dir_path = dir_path
+                _dir_path = Path(_dir_path)
+                if check_dict_type:
+                    self.check_dict_type(ext, "ext")
+                if isinstance(ext, key_dict):
+                    _ext = ext[k]
+                else:
+                    _ext = ext
+                _path_or_buf = str(Path(_dir_path) / f"{k}.{_ext}")
+            elif isinstance(path_or_buf, key_dict):
+                _path_or_buf = path_or_buf[k]
+            else:
+                _path_or_buf = path_or_buf
+            if isinstance(_path_or_buf, CustomTemplate):
+                _path_or_buf = _path_or_buf.substitute(dict(symbol=k, data=v), sub_id="path_or_buf")
+            _kwargs = self.select_key_kwargs(k, kwargs, check_dict_type=check_dict_type)
+            sep = _kwargs.pop("sep", None)
+            if isinstance(_path_or_buf, (str, Path)):
+                _path_or_buf = Path(_path_or_buf)
+                if check_dict_type:
+                    self.check_dict_type(mkdir_kwargs, "mkdir_kwargs")
+                if isinstance(mkdir_kwargs, key_dict):
+                    _mkdir_kwargs = mkdir_kwargs[k]
+                else:
+                    _mkdir_kwargs = self.select_key_kwargs(k, mkdir_kwargs, check_dict_type=check_dict_type)
+                check_mkdir(_path_or_buf.parent, **_mkdir_kwargs)
+                if _path_or_buf.suffix.lower() == ".csv":
+                    if sep is None:
+                        sep = ","
+                if _path_or_buf.suffix.lower() == ".tsv":
+                    if sep is None:
+                        sep = "\t"
+            if sep is None:
+                sep = ","
+            v.to_csv(path_or_buf=_path_or_buf, sep=sep, **_kwargs)
+
+    def to_hdf(
+        self,
+        file_path: tp.Union[tp.PathLike, key_dict] = ".",
+        key: tp.Optional[tp.Union[str, key_dict]] = None,
+        path_or_buf: tp.Optional[tp.Union[str, key_dict]] = None,
+        mkdir_kwargs: tp.Union[tp.KwargsLike, key_dict] = None,
+        format: str = "table",
+        check_dict_type: bool = True,
+        **kwargs,
+    ) -> None:
+        """Save data into an HDF file.
+
+        Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
+        depending on the format of the data dictionary.
+
+        If `file_path` exists, and it's a directory, will create inside it a file named
+        after this class. This won't work with directories that do not exist, otherwise
+        they could be confused with file names."""
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("tables")
+
+        for k, v in self.data.items():
+            if check_dict_type:
+                self.check_dict_type(path_or_buf, "path_or_buf")
+            if path_or_buf is None:
+                if check_dict_type:
+                    self.check_dict_type(file_path, "file_path")
+                if isinstance(file_path, key_dict):
+                    _file_path = file_path[k]
+                else:
+                    _file_path = file_path
+                _file_path = Path(_file_path)
+                if _file_path.exists() and _file_path.is_dir():
+                    _file_path /= type(self).__name__ + ".h5"
+                _dir_path = _file_path.parent
+                if check_dict_type:
+                    self.check_dict_type(mkdir_kwargs, "mkdir_kwargs")
+                if isinstance(mkdir_kwargs, key_dict):
+                    _mkdir_kwargs = mkdir_kwargs[k]
+                else:
+                    _mkdir_kwargs = self.select_key_kwargs(k, mkdir_kwargs, check_dict_type=check_dict_type)
+                check_mkdir(_dir_path, **_mkdir_kwargs)
+                _path_or_buf = str(_file_path)
+            elif isinstance(path_or_buf, key_dict):
+                _path_or_buf = path_or_buf[k]
+            else:
+                _path_or_buf = path_or_buf
+            if isinstance(_path_or_buf, CustomTemplate):
+                _path_or_buf = _path_or_buf.substitute(dict(symbol=k, data=v), sub_id="path_or_buf")
+            if check_dict_type:
+                self.check_dict_type(key, "key")
+            if key is None:
+                _key = str(k)
+            elif isinstance(key, key_dict):
+                _key = key[k]
+            else:
+                _key = key
+            if isinstance(_key, CustomTemplate):
+                _key = _key.substitute(dict(symbol=k, data=v), sub_id="key")
+            _kwargs = self.select_key_kwargs(k, kwargs, check_dict_type=check_dict_type)
+            v.to_hdf(path_or_buf=_path_or_buf, key=_key, format=format, **_kwargs)
+
+    @classmethod
+    def from_csv(cls: tp.Type[DataT], *args, fetch_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
+        """Use `CSVData` to load data from CSV and switch the class back to this class.
+
+        Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
+        from vectorbtpro.data.custom import CSVData
+
+        if fetch_kwargs is None:
+            fetch_kwargs = {}
+        data = CSVData.fetch(*args, **kwargs)
+        data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
+        data = data.update_fetch_kwargs(**fetch_kwargs)
+        return data
+
+    @classmethod
+    def from_hdf(cls: tp.Type[DataT], *args, fetch_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
+        """Use `HDFData` to load data from HDF and switch the class back to this class.
+
+        Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
+        from vectorbtpro.data.custom import HDFData
+
+        if fetch_kwargs is None:
+            fetch_kwargs = {}
+        if len(args) == 0 and "symbols" not in kwargs:
+            args = (cls.__name__ + ".h5",)
+        data = HDFData.fetch(*args, **kwargs)
+        data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
+        data = data.update_fetch_kwargs(**fetch_kwargs)
+        return data
 
     # ############# Stats ############# #
 

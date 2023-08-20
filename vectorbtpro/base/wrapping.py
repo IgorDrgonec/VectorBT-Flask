@@ -1738,36 +1738,7 @@ class Wrapping(Configured, ExtPandasIndexer, AttrResolverMixin):
         """Resolve keyword arguments for initializing `Wrapping` after stacking.
 
         Should be called after `Wrapping.resolve_row_stack_kwargs` or `Wrapping.resolve_column_stack_kwargs`."""
-        if len(wrappings) == 1:
-            wrappings = wrappings[0]
-        wrappings = list(wrappings)
-
-        common_keys = set()
-        for wrapping in wrappings:
-            common_keys = common_keys.union(set(wrapping.config.keys()))
-        init_wrapping = wrappings[0]
-        for i in range(1, len(wrappings)):
-            wrapping = wrappings[i]
-            for k in common_keys:
-                if k not in kwargs:
-                    same_k = True
-                    try:
-                        if k in wrapping.config:
-                            if not checks.is_deep_equal(init_wrapping.config[k], wrapping.config[k]):
-                                same_k = False
-                        else:
-                            same_k = False
-                    except KeyError as e:
-                        same_k = False
-                    if not same_k:
-                        raise ValueError(f"Objects to be merged must have compatible '{k}'. Pass to override.")
-        for k in common_keys:
-            if k not in kwargs:
-                if k in init_wrapping.config:
-                    kwargs[k] = init_wrapping.config[k]
-                else:
-                    raise ValueError(f"Objects to be merged must have compatible '{k}'. Pass to override.")
-        return kwargs
+        return cls.resolve_merge_kwargs(*[wrapping.config for wrapping in wrappings], **kwargs)
 
     @classmethod
     def row_stack(

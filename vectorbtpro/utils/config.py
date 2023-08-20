@@ -922,6 +922,40 @@ class Configured(Cacheable, Comparable, Pickleable, Prettified):
                 writeable_attrs |= cls._writeable_attrs
         return writeable_attrs
 
+    @classmethod
+    def resolve_merge_kwargs(cls, *configs: tp.MaybeTuple[ConfigT], **kwargs) -> tp.Kwargs:
+        """Resolve keyword arguments for initializing `Configured` after merging."""
+        if len(configs) == 1:
+            configs = configs[0]
+        configs = list(configs)
+
+        common_keys = set()
+        for config in configs:
+            common_keys = common_keys.union(set(config.keys()))
+        init_config = configs[0]
+        for i in range(1, len(configs)):
+            config = configs[i]
+            for k in common_keys:
+                if k not in kwargs:
+                    same_k = True
+                    try:
+                        if k in config:
+                            if not is_deep_equal(init_config[k], config[k]):
+                                same_k = False
+                        else:
+                            same_k = False
+                    except KeyError as e:
+                        same_k = False
+                    if not same_k:
+                        raise ValueError(f"Objects to be merged must have compatible '{k}'. Pass to override.")
+        for k in common_keys:
+            if k not in kwargs:
+                if k in init_config:
+                    kwargs[k] = init_config[k]
+                else:
+                    raise ValueError(f"Objects to be merged must have compatible '{k}'. Pass to override.")
+        return kwargs
+
     def replace(
         self: ConfiguredT,
         copy_mode_: tp.Optional[str] = None,

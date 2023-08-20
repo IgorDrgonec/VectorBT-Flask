@@ -22,22 +22,6 @@ __all__ = [
 ]
 
 
-class Interval(enum.Enum):
-    in_1_minute = "1"
-    in_3_minute = "3"
-    in_5_minute = "5"
-    in_15_minute = "15"
-    in_30_minute = "30"
-    in_45_minute = "45"
-    in_1_hour = "1H"
-    in_2_hour = "2H"
-    in_3_hour = "3H"
-    in_4_hour = "4H"
-    in_daily = "1D"
-    in_weekly = "1W"
-    in_monthly = "1M"
-
-
 SIGNIN_URL = "https://www.tradingview.com/accounts/signin/"
 SEARCH_URL = "https://symbol-search.tradingview.com/symbol_search/v3/?text={}&exchange={}&start={}&hl=2&lang=en&domain=production"
 SCAN_URL = "https://scanner.tradingview.com/{}/scan"
@@ -182,7 +166,10 @@ class TVClient(Configured):
     @staticmethod
     def convert_raw_data(raw_data: str, symbol: str) -> pd.DataFrame:
         """Process raw data into a DataFrame."""
-        out = re.search(r'"s":\[(.+?)\}\]', raw_data).group(1)
+        search_result = re.search(r'"s":\[(.+?)\}\]', raw_data)
+        if search_result is None:
+            raise ValueError("Couldn't parse data returned by TradingView")
+        out = search_result.group(1)
         x = out.split(',{"')
         data = list()
         volume_data = True
@@ -223,7 +210,7 @@ class TVClient(Configured):
         self,
         symbol: str,
         exchange: str = "NSE",
-        interval: Interval = Interval.in_daily,
+        interval: str = "1D",
         fut_contract: tp.Optional[int] = None,
         adjustment: str = "splits",
         extended_session: bool = False,
@@ -233,7 +220,6 @@ class TVClient(Configured):
     ) -> tp.Union[str, tp.Frame]:
         """Get historical data."""
         symbol = self.format_symbol(symbol=symbol, exchange=exchange, fut_contract=fut_contract)
-        interval = interval.value
 
         self.create_connection(pro_data=pro_data)
         self.send_message("set_auth_token", [self.auth_token])

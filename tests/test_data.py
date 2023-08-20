@@ -1837,14 +1837,16 @@ class TestData:
         data = MyData.fetch(["S1", "S2", "S3"], shape=(5, 3), columns=["F1", "F2", "F3"])
         data01 = MyData.fetch(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"])
         data2 = MyData.fetch(["S3"], shape=(5, 3), columns=["F1", "F2", "F3"])
-        assert MyData.merge(data01, data2).equals(data, debug=True)
-        assert MyData.merge(data01, data2) == data
+        assert MyData.merge(data01.to_symbol_oriented(), data2.to_symbol_oriented()) == data.to_symbol_oriented()
+        assert MyData.merge(data01.to_feature_oriented(), data2.to_feature_oriented()) == data.to_feature_oriented()
         data12 = MyData.fetch(["S2", "S3"], shape=(5, 3), columns=["F1", "F2", "F3"])
-        assert MyData.merge(data01, data12) == data
-        data12 = MyData.fetch(["S2", "S3"], shape=(3, 2), start_date=datetime(2020, 1, 3), columns=["F2", "F3"])
-        merged_data = MyData.merge(data01, data12, missing_columns="nan")
+        assert MyData.merge(data01.to_symbol_oriented(), data12.to_symbol_oriented()) == data.to_symbol_oriented()
+        assert MyData.merge(data01.to_feature_oriented(), data12.to_feature_oriented()) == data.to_feature_oriented()
+        data12 = MyData.fetch(["S2", "S3"], shape=(3, 2), start_date=datetime(2020, 1, 3), columns=["F3", "F4"])
+        merged_data1 = MyData.merge(data01.to_symbol_oriented(), data12.to_symbol_oriented(), missing_columns="nan")
+        merged_data2 = MyData.merge(data01.to_feature_oriented(), data12.to_feature_oriented(), missing_columns="nan")
         assert_frame_equal(
-            merged_data.data["S1"],
+            merged_data1.data["S1"],
             pd.DataFrame(
                 [
                     ["S1_F1_0", "S1_F2_0", "S1_F3_0", np.nan],
@@ -1867,14 +1869,14 @@ class TestData:
             ),
         )
         assert_frame_equal(
-            merged_data.data["S2"],
+            merged_data1.data["S2"],
             pd.DataFrame(
                 [
                     ["S2_F1_0", "S2_F2_0", "S2_F3_0", np.nan],
                     ["S2_F1_1", "S2_F2_1", "S2_F3_1", np.nan],
-                    ["S2_F1_2", "S2_F2_2", "S2_F1_0", "S2_F2_0"],
-                    ["S2_F1_3", "S2_F2_3", "S2_F1_1", "S2_F2_1"],
-                    ["S2_F1_4", "S2_F2_4", "S2_F1_2", "S2_F2_2"],
+                    ["S2_F1_2", "S2_F2_2", "S2_F3_0", "S2_F4_0"],
+                    ["S2_F1_3", "S2_F2_3", "S2_F3_1", "S2_F4_1"],
+                    ["S2_F1_4", "S2_F2_4", "S2_F3_2", "S2_F4_2"],
                 ],
                 index=pd.DatetimeIndex(
                     [
@@ -1890,14 +1892,14 @@ class TestData:
             ),
         )
         assert_frame_equal(
-            merged_data.data["S3"],
+            merged_data1.data["S3"],
             pd.DataFrame(
                 [
                     [np.nan, np.nan, np.nan, np.nan],
                     [np.nan, np.nan, np.nan, np.nan],
-                    [np.nan, np.nan, "S3_F1_0", "S3_F2_0"],
-                    [np.nan, np.nan, "S3_F1_1", "S3_F2_1"],
-                    [np.nan, np.nan, "S3_F1_2", "S3_F2_2"],
+                    [np.nan, np.nan, "S3_F3_0", "S3_F4_0"],
+                    [np.nan, np.nan, "S3_F3_1", "S3_F4_1"],
+                    [np.nan, np.nan, "S3_F3_2", "S3_F4_2"],
                 ],
                 index=pd.DatetimeIndex(
                     [
@@ -1912,93 +1914,67 @@ class TestData:
                 columns=pd.Index(["F1", "F2", "F3", "F4"], dtype="object"),
             ),
         )
-
-    def test_to_csv(self, tmp_path):
-        data = MyData.fetch(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"])
-
-        def _load_and_check_symbol(s, path, **kwargs):
-            df = pd.read_csv(path, parse_dates=True, index_col=0, **kwargs).squeeze("columns")
-            df.index.freq = df.index.inferred_freq
-            assert_frame_equal(df, data.data[s])
-
-        data.to_csv(tmp_path)
-        _load_and_check_symbol("S1", tmp_path / "S1.csv")
-        _load_and_check_symbol("S2", tmp_path / "S2.csv")
-
-        data.to_csv(
-            vbt.symbol_dict({"S1": tmp_path / "csv_data", "S2": tmp_path / "csv_data"}),
-            ext=vbt.symbol_dict({"S1": "csv", "S2": "tsv"}),
-            sep=vbt.symbol_dict({"S1": ",", "S2": "\t"}),
-            mkdir_kwargs=dict(mkdir=True),
+        assert_frame_equal(
+            merged_data1.data["S1"].astype(object),
+            merged_data2.to_symbol_oriented().data["S1"].astype(object),
         )
-        _load_and_check_symbol("S1", tmp_path / "csv_data/S1.csv", sep=",")
-        _load_and_check_symbol("S2", tmp_path / "csv_data/S2.tsv", sep="\t")
-
-        data.to_csv(path_or_buf=vbt.symbol_dict({"S1": tmp_path / "my_S1.csv", "S2": tmp_path / "my_S2.csv"}))
-        _load_and_check_symbol("S1", tmp_path / "my_S1.csv")
-        _load_and_check_symbol("S2", tmp_path / "my_S2.csv")
-
-        data.to_csv(
-            vbt.symbol_dict({"S1": tmp_path / "csv_data", "S2": tmp_path / "csv_data"}),
-            ext=vbt.symbol_dict({"S1": "csv", "S2": "tsv"}),
-            sep=vbt.symbol_dict({"S1": ",", "S2": "\t"}),
+        assert_frame_equal(
+            merged_data1.data["S2"].astype(object),
+            merged_data2.to_symbol_oriented().data["S2"].astype(object),
         )
-        _load_and_check_symbol("S1", tmp_path / "csv_data/S1.csv", sep=",")
-        _load_and_check_symbol("S2", tmp_path / "csv_data/S2.tsv", sep="\t")
-
-    def test_to_hdf(self, tmp_path):
-        data = MyData.fetch(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"])
-
-        def _load_and_check_symbol(s, path, key=None, **kwargs):
-            if key is None:
-                key = s
-            df = pd.read_hdf(path, key, **kwargs)
-            df.index.freq = df.index.inferred_freq
-            assert_frame_equal(df, data.data[s])
-
-        data.to_hdf(tmp_path)
-        _load_and_check_symbol("S1", tmp_path / "MyData.h5")
-        _load_and_check_symbol("S2", tmp_path / "MyData.h5")
-
-        data.to_hdf(
-            vbt.symbol_dict({"S1": tmp_path / "hdf_data/S1.h5", "S2": tmp_path / "hdf_data/S2.h5"}),
-            mkdir_kwargs=dict(mkdir=True),
+        assert_frame_equal(
+            merged_data1.data["S3"].astype(object),
+            merged_data2.to_symbol_oriented().data["S3"].astype(object),
         )
-        _load_and_check_symbol("S1", tmp_path / "hdf_data/S1.h5")
-        _load_and_check_symbol("S2", tmp_path / "hdf_data/S2.h5")
-
-        data.to_hdf(
-            vbt.symbol_dict({"S1": tmp_path / "hdf_data/my_data.h5", "S2": tmp_path / "hdf_data/my_data.h5"}),
-            key=vbt.symbol_dict({"S1": "df1", "S2": "df2"}),
+        assert_frame_equal(
+            merged_data1.to_feature_oriented().data["F1"].astype(object),
+            merged_data2.data["F1"].astype(object),
         )
-        _load_and_check_symbol("S1", tmp_path / "hdf_data/my_data.h5", key="df1")
-        _load_and_check_symbol("S2", tmp_path / "hdf_data/my_data.h5", key="df2")
-
-        data.to_hdf(
-            path_or_buf=vbt.symbol_dict(
-                {"S1": tmp_path / "hdf_data/my_data.h5", "S2": tmp_path / "hdf_data/my_data.h5"},
-            ),
-            key=vbt.symbol_dict({"S1": "df1", "S2": "df2"}),
+        assert_frame_equal(
+            merged_data1.to_feature_oriented().data["F2"].astype(object),
+            merged_data2.data["F2"].astype(object),
         )
-        _load_and_check_symbol("S1", tmp_path / "hdf_data/my_data.h5", key="df1")
-        _load_and_check_symbol("S2", tmp_path / "hdf_data/my_data.h5", key="df2")
+        assert_frame_equal(
+            merged_data1.to_feature_oriented().data["F3"].astype(object),
+            merged_data2.data["F3"].astype(object),
+        )
+        assert_frame_equal(
+            merged_data1.to_feature_oriented().data["F4"].astype(object),
+            merged_data2.data["F4"].astype(object),
+        )
 
     def test_indexing(self):
         assert (
-            MyData.fetch(["S1", "S2"], shape=(5,), columns="F1").iloc[:3].wrapper
-            == MyData.fetch(["S1", "S2"], shape=(3,), columns="F1").wrapper
+            MyData.fetch(["S1", "S2"], shape=(5,), columns="F1").to_symbol_oriented().iloc[:3].wrapper
+            == MyData.fetch(["S1", "S2"], shape=(3,), columns="F1").to_symbol_oriented().wrapper
         )
         assert (
-            MyData.fetch(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"]).iloc[:3].wrapper
-            == MyData.fetch(["S1", "S2"], shape=(3, 3), columns=["F1", "F2", "F3"]).wrapper
+            MyData.fetch(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented().iloc[:3].wrapper
+            == MyData.fetch(["S1", "S2"], shape=(3, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented().wrapper
         )
         assert (
-            MyData.fetch(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"])["F1"].wrapper
-            == MyData.fetch(["S1", "S2"], shape=(5,), columns="F1").wrapper
+            MyData.fetch(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented()["F1"].wrapper
+            == MyData.fetch(["S1", "S2"], shape=(5,), columns="F1").to_symbol_oriented().wrapper
         )
         assert (
-            MyData.fetch(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"])[["F1"]].wrapper
-            == MyData.fetch(["S1", "S2"], shape=(5, 1), columns=["F1"]).wrapper
+            MyData.fetch(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented()[["F1"]].wrapper
+            == MyData.fetch(["S1", "S2"], shape=(5, 1), columns=["F1"]).to_symbol_oriented().wrapper
+        )
+        assert (
+            MyData.fetch("S1", shape=(5, 2), columns=["F1", "F2"]).to_feature_oriented().iloc[:3].wrapper
+            == MyData.fetch("S1", shape=(3, 2), columns=["F1", "F2"]).to_feature_oriented().wrapper
+        )
+        assert (
+            MyData.fetch(["S1", "S2"], shape=(5, 2), columns=["F1", "F2"]).to_feature_oriented().iloc[:3].wrapper
+            == MyData.fetch(["S1", "S2"], shape=(3, 2), columns=["F1", "F2"]).to_feature_oriented().wrapper
+        )
+        assert (
+            MyData.fetch(["S1", "S2"], shape=(5, 2), columns=["F1", "F2"]).to_feature_oriented()["S1"].wrapper
+            == MyData.fetch("S1", shape=(5, 2), columns=["F1", "F2"]).to_feature_oriented().wrapper
+        )
+        assert (
+            MyData.fetch(["S1", "S2"], shape=(5, 2), columns=["F1", "F2"]).to_feature_oriented()[["S1"]].wrapper
+            == MyData.fetch(["S1"], shape=(5, 2), columns=["F1", "F2"]).to_feature_oriented().wrapper
         )
 
     def test_transform(self):
@@ -2277,6 +2253,171 @@ class TestData:
                 ),
             )
 
+    def test_symbol_to_csv(self, tmp_path):
+        data = MyData.fetch(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented()
+
+        def _load_and_check_symbol(s, path, **kwargs):
+            df = pd.read_csv(path, parse_dates=True, index_col=0, **kwargs).squeeze("columns")
+            df.index.freq = df.index.inferred_freq
+            assert_frame_equal(df, data.data[s])
+
+        data.to_csv(tmp_path)
+        _load_and_check_symbol("S1", tmp_path / "S1.csv")
+        _load_and_check_symbol("S2", tmp_path / "S2.csv")
+
+        data.to_csv(
+            vbt.symbol_dict({"S1": tmp_path / "csv_data", "S2": tmp_path / "csv_data"}),
+            ext=vbt.symbol_dict({"S1": "csv", "S2": "tsv"}),
+            sep=vbt.symbol_dict({"S1": ",", "S2": "\t"}),
+            mkdir_kwargs=dict(mkdir=True),
+        )
+        with pytest.raises(Exception):
+            data.to_csv(
+                vbt.feature_dict({"S1": tmp_path / "csv_data", "S2": tmp_path / "csv_data"}),
+                ext=vbt.feature_dict({"S1": "csv", "S2": "tsv"}),
+                sep=vbt.feature_dict({"S1": ",", "S2": "\t"}),
+                mkdir_kwargs=dict(mkdir=True),
+            )
+        _load_and_check_symbol("S1", tmp_path / "csv_data/S1.csv", sep=",")
+        _load_and_check_symbol("S2", tmp_path / "csv_data/S2.tsv", sep="\t")
+
+        data.to_csv(path_or_buf=vbt.symbol_dict({"S1": tmp_path / "my_S1.csv", "S2": tmp_path / "my_S2.csv"}))
+        _load_and_check_symbol("S1", tmp_path / "my_S1.csv")
+        _load_and_check_symbol("S2", tmp_path / "my_S2.csv")
+
+        data.to_csv(
+            vbt.symbol_dict({"S1": tmp_path / "csv_data", "S2": tmp_path / "csv_data"}),
+            ext=vbt.symbol_dict({"S1": "csv", "S2": "tsv"}),
+            sep=vbt.symbol_dict({"S1": ",", "S2": "\t"}),
+        )
+        _load_and_check_symbol("S1", tmp_path / "csv_data/S1.csv", sep=",")
+        _load_and_check_symbol("S2", tmp_path / "csv_data/S2.tsv", sep="\t")
+
+    def test_feature_to_csv(self, tmp_path):
+        data = MyData.fetch(["S1", "S2", "S3"], shape=(5, 2), columns=["F1", "F2"]).to_feature_oriented()
+
+        def _load_and_check_feature(s, path, **kwargs):
+            df = pd.read_csv(path, parse_dates=True, index_col=0, **kwargs).squeeze("columns")
+            df.index.freq = df.index.inferred_freq
+            df.columns.name = "symbol"
+            assert_frame_equal(df, data.data[s])
+
+        data.to_csv(tmp_path)
+        _load_and_check_feature("F1", tmp_path / "F1.csv")
+        _load_and_check_feature("F2", tmp_path / "F2.csv")
+
+        data.to_csv(
+            vbt.feature_dict({"F1": tmp_path / "csv_data", "F2": tmp_path / "csv_data"}),
+            ext=vbt.feature_dict({"F1": "csv", "F2": "tsv"}),
+            sep=vbt.feature_dict({"F1": ",", "F2": "\t"}),
+            mkdir_kwargs=dict(mkdir=True),
+        )
+        with pytest.raises(Exception):
+            data.to_csv(
+                vbt.symbol_dict({"F1": tmp_path / "csv_data", "F2": tmp_path / "csv_data"}),
+                ext=vbt.symbol_dict({"F1": "csv", "F2": "tsv"}),
+                sep=vbt.symbol_dict({"F1": ",", "F2": "\t"}),
+                mkdir_kwargs=dict(mkdir=True),
+            )
+        _load_and_check_feature("F1", tmp_path / "csv_data/F1.csv", sep=",")
+        _load_and_check_feature("F2", tmp_path / "csv_data/F2.tsv", sep="\t")
+
+        data.to_csv(path_or_buf=vbt.feature_dict({"F1": tmp_path / "my_F1.csv", "F2": tmp_path / "my_F2.csv"}))
+        _load_and_check_feature("F1", tmp_path / "my_F1.csv")
+        _load_and_check_feature("F2", tmp_path / "my_F2.csv")
+
+        data.to_csv(
+            vbt.feature_dict({"F1": tmp_path / "csv_data", "F2": tmp_path / "csv_data"}),
+            ext=vbt.feature_dict({"F1": "csv", "F2": "tsv"}),
+            sep=vbt.feature_dict({"F1": ",", "F2": "\t"}),
+        )
+        _load_and_check_feature("F1", tmp_path / "csv_data/F1.csv", sep=",")
+        _load_and_check_feature("F2", tmp_path / "csv_data/F2.tsv", sep="\t")
+
+    def test_symbol_to_hdf(self, tmp_path):
+        data = MyData.fetch(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented()
+
+        def _load_and_check_symbol(s, path, key=None, **kwargs):
+            if key is None:
+                key = s
+            df = pd.read_hdf(path, key, **kwargs)
+            df.index.freq = df.index.inferred_freq
+            assert_frame_equal(df, data.data[s])
+
+        data.to_hdf(tmp_path)
+        _load_and_check_symbol("S1", tmp_path / "MyData.h5")
+        _load_and_check_symbol("S2", tmp_path / "MyData.h5")
+
+        data.to_hdf(
+            vbt.symbol_dict({"S1": tmp_path / "hdf_data/S1.h5", "S2": tmp_path / "hdf_data/S2.h5"}),
+            mkdir_kwargs=dict(mkdir=True),
+        )
+        with pytest.raises(Exception):
+            data.to_hdf(
+                vbt.feature_dict({"S1": tmp_path / "hdf_data/S1.h5", "S2": tmp_path / "hdf_data/S2.h5"}),
+                mkdir_kwargs=dict(mkdir=True),
+            )
+        _load_and_check_symbol("S1", tmp_path / "hdf_data/S1.h5")
+        _load_and_check_symbol("S2", tmp_path / "hdf_data/S2.h5")
+
+        data.to_hdf(
+            vbt.symbol_dict({"S1": tmp_path / "hdf_data/my_data.h5", "S2": tmp_path / "hdf_data/my_data.h5"}),
+            key=vbt.symbol_dict({"S1": "df1", "S2": "df2"}),
+        )
+        _load_and_check_symbol("S1", tmp_path / "hdf_data/my_data.h5", key="df1")
+        _load_and_check_symbol("S2", tmp_path / "hdf_data/my_data.h5", key="df2")
+
+        data.to_hdf(
+            path_or_buf=vbt.symbol_dict(
+                {"S1": tmp_path / "hdf_data/my_data.h5", "S2": tmp_path / "hdf_data/my_data.h5"},
+            ),
+            key=vbt.symbol_dict({"S1": "df1", "S2": "df2"}),
+        )
+        _load_and_check_symbol("S1", tmp_path / "hdf_data/my_data.h5", key="df1")
+        _load_and_check_symbol("S2", tmp_path / "hdf_data/my_data.h5", key="df2")
+
+    def test_feature_to_hdf(self, tmp_path):
+        data = MyData.fetch(["S1", "S2", "S3"], shape=(5, 2), columns=["F1", "F2"]).to_feature_oriented()
+
+        def _load_and_check_feature(s, path, key=None, **kwargs):
+            if key is None:
+                key = s
+            df = pd.read_hdf(path, key, **kwargs)
+            df.index.freq = df.index.inferred_freq
+            assert_frame_equal(df, data.data[s])
+
+        data.to_hdf(tmp_path)
+        _load_and_check_feature("F1", tmp_path / "MyData.h5")
+        _load_and_check_feature("F2", tmp_path / "MyData.h5")
+
+        data.to_hdf(
+            vbt.feature_dict({"F1": tmp_path / "hdf_data/F1.h5", "F2": tmp_path / "hdf_data/F2.h5"}),
+            mkdir_kwargs=dict(mkdir=True),
+        )
+        with pytest.raises(Exception):
+            data.to_hdf(
+                vbt.symbol_dict({"F1": tmp_path / "hdf_data/F1.h5", "F2": tmp_path / "hdf_data/F2.h5"}),
+                mkdir_kwargs=dict(mkdir=True),
+            )
+        _load_and_check_feature("F1", tmp_path / "hdf_data/F1.h5")
+        _load_and_check_feature("F2", tmp_path / "hdf_data/F2.h5")
+
+        data.to_hdf(
+            vbt.feature_dict({"F1": tmp_path / "hdf_data/my_data.h5", "F2": tmp_path / "hdf_data/my_data.h5"}),
+            key=vbt.feature_dict({"F1": "df1", "F2": "df2"}),
+        )
+        _load_and_check_feature("F1", tmp_path / "hdf_data/my_data.h5", key="df1")
+        _load_and_check_feature("F2", tmp_path / "hdf_data/my_data.h5", key="df2")
+
+        data.to_hdf(
+            path_or_buf=vbt.feature_dict(
+                {"F1": tmp_path / "hdf_data/my_data.h5", "F2": tmp_path / "hdf_data/my_data.h5"},
+            ),
+            key=vbt.feature_dict({"F1": "df1", "F2": "df2"}),
+        )
+        _load_and_check_feature("F1", tmp_path / "hdf_data/my_data.h5", key="df1")
+        _load_and_check_feature("F2", tmp_path / "hdf_data/my_data.h5", key="df2")
+
     def test_symbol_stats(self):
         index_mask = vbt.symbol_dict({"S1": [False, True, True, True, True], "S2": [True, True, True, True, False]})
         column_mask = vbt.symbol_dict({"S1": [False, True, True], "S2": [True, True, False]})
@@ -2296,8 +2437,8 @@ class TestData:
                 "End",
                 "Period",
                 "Total Symbols",
-                "Null Counts: 0",
-                "Null Counts: 1",
+                "Null Counts: S1",
+                "Null Counts: S2",
             ],
             dtype="object",
         )
@@ -2375,9 +2516,9 @@ class TestData:
                 "End",
                 "Period",
                 "Total Features",
-                "Null Counts: F0",
                 "Null Counts: F1",
                 "Null Counts: F2",
+                "Null Counts: F3",
             ],
             dtype="object",
         )
@@ -2429,7 +2570,7 @@ class TestData:
                 name="group",
             ),
         )
-        assert_series_equal(data["S1"].stats(), data.stats(column=0).rename(None))
+        assert_series_equal(data["S1"].stats(), data.stats(column="S1"))
         assert_series_equal(
             data.replace(wrapper=data.wrapper.replace(group_by=True)).stats(),
             data.stats(group_by=True),
@@ -2986,8 +3127,8 @@ class TestCSVDataSaver:
         saved_result0.index.freq = "D"
         saved_result1 = pd.concat((data.data["S2"].iloc[:-1], updated_data.data["S2"]), axis=0)
         saved_result1.index.freq = "D"
-        assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["0"], saved_result0)
-        assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["1"], saved_result1)
+        assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["S1"], saved_result0)
+        assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["S2"], saved_result1)
 
         new_data = saver.data
         new_saver = vbt.CSVDataSaver(
@@ -3008,8 +3149,8 @@ class TestCSVDataSaver:
             (data.data["S2"].iloc[:-1], new_data.data["S2"].iloc[:-1], new_updated_data.data["S2"]), axis=0
         )
         new_saved_result1.index.freq = "D"
-        assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["0"], new_saved_result0)
-        assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["1"], new_saved_result1)
+        assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["S1"], new_saved_result0)
+        assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["S2"], new_saved_result1)
 
     def test_update_every(self, tmp_path):
         data = MyData.fetch(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"])
@@ -3033,8 +3174,8 @@ class TestCSVDataSaver:
         saver.update_every(call_count=call_count)
         for i in range(5):
             data = data.update()
-        assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["0"], data.data["S1"])
-        assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["1"], data.data["S2"])
+        assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["S1"], data.data["S1"])
+        assert_frame_equal(vbt.CSVData.fetch(tmp_path / "saver").data["S2"], data.data["S2"])
 
 
 class TestHDFDataSaver:
@@ -3056,8 +3197,8 @@ class TestHDFDataSaver:
         saved_result0.index.freq = "D"
         saved_result1 = pd.concat((data.data["S2"].iloc[:-1], updated_data.data["S2"]), axis=0)
         saved_result1.index.freq = "D"
-        assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["0"], saved_result0)
-        assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["1"], saved_result1)
+        assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["S1"], saved_result0)
+        assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["S2"], saved_result1)
 
         new_data = saver.data
         new_saver = vbt.HDFDataSaver(
@@ -3079,8 +3220,8 @@ class TestHDFDataSaver:
             (data.data["S2"].iloc[:-1], new_data.data["S2"].iloc[:-1], new_updated_data.data["S2"]), axis=0
         )
         new_saved_result1.index.freq = "D"
-        assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["0"], new_saved_result0)
-        assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["1"], new_saved_result1)
+        assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["S1"], new_saved_result0)
+        assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["S2"], new_saved_result1)
 
     def test_update_every(self, tmp_path):
         data = MyData.fetch(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"])
@@ -3105,5 +3246,5 @@ class TestHDFDataSaver:
         saver.update_every(call_count=call_count)
         for i in range(5):
             data = data.update()
-        assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["0"], data.data["S1"])
-        assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["1"], data.data["S2"])
+        assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["S1"], data.data["S1"])
+        assert_frame_equal(vbt.HDFData.fetch(tmp_path / "saver.h5").data["S2"], data.data["S2"])
