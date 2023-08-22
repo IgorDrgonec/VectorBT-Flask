@@ -317,6 +317,9 @@ def reconstruct(cls: tp.Union[tp.Hashable, tp.Type], rec_state: RecState) -> obj
             modify_state = rec_info_registry[class_path].modify_state
             if modify_state is not None:
                 rec_state = modify_state(rec_state)
+
+    if issubclass(cls, Pickleable):
+        rec_state = cls.modify_state(rec_state)
     obj = cls(*rec_state.init_args, **rec_state.init_kwargs)
     for k, v in rec_state.attr_dct.items():
         setattr(obj, k, v)
@@ -1036,6 +1039,11 @@ class Pickleable:
     def rec_state(self) -> tp.Optional[RecState]:
         """Reconstruction state of the type `RecState`."""
         return None
+
+    @classmethod
+    def modify_state(cls, rec_state: RecState) -> RecState:
+        """Modify the reconstruction state before reconstruction."""
+        return rec_state
 
     def __reduce__(self) -> tp.Union[str, tp.Tuple]:
         rec_state = self.rec_state

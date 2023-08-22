@@ -33,7 +33,7 @@ from vectorbtpro.utils.datetime_ import is_tz_aware, to_timezone, try_to_datetim
 from vectorbtpro.utils.parsing import get_func_arg_names, extend_args
 from vectorbtpro.utils.path_ import check_mkdir
 from vectorbtpro.utils.template import RepEval, CustomTemplate, substitute_templates
-from vectorbtpro.utils.pickling import pdict
+from vectorbtpro.utils.pickling import pdict, RecState
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.decorators import cached_property, class_or_instancemethod
 from vectorbtpro.utils.selection import _NoResult, NoResult, NoResultsException
@@ -500,6 +500,19 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     def use_feature_config_of(self, cls: tp.Type[DataT]) -> None:
         """Copy feature config from another `Data` class."""
         self._feature_config = cls.feature_config.copy()
+
+    @classmethod
+    def modify_state(cls, rec_state: RecState) -> RecState:
+        if "_column_config" in rec_state.attr_dct and "_feature_config" not in rec_state.attr_dct:
+            # Ensure backward compatibility
+            new_attr_dct = dict(rec_state.attr_dct)
+            new_attr_dct["_feature_config"] = new_attr_dct.pop("_column_config")
+            rec_state = RecState(
+                init_args=rec_state.init_args,
+                init_kwargs=rec_state.init_kwargs,
+                attr_dct=new_attr_dct,
+            )
+        return rec_state
 
     @classmethod
     def fix_dict_types_in_kwargs(cls, kwargs: tp.Kwargs) -> tp.Kwargs:
