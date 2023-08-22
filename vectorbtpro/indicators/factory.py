@@ -342,7 +342,7 @@ class IndicatorBase(Analyzable):
         in_output_settings: tp.Optional[tp.MappingSequence[tp.KwargsLike]] = None,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
-        template_context: tp.Optional[tp.Mapping] = None,
+        template_context: tp.KwargsLike = None,
         params: tp.Optional[tp.MappingSequence[tp.Params]] = None,
         param_product: bool = False,
         random_subset: tp.Optional[int] = None,

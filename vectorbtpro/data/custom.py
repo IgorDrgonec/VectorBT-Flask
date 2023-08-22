@@ -3505,7 +3505,9 @@ class TVData(RemoteData):
         if split is None:
             raise ValueError(f"Invalid timeframe '{timeframe}'")
         multiplier, unit = split
-        if unit == "t":
+        if unit == "s":
+            interval = f"{str(multiplier)}S"
+        elif unit == "t":
             interval = str(multiplier)
         elif unit == "h":
             interval = f"{str(multiplier)}H"

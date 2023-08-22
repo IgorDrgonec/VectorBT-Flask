@@ -760,7 +760,7 @@ def yield_arg_chunks(
     ann_args: tp.AnnArgs,
     chunk_meta: tp.Iterable[ChunkMeta],
     arg_take_spec: tp.Optional[tp.ArgTakeSpecLike] = None,
-    template_context: tp.Optional[tp.Mapping] = None,
+    template_context: tp.KwargsLike = None,
     **kwargs,
 ) -> tp.Generator[tp.FuncArgs, None, None]:
     """Split annotated arguments into chunks using `take_from_args` and yield each chunk.
@@ -810,7 +810,7 @@ def chunked(
     chunk_meta: tp.Optional[tp.ChunkMetaLike] = None,
     skip_one_chunk: tp.Optional[bool] = None,
     arg_take_spec: tp.Optional[tp.ArgTakeSpecLike] = None,
-    template_context: tp.Optional[tp.Mapping] = None,
+    template_context: tp.KwargsLike = None,
     prepend_chunk_meta: tp.Optional[bool] = None,
     merge_func: tp.Union[None, str, tuple, tp.Callable] = None,
     merge_kwargs: tp.KwargsLike = None,

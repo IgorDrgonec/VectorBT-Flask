@@ -32,10 +32,11 @@ from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig, copy_dic
 from vectorbtpro.utils.datetime_ import is_tz_aware, to_timezone, try_to_datetime_index
 from vectorbtpro.utils.parsing import get_func_arg_names, extend_args
 from vectorbtpro.utils.path_ import check_mkdir
-from vectorbtpro.utils.template import RepEval, CustomTemplate
+from vectorbtpro.utils.template import RepEval, CustomTemplate, substitute_templates
 from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.decorators import cached_property, class_or_instancemethod
+from vectorbtpro.utils.selection import _NoResult, NoResult, NoResultsException
 
 __all__ = [
     "feature_dict",
@@ -2518,6 +2519,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         on_features: tp.Optional[tp.MaybeFeatures] = None,
         on_symbols: tp.Optional[tp.MaybeSymbols] = None,
         pass_as_first: bool = False,
+        ignore_args: tp.Optional[tp.Sequence[str]] = None,
         rename_args: tp.DictLike = None,
         location: tp.Optional[str] = None,
         prepend_location: tp.Optional[bool] = None,
@@ -2525,6 +2527,11 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         concat: bool = True,
         silence_warnings: bool = False,
         raise_errors: bool = False,
+        execute_kwargs: tp.KwargsLike = None,
+        merge_func: tp.Union[None, str, tuple, tp.Callable] = None,
+        merge_kwargs: tp.KwargsLike = None,
+        template_context: tp.KwargsLike = None,
+        return_keys: bool = False,
         **kwargs,
     ) -> tp.Any:
         """Run a function on data.
@@ -2551,10 +2558,17 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         `vectorbtpro.indicators.factory.IndicatorBase.to_frame` respectively.
 
         Any argument in `*args` and `**kwargs` can be wrapped with `run_func_dict`/`run_arg_dict`
-        to specify the value per function/argument name or index when `func` is iterable."""
+        to specify the value per function/argument name or index when `func` is iterable.
+
+        Multiple function calls are executed with `vectorbtpro.utils.execution.execute`."""
         from vectorbtpro.indicators.factory import IndicatorBase, IndicatorFactory
         from vectorbtpro.indicators.talib_ import talib_func
         from vectorbtpro.portfolio.base import Portfolio
+
+        if execute_kwargs is None:
+            execute_kwargs = {}
+        if merge_kwargs is None:
+            merge_kwargs = {}
 
         _self = self
         if on_features is not None:
@@ -2597,7 +2611,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             return _kwargs
 
         if checks.is_iterable(func) and not isinstance(func, str):
-            outputs = []
+            funcs_args = []
             keys = []
             for i, f in enumerate(func):
                 _location = location
@@ -2610,43 +2624,86 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                             func_name = _location + "_" + func_name
                     else:
                         _location, f = IndicatorFactory.split_indicator_name(f)
+                        if f is None:
+                            raise ValueError("Sequence of locations is not supported")
                         func_name = f.lower().strip()
                         if _location is not None:
                             if prepend_location in (None, True):
                                 func_name = _location + "_" + func_name
                 else:
                     func_name = f
-                try:
-                    new_args = _select_func_args(i, func_name, args)
-                    new_kwargs = _select_func_kwargs(i, func_name, kwargs)
-                    if concat and _location == "talib_func":
-                        new_kwargs["unpack_to"] = "frame"
-                    out = _self.run(
-                        f,
-                        *new_args,
+                new_args = _select_func_args(i, func_name, args)
+                new_args = (f, *new_args)
+                new_kwargs = _select_func_kwargs(i, func_name, kwargs)
+                if concat and _location == "talib_func":
+                    new_kwargs["unpack_to"] = "frame"
+                new_kwargs = {
+                    **dict(
+                        ignore_args=ignore_args,
                         rename_args=rename_args,
                         location=_location,
                         prepend_location=prepend_location,
-                        unpack=unpack,
+                        unpack="frame" if concat else unpack,
                         concat=concat,
                         silence_warnings=silence_warnings,
                         raise_errors=raise_errors,
-                        **new_kwargs,
-                    )
-                    if concat and isinstance(out, pd.Series):
-                        out = out.to_frame()
-                    if concat and isinstance(out, IndicatorBase):
-                        out = out.to_frame()
-                    outputs.append(out)
-                    keys.append(str(func_name))
-                except Exception as e:
-                    if raise_errors:
-                        raise e
-                    if not silence_warnings:
-                        warnings.warn(func_name + ": " + str(e), stacklevel=2)
-            if not concat:
-                return outputs
-            return pd.concat(outputs, keys=pd.Index(keys, name="run_func"), axis=1)
+                        execute_kwargs=execute_kwargs,
+                        merge_func=merge_func,
+                        merge_kwargs=merge_kwargs,
+                        template_context=template_context,
+                        return_keys=return_keys,
+                    ),
+                    **new_kwargs,
+                }
+
+                def _run(*args, _func_name=func_name, **kwargs):
+                    try:
+                        return _self.run(*args, **kwargs)
+                    except Exception as e:
+                        if raise_errors:
+                            raise e
+                        if not silence_warnings:
+                            warnings.warn(_func_name + ": " + str(e), stacklevel=2)
+                    return NoResult
+
+                funcs_args.append((_run, new_args, new_kwargs))
+                keys.append(str(func_name))
+
+            keys = pd.Index(keys, name="run_func")
+            results = execute(funcs_args, n_calls=len(keys), progress_desc=keys, **execute_kwargs)
+            
+            skip_indices = set()
+            for i, result in enumerate(results):
+                if isinstance(result, _NoResult):
+                    skip_indices.add(i)
+            if len(skip_indices) > 0:
+                new_results = []
+                keep_indices = []
+                for i, result in enumerate(results):
+                    if i not in skip_indices:
+                        new_results.append(result)
+                        keep_indices.append(i)
+                results = new_results
+                keys = keys[keep_indices]
+            if len(results) == 0:
+                raise NoResultsException
+
+            if merge_func is None and concat:
+                merge_func = "column_stack"
+            if merge_func is not None:
+                if isinstance(merge_func, (str, tuple)):
+                    from vectorbtpro.base.merging import resolve_merge_func
+
+                    merge_func = resolve_merge_func(merge_func)
+                    merge_kwargs = {**dict(keys=keys), **merge_kwargs}
+                merge_kwargs = substitute_templates(merge_kwargs, template_context, sub_id="merge_kwargs")
+                if return_keys:
+                    return merge_func(results, **merge_kwargs), keys
+                return merge_func(results, **merge_kwargs)
+            if return_keys:
+                return results, keys
+            return results
+
         if isinstance(func, str):
             func_name = func.lower().strip()
             if func_name.startswith("from_") and getattr(Portfolio, func_name):
@@ -2672,6 +2729,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 return _self.run(
                     indicators,
                     *args,
+                    ignore_args=ignore_args,
                     rename_args=rename_args,
                     location=location,
                     prepend_location=prepend_location,
@@ -2679,6 +2737,11 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     concat=concat,
                     silence_warnings=silence_warnings,
                     raise_errors=raise_errors,
+                    execute_kwargs=execute_kwargs,
+                    merge_func=merge_func,
+                    merge_kwargs=merge_kwargs,
+                    template_context=template_context,
+                    return_keys=return_keys,
                     **kwargs,
                 )
             if location is not None:
@@ -2695,6 +2758,9 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         with_kwargs = {}
         for arg_name in get_func_arg_names(func):
             real_arg_name = arg_name
+            if ignore_args is not None:
+                if arg_name in ignore_args:
+                    continue
             if rename_args is not None:
                 if arg_name in rename_args:
                     arg_name = rename_args[arg_name]
@@ -2725,16 +2791,22 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                         with_kwargs[real_arg_name] = _self.get_feature(feature_idx)
         new_args, new_kwargs = extend_args(func, args, kwargs, **with_kwargs)
         out = func(*new_args, **new_kwargs)
-        if isinstance(out, IndicatorBase):
-            if isinstance(unpack, bool):
-                if unpack:
+        if isinstance(unpack, bool):
+            if unpack:
+                if isinstance(out, IndicatorBase):
                     out = out.unpack()
-            elif isinstance(unpack, str) and unpack.lower() == "dict":
+        elif isinstance(unpack, str) and unpack.lower() == "dict":
+            if isinstance(out, IndicatorBase):
                 out = out.to_dict()
-            elif isinstance(unpack, str) and unpack.lower() == "frame":
+            elif isinstance(out, pd.Series):
+                out = {func.__name__: out}
+        elif isinstance(unpack, str) and unpack.lower() == "frame":
+            if isinstance(out, IndicatorBase):
                 out = out.to_frame()
-            else:
-                raise ValueError(f"Invalid option unpack='{unpack}'")
+            elif isinstance(out, pd.Series):
+                out = out.to_frame()
+        else:
+            raise ValueError(f"Invalid option unpack='{unpack}'")
         return out
 
     # ############# Persisting ############# #

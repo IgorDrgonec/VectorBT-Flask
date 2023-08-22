@@ -555,7 +555,7 @@ class JITRegistry:
         allow_new: tp.Optional[bool] = None,
         register_new: tp.Optional[bool] = None,
         return_missing_task: bool = False,
-        template_context: tp.Optional[tp.Mapping] = None,
+        template_context: tp.KwargsLike = None,
         tags: tp.Optional[set] = None,
         **jitter_kwargs,
     ) -> tp.Union[tp.Hashable, tp.Callable]:

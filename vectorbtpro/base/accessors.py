@@ -1294,7 +1294,7 @@ class BaseAccessor(Wrapping):
         to_2d: bool = False,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
-        template_context: tp.Optional[tp.Mapping] = None,
+        template_context: tp.KwargsLike = None,
         wrap_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.SeriesFrame:
@@ -1405,7 +1405,7 @@ class BaseAccessor(Wrapping):
         keys: tp.Optional[tp.IndexLike] = None,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
-        template_context: tp.Optional[tp.Mapping] = None,
+        template_context: tp.KwargsLike = None,
         wrap_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.MaybeTuple[tp.Frame]:
@@ -1524,7 +1524,7 @@ class BaseAccessor(Wrapping):
         keys: tp.Optional[tp.IndexLike] = None,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
-        template_context: tp.Optional[tp.Mapping] = None,
+        template_context: tp.KwargsLike = None,
         wrap_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.SeriesFrame:

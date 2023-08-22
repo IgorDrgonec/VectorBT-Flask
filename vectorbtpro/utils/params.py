@@ -620,7 +620,7 @@ def parameterized(
     search_max_len: tp.Optional[int] = None,
     search_max_depth: tp.Optional[int] = None,
     skip_single_param: tp.Optional[bool] = None,
-    template_context: tp.Optional[tp.Mapping] = None,
+    template_context: tp.KwargsLike = None,
     random_subset: tp.Optional[int] = None,
     seed: tp.Optional[int] = None,
     index_stack_kwargs: tp.KwargsLike = None,
