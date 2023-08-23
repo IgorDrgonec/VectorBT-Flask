@@ -81,12 +81,18 @@ def ts_max(x: tp.Array2d, d: float) -> tp.Array2d:
 
 def ts_argmin(x: tp.Array2d, d: float) -> tp.Array2d:
     """Return the rolling argmin."""
-    return np.add(rolling_argmin_nb(x, math.floor(d), local=True), 1)
+    argmin = rolling_argmin_nb(x, math.floor(d), local=True)
+    if -1 in argmin:
+        argmin = np.where(argmin != -1, argmin, np.nan)
+    return np.add(argmin, 1)
 
 
 def ts_argmax(x: tp.Array2d, d: float) -> tp.Array2d:
     """Return the rolling argmax."""
-    return np.add(rolling_argmax_nb(x, math.floor(d), local=True), 1)
+    argmax = rolling_argmax_nb(x, math.floor(d), local=True)
+    if -1 in argmax:
+        argmax = np.where(argmax != -1, argmax, np.nan)
+    return np.add(argmax, 1)
 
 
 def ts_rank(x: tp.Array2d, d: float) -> tp.Array2d:
