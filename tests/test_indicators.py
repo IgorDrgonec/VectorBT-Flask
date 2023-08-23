@@ -231,7 +231,7 @@ class TestFactory:
         target = pd.DataFrame(
             np.array([[110.0], [110.0], [110.0], [110.0], [110.0]]),
             index=ts.index,
-            columns=pd.MultiIndex.from_tuples([(0, "a")], names=["custom_p", None]),
+            columns=pd.Index([0], dtype="int64", name="custom_p"),
         )
         assert_frame_equal(
             F.with_custom_func(custom_func, var_args=True).run(ts[["a"]], 0, 10, b=100, per_column=True).out,
@@ -241,7 +241,7 @@ class TestFactory:
             F.with_custom_func(custom_func_nb, var_args=True).run(ts[["a"]], 0, 10, 100, per_column=True).out,
             target,
         )
-        target = pd.Series(np.array([110.0, 110.0, 110.0, 110.0, 110.0]), index=ts.index, name=(0, "a"))
+        target = pd.Series(np.array([110.0, 110.0, 110.0, 110.0, 110.0]), index=ts.index)
         assert_series_equal(
             F.with_custom_func(custom_func, var_args=True, per_column=False).run(ts["a"], 0, 10, b=100).out,
             target,
@@ -330,7 +330,7 @@ class TestFactory:
         target = pd.DataFrame(
             np.array([[110.0], [110.0], [110.0], [110.0], [110.0]]),
             index=ts.index,
-            columns=pd.MultiIndex.from_tuples([(0, "a")], names=["custom_p", None]),
+            columns=pd.Index([0], dtype="int64", name="custom_p"),
         )
         assert_frame_equal(
             F.with_apply_func(apply_func, var_args=True).run(ts[["a"]], 0, 10, b=100, per_column=True).out,
@@ -340,7 +340,7 @@ class TestFactory:
             F.with_apply_func(apply_func_nb, var_args=True).run(ts[["a"]], 0, 10, 100, per_column=True).out,
             target,
         )
-        target = pd.Series(np.array([110.0, 110.0, 110.0, 110.0, 110.0]), index=ts.index, name=(0, "a"))
+        target = pd.Series(np.array([110.0, 110.0, 110.0, 110.0, 110.0]), index=ts.index)
         assert_series_equal(
             F.with_apply_func(apply_func, var_args=True).run(ts["a"], 0, 10, b=100).out,
             target,
@@ -1862,7 +1862,7 @@ class TestFactory:
         assert_index_equal(obj.wrapper.index, ts.index)
         assert_index_equal(
             obj.wrapper.columns,
-            pd.MultiIndex.from_tuples([(0, 1, "a")], names=["custom_p1", "custom_p2", None]),
+            pd.MultiIndex.from_tuples([(0, 1)], names=["custom_p1", "custom_p2"]),
         )
         obj = F.with_apply_func(lambda ts, p1, p2: ts * p1 * p2).run(ts["a"], [0, 1], 2)
         assert obj.wrapper.ndim == 2
@@ -1899,14 +1899,14 @@ class TestFactory:
         assert_index_equal(obj.wrapper.index, ts.index)
         assert_index_equal(
             obj.wrapper.columns,
-            pd.MultiIndex.from_tuples([(0, 1, "a")], names=["custom_p1", "custom_p2", None]),
+            pd.MultiIndex.from_tuples([(0, 1)], names=["custom_p1", "custom_p2"]),
         )
         obj = F.with_apply_func(lambda ts, p1, p2: ts * p1 * p2).run(ts[["a"]], 0, 1, per_column=True)
         assert obj.wrapper.ndim == 2
         assert_index_equal(obj.wrapper.index, ts.index)
         assert_index_equal(
             obj.wrapper.columns,
-            pd.MultiIndex.from_tuples([(0, 1, "a")], names=["custom_p1", "custom_p2", None]),
+            pd.MultiIndex.from_tuples([(0, 1)], names=["custom_p1", "custom_p2"]),
         )
         obj = F.with_apply_func(lambda ts, p1, p2: ts * p1 * p2).run(ts, 0, 1, per_column=True)
         assert obj.wrapper.ndim == 2
@@ -2406,6 +2406,7 @@ class TestFactory:
             "__hash__",
             "__init__",
             "__init_subclass__",
+            "__iter__",
             "__le__",
             "__lt__",
             "__module__",
@@ -2415,13 +2416,13 @@ class TestFactory:
             "__reduce_ex__",
             "__repr__",
             "__setattr__",
+            "__setitem__",
             "__sizeof__",
             "__str__",
             "__subclasshook__",
             "__weakref__",
             "_config",
             "_expected_keys",
-            "_xloc",
             "_iloc",
             "_in_out",
             "_in_output_names",
@@ -2454,6 +2455,7 @@ class TestFactory:
             "_tuple_mapper",
             "_wrapper",
             "_writeable_attrs",
+            "_xloc",
             "apply_func",
             "build_metrics_doc",
             "build_subplots_doc",
@@ -2478,7 +2480,6 @@ class TestFactory:
             "get_writeable_attrs",
             "getsize",
             "group_select",
-            "xloc",
             "iloc",
             "in_out",
             "in_out_readable",
@@ -2486,6 +2487,7 @@ class TestFactory:
             "in_output_names",
             "indexing_func",
             "indexing_kwargs",
+            "indexing_setter_func",
             "input_names",
             "lazy_output_names",
             "level_names",
@@ -2493,6 +2495,7 @@ class TestFactory:
             "loads",
             "loc",
             "metrics",
+            "modify_state",
             "o1",
             "o1_above",
             "o1_below",
@@ -2529,6 +2532,7 @@ class TestFactory:
             "resolve_attr",
             "resolve_column_stack_kwargs",
             "resolve_file_path",
+            "resolve_merge_kwargs",
             "resolve_row_stack_kwargs",
             "resolve_self",
             "resolve_shortcut_attr",
@@ -2560,6 +2564,7 @@ class TestFactory:
             "unpack",
             "update_config",
             "wrapper",
+            "xloc",
             "xs",
         ]
 
@@ -3338,17 +3343,16 @@ class TestBasic:
             ),
         )
 
-        outputs = vbt.ind_nb.bbands_nb(close.values, window=np.array([14, 28]))
-
+        outputs = vbt.ind_nb.bbands_nb(close.values, window=np.array([2, 3]))
         np.testing.assert_array_equal(
             outputs[0],
             np.array(
                 [
                     [np.nan, np.nan],
-                    [3.0, np.nan],
-                    [4.0, 5.847617696340303],
-                    [5.0, 5.475366274566866],
-                    [6.0, 4.876087095467319],
+                    [3.5, np.nan],
+                    [4.5, 5.6329931618554525],
+                    [5.5, 4.6329931618554525],
+                    [6.5, 3.632993161855452],
                 ]
             ),
         )
@@ -3358,9 +3362,9 @@ class TestBasic:
                 [
                     [np.nan, np.nan],
                     [2.5, np.nan],
-                    [3.5, 3.75],
-                    [4.5, 2.875],
-                    [5.5, 1.9375],
+                    [3.5, 4.0],
+                    [4.5, 3.0],
+                    [5.5, 2.0],
                 ]
             ),
         )
@@ -3369,10 +3373,10 @@ class TestBasic:
             np.array(
                 [
                     [np.nan, np.nan],
-                    [2.0, np.nan],
-                    [3.0, 1.6523823036596967],
-                    [4.0, 0.27463372543313413],
-                    [5.0, -1.0010870954673199],
+                    [1.5, np.nan],
+                    [2.5, 2.367006838144548],
+                    [3.5, 1.367006838144548],
+                    [4.5, 0.36700683814454793],
                 ]
             ),
         )
