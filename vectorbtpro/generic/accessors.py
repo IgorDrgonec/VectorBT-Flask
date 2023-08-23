@@ -2799,7 +2799,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             target_rbound_index=target_rbound_index.values,
             closed_lbound=closed_lbound,
             closed_rbound=closed_rbound,
-            skip_minus_one=False,
+            skip_not_found=False,
             jitted=jitted,
         )
 

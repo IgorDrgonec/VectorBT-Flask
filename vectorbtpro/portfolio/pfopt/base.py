@@ -1743,7 +1743,7 @@ class PortfolioOptimizer(Analyzable):
         kind: tp.Union[None, str, Param] = point_idxr_defaults["kind"],
         indexer_method: tp.Union[None, str, Param] = point_idxr_defaults["indexer_method"],
         indexer_tolerance: tp.Union[None, str, Param] = point_idxr_defaults["indexer_tolerance"],
-        skip_minus_one: tp.Union[bool, Param] = point_idxr_defaults["skip_minus_one"],
+        skip_not_found: tp.Union[bool, Param] = point_idxr_defaults["skip_not_found"],
         index_points: tp.Union[None, tp.MaybeSequence[int], Param] = None,
         rescale_to: tp.Union[None, tp.Tuple[float, float], Param] = None,
         search_max_len: tp.Optional[int] = None,
@@ -1952,7 +1952,7 @@ class PortfolioOptimizer(Analyzable):
             "kind": kind,
             "indexer_method": indexer_method,
             "indexer_tolerance": indexer_tolerance,
-            "skip_minus_one": skip_minus_one,
+            "skip_not_found": skip_not_found,
             "index_points": index_points,
             "rescale_to": rescale_to,
             **{f"args_{i}": args[i] for i in range(len(args))},
@@ -2056,7 +2056,7 @@ class PortfolioOptimizer(Analyzable):
                 _kind = group_config.pop("kind")
                 _indexer_method = group_config.pop("indexer_method")
                 _indexer_tolerance = group_config.pop("indexer_tolerance")
-                _skip_minus_one = group_config.pop("skip_minus_one")
+                _skip_not_found = group_config.pop("skip_not_found")
                 _index_points = group_config.pop("index_points")
                 _rescale_to = group_config.pop("rescale_to")
                 _jitted_loop = group_config.pop("jitted_loop")
@@ -2085,7 +2085,7 @@ class PortfolioOptimizer(Analyzable):
                         kind=_kind,
                         indexer_method=_indexer_method,
                         indexer_tolerance=_indexer_tolerance,
-                        skip_minus_one=_skip_minus_one,
+                        skip_not_found=_skip_not_found,
                         index_points=_index_points,
                         rescale_to=_rescale_to,
                         jitted_loop=_jitted_loop,
@@ -2112,7 +2112,7 @@ class PortfolioOptimizer(Analyzable):
                             kind=_kind,
                             indexer_method=_indexer_method,
                             indexer_tolerance=_indexer_tolerance,
-                            skip_minus_one=_skip_minus_one,
+                            skip_not_found=_skip_not_found,
                         ),
                         _template_context,
                         sub_id="get_index_points_defaults",
@@ -2428,7 +2428,7 @@ class PortfolioOptimizer(Analyzable):
         add_start_delta: tp.Union[None, tp.FrequencyLike, Param] = range_idxr_defaults["add_start_delta"],
         add_end_delta: tp.Union[None, tp.FrequencyLike, Param] = range_idxr_defaults["add_end_delta"],
         kind: tp.Union[None, str, Param] = range_idxr_defaults["kind"],
-        skip_minus_one: tp.Union[bool, Param] = range_idxr_defaults["skip_minus_one"],
+        skip_not_found: tp.Union[bool, Param] = range_idxr_defaults["skip_not_found"],
         index_ranges: tp.Union[None, tp.MaybeSequence[tp.MaybeSequence[int]], Param] = None,
         index_loc: tp.Union[None, tp.MaybeSequence[int], Param] = None,
         rescale_to: tp.Union[None, tp.Tuple[float, float], Param] = None,
@@ -2709,7 +2709,7 @@ class PortfolioOptimizer(Analyzable):
             "add_start_delta": add_start_delta,
             "add_end_delta": add_end_delta,
             "kind": kind,
-            "skip_minus_one": skip_minus_one,
+            "skip_not_found": skip_not_found,
             "index_ranges": index_ranges,
             "index_loc": index_loc,
             "rescale_to": rescale_to,
@@ -2818,7 +2818,7 @@ class PortfolioOptimizer(Analyzable):
                 _add_start_delta = group_config.pop("add_start_delta")
                 _add_end_delta = group_config.pop("add_end_delta")
                 _kind = group_config.pop("kind")
-                _skip_minus_one = group_config.pop("skip_minus_one")
+                _skip_not_found = group_config.pop("skip_not_found")
                 _index_ranges = group_config.pop("index_ranges")
                 _index_loc = group_config.pop("index_loc")
                 _rescale_to = group_config.pop("rescale_to")
@@ -2853,7 +2853,7 @@ class PortfolioOptimizer(Analyzable):
                         add_start_delta=_add_start_delta,
                         add_end_delta=_add_end_delta,
                         kind=_kind,
-                        skip_minus_one=_skip_minus_one,
+                        skip_not_found=_skip_not_found,
                         index_ranges=_index_ranges,
                         index_loc=_index_loc,
                         rescale_to=_rescale_to,
@@ -2886,7 +2886,7 @@ class PortfolioOptimizer(Analyzable):
                             add_start_delta=_add_start_delta,
                             add_end_delta=_add_end_delta,
                             kind=_kind,
-                            skip_minus_one=_skip_minus_one,
+                            skip_not_found=_skip_not_found,
                             jitted=_jitted,
                         ),
                         _template_context,

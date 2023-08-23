@@ -332,7 +332,7 @@ class Resampler(Configured):
         target_rbound_index: tp.Optional[tp.IndexLike] = None,
         closed_lbound: bool = True,
         closed_rbound: bool = False,
-        skip_minus_one: bool = False,
+        skip_not_found: bool = False,
         jitted: tp.JittedOption = None,
     ) -> tp.Tuple[tp.Array1d, tp.Array1d]:
         """See `vectorbtpro.base.resampling.nb.map_bounds_to_source_ranges_nb`.
@@ -375,7 +375,7 @@ class Resampler(Configured):
             target_rbound_index.values,
             closed_lbound=closed_lbound,
             closed_rbound=closed_rbound,
-            skip_minus_one=skip_minus_one,
+            skip_not_found=skip_not_found,
         )
 
     def resample_source_mask(

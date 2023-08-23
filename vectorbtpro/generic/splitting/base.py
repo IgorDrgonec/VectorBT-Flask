@@ -1064,7 +1064,7 @@ class Splitter(Analyzable):
             if k in func_arg_names:
                 ranges_kwargs[k] = kwargs.pop(k)
 
-        start_idxs, stop_idxs = get_index_ranges(index, *args, skip_minus_one=True, **ranges_kwargs)
+        start_idxs, stop_idxs = get_index_ranges(index, *args, skip_not_found=True, **ranges_kwargs)
         splits = []
         for start, stop in zip(start_idxs, stop_idxs):
             new_split = slice(start, stop)
