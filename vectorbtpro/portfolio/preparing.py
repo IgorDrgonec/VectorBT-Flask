@@ -528,8 +528,8 @@ fo_arg_config = ReadonlyConfig(
         save_state=dict(),
         save_value=dict(),
         save_returns=dict(),
-        max_orders=dict(),
-        max_logs=dict(),
+        max_order_records=dict(),
+        max_log_records=dict(),
     )
 )
 """_"""
@@ -568,14 +568,14 @@ class FOPreparer(BasePFPreparer):
         return 0
 
     @cachedproperty
-    def _pre_max_orders(self) -> tp.Optional[int]:
-        """Argument `max_orders` before broadcasting."""
-        return self["max_orders"]
+    def _pre_max_order_records(self) -> tp.Optional[int]:
+        """Argument `max_order_records` before broadcasting."""
+        return self["max_order_records"]
 
     @cachedproperty
-    def _pre_max_logs(self) -> tp.Optional[int]:
-        """Argument `max_logs` before broadcasting."""
-        return self["max_logs"]
+    def _pre_max_log_records(self) -> tp.Optional[int]:
+        """Argument `max_log_records` before broadcasting."""
+        return self["max_log_records"]
 
     # ############# After broadcasting ############# #
 
@@ -608,34 +608,34 @@ class FOPreparer(BasePFPreparer):
         return self.price_and_from_ago[1]
 
     @cachedproperty
-    def max_orders(self) -> tp.Optional[int]:
-        """Argument `max_orders`."""
-        max_orders = self._pre_max_orders
-        if max_orders is None:
+    def max_order_records(self) -> tp.Optional[int]:
+        """Argument `max_order_records`."""
+        max_order_records = self._pre_max_order_records
+        if max_order_records is None:
             _size = self._post_size
             if _size.size == 1:
-                max_orders = self.target_shape[0] * int(not np.isnan(_size.item(0)))
+                max_order_records = self.target_shape[0] * int(not np.isnan(_size.item(0)))
             else:
                 if _size.shape[0] == 1 and self.target_shape[0] > 1:
-                    max_orders = self.target_shape[0] * int(np.any(~np.isnan(_size)))
+                    max_order_records = self.target_shape[0] * int(np.any(~np.isnan(_size)))
                 else:
-                    max_orders = int(np.max(np.sum(~np.isnan(_size), axis=0)))
-        return max_orders
+                    max_order_records = int(np.max(np.sum(~np.isnan(_size), axis=0)))
+        return max_order_records
 
     @cachedproperty
-    def max_logs(self) -> tp.Optional[int]:
-        """Argument `max_logs`."""
-        max_logs = self._pre_max_logs
-        if max_logs is None:
+    def max_log_records(self) -> tp.Optional[int]:
+        """Argument `max_log_records`."""
+        max_log_records = self._pre_max_log_records
+        if max_log_records is None:
             _log = self._post_log
             if _log.size == 1:
-                max_logs = self.target_shape[0] * int(_log.item(0))
+                max_log_records = self.target_shape[0] * int(_log.item(0))
             else:
                 if _log.shape[0] == 1 and self.target_shape[0] > 1:
-                    max_logs = self.target_shape[0] * int(np.any(_log))
+                    max_log_records = self.target_shape[0] * int(np.any(_log))
                 else:
-                    max_logs = int(np.max(np.sum(_log, axis=0)))
-        return max_logs
+                    max_log_records = int(np.max(np.sum(_log, axis=0)))
+        return max_log_records
 
     # ############# Template substitution ############# #
 
@@ -649,8 +649,8 @@ class FOPreparer(BasePFPreparer):
                 save_state=self.save_state,
                 save_value=self.save_value,
                 save_returns=self.save_returns,
-                max_orders=self.max_orders,
-                max_logs=self.max_logs,
+                max_order_records=self.max_order_records,
+                max_log_records=self.max_log_records,
             ),
             BasePFPreparer.template_context.func(self),
         )
@@ -908,8 +908,8 @@ fs_arg_config = ReadonlyConfig(
         save_state=dict(),
         save_value=dict(),
         save_returns=dict(),
-        max_orders=dict(),
-        max_logs=dict(),
+        max_order_records=dict(),
+        max_log_records=dict(),
         records=dict(
             rename_fields=dict(
                 entry="entries",
@@ -1166,9 +1166,9 @@ class FSPreparer(BasePFPreparer):
         return 0
 
     @cachedproperty
-    def _pre_max_logs(self) -> tp.Optional[int]:
-        """Argument `max_logs` before broadcasting."""
-        return self["max_logs"]
+    def _pre_max_log_records(self) -> tp.Optional[int]:
+        """Argument `max_log_records` before broadcasting."""
+        return self["max_log_records"]
 
     @cachedproperty
     def _pre_in_outputs(self) -> tp.Optional[tp.NamedTuple]:
@@ -1320,19 +1320,19 @@ class FSPreparer(BasePFPreparer):
         return self.price_and_from_ago[1]
 
     @cachedproperty
-    def max_logs(self) -> tp.Optional[int]:
-        """Argument `max_logs`."""
-        max_logs = self._pre_max_logs
-        if max_logs is None:
+    def max_log_records(self) -> tp.Optional[int]:
+        """Argument `max_log_records`."""
+        max_log_records = self._pre_max_log_records
+        if max_log_records is None:
             _log = self._post_log
             if _log.size == 1:
-                max_logs = self.target_shape[0] * int(_log.item(0))
+                max_log_records = self.target_shape[0] * int(_log.item(0))
             else:
                 if _log.shape[0] == 1 and self.target_shape[0] > 1:
-                    max_logs = self.target_shape[0] * int(np.any(_log))
+                    max_log_records = self.target_shape[0] * int(np.any(_log))
                 else:
-                    max_logs = int(np.max(np.sum(_log, axis=0)))
-        return max_logs
+                    max_log_records = int(np.max(np.sum(_log, axis=0)))
+        return max_log_records
 
     @cachedproperty
     def use_stops(self) -> bool:
@@ -1395,8 +1395,8 @@ class FSPreparer(BasePFPreparer):
                 save_state=self.save_state,
                 save_value=self.save_value,
                 save_returns=self.save_returns,
-                max_orders=self.max_orders,
-                max_logs=self.max_logs,
+                max_order_records=self.max_order_records,
+                max_log_records=self.max_log_records,
             ),
             BasePFPreparer.template_context.func(self),
         )
@@ -1561,8 +1561,8 @@ fof_arg_config = ReadonlyConfig(
         fill_pos_info=dict(),
         track_value=dict(),
         row_wise=dict(),
-        max_orders=dict(),
-        max_logs=dict(),
+        max_order_records=dict(),
+        max_log_records=dict(),
     )
 )
 """_"""
@@ -1816,8 +1816,8 @@ class FOFPreparer(BasePFPreparer):
                 update_value=self.update_value,
                 fill_pos_info=self.fill_pos_info,
                 track_value=self.track_value,
-                max_orders=self.max_orders,
-                max_logs=self.max_logs,
+                max_order_records=self.max_order_records,
+                max_log_records=self.max_log_records,
             ),
             BasePFPreparer.template_context.func(self),
         )

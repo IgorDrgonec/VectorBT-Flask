@@ -235,7 +235,7 @@ class RandomData(SyntheticData):
         cls,
         symbol: tp.Symbol,
         index: tp.Index,
-        features: tp.Union[tp.Hashable, tp.IndexLike] = None,
+        columns: tp.Union[tp.Hashable, tp.IndexLike] = None,
         start_value: tp.Optional[float] = None,
         mean: tp.Optional[float] = None,
         std: tp.Optional[float] = None,
@@ -249,7 +249,7 @@ class RandomData(SyntheticData):
         Args:
             symbol (str): Symbol.
             index (pd.Index): Pandas index.
-            features (hashable or index_like): Feature names.
+            columns (hashable or index_like): Column names.
 
                 Provide a single value (hashable) to make a Series.
             start_value (float): Value at time 0.
@@ -268,13 +268,13 @@ class RandomData(SyntheticData):
         """
         random_cfg = cls.get_settings(key_id="custom")
 
-        if checks.is_hashable(features):
-            features = [features]
+        if checks.is_hashable(columns):
+            columns = [columns]
             make_series = True
         else:
             make_series = False
-        if not isinstance(features, pd.Index):
-            features = pd.Index(features)
+        if not isinstance(columns, pd.Index):
+            columns = pd.Index(columns)
         if start_value is None:
             start_value = random_cfg["start_value"]
         if mean is None:
@@ -290,15 +290,15 @@ class RandomData(SyntheticData):
 
         func = jit_reg.resolve_option(nb.generate_random_data_nb, jitted)
         out = func(
-            (len(index), len(features)),
+            (len(index), len(columns)),
             start_value=to_1d_array(start_value),
             mean=to_1d_array(mean),
             std=to_1d_array(std),
             symmetric=to_1d_array(symmetric),
         )
         if make_series:
-            return pd.Series(out[:, 0], index=index, name=features[0])
-        return pd.DataFrame(out, index=index, columns=features)
+            return pd.Series(out[:, 0], index=index, name=columns[0])
+        return pd.DataFrame(out, index=index, columns=columns)
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SymbolData:
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
@@ -400,7 +400,7 @@ class GBMData(SyntheticData):
         cls,
         symbol: tp.Symbol,
         index: tp.Index,
-        features: tp.Union[tp.Hashable, tp.IndexLike] = None,
+        columns: tp.Union[tp.Hashable, tp.IndexLike] = None,
         start_value: tp.Optional[float] = None,
         mean: tp.Optional[float] = None,
         std: tp.Optional[float] = None,
@@ -414,7 +414,7 @@ class GBMData(SyntheticData):
         Args:
             symbol (str): Symbol.
             index (pd.Index): Pandas index.
-            features (hashable or index_like): Feature names.
+            columns (hashable or index_like): Column names.
 
                 Provide a single value (hashable) to make a Series.
             start_value (float): Value at time 0.
@@ -433,13 +433,13 @@ class GBMData(SyntheticData):
         """
         gbm_cfg = cls.get_settings(key_id="custom")
 
-        if checks.is_hashable(features):
-            features = [features]
+        if checks.is_hashable(columns):
+            columns = [columns]
             make_series = True
         else:
             make_series = False
-        if not isinstance(features, pd.Index):
-            features = pd.Index(features)
+        if not isinstance(columns, pd.Index):
+            columns = pd.Index(columns)
         if start_value is None:
             start_value = gbm_cfg["start_value"]
         if mean is None:
@@ -455,15 +455,15 @@ class GBMData(SyntheticData):
 
         func = jit_reg.resolve_option(nb.generate_gbm_data_nb, jitted)
         out = func(
-            (len(index), len(features)),
+            (len(index), len(columns)),
             start_value=to_1d_array(start_value),
             mean=to_1d_array(mean),
             std=to_1d_array(std),
             dt=to_1d_array(dt),
         )
         if make_series:
-            return pd.Series(out[:, 0], index=index, name=features[0])
-        return pd.DataFrame(out, index=index, columns=features)
+            return pd.Series(out[:, 0], index=index, name=columns[0])
+        return pd.DataFrame(out, index=index, columns=columns)
 
 
 class GBMOHLCData(GBMData):

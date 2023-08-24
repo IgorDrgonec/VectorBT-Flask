@@ -481,7 +481,6 @@ def build_param_indexer(
         setattr(ParamIndexer, param_name + "_loc", property(param_loc))
 
     ParamIndexer.__name__ = class_name
-    ParamIndexer.__qualname__ = class_name
     if module_name is not None:
         ParamIndexer.__module__ = module_name
 

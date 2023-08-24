@@ -1399,7 +1399,7 @@ def process_order_nb(
         if is_filled and order_records.shape[0] > 0:
             # Fill order record
             if order_counts[col] >= order_records.shape[0]:
-                raise IndexError("order_records index out of range. Set a higher max_orders.")
+                raise IndexError("order_records index out of range. Set a higher max_order_records.")
             fill_order_record_nb(order_records, order_counts[col], col, i, order_result)
             order_counts[col] += 1
 
@@ -1407,7 +1407,7 @@ def process_order_nb(
         if order.log and log_records.shape[0] > 0:
             # Fill log record
             if log_counts[col] >= log_records.shape[0]:
-                raise IndexError("log_records index out of range. Set a higher max_logs.")
+                raise IndexError("log_records index out of range. Set a higher max_log_records.")
             fill_log_record_nb(
                 log_records,
                 log_counts[col],
@@ -1551,18 +1551,18 @@ def get_group_value_nb(
 @register_jitted(cache=True)
 def prepare_records_nb(
     target_shape: tp.Shape,
-    max_orders: tp.Optional[int] = None,
-    max_logs: tp.Optional[int] = 0,
+    max_order_records: tp.Optional[int] = None,
+    max_log_records: tp.Optional[int] = 0,
 ) -> tp.Tuple[tp.RecordArray2d, tp.RecordArray2d]:
     """Prepare records."""
-    if max_orders is None:
+    if max_order_records is None:
         order_records = np.empty((target_shape[0], target_shape[1]), dtype=order_dt)
     else:
-        order_records = np.empty((max_orders, target_shape[1]), dtype=order_dt)
-    if max_logs is None:
+        order_records = np.empty((max_order_records, target_shape[1]), dtype=order_dt)
+    if max_log_records is None:
         log_records = np.empty((target_shape[0], target_shape[1]), dtype=log_dt)
     else:
-        log_records = np.empty((max_logs, target_shape[1]), dtype=log_dt)
+        log_records = np.empty((max_log_records, target_shape[1]), dtype=log_dt)
     return order_records, log_records
 
 

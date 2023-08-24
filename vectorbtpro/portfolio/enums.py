@@ -1304,9 +1304,9 @@ __pdoc__[
 It's a 2-dimensional array with records of type `order_dt`.
 
 The array is initialized with empty records first (they contain random data), and then 
-gradually filled with order data. The number of empty records depends upon `max_orders`, 
+gradually filled with order data. The number of empty records depends upon `max_order_records`, 
 but usually it matches the number of rows, meaning there is maximal one order record per element.
-`max_orders` can be chosen lower if not every `order_func_nb` leads to a filled order, to save memory.
+`max_order_records` can be chosen lower if not every `order_func_nb` leads to a filled order, to save memory.
 It can also be chosen higher if more than one order per element is expected.
 
 You can use `SimulationContext.order_counts` to get the number of filled orders in each column.
@@ -2149,7 +2149,7 @@ __pdoc__[
     "Order.log"
 ] = """Whether to log this order by filling a log record. 
 
-Remember to increase `max_logs`."""
+Remember to increase `max_log_records`."""
 
 NoOrder = Order(
     size=np.nan,

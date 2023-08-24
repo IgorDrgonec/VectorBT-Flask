@@ -243,7 +243,6 @@ def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
                 return getattr(self, _method_name)(**_method_kwargs)
 
             new_prop.__name__ = target_name
-            new_prop.__qualname__ = f"{cls.__name__}.{target_name}"
             new_prop.__doc__ = docstring
             setattr(cls, new_prop.__name__, decorator(new_prop, **decorator_kwargs))
         return cls

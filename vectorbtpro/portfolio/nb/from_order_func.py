@@ -429,8 +429,8 @@ PostOrderFuncT = tp.Callable[[PostOrderContext, tp.VarArg()], None]
         update_value=None,
         fill_pos_info=None,
         track_value=None,
-        max_orders=None,
-        max_logs=None,
+        max_order_records=None,
+        max_log_records=None,
         in_outputs=ch.ArgsTaker(),
     ),
     **portfolio_ch.merge_sim_outs_config,
@@ -481,8 +481,8 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
     update_value: bool = False,
     fill_pos_info: bool = True,
     track_value: bool = True,
-    max_orders: tp.Optional[int] = None,
-    max_logs: tp.Optional[int] = 0,
+    max_order_records: tp.Optional[int] = None,
+    max_log_records: tp.Optional[int] = 0,
     in_outputs: tp.Optional[tp.NamedTuple] = None,
 ) -> SimulationOutput:
     """Fill order and log records by iterating over a shape and calling a range of user-defined functions.
@@ -600,8 +600,8 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
         update_value (bool): See `vectorbtpro.portfolio.enums.SimulationContext.update_value`.
         fill_pos_info (bool): See `vectorbtpro.portfolio.enums.SimulationContext.fill_pos_info`.
         track_value (bool): See `vectorbtpro.portfolio.enums.SimulationContext.track_value`.
-        max_orders (int): The max number of order records expected to be filled at each column.
-        max_logs (int): The max number of log records expected to be filled at each column.
+        max_order_records (int): The max number of order records expected to be filled at each column.
+        max_log_records (int): The max number of log records expected to be filled at each column.
         in_outputs (bool): See `vectorbtpro.portfolio.enums.SimulationContext.in_outputs`.
 
     !!! note
@@ -841,7 +841,7 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
     close_ = to_2d_array_nb(np.asarray(close))
     bm_close_ = to_2d_array_nb(np.asarray(bm_close))
 
-    order_records, log_records = prepare_records_nb(target_shape, max_orders, max_logs)
+    order_records, log_records = prepare_records_nb(target_shape, max_order_records, max_log_records)
     last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)
     last_position = prepare_last_position_nb(target_shape, init_position_)
     last_value = prepare_last_value_nb(
@@ -1652,8 +1652,8 @@ PostRowFuncT = tp.Callable[[RowContext, tp.VarArg()], None]
         update_value=None,
         fill_pos_info=None,
         track_value=None,
-        max_orders=None,
-        max_logs=None,
+        max_order_records=None,
+        max_log_records=None,
         in_outputs=ch.ArgsTaker(),
     ),
     **portfolio_ch.merge_sim_outs_config,
@@ -1704,8 +1704,8 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
     update_value: bool = False,
     fill_pos_info: bool = True,
     track_value: bool = True,
-    max_orders: tp.Optional[int] = None,
-    max_logs: tp.Optional[int] = 0,
+    max_order_records: tp.Optional[int] = None,
+    max_log_records: tp.Optional[int] = 0,
     in_outputs: tp.Optional[tp.NamedTuple] = None,
 ) -> SimulationOutput:
     """Same as `from_order_func_nb`, but iterates in row-major order.
@@ -1827,7 +1827,7 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
     close_ = to_2d_array_nb(np.asarray(close))
     bm_close_ = to_2d_array_nb(np.asarray(bm_close))
 
-    order_records, log_records = prepare_records_nb(target_shape, max_orders, max_logs)
+    order_records, log_records = prepare_records_nb(target_shape, max_order_records, max_log_records)
     last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)
     last_position = prepare_last_position_nb(target_shape, init_position_)
     last_value = prepare_last_value_nb(
@@ -2622,8 +2622,8 @@ FlexOrderFuncT = tp.Callable[[FlexOrderContext, tp.VarArg()], tp.Tuple[int, Orde
         update_value=None,
         fill_pos_info=None,
         track_value=None,
-        max_orders=None,
-        max_logs=None,
+        max_order_records=None,
+        max_log_records=None,
         in_outputs=ch.ArgsTaker(),
     ),
     **portfolio_ch.merge_sim_outs_config,
@@ -2673,8 +2673,8 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
     update_value: bool = False,
     fill_pos_info: bool = True,
     track_value: bool = True,
-    max_orders: tp.Optional[int] = None,
-    max_logs: tp.Optional[int] = 0,
+    max_order_records: tp.Optional[int] = None,
+    max_log_records: tp.Optional[int] = 0,
     in_outputs: tp.Optional[tp.NamedTuple] = None,
 ) -> SimulationOutput:
     """Same as `from_order_func_nb`, but with no predefined call sequence.
@@ -2689,7 +2689,7 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
 
     !!! note
         Since one element can now accommodate multiple orders, you may run into "order_records index out of range"
-        exception. In this case, you must increase `max_orders`. This cannot be done automatically and
+        exception. In this case, you must increase `max_order_records`. This cannot be done automatically and
         dynamically to avoid performance degradation.
 
     Call hierarchy:
@@ -2870,7 +2870,7 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
     close_ = to_2d_array_nb(np.asarray(close))
     bm_close_ = to_2d_array_nb(np.asarray(bm_close))
 
-    order_records, log_records = prepare_records_nb(target_shape, max_orders, max_logs)
+    order_records, log_records = prepare_records_nb(target_shape, max_order_records, max_log_records)
     last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)
     last_position = prepare_last_position_nb(target_shape, init_position_)
     last_value = prepare_last_value_nb(
@@ -3634,8 +3634,8 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
         update_value=None,
         fill_pos_info=None,
         track_value=None,
-        max_orders=None,
-        max_logs=None,
+        max_order_records=None,
+        max_log_records=None,
         in_outputs=ch.ArgsTaker(),
     ),
     **portfolio_ch.merge_sim_outs_config,
@@ -3685,8 +3685,8 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
     update_value: bool = False,
     fill_pos_info: bool = True,
     track_value: bool = True,
-    max_orders: tp.Optional[int] = None,
-    max_logs: tp.Optional[int] = 0,
+    max_order_records: tp.Optional[int] = None,
+    max_log_records: tp.Optional[int] = 0,
     in_outputs: tp.Optional[tp.NamedTuple] = None,
 ) -> SimulationOutput:
     """Same as `from_flex_order_func_nb`, but iterates using row-major order, with the rows
@@ -3755,7 +3755,7 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
     close_ = to_2d_array_nb(np.asarray(close))
     bm_close_ = to_2d_array_nb(np.asarray(bm_close))
 
-    order_records, log_records = prepare_records_nb(target_shape, max_orders, max_logs)
+    order_records, log_records = prepare_records_nb(target_shape, max_order_records, max_log_records)
     last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)
     last_position = prepare_last_position_nb(target_shape, init_position_)
     last_value = prepare_last_value_nb(

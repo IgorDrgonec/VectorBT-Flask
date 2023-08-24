@@ -6173,19 +6173,19 @@ class TestFromSignals:
             ),
         )
 
-    def test_max_orders(self):
+    def test_max_order_records(self):
         assert from_signals_both(close=price_wide).order_records.shape[0] == 6
-        assert from_signals_both(close=price_wide, max_orders=2).order_records.shape[0] == 6
-        assert from_signals_both(close=price_wide, max_orders=0).order_records.shape[0] == 0
+        assert from_signals_both(close=price_wide, max_order_records=2).order_records.shape[0] == 6
+        assert from_signals_both(close=price_wide, max_order_records=0).order_records.shape[0] == 0
         with pytest.raises(Exception):
-            from_signals_both(close=price_wide, max_orders=1)
+            from_signals_both(close=price_wide, max_order_records=1)
 
-    def test_max_logs(self):
+    def test_max_log_records(self):
         assert from_signals_both(close=price_wide, log=True).log_records.shape[0] == 6
-        assert from_signals_both(close=price_wide, log=True, max_logs=2).log_records.shape[0] == 6
-        assert from_signals_both(close=price_wide, log=True, max_logs=0).log_records.shape[0] == 0
+        assert from_signals_both(close=price_wide, log=True, max_log_records=2).log_records.shape[0] == 6
+        assert from_signals_both(close=price_wide, log=True, max_log_records=0).log_records.shape[0] == 0
         with pytest.raises(Exception):
-            from_signals_both(close=price_wide, log=True, max_logs=1)
+            from_signals_both(close=price_wide, log=True, max_log_records=1)
 
     def test_jitted_parallel(self):
         price_wide2 = price_wide.copy()

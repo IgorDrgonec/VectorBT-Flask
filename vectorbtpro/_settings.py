@@ -572,6 +572,7 @@ ${config_doc}
 _settings["datetime"] = datetime
 
 data = child_dict(
+    keys_are_features=False,
     wrapper_kwargs=Config(),
     skip_on_error=False,
     silence_warnings=False,
@@ -1296,8 +1297,8 @@ portfolio = child_dict(
     from_ago=None,
     call_seq=None,
     attach_call_seq=False,
-    max_orders=None,
-    max_logs=None,
+    max_order_records=None,
+    max_log_records=None,
     jitted=None,
     chunked=None,
     staticized=False,

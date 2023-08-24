@@ -177,7 +177,7 @@ SettingsKeys = ClassVar[Union[None, Hashable, Dict[Hashable, Hashable]]]
 Key = Feature = Symbol = Hashable
 Keys = Features = Symbols = Sequence[Hashable]
 MaybeKeys = MaybeFeatures = MaybeSymbols = Union[Hashable, Sequence[Hashable]]
-SymbolData = Union[None, SeriesFrame, Tuple[SeriesFrame, Kwargs]]
+KeyData = FeatureData = SymbolData = Union[None, SeriesFrame, Tuple[SeriesFrame, Kwargs]]
 
 # Plotting
 TraceName = Union[str, None]

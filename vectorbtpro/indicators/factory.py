@@ -1595,7 +1595,7 @@ class IndicatorFactory(Configured):
                 )
                 return out
 
-            combine_method.__qualname__ = f"{Indicator.__name__}.{attr_name}_{func_name}"
+            combine_method.__name__ = f"{attr_name}_{func_name}"
             combine_method.__doc__ = docstring
             setattr(Indicator, f"{attr_name}_{func_name}", combine_method)
 
@@ -1614,7 +1614,7 @@ class IndicatorFactory(Configured):
                 ) -> tp.SeriesFrame:
                     return getattr(self, _attr_name).vbt(mapping=_mapping).apply_mapping(enum_unkval=_enum_unkval)
 
-                attr_readable.__qualname__ = f"{Indicator.__name__}.{attr_name}_readable"
+                attr_readable.__name__ = f"{attr_name}_readable"
                 attr_readable.__doc__ = inspect.cleandoc(
                     """`{attr_name}` in readable format based on the following mapping: 
                                 
@@ -1633,7 +1633,7 @@ class IndicatorFactory(Configured):
                 ) -> tp.SeriesFrame:
                     return getattr(self, _attr_name).vbt(mapping=_mapping).stats(*args, **kwargs)
 
-                attr_stats.__qualname__ = f"{Indicator.__name__}.{attr_name}_stats"
+                attr_stats.__name__ = f"{attr_name}_stats"
                 attr_stats.__doc__ = inspect.cleandoc("""Stats of `{attr_name}` based on the following mapping: 
 
                     ```python
@@ -1676,7 +1676,7 @@ class IndicatorFactory(Configured):
                 def attr_stats(self, *args, _attr_name: str = attr_name, **kwargs) -> tp.SeriesFrame:
                     return getattr(self, _attr_name).vbt.stats(*args, **kwargs)
 
-                attr_stats.__qualname__ = f"{Indicator.__name__}.{attr_name}_stats"
+                attr_stats.__name__ = f"{attr_name}_stats"
                 attr_stats.__doc__ = f"""Stats of `{attr_name}` as generic."""
                 setattr(Indicator, f"{attr_name}_stats", attr_stats)
 
@@ -1695,7 +1695,7 @@ class IndicatorFactory(Configured):
                 def attr_stats(self, *args, _attr_name: str = attr_name, **kwargs) -> tp.SeriesFrame:
                     return getattr(self, _attr_name).vbt.signals.stats(*args, **kwargs)
 
-                attr_stats.__qualname__ = f"{Indicator.__name__}.{attr_name}_stats"
+                attr_stats.__name__ = f"{attr_name}_stats"
                 attr_stats.__doc__ = f"""Stats of `{attr_name}` as signals."""
                 setattr(Indicator, f"{attr_name}_stats", attr_stats)
 
@@ -2185,7 +2185,7 @@ Other keyword arguments are passed to `{0}.run_pipeline`.""".format(
             _1,
         )
         run = compile_run_function("run", run_docstring, def_run_kwargs)
-        run.__qualname__ = f"{Indicator.__name__}.run"
+        run.__name__ = "run"
         setattr(Indicator, "run", run)
 
         if len(param_names) > 0:
@@ -2319,7 +2319,7 @@ Other keyword arguments are passed to `{0}.run`.
                 _1,
             )
             run_combs = compile_run_function("run_combs", run_combs_docstring, def_run_combs_kwargs)
-            run_combs.__qualname__ = f"{Indicator.__name__}.run_combs"
+            run_combs.__name__ = "run_combs"
             setattr(Indicator, "run_combs", run_combs)
 
         return Indicator
@@ -3208,7 +3208,6 @@ Other keyword arguments are passed to `{0}.run`.
                 **kwargs,
             )
 
-        plot.__qualname__ = f"{Indicator.__name__}.plot"
         plot.__doc__ = f"""Plot function based on `vbt.talib_plot_func("{func_name}")`."""
         setattr(Indicator, "plot", plot)
 

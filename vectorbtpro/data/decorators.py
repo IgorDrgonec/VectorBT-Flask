@@ -14,16 +14,16 @@ def attach_symbol_dict_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
 
     checks.assert_subclass_of(cls, "Data")
 
-    for target_name in cls._symbol_dict_attrs:
-        def new_method(self, _target_name=target_name, **kwargs):
+    for target_name in cls._key_dict_attrs:
+        def new_method(self, _target_name=target_name, check_dict_type: bool = True, **kwargs):
             new_kwargs = copy_dict(getattr(self, _target_name))
-            for s in self.symbols:
+            for s in self.get_keys(type(new_kwargs)):
                 if s not in new_kwargs:
                     new_kwargs[s] = dict()
             for k, v in kwargs.items():
-                from vectorbtpro.data.base import symbol_dict
-
-                if isinstance(v, symbol_dict):
+                if check_dict_type:
+                    self.check_dict_type(v, k, dict_type=type(new_kwargs))
+                if isinstance(v, type(new_kwargs)):
                     for s, _v in v.items():
                         new_kwargs[s][k] = _v
                 else:
@@ -32,7 +32,6 @@ def attach_symbol_dict_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
             return self.replace(**{_target_name: new_kwargs})
 
         new_method.__name__ = "update_" + target_name
-        new_method.__qualname__ = f"{cls.__name__}.get_{target_name}"
         new_method.__doc__ = f"""Update `Data.{target_name}`. Returns a new instance."""
         setattr(cls, new_method.__name__, new_method)
 

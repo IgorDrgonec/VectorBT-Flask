@@ -410,8 +410,8 @@ def signal_to_size_nb(
         save_state=None,
         save_value=None,
         save_returns=None,
-        max_orders=None,
-        max_logs=None,
+        max_order_records=None,
+        max_log_records=None,
     ),
     **portfolio_ch.merge_sim_outs_config,
 )
@@ -463,8 +463,8 @@ def from_basic_signals_nb(
     save_state: bool = False,
     save_value: bool = False,
     save_returns: bool = False,
-    max_orders: tp.Optional[int] = None,
-    max_logs: tp.Optional[int] = 0,
+    max_order_records: tp.Optional[int] = None,
+    max_log_records: tp.Optional[int] = 0,
 ) -> SimulationOutput:
     """Simulate given basic signals (no limit or stop orders).
 
@@ -514,14 +514,14 @@ def from_basic_signals_nb(
     upon_opposite_entry_ = to_2d_array_nb(np.asarray(upon_opposite_entry))
     from_ago_ = to_2d_array_nb(np.asarray(from_ago))
 
-    if max_orders is None:
+    if max_order_records is None:
         order_records = np.empty((target_shape[0], target_shape[1]), dtype=fs_order_dt)
     else:
-        order_records = np.empty((max_orders, target_shape[1]), dtype=fs_order_dt)
-    if max_logs is None:
+        order_records = np.empty((max_order_records, target_shape[1]), dtype=fs_order_dt)
+    if max_log_records is None:
         log_records = np.empty((target_shape[0], target_shape[1]), dtype=log_dt)
     else:
-        log_records = np.empty((max_logs, target_shape[1]), dtype=log_dt)
+        log_records = np.empty((max_log_records, target_shape[1]), dtype=log_dt)
     order_counts = np.full(target_shape[1], 0, dtype=np.int_)
     log_counts = np.full(target_shape[1], 0, dtype=np.int_)
 
@@ -1108,8 +1108,8 @@ def from_basic_signals_nb(
         save_state=None,
         save_value=None,
         save_returns=None,
-        max_orders=None,
-        max_logs=None,
+        max_order_records=None,
+        max_log_records=None,
     ),
     **portfolio_ch.merge_sim_outs_config,
 )
@@ -1188,8 +1188,8 @@ def from_signals_nb(
     save_state: bool = False,
     save_value: bool = False,
     save_returns: bool = False,
-    max_orders: tp.Optional[int] = None,
-    max_logs: tp.Optional[int] = 0,
+    max_order_records: tp.Optional[int] = None,
+    max_log_records: tp.Optional[int] = 0,
 ) -> SimulationOutput:
     """Simulate given signals.
 
@@ -1268,14 +1268,14 @@ def from_signals_nb(
     n_td_steps = td_stop_.shape[0]
     n_dt_steps = dt_stop_.shape[0]
 
-    if max_orders is None:
+    if max_order_records is None:
         order_records = np.empty((target_shape[0], target_shape[1]), dtype=fs_order_dt)
     else:
-        order_records = np.empty((max_orders, target_shape[1]), dtype=fs_order_dt)
-    if max_logs is None:
+        order_records = np.empty((max_order_records, target_shape[1]), dtype=fs_order_dt)
+    if max_log_records is None:
         log_records = np.empty((target_shape[0], target_shape[1]), dtype=log_dt)
     else:
-        log_records = np.empty((max_logs, target_shape[1]), dtype=log_dt)
+        log_records = np.empty((max_log_records, target_shape[1]), dtype=log_dt)
     order_counts = np.full(target_shape[1], 0, dtype=np.int_)
     log_counts = np.full(target_shape[1], 0, dtype=np.int_)
 
@@ -3426,8 +3426,8 @@ PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
         ffill_val_price=None,
         update_value=None,
         fill_pos_info=None,
-        max_orders=None,
-        max_logs=None,
+        max_order_records=None,
+        max_log_records=None,
         in_outputs=ch.ArgsTaker(),
     ),
     **portfolio_ch.merge_sim_outs_config,
@@ -3513,8 +3513,8 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     ffill_val_price: bool = True,
     update_value: bool = False,
     fill_pos_info: bool = True,
-    max_orders: tp.Optional[int] = None,
-    max_logs: tp.Optional[int] = 0,
+    max_order_records: tp.Optional[int] = None,
+    max_log_records: tp.Optional[int] = 0,
     in_outputs: tp.Optional[tp.NamedTuple] = None,
 ) -> SimulationOutput:
     """Simulate given a signal function.
@@ -3597,14 +3597,14 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     n_td_steps = td_stop_.shape[0]
     n_dt_steps = dt_stop_.shape[0]
 
-    if max_orders is None:
+    if max_order_records is None:
         order_records = np.empty((target_shape[0], target_shape[1]), dtype=fs_order_dt)
     else:
-        order_records = np.empty((max_orders, target_shape[1]), dtype=fs_order_dt)
-    if max_logs is None:
+        order_records = np.empty((max_order_records, target_shape[1]), dtype=fs_order_dt)
+    if max_log_records is None:
         log_records = np.empty((target_shape[0], target_shape[1]), dtype=log_dt)
     else:
-        log_records = np.empty((max_logs, target_shape[1]), dtype=log_dt)
+        log_records = np.empty((max_log_records, target_shape[1]), dtype=log_dt)
     order_counts = np.full(target_shape[1], 0, dtype=np.int_)
     log_counts = np.full(target_shape[1], 0, dtype=np.int_)
 

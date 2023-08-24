@@ -1473,32 +1473,32 @@ class TestData:
         assert data.to_feature_oriented().get_symbol_wrapper(symbols=["S1", "S3"]) == data.get_symbol_wrapper(
             symbols=["S1", "S3"]
         )
-        data = MyData.fetch("S1", symbol_classes="C1", shape=(5,), columns="F1").to_symbol_oriented()
+        data = MyData.fetch("S1", classes="C1", shape=(5,), columns="F1").to_symbol_oriented()
         assert_index_equal(
             data.symbol_wrapper.columns,
             pd.MultiIndex.from_tuples([("C1", "S1")], names=["symbol_class", "symbol"]),
         )
         assert data.to_feature_oriented().symbol_wrapper == data.symbol_wrapper
-        data = MyData.fetch("S1", symbol_classes=dict(c1="C1", c2="C2"), shape=(5,), columns="F1").to_symbol_oriented()
+        data = MyData.fetch("S1", classes=dict(c1="C1", c2="C2"), shape=(5,), columns="F1").to_symbol_oriented()
         assert_index_equal(
             data.symbol_wrapper.columns,
             pd.MultiIndex.from_tuples([("C1", "C2", "S1")], names=["c1", "c2", "symbol"]),
         )
         assert data.to_feature_oriented().symbol_wrapper == data.symbol_wrapper
-        data = MyData.fetch(["S1", "S2"], symbol_classes="C1", shape=(5,), columns="F1").to_symbol_oriented()
+        data = MyData.fetch(["S1", "S2"], classes="C1", shape=(5,), columns="F1").to_symbol_oriented()
         assert_index_equal(
             data.symbol_wrapper.columns,
             pd.MultiIndex.from_tuples([("C1", "S1"), ("C1", "S2")], names=["symbol_class", "symbol"]),
         )
         assert data.to_feature_oriented().symbol_wrapper == data.symbol_wrapper
-        data = MyData.fetch(["S1", "S2"], symbol_classes=["C1", "C2"], shape=(5,), columns="F1").to_symbol_oriented()
+        data = MyData.fetch(["S1", "S2"], classes=["C1", "C2"], shape=(5,), columns="F1").to_symbol_oriented()
         assert_index_equal(
             data.symbol_wrapper.columns,
             pd.MultiIndex.from_tuples([("C1", "S1"), ("C2", "S2")], names=["symbol_class", "symbol"]),
         )
         assert data.to_feature_oriented().symbol_wrapper == data.symbol_wrapper
         data = MyData.fetch(
-            ["S1", "S2"], symbol_classes=[dict(c1="C1", c2="C2"), dict(c1="C3", c2="C4")], shape=(5,), columns="F1"
+            ["S1", "S2"], classes=[dict(c1="C1", c2="C2"), dict(c1="C3", c2="C4")], shape=(5,), columns="F1"
         ).to_symbol_oriented()
         assert_index_equal(
             data.symbol_wrapper.columns,
@@ -2033,7 +2033,7 @@ class TestData:
                     index=pd.date_range("2020-01-01", "2020-01-05"),
                 )
             ),
-            single_symbol=True,
+            single_key=True,
         )
         ohlcv_data.feature_config["Other"] = dict(
             resample_func=lambda self, obj, resampler, **kwargs: obj.vbt.resample_apply(
@@ -2068,7 +2068,7 @@ class TestData:
                     index=pd.date_range("2020-01-01", "2020-01-05"),
                 )
             ),
-            single_symbol=True,
+            single_key=True,
         )
         ohlcv_data.feature_config["Other"] = dict(
             realign_func=lambda self, obj, resampler, **kwargs: obj.vbt.resample_opening(resampler, **kwargs)
@@ -2895,7 +2895,7 @@ class TestCustom:
         )
         assert_frame_equal(
             vbt.RandomData.fetch(
-                features=pd.Index([0, 1], name="path"), start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42
+                columns=pd.Index([0, 1], name="path"), start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42
             ).get(),
             pd.DataFrame(
                 [
@@ -2995,7 +2995,7 @@ class TestCustom:
         )
         assert_frame_equal(
             vbt.GBMData.fetch(
-                features=pd.Index([0, 1], name="path"), start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42
+                columns=pd.Index([0, 1], name="path"), start="2021-01-01 UTC", end="2021-01-06 UTC", seed=42
             ).get(),
             pd.DataFrame(
                 [

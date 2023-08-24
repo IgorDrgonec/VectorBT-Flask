@@ -56,8 +56,8 @@ from vectorbtpro.utils.array_ import insert_argsort_nb
         save_state=None,
         save_value=None,
         save_returns=None,
-        max_orders=None,
-        max_logs=None,
+        max_order_records=None,
+        max_log_records=None,
         skipna=None,
     ),
     **portfolio_ch.merge_sim_outs_config
@@ -102,8 +102,8 @@ def from_orders_nb(
     save_state: bool = False,
     save_value: bool = False,
     save_returns: bool = False,
-    max_orders: tp.Optional[int] = None,
-    max_logs: tp.Optional[int] = 0,
+    max_order_records: tp.Optional[int] = None,
+    max_log_records: tp.Optional[int] = 0,
 ) -> SimulationOutput:
     """Creates on order out of each element.
 
@@ -172,7 +172,7 @@ def from_orders_nb(
     val_price_ = to_2d_array_nb(np.asarray(val_price))
     from_ago_ = to_2d_array_nb(np.asarray(from_ago))
 
-    order_records, log_records = prepare_records_nb(target_shape, max_orders, max_logs)
+    order_records, log_records = prepare_records_nb(target_shape, max_order_records, max_log_records)
     order_counts = np.full(target_shape[1], 0, dtype=np.int_)
     log_counts = np.full(target_shape[1], 0, dtype=np.int_)
     last_cash = prepare_last_cash_nb(

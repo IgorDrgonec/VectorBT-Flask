@@ -2336,8 +2336,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         save_state: tp.Optional[bool] = None,
         save_value: tp.Optional[bool] = None,
         save_returns: tp.Optional[bool] = None,
-        max_orders: tp.Optional[int] = None,
-        max_logs: tp.Optional[int] = None,
+        max_order_records: tp.Optional[int] = None,
+        max_log_records: tp.Optional[int] = None,
         seed: tp.Optional[int] = None,
         group_by: tp.GroupByLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
@@ -2536,11 +2536,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             save_returns (bool): Whether to save the returns.
 
                 The array will be available as `returns` in in-outputs.
-            max_orders (int): The max number of order records expected to be filled at each column.
+            max_order_records (int): The max number of order records expected to be filled at each column.
                 Defaults to the maximum number of non-NaN values across all columns of the size array.
 
                 Set to a lower number if you run out of memory, and to 0 to not fill.
-            max_logs (int): The max number of log records expected to be filled at each column.
+            max_log_records (int): The max number of log records expected to be filled at each column.
                 Defaults to the maximum number of True values across all columns of the log array.
 
                 Set to a lower number if you run out of memory, and to 0 to not fill.
@@ -2871,8 +2871,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         save_state: tp.Optional[bool] = None,
         save_value: tp.Optional[bool] = None,
         save_returns: tp.Optional[bool] = None,
-        max_orders: tp.Optional[int] = None,
-        max_logs: tp.Optional[int] = None,
+        max_order_records: tp.Optional[int] = None,
+        max_log_records: tp.Optional[int] = None,
         in_outputs: tp.Optional[tp.MappingLike] = None,
         seed: tp.Optional[int] = None,
         group_by: tp.GroupByLike = None,
@@ -3151,8 +3151,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             save_state (bool): See `Portfolio.from_orders`.
             save_value (bool): See `Portfolio.from_orders`.
             save_returns (bool): See `Portfolio.from_orders`.
-            max_orders (int): See `Portfolio.from_orders`.
-            max_logs (int): See `Portfolio.from_orders`.
+            max_order_records (int): See `Portfolio.from_orders`.
+            max_log_records (int): See `Portfolio.from_orders`.
             in_outputs (mapping_like): Mapping with in-output objects. Only for flexible mode.
 
                 Will be available via `Portfolio.in_outputs` as a named tuple.
@@ -4031,8 +4031,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         fill_pos_info: tp.Optional[bool] = None,
         track_value: tp.Optional[bool] = None,
         row_wise: tp.Optional[bool] = None,
-        max_orders: tp.Optional[int] = None,
-        max_logs: tp.Optional[int] = None,
+        max_order_records: tp.Optional[int] = None,
+        max_log_records: tp.Optional[int] = None,
         in_outputs: tp.Optional[tp.MappingLike] = None,
         seed: tp.Optional[int] = None,
         group_by: tp.GroupByLike = None,
@@ -4152,12 +4152,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
                 Disable this to make simulation faster for simple use cases.
             row_wise (bool): Whether to iterate over rows rather than columns/groups.
-            max_orders (int): The max number of order records expected to be filled at each column.
+            max_order_records (int): The max number of order records expected to be filled at each column.
                 Defaults to the number of rows in the broadcasted shape.
 
                 Set to a lower number if you run out of memory, to 0 to not fill, and to a higher number
                 if there are more than one order expected at each timestamp.
-            max_logs (int): The max number of log records expected to be filled at each column.
+            max_log_records (int): The max number of log records expected to be filled at each column.
                 Defaults to the number of rows in the broadcasted shape.
 
                 Set to a lower number if you run out of memory, to 0 to not fill, and to a higher number
@@ -4540,7 +4540,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ...     flex_order_func_nb=flex_order_func_nb,
             ...     flex_order_args=(size,),
             ...     open=open,
-            ...     max_orders=close.shape[0] * 2
+            ...     max_order_records=close.shape[0] * 2
             ... )
 
             >>> pf.orders.records_readable

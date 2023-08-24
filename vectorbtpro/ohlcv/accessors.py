@@ -306,6 +306,140 @@ class OHLCVDFAccessor(OHLCDataMixin, GenericDFAccessor):
 
     # ############# Plotting ############# #
 
+    def plot_ohlc(
+        self,
+        ohlc_type: tp.Union[None, str, tp.BaseTraceType] = None,
+        trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:
+        """Plot OHLC data.
+
+        Args:
+            ohlc_type: Either 'OHLC', 'Candlestick' or Plotly trace.
+
+                Pass None to use the default.
+            trace_kwargs (dict): Keyword arguments passed to `ohlc_type`.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
+            fig (Figure or FigureWidget): Figure to add traces to.
+            **layout_kwargs: Keyword arguments for layout.
+        """
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("plotly")
+        import plotly.graph_objects as go
+        from vectorbtpro.utils.figure import make_figure
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+        ohlcv_cfg = settings["ohlcv"]
+
+        if trace_kwargs is None:
+            trace_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
+
+        # Set up figure
+        if fig is None:
+            fig = make_figure()
+        fig.update_layout(**layout_kwargs)
+
+        if ohlc_type is None:
+            ohlc_type = ohlcv_cfg["ohlc_type"]
+        if isinstance(ohlc_type, str):
+            if ohlc_type.lower() == "ohlc":
+                plot_obj = go.Ohlc
+            elif ohlc_type.lower() == "candlestick":
+                plot_obj = go.Candlestick
+            else:
+                raise ValueError("Plot type can be either 'OHLC' or 'Candlestick'")
+        else:
+            plot_obj = ohlc_type
+        def_trace_kwargs = dict(
+            x=self.wrapper.index,
+            open=self.open,
+            high=self.high,
+            low=self.low,
+            close=self.close,
+            name="OHLC",
+            increasing=dict(
+                fillcolor=plotting_cfg["color_schema"]["increasing"],
+                line=dict(color=plotting_cfg["color_schema"]["increasing"]),
+            ),
+            decreasing=dict(
+                fillcolor=plotting_cfg["color_schema"]["decreasing"],
+                line=dict(color=plotting_cfg["color_schema"]["decreasing"]),
+            ),
+            opacity=0.75,
+        )
+        if plot_obj is go.Ohlc:
+            del def_trace_kwargs["increasing"]["fillcolor"]
+            del def_trace_kwargs["decreasing"]["fillcolor"]
+        _trace_kwargs = merge_dicts(def_trace_kwargs, trace_kwargs)
+        ohlc = plot_obj(**_trace_kwargs)
+        fig.add_trace(ohlc, **add_trace_kwargs)
+        xaxis = getattr(fig.data[-1], "xaxis", None)
+        if xaxis is None:
+            xaxis = "x"
+        if "rangeslider_visible" not in layout_kwargs.get(xaxis.replace("x", "xaxis"), {}):
+            fig.update_layout({xaxis.replace("x", "xaxis"): dict(rangeslider_visible=False)})
+        return fig
+
+    def plot_volume(
+        self,
+        trace_kwargs: tp.KwargsLike = None,
+        add_trace_kwargs: tp.KwargsLike = None,
+        fig: tp.Optional[tp.BaseFigure] = None,
+        **layout_kwargs,
+    ) -> tp.BaseFigure:
+        """Plot volume data.
+
+        Args:
+            trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar`.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
+            fig (Figure or FigureWidget): Figure to add traces to.
+            **layout_kwargs: Keyword arguments for layout.
+        """
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("plotly")
+        import plotly.graph_objects as go
+        from vectorbtpro.utils.figure import make_figure
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        if trace_kwargs is None:
+            trace_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
+
+        # Set up figure
+        if fig is None:
+            fig = make_figure()
+        fig.update_layout(**layout_kwargs)
+
+        marker_colors = np.empty(self.volume.shape, dtype=object)
+        mask_greater = (self.close.values - self.open.values) > 0
+        mask_less = (self.close.values - self.open.values) < 0
+        marker_colors[mask_greater] = plotting_cfg["color_schema"]["increasing"]
+        marker_colors[mask_less] = plotting_cfg["color_schema"]["decreasing"]
+        marker_colors[~(mask_greater | mask_less)] = plotting_cfg["color_schema"]["gray"]
+        _trace_kwargs = merge_dicts(
+            dict(
+                x=self.wrapper.index,
+                y=self.volume,
+                marker=dict(color=marker_colors, line_width=0),
+                opacity=0.5,
+                name="Volume",
+            ),
+            trace_kwargs,
+        )
+        volume_bar = go.Bar(**_trace_kwargs)
+        fig.add_trace(volume_bar, **add_trace_kwargs)
+        return fig
+
     def plot(
         self,
         ohlc_type: tp.Union[None, str, tp.BaseTraceType] = None,
@@ -317,7 +451,7 @@ class OHLCVDFAccessor(OHLCDataMixin, GenericDFAccessor):
         fig: tp.Optional[tp.BaseFigure] = None,
         **layout_kwargs,
     ) -> tp.BaseFigure:
-        """Plot OHLCV data.
+        """Plot OHLC(V) data.
 
         Args:
             ohlc_type: Either 'OHLC', 'Candlestick' or Plotly trace.
@@ -345,21 +479,8 @@ class OHLCVDFAccessor(OHLCDataMixin, GenericDFAccessor):
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("plotly")
-        import plotly.graph_objects as go
         from vectorbtpro.utils.figure import make_figure, make_subplots
-        from vectorbtpro._settings import settings
 
-        plotting_cfg = settings["plotting"]
-        ohlcv_cfg = settings["ohlcv"]
-
-        if ohlc_trace_kwargs is None:
-            ohlc_trace_kwargs = {}
-        if volume_trace_kwargs is None:
-            volume_trace_kwargs = {}
-        if add_trace_kwargs is None:
-            add_trace_kwargs = {}
-        if volume_add_trace_kwargs is None:
-            volume_add_trace_kwargs = {}
         if plot_volume is None:
             plot_volume = self.volume is not None
         if plot_volume:
@@ -389,66 +510,18 @@ class OHLCVDFAccessor(OHLCDataMixin, GenericDFAccessor):
                     yaxis2=dict(showgrid=True),
                 )
         fig.update_layout(**layout_kwargs)
-        if ohlc_type is None:
-            ohlc_type = ohlcv_cfg["ohlc_type"]
-        if isinstance(ohlc_type, str):
-            if ohlc_type.lower() == "ohlc":
-                plot_obj = go.Ohlc
-            elif ohlc_type.lower() == "candlestick":
-                plot_obj = go.Candlestick
-            else:
-                raise ValueError("Plot type can be either 'OHLC' or 'Candlestick'")
-        else:
-            plot_obj = ohlc_type
-        def_ohlc_trace_kwargs = dict(
-            x=self.wrapper.index,
-            open=self.open,
-            high=self.high,
-            low=self.low,
-            close=self.close,
-            name="OHLC",
-            increasing=dict(
-                fillcolor=plotting_cfg["color_schema"]["increasing"],
-                line=dict(color=plotting_cfg["color_schema"]["increasing"]),
-            ),
-            decreasing=dict(
-                fillcolor=plotting_cfg["color_schema"]["decreasing"],
-                line=dict(color=plotting_cfg["color_schema"]["decreasing"]),
-            ),
-            opacity=0.75,
+
+        fig = self.plot_ohlc(
+            ohlc_type=ohlc_type,
+            trace_kwargs=ohlc_trace_kwargs,
+            add_trace_kwargs=add_trace_kwargs,
+            fig=fig,
         )
-        if plot_obj is go.Ohlc:
-            del def_ohlc_trace_kwargs["increasing"]["fillcolor"]
-            del def_ohlc_trace_kwargs["decreasing"]["fillcolor"]
-        _ohlc_trace_kwargs = merge_dicts(def_ohlc_trace_kwargs, ohlc_trace_kwargs)
-        ohlc = plot_obj(**_ohlc_trace_kwargs)
-        fig.add_trace(ohlc, **add_trace_kwargs)
-        xaxis = getattr(fig.data[-1], "xaxis", None)
-        if xaxis is None:
-            xaxis = "x"
-        if "rangeslider_visible" not in layout_kwargs.get(xaxis.replace("x", "xaxis"), {}):
-            fig.update_layout({xaxis.replace("x", "xaxis"): dict(rangeslider_visible=False)})
-
-        if plot_volume:
-            marker_colors = np.empty(self.volume.shape, dtype=object)
-            mask_greater = (self.close.values - self.open.values) > 0
-            mask_less = (self.close.values - self.open.values) < 0
-            marker_colors[mask_greater] = plotting_cfg["color_schema"]["increasing"]
-            marker_colors[mask_less] = plotting_cfg["color_schema"]["decreasing"]
-            marker_colors[~(mask_greater | mask_less)] = plotting_cfg["color_schema"]["gray"]
-            _volume_trace_kwargs = merge_dicts(
-                dict(
-                    x=self.wrapper.index,
-                    y=self.volume,
-                    marker=dict(color=marker_colors, line_width=0),
-                    opacity=0.5,
-                    name="Volume",
-                ),
-                volume_trace_kwargs,
-            )
-            volume_bar = go.Bar(**_volume_trace_kwargs)
-            fig.add_trace(volume_bar, **volume_add_trace_kwargs)
-
+        fig = self.plot_volume(
+            trace_kwargs=volume_trace_kwargs,
+            add_trace_kwargs=volume_add_trace_kwargs,
+            fig=fig,
+        )
         return fig
 
     @property

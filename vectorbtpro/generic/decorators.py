@@ -91,7 +91,6 @@ def attach_nb_methods(config: Config) -> tp.ClassWrapper:
                 new_method.__signature__ = source_sig.replace(parameters=new_parameters)
 
             new_method.__doc__ = f"See `{func.__module__ + '.' + func.__name__}`."
-            new_method.__qualname__ = f"{cls.__name__}.{target_name}"
             new_method.__name__ = target_name
             setattr(cls, target_name, new_method)
         return cls
@@ -150,7 +149,6 @@ def attach_transform_methods(config: Config) -> tp.ClassWrapper:
                     new_method.__signature__ = source_sig
 
             new_method.__doc__ = docstring
-            new_method.__qualname__ = f"{cls.__name__}.{target_name}"
             new_method.__name__ = target_name
             setattr(cls, target_name, new_method)
         return cls
