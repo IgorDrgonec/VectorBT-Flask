@@ -1,0 +1,112 @@
+# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+
+"""Module with `GBMData`."""
+
+import pandas as pd
+
+from vectorbtpro import _typing as tp
+from vectorbtpro.base.reshaping import to_1d_array
+from vectorbtpro.data import nb
+from vectorbtpro.registries.jit_registry import jit_reg
+from vectorbtpro.utils import checks
+from vectorbtpro.utils.config import merge_dicts
+from vectorbtpro.utils.random_ import set_seed
+from vectorbtpro.data.custom.synthetic import SyntheticData
+
+__all__ = [
+    "GBMData",
+]
+
+__pdoc__ = {}
+
+
+class GBMData(SyntheticData):
+    """`SyntheticData` for data generated using `vectorbtpro.data.nb.generate_gbm_data_nb`."""
+
+    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.gbm")
+
+    @classmethod
+    def generate_key(
+        cls,
+        key: tp.Key,
+        index: tp.Index,
+        columns: tp.Union[tp.Hashable, tp.IndexLike] = None,
+        start_value: tp.Optional[float] = None,
+        mean: tp.Optional[float] = None,
+        std: tp.Optional[float] = None,
+        dt: tp.Optional[float] = None,
+        seed: tp.Optional[int] = None,
+        jitted: tp.JittedOption = None,
+        **kwargs,
+    ) -> tp.KeyData:
+        """Generate a feature or symbol.
+
+        Args:
+            key (hashable): Feature or symbol.
+            index (pd.Index): Pandas index.
+            columns (hashable or index_like): Column names.
+
+                Provide a single value (hashable) to make a Series.
+            start_value (float): Value at time 0.
+
+                Does not appear as the first value in the output data.
+            mean (float): Drift, or mean of the percentage change.
+            std (float): Standard deviation of the percentage change.
+            dt (float): Time change (one period of time).
+            seed (int): Set seed to make output deterministic.
+            jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
+
+        For defaults, see `custom.gbm` in `vectorbtpro._settings.data`.
+
+        !!! note
+            When setting a seed, remember to pass a seed per feature/symbol using
+            `vectorbtpro.data.base.feature_dict`/`vectorbtpro.data.base.symbol_dict` or generally
+            `vectorbtpro.data.base.key_dict`.
+        """
+        gbm_cfg = cls.get_settings(key_id="custom")
+
+        if checks.is_hashable(columns):
+            columns = [columns]
+            make_series = True
+        else:
+            make_series = False
+        if not isinstance(columns, pd.Index):
+            columns = pd.Index(columns)
+        if start_value is None:
+            start_value = gbm_cfg["start_value"]
+        if mean is None:
+            mean = gbm_cfg["mean"]
+        if std is None:
+            std = gbm_cfg["std"]
+        if dt is None:
+            dt = gbm_cfg["dt"]
+        if seed is None:
+            seed = gbm_cfg["seed"]
+        if seed is not None:
+            set_seed(seed)
+
+        func = jit_reg.resolve_option(nb.generate_gbm_data_nb, jitted)
+        out = func(
+            (len(index), len(columns)),
+            start_value=to_1d_array(start_value),
+            mean=to_1d_array(mean),
+            std=to_1d_array(std),
+            dt=to_1d_array(dt),
+        )
+        if make_series:
+            return pd.Series(out[:, 0], index=index, name=columns[0])
+        return pd.DataFrame(out, index=index, columns=columns)
+
+    def update_key(self, key: tp.Key, key_is_feature: bool = False, **kwargs) -> tp.KeyData:
+        if key_is_feature:
+            fetch_kwargs = self.select_feature_kwargs(key, self.fetch_kwargs)
+        else:
+            fetch_kwargs = self.select_symbol_kwargs(key, self.fetch_kwargs)
+        fetch_kwargs["start"] = self.last_index[key]
+        _ = fetch_kwargs.pop("start_value", None)
+        start_value = self.data[key].iloc[-2]
+        fetch_kwargs["seed"] = None
+        kwargs = merge_dicts(fetch_kwargs, kwargs)
+        if key_is_feature:
+            return self.fetch_feature(key, start_value=start_value, **kwargs)
+        return self.fetch_symbol(key, start_value=start_value, **kwargs)

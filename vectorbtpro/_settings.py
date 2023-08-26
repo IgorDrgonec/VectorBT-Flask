@@ -599,8 +599,12 @@ data = child_dict(
             seed=None,
         ),
         random_ohlc=Config(
-            std=0.001,
             n_ticks=50,
+            start_value=100.0,
+            mean=0.0,
+            std=0.001,
+            symmetric=False,
+            seed=None,
         ),
         gbm=Config(
             start_value=100.0,
@@ -610,8 +614,12 @@ data = child_dict(
             seed=None,
         ),
         gbm_ohlc=Config(
-            std=0.001,
             n_ticks=50,
+            start_value=100.0,
+            mean=0.0,
+            std=0.001,
+            dt=1.0,
+            seed=None,
         ),
         # Local
         local=Config(),

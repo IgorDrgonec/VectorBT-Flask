@@ -32,9 +32,9 @@ def teardown_module():
 
 class MyData(vbt.Data):
     @classmethod
-    def fetch_symbol(
+    def fetch_key(
         cls,
-        symbol,
+        key,
         shape=(5, 3),
         start_date=datetime(2020, 1, 1),
         columns=None,
@@ -69,7 +69,7 @@ class MyData(vbt.Data):
                 a[:] = np.arange(len(a))
             else:
                 for i in range(a.shape[0]):
-                    a[i] = str(symbol) + "_" + str(i)
+                    a[i] = str(key) + "_" + str(i)
                     if is_update:
                         a[i] += "_u"
         else:
@@ -79,9 +79,9 @@ class MyData(vbt.Data):
                 for col in range(a.shape[1]):
                     for i in range(a.shape[0]):
                         if columns is not None:
-                            a[i, col] = str(symbol) + "_" + str(columns[col]) + "_" + str(i)
+                            a[i, col] = str(key) + "_" + str(columns[col]) + "_" + str(i)
                         else:
-                            a[i, col] = str(symbol) + "_" + str(col) + "_" + str(i)
+                            a[i, col] = str(key) + "_" + str(col) + "_" + str(i)
                         if is_update:
                             a[i, col] += "_u"
         if return_arr:
@@ -102,6 +102,22 @@ class MyData(vbt.Data):
         if tz_localize is not None:
             df = df.tz_localize(tz_localize)
         return df
+
+    @classmethod
+    def fetch_feature(cls, *args, **kwargs):
+        return cls.fetch_key(*args, **kwargs)
+
+    @classmethod
+    def fetch_symbol(cls, *args, **kwargs):
+        return cls.fetch_key(*args, **kwargs)
+
+    def update_feature(self, feature, n=1, **kwargs):
+        fetch_kwargs = self.select_feature_kwargs(feature, self.fetch_kwargs)
+        start_date = self.last_index[feature]
+        shape = fetch_kwargs.pop("shape", (5, 3))
+        new_shape = (n, shape[1]) if len(shape) > 1 else (n,)
+        kwargs = merge_dicts(fetch_kwargs, dict(start_date=start_date), kwargs)
+        return self.fetch_feature(feature, shape=new_shape, is_update=True, **kwargs)
 
     def update_symbol(self, symbol, n=1, **kwargs):
         fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
@@ -347,13 +363,14 @@ class TestData:
             new_data = MyData.load(tmp_path / "data", file_format="ini")
             assert new_data == data
 
-    def test_fetch(self):
+    @pytest.mark.parametrize("test_keys_are_features", [False, True])
+    def test_fetch(self, test_keys_are_features):
         assert_series_equal(
-            MyData.fetch("S1", shape=(5,), return_arr=True).data["S1"],
+            MyData.fetch("S1", keys_are_features=test_keys_are_features, shape=(5,), return_arr=True).data["S1"],
             pd.Series(["S1_0", "S1_1", "S1_2", "S1_3", "S1_4"]),
         )
         assert_frame_equal(
-            MyData.fetch("S1", shape=(5, 3), return_arr=True).data["S1"],
+            MyData.fetch("S1", keys_are_features=test_keys_are_features, shape=(5, 3), return_arr=True).data["S1"],
             pd.DataFrame(
                 [
                     ["S1_0_0", "S1_1_0", "S1_2_0"],
@@ -376,15 +393,15 @@ class TestData:
             tz=timezone.utc,
         )
         assert_series_equal(
-            MyData.fetch("S1", shape=(5,)).data["S1"],
+            MyData.fetch("S1", keys_are_features=test_keys_are_features, shape=(5,)).data["S1"],
             pd.Series(["S1_0", "S1_1", "S1_2", "S1_3", "S1_4"], index=index),
         )
         assert_series_equal(
-            MyData.fetch("S1", shape=(5,), columns="F1").data["S1"],
+            MyData.fetch("S1", keys_are_features=test_keys_are_features, shape=(5,), columns="F1").data["S1"],
             pd.Series(["S1_0", "S1_1", "S1_2", "S1_3", "S1_4"], index=index, name="F1"),
         )
         assert_frame_equal(
-            MyData.fetch("S1", shape=(5, 3)).data["S1"],
+            MyData.fetch("S1", keys_are_features=test_keys_are_features, shape=(5, 3)).data["S1"],
             pd.DataFrame(
                 [
                     ["S1_0_0", "S1_1_0", "S1_2_0"],
@@ -397,7 +414,9 @@ class TestData:
             ),
         )
         assert_frame_equal(
-            MyData.fetch("S1", shape=(5, 3), columns=["F1", "F2", "F3"]).data["S1"],
+            MyData.fetch("S1", keys_are_features=test_keys_are_features, shape=(5, 3), columns=["F1", "F2", "F3"]).data[
+                "S1"
+            ],
             pd.DataFrame(
                 [
                     ["S1_F1_0", "S1_F2_0", "S1_F3_0"],
@@ -411,15 +430,15 @@ class TestData:
             ),
         )
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,)).data["S1"],
+            MyData.fetch(["S1", "S2"], keys_are_features=test_keys_are_features, shape=(5,)).data["S1"],
             pd.Series(["S1_0", "S1_1", "S1_2", "S1_3", "S1_4"], index=index),
         )
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,)).data["S2"],
+            MyData.fetch(["S1", "S2"], keys_are_features=test_keys_are_features, shape=(5,)).data["S2"],
             pd.Series(["S2_0", "S2_1", "S2_2", "S2_3", "S2_4"], index=index),
         )
         assert_frame_equal(
-            MyData.fetch(["S1", "S2"], shape=(5, 3)).data["S1"],
+            MyData.fetch(["S1", "S2"], keys_are_features=test_keys_are_features, shape=(5, 3)).data["S1"],
             pd.DataFrame(
                 [
                     ["S1_0_0", "S1_1_0", "S1_2_0"],
@@ -432,7 +451,7 @@ class TestData:
             ),
         )
         assert_frame_equal(
-            MyData.fetch(["S1", "S2"], shape=(5, 3)).data["S2"],
+            MyData.fetch(["S1", "S2"], keys_are_features=test_keys_are_features, shape=(5, 3)).data["S2"],
             pd.DataFrame(
                 [
                     ["S2_0_0", "S2_1_0", "S2_2_0"],
@@ -456,30 +475,61 @@ class TestData:
             tz="utc",
         ).tz_convert(to_timezone("Europe/Berlin"))
         assert_series_equal(
-            MyData.fetch("S1", shape=(5,), tz_localize="UTC", tz_convert="Europe/Berlin").data["S1"],
+            MyData.fetch(
+                "S1",
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                tz_localize="UTC",
+                tz_convert="Europe/Berlin",
+            ).data["S1"],
             pd.Series(["S1_0", "S1_1", "S1_2", "S1_3", "S1_4"], index=index2),
         )
-        index_mask = vbt.symbol_dict({"S1": [False, True, True, True, True], "S2": [True, True, True, True, False]})
+        index_mask = vbt.key_dict({"S1": [False, True, True, True, True], "S2": [True, True, True, True, False]})
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="nan").data["S1"],
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="nan",
+            ).data["S1"],
             pd.Series([np.nan, "S1_1", "S1_2", "S1_3", "S1_4"], index=index),
         )
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="nan").data["S2"],
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="nan",
+            ).data["S2"],
             pd.Series(["S2_0", "S2_1", "S2_2", "S2_3", np.nan], index=index),
         )
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="drop").data["S1"],
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="drop",
+            ).data["S1"],
             pd.Series(["S1_1", "S1_2", "S1_3"], index=index[1:4]),
         )
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="drop").data["S2"],
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="drop",
+            ).data["S2"],
             pd.Series(["S2_1", "S2_2", "S2_3"], index=index[1:4]),
         )
-        column_mask = vbt.symbol_dict({"S1": [False, True, True], "S2": [True, True, False]})
+        column_mask = vbt.key_dict({"S1": [False, True, True], "S2": [True, True, False]})
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -500,6 +550,7 @@ class TestData:
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -520,6 +571,7 @@ class TestData:
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -535,6 +587,7 @@ class TestData:
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -547,41 +600,43 @@ class TestData:
                 columns=pd.Index([1], dtype="int64"),
             ),
         )
-        symbols = {
+        keys = {
             "S1": dict(index_mask=[False, True, True, True, True]),
             "S2": dict(index_mask=[True, True, True, True, False]),
         }
         assert_series_equal(
-            MyData.fetch(symbols, shape=(5,), missing_index="nan").data["S1"],
+            MyData.fetch(keys, keys_are_features=test_keys_are_features, shape=(5,), missing_index="nan").data["S1"],
             pd.Series([np.nan, "S1_1", "S1_2", "S1_3", "S1_4"], index=index),
         )
         assert_series_equal(
-            MyData.fetch(symbols, shape=(5,), missing_index="nan").data["S2"],
+            MyData.fetch(keys, keys_are_features=test_keys_are_features, shape=(5,), missing_index="nan").data["S2"],
             pd.Series(["S2_0", "S2_1", "S2_2", "S2_3", np.nan], index=index),
         )
         assert_series_equal(
-            MyData.fetch(symbols, shape=(5,), missing_index="drop").data["S1"],
+            MyData.fetch(keys, keys_are_features=test_keys_are_features, shape=(5,), missing_index="drop").data["S1"],
             pd.Series(["S1_1", "S1_2", "S1_3"], index=index[1:4]),
         )
         assert_series_equal(
-            MyData.fetch(symbols, shape=(5,), missing_index="drop").data["S2"],
+            MyData.fetch(keys, keys_are_features=test_keys_are_features, shape=(5,), missing_index="drop").data["S2"],
             pd.Series(["S2_1", "S2_2", "S2_3"], index=index[1:4]),
         )
         assert (
             len(
                 MyData.fetch(
                     ["S1", "S2"],
+                    keys_are_features=test_keys_are_features,
                     shape=(5, 3),
-                    return_none=vbt.symbol_dict({"S1": True, "S2": False}),
-                ).symbols
+                    return_none=vbt.key_dict({"S1": True, "S2": False}),
+                ).keys
             )
             == 1
         )
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
-                return_none=vbt.symbol_dict({"S1": True, "S2": False}),
+                return_none=vbt.key_dict({"S1": True, "S2": False}),
             ).data["S2"],
             pd.DataFrame(
                 [
@@ -598,18 +653,20 @@ class TestData:
             len(
                 MyData.fetch(
                     ["S1", "S2"],
+                    keys_are_features=test_keys_are_features,
                     shape=(5, 3),
-                    raise_error=vbt.symbol_dict({"S1": True, "S2": False}),
+                    raise_error=vbt.key_dict({"S1": True, "S2": False}),
                     skip_on_error=True,
-                ).symbols
+                ).keys
             )
             == 1
         )
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
-                raise_error=vbt.symbol_dict({"S1": True, "S2": False}),
+                raise_error=vbt.key_dict({"S1": True, "S2": False}),
                 skip_on_error=True,
             ).data["S2"],
             pd.DataFrame(
@@ -626,13 +683,15 @@ class TestData:
         with pytest.raises(Exception):
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
-                raise_error=vbt.symbol_dict({"S1": True, "S2": False}),
+                raise_error=vbt.key_dict({"S1": True, "S2": False}),
                 skip_on_error=False,
             )
         with pytest.raises(Exception):
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -642,6 +701,7 @@ class TestData:
         with pytest.raises(Exception):
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -651,6 +711,7 @@ class TestData:
         with pytest.raises(Exception):
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -660,6 +721,7 @@ class TestData:
         with pytest.raises(Exception):
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -667,33 +729,56 @@ class TestData:
                 missing_columns="test",
             )
         with pytest.raises(Exception):
-            MyData.fetch(["S1", "S2"], shape=(5, 3), return_none=True)
+            MyData.fetch(["S1", "S2"], keys_are_features=test_keys_are_features, shape=(5, 3), return_none=True)
         with pytest.raises(Exception):
-            MyData.fetch(["S1", "S2"], shape=(5, 3), return_empty=True)
+            MyData.fetch(["S1", "S2"], keys_are_features=test_keys_are_features, shape=(5, 3), return_empty=True)
         with pytest.raises(Exception):
-            MyData.fetch(["S1", "S2"], shape=(5, 3), raise_error=True, skip_on_error=False)
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5, 3),
+                raise_error=True,
+                skip_on_error=False,
+            )
         with pytest.raises(Exception):
-            MyData.fetch(["S1", "S2"], shape=(5, 3), raise_error=True, skip_on_error=True)
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5, 3),
+                raise_error=True,
+                skip_on_error=True,
+            )
 
-    def test_update(self):
+    @pytest.mark.parametrize("test_keys_are_features", [False, True])
+    def test_update(self, test_keys_are_features):
         assert_series_equal(
-            MyData.fetch("S1", shape=(5,), return_arr=True).update().data["S1"],
+            MyData.fetch("S1", keys_are_features=test_keys_are_features, shape=(5,), return_arr=True)
+            .update()
+            .data["S1"],
             pd.Series(["S1_0", "S1_1", "S1_2", "S1_3", "S1_0_u"]),
         )
         assert_series_equal(
-            MyData.fetch("S1", shape=(5,), return_arr=True).update(concat=False).data["S1"],
+            MyData.fetch("S1", keys_are_features=test_keys_are_features, shape=(5,), return_arr=True)
+            .update(concat=False)
+            .data["S1"],
             pd.Series(["S1_0_u"], index=pd.Index([4], dtype="int64")),
         )
         assert_series_equal(
-            MyData.fetch("S1", shape=(5,), return_arr=True).update(n=2).data["S1"],
+            MyData.fetch("S1", keys_are_features=test_keys_are_features, shape=(5,), return_arr=True)
+            .update(n=2)
+            .data["S1"],
             pd.Series(["S1_0", "S1_1", "S1_2", "S1_3", "S1_0_u", "S1_1_u"]),
         )
         assert_series_equal(
-            MyData.fetch("S1", shape=(5,), return_arr=True).update(n=2, concat=False).data["S1"],
+            MyData.fetch("S1", keys_are_features=test_keys_are_features, shape=(5,), return_arr=True)
+            .update(n=2, concat=False)
+            .data["S1"],
             pd.Series(["S1_0_u", "S1_1_u"], index=pd.Index([4, 5], dtype="int64")),
         )
         assert_frame_equal(
-            MyData.fetch("S1", shape=(5, 3), return_arr=True).update().data["S1"],
+            MyData.fetch("S1", keys_are_features=test_keys_are_features, shape=(5, 3), return_arr=True)
+            .update()
+            .data["S1"],
             pd.DataFrame(
                 [
                     ["S1_0_0", "S1_1_0", "S1_2_0"],
@@ -705,7 +790,9 @@ class TestData:
             ),
         )
         assert_frame_equal(
-            MyData.fetch("S1", shape=(5, 3), return_arr=True).update(concat=False).data["S1"],
+            MyData.fetch("S1", keys_are_features=test_keys_are_features, shape=(5, 3), return_arr=True)
+            .update(concat=False)
+            .data["S1"],
             pd.DataFrame(
                 [
                     ["S1_0_0_u", "S1_1_0_u", "S1_2_0_u"],
@@ -714,7 +801,9 @@ class TestData:
             ),
         )
         assert_frame_equal(
-            MyData.fetch("S1", shape=(5, 3), return_arr=True).update(n=2).data["S1"],
+            MyData.fetch("S1", keys_are_features=test_keys_are_features, shape=(5, 3), return_arr=True)
+            .update(n=2)
+            .data["S1"],
             pd.DataFrame(
                 [
                     ["S1_0_0", "S1_1_0", "S1_2_0"],
@@ -727,7 +816,9 @@ class TestData:
             ),
         )
         assert_frame_equal(
-            MyData.fetch("S1", shape=(5, 3), return_arr=True).update(n=2, concat=False).data["S1"],
+            MyData.fetch("S1", keys_are_features=test_keys_are_features, shape=(5, 3), return_arr=True)
+            .update(n=2, concat=False)
+            .data["S1"],
             pd.DataFrame(
                 [
                     ["S1_0_0_u", "S1_1_0_u", "S1_2_0_u"],
@@ -748,11 +839,11 @@ class TestData:
             tz=timezone.utc,
         )
         assert_series_equal(
-            MyData.fetch("S1", shape=(5,)).update().data["S1"],
+            MyData.fetch("S1", keys_are_features=test_keys_are_features, shape=(5,)).update().data["S1"],
             pd.Series(["S1_0", "S1_1", "S1_2", "S1_3", "S1_0_u"], index=index),
         )
         assert_series_equal(
-            MyData.fetch("S1", shape=(5,)).update(concat=False).data["S1"],
+            MyData.fetch("S1", keys_are_features=test_keys_are_features, shape=(5,)).update(concat=False).data["S1"],
             pd.Series(["S1_0_u"], index=index[[-1]]),
         )
         updated_index = pd.DatetimeIndex(
@@ -768,11 +859,13 @@ class TestData:
             tz=timezone.utc,
         )
         assert_series_equal(
-            MyData.fetch("S1", shape=(5,)).update(n=2).data["S1"],
+            MyData.fetch("S1", keys_are_features=test_keys_are_features, shape=(5,)).update(n=2).data["S1"],
             pd.Series(["S1_0", "S1_1", "S1_2", "S1_3", "S1_0_u", "S1_1_u"], index=updated_index),
         )
         assert_series_equal(
-            MyData.fetch("S1", shape=(5,)).update(n=2, concat=False).data["S1"],
+            MyData.fetch("S1", keys_are_features=test_keys_are_features, shape=(5,))
+            .update(n=2, concat=False)
+            .data["S1"],
             pd.Series(
                 ["S1_0_u", "S1_1_u"],
                 index=pd.DatetimeIndex(
@@ -792,52 +885,100 @@ class TestData:
             tz="utc",
         ).tz_convert(to_timezone("Europe/Berlin"))
         assert_series_equal(
-            MyData.fetch("S1", shape=(5,), tz_localize="UTC", tz_convert="Europe/Berlin")
+            MyData.fetch(
+                "S1",
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                tz_localize="UTC",
+                tz_convert="Europe/Berlin",
+            )
             .update(tz_localize=None)
             .data["S1"],
             pd.Series(["S1_0", "S1_1", "S1_2", "S1_3", "S1_0_u"], index=index2),
         )
         assert_series_equal(
-            MyData.fetch("S1", shape=(5,), tz_localize="UTC", tz_convert="Europe/Berlin")
+            MyData.fetch(
+                "S1",
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                tz_localize="UTC",
+                tz_convert="Europe/Berlin",
+            )
             .update(tz_localize=None, concat=False)
             .data["S1"],
             pd.Series(["S1_0_u"], index=index2[[-1]]),
         )
-        index_mask = vbt.symbol_dict({"S1": [False, True, True, True, True], "S2": [True, True, True, True, False]})
-        update_index_mask = vbt.symbol_dict({"S1": [True], "S2": [False]})
+        index_mask = vbt.key_dict({"S1": [False, True, True, True, True], "S2": [True, True, True, True, False]})
+        update_index_mask = vbt.key_dict({"S1": [True], "S2": [False]})
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="nan")
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="nan",
+            )
             .update(index_mask=update_index_mask)
             .data["S1"],
             pd.Series([np.nan, "S1_1", "S1_2", "S1_3", "S1_0_u"], index=index),
         )
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="nan")
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="nan",
+            )
             .update(index_mask=update_index_mask)
             .data["S2"],
             pd.Series(["S2_0", "S2_1", "S2_2", "S2_3", np.nan], index=index),
         )
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="nan")
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="nan",
+            )
             .update(index_mask=update_index_mask, concat=False)
             .data["S1"],
             pd.Series(["S1_0_u"], index=index[[-1]], dtype=object),
         )
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="nan")
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="nan",
+            )
             .update(index_mask=update_index_mask, concat=False)
             .data["S2"],
             pd.Series([np.nan], index=index[[-1]], dtype=object),
         )
-        update_index_mask2 = vbt.symbol_dict({"S1": [True, False, False], "S2": [True, False, True]})
+        update_index_mask2 = vbt.key_dict({"S1": [True, False, False], "S2": [True, False, True]})
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="nan")
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="nan",
+            )
             .update(n=3, index_mask=update_index_mask2)
             .data["S1"],
             pd.Series([np.nan, "S1_1", "S1_2", "S1_3", "S1_0_u", np.nan], index=updated_index),
         )
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="nan")
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="nan",
+            )
             .update(n=3, index_mask=update_index_mask2)
             .data["S2"],
             pd.Series(
@@ -853,13 +994,25 @@ class TestData:
             ),
         )
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="nan")
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="nan",
+            )
             .update(n=3, index_mask=update_index_mask2, concat=False)
             .data["S1"],
             pd.Series(["S1_3", "S1_0_u", np.nan], index=updated_index[-3:]),
         )
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="nan")
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="nan",
+            )
             .update(n=3, index_mask=update_index_mask2, concat=False)
             .data["S2"],
             pd.Series(
@@ -872,43 +1025,85 @@ class TestData:
             ),
         )
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="drop")
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="drop",
+            )
             .update(index_mask=update_index_mask)
             .data["S1"],
             pd.Series(["S1_1", "S1_2", "S1_3"], index=index[1:4]),
         )
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="drop")
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="drop",
+            )
             .update(index_mask=update_index_mask)
             .data["S2"],
             pd.Series(["S2_1", "S2_2", "S2_3"], index=index[1:4]),
         )
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="drop")
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="drop",
+            )
             .update(index_mask=update_index_mask, concat=False)
             .data["S1"],
             pd.Series([], index=pd.DatetimeIndex([], dtype="datetime64[ns, UTC]", freq=None), dtype=object),
         )
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="drop")
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="drop",
+            )
             .update(index_mask=update_index_mask, concat=False)
             .data["S2"],
             pd.Series([], index=pd.DatetimeIndex([], dtype="datetime64[ns, UTC]", freq=None), dtype=object),
         )
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="drop")
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="drop",
+            )
             .update(n=3, index_mask=update_index_mask2)
             .data["S1"],
             pd.Series(["S1_1", "S1_2", "S1_3"], index=index[1:4]),
         )
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="drop")
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="drop",
+            )
             .update(n=3, index_mask=update_index_mask2)
             .data["S2"],
             pd.Series(["S2_1", "S2_2", "S2_0_u"], index=index[1:4]),
         )
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="drop")
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="drop",
+            )
             .update(n=3, index_mask=update_index_mask2, concat=False)
             .data["S1"],
             pd.Series(
@@ -916,7 +1111,13 @@ class TestData:
             ),
         )
         assert_series_equal(
-            MyData.fetch(["S1", "S2"], shape=(5,), index_mask=index_mask, missing_index="drop")
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5,),
+                index_mask=index_mask,
+                missing_index="drop",
+            )
             .update(n=3, index_mask=update_index_mask2, concat=False)
             .data["S2"],
             pd.Series(
@@ -924,10 +1125,11 @@ class TestData:
                 index=pd.DatetimeIndex(["2020-01-04 00:00:00+00:00"], dtype="datetime64[ns, UTC]", freq=None),
             ),
         )
-        column_mask = vbt.symbol_dict({"S1": [False, True, True], "S2": [True, True, False]})
+        column_mask = vbt.key_dict({"S1": [False, True, True], "S2": [True, True, False]})
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -950,6 +1152,7 @@ class TestData:
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -972,6 +1175,7 @@ class TestData:
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -990,6 +1194,7 @@ class TestData:
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -1008,6 +1213,7 @@ class TestData:
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -1031,6 +1237,7 @@ class TestData:
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -1054,6 +1261,7 @@ class TestData:
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -1074,6 +1282,7 @@ class TestData:
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -1094,6 +1303,7 @@ class TestData:
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -1111,6 +1321,7 @@ class TestData:
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -1128,6 +1339,7 @@ class TestData:
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -1145,6 +1357,7 @@ class TestData:
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -1162,6 +1375,7 @@ class TestData:
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -1179,6 +1393,7 @@ class TestData:
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -1196,6 +1411,7 @@ class TestData:
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -1213,6 +1429,7 @@ class TestData:
         assert_frame_equal(
             MyData.fetch(
                 ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
                 shape=(5, 3),
                 index_mask=index_mask,
                 column_mask=column_mask,
@@ -1227,43 +1444,56 @@ class TestData:
                 columns=pd.Index([1], dtype="int64"),
             ),
         )
-        assert MyData.fetch(
-            ["S1", "S2"],
-            shape=(5, 3),
-            index_mask=index_mask,
-            column_mask=column_mask,
-            missing_index="drop",
-            missing_columns="drop",
-        ).last_index == vbt.symbol_dict({"S1": index[4], "S2": index[3]})
-        assert MyData.fetch(
-            ["S1", "S2"],
-            shape=(5, 3),
-            index_mask=index_mask,
-            column_mask=column_mask,
-            missing_index="drop",
-            missing_columns="drop",
-        ).update(n=3, index_mask=update_index_mask2).last_index == vbt.symbol_dict(
+        assert vbt.key_dict(
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5, 3),
+                index_mask=index_mask,
+                column_mask=column_mask,
+                missing_index="drop",
+                missing_columns="drop",
+            ).last_index
+        ) == vbt.key_dict({"S1": index[4], "S2": index[3]})
+        assert vbt.key_dict(
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5, 3),
+                index_mask=index_mask,
+                column_mask=column_mask,
+                missing_index="drop",
+                missing_columns="drop",
+            )
+            .update(n=3, index_mask=update_index_mask2)
+            .last_index
+        ) == vbt.key_dict(
             {
                 "S1": updated_index[4],
                 "S2": updated_index[5],
             }
         )
-        assert MyData.fetch(
-            ["S1", "S2"],
-            shape=(5, 3),
-            index_mask=index_mask,
-            column_mask=column_mask,
-            missing_index="drop",
-            missing_columns="drop",
-        ).update(n=3, index_mask=update_index_mask2, concat=False).last_index == vbt.symbol_dict(
+        assert vbt.key_dict(
+            MyData.fetch(
+                ["S1", "S2"],
+                keys_are_features=test_keys_are_features,
+                shape=(5, 3),
+                index_mask=index_mask,
+                column_mask=column_mask,
+                missing_index="drop",
+                missing_columns="drop",
+            )
+            .update(n=3, index_mask=update_index_mask2, concat=False)
+            .last_index
+        ) == vbt.key_dict(
             {
                 "S1": updated_index[4],
                 "S2": updated_index[5],
             }
         )
         assert_frame_equal(
-            MyData.fetch(["S1", "S2"], shape=(5, 3))
-            .update(n=2, return_none=vbt.symbol_dict({"S1": True, "S2": False}))
+            MyData.fetch(["S1", "S2"], keys_are_features=test_keys_are_features, shape=(5, 3))
+            .update(n=2, return_none=vbt.key_dict({"S1": True, "S2": False}))
             .data["S1"],
             pd.DataFrame(
                 [
@@ -1278,8 +1508,8 @@ class TestData:
             ),
         )
         assert_frame_equal(
-            MyData.fetch(["S1", "S2"], shape=(5, 3))
-            .update(n=2, return_none=vbt.symbol_dict({"S1": True, "S2": False}))
+            MyData.fetch(["S1", "S2"], keys_are_features=test_keys_are_features, shape=(5, 3))
+            .update(n=2, return_none=vbt.key_dict({"S1": True, "S2": False}))
             .data["S2"],
             pd.DataFrame(
                 [
@@ -1294,8 +1524,8 @@ class TestData:
             ),
         )
         assert_frame_equal(
-            MyData.fetch(["S1", "S2"], shape=(5, 3))
-            .update(n=2, return_none=vbt.symbol_dict({"S1": True, "S2": False}), concat=False)
+            MyData.fetch(["S1", "S2"], keys_are_features=test_keys_are_features, shape=(5, 3))
+            .update(n=2, return_none=vbt.key_dict({"S1": True, "S2": False}), concat=False)
             .data["S1"],
             pd.DataFrame(
                 [["S1_0_4", "S1_1_4", "S1_2_4"], [np.nan, np.nan, np.nan]],
@@ -1305,8 +1535,8 @@ class TestData:
             ),
         )
         assert_frame_equal(
-            MyData.fetch(["S1", "S2"], shape=(5, 3))
-            .update(n=2, return_none=vbt.symbol_dict({"S1": True, "S2": False}), concat=False)
+            MyData.fetch(["S1", "S2"], keys_are_features=test_keys_are_features, shape=(5, 3))
+            .update(n=2, return_none=vbt.key_dict({"S1": True, "S2": False}), concat=False)
             .data["S2"],
             pd.DataFrame(
                 [["S2_0_0_u", "S2_1_0_u", "S2_2_0_u"], ["S2_0_1_u", "S2_1_1_u", "S2_2_1_u"]],
@@ -1316,8 +1546,8 @@ class TestData:
             ),
         )
         assert_frame_equal(
-            MyData.fetch(["S1", "S2"], shape=(5, 3))
-            .update(n=2, return_empty=vbt.symbol_dict({"S1": True, "S2": False}))
+            MyData.fetch(["S1", "S2"], keys_are_features=test_keys_are_features, shape=(5, 3))
+            .update(n=2, return_empty=vbt.key_dict({"S1": True, "S2": False}))
             .data["S1"],
             pd.DataFrame(
                 [
@@ -1332,8 +1562,8 @@ class TestData:
             ),
         )
         assert_frame_equal(
-            MyData.fetch(["S1", "S2"], shape=(5, 3))
-            .update(n=2, return_empty=vbt.symbol_dict({"S1": True, "S2": False}))
+            MyData.fetch(["S1", "S2"], keys_are_features=test_keys_are_features, shape=(5, 3))
+            .update(n=2, return_empty=vbt.key_dict({"S1": True, "S2": False}))
             .data["S2"],
             pd.DataFrame(
                 [
@@ -1348,8 +1578,8 @@ class TestData:
             ),
         )
         assert_frame_equal(
-            MyData.fetch(["S1", "S2"], shape=(5, 3))
-            .update(n=2, raise_error=vbt.symbol_dict({"S1": True, "S2": False}), skip_on_error=True)
+            MyData.fetch(["S1", "S2"], keys_are_features=test_keys_are_features, shape=(5, 3))
+            .update(n=2, raise_error=vbt.key_dict({"S1": True, "S2": False}), skip_on_error=True)
             .data["S1"],
             pd.DataFrame(
                 [
@@ -1364,8 +1594,8 @@ class TestData:
             ),
         )
         assert_frame_equal(
-            MyData.fetch(["S1", "S2"], shape=(5, 3))
-            .update(n=2, raise_error=vbt.symbol_dict({"S1": True, "S2": False}), skip_on_error=True)
+            MyData.fetch(["S1", "S2"], keys_are_features=test_keys_are_features, shape=(5, 3))
+            .update(n=2, raise_error=vbt.key_dict({"S1": True, "S2": False}), skip_on_error=True)
             .data["S2"],
             pd.DataFrame(
                 [
@@ -1380,7 +1610,9 @@ class TestData:
             ),
         )
         assert_frame_equal(
-            MyData.fetch(["S1", "S2"], shape=(5, 3)).update(n=2, raise_error=True, skip_on_error=True).data["S1"],
+            MyData.fetch(["S1", "S2"], keys_are_features=test_keys_are_features, shape=(5, 3))
+            .update(n=2, raise_error=True, skip_on_error=True)
+            .data["S1"],
             pd.DataFrame(
                 [
                     ["S1_0_0", "S1_1_0", "S1_2_0"],
@@ -1393,7 +1625,9 @@ class TestData:
             ),
         )
         assert_frame_equal(
-            MyData.fetch(["S1", "S2"], shape=(5, 3)).update(n=2, raise_error=True, skip_on_error=True).data["S2"],
+            MyData.fetch(["S1", "S2"], keys_are_features=test_keys_are_features, shape=(5, 3))
+            .update(n=2, raise_error=True, skip_on_error=True)
+            .data["S2"],
             pd.DataFrame(
                 [
                     ["S2_0_0", "S2_1_0", "S2_2_0"],
@@ -1436,8 +1670,8 @@ class TestData:
             data.feature_wrapper.columns,
             pd.Index(["F1", "F2", "F3"], dtype="object"),
         )
-        assert data.to_symbol_oriented().get_feature_wrapper(features=["F1", "F2"]) == data.get_feature_wrapper(
-            features=["F1", "F2"]
+        assert data.to_symbol_oriented().get_feature_wrapper(features=["F1", "F3"]) == data.get_feature_wrapper(
+            features=["F1", "F3"]
         )
 
     def test_symbol_wrapper(self):

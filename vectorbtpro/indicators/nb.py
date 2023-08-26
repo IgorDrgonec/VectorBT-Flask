@@ -253,7 +253,7 @@ def avg_gain_1d_nb(
     adjust: bool = False,
 ) -> tp.Array1d:
     """Average gain."""
-    up_change = np.empty_like(close, dtype=np.float_)
+    up_change = np.empty(close.shape, dtype=np.float_)
     for i in range(close.shape[0]):
         if i == 0:
             up_change[i] = np.nan
@@ -311,7 +311,7 @@ def avg_loss_1d_nb(
     adjust: bool = False,
 ) -> tp.Array1d:
     """Average loss."""
-    down_change = np.empty_like(close, dtype=np.float_)
+    down_change = np.empty(close.shape, dtype=np.float_)
     for i in range(close.shape[0]):
         if i == 0:
             down_change[i] = np.nan
@@ -944,7 +944,7 @@ def adx_nb(
 @register_jitted(cache=True)
 def obv_1d_nb(close: tp.Array1d, volume: tp.Array1d) -> tp.Array1d:
     """On-Balance Volume (OBV)."""
-    obv = np.empty_like(close, dtype=np.float_)
+    obv = np.empty(close.shape, dtype=np.float_)
     cumsum = 0.0
     for i in range(close.shape[0]):
         prev_close = close[i - 1] if i > 0 else np.nan
@@ -969,7 +969,7 @@ def obv_1d_nb(close: tp.Array1d, volume: tp.Array1d) -> tp.Array1d:
 @register_jitted(cache=True, tags={"can_parallel"})
 def obv_nb(close: tp.Array2d, volume: tp.Array2d) -> tp.Array2d:
     """2-dim version of `obv_1d_nb`."""
-    obv = np.empty_like(close, dtype=np.float_)
+    obv = np.empty(close.shape, dtype=np.float_)
     for col in prange(close.shape[1]):
         obv[:, col] = obv_1d_nb(close[:, col], volume[:, col])
     return obv
@@ -1146,7 +1146,7 @@ def vwap_1d_nb(
     """Volume-Weighted Average Price (VWAP)."""
     group_end_idxs = np.cumsum(group_lens)
     group_start_idxs = group_end_idxs - group_lens
-    out = np.empty_like(volume, dtype=np.float_)
+    out = np.full(volume.shape, np.nan, dtype=np.float_)
 
     typical_price = typical_price_1d_nb(high, low, close)
     for group in range(len(group_lens)):

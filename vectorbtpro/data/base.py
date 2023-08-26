@@ -1,11 +1,6 @@
 # Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
-"""Base class for working with data sources.
-
-Class `Data` allows storing, downloading, updating, and managing data. It stores data
-as a dictionary of Series/DataFrames keyed by symbol, and makes sure that
-all Pandas objects have the same index and columns by aligning them.
-"""
+"""Base class for working with data sources."""
 
 import warnings
 from pathlib import Path
@@ -38,6 +33,7 @@ from vectorbtpro.utils.decorators import cached_property, class_or_instancemetho
 from vectorbtpro.utils.selection import _NoResult, NoResult, NoResultsException
 
 __all__ = [
+    "key_dict",
     "feature_dict",
     "symbol_dict",
     "run_func_dict",
@@ -537,8 +533,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     @classmethod
     def fix_data_dict_type(cls, data: dict) -> tp.Union[feature_dict, symbol_dict]:
         """Fix dict type for data."""
-        if not isinstance(data, dict):
-            raise TypeError("Data must be of a dict type")
+        checks.assert_instance_of(data, dict, arg_name="data")
         if not isinstance(data, key_dict):
             data = symbol_dict(data)
         return data
@@ -553,13 +548,11 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         for attr in cls._key_dict_attrs:
             if attr in kwargs:
                 attr_value = kwargs[attr]
-                if not isinstance(attr_value, dict):
-                    raise TypeError(f"Attribute '{attr}' must be of a dict type")
+                checks.assert_instance_of(attr_value, dict, arg_name=attr)
                 if not isinstance(attr_value, key_dict):
                     attr_value = data_type(attr_value)
                 if attr in cls._data_dict_type_attrs:
-                    if not isinstance(attr_value, data_type):
-                        raise TypeError(f"Attribute '{attr}' must have the same dict type as data")
+                    checks.assert_instance_of(attr_value, data_type, arg_name=attr)
                 kwargs[attr] = attr_value
         return kwargs
 
@@ -862,7 +855,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
     def get_keys(self, dict_type: tp.Type[tp.Union[feature_dict, symbol_dict]]) -> tp.List[tp.Key]:
         """Get keys depending on the provided dict type."""
-        checks.assert_subclass_of(dict_type, (feature_dict, symbol_dict))
+        checks.assert_subclass_of(dict_type, (feature_dict, symbol_dict), arg_name="dict_type")
         if issubclass(dict_type, feature_dict):
             return self.features
         return self.symbols
@@ -1598,7 +1591,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 data = feature_dict(feature=data)
             else:
                 data = symbol_dict(symbol=data)
-        checks.assert_instance_of(data, dict)
+        checks.assert_instance_of(data, dict, arg_name="data")
         if not isinstance(data, key_dict):
             if symbol_columns:
                 data = feature_dict(data)
@@ -1608,10 +1601,10 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             data = cls.invert_data(data)
         if len(data) > 1:
             single_key = False
-        checks.assert_instance_of(last_index, dict)
+        checks.assert_instance_of(last_index, dict, arg_name="last_index")
         if not isinstance(last_index, key_dict):
             last_index = type(data)(last_index)
-        checks.assert_instance_of(delisted, dict)
+        checks.assert_instance_of(delisted, dict, arg_name="delisted")
         if not isinstance(delisted, key_dict):
             delisted = type(data)(delisted)
 
@@ -1699,7 +1692,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         dict_type: tp.Optional[tp.Type[tp.Union[feature_dict, symbol_dict]]] = None,
     ) -> None:
         if isinstance(cls_or_self, type):
-            checks.assert_not_none(dict_type)
+            checks.assert_not_none(dict_type, arg_name="dict_type")
         if dict_type is None:
             dict_type = cls_or_self.dict_type
         if issubclass(dict_type, feature_dict) and isinstance(arg, symbol_dict):
@@ -1717,14 +1710,14 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     ) -> dict:
         """Select keyword arguments belonging to a feature or symbol."""
         if isinstance(cls_or_self, type):
-            checks.assert_not_none(dict_type)
+            checks.assert_not_none(dict_type, arg_name="dict_type")
         if dict_type is None:
             dict_type = cls_or_self.dict_type
         if kwargs is None:
             return {}
         if check_dict_type:
             cls_or_self.check_dict_type(kwargs, "kwargs", dict_type=dict_type)
-        if isinstance(kwargs, dict_type):
+        if isinstance(kwargs, (key_dict, dict_type)):
             if key not in kwargs:
                 return {}
             kwargs = kwargs[key]
@@ -1732,7 +1725,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         for k, v in kwargs.items():
             if check_dict_type:
                 cls_or_self.check_dict_type(v, k, dict_type=dict_type)
-            if isinstance(v, dict_type):
+            if isinstance(v, (key_dict, dict_type)):
                 if key in v:
                     _kwargs[k] = v[key]
             else:
@@ -1970,6 +1963,45 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         return None
 
     @classmethod
+    def resolve_keys_meta(
+        cls,
+        keys: tp.Union[tp.MaybeKeys] = None,
+        keys_are_features: tp.Optional[bool] = None,
+        features: tp.Union[tp.MaybeFeatures] = None,
+        symbols: tp.Union[tp.MaybeSymbols] = None,
+    ) -> tp.Kwargs:
+        """Resolve metadata for keys."""
+        data_cfg = cls.get_settings(key_id="base")
+
+        if keys is not None and features is not None:
+            raise ValueError("Must provide either keys or features, not both")
+        if keys is not None and symbols is not None:
+            raise ValueError("Must provide either keys or symbols, not both")
+        if features is not None and symbols is not None:
+            raise ValueError("Must provide either features or symbols, not both")
+        if keys is None:
+            if features is not None:
+                keys = features
+                keys_are_features = True
+                dict_type = feature_dict
+            else:
+                keys = symbols
+                keys_are_features = False
+                dict_type = symbol_dict
+        else:
+            if keys_are_features is None:
+                keys_are_features = data_cfg["keys_are_features"]
+            if keys_are_features:
+                dict_type = feature_dict
+            else:
+                dict_type = symbol_dict
+        return dict(
+            keys=keys,
+            keys_are_features=keys_are_features,
+            dict_type=dict_type,
+        )
+
+    @classmethod
     def fetch(
         cls: tp.Type[DataT],
         keys: tp.Union[tp.MaybeKeys] = None,
@@ -1990,19 +2022,29 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         return_raw: bool = False,
         **kwargs,
     ) -> tp.Union[DataT, tp.List[tp.Any]]:
-        """Fetch data of each symbol using `Data.fetch_symbol` and pass to `Data.from_data`.
+        """Fetch data of each feature/symbol using `Data.fetch_symbol` and pass to `Data.from_data`.
 
-        Iteration over symbols is done using `vectorbtpro.utils.execution.execute`.
+        Iteration over features/symbols is done using `vectorbtpro.utils.execution.execute`.
         That is, it can be distributed and parallelized when needed.
 
         Args:
+            keys (hashable, sequence of hashable, or dict): One or multiple keys.
+
+                Depending on `keys_are_features` will be set to `features` or `symbols`.
+            keys_are_features (bool): Whether `keys` are considered features.
+            features (hashable, sequence of hashable, or dict): One or multiple features.
+
+                If provided as a dictionary, will use keys as features and values as keyword arguments.
+
+                !!! note
+                    Tuple is considered as a single feature (tuple is a hashable).
             symbols (hashable, sequence of hashable, or dict): One or multiple symbols.
 
                 If provided as a dictionary, will use keys as symbols and values as keyword arguments.
 
                 !!! note
                     Tuple is considered as a single symbol (tuple is a hashable).
-            classes (symbol_dict): See `Data.classes`.
+            classes (feature_dict or symbol_dict): See `Data.classes`.
 
                 Can be a hashable (single value), a dictionary (class names as keys and
                 class values as values), or a sequence of such.
@@ -2015,66 +2057,70 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             missing_index (str): See `Data.from_data`.
             missing_columns (str): See `Data.from_data`.
             wrapper_kwargs (dict): See `Data.from_data`.
-            skip_on_error (bool): Whether to skip the symbol when an exception is raised.
+            skip_on_error (bool): Whether to skip the feature/symbol when an exception is raised.
             silence_warnings (bool): Whether to silence all warnings.
 
-                Will also forward this argument to `Data.fetch_symbol` if in the signature.
+                Will also forward this argument to `Data.fetch_feature`/`Data.fetch_symbol` if in the signature.
             execute_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.execution.execute`.
             return_raw (bool): Whether to return the raw outputs.
-            **kwargs: Passed to `Data.fetch_symbol`.
+            **kwargs: Passed to `Data.fetch_feature`/`Data.fetch_symbol`.
 
-                If two symbols require different keyword arguments, pass `symbol_dict` for each argument.
+                If two features/symbols require different keyword arguments, pass
+                `key_dict` or `feature_dict`/`symbol_dict` for each argument.
 
         For defaults, see `vectorbtpro._settings.data`.
         """
         data_cfg = cls.get_settings(key_id="base")
 
-        if keys is not None and features is not None:
-            raise ValueError("Must provide either keys or features, not both")
-        if keys is not None and symbols is not None:
-            raise ValueError("Must provide either keys or symbols, not both")
-        if features is not None and symbols is not None:
-            raise ValueError("Must provide either features or symbols, not both")
-        if keys_are_features is None:
-            keys_are_features = data_cfg["keys_are_features"]
-        if keys is not None:
-            if keys_are_features:
-                features = keys
-            else:
-                symbols = keys
+        keys_meta = cls.resolve_keys_meta(
+            keys=keys,
+            keys_are_features=keys_are_features,
+            features=features,
+            symbols=symbols,
+        )
+        keys = keys_meta["keys"]
+        keys_are_features = keys_meta["keys_are_features"]
+        dict_type = keys_meta["dict_type"]
 
-        fetch_kwargs = {}
-        if isinstance(symbols, dict):
-            new_symbols = []
-            for symbol, symbol_fetch_kwargs in symbols.items():
-                new_symbols.append(symbol)
-                fetch_kwargs[symbol] = symbol_fetch_kwargs
-            symbols = new_symbols
-            single_symbol = False
-        elif cls.has_multiple_keys(symbols):
-            symbols = list(symbols)
-            if len(set(symbols)) < len(symbols):
-                raise ValueError("Duplicate symbols provided")
-            single_symbol = False
+        fetch_kwargs = dict_type()
+        if isinstance(keys, dict):
+            new_keys = []
+            for k, key_fetch_kwargs in keys.items():
+                new_keys.append(k)
+                fetch_kwargs[k] = key_fetch_kwargs
+            keys = new_keys
+            single_key = False
+        elif cls.has_multiple_keys(keys):
+            keys = list(keys)
+            if len(set(keys)) < len(keys):
+                raise ValueError("Duplicate keys provided")
+            single_key = False
         else:
-            single_symbol = True
-            symbols = [symbols]
+            single_key = True
+            keys = [keys]
         if classes is not None:
-            if not isinstance(classes, symbol_dict):
+            cls.check_dict_type(classes, "classes", dict_type=dict_type)
+            if not isinstance(classes, key_dict):
                 new_classes = {}
                 single_class = checks.is_hashable(classes) or isinstance(classes, dict)
                 if single_class:
-                    for symbol in symbols:
+                    for k in keys:
                         if isinstance(classes, dict):
-                            new_classes[symbol] = classes
+                            new_classes[k] = classes
                         else:
-                            new_classes[symbol] = {"symbol_class": classes}
+                            if keys_are_features:
+                                new_classes[k] = {"feature_class": classes}
+                            else:
+                                new_classes[k] = {"symbol_class": classes}
                 else:
-                    for i, symbol in enumerate(symbols):
+                    for i, k in enumerate(keys):
                         _classes = classes[i]
                         if not isinstance(_classes, dict):
-                            _classes = {"symbol_class": _classes}
-                        new_classes[symbol] = _classes
+                            if keys_are_features:
+                                _classes = {"feature_class": _classes}
+                            else:
+                                _classes = {"symbol_class": _classes}
+                        new_classes[k] = _classes
                 classes = new_classes
         wrapper_kwargs = merge_dicts(data_cfg["wrapper_kwargs"], wrapper_kwargs)
         if skip_on_error is None:
@@ -2082,38 +2128,47 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         if silence_warnings is None:
             silence_warnings = data_cfg["silence_warnings"]
         execute_kwargs = merge_dicts(data_cfg["execute_kwargs"], execute_kwargs)
-        if not single_symbol and "show_progress" not in execute_kwargs:
+        if not single_key and "show_progress" not in execute_kwargs:
             execute_kwargs["show_progress"] = True
 
         funcs_args = []
-        func_arg_names = get_func_arg_names(cls.fetch_symbol)
-        for symbol in symbols:
-            symbol_fetch_kwargs = cls.select_symbol_kwargs(symbol, kwargs)
+        if keys_are_features:
+            func_arg_names = get_func_arg_names(cls.fetch_feature)
+        else:
+            func_arg_names = get_func_arg_names(cls.fetch_symbol)
+        for k in keys:
+            if keys_are_features:
+                key_fetch_func = cls.try_fetch_feature
+                key_fetch_kwargs = cls.select_feature_kwargs(k, kwargs)
+            else:
+                key_fetch_func = cls.try_fetch_symbol
+                key_fetch_kwargs = cls.select_symbol_kwargs(k, kwargs)
             if "silence_warnings" in func_arg_names:
-                symbol_fetch_kwargs["silence_warnings"] = silence_warnings
-            if symbol in fetch_kwargs:
-                symbol_fetch_kwargs = merge_dicts(symbol_fetch_kwargs, fetch_kwargs[symbol])
+                key_fetch_kwargs["silence_warnings"] = silence_warnings
+            if k in fetch_kwargs:
+                key_fetch_kwargs = merge_dicts(key_fetch_kwargs, fetch_kwargs[k])
+
             funcs_args.append(
                 (
-                    cls.try_fetch_symbol,
-                    (symbol,),
+                    key_fetch_func,
+                    (k,),
                     dict(
                         skip_on_error=skip_on_error,
                         silence_warnings=silence_warnings,
-                        fetch_kwargs=symbol_fetch_kwargs,
+                        fetch_kwargs=key_fetch_kwargs,
                     ),
                 )
             )
-            fetch_kwargs[symbol] = symbol_fetch_kwargs
+            fetch_kwargs[k] = key_fetch_kwargs
 
-        outputs = execute(funcs_args, n_calls=len(symbols), progress_desc=symbols, **execute_kwargs)
+        outputs = execute(funcs_args, n_calls=len(keys), progress_desc=keys, **execute_kwargs)
         if return_raw:
             return outputs
 
-        data = {}
-        returned_kwargs = {}
+        data = dict_type()
+        returned_kwargs = dict_type()
         for i, out in enumerate(outputs):
-            symbol = symbols[i]
+            k = keys[i]
             if out is not None:
                 if isinstance(out, tuple):
                     _data = out[0]
@@ -2139,21 +2194,29 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     wrapper_kwargs["freq"] = _freq
                 if _data.size == 0:
                     if not silence_warnings:
-                        warnings.warn(
-                            f"Symbol '{str(symbol)}' returned an empty array. Skipping.",
-                            stacklevel=2,
-                        )
+                        if keys_are_features:
+                            warnings.warn(
+                                f"Feature '{str(k)}' returned an empty array. Skipping.",
+                                stacklevel=2,
+                            )
+                        else:
+                            warnings.warn(
+                                f"Symbol '{str(k)}' returned an empty array. Skipping.",
+                                stacklevel=2,
+                            )
                 else:
-                    data[symbol] = _data
-                    returned_kwargs[symbol] = _returned_kwargs
+                    data[k] = _data
+                    returned_kwargs[k] = _returned_kwargs
 
         if len(data) == 0:
-            raise ValueError("No symbols could be fetched")
+            if keys_are_features:
+                raise ValueError("No features could be fetched")
+            else:
+                raise ValueError("No symbols could be fetched")
 
-        # Create new instance from data
         return cls.from_data(
             data,
-            single_key=single_symbol,
+            single_key=single_key,
             classes=classes,
             level_name=level_name,
             tz_localize=tz_localize,
@@ -2182,6 +2245,48 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         return custom.YFData.fetch(data_str.strip())
 
     # ############# Updating ############# #
+
+    def update_feature(
+        self,
+        feature: tp.Feature,
+        **kwargs,
+    ) -> tp.FeatureData:
+        """Update a feature.
+
+        Can also return a dictionary that will be accessible in `Data.returned_kwargs`.
+
+        This is an abstract method - override it to define custom logic."""
+        raise NotImplementedError
+
+    def try_update_feature(
+        self,
+        feature: tp.Feature,
+        skip_on_error: bool = False,
+        silence_warnings: bool = False,
+        update_kwargs: tp.KwargsLike = None,
+    ) -> tp.FeatureData:
+        """Try to update a feature using `Data.update_feature`."""
+        if update_kwargs is None:
+            update_kwargs = {}
+        try:
+            out = self.update_feature(feature, **update_kwargs)
+            if out is None:
+                if not silence_warnings:
+                    warnings.warn(
+                        f"Feature '{str(feature)}' returned None. Skipping.",
+                        stacklevel=2,
+                    )
+            return out
+        except Exception as e:
+            if not skip_on_error:
+                raise e
+            if not silence_warnings:
+                warnings.warn(traceback.format_exc(), stacklevel=2)
+                warnings.warn(
+                    f"Feature '{str(feature)}' raised an exception. Skipping.",
+                    stacklevel=2,
+                )
+        return None
 
     def update_symbol(
         self,
@@ -2235,26 +2340,25 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         return_raw: bool = False,
         **kwargs,
     ) -> tp.Union[DataT, tp.List[tp.Any]]:
-        """Fetch additional data of each symbol using `Data.update_symbol`.
+        """Fetch additional data of each feature/symbol using `Data.update_feature`/`Data.update_symbol`.
 
         Args:
             concat (bool): Whether to concatenate existing and updated/new data.
-            skip_on_error (bool): Whether to skip the symbol when an exception is raised.
+            skip_on_error (bool): Whether to skip the feature/symbol when an exception is raised.
             silence_warnings (bool): Whether to silence all warnings.
 
-                Will also forward this argument to `Data.update_symbol` if accepted by `Data.fetch_symbol`.
+                Will also forward this argument to `Data.update_feature`/`Data.update_symbol`
+                if accepted by `Data.fetch_feature`/`Data.fetch_symbol`.
             execute_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.execution.execute`.
             return_raw (bool): Whether to return the raw outputs.
-            **kwargs: Passed to `Data.update_symbol`.
+            **kwargs: Passed to `Data.update_feature`/`Data.update_symbol`.
 
-                If two symbols require different keyword arguments, pass `symbol_dict` for each argument.
+                If two features/symbols require different keyword arguments,
+                pass `key_dict` or `feature_dict`/`symbol_dict` for each argument.
 
         !!! note
             Returns a new `Data` instance instead of changing the data in place.
         """
-        if self.feature_oriented:
-            raise TypeError("This operation doesn't support feature-oriented data")
-
         data_cfg = self.get_settings(key_id="base")
 
         if skip_on_error is None:
@@ -2264,31 +2368,41 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         execute_kwargs = merge_dicts(data_cfg["execute_kwargs"], execute_kwargs)
         if "show_progress" not in execute_kwargs:
             execute_kwargs["show_progress"] = False
-        func_arg_names = get_func_arg_names(self.fetch_symbol)
+        if self.feature_oriented:
+            func_arg_names = get_func_arg_names(self.fetch_feature)
+        else:
+            func_arg_names = get_func_arg_names(self.fetch_symbol)
         if "show_progress" in func_arg_names and "show_progress" not in kwargs:
             kwargs["show_progress"] = False
+        checks.assert_instance_of(self.last_index, self.dict_type, "last_index")
+        checks.assert_instance_of(self.delisted, self.dict_type, "delisted")
 
         funcs_args = []
-        symbol_indices = []
-        for i, symbol in enumerate(self.symbols):
-            if not self.delisted.get(symbol, False):
-                symbol_update_kwargs = self.select_symbol_kwargs(symbol, kwargs)
+        key_indices = []
+        for i, k in enumerate(self.keys):
+            if not self.delisted.get(k, False):
+                if self.feature_oriented:
+                    key_update_func = self.try_update_feature
+                    key_update_kwargs = self.select_feature_kwargs(k, kwargs)
+                else:
+                    key_update_func = self.try_update_symbol
+                    key_update_kwargs = self.select_symbol_kwargs(k, kwargs)
                 if "silence_warnings" in func_arg_names:
-                    symbol_update_kwargs["silence_warnings"] = silence_warnings
+                    key_update_kwargs["silence_warnings"] = silence_warnings
                 funcs_args.append(
                     (
-                        self.try_update_symbol,
-                        (symbol,),
+                        key_update_func,
+                        (k,),
                         dict(
                             skip_on_error=skip_on_error,
                             silence_warnings=silence_warnings,
-                            update_kwargs=symbol_update_kwargs,
+                            update_kwargs=key_update_kwargs,
                         ),
                     )
                 )
-                symbol_indices.append(i)
+                key_indices.append(i)
 
-        outputs = execute(funcs_args, n_calls=len(self.symbols), progress_desc=self.symbols, **execute_kwargs)
+        outputs = execute(funcs_args, n_calls=len(self.keys), progress_desc=self.keys, **execute_kwargs)
         if return_raw:
             return outputs
 
@@ -2296,28 +2410,34 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         new_last_index = {}
         new_returned_kwargs = {}
         i = 0
-        for symbol, obj in self.data.items():
-            if self.delisted.get(symbol, False):
+        for k, obj in self.data.items():
+            if self.delisted.get(k, False):
                 out = None
             else:
                 out = outputs[i]
                 i += 1
-            skip_symbol = False
+            skip_key = False
             if out is not None:
                 if isinstance(out, tuple):
                     new_obj = out[0]
-                    new_returned_kwargs[symbol] = out[1]
+                    new_returned_kwargs[k] = out[1]
                 else:
                     new_obj = out
-                    new_returned_kwargs[symbol] = {}
+                    new_returned_kwargs[k] = {}
                 new_obj = to_any_array(new_obj)
                 if new_obj.size == 0:
                     if not silence_warnings:
-                        warnings.warn(
-                            f"Symbol '{str(symbol)}' returned an empty array. Skipping.",
-                            stacklevel=2,
-                        )
-                    skip_symbol = True
+                        if self.feature_oriented:
+                            warnings.warn(
+                                f"Feature '{str(k)}' returned an empty array. Skipping.",
+                                stacklevel=2,
+                            )
+                        else:
+                            warnings.warn(
+                                f"Symbol '{str(k)}' returned an empty array. Skipping.",
+                                stacklevel=2,
+                            )
+                    skip_key = True
                 else:
                     if not isinstance(new_obj, (pd.Series, pd.DataFrame)):
                         new_obj = to_pd_array(new_obj)
@@ -2332,20 +2452,20 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                         tz_localize=self.tz_localize,
                         tz_convert=self.tz_convert,
                     )
-                    new_data[symbol] = new_obj
+                    new_data[k] = new_obj
                     if len(new_obj.index) > 0:
-                        new_last_index[symbol] = new_obj.index[-1]
+                        new_last_index[k] = new_obj.index[-1]
                     else:
-                        new_last_index[symbol] = self.last_index[symbol]
+                        new_last_index[k] = self.last_index[k]
             else:
-                skip_symbol = True
-            if skip_symbol:
-                new_data[symbol] = obj.iloc[0:0]
-                new_last_index[symbol] = self.last_index[symbol]
+                skip_key = True
+            if skip_key:
+                new_data[k] = obj.iloc[0:0]
+                new_last_index[k] = self.last_index[k]
 
         # Get the last index in the old data from where the new data should begin
         from_index = None
-        for symbol, new_obj in new_data.items():
+        for k, new_obj in new_data.items():
             if len(new_obj.index) > 0:
                 index = new_obj.index[0]
             else:
@@ -2354,19 +2474,25 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 from_index = index
         if from_index is None:
             if not silence_warnings:
-                warnings.warn(
-                    f"None of the symbols have been updated",
-                    stacklevel=2,
-                )
+                if self.feature_oriented:
+                    warnings.warn(
+                        f"None of the features were updated",
+                        stacklevel=2,
+                    )
+                else:
+                    warnings.warn(
+                        f"None of the symbols were updated",
+                        stacklevel=2,
+                    )
             return self.copy()
 
         # Concatenate the updated old data and the new data
-        for symbol, new_obj in new_data.items():
+        for k, new_obj in new_data.items():
             if len(new_obj.index) > 0:
                 to_index = new_obj.index[0]
             else:
                 to_index = None
-            obj = self.data[symbol]
+            obj = self.data[k]
             if isinstance(obj, pd.DataFrame) and isinstance(new_obj, pd.DataFrame):
                 shared_columns = obj.columns.intersection(new_obj.columns)
                 obj = obj[shared_columns]
@@ -2384,15 +2510,15 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             obj = obj.loc[from_index:to_index]
             new_obj = pd.concat((obj, new_obj), axis=0)
             new_obj = new_obj[~new_obj.index.duplicated(keep="last")]
-            new_data[symbol] = new_obj
+            new_data[k] = new_obj
 
         # Align the index and columns in the new data
         new_data = self.align_index(new_data, missing=self.missing_index, silence_warnings=silence_warnings)
         new_data = self.align_columns(new_data, missing=self.missing_columns, silence_warnings=silence_warnings)
 
         # Align the columns and data type in the old and new data
-        for symbol, new_obj in new_data.items():
-            obj = self.data[symbol]
+        for k, new_obj in new_data.items():
+            obj = self.data[k]
             if isinstance(obj, pd.DataFrame) and isinstance(new_obj, pd.DataFrame):
                 new_obj = new_obj[obj.columns]
             elif isinstance(new_obj, pd.DataFrame):
@@ -2404,39 +2530,39 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 new_obj = new_obj.astype(obj.dtypes)
             else:
                 new_obj = new_obj.astype(obj.dtype)
-            new_data[symbol] = new_obj
+            new_data[k] = new_obj
 
         if not concat:
             # Do not concatenate with the old data
-            for symbol, new_obj in new_data.items():
+            for k, new_obj in new_data.items():
                 if isinstance(new_obj.index, pd.DatetimeIndex):
                     new_obj.index.freq = new_obj.index.inferred_freq
-            new_index = new_data[self.symbols[0]].index
+            new_index = new_data[self.keys[0]].index
             return self.replace(
                 wrapper=self.wrapper.replace(index=new_index),
-                data=symbol_dict(new_data),
-                returned_kwargs=symbol_dict(new_returned_kwargs),
-                last_index=symbol_dict(new_last_index),
+                data=self.dict_type(new_data),
+                returned_kwargs=self.dict_type(new_returned_kwargs),
+                last_index=self.dict_type(new_last_index),
             )
 
         # Append the new data to the old data
-        for symbol, new_obj in new_data.items():
-            obj = self.data[symbol]
+        for k, new_obj in new_data.items():
+            obj = self.data[k]
             obj = obj.loc[:from_index]
             if obj.index[-1] == from_index:
                 obj = obj.iloc[:-1]
             new_obj = pd.concat((obj, new_obj), axis=0)
             if isinstance(new_obj.index, pd.DatetimeIndex):
                 new_obj.index.freq = new_obj.index.inferred_freq
-            new_data[symbol] = new_obj
+            new_data[k] = new_obj
 
-        new_index = new_data[self.symbols[0]].index
+        new_index = new_data[self.keys[0]].index
 
         return self.replace(
             wrapper=self.wrapper.replace(index=new_index),
-            data=symbol_dict(new_data),
-            returned_kwargs=symbol_dict(new_returned_kwargs),
-            last_index=symbol_dict(new_last_index),
+            data=self.dict_type(new_data),
+            returned_kwargs=self.dict_type(new_returned_kwargs),
+            last_index=self.dict_type(new_last_index),
         )
 
     # ############# Transforming ############# #
@@ -3127,7 +3253,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
         if fetch_kwargs is None:
             fetch_kwargs = {}
-        if len(args) == 0 and "symbols" not in kwargs:
+        if len(args) == 0 and "keys" not in kwargs and "features" not in kwargs and "symbols" not in kwargs:
             args = (cls.__name__ + ".h5",)
         data = HDFData.fetch(*args, **kwargs)
         data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
