@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from vectorbtpro.data.custom.custom import *
     from vectorbtpro.data.custom.file import *
     from vectorbtpro.data.custom.gbm import *
-    from vectorbtpro.data.custom.gbm import *
     from vectorbtpro.data.custom.gbm_ohlc import *
     from vectorbtpro.data.custom.hdf import *
     from vectorbtpro.data.custom.local import *

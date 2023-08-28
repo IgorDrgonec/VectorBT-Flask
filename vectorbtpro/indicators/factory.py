@@ -358,7 +358,7 @@ class IndicatorBase(Analyzable):
         level_names: tp.Optional[tp.Sequence[str]] = None,
         hide_levels: tp.Optional[tp.Sequence[tp.Union[str, int]]] = None,
         build_col_kwargs: tp.KwargsLike = None,
-        return_raw: bool = False,
+        return_raw: tp.Union[bool, str] = False,
         use_raw: tp.Optional[RawOutputT] = None,
         wrapper_kwargs: tp.KwargsLike = None,
         seed: tp.Optional[int] = None,
@@ -467,7 +467,10 @@ class IndicatorBase(Analyzable):
                 Must have the same length as `param_list`.
             hide_levels (list of int or str): A list of level names or indices of parameter levels to hide.
             build_col_kwargs (dict): Keyword arguments passed to `build_columns`.
-            return_raw (bool): Whether to return raw output without post-processing and hashed parameter tuples.
+            return_raw (bool or str): Whether to return raw outputs and hashed parameter tuples without
+                further post-processing.
+
+                Pass "outputs" to only return outputs.
             use_raw (bool): Takes the raw results and uses them instead of running `custom_func`.
             wrapper_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.wrapping.ArrayWrapper`.
             seed (int): Set seed to make output deterministic.
@@ -776,7 +779,7 @@ class IndicatorBase(Analyzable):
                 func_args += tuple(func_kwargs.values())
                 func_kwargs = {}
             if pass_packed:
-                output = custom_func(
+                outputs = custom_func(
                     tuple(input_list_ready),
                     tuple(in_output_list_ready),
                     tuple(param_list_ready),
@@ -784,9 +787,21 @@ class IndicatorBase(Analyzable):
                     **func_kwargs,
                 )
             else:
-                output = custom_func(
+                outputs = custom_func(
                     *input_list_ready, *in_output_list_ready, *param_list_ready, *func_args, **func_kwargs
                 )
+
+            # Return outputs
+            if isinstance(return_raw, str):
+                if return_raw.lower() == "outputs":
+                    if use_run_unique and not silence_warnings:
+                        warnings.warn(
+                            "Raw outputs are produced by unique parameter combinations when run_unique=True",
+                            stacklevel=2,
+                        )
+                    return outputs
+                else:
+                    raise ValueError(f"Invalid option return_raw='{return_raw}'")
 
             # Return cache
             if kwargs.get("return_cache", False):
@@ -795,17 +810,17 @@ class IndicatorBase(Analyzable):
                         "Cache is produced by unique parameter combinations when run_unique=True",
                         stacklevel=2,
                     )
-                return output
+                return outputs
 
             # Post-process results
-            if output is None:
+            if outputs is None:
                 output_list = []
                 other_list = []
             else:
-                if isinstance(output, (tuple, list, List)):
-                    output_list = list(output)
+                if isinstance(outputs, (tuple, list, List)):
+                    output_list = list(outputs)
                 else:
-                    output_list = [output]
+                    output_list = [outputs]
                 # Other outputs should be returned without post-processing (for example cache_dict)
                 if len(output_list) > num_ret_outputs:
                     other_list = output_list[num_ret_outputs:]
@@ -853,7 +868,7 @@ class IndicatorBase(Analyzable):
             if return_raw:
                 if use_run_unique and not silence_warnings:
                     warnings.warn(
-                        "Raw output is produced by unique parameter combinations when run_unique=True",
+                        "Raw outputs are produced by unique parameter combinations when run_unique=True",
                         stacklevel=2,
                     )
                 return raw

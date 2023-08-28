@@ -1532,7 +1532,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     def from_data(
         cls: tp.Type[DataT],
         data: tp.Union[dict, tp.SeriesFrame],
-        symbol_columns: bool = False,
+        columns_are_symbols: bool = False,
         invert_data: bool = False,
         single_key: bool = True,
         classes: tp.Optional[dict] = None,
@@ -1553,7 +1553,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
         Args:
             data (dict): Dictionary of array-like objects keyed by symbol.
-            symbol_columns (bool): Whether columns in each DataFrame are symbols.
+            columns_are_symbols (bool): Whether columns in each DataFrame are symbols.
             invert_data (bool): Whether to invert the data dictionary with `Data.invert_data`.
             single_key (bool): See `Data.single_key`.
             classes (feature_dict or symbol_dict): See `Data.classes`.
@@ -1584,16 +1584,16 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         if delisted is None:
             delisted = {}
 
-        if symbol_columns and isinstance(data, symbol_dict):
-            raise TypeError("Data cannot have the type symbol_dict when symbol_columns=True")
+        if columns_are_symbols and isinstance(data, symbol_dict):
+            raise TypeError("Data cannot have the type symbol_dict when columns_are_symbols=True")
         if isinstance(data, (pd.Series, pd.DataFrame)):
-            if symbol_columns:
+            if columns_are_symbols:
                 data = feature_dict(feature=data)
             else:
                 data = symbol_dict(symbol=data)
         checks.assert_instance_of(data, dict, arg_name="data")
         if not isinstance(data, key_dict):
-            if symbol_columns:
+            if columns_are_symbols:
                 data = feature_dict(data)
             else:
                 data = symbol_dict(data)
@@ -2234,7 +2234,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         """Parse a `Data` instance from a string.
 
         For example: `YFData:BTC-USD` or just `BTC-USD` where the data class is
-        `vectorbtpro.data.custom.YFData` by default."""
+        `vectorbtpro.data.custom.yf.YFData` by default."""
         from vectorbtpro.data import custom
 
         if ":" in data_str:
@@ -3235,7 +3235,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         """Use `CSVData` to load data from CSV and switch the class back to this class.
 
         Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
-        from vectorbtpro.data.custom import CSVData
+        from vectorbtpro.data.custom.csv import CSVData
 
         if fetch_kwargs is None:
             fetch_kwargs = {}
@@ -3249,7 +3249,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         """Use `HDFData` to load data from HDF and switch the class back to this class.
 
         Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
-        from vectorbtpro.data.custom import HDFData
+        from vectorbtpro.data.custom.hdf import HDFData
 
         if fetch_kwargs is None:
             fetch_kwargs = {}

@@ -440,8 +440,7 @@ class TVData(RemoteData):
     def resolve_client(cls, client: tp.Optional[TVClient] = None, **client_config) -> TVClient:
         """Resolve the client.
 
-        If provided, must be of the type `vectorbtpro.data.tv.TVClient`.
-        Otherwise, will be created using `client_config`."""
+        If provided, must be of the type `TVClient`. Otherwise, will be created using `client_config`."""
         tv_cfg = cls.get_settings(key_id="custom")
 
         if client is None:
@@ -477,7 +476,7 @@ class TVData(RemoteData):
             symbol (str): Symbol.
 
                 Symbol must be in the `EXCHANGE:SYMBOL` format if `exchange` is None.
-            client (vectorbtpro.data.tv.TVClient): Client.
+            client (TVClient): Client.
 
                 See `TVData.resolve_client`.
             client_config (dict): Client config.
