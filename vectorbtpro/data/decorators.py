@@ -32,6 +32,7 @@ def attach_symbol_dict_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
             return self.replace(**{_target_name: new_kwargs})
 
         new_method.__name__ = "update_" + target_name
+        new_method.__qualname__ = f"{cls.__name__}.{new_method.__name__}"
         new_method.__doc__ = f"""Update `Data.{target_name}`. Returns a new instance."""
         setattr(cls, new_method.__name__, new_method)
 

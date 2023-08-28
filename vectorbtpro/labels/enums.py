@@ -32,9 +32,9 @@ __pdoc__[
 ```
 
 Attributes:
-    Binary: See `vectorbtpro.labels.nb.bn_trend_labels_nb`.
-    BinaryCont: See `vectorbtpro.labels.nb.bn_cont_trend_labels_nb`.
-    BinaryContSat: See `vectorbtpro.labels.nb.bn_cont_sat_trend_labels_nb`.
-    PctChange: See `vectorbtpro.labels.nb.pct_trend_labels_nb`.
+    Binary: See `vectorbtpro.labels.nb.bin_trend_labels_nb`.
+    BinaryCont: See `vectorbtpro.labels.nb.binc_trend_labels_nb`.
+    BinaryContSat: See `vectorbtpro.labels.nb.bincs_trend_labels_nb`.
+    PctChange: See `vectorbtpro.labels.nb.pct_trend_labels_nb` with `normalize` set to False.
     PctChangeNorm: See `vectorbtpro.labels.nb.pct_trend_labels_nb` with `normalize` set to True.
 """

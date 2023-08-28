@@ -1,6 +1,6 @@
 # Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
 
-"""Modules with custom data sources."""
+"""Modules with custom data classes."""
 
 from typing import TYPE_CHECKING
 

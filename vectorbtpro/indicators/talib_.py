@@ -261,6 +261,7 @@ def talib_func(func_name: str) -> tp.Callable:
         k += 1
     run_talib_func.__signature__ = signature.replace(parameters=new_parameters)
     run_talib_func.__name__ = "run_" + func_name.lower()
+    run_talib_func.__qualname__ = run_talib_func.__name__
     run_talib_func.__doc__ = f"""Run `talib.{func_name}` on NumPy arrays, Series, and DataFrames.
     
 Requires [TA-Lib](https://github.com/mrjbq7/ta-lib) installed.
@@ -460,6 +461,7 @@ def talib_plot_func(func_name: str) -> tp.Callable:
         ]
     )
     run_talib_plot_func.__name__ = "plot_" + func_name.lower()
+    run_talib_plot_func.__qualname__ = run_talib_plot_func.__name__
     run_talib_plot_func.__doc__ = f"""Plot output arrays of `talib.{func_name}`.
 
 Args:

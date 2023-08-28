@@ -517,11 +517,12 @@ class OHLCVDFAccessor(OHLCDataMixin, GenericDFAccessor):
             add_trace_kwargs=add_trace_kwargs,
             fig=fig,
         )
-        fig = self.plot_volume(
-            trace_kwargs=volume_trace_kwargs,
-            add_trace_kwargs=volume_add_trace_kwargs,
-            fig=fig,
-        )
+        if plot_volume:
+            fig = self.plot_volume(
+                trace_kwargs=volume_trace_kwargs,
+                add_trace_kwargs=volume_add_trace_kwargs,
+                fig=fig,
+            )
         return fig
 
     @property

@@ -3769,8 +3769,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         Generates signals based either on the number of signals `n` or the probability
         of encountering a signal `prob`.
 
-        * If `n` is set, see `vectorbtpro.signals.generators.RANDNX`.
-        * If `prob` is set, see `vectorbtpro.signals.generators.RPROBNX`.
+        * If `n` is set, see `vectorbtpro.signals.generators.randnx.RANDNX`.
+        * If `prob` is set, see `vectorbtpro.signals.generators.rprobnx.RPROBNX`.
 
         Based on `Portfolio.from_signals`.
 
