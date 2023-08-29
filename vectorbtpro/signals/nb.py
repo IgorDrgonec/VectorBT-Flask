@@ -931,6 +931,60 @@ def part_pos_rank_nb(c: RankContext) -> int:
     return c.part_cnt - 1
 
 
+# ############# Distance ############# #
+
+@register_jitted(cache=True)
+def distance_from_last_1d_nb(mask: tp.Array1d, nth: int = 1) -> tp.Array1d:
+    """Distance from the last n-th True value to the current value.
+
+    Unless `nth` is zero, the current True value isn't counted as one of the last True values."""
+    if nth < 0:
+        raise ValueError("nth must be at least 0")
+    out = np.empty(mask.shape, dtype=np.int_)
+    last_indices = np.empty(mask.shape, dtype=np.int_)
+    k = 0
+    for i in range(mask.shape[0]):
+        if nth == 0:
+            if mask[i]:
+                last_indices[k] = i
+                k += 1
+            if k - 1 < 0:
+                out[i] = -1
+            else:
+                out[i] = i - last_indices[k - 1]
+        elif nth == 1:
+            if k - nth < 0:
+                out[i] = -1
+            else:
+                out[i] = i - last_indices[k - nth]
+            if mask[i]:
+                last_indices[k] = i
+                k += 1
+        else:
+            if mask[i]:
+                last_indices[k] = i
+                k += 1
+            if k - nth < 0:
+                out[i] = -1
+            else:
+                out[i] = i - last_indices[k - nth]
+    return out
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="mask", axis=1),
+    arg_take_spec=dict(mask=ch.ArraySlicer(axis=1), nth=None),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def distance_from_last_nb(mask: tp.Array2d, nth: int = 1) -> tp.Array2d:
+    """2-dim version of `distance_from_last_1d_nb`."""
+    out = np.empty(mask.shape, dtype=np.int_)
+    for col in prange(mask.shape[1]):
+        out[:, col] = distance_from_last_1d_nb(mask[:, col], nth=nth)
+    return out
+
+
 # ############# Cleaning ############# #
 
 

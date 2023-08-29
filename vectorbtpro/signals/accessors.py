@@ -1875,6 +1875,21 @@ class SignalsAccessor(GenericAccessor):
         Uses `SignalsAccessor.partition_pos_rank`."""
         return self.partition_pos_rank(as_mapped=True, group_by=group_by, **kwargs)
 
+    # ############# Distance ############# #
+
+    def distance_from_last(
+        self,
+        nth: int = 1,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """See `vectorbtpro.signals.nb.distance_from_last_nb`."""
+        func = jit_reg.resolve_option(nb.distance_from_last_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        distance_from_last = func(self.to_2d_array(), nth=nth)
+        return self.wrapper.wrap(distance_from_last, group_by=False, **resolve_dict(wrap_kwargs))
+
     # ############# Conversion ############# #
 
     def to_mapped(

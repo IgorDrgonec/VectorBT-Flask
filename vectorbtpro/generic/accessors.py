@@ -3175,9 +3175,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
         pct: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
-        group_by: tp.GroupByLike = None,
         wrap_kwargs: tp.KwargsLike = None,
-    ):
+    ) -> tp.SeriesFrame:
         """Compute numerical data rank.
 
         By default, equal values are assigned a rank that is the average of the ranks of those values."""
