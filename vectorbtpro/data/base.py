@@ -195,6 +195,8 @@ class BaseDataMixin:
         self,
         features: tp.Optional[tp.MaybeFeatures] = None,
         symbols: tp.Optional[tp.MaybeSymbols] = None,
+        feature: tp.Optional[tp.Feature] = None,
+        symbol: tp.Optional[tp.Symbol] = None,
         **kwargs,
     ) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Get one or more features of one or more symbols of data."""
@@ -1179,53 +1181,59 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         self,
         features: tp.Optional[tp.MaybeFeatures] = None,
         symbols: tp.Optional[tp.MaybeSymbols] = None,
+        feature: tp.Optional[tp.Feature] = None,
+        symbol: tp.Optional[tp.Symbol] = None,
         squeeze_features: bool = False,
         squeeze_symbols: bool = False,
         **kwargs,
     ) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Get one or more features of one or more symbols of data."""
-        if features is not None:
-            if squeeze_features and self.has_multiple_keys(features) and len(features) == 1:
-                features = features[0]
-            if self.has_multiple_keys(features):
-                feature_idxs = [self.get_feature_idx(k, raise_error=True) for k in features]
-                features = [self.features[i] for i in feature_idxs]
-                single_feature = False
-            else:
-                feature_idxs = self.get_feature_idx(features, raise_error=True)
-                features = self.features[feature_idxs]
-                single_feature = True
+        if features is not None and feature is not None:
+            raise ValueError("Either features or feature must be provided, not both")
+        if symbols is not None and symbol is not None:
+            raise ValueError("Either symbols or symbol must be provided, not both")
+
+        if feature is not None:
+            features = feature
+            single_feature = True
         else:
-            single_feature = self.single_feature
-            if squeeze_features and not single_feature and len(self.features) == 1:
-                single_feature = True
-            if single_feature:
-                feature_idxs = 0
-                features = self.features[feature_idxs]
-            else:
-                feature_idxs = list(range(len(self.features)))
+            if features is None:
                 features = self.features
-        if symbols is not None:
-            if squeeze_symbols and self.has_multiple_keys(symbols) and len(symbols) == 1:
-                symbols = symbols[0]
-            if self.has_multiple_keys(symbols):
-                symbol_idxs = [self.get_symbol_idx(k, raise_error=True) for k in symbols]
-                symbols = [self.symbols[i] for i in symbol_idxs]
-                single_symbol = False
+                single_feature = self.single_feature
+                if single_feature:
+                    features = features[0]
             else:
-                symbol_idxs = self.get_symbol_idx(symbols, raise_error=True)
-                symbols = self.symbols[symbol_idxs]
-                single_symbol = True
+                single_feature = not self.has_multiple_keys(features)
+            if not single_feature and squeeze_features and len(features) == 1:
+                features = features[0]
+                single_feature = True
+        if symbol is not None:
+            symbols = symbol
+            single_symbol = True
         else:
-            single_symbol = self.single_symbol
-            if squeeze_symbols and not single_symbol and len(self.symbols) == 1:
-                single_symbol = True
-            if single_symbol:
-                symbol_idxs = 0
-                symbols = self.symbols[symbol_idxs]
-            else:
-                symbol_idxs = list(range(len(self.symbols)))
+            if symbols is None:
                 symbols = self.symbols
+                single_symbol = self.single_symbol
+                if single_symbol:
+                    symbols = symbols[0]
+            else:
+                single_symbol = not self.has_multiple_keys(symbols)
+            if not single_symbol and squeeze_symbols and len(symbols) == 1:
+                symbols = symbols[0]
+                single_symbol = True
+
+        if not single_feature:
+            feature_idxs = [self.get_feature_idx(k, raise_error=True) for k in features]
+            features = [self.features[i] for i in feature_idxs]
+        else:
+            feature_idxs = self.get_feature_idx(features, raise_error=True)
+            features = self.features[feature_idxs]
+        if not single_symbol:
+            symbol_idxs = [self.get_symbol_idx(k, raise_error=True) for k in symbols]
+            symbols = [self.symbols[i] for i in symbol_idxs]
+        else:
+            symbol_idxs = self.get_symbol_idx(symbols, raise_error=True)
+            symbols = self.symbols[symbol_idxs]
 
         if self.feature_oriented:
             if single_feature:

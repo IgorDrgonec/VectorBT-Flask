@@ -161,13 +161,22 @@ class OHLCVDFAccessor(OHLCDataMixin, GenericDFAccessor):
         self,
         features: tp.Union[None, tp.MaybeFeatures] = None,
         symbols: tp.Union[None, tp.MaybeSymbols] = None,
+        feature: tp.Optional[tp.Feature] = None,
+        symbol: tp.Optional[tp.Symbol] = None,
         **kwargs,
     ) -> tp.SeriesFrame:
-        if symbols is not None:
+        if features is not None and feature is not None:
+            raise ValueError("Either features or feature must be provided, not both")
+        if symbols is not None or symbol is not None:
             raise ValueError("Cannot provide symbols")
-        if features is None:
-            return self.obj
-        if self.has_multiple_keys(features):
+        if feature is not None:
+            features = feature
+            single_feature = True
+        else:
+            if features is None:
+                return self.obj
+            single_feature = not self.has_multiple_keys(features)
+        if not single_feature:
             feature_idxs = [self.get_feature_idx(k, raise_error=True) for k in features]
         else:
             feature_idxs = self.get_feature_idx(features, raise_error=True)
