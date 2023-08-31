@@ -84,7 +84,7 @@ def convert_to_dict(dct: InConfigLikeT, nested: bool = True) -> dict:
     return dct
 
 
-def get_dict_item(dct: dict, k: tp.Hashable) -> tp.Any:
+def get_dict_item(dct: dict, k: tp.Hashable, populate: bool = False) -> tp.Any:
     """Get dict item under the key `k`.
 
     The key can be nested using the dot notation or tuple, and must be hashable."""
@@ -94,8 +94,10 @@ def get_dict_item(dct: dict, k: tp.Hashable) -> tp.Any:
         k = tuple(k.split("."))
     if isinstance(k, tuple):
         if len(k) == 1:
-            return get_dict_item(dct, k[0])
-        return get_dict_item(get_dict_item(dct, k[0]), k[1:])
+            return get_dict_item(dct, k[0], populate=populate)
+        return get_dict_item(get_dict_item(dct, k[0], populate=populate), k[1:], populate=populate)
+    if k not in dct and populate:
+        dct[k] = dict()
     return dct[k]
 
 
@@ -1110,8 +1112,10 @@ class Configured(Cacheable, Comparable, Pickleable, Prettified):
         raise KeyError(f"Key '{k}' not found among registered settings")
 
     @classmethod
-    def set_settings(cls, key_id: tp.Optional[str] = None, **kwargs) -> None:
-        """Set class-related settings in `vectorbtpro._settings`."""
+    def set_settings(cls, key_id: tp.Optional[str] = None, populate_: bool = False, **kwargs) -> None:
+        """Set class-related settings in `vectorbtpro._settings`.
+
+        If the settings do not exist yet, pass `populate_=True`."""
         from vectorbtpro._settings import settings
 
         if isinstance(cls._setting_keys, dict):
@@ -1124,14 +1128,17 @@ class Configured(Cacheable, Comparable, Pickleable, Prettified):
             cls_settings_key = cls._setting_keys
         if cls_settings_key is None:
             raise ValueError(f"No settings associated with the class '{cls.__name__}'")
-        cls_cfg = get_dict_item(settings, cls_settings_key)
+        cls_cfg = get_dict_item(settings, cls_settings_key, populate=populate_)
         for k, v in kwargs.items():
-            if k not in cls_cfg:
-                raise KeyError(f"Invalid key '{k}'")
-            if isinstance(cls_cfg[k], dict) and isinstance(v, dict):
-                cls_cfg[k] = merge_dicts(cls_cfg[k], v)
-            else:
+            if populate_:
                 cls_cfg[k] = v
+            else:
+                if k not in cls_cfg:
+                    raise KeyError(f"Invalid key '{k}'")
+                if isinstance(cls_cfg[k], dict) and isinstance(v, dict):
+                    cls_cfg[k] = merge_dicts(cls_cfg[k], v)
+                else:
+                    cls_cfg[k] = v
 
     @classmethod
     def reset_settings(cls, key_id: tp.Optional[str] = None) -> None:

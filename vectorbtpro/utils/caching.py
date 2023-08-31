@@ -4,6 +4,7 @@
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.decorators import class_or_instancemethod
+from vectorbtpro.utils.path_ import remove_dir
 
 __all__ = [
     "clear_pycache",
@@ -11,22 +12,12 @@ __all__ = [
 ]
 
 
-def delete_dir(p):
-    """Delete directory with files."""
-    for sub in p.iterdir():
-        if sub.is_dir():
-            delete_dir(sub)
-        else:
-            sub.unlink()
-    p.rmdir()
-
-
 def clear_pycache():
     """Clear __pycache__ folders and .pyc files."""
     import pathlib
 
     for p in pathlib.Path(__file__).parent.parent.rglob("__pycache__"):
-        delete_dir(p)
+        remove_dir(p, with_contents=True)
     for p in pathlib.Path(__file__).parent.parent.rglob("*.py[co]"):
         p.unlink()
 

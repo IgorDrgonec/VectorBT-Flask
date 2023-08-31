@@ -101,7 +101,7 @@ class BaseDataMixin:
         return self.symbol_wrapper.columns.tolist()
 
     @classmethod
-    def has_multiple_keys(cls, keys: tp.Union[tp.Key, tp.Keys]) -> bool:
+    def has_multiple_keys(cls, keys: tp.MaybeKeys) -> bool:
         """Check whether there are one or multiple keys."""
         if checks.is_hashable(keys):
             return False
@@ -287,7 +287,7 @@ class OHLCDataMixin(BaseDataMixin):
         return self.get_feature("VWAP")
 
     @property
-    def hlc3(self) -> tp.Optional[tp.SeriesFrame]:
+    def hlc3(self) -> tp.SeriesFrame:
         """HLC/3."""
         high = self.get_feature("High", raise_error=True)
         low = self.get_feature("Low", raise_error=True)
@@ -295,7 +295,7 @@ class OHLCDataMixin(BaseDataMixin):
         return (high + low + close) / 3
 
     @property
-    def ohlc4(self) -> tp.Optional[tp.SeriesFrame]:
+    def ohlc4(self) -> tp.SeriesFrame:
         """OHLC/4."""
         open = self.get_feature("Open", raise_error=True)
         high = self.get_feature("High", raise_error=True)
@@ -337,7 +337,7 @@ class OHLCDataMixin(BaseDataMixin):
         volume_idx = self.get_feature_idx("Volume", raise_error=True)
         return self.select_feature_idxs([open_idx, high_idx, low_idx, close_idx, volume_idx])
 
-    def get_returns_acc(self, **kwargs) -> tp.Optional[tp.SeriesFrame]:
+    def get_returns_acc(self, **kwargs) -> ReturnsAccessor:
         """Return accessor of type `vectorbtpro.returns.accessors.ReturnsAccessor`."""
         return ReturnsAccessor.from_value(
             self.get_feature("Close", raise_error=True),
@@ -347,11 +347,11 @@ class OHLCDataMixin(BaseDataMixin):
         )
 
     @property
-    def returns_acc(self) -> tp.Optional[tp.SeriesFrame]:
+    def returns_acc(self) -> ReturnsAccessor:
         """`OHLCDataMixin.get_returns_acc` with default arguments."""
         return self.get_returns_acc()
 
-    def get_returns(self, **kwargs) -> tp.Optional[tp.SeriesFrame]:
+    def get_returns(self, **kwargs) -> tp.SeriesFrame:
         """Returns."""
         return ReturnsAccessor.from_value(
             self.get_feature("Close", raise_error=True),
@@ -361,11 +361,11 @@ class OHLCDataMixin(BaseDataMixin):
         )
 
     @property
-    def returns(self) -> tp.Optional[tp.SeriesFrame]:
+    def returns(self) -> tp.SeriesFrame:
         """`OHLCDataMixin.get_returns` with default arguments."""
         return self.get_returns()
 
-    def get_log_returns(self, **kwargs) -> tp.Optional[tp.SeriesFrame]:
+    def get_log_returns(self, **kwargs) -> tp.SeriesFrame:
         """Log returns."""
         return ReturnsAccessor.from_value(
             self.get_feature("Close", raise_error=True),
@@ -376,11 +376,11 @@ class OHLCDataMixin(BaseDataMixin):
         )
 
     @property
-    def log_returns(self) -> tp.Optional[tp.SeriesFrame]:
+    def log_returns(self) -> tp.SeriesFrame:
         """`OHLCDataMixin.get_log_returns` with default arguments."""
         return self.get_log_returns()
 
-    def get_daily_returns(self, **kwargs) -> tp.Optional[tp.SeriesFrame]:
+    def get_daily_returns(self, **kwargs) -> tp.SeriesFrame:
         """Daily returns."""
         return ReturnsAccessor.from_value(
             self.get_feature("Close", raise_error=True),
@@ -390,11 +390,11 @@ class OHLCDataMixin(BaseDataMixin):
         ).daily()
 
     @property
-    def daily_returns(self) -> tp.Optional[tp.SeriesFrame]:
+    def daily_returns(self) -> tp.SeriesFrame:
         """`OHLCDataMixin.get_daily_returns` with default arguments."""
         return self.get_daily_returns()
 
-    def get_daily_log_returns(self, **kwargs) -> tp.Optional[tp.SeriesFrame]:
+    def get_daily_log_returns(self, **kwargs) -> tp.SeriesFrame:
         """Daily log returns."""
         return ReturnsAccessor.from_value(
             self.get_feature("Close", raise_error=True),
@@ -405,7 +405,7 @@ class OHLCDataMixin(BaseDataMixin):
         ).daily()
 
     @property
-    def daily_log_returns(self) -> tp.Optional[tp.SeriesFrame]:
+    def daily_log_returns(self) -> tp.SeriesFrame:
         """`OHLCDataMixin.get_daily_log_returns` with default arguments."""
         return self.get_daily_log_returns()
 
@@ -1749,7 +1749,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             return type(dct)({k: dct[k] for k in keys})
         return type(dct)({k: dct[k] for k in keys if k in dct})
 
-    def select(self: DataT, keys: tp.Union[tp.Key, tp.Keys], **kwargs) -> DataT:
+    def select(self: DataT, keys: tp.MaybeKeys, **kwargs) -> DataT:
         """Create a new `Data` instance with one or more keys from this instance.
 
         Applies to features if data has the type `feature_dict` and symbols if `symbol_dict`."""
@@ -2022,7 +2022,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         return_raw: bool = False,
         **kwargs,
     ) -> tp.Union[DataT, tp.List[tp.Any]]:
-        """Fetch data of each feature/symbol using `Data.fetch_symbol` and pass to `Data.from_data`.
+        """Fetch data of each feature/symbol using `Data.fetch_feature`/`Data.fetch_symbol` and
+        prepare it with `Data.from_data`.
 
         Iteration over features/symbols is done using `vectorbtpro.utils.execution.execute`.
         That is, it can be distributed and parallelized when needed.
@@ -3325,6 +3326,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
     def plot(
         self,
+        column: tp.Optional[tp.Hashable] = None,
         feature: tp.Optional[tp.Feature] = None,
         symbol: tp.Optional[tp.Symbol] = None,
         feature_map: tp.KwargsLike = None,
@@ -3335,8 +3337,11 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         """Plot either one feature of multiple symbols, or OHLC(V) of one symbol.
 
         Args:
-            feature (str): Name of the feature to plot.
-            symbol (str): Name of the symbol to plot.
+            column (hashable): Name of the feature or symbol to plot.
+
+                Depends on the data orientation.
+            feature (hashable): Name of the feature to plot.
+            symbol (hashable): Name of the symbol to plot.
             feature_map (sequence of str): Dictionary mapping the feature names to OHLCV.
 
                 Applied only if OHLC(V) is plotted.
@@ -3379,6 +3384,15 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
             ![](/assets/images/api/data_plot_ohlcv.svg){: .iimg loading=lazy }
         """
+        if column is not None:
+            if self.feature_oriented:
+                if symbol is not None:
+                    raise ValueError("Either column or symbol can be provided, not both")
+                symbol = column
+            else:
+                if feature is not None:
+                    raise ValueError("Either column or feature can be provided, not both")
+                feature = column
         if feature is None and self.has_ohlc:
             data = self.get(symbols=symbol, squeeze_symbols=True)
             if isinstance(data, tuple):

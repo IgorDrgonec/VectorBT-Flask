@@ -111,10 +111,12 @@ class Figure(_Figure, FigureMixin):
 
         pre_show_func = plotting_cfg.get("pre_show_func", None)
         if pre_show_func is not None:
-            pre_show_func(self)
-        fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
+            _self = pre_show_func(self)
+        else:
+            _self = self
+        fig_kwargs = dict(width=_self.layout.width, height=_self.layout.height)
         show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
-        _Figure.show(self, *args, **show_kwargs)
+        _Figure.show(_self, *args, **show_kwargs)
 
 
 class FigureWidget(_FigureWidget, FigureMixin):
@@ -138,10 +140,12 @@ class FigureWidget(_FigureWidget, FigureMixin):
 
         pre_show_func = plotting_cfg.get("pre_show_func", None)
         if pre_show_func is not None:
-            pre_show_func(self)
-        fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
+            _self = pre_show_func(self)
+        else:
+            _self = self
+        fig_kwargs = dict(width=_self.layout.width, height=_self.layout.height)
         show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
-        _Figure.show(self, *args, **show_kwargs)
+        _Figure.show(_self, *args, **show_kwargs)
 
 
 try:
@@ -168,10 +172,12 @@ try:
 
             pre_show_func = plotting_cfg.get("pre_show_func", None)
             if pre_show_func is not None:
-                pre_show_func(self)
-            fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
+                _self = pre_show_func(self)
+            else:
+                _self = self
+            fig_kwargs = dict(width=_self.layout.width, height=_self.layout.height)
             show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
-            _Figure.show(self, *args, **show_kwargs)
+            _Figure.show(_self, *args, **show_kwargs)
 
     class FigureWidgetResampler(_FigureWidgetResampler, FigureMixin):
         """Figure widget resampler."""
@@ -194,10 +200,12 @@ try:
 
             pre_show_func = plotting_cfg.get("pre_show_func", None)
             if pre_show_func is not None:
-                pre_show_func(self)
-            fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
+                _self = pre_show_func(self)
+            else:
+                _self = self
+            fig_kwargs = dict(width=_self.layout.width, height=_self.layout.height)
             show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
-            _Figure.show(self, *args, **show_kwargs)
+            _Figure.show(_self, *args, **show_kwargs)
 
 except ImportError:
     FigureResampler = Figure

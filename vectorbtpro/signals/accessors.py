@@ -1884,7 +1884,33 @@ class SignalsAccessor(GenericAccessor):
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
-        """See `vectorbtpro.signals.nb.distance_from_last_nb`."""
+        """See `vectorbtpro.signals.nb.distance_from_last_nb`.
+
+        Usage:
+            * Get the distance to the last signal:
+
+            ```pycon
+            >>> mask.vbt.signals.distance_from_last()
+                        a  b  c
+            2020-01-01 -1 -1 -1
+            2020-01-02  1  1  1
+            2020-01-03  2  2  1
+            2020-01-04  3  1  1
+            2020-01-05  4  2  2
+            ```
+
+            * Get the distance to the second last signal:
+
+            ```pycon
+            >>> mask.vbt.signals.distance_from_last(nth=2)
+                        a  b  c
+            2020-01-01 -1 -1 -1
+            2020-01-02 -1 -1  1
+            2020-01-03 -1  2  1
+            2020-01-04 -1  3  2
+            2020-01-05 -1  2  3
+            ```
+        """
         func = jit_reg.resolve_option(nb.distance_from_last_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         distance_from_last = func(self.to_2d_array(), nth=nth)
