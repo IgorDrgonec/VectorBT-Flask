@@ -4676,7 +4676,7 @@ Other keyword arguments are passed to `{0}.run`.
 
         Usage:
             ```pycon
-            >>> data = vbt.YFData.fetch(['BTC-USD', 'ETH-USD'])
+            >>> data = vbt.YFData.pull(['BTC-USD', 'ETH-USD'])
 
             >>> WQA1 = vbt.IF.from_wqa101(1)
             >>> wqa1 = WQA1.run(data.get('Close'))

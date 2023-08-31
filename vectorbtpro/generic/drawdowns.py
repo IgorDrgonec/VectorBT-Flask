@@ -16,7 +16,7 @@ Using `Drawdowns.from_price`, you can generate drawdown records for any time ser
 >>> import pandas as pd
 >>> import vectorbtpro as vbt
 
->>> price = vbt.YFData.fetch(
+>>> price = vbt.YFData.pull(
 ...     "BTC-USD",
 ...     start="2019-10 UTC",
 ...     end="2020-01 UTC"

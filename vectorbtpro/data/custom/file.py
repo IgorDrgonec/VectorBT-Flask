@@ -56,7 +56,7 @@ class FileData(LocalData):
         return Path(path).stem
 
     @classmethod
-    def fetch(
+    def pull(
         cls: tp.Type[FileDataT],
         keys: tp.Union[tp.MaybeKeys] = None,
         *,
@@ -71,7 +71,7 @@ class FileData(LocalData):
         path_to_key_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> FileDataT:
-        """Override `vectorbtpro.data.base.Data.fetch` to take care of paths.
+        """Override `vectorbtpro.data.base.Data.pull` to take care of paths.
 
         Use either features, symbols, or `paths` to specify the path to one or multiple files.
         Allowed are paths in a string or `pathlib.Path` format, or string expressions accepted by `glob.glob`.
@@ -176,7 +176,7 @@ class FileData(LocalData):
             if len(keys) == 1 and single_key:
                 keys = keys[0]
 
-        return super(FileData, cls).fetch(
+        return super(FileData, cls).pull(
             keys,
             keys_are_features=keys_are_features,
             path=paths,

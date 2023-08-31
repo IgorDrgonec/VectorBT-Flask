@@ -330,7 +330,7 @@ Get count and PnL of trades with duration of more than 2 days:
     See `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats` and `Trades.metrics`.
 
 ```pycon
->>> price = vbt.RandomData.fetch(
+>>> price = vbt.RandomData.pull(
 ...     ['a', 'b'],
 ...     start=datetime(2020, 1, 1),
 ...     end=datetime(2020, 3, 1),

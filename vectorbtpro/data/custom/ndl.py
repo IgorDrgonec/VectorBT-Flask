@@ -42,7 +42,7 @@ class NDLData(RemoteData):
         * Fetch data:
 
         ```pycon
-        >>> data = vbt.NDLData.fetch(
+        >>> data = vbt.NDLData.pull(
         ...     "EIA/PET_RWTC_D",
         ...     start="2020-01-01",
         ...     end="2021-01-01"

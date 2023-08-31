@@ -7,7 +7,7 @@ You can access all the indicators by `vbt.*`.
 Run for the examples:
 
 ```pycon
->>> ohlcv = vbt.YFData.fetch(
+>>> ohlcv = vbt.YFData.pull(
 ...     "BTC-USD",
 ...     start="2019-03-01",
 ...     end="2019-09-01"

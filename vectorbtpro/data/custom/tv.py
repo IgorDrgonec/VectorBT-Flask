@@ -374,7 +374,7 @@ class TVData(RemoteData):
         * Fetch data:
 
         ```pycon
-        >>> data = vbt.TVData.fetch(
+        >>> data = vbt.TVData.pull(
         ...     "NASDAQ:AAPL",
         ...     timeframe="1 hour"
         ... )

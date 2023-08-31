@@ -2717,7 +2717,7 @@ class Splitter(Analyzable):
             >>> import numpy as np
             >>> import pandas as pd
 
-            >>> data = vbt.YFData.fetch(
+            >>> data = vbt.YFData.pull(
             ...     "BTC-USD",
             ...     start="2020-01-01 UTC",
             ...     end="2021-01-01 UTC"
@@ -3142,7 +3142,7 @@ class Splitter(Analyzable):
             >>> import numpy as np
             >>> import pandas as pd
 
-            >>> data = vbt.YFData.fetch(
+            >>> data = vbt.YFData.pull(
             ...     "BTC-USD",
             ...     start="2020-01-01 UTC",
             ...     end="2021-01-01 UTC"

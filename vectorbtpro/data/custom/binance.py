@@ -66,7 +66,7 @@ class BinanceData(RemoteData):
         * Fetch data:
 
         ```pycon
-        >>> data = vbt.BinanceData.fetch(
+        >>> data = vbt.BinanceData.pull(
         ...     "BTCUSDT",
         ...     start="2020-01-01",
         ...     end="2021-01-01",

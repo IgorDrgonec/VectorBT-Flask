@@ -469,7 +469,7 @@ class OHLCVDFAccessor(OHLCDataMixin, GenericDFAccessor):
             ```pycon
             >>> import vectorbtpro as vbt
 
-            >>> vbt.YFData.fetch("BTC-USD").get().vbt.ohlcv.plot().show()
+            >>> vbt.YFData.pull("BTC-USD").get().vbt.ohlcv.plot().show()
             ```
 
             [=100% "100%"]{: .candystripe}

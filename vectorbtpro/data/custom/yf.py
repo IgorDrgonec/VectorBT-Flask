@@ -33,7 +33,7 @@ class YFData(RemoteData):
         ```pycon
         >>> import vectorbtpro as vbt
 
-        >>> data = vbt.YFData.fetch(
+        >>> data = vbt.YFData.pull(
         ...     "BTC-USD",
         ...     start="2020-01-01",
         ...     end="2021-01-01",

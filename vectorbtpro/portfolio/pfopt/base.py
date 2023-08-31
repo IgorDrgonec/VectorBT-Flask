@@ -576,7 +576,7 @@ def pypfopt_optimize(
         ```pycon
         >>> import vectorbtpro as vbt
 
-        >>> data = vbt.YFData.fetch(["MSFT", "AMZN", "KO", "MA"])
+        >>> data = vbt.YFData.pull(["MSFT", "AMZN", "KO", "MA"])
         ```
 
         [=100% "100%"]{: .candystripe}
@@ -1180,7 +1180,7 @@ def riskfolio_optimize(
         ```pycon
         >>> import vectorbtpro as vbt
 
-        >>> data = vbt.YFData.fetch(["MSFT", "AMZN", "KO", "MA"])
+        >>> data = vbt.YFData.pull(["MSFT", "AMZN", "KO", "MA"])
         >>> returns = data.close.vbt.to_returns()
         ```
 
@@ -1783,7 +1783,7 @@ class PortfolioOptimizer(Analyzable):
             >>> import vectorbtpro as vbt
             >>> import numpy as np
 
-            >>> data = vbt.YFData.fetch(
+            >>> data = vbt.YFData.pull(
             ...     ["MSFT", "AMZN", "AAPL"],
             ...     start="2010-01-01",
             ...     end="2020-01-01"
@@ -2494,7 +2494,7 @@ class PortfolioOptimizer(Analyzable):
             ```pycon
             >>> import vectorbtpro as vbt
 
-            >>> data = vbt.YFData.fetch(
+            >>> data = vbt.YFData.pull(
             ...     ["MSFT", "AMZN", "AAPL"],
             ...     start="2010-01-01",
             ...     end="2020-01-01"

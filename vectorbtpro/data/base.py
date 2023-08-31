@@ -956,12 +956,12 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
     @property
     def tz_localize(self) -> tp.Union[None, bool, tp.TimezoneLike]:
-        """Timezone to localize a datetime-naive index to, which is initially passed to `Data.fetch`."""
+        """Timezone to localize a datetime-naive index to, which is initially passed to `Data.pull`."""
         return self._tz_localize
 
     @property
     def tz_convert(self) -> tp.Union[None, bool, tp.TimezoneLike]:
-        """Timezone to convert a datetime-aware to, which is initially passed to `Data.fetch`."""
+        """Timezone to convert a datetime-aware to, which is initially passed to `Data.pull`."""
         return self._tz_convert
 
     @property
@@ -1665,7 +1665,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         return self.replace(data=new_data, **kwargs)
 
     def to_feature_oriented(self: DataT, **kwargs) -> DataT:
-        """Convert to the feature-oriented format.
+        """Convert this instance to the feature-oriented format.
 
         Returns self if the data is already properly formatted."""
         if self.feature_oriented:
@@ -1675,7 +1675,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         return self.invert(**kwargs)
 
     def to_symbol_oriented(self: DataT, **kwargs) -> DataT:
-        """Convert to the symbol-oriented format.
+        """Convert this instance to the symbol-oriented format.
 
         Returns self if the data is already properly formatted."""
         if self.symbol_oriented:
@@ -2002,7 +2002,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         )
 
     @classmethod
-    def fetch(
+    def pull(
         cls: tp.Type[DataT],
         keys: tp.Union[tp.MaybeKeys] = None,
         *,
@@ -2022,8 +2022,9 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         return_raw: bool = False,
         **kwargs,
     ) -> tp.Union[DataT, tp.List[tp.Any]]:
-        """Fetch data of each feature/symbol using `Data.fetch_feature`/`Data.fetch_symbol` and
-        prepare it with `Data.from_data`.
+        """Pull data.
+
+        Fetches each feature/symbol with `Data.fetch_feature`/`Data.fetch_symbol` and prepares it with `Data.from_data`.
 
         Iteration over features/symbols is done using `vectorbtpro.utils.execution.execute`.
         That is, it can be distributed and parallelized when needed.
@@ -2231,6 +2232,11 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         )
 
     @classmethod
+    def fetch(cls: tp.Type[DataT], *args, **kwargs) -> tp.Union[DataT, tp.List[tp.Any]]:
+        """Exists for backward compatibility. Use `Data.pull` instead."""
+        return cls.pull(*args, **kwargs)
+
+    @classmethod
     def from_data_str(cls: tp.Type[DataT], data_str: str) -> DataT:
         """Parse a `Data` instance from a string.
 
@@ -2242,8 +2248,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             cls_name, symbol = data_str.split(":")
             cls_name = cls_name.strip()
             symbol = symbol.strip()
-            return getattr(custom, cls_name).fetch(symbol)
-        return custom.YFData.fetch(data_str.strip())
+            return getattr(custom, cls_name).pull(symbol)
+        return custom.YFData.pull(data_str.strip())
 
     # ############# Updating ############# #
 
@@ -2341,7 +2347,9 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         return_raw: bool = False,
         **kwargs,
     ) -> tp.Union[DataT, tp.List[tp.Any]]:
-        """Fetch additional data of each feature/symbol using `Data.update_feature`/`Data.update_symbol`.
+        """Update data.
+
+        Fetches new data for each feature/symbol using `Data.update_feature`/`Data.update_symbol`.
 
         Args:
             concat (bool): Whether to concatenate existing and updated/new data.
@@ -3240,7 +3248,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
         if fetch_kwargs is None:
             fetch_kwargs = {}
-        data = CSVData.fetch(*args, **kwargs)
+        data = CSVData.pull(*args, **kwargs)
         data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
         data = data.update_fetch_kwargs(**fetch_kwargs)
         return data
@@ -3256,7 +3264,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             fetch_kwargs = {}
         if len(args) == 0 and "keys" not in kwargs and "features" not in kwargs and "symbols" not in kwargs:
             args = (cls.__name__ + ".h5",)
-        data = HDFData.fetch(*args, **kwargs)
+        data = HDFData.pull(*args, **kwargs)
         data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
         data = data.update_fetch_kwargs(**fetch_kwargs)
         return data
@@ -3365,7 +3373,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
             >>> start = '2021-01-01 UTC'  # crypto is in UTC
             >>> end = '2021-06-01 UTC'
-            >>> data = vbt.YFData.fetch(['BTC-USD', 'ETH-USD', 'ADA-USD'], start=start, end=end)
+            >>> data = vbt.YFData.pull(['BTC-USD', 'ETH-USD', 'ADA-USD'], start=start, end=end)
             ```
 
             [=100% "100%"]{: .candystripe}

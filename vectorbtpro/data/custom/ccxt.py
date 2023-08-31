@@ -62,7 +62,7 @@ class CCXTData(RemoteData):
         * Fetch data:
 
         ```pycon
-        >>> data = vbt.CCXTData.fetch(
+        >>> data = vbt.CCXTData.pull(
         ...     "BTCUSDT",
         ...     exchange="binance",
         ...     start="2020-01-01",

@@ -60,7 +60,7 @@ class PolygonData(RemoteData):
         * Fetch stock data:
 
         ```pycon
-        >>> data = vbt.PolygonData.fetch(
+        >>> data = vbt.PolygonData.pull(
         ...     "AAPL",
         ...     start="2021-01-01",
         ...     end="2022-01-01",
@@ -71,7 +71,7 @@ class PolygonData(RemoteData):
         * Fetch crypto data:
 
         ```pycon
-        >>> data = vbt.PolygonData.fetch(
+        >>> data = vbt.PolygonData.pull(
         ...     "X:BTCUSD",
         ...     start="2021-01-01",
         ...     end="2022-01-01",

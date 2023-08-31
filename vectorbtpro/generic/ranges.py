@@ -20,7 +20,7 @@ are 0 and 20 (not 19!) respectively.
 
 >>> start = '2019-01-01 UTC'  # crypto is in UTC
 >>> end = '2020-01-01 UTC'
->>> price = vbt.YFData.fetch('BTC-USD', start=start, end=end).get('Close')
+>>> price = vbt.YFData.pull('BTC-USD', start=start, end=end).get('Close')
 ```
 
 [=100% "100%"]{: .candystripe}

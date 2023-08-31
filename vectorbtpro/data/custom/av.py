@@ -61,24 +61,24 @@ class AVData(RemoteData):
         * Fetch data:
 
         ```pycon
-        >>> data = vbt.AVData.fetch(
+        >>> data = vbt.AVData.pull(
         ...     "GOOGL",
         ...     timeframe="1 day",  # premium?
         ... )
 
-        >>> data = vbt.AVData.fetch(
+        >>> data = vbt.AVData.pull(
         ...     "BTC_USD",
         ...     timeframe="30 minutes",  # premium?
         ...     category="digital-currency",
         ...     outputsize="full"
         ... )
 
-        >>> data = vbt.AVData.fetch(
+        >>> data = vbt.AVData.pull(
         ...     "REAL_GDP",
         ...     category="economic-indicators"
         ... )
 
-        >>> data = vbt.AVData.fetch(
+        >>> data = vbt.AVData.pull(
         ...     "IBM",
         ...     category="technical-indicators",
         ...     function="STOCHRSI",

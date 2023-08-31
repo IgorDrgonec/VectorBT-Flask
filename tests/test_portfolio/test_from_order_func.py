@@ -99,7 +99,7 @@ class InOutputs(NamedTuple):
 
 class TestFromOrderFunc:
     def test_data(self):
-        data = vbt.RandomOHLCData.fetch(
+        data = vbt.RandomOHLCData.pull(
             [0, 1],
             start="2020-01-01",
             end="2020-02-01",

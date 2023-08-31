@@ -84,7 +84,7 @@ def signal_func_nb(c, long_num_arr, short_num_arr):
 
 class TestFromSignals:
     def test_data(self):
-        data = vbt.RandomOHLCData.fetch(
+        data = vbt.RandomOHLCData.pull(
             [0, 1],
             start="2020-01-01",
             end="2020-02-01",
