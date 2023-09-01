@@ -3652,7 +3652,7 @@ class TestPatternRanges:
         )
         pd.testing.assert_index_equal(
             new_pattern_ranges.wrapper.columns,
-            pd.MultiIndex.from_tuples([(0, "a")], names=["min_similarity", None]),
+            pd.Index([0], dtype="int64", name="min_similarity"),
         )
         assert new_pattern_ranges.search_configs == [
             vbt.PatternRanges.resolve_search_config(

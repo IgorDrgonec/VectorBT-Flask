@@ -22,7 +22,7 @@ from vectorbtpro.base.reshaping import (
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.base.indexes import ExceptLevel
-from vectorbtpro.data.base import Data
+from vectorbtpro.data.base import OHLCDataMixin, Data
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.drawdowns import Drawdowns
@@ -44,7 +44,6 @@ from vectorbtpro.records.base import Records
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.returns.accessors import ReturnsAccessor
-from vectorbtpro.signals.generators import RANDNX, RPROBNX
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.colors import adjust_opacity
@@ -52,7 +51,7 @@ from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, Readonly
 from vectorbtpro.utils.decorators import custom_property, cached_property, class_or_instancemethod
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.parsing import get_func_kwargs
-from vectorbtpro.utils.template import Rep, RepEval, RepFunc
+from vectorbtpro.utils.template import Rep, RepEval, RepFunc, substitute_templates
 
 try:
     if not tp.TYPE_CHECKING:
@@ -2300,7 +2299,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_orders(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data, FOPreparer, PFPrepResult],
+        close: tp.Union[tp.ArrayLike, OHLCDataMixin, FOPreparer, PFPrepResult],
         size: tp.Optional[tp.ArrayLike] = None,
         size_type: tp.Optional[tp.ArrayLike] = None,
         direction: tp.Optional[tp.ArrayLike] = None,
@@ -2337,8 +2336,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         save_state: tp.Optional[bool] = None,
         save_value: tp.Optional[bool] = None,
         save_returns: tp.Optional[bool] = None,
-        max_orders: tp.Optional[int] = None,
-        max_logs: tp.Optional[int] = None,
+        max_order_records: tp.Optional[int] = None,
+        max_log_records: tp.Optional[int] = None,
         seed: tp.Optional[int] = None,
         group_by: tp.GroupByLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
@@ -2359,12 +2358,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         Prepared by `vectorbtpro.portfolio.preparing.FOPreparer`.
 
         Args:
-            close (array_like, Data, FOPreparer, or PFPrepResult): Latest asset price at each time step.
+            close (array_like, OHLCDataMixin, FOPreparer, or PFPrepResult): Latest asset price at each time step.
                 Will broadcast.
 
                 Used for calculating unrealized PnL and portfolio value.
 
-                If an instance of `vectorbtpro.data.base.Data`, will extract the open, high, low, and close price.
+                If an instance of `vectorbtpro.data.base.OHLCDataMixin`, will extract the open, high, low, and close price.
                 If an instance of `vectorbtpro.portfolio.preparing.FOPreparer`, will use it as a preparer.
                 If an instance of `vectorbtpro.portfolio.preparing.PFPrepResult`, will use it as a preparer result.
             size (float or array_like): Size to order.
@@ -2537,11 +2536,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             save_returns (bool): Whether to save the returns.
 
                 The array will be available as `returns` in in-outputs.
-            max_orders (int): The max number of order records expected to be filled at each column.
+            max_order_records (int): The max number of order records expected to be filled at each column.
                 Defaults to the maximum number of non-NaN values across all columns of the size array.
 
                 Set to a lower number if you run out of memory, and to 0 to not fill.
-            max_logs (int): The max number of log records expected to be filled at each column.
+            max_log_records (int): The max number of log records expected to be filled at each column.
                 Defaults to the maximum number of True values across all columns of the log array.
 
                 Set to a lower number if you run out of memory, and to 0 to not fill.
@@ -2769,7 +2768,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             del local_kwargs["return_preparer"]
             del local_kwargs["return_prep_result"]
             del local_kwargs["return_sim_out"]
-            if isinstance(close, (Data, str)):
+            if isinstance(close, (OHLCDataMixin, str)):
                 local_kwargs["data"] = close
                 local_kwargs["close"] = None
             preparer = FOPreparer(**local_kwargs)
@@ -2790,7 +2789,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_signals(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data, FSPreparer, PFPrepResult],
+        close: tp.Union[tp.ArrayLike, OHLCDataMixin, FSPreparer, PFPrepResult],
         entries: tp.Optional[tp.ArrayLike] = None,
         exits: tp.Optional[tp.ArrayLike] = None,
         *,
@@ -2872,14 +2871,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         save_state: tp.Optional[bool] = None,
         save_value: tp.Optional[bool] = None,
         save_returns: tp.Optional[bool] = None,
-        max_orders: tp.Optional[int] = None,
-        max_logs: tp.Optional[int] = None,
+        max_order_records: tp.Optional[int] = None,
+        max_log_records: tp.Optional[int] = None,
         in_outputs: tp.Optional[tp.MappingLike] = None,
         seed: tp.Optional[int] = None,
         group_by: tp.GroupByLike = None,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
-        template_context: tp.Optional[tp.Mapping] = None,
+        template_context: tp.KwargsLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         staticized: tp.StaticizedOption = None,
@@ -2909,7 +2908,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         Prepared by `vectorbtpro.portfolio.preparing.FSPreparer`.
 
         Args:
-            close (array_like, Data, FSPreparer, or PFPrepResult): See `Portfolio.from_orders`.
+            close (array_like, OHLCDataMixin, FSPreparer, or PFPrepResult): See `Portfolio.from_orders`.
             entries (array_like of bool): Boolean array of entry signals.
                 Defaults to True if all other signal arrays are not set, otherwise False. Will broadcast.
 
@@ -3152,8 +3151,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             save_state (bool): See `Portfolio.from_orders`.
             save_value (bool): See `Portfolio.from_orders`.
             save_returns (bool): See `Portfolio.from_orders`.
-            max_orders (int): See `Portfolio.from_orders`.
-            max_logs (int): See `Portfolio.from_orders`.
+            max_order_records (int): See `Portfolio.from_orders`.
+            max_log_records (int): See `Portfolio.from_orders`.
             in_outputs (mapping_like): Mapping with in-output objects. Only for flexible mode.
 
                 Will be available via `Portfolio.in_outputs` as a named tuple.
@@ -3656,7 +3655,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             del local_kwargs["return_preparer"]
             del local_kwargs["return_prep_result"]
             del local_kwargs["return_sim_out"]
-            if isinstance(close, (Data, str)):
+            if isinstance(close, (OHLCDataMixin, str)):
                 local_kwargs["data"] = close
                 local_kwargs["close"] = None
             preparer = FSPreparer(**local_kwargs)
@@ -3677,7 +3676,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_holding(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data],
+        close: tp.Union[tp.ArrayLike, OHLCDataMixin],
         direction: tp.Optional[int] = None,
         at_first_valid_in: tp.Optional[str] = "close",
         close_at_end: tp.Optional[bool] = None,
@@ -3702,10 +3701,18 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             close_at_end = portfolio_cfg["close_at_end"]
 
         if dynamic_mode:
+            def _substitute_signal_args(preparer):
+                return (
+                    direction,
+                    close_at_end,
+                    *((preparer.adjust_func_nb,) if preparer.staticized is None else ()),
+                    preparer.adjust_args,
+                )
+
             return cls.from_signals(
                 close,
                 signal_func_nb=nb.holding_enex_signal_func_nb,
-                signal_args=(direction, close_at_end),
+                signal_args=RepFunc(_substitute_signal_args),
                 accumulate=False,
                 **kwargs,
             )
@@ -3747,7 +3754,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_random_signals(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data],
+        close: tp.Union[tp.ArrayLike, OHLCDataMixin],
         n: tp.Optional[tp.ArrayLike] = None,
         prob: tp.Optional[tp.ArrayLike] = None,
         entry_prob: tp.Optional[tp.ArrayLike] = None,
@@ -3762,8 +3769,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         Generates signals based either on the number of signals `n` or the probability
         of encountering a signal `prob`.
 
-        * If `n` is set, see `vectorbtpro.signals.generators.RANDNX`.
-        * If `prob` is set, see `vectorbtpro.signals.generators.RPROBNX`.
+        * If `n` is set, see `vectorbtpro.signals.generators.randnx.RANDNX`.
+        * If `prob` is set, see `vectorbtpro.signals.generators.rprobnx.RPROBNX`.
 
         Based on `Portfolio.from_signals`.
 
@@ -3812,7 +3819,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         portfolio_cfg = settings["portfolio"]
 
-        if isinstance(close, (Data, str)):
+        if isinstance(close, (OHLCDataMixin, str)):
             if isinstance(close, str):
                 close = Data.from_data_str(close)
             data = close
@@ -3836,6 +3843,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         if n is not None and (entry_prob is not None or exit_prob is not None):
             raise ValueError("Either n or entry_prob and exit_prob must be provided")
         if n is not None:
+            from vectorbtpro.signals.generators.randnx import RANDNX
+
             rand = RANDNX.run(
                 n=n,
                 input_shape=close_wrapper.shape,
@@ -3847,6 +3856,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             entries = rand.entries
             exits = rand.exits
         elif entry_prob is not None and exit_prob is not None:
+            from vectorbtpro.signals.generators.rprobnx import RPROBNX
+
             rprobnx = RPROBNX.run(
                 entry_prob=entry_prob,
                 exit_prob=exit_prob,
@@ -3867,7 +3878,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_optimizer(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data],
+        close: tp.Union[tp.ArrayLike, OHLCDataMixin],
         optimizer: PortfolioOptimizer,
         pf_method: str = "from_orders",
         squeeze_groups: bool = True,
@@ -3977,7 +3988,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_order_func(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data, FOFPreparer, PFPrepResult],
+        close: tp.Union[tp.ArrayLike, OHLCDataMixin, FOFPreparer, PFPrepResult],
         *,
         init_cash: tp.Optional[tp.ArrayLike] = None,
         init_position: tp.Optional[tp.ArrayLike] = None,
@@ -4020,14 +4031,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         fill_pos_info: tp.Optional[bool] = None,
         track_value: tp.Optional[bool] = None,
         row_wise: tp.Optional[bool] = None,
-        max_orders: tp.Optional[int] = None,
-        max_logs: tp.Optional[int] = None,
+        max_order_records: tp.Optional[int] = None,
+        max_log_records: tp.Optional[int] = None,
         in_outputs: tp.Optional[tp.MappingLike] = None,
         seed: tp.Optional[int] = None,
         group_by: tp.GroupByLike = None,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
-        template_context: tp.Optional[tp.Mapping] = None,
+        template_context: tp.KwargsLike = None,
         keep_inout_flex: tp.Optional[bool] = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -4055,10 +4066,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         Prepared by `vectorbtpro.portfolio.preparing.FOFPreparer`.
 
         Args:
-            close (array_like, Data, FOFPreparer, or PFPrepResult): Latest asset price at each time step.
+            close (array_like, OHLCDataMixin, FOFPreparer, or PFPrepResult): Latest asset price at each time step.
                 Will broadcast.
 
-                If an instance of `vectorbtpro.data.base.Data`, will extract the open, high,
+                If an instance of `vectorbtpro.data.base.OHLCDataMixin`, will extract the open, high,
                 low, and close price.
 
                 Used for calculating unrealized PnL and portfolio value.
@@ -4141,12 +4152,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
                 Disable this to make simulation faster for simple use cases.
             row_wise (bool): Whether to iterate over rows rather than columns/groups.
-            max_orders (int): The max number of order records expected to be filled at each column.
+            max_order_records (int): The max number of order records expected to be filled at each column.
                 Defaults to the number of rows in the broadcasted shape.
 
                 Set to a lower number if you run out of memory, to 0 to not fill, and to a higher number
                 if there are more than one order expected at each timestamp.
-            max_logs (int): The max number of log records expected to be filled at each column.
+            max_log_records (int): The max number of log records expected to be filled at each column.
                 Defaults to the number of rows in the broadcasted shape.
 
                 Set to a lower number if you run out of memory, to 0 to not fill, and to a higher number
@@ -4529,7 +4540,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ...     flex_order_func_nb=flex_order_func_nb,
             ...     flex_order_args=(size,),
             ...     open=open,
-            ...     max_orders=close.shape[0] * 2
+            ...     max_order_records=close.shape[0] * 2
             ... )
 
             >>> pf.orders.records_readable
@@ -4567,7 +4578,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             del local_kwargs["return_preparer"]
             del local_kwargs["return_prep_result"]
             del local_kwargs["return_sim_out"]
-            if isinstance(close, (Data, str)):
+            if isinstance(close, (OHLCDataMixin, str)):
                 local_kwargs["data"] = close
                 local_kwargs["close"] = None
             preparer = FOFPreparer(**local_kwargs)
@@ -4588,7 +4599,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @classmethod
     def from_def_order_func(
         cls: tp.Type[PortfolioT],
-        close: tp.Union[tp.ArrayLike, Data, FDOFPreparer, PFPrepResult],
+        close: tp.Union[tp.ArrayLike, OHLCDataMixin, FDOFPreparer, PFPrepResult],
         size: tp.Optional[tp.ArrayLike] = None,
         size_type: tp.Optional[tp.ArrayLike] = None,
         direction: tp.Optional[tp.ArrayLike] = None,
@@ -4716,7 +4727,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             del local_kwargs["return_preparer"]
             del local_kwargs["return_prep_result"]
             del local_kwargs["return_sim_out"]
-            if isinstance(close, (Data, str)):
+            if isinstance(close, (OHLCDataMixin, str)):
                 local_kwargs["data"] = close
                 local_kwargs["close"] = None
             preparer = FDOFPreparer(**local_kwargs)
@@ -7962,7 +7973,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
     @classmethod
     def override_in_output_config_doc(cls, __pdoc__: dict, source_cls: tp.Optional[type] = None) -> None:
-        """Call this method on each subclass that overrides `Data.in_output_config`."""
+        """Call this method on each subclass that overrides `Portfolio.in_output_config`."""
         __pdoc__[cls.__name__ + ".in_output_config"] = cls.build_in_output_config_doc(source_cls=source_cls)
 
 

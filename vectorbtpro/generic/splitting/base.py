@@ -25,6 +25,7 @@ from vectorbtpro.utils.datetime_ import (
     parse_timedelta,
 )
 from vectorbtpro.utils.execution import execute
+from vectorbtpro.utils.selection import _NoResult, NoResultsException, PosSel, LabelSel
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.indexing import hslice, PandasIndexer, get_index_ranges
 from vectorbtpro.base.indexes import combine_indexes, stack_indexes
@@ -661,7 +662,8 @@ class Splitter(Analyzable):
         cls: tp.Type[SplitterT],
         index: tp.IndexLike,
         n: int,
-        length: tp.Union[None, int, float, tp.TimedeltaLike] = None,
+        length: tp.Union[None, str, int, float, tp.TimedeltaLike] = None,
+        optimize_anchor_set: int = 1,
         split: tp.Optional[tp.SplitLike] = None,
         split_range_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
@@ -673,6 +675,9 @@ class Splitter(Analyzable):
         If `length` is None, splits the index evenly into `n` non-overlapping ranges
         using `Splitter.from_rolling`. Otherwise, picks `n` evenly-spaced, potentially overlapping
         ranges of a fixed length. For other arguments, see `Splitter.from_rolling`.
+
+        If `length` is "optimize", searches for a length to cover the most of the index.
+        Use `optimize_anchor_set` to provide the index of a set that should become non-overlapping.
 
         Usage:
             * Roll 10 ranges with 100 elements, and split it into 3/4:
@@ -709,6 +714,50 @@ class Splitter(Analyzable):
                 length=len(index) // n,
                 offset=0,
                 offset_anchor="prev_end",
+                offset_anchor_set=None,
+                split=split,
+                split_range_kwargs=split_range_kwargs,
+                template_context=template_context,
+                **kwargs,
+            )
+
+        if isinstance(length, str) and length.lower() == "optimize":
+            from scipy.optimize import minimize_scalar
+
+            if split is not None and not checks.is_float(split):
+                raise TypeError("Split must be a float when length='optimize'")
+            checks.assert_in(optimize_anchor_set, (0, 1))
+
+            if split is None:
+                ratio = 1.0
+            else:
+                ratio = split
+
+            def empty_len_objective(length):
+                if split is None or optimize_anchor_set == 0:
+                    length = int(length)
+                    first_len = int(ratio * length)
+                    second_len = length - first_len
+                    empty_len = len(index) - (n * first_len + second_len)
+                else:
+                    length = int(length)
+                    first_len = int(ratio * length)
+                    second_len = length - first_len
+                    empty_len = len(index) - (n * second_len + first_len)
+                if empty_len >= 0:
+                    return empty_len
+                return len(index)
+
+            length = int(minimize_scalar(empty_len_objective).x)
+            if split is None or optimize_anchor_set == 0:
+                offset = int(ratio * length)
+            else:
+                offset = length - int(ratio * length)
+            return cls.from_rolling(
+                index,
+                length=length,
+                offset=offset,
+                offset_anchor="prev_start",
                 offset_anchor_set=None,
                 split=split,
                 split_range_kwargs=split_range_kwargs,
@@ -1015,7 +1064,7 @@ class Splitter(Analyzable):
             if k in func_arg_names:
                 ranges_kwargs[k] = kwargs.pop(k)
 
-        start_idxs, stop_idxs = get_index_ranges(index, *args, skip_minus_one=True, **ranges_kwargs)
+        start_idxs, stop_idxs = get_index_ranges(index, *args, skip_not_found=True, **ranges_kwargs)
         splits = []
         for start, stop in zip(start_idxs, stop_idxs):
             new_split = slice(start, stop)
@@ -1782,12 +1831,10 @@ class Splitter(Analyzable):
 
     def to_grouped(
         self: SplitterT,
-        split: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
-        set_: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
+        split: tp.Optional[tp.Selection] = None,
+        set_: tp.Optional[tp.Selection] = None,
         split_group_by: tp.AnyGroupByLike = None,
         set_group_by: tp.AnyGroupByLike = None,
-        split_as_indices: bool = False,
-        set_as_indices: bool = False,
         merge_split_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> SplitterT:
@@ -1808,8 +1855,6 @@ class Splitter(Analyzable):
             set_=set_,
             split_group_by=split_group_by,
             set_group_by=set_group_by,
-            split_as_indices=split_as_indices,
-            set_as_indices=set_as_indices,
         )
         if split is not None:
             split_labels = split_labels[split_group_indices]
@@ -1821,12 +1866,10 @@ class Splitter(Analyzable):
             new_splits_arr.append([])
             for j in set_group_indices:
                 new_range = self.select_range(
-                    split=i,
-                    set_=j,
+                    split=PosSel(i),
+                    set_=PosSel(j),
                     split_group_by=split_group_by,
                     set_group_by=set_group_by,
-                    split_as_indices=True,
-                    set_as_indices=True,
                     merge_split_kwargs=merge_split_kwargs,
                 )
                 new_splits_arr[-1].append(new_range)
@@ -2330,19 +2373,18 @@ class Splitter(Analyzable):
 
     def select_indices(
         self,
-        split: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
-        set_: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
+        split: tp.Optional[tp.Selection] = None,
+        set_: tp.Optional[tp.Selection] = None,
         split_group_by: tp.AnyGroupByLike = None,
         set_group_by: tp.AnyGroupByLike = None,
-        split_as_indices: bool = False,
-        set_as_indices: bool = False,
     ) -> tp.Tuple[tp.Array1d, tp.Array1d, tp.Array1d, tp.Array1d]:
         """Get indices corresponding to selected splits and sets.
 
         Arguments `split` and `set_` can be either integers and labels. Also, multiple
         values are accepted; in such a case, the corresponding ranges are merged.
-        If split/set labels are of the integer data type, treats the provided values as labels
-        rather than indices, unless `split_as_indices`/`set_as_indices` is enabled.
+        If split/set labels are of an integer data type, treats the provided values as labels
+        rather than indices, unless the split/set index is not of an integer data type or the values
+        are wrapped with `vectorbtpro.utils.selection.PosSel`.
 
         If `split_group_by` and/or `set_group_by` are provided, their groupers get
         created using `vectorbtpro.base.accessors.BaseIDXAccessor.get_grouper` and
@@ -2357,6 +2399,13 @@ class Splitter(Analyzable):
             split_group_indices = np.arange(self.get_n_splits(split_group_by=split_group_by))
             split_indices = np.arange(self.n_splits)
         else:
+            kind = None
+            if isinstance(split, PosSel):
+                split = split.value
+                kind = "positions"
+            elif isinstance(split, LabelSel):
+                split = split.value
+                kind = "labels"
             if checks.is_hashable(split):
                 split = [split]
             if split_group_by is not None:
@@ -2364,7 +2413,15 @@ class Splitter(Analyzable):
                 groups, group_index = split_group_by.get_groups_and_index()
                 mask = None
                 for g in split:
-                    if checks.is_int(g) and (split_as_indices or not pd.api.types.is_integer_dtype(group_index)):
+                    if isinstance(g, PosSel):
+                        g = g.value
+                        kind = "positions"
+                    elif isinstance(g, LabelSel):
+                        g = g.value
+                        kind = "labels"
+                    if kind == "positions" or (
+                        kind is None and checks.is_int(g) and not pd.api.types.is_integer_dtype(group_index)
+                    ):
                         i = g
                     else:
                         i = group_index.get_indexer([g])[0]
@@ -2380,7 +2437,15 @@ class Splitter(Analyzable):
             else:
                 split_indices = []
                 for s in split:
-                    if checks.is_int(s) and (split_as_indices or not pd.api.types.is_integer_dtype(self.split_labels)):
+                    if isinstance(s, PosSel):
+                        s = s.value
+                        kind = "positions"
+                    elif isinstance(s, LabelSel):
+                        s = s.value
+                        kind = "labels"
+                    if kind == "positions" or (
+                        kind is None and checks.is_int(s) and not pd.api.types.is_integer_dtype(self.split_labels)
+                    ):
                         i = s
                     else:
                         i = self.split_labels.get_indexer([s])[0]
@@ -2392,6 +2457,13 @@ class Splitter(Analyzable):
             set_group_indices = np.arange(self.get_n_sets(set_group_by=set_group_by))
             set_indices = np.arange(self.n_sets)
         else:
+            kind = None
+            if isinstance(set_, PosSel):
+                set_ = set_.value
+                kind = "positions"
+            elif isinstance(set_, LabelSel):
+                set_ = set_.value
+                kind = "labels"
             if checks.is_hashable(set_):
                 set_ = [set_]
             if set_group_by is not None:
@@ -2399,7 +2471,15 @@ class Splitter(Analyzable):
                 groups, group_index = set_group_by.get_groups_and_index()
                 mask = None
                 for g in set_:
-                    if checks.is_int(g) and (set_as_indices or not pd.api.types.is_integer_dtype(group_index)):
+                    if isinstance(g, PosSel):
+                        g = g.value
+                        kind = "positions"
+                    elif isinstance(g, LabelSel):
+                        g = g.value
+                        kind = "labels"
+                    if kind == "positions" or (
+                        kind is None and checks.is_int(g) and not pd.api.types.is_integer_dtype(group_index)
+                    ):
                         i = g
                     else:
                         i = group_index.get_indexer([g])[0]
@@ -2415,7 +2495,15 @@ class Splitter(Analyzable):
             else:
                 set_indices = []
                 for s in set_:
-                    if checks.is_int(s) and (set_as_indices or not pd.api.types.is_integer_dtype(self.set_labels)):
+                    if isinstance(s, PosSel):
+                        s = s.value
+                        kind = "positions"
+                    elif isinstance(s, LabelSel):
+                        s = s.value
+                        kind = "labels"
+                    if kind == "positions" or (
+                        kind is None and checks.is_int(s) and not pd.api.types.is_integer_dtype(self.set_labels)
+                    ):
                         i = s
                     else:
                         i = self.set_labels.get_indexer([s])[0]
@@ -2566,12 +2654,10 @@ class Splitter(Analyzable):
     def take(
         self,
         obj: tp.Any,
-        split: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
-        set_: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
+        split: tp.Optional[tp.Selection] = None,
+        set_: tp.Optional[tp.Selection] = None,
         split_group_by: tp.AnyGroupByLike = None,
         set_group_by: tp.AnyGroupByLike = None,
-        split_as_indices: bool = False,
-        set_as_indices: bool = False,
         squeeze_one_split: bool = True,
         squeeze_one_set: bool = True,
         into: tp.Optional[str] = None,
@@ -2631,7 +2717,7 @@ class Splitter(Analyzable):
             >>> import numpy as np
             >>> import pandas as pd
 
-            >>> data = vbt.YFData.fetch(
+            >>> data = vbt.YFData.pull(
             ...     "BTC-USD",
             ...     start="2020-01-01 UTC",
             ...     end="2021-01-01 UTC"
@@ -2719,8 +2805,6 @@ class Splitter(Analyzable):
             set_=set_,
             split_group_by=split_group_by,
             set_group_by=set_group_by,
-            split_as_indices=split_as_indices,
-            set_as_indices=set_as_indices,
         )
         if split is not None:
             split_labels = split_labels[split_group_indices]
@@ -2769,12 +2853,10 @@ class Splitter(Analyzable):
             split_idx = split_group_indices[i]
             set_idx = set_group_indices[j]
             range_ = self.select_range(
-                split=split_idx,
-                set_=set_idx,
+                split=PosSel(split_idx),
+                set_=PosSel(set_idx),
                 split_group_by=split_group_by,
                 set_group_by=set_group_by,
-                split_as_indices=True,
-                set_as_indices=True,
                 merge_split_kwargs=dict(template_context=template_context),
             )
             range_meta = self.get_ready_range(
@@ -2975,12 +3057,10 @@ class Splitter(Analyzable):
         self,
         apply_func: tp.Callable,
         *apply_args,
-        split: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
-        set_: tp.Optional[tp.MaybeIterable[tp.Hashable]] = None,
+        split: tp.Optional[tp.Selection] = None,
+        set_: tp.Optional[tp.Selection] = None,
         split_group_by: tp.AnyGroupByLike = None,
         set_group_by: tp.AnyGroupByLike = None,
-        split_as_indices: bool = False,
-        set_as_indices: bool = False,
         squeeze_one_split: bool = True,
         squeeze_one_set: bool = True,
         remap_to_obj: bool = True,
@@ -3051,6 +3131,9 @@ class Splitter(Analyzable):
         If `merge_all` is True, will merge all results in a flattened manner irrespective of the
         iteration mode. Otherwise, will merge by split/set.
 
+        If `vectorbtpro.utils.selection.NoResult` is returned, will skip the current iteration and
+        remove it from the final index.
+
         Usage:
             * Get the return of each data range:
 
@@ -3059,7 +3142,7 @@ class Splitter(Analyzable):
             >>> import numpy as np
             >>> import pandas as pd
 
-            >>> data = vbt.YFData.fetch(
+            >>> data = vbt.YFData.pull(
             ...     "BTC-USD",
             ...     start="2020-01-01 UTC",
             ...     end="2021-01-01 UTC"
@@ -3147,8 +3230,6 @@ class Splitter(Analyzable):
             set_=set_,
             split_group_by=split_group_by,
             set_group_by=set_group_by,
-            split_as_indices=split_as_indices,
-            set_as_indices=set_as_indices,
         )
         if split is not None:
             split_labels = split_labels[split_group_indices]
@@ -3182,12 +3263,10 @@ class Splitter(Analyzable):
             split_idx = split_group_indices[i]
             set_idx = set_group_indices[j]
             range_ = self.select_range(
-                split=split_idx,
-                set_=set_idx,
+                split=PosSel(split_idx),
+                set_=PosSel(set_idx),
                 split_group_by=split_group_by,
                 set_group_by=set_group_by,
-                split_as_indices=True,
-                set_as_indices=True,
                 merge_split_kwargs=dict(template_context=_template_context),
             )
             range_meta = self.get_ready_range(
@@ -3416,10 +3495,37 @@ class Splitter(Analyzable):
         else:
             raise ValueError(f"Invalid option iteration='{iteration}'")
 
+        def _skip_iterations(results, keys=None, return_keep_indices=False):
+            skip_indices = set()
+            for i, result in enumerate(results):
+                if isinstance(result, _NoResult):
+                    skip_indices.add(i)
+            if len(skip_indices) > 0:
+                new_results = []
+                keep_indices = []
+                for i, result in enumerate(results):
+                    if i not in skip_indices:
+                        new_results.append(result)
+                        keep_indices.append(i)
+                results = new_results
+                if keys is not None:
+                    keys = keys[keep_indices]
+            else:
+                keep_indices = None
+            if keys is None:
+                if return_keep_indices:
+                    return results, keep_indices
+                return results
+            if return_keep_indices:
+                return results, keys, keep_indices
+            return results, keys
+
         if merge_all:
             if iteration.lower() in ("split_wise", "set_wise"):
                 results = [result for _results in results for result in _results]
             if one_range:
+                if isinstance(results[0], _NoResult):
+                    raise NoResultsException
                 return results[0]
             if iteration.lower() in ("split_major", "split_wise"):
                 if one_set:
@@ -3447,6 +3553,9 @@ class Splitter(Analyzable):
                         for i in range(n_splits):
                             range_bounds.append(bounds[(i, j)])
                     keys = _attach_bounds(keys, range_bounds)
+            results, keys = _skip_iterations(results, keys=keys)
+            if len(results) == 0:
+                raise NoResultsException
 
             def _wrap_output(_results):
                 try:
@@ -3479,7 +3588,10 @@ class Splitter(Analyzable):
                 new_results.append(results[i * n_splits : (i + 1) * n_splits])
             results = new_results
         if one_range:
+            if isinstance(results[0][0], _NoResult):
+                raise NoResultsException
             return results[0][0]
+
         split_bounds = []
         if attach_bounds is not None:
             for i in range(n_splits):
@@ -3509,9 +3621,12 @@ class Splitter(Analyzable):
 
         if merge_func is not None:
             merged_results = []
+            keep_major_indices = []
             for i, _results in enumerate(results):
                 if one_minor:
-                    merged_results.append(_results[0])
+                    if not isinstance(_results[0], _NoResult):
+                        merged_results.append(_results[0])
+                        keep_major_indices.append(i)
                 else:
                     _template_context = dict(template_context)
                     _template_context["funcs_args"] = funcs_args
@@ -3519,15 +3634,23 @@ class Splitter(Analyzable):
                         minor_keys_wbounds = _attach_bounds(minor_keys, major_bounds[i])
                     else:
                         minor_keys_wbounds = minor_keys
-                    _template_context["keys"] = minor_keys_wbounds
-                    if isinstance(merge_func, (str, tuple)):
-                        _merge_func = resolve_merge_func(merge_func)
-                        _merge_kwargs = {**dict(keys=minor_keys_wbounds), **merge_kwargs}
-                    else:
-                        _merge_func = merge_func
-                        _merge_kwargs = merge_kwargs
-                    _merge_kwargs = substitute_templates(_merge_kwargs, _template_context, sub_id="merge_kwargs")
-                    merged_results.append(_merge_func(_results, **_merge_kwargs))
+                    _results, minor_keys_wbounds = _skip_iterations(_results, keys=minor_keys_wbounds)
+                    if len(_results) > 0:
+                        _template_context["keys"] = minor_keys_wbounds
+                        if isinstance(merge_func, (str, tuple)):
+                            _merge_func = resolve_merge_func(merge_func)
+                            _merge_kwargs = {**dict(keys=minor_keys_wbounds), **merge_kwargs}
+                        else:
+                            _merge_func = merge_func
+                            _merge_kwargs = merge_kwargs
+                        _merge_kwargs = substitute_templates(_merge_kwargs, _template_context, sub_id="merge_kwargs")
+                        merged_results.append(_merge_func(_results, **_merge_kwargs))
+                        keep_major_indices.append(i)
+            if len(merged_results) == 0:
+                raise NoResultsException
+            if len(merged_results) < len(major_keys):
+                major_keys = major_keys[keep_major_indices]
+
             if one_major:
                 return merged_results[0]
             if wrap_results:
@@ -3555,6 +3678,9 @@ class Splitter(Analyzable):
                         major_keys_wbounds = _attach_bounds(major_keys, minor_bounds[0])
                     else:
                         major_keys_wbounds = major_keys
+                    _results, major_keys_wbounds = _skip_iterations(_results, keys=major_keys_wbounds)
+                    if len(_results) == 0:
+                        raise NoResultsException
                     try:
                         return pd.Series(_results, index=major_keys_wbounds)
                     except Exception as e:
@@ -3564,45 +3690,82 @@ class Splitter(Analyzable):
                         minor_keys_wbounds = _attach_bounds(minor_keys, major_bounds[0])
                     else:
                         minor_keys_wbounds = minor_keys
+                    _results, minor_keys_wbounds = _skip_iterations(_results, keys=minor_keys_wbounds)
+                    if len(_results) == 0:
+                        raise NoResultsException
                     try:
                         return pd.Series(_results, index=minor_keys_wbounds)
                     except Exception as e:
                         return pd.Series(_results, index=minor_keys_wbounds, dtype=object)
+
                 new_results = []
+                keep_major_indices = []
                 for i, r in enumerate(_results):
                     if attach_bounds is not None:
                         minor_keys_wbounds = _attach_bounds(minor_keys, major_bounds[i])
                     else:
                         minor_keys_wbounds = minor_keys
-                    try:
-                        new_r = pd.Series(r, index=minor_keys_wbounds)
-                    except Exception as e:
-                        new_r = pd.Series(r, index=minor_keys_wbounds, dtype=object)
-                    new_results.append(new_r)
+                    r, minor_keys_wbounds = _skip_iterations(r, keys=minor_keys_wbounds)
+                    if len(r) > 0:
+                        try:
+                            new_r = pd.Series(r, index=minor_keys_wbounds)
+                        except Exception as e:
+                            new_r = pd.Series(r, index=minor_keys_wbounds, dtype=object)
+                        new_results.append(new_r)
+                        keep_major_indices.append(i)
+                if len(new_results) == 0:
+                    raise NoResultsException
+                if len(new_results) < len(major_keys):
+                    _major_keys = major_keys[keep_major_indices]
+                else:
+                    _major_keys = major_keys
                 try:
-                    return pd.Series(new_results, index=major_keys)
+                    return pd.Series(new_results, index=_major_keys)
                 except Exception as e:
-                    return pd.Series(new_results, index=major_keys, dtype=object)
+                    return pd.Series(new_results, index=_major_keys, dtype=object)
 
             if one_major or one_minor:
-                if isinstance(results[0], tuple):
+                n_results = 1
+                for r in results:
+                    if isinstance(r, tuple):
+                        n_results = len(r)
+                        break
+                if n_results > 1:
                     new_results = []
-                    for k in range(len(results[0])):
+                    for k in range(n_results):
                         new_results.append([])
                         for i in range(len(results)):
-                            new_results[-1].append(results[i][k])
+                            if isinstance(results[i], _NoResult):
+                                new_results[-1].append(results[i])
+                            else:
+                                new_results[-1].append(results[i][k])
                     return tuple(map(_wrap_output, new_results))
             else:
-                if isinstance(results[0][0], tuple):
+                n_results = 1
+                for r in results:
+                    for _r in r:
+                        if isinstance(_r, tuple):
+                            n_results = len(_r)
+                            break
+                    if n_results > 1:
+                        break
+                if n_results > 1:
                     new_results = []
-                    for k in range(len(results[0][0])):
+                    for k in range(n_results):
                         new_results.append([])
                         for i in range(len(results)):
                             new_results[-1].append([])
                             for j in range(len(results[0])):
-                                new_results[-1][-1].append(results[i][j][k])
+                                if isinstance(results[i][j], _NoResult):
+                                    new_results[-1][-1].append(results[i][j])
+                                else:
+                                    new_results[-1][-1].append(results[i][j][k])
                     return tuple(map(_wrap_output, new_results))
             return _wrap_output(results)
+
+        results = _skip_iterations(results)
+        if len(results) == 0:
+            raise NoResultsException
         return results
 
     # ############# Splits ############# #
@@ -3952,12 +4115,10 @@ class Splitter(Analyzable):
         for i in range(n_splits):
             for j in range(n_sets):
                 range_ = self.select_range(
-                    split=i,
-                    set_=j,
+                    split=PosSel(i),
+                    set_=PosSel(j),
                     split_group_by=split_group_by,
                     set_group_by=set_group_by,
-                    split_as_indices=True,
-                    set_as_indices=True,
                     merge_split_kwargs=dict(template_context=template_context),
                 )
                 bounds[i, j, :] = self.get_range_bounds(
@@ -4087,12 +4248,10 @@ class Splitter(Analyzable):
             out = np.full((n_sets, len(self.index)), False)
             for j in range(n_sets):
                 range_ = self.select_range(
-                    split=i,
-                    set_=j,
+                    split=PosSel(i),
+                    set_=PosSel(j),
                     split_group_by=split_group_by,
                     set_group_by=set_group_by,
-                    split_as_indices=True,
-                    set_as_indices=True,
                     merge_split_kwargs=dict(template_context=template_context),
                 )
                 out[j, :] = self.get_range_mask(range_, template_context=template_context, **kwargs)
@@ -4123,12 +4282,10 @@ class Splitter(Analyzable):
             out = np.full((n_splits, len(self.index)), False)
             for i in range(n_splits):
                 range_ = self.select_range(
-                    split=i,
-                    set_=j,
+                    split=PosSel(i),
+                    set_=PosSel(j),
                     split_group_by=split_group_by,
                     set_group_by=set_group_by,
-                    split_as_indices=True,
-                    set_as_indices=True,
                     merge_split_kwargs=dict(template_context=template_context),
                 )
                 out[i, :] = self.get_range_mask(range_, template_context=template_context, **kwargs)

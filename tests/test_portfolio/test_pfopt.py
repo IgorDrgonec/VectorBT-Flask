@@ -1826,12 +1826,7 @@ class TestPortfolioOptimizer:
             pf_opt.get_allocations(squeeze_groups=False),
             pd.DataFrame(
                 prices.sum().values[None],
-                index=pd.MultiIndex.from_arrays(
-                    [
-                        pd.Index(["group"], name="group"),
-                        prices.index[[4]],
-                    ]
-                ),
+                index=pd.Index(["group"], dtype="object", name="group"),
                 columns=prices.columns,
             ),
         )

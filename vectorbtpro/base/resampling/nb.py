@@ -200,7 +200,7 @@ def map_bounds_to_source_ranges_nb(
     target_rbound_index: tp.Array1d,
     closed_lbound: bool = True,
     closed_rbound: bool = False,
-    skip_minus_one: bool = False,
+    skip_not_found: bool = False,
 ) -> tp.Tuple[tp.Array1d, tp.Array1d]:
     """Get the source bounds that correspond to the target bounds.
 
@@ -252,7 +252,7 @@ def map_bounds_to_source_ranges_nb(
                     from_j = j
                 to_j = j + 1
 
-        if skip_minus_one:
+        if skip_not_found:
             if from_j != -1:
                 range_starts_out[k] = from_j
                 range_ends_out[k] = to_j
@@ -265,7 +265,7 @@ def map_bounds_to_source_ranges_nb(
                 range_starts_out[i] = from_j
                 range_ends_out[i] = to_j
 
-    if skip_minus_one:
+    if skip_not_found:
         return range_starts_out[:k], range_ends_out[:k]
     return range_starts_out, range_ends_out
 

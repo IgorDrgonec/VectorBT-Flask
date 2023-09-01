@@ -209,19 +209,21 @@ def index_repeating_rows_nb(arr: tp.Array2d) -> tp.Array1d:
 
 
 def build_nan_mask(*arrs: tp.Array) -> tp.Optional[tp.Array]:
-    """Build NaN mask out of one to multiple arrays via OR rule."""
+    """Build a NaN mask out of one to multiple arrays via the OR rule."""
     nan_mask = None
     for arr in arrs:
         if nan_mask is None:
             nan_mask = np.isnan(arr)
         else:
-            nan_mask |= nan_mask
+            nan_mask |= np.isnan(arr)
+    if nan_mask.ndim == 2:
+        nan_mask = nan_mask.any(axis=1)
     return nan_mask
 
 
 def squeeze_nan(*arrs: tp.Array, nan_mask: tp.Optional[tp.Array1d] = None) -> tp.Tuple[tp.Array, ...]:
     """Squeeze NaN values using a mask."""
-    if nan_mask is None or not np.any(nan_mask, axis=-1):
+    if nan_mask is None or not np.any(nan_mask):
         return arrs
 
     new_arrs = ()
@@ -232,12 +234,15 @@ def squeeze_nan(*arrs: tp.Array, nan_mask: tp.Optional[tp.Array1d] = None) -> tp
 
 def unsqueeze_nan(*arrs: tp.Array, nan_mask: tp.Optional[tp.Array1d] = None) -> tp.Tuple[tp.Array, ...]:
     """Un-squeeze NaN values using a mask."""
-    if nan_mask is None or not np.any(nan_mask, axis=-1):
+    if nan_mask is None or not np.any(nan_mask):
         return arrs
 
     new_arrs = ()
     for arr in arrs:
-        new_arr = np.full(len(nan_mask), np.nan, dtype=np.float_)
+        if arr.ndim == 2:
+            new_arr = np.full((len(nan_mask), arr.shape[1]), np.nan, dtype=np.float_)
+        else:
+            new_arr = np.full(len(nan_mask), np.nan, dtype=np.float_)
         new_arr[~nan_mask] = arr
         new_arrs += (new_arr,)
     return new_arrs

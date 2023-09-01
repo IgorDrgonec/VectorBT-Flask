@@ -368,9 +368,9 @@ class TestAccessors:
         en, ex = pd.Series.vbt.signals.generate_both(
             5,
             entry_place_func_nb=entry_place_func3_nb,
-            entry_args=(vbt.Rep("temp"),),
+            entry_place_args=(vbt.Rep("temp"),),
             exit_place_func_nb=exit_place_func3_nb,
-            exit_args=(vbt.Rep("temp"),),
+            exit_place_args=(vbt.Rep("temp"),),
             broadcast_named_args=dict(temp=0),
             wrap_kwargs=dict(index=mask["a"].index, columns=["a"]),
         )
@@ -2330,6 +2330,36 @@ class TestAccessors:
         np.testing.assert_array_equal(mapped.idx_arr, np.array([0, 1, 3, 1, 2, 4, 2, 3]))
         assert mapped.wrapper == mask2.vbt.wrapper
 
+    def test_distance_from_last(self):
+        assert_series_equal(
+            mask["a"].vbt.signals.distance_from_last(),
+            pd.Series([-1, 1, 2, 3, 1], index=mask.index, name="a")
+        )
+        assert_frame_equal(
+            mask.vbt.signals.distance_from_last(),
+            pd.DataFrame(
+                [[-1, -1, -1], [1, -1, -1], [2, 1, -1], [3, 2, 1], [1, 3, 2]],
+                index=mask.index,
+                columns=mask.columns,
+            )
+        )
+        assert_frame_equal(
+            mask.vbt.signals.distance_from_last(nth=0),
+            pd.DataFrame(
+                [[0, -1, -1], [1, 0, -1], [2, 1, 0], [0, 2, 1], [1, 0, 2]],
+                index=mask.index,
+                columns=mask.columns,
+            )
+        )
+        assert_frame_equal(
+            mask.vbt.signals.distance_from_last(nth=2),
+            pd.DataFrame(
+                [[-1, -1, -1], [-1, -1, -1], [-1, -1, -1], [3, -1, -1], [4, 3, -1]],
+                index=mask.index,
+                columns=mask.columns,
+            )
+        )
+
     def test_nth_index(self):
         assert mask["a"].vbt.signals.nth_index(0) == pd.Timestamp("2020-01-01 00:00:00")
         assert_series_equal(
@@ -2980,8 +3010,8 @@ class TestFactory:
             [0, 1],
             [1, 0],
             cache_args=(0,),
-            entry_args=(100,),
-            exit_args=(100,),
+            entry_place_args=(100,),
+            exit_place_args=(100,),
         )
         assert_frame_equal(
             my_sig.entries,
@@ -3033,8 +3063,8 @@ class TestFactory:
             [0, 1],
             [1, 0],
             cache_args=(0,),
-            entry_args=(100,),
-            exit_args=(100,),
+            entry_place_args=(100,),
+            exit_place_args=(100,),
             entry_kwargs=dict(wait=2),
             exit_kwargs=dict(wait=2),
         )

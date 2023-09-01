@@ -1806,7 +1806,7 @@ class MappedArray(Analyzable):
         return self.wrapper.wrap(out_arr, group_by=group_by, **resolve_dict(wrap_kwargs))
 
     @property
-    def mask(self) -> tp.SeriesFrame:
+    def pd_mask(self) -> tp.SeriesFrame:
         """`MappedArray.get_pd_mask` with default arguments."""
         return self.get_pd_mask()
 

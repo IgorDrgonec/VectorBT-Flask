@@ -325,7 +325,7 @@ def get_chunk_meta_from_args(
                 n_chunks = n_chunks.apply(ann_args)
             elif callable(n_chunks):
                 n_chunks = n_chunks(ann_args)
-            elif not isinstance(n_chunks, int):
+            elif not isinstance(n_chunks, (int, str)):
                 raise TypeError(f"Type {type(n_chunks)} for n_chunks is not supported")
         if size is not None:
             if isinstance(size, Sizer):
@@ -339,7 +339,7 @@ def get_chunk_meta_from_args(
                 chunk_len = chunk_len.apply(ann_args)
             elif callable(chunk_len):
                 chunk_len = chunk_len(ann_args)
-            elif not isinstance(chunk_len, int):
+            elif not isinstance(chunk_len, (int, str)):
                 raise TypeError(f"Type {type(chunk_len)} for chunk_len is not supported")
         return yield_chunk_meta(n_chunks=n_chunks, size=size, min_size=min_size, chunk_len=chunk_len)
     if isinstance(chunk_meta, ChunkMetaGenerator):
@@ -760,7 +760,7 @@ def yield_arg_chunks(
     ann_args: tp.AnnArgs,
     chunk_meta: tp.Iterable[ChunkMeta],
     arg_take_spec: tp.Optional[tp.ArgTakeSpecLike] = None,
-    template_context: tp.Optional[tp.Mapping] = None,
+    template_context: tp.KwargsLike = None,
     **kwargs,
 ) -> tp.Generator[tp.FuncArgs, None, None]:
     """Split annotated arguments into chunks using `take_from_args` and yield each chunk.
@@ -810,7 +810,7 @@ def chunked(
     chunk_meta: tp.Optional[tp.ChunkMetaLike] = None,
     skip_one_chunk: tp.Optional[bool] = None,
     arg_take_spec: tp.Optional[tp.ArgTakeSpecLike] = None,
-    template_context: tp.Optional[tp.Mapping] = None,
+    template_context: tp.KwargsLike = None,
     prepend_chunk_meta: tp.Optional[bool] = None,
     merge_func: tp.Union[None, str, tuple, tp.Callable] = None,
     merge_kwargs: tp.KwargsLike = None,

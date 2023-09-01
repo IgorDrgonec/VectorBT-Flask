@@ -5,16 +5,16 @@ import vectorbtpro as vbt
 
 from tests.utils import *
 
-close_ts = pd.DataFrame(
+close = pd.DataFrame(
     {"a": [1, 2, 1, 2, 3, 2], "b": [3, 2, 3, 2, 1, 2]},
     index=pd.Index(
         [
-            datetime(2020, 1, 1),
-            datetime(2020, 1, 2),
-            datetime(2020, 1, 3),
-            datetime(2020, 1, 4),
-            datetime(2020, 1, 5),
-            datetime(2020, 1, 6),
+            datetime(2023, 1, 1),
+            datetime(2023, 1, 2),
+            datetime(2023, 1, 3),
+            datetime(2023, 1, 4),
+            datetime(2023, 1, 5),
+            datetime(2023, 1, 6),
         ]
     ),
 )
@@ -43,7 +43,7 @@ def teardown_module():
 class TestGenerators:
     def test_FMEAN(self):
         assert_frame_equal(
-            vbt.FMEAN.run(close_ts, window=(2, 3), wtype="simple").fmean,
+            vbt.FMEAN.run(close, window=(2, 3), wtype="simple").fmean,
             pd.DataFrame(
                 np.array(
                     [
@@ -55,7 +55,7 @@ class TestGenerators:
                         [np.nan, np.nan, np.nan, np.nan],
                     ]
                 ),
-                index=close_ts.index,
+                index=close.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
                         (2, "simple", "a"),
@@ -68,7 +68,7 @@ class TestGenerators:
             ),
         )
         assert_frame_equal(
-            vbt.FMEAN.run(close_ts, window=(2, 3), wtype="exp").fmean,
+            vbt.FMEAN.run(close, window=(2, 3), wtype="exp").fmean,
             pd.DataFrame(
                 np.array(
                     [
@@ -80,7 +80,7 @@ class TestGenerators:
                         [np.nan, np.nan, np.nan, np.nan],
                     ]
                 ),
-                index=close_ts.index,
+                index=close.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
                         (2, "exp", "a"),
@@ -92,10 +92,25 @@ class TestGenerators:
                 ),
             ),
         )
+        chunked_func = vbt.ch_reg.resolve_option(vbt.lab_nb.future_mean_nb, dict(n_chunks=2))
+        np.testing.assert_array_equal(
+            chunked_func(
+                close.values,
+                window=np.array([2, 3]),
+                wtype=np.array([0, 1]),
+                wait=np.array([0, 1]),
+            ),
+            vbt.lab_nb.future_mean_nb(
+                close.values,
+                window=np.array([2, 3]),
+                wtype=np.array([0, 1]),
+                wait=np.array([0, 1]),
+            ),
+        )
 
     def test_FSTD(self):
         assert_frame_equal(
-            vbt.FSTD.run(close_ts, window=(2, 3), wtype="simple").fstd,
+            vbt.FSTD.run(close, window=(2, 3), wtype="simple").fstd,
             pd.DataFrame(
                 np.array(
                     [
@@ -107,7 +122,7 @@ class TestGenerators:
                         [np.nan, np.nan, np.nan, np.nan],
                     ]
                 ),
-                index=close_ts.index,
+                index=close.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
                         (2, "simple", "a"),
@@ -120,7 +135,7 @@ class TestGenerators:
             ),
         )
         assert_frame_equal(
-            vbt.FSTD.run(close_ts, window=(2, 3), wtype="exp").fstd,
+            vbt.FSTD.run(close, window=(2, 3), wtype="exp").fstd,
             pd.DataFrame(
                 np.array(
                     [
@@ -132,7 +147,7 @@ class TestGenerators:
                         [np.nan, np.nan, np.nan, np.nan],
                     ]
                 ),
-                index=close_ts.index,
+                index=close.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
                         (2, "exp", "a"),
@@ -144,10 +159,25 @@ class TestGenerators:
                 ),
             ),
         )
+        chunked_func = vbt.ch_reg.resolve_option(vbt.lab_nb.future_std_nb, dict(n_chunks=2))
+        np.testing.assert_array_equal(
+            chunked_func(
+                close.values,
+                window=np.array([2, 3]),
+                wtype=np.array([0, 2]),
+                wait=np.array([0, 1]),
+            ),
+            vbt.lab_nb.future_std_nb(
+                close.values,
+                window=np.array([2, 3]),
+                wtype=np.array([0, 2]),
+                wait=np.array([0, 1]),
+            ),
+        )
 
     def test_FMIN(self):
         assert_frame_equal(
-            vbt.FMIN.run(close_ts, window=(2, 3)).fmin,
+            vbt.FMIN.run(close, window=(2, 3)).fmin,
             pd.DataFrame(
                 np.array(
                     [
@@ -159,7 +189,7 @@ class TestGenerators:
                         [np.nan, np.nan, np.nan, np.nan],
                     ]
                 ),
-                index=close_ts.index,
+                index=close.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
                         (2, "a"),
@@ -171,10 +201,23 @@ class TestGenerators:
                 ),
             ),
         )
+        chunked_func = vbt.ch_reg.resolve_option(vbt.lab_nb.future_min_nb, dict(n_chunks=2))
+        np.testing.assert_array_equal(
+            chunked_func(
+                close.values,
+                window=np.array([2, 3]),
+                wait=np.array([0, 1]),
+            ),
+            vbt.lab_nb.future_min_nb(
+                close.values,
+                window=np.array([2, 3]),
+                wait=np.array([0, 1]),
+            ),
+        )
 
     def test_FMAX(self):
         assert_frame_equal(
-            vbt.FMAX.run(close_ts, window=(2, 3)).fmax,
+            vbt.FMAX.run(close, window=(2, 3)).fmax,
             pd.DataFrame(
                 np.array(
                     [
@@ -186,7 +229,7 @@ class TestGenerators:
                         [np.nan, np.nan, np.nan, np.nan],
                     ]
                 ),
-                index=close_ts.index,
+                index=close.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
                         (2, "a"),
@@ -198,10 +241,23 @@ class TestGenerators:
                 ),
             ),
         )
+        chunked_func = vbt.ch_reg.resolve_option(vbt.lab_nb.future_max_nb, dict(n_chunks=2))
+        np.testing.assert_array_equal(
+            chunked_func(
+                close.values,
+                window=np.array([2, 3]),
+                wait=np.array([0, 1]),
+            ),
+            vbt.lab_nb.future_max_nb(
+                close.values,
+                window=np.array([2, 3]),
+                wait=np.array([0, 1]),
+            ),
+        )
 
     def test_FIXLB(self):
         assert_frame_equal(
-            vbt.FIXLB.run(close_ts, n=(2, 3)).labels,
+            vbt.FIXLB.run(close, n=(2, 3)).labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -213,7 +269,7 @@ class TestGenerators:
                         [np.nan, np.nan, np.nan, np.nan],
                     ]
                 ),
-                index=close_ts.index,
+                index=close.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
                         (2, "a"),
@@ -225,10 +281,21 @@ class TestGenerators:
                 ),
             ),
         )
+        chunked_func = vbt.ch_reg.resolve_option(vbt.lab_nb.fixed_labels_nb, dict(n_chunks=2))
+        np.testing.assert_array_equal(
+            chunked_func(
+                close.values,
+                n=np.array([1, 2]),
+            ),
+            vbt.lab_nb.fixed_labels_nb(
+                close.values,
+                n=np.array([1, 2]),
+            ),
+        )
 
     def test_MEANLB(self):
         assert_frame_equal(
-            vbt.MEANLB.run(close_ts, window=(2, 3), wtype="simple").labels,
+            vbt.MEANLB.run(close, window=(2, 3), wtype="simple").labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -240,7 +307,7 @@ class TestGenerators:
                         [np.nan, np.nan, np.nan, np.nan],
                     ]
                 ),
-                index=close_ts.index,
+                index=close.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
                         (2, "simple", "a"),
@@ -253,7 +320,7 @@ class TestGenerators:
             ),
         )
         assert_frame_equal(
-            vbt.MEANLB.run(close_ts, window=(2, 3), wtype="exp").labels,
+            vbt.MEANLB.run(close, window=(2, 3), wtype="exp").labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -265,7 +332,7 @@ class TestGenerators:
                         [np.nan, np.nan, np.nan, np.nan],
                     ]
                 ),
-                index=close_ts.index,
+                index=close.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
                         (2, "exp", "a"),
@@ -277,10 +344,25 @@ class TestGenerators:
                 ),
             ),
         )
+        chunked_func = vbt.ch_reg.resolve_option(vbt.lab_nb.mean_labels_nb, dict(n_chunks=2))
+        np.testing.assert_array_equal(
+            chunked_func(
+                close.values,
+                window=np.array([2, 3]),
+                wtype=np.array([0, 1]),
+                wait=np.array([0, 1]),
+            ),
+            vbt.lab_nb.mean_labels_nb(
+                close.values,
+                window=np.array([2, 3]),
+                wtype=np.array([0, 1]),
+                wait=np.array([0, 1]),
+            ),
+        )
 
-    def test_LEXLB(self):
+    def test_PIVOTLB(self):
         assert_frame_equal(
-            vbt.LEXLB.run(close_ts, up_th=up_ths, down_th=down_ths).labels,
+            vbt.PIVOTLB.run(close, close, up_th=up_ths, down_th=down_ths).labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -292,7 +374,7 @@ class TestGenerators:
                         [0, 1, 0, 1, 0, 0],
                     ]
                 ),
-                index=close_ts.index,
+                index=close.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
                         ("array_0", "array_0", "a"),
@@ -302,14 +384,29 @@ class TestGenerators:
                         ("array_2", "array_2", "a"),
                         ("array_2", "array_2", "b"),
                     ],
-                    names=["lexlb_up_th", "lexlb_down_th", None],
+                    names=["pivotlb_up_th", "pivotlb_down_th", None],
                 ),
+            ),
+        )
+        chunked_func = vbt.ch_reg.resolve_option(vbt.lab_nb.pivots_nb, dict(n_chunks=2))
+        np.testing.assert_array_equal(
+            chunked_func(
+                close.values,
+                close.values,
+                up_th=close * 0.1,
+                down_th=close * 0.1,
+            ),
+            vbt.lab_nb.pivots_nb(
+                close.values,
+                close.values,
+                up_th=close * 0.1,
+                down_th=close * 0.1,
             ),
         )
 
     def test_TRENDLB(self):
         assert_frame_equal(
-            vbt.TRENDLB.run(close_ts, up_th=up_ths, down_th=down_ths, mode="Binary").labels,
+            vbt.TRENDLB.run(close, close, up_th=up_ths, down_th=down_ths, mode="Binary").labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -321,22 +418,22 @@ class TestGenerators:
                         [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
                     ]
                 ),
-                index=close_ts.index,
+                index=close.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
-                        ("array_0", "array_0", 'binary', "a"),
-                        ("array_0", "array_0", 'binary', "b"),
-                        ("array_1", "array_1", 'binary', "a"),
-                        ("array_1", "array_1", 'binary', "b"),
-                        ("array_2", "array_2", 'binary', "a"),
-                        ("array_2", "array_2", 'binary', "b"),
+                        ("array_0", "array_0", "binary", "a"),
+                        ("array_0", "array_0", "binary", "b"),
+                        ("array_1", "array_1", "binary", "a"),
+                        ("array_1", "array_1", "binary", "b"),
+                        ("array_2", "array_2", "binary", "a"),
+                        ("array_2", "array_2", "binary", "b"),
                     ],
                     names=["trendlb_up_th", "trendlb_down_th", "trendlb_mode", None],
                 ),
             ),
         )
         assert_frame_equal(
-            vbt.TRENDLB.run(close_ts, up_th=up_ths, down_th=down_ths, mode="BinaryCont").labels,
+            vbt.TRENDLB.run(close, close, up_th=up_ths, down_th=down_ths, mode="BinaryCont").labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -348,22 +445,22 @@ class TestGenerators:
                         [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
                     ]
                 ),
-                index=close_ts.index,
+                index=close.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
-                        ("array_0", "array_0", 'binarycont', "a"),
-                        ("array_0", "array_0", 'binarycont', "b"),
-                        ("array_1", "array_1", 'binarycont', "a"),
-                        ("array_1", "array_1", 'binarycont', "b"),
-                        ("array_2", "array_2", 'binarycont', "a"),
-                        ("array_2", "array_2", 'binarycont', "b"),
+                        ("array_0", "array_0", "binarycont", "a"),
+                        ("array_0", "array_0", "binarycont", "b"),
+                        ("array_1", "array_1", "binarycont", "a"),
+                        ("array_1", "array_1", "binarycont", "b"),
+                        ("array_2", "array_2", "binarycont", "a"),
+                        ("array_2", "array_2", "binarycont", "b"),
                     ],
                     names=["trendlb_up_th", "trendlb_down_th", "trendlb_mode", None],
                 ),
             ),
         )
         assert_frame_equal(
-            vbt.TRENDLB.run(close_ts, up_th=up_ths, down_th=down_ths, mode="BinaryContSat").labels,
+            vbt.TRENDLB.run(close, close, up_th=up_ths, down_th=down_ths, mode="BinaryContSat").labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -375,7 +472,7 @@ class TestGenerators:
                         [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
                     ]
                 ),
-                index=close_ts.index,
+                index=close.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
                         ("array_0", "array_0", "binarycontsat", "a"),
@@ -390,19 +487,19 @@ class TestGenerators:
             ),
         )
         assert_frame_equal(
-            vbt.TRENDLB.run(close_ts, up_th=up_ths, down_th=down_ths, mode="PctChange").labels,
+            vbt.TRENDLB.run(close, close, up_th=up_ths, down_th=down_ths, mode="PctChange").labels,
             pd.DataFrame(
                 np.array(
                     [
-                        [1.0, -0.3333333333333333, 2.0, -0.6666666666666666, np.nan, np.nan],
-                        [-0.5, 0.5, 0.5, -0.5, np.nan, np.nan],
-                        [2.0, -0.6666666666666666, 2.0, -0.6666666666666666, np.nan, np.nan],
-                        [0.5, -0.5, 0.5, -0.5, np.nan, np.nan],
+                        [1.0, -0.5, 2.0, -2.0, np.nan, np.nan],
+                        [-1.0, 0.5, 0.5, -1.0, np.nan, np.nan],
+                        [2.0, -2.0, 2.0, -2.0, np.nan, np.nan],
+                        [0.5, -1.0, 0.5, -1.0, np.nan, np.nan],
                         [np.nan, 1.0, np.nan, 1.0, np.nan, np.nan],
                         [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
                     ]
                 ),
-                index=close_ts.index,
+                index=close.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
                         ("array_0", "array_0", "pctchange", "a"),
@@ -417,7 +514,7 @@ class TestGenerators:
             ),
         )
         assert_frame_equal(
-            vbt.TRENDLB.run(close_ts, up_th=up_ths, down_th=down_ths, mode="PctChangeNorm").labels,
+            vbt.TRENDLB.run(close, close, up_th=up_ths, down_th=down_ths, mode="PctChangeNorm").labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -436,7 +533,7 @@ class TestGenerators:
                         [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
                     ]
                 ),
-                index=close_ts.index,
+                index=close.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
                         ("array_0", "array_0", "pctchangenorm", "a"),
@@ -450,10 +547,27 @@ class TestGenerators:
                 ),
             ),
         )
+        chunked_func = vbt.ch_reg.resolve_option(vbt.lab_nb.trend_labels_nb, dict(n_chunks=2))
+        np.testing.assert_array_equal(
+            chunked_func(
+                close.values,
+                close.values,
+                up_th=close * 0.1,
+                down_th=close * 0.1,
+                mode=np.array([0, 1]),
+            ),
+            vbt.lab_nb.trend_labels_nb(
+                close.values,
+                close.values,
+                up_th=close * 0.1,
+                down_th=close * 0.1,
+                mode=np.array([0, 1]),
+            ),
+        )
 
     def test_BOLB(self):
         assert_frame_equal(
-            vbt.BOLB.run(close_ts, window=1, up_th=up_ths, down_th=down_ths).labels,
+            vbt.BOLB.run(close, close, window=1, up_th=up_ths, down_th=down_ths).labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -465,7 +579,7 @@ class TestGenerators:
                         [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
                     ]
                 ),
-                index=close_ts.index,
+                index=close.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
                         (1, "array_0", "array_0", "a"),
@@ -480,7 +594,7 @@ class TestGenerators:
             ),
         )
         assert_frame_equal(
-            vbt.BOLB.run(close_ts, window=2, up_th=up_ths, down_th=down_ths).labels,
+            vbt.BOLB.run(close, close, window=2, up_th=up_ths, down_th=down_ths).labels,
             pd.DataFrame(
                 np.array(
                     [
@@ -492,7 +606,7 @@ class TestGenerators:
                         [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
                     ]
                 ),
-                index=close_ts.index,
+                index=close.index,
                 columns=pd.MultiIndex.from_tuples(
                     [
                         (2, "array_0", "array_0", "a"),
@@ -504,5 +618,24 @@ class TestGenerators:
                     ],
                     names=["bolb_window", "bolb_up_th", "bolb_down_th", None],
                 ),
+            ),
+        )
+        chunked_func = vbt.ch_reg.resolve_option(vbt.lab_nb.breakout_labels_nb, dict(n_chunks=2))
+        np.testing.assert_array_equal(
+            chunked_func(
+                close.values,
+                close.values,
+                window=np.array([2, 3]),
+                up_th=close * 0.1,
+                down_th=close * 0.1,
+                wait=np.array([0, 1]),
+            ),
+            vbt.lab_nb.breakout_labels_nb(
+                close.values,
+                close.values,
+                window=np.array([2, 3]),
+                up_th=close * 0.1,
+                down_th=close * 0.1,
+                wait=np.array([0, 1]),
             ),
         )

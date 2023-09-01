@@ -517,7 +517,7 @@ def select_levels(
     levels: tp.Union[ExceptLevel, tp.MaybeLevelSequence],
     strict: bool = True,
 ) -> tp.Index:
-    """Build a new index by selecting one or multiple `level_names` from `index`.
+    """Build a new index by selecting one or multiple `levels` from `index`.
 
     Provide `levels` as an instance of `ExceptLevel` to select everything apart from the specified levels."""
     was_multiindex = True
@@ -575,7 +575,7 @@ def drop_redundant_levels(index: tp.Index) -> tp.Index:
 
     levels_to_drop = []
     for i in range(index.nlevels):
-        if len(index) > 1 and len(index.levels[i]) == 1 and index.levels[i].name is None:
+        if len(index.levels[i]) == 1 and index.levels[i].name is None:
             levels_to_drop.append(i)
         elif checks.is_default_index(index.get_level_values(i)):
             levels_to_drop.append(i)

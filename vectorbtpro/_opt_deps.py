@@ -12,7 +12,7 @@ opt_dep_config = HybridConfig(
     dict(
         yfinance=dict(
             link="https://github.com/ranaroussi/yfinance",
-            version=">=0.2.18",
+            version=">=0.2.20",
         ),
         binance=dict(
             dist_name="python-binance",

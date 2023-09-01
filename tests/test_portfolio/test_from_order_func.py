@@ -99,7 +99,7 @@ class InOutputs(NamedTuple):
 
 class TestFromOrderFunc:
     def test_data(self):
-        data = vbt.RandomOHLCData.fetch(
+        data = vbt.RandomOHLCData.pull(
             [0, 1],
             start="2020-01-01",
             end="2020-02-01",
@@ -1080,7 +1080,7 @@ class TestFromOrderFunc:
             group_by=[0, 0, 1],
             cash_sharing=True,
             keep_inout_flex=False,
-            max_logs=price_wide.shape[0],
+            max_log_records=price_wide.shape[0],
             flexible=test_flexible,
         )
 
@@ -3031,7 +3031,7 @@ class TestFromOrderFunc:
 
     @pytest.mark.parametrize("test_row_wise", [False, True])
     @pytest.mark.parametrize("test_flexible", [False, True])
-    def test_max_orders(self, test_row_wise, test_flexible):
+    def test_max_order_records(self, test_row_wise, test_flexible):
         order_func = flex_order_func_nb if test_flexible else order_func_nb
         assert (
             from_order_func(
@@ -3049,7 +3049,7 @@ class TestFromOrderFunc:
                 order_func,
                 np.array([[np.inf]]),
                 row_wise=test_row_wise,
-                max_orders=5,
+                max_order_records=5,
                 flexible=test_flexible,
             ).order_records.shape[0]
             == 15
@@ -3060,7 +3060,7 @@ class TestFromOrderFunc:
                 order_func,
                 np.array([[np.inf]]),
                 row_wise=test_row_wise,
-                max_orders=0,
+                max_order_records=0,
                 flexible=test_flexible,
             ).order_records.shape[0]
             == 0
@@ -3071,13 +3071,13 @@ class TestFromOrderFunc:
                 order_func,
                 np.array([[np.inf]]),
                 row_wise=test_row_wise,
-                max_orders=4,
+                max_order_records=4,
                 flexible=test_flexible,
             )
 
     @pytest.mark.parametrize("test_row_wise", [False, True])
     @pytest.mark.parametrize("test_flexible", [False, True])
-    def test_max_logs(self, test_row_wise, test_flexible):
+    def test_max_log_records(self, test_row_wise, test_flexible):
         log_order_func = log_flex_order_func_nb if test_flexible else log_order_func_nb
         assert (
             from_order_func(
@@ -3095,7 +3095,7 @@ class TestFromOrderFunc:
                 log_order_func,
                 np.array([[np.inf]]),
                 row_wise=test_row_wise,
-                max_logs=5,
+                max_log_records=5,
                 flexible=test_flexible,
             ).log_records.shape[0]
             == 15
@@ -3106,7 +3106,7 @@ class TestFromOrderFunc:
                 log_order_func,
                 np.array([[np.inf]]),
                 row_wise=test_row_wise,
-                max_logs=0,
+                max_log_records=0,
                 flexible=test_flexible,
             ).log_records.shape[0]
             == 0
@@ -3117,7 +3117,7 @@ class TestFromOrderFunc:
                 log_order_func,
                 np.array([[np.inf]]),
                 row_wise=test_row_wise,
-                max_logs=4,
+                max_log_records=4,
                 flexible=test_flexible,
             )
 

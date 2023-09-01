@@ -34,7 +34,7 @@ class CustomTemplate:
     template: tp.Any = attr.ib()
     """Template to be processed."""
 
-    context: tp.Optional[tp.Mapping] = attr.ib(default=None)
+    context: tp.KwargsLike = attr.ib(default=None)
     """Context mapping."""
 
     strict: tp.Optional[bool] = attr.ib(default=None)
@@ -63,7 +63,7 @@ class CustomTemplate:
 
     def resolve_context(
         self,
-        context: tp.Optional[tp.Mapping] = None,
+        context: tp.KwargsLike = None,
         sub_id: tp.Optional[Hashable] = None,
     ) -> tp.Kwargs:
         """Resolve `CustomTemplate.context`.
@@ -111,7 +111,7 @@ class CustomTemplate:
 
     def substitute(
         self,
-        context: tp.Optional[tp.Mapping] = None,
+        context: tp.KwargsLike = None,
         strict: tp.Optional[bool] = None,
         sub_id: tp.Optional[Hashable] = None,
     ) -> tp.Any:
@@ -127,7 +127,7 @@ class Sub(CustomTemplate):
 
     def substitute(
         self,
-        context: tp.Optional[tp.Mapping] = None,
+        context: tp.KwargsLike = None,
         strict: tp.Optional[bool] = None,
         sub_id: tp.Optional[Hashable] = None,
     ) -> tp.Any:
@@ -150,7 +150,7 @@ class Rep(CustomTemplate):
 
     def substitute(
         self,
-        context: tp.Optional[tp.Mapping] = None,
+        context: tp.KwargsLike = None,
         strict: tp.Optional[bool] = None,
         sub_id: tp.Optional[Hashable] = None,
     ) -> tp.Any:
@@ -174,7 +174,7 @@ class RepEval(CustomTemplate):
 
     def substitute(
         self,
-        context: tp.Optional[tp.Mapping] = None,
+        context: tp.KwargsLike = None,
         strict: tp.Optional[bool] = None,
         sub_id: tp.Optional[Hashable] = None,
     ) -> tp.Any:
@@ -197,7 +197,7 @@ class RepFunc(CustomTemplate):
 
     def substitute(
         self,
-        context: tp.Optional[tp.Mapping] = None,
+        context: tp.KwargsLike = None,
         strict: tp.Optional[bool] = None,
         sub_id: int = 0,
     ) -> tp.Any:
@@ -274,7 +274,7 @@ def has_templates(
 
 def substitute_templates(
     obj: tp.Any,
-    context: tp.Optional[tp.Mapping] = None,
+    context: tp.KwargsLike = None,
     strict: tp.Optional[bool] = None,
     make_copy: bool = True,
     sub_id: tp.Optional[Hashable] = None,

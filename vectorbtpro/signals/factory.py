@@ -302,10 +302,12 @@ class SignalFactory(IndicatorFactory):
         The following arguments can be passed to `run` and `run_combs` methods:
 
         Args:
-            *args: Must be used instead of `entry_args` with `FactoryMode.Entries` and instead of
-                `exit_args` with `FactoryMode.Exits` and `FactoryMode.Chain` with default `entry_place_func_nb`.
-            entry_args (tuple): Arguments passed to the entry placement function.
-            exit_args (tuple): Arguments passed to the exit placement function.
+            *args: Can be used instead of `place_args`.
+            place_args (tuple): Arguments passed to any placement function (depending on the mode).
+            entry_place_args (tuple): Arguments passed to the entry placement function.
+            exit_place_args (tuple): Arguments passed to the exit placement function.
+            entry_args (tuple): Alias for `entry_place_args`.
+            exit_args (tuple): Alias for `exit_place_args`.
             cache_args (tuple): Arguments passed to the cache function.
             entry_kwargs (tuple): Settings for the entry placement function. Also contains arguments
                 passed as positional if in `pass_kwargs`.
@@ -315,8 +317,7 @@ class SignalFactory(IndicatorFactory):
                 passed as positional if in `pass_kwargs`.
             return_cache (bool): Whether to return only cache.
             use_cache (any): Cache to use.
-            **kwargs: Must be used instead of `entry_kwargs` with `FactoryMode.Entries` and instead of
-                `exit_kwargs` with `FactoryMode.Exits` and `FactoryMode.Chain` with default `entry_place_func_nb`.
+            **kwargs: Default keyword arguments (depending on the mode).
 
         For more arguments, see `vectorbtpro.indicators.factory.IndicatorBase.run_pipeline`.
 
@@ -504,6 +505,7 @@ class SignalFactory(IndicatorFactory):
         param_names = self.param_names
         in_output_names = self.in_output_names
 
+        default_chain_entry_func = True
         if mode == FactoryMode.Entries:
             require_input_shape = len(input_names) == 0
             checks.assert_not_none(entry_place_func_nb)
@@ -522,6 +524,8 @@ class SignalFactory(IndicatorFactory):
             require_input_shape = False
             if entry_place_func_nb is None:
                 entry_place_func_nb = first_place_nb
+            else:
+                default_chain_entry_func = False
             if entry_settings is None:
                 entry_settings = {}
             entry_settings = merge_dicts(dict(pass_inputs=["entries"]), entry_settings)
@@ -566,9 +570,7 @@ class SignalFactory(IndicatorFactory):
         # Build a function that selects a parameter tuple
         if mode == FactoryMode.Entries:
             _0 = "i"
-            _0 += ", shape"
-            _0 += ", only_once"
-            _0 += ", entry_wait"
+            _0 += ", target_shape"
             if len(entry_input_names) > 0:
                 _0 += ", " + ", ".join(entry_input_names)
             if len(entry_in_output_names) > 0:
@@ -576,26 +578,26 @@ class SignalFactory(IndicatorFactory):
             if len(entry_param_names) > 0:
                 _0 += ", " + ", ".join(entry_param_names)
             _0 += ", entry_args"
-            _1 = "shape"
-            _1 += ", only_once"
-            _1 += ", entry_wait"
-            _1 += ", entry_place_func_nb"
+            _0 += ", only_once"
+            _0 += ", wait"
+            _1 = "target_shape=target_shape"
+            _1 += ", place_func_nb=entry_place_func_nb"
+            _1 += ", place_args=("
             if len(entry_input_names) > 0:
-                _1 += ", " + ", ".join(entry_input_names)
+                _1 += ", ".join(entry_input_names) + ", "
             if len(entry_in_output_names) > 0:
-                _1 += ", " + ", ".join(map(lambda x: x + "[i]", entry_in_output_names))
+                _1 += ", ".join(map(lambda x: x + "[i]", entry_in_output_names)) + ", "
             if len(entry_param_names) > 0:
-                _1 += ", " + ", ".join(map(lambda x: x + "[i]", entry_param_names))
-            _1 += ", *entry_args"
+                _1 += ", ".join(map(lambda x: x + "[i]", entry_param_names)) + ", "
+            _1 += "*entry_args,)"
+            _1 += ", only_once=only_once"
+            _1 += ", wait=wait"
             func_str = "def apply_func({0}):\n   return generate_func_nb({1})".format(_0, _1)
             scope = {"generate_func_nb": generate_func_nb, "entry_place_func_nb": entry_place_func_nb}
 
         elif mode == FactoryMode.Exits:
             _0 = "i"
             _0 += ", entries"
-            _0 += ", exit_wait"
-            _0 += ", until_next"
-            _0 += ", skip_until_exit"
             if len(exit_input_names) > 0:
                 _0 += ", " + ", ".join(exit_input_names)
             if len(exit_in_output_names) > 0:
@@ -603,26 +605,28 @@ class SignalFactory(IndicatorFactory):
             if len(exit_param_names) > 0:
                 _0 += ", " + ", ".join(exit_param_names)
             _0 += ", exit_args"
-            _1 = "entries"
-            _1 += ", exit_wait"
-            _1 += ", until_next"
-            _1 += ", skip_until_exit"
-            _1 += ", exit_place_func_nb"
+            _0 += ", wait"
+            _0 += ", until_next"
+            _0 += ", skip_until_exit"
+            _1 = "entries=entries"
+            _1 += ", exit_place_func_nb=exit_place_func_nb"
+            _1 += ", exit_place_args=("
             if len(exit_input_names) > 0:
-                _1 += ", " + ", ".join(exit_input_names)
+                _1 += ", ".join(exit_input_names) + ", "
             if len(exit_in_output_names) > 0:
-                _1 += ", " + ", ".join(map(lambda x: x + "[i]", exit_in_output_names))
+                _1 += ", ".join(map(lambda x: x + "[i]", exit_in_output_names)) + ", "
             if len(exit_param_names) > 0:
-                _1 += ", " + ", ".join(map(lambda x: x + "[i]", exit_param_names))
-            _1 += ", *exit_args"
+                _1 += ", ".join(map(lambda x: x + "[i]", exit_param_names)) + ", "
+            _1 += "*exit_args,)"
+            _1 += ", wait=wait"
+            _1 += ", until_next=until_next"
+            _1 += ", skip_until_exit=skip_until_exit"
             func_str = "def apply_func({0}):\n   return generate_ex_func_nb({1})".format(_0, _1)
             scope = {"generate_ex_func_nb": generate_ex_func_nb, "exit_place_func_nb": exit_place_func_nb}
 
         else:
             _0 = "i"
-            _0 += ", shape"
-            _0 += ", entry_wait"
-            _0 += ", exit_wait"
+            _0 += ", target_shape"
             if len(entry_input_names) > 0:
                 _0 += ", " + ", ".join(map(lambda x: "_entry_" + x, entry_input_names))
             if len(entry_in_output_names) > 0:
@@ -637,11 +641,11 @@ class SignalFactory(IndicatorFactory):
             if len(exit_param_names) > 0:
                 _0 += ", " + ", ".join(map(lambda x: "_exit_" + x, exit_param_names))
             _0 += ", exit_args"
-            _1 = "shape"
-            _1 += ", entry_wait"
-            _1 += ", exit_wait"
-            _1 += ", entry_place_func_nb"
-            _1 += ", ("
+            _0 += ", entry_wait"
+            _0 += ", exit_wait"
+            _1 = "target_shape=target_shape"
+            _1 += ", entry_place_func_nb=entry_place_func_nb"
+            _1 += ", entry_place_args=("
             if len(entry_input_names) > 0:
                 _1 += ", ".join(map(lambda x: "_entry_" + x, entry_input_names)) + ", "
             if len(entry_in_output_names) > 0:
@@ -649,8 +653,8 @@ class SignalFactory(IndicatorFactory):
             if len(entry_param_names) > 0:
                 _1 += ", ".join(map(lambda x: "_entry_" + x + "[i]", entry_param_names)) + ", "
             _1 += "*entry_args,)"
-            _1 += ", exit_place_func_nb"
-            _1 += ", ("
+            _1 += ", exit_place_func_nb=exit_place_func_nb"
+            _1 += ", exit_place_args=("
             if len(exit_input_names) > 0:
                 _1 += ", ".join(map(lambda x: "_exit_" + x, exit_input_names)) + ", "
             if len(exit_in_output_names) > 0:
@@ -658,6 +662,8 @@ class SignalFactory(IndicatorFactory):
             if len(exit_param_names) > 0:
                 _1 += ", ".join(map(lambda x: "_exit_" + x + "[i]", exit_param_names)) + ", "
             _1 += "*exit_args,)"
+            _1 += ", entry_wait=entry_wait"
+            _1 += ", exit_wait=exit_wait"
             func_str = "def apply_func({0}):\n   return generate_enex_func_nb({1})".format(_0, _1)
             scope = {
                 "generate_enex_func_nb": generate_enex_func_nb,
@@ -682,9 +688,12 @@ class SignalFactory(IndicatorFactory):
             param_list: tp.List[tp.List[tp.Param]],
             *args,
             input_shape: tp.Optional[tp.Shape] = None,
-            entry_args: tp.Optional[tp.Args] = None,
-            exit_args: tp.Optional[tp.Args] = None,
-            cache_args: tp.Optional[tp.Args] = None,
+            place_args: tp.ArgsLike = None,
+            entry_place_args: tp.ArgsLike = None,
+            exit_place_args: tp.ArgsLike = None,
+            entry_args: tp.ArgsLike = None,
+            exit_args: tp.ArgsLike = None,
+            cache_args: tp.ArgsLike = None,
             entry_kwargs: tp.KwargsLike = None,
             exit_kwargs: tp.KwargsLike = None,
             cache_kwargs: tp.KwargsLike = None,
@@ -700,41 +709,57 @@ class SignalFactory(IndicatorFactory):
             else:
                 input_shape = input_list[0].shape
 
+            if len(args) > 0 and place_args is not None:
+                raise ValueError("Either *args or place_args must be provided, not both")
+            if place_args is None:
+                place_args = args
+            if (
+                mode == FactoryMode.Entries
+                or mode == FactoryMode.Both
+                or (mode == FactoryMode.Chain and not default_chain_entry_func)
+            ):
+                if len(place_args) > 0 and entry_place_args is not None:
+                    raise ValueError("Either place_args or entry_place_args must be provided, not both")
+                if entry_place_args is None:
+                    entry_place_args = place_args
+            else:
+                if entry_place_args is None:
+                    entry_place_args = ()
+            if mode in (FactoryMode.Exits, FactoryMode.Both, FactoryMode.Chain):
+                if len(place_args) > 0 and exit_place_args is not None:
+                    raise ValueError("Either place_args or exit_place_args must be provided, not both")
+                if exit_place_args is None:
+                    exit_place_args = place_args
+            else:
+                if exit_place_args is None:
+                    exit_place_args = ()
+            if len(entry_place_args) > 0 and entry_args is not None:
+                raise ValueError("Either entry_place_args or entry_args must be provided, not both")
             if entry_args is None:
-                entry_args = ()
+                entry_args = entry_place_args
+            if len(exit_place_args) > 0 and exit_args is not None:
+                raise ValueError("Either exit_place_args or exit_args must be provided, not both")
             if exit_args is None:
-                exit_args = ()
+                exit_args = exit_place_args
             if cache_args is None:
                 cache_args = ()
-            if mode == FactoryMode.Entries:
-                if len(entry_args) > 0:
-                    raise ValueError("Use *args instead of entry_args with FactoryMode.Entries")
-                entry_args = args
-            elif mode == FactoryMode.Exits or (mode == FactoryMode.Chain and entry_place_func_nb == first_place_nb):
-                if len(exit_args) > 0:
-                    raise ValueError("Use *args instead of exit_args with FactoryMode.Exits or FactoryMode.Chain")
-                exit_args = args
-            else:
-                if len(args) > 0:
-                    raise ValueError("*args cannot be used with FactoryMode.Both")
 
-            if entry_kwargs is None:
-                entry_kwargs = {}
-            if exit_kwargs is None:
-                exit_kwargs = {}
+            if (
+                mode == FactoryMode.Entries
+                or mode == FactoryMode.Both
+                or (mode == FactoryMode.Chain and not default_chain_entry_func)
+            ):
+                entry_kwargs = merge_dicts(_kwargs, entry_kwargs)
+            else:
+                if entry_kwargs is None:
+                    entry_kwargs = {}
+            if mode in (FactoryMode.Exits, FactoryMode.Both, FactoryMode.Chain):
+                exit_kwargs = merge_dicts(_kwargs, exit_kwargs)
+            else:
+                if exit_kwargs is None:
+                    exit_kwargs = {}
             if cache_kwargs is None:
                 cache_kwargs = {}
-            if mode == FactoryMode.Entries:
-                if len(entry_kwargs) > 0:
-                    raise ValueError("Use **kwargs instead of entry_kwargs with FactoryMode.Entries")
-                entry_kwargs = _kwargs
-            elif mode == FactoryMode.Exits or (mode == FactoryMode.Chain and entry_place_func_nb == first_place_nb):
-                if len(exit_kwargs) > 0:
-                    raise ValueError("Use **kwargs instead of exit_kwargs with FactoryMode.Exits or FactoryMode.Chain")
-                exit_kwargs = _kwargs
-            else:
-                if len(_kwargs) > 0:
-                    raise ValueError("*args cannot be used with FactoryMode.Both")
 
             kwargs_defaults = dict(
                 input_shape=input_shape,
@@ -845,12 +870,12 @@ class SignalFactory(IndicatorFactory):
                     n_params,
                     apply_func,
                     input_shape,
-                    only_once,
-                    entry_wait,
                     *entry_input_list,
                     *_entry_in_output_list,
                     *_entry_param_list,
                     entry_args + entry_more_args + entry_cache,
+                    only_once,
+                    entry_wait,
                     n_outputs=1,
                     jitted_loop=True,
                     execute_kwargs=execute_kwargs,
@@ -864,13 +889,13 @@ class SignalFactory(IndicatorFactory):
                     n_params,
                     apply_func,
                     input_list[0],
-                    exit_wait,
-                    until_next,
-                    skip_until_exit,
                     *exit_input_list,
                     *_exit_in_output_list,
                     *_exit_param_list,
                     exit_args + exit_more_args + exit_cache,
+                    exit_wait,
+                    until_next,
+                    skip_until_exit,
                     n_outputs=1,
                     jitted_loop=True,
                     execute_kwargs=execute_kwargs,
@@ -886,8 +911,6 @@ class SignalFactory(IndicatorFactory):
                     n_params,
                     apply_func,
                     input_shape,
-                    entry_wait,
-                    exit_wait,
                     *entry_input_list,
                     *_entry_in_output_list,
                     *_entry_param_list,
@@ -896,6 +919,8 @@ class SignalFactory(IndicatorFactory):
                     *_exit_in_output_list,
                     *_exit_param_list,
                     exit_args + exit_more_args + exit_cache,
+                    entry_wait,
+                    exit_wait,
                     n_outputs=2,
                     jitted_loop=True,
                     execute_kwargs=execute_kwargs,

@@ -119,7 +119,6 @@ default_theme = dark
 import json
 import os
 import pkgutil
-from pathlib import Path
 
 import numpy as np
 from numba import config as nb_config
@@ -133,7 +132,7 @@ from vectorbtpro.utils.execution import (
     ProcessPoolEngine,
     PathosEngine,
     DaskEngine,
-    RayEngine
+    RayEngine,
 )
 from vectorbtpro.utils.jitting import NumPyJitter, NumbaJitter
 from vectorbtpro.utils.template import Sub, RepEval, substitute_templates
@@ -157,8 +156,7 @@ importing = child_dict(
 )
 """_"""
 
-__pdoc__["importing"] = Sub(
-    """Sub-config with settings applied on importing.
+__pdoc__["importing"] = Sub("""Sub-config with settings applied on importing.
     
 Disabling these options will make vectorbt load faster, but will limit the flexibility of accessing
 various features of the package.
@@ -170,8 +168,7 @@ various features of the package.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["importing"] = importing
 
@@ -186,8 +183,7 @@ caching = child_dict(
 )
 """_"""
 
-__pdoc__["caching"] = Sub(
-    """Sub-config with settings applied across `vectorbtpro.registries.ca_registry`, 
+__pdoc__["caching"] = Sub("""Sub-config with settings applied across `vectorbtpro.registries.ca_registry`, 
 `vectorbtpro.utils.caching`, and cacheable decorators in `vectorbtpro.utils.decorators`.
 
 !!! hint
@@ -197,8 +193,7 @@ __pdoc__["caching"] = Sub(
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["caching"] = caching
 
@@ -231,8 +226,7 @@ jitting = child_dict(
 )
 """_"""
 
-__pdoc__["jitting"] = Sub(
-    """Sub-config with settings applied across `vectorbtpro.registries.jit_registry` and 
+__pdoc__["jitting"] = Sub("""Sub-config with settings applied across `vectorbtpro.registries.jit_registry` and 
 `vectorbtpro.utils.jitting`.
 
 !!! note
@@ -242,8 +236,7 @@ __pdoc__["jitting"] = Sub(
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["jitting"] = jitting
 
@@ -256,13 +249,11 @@ numba = child_dict(
 )
 """_"""
 
-__pdoc__["numba"] = Sub(
-    """Sub-config with Numba-related settings.
+__pdoc__["numba"] = Sub("""Sub-config with Numba-related settings.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["numba"] = numba
 
@@ -275,16 +266,14 @@ math = child_dict(
 )
 """_"""
 
-__pdoc__["math"] = Sub(
-    """Sub-config with settings applied across `vectorbtpro.utils.math_`.
+__pdoc__["math"] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.math_`.
 
 !!! note
     All math settings are applied only on import.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["math"] = math
 
@@ -294,8 +283,18 @@ execution = child_dict(
     chunk_len=None,
     distribute="calls",
     warmup=False,
+    pre_execute_func=None,
+    pre_execute_kwargs=None,
+    pre_chunk_func=None,
+    pre_chunk_kwargs=None,
+    post_chunk_func=None,
+    post_chunk_kwargs=None,
+    post_execute_func=None,
+    post_execute_kwargs=None,
+    post_execute_on_sorted=False,
     show_progress=True,
     pbar_kwargs=Config(),
+    template_context=Config(),
     engines=Config(
         serial=Config(
             cls=SerialEngine,
@@ -338,13 +337,11 @@ execution = child_dict(
 )
 """_"""
 
-__pdoc__["execution"] = Sub(
-    """Sub-config with settings applied across `vectorbtpro.utils.execution`.
+__pdoc__["execution"] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.execution`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["execution"] = execution
 
@@ -364,8 +361,7 @@ chunking = child_dict(
 )
 """_"""
 
-__pdoc__["chunking"] = Sub(
-    """Sub-config with settings applied across `vectorbtpro.registries.ch_registry` 
+__pdoc__["chunking"] = Sub("""Sub-config with settings applied across `vectorbtpro.registries.ch_registry` 
 and `vectorbtpro.utils.chunking`.
 
 !!! note
@@ -373,8 +369,7 @@ and `vectorbtpro.utils.chunking`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["chunking"] = chunking
 
@@ -392,13 +387,11 @@ params = child_dict(
 )
 """_"""
 
-__pdoc__["params"] = Sub(
-    """Sub-config with settings applied across `vectorbtpro.utils.params`.
+__pdoc__["params"] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.params`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["params"] = params
 
@@ -411,13 +404,11 @@ template = child_dict(
 )
 """_"""
 
-__pdoc__["template"] = Sub(
-    """Sub-config with settings applied across `vectorbtpro.utils.template`.
+__pdoc__["template"] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.template`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["template"] = template
 
@@ -437,17 +428,15 @@ pickling = child_dict(
             lz4={"lz4"},
             blosc={"blosc"},
         ),
-    )
+    ),
 )
 """_"""
 
-__pdoc__["pickling"] = Sub(
-    """Sub-config with settings applied to `vectorbtpro.utils.pickling`.
+__pdoc__["pickling"] = Sub("""Sub-config with settings applied to `vectorbtpro.utils.pickling`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["pickling"] = pickling
 
@@ -456,13 +445,11 @@ config = child_dict(
 )
 """_"""
 
-__pdoc__["config"] = Sub(
-    """Sub-config with settings applied to `vectorbtpro.utils.config.Config`.
+__pdoc__["config"] = Sub("""Sub-config with settings applied to `vectorbtpro.utils.config.Config`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["config"] = config
 
@@ -477,13 +464,11 @@ configured = child_dict(
 )
 """_"""
 
-__pdoc__["configured"] = Sub(
-    """Sub-config with settings applied to `vectorbtpro.utils.config.Configured`.
+__pdoc__["configured"] = Sub("""Sub-config with settings applied to `vectorbtpro.utils.config.Configured`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["configured"] = configured
 
@@ -506,13 +491,11 @@ broadcasting = child_dict(
 )
 """_"""
 
-__pdoc__["broadcasting"] = Sub(
-    """Sub-config with settings applied to broadcasting functions across `vectorbtpro.base`.
+__pdoc__["broadcasting"] = Sub("""Sub-config with settings applied to broadcasting functions across `vectorbtpro.base`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["broadcasting"] = broadcasting
 
@@ -522,16 +505,14 @@ indexing = child_dict(
 )
 """_"""
 
-__pdoc__["indexing"] = Sub(
-    """Sub-config with settings applied to indexing functions across `vectorbtpro.base`.
+__pdoc__["indexing"] = Sub("""Sub-config with settings applied to indexing functions across `vectorbtpro.base`.
     
 !!! note
     Options `rotate_rows` and `rotate_cols` are applied only on import. 
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["indexing"] = indexing
 
@@ -550,16 +531,14 @@ wrapping = child_dict(
 )
 """_"""
 
-__pdoc__["wrapping"] = Sub(
-    """Sub-config with settings applied across `vectorbtpro.base.wrapping`.
+__pdoc__["wrapping"] = Sub("""Sub-config with settings applied across `vectorbtpro.base.wrapping`.
 
 ```python
 ${config_doc}
 ```
 
 When enabling `max_precision` and running your code for the first time, make sure to enable 
-`prec_check_bounds`. After that, you can safely disable it to slightly increase performance."""
-)
+`prec_check_bounds`. After that, you can safely disable it to slightly increase performance.""")
 
 _settings["wrapping"] = wrapping
 
@@ -568,13 +547,11 @@ resampling = child_dict(
 )
 """_"""
 
-__pdoc__["resampling"] = Sub(
-    """Sub-config with settings applied across `vectorbtpro.base.resampling`.
+__pdoc__["resampling"] = Sub("""Sub-config with settings applied across `vectorbtpro.base.resampling`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["resampling"] = resampling
 
@@ -586,17 +563,16 @@ datetime = child_dict(
 )
 """_"""
 
-__pdoc__["datetime"] = Sub(
-    """Sub-config with settings applied across `vectorbtpro.utils.datetime_`.
+__pdoc__["datetime"] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.datetime_`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["datetime"] = datetime
 
 data = child_dict(
+    keys_are_features=False,
     wrapper_kwargs=Config(),
     skip_on_error=False,
     silence_warnings=False,
@@ -623,8 +599,12 @@ data = child_dict(
             seed=None,
         ),
         random_ohlc=Config(
-            std=0.001,
             n_ticks=50,
+            start_value=100.0,
+            mean=0.0,
+            std=0.001,
+            symmetric=False,
+            seed=None,
         ),
         gbm=Config(
             start_value=100.0,
@@ -634,8 +614,12 @@ data = child_dict(
             seed=None,
         ),
         gbm_ohlc=Config(
-            std=0.001,
             n_ticks=50,
+            start_value=100.0,
+            mean=0.0,
+            std=0.001,
+            dt=1.0,
+            seed=None,
         ),
         # Local
         local=Config(),
@@ -784,8 +768,8 @@ data = child_dict(
             client_config=dict(
                 username=None,
                 password=None,
+                auth_token=None,
                 user_agent=None,
-                token=None,
             ),
             exchange=None,
             timeframe="D",
@@ -800,13 +784,21 @@ data = child_dict(
             pbar_kwargs=Config(),
         ),
     ),
-    stats=Config(),
+    stats=Config(
+        filters=Config(
+            is_feature_oriented=dict(
+                filter_func=lambda self, metric_settings: self.feature_oriented,
+            ),
+            is_symbol_oriented=dict(
+                filter_func=lambda self, metric_settings: self.symbol_oriented,
+            ),
+        )
+    ),
     plots=Config(),
 )
 """_"""
 
-__pdoc__["data"] = Sub(
-    """Sub-config with settings applied across `vectorbtpro.data`.
+__pdoc__["data"] = Sub("""Sub-config with settings applied across `vectorbtpro.data`.
 
 ```python
 ${config_doc}
@@ -821,14 +813,14 @@ CCXT:
     
 Alpaca:
     Sign up for Alpaca API keys under https://app.alpaca.markets/signup.
-"""
-)
+""")
 
 _settings["data"] = data
 
 plotting = child_dict(
     use_widgets=True,
     use_resampler=False,
+    pre_show_func=None,
     show_kwargs=Config(),
     use_gl=False,
     color_schema=Config(
@@ -845,7 +837,7 @@ plotting = child_dict(
         red="#EA4335",
         gray="#E2E2E2",
         purple="#A661D5",
-        pink="#DD59AA"
+        pink="#DD59AA",
     ),
     themes=child_dict(
         light=child_dict(
@@ -916,15 +908,13 @@ plotting = child_dict(
 )
 """_"""
 
-__pdoc__["plotting"] = Sub(
-    """Sub-config with settings applied to Plotly figures 
+__pdoc__["plotting"] = Sub("""Sub-config with settings applied to Plotly figures 
 created from `vectorbtpro.utils.figure`.
 
 ```python
 ${config_doc}
 ```
-"""
-)
+""")
 
 _settings["plotting"] = plotting
 
@@ -954,14 +944,12 @@ stats_builder = child_dict(
 )
 """_"""
 
-__pdoc__["stats_builder"] = Sub(
-    """Sub-config with settings applied to 
+__pdoc__["stats_builder"] = Sub("""Sub-config with settings applied to 
 `vectorbtpro.generic.stats_builder.StatsBuilderMixin`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["stats_builder"] = stats_builder
 
@@ -1001,14 +989,12 @@ plots_builder = child_dict(
 )
 """_"""
 
-__pdoc__["plots_builder"] = Sub(
-    """Sub-config with settings applied to 
+__pdoc__["plots_builder"] = Sub("""Sub-config with settings applied to 
 `vectorbtpro.generic.plots_builder.PlotsBuilderMixin`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["plots_builder"] = plots_builder
 
@@ -1032,13 +1018,11 @@ generic = child_dict(
 )
 """_"""
 
-__pdoc__["generic"] = Sub(
-    """Sub-config with settings applied to `vectorbtpro.generic.accessors.GenericAccessor`.
+__pdoc__["generic"] = Sub("""Sub-config with settings applied to `vectorbtpro.generic.accessors.GenericAccessor`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["generic"] = generic
 
@@ -1048,13 +1032,11 @@ ranges = child_dict(
 )
 """_"""
 
-__pdoc__["ranges"] = Sub(
-    """Sub-config with settings applied to `vectorbtpro.generic.ranges.Ranges`.
+__pdoc__["ranges"] = Sub("""Sub-config with settings applied to `vectorbtpro.generic.ranges.Ranges`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["ranges"] = ranges
 
@@ -1065,7 +1047,8 @@ splitter = child_dict(
             has_multiple_sets=dict(
                 filter_func=lambda self, metric_settings: self.get_n_sets(
                     set_group_by=metric_settings.get("set_group_by", None)
-                ) > 1,
+                )
+                > 1,
             ),
             normalize=dict(
                 filter_func=lambda self, metric_settings: metric_settings["normalize"],
@@ -1076,13 +1059,11 @@ splitter = child_dict(
 )
 """_"""
 
-__pdoc__["splitter"] = Sub(
-    """Sub-config with settings applied to `vectorbtpro.generic.splitting.base.Splitter`.
+__pdoc__["splitter"] = Sub("""Sub-config with settings applied to `vectorbtpro.generic.splitting.base.Splitter`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["splitter"] = splitter
 
@@ -1096,37 +1077,27 @@ drawdowns = child_dict(
 )
 """_"""
 
-__pdoc__["drawdowns"] = Sub(
-    """Sub-config with settings applied to `vectorbtpro.generic.drawdowns.Drawdowns`.
+__pdoc__["drawdowns"] = Sub("""Sub-config with settings applied to `vectorbtpro.generic.drawdowns.Drawdowns`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["drawdowns"] = drawdowns
 
 ohlcv = child_dict(
     ohlc_type="candlestick",
-    column_names=child_dict(
-        open="Open",
-        high="High",
-        low="Low",
-        close="Close",
-        volume="Volume",
-    ),
+    feature_map=Config(),
     stats=Config(),
     plots=Config(),
 )
 """_"""
 
-__pdoc__["ohlcv"] = Sub(
-    """Sub-config with settings applied across `vectorbtpro.ohlcv`.
+__pdoc__["ohlcv"] = Sub("""Sub-config with settings applied across `vectorbtpro.ohlcv`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["ohlcv"] = ohlcv
 
@@ -1147,13 +1118,11 @@ signals = child_dict(
 )
 """_"""
 
-__pdoc__["signals"] = Sub(
-    """Sub-config with settings applied to `vectorbtpro.signals.accessors.SignalsAccessor`.
+__pdoc__["signals"] = Sub("""Sub-config with settings applied to `vectorbtpro.signals.accessors.SignalsAccessor`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["signals"] = signals
 
@@ -1193,13 +1162,11 @@ returns = child_dict(
 )
 """_"""
 
-__pdoc__["returns"] = Sub(
-    """Sub-config with settings applied to `vectorbtpro.returns.accessors.ReturnsAccessor`.
+__pdoc__["returns"] = Sub("""Sub-config with settings applied to `vectorbtpro.returns.accessors.ReturnsAccessor`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["returns"] = returns
 
@@ -1208,13 +1175,11 @@ qs_adapter = child_dict(
 )
 """_"""
 
-__pdoc__["qs_adapter"] = Sub(
-    """Sub-config with settings applied to `vectorbtpro.returns.qs_adapter.QSAdapter`.
+__pdoc__["qs_adapter"] = Sub("""Sub-config with settings applied to `vectorbtpro.returns.qs_adapter.QSAdapter`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["qs_adapter"] = qs_adapter
 
@@ -1224,13 +1189,11 @@ records = child_dict(
 )
 """_"""
 
-__pdoc__["records"] = Sub(
-    """Sub-config with settings applied to `vectorbtpro.records.base.Records`.
+__pdoc__["records"] = Sub("""Sub-config with settings applied to `vectorbtpro.records.base.Records`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["records"] = records
 
@@ -1253,13 +1216,11 @@ mapped_array = child_dict(
 )
 """_"""
 
-__pdoc__["mapped_array"] = Sub(
-    """Sub-config with settings applied to `vectorbtpro.records.mapped_array.MappedArray`.
+__pdoc__["mapped_array"] = Sub("""Sub-config with settings applied to `vectorbtpro.records.mapped_array.MappedArray`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["mapped_array"] = mapped_array
 
@@ -1269,13 +1230,11 @@ orders = child_dict(
 )
 """_"""
 
-__pdoc__["orders"] = Sub(
-    """Sub-config with settings applied to `vectorbtpro.portfolio.orders.Orders`.
+__pdoc__["orders"] = Sub("""Sub-config with settings applied to `vectorbtpro.portfolio.orders.Orders`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["orders"] = orders
 
@@ -1290,13 +1249,11 @@ trades = child_dict(
 )
 """_"""
 
-__pdoc__["trades"] = Sub(
-    """Sub-config with settings applied to `vectorbtpro.portfolio.trades.Trades`.
+__pdoc__["trades"] = Sub("""Sub-config with settings applied to `vectorbtpro.portfolio.trades.Trades`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["trades"] = trades
 
@@ -1305,13 +1262,11 @@ logs = child_dict(
 )
 """_"""
 
-__pdoc__["logs"] = Sub(
-    """Sub-config with settings applied to `vectorbtpro.portfolio.logs.Logs`.
+__pdoc__["logs"] = Sub("""Sub-config with settings applied to `vectorbtpro.portfolio.logs.Logs`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["logs"] = logs
 
@@ -1350,8 +1305,8 @@ portfolio = child_dict(
     from_ago=None,
     call_seq=None,
     attach_call_seq=False,
-    max_orders=None,
-    max_logs=None,
+    max_order_records=None,
+    max_log_records=None,
     jitted=None,
     chunked=None,
     staticized=False,
@@ -1382,6 +1337,8 @@ portfolio = child_dict(
         adjust_args=(),
         signal_func_nb=None,
         signal_args=None,
+        post_signal_func_nb=None,
+        post_signal_args=(),
         post_segment_func_nb=None,
         post_segment_args=(),
         order_mode=False,
@@ -1494,13 +1451,11 @@ portfolio = child_dict(
 )
 """_"""
 
-__pdoc__["portfolio"] = Sub(
-    """Sub-config with settings applied to `vectorbtpro.portfolio.base.Portfolio`.
+__pdoc__["portfolio"] = Sub("""Sub-config with settings applied to `vectorbtpro.portfolio.base.Portfolio`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["portfolio"] = portfolio
 
@@ -1521,6 +1476,7 @@ pfopt = child_dict(
         allocation_method="lp_portfolio",
         silence_warnings=True,
         ignore_opt_errors=True,
+        ignore_errors=False,
     ),
     riskfolio=Config(
         nan_to_zero=True,
@@ -1548,6 +1504,7 @@ pfopt = child_dict(
         func_kwargs=Config(),
         silence_warnings=True,
         return_port=False,
+        ignore_errors=False,
     ),
     stats=Config(
         filters=dict(
@@ -1566,13 +1523,11 @@ pfopt = child_dict(
 )
 """_"""
 
-__pdoc__["pfopt"] = Sub(
-    """Sub-config with settings applied across `vectorbtpro.portfolio.pfopt`.
+__pdoc__["pfopt"] = Sub("""Sub-config with settings applied across `vectorbtpro.portfolio.pfopt`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["pfopt"] = pfopt
 
@@ -1591,8 +1546,7 @@ messaging = child_dict(
 )
 """_"""
 
-__pdoc__["messaging"] = Sub(
-    """Sub-config with settings applied across `vectorbtpro.messaging`.
+__pdoc__["messaging"] = Sub("""Sub-config with settings applied across `vectorbtpro.messaging`.
 
 ```python
 ${config_doc}
@@ -1609,8 +1563,7 @@ python-telegram-bot:
 GIPHY:
     Sub-config with settings applied to 
     [GIPHY Translate Endpoint](https://developers.giphy.com/docs/api/endpoint#translate).
-"""
-)
+""")
 
 _settings["messaging"] = messaging
 
@@ -1621,13 +1574,11 @@ pbar = child_dict(
 )
 """_"""
 
-__pdoc__["pbar"] = Sub(
-    """Sub-config with settings applied across `vectorbtpro.utils.pbar`.
+__pdoc__["pbar"] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.pbar`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["pbar"] = pbar
 
@@ -1641,13 +1592,11 @@ path = child_dict(
 )
 """_"""
 
-__pdoc__["path"] = Sub(
-    """Sub-config with settings applied across `vectorbtpro.utils.path_`.
+__pdoc__["path"] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.path_`.
 
 ```python
 ${config_doc}
-```"""
-)
+```""")
 
 _settings["path"] = path
 
@@ -1710,7 +1659,7 @@ settings = SettingsConfig(
         frozen_keys=True,
         convert_children=Config,
         as_attrs=True,
-    )
+    ),
 )
 """Global settings config.
 

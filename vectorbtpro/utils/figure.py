@@ -61,7 +61,7 @@ FigureMixinT = tp.TypeVar("FigureMixinT", bound="FigureMixin")
 
 class FigureMixin:
     def show(self, *args, **kwargs) -> None:
-        """Display the figure in PNG format."""
+        """Display the figure."""
         raise NotImplementedError
 
     def show_png(self, **kwargs) -> None:
@@ -73,13 +73,13 @@ class FigureMixin:
         self.show(renderer="svg", **kwargs)
 
     def auto_rangebreaks(self: FigureMixinT, index: tp.Optional[tp.IndexLike] = None, **kwargs) -> FigureMixinT:
-        """Set range breaks automatically based on `vectorbtpro.utils.dt.get_rangebreaks`."""
+        """Set range breaks automatically based on `vectorbtpro.utils.datetime_.get_rangebreaks`."""
         if index is None:
             for d in self.data:
                 if "x" in d:
                     d_index = pd.Index(self.data[0].x)
                     if not isinstance(d_index, pd.DatetimeIndex):
-                        continue
+                        return self
                     if index is None:
                         index = d_index
                     elif not index.equals(d_index):
@@ -109,9 +109,14 @@ class Figure(_Figure, FigureMixin):
 
         plotting_cfg = settings["plotting"]
 
-        fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
+        pre_show_func = plotting_cfg.get("pre_show_func", None)
+        if pre_show_func is not None:
+            _self = pre_show_func(self)
+        else:
+            _self = self
+        fig_kwargs = dict(width=_self.layout.width, height=_self.layout.height)
         show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
-        _Figure.show(self, *args, **show_kwargs)
+        _Figure.show(_self, *args, **show_kwargs)
 
 
 class FigureWidget(_FigureWidget, FigureMixin):
@@ -133,9 +138,14 @@ class FigureWidget(_FigureWidget, FigureMixin):
 
         plotting_cfg = settings["plotting"]
 
-        fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
+        pre_show_func = plotting_cfg.get("pre_show_func", None)
+        if pre_show_func is not None:
+            _self = pre_show_func(self)
+        else:
+            _self = self
+        fig_kwargs = dict(width=_self.layout.width, height=_self.layout.height)
         show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
-        _Figure.show(self, *args, **show_kwargs)
+        _Figure.show(_self, *args, **show_kwargs)
 
 
 try:
@@ -160,9 +170,14 @@ try:
 
             plotting_cfg = settings["plotting"]
 
-            fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
+            pre_show_func = plotting_cfg.get("pre_show_func", None)
+            if pre_show_func is not None:
+                _self = pre_show_func(self)
+            else:
+                _self = self
+            fig_kwargs = dict(width=_self.layout.width, height=_self.layout.height)
             show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
-            _Figure.show(self, *args, **show_kwargs)
+            _Figure.show(_self, *args, **show_kwargs)
 
     class FigureWidgetResampler(_FigureWidgetResampler, FigureMixin):
         """Figure widget resampler."""
@@ -183,9 +198,14 @@ try:
 
             plotting_cfg = settings["plotting"]
 
-            fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
+            pre_show_func = plotting_cfg.get("pre_show_func", None)
+            if pre_show_func is not None:
+                _self = pre_show_func(self)
+            else:
+                _self = self
+            fig_kwargs = dict(width=_self.layout.width, height=_self.layout.height)
             show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
-            _Figure.show(self, *args, **show_kwargs)
+            _Figure.show(_self, *args, **show_kwargs)
 
 except ImportError:
     FigureResampler = Figure

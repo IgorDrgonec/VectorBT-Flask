@@ -216,7 +216,10 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
                     if not checks.is_index_equal(new_columns, wrapper.columns):
                         if not stack_columns:
                             raise ValueError("Objects to be merged must have the same columns")
-                        new_columns = stack_indexes((new_columns, wrapper.columns), **resolve_dict(index_stack_kwargs))
+                        new_columns = stack_indexes(
+                            (new_columns, wrapper.columns),
+                            **resolve_dict(index_stack_kwargs),
+                        )
             columns = new_columns
         elif not isinstance(columns, pd.Index):
             columns = pd.Index(columns)
@@ -437,7 +440,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
     def __init__(
         self,
         index: tp.IndexLike,
-        columns: tp.IndexLike,
+        columns: tp.Optional[tp.IndexLike] = None,
         ndim: tp.Optional[int] = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         column_only_select: tp.Optional[bool] = None,
@@ -449,8 +452,9 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
     ) -> None:
 
         checks.assert_not_none(index)
-        checks.assert_not_none(columns)
         index = try_to_datetime_index(index)
+        if columns is None:
+            columns = [None]
         if not isinstance(columns, pd.Index):
             columns = pd.Index(columns)
         if ndim is None:
@@ -1735,36 +1739,7 @@ class Wrapping(Configured, ExtPandasIndexer, AttrResolverMixin):
         """Resolve keyword arguments for initializing `Wrapping` after stacking.
 
         Should be called after `Wrapping.resolve_row_stack_kwargs` or `Wrapping.resolve_column_stack_kwargs`."""
-        if len(wrappings) == 1:
-            wrappings = wrappings[0]
-        wrappings = list(wrappings)
-
-        common_keys = set()
-        for wrapping in wrappings:
-            common_keys = common_keys.union(set(wrapping.config.keys()))
-        init_wrapping = wrappings[0]
-        for i in range(1, len(wrappings)):
-            wrapping = wrappings[i]
-            for k in common_keys:
-                if k not in kwargs:
-                    same_k = True
-                    try:
-                        if k in wrapping.config:
-                            if not checks.is_deep_equal(init_wrapping.config[k], wrapping.config[k]):
-                                same_k = False
-                        else:
-                            same_k = False
-                    except KeyError as e:
-                        same_k = False
-                    if not same_k:
-                        raise ValueError(f"Objects to be merged must have compatible '{k}'. Pass to override.")
-        for k in common_keys:
-            if k not in kwargs:
-                if k in init_wrapping.config:
-                    kwargs[k] = init_wrapping.config[k]
-                else:
-                    raise ValueError(f"Objects to be merged must have compatible '{k}'. Pass to override.")
-        return kwargs
+        return cls.resolve_merge_kwargs(*[wrapping.config for wrapping in wrappings], **kwargs)
 
     @classmethod
     def row_stack(
@@ -1961,7 +1936,9 @@ class Wrapping(Configured, ExtPandasIndexer, AttrResolverMixin):
         """Select one column/group from a pandas object.
 
         `column` can be a label-based position as well as an integer position (if label fails)."""
-        if not isinstance(cls_or_self, type) and wrapper is None:
+        if wrapper is None:
+            if isinstance(cls_or_self, type):
+                raise ValueError("Wrapper must be provided")
             wrapper = cls_or_self.wrapper
         if obj is None:
             return None

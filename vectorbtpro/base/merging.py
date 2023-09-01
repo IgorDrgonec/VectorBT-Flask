@@ -48,10 +48,12 @@ def concat_merge(
     if len(objs) == 1:
         objs = objs[0]
     objs = list(objs)
+    if len(objs) == 0:
+        raise ValueError("No objects to be merged")
 
     if isinstance(objs[0], tuple):
         if len(objs[0]) == 1:
-            return (
+            out_tuple = (
                 concat_merge(
                     list(map(lambda x: x[0], objs)),
                     keys=keys,
@@ -61,19 +63,24 @@ def concat_merge(
                     **kwargs,
                 ),
             )
-        return tuple(
-            map(
-                lambda x: concat_merge(
-                    x,
-                    keys=keys,
-                    wrap=wrap,
-                    wrapper=wrapper,
-                    wrap_kwargs=wrap_kwargs,
-                    **kwargs,
-                ),
-                zip(*objs),
+        else:
+            out_tuple = tuple(
+                map(
+                    lambda x: concat_merge(
+                        x,
+                        keys=keys,
+                        wrap=wrap,
+                        wrapper=wrapper,
+                        wrap_kwargs=wrap_kwargs,
+                        **kwargs,
+                    ),
+                    zip(*objs),
+                )
             )
-        )
+        if checks.is_namedtuple(objs[0]):
+            return type(objs[0])(*out_tuple)
+        return type(objs[0])(out_tuple)
+
     if isinstance(objs[0], Wrapping):
         raise TypeError("Concatenating Wrapping instances is not supported")
 
@@ -88,6 +95,7 @@ def concat_merge(
         return np.asarray(objs)
     if isinstance(objs[0], pd.Index):
         objs = list(map(lambda x: x.to_series(), objs))
+
     default_index = True
     if not isinstance(objs[0], pd.Series):
         if isinstance(objs[0], pd.DataFrame):
@@ -107,6 +115,7 @@ def concat_merge(
             objs = new_objs
         else:
             return np.concatenate(objs)
+
     if keys is not None and isinstance(keys[0], pd.Index):
         new_obj = pd.concat(objs, axis=0, **kwargs)
         if index_stack_kwargs is None:
@@ -158,10 +167,12 @@ def row_stack_merge(
     if len(objs) == 1:
         objs = objs[0]
     objs = list(objs)
+    if len(objs) == 0:
+        raise ValueError("No objects to be merged")
 
     if isinstance(objs[0], tuple):
         if len(objs[0]) == 1:
-            return (
+            out_tuple = (
                 row_stack_merge(
                     list(map(lambda x: x[0], objs)),
                     keys=keys,
@@ -171,19 +182,23 @@ def row_stack_merge(
                     **kwargs,
                 ),
             )
-        return tuple(
-            map(
-                lambda x: row_stack_merge(
-                    x,
-                    keys=keys,
-                    wrap=wrap,
-                    wrapper=wrapper,
-                    wrap_kwargs=wrap_kwargs,
-                    **kwargs,
-                ),
-                zip(*objs),
+        else:
+            out_tuple = tuple(
+                map(
+                    lambda x: row_stack_merge(
+                        x,
+                        keys=keys,
+                        wrap=wrap,
+                        wrapper=wrapper,
+                        wrap_kwargs=wrap_kwargs,
+                        **kwargs,
+                    ),
+                    zip(*objs),
+                )
             )
-        )
+        if checks.is_namedtuple(objs[0]):
+            return type(objs[0])(*out_tuple)
+        return type(objs[0])(out_tuple)
 
     if isinstance(objs[0], Wrapping):
         kwargs = merge_dicts(dict(wrapper_kwargs=dict(keys=keys)), kwargs)
@@ -194,6 +209,7 @@ def row_stack_merge(
         wrap = wrapper is not None or keys is not None or len(wrap_kwargs) > 0
     if isinstance(objs[0], pd.Index):
         objs = list(map(lambda x: x.to_series(), objs))
+
     default_index = True
     if not isinstance(objs[0], (pd.Series, pd.DataFrame)):
         if isinstance(wrap, str) or wrap:
@@ -224,6 +240,7 @@ def row_stack_merge(
             objs = new_objs
         else:
             return np.row_stack(objs)
+
     if keys is not None and isinstance(keys[0], pd.Index):
         new_obj = pd.concat(objs, axis=0, **kwargs)
         if index_stack_kwargs is None:
@@ -285,6 +302,8 @@ def column_stack_merge(
     if len(objs) == 1:
         objs = objs[0]
     objs = list(objs)
+    if len(objs) == 0:
+        raise ValueError("No objects to be merged")
     if isinstance(reset_index, bool):
         if reset_index:
             reset_index = "from_start"
@@ -293,7 +312,7 @@ def column_stack_merge(
 
     if isinstance(objs[0], tuple):
         if len(objs[0]) == 1:
-            return (
+            out_tuple = (
                 column_stack_merge(
                     list(map(lambda x: x[0], objs)),
                     reset_index=reset_index,
@@ -304,20 +323,24 @@ def column_stack_merge(
                     **kwargs,
                 ),
             )
-        return tuple(
-            map(
-                lambda x: column_stack_merge(
-                    x,
-                    reset_index=reset_index,
-                    keys=keys,
-                    wrap=wrap,
-                    wrapper=wrapper,
-                    wrap_kwargs=wrap_kwargs,
-                    **kwargs,
-                ),
-                zip(*objs),
+        else:
+            out_tuple = tuple(
+                map(
+                    lambda x: column_stack_merge(
+                        x,
+                        reset_index=reset_index,
+                        keys=keys,
+                        wrap=wrap,
+                        wrapper=wrapper,
+                        wrap_kwargs=wrap_kwargs,
+                        **kwargs,
+                    ),
+                    zip(*objs),
+                )
             )
-        )
+        if checks.is_namedtuple(objs[0]):
+            return type(objs[0])(*out_tuple)
+        return type(objs[0])(out_tuple)
 
     if isinstance(objs[0], Wrapping):
         if reset_index is not None:
@@ -342,6 +365,7 @@ def column_stack_merge(
         wrap = wrapper is not None or keys is not None or len(wrap_kwargs) > 0
     if isinstance(objs[0], pd.Index):
         objs = list(map(lambda x: x.to_series(), objs))
+
     default_columns = True
     if not isinstance(objs[0], (pd.Series, pd.DataFrame)):
         if isinstance(wrap, str) or wrap:
@@ -403,6 +427,7 @@ def column_stack_merge(
                     start_col = end_col
                 return new_obj
             return column_stack(objs)
+
     if reset_index is not None:
         max_length = max(map(len, objs))
         new_objs = []
@@ -417,6 +442,7 @@ def column_stack_merge(
             new_objs.append(new_obj)
         objs = new_objs
         kwargs = merge_dicts(dict(sort=True), kwargs)
+
     if keys is not None and isinstance(keys[0], pd.Index):
         new_obj = pd.concat(objs, axis=1, **kwargs)
         if index_stack_kwargs is None:
@@ -449,6 +475,8 @@ def mixed_merge(
     if len(objs) == 1:
         objs = objs[0]
     objs = list(objs)
+    if len(objs) == 0:
+        raise ValueError("No objects to be merged")
     if func_names is None:
         raise ValueError("Merging function names are required")
     if not isinstance(objs[0], tuple):

@@ -23,7 +23,7 @@ from vectorbtpro.utils.config import Configured
 from vectorbtpro.utils.config import merge_dicts, ReadonlyConfig
 from vectorbtpro.utils.mapping import to_field_mapping
 from vectorbtpro.utils.template import CustomTemplate, substitute_templates
-from vectorbtpro.data.base import Data
+from vectorbtpro.data.base import OHLCDataMixin, Data
 
 __all__ = [
     "PFPrepResult",
@@ -140,7 +140,7 @@ class BasePFPreparer(BasePreparer):
     def init_cash_mode(self) -> tp.Optional[int]:
         """Initial cash mode."""
         init_cash = self["init_cash"]
-        if init_cash in enums.InitCashMode:
+        if checks.is_int(init_cash) and init_cash in enums.InitCashMode:
             return init_cash
         return None
 
@@ -159,7 +159,7 @@ class BasePFPreparer(BasePreparer):
         return checks.is_int(call_seq) and call_seq == enums.CallSeqType.Auto
 
     @cachedproperty
-    def data(self) -> tp.Optional[Data]:
+    def data(self) -> tp.Optional[OHLCDataMixin]:
         """Argument `data`."""
         data = self["data"]
         if data is None:
@@ -249,7 +249,7 @@ class BasePFPreparer(BasePreparer):
         """Argument `freq` before casting to nanosecond format."""
         freq = self["freq"]
         if freq is None and self.data is not None:
-            return self.data.freq
+            return self.data.symbol_wrapper.freq
         return freq
 
     @cachedproperty
@@ -528,8 +528,8 @@ fo_arg_config = ReadonlyConfig(
         save_state=dict(),
         save_value=dict(),
         save_returns=dict(),
-        max_orders=dict(),
-        max_logs=dict(),
+        max_order_records=dict(),
+        max_log_records=dict(),
     )
 )
 """_"""
@@ -568,14 +568,14 @@ class FOPreparer(BasePFPreparer):
         return 0
 
     @cachedproperty
-    def _pre_max_orders(self) -> tp.Optional[int]:
-        """Argument `max_orders` before broadcasting."""
-        return self["max_orders"]
+    def _pre_max_order_records(self) -> tp.Optional[int]:
+        """Argument `max_order_records` before broadcasting."""
+        return self["max_order_records"]
 
     @cachedproperty
-    def _pre_max_logs(self) -> tp.Optional[int]:
-        """Argument `max_logs` before broadcasting."""
-        return self["max_logs"]
+    def _pre_max_log_records(self) -> tp.Optional[int]:
+        """Argument `max_log_records` before broadcasting."""
+        return self["max_log_records"]
 
     # ############# After broadcasting ############# #
 
@@ -608,34 +608,34 @@ class FOPreparer(BasePFPreparer):
         return self.price_and_from_ago[1]
 
     @cachedproperty
-    def max_orders(self) -> tp.Optional[int]:
-        """Argument `max_orders`."""
-        max_orders = self._pre_max_orders
-        if max_orders is None:
+    def max_order_records(self) -> tp.Optional[int]:
+        """Argument `max_order_records`."""
+        max_order_records = self._pre_max_order_records
+        if max_order_records is None:
             _size = self._post_size
             if _size.size == 1:
-                max_orders = self.target_shape[0] * int(not np.isnan(_size.item(0)))
+                max_order_records = self.target_shape[0] * int(not np.isnan(_size.item(0)))
             else:
                 if _size.shape[0] == 1 and self.target_shape[0] > 1:
-                    max_orders = self.target_shape[0] * int(np.any(~np.isnan(_size)))
+                    max_order_records = self.target_shape[0] * int(np.any(~np.isnan(_size)))
                 else:
-                    max_orders = int(np.max(np.sum(~np.isnan(_size), axis=0)))
-        return max_orders
+                    max_order_records = int(np.max(np.sum(~np.isnan(_size), axis=0)))
+        return max_order_records
 
     @cachedproperty
-    def max_logs(self) -> tp.Optional[int]:
-        """Argument `max_logs`."""
-        max_logs = self._pre_max_logs
-        if max_logs is None:
+    def max_log_records(self) -> tp.Optional[int]:
+        """Argument `max_log_records`."""
+        max_log_records = self._pre_max_log_records
+        if max_log_records is None:
             _log = self._post_log
             if _log.size == 1:
-                max_logs = self.target_shape[0] * int(_log.item(0))
+                max_log_records = self.target_shape[0] * int(_log.item(0))
             else:
                 if _log.shape[0] == 1 and self.target_shape[0] > 1:
-                    max_logs = self.target_shape[0] * int(np.any(_log))
+                    max_log_records = self.target_shape[0] * int(np.any(_log))
                 else:
-                    max_logs = int(np.max(np.sum(_log, axis=0)))
-        return max_logs
+                    max_log_records = int(np.max(np.sum(_log, axis=0)))
+        return max_log_records
 
     # ############# Template substitution ############# #
 
@@ -649,8 +649,8 @@ class FOPreparer(BasePFPreparer):
                 save_state=self.save_state,
                 save_value=self.save_value,
                 save_returns=self.save_returns,
-                max_orders=self.max_orders,
-                max_logs=self.max_logs,
+                max_order_records=self.max_order_records,
+                max_log_records=self.max_log_records,
             ),
             BasePFPreparer.template_context.func(self),
         )
@@ -722,6 +722,8 @@ fs_arg_config = ReadonlyConfig(
         adjust_args=dict(substitute_templates=True),
         signal_func_nb=dict(),
         signal_args=dict(substitute_templates=True),
+        post_signal_func_nb=dict(),
+        post_signal_args=dict(substitute_templates=True),
         post_segment_func_nb=dict(),
         post_segment_args=dict(substitute_templates=True),
         order_mode=dict(),
@@ -906,8 +908,8 @@ fs_arg_config = ReadonlyConfig(
         save_state=dict(),
         save_value=dict(),
         save_returns=dict(),
-        max_orders=dict(),
-        max_logs=dict(),
+        max_order_records=dict(),
+        max_log_records=dict(),
         records=dict(
             rename_fields=dict(
                 entry="entries",
@@ -969,6 +971,7 @@ class FSPreparer(BasePFPreparer):
         return (
             self["adjust_func_nb"] is not None
             or self["signal_func_nb"] is not None
+            or self["post_signal_func_nb"] is not None
             or self["post_segment_func_nb"] is not None
             or self.order_mode
             or self._pre_staticized is not None
@@ -1044,6 +1047,15 @@ class FSPreparer(BasePFPreparer):
         return None
 
     @cachedproperty
+    def post_signal_func_nb(self) -> tp.Optional[tp.Callable]:
+        """Argument `post_signal_func_nb`."""
+        if self.dynamic_mode:
+            if self["post_signal_func_nb"] is None:
+                return nb.no_post_func_nb
+            return self["post_signal_func_nb"]
+        return None
+
+    @cachedproperty
     def post_segment_func_nb(self) -> tp.Optional[tp.Callable]:
         """Argument `post_segment_func_nb`."""
         if self.dynamic_mode:
@@ -1076,6 +1088,8 @@ class FSPreparer(BasePFPreparer):
                 self.adapt_staticized_to_udf(staticized, self["signal_func_nb"], "signal_func_nb")
             if self["adjust_func_nb"] is not None and isinstance(staticized, dict):
                 self.adapt_staticized_to_udf(staticized, self["adjust_func_nb"], "adjust_func_nb")
+            if self["post_signal_func_nb"] is not None and isinstance(staticized, dict):
+                self.adapt_staticized_to_udf(staticized, self["post_signal_func_nb"], "post_signal_func_nb")
             if self["post_segment_func_nb"] is not None and isinstance(staticized, dict):
                 self.adapt_staticized_to_udf(staticized, self["post_segment_func_nb"], "post_segment_func_nb")
         return staticized
@@ -1152,9 +1166,9 @@ class FSPreparer(BasePFPreparer):
         return 0
 
     @cachedproperty
-    def _pre_max_logs(self) -> tp.Optional[int]:
-        """Argument `max_logs` before broadcasting."""
-        return self["max_logs"]
+    def _pre_max_log_records(self) -> tp.Optional[int]:
+        """Argument `max_log_records` before broadcasting."""
+        return self["max_log_records"]
 
     @cachedproperty
     def _pre_in_outputs(self) -> tp.Optional[tp.NamedTuple]:
@@ -1306,40 +1320,57 @@ class FSPreparer(BasePFPreparer):
         return self.price_and_from_ago[1]
 
     @cachedproperty
-    def max_logs(self) -> tp.Optional[int]:
-        """Argument `max_logs`."""
-        max_logs = self._pre_max_logs
-        if max_logs is None:
+    def max_log_records(self) -> tp.Optional[int]:
+        """Argument `max_log_records`."""
+        max_log_records = self._pre_max_log_records
+        if max_log_records is None:
             _log = self._post_log
             if _log.size == 1:
-                max_logs = self.target_shape[0] * int(_log.item(0))
+                max_log_records = self.target_shape[0] * int(_log.item(0))
             else:
                 if _log.shape[0] == 1 and self.target_shape[0] > 1:
-                    max_logs = self.target_shape[0] * int(np.any(_log))
+                    max_log_records = self.target_shape[0] * int(np.any(_log))
                 else:
-                    max_logs = int(np.max(np.sum(_log, axis=0)))
-        return max_logs
+                    max_log_records = int(np.max(np.sum(_log, axis=0)))
+        return max_log_records
 
     @cachedproperty
     def use_stops(self) -> bool:
         """Argument `use_stops`."""
-        if self.stop_ladder:
-            use_stops = True
-        else:
-            if self.dynamic_mode:
+        if self["use_stops"] is None:
+            if self.stop_ladder:
                 use_stops = True
             else:
-                if (
-                    not np.any(self.sl_stop)
-                    and not np.any(self.tsl_stop)
-                    and not np.any(self.tp_stop)
-                    and not np.any(self.td_stop != -1)
-                    and not np.any(self.dt_stop != -1)
-                ):
-                    use_stops = False
-                else:
+                if self.dynamic_mode:
                     use_stops = True
+                else:
+                    if (
+                        not np.all(np.isnan(self.sl_stop))
+                        or not np.all(np.isnan(self.tsl_stop))
+                        or not np.all(np.isnan(self.tp_stop))
+                        or np.any(self.td_stop != -1)
+                        or np.any(self.dt_stop != -1)
+                    ):
+                        use_stops = True
+                    else:
+                        use_stops = False
+        else:
+            use_stops = self["use_stops"]
         return use_stops
+
+    @cachedproperty
+    def use_limit_orders(self) -> bool:
+        """Whether to use limit orders."""
+        if np.any(self.order_type == enums.OrderType.Limit):
+            return True
+        if self.use_stops and np.any(self.stop_order_type == enums.OrderType.Limit):
+            return True
+        return False
+
+    @cachedproperty
+    def basic_mode(self) -> bool:
+        """Whether the basic mode is enabled."""
+        return not self.use_stops and not self.use_limit_orders
 
     # ############# Template substitution ############# #
 
@@ -1354,6 +1385,8 @@ class FSPreparer(BasePFPreparer):
                 adjust_args=self._pre_adjust_args,
                 signal_func_nb=self.signal_func_nb,
                 signal_args=self._pre_signal_args,
+                post_signal_func_nb=self.post_signal_func_nb,
+                post_signal_args=self._pre_post_signal_args,
                 post_segment_func_nb=self.post_segment_func_nb,
                 post_segment_args=self._pre_post_segment_args,
                 ffill_val_price=self.ffill_val_price,
@@ -1362,8 +1395,8 @@ class FSPreparer(BasePFPreparer):
                 save_state=self.save_state,
                 save_value=self.save_value,
                 save_returns=self.save_returns,
-                max_orders=self.max_orders,
-                max_logs=self.max_logs,
+                max_order_records=self.max_order_records,
+                max_log_records=self.max_log_records,
             ),
             BasePFPreparer.template_context.func(self),
         )
@@ -1466,8 +1499,10 @@ class FSPreparer(BasePFPreparer):
     def target_func(self) -> tp.Optional[tp.Callable]:
         if self.dynamic_mode:
             func = self.resolve_dynamic_target_func("from_signal_func_nb", self.staticized)
-        else:
+        elif not self.basic_mode:
             func = nb.from_signals_nb
+        else:
+            func = nb.from_basic_signals_nb
         func = jit_reg.resolve_option(func, self.jitted)
         func = ch_reg.resolve_option(func, self.chunked)
         return func
@@ -1478,6 +1513,7 @@ class FSPreparer(BasePFPreparer):
         if self.dynamic_mode:
             if self.staticized is not None:
                 target_arg_map["signal_func_nb"] = None
+                target_arg_map["post_signal_func_nb"] = None
                 target_arg_map["post_segment_func_nb"] = None
         else:
             target_arg_map["group_lens"] = "cs_group_lens"
@@ -1525,8 +1561,8 @@ fof_arg_config = ReadonlyConfig(
         fill_pos_info=dict(),
         track_value=dict(),
         row_wise=dict(),
-        max_orders=dict(),
-        max_logs=dict(),
+        max_order_records=dict(),
+        max_log_records=dict(),
     )
 )
 """_"""
@@ -1780,8 +1816,8 @@ class FOFPreparer(BasePFPreparer):
                 update_value=self.update_value,
                 fill_pos_info=self.fill_pos_info,
                 track_value=self.track_value,
-                max_orders=self.max_orders,
-                max_logs=self.max_logs,
+                max_order_records=self.max_order_records,
+                max_log_records=self.max_log_records,
             ),
             BasePFPreparer.template_context.func(self),
         )

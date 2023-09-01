@@ -317,6 +317,9 @@ def reconstruct(cls: tp.Union[tp.Hashable, tp.Type], rec_state: RecState) -> obj
             modify_state = rec_info_registry[class_path].modify_state
             if modify_state is not None:
                 rec_state = modify_state(rec_state)
+
+    if issubclass(cls, Pickleable):
+        rec_state = cls.modify_state(rec_state)
     obj = cls(*rec_state.init_args, **rec_state.init_kwargs)
     for k, v in rec_state.attr_dct.items():
         setattr(obj, k, v)
@@ -1037,6 +1040,11 @@ class Pickleable:
         """Reconstruction state of the type `RecState`."""
         return None
 
+    @classmethod
+    def modify_state(cls, rec_state: RecState) -> RecState:
+        """Modify the reconstruction state before reconstruction."""
+        return rec_state
+
     def __reduce__(self) -> tp.Union[str, tp.Tuple]:
         rec_state = self.rec_state
         if rec_state is None:
@@ -1072,11 +1080,30 @@ class pdict(Comparable, Pickleable, Prettified, dict):
                 init_args[0][k] = init_kwargs.pop(k)
         return RecState(init_args=init_args, init_kwargs=init_kwargs)
 
-    def equals(self, other: tp.Any, check_types: bool = True) -> bool:
+    def equals(
+        self,
+        other: tp.Any,
+        check_types: bool = True,
+        _key: tp.Optional[str] = None,
+        **kwargs,
+    ) -> bool:
         """Check two objects for equality."""
-        if check_types and type(self) != type(other):
+        if _key is None:
+            _key = type(self).__name__
+        if check_types and not is_deep_equal(
+            self,
+            other,
+            _key=_key,
+            only_types=True,
+            **kwargs,
+        ):
             return False
-        return is_deep_equal(dict(self), dict(other))
+        return is_deep_equal(
+            dict(self),
+            dict(other),
+            _key=_key,
+            **kwargs,
+        )
 
     def prettify(self, **kwargs) -> str:
         return prettify_dict(self, **kwargs)

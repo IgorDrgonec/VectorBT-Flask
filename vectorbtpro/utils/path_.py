@@ -3,6 +3,7 @@
 """Utilities for working with paths."""
 
 from pathlib import Path
+from glob import glob
 from itertools import islice
 import humanize
 import shutil
@@ -10,14 +11,45 @@ import shutil
 from vectorbtpro import _typing as tp
 
 __all__ = [
+    "list_any_files",
+    "list_files",
+    "list_dirs",
     "file_exists",
     "dir_exists",
     "file_size",
     "dir_size",
+    "make_file",
     "make_dir",
     "remove_file",
     "remove_dir",
+    "print_dir_tree",
 ]
+
+
+def list_any_files(path: tp.Optional[tp.PathLike] = None, recursive: bool = False) -> tp.List[Path]:
+    """List files and directories matching a path.
+
+    If the directory path is not provided, the current working directory is used."""
+    if path is None:
+        path = Path.cwd()
+    else:
+        path = Path(path)
+    if path.exists() and path.is_dir():
+        if recursive:
+            path = path / "**" / "*"
+        else:
+            path = path / "*"
+    return [Path(p) for p in glob(str(path), recursive=recursive)]
+
+
+def list_files(path: tp.Optional[tp.PathLike] = None, recursive: bool = False) -> tp.List[Path]:
+    """List files matching a path using `list_any_files`."""
+    return [p for p in list_any_files(path, recursive=recursive) if p.is_file()]
+
+
+def list_dirs(path: tp.Optional[tp.PathLike] = None, recursive: bool = False) -> tp.List[Path]:
+    """List directories matching a path using `list_any_files`."""
+    return [p for p in list_any_files(path, recursive=recursive) if p.is_dir()]
 
 
 def file_exists(file_path: tp.PathLike) -> bool:
@@ -89,13 +121,22 @@ def check_mkdir(
     dir_path.mkdir(mode=mode, parents=parents, exist_ok=exist_ok)
 
 
-def make_dir(dir_path: tp.PathLike, **kwargs) -> None:
-    """Make a directory."""
+def make_file(file_path: tp.PathLike, mode: int = 0o666, exist_ok: bool = True, **kwargs) -> Path:
+    """Make an empty file."""
+    file_path = Path(file_path)
+    check_mkdir(file_path.parent, **kwargs)
+    file_path.touch(mode=mode, exist_ok=exist_ok)
+    return file_path
+
+
+def make_dir(dir_path: tp.PathLike, **kwargs) -> Path:
+    """Make an empty directory."""
     check_mkdir(dir_path, mkdir=True, **kwargs)
+    return dir_path
 
 
 def remove_file(file_path: tp.PathLike, missing_ok: bool = False) -> None:
-    """Remove a file."""
+    """Remove (delete) a file."""
     file_path = Path(file_path)
     if file_exists(file_path):
         file_path.unlink()
@@ -104,7 +145,7 @@ def remove_file(file_path: tp.PathLike, missing_ok: bool = False) -> None:
 
 
 def remove_dir(dir_path: tp.PathLike, missing_ok: bool = False, with_contents: bool = False) -> None:
-    """Remove a directory."""
+    """Remove (delete) a directory."""
     dir_path = Path(dir_path)
     if dir_exists(dir_path):
         if any(dir_path.iterdir()) and not with_contents:
@@ -114,7 +155,7 @@ def remove_dir(dir_path: tp.PathLike, missing_ok: bool = False, with_contents: b
         raise FileNotFoundError(f"Directory '{dir_path}' not found")
 
 
-def tree(
+def dir_tree(
     dir_path: Path,
     level: int = -1,
     limit_to_directories: bool = False,
@@ -165,3 +206,8 @@ def tree(
         tree_str += "\n" + f"... length_limit, {length_limit}, reached, counted:"
     tree_str += "\n" + f"\n{directories} directories" + (f", {files} files" if files else "")
     return tree_str
+
+
+def print_dir_tree(*args, **kwargs) -> None:
+    """Generate a directory tree with `tree` and print it out."""
+    print(dir_tree(*args, **kwargs))

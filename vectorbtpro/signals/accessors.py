@@ -261,11 +261,12 @@ class SignalsAccessor(GenericAccessor):
         shape: tp.Union[tp.ShapeLike, ArrayWrapper],
         place_func_nb: tp.PlaceFunc,
         *args,
+        place_args: tp.ArgsLike = None,
         only_once: bool = True,
         wait: int = 1,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
-        template_context: tp.Optional[tp.Mapping] = None,
+        template_context: tp.KwargsLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
@@ -275,6 +276,8 @@ class SignalsAccessor(GenericAccessor):
 
         `shape` can be a shape-like tuple or an instance of `vectorbtpro.base.wrapping.ArrayWrapper`
         (will be used as `wrapper`).
+
+        Arguments to `place_func_nb` can be passed either as `*args` or `place_args` (but not both!).
 
         Usage:
             * Generate random signals manually:
@@ -305,6 +308,10 @@ class SignalsAccessor(GenericAccessor):
         if isinstance(shape, ArrayWrapper):
             wrapper = shape
             shape = wrapper.shape
+        if len(args) > 0 and place_args is not None:
+            raise ValueError("Either *args or place_args must be provided, not both")
+        if place_args is None:
+            place_args = args
         if broadcast_named_args is None:
             broadcast_named_args = {}
         if broadcast_kwargs is None:
@@ -314,20 +321,22 @@ class SignalsAccessor(GenericAccessor):
 
         shape_2d = cls.resolve_shape(shape)
         if len(broadcast_named_args) > 0:
-            broadcast_named_args = reshaping.broadcast(
-                broadcast_named_args,
-                to_shape=shape_2d,
-                **broadcast_kwargs
-            )
+            broadcast_named_args = reshaping.broadcast(broadcast_named_args, to_shape=shape_2d, **broadcast_kwargs)
         template_context = merge_dicts(
             broadcast_named_args,
             dict(shape=shape, shape_2d=shape_2d, wait=wait),
             template_context,
         )
-        args = substitute_templates(args, template_context, sub_id="args")
+        place_args = substitute_templates(place_args, template_context, sub_id="place_args")
         func = jit_reg.resolve_option(nb.generate_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        result = func(shape_2d, only_once, wait, place_func_nb, *args)
+        result = func(
+            target_shape=shape_2d,
+            place_func_nb=place_func_nb,
+            place_args=place_args,
+            only_once=only_once,
+            wait=wait,
+        )
 
         if wrapper is None:
             wrapper = ArrayWrapper.from_shape(shape_2d, ndim=cls.ndim)
@@ -339,15 +348,16 @@ class SignalsAccessor(GenericAccessor):
     def generate_both(
         cls,
         shape: tp.Union[tp.ShapeLike, ArrayWrapper],
-        entry_place_func_nb: tp.Optional[tp.PlaceFunc] = None,
-        entry_args: tp.ArgsLike = None,
-        exit_place_func_nb: tp.Optional[tp.PlaceFunc] = None,
-        exit_args: tp.ArgsLike = None,
+        entry_place_func_nb: tp.PlaceFunc,
+        exit_place_func_nb: tp.PlaceFunc,
+        *args,
+        entry_place_args: tp.ArgsLike = None,
+        exit_place_args: tp.ArgsLike = None,
         entry_wait: int = 1,
         exit_wait: int = 1,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
-        template_context: tp.Optional[tp.Mapping] = None,
+        template_context: tp.KwargsLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
@@ -357,6 +367,9 @@ class SignalsAccessor(GenericAccessor):
 
         `shape` can be a shape-like tuple or an instance of `vectorbtpro.base.wrapping.ArrayWrapper`
         (will be used as `wrapper`).
+
+        Arguments to `entry_place_func_nb` can be passed either as `*args` or `entry_place_args` while
+        arguments to `exit_place_func_nb` can be passed either as `*args` or `exit_place_args` (but not both!).
 
         Usage:
             * Generate entry and exit signals one after another:
@@ -408,9 +421,9 @@ class SignalsAccessor(GenericAccessor):
             >>> en, ex = vbt.pd_acc.signals.generate_both(
             ...     (5, 3),
             ...     entry_place_func_nb=entry_place_func_nb,
-            ...     entry_args=(3,),
+            ...     entry_place_args=(3,),
             ...     exit_place_func_nb=exit_place_func_nb,
-            ...     exit_args=(1,),
+            ...     exit_place_args=(1,),
             ...     wrap_kwargs=dict(
             ...         index=mask.index,
             ...         columns=mask.columns
@@ -435,10 +448,14 @@ class SignalsAccessor(GenericAccessor):
         if isinstance(shape, ArrayWrapper):
             wrapper = shape
             shape = wrapper.shape
-        if entry_args is None:
-            entry_args = ()
-        if exit_args is None:
-            exit_args = ()
+        if len(args) > 0 and entry_place_args is not None:
+            raise ValueError("Either *args or entry_place_args must be provided, not both")
+        if len(args) > 0 and exit_place_args is not None:
+            raise ValueError("Either *args or exit_place_args must be provided, not both")
+        if entry_place_args is None:
+            entry_place_args = args
+        if exit_place_args is None:
+            exit_place_args = args
         if broadcast_named_args is None:
             broadcast_named_args = {}
         if broadcast_kwargs is None:
@@ -463,18 +480,18 @@ class SignalsAccessor(GenericAccessor):
             ),
             template_context,
         )
-        entry_args = substitute_templates(entry_args, template_context, sub_id="entry_args")
-        exit_args = substitute_templates(exit_args, template_context, sub_id="exit_args")
+        entry_place_args = substitute_templates(entry_place_args, template_context, sub_id="entry_place_args")
+        exit_place_args = substitute_templates(exit_place_args, template_context, sub_id="exit_place_args")
         func = jit_reg.resolve_option(nb.generate_enex_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         result1, result2 = func(
-            shape_2d,
-            entry_wait,
-            exit_wait,
-            entry_place_func_nb,
-            entry_args,
-            exit_place_func_nb,
-            exit_args,
+            target_shape=shape_2d,
+            entry_place_func_nb=entry_place_func_nb,
+            entry_place_args=entry_place_args,
+            exit_place_func_nb=exit_place_func_nb,
+            exit_place_args=exit_place_args,
+            entry_wait=entry_wait,
+            exit_wait=exit_wait,
         )
         if wrapper is None:
             wrapper = ArrayWrapper.from_shape(shape_2d, ndim=cls.ndim)
@@ -486,12 +503,13 @@ class SignalsAccessor(GenericAccessor):
         self,
         exit_place_func_nb: tp.PlaceFunc,
         *args,
+        exit_place_args: tp.ArgsLike = None,
         wait: int = 1,
         until_next: bool = True,
         skip_until_exit: bool = False,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
-        template_context: tp.Optional[tp.Mapping] = None,
+        template_context: tp.KwargsLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
@@ -516,6 +534,10 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05   True  False   True
             ```
         """
+        if len(args) > 0 and exit_place_args is not None:
+            raise ValueError("Either *args or exit_place_args must be provided, not both")
+        if exit_place_args is None:
+            exit_place_args = args
         if broadcast_named_args is None:
             broadcast_named_args = {}
         if broadcast_kwargs is None:
@@ -541,10 +563,17 @@ class SignalsAccessor(GenericAccessor):
             dict(wait=wait, until_next=until_next, skip_until_exit=skip_until_exit),
             template_context,
         )
-        args = substitute_templates(args, template_context, sub_id="args")
+        exit_place_args = substitute_templates(exit_place_args, template_context, sub_id="exit_place_args")
         func = jit_reg.resolve_option(nb.generate_ex_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        exits = func(obj, wait, until_next, skip_until_exit, exit_place_func_nb, *args)
+        exits = func(
+            entries=obj,
+            exit_place_func_nb=exit_place_func_nb,
+            exit_place_args=exit_place_args,
+            wait=wait,
+            until_next=until_next,
+            skip_until_exit=skip_until_exit,
+        )
         return wrapper.wrap(exits, group_by=False, **resolve_dict(wrap_kwargs))
 
     # ############# Cleaning ############# #
@@ -552,7 +581,7 @@ class SignalsAccessor(GenericAccessor):
     @class_or_instancemethod
     def clean(
         cls_or_self,
-        *args,
+        *others,
         force_first: bool = True,
         keep_conflicts: bool = False,
         reverse_order: bool = False,
@@ -569,28 +598,30 @@ class SignalsAccessor(GenericAccessor):
             broadcast_kwargs = {}
         if wrap_kwargs is None:
             wrap_kwargs = {}
-        if not isinstance(cls_or_self, type):
-            args = (cls_or_self.obj, *args)
-        if len(args) == 1:
-            obj = args[0]
+        if isinstance(cls_or_self, type):
+            objs = others
+        else:
+            objs = (cls_or_self.obj, *others)
+        if len(objs) == 1:
+            obj = objs[0]
             if not isinstance(obj, (pd.Series, pd.DataFrame)):
                 obj = ArrayWrapper.from_obj(obj).wrap(obj)
             return obj.vbt.signals.first(wrap_kwargs=wrap_kwargs, jitted=jitted, chunked=chunked)
-        if len(args) == 2:
+        if len(objs) == 2:
             broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
             broadcasted_args, wrapper = reshaping.broadcast(
-                dict(entries=args[0], exits=args[1]),
+                dict(entries=objs[0], exits=objs[1]),
                 return_wrapper=True,
                 **broadcast_kwargs,
             )
             func = jit_reg.resolve_option(nb.clean_enex_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             entries_out, exits_out = func(
-                broadcasted_args["entries"],
-                broadcasted_args["exits"],
-                force_first,
-                keep_conflicts,
-                reverse_order
+                entries=broadcasted_args["entries"],
+                exits=broadcasted_args["exits"],
+                force_first=force_first,
+                keep_conflicts=keep_conflicts,
+                reverse_order=reverse_order,
             )
             return (
                 wrapper.wrap(entries_out, group_by=False, **wrap_kwargs),
@@ -669,8 +700,10 @@ class SignalsAccessor(GenericAccessor):
             ```
         """
         if isinstance(shape, ArrayWrapper):
-            wrapper = shape
-            shape = wrapper.shape
+            if "wrapper" in kwargs:
+                raise ValueError("Wrapper must be provided either via shape or wrapper, not both")
+            kwargs["wrapper"] = shape
+            shape = kwargs["wrapper"].shape
         shape_2d = cls.resolve_shape(shape)
         if n is not None and prob is not None:
             raise ValueError("Either n or prob must be provided, not both")
@@ -681,7 +714,11 @@ class SignalsAccessor(GenericAccessor):
             n = reshaping.broadcast_array_to(n, shape_2d[1])
             chunked = ch.specialize_chunked_option(
                 chunked,
-                arg_take_spec=dict(args=ch.ArgsTaker(base_ch.FlexArraySlicer())),
+                arg_take_spec=dict(
+                    place_args=ch.ArgsTaker(
+                        base_ch.FlexArraySlicer(),
+                    ),
+                ),
             )
             return cls.generate(
                 shape,
@@ -695,7 +732,13 @@ class SignalsAccessor(GenericAccessor):
             prob = reshaping.to_2d_array(reshaping.broadcast_array_to(prob, shape))
             chunked = ch.specialize_chunked_option(
                 chunked,
-                arg_take_spec=dict(args=ch.ArgsTaker(base_ch.FlexArraySlicer(axis=1), None, None)),
+                arg_take_spec=dict(
+                    place_args=ch.ArgsTaker(
+                        base_ch.FlexArraySlicer(axis=1),
+                        None,
+                        None,
+                    ),
+                ),
             )
             return cls.generate(
                 shape,
@@ -817,16 +860,22 @@ class SignalsAccessor(GenericAccessor):
             chunked = ch.specialize_chunked_option(
                 chunked,
                 arg_take_spec=dict(
-                    entry_args=ch.ArgsTaker(base_ch.FlexArraySlicer(axis=1), None, None),
-                    exit_args=ch.ArgsTaker(base_ch.FlexArraySlicer(axis=1), None, None),
+                    entry_place_args=ch.ArgsTaker(
+                        base_ch.FlexArraySlicer(axis=1),
+                        None,
+                    ),
+                    exit_place_args=ch.ArgsTaker(
+                        base_ch.FlexArraySlicer(axis=1),
+                        None,
+                    ),
                 ),
             )
             return cls.generate_both(
                 shape,
                 entry_place_func_nb=jit_reg.resolve_option(nb.rand_by_prob_place_nb, jitted),
-                entry_args=(entry_prob, entry_pick_first),
+                entry_place_args=(entry_prob, entry_pick_first),
                 exit_place_func_nb=jit_reg.resolve_option(nb.rand_by_prob_place_nb, jitted),
-                exit_args=(exit_prob, exit_pick_first),
+                exit_place_args=(exit_prob, exit_pick_first),
                 entry_wait=entry_wait,
                 exit_wait=exit_wait,
                 jitted=jitted,
@@ -898,7 +947,12 @@ class SignalsAccessor(GenericAccessor):
             prob = broadcasted_args["prob"]
             chunked = ch.specialize_chunked_option(
                 chunked,
-                arg_take_spec=dict(args=ch.ArgsTaker(base_ch.FlexArraySlicer(axis=1), None, None)),
+                arg_take_spec=dict(
+                    exit_place_args=ch.ArgsTaker(
+                        base_ch.FlexArraySlicer(axis=1),
+                        None,
+                    )
+                ),
             )
             return obj.vbt.signals.generate_exits(
                 jit_reg.resolve_option(nb.rand_by_prob_place_nb, jitted),
@@ -915,7 +969,11 @@ class SignalsAccessor(GenericAccessor):
         n = reshaping.broadcast_array_to(1, self.wrapper.shape_2d[1])
         chunked = ch.specialize_chunked_option(
             chunked,
-            arg_take_spec=dict(args=ch.ArgsTaker(base_ch.FlexArraySlicer())),
+            arg_take_spec=dict(
+                exit_place_args=ch.ArgsTaker(
+                    base_ch.FlexArraySlicer(),
+                )
+            ),
         )
         return self.generate_exits(
             jit_reg.resolve_option(nb.rand_place_nb, jitted),
@@ -1055,15 +1113,16 @@ class SignalsAccessor(GenericAccessor):
             chunked = ch.specialize_chunked_option(
                 chunked,
                 arg_take_spec=dict(
-                    entry_args=ch.ArgsTaker(ch.ArraySlicer(axis=1)),
-                    exit_args=ch.ArgsTaker(
+                    entry_place_args=ch.ArgsTaker(
+                        ch.ArraySlicer(axis=1),
+                    ),
+                    exit_place_args=ch.ArgsTaker(
                         base_ch.FlexArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1),
-                        None,
                     ),
                 ),
             )
@@ -1071,9 +1130,9 @@ class SignalsAccessor(GenericAccessor):
             return cls.generate_both(
                 entries.shape,
                 entry_place_func_nb=jit_reg.resolve_option(nb.first_place_nb, jitted),
-                entry_args=(entries_arr,),
+                entry_place_args=(entries_arr,),
                 exit_place_func_nb=jit_reg.resolve_option(nb.stop_place_nb, jitted),
-                exit_args=(
+                exit_place_args=(
                     broadcasted_args["entry_ts"],
                     broadcasted_args["ts"],
                     broadcasted_args["follow_ts"],
@@ -1093,14 +1152,13 @@ class SignalsAccessor(GenericAccessor):
             chunked = ch.specialize_chunked_option(
                 chunked,
                 arg_take_spec=dict(
-                    args=ch.ArgsTaker(
+                    exit_place_args=ch.ArgsTaker(
                         base_ch.FlexArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1),
-                        None,
                     )
                 ),
             )
@@ -1393,8 +1451,10 @@ class SignalsAccessor(GenericAccessor):
             chunked = ch.specialize_chunked_option(
                 chunked,
                 arg_take_spec=dict(
-                    entry_args=ch.ArgsTaker(ch.ArraySlicer(axis=1)),
-                    exit_args=ch.ArgsTaker(
+                    entry_place_args=ch.ArgsTaker(
+                        ch.ArraySlicer(axis=1),
+                    ),
+                    exit_place_args=ch.ArgsTaker(
                         base_ch.FlexArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1),
@@ -1408,7 +1468,6 @@ class SignalsAccessor(GenericAccessor):
                         base_ch.FlexArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1),
-                        None,
                         None,
                     ),
                 ),
@@ -1416,9 +1475,9 @@ class SignalsAccessor(GenericAccessor):
             new_entries, exits = cls.generate_both(
                 entries.shape,
                 entry_place_func_nb=jit_reg.resolve_option(nb.first_place_nb, jitted),
-                entry_args=(entries_arr,),
+                entry_place_args=(entries_arr,),
                 exit_place_func_nb=jit_reg.resolve_option(nb.ohlc_stop_place_nb, jitted),
-                exit_args=(
+                exit_place_args=(
                     broadcasted_args["entry_price"],
                     broadcasted_args["open"],
                     broadcasted_args["high"],
@@ -1450,7 +1509,7 @@ class SignalsAccessor(GenericAccessor):
             chunked = ch.specialize_chunked_option(
                 chunked,
                 arg_take_spec=dict(
-                    args=ch.ArgsTaker(
+                    exit_place_args=ch.ArgsTaker(
                         base_ch.FlexArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1),
@@ -1464,7 +1523,6 @@ class SignalsAccessor(GenericAccessor):
                         base_ch.FlexArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1),
                         base_ch.FlexArraySlicer(axis=1),
-                        None,
                         None,
                     )
                 ),
@@ -1502,6 +1560,7 @@ class SignalsAccessor(GenericAccessor):
         self,
         rank_func_nb: tp.RankFunc,
         *args,
+        rank_args: tp.ArgsLike = None,
         reset_by: tp.Optional[tp.ArrayLike] = None,
         after_false: bool = False,
         after_reset: bool = False,
@@ -1509,7 +1568,7 @@ class SignalsAccessor(GenericAccessor):
         as_mapped: bool = False,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
-        template_context: tp.Optional[tp.Mapping] = None,
+        template_context: tp.KwargsLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
@@ -1517,9 +1576,15 @@ class SignalsAccessor(GenericAccessor):
     ) -> tp.Union[tp.SeriesFrame, MappedArray]:
         """See `vectorbtpro.signals.nb.rank_nb`.
 
+        Arguments to `rank_func_nb` can be passed either as `*args` or `rank_args` (but not both!).
+
         Will broadcast with `reset_by` using `vectorbtpro.base.reshaping.broadcast` and `broadcast_kwargs`.
 
         Set `as_mapped` to True to return an instance of `vectorbtpro.records.mapped_array.MappedArray`."""
+        if len(args) > 0 and rank_args is not None:
+            raise ValueError("Either *args or rank_args must be provided, not both")
+        if rank_args is None:
+            rank_args = args
         if broadcast_named_args is None:
             broadcast_named_args = {}
         if broadcast_kwargs is None:
@@ -1555,10 +1620,18 @@ class SignalsAccessor(GenericAccessor):
             ),
             template_context,
         )
-        args = substitute_templates(args, template_context, sub_id="args")
+        rank_args = substitute_templates(rank_args, template_context, sub_id="rank_args")
         func = jit_reg.resolve_option(nb.rank_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        rank = func(obj, reset_by, after_false, after_reset, reset_wait, rank_func_nb, *args)
+        rank = func(
+            mask=obj,
+            rank_func_nb=rank_func_nb,
+            rank_args=rank_args,
+            reset_by=reset_by,
+            after_false=after_false,
+            after_reset=after_reset,
+            reset_wait=reset_wait,
+        )
         rank_wrapped = wrapper.wrap(rank, group_by=False, **wrap_kwargs)
         if as_mapped:
             rank_wrapped = rank_wrapped.replace(-1, np.nan)
@@ -1616,14 +1689,14 @@ class SignalsAccessor(GenericAccessor):
         chunked = ch.specialize_chunked_option(
             chunked,
             arg_take_spec=dict(
-                args=ch.ArgsTaker(
+                rank_args=ch.ArgsTaker(
                     None,
                 )
             ),
         )
         return self.rank(
-            jit_reg.resolve_option(nb.sig_pos_rank_nb, jitted),
-            allow_gaps,
+            rank_func_nb=jit_reg.resolve_option(nb.sig_pos_rank_nb, jitted),
+            rank_args=(allow_gaps,),
             jitted=jitted,
             chunked=chunked,
             **kwargs,
@@ -1802,6 +1875,47 @@ class SignalsAccessor(GenericAccessor):
         Uses `SignalsAccessor.partition_pos_rank`."""
         return self.partition_pos_rank(as_mapped=True, group_by=group_by, **kwargs)
 
+    # ############# Distance ############# #
+
+    def distance_from_last(
+        self,
+        nth: int = 1,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """See `vectorbtpro.signals.nb.distance_from_last_nb`.
+
+        Usage:
+            * Get the distance to the last signal:
+
+            ```pycon
+            >>> mask.vbt.signals.distance_from_last()
+                        a  b  c
+            2020-01-01 -1 -1 -1
+            2020-01-02  1  1  1
+            2020-01-03  2  2  1
+            2020-01-04  3  1  1
+            2020-01-05  4  2  2
+            ```
+
+            * Get the distance to the second last signal:
+
+            ```pycon
+            >>> mask.vbt.signals.distance_from_last(nth=2)
+                        a  b  c
+            2020-01-01 -1 -1 -1
+            2020-01-02 -1 -1  1
+            2020-01-03 -1  2  1
+            2020-01-04 -1  3  2
+            2020-01-05 -1  2  3
+            ```
+        """
+        func = jit_reg.resolve_option(nb.distance_from_last_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        distance_from_last = func(self.to_2d_array(), nth=nth)
+        return self.wrapper.wrap(distance_from_last, group_by=False, **resolve_dict(wrap_kwargs))
+
     # ############# Conversion ############# #
 
     def to_mapped(
@@ -1919,22 +2033,21 @@ class SignalsAccessor(GenericAccessor):
             to_attach = self.obj
         else:
             # Two input arrays
-            broadcasted_args = reshaping.broadcast(
+            broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
+            broadcasted_args, wrapper = reshaping.broadcast(
                 dict(obj=self.obj, other=other),
-                **broadcast_kwargs
+                return_wrapper=True,
+                **broadcast_kwargs,
             )
-            obj = broadcasted_args["obj"]
-            other = broadcasted_args["other"]
             func = jit_reg.resolve_option(nb.between_two_ranges_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             range_records = func(
-                reshaping.to_2d_array(obj),
-                reshaping.to_2d_array(other),
+                broadcasted_args["obj"],
+                broadcasted_args["other"],
                 from_other=from_other,
                 incl_open=incl_open,
             )
-            wrapper = ArrayWrapper.from_obj(obj)
-            to_attach = other if attach_other else obj
+            to_attach = broadcasted_args["other"] if attach_other else broadcasted_args["obj"]
         kwargs = merge_dicts(dict(close=to_attach), kwargs)
         return Ranges.from_records(wrapper, range_records, **kwargs).regroup(group_by)
 

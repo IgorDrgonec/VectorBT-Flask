@@ -533,6 +533,7 @@ def pypfopt_optimize(
     allocation_method: tp.Optional[str] = None,
     silence_warnings: tp.Optional[bool] = None,
     ignore_opt_errors: tp.Optional[bool] = None,
+    ignore_errors: tp.Optional[bool] = None,
     **kwargs,
 ) -> tp.Dict[str, float]:
     """Get allocation using PyPortfolioOpt.
@@ -557,7 +558,9 @@ def pypfopt_optimize(
     `weights_sum_to_one` and those starting with `target` are passed
     `pypfopt.base_optimizer.BaseConvexOptimizer.convex_objective`
     and `pypfopt.base_optimizer.BaseConvexOptimizer.nonconvex_objective` respectively.
+
     Set `ignore_opt_errors` to True to ignore any target optimization errors.
+    Set `ignore_errors` to True to ignore any errors, even those caused by the user.
 
     If `discrete_allocation` is True, resolves `pypfopt.discrete_allocation.DiscreteAllocation`
     and calls `allocation_method` as an attribute of the allocation object.
@@ -573,7 +576,7 @@ def pypfopt_optimize(
         ```pycon
         >>> import vectorbtpro as vbt
 
-        >>> data = vbt.YFData.fetch(["MSFT", "AMZN", "KO", "MA"])
+        >>> data = vbt.YFData.pull(["MSFT", "AMZN", "KO", "MA"])
         ```
 
         [=100% "100%"]{: .candystripe}
@@ -680,6 +683,7 @@ def pypfopt_optimize(
     allocation_method = _resolve_setting("allocation_method", allocation_method)
     silence_warnings = _resolve_setting("silence_warnings", silence_warnings)
     ignore_opt_errors = _resolve_setting("ignore_opt_errors", ignore_opt_errors)
+    ignore_errors = _resolve_setting("ignore_errors", ignore_errors)
     kwargs = merge_dicts(pypfopt_cfg, kwargs)
 
     if "cache" not in kwargs:
@@ -687,81 +691,86 @@ def pypfopt_optimize(
     if "used_arg_names" not in kwargs:
         kwargs["used_arg_names"] = set()
 
-    with warnings.catch_warnings():
-        if silence_warnings:
-            warnings.simplefilter("ignore")
+    try:
+        with warnings.catch_warnings():
+            if silence_warnings:
+                warnings.simplefilter("ignore")
 
-        optimizer = kwargs["optimizer"] = resolve_pypfopt_optimizer(**kwargs)
+            optimizer = kwargs["optimizer"] = resolve_pypfopt_optimizer(**kwargs)
 
-        if objectives is not None:
-            if not checks.is_iterable(objectives) or isinstance(objectives, str):
-                objectives = [objectives]
-            for objective in objectives:
-                if isinstance(objective, str):
-                    import pypfopt.objective_functions
+            if objectives is not None:
+                if not checks.is_iterable(objectives) or isinstance(objectives, str):
+                    objectives = [objectives]
+                for objective in objectives:
+                    if isinstance(objective, str):
+                        import pypfopt.objective_functions
 
-                    objective = getattr(pypfopt.objective_functions, objective)
-                objective_kwargs = resolve_pypfopt_func_kwargs(objective, **kwargs)
-                optimizer.add_objective(objective, **objective_kwargs)
-        if constraints is not None:
-            if not checks.is_iterable(constraints):
-                constraints = [constraints]
-            for constraint in constraints:
-                optimizer.add_constraint(constraint)
-        if sector_mapper is not None:
-            if sector_lower is None:
-                sector_lower = {}
-            if sector_upper is None:
-                sector_upper = {}
-            optimizer.add_sector_constraints(sector_mapper, sector_lower, sector_upper)
+                        objective = getattr(pypfopt.objective_functions, objective)
+                    objective_kwargs = resolve_pypfopt_func_kwargs(objective, **kwargs)
+                    optimizer.add_objective(objective, **objective_kwargs)
+            if constraints is not None:
+                if not checks.is_iterable(constraints):
+                    constraints = [constraints]
+                for constraint in constraints:
+                    optimizer.add_constraint(constraint)
+            if sector_mapper is not None:
+                if sector_lower is None:
+                    sector_lower = {}
+                if sector_upper is None:
+                    sector_upper = {}
+                optimizer.add_sector_constraints(sector_mapper, sector_lower, sector_upper)
 
-        try:
-            if isinstance(target, str):
-                resolve_pypfopt_func_call(getattr(optimizer, target), **kwargs)
-            else:
-                if target_is_convex:
-                    optimizer.convex_objective(
-                        target,
-                        weights_sum_to_one=weights_sum_to_one,
-                        **resolve_pypfopt_func_kwargs(target, **kwargs),
-                    )
+            try:
+                if isinstance(target, str):
+                    resolve_pypfopt_func_call(getattr(optimizer, target), **kwargs)
                 else:
-                    optimizer.nonconvex_objective(
-                        target,
-                        objective_args=tuple(resolve_pypfopt_func_kwargs(target, **kwargs).values()),
-                        weights_sum_to_one=weights_sum_to_one,
-                        constraints=target_constraints,
-                        solver=target_solver,
-                        initial_guess=target_initial_guess,
-                    )
-        except (OptimizationError, SolverError, ValueError) as e:
-            if isinstance(e, ValueError) and "expected return exceeding the risk-free rate" not in str(e):
+                    if target_is_convex:
+                        optimizer.convex_objective(
+                            target,
+                            weights_sum_to_one=weights_sum_to_one,
+                            **resolve_pypfopt_func_kwargs(target, **kwargs),
+                        )
+                    else:
+                        optimizer.nonconvex_objective(
+                            target,
+                            objective_args=tuple(resolve_pypfopt_func_kwargs(target, **kwargs).values()),
+                            weights_sum_to_one=weights_sum_to_one,
+                            constraints=target_constraints,
+                            solver=target_solver,
+                            initial_guess=target_initial_guess,
+                        )
+            except (OptimizationError, SolverError, ValueError) as e:
+                if isinstance(e, ValueError) and "expected return exceeding the risk-free rate" not in str(e):
+                    raise e
+                if ignore_opt_errors:
+                    warnings.warn(str(e), stacklevel=2)
+                    return {}
                 raise e
-            if ignore_opt_errors:
-                warnings.warn(str(e), stacklevel=2)
-                return {}
-            raise e
 
-        weights = kwargs["weights"] = resolve_pypfopt_func_call(optimizer.clean_weights, **kwargs)
-        if discrete_allocation:
-            from pypfopt.discrete_allocation import DiscreteAllocation
+            weights = kwargs["weights"] = resolve_pypfopt_func_call(optimizer.clean_weights, **kwargs)
+            if discrete_allocation:
+                from pypfopt.discrete_allocation import DiscreteAllocation
 
-            allocator = resolve_pypfopt_func_call(DiscreteAllocation, **kwargs)
-            return resolve_pypfopt_func_call(getattr(allocator, allocation_method), **kwargs)[0]
+                allocator = resolve_pypfopt_func_call(DiscreteAllocation, **kwargs)
+                return resolve_pypfopt_func_call(getattr(allocator, allocation_method), **kwargs)[0]
 
-        passed_arg_names = set(kwargs.keys())
-        passed_arg_names.remove("cache")
-        passed_arg_names.remove("used_arg_names")
-        passed_arg_names.remove("optimizer")
-        passed_arg_names.remove("weights")
-        unused_arg_names = passed_arg_names.difference(kwargs["used_arg_names"])
-        if len(unused_arg_names) > 0:
-            warnings.warn(f"Some arguments were not used: {unused_arg_names}", stacklevel=2)
+            passed_arg_names = set(kwargs.keys())
+            passed_arg_names.remove("cache")
+            passed_arg_names.remove("used_arg_names")
+            passed_arg_names.remove("optimizer")
+            passed_arg_names.remove("weights")
+            unused_arg_names = passed_arg_names.difference(kwargs["used_arg_names"])
+            if len(unused_arg_names) > 0:
+                warnings.warn(f"Some arguments were not used: {unused_arg_names}", stacklevel=2)
 
-        if not discrete_allocation:
-            weights = {k: 1 if v >= 1 else v for k, v in weights.items()}
+            if not discrete_allocation:
+                weights = {k: 1 if v >= 1 else v for k, v in weights.items()}
 
-    return dict(weights)
+        return dict(weights)
+    except Exception as e:
+        if ignore_errors:
+            return {}
+        raise e
 
 
 # ############# Riskfolio-Lib ############# #
@@ -776,6 +785,8 @@ def prepare_returns(
 ) -> tp.Frame:
     """Prepare returns."""
     returns = to_pd_array(returns)
+    if not isinstance(returns, pd.DataFrame):
+        raise ValueError("Returns must be a two-dimensional array")
     if returns.size == 0:
         return returns
     if nan_to_zero or dropna_rows or dropna_cols or dropna_any:
@@ -1060,12 +1071,13 @@ def riskfolio_optimize(
     sol_params: tp.KwargsLike = None,
     freq: tp.Optional[tp.FrequencyLike] = None,
     year_freq: tp.Optional[tp.FrequencyLike] = None,
-    pre_opt: bool = False,
+    pre_opt: tp.Optional[bool] = None,
     pre_opt_kwargs: tp.KwargsLike = None,
-    pre_opt_as_w: bool = False,
+    pre_opt_as_w: tp.Optional[bool] = None,
     func_kwargs: tp.KwargsLike = None,
-    silence_warnings: bool = True,
-    return_port: bool = False,
+    silence_warnings: tp.Optional[bool] = None,
+    return_port: tp.Optional[bool] = None,
+    ignore_errors: tp.Optional[bool] = None,
     **kwargs,
 ) -> tp.Union[tp.Dict[str, float], tp.Tuple[tp.Dict[str, float], RPortfolioT]]:
     """Get allocation using Riskfolio-Lib.
@@ -1156,6 +1168,7 @@ def riskfolio_optimize(
             `select_pfopt_func_kwargs` when calling each Riskfolio-Lib's function.
         silence_warnings (bool): Whether to silence all warnings.
         return_port (bool): Whether to also return the portfolio.
+        ignore_errors (bool): Whether to ignore any errors, even those caused by the user.
         **kwargs: Keyword arguments that will be passed to any Riskfolio-Lib's function
             that needs them (i.e., lists any of them in its signature).
 
@@ -1167,7 +1180,7 @@ def riskfolio_optimize(
         ```pycon
         >>> import vectorbtpro as vbt
 
-        >>> data = vbt.YFData.fetch(["MSFT", "AMZN", "KO", "MA"])
+        >>> data = vbt.YFData.pull(["MSFT", "AMZN", "KO", "MA"])
         >>> returns = data.close.vbt.to_returns()
         ```
 
@@ -1308,6 +1321,7 @@ def riskfolio_optimize(
     func_kwargs = merge_dicts(riskfolio_cfg.pop("func_kwargs"), func_kwargs)
     silence_warnings = _resolve_setting("silence_warnings", silence_warnings)
     return_port = _resolve_setting("return_port", return_port)
+    ignore_errors = _resolve_setting("ignore_errors", ignore_errors)
     kwargs = merge_dicts(riskfolio_cfg, kwargs)
     if pre_opt_kwargs is None:
         pre_opt_kwargs = {}
@@ -1316,320 +1330,325 @@ def riskfolio_optimize(
     func_kwargs = pfopt_func_dict(func_kwargs)
     unused_arg_names = set(kwargs.keys())
 
-    with warnings.catch_warnings():
-        if silence_warnings:
-            warnings.simplefilter("ignore")
+    try:
+        with warnings.catch_warnings():
+            if silence_warnings:
+                warnings.simplefilter("ignore")
 
-        # Prepare returns
-        new_returns = prepare_returns(
-            returns,
-            nan_to_zero=nan_to_zero,
-            dropna_rows=dropna_rows,
-            dropna_cols=dropna_cols,
-            dropna_any=dropna_any,
-        )
-        col_indices = [i for i, c in enumerate(returns.columns) if c in new_returns.columns]
-        returns = new_returns
-        if returns.size == 0:
-            return {}
+            # Prepare returns
+            new_returns = prepare_returns(
+                returns,
+                nan_to_zero=nan_to_zero,
+                dropna_rows=dropna_rows,
+                dropna_cols=dropna_cols,
+                dropna_any=dropna_any,
+            )
+            col_indices = [i for i, c in enumerate(returns.columns) if c in new_returns.columns]
+            returns = new_returns
+            if returns.size == 0:
+                return {}
 
-        # Pre-optimize
-        if pre_opt:
-            w, port = riskfolio_optimize(returns, port=port, return_port=True, **pre_opt_kwargs)
-            if pre_opt_as_w:
-                w = pd.DataFrame.from_records([w]).T.rename(columns={0: "weights"})
-                kwargs["w"] = w
-                unused_arg_names.add("w")
+            # Pre-optimize
+            if pre_opt:
+                w, port = riskfolio_optimize(returns, port=port, return_port=True, **pre_opt_kwargs)
+                if pre_opt_as_w:
+                    w = pd.DataFrame.from_records([w]).T.rename(columns={0: "weights"})
+                    kwargs["w"] = w
+                    unused_arg_names.add("w")
 
-        # Build portfolio
-        if port_cls is None:
-            port_cls = rp.Portfolio
-        elif isinstance(port_cls, str) and port_cls.lower() in ("hc", "hcportfolio"):
-            port_cls = rp.HCPortfolio
-        elif isinstance(port_cls, str):
-            port_cls = getattr(rp, port_cls)
-        else:
-            port_cls = port_cls
-        matched_kwargs = resolve_riskfolio_func_kwargs(
-            port_cls,
-            unused_arg_names=unused_arg_names,
-            func_kwargs=func_kwargs,
-            **kwargs,
-        )
-        if port is None:
-            port = port_cls(returns, **matched_kwargs)
-        else:
-            for k, v in matched_kwargs.items():
-                setattr(port, k, v)
-        if solvers is not None:
-            port.solvers = list(solvers)
-        if sol_params is not None:
-            port.sol_params = dict(sol_params)
-        if factors is not None:
-            factors = to_pd_array(factors).dropna()
-            port.factors = factors
-
-        # Resolve optimization and stats methods
-        if opt_method is None:
-            if len(func_kwargs) > 0:
-                for name_or_func in func_kwargs:
-                    if isinstance(name_or_func, str):
-                        if name_or_func.endswith("optimization"):
-                            if opt_method is not None:
-                                raise ValueError("Function keyword arguments list multiple optimization methods")
-                            opt_method = name_or_func
-        if opt_method is None:
-            opt_method = "optimization"
-        if stats_methods is None:
-            if len(func_kwargs) > 0:
-                for name_or_func in func_kwargs:
-                    if isinstance(name_or_func, str):
-                        if name_or_func.endswith("_stats"):
-                            if stats_methods is None:
-                                stats_methods = []
-                            stats_methods.append(name_or_func)
-        if isinstance(port, rp.Portfolio):
-            if isinstance(opt_method, str) and opt_method.lower() == "optimization":
-                opt_func = port.optimization
-                if model is None:
-                    opt_func_kwargs = select_pfopt_func_kwargs(opt_func, func_kwargs)
-                    model = opt_func_kwargs.get("model", "Classic")
-                if model.lower() == "classic":
-                    model = "Classic"
-                    if stats_methods is None:
-                        stats_methods = ["assets_stats"]
-                elif model.lower() == "fm":
-                    model = "FM"
-                    if stats_methods is None:
-                        stats_methods = ["assets_stats", "factors_stats"]
-                elif model.lower() == "bl":
-                    model = "BL"
-                    if stats_methods is None:
-                        stats_methods = ["assets_stats", "blacklitterman_stats"]
-                elif model.lower() in ("bl_fm", "blfm"):
-                    model = "BL_FM"
-                    if stats_methods is None:
-                        stats_methods = ["assets_stats", "factors_stats", "blfactors_stats"]
-            elif isinstance(opt_method, str) and opt_method.lower() in ("wc", "wc_optimization"):
-                opt_func = port.wc_optimization
-                if stats_methods is None:
-                    stats_methods = ["assets_stats", "wc_stats"]
-            elif isinstance(opt_method, str) and opt_method.lower() in ("rp", "rp_optimization"):
-                opt_func = port.rp_optimization
-                if model is None:
-                    opt_func_kwargs = select_pfopt_func_kwargs(opt_func, func_kwargs)
-                    model = opt_func_kwargs.get("model", "Classic")
-                if model.lower() == "classic":
-                    model = "Classic"
-                    if stats_methods is None:
-                        stats_methods = ["assets_stats"]
-                elif model.lower() == "fm":
-                    model = "FM"
-                    if stats_methods is None:
-                        stats_methods = ["assets_stats", "factors_stats"]
-            elif isinstance(opt_method, str) and opt_method.lower() in ("rrp", "rrp_optimization"):
-                opt_func = port.rrp_optimization
-                if model is None:
-                    opt_func_kwargs = select_pfopt_func_kwargs(opt_func, func_kwargs)
-                    model = opt_func_kwargs.get("model", "Classic")
-                if model.lower() == "classic":
-                    model = "Classic"
-                    if stats_methods is None:
-                        stats_methods = ["assets_stats"]
-                elif model.lower() == "fm":
-                    model = "FM"
-                    if stats_methods is None:
-                        stats_methods = ["assets_stats", "factors_stats"]
-            elif isinstance(opt_method, str) and opt_method.lower() in ("owa", "owa_optimization"):
-                opt_func = port.owa_optimization
-                if stats_methods is None:
-                    stats_methods = ["assets_stats"]
-            elif isinstance(opt_method, str):
-                opt_func = getattr(port, opt_method)
+            # Build portfolio
+            if port_cls is None:
+                port_cls = rp.Portfolio
+            elif isinstance(port_cls, str) and port_cls.lower() in ("hc", "hcportfolio"):
+                port_cls = rp.HCPortfolio
+            elif isinstance(port_cls, str):
+                port_cls = getattr(rp, port_cls)
             else:
-                opt_func = opt_method
-        else:
-            if isinstance(opt_method, str):
-                opt_func = getattr(port, opt_method)
-            else:
-                opt_func = opt_method
-        if model is not None:
-            kwargs["model"] = model
-            unused_arg_names.add("model")
-        if stats_methods is None:
-            stats_methods = []
-
-        # Apply constraints
-        if constraints is not None:
-            if constraints_method is None:
-                if isinstance(port, rp.Portfolio):
-                    if "factors_stats" in stats_methods:
-                        constraints_method = "factors"
-                    else:
-                        constraints_method = "assets"
-                elif isinstance(port, rp.HCPortfolio):
-                    constraints_method = "hrp"
-                else:
-                    raise ValueError("Constraints method is required")
-            if constraints_method.lower() in ("assets", "assets_constraints"):
-                asset_classes = resolve_asset_classes(asset_classes, returns.columns, col_indices)
-                kwargs["asset_classes"] = asset_classes
-                unused_arg_names.add("asset_classes")
-                constraints = resolve_assets_constraints(constraints)
-                kwargs["constraints"] = constraints
-                unused_arg_names.add("constraints")
-                matched_kwargs = resolve_riskfolio_func_kwargs(
-                    rp.assets_constraints,
-                    unused_arg_names=unused_arg_names,
-                    func_kwargs=func_kwargs,
-                    **kwargs,
-                )
-                port.ainequality, port.binequality = warn_stdout(rp.assets_constraints)(**matched_kwargs)
-            elif constraints_method.lower() in ("factors", "factors_constraints"):
-                if "loadings" not in kwargs:
-                    matched_kwargs = resolve_riskfolio_func_kwargs(
-                        rp.loadings_matrix,
-                        unused_arg_names=unused_arg_names,
-                        func_kwargs=func_kwargs,
-                        **kwargs,
-                    )
-                    if "X" not in matched_kwargs:
-                        matched_kwargs["X"] = port.factors
-                    if "Y" not in matched_kwargs:
-                        matched_kwargs["Y"] = port.returns
-                    loadings = warn_stdout(rp.loadings_matrix)(**matched_kwargs)
-                    kwargs["loadings"] = loadings
-                    unused_arg_names.add("loadings")
-                constraints = resolve_factors_constraints(constraints)
-                kwargs["constraints"] = constraints
-                unused_arg_names.add("constraints")
-
-                matched_kwargs = resolve_riskfolio_func_kwargs(
-                    rp.factors_constraints,
-                    unused_arg_names=unused_arg_names,
-                    func_kwargs=func_kwargs,
-                    **kwargs,
-                )
-                port.ainequality, port.binequality = warn_stdout(rp.factors_constraints)(**matched_kwargs)
-            elif constraints_method.lower() in ("hrp", "hrp_constraints"):
-                asset_classes = resolve_asset_classes(asset_classes, returns.columns, col_indices)
-                kwargs["asset_classes"] = asset_classes
-                unused_arg_names.add("asset_classes")
-                constraints = resolve_hrp_constraints(constraints)
-                kwargs["constraints"] = constraints
-                unused_arg_names.add("constraints")
-                matched_kwargs = resolve_riskfolio_func_kwargs(
-                    rp.hrp_constraints,
-                    unused_arg_names=unused_arg_names,
-                    func_kwargs=func_kwargs,
-                    **kwargs,
-                )
-                port.w_max, port.w_min = warn_stdout(rp.hrp_constraints)(**matched_kwargs)
-            else:
-                raise ValueError(f"Constraints method '{constraints_method}' is not supported")
-
-        # Resolve views
-        if views is not None:
-            if views_method is None:
-                if "blfactors_stats" in stats_methods:
-                    views_method = "factors"
-                else:
-                    views_method = "assets"
-            if views_method.lower() in ("assets", "assets_views"):
-                asset_classes = resolve_asset_classes(asset_classes, returns.columns, col_indices)
-                kwargs["asset_classes"] = asset_classes
-                unused_arg_names.add("asset_classes")
-                views = resolve_assets_views(views)
-                kwargs["views"] = views
-                unused_arg_names.add("views")
-                matched_kwargs = resolve_riskfolio_func_kwargs(
-                    rp.assets_views,
-                    unused_arg_names=unused_arg_names,
-                    func_kwargs=func_kwargs,
-                    **kwargs,
-                )
-                P, Q = warn_stdout(rp.assets_views)(**matched_kwargs)
-                ann_factor = ReturnsAccessor.get_ann_factor(year_freq, freq)
-                if ann_factor is not None:
-                    Q /= ann_factor
-                else:
-                    warnings.warn(f"Set frequency and year frequency to adjust expected returns", stacklevel=2)
-                kwargs["P"] = P
-                unused_arg_names.add("P")
-                kwargs["Q"] = Q
-                unused_arg_names.add("Q")
-            elif views_method.lower() in ("factors", "factors_views"):
-                if "loadings" not in kwargs:
-                    matched_kwargs = resolve_riskfolio_func_kwargs(
-                        rp.loadings_matrix,
-                        unused_arg_names=unused_arg_names,
-                        func_kwargs=func_kwargs,
-                        **kwargs,
-                    )
-                    if "X" not in matched_kwargs:
-                        matched_kwargs["X"] = port.factors
-                    if "Y" not in matched_kwargs:
-                        matched_kwargs["Y"] = port.returns
-                    loadings = warn_stdout(rp.loadings_matrix)(**matched_kwargs)
-                    kwargs["loadings"] = loadings
-                    unused_arg_names.add("loadings")
-                if "B" not in kwargs:
-                    kwargs["B"] = kwargs["loadings"]
-                    unused_arg_names.add("B")
-                views = resolve_factors_views(views)
-                kwargs["views"] = views
-                unused_arg_names.add("views")
-                matched_kwargs = resolve_riskfolio_func_kwargs(
-                    rp.factors_views,
-                    unused_arg_names=unused_arg_names,
-                    func_kwargs=func_kwargs,
-                    **kwargs,
-                )
-                P_f, Q_f = warn_stdout(rp.factors_views)(**matched_kwargs)
-                ann_factor = ReturnsAccessor.get_ann_factor(year_freq, freq)
-                if ann_factor is not None:
-                    Q_f /= ann_factor
-                else:
-                    warnings.warn(f"Set frequency and year frequency to adjust expected returns", stacklevel=2)
-                kwargs["P_f"] = P_f
-                unused_arg_names.add("P_f")
-                kwargs["Q_f"] = Q_f
-                unused_arg_names.add("Q_f")
-            else:
-                raise ValueError(f"Views method '{constraints_method}' is not supported")
-
-        # Run stats
-        for stats_method in stats_methods:
-            stats_func = getattr(port, stats_method)
+                port_cls = port_cls
             matched_kwargs = resolve_riskfolio_func_kwargs(
-                stats_func,
+                port_cls,
                 unused_arg_names=unused_arg_names,
                 func_kwargs=func_kwargs,
                 **kwargs,
             )
-            warn_stdout(stats_func)(**matched_kwargs)
+            if port is None:
+                port = port_cls(returns, **matched_kwargs)
+            else:
+                for k, v in matched_kwargs.items():
+                    setattr(port, k, v)
+            if solvers is not None:
+                port.solvers = list(solvers)
+            if sol_params is not None:
+                port.sol_params = dict(sol_params)
+            if factors is not None:
+                factors = to_pd_array(factors).dropna()
+                port.factors = factors
 
-        # Run optimization
-        matched_kwargs = resolve_riskfolio_func_kwargs(
-            opt_func,
-            unused_arg_names=unused_arg_names,
-            func_kwargs=func_kwargs,
-            **kwargs,
-        )
-        weights = warn_stdout(opt_func)(**matched_kwargs)
+            # Resolve optimization and stats methods
+            if opt_method is None:
+                if len(func_kwargs) > 0:
+                    for name_or_func in func_kwargs:
+                        if isinstance(name_or_func, str):
+                            if name_or_func.endswith("optimization"):
+                                if opt_method is not None:
+                                    raise ValueError("Function keyword arguments list multiple optimization methods")
+                                opt_method = name_or_func
+            if opt_method is None:
+                opt_method = "optimization"
+            if stats_methods is None:
+                if len(func_kwargs) > 0:
+                    for name_or_func in func_kwargs:
+                        if isinstance(name_or_func, str):
+                            if name_or_func.endswith("_stats"):
+                                if stats_methods is None:
+                                    stats_methods = []
+                                stats_methods.append(name_or_func)
+            if isinstance(port, rp.Portfolio):
+                if isinstance(opt_method, str) and opt_method.lower() == "optimization":
+                    opt_func = port.optimization
+                    if model is None:
+                        opt_func_kwargs = select_pfopt_func_kwargs(opt_func, func_kwargs)
+                        model = opt_func_kwargs.get("model", "Classic")
+                    if model.lower() == "classic":
+                        model = "Classic"
+                        if stats_methods is None:
+                            stats_methods = ["assets_stats"]
+                    elif model.lower() == "fm":
+                        model = "FM"
+                        if stats_methods is None:
+                            stats_methods = ["assets_stats", "factors_stats"]
+                    elif model.lower() == "bl":
+                        model = "BL"
+                        if stats_methods is None:
+                            stats_methods = ["assets_stats", "blacklitterman_stats"]
+                    elif model.lower() in ("bl_fm", "blfm"):
+                        model = "BL_FM"
+                        if stats_methods is None:
+                            stats_methods = ["assets_stats", "factors_stats", "blfactors_stats"]
+                elif isinstance(opt_method, str) and opt_method.lower() in ("wc", "wc_optimization"):
+                    opt_func = port.wc_optimization
+                    if stats_methods is None:
+                        stats_methods = ["assets_stats", "wc_stats"]
+                elif isinstance(opt_method, str) and opt_method.lower() in ("rp", "rp_optimization"):
+                    opt_func = port.rp_optimization
+                    if model is None:
+                        opt_func_kwargs = select_pfopt_func_kwargs(opt_func, func_kwargs)
+                        model = opt_func_kwargs.get("model", "Classic")
+                    if model.lower() == "classic":
+                        model = "Classic"
+                        if stats_methods is None:
+                            stats_methods = ["assets_stats"]
+                    elif model.lower() == "fm":
+                        model = "FM"
+                        if stats_methods is None:
+                            stats_methods = ["assets_stats", "factors_stats"]
+                elif isinstance(opt_method, str) and opt_method.lower() in ("rrp", "rrp_optimization"):
+                    opt_func = port.rrp_optimization
+                    if model is None:
+                        opt_func_kwargs = select_pfopt_func_kwargs(opt_func, func_kwargs)
+                        model = opt_func_kwargs.get("model", "Classic")
+                    if model.lower() == "classic":
+                        model = "Classic"
+                        if stats_methods is None:
+                            stats_methods = ["assets_stats"]
+                    elif model.lower() == "fm":
+                        model = "FM"
+                        if stats_methods is None:
+                            stats_methods = ["assets_stats", "factors_stats"]
+                elif isinstance(opt_method, str) and opt_method.lower() in ("owa", "owa_optimization"):
+                    opt_func = port.owa_optimization
+                    if stats_methods is None:
+                        stats_methods = ["assets_stats"]
+                elif isinstance(opt_method, str):
+                    opt_func = getattr(port, opt_method)
+                else:
+                    opt_func = opt_method
+            else:
+                if isinstance(opt_method, str):
+                    opt_func = getattr(port, opt_method)
+                else:
+                    opt_func = opt_method
+            if model is not None:
+                kwargs["model"] = model
+                unused_arg_names.add("model")
+            if stats_methods is None:
+                stats_methods = []
 
-        # Post-process weights
-        if len(unused_arg_names) > 0:
-            warnings.warn(f"Some arguments were not used: {unused_arg_names}", stacklevel=2)
-        if weights is None:
-            weights = {}
-        if isinstance(weights, pd.DataFrame):
-            if "weights" not in weights.columns:
-                raise ValueError("Weights column wasn't returned")
-            weights = weights["weights"]
-    if return_port:
-        return dict(weights), port
-    return dict(weights)
+            # Apply constraints
+            if constraints is not None:
+                if constraints_method is None:
+                    if isinstance(port, rp.Portfolio):
+                        if "factors_stats" in stats_methods:
+                            constraints_method = "factors"
+                        else:
+                            constraints_method = "assets"
+                    elif isinstance(port, rp.HCPortfolio):
+                        constraints_method = "hrp"
+                    else:
+                        raise ValueError("Constraints method is required")
+                if constraints_method.lower() in ("assets", "assets_constraints"):
+                    asset_classes = resolve_asset_classes(asset_classes, returns.columns, col_indices)
+                    kwargs["asset_classes"] = asset_classes
+                    unused_arg_names.add("asset_classes")
+                    constraints = resolve_assets_constraints(constraints)
+                    kwargs["constraints"] = constraints
+                    unused_arg_names.add("constraints")
+                    matched_kwargs = resolve_riskfolio_func_kwargs(
+                        rp.assets_constraints,
+                        unused_arg_names=unused_arg_names,
+                        func_kwargs=func_kwargs,
+                        **kwargs,
+                    )
+                    port.ainequality, port.binequality = warn_stdout(rp.assets_constraints)(**matched_kwargs)
+                elif constraints_method.lower() in ("factors", "factors_constraints"):
+                    if "loadings" not in kwargs:
+                        matched_kwargs = resolve_riskfolio_func_kwargs(
+                            rp.loadings_matrix,
+                            unused_arg_names=unused_arg_names,
+                            func_kwargs=func_kwargs,
+                            **kwargs,
+                        )
+                        if "X" not in matched_kwargs:
+                            matched_kwargs["X"] = port.factors
+                        if "Y" not in matched_kwargs:
+                            matched_kwargs["Y"] = port.returns
+                        loadings = warn_stdout(rp.loadings_matrix)(**matched_kwargs)
+                        kwargs["loadings"] = loadings
+                        unused_arg_names.add("loadings")
+                    constraints = resolve_factors_constraints(constraints)
+                    kwargs["constraints"] = constraints
+                    unused_arg_names.add("constraints")
+
+                    matched_kwargs = resolve_riskfolio_func_kwargs(
+                        rp.factors_constraints,
+                        unused_arg_names=unused_arg_names,
+                        func_kwargs=func_kwargs,
+                        **kwargs,
+                    )
+                    port.ainequality, port.binequality = warn_stdout(rp.factors_constraints)(**matched_kwargs)
+                elif constraints_method.lower() in ("hrp", "hrp_constraints"):
+                    asset_classes = resolve_asset_classes(asset_classes, returns.columns, col_indices)
+                    kwargs["asset_classes"] = asset_classes
+                    unused_arg_names.add("asset_classes")
+                    constraints = resolve_hrp_constraints(constraints)
+                    kwargs["constraints"] = constraints
+                    unused_arg_names.add("constraints")
+                    matched_kwargs = resolve_riskfolio_func_kwargs(
+                        rp.hrp_constraints,
+                        unused_arg_names=unused_arg_names,
+                        func_kwargs=func_kwargs,
+                        **kwargs,
+                    )
+                    port.w_max, port.w_min = warn_stdout(rp.hrp_constraints)(**matched_kwargs)
+                else:
+                    raise ValueError(f"Constraints method '{constraints_method}' is not supported")
+
+            # Resolve views
+            if views is not None:
+                if views_method is None:
+                    if "blfactors_stats" in stats_methods:
+                        views_method = "factors"
+                    else:
+                        views_method = "assets"
+                if views_method.lower() in ("assets", "assets_views"):
+                    asset_classes = resolve_asset_classes(asset_classes, returns.columns, col_indices)
+                    kwargs["asset_classes"] = asset_classes
+                    unused_arg_names.add("asset_classes")
+                    views = resolve_assets_views(views)
+                    kwargs["views"] = views
+                    unused_arg_names.add("views")
+                    matched_kwargs = resolve_riskfolio_func_kwargs(
+                        rp.assets_views,
+                        unused_arg_names=unused_arg_names,
+                        func_kwargs=func_kwargs,
+                        **kwargs,
+                    )
+                    P, Q = warn_stdout(rp.assets_views)(**matched_kwargs)
+                    ann_factor = ReturnsAccessor.get_ann_factor(year_freq, freq)
+                    if ann_factor is not None:
+                        Q /= ann_factor
+                    else:
+                        warnings.warn(f"Set frequency and year frequency to adjust expected returns", stacklevel=2)
+                    kwargs["P"] = P
+                    unused_arg_names.add("P")
+                    kwargs["Q"] = Q
+                    unused_arg_names.add("Q")
+                elif views_method.lower() in ("factors", "factors_views"):
+                    if "loadings" not in kwargs:
+                        matched_kwargs = resolve_riskfolio_func_kwargs(
+                            rp.loadings_matrix,
+                            unused_arg_names=unused_arg_names,
+                            func_kwargs=func_kwargs,
+                            **kwargs,
+                        )
+                        if "X" not in matched_kwargs:
+                            matched_kwargs["X"] = port.factors
+                        if "Y" not in matched_kwargs:
+                            matched_kwargs["Y"] = port.returns
+                        loadings = warn_stdout(rp.loadings_matrix)(**matched_kwargs)
+                        kwargs["loadings"] = loadings
+                        unused_arg_names.add("loadings")
+                    if "B" not in kwargs:
+                        kwargs["B"] = kwargs["loadings"]
+                        unused_arg_names.add("B")
+                    views = resolve_factors_views(views)
+                    kwargs["views"] = views
+                    unused_arg_names.add("views")
+                    matched_kwargs = resolve_riskfolio_func_kwargs(
+                        rp.factors_views,
+                        unused_arg_names=unused_arg_names,
+                        func_kwargs=func_kwargs,
+                        **kwargs,
+                    )
+                    P_f, Q_f = warn_stdout(rp.factors_views)(**matched_kwargs)
+                    ann_factor = ReturnsAccessor.get_ann_factor(year_freq, freq)
+                    if ann_factor is not None:
+                        Q_f /= ann_factor
+                    else:
+                        warnings.warn(f"Set frequency and year frequency to adjust expected returns", stacklevel=2)
+                    kwargs["P_f"] = P_f
+                    unused_arg_names.add("P_f")
+                    kwargs["Q_f"] = Q_f
+                    unused_arg_names.add("Q_f")
+                else:
+                    raise ValueError(f"Views method '{constraints_method}' is not supported")
+
+            # Run stats
+            for stats_method in stats_methods:
+                stats_func = getattr(port, stats_method)
+                matched_kwargs = resolve_riskfolio_func_kwargs(
+                    stats_func,
+                    unused_arg_names=unused_arg_names,
+                    func_kwargs=func_kwargs,
+                    **kwargs,
+                )
+                warn_stdout(stats_func)(**matched_kwargs)
+
+            # Run optimization
+            matched_kwargs = resolve_riskfolio_func_kwargs(
+                opt_func,
+                unused_arg_names=unused_arg_names,
+                func_kwargs=func_kwargs,
+                **kwargs,
+            )
+            weights = warn_stdout(opt_func)(**matched_kwargs)
+
+            # Post-process weights
+            if len(unused_arg_names) > 0:
+                warnings.warn(f"Some arguments were not used: {unused_arg_names}", stacklevel=2)
+            if weights is None:
+                weights = {}
+            if isinstance(weights, pd.DataFrame):
+                if "weights" not in weights.columns:
+                    raise ValueError("Weights column wasn't returned")
+                weights = weights["weights"]
+        if return_port:
+            return dict(weights), port
+        return dict(weights)
+    except Exception as e:
+        if ignore_errors:
+            return {}
+        raise e
 
 
 # ############# PortfolioOptimizer ############# #
@@ -1724,7 +1743,7 @@ class PortfolioOptimizer(Analyzable):
         kind: tp.Union[None, str, Param] = point_idxr_defaults["kind"],
         indexer_method: tp.Union[None, str, Param] = point_idxr_defaults["indexer_method"],
         indexer_tolerance: tp.Union[None, str, Param] = point_idxr_defaults["indexer_tolerance"],
-        skip_minus_one: tp.Union[bool, Param] = point_idxr_defaults["skip_minus_one"],
+        skip_not_found: tp.Union[bool, Param] = point_idxr_defaults["skip_not_found"],
         index_points: tp.Union[None, tp.MaybeSequence[int], Param] = None,
         rescale_to: tp.Union[None, tp.Tuple[float, float], Param] = None,
         search_max_len: tp.Optional[int] = None,
@@ -1764,7 +1783,7 @@ class PortfolioOptimizer(Analyzable):
             >>> import vectorbtpro as vbt
             >>> import numpy as np
 
-            >>> data = vbt.YFData.fetch(
+            >>> data = vbt.YFData.pull(
             ...     ["MSFT", "AMZN", "AAPL"],
             ...     start="2010-01-01",
             ...     end="2020-01-01"
@@ -1933,7 +1952,7 @@ class PortfolioOptimizer(Analyzable):
             "kind": kind,
             "indexer_method": indexer_method,
             "indexer_tolerance": indexer_tolerance,
-            "skip_minus_one": skip_minus_one,
+            "skip_not_found": skip_not_found,
             "index_points": index_points,
             "rescale_to": rescale_to,
             **{f"args_{i}": args[i] for i in range(len(args))},
@@ -2037,7 +2056,7 @@ class PortfolioOptimizer(Analyzable):
                 _kind = group_config.pop("kind")
                 _indexer_method = group_config.pop("indexer_method")
                 _indexer_tolerance = group_config.pop("indexer_tolerance")
-                _skip_minus_one = group_config.pop("skip_minus_one")
+                _skip_not_found = group_config.pop("skip_not_found")
                 _index_points = group_config.pop("index_points")
                 _rescale_to = group_config.pop("rescale_to")
                 _jitted_loop = group_config.pop("jitted_loop")
@@ -2066,7 +2085,7 @@ class PortfolioOptimizer(Analyzable):
                         kind=_kind,
                         indexer_method=_indexer_method,
                         indexer_tolerance=_indexer_tolerance,
-                        skip_minus_one=_skip_minus_one,
+                        skip_not_found=_skip_not_found,
                         index_points=_index_points,
                         rescale_to=_rescale_to,
                         jitted_loop=_jitted_loop,
@@ -2093,7 +2112,7 @@ class PortfolioOptimizer(Analyzable):
                             kind=_kind,
                             indexer_method=_indexer_method,
                             indexer_tolerance=_indexer_tolerance,
-                            skip_minus_one=_skip_minus_one,
+                            skip_not_found=_skip_not_found,
                         ),
                         _template_context,
                         sub_id="get_index_points_defaults",
@@ -2409,7 +2428,7 @@ class PortfolioOptimizer(Analyzable):
         add_start_delta: tp.Union[None, tp.FrequencyLike, Param] = range_idxr_defaults["add_start_delta"],
         add_end_delta: tp.Union[None, tp.FrequencyLike, Param] = range_idxr_defaults["add_end_delta"],
         kind: tp.Union[None, str, Param] = range_idxr_defaults["kind"],
-        skip_minus_one: tp.Union[bool, Param] = range_idxr_defaults["skip_minus_one"],
+        skip_not_found: tp.Union[bool, Param] = range_idxr_defaults["skip_not_found"],
         index_ranges: tp.Union[None, tp.MaybeSequence[tp.MaybeSequence[int]], Param] = None,
         index_loc: tp.Union[None, tp.MaybeSequence[int], Param] = None,
         rescale_to: tp.Union[None, tp.Tuple[float, float], Param] = None,
@@ -2475,7 +2494,7 @@ class PortfolioOptimizer(Analyzable):
             ```pycon
             >>> import vectorbtpro as vbt
 
-            >>> data = vbt.YFData.fetch(
+            >>> data = vbt.YFData.pull(
             ...     ["MSFT", "AMZN", "AAPL"],
             ...     start="2010-01-01",
             ...     end="2020-01-01"
@@ -2690,7 +2709,7 @@ class PortfolioOptimizer(Analyzable):
             "add_start_delta": add_start_delta,
             "add_end_delta": add_end_delta,
             "kind": kind,
-            "skip_minus_one": skip_minus_one,
+            "skip_not_found": skip_not_found,
             "index_ranges": index_ranges,
             "index_loc": index_loc,
             "rescale_to": rescale_to,
@@ -2799,7 +2818,7 @@ class PortfolioOptimizer(Analyzable):
                 _add_start_delta = group_config.pop("add_start_delta")
                 _add_end_delta = group_config.pop("add_end_delta")
                 _kind = group_config.pop("kind")
-                _skip_minus_one = group_config.pop("skip_minus_one")
+                _skip_not_found = group_config.pop("skip_not_found")
                 _index_ranges = group_config.pop("index_ranges")
                 _index_loc = group_config.pop("index_loc")
                 _rescale_to = group_config.pop("rescale_to")
@@ -2834,7 +2853,7 @@ class PortfolioOptimizer(Analyzable):
                         add_start_delta=_add_start_delta,
                         add_end_delta=_add_end_delta,
                         kind=_kind,
-                        skip_minus_one=_skip_minus_one,
+                        skip_not_found=_skip_not_found,
                         index_ranges=_index_ranges,
                         index_loc=_index_loc,
                         rescale_to=_rescale_to,
@@ -2867,7 +2886,7 @@ class PortfolioOptimizer(Analyzable):
                             add_start_delta=_add_start_delta,
                             add_end_delta=_add_end_delta,
                             kind=_kind,
-                            skip_minus_one=_skip_minus_one,
+                            skip_not_found=_skip_not_found,
                             jitted=_jitted,
                         ),
                         _template_context,

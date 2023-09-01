@@ -84,7 +84,7 @@ def signal_func_nb(c, long_num_arr, short_num_arr):
 
 class TestFromSignals:
     def test_data(self):
-        data = vbt.RandomOHLCData.fetch(
+        data = vbt.RandomOHLCData.pull(
             [0, 1],
             start="2020-01-01",
             end="2020-02-01",
@@ -304,33 +304,70 @@ class TestFromSignals:
         )
         assert_records_close(
             out,
-            np.array([
+            np.array(
                 [
-                    (0, 0, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 0.0, 0.0, 0, 0, 0),
-                    (0, 1, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 0.0, 0.0, 1, 0, 0),
-                    (0, 2, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 0.0, 0.0, 1, 0, 0),
+                    [
+                        (0, 0, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 0.0, 0.0, 0, 0, 0),
+                        (0, 1, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 0.0, 0.0, 1, 0, 0),
+                        (0, 2, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 0.0, 0.0, 1, 0, 0),
+                    ],
+                    [
+                        (0, 0, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 100.0, 1.0, 0, 0, 0),
+                        (0, 1, 100.0, 0, 0, 1.0, 0.0, 1, 1, 2.0, 0.0, -100.0, -1.0, 1, 1, 0),
+                        (0, 2, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, -100.0, -1.0, 1, 0, 0),
+                    ],
+                    [
+                        (0, 0, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 200.0, 2.0, 0, 0, 0),
+                        (0, 1, 100.0, 0, 0, 1.0, 0.0, 1, 1, 2.0, 0.0, -100.0, -1.0, 1, 1, 0),
+                        (0, 2, 100.0, 0, 0, 1.0, 0.0, 1, -1, 3.0, 0.0, -200.0, -2.0, 1, 0, 0),
+                    ],
+                    [
+                        (1, 0, 100.0, 1, 3, 4.0, 0.0, -1, -1, np.nan, 0.0, 0.0, 0.0, 1, 0, 1),
+                        (0, 1, 100.0, 0, 0, 1.0, 0.0, 1, 1, 2.0, 0.0, -100.0, -1.0, 1, 1, 0),
+                        (
+                            0,
+                            2,
+                            100.0,
+                            0,
+                            0,
+                            1.0,
+                            0.0,
+                            1,
+                            -1,
+                            3.0,
+                            0.0,
+                            -233.33333333333331,
+                            -2.333333333333333,
+                            1,
+                            0,
+                            0,
+                        ),
+                    ],
+                    [
+                        (1, 0, 100.0, 1, 3, 4.0, 0.0, -1, -1, np.nan, 0.0, -100.0, -0.25, 1, 0, 1),
+                        (0, 1, 100.0, 0, 0, 1.0, 0.0, 1, 1, 2.0, 0.0, -100.0, -1.0, 1, 1, 0),
+                        (
+                            0,
+                            2,
+                            100.0,
+                            0,
+                            0,
+                            1.0,
+                            0.0,
+                            1,
+                            -1,
+                            3.0,
+                            0.0,
+                            -266.66666666666663,
+                            -2.666666666666666,
+                            1,
+                            0,
+                            0,
+                        ),
+                    ],
                 ],
-                [
-                    (0, 0, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 100.0, 1.0, 0, 0, 0),
-                    (0, 1, 100.0, 0, 0, 1.0, 0.0, 1, 1, 2.0, 0.0, -100.0, -1.0, 1, 1, 0),
-                    (0, 2, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, -100.0, -1.0, 1, 0, 0),
-                ],
-                [
-                    (0, 0, 100.0, 0, 0, 1.0, 0.0, -1, -1, np.nan, 0.0, 200.0, 2.0, 0, 0, 0),
-                    (0, 1, 100.0, 0, 0, 1.0, 0.0, 1, 1, 2.0, 0.0, -100.0, -1.0, 1, 1, 0),
-                    (0, 2, 100.0, 0, 0, 1.0, 0.0, 1, -1, 3.0, 0.0, -200.0, -2.0, 1, 0, 0),
-                ],
-                [
-                    (1, 0, 100.0, 1, 3, 4.0, 0.0, -1, -1, np.nan, 0.0, 0.0, 0.0, 1, 0, 1),
-                    (0, 1, 100.0, 0, 0, 1.0, 0.0, 1, 1, 2.0, 0.0, -100.0, -1.0, 1, 1, 0),
-                    (0, 2, 100.0, 0, 0, 1.0, 0.0, 1, -1, 3.0, 0.0, -233.33333333333331, -2.333333333333333, 1, 0, 0),
-                ],
-                [
-                    (1, 0, 100.0, 1, 3, 4.0, 0.0, -1, -1, np.nan, 0.0, -100.0, -0.25, 1, 0, 1),
-                    (0, 1, 100.0, 0, 0, 1.0, 0.0, 1, 1, 2.0, 0.0, -100.0, -1.0, 1, 1, 0),
-                    (0, 2, 100.0, 0, 0, 1.0, 0.0, 1, -1, 3.0, 0.0, -266.66666666666663, -2.666666666666666, 1, 0, 0),
-                ],
-            ], dtype=vbt.pf_enums.trade_dt),
+                dtype=vbt.pf_enums.trade_dt,
+            ),
         )
 
     def test_ladder(self):
@@ -345,9 +382,7 @@ class TestFromSignals:
 
         assert_records_close(
             from_signals_both(
-                adjust_func_nb=adjust_func_nb,
-                adjust_args=(np.array([1.0, 2.0]), np.array([0.5, 1.0])),
-                use_stops=True
+                adjust_func_nb=adjust_func_nb, adjust_args=(np.array([1.0, 2.0]), np.array([0.5, 1.0])), use_stops=True
             ).order_records,
             np.array(
                 [
@@ -530,7 +565,7 @@ class TestFromSignals:
         assert_records_close(
             from_signals_both(size=0.5, size_type="valuepercent").order_records,
             np.array(
-                [(0, 0, 0, 0, 0, 50.0, 1.0, 0.0, 0, 0, -1), (1, 0, 3, 3, 3, 75.0, 4.0, 0.0, 1, 0, -1)],
+                [(0, 0, 0, 0, 0, 50.0, 1.0, 0.0, 0, 0, -1), (1, 0, 3, 3, 3, 81.25, 4.0, 0.0, 1, 0, -1)],
                 dtype=fs_order_dt,
             ),
         )
@@ -1452,7 +1487,7 @@ class TestFromSignals:
                         0.0,
                         0.0,
                         4.0,
-                        300.0,
+                        400.0,
                         -np.inf,
                         np.inf,
                         0,
@@ -1482,7 +1517,7 @@ class TestFromSignals:
                         400.0,
                         0.0,
                         4.0,
-                        300.0,
+                        400.0,
                         1,
                     ),
                 ],
@@ -6138,19 +6173,19 @@ class TestFromSignals:
             ),
         )
 
-    def test_max_orders(self):
+    def test_max_order_records(self):
         assert from_signals_both(close=price_wide).order_records.shape[0] == 6
-        assert from_signals_both(close=price_wide, max_orders=2).order_records.shape[0] == 6
-        assert from_signals_both(close=price_wide, max_orders=0).order_records.shape[0] == 0
+        assert from_signals_both(close=price_wide, max_order_records=2).order_records.shape[0] == 6
+        assert from_signals_both(close=price_wide, max_order_records=0).order_records.shape[0] == 0
         with pytest.raises(Exception):
-            from_signals_both(close=price_wide, max_orders=1)
+            from_signals_both(close=price_wide, max_order_records=1)
 
-    def test_max_logs(self):
+    def test_max_log_records(self):
         assert from_signals_both(close=price_wide, log=True).log_records.shape[0] == 6
-        assert from_signals_both(close=price_wide, log=True, max_logs=2).log_records.shape[0] == 6
-        assert from_signals_both(close=price_wide, log=True, max_logs=0).log_records.shape[0] == 0
+        assert from_signals_both(close=price_wide, log=True, max_log_records=2).log_records.shape[0] == 6
+        assert from_signals_both(close=price_wide, log=True, max_log_records=0).log_records.shape[0] == 0
         with pytest.raises(Exception):
-            from_signals_both(close=price_wide, log=True, max_logs=1)
+            from_signals_both(close=price_wide, log=True, max_log_records=1)
 
     def test_jitted_parallel(self):
         price_wide2 = price_wide.copy()

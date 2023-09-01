@@ -139,8 +139,9 @@ def attach_fields(*args, on_conflict: str = "raise") -> tp.FlexClassWrapper:
                     ) -> MappedArray:
                         return self.get_map_field(_field_name, **_defaults)
 
-                    new_prop.__doc__ = f"Mapped array of the field `{field_name}`."
                     new_prop.__name__ = target_name
+                    new_prop.__qualname__ = f"{cls.__name__}.{new_prop.__name__}"
+                    new_prop.__doc__ = f"Mapped array of the field `{field_name}`."
                     setattr(cls, target_name, cached_property(new_prop))
 
                 if attach_filters:
@@ -175,8 +176,9 @@ def attach_fields(*args, on_conflict: str = "raise") -> tp.FlexClassWrapper:
                             filter_mask = self.get_field_arr(_field_name) == _filter_value
                             return self.apply_mask(filter_mask, **_filter_defaults)
 
-                        new_filter_prop.__doc__ = f"Records filtered by `{field_name} == {filter_value}`."
                         new_filter_prop.__name__ = target_filter_name
+                        new_filter_prop.__qualname__ = f"{cls.__name__}.{new_filter_prop.__name__}"
+                        new_filter_prop.__doc__ = f"Records filtered by `{field_name} == {filter_value}`."
                         setattr(cls, target_filter_name, cached_property(new_filter_prop))
 
         return cls
@@ -243,7 +245,7 @@ def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
                 return getattr(self, _method_name)(**_method_kwargs)
 
             new_prop.__name__ = target_name
-            new_prop.__qualname__ = f"{cls.__name__}.{target_name}"
+            new_prop.__qualname__ = f"{cls.__name__}.{new_prop.__name__}"
             new_prop.__doc__ = docstring
             setattr(cls, new_prop.__name__, decorator(new_prop, **decorator_kwargs))
         return cls

@@ -97,23 +97,43 @@ class BaseIDXAccessor(Configured):
         return indexes.tile_index(self.obj, *args, **kwargs)
 
     @class_or_instancemethod
-    def stack(cls_or_self, *others: tp.Union[tp.IndexLike, "BaseIDXAccessor"], **kwargs) -> tp.Index:
-        """See `vectorbtpro.base.indexes.stack_indexes`."""
+    def stack(
+        cls_or_self,
+        *others: tp.Union[tp.IndexLike, "BaseIDXAccessor"],
+        on_top: bool = False,
+        **kwargs,
+    ) -> tp.Index:
+        """See `vectorbtpro.base.indexes.stack_indexes`.
+
+        Set `on_top` to True to stack the second index on top of this one."""
         others = tuple(map(lambda x: x.obj if isinstance(x, BaseIDXAccessor) else x, others))
         if isinstance(cls_or_self, type):
             objs = others
         else:
-            objs = (cls_or_self.obj, *others)
+            if on_top:
+                objs = (*others, cls_or_self.obj)
+            else:
+                objs = (cls_or_self.obj, *others)
         return indexes.stack_indexes(*objs, **kwargs)
 
     @class_or_instancemethod
-    def combine(cls_or_self, *others: tp.Union[tp.IndexLike, "BaseIDXAccessor"], **kwargs) -> tp.Index:
-        """See `vectorbtpro.base.indexes.combine_indexes`."""
+    def combine(
+        cls_or_self,
+        *others: tp.Union[tp.IndexLike, "BaseIDXAccessor"],
+        on_top: bool = False,
+        **kwargs,
+    ) -> tp.Index:
+        """See `vectorbtpro.base.indexes.combine_indexes`.
+
+        Set `on_top` to True to stack the second index on top of this one."""
         others = tuple(map(lambda x: x.obj if isinstance(x, BaseIDXAccessor) else x, others))
         if isinstance(cls_or_self, type):
             objs = others
         else:
-            objs = (cls_or_self.obj, *others)
+            if on_top:
+                objs = (*others, cls_or_self.obj)
+            else:
+                objs = (cls_or_self.obj, *others)
         return indexes.combine_indexes(*objs, **kwargs)
 
     @class_or_instancemethod
@@ -1274,7 +1294,7 @@ class BaseAccessor(Wrapping):
         to_2d: bool = False,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
-        template_context: tp.Optional[tp.Mapping] = None,
+        template_context: tp.KwargsLike = None,
         wrap_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.SeriesFrame:
@@ -1385,7 +1405,7 @@ class BaseAccessor(Wrapping):
         keys: tp.Optional[tp.IndexLike] = None,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
-        template_context: tp.Optional[tp.Mapping] = None,
+        template_context: tp.KwargsLike = None,
         wrap_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.MaybeTuple[tp.Frame]:
@@ -1504,7 +1524,7 @@ class BaseAccessor(Wrapping):
         keys: tp.Optional[tp.IndexLike] = None,
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
-        template_context: tp.Optional[tp.Mapping] = None,
+        template_context: tp.KwargsLike = None,
         wrap_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.SeriesFrame:

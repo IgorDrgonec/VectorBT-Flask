@@ -84,7 +84,7 @@ def convert_to_dict(dct: InConfigLikeT, nested: bool = True) -> dict:
     return dct
 
 
-def get_dict_item(dct: dict, k: tp.Hashable) -> tp.Any:
+def get_dict_item(dct: dict, k: tp.Hashable, populate: bool = False) -> tp.Any:
     """Get dict item under the key `k`.
 
     The key can be nested using the dot notation or tuple, and must be hashable."""
@@ -94,8 +94,10 @@ def get_dict_item(dct: dict, k: tp.Hashable) -> tp.Any:
         k = tuple(k.split("."))
     if isinstance(k, tuple):
         if len(k) == 1:
-            return get_dict_item(dct, k[0])
-        return get_dict_item(get_dict_item(dct, k[0]), k[1:])
+            return get_dict_item(dct, k[0], populate=populate)
+        return get_dict_item(get_dict_item(dct, k[0], populate=populate), k[1:], populate=populate)
+    if k not in dct and populate:
+        dct[k] = dict()
     return dct[k]
 
 
@@ -754,12 +756,37 @@ class Config(pdict):
             )
         return prettify_dict(self, replace=replace, path=path, htchar=htchar, lfchar=lfchar, indent=indent)
 
-    def equals(self, other: tp.Any, check_types: bool = True, check_options: bool = False) -> bool:
-        if check_types and type(self) != type(other):
+    def equals(
+        self,
+        other: tp.Any,
+        check_types: bool = True,
+        check_options: bool = False,
+        _key: tp.Optional[str] = None,
+        **kwargs,
+    ) -> bool:
+        if _key is None:
+            _key = type(self).__name__
+        if check_types and not is_deep_equal(
+            self,
+            other,
+            _key=_key,
+            only_types=True,
+            **kwargs,
+        ):
             return False
-        if check_options and not is_deep_equal(self.options_, other.options_):
+        if check_options and not is_deep_equal(
+            self.options_,
+            other.options_,
+            _key=_key + ".options_",
+            **kwargs,
+        ):
             return False
-        return is_deep_equal(dict(self), dict(other))
+        return is_deep_equal(
+            dict(self),
+            dict(other),
+            _key=_key,
+            **kwargs,
+        )
 
     @property
     def rec_state(self) -> tp.Optional[RecState]:
@@ -897,6 +924,40 @@ class Configured(Cacheable, Comparable, Pickleable, Prettified):
                 writeable_attrs |= cls._writeable_attrs
         return writeable_attrs
 
+    @classmethod
+    def resolve_merge_kwargs(cls, *configs: tp.MaybeTuple[ConfigT], **kwargs) -> tp.Kwargs:
+        """Resolve keyword arguments for initializing `Configured` after merging."""
+        if len(configs) == 1:
+            configs = configs[0]
+        configs = list(configs)
+
+        common_keys = set()
+        for config in configs:
+            common_keys = common_keys.union(set(config.keys()))
+        init_config = configs[0]
+        for i in range(1, len(configs)):
+            config = configs[i]
+            for k in common_keys:
+                if k not in kwargs:
+                    same_k = True
+                    try:
+                        if k in config:
+                            if not is_deep_equal(init_config[k], config[k]):
+                                same_k = False
+                        else:
+                            same_k = False
+                    except KeyError as e:
+                        same_k = False
+                    if not same_k:
+                        raise ValueError(f"Objects to be merged must have compatible '{k}'. Pass to override.")
+        for k in common_keys:
+            if k not in kwargs:
+                if k in init_config:
+                    kwargs[k] = init_config[k]
+                else:
+                    raise ValueError(f"Objects to be merged must have compatible '{k}'. Pass to override.")
+        return kwargs
+
     def replace(
         self: ConfiguredT,
         copy_mode_: tp.Optional[str] = None,
@@ -947,17 +1008,43 @@ class Configured(Cacheable, Comparable, Pickleable, Prettified):
         check_types: bool = True,
         check_attrs: bool = True,
         check_options: bool = False,
+        _key: tp.Optional[str] = None,
+        **kwargs,
     ) -> bool:
         """Check two objects for equality."""
-        if check_types and type(self) != type(other):
+        if _key is None:
+            _key = type(self).__name__
+        if check_types and not is_deep_equal(
+            self,
+            other,
+            _key=_key,
+            only_types=True,
+            **kwargs,
+        ):
             return False
         if check_attrs:
-            if self.get_writeable_attrs() != other.get_writeable_attrs():
+            if not is_deep_equal(
+                self.get_writeable_attrs(),
+                other.get_writeable_attrs(),
+                _key=_key + ".get_writeable_attrs()",
+                **kwargs,
+            ):
                 return False
             for attr in self.get_writeable_attrs():
-                if not is_deep_equal(getattr(self, attr), getattr(other, attr)):
+                if not is_deep_equal(
+                    getattr(self, attr),
+                    getattr(other, attr),
+                    _key=_key + f".{attr}",
+                    **kwargs,
+                ):
                     return False
-        return self.config.equals(other.config, check_types=check_types, check_options=check_options)
+        return self.config.equals(
+            other.config,
+            check_types=check_types,
+            check_options=check_options,
+            _key=_key + ".config",
+            **kwargs,
+        )
 
     def update_config(self, *args, **kwargs) -> None:
         """Force-update the config."""
@@ -1025,8 +1112,10 @@ class Configured(Cacheable, Comparable, Pickleable, Prettified):
         raise KeyError(f"Key '{k}' not found among registered settings")
 
     @classmethod
-    def set_settings(cls, key_id: tp.Optional[str] = None, **kwargs) -> None:
-        """Set class-related settings in `vectorbtpro._settings`."""
+    def set_settings(cls, key_id: tp.Optional[str] = None, populate_: bool = False, **kwargs) -> None:
+        """Set class-related settings in `vectorbtpro._settings`.
+
+        If the settings do not exist yet, pass `populate_=True`."""
         from vectorbtpro._settings import settings
 
         if isinstance(cls._setting_keys, dict):
@@ -1039,14 +1128,17 @@ class Configured(Cacheable, Comparable, Pickleable, Prettified):
             cls_settings_key = cls._setting_keys
         if cls_settings_key is None:
             raise ValueError(f"No settings associated with the class '{cls.__name__}'")
-        cls_cfg = get_dict_item(settings, cls_settings_key)
+        cls_cfg = get_dict_item(settings, cls_settings_key, populate=populate_)
         for k, v in kwargs.items():
-            if k not in cls_cfg:
-                raise KeyError(f"Invalid key '{k}'")
-            if isinstance(cls_cfg[k], dict) and isinstance(v, dict):
-                cls_cfg[k] = merge_dicts(cls_cfg[k], v)
-            else:
+            if populate_:
                 cls_cfg[k] = v
+            else:
+                if k not in cls_cfg:
+                    raise KeyError(f"Invalid key '{k}'")
+                if isinstance(cls_cfg[k], dict) and isinstance(v, dict):
+                    cls_cfg[k] = merge_dicts(cls_cfg[k], v)
+                else:
+                    cls_cfg[k] = v
 
     @classmethod
     def reset_settings(cls, key_id: tp.Optional[str] = None) -> None:

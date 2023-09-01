@@ -11,7 +11,7 @@ a portfolio and can be accessed as `vectorbtpro.portfolio.base.Portfolio.orders`
 >>> from datetime import datetime, timedelta
 >>> import vectorbtpro as vbt
 
->>> price = vbt.RandomData.fetch(
+>>> price = vbt.RandomData.pull(
 ...     ['a', 'b'],
 ...     start=datetime(2020, 1, 1),
 ...     end=datetime(2020, 3, 1),

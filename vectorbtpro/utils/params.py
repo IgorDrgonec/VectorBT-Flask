@@ -19,6 +19,7 @@ from vectorbtpro.utils.config import Config, merge_dicts
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.template import CustomTemplate, substitute_templates
 from vectorbtpro.utils.parsing import annotate_args, flatten_ann_args, ann_args_to_args
+from vectorbtpro.utils.selection import PosSel, LabelSel, _NoResult, NoResultsException
 
 __all__ = [
     "generate_param_combs",
@@ -177,7 +178,7 @@ class Param:
     denotes the name of other parameter(s)."""
 
     context: tp.KwargsLike = attr.ib(default=None)
-    """Context used in evaluation of `Param.condition`."""
+    """Context used in evaluation of `Param.condition` and `Param.map_template`."""
 
     keys: tp.Optional[tp.IndexLike] = attr.ib(default=None)
     """Keys acting as an index level.
@@ -619,14 +620,14 @@ def parameterized(
     search_max_len: tp.Optional[int] = None,
     search_max_depth: tp.Optional[int] = None,
     skip_single_param: tp.Optional[bool] = None,
-    template_context: tp.Optional[tp.Mapping] = None,
+    template_context: tp.KwargsLike = None,
     random_subset: tp.Optional[int] = None,
     seed: tp.Optional[int] = None,
     index_stack_kwargs: tp.KwargsLike = None,
     name_tuple_to_str: tp.Union[None, bool, tp.Callable] = None,
     merge_func: tp.Union[None, str, tuple, tp.Callable] = None,
     merge_kwargs: tp.KwargsLike = None,
-    selection: tp.Union[None, tp.MaybeIterable[tp.Hashable]] = None,
+    selection: tp.Optional[tp.Selection] = None,
     forward_kwargs_as: tp.KwargsLike = None,
     mono_n_chunks: tp.Optional[tp.Union[str, int]] = None,
     mono_min_size: tp.Optional[int] = None,
@@ -651,7 +652,9 @@ def parameterized(
     4. Generates and resolves parameter configs by combining combinations from the step above with
     `param_configs` that is optionally passed by the user. User-defined `param_configs` have more priority.
     5. If `selection` is not None, substitutes it as a template, translates it into indices that
-    can be mapped to `param_index`, and selects them from all the objects generated above
+    can be mapped to `param_index`, and selects them from all the objects generated above.
+    The selection value(s) can be wrapped with `vectorbtpro.utils.selection.PosSel` or
+    `vectorbtpro.utils.selection.LabelSel` to instruct vectorbtpro what the value(s) should denote.
     6. Builds mono-chunks if `mono_n_chunks`, `mono_chunk_len`, or `mono_chunk_meta` is not None
     7. Extracts arguments and keyword arguments from each parameter config and substitutes any templates (lazily)
     8. Passes each set of the function and its arguments to `vectorbtpro.utils.execution.execute` for execution
@@ -678,7 +681,7 @@ def parameterized(
 
     Any template in both `execute_kwargs` and `merge_kwargs` will be substituted. You can use
     the keys `param_configs`, `param_index`, all keys in `template_context`, and all arguments as found
-    in the signature of the function.
+    in the signature of the function. To substitute templates further down the pipeline, use substitution ids.
 
     If `skip_single_param` is True, won't use the execution engine, but will execute and
     return the result right away.
@@ -691,6 +694,9 @@ def parameterized(
 
     When defining a custom merging function, make sure to use `param_index` (via templates) to build the final
     index/column hierarchy.
+
+    If `vectorbtpro.utils.selection.NoResult` is returned, will skip the current iteration and
+    remove it from the final index.
 
     Keyword arguments `**execute_kwargs` are passed directly to `vectorbtpro.utils.execution.execute`.
 
@@ -1033,13 +1039,26 @@ def parameterized(
 
             if selection is not None:
                 selection = substitute_templates(selection, template_context, sub_id="selection")
+                if isinstance(selection, _NoResult):
+                    raise NoResultsException
                 found_param = False
+                kind = None
+                if isinstance(selection, PosSel):
+                    selection = selection.value
+                    kind = "positions"
+                elif isinstance(selection, LabelSel):
+                    selection = selection.value
+                    kind = "labels"
                 if checks.is_hashable(selection):
-                    if checks.is_int(selection):
+                    if kind == "positions" or (kind is None and checks.is_int(selection)):
                         selection = {selection}
                         found_param = True
                         template_context["single_param"] = True
-                    elif template_context["param_index"] is not None and selection in template_context["param_index"]:
+                    elif kind == "labels" or (
+                        kind is None
+                        and template_context["param_index"] is not None
+                        and selection in template_context["param_index"]
+                    ):
                         selection = {template_context["param_index"].get_loc(selection)}
                         found_param = True
                         template_context["single_param"] = True
@@ -1047,13 +1066,25 @@ def parameterized(
                     if checks.is_iterable(selection):
                         new_selection = set()
                         for s in selection:
-                            if checks.is_int(s):
+                            if isinstance(s, PosSel):
+                                s = s.value
+                                kind = "positions"
+                            elif isinstance(s, LabelSel):
+                                s = s.value
+                                kind = "labels"
+                            if kind == "positions" or (kind is None and checks.is_int(s)):
                                 new_selection.add(s)
-                            elif template_context["param_index"] is not None and s in template_context["param_index"]:
+                            elif kind == "labels" or (
+                                kind is None
+                                and template_context["param_index"] is not None
+                                and s in template_context["param_index"]
+                            ):
                                 new_selection.add(template_context["param_index"].get_loc(s))
                             else:
                                 raise ValueError(f"Selection {selection} couldn't be matched with parameter index")
                         selection = new_selection
+                        if len(selection) == 0:
+                            raise ValueError(f"Selection {selection} is empty")
                     else:
                         raise ValueError(f"Selection {selection} couldn't be matched with parameter index")
                 if template_context["param_index"] is not None:
@@ -1088,7 +1119,10 @@ def parameterized(
 
             if skip_single_param and template_context["single_param"]:
                 funcs_args = list(_prepare_args())
-                return funcs_args[0][0](*funcs_args[0][1], **funcs_args[0][2])
+                result = funcs_args[0][0](*funcs_args[0][1], **funcs_args[0][2])
+                if isinstance(result, _NoResult):
+                    raise NoResultsException
+                return result
 
             if mono_n_chunks is not None or mono_chunk_len is not None or mono_chunk_meta is not None:
                 # Prepare mono-chunks
@@ -1143,8 +1177,10 @@ def parameterized(
                                 all_same[k] = True
                             else:
                                 if k not in new_param_config:
-                                    raise ValueError(f"Mono-chunks cannot be built because key '{k}' "
-                                                     f"is not present in all parameter configs")
+                                    raise ValueError(
+                                        f"Mono-chunks cannot be built because key '{k}' "
+                                        "is not present in all parameter configs"
+                                    )
                                 if v is not new_param_config[k][-1]:
                                     all_same[k] = False
                                 new_param_config[k].append(v)
@@ -1222,12 +1258,29 @@ def parameterized(
                 )
 
             # Execute function on each parameter combination
-            execute_kwargs = substitute_templates(execute_kwargs, template_context, sub_id="execute_kwargs")
             results = execute(
                 template_context["funcs_args"],
                 n_calls=len(template_context["param_configs"]),
                 **execute_kwargs,
             )
+
+            # Filter the results
+            skip_indices = set()
+            for i, result in enumerate(results):
+                if isinstance(result, _NoResult):
+                    skip_indices.add(i)
+            if len(skip_indices) > 0:
+                new_results = []
+                keep_indices = []
+                for i, result in enumerate(results):
+                    if i not in skip_indices:
+                        new_results.append(result)
+                        keep_indices.append(i)
+                results = new_results
+                if template_context["param_index"] is not None:
+                    template_context["param_index"] = template_context["param_index"][keep_indices]
+            if len(results) == 0:
+                raise NoResultsException
 
             # Merge the results
             if merge_func is not None:

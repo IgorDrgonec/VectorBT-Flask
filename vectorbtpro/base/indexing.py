@@ -18,6 +18,7 @@ from vectorbtpro.utils import datetime_ as dt, datetime_nb as dt_nb
 from vectorbtpro.utils.config import hdict, merge_dicts
 from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.utils.mapping import to_field_mapping
+from vectorbtpro.utils.selection import PosSel, LabelSel
 from vectorbtpro.registries.jit_registry import jit_reg
 
 __all__ = [
@@ -480,7 +481,7 @@ def build_param_indexer(
         setattr(ParamIndexer, param_name + "_loc", property(param_loc))
 
     ParamIndexer.__name__ = class_name
-    ParamIndexer.__qualname__ = class_name
+    ParamIndexer.__qualname__ = ParamIndexer.__name__
     if module_name is not None:
         ParamIndexer.__module__ = module_name
 
@@ -874,7 +875,7 @@ class DTCIdxr(UniIdxr):
     """One or more datetime-like components."""
 
     parse_kwargs: tp.KwargsLike = attr.ib(default=None)
-    """Keyword arguments passed to `vectorbtpro.utils.datetime_.parse_time_str`."""
+    """Keyword arguments passed to `vectorbtpro.utils.datetime_.DTC.parse`."""
 
     closed_start: bool = attr.ib(default=True)
     """Whether slice start should be inclusive."""
@@ -1012,8 +1013,8 @@ class PointIdxr(UniIdxr):
     If `at_time` is set and `indexer_method` is neither exact nor nearest, `indexer_tolerance` 
     becomes such that the next element must be within the current day."""
 
-    skip_minus_one: bool = attr.ib(default=True)
-    """Whether to remove indices that are -1 (not found)."""
+    skip_not_found: bool = attr.ib(default=True)
+    """Whether to drop indices that are -1 (not found)."""
 
     def get(
         self,
@@ -1043,7 +1044,7 @@ def get_index_points(
     kind: tp.Optional[str] = point_idxr_defaults["kind"],
     indexer_method: str = point_idxr_defaults["indexer_method"],
     indexer_tolerance: str = point_idxr_defaults["indexer_tolerance"],
-    skip_minus_one: bool = point_idxr_defaults["skip_minus_one"],
+    skip_not_found: bool = point_idxr_defaults["skip_not_found"],
 ) -> tp.Array1d:
     """Translate indices or labels into index points.
 
@@ -1233,7 +1234,7 @@ def get_index_points(
         else:
             index_points = index_points[index_points < end]
 
-    if skip_minus_one:
+    if skip_not_found:
         index_points = index_points[index_points != -1]
 
     return index_points
@@ -1347,8 +1348,8 @@ class RangeIdxr(UniIdxr):
     `start` and `end` get wrapped with NumPy. If kind` is 'bounds', 
     `vectorbtpro.base.resampling.base.Resampler.map_bounds_to_source_ranges` is used."""
 
-    skip_minus_one: bool = attr.ib(default=True)
-    """Whether to remove indices that are -1 (not found)."""
+    skip_not_found: bool = attr.ib(default=True)
+    """Whether to drop indices that are -1 (not found)."""
 
     jitted: tp.JittedOption = attr.ib(default=None)
     """Jitting option passed to `vectorbtpro.base.resampling.base.Resampler.map_bounds_to_source_ranges`."""
@@ -1387,7 +1388,7 @@ def get_index_ranges(
     add_start_delta: tp.Optional[tp.FrequencyLike] = range_idxr_defaults["add_start_delta"],
     add_end_delta: tp.Optional[tp.FrequencyLike] = range_idxr_defaults["add_end_delta"],
     kind: tp.Optional[str] = range_idxr_defaults["kind"],
-    skip_minus_one: bool = range_idxr_defaults["skip_minus_one"],
+    skip_not_found: bool = range_idxr_defaults["skip_not_found"],
     jitted: tp.JittedOption = range_idxr_defaults["jitted"],
 ) -> tp.Tuple[tp.Array1d, tp.Array1d]:
     """Translate indices, labels, or bounds into index ranges.
@@ -1781,37 +1782,34 @@ def get_index_ranges(
             target_rbound_index=end.values,
             closed_lbound=closed_start,
             closed_rbound=closed_end,
-            skip_minus_one=skip_minus_one,
+            skip_not_found=skip_not_found,
             jitted=jitted,
         )
-    elif kind.lower() == "labels":
-        range_starts = np.empty(len(start), dtype=np.int_)
-        range_ends = np.empty(len(end), dtype=np.int_)
-        range_index = pd.Series(np.arange(len(naive_index)), index=naive_index)
-        for i in range(len(range_starts)):
-            selected_range = range_index[start[i] : end[i]]
-            if len(selected_range) > 0 and not closed_start and selected_range.index[0] == start[i]:
-                selected_range = selected_range.iloc[1:]
-            if len(selected_range) > 0 and not closed_end and selected_range.index[-1] == end[i]:
-                selected_range = selected_range.iloc[:-1]
-            if len(selected_range) > 0:
-                range_starts[i] = selected_range.iloc[0]
-                range_ends[i] = selected_range.iloc[-1]
-            else:
-                range_starts[i] = -1
-                range_ends[i] = -1
-        if skip_minus_one:
-            valid_mask = (range_starts != -1) & (range_ends != -1)
-            range_starts = range_starts[valid_mask]
-            range_ends = range_ends[valid_mask]
     else:
-        if not closed_start:
-            start = start + 1
-        if closed_end:
-            end = end + 1
-        range_starts = np.asarray(start)
-        range_ends = np.asarray(end)
-        if skip_minus_one:
+        if kind.lower() == "labels":
+            range_starts = np.empty(len(start), dtype=np.int_)
+            range_ends = np.empty(len(end), dtype=np.int_)
+            range_index = pd.Series(np.arange(len(naive_index)), index=naive_index)
+            for i in range(len(range_starts)):
+                selected_range = range_index[start[i] : end[i]]
+                if len(selected_range) > 0 and not closed_start and selected_range.index[0] == start[i]:
+                    selected_range = selected_range.iloc[1:]
+                if len(selected_range) > 0 and not closed_end and selected_range.index[-1] == end[i]:
+                    selected_range = selected_range.iloc[:-1]
+                if len(selected_range) > 0:
+                    range_starts[i] = selected_range.iloc[0]
+                    range_ends[i] = selected_range.iloc[-1]
+                else:
+                    range_starts[i] = -1
+                    range_ends[i] = -1
+        else:
+            if not closed_start:
+                start = start + 1
+            if closed_end:
+                end = end + 1
+            range_starts = np.asarray(start)
+            range_ends = np.asarray(end)
+        if skip_not_found:
             valid_mask = (range_starts != -1) & (range_ends != -1)
             range_starts = range_starts[valid_mask]
             range_ends = range_ends[valid_mask]
@@ -1828,6 +1826,8 @@ class AutoIdxr(UniIdxr):
 
     value: tp.Union[
         None,
+        tp.PosSel,
+        tp.LabelSel,
         tp.MaybeSequence[tp.MaybeSequence[int]],
         tp.MaybeSequence[tp.Label],
         tp.MaybeSequence[tp.DatetimeLike],
@@ -1835,7 +1835,10 @@ class AutoIdxr(UniIdxr):
         tp.FrequencyLike,
         tp.Slice,
     ] = attr.ib()
-    """One or more integer indices, datetime-like objects, frequency-like objects, or labels."""
+    """One or more integer indices, datetime-like objects, frequency-like objects, or labels.
+    
+    Can also be an instance of `vectorbtpro.utils.selection.PosSel` holding position(s)
+    and `vectorbtpro.utils.selection.LabelSel` holding label(s)."""
 
     closed_start: bool = attr.ib(default=_DEF)
     """Whether slice start should be inclusive."""
@@ -1911,7 +1914,13 @@ class AutoIdxr(UniIdxr):
             idxr_kwargs["indexer_method"] = self.indexer_method
 
         if kind is None:
-            if isinstance(value, (slice, hslice)):
+            if isinstance(value, PosSel):
+                kind = "positions"
+                value = value.value
+            elif isinstance(value, LabelSel):
+                kind = "labels"
+                value = value.value
+            elif isinstance(value, (slice, hslice)):
                 if checks.is_int(value.start) or checks.is_int(value.stop):
                     kind = "positions"
                 elif value.start is None and value.stop is None:

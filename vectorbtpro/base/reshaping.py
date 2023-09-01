@@ -749,6 +749,11 @@ class BCO:
     merge_kwargs: tp.Optional[tp.Kwargs] = attr.ib(default=None)
     """Keyword arguments passed to `vectorbtpro.base.merging.column_stack_merge`."""
 
+    context: tp.KwargsLike = attr.ib(default=None)
+    """Context used in evaluation of templates.
+    
+    Will be merged over `template_context`."""
+
 
 @attr.s(frozen=True)
 class Default:
@@ -819,6 +824,7 @@ def broadcast(
     ignore_ranges: tp.Optional[bool] = None,
     check_index_names: tp.Optional[bool] = None,
     index_stack_kwargs: tp.KwargsLike = None,
+    template_context: tp.KwargsLike = None,
 ) -> tp.Any:
     """Bring any array-like object in `args` to the same shape by using NumPy-like broadcasting.
 
@@ -867,15 +873,15 @@ def broadcast(
         require_kwargs (dict, sequence or mapping): See `BCO.require_kwargs`.
 
             This key will be merged with any argument-specific dict. If the mapping contains all keys in
-            `np.require`, it will be applied on all objects.
+            `np.require`, it will be applied to all objects.
         reindex_kwargs (dict, sequence or mapping): See `BCO.reindex_kwargs`.
 
             This key will be merged with any argument-specific dict. If the mapping contains all keys in
-            `pd.DataFrame.reindex`, it will be applied on all objects.
+            `pd.DataFrame.reindex`, it will be applied to all objects.
         merge_kwargs (dict, sequence or mapping): See `BCO.merge_kwargs`.
 
             This key will be merged with any argument-specific dict. If the mapping contains all keys in
-            `pd.DataFrame.reindex`, it will be applied on all objects.
+            `pd.DataFrame.merge`, it will be applied to all objects.
         tile (int or index_like): Tile the final object by the number of times or index.
         random_subset (int): Select a random subset of parameter values.
 
@@ -888,12 +894,13 @@ def broadcast(
         ignore_ranges (bool): See `broadcast_index`.
         check_index_names (bool): See `broadcast_index`.
         index_stack_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.indexes.stack_indexes`.
+        template_context (dict): Template context.
 
     For defaults, see `vectorbtpro._settings.broadcasting`.
 
     Any keyword argument that can be associated with an object can be passed as
 
-    * a const that is applied on all objects,
+    * a const that is applied to all objects,
     * a sequence with value per object, and
     * a mapping with value per object name and the special key `_def` denoting the default value.
 
@@ -1307,6 +1314,11 @@ def broadcast(
         else:
             _merge_kwargs = merge_dicts(merge_kwargs, _merge_kwargs)
 
+        if isinstance(obj, BCO):
+            _context = merge_dicts(template_context, obj.context)
+        else:
+            _context = template_context
+
         if isinstance(value, Param):
             param_keys.add(k)
         elif isinstance(value, (indexing.index_dict, indexing.IdxSetter, indexing.IdxSetterFactory, CustomTemplate)):
@@ -1325,6 +1337,7 @@ def broadcast(
             require_kwargs=_require_kwargs,
             reindex_kwargs=_reindex_kwargs,
             merge_kwargs=_merge_kwargs,
+            context=_context,
         )
 
     # Check whether we should broadcast Pandas metadata and work on 2-dim data
@@ -1519,6 +1532,7 @@ def broadcast(
         _axis = bco_instances[k].axis
         _expand_axis = bco_instances[k].expand_axis
         _merge_kwargs = bco_instances[k].merge_kwargs
+        _context = bco_instances[k].context
         must_reset_index = _merge_kwargs.get("reset_index", None) not in (None, False)
         _reindex_kwargs = resolve_dict(bco_instances[k].reindex_kwargs)
         _fill_value = _reindex_kwargs.get("fill_value", np.nan)
@@ -1541,11 +1555,14 @@ def broadcast(
                         keep_flex=_keep_flex,
                     )
                 elif isinstance(o, CustomTemplate):
-                    context = dict(
-                        bco_instances=bco_instances,
-                        wrapper=wrapper,
-                        obj_name=k,
-                        bco=bco_instances[k],
+                    context = merge_dicts(
+                        dict(
+                            bco_instances=bco_instances,
+                            wrapper=wrapper,
+                            obj_name=k,
+                            bco=bco_instances[k],
+                        ),
+                        _context,
                     )
                     o = o.substitute(context, sub_id="broadcast")
                 o = to_2d_array(o)
@@ -1628,12 +1645,15 @@ def broadcast(
                     new_obj = new_obj.values
                 new_obj = _adjust_dims(new_obj, _keep_flex, _min_ndim, _expand_axis)
             elif isinstance(bco.value, CustomTemplate):
-                context = dict(
-                    bco_instances=bco_instances,
-                    new_objs=new_objs,
-                    wrapper=wrapper,
-                    obj_name=k,
-                    bco=bco,
+                context = merge_dicts(
+                    dict(
+                        bco_instances=bco_instances,
+                        new_objs=new_objs,
+                        wrapper=wrapper,
+                        obj_name=k,
+                        bco=bco,
+                    ),
+                    bco.context,
                 )
                 new_obj = bco.value.substitute(context, sub_id="broadcast")
             else:

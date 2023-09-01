@@ -426,6 +426,8 @@ __all__ = [
     "CAQuery",
     "CAQueryDelegator",
     "clear_cache",
+    "collect_garbage",
+    "flush",
 ]
 
 __pdoc__ = {}
@@ -2362,3 +2364,16 @@ class CAQueryDelegator(CASetupDelegatorMixin):
 
 clear_cache = CAQueryDelegator().clear_cache
 """Clear cache globally."""
+
+
+def collect_garbage() -> None:
+    """Collect garbage."""
+    import gc
+
+    gc.collect()
+
+
+def flush() -> None:
+    """Clear cache and collect garbage."""
+    clear_cache()
+    collect_garbage()

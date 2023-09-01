@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from vectorbtpro.utils.jitting import Jitter
     from vectorbtpro.utils.template import CustomTemplate
     from vectorbtpro.utils.datetime_ import DTC, DTCNT
+    from vectorbtpro.utils.selection import PosSel, LabelSel
     from vectorbtpro.base.indexing import hslice
     from vectorbtpro.base.grouping.base import Grouper
     from vectorbtpro.base.resampling.base import Resampler
@@ -53,13 +54,15 @@ else:
     TraceUpdater = "TraceUpdater"
     Jitter = "Jitter"
     CustomTemplate = "CustomTemplate"
+    DTC = "DTC"
+    DTCNT = "DTCNT"
+    PosSel = "PosSel"
+    LabelSel = "LabelSel"
     hslice = "hslice"
     Grouper = "Grouper"
     Resampler = "Resampler"
     FixRange = "FixRange"
     RelRange = "RelRange"
-    DTC = "DTC"
-    DTCNT = "DTCNT"
 
 __all__ = []
 
@@ -171,9 +174,10 @@ PathLike = Union[str, Path]
 SettingsKeys = ClassVar[Union[None, Hashable, Dict[Hashable, Hashable]]]
 
 # Data
-Symbol = Hashable
-Symbols = Sequence[Symbol]
-SymbolData = Union[None, SeriesFrame, Tuple[SeriesFrame, Kwargs]]
+Key = Feature = Symbol = Hashable
+Keys = Features = Symbols = Sequence[Hashable]
+MaybeKeys = MaybeFeatures = MaybeSymbols = Union[Hashable, Sequence[Hashable]]
+KeyData = FeatureData = SymbolData = Union[None, SeriesFrame, Tuple[SeriesFrame, Kwargs]]
 
 # Plotting
 TraceName = Union[str, None]
@@ -264,3 +268,6 @@ BoundsArray = Array3d
 
 # Staticization
 StaticizedOption = Union[None, bool, Kwargs, TaskId]
+
+# Selection
+Selection = Union[PosSel, LabelSel, MaybeIterable[Union[PosSel, LabelSel, Hashable]]]
