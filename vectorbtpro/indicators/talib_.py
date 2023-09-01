@@ -12,10 +12,10 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_pd_array, column_stack, broadcast_arrays, broadcast
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic import nb as generic_nb
+from vectorbtpro.generic.accessors import GenericAccessor
 from vectorbtpro.utils.array_ import build_nan_mask, squeeze_nan, unsqueeze_nan
-from vectorbtpro.utils.datetime_ import freq_to_timedelta64, infer_index_freq
 from vectorbtpro.utils.colors import adjust_opacity
-from vectorbtpro.utils.config import merge_dicts
+from vectorbtpro.utils.config import merge_dicts, resolve_dict
 
 __all__ = [
     "talib_func",
@@ -47,6 +47,9 @@ def talib_func(func_name: str) -> tp.Callable:
     def run_talib_func(
         *args,
         timeframe: tp.Optional[tp.FrequencyLike] = None,
+        resample_map: tp.KwargsLike = None,
+        resample_kwargs: tp.KwargsLikeSequence = None,
+        realign_kwargs: tp.KwargsLikeSequence = None,
         wrapper: tp.Optional[ArrayWrapper] = None,
         skipna: bool = False,
         silence_warnings: bool = False,
@@ -114,7 +117,7 @@ def talib_func(func_name: str) -> tp.Callable:
         input_shape = inputs[0].shape
 
         def _run_talib_func(inputs, *_args, **_kwargs):
-            new_index = None
+            target_index = None
             if timeframe is not None:
                 if wrapper is None:
                     raise ValueError("Resampling requires a wrapper")
@@ -128,20 +131,21 @@ def talib_func(func_name: str) -> tp.Callable:
                             stacklevel=2,
                         )
                 new_inputs = ()
+                _resample_map = merge_dicts(resample_map, {
+                    "open": "first",
+                    "high": "max",
+                    "low": "min",
+                    "close": "last",
+                    "volume": "sum",
+                })
                 for i, input in enumerate(inputs):
-                    if input_names[i] == "open":
-                        new_input = pd.Series(input, index=wrapper.index).resample(timeframe).first()
-                    elif input_names[i] == "high":
-                        new_input = pd.Series(input, index=wrapper.index).resample(timeframe).max()
-                    elif input_names[i] == "low":
-                        new_input = pd.Series(input, index=wrapper.index).resample(timeframe).min()
-                    elif input_names[i] == "close":
-                        new_input = pd.Series(input, index=wrapper.index).resample(timeframe).last()
-                    elif input_names[i] == "volume":
-                        new_input = pd.Series(input, index=wrapper.index).resample(timeframe).sum()
-                    else:
-                        raise ValueError(f"Can't resample '{input_names[i]}'")
-                    new_index = new_input.index
+                    _resample_kwargs = resolve_dict(resample_kwargs, i=i)
+                    new_input = GenericAccessor(wrapper, input).resample_apply(
+                        timeframe,
+                        _resample_map[input_names[i]],
+                        **_resample_kwargs,
+                    )
+                    target_index = new_input.index
                     new_inputs += (new_input.values,)
                 inputs = new_inputs
 
@@ -181,32 +185,20 @@ def talib_func(func_name: str) -> tp.Callable:
                         outputs = unsqueeze_nan(*outputs, nan_mask=nan_mask)
                     if timeframe is not None:
                         new_outputs = ()
-                        for output in outputs:
-                            source_freq = infer_index_freq(
-                                new_index,
-                                allow_date_offset=False,
-                                allow_numeric=False,
-                            )
-                            if source_freq is not None:
-                                source_freq = freq_to_timedelta64(source_freq)
-                            else:
-                                source_freq = None
-                            if wrapper.freq is not None:
-                                target_freq = freq_to_timedelta64(wrapper.freq)
-                            else:
-                                target_freq = None
-                            new_output = generic_nb.latest_at_index_1d_nb(
-                                output,
-                                new_index.values,
-                                wrapper.index.values,
-                                source_freq=source_freq,
-                                target_freq=target_freq,
+                        target_wrapper = wrapper.replace(index=target_index, freq=None)
+                        for i, output in enumerate(outputs):
+                            _realign_kwargs = merge_dicts(dict(
                                 source_rbound=True,
                                 target_rbound=True,
                                 nan_value=np.nan,
                                 ffill=True,
+                            ), resolve_dict(realign_kwargs, i=i))
+                            new_output = GenericAccessor(target_wrapper, output).latest_at_index(
+                                wrapper.index,
+                                freq=wrapper.freq,
+                                **_realign_kwargs,
                             )
-                            new_outputs += (new_output,)
+                            new_outputs += (new_output.values,)
                         outputs = new_outputs
             return outputs
 
@@ -267,7 +259,11 @@ def talib_func(func_name: str) -> tp.Callable:
 Requires [TA-Lib](https://github.com/mrjbq7/ta-lib) installed.
 
 Set `timeframe` to a frequency to resample the input arrays to this frequency, run the function,
-and then resample the output arrays back to the original frequency.
+and then resample the output arrays back to the original frequency. Optionally, provide `resample_map`
+as a dictionary that maps input names to resample-apply function names. Keyword arguments 
+`resample_kwargs` are passed to `vectorbtpro.generic.accessors.GenericAccessor.resample_apply`
+while `realign_kwargs` are passed to `vectorbtpro.generic.accessors.GenericAccessor.latest_at_index`.
+Both can be also provided as sequences of dictionaries - one dictionary per input and output respectively.
 
 Set `skipna` to True to run the TA-Lib function on non-NA values only.
 
