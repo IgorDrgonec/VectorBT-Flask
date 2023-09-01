@@ -65,7 +65,6 @@ if settings["importing"]["auto_import"]:
                 module = importlib.import_module(mod_name)
             if hasattr(module, "__all__") and relative_name not in package.__exclude_from__all__:
                 for k in module.__all__:
-                    print(package, mod_name, k, type(getattr(package, k)) if hasattr(package, k) else None, type(getattr(module, k)))
                     if hasattr(package, k) and getattr(package, k) is not getattr(module, k):
                         raise ValueError(
                             f"Attempt to override '{k}' in '{package.__name__}' from '{mod_name}'"
