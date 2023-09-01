@@ -138,9 +138,10 @@ def talib_func(func_name: str) -> tp.Callable:
                     "close": "last",
                     "volume": "sum",
                 })
+                source_wrapper = ArrayWrapper(index=wrapper.index, freq=wrapper.freq)
                 for i, input in enumerate(inputs):
                     _resample_kwargs = resolve_dict(resample_kwargs, i=i)
-                    new_input = GenericAccessor(wrapper, input).resample_apply(
+                    new_input = GenericAccessor(source_wrapper, input).resample_apply(
                         timeframe,
                         _resample_map[input_names[i]],
                         **_resample_kwargs,
@@ -185,13 +186,14 @@ def talib_func(func_name: str) -> tp.Callable:
                         outputs = unsqueeze_nan(*outputs, nan_mask=nan_mask)
                     if timeframe is not None:
                         new_outputs = ()
-                        target_wrapper = wrapper.replace(index=target_index, freq=None)
+                        target_wrapper = ArrayWrapper(index=target_index)
                         for i, output in enumerate(outputs):
                             _realign_kwargs = merge_dicts(dict(
                                 source_rbound=True,
                                 target_rbound=True,
                                 nan_value=np.nan,
                                 ffill=True,
+                                silence_warnings=True,
                             ), resolve_dict(realign_kwargs, i=i))
                             new_output = GenericAccessor(target_wrapper, output).latest_at_index(
                                 wrapper.index,

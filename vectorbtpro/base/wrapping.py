@@ -440,7 +440,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
     def __init__(
         self,
         index: tp.IndexLike,
-        columns: tp.IndexLike,
+        columns: tp.Optional[tp.IndexLike] = None,
         ndim: tp.Optional[int] = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
         column_only_select: tp.Optional[bool] = None,
@@ -452,8 +452,9 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
     ) -> None:
 
         checks.assert_not_none(index)
-        checks.assert_not_none(columns)
         index = try_to_datetime_index(index)
+        if columns is None:
+            columns = [None]
         if not isinstance(columns, pd.Index):
             columns = pd.Index(columns)
         if ndim is None:
