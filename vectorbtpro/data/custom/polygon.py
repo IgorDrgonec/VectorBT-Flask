@@ -29,7 +29,7 @@ except ImportError:
     PolygonClientT = tp.Any
 
 __all__ = [
-    "RemoteData",
+    "PolygonData",
 ]
 
 __pdoc__ = {}
