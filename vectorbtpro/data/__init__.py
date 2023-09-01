@@ -10,5 +10,4 @@ if TYPE_CHECKING:
     from vectorbtpro.data.decorators import *
     from vectorbtpro.data.nb import *
     from vectorbtpro.data.saver import *
-    from vectorbtpro.data.tv import *
     from vectorbtpro.data.updater import *
