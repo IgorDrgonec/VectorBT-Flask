@@ -149,6 +149,7 @@ _settings = {}
 
 importing = child_dict(
     auto_import=True,
+    clear_pycache=False,
     plotly=True,
     telegram=True,
     quantstats=True,
