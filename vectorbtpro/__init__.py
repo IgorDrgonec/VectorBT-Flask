@@ -39,7 +39,6 @@ warnings.filterwarnings(
 )
 
 if settings["importing"]["clear_pycache"]:
-    print("here")
     from vectorbtpro.utils.caching import clear_pycache
 
     clear_pycache()
