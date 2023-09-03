@@ -118,10 +118,13 @@ class PXSRAccessor(PXAccessor, BaseSRAccessor):
         self,
         wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
         obj: tp.Optional[tp.ArrayLike] = None,
+        _full_init: bool = True,
         **kwargs,
     ) -> None:
-        BaseSRAccessor.__init__(self, wrapper, obj=obj, **kwargs)
-        PXAccessor.__init__(self, wrapper, obj=obj, **kwargs)
+        BaseSRAccessor.__init__(self, wrapper, obj=obj, _full_init=False, **kwargs)
+
+        if _full_init:
+            PXAccessor.__init__(self, wrapper, obj=obj, **kwargs)
 
 
 @register_df_vbt_accessor("px")
@@ -134,7 +137,10 @@ class PXDFAccessor(PXAccessor, BaseDFAccessor):
         self,
         wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
         obj: tp.Optional[tp.ArrayLike] = None,
+        _full_init: bool = True,
         **kwargs,
     ) -> None:
-        BaseDFAccessor.__init__(self, wrapper, obj=obj, **kwargs)
-        PXAccessor.__init__(self, wrapper, obj=obj, **kwargs)
+        BaseDFAccessor.__init__(self, wrapper, obj=obj, _full_init=False, **kwargs)
+
+        if _full_init:
+            PXAccessor.__init__(self, wrapper, obj=obj, **kwargs)

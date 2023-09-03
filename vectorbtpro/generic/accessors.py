@@ -221,7 +221,7 @@ from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, Readonly
 from vectorbtpro.utils.decorators import class_or_instancemethod, class_or_instanceproperty
 from vectorbtpro.utils.mapping import apply_mapping, to_value_mapping
 from vectorbtpro.utils.template import substitute_templates
-from vectorbtpro.utils.datetime_ import freq_to_timedelta, freq_to_timedelta64, try_to_datetime_index, parse_timedelta
+from vectorbtpro.utils.datetime_ import freq_to_timedelta, freq_to_timedelta64, prepare_dt_index, parse_timedelta
 from vectorbtpro.utils.colors import adjust_opacity, map_value_to_cmap
 from vectorbtpro.utils.enum_ import map_enum_fields
 
@@ -2783,8 +2783,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
 
-        target_lbound_index = try_to_datetime_index(target_lbound_index)
-        target_rbound_index = try_to_datetime_index(target_rbound_index)
+        target_lbound_index = prepare_dt_index(target_lbound_index)
+        target_rbound_index = prepare_dt_index(target_rbound_index)
         if len(target_lbound_index) == 1 and len(target_rbound_index) > 1:
             target_lbound_index = repeat_index(target_lbound_index, len(target_rbound_index))
             if wrap_with_lbound is None:
@@ -5074,10 +5074,13 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
         obj: tp.Optional[tp.ArrayLike] = None,
         mapping: tp.Optional[tp.MappingLike] = None,
+        _full_init: bool = True,
         **kwargs,
     ) -> None:
-        BaseSRAccessor.__init__(self, wrapper, obj=obj, **kwargs)
-        GenericAccessor.__init__(self, wrapper, obj=obj, mapping=mapping, **kwargs)
+        BaseSRAccessor.__init__(self, wrapper, obj=obj, _full_init=False, **kwargs)
+
+        if _full_init:
+            GenericAccessor.__init__(self, wrapper, obj=obj, mapping=mapping, **kwargs)
 
     def fit_pattern(
         self,
@@ -5201,10 +5204,13 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
         obj: tp.Optional[tp.ArrayLike] = None,
         mapping: tp.Optional[tp.MappingLike] = None,
+        _full_init: bool = True,
         **kwargs,
     ) -> None:
-        BaseDFAccessor.__init__(self, wrapper, obj=obj, **kwargs)
-        GenericAccessor.__init__(self, wrapper, obj=obj, mapping=mapping, **kwargs)
+        BaseDFAccessor.__init__(self, wrapper, obj=obj, _full_init=False, **kwargs)
+
+        if _full_init:
+            GenericAccessor.__init__(self, wrapper, obj=obj, mapping=mapping, **kwargs)
 
     def plot_projections(
         self,

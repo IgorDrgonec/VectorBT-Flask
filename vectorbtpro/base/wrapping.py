@@ -17,7 +17,7 @@ from vectorbtpro.base.indexes import stack_indexes, concat_indexes
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
 from vectorbtpro.utils.config import Configured, merge_dicts, resolve_dict
-from vectorbtpro.utils.datetime_ import infer_index_freq, try_to_datetime_index
+from vectorbtpro.utils.datetime_ import infer_index_freq, prepare_dt_index
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method, cached_property
 from vectorbtpro.utils.array_ import is_range, cast_to_min_precision, cast_to_max_precision
@@ -430,6 +430,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         "columns",
         "ndim",
         "freq",
+        "parse_index",
         "column_only_select",
         "range_only_select",
         "group_select",
@@ -443,6 +444,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         columns: tp.Optional[tp.IndexLike] = None,
         ndim: tp.Optional[int] = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
+        parse_index: tp.Optional[bool] = None,
         column_only_select: tp.Optional[bool] = None,
         range_only_select: tp.Optional[bool] = None,
         group_select: tp.Optional[bool] = None,
@@ -450,9 +452,8 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         grouper: tp.Optional[Grouper] = None,
         **kwargs,
     ) -> None:
-
         checks.assert_not_none(index)
-        index = try_to_datetime_index(index)
+        index = prepare_dt_index(index, parse_index=parse_index)
         if columns is None:
             columns = [None]
         if not isinstance(columns, pd.Index):
@@ -483,6 +484,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
             columns=columns,
             ndim=ndim,
             freq=freq,
+            parse_index=parse_index,
             column_only_select=column_only_select,
             range_only_select=range_only_select,
             group_select=group_select,
@@ -495,6 +497,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         self._columns = columns
         self._ndim = ndim
         self._freq = freq
+        self._parse_index = parse_index
         self._column_only_select = column_only_select
         self._range_only_select = range_only_select
         self._group_select = group_select
@@ -966,6 +969,13 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
     def arr_to_timedelta(self, *args, **kwargs) -> tp.Union[pd.Index, tp.MaybeArray]:
         """See `vectorbtpro.base.accessors.BaseIDXAccessor.arr_to_timedelta`."""
         return self.index_acc.arr_to_timedelta(*args, **kwargs)
+
+    @property
+    def parse_index(self) -> tp.Optional[bool]:
+        """Whether to try to convert the index into a datetime index.
+
+        Applied during the initialization and passed to `vectorbtpro.utils.datetime_.prepare_dt_index`."""
+        return self._parse_index
 
     @property
     def column_only_select(self) -> tp.Optional[bool]:

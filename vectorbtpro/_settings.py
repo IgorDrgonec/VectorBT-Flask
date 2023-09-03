@@ -559,9 +559,10 @@ _settings["resampling"] = resampling
 datetime = child_dict(
     naive_tz="tzlocal()",
     to_fixed_offset=None,
+    parse_index=True,
     parse_with_pandas=True,
     parse_with_dateparser=False,
-    parser_kwargs=Config(),
+    dateparser_kwargs=Config(),
 )
 """_"""
 

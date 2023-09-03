@@ -23,7 +23,7 @@ from vectorbtpro.data.decorators import attach_symbol_dict_methods
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig, copy_dict
-from vectorbtpro.utils.datetime_ import is_tz_aware, to_timezone, try_to_datetime_index
+from vectorbtpro.utils.datetime_ import is_tz_aware, to_timezone, prepare_dt_index
 from vectorbtpro.utils.parsing import get_func_arg_names, extend_args
 from vectorbtpro.utils.path_ import check_mkdir
 from vectorbtpro.utils.template import RepEval, CustomTemplate, substitute_templates
@@ -1293,7 +1293,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     obj = obj.tz_localize(to_timezone(tz_localize))
             if tz_convert is not None:
                 obj = obj.tz_convert(to_timezone(tz_convert))
-        obj.index = try_to_datetime_index(obj.index)
+        obj.index = prepare_dt_index(obj.index)
         return obj
 
     @classmethod

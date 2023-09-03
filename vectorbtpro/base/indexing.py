@@ -840,7 +840,7 @@ class DatetimeIdxr(UniIdxr):
             return slice(None, None, None)
         if index is None:
             raise ValueError("Index is required")
-        index = dt.try_to_datetime_index(index)
+        index = dt.prepare_dt_index(index)
         checks.assert_instance_of(index, pd.DatetimeIndex)
         if not index.is_unique:
             raise ValueError("Datetime index must be unique")
@@ -910,7 +910,7 @@ class DTCIdxr(UniIdxr):
             parse_kwargs = {}
         if index is None:
             raise ValueError("Index is required")
-        index = dt.try_to_datetime_index(index)
+        index = dt.prepare_dt_index(index)
         ns_index = dt.to_ns(index)
         checks.assert_instance_of(index, pd.DatetimeIndex)
         if not index.is_unique:
@@ -1115,7 +1115,7 @@ def get_index_points(
         array([ 6, 13])
         ```
     """
-    index = dt.try_to_datetime_index(index)
+    index = dt.prepare_dt_index(index)
     if on is not None and isinstance(on, str):
         on = dt.try_align_dt_to_index(on, index)
     if start is not None and isinstance(start, str):
@@ -1171,7 +1171,7 @@ def get_index_points(
             else:
                 kind = "indices"
         else:
-            on = dt.try_to_datetime_index(on)
+            on = dt.prepare_dt_index(on)
             if pd.api.types.is_integer_dtype(on):
                 kind = "indices"
             else:
@@ -1186,7 +1186,7 @@ def get_index_points(
                 on = index[0]
             else:
                 on = 0
-    on = dt.try_to_datetime_index(on)
+    on = dt.prepare_dt_index(on)
 
     if at_time is not None:
         checks.assert_instance_of(on, pd.DatetimeIndex)
@@ -1576,7 +1576,7 @@ def get_index_ranges(
     from vectorbtpro.base.indexes import repeat_index
     from vectorbtpro.base.resampling.base import Resampler
 
-    index = dt.try_to_datetime_index(index)
+    index = dt.prepare_dt_index(index)
     if isinstance(index, pd.DatetimeIndex):
         if start is not None:
             start = dt.try_align_to_dt_index(start, index)

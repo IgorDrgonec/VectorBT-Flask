@@ -19,7 +19,7 @@ from vectorbtpro.utils.template import CustomTemplate, Rep, RepFunc, substitute_
 from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.datetime_ import (
-    try_to_datetime_index,
+    prepare_dt_index,
     try_align_dt_to_index,
     try_align_to_dt_index,
     parse_timedelta,
@@ -154,7 +154,7 @@ class RelRange:
     ) -> slice:
         """Convert the relative range into a slice."""
         if index is not None:
-            index = try_to_datetime_index(index)
+            index = prepare_dt_index(index)
             freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         offset_anchor = self.offset_anchor
         offset = self.offset
@@ -356,7 +356,7 @@ class Splitter(Analyzable):
 
         Labels for splits and sets can be provided via `split_labels` and `set_labels` respectively.
         Both arguments can be provided as templates. The split array will be available as `splits`."""
-        index = try_to_datetime_index(index)
+        index = prepare_dt_index(index)
         if split_range_kwargs is None:
             split_range_kwargs = {}
 
@@ -568,7 +568,7 @@ class Splitter(Analyzable):
 
             ![](/assets/images/api/from_rolling_3.svg){: .iimg loading=lazy }
         """
-        index = try_to_datetime_index(index)
+        index = prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         if isinstance(backwards, str):
             if backwards.lower() == "sorted":
@@ -700,7 +700,7 @@ class Splitter(Analyzable):
 
             ![](/assets/images/api/from_n_rolling.svg){: .iimg loading=lazy }
         """
-        index = try_to_datetime_index(index)
+        index = prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         if split_range_kwargs is None:
             split_range_kwargs = {}
@@ -852,7 +852,7 @@ class Splitter(Analyzable):
 
             ![](/assets/images/api/from_expanding.svg){: .iimg loading=lazy }
         """
-        index = try_to_datetime_index(index)
+        index = prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         if split_range_kwargs is None:
             split_range_kwargs = {}
@@ -956,7 +956,7 @@ class Splitter(Analyzable):
 
             ![](/assets/images/api/from_n_expanding.svg){: .iimg loading=lazy }
         """
-        index = try_to_datetime_index(index)
+        index = prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         if split_range_kwargs is None:
             split_range_kwargs = {}
@@ -1055,7 +1055,7 @@ class Splitter(Analyzable):
 
             ![](/assets/images/api/from_ranges_2.svg){: .iimg loading=lazy }
         """
-        index = try_to_datetime_index(index)
+        index = prepare_dt_index(index)
         if split_range_kwargs is None:
             split_range_kwargs = {}
         func_arg_names = get_func_arg_names(get_index_ranges)
@@ -1129,7 +1129,7 @@ class Splitter(Analyzable):
 
             ![](/assets/images/api/from_grouper.svg){: .iimg loading=lazy }
         """
-        index = try_to_datetime_index(index)
+        index = prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         if split_range_kwargs is None:
             split_range_kwargs = {}
@@ -1229,7 +1229,7 @@ class Splitter(Analyzable):
 
             ![](/assets/images/api/from_n_random.svg){: .iimg loading=lazy }
         """
-        index = try_to_datetime_index(index)
+        index = prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         if split_range_kwargs is None:
             split_range_kwargs = {}
@@ -1402,7 +1402,7 @@ class Splitter(Analyzable):
         Uses `Splitter.from_splits` to prepare the splits array and labels, and to build the instance."""
         from sklearn.model_selection import BaseCrossValidator
 
-        index = try_to_datetime_index(index)
+        index = prepare_dt_index(index)
         checks.assert_instance_of(splitter, BaseCrossValidator)
         if set_labels is None:
             set_labels = ["train", "test"]
@@ -1486,7 +1486,7 @@ class Splitter(Analyzable):
 
             ![](/assets/images/api/from_split_func.svg){: .iimg loading=lazy }
         """
-        index = try_to_datetime_index(index)
+        index = prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         if split_range_kwargs is None:
             split_range_kwargs = {}
@@ -1682,7 +1682,7 @@ class Splitter(Analyzable):
     ) -> None:
         if wrapper.grouper.is_grouped():
             raise ValueError("Splitter cannot be grouped")
-        index = try_to_datetime_index(index)
+        index = prepare_dt_index(index)
         if splits_arr.shape[0] != wrapper.shape_2d[0]:
             raise ValueError("Number of splits must match wrapper index")
         if splits_arr.shape[1] != wrapper.shape_2d[1]:
@@ -1921,7 +1921,7 @@ class Splitter(Analyzable):
                 raise ValueError("Must provide index")
             index = cls_or_self.index
         else:
-            index = try_to_datetime_index(index)
+            index = prepare_dt_index(index)
         if range_format.lower() not in (
             "any",
             "indices",
@@ -2156,7 +2156,7 @@ class Splitter(Analyzable):
                 raise ValueError("Must provide index")
             index = cls_or_self.index
         else:
-            index = try_to_datetime_index(index)
+            index = prepare_dt_index(index)
 
         # Prepare source range
         range_meta = cls_or_self.get_ready_range(
@@ -2319,7 +2319,7 @@ class Splitter(Analyzable):
                 raise ValueError("Must provide index")
             index = cls_or_self.index
         else:
-            index = try_to_datetime_index(index)
+            index = prepare_dt_index(index)
         all_hslices = True
         all_masks = True
         new_ranges = []
@@ -2552,10 +2552,10 @@ class Splitter(Analyzable):
                 raise ValueError("Must provide index")
             index = cls_or_self.index
         else:
-            index = try_to_datetime_index(index)
+            index = prepare_dt_index(index)
         if target_index is None:
             raise ValueError("Must provide target index")
-        target_index = try_to_datetime_index(target_index)
+        target_index = prepare_dt_index(target_index)
         if index.equals(target_index):
             return range_
 
@@ -2607,7 +2607,7 @@ class Splitter(Analyzable):
                 raise ValueError("Must provide index")
             index = cls_or_self.index
         else:
-            index = try_to_datetime_index(index)
+            index = prepare_dt_index(index)
         if remap_to_obj and (
             isinstance(obj, (pd.Index, pd.Series, pd.DataFrame, PandasIndexer)) or obj_index is not None
         ):
@@ -4031,7 +4031,7 @@ class Splitter(Analyzable):
                 raise ValueError("Must provide index")
             index = cls_or_self.index
         else:
-            index = try_to_datetime_index(index)
+            index = prepare_dt_index(index)
         if right_inclusive:
             return index[start], index[stop - 1]
         if stop == len(index):
@@ -4061,7 +4061,7 @@ class Splitter(Analyzable):
                 raise ValueError("Must provide index")
             index = cls_or_self.index
         else:
-            index = try_to_datetime_index(index)
+            index = prepare_dt_index(index)
         range_meta = cls_or_self.get_ready_range(
             range_,
             template_context=template_context,
@@ -4215,7 +4215,7 @@ class Splitter(Analyzable):
                 raise ValueError("Must provide index")
             index = cls_or_self.index
         else:
-            index = try_to_datetime_index(index)
+            index = prepare_dt_index(index)
         range_ = cls_or_self.get_ready_range(
             range_,
             allow_zero_len=True,

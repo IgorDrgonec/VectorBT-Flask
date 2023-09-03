@@ -2625,10 +2625,13 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
         self,
         wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
         obj: tp.Optional[tp.ArrayLike] = None,
+        _full_init: bool = True,
         **kwargs,
     ) -> None:
-        GenericSRAccessor.__init__(self, wrapper, obj=obj, **kwargs)
-        SignalsAccessor.__init__(self, wrapper, obj=obj, **kwargs)
+        GenericSRAccessor.__init__(self, wrapper, obj=obj, _full_init=False, **kwargs)
+
+        if _full_init:
+            SignalsAccessor.__init__(self, wrapper, obj=obj, **kwargs)
 
 
 @register_df_vbt_accessor("signals")
@@ -2641,7 +2644,10 @@ class SignalsDFAccessor(SignalsAccessor, GenericDFAccessor):
         self,
         wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
         obj: tp.Optional[tp.ArrayLike] = None,
+        _full_init: bool = True,
         **kwargs,
     ) -> None:
-        GenericDFAccessor.__init__(self, wrapper, obj=obj, **kwargs)
-        SignalsAccessor.__init__(self, wrapper, obj=obj, **kwargs)
+        GenericDFAccessor.__init__(self, wrapper, obj=obj, _full_init=False, **kwargs)
+
+        if _full_init:
+            SignalsAccessor.__init__(self, wrapper, obj=obj, **kwargs)

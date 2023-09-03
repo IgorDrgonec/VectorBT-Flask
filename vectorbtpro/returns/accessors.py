@@ -1969,18 +1969,21 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
         bm_returns: tp.Optional[tp.ArrayLike] = None,
         year_freq: tp.Optional[tp.FrequencyLike] = None,
         defaults: tp.KwargsLike = None,
+        _full_init: bool = True,
         **kwargs,
     ) -> None:
-        GenericSRAccessor.__init__(self, wrapper, obj=obj, **kwargs)
-        ReturnsAccessor.__init__(
-            self,
-            wrapper,
-            obj=obj,
-            bm_returns=bm_returns,
-            year_freq=year_freq,
-            defaults=defaults,
-            **kwargs,
-        )
+        GenericSRAccessor.__init__(self, wrapper, obj=obj, _full_init=False, **kwargs)
+
+        if _full_init:
+            ReturnsAccessor.__init__(
+                self,
+                wrapper,
+                obj=obj,
+                bm_returns=bm_returns,
+                year_freq=year_freq,
+                defaults=defaults,
+                **kwargs,
+            )
 
 
 @register_df_vbt_accessor("returns")
@@ -1996,15 +1999,18 @@ class ReturnsDFAccessor(ReturnsAccessor, GenericDFAccessor):
         bm_returns: tp.Optional[tp.ArrayLike] = None,
         year_freq: tp.Optional[tp.FrequencyLike] = None,
         defaults: tp.KwargsLike = None,
+        _full_init: bool = True,
         **kwargs,
     ) -> None:
-        GenericDFAccessor.__init__(self, wrapper, obj=obj, **kwargs)
-        ReturnsAccessor.__init__(
-            self,
-            wrapper,
-            obj=obj,
-            bm_returns=bm_returns,
-            year_freq=year_freq,
-            defaults=defaults,
-            **kwargs,
-        )
+        GenericDFAccessor.__init__(self, wrapper, obj=obj, _full_init=False, **kwargs)
+
+        if _full_init:
+            ReturnsAccessor.__init__(
+                self,
+                wrapper,
+                obj=obj,
+                bm_returns=bm_returns,
+                year_freq=year_freq,
+                defaults=defaults,
+                **kwargs,
+            )

@@ -352,10 +352,20 @@ def freq_to_timedelta64(freq: tp.FrequencyLike) -> np.timedelta64:
     return freq
 
 
-def try_to_datetime_index(index: tp.IndexLike, parser_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Index:
+def prepare_dt_index(
+    index: tp.IndexLike,
+    parse_index: tp.Optional[bool] = None,
+    parse_with_pandas: tp.Optional[bool] = None,
+    parse_with_dateparser: tp.Optional[bool] = None,
+    dateparser_kwargs: tp.KwargsLike = None,
+    **kwargs,
+) -> tp.Index:
     """Try converting an index to a datetime index.
 
-    `parser_kwargs` are passed to `pd.to_datetime` while `**kwargs` are passed to `dateparser.parse`.
+    If `parse_index` is True and the object has an object data type, will parse with Pandas
+    (`parse_with_pandas` must be True) and/or dateparser (`parse_with_dateparser` must be True).
+
+    `dateparser_kwargs` are passed to `dateparser.parse` while `**kwargs` are passed to `pd.to_datetime`.
 
     For defaults, see `vectorbtpro._settings.datetime`."""
     import dateparser
@@ -363,25 +373,36 @@ def try_to_datetime_index(index: tp.IndexLike, parser_kwargs: tp.KwargsLike = No
 
     datetime_cfg = settings["datetime"]
 
-    parser_kwargs = merge_dicts(datetime_cfg["parser_kwargs"], parser_kwargs)
+    if parse_index is None:
+        parse_index = datetime_cfg["parse_index"]
+    if parse_with_pandas is None:
+        parse_with_pandas = datetime_cfg["parse_with_pandas"]
+    if parse_with_dateparser is None:
+        parse_with_dateparser = datetime_cfg["parse_with_dateparser"]
+
+    dateparser_kwargs = merge_dicts(datetime_cfg["dateparser_kwargs"], dateparser_kwargs)
 
     if not isinstance(index, pd.Index):
         if isinstance(index, str):
-            if datetime_cfg["parse_with_pandas"]:
-                try:
-                    index = pd.to_datetime(index, **kwargs)
-                    index = [index]
-                except Exception as e:
-                    pass
-            if datetime_cfg["parse_with_dateparser"]:
-                try:
-                    parsed_index = dateparser.parse(index, **parser_kwargs)
-                    if parsed_index is None:
-                        raise Exception
-                    index = pd.to_datetime(parsed_index, **kwargs)
-                    index = [index]
-                except Exception as e2:
-                    pass
+            if parse_index:
+                parsed = False
+                if parse_with_pandas:
+                    try:
+                        index = pd.to_datetime(index, **kwargs)
+                        index = [index]
+                        parsed = True
+                    except Exception as e:
+                        pass
+                if not parsed and parse_with_dateparser:
+                    try:
+                        parsed_index = dateparser.parse(index, **dateparser_kwargs)
+                        if parsed_index is None:
+                            raise Exception
+                        index = pd.to_datetime(parsed_index, **kwargs)
+                        index = [index]
+                        parsed = True
+                    except Exception as e2:
+                        pass
         try:
             index = pd.Index(index)
         except Exception as e:
@@ -389,30 +410,31 @@ def try_to_datetime_index(index: tp.IndexLike, parser_kwargs: tp.KwargsLike = No
     if isinstance(index, pd.DatetimeIndex):
         return index
     if index.dtype == object:
-        if datetime_cfg["parse_with_pandas"]:
-            try:
-                return pd.to_datetime(index, **kwargs)
-            except Exception as e:
-                pass
-        if datetime_cfg["parse_with_dateparser"]:
-            try:
-                def _parse(x):
-                    _parsed_index = dateparser.parse(x, **parser_kwargs)
-                    if _parsed_index is None:
-                        raise Exception
-                    return _parsed_index
+        if parse_index:
+            if parse_with_pandas:
+                try:
+                    return pd.to_datetime(index, **kwargs)
+                except Exception as e:
+                    pass
+            if parse_with_dateparser:
+                try:
+                    def _parse(x):
+                        _parsed_index = dateparser.parse(x, **dateparser_kwargs)
+                        if _parsed_index is None:
+                            raise Exception
+                        return _parsed_index
 
-                return pd.to_datetime(index.map(_parse), **kwargs)
-            except Exception as e2:
-                pass
+                    return pd.to_datetime(index.map(_parse), **kwargs)
+                except Exception as e2:
+                    pass
     return index
 
 
 def try_align_to_dt_index(source_index: tp.IndexLike, target_index: tp.Index, **kwargs) -> tp.Index:
     """Try aligning an index to another datetime index.
 
-    Keyword arguments are passed to `try_to_datetime_index`."""
-    source_index = try_to_datetime_index(source_index, **kwargs)
+    Keyword arguments are passed to `prepare_dt_index`."""
+    source_index = prepare_dt_index(source_index, **kwargs)
     if isinstance(source_index, pd.DatetimeIndex) and isinstance(target_index, pd.DatetimeIndex):
         if source_index.tzinfo is None and target_index.tzinfo is not None:
             source_index = source_index.tz_localize(target_index.tzinfo)
@@ -482,8 +504,8 @@ def get_dt_index_gaps(
 
     Returns two indexes: start indexes (inclusive) and end indexes (exclusive).
 
-    Keyword arguments are passed to `try_to_datetime_index`."""
-    index = try_to_datetime_index(index, **kwargs)
+    Keyword arguments are passed to `prepare_dt_index`."""
+    index = prepare_dt_index(index, **kwargs)
     checks.assert_instance_of(index, pd.DatetimeIndex)
     if not index.is_unique:
         raise ValueError("Datetime index must be unique")
@@ -491,7 +513,7 @@ def get_dt_index_gaps(
         raise ValueError("Datetime index must be monotonically increasing")
     freq = infer_index_freq(index, freq=freq, allow_numeric=False, detect_via_diff=True)
     if skip_index is not None:
-        skip_index = try_to_datetime_index(skip_index, **kwargs)
+        skip_index = prepare_dt_index(skip_index, **kwargs)
         checks.assert_instance_of(skip_index, pd.DatetimeIndex)
         skip_bound_start = skip_index.min()
         skip_bound_end = skip_index.max()
@@ -572,15 +594,18 @@ def is_tz_aware(dt: tp.Union[datetime, pd.Timestamp, pd.DatetimeIndex]) -> bool:
 def to_timezone(
     tz: tp.TimezoneLike,
     to_fixed_offset: tp.Optional[bool] = None,
-    parser_kwargs: tp.KwargsLike = None,
+    parse_with_pandas: tp.Optional[bool] = None,
+    parse_with_dateparser: tp.Optional[bool] = None,
+    dateparser_kwargs: tp.KwargsLike = None,
 ) -> tzinfo:
     """Parse the timezone.
 
-    Strings are parsed with `pandas`, and `dateparser`, while integers and floats are treated as hour offsets.
+    If the object is a string, will parse with Pandas (`parse_with_pandas` must be True) and/or dateparser
+    (`parse_with_dateparser` must be True).
 
     If `to_fixed_offset` is set to True, will convert to `datetime.timezone`. See global settings.
 
-    `parser_kwargs` are passed to `dateparser.parse`.
+    `dateparser_kwargs` are passed to `dateparser.parse`.
 
     For defaults, see `vectorbtpro._settings.datetime`."""
     import dateparser
@@ -592,16 +617,29 @@ def to_timezone(
         return get_local_tz()
     if to_fixed_offset is None:
         to_fixed_offset = datetime_cfg["to_fixed_offset"]
-    parser_kwargs = merge_dicts(datetime_cfg["parser_kwargs"], parser_kwargs)
+    if parse_with_pandas is None:
+        parse_with_pandas = datetime_cfg["parse_with_pandas"]
+    if parse_with_dateparser is None:
+        parse_with_dateparser = datetime_cfg["parse_with_dateparser"]
+    dateparser_kwargs = merge_dicts(datetime_cfg["dateparser_kwargs"], dateparser_kwargs)
 
     if isinstance(tz, str):
-        try:
-            tz = pd.Timestamp("now", tz=tz).tz
-        except Exception as e:
-            dt = dateparser.parse("now %s" % tz, **parser_kwargs)
-            if dt is not None:
-                tz = dt.tzinfo
-                to_fixed_offset = True
+        parsed = False
+        if parse_with_pandas:
+            try:
+                tz = pd.Timestamp("now", tz=tz).tz
+                parsed = True
+            except Exception as e:
+                pass
+        if not parsed and parse_with_dateparser:
+            try:
+                dt = dateparser.parse("now %s" % tz, **dateparser_kwargs)
+                if dt is not None:
+                    tz = dt.tzinfo
+                    to_fixed_offset = True
+                parsed = True
+            except Exception as e:
+                pass
     if checks.is_number(tz):
         tz = timezone(timedelta(seconds=tz))
     if isinstance(tz, timedelta):
@@ -620,7 +658,9 @@ def to_timezone(
 
 def to_timestamp(
     dt_like: tp.DatetimeLike,
-    parser_kwargs: tp.KwargsLike = None,
+    parse_with_pandas: tp.Optional[bool] = None,
+    parse_with_dateparser: tp.Optional[bool] = None,
+    dateparser_kwargs: tp.KwargsLike = None,
     unit: str = "ns",
     tz: tp.Optional[tp.TimezoneLike] = None,
     to_fixed_offset: tp.Optional[bool] = None,
@@ -628,46 +668,81 @@ def to_timestamp(
 ) -> pd.Timestamp:
     """Parse the datetime as a `pd.Timestamp`.
 
-    `parser_kwargs` are passed to `pd.Timestamp` while `**kwargs` are passed to `dateparser.parse`.
+    If the object is a string, will parse with Pandas (`parse_with_pandas` must be True)
+    and/or dateparser (`parse_with_dateparser` must be True).
+
+    `dateparser_kwargs` are passed to `dateparser.parse` while `**kwargs` are passed to `pd.Timestamp`.
 
     For defaults, see `vectorbtpro._settings.datetime`."""
     from vectorbtpro._settings import settings
 
     datetime_cfg = settings["datetime"]
 
-    parser_kwargs = merge_dicts(datetime_cfg["parser_kwargs"], parser_kwargs)
+    if parse_with_pandas is None:
+        parse_with_pandas = datetime_cfg["parse_with_pandas"]
+    if parse_with_dateparser is None:
+        parse_with_dateparser = datetime_cfg["parse_with_dateparser"]
+    dateparser_kwargs = merge_dicts(datetime_cfg["dateparser_kwargs"], dateparser_kwargs)
     if tz is not None:
-        tz = to_timezone(tz, to_fixed_offset=to_fixed_offset, parser_kwargs=parser_kwargs)
+        tz = to_timezone(
+            tz,
+            to_fixed_offset=to_fixed_offset,
+            parse_with_pandas=parse_with_pandas,
+            parse_with_dateparser=parse_with_dateparser,
+            dateparser_kwargs=dateparser_kwargs,
+        )
 
     if isinstance(dt_like, pd.Timestamp):
         dt = dt_like
     elif checks.is_number(dt_like):
         dt = pd.Timestamp(dt_like, tz="utc", unit=unit, **kwargs)
     elif isinstance(dt_like, str):
-        try:
-            tz = to_timezone(dt_like.split(" ")[-1], to_fixed_offset=to_fixed_offset, parser_kwargs=parser_kwargs)
-            dt_like = " ".join(dt_like.split(" ")[:-1])
-        except Exception as e:
-            pass
-        try:
-            if dt_like.lower() == "now":
-                dt = pd.Timestamp.now(tz=tz)
-            else:
-                dt = pd.Timestamp(dt_like, **kwargs)
-        except Exception as e:
-            import dateparser
+        if parse_with_pandas or parse_with_dateparser:
+            try:
+                tz = to_timezone(
+                    dt_like.split(" ")[-1],
+                    to_fixed_offset=to_fixed_offset,
+                    parse_with_pandas=parse_with_pandas,
+                    parse_with_dateparser=parse_with_dateparser,
+                    dateparser_kwargs=dateparser_kwargs,
+                )
+                dt_like = " ".join(dt_like.split(" ")[:-1])
+            except Exception as e:
+                pass
+        parsed = False
+        if parse_with_pandas:
+            try:
+                if dt_like.lower() == "now":
+                    dt = pd.Timestamp.now(tz=tz)
+                else:
+                    dt = pd.Timestamp(dt_like, **kwargs)
+                parsed = True
+            except Exception as e:
+                pass
+        if not parsed and parse_with_dateparser:
+            try:
+                import dateparser
 
-            settings = parser_kwargs.get("settings", {})
-            settings["RELATIVE_BASE"] = settings.get("RELATIVE_BASE", pd.Timestamp.now(tz=tz).to_pydatetime())
-            parser_kwargs["settings"] = settings
-            dt = dateparser.parse(dt_like, **parser_kwargs)
-            if dt is not None:
-                if is_tz_aware(dt):
-                    tz = to_timezone(dt.tzinfo, to_fixed_offset=True, parser_kwargs=parser_kwargs)
-                    dt = dt.replace(tzinfo=tz)
-                dt = pd.Timestamp(dt, **kwargs)
-            else:
-                raise ValueError(f"Could not parse the timestamp {dt_like}")
+                settings = dateparser_kwargs.get("settings", {})
+                settings["RELATIVE_BASE"] = settings.get("RELATIVE_BASE", pd.Timestamp.now(tz=tz).to_pydatetime())
+                dateparser_kwargs["settings"] = settings
+                dt = dateparser.parse(dt_like, **dateparser_kwargs)
+                if dt is not None:
+                    if is_tz_aware(dt):
+                        tz = to_timezone(
+                            dt.tzinfo,
+                            to_fixed_offset=True,
+                            parse_with_pandas=parse_with_pandas,
+                            parse_with_dateparser=parse_with_dateparser,
+                            dateparser_kwargs=dateparser_kwargs,
+                        )
+                        dt = dt.replace(tzinfo=tz)
+                    dt = pd.Timestamp(dt, **kwargs)
+                else:
+                    raise ValueError(f"Could not parse the timestamp {dt_like}")
+                parsed = True
+            except Exception as e:
+                pass
     else:
         dt = pd.Timestamp(dt_like, **kwargs)
     if tz is not None:
