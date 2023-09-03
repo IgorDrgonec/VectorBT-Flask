@@ -38,6 +38,11 @@ warnings.filterwarnings(
     "ignore", message="The localize method is no longer necessary, as this time zone supports the fold attribute"
 )
 
+if settings["importing"]["clear_pycache"]:
+    from vectorbtpro.utils.caching import clear_pycache
+
+    clear_pycache()
+
 if settings["importing"]["auto_import"]:
     from vectorbtpro.utils.module_ import check_installed
 

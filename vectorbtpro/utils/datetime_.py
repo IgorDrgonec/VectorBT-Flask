@@ -367,19 +367,21 @@ def try_to_datetime_index(index: tp.IndexLike, parser_kwargs: tp.KwargsLike = No
 
     if not isinstance(index, pd.Index):
         if isinstance(index, str):
-            try:
-                index = pd.to_datetime(index, **kwargs)
-                index = [index]
-            except Exception as e:
-                if datetime_cfg["parse_index"]:
-                    try:
-                        parsed_index = dateparser.parse(index, **parser_kwargs)
-                        if parsed_index is None:
-                            raise Exception
-                        index = pd.to_datetime(parsed_index, **kwargs)
-                        index = [index]
-                    except Exception as e2:
-                        pass
+            if datetime_cfg["parse_with_pandas"]:
+                try:
+                    index = pd.to_datetime(index, **kwargs)
+                    index = [index]
+                except Exception as e:
+                    pass
+            if datetime_cfg["parse_with_dateparser"]:
+                try:
+                    parsed_index = dateparser.parse(index, **parser_kwargs)
+                    if parsed_index is None:
+                        raise Exception
+                    index = pd.to_datetime(parsed_index, **kwargs)
+                    index = [index]
+                except Exception as e2:
+                    pass
         try:
             index = pd.Index(index)
         except Exception as e:
@@ -387,21 +389,22 @@ def try_to_datetime_index(index: tp.IndexLike, parser_kwargs: tp.KwargsLike = No
     if isinstance(index, pd.DatetimeIndex):
         return index
     if index.dtype == object:
-        try:
-            return pd.to_datetime(index, **kwargs)
-        except Exception as e:
-            if datetime_cfg["parse_index"]:
-                try:
+        if datetime_cfg["parse_with_pandas"]:
+            try:
+                return pd.to_datetime(index, **kwargs)
+            except Exception as e:
+                pass
+        if datetime_cfg["parse_with_dateparser"]:
+            try:
+                def _parse(x):
+                    _parsed_index = dateparser.parse(x, **parser_kwargs)
+                    if _parsed_index is None:
+                        raise Exception
+                    return _parsed_index
 
-                    def _parse(x):
-                        _parsed_index = dateparser.parse(x, **parser_kwargs)
-                        if _parsed_index is None:
-                            raise Exception
-                        return _parsed_index
-
-                    return pd.to_datetime(index.map(_parse), **kwargs)
-                except Exception as e2:
-                    pass
+                return pd.to_datetime(index.map(_parse), **kwargs)
+            except Exception as e2:
+                pass
     return index
 
 

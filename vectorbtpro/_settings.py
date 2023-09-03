@@ -149,6 +149,7 @@ _settings = {}
 
 importing = child_dict(
     auto_import=True,
+    clear_pycache=False,
     plotly=True,
     telegram=True,
     quantstats=True,
@@ -558,7 +559,8 @@ _settings["resampling"] = resampling
 datetime = child_dict(
     naive_tz="tzlocal()",
     to_fixed_offset=None,
-    parse_index=False,
+    parse_with_pandas=True,
+    parse_with_dateparser=False,
     parser_kwargs=Config(),
 )
 """_"""
