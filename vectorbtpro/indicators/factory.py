@@ -3923,7 +3923,7 @@ Other keyword arguments are passed to `{0}.run`.
                 for c in out.columns:
                     if len(out.columns) == len(config["output_names"]):
                         outputs.append(out[c].values)
-                    elif c not in ("open", "high", "low", "close", "volume", "data"):
+                    elif c.replace(" ", "").lower() not in ("open", "high", "low", "close", "volume", "data"):
                         outputs.append(out[c].values)
                 return tuple(outputs)
             return out.values
