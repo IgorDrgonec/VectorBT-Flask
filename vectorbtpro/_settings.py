@@ -559,9 +559,11 @@ _settings["resampling"] = resampling
 datetime = child_dict(
     naive_tz="tzlocal()",
     to_fixed_offset=None,
-    parse_index=True,
-    parse_with_pandas=True,
-    parse_with_dateparser=False,
+    parse_with_dateparser=True,
+    index=child_dict(
+        parse_index=True,
+        parse_with_dateparser=False,
+    ),
     dateparser_kwargs=Config(),
 )
 """_"""
@@ -651,6 +653,14 @@ data = child_dict(
             start_row=None,
             end_row=None,
             read_hdf_kwargs=dict(),
+        ),
+        # Database
+        db=Config(),
+        sql=Config(
+            engine=None,
+            engine_config=dict(
+                url=None,
+            ),
         ),
         # Remote
         remote=Config(),

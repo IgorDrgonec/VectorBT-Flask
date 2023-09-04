@@ -225,40 +225,40 @@ class DTC:
         )
 
     @classmethod
-    def parse(cls: tp.Type[DTCT], dtc_like: tp.DTCLike, **parse_kwargs) -> DTCT:
+    def parse(cls: tp.Type[DTCT], dtc: tp.DTCLike, **parse_kwargs) -> DTCT:
         """Parse `DTC` instance from a datetime-component-like object."""
-        if checks.is_namedtuple(dtc_like):
-            return cls.from_namedtuple(dtc_like)
-        if isinstance(dtc_like, np.datetime64):
-            dtc_like = pd.Timestamp(dtc_like)
-        if isinstance(dtc_like, pd.Timestamp):
-            if dtc_like.tzinfo is not None:
+        if checks.is_namedtuple(dtc):
+            return cls.from_namedtuple(dtc)
+        if isinstance(dtc, np.datetime64):
+            dtc = pd.Timestamp(dtc)
+        if isinstance(dtc, pd.Timestamp):
+            if dtc.tzinfo is not None:
                 raise ValueError("DTC doesn't support timezones")
-            dtc_like = dtc_like.to_pydatetime()
-        if isinstance(dtc_like, datetime):
-            if dtc_like.tzinfo is not None:
+            dtc = dtc.to_pydatetime()
+        if isinstance(dtc, datetime):
+            if dtc.tzinfo is not None:
                 raise ValueError("DTC doesn't support timezones")
-            return cls.from_datetime(dtc_like)
-        if isinstance(dtc_like, date):
-            return cls.from_date(dtc_like)
-        if isinstance(dtc_like, time):
-            return cls.from_time(dtc_like)
-        if isinstance(dtc_like, (int, str)):
-            return cls.parse_time_str(str(dtc_like), **parse_kwargs)
-        raise TypeError(f"Invalid type {type(dtc_like)}")
+            return cls.from_datetime(dtc)
+        if isinstance(dtc, date):
+            return cls.from_date(dtc)
+        if isinstance(dtc, time):
+            return cls.from_time(dtc)
+        if isinstance(dtc, (int, str)):
+            return cls.parse_time_str(str(dtc), **parse_kwargs)
+        raise TypeError(f"Invalid type {type(dtc)}")
 
     @classmethod
     def is_parsable(
         cls: tp.Type[DTCT],
-        dtc_like: tp.DTCLike,
+        dtc: tp.DTCLike,
         check_func: tp.Optional[tp.Callable] = None,
         **parse_kwargs,
     ) -> bool:
         """Check whether a datetime-component-like object is parsable."""
         try:
-            if isinstance(dtc_like, DTC):
+            if isinstance(dtc, DTC):
                 return True
-            dtc = cls.parse(dtc_like, **parse_kwargs)
+            dtc = cls.parse(dtc, **parse_kwargs)
             if check_func is not None and not check_func(dtc):
                 return False
             return True
@@ -355,7 +355,6 @@ def freq_to_timedelta64(freq: tp.FrequencyLike) -> np.timedelta64:
 def prepare_dt_index(
     index: tp.IndexLike,
     parse_index: tp.Optional[bool] = None,
-    parse_with_pandas: tp.Optional[bool] = None,
     parse_with_dateparser: tp.Optional[bool] = None,
     dateparser_kwargs: tp.KwargsLike = None,
     **kwargs,
@@ -363,7 +362,7 @@ def prepare_dt_index(
     """Try converting an index to a datetime index.
 
     If `parse_index` is True and the object has an object data type, will parse with Pandas
-    (`parse_with_pandas` must be True) and/or dateparser (`parse_with_dateparser` must be True).
+    (`parse_index` must be True) and dateparser (in addition `parse_with_dateparser` must be True).
 
     `dateparser_kwargs` are passed to `dateparser.parse` while `**kwargs` are passed to `pd.to_datetime`.
 
@@ -374,35 +373,27 @@ def prepare_dt_index(
     datetime_cfg = settings["datetime"]
 
     if parse_index is None:
-        parse_index = datetime_cfg["parse_index"]
-    if parse_with_pandas is None:
-        parse_with_pandas = datetime_cfg["parse_with_pandas"]
+        parse_index = datetime_cfg["index"]["parse_index"]
     if parse_with_dateparser is None:
-        parse_with_dateparser = datetime_cfg["parse_with_dateparser"]
-
+        parse_with_dateparser = datetime_cfg["index"]["parse_with_dateparser"]
     dateparser_kwargs = merge_dicts(datetime_cfg["dateparser_kwargs"], dateparser_kwargs)
 
     if not isinstance(index, pd.Index):
         if isinstance(index, str):
             if parse_index:
-                parsed = False
-                if parse_with_pandas:
-                    try:
-                        index = pd.to_datetime(index, **kwargs)
-                        index = [index]
-                        parsed = True
-                    except Exception as e:
-                        pass
-                if not parsed and parse_with_dateparser:
-                    try:
-                        parsed_index = dateparser.parse(index, **dateparser_kwargs)
-                        if parsed_index is None:
-                            raise Exception
-                        index = pd.to_datetime(parsed_index, **kwargs)
-                        index = [index]
-                        parsed = True
-                    except Exception as e2:
-                        pass
+                try:
+                    index = pd.to_datetime(index, **kwargs)
+                    index = [index]
+                except Exception as e:
+                    if parse_with_dateparser:
+                        try:
+                            parsed_index = dateparser.parse(index, **dateparser_kwargs)
+                            if parsed_index is None:
+                                raise Exception
+                            index = pd.to_datetime(parsed_index, **kwargs)
+                            index = [index]
+                        except Exception as e2:
+                            pass
         try:
             index = pd.Index(index)
         except Exception as e:
@@ -411,22 +402,20 @@ def prepare_dt_index(
         return index
     if index.dtype == object:
         if parse_index:
-            if parse_with_pandas:
-                try:
-                    return pd.to_datetime(index, **kwargs)
-                except Exception as e:
-                    pass
-            if parse_with_dateparser:
-                try:
-                    def _parse(x):
-                        _parsed_index = dateparser.parse(x, **dateparser_kwargs)
-                        if _parsed_index is None:
-                            raise Exception
-                        return _parsed_index
+            try:
+                return pd.to_datetime(index, **kwargs)
+            except Exception as e:
+                if parse_with_dateparser:
+                    try:
+                        def _parse(x):
+                            _parsed_index = dateparser.parse(x, **dateparser_kwargs)
+                            if _parsed_index is None:
+                                raise Exception
+                            return _parsed_index
 
-                    return pd.to_datetime(index.map(_parse), **kwargs)
-                except Exception as e2:
-                    pass
+                        return pd.to_datetime(index.map(_parse), **kwargs)
+                    except Exception as e2:
+                        pass
     return index
 
 
@@ -443,13 +432,13 @@ def try_align_to_dt_index(source_index: tp.IndexLike, target_index: tp.Index, **
     return source_index
 
 
-def try_align_dt_to_index(dt_like: tp.DatetimeLike, target_index: tp.Index, **kwargs) -> tp.DatetimeLike:
+def try_align_dt_to_index(dt: tp.DatetimeLike, target_index: tp.Index, **kwargs) -> tp.DatetimeLike:
     """Try aligning a datetime-like object to another datetime index.
 
     Keyword arguments are passed to `to_timestamp`."""
     if not isinstance(target_index, pd.DatetimeIndex):
-        return dt_like
-    dt = to_timestamp(dt_like, **kwargs)
+        return dt
+    dt = to_timestamp(dt, **kwargs)
     if dt.tzinfo is None and target_index.tzinfo is not None:
         dt = dt.tz_localize(target_index.tzinfo)
     elif dt.tzinfo is not None and target_index.tzinfo is not None:
@@ -594,14 +583,12 @@ def is_tz_aware(dt: tp.Union[datetime, pd.Timestamp, pd.DatetimeIndex]) -> bool:
 def to_timezone(
     tz: tp.TimezoneLike,
     to_fixed_offset: tp.Optional[bool] = None,
-    parse_with_pandas: tp.Optional[bool] = None,
     parse_with_dateparser: tp.Optional[bool] = None,
     dateparser_kwargs: tp.KwargsLike = None,
 ) -> tzinfo:
     """Parse the timezone.
 
-    If the object is a string, will parse with Pandas (`parse_with_pandas` must be True) and/or dateparser
-    (`parse_with_dateparser` must be True).
+    If the object is a string, will parse with Pandas and dateparser (`parse_with_dateparser` must be True).
 
     If `to_fixed_offset` is set to True, will convert to `datetime.timezone`. See global settings.
 
@@ -617,29 +604,22 @@ def to_timezone(
         return get_local_tz()
     if to_fixed_offset is None:
         to_fixed_offset = datetime_cfg["to_fixed_offset"]
-    if parse_with_pandas is None:
-        parse_with_pandas = datetime_cfg["parse_with_pandas"]
     if parse_with_dateparser is None:
         parse_with_dateparser = datetime_cfg["parse_with_dateparser"]
     dateparser_kwargs = merge_dicts(datetime_cfg["dateparser_kwargs"], dateparser_kwargs)
 
     if isinstance(tz, str):
-        parsed = False
-        if parse_with_pandas:
-            try:
-                tz = pd.Timestamp("now", tz=tz).tz
-                parsed = True
-            except Exception as e:
-                pass
-        if not parsed and parse_with_dateparser:
-            try:
-                dt = dateparser.parse("now %s" % tz, **dateparser_kwargs)
-                if dt is not None:
-                    tz = dt.tzinfo
-                    to_fixed_offset = True
-                parsed = True
-            except Exception as e:
-                pass
+        try:
+            tz = pd.Timestamp("now", tz=tz).tz
+        except Exception as e:
+            if parse_with_dateparser:
+                try:
+                    dt = dateparser.parse("now %s" % tz, **dateparser_kwargs)
+                    if dt is not None:
+                        tz = dt.tzinfo
+                        to_fixed_offset = True
+                except Exception as e:
+                    pass
     if checks.is_number(tz):
         tz = timezone(timedelta(seconds=tz))
     if isinstance(tz, timedelta):
@@ -657,8 +637,7 @@ def to_timezone(
 
 
 def to_timestamp(
-    dt_like: tp.DatetimeLike,
-    parse_with_pandas: tp.Optional[bool] = None,
+    dt: tp.DatetimeLike,
     parse_with_dateparser: tp.Optional[bool] = None,
     dateparser_kwargs: tp.KwargsLike = None,
     unit: str = "ns",
@@ -668,8 +647,7 @@ def to_timestamp(
 ) -> pd.Timestamp:
     """Parse the datetime as a `pd.Timestamp`.
 
-    If the object is a string, will parse with Pandas (`parse_with_pandas` must be True)
-    and/or dateparser (`parse_with_dateparser` must be True).
+    If the object is a string, will parse with Pandas and dateparser (`parse_with_dateparser` must be True).
 
     `dateparser_kwargs` are passed to `dateparser.parse` while `**kwargs` are passed to `pd.Timestamp`.
 
@@ -678,8 +656,6 @@ def to_timestamp(
 
     datetime_cfg = settings["datetime"]
 
-    if parse_with_pandas is None:
-        parse_with_pandas = datetime_cfg["parse_with_pandas"]
     if parse_with_dateparser is None:
         parse_with_dateparser = datetime_cfg["parse_with_dateparser"]
     dateparser_kwargs = merge_dicts(datetime_cfg["dateparser_kwargs"], dateparser_kwargs)
@@ -687,64 +663,53 @@ def to_timestamp(
         tz = to_timezone(
             tz,
             to_fixed_offset=to_fixed_offset,
-            parse_with_pandas=parse_with_pandas,
             parse_with_dateparser=parse_with_dateparser,
             dateparser_kwargs=dateparser_kwargs,
         )
 
-    if isinstance(dt_like, pd.Timestamp):
-        dt = dt_like
-    elif checks.is_number(dt_like):
-        dt = pd.Timestamp(dt_like, tz="utc", unit=unit, **kwargs)
-    elif isinstance(dt_like, str):
-        if parse_with_pandas or parse_with_dateparser:
-            try:
-                tz = to_timezone(
-                    dt_like.split(" ")[-1],
-                    to_fixed_offset=to_fixed_offset,
-                    parse_with_pandas=parse_with_pandas,
-                    parse_with_dateparser=parse_with_dateparser,
-                    dateparser_kwargs=dateparser_kwargs,
-                )
-                dt_like = " ".join(dt_like.split(" ")[:-1])
-            except Exception as e:
-                pass
-        parsed = False
-        if parse_with_pandas:
-            try:
-                if dt_like.lower() == "now":
-                    dt = pd.Timestamp.now(tz=tz)
-                else:
-                    dt = pd.Timestamp(dt_like, **kwargs)
-                parsed = True
-            except Exception as e:
-                pass
-        if not parsed and parse_with_dateparser:
-            try:
-                import dateparser
+    if checks.is_number(dt):
+        dt = pd.Timestamp(dt, tz="utc", unit=unit, **kwargs)
+    elif isinstance(dt, str):
+        try:
+            tz = to_timezone(
+                dt.split(" ")[-1],
+                to_fixed_offset=to_fixed_offset,
+                parse_with_dateparser=parse_with_dateparser,
+                dateparser_kwargs=dateparser_kwargs,
+            )
+            dt = " ".join(dt.split(" ")[:-1])
+        except Exception as e:
+            pass
+        try:
+            if dt.lower() == "now":
+                dt = pd.Timestamp.now(tz=tz)
+            else:
+                dt = pd.Timestamp(dt, **kwargs)
+        except Exception as e:
+            if parse_with_dateparser:
+                try:
+                    import dateparser
 
-                settings = dateparser_kwargs.get("settings", {})
-                settings["RELATIVE_BASE"] = settings.get("RELATIVE_BASE", pd.Timestamp.now(tz=tz).to_pydatetime())
-                dateparser_kwargs["settings"] = settings
-                dt = dateparser.parse(dt_like, **dateparser_kwargs)
-                if dt is not None:
-                    if is_tz_aware(dt):
-                        tz = to_timezone(
-                            dt.tzinfo,
-                            to_fixed_offset=True,
-                            parse_with_pandas=parse_with_pandas,
-                            parse_with_dateparser=parse_with_dateparser,
-                            dateparser_kwargs=dateparser_kwargs,
-                        )
-                        dt = dt.replace(tzinfo=tz)
-                    dt = pd.Timestamp(dt, **kwargs)
-                else:
-                    raise ValueError(f"Could not parse the timestamp {dt_like}")
-                parsed = True
-            except Exception as e:
-                pass
-    else:
-        dt = pd.Timestamp(dt_like, **kwargs)
+                    settings = dateparser_kwargs.get("settings", {})
+                    settings["RELATIVE_BASE"] = settings.get("RELATIVE_BASE", pd.Timestamp.now(tz=tz).to_pydatetime())
+                    dateparser_kwargs["settings"] = settings
+                    dt = dateparser.parse(dt, **dateparser_kwargs)
+                    if dt is not None:
+                        if is_tz_aware(dt):
+                            tz = to_timezone(
+                                dt.tzinfo,
+                                to_fixed_offset=True,
+                                parse_with_dateparser=parse_with_dateparser,
+                                dateparser_kwargs=dateparser_kwargs,
+                            )
+                            dt = dt.replace(tzinfo=tz)
+                        dt = pd.Timestamp(dt, **kwargs)
+                    else:
+                        raise ValueError(f"Could not parse the timestamp {dt}")
+                except Exception as e:
+                    pass
+    elif not isinstance(dt, pd.Timestamp):
+        dt = pd.Timestamp(dt, **kwargs)
     if tz is not None:
         if not is_tz_aware(dt):
             dt = dt.tz_localize(tz)
@@ -754,7 +719,7 @@ def to_timestamp(
 
 
 def to_tzaware_timestamp(
-    dt_like: tp.DatetimeLike,
+    dt: tp.DatetimeLike,
     naive_tz: tp.Optional[tp.TimezoneLike] = None,
     tz: tp.Optional[tp.TimezoneLike] = None,
     **kwargs,
@@ -775,7 +740,7 @@ def to_tzaware_timestamp(
     if naive_tz is None:
         naive_tz = datetime_cfg["naive_tz"]
 
-    ts = to_timestamp(dt_like, tz=naive_tz, **kwargs)
+    ts = to_timestamp(dt, tz=naive_tz, **kwargs)
     if is_tz_aware(ts):
         ts = ts.tz_localize(None).tz_localize(to_timezone(ts.tzinfo))
     if tz is not None:
@@ -783,36 +748,36 @@ def to_tzaware_timestamp(
     return ts
 
 
-def to_naive_timestamp(dt_like: tp.DatetimeLike, **kwargs) -> pd.Timestamp:
+def to_naive_timestamp(dt: tp.DatetimeLike, **kwargs) -> pd.Timestamp:
     """Parse the datetime as a timezone-naive `pd.Timestamp`."""
-    return to_timestamp(dt_like, **kwargs).tz_localize(None)
+    return to_timestamp(dt, **kwargs).tz_localize(None)
 
 
-def to_datetime(dt_like: tp.DatetimeLike, **kwargs) -> datetime:
+def to_datetime(dt: tp.DatetimeLike, **kwargs) -> datetime:
     """Parse the datetime as a `datetime.datetime`.
 
     Uses `to_timestamp`."""
     if "unit" not in kwargs:
         kwargs["unit"] = "ms"
-    return to_timestamp(dt_like, **kwargs).to_pydatetime()
+    return to_timestamp(dt, **kwargs).to_pydatetime()
 
 
-def to_tzaware_datetime(dt_like: tp.DatetimeLike, **kwargs) -> datetime:
+def to_tzaware_datetime(dt: tp.DatetimeLike, **kwargs) -> datetime:
     """Parse the datetime as a timezone-aware `datetime.datetime`.
 
     Uses `to_tzaware_timestamp`."""
     if "unit" not in kwargs:
         kwargs["unit"] = "ms"
-    return to_tzaware_timestamp(dt_like, **kwargs).to_pydatetime()
+    return to_tzaware_timestamp(dt, **kwargs).to_pydatetime()
 
 
-def to_naive_datetime(dt_like: tp.DatetimeLike, **kwargs) -> datetime:
+def to_naive_datetime(dt: tp.DatetimeLike, **kwargs) -> datetime:
     """Parse the datetime as a timezone-naive `datetime.datetime`.
 
     Uses `to_naive_timestamp`."""
     if "unit" not in kwargs:
         kwargs["unit"] = "ms"
-    return to_naive_timestamp(dt_like, **kwargs).to_pydatetime()
+    return to_naive_timestamp(dt, **kwargs).to_pydatetime()
 
 
 def datetime_to_ms(dt: datetime) -> int:
