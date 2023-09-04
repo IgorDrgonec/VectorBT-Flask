@@ -1566,6 +1566,28 @@ class TestIndexing:
         np.testing.assert_array_equal(row_idxs, np.array([0, 1, 23, 24, 25, 47, 48]))
         assert col_idxs == slice(None, None, None)
 
+        dti = pd.date_range("2020-01-01", "2020-01-03", freq="15T", tz="Europe/Berlin")
+        row_idxs, col_idxs = indexing.get_idxs(
+            slice("14:30", "15:45"), dti, c, closed_start=False, closed_end=False
+        )
+        np.testing.assert_array_equal(row_idxs, np.array([59, 60, 61, 62, 155, 156, 157, 158]))
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(
+            slice("14:30", "15:45"), dti, c, closed_start=False, closed_end=True
+        )
+        np.testing.assert_array_equal(row_idxs, np.array([59, 60, 61, 62, 63, 155, 156, 157, 158, 159]))
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(
+            slice("14:30", "15:45"), dti, c, closed_start=True, closed_end=False
+        )
+        np.testing.assert_array_equal(row_idxs, np.array([58, 59, 60, 61, 62, 154, 155, 156, 157, 158]))
+        assert col_idxs == slice(None, None, None)
+        row_idxs, col_idxs = indexing.get_idxs(
+            slice("14:30", "15:45"), dti, c, closed_start=True, closed_end=True
+        )
+        np.testing.assert_array_equal(row_idxs, np.array([58, 59, 60, 61, 62, 63, 154, 155, 156, 157, 158, 159]))
+        assert col_idxs == slice(None, None, None)
+
     def test_idx_setter_factory(self):
         idx_setter = indexing.IdxDict({0: 0, indexing.idx(1): 1}).get()
         assert checks.is_deep_equal(

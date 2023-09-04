@@ -16,7 +16,12 @@ from pandas.tseries.frequencies import to_offset
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import combining, reshaping, indexes
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.base.indexing import point_idxr_defaults, range_idxr_defaults, get_index_points, get_index_ranges
+from vectorbtpro.base.indexing import (
+    point_idxr_defaults,
+    range_idxr_defaults,
+    get_index_points,
+    get_index_ranges,
+)
 from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.utils import checks
