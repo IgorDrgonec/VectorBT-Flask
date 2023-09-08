@@ -126,6 +126,14 @@ opt_dep_config = HybridConfig(
         optuna=dict(
             link="https://github.com/optuna/optuna",
         ),
+        sqlalchemy=dict(
+            dist_name="SQLAlchemy",
+            link="https://github.com/sqlalchemy/sqlalchemy",
+            version=">=2.0.0",
+        ),
+        mpire=dict(
+            link="https://github.com/sybrenjansen/mpire",
+        )
     )
 )
 """_"""

@@ -2,7 +2,6 @@
 
 """Engines for executing functions."""
 
-import time
 import multiprocessing
 import concurrent.futures
 import gc
@@ -174,30 +173,42 @@ class ThreadPoolEngine(ExecutionEngine):
 
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
         "init_kwargs",
+        "timeout",
     }
 
-    def __init__(self, init_kwargs: tp.KwargsLike = None, **kwargs) -> None:
+    def __init__(self, init_kwargs: tp.KwargsLike = None, timeout: tp.Optional[int] = None, **kwargs) -> None:
         from vectorbtpro._settings import settings
 
         threadpool_cfg = settings["execution"]["engines"]["threadpool"]
 
         init_kwargs = merge_dicts(init_kwargs, threadpool_cfg["init_kwargs"])
+        if timeout is None:
+            timeout = threadpool_cfg["timeout"]
 
         self._init_kwargs = init_kwargs
+        self._timeout = timeout
 
-        ExecutionEngine.__init__(self, init_kwargs=init_kwargs, **kwargs)
+        ExecutionEngine.__init__(self, init_kwargs=init_kwargs, timeout=timeout, **kwargs)
 
     @property
     def init_kwargs(self) -> tp.Kwargs:
         """Keyword arguments used to initialize `ThreadPoolExecutor`."""
         return self._init_kwargs
 
+    @property
+    def timeout(self) -> tp.Optional[int]:
+        """Timeout."""
+        return self._timeout
+
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         with concurrent.futures.ThreadPoolExecutor(**self.init_kwargs) as executor:
-            futures = {executor.submit(func, *args, **kwargs): i for i, (func, args, kwargs) in enumerate(funcs_args)}
+            futures = {}
+            for i, (func, args, kwargs) in enumerate(funcs_args):
+                future = executor.submit(func, *args, **kwargs)
+                futures[future] = i
             results = [None] * len(futures)
             for fut in concurrent.futures.as_completed(futures):
-                results[futures[fut]] = fut.result()
+                results[futures[fut]] = fut.result(timeout=self.timeout)
             return results
 
 
@@ -206,28 +217,44 @@ class ProcessPoolEngine(ExecutionEngine):
 
     For defaults, see `engines.processpool` in `vectorbtpro._settings.execution`."""
 
-    def __init__(self, init_kwargs: tp.KwargsLike = None) -> None:
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+        "init_kwargs",
+        "timeout",
+    }
+
+    def __init__(self, init_kwargs: tp.KwargsLike = None, timeout: tp.Optional[int] = None, **kwargs) -> None:
         from vectorbtpro._settings import settings
 
         processpool_cfg = settings["execution"]["engines"]["processpool"]
 
         init_kwargs = merge_dicts(init_kwargs, processpool_cfg["init_kwargs"])
+        if timeout is None:
+            timeout = processpool_cfg["timeout"]
 
         self._init_kwargs = init_kwargs
+        self._timeout = timeout
 
-        ExecutionEngine.__init__(self, init_kwargs=init_kwargs)
+        ExecutionEngine.__init__(self, init_kwargs=init_kwargs, timeout=timeout, **kwargs)
 
     @property
     def init_kwargs(self) -> tp.Kwargs:
         """Keyword arguments used to initialize `ProcessPoolExecutor`."""
         return self._init_kwargs
 
+    @property
+    def timeout(self) -> tp.Optional[int]:
+        """Timeout."""
+        return self._timeout
+
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         with concurrent.futures.ProcessPoolExecutor(**self.init_kwargs) as executor:
-            futures = {executor.submit(func, *args, **kwargs): i for i, (func, args, kwargs) in enumerate(funcs_args)}
+            futures = {}
+            for i, (func, args, kwargs) in enumerate(funcs_args):
+                future = executor.submit(func, *args, **kwargs)
+                futures[future] = i
             results = [None] * len(futures)
             for fut in concurrent.futures.as_completed(futures):
-                results[futures[fut]] = fut.result()
+                results[futures[fut]] = fut.result(timeout=self.timeout)
             return results
 
 
@@ -243,17 +270,15 @@ class PathosEngine(ExecutionEngine):
 
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
         "pool_type",
-        "sleep",
         "init_kwargs",
+        "timeout",
     }
 
     def __init__(
         self,
         pool_type: tp.Optional[str] = None,
-        sleep: tp.Optional[int] = None,
         init_kwargs: tp.KwargsLike = None,
-        show_progress: tp.Optional[bool] = None,
-        pbar_kwargs: tp.KwargsLike = None,
+        timeout: tp.Optional[int] = None,
         **kwargs,
     ) -> None:
         from vectorbtpro._settings import settings
@@ -262,20 +287,21 @@ class PathosEngine(ExecutionEngine):
 
         if pool_type is None:
             pool_type = pathos_cfg["pool_type"]
-        if sleep is None:
-            sleep = pathos_cfg["sleep"]
         init_kwargs = merge_dicts(init_kwargs, pathos_cfg["init_kwargs"])
-        if show_progress is None:
-            show_progress = pathos_cfg["show_progress"]
-        pbar_kwargs = merge_dicts(pbar_kwargs, pathos_cfg["pbar_kwargs"])
+        if timeout is None:
+            timeout = pathos_cfg["timeout"]
 
         self._pool_type = pool_type
-        self._sleep = sleep
         self._init_kwargs = init_kwargs
-        self._show_progress = show_progress
-        self._pbar_kwargs = pbar_kwargs
+        self._timeout = timeout
 
-        ExecutionEngine.__init__(self, init_kwargs=init_kwargs, **kwargs)
+        ExecutionEngine.__init__(
+            self,
+            pool_type=pool_type,
+            init_kwargs=init_kwargs,
+            timeout=timeout,
+            **kwargs,
+        )
 
     @property
     def pool_type(self) -> str:
@@ -283,27 +309,14 @@ class PathosEngine(ExecutionEngine):
         return self._pool_type
 
     @property
-    def sleep(self) -> tp.Optional[int]:
-        """Number of seconds between task checks.
-
-        The higher, the less CPU it uses but also the more time it takes to gather the results.
-        Thus, should be in a millisecond range."""
-        return self._sleep
-
-    @property
-    def show_progress(self) -> bool:
-        """Whether to show the progress bar using `vectorbtpro.utils.pbar.get_pbar`."""
-        return self._show_progress
-
-    @property
-    def pbar_kwargs(self) -> tp.Kwargs:
-        """Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`."""
-        return self._pbar_kwargs
-
-    @property
     def init_kwargs(self) -> tp.Kwargs:
         """Keyword arguments used to initialize the pool."""
         return self._init_kwargs
+
+    @property
+    def timeout(self) -> tp.Optional[int]:
+        """Timeout."""
+        return self._timeout
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         from vectorbtpro.utils.module_ import assert_can_import
@@ -321,21 +334,82 @@ class PathosEngine(ExecutionEngine):
         else:
             raise ValueError(f"Invalid option pool_type='{self.pool_type}'")
 
-        if n_calls is None and hasattr(funcs_args, "__len__"):
-            n_calls = len(funcs_args)
+        with Pool(**self.init_kwargs) as pool:
+            async_results = []
+            for (func, args, kwargs) in funcs_args:
+                async_result = pool.apipe(func, *args, **kwargs)
+                async_results.append(async_result)
+            pool.clear()
+        return [async_result.get(timeout=self.timeout) for async_result in async_results]
 
-        with get_pbar(total=n_calls, show_progress=self.show_progress, **self.pbar_kwargs) as pbar:
-            with Pool(**self.init_kwargs) as pool:
-                futures = [pool.apipe(func, *args, **kwargs) for (func, args, kwargs) in funcs_args]
-                tasks = set(futures)
-                while tasks:
-                    ready_tasks = {task for task in tasks if task.ready()}
-                    if ready_tasks:
-                        pbar.update(len(ready_tasks))
-                        tasks -= ready_tasks
-                    if self.sleep is not None:
-                        time.sleep(self.sleep)
-                return [f.get() for f in futures]
+
+class MpireEngine(ExecutionEngine):
+    """Class for executing functions using `WorkerPool` from `mpire`.
+
+    For defaults, see `engines.mpire` in `vectorbtpro._settings.execution`."""
+
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+        "init_kwargs",
+        "apply_kwargs",
+        "timeout",
+    }
+
+    def __init__(
+        self,
+        init_kwargs: tp.KwargsLike = None,
+        apply_kwargs: tp.KwargsLike = None,
+        timeout: tp.Optional[int] = None,
+        **kwargs,
+    ) -> None:
+        from vectorbtpro._settings import settings
+
+        mpire_cfg = settings["execution"]["engines"]["mpire"]
+
+        init_kwargs = merge_dicts(init_kwargs, mpire_cfg["init_kwargs"])
+        apply_kwargs = merge_dicts(apply_kwargs, mpire_cfg["apply_kwargs"])
+        if timeout is None:
+            timeout = mpire_cfg["timeout"]
+
+        self._init_kwargs = init_kwargs
+        self._apply_kwargs = apply_kwargs
+        self._timeout = timeout
+
+        ExecutionEngine.__init__(
+            self,
+            init_kwargs=init_kwargs,
+            apply_kwargs=apply_kwargs,
+            timeout=timeout,
+            **kwargs,
+        )
+
+    @property
+    def init_kwargs(self) -> tp.Kwargs:
+        """Keyword arguments used to initialize `WorkerPool`."""
+        return self._init_kwargs
+
+    @property
+    def apply_kwargs(self) -> tp.Kwargs:
+        """Keyword arguments passed to `WorkerPool.async_apply`."""
+        return self._apply_kwargs
+
+    @property
+    def timeout(self) -> tp.Optional[int]:
+        """Timeout."""
+        return self._timeout
+
+    def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("mpire")
+        from mpire import WorkerPool
+
+        with WorkerPool(**self.init_kwargs) as pool:
+            async_results = []
+            for i, (func, args, kwargs) in enumerate(funcs_args):
+                async_result = pool.apply_async(func, args=args, kwargs=kwargs, **self.apply_kwargs)
+                async_results.append(async_result)
+            pool.stop_and_join()
+        return [async_result.get(timeout=self.timeout) for async_result in async_results]
 
 
 class DaskEngine(ExecutionEngine):
@@ -699,6 +773,12 @@ def execute(
         if engine.lower() in engines_cfg:
             engine_cfg = engines_cfg[engine]
             engine = engines_cfg[engine]["cls"]
+        else:
+            raise ValueError(f"Invalid engine name '{engine}'")
+    if isinstance(engine, str):
+        globals_dict = globals()
+        if engine in globals_dict:
+            engine = globals_dict[engine]
         else:
             raise ValueError(f"Invalid engine name '{engine}'")
     if isinstance(engine, type) and issubclass(engine, ExecutionEngine):

@@ -30,8 +30,10 @@ RUN pip install --quiet --no-cache-dir --ignore-installed 'llvmlite'
 
 RUN pip install --quiet --no-cache-dir \
     'numpy==1.23.3' \
-    'numba==0.56.4' \
     'pandas>=1.5.0' \
+    'numba==0.56.4' \
+    'scipy' \
+    'scikit-learn' \
     'schedule' \
     'requests' \
     'tqdm' \
@@ -40,21 +42,28 @@ RUN pip install --quiet --no-cache-dir \
     'imageio' \
     'mypy_extensions' \
     'humanize' \
-    'attrs>=19.2.0' \
+    'attrs>=21.1.0' \
     'websocket-client' \
-    'hyperopt' \
-    'optuna' \
     'yfinance>=0.2.20' \
     'python-binance>=1.0.16' \
     'alpaca-py' \
     'ccxt>=1.89.14' \
     'tables' \
+    'SQLAlchemy>=2.0.0' \
     'polygon-api-client>=1.0.0' \
+    'beautifulsoup4' \
     'nasdaq-data-link' \
+    'TA-Lib==0.4.21' \
     'ta' \
     'pandas_ta' \
-    'TA-Lib==0.4.21' \
     'technical' \
+    'numexpr' \
+    'hyperopt' \
+    'optuna' \
+    'pathos' \
+    'mpire' \
+    'dask' \
+    'ray>=1.4.1' \
     'plotly-resampler' \
     'quantstats>=0.0.37' \
     'PyPortfolioOpt>=1.5.1' \

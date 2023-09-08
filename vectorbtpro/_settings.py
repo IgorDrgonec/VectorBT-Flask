@@ -126,14 +126,6 @@ from numba import config as nb_config
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.checks import is_instance_of
 from vectorbtpro.utils.config import child_dict, Config
-from vectorbtpro.utils.execution import (
-    SerialEngine,
-    ThreadPoolEngine,
-    ProcessPoolEngine,
-    PathosEngine,
-    DaskEngine,
-    RayEngine,
-)
 from vectorbtpro.utils.jitting import NumPyJitter, NumbaJitter
 from vectorbtpro.utils.template import Sub, RepEval, substitute_templates
 
@@ -298,7 +290,7 @@ execution = child_dict(
     template_context=Config(),
     engines=Config(
         serial=Config(
-            cls=SerialEngine,
+            cls="SerialEngine",
             show_progress=False,
             pbar_kwargs=Config(),
             clear_cache=False,
@@ -306,27 +298,33 @@ execution = child_dict(
             cooldown=None,
         ),
         threadpool=Config(
-            cls=ThreadPoolEngine,
+            cls="ThreadPoolEngine",
             init_kwargs=Config(),
+            timeout=None,
         ),
         processpool=Config(
-            cls=ProcessPoolEngine,
+            cls="ProcessPoolEngine",
             init_kwargs=Config(),
+            timeout=None,
         ),
         pathos=Config(
-            cls=PathosEngine,
+            cls="PathosEngine",
             pool_type="process",
-            sleep=0.001,
             init_kwargs=Config(),
-            show_progress=False,
-            pbar_kwargs=Config(),
+            timeout=None,
+        ),
+        mpire=Config(
+            cls="MpireEngine",
+            init_kwargs=Config(),
+            apply_kwargs=Config(),
+            timeout=None,
         ),
         dask=Config(
-            cls=DaskEngine,
+            cls="DaskEngine",
             compute_kwargs=Config(),
         ),
         ray=Config(
-            cls=RayEngine,
+            cls="RayEngine",
             restart=False,
             reuse_refs=True,
             del_refs=True,

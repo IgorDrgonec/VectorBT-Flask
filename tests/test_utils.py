@@ -42,6 +42,12 @@ try:
 except:
     pathos_available = False
 
+mpire_available = True
+try:
+    import mpire
+except:
+    mpire_available = False
+
 dask_available = True
 try:
     import dask
@@ -2632,6 +2638,8 @@ class TestExecution:
             assert execution.execute(funcs_args, engine="ray") == [10, 35, 60]
         assert execution.execute(funcs_args, engine="threadpool") == [10, 35, 60]
         assert execution.execute(funcs_args, engine="processpool") == [10, 35, 60]
+        if mpire_available:
+            assert execution.execute(funcs_args, engine="mpire") == [10, 35, 60]
         if pathos_available:
             assert execution.execute(funcs_args, engine="pathos", pool_type="thread") == [10, 35, 60]
             assert execution.execute(funcs_args, engine="pathos", pool_type="process") == [10, 35, 60]
