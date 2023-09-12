@@ -989,11 +989,16 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     def get_key_wrapper(
         self,
         keys: tp.Optional[tp.MaybeKeys] = None,
-        stack_classes: bool = True,
+        attach_classes: bool = True,
         index_stack_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> ArrayWrapper:
-        """Get wrapper with keys as columns."""
+        """Get wrapper with keys as columns.
+
+        If `attach_classes` is True, attaches `Data.classes` by stacking them over
+        the keys using `vectorbtpro.base.indexes.stack_indexes`.
+
+        Other keyword arguments are passed to the constructor of the wrapper."""
         if index_stack_kwargs is None:
             index_stack_kwargs = {}
         if keys is None:
@@ -1021,7 +1026,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             **kwargs,
         )
 
-        if stack_classes:
+        if attach_classes:
             classes = []
             all_have_classes = True
             for key in wrapper.columns:
@@ -1047,6 +1052,11 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 key_columns = stack_indexes((classes_columns, wrapper.columns), **index_stack_kwargs)
                 wrapper = wrapper.replace(columns=key_columns)
         return wrapper
+
+    @cached_property
+    def key_wrapper(self) -> ArrayWrapper:
+        """Key wrapper."""
+        return self.get_key_wrapper()
 
     def get_feature_wrapper(self, features: tp.Optional[tp.MaybeFeatures] = None, **kwargs) -> ArrayWrapper:
         """Get wrapper with features as columns."""
@@ -1147,14 +1157,14 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     def concat(
         self,
         keys: tp.Optional[tp.Symbols] = None,
-        stack_classes: bool = True,
+        attach_classes: bool = True,
         index_stack_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.Union[feature_dict, symbol_dict]:
         """Concatenate keys along columns."""
         key_wrapper = self.get_key_wrapper(
             keys=keys,
-            stack_classes=stack_classes,
+            attach_classes=attach_classes,
             index_stack_kwargs=index_stack_kwargs,
             **kwargs,
         )
@@ -1656,13 +1666,13 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             **kwargs,
         )
 
-    def invert(self: DataT, get_wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
+    def invert(self: DataT, key_wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
         """Invert data and return a new instance."""
-        if get_wrapper_kwargs is None:
-            get_wrapper_kwargs = {}
-        new_data = self.concat(stack_classes=False)
+        if key_wrapper_kwargs is None:
+            key_wrapper_kwargs = {}
+        new_data = self.concat(attach_classes=False)
         if "wrapper" not in kwargs:
-            kwargs["wrapper"] = self.get_key_wrapper(**get_wrapper_kwargs)
+            kwargs["wrapper"] = self.get_key_wrapper(**key_wrapper_kwargs)
         if "classes" not in kwargs:
             kwargs["classes"] = self.column_type()
         if "single_key" not in kwargs:
@@ -2644,6 +2654,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         per_feature: bool = False,
         per_symbol: bool = False,
         pass_frame: bool = False,
+        key_wrapper_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> DataT:
         """Transform data.
@@ -2654,6 +2665,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         if `pass_frame` is False or as a DataFrame with one column if `pass_frame` is True.
         If both are False, concatenates all features and symbols into a single DataFrame
         and calls `transform_func` on it. Then, splits the data by key and builds a new `Data` instance.
+        Keyword arguments `key_wrapper_kwargs` are passed to `Data.get_key_wrapper` to control,
+        for example, attachment of classes.
 
         After the transformation, the new data is aligned using `Data.align_data`.
 
@@ -2665,31 +2678,24 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             To add new columns, use either column stacking or `Data.merge`.
 
             Index, on the other hand, can be changed freely."""
-        if (self.feature_oriented and per_feature) or (self.symbol_oriented and per_symbol):
+        if key_wrapper_kwargs is None:
+            key_wrapper_kwargs = {}
+
+        if (self.feature_oriented and (per_feature and not per_symbol)) or (
+            self.symbol_oriented and (per_symbol and not per_feature)
+        ):
             new_data = self.dict_type()
             for k in self.keys:
-                if (self.feature_oriented and per_symbol) or (self.symbol_oriented and per_feature):
-                    if isinstance(self.data[k], pd.Series):
-                        new_data[k] = transform_func(self.data[k], *args, **kwargs)
-                    else:
-                        _new_data = []
-                        for i in range(len(self.data[k].columns)):
-                            if pass_frame:
-                                _new_data.append(transform_func(self.data[k].iloc[:, [i]], *args, **kwargs))
-                            else:
-                                new_obj = transform_func(self.data[k].iloc[:, i], *args, **kwargs)
-                                checks.assert_meta_equal(new_obj, self.data[k].iloc[:, i], axis=1)
-                                new_obj = new_obj.to_frame()
-                                new_obj.columns = self.data[k].columns[[i]]
-                                _new_data.append(new_obj)
-                        new_data[k] = pd.concat(_new_data, axis=1)
-                else:
-                    new_data[k] = transform_func(self.data[k], *args, **kwargs)
+                new_data[k] = transform_func(self.data[k], *args, **kwargs)
                 checks.assert_meta_equal(new_data[k], self.data[k], axis=1)
-        elif (self.feature_oriented and per_symbol) or (self.symbol_oriented and per_feature):
+        elif (self.feature_oriented and (per_symbol and not per_feature)) or (
+            self.symbol_oriented and (per_feature and not per_symbol)
+        ):
             first_data = self.data[list(self.data.keys())[0]]
             if isinstance(first_data, pd.Series):
                 concat_data = pd.concat(self.data.values(), axis=1)
+                key_wrapper = self.get_key_wrapper(**key_wrapper_kwargs)
+                concat_data.columns = key_wrapper.columns
                 new_concat_data = transform_func(concat_data, *args, **kwargs)
                 checks.assert_meta_equal(new_concat_data, concat_data, axis=1)
                 new_data = self.dict_type()
@@ -2700,6 +2706,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 all_concat_data = []
                 for i in range(len(first_data.columns)):
                     concat_data = pd.concat([self.data[k].iloc[:, [i]] for k in self.keys], axis=1)
+                    key_wrapper = self.get_key_wrapper(**key_wrapper_kwargs)
+                    concat_data.columns = key_wrapper.columns
                     new_concat_data = transform_func(concat_data, *args, **kwargs)
                     checks.assert_meta_equal(new_concat_data, concat_data, axis=1)
                     all_concat_data.append(new_concat_data)
@@ -2709,14 +2717,28 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     for c in range(len(first_data.columns)):
                         new_objs.append(all_concat_data[c].iloc[:, [i]])
                     new_data[k] = pd.concat(new_objs, axis=1)
+                    new_data[k].columns = first_data.columns
         else:
-            if isinstance(self.level_name, tuple):
-                keys = pd.MultiIndex.from_tuples(self.keys, names=self.level_name)
+            key_wrapper = self.get_key_wrapper(**key_wrapper_kwargs)
+            concat_data = pd.concat(self.data.values(), axis=1, keys=key_wrapper.columns)
+            if (self.feature_oriented and (per_feature and per_symbol)) or (
+                self.symbol_oriented and (per_symbol and per_feature)
+            ):
+                new_concat_data = []
+                for i in range(len(concat_data.columns)):
+                    if pass_frame:
+                        new_obj = transform_func(concat_data.iloc[:, [i]], *args, **kwargs)
+                        checks.assert_meta_equal(new_obj, concat_data.iloc[:, [i]], axis=1)
+                    else:
+                        new_obj = transform_func(concat_data.iloc[:, i], *args, **kwargs)
+                        checks.assert_meta_equal(new_obj, concat_data.iloc[:, i], axis=1)
+                    new_concat_data.append(new_obj)
+                new_concat_data = pd.concat(new_concat_data, axis=1)
             else:
-                keys = pd.Index(self.keys, name=self.level_name)
-            concat_data = pd.concat(self.data.values(), axis=1, keys=keys)
-            new_concat_data = transform_func(concat_data, *args, **kwargs)
-            checks.assert_meta_equal(new_concat_data, concat_data, axis=1)
+                new_concat_data = transform_func(concat_data, *args, **kwargs)
+                checks.assert_meta_equal(new_concat_data, concat_data, axis=1)
+            native_concat_data = pd.concat(self.data.values(), axis=1, keys=None)
+            new_concat_data.columns = native_concat_data.columns
             new_data = self.dict_type()
             first_data = self.data[list(self.data.keys())[0]]
             for i, k in enumerate(self.keys):
