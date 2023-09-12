@@ -73,7 +73,9 @@ class FigureMixin:
         self.show(renderer="svg", **kwargs)
 
     def auto_rangebreaks(self: FigureMixinT, index: tp.Optional[tp.IndexLike] = None, **kwargs) -> FigureMixinT:
-        """Set range breaks automatically based on `vectorbtpro.utils.datetime_.get_rangebreaks`."""
+        """Set range breaks automatically based on `vectorbtpro.utils.datetime_.get_rangebreaks`.
+
+        Changes the figure in place and returns it."""
         if index is None:
             for d in self.data:
                 if "x" in d:
@@ -88,6 +90,12 @@ class FigureMixin:
                 raise ValueError("Couldn't extract x-axis values, please provide index")
         rangebreaks = get_rangebreaks(index, **kwargs)
         return self.update_xaxes(rangebreaks=rangebreaks)
+
+    def skip_index(self: FigureMixinT, skip_index: tp.IndexLike) -> FigureMixinT:
+        """Skip index values.
+
+        Changes the figure in place and returns it."""
+        return self.update_xaxes(rangebreaks=[dict(values=skip_index)])
 
 
 class Figure(_Figure, FigureMixin):

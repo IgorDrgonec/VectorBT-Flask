@@ -76,6 +76,7 @@ Number = Union[int, float, complex, np.number, np.bool_]
 Int = Union[int, np.integer]
 Float = Union[float, np.floating]
 IntFloat = Union[Int, Float]
+IntStr = Union[Int, str]
 
 # Basic sequences
 MaybeTuple = Union[T, Tuple[T, ...]]
@@ -174,9 +175,9 @@ PathLike = Union[str, Path]
 SettingsKeys = ClassVar[Union[None, Hashable, Dict[Hashable, Hashable]]]
 
 # Data
-Key = Feature = Symbol = Hashable
-Keys = Features = Symbols = Sequence[Hashable]
-MaybeKeys = MaybeFeatures = MaybeSymbols = Union[Hashable, Sequence[Hashable]]
+Column = Key = Feature = Symbol = Hashable
+Columns = Keys = Features = Symbols = Sequence[Hashable]
+MaybeColumns = MaybeKeys = MaybeFeatures = MaybeSymbols = Union[Hashable, Sequence[Hashable]]
 KeyData = FeatureData = SymbolData = Union[None, SeriesFrame, Tuple[SeriesFrame, Kwargs]]
 
 # Plotting

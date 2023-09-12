@@ -51,9 +51,34 @@ class FileData(LocalData):
         return sub_paths
 
     @classmethod
+    def list_paths(cls, path: tp.PathLike = ".", **match_path_kwargs) -> tp.List[Path]:
+        """List all features or symbols under a path."""
+        if not isinstance(path, Path):
+            path = Path(path)
+        if path.exists() and path.is_dir():
+            path = path / "*"
+        return cls.match_path(path, **match_path_kwargs)
+
+    @classmethod
     def path_to_key(cls, path: tp.PathLike, **kwargs) -> str:
         """Convert a path into a feature or symbol."""
         return Path(path).stem
+
+    @classmethod
+    def resolve_keys_meta(
+        cls,
+        keys: tp.Union[None, dict, tp.MaybeKeys] = None,
+        keys_are_features: tp.Optional[bool] = None,
+        features: tp.Union[None, dict, tp.MaybeFeatures] = None,
+        symbols: tp.Union[None, dict, tp.MaybeSymbols] = None,
+        paths: tp.Any = None,
+    ) -> tp.Kwargs:
+        return LocalData.resolve_keys_meta(
+            keys=keys,
+            keys_are_features=keys_are_features,
+            features=features,
+            symbols=symbols,
+        )
 
     @classmethod
     def pull(
@@ -88,6 +113,7 @@ class FileData(LocalData):
             keys_are_features=keys_are_features,
             features=features,
             symbols=symbols,
+            paths=paths,
         )
         keys = keys_meta["keys"]
         keys_are_features = keys_meta["keys_are_features"]

@@ -146,7 +146,7 @@ class YFData(RemoteData):
             timeframe = str(multiplier) + unit
 
         df = ticker.history(period=period, start=start, end=end, interval=timeframe, **history_kwargs)
-        if isinstance(df.index, pd.DatetimeIndex) and df.index.tzinfo is None:
+        if isinstance(df.index, pd.DatetimeIndex) and df.index.tz is None:
             df = df.tz_localize(ticker_tz)
 
         if not df.empty:
@@ -159,8 +159,8 @@ class YFData(RemoteData):
         return df, dict(tz_convert=tz, freq=freq)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[symbol]
+        fetch_kwargs = self.select_fetch_kwargs(symbol)
+        fetch_kwargs["start"] = self.select_last_index(symbol)
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)
 

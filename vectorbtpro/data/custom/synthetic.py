@@ -30,21 +30,21 @@ class SyntheticData(CustomData):
 
     @classmethod
     def generate_key(cls, key: tp.Key, index: tp.Index, key_is_feature: bool = False, **kwargs) -> tp.KeyData:
-        """Abstract method to generate data for a feature or symbol."""
+        """Abstract method to generate data of a feature or symbol."""
         raise NotImplementedError
 
     @classmethod
     def generate_feature(cls, feature: tp.Feature, index: tp.Index, **kwargs) -> tp.FeatureData:
-        """Abstract method to generate data for a feature.
+        """Abstract method to generate data of a feature.
 
-        Calls `SyntheticData.generate_key` with `key_is_feature=True`."""
+        Uses `SyntheticData.generate_key` with `key_is_feature=True`."""
         return cls.generate_key(feature, index, key_is_feature=True, **kwargs)
 
     @classmethod
     def generate_symbol(cls, symbol: tp.Symbol, index: tp.Index, **kwargs) -> tp.SymbolData:
         """Abstract method to generate data for a symbol.
 
-        Calls `SyntheticData.generate_key` with `key_is_feature=False`."""
+        Uses `SyntheticData.generate_key` with `key_is_feature=False`."""
         return cls.generate_key(symbol, index, key_is_feature=False, **kwargs)
 
     @classmethod
@@ -61,7 +61,7 @@ class SyntheticData(CustomData):
         inclusive: tp.Optional[str] = None,
         **kwargs,
     ) -> tp.KeyData:
-        """Generate data for a feature or symbol.
+        """Generate data of a feature or symbol.
 
         Generates datetime index using `pd.date_range` and passes it to `SyntheticData.generate_key`
         to fill the Series/DataFrame with generated data.
@@ -95,15 +95,15 @@ class SyntheticData(CustomData):
         if start is None and periods is None:
             if tz is not None:
                 start = to_timestamp(0, tz=tz)
-            elif end is not None and end.tzinfo is not None:
-                start = to_timestamp(0, tz=end.tzinfo)
+            elif end is not None and end.tz is not None:
+                start = to_timestamp(0, tz=end.tz)
             else:
                 start = to_naive_timestamp(0)
         if end is None and periods is None:
             if tz is not None:
                 end = to_timestamp("now", tz=tz)
-            elif start is not None and start.tzinfo is not None:
-                end = to_timestamp("now", tz=start.tzinfo)
+            elif start is not None and start.tz is not None:
+                end = to_timestamp("now", tz=start.tz)
             else:
                 end = to_naive_timestamp("now")
 
@@ -116,7 +116,7 @@ class SyntheticData(CustomData):
             inclusive=inclusive,
         )
         if tz is None:
-            tz = index.tzinfo
+            tz = index.tz
         if len(index) == 0:
             raise ValueError("Date range is empty")
         if key_is_feature:
@@ -125,38 +125,35 @@ class SyntheticData(CustomData):
 
     @classmethod
     def fetch_feature(cls, feature: tp.Feature, **kwargs) -> tp.FeatureData:
-        """Generate data for a feature.
+        """Generate data of a feature.
 
-        Calls `SyntheticData.fetch_key` with `key_is_feature=True`."""
+        Uses `SyntheticData.fetch_key` with `key_is_feature=True`."""
         return cls.fetch_key(feature, key_is_feature=True, **kwargs)
 
     @classmethod
     def fetch_symbol(cls, symbol: tp.Symbol, **kwargs) -> tp.SymbolData:
         """Generate data for a symbol.
 
-        Calls `SyntheticData.fetch_key` with `key_is_feature=False`."""
+        Uses `SyntheticData.fetch_key` with `key_is_feature=False`."""
         return cls.fetch_key(symbol, key_is_feature=False, **kwargs)
 
     def update_key(self, key: tp.Key, key_is_feature: bool = False, **kwargs) -> tp.KeyData:
-        """Update data for a feature or symbol."""
-        if key_is_feature:
-            fetch_kwargs = self.select_feature_kwargs(key, self.fetch_kwargs)
-        else:
-            fetch_kwargs = self.select_symbol_kwargs(key, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[key]
+        """Update data of a feature or symbol."""
+        fetch_kwargs = self.select_fetch_kwargs(key)
+        fetch_kwargs["start"] = self.select_last_index(key)
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         if key_is_feature:
             return self.fetch_feature(key, **kwargs)
         return self.fetch_symbol(key, **kwargs)
 
     def update_feature(self, feature: tp.Feature, **kwargs) -> tp.FeatureData:
-        """Update data for a feature.
+        """Update data of a feature.
 
-        Calls `SyntheticData.update_key` with `key_is_feature=True`."""
+        Uses `SyntheticData.update_key` with `key_is_feature=True`."""
         return self.update_key(feature, key_is_feature=True, **kwargs)
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SymbolData:
         """Update data for a symbol.
 
-        Calls `SyntheticData.update_key` with `key_is_feature=False`."""
+        Uses `SyntheticData.update_key` with `key_is_feature=False`."""
         return self.update_key(symbol, key_is_feature=False, **kwargs)

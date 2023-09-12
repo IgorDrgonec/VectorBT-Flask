@@ -125,12 +125,12 @@ class NDLData(RemoteData):
 
         # Establish the timestamps
         if start is not None:
-            start = to_tzaware_datetime(start, naive_tz=tz, tz="UTC")
+            start = to_tzaware_datetime(start, naive_tz=tz, tz="utc")
             start_date = pd.Timestamp(start).isoformat()
         else:
             start_date = None
         if end is not None:
-            end = to_tzaware_datetime(end, naive_tz=tz, tz="UTC")
+            end = to_tzaware_datetime(end, naive_tz=tz, tz="utc")
             end_date = pd.Timestamp(end).isoformat()
         else:
             end_date = None
@@ -155,21 +155,21 @@ class NDLData(RemoteData):
             new_columns.append(new_c)
         df = df.rename(columns=dict(zip(df.columns, new_columns)))
 
-        if isinstance(df.index, pd.DatetimeIndex) and df.index.tzinfo is None:
-            df = df.tz_localize("UTC")
+        if isinstance(df.index, pd.DatetimeIndex) and df.index.tz is None:
+            df = df.tz_localize("utc")
         if not df.empty:
             if start is not None:
-                start = to_timestamp(start, tz=df.index.tzinfo)
+                start = to_timestamp(start, tz=df.index.tz)
                 if df.index[0] < start:
                     df = df[df.index >= start]
             if end is not None:
-                end = to_timestamp(end, tz=df.index.tzinfo)
+                end = to_timestamp(end, tz=df.index.tz)
                 if df.index[-1] >= end:
                     df = df[df.index < end]
         return df, dict(tz_convert=tz)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[symbol]
+        fetch_kwargs = self.select_fetch_kwargs(symbol)
+        fetch_kwargs["start"] = self.select_last_index(symbol)
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)

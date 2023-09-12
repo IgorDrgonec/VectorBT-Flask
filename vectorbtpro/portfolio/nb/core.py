@@ -2009,9 +2009,9 @@ def check_limit_expired_nb(
         return is_expired_on_open, is_expired
     elif time_delta_format == TimeDeltaFormat.Index:
         if index is None:
-            raise ValueError("Index must be provided for TimeDeltaFormat.Index")
+            raise ValueError("Must provide index for TimeDeltaFormat.Index")
         if freq is None:
-            raise ValueError("Frequency must be provided for TimeDeltaFormat.Index")
+            raise ValueError("Must provide frequency for TimeDeltaFormat.Index")
         is_expired_on_open = False
         is_expired = False
         if tif != -1:
@@ -2243,9 +2243,9 @@ def check_td_stop_hit_nb(
         return is_hit_on_open, is_hit
     elif time_delta_format == TimeDeltaFormat.Index:
         if index is None:
-            raise ValueError("Index must be provided for TimeDeltaFormat.Index")
+            raise ValueError("Must provide index for TimeDeltaFormat.Index")
         if freq is None:
-            raise ValueError("Frequency must be provided for TimeDeltaFormat.Index")
+            raise ValueError("Must provide frequency for TimeDeltaFormat.Index")
         is_hit_on_open = False
         is_hit = False
         if stop != -1:
@@ -2286,9 +2286,9 @@ def check_dt_stop_hit_nb(
         return is_hit_on_open, is_hit
     elif time_delta_format == TimeDeltaFormat.Index:
         if index is None:
-            raise ValueError("Index must be provided for TimeDeltaFormat.Index")
+            raise ValueError("Must provide index for TimeDeltaFormat.Index")
         if freq is None:
-            raise ValueError("Frequency must be provided for TimeDeltaFormat.Index")
+            raise ValueError("Must provide frequency for TimeDeltaFormat.Index")
         is_hit_on_open = False
         is_hit = False
         if stop != -1:
@@ -2445,7 +2445,7 @@ def get_time_stop_ladder_exit_size_nb(
         raise ValueError("Initial index of the ladder must be known")
     if time_delta_format == TimeDeltaFormat.Index:
         if index is None:
-            raise ValueError("Index must be provided for TimeDeltaFormat.Index")
+            raise ValueError("Must provide index for TimeDeltaFormat.Index")
         init_idx = index[init_idx]
     idx = flex_select_nb(stop_, step, col)
     if idx == -1:

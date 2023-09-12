@@ -425,10 +425,10 @@ def try_align_to_dt_index(source_index: tp.IndexLike, target_index: tp.Index, **
     Keyword arguments are passed to `prepare_dt_index`."""
     source_index = prepare_dt_index(source_index, **kwargs)
     if isinstance(source_index, pd.DatetimeIndex) and isinstance(target_index, pd.DatetimeIndex):
-        if source_index.tzinfo is None and target_index.tzinfo is not None:
-            source_index = source_index.tz_localize(target_index.tzinfo)
-        elif source_index.tzinfo is not None and target_index.tzinfo is not None:
-            source_index = source_index.tz_convert(target_index.tzinfo)
+        if source_index.tz is None and target_index.tz is not None:
+            source_index = source_index.tz_localize(target_index.tz)
+        elif source_index.tz is not None and target_index.tz is not None:
+            source_index = source_index.tz_convert(target_index.tz)
     return source_index
 
 
@@ -439,10 +439,10 @@ def try_align_dt_to_index(dt: tp.DatetimeLike, target_index: tp.Index, **kwargs)
     if not isinstance(target_index, pd.DatetimeIndex):
         return dt
     dt = to_timestamp(dt, **kwargs)
-    if dt.tzinfo is None and target_index.tzinfo is not None:
-        dt = dt.tz_localize(target_index.tzinfo)
-    elif dt.tzinfo is not None and target_index.tzinfo is not None:
-        dt = dt.tz_convert(target_index.tzinfo)
+    if dt.tzinfo is None and target_index.tz is not None:
+        dt = dt.tz_localize(target_index.tz)
+    elif dt.tzinfo is not None and target_index.tz is not None:
+        dt = dt.tz_convert(target_index.tz)
     return dt
 
 

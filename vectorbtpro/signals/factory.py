@@ -710,7 +710,7 @@ class SignalFactory(IndicatorFactory):
                 input_shape = input_list[0].shape
 
             if len(args) > 0 and place_args is not None:
-                raise ValueError("Either *args or place_args must be provided, not both")
+                raise ValueError("Must provide either *args or place_args, not both")
             if place_args is None:
                 place_args = args
             if (
@@ -719,7 +719,7 @@ class SignalFactory(IndicatorFactory):
                 or (mode == FactoryMode.Chain and not default_chain_entry_func)
             ):
                 if len(place_args) > 0 and entry_place_args is not None:
-                    raise ValueError("Either place_args or entry_place_args must be provided, not both")
+                    raise ValueError("Must provide either place_args or entry_place_args, not both")
                 if entry_place_args is None:
                     entry_place_args = place_args
             else:
@@ -727,18 +727,18 @@ class SignalFactory(IndicatorFactory):
                     entry_place_args = ()
             if mode in (FactoryMode.Exits, FactoryMode.Both, FactoryMode.Chain):
                 if len(place_args) > 0 and exit_place_args is not None:
-                    raise ValueError("Either place_args or exit_place_args must be provided, not both")
+                    raise ValueError("Must provide either place_args or exit_place_args, not both")
                 if exit_place_args is None:
                     exit_place_args = place_args
             else:
                 if exit_place_args is None:
                     exit_place_args = ()
             if len(entry_place_args) > 0 and entry_args is not None:
-                raise ValueError("Either entry_place_args or entry_args must be provided, not both")
+                raise ValueError("Must provide either entry_place_args or entry_args, not both")
             if entry_args is None:
                 entry_args = entry_place_args
             if len(exit_place_args) > 0 and exit_args is not None:
-                raise ValueError("Either exit_place_args or exit_args must be provided, not both")
+                raise ValueError("Must provide either exit_place_args or exit_args, not both")
             if exit_args is None:
                 exit_args = exit_place_args
             if cache_args is None:

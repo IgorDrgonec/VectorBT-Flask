@@ -927,7 +927,7 @@ def execute(
             _n_calls = n_calls
         else:
             if isinstance(funcs_args, CustomTemplate):
-                raise ValueError("When funcs_args is a template, n_calls must be provided")
+                raise ValueError("When funcs_args is a template, must provide n_calls")
             funcs_args = list(funcs_args)
             _n_calls = len(funcs_args)
         if isinstance(n_chunks, str) and n_chunks.lower() == "auto":

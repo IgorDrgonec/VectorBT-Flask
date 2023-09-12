@@ -11,14 +11,8 @@ __all__ = [
 
 __pdoc__ = {}
 
-RemoteDataT = tp.TypeVar("RemoteDataT", bound="RemoteData")
-
 
 class RemoteData(CustomData):
-    """Data class for fetching remote data.
-
-    Remote data usually has arguments such as `start`, `end`, and `timeframe`.
-
-    Overrides `vectorbtpro.data.base.Data.update_symbol` to update data based on the `start` argument."""
+    """Data class for fetching remote data."""
 
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.remote")

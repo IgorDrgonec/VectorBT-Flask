@@ -139,7 +139,7 @@ class BinanceData(RemoteData):
     ) -> tp.List[str]:
         """List all symbols.
 
-        Uses `CustomData.key_match` to check each symbol against `pattern`."""
+        Uses `vectorbtpro.data.custom.custom.CustomData.key_match` to check each symbol against `pattern`."""
         if client_config is None:
             client_config = {}
         client = cls.resolve_client(client=client, **client_config)
@@ -250,14 +250,14 @@ class BinanceData(RemoteData):
                 unit = "w"
             timeframe = str(multiplier) + unit
         if start is not None:
-            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="UTC"))
+            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="utc"))
             first_valid_ts = client._get_earliest_valid_timestamp(symbol, timeframe, klines_type)
             start_ts = max(start_ts, first_valid_ts)
         else:
             start_ts = None
         prev_end_ts = None
         if end is not None:
-            end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz="UTC"))
+            end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz="utc"))
         else:
             end_ts = None
 
@@ -360,8 +360,8 @@ class BinanceData(RemoteData):
         return df, dict(tz_convert=tz, freq=freq)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[symbol]
+        fetch_kwargs = self.select_fetch_kwargs(symbol)
+        fetch_kwargs["start"] = self.select_last_index(symbol)
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)
 

@@ -30,23 +30,31 @@ class CSVData(FileData):
     _setting_keys: tp.SettingsKeys = dict(custom="data.custom.csv")
 
     @classmethod
-    def list_keys(cls, path: tp.PathLike = ".", **match_path_kwargs) -> tp.List[tp.Key]:
-        """List all features or symbols under a path."""
+    def list_paths(cls, path: tp.PathLike = ".", **match_path_kwargs) -> tp.List[Path]:
         if not isinstance(path, Path):
             path = Path(path)
         if path.exists() and path.is_dir():
-            path = path / "**" / "*.csv"
-        return list(map(str, cls.match_path(path, **match_path_kwargs)))
+            path = path / "*.csv"
+        return cls.match_path(path, **match_path_kwargs)
 
     @classmethod
-    def list_features(cls, path: tp.PathLike = ".", **match_path_kwargs) -> tp.List[tp.Feature]:
-        """List all features under a path."""
-        return cls.list_keys(path=path, **match_path_kwargs)
-
-    @classmethod
-    def list_symbols(cls, path: tp.PathLike = ".", **match_path_kwargs) -> tp.List[tp.Symbol]:
-        """List all symbols under a path."""
-        return cls.list_keys(path=path, **match_path_kwargs)
+    def resolve_keys_meta(
+        cls,
+        keys: tp.Union[None, dict, tp.MaybeKeys] = None,
+        keys_are_features: tp.Optional[bool] = None,
+        features: tp.Union[None, dict, tp.MaybeFeatures] = None,
+        symbols: tp.Union[None, dict, tp.MaybeSymbols] = None,
+        paths: tp.Any = None,
+    ) -> tp.Kwargs:
+        keys_meta = FileData.resolve_keys_meta(
+            keys=keys,
+            keys_are_features=keys_are_features,
+            features=features,
+            symbols=symbols,
+        )
+        if keys_meta["keys"] is None and paths is None:
+            keys_meta["keys"] = "*.csv"
+        return keys_meta
 
     @classmethod
     def fetch_key(
@@ -61,11 +69,12 @@ class CSVData(FileData):
         header: tp.Optional[tp.MaybeSequence[int]] = None,
         index_col: tp.Optional[int] = None,
         parse_dates: tp.Optional[bool] = None,
-        squeeze: tp.Optional[bool] = None,
+        chunksize: tp.Optional[int] = None,
         chunk_func: tp.Optional[tp.Callable] = None,
+        squeeze: tp.Optional[bool] = None,
         **read_csv_kwargs,
     ) -> tp.KeyData:
-        """Load a CSV file for a feature or symbol.
+        """Fetch the CSV file of a feature or symbol.
 
         Args:
             key (hashable): Feature or symbol.
@@ -89,11 +98,14 @@ class CSVData(FileData):
                 Must exclude header rows.
             header (int or sequence of int): See `pd.read_csv`.
             index_col (int): See `pd.read_csv`.
+
+                 If False, will pass None.
             parse_dates (bool): See `pd.read_csv`.
-            squeeze (int): Whether to squeeze a DataFrame with one column into a Series.
+            chunksize (int): See `pd.read_csv`.
             chunk_func (callable): Function to select and concatenate chunks from `TextFileReader`.
 
                 Gets called only if `iterator` or `chunksize` are set.
+            squeeze (int): Whether to squeeze a DataFrame with one column into a Series.
             **read_csv_kwargs: Keyword arguments passed to `pd.read_csv`.
 
         `skiprows` and `nrows` will be automatically calculated based on `start_row` and `end_row`.
@@ -128,6 +140,10 @@ class CSVData(FileData):
             index_col = None
         if parse_dates is None:
             parse_dates = csv_cfg["parse_dates"]
+        if chunksize is None:
+            chunksize = csv_cfg["chunksize"]
+        if chunk_func is None:
+            chunk_func = csv_cfg["chunk_func"]
         if squeeze is None:
             squeeze = csv_cfg["squeeze"]
         read_csv_kwargs = merge_dicts(csv_cfg["read_csv_kwargs"], read_csv_kwargs)
@@ -169,6 +185,7 @@ class CSVData(FileData):
             parse_dates=parse_dates,
             skiprows=skiprows,
             nrows=nrows,
+            chunksize=chunksize,
             **read_csv_kwargs,
         )
 
@@ -186,15 +203,15 @@ class CSVData(FileData):
             if tz is not None:
                 obj.index = obj.index.tz_convert(tz)
         if isinstance(obj.index, pd.DatetimeIndex) and tz is None:
-            tz = obj.index.tzinfo
+            tz = obj.index.tz
         if start is not None or end is not None:
             if not isinstance(obj.index, pd.DatetimeIndex):
                 raise TypeError("Cannot filter index that is not DatetimeIndex")
-            if obj.index.tzinfo is not None:
+            if obj.index.tz is not None:
                 if start is not None:
-                    start = to_tzaware_timestamp(start, naive_tz=tz, tz=obj.index.tzinfo)
+                    start = to_tzaware_timestamp(start, naive_tz=tz, tz=obj.index.tz)
                 if end is not None:
-                    end = to_tzaware_timestamp(end, naive_tz=tz, tz=obj.index.tzinfo)
+                    end = to_tzaware_timestamp(end, naive_tz=tz, tz=obj.index.tz)
             else:
                 if start is not None:
                     start = to_naive_timestamp(start, tz=tz)
@@ -214,38 +231,36 @@ class CSVData(FileData):
 
     @classmethod
     def fetch_feature(cls, feature: tp.Feature, **kwargs) -> tp.FeatureData:
-        """Load the CSV file for a feature.
+        """Fetch the CSV file of a feature.
 
-        Calls `CSVData.fetch_key`."""
+        Uses `CSVData.fetch_key`."""
         return cls.fetch_key(feature, **kwargs)
 
     @classmethod
     def fetch_symbol(cls, symbol: tp.Symbol, **kwargs) -> tp.SymbolData:
-        """Load the CSV file for a symbol.
+        """Fetch the CSV file of a symbol.
 
-        Calls `CSVData.fetch_key`."""
+        Uses `CSVData.fetch_key`."""
         return cls.fetch_key(symbol, **kwargs)
 
     def update_key(self, key: tp.Key, key_is_feature: bool = False, **kwargs) -> tp.KeyData:
-        """Update data for a feature or symbol."""
-        if key_is_feature:
-            fetch_kwargs = self.select_feature_kwargs(key, self.fetch_kwargs)
-        else:
-            fetch_kwargs = self.select_symbol_kwargs(key, self.fetch_kwargs)
-        fetch_kwargs["start_row"] = self.returned_kwargs[key]["last_row"]
+        """Update data of a feature or symbol."""
+        fetch_kwargs = self.select_fetch_kwargs(key)
+        returned_kwargs = self.select_returned_kwargs(key)
+        fetch_kwargs["start_row"] = returned_kwargs["last_row"]
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         if key_is_feature:
             return self.fetch_feature(key, **kwargs)
         return self.fetch_symbol(key, **kwargs)
 
     def update_feature(self, feature: tp.Feature, **kwargs) -> tp.FeatureData:
-        """Update data for a feature.
+        """Update data of a feature.
 
-        Calls `CSVData.update_key` with `key_is_feature=True`."""
+        Uses `CSVData.update_key` with `key_is_feature=True`."""
         return self.update_key(feature, key_is_feature=True, **kwargs)
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SymbolData:
         """Update data for a symbol.
 
-        Calls `CSVData.update_key` with `key_is_feature=False`."""
+        Uses `CSVData.update_key` with `key_is_feature=False`."""
         return self.update_key(symbol, key_is_feature=False, **kwargs)

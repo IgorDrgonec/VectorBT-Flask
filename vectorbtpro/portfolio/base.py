@@ -3841,7 +3841,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             run_kwargs = {}
 
         if n is not None and (entry_prob is not None or exit_prob is not None):
-            raise ValueError("Either n or entry_prob and exit_prob must be provided")
+            raise ValueError("Must provide either n or entry_prob and exit_prob")
         if n is not None:
             from vectorbtpro.signals.generators.randnx import RANDNX
 
@@ -3871,7 +3871,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             entries = rprobnx.entries
             exits = rprobnx.exits
         else:
-            raise ValueError("At least n or entry_prob and exit_prob must be provided")
+            raise ValueError("Must provide at least n or entry_prob and exit_prob")
 
         return cls.from_signals(data, entries, exits, seed=seed, **kwargs)
 

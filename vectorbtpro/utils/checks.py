@@ -60,6 +60,11 @@ def is_number(arg: tp.Any) -> bool:
     return is_int(arg) or is_float(arg)
 
 
+def is_np_scalar(arg: tp.Any) -> bool:
+    """Check whether the argument is a NumPy scalar."""
+    return isinstance(arg, np.generic)
+
+
 def is_td(arg: tp.Any) -> bool:
     """Check whether the argument is a timedelta object."""
     return isinstance(arg, (pd.Timedelta, datetime.timedelta, np.timedelta64))

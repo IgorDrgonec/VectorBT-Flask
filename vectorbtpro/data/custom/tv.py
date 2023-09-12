@@ -190,7 +190,7 @@ class TVClient(Configured):
         if auth_token is None:
             auth_token = self.auth(username, password, user_agent=user_agent)
         elif username is not None or password is not None:
-            raise ValueError("Either username and password, or auth_token must be provided")
+            raise ValueError("Must provide either username and password, or auth_token")
 
         self._auth_token = auth_token
         self._ws = None
@@ -237,7 +237,7 @@ class TVClient(Configured):
                 raise ValueError(json)
             return json["user"]["auth_token"]
         if username is not None or password is not None:
-            raise ValueError("Both username and password must be provided")
+            raise ValueError("Must provide both username and password")
         return "unauthorized_user_token"
 
     @classmethod
@@ -519,7 +519,9 @@ class TVData(RemoteData):
     @classmethod
     def list_symbols(
         cls,
-        pattern: tp.Optional[str] = None,
+        *,
+        exchange_pattern: tp.Optional[str] = None,
+        symbol_pattern: tp.Optional[str] = None,
         use_regex: bool = False,
         client: tp.Optional[TVClient] = None,
         client_config: tp.DictLike = None,
@@ -542,15 +544,22 @@ class TVData(RemoteData):
         Otherwise, uses the market scanner (returns all symbols, big payload).
 
         When using the market scanner, use `market` to filter by one or multiple markets. For the list
-        of available markets, see `MARKET_LIST`. Use `fields` to make the market scanner return additional
-        information that can be used for filtering with `filter_by`. Such information is passed
-        to the function as a dictionary where fields are keys. The function can also be a template
-        that can use the same information provided as a context. For the list of available fields, see `FIELD_LIST`.
+        of available markets, see `MARKET_LIST`.
+
+        Use `fields` to make the market scanner return additional information that can be used for
+        filtering with `filter_by`. Such information is passed to the function as a dictionary where
+        fields are keys. The function can also be a template that can use the same information provided
+        as a context, or a list of values that should be matched against the values corresponding to their fields.
+        For the list of available fields, see `FIELD_LIST`.
+
         Use `groups` to provide a single dictionary or a list of dictionaries with groups.
         Each dictionary can be provided either in a compressed format, such as `dict(index=index)`,
         or in a full format, such as `dict(type="index", values=[index])`.
 
         Keyword arguments `scanner_kwargs` are encoded and passed directly to the market scanner.
+
+        Uses `vectorbtpro.data.custom.custom.CustomData.key_match` to check each exchange against
+        `exchange_pattern` and each symbol against `symbol_pattern`.
 
         Usage:
             * List all symbols (market scanner):
@@ -562,7 +571,13 @@ class TVData(RemoteData):
             * Search for symbols matching a pattern (market scanner, client-side):
 
             ```pycon
-            >>> vbt.TVData.list_symbols("BTC*")
+            >>> vbt.TVData.list_symbols(symbol_pattern="BTC*")
+            ```
+
+            * Search for exchanges matching a pattern (market scanner, client-side):
+
+            ```pycon
+            >>> vbt.TVData.list_symbols(exchange_pattern="NASDAQ")
             ```
 
             * Search for symbols containing a text (symbol search, server-side):
@@ -671,6 +686,9 @@ class TVData(RemoteData):
                 else:
                     scanner_kwargs["symbols"] = dict()
                 scanner_kwargs["symbols"]["groups"] = groups
+            if filter_by is not None:
+                if isinstance(filter_by, str):
+                    filter_by = [filter_by]
             data = client.scan_symbols(market.lower(), **scanner_kwargs)
             all_symbols = []
             for item in data:
@@ -678,19 +696,31 @@ class TVData(RemoteData):
                     if fields is not None:
                         context = merge_dicts(dict(zip(fields, item["d"])), template_context)
                     else:
-                        raise ValueError("Fields must be provided for filter_by")
+                        raise ValueError("Must provide fields for filter_by")
                     if isinstance(filter_by, CustomTemplate):
-                        if filter_by.substitute(context, sub_id="filter_by"):
-                            all_symbols.append(item["s"])
+                        if not filter_by.substitute(context, sub_id="filter_by"):
+                            continue
+                    elif callable(filter_by):
+                        if not filter_by(context):
+                            continue
                     else:
-                        if filter_by(context):
-                            all_symbols.append(item["s"])
-                else:
-                    all_symbols.append(item["s"])
+                        if len(fields) != len(filter_by):
+                            raise ValueError("Fields and filter_by must have the same number of values")
+                        conditions_met = True
+                        for i in range(len(fields)):
+                            if context[fields[i]] != filter_by[i]:
+                                conditions_met = False
+                                break
+                        if not conditions_met:
+                            continue
+                all_symbols.append(item["s"])
         found_symbols = []
         for symbol in all_symbols:
-            if pattern is not None:
-                if not cls.key_match(symbol.split(":")[1], pattern, use_regex=use_regex):
+            if exchange_pattern is not None:
+                if not cls.key_match(symbol.split(":")[0], exchange_pattern, use_regex=use_regex):
+                    continue
+            if symbol_pattern is not None:
+                if not cls.key_match(symbol.split(":")[1], symbol_pattern, use_regex=use_regex):
                     continue
             found_symbols.append(symbol)
         return sorted(found_symbols)

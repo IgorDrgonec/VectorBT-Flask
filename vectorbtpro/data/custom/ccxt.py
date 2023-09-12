@@ -79,12 +79,12 @@ class CCXTData(RemoteData):
         cls,
         pattern: tp.Optional[str] = None,
         use_regex: bool = False,
-        exchange: tp.Optional[tp.Union[str, CCXTExchangeT]] = None,
+        exchange: tp.Union[None, str, CCXTExchangeT] = None,
         exchange_config: tp.Optional[tp.KwargsLike] = None,
     ) -> tp.List[str]:
         """List all symbols.
 
-        Uses `CustomData.key_match` to check each symbol against `pattern`."""
+        Uses `vectorbtpro.data.custom.custom.CustomData.key_match` to check each symbol against `pattern`."""
         if exchange_config is None:
             exchange_config = {}
         exchange = cls.resolve_exchange(exchange=exchange, **exchange_config)
@@ -99,7 +99,7 @@ class CCXTData(RemoteData):
     @classmethod
     def resolve_exchange(
         cls,
-        exchange: tp.Optional[tp.Union[str, CCXTExchangeT]] = None,
+        exchange: tp.Union[None, str, CCXTExchangeT] = None,
         **exchange_config,
     ) -> CCXTExchangeT:
         """Resolve the exchange.
@@ -125,10 +125,8 @@ class CCXTData(RemoteData):
         if exchange_config is None:
             exchange_config = {}
         has_exchange_config = len(exchange_config) > 0
-        exchange_config = merge_dicts(
-            ccxt_cfg["exchange_config"],
-            ccxt_cfg["exchanges"].get(exchange_name, {}).get("exchange_config", {}),
-            exchange_config,
+        exchange_config = cls.resolve_argument(
+            exchange_config, "exchange_config", exchange_name, is_dict=True, cfg=ccxt_cfg
         )
         if isinstance(exchange, str):
             if not hasattr(ccxt, exchange):
@@ -149,7 +147,7 @@ class CCXTData(RemoteData):
     ) -> tp.Optional[pd.Timestamp]:
         """Find the earliest date using binary search."""
         if start is not None:
-            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="UTC"))
+            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="utc"))
             fetched_data = fetch_func(start_ts, 1)
             if for_internal_use and len(fetched_data) > 0:
                 return pd.Timestamp(start_ts, unit="ms", tz="utc")
@@ -161,14 +159,14 @@ class CCXTData(RemoteData):
                 return pd.Timestamp(0, unit="ms", tz="utc")
         if len(fetched_data) == 0:
             if start is not None:
-                start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="UTC"))
+                start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="utc"))
             else:
-                start_ts = datetime_to_ms(to_tzaware_datetime(0, naive_tz=tz, tz="UTC"))
+                start_ts = datetime_to_ms(to_tzaware_datetime(0, naive_tz=tz, tz="utc"))
             start_ts = start_ts - start_ts % 86400000
             if end is not None:
-                end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz="UTC"))
+                end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz="utc"))
             else:
-                end_ts = datetime_to_ms(to_tzaware_datetime("now", naive_tz=tz, tz="UTC"))
+                end_ts = datetime_to_ms(to_tzaware_datetime("now", naive_tz=tz, tz="utc"))
             end_ts = end_ts - end_ts % 86400000 + 86400000
             start_time = start_ts
             end_time = end_ts
@@ -198,10 +196,32 @@ class CCXTData(RemoteData):
         )
 
     @classmethod
+    def resolve_argument(
+        cls,
+        arg_value: tp.Any,
+        arg_name: str,
+        exchange_name: str,
+        is_dict: bool = False,
+        cfg: tp.Optional[dict] = None,
+    ) -> tp.Any:
+        """Resolve an argument with respect to global settings."""
+        if cfg is None:
+            cfg = cls.get_settings(key_id="custom")
+        if is_dict:
+            return merge_dicts(
+                cfg[arg_name],
+                cfg["exchanges"].get(exchange_name, {}).get(arg_name, {}),
+                arg_value,
+            )
+        if arg_value is not None:
+            return arg_value
+        return cfg["exchanges"].get(exchange_name, {}).get(arg_name, cfg[arg_name])
+
+    @classmethod
     def fetch_symbol(
         cls,
         symbol: str,
-        exchange: tp.Optional[tp.Union[str, CCXTExchangeT]] = None,
+        exchange: tp.Union[None, str, CCXTExchangeT] = None,
         exchange_config: tp.Optional[tp.KwargsLike] = None,
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
@@ -271,40 +291,18 @@ class CCXTData(RemoteData):
         exchange = cls.resolve_exchange(exchange=exchange, **exchange_config)
         exchange_name = type(exchange).__name__
 
-        if start is None:
-            start = ccxt_cfg["exchanges"].get(exchange_name, {}).get("start", ccxt_cfg["start"])
-        if end is None:
-            end = ccxt_cfg["exchanges"].get(exchange_name, {}).get("end", ccxt_cfg["end"])
-        if timeframe is None:
-            timeframe = ccxt_cfg["exchanges"].get(exchange_name, {}).get("timeframe", ccxt_cfg["timeframe"])
-        if tz is None:
-            tz = ccxt_cfg["exchanges"].get(exchange_name, {}).get("tz", ccxt_cfg["tz"])
-        if find_earliest_date is None:
-            find_earliest_date = (
-                ccxt_cfg["exchanges"].get(exchange_name, {}).get("find_earliest_date", ccxt_cfg["find_earliest_date"])
-            )
-        if limit is None:
-            limit = ccxt_cfg["exchanges"].get(exchange_name, {}).get("limit", ccxt_cfg["limit"])
-        if delay is None:
-            delay = ccxt_cfg["exchanges"].get(exchange_name, {}).get("delay", ccxt_cfg["delay"])
-        if retries is None:
-            retries = ccxt_cfg["exchanges"].get(exchange_name, {}).get("retries", ccxt_cfg["retries"])
-        fetch_params = merge_dicts(
-            ccxt_cfg["fetch_params"],
-            ccxt_cfg["exchanges"].get(exchange_name, {}).get("fetch_params", {}),
-            fetch_params,
-        )
-        if show_progress is None:
-            show_progress = ccxt_cfg["exchanges"].get(exchange_name, {}).get("show_progress", ccxt_cfg["show_progress"])
-        pbar_kwargs = merge_dicts(
-            ccxt_cfg["pbar_kwargs"],
-            ccxt_cfg["exchanges"].get(exchange_name, {}).get("pbar_kwargs", {}),
-            pbar_kwargs,
-        )
-        if silence_warnings is None:
-            silence_warnings = (
-                ccxt_cfg["exchanges"].get(exchange_name, {}).get("silence_warnings", ccxt_cfg["silence_warnings"])
-            )
+        start = cls.resolve_argument(start, "start", exchange_name, cfg=ccxt_cfg)
+        end = cls.resolve_argument(end, "end", exchange_name, cfg=ccxt_cfg)
+        timeframe = cls.resolve_argument(timeframe, "timeframe", exchange_name, cfg=ccxt_cfg)
+        tz = cls.resolve_argument(tz, "tz", exchange_name, cfg=ccxt_cfg)
+        find_earliest_date = cls.resolve_argument(find_earliest_date, "find_earliest_date", exchange_name, cfg=ccxt_cfg)
+        limit = cls.resolve_argument(limit, "limit", exchange_name, cfg=ccxt_cfg)
+        delay = cls.resolve_argument(delay, "delay", exchange_name, cfg=ccxt_cfg)
+        retries = cls.resolve_argument(retries, "retries", exchange_name, cfg=ccxt_cfg)
+        fetch_params = cls.resolve_argument(fetch_params, "fetch_params", exchange_name, is_dict=True, cfg=ccxt_cfg)
+        show_progress = cls.resolve_argument(show_progress, "show_progress", exchange_name, cfg=ccxt_cfg)
+        pbar_kwargs = cls.resolve_argument(pbar_kwargs, "pbar_kwargs", exchange_name, is_dict=True, cfg=ccxt_cfg)
+        silence_warnings = cls.resolve_argument(silence_warnings, "silence_warnings", exchange_name, cfg=ccxt_cfg)
         if not exchange.has["fetchOHLCV"]:
             raise ValueError(f"Exchange {exchange} does not support OHLCV")
         if exchange.has["fetchOHLCV"] == "emulated":
@@ -358,7 +356,7 @@ class CCXTData(RemoteData):
         if find_earliest_date and start is not None:
             start = cls._find_earliest_date(_fetch, start=start, end=end, tz=tz, for_internal_use=True)
         if start is not None:
-            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="UTC"))
+            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="utc"))
         else:
             start_ts = None
         if end is not None:
@@ -441,7 +439,7 @@ class CCXTData(RemoteData):
         return df, dict(tz_convert=tz, freq=freq)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[symbol]
+        fetch_kwargs = self.select_fetch_kwargs(symbol)
+        fetch_kwargs["start"] = self.select_last_index(symbol)
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)

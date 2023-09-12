@@ -26,8 +26,6 @@ __all__ = [
     "AlpacaData",
 ]
 
-__pdoc__ = {}
-
 AlpacaDataT = tp.TypeVar("AlpacaDataT", bound="AlpacaData")
 
 
@@ -91,7 +89,7 @@ class AlpacaData(RemoteData):
     ) -> tp.List[str]:
         """List all symbols.
 
-        Uses `CustomData.key_match` to check each symbol against `pattern`.
+        Uses `vectorbtpro.data.custom.custom.CustomData.key_match` to check each symbol against `pattern`.
 
         Arguments `status`, `asset_class`, and `exchange` can be strings, such as `asset_class="crypto"`.
         For possible values, take a look into `alpaca.trading.enums`.
@@ -282,12 +280,12 @@ class AlpacaData(RemoteData):
         timeframe = TimeFrame(multiplier, unit)
 
         if start is not None:
-            start = to_tzaware_datetime(start, naive_tz=tz, tz="UTC")
+            start = to_tzaware_datetime(start, naive_tz=tz, tz="utc")
             start_str = start.replace(tzinfo=None).isoformat("T")
         else:
             start_str = None
         if end is not None:
-            end = to_tzaware_datetime(end, naive_tz=tz, tz="UTC")
+            end = to_tzaware_datetime(end, naive_tz=tz, tz="utc")
             end_str = end.replace(tzinfo=None).isoformat("T")
         else:
             end_str = None
@@ -329,8 +327,8 @@ class AlpacaData(RemoteData):
             },
             inplace=True,
         )
-        if isinstance(df.index, pd.DatetimeIndex) and df.index.tzinfo is None:
-            df = df.tz_localize("UTC")
+        if isinstance(df.index, pd.DatetimeIndex) and df.index.tz is None:
+            df = df.tz_localize("utc")
 
         if "Open" in df.columns:
             df["Open"] = df["Open"].astype(float)
@@ -349,20 +347,17 @@ class AlpacaData(RemoteData):
 
         if not df.empty:
             if start is not None:
-                start = to_timestamp(start, tz=df.index.tzinfo)
+                start = to_timestamp(start, tz=df.index.tz)
                 if df.index[0] < start:
                     df = df[df.index >= start]
             if end is not None:
-                end = to_timestamp(end, tz=df.index.tzinfo)
+                end = to_timestamp(end, tz=df.index.tz)
                 if df.index[-1] >= end:
                     df = df[df.index < end]
         return df, dict(tz_convert=tz, freq=freq)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[symbol]
+        fetch_kwargs = self.select_fetch_kwargs(symbol)
+        fetch_kwargs["start"] = self.select_last_index(symbol)
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)
-
-
-AlpacaData.override_feature_config_doc(__pdoc__)

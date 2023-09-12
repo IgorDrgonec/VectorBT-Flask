@@ -1154,7 +1154,7 @@ def get_index_points(
                 start_date,
                 end_date,
                 freq=dt.parse_timedelta(every),
-                tz=index.tzinfo,
+                tz=index.tz,
                 normalize=normalize_every,
             )
             if exact_start and on[0] > start_date:
@@ -2101,7 +2101,7 @@ class Idxr(IdxrBase):
         template_context: tp.KwargsLike = None,
     ) -> tp.Tuple[tp.MaybeIndexArray, tp.MaybeIndexArray]:
         if len(self.idxrs) == 0:
-            raise ValueError("At least one indexer must be provided")
+            raise ValueError("Must provide at least one indexer")
         elif len(self.idxrs) == 1:
             idxr = self.idxrs[0]
             if isinstance(idxr, CustomTemplate):
@@ -2130,7 +2130,7 @@ class Idxr(IdxrBase):
             row_idxr = self.idxrs[0]
             col_idxr = self.idxrs[1]
         else:
-            raise ValueError("At most two indexers must be provided")
+            raise ValueError("Must provide at most two indexers")
         if not isinstance(row_idxr, RowIdxr):
             if isinstance(row_idxr, (ColIdxr, Idxr)):
                 raise TypeError(f"Indexer {type(row_idxr)} not supported as a row indexer")

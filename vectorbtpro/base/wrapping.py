@@ -1948,7 +1948,7 @@ class Wrapping(Configured, ExtPandasIndexer, AttrResolverMixin):
         `column` can be a label-based position as well as an integer position (if label fails)."""
         if wrapper is None:
             if isinstance(cls_or_self, type):
-                raise ValueError("Wrapper must be provided")
+                raise ValueError("Must provide wrapper")
             wrapper = cls_or_self.wrapper
         if obj is None:
             return None

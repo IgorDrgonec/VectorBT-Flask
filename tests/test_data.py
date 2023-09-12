@@ -113,15 +113,15 @@ class MyData(vbt.Data):
 
     def update_feature(self, feature, n=1, **kwargs):
         fetch_kwargs = self.select_feature_kwargs(feature, self.fetch_kwargs)
-        start_date = self.last_index[feature]
+        start_date = self.select_last_index(feature)
         shape = fetch_kwargs.pop("shape", (5, 3))
         new_shape = (n, shape[1]) if len(shape) > 1 else (n,)
         kwargs = merge_dicts(fetch_kwargs, dict(start_date=start_date), kwargs)
         return self.fetch_feature(feature, shape=new_shape, is_update=True, **kwargs)
 
     def update_symbol(self, symbol, n=1, **kwargs):
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        start_date = self.last_index[symbol]
+        fetch_kwargs = self.select_fetch_kwargs(symbol)
+        start_date = self.select_last_index(symbol)
         shape = fetch_kwargs.pop("shape", (5, 3))
         new_shape = (n, shape[1]) if len(shape) > 1 else (n,)
         kwargs = merge_dicts(fetch_kwargs, dict(start_date=start_date), kwargs)
@@ -479,7 +479,7 @@ class TestData:
                 "S1",
                 keys_are_features=test_keys_are_features,
                 shape=(5,),
-                tz_localize="UTC",
+                tz_localize="utc",
                 tz_convert="Europe/Berlin",
             ).data["S1"],
             pd.Series(["S1_0", "S1_1", "S1_2", "S1_3", "S1_4"], index=index2),
@@ -889,7 +889,7 @@ class TestData:
                 "S1",
                 keys_are_features=test_keys_are_features,
                 shape=(5,),
-                tz_localize="UTC",
+                tz_localize="utc",
                 tz_convert="Europe/Berlin",
             )
             .update(tz_localize=None)
@@ -901,7 +901,7 @@ class TestData:
                 "S1",
                 keys_are_features=test_keys_are_features,
                 shape=(5,),
-                tz_localize="UTC",
+                tz_localize="utc",
                 tz_convert="Europe/Berlin",
             )
             .update(tz_localize=None, concat=False)
@@ -2680,8 +2680,8 @@ class TestData:
             data.stats(),
             pd.Series(
                 [
-                    pd.Timestamp("2020-01-01 00:00:00+0000", tz="UTC"),
-                    pd.Timestamp("2020-01-05 00:00:00+0000", tz="UTC"),
+                    pd.Timestamp("2020-01-01 00:00:00+0000", tz="utc"),
+                    pd.Timestamp("2020-01-05 00:00:00+0000", tz="utc"),
                     pd.Timedelta("5 days 00:00:00"),
                     2,
                     7,
@@ -2695,8 +2695,8 @@ class TestData:
             data.stats(column="F1"),
             pd.Series(
                 [
-                    pd.Timestamp("2020-01-01 00:00:00+0000", tz="UTC"),
-                    pd.Timestamp("2020-01-05 00:00:00+0000", tz="UTC"),
+                    pd.Timestamp("2020-01-01 00:00:00+0000", tz="utc"),
+                    pd.Timestamp("2020-01-05 00:00:00+0000", tz="utc"),
                     pd.Timedelta("5 days 00:00:00"),
                     2,
                     5,
@@ -2710,8 +2710,8 @@ class TestData:
             data.stats(group_by=True),
             pd.Series(
                 [
-                    pd.Timestamp("2020-01-01 00:00:00+0000", tz="UTC"),
-                    pd.Timestamp("2020-01-05 00:00:00+0000", tz="UTC"),
+                    pd.Timestamp("2020-01-01 00:00:00+0000", tz="utc"),
+                    pd.Timestamp("2020-01-05 00:00:00+0000", tz="utc"),
                     pd.Timedelta("5 days 00:00:00"),
                     2,
                     7,
@@ -2760,8 +2760,8 @@ class TestData:
             data.stats(),
             pd.Series(
                 [
-                    pd.Timestamp("2020-01-01 00:00:00+0000", tz="UTC"),
-                    pd.Timestamp("2020-01-05 00:00:00+0000", tz="UTC"),
+                    pd.Timestamp("2020-01-01 00:00:00+0000", tz="utc"),
+                    pd.Timestamp("2020-01-05 00:00:00+0000", tz="utc"),
                     pd.Timedelta("5 days 00:00:00"),
                     3,
                     6,
@@ -2776,8 +2776,8 @@ class TestData:
             data.stats(column=0),
             pd.Series(
                 [
-                    pd.Timestamp("2020-01-01 00:00:00+0000", tz="UTC"),
-                    pd.Timestamp("2020-01-05 00:00:00+0000", tz="UTC"),
+                    pd.Timestamp("2020-01-01 00:00:00+0000", tz="utc"),
+                    pd.Timestamp("2020-01-05 00:00:00+0000", tz="utc"),
                     pd.Timedelta("5 days 00:00:00"),
                     3,
                     5,
@@ -2792,8 +2792,8 @@ class TestData:
             data.stats(group_by=True),
             pd.Series(
                 [
-                    pd.Timestamp("2020-01-01 00:00:00+0000", tz="UTC"),
-                    pd.Timestamp("2020-01-05 00:00:00+0000", tz="UTC"),
+                    pd.Timestamp("2020-01-01 00:00:00+0000", tz="utc"),
+                    pd.Timestamp("2020-01-05 00:00:00+0000", tz="utc"),
                     pd.Timedelta("5 days 00:00:00"),
                     3,
                     6,

@@ -2233,7 +2233,7 @@ class TestDatetime:
         assert datetime_.is_tz_aware(pd.Timestamp("2020-01-01", tz=datetime_.get_utc_tz()))
 
     def test_to_timezone(self):
-        assert datetime_.to_timezone("UTC", to_fixed_offset=True) == _timezone.utc
+        assert datetime_.to_timezone("utc", to_fixed_offset=True) == _timezone.utc
         assert isinstance(datetime_.to_timezone("Europe/Berlin", to_fixed_offset=True), _timezone)
         assert datetime_.to_timezone("+0500") == _timezone(_timedelta(hours=5))
         assert datetime_.to_timezone(_timezone(_timedelta(hours=1))) == _timezone(_timedelta(hours=1))

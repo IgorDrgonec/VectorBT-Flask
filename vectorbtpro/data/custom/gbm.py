@@ -98,11 +98,8 @@ class GBMData(SyntheticData):
         return pd.DataFrame(out, index=index, columns=columns)
 
     def update_key(self, key: tp.Key, key_is_feature: bool = False, **kwargs) -> tp.KeyData:
-        if key_is_feature:
-            fetch_kwargs = self.select_feature_kwargs(key, self.fetch_kwargs)
-        else:
-            fetch_kwargs = self.select_symbol_kwargs(key, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[key]
+        fetch_kwargs = self.select_fetch_kwargs(key)
+        fetch_kwargs["start"] = self.select_last_index(key)
         _ = fetch_kwargs.pop("start_value", None)
         start_value = self.data[key].iloc[-2]
         fetch_kwargs["seed"] = None

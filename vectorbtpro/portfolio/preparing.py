@@ -1688,9 +1688,9 @@ class FOFPreparer(BasePFPreparer):
         """Argument `order_func_nb`."""
         order_func_nb = self["order_func_nb"]
         if self.flexible and order_func_nb is not None:
-            raise ValueError("Either order_func_nb or flex_order_func_nb must be provided")
+            raise ValueError("Must provide either order_func_nb or flex_order_func_nb")
         if not self.flexible and order_func_nb is None:
-            raise ValueError("Either order_func_nb or flex_order_func_nb must be provided")
+            raise ValueError("Must provide either order_func_nb or flex_order_func_nb")
         if order_func_nb is None:
             order_func_nb = nb.no_order_func_nb
         return order_func_nb

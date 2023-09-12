@@ -99,8 +99,8 @@ class GBMOHLCData(SyntheticData):
         return pd.DataFrame(out, index=index, columns=["Open", "High", "Low", "Close"])
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SymbolData:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[symbol]
+        fetch_kwargs = self.select_fetch_kwargs(symbol)
+        fetch_kwargs["start"] = self.select_last_index(symbol)
         _ = fetch_kwargs.pop("start_value", None)
         start_value = self.data[symbol]["Open"].iloc[-1]
         fetch_kwargs["seed"] = None

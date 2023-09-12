@@ -1735,7 +1735,7 @@ class PatternRanges(Ranges):
                 v = defaults[k]
             if k == "pattern":
                 if v is None:
-                    raise ValueError("Pattern must be provided")
+                    raise ValueError("Must provide pattern")
                 v = to_1d_array(v)
             elif k == "max_error":
                 v = to_1d_array(v)

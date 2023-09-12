@@ -224,7 +224,7 @@ class Resampler(Configured):
         checks.assert_instance_of(index, pd.DatetimeIndex)
         if freq is not None:
             return index.shift(-1, freq=freq) + pd.Timedelta(1, "ns")
-        min_ts = pd.DatetimeIndex([pd.Timestamp.min.tz_localize(index.tzinfo)])
+        min_ts = pd.DatetimeIndex([pd.Timestamp.min.tz_localize(index.tz)])
         return (index[:-1] + pd.Timedelta(1, "ns")).append(min_ts)
 
     @classmethod
@@ -236,7 +236,7 @@ class Resampler(Configured):
         checks.assert_instance_of(index, pd.DatetimeIndex)
         if freq is not None:
             return index.shift(1, freq=freq) - pd.Timedelta(1, "ns")
-        max_ts = pd.DatetimeIndex([pd.Timestamp.max.tz_localize(index.tzinfo)])
+        max_ts = pd.DatetimeIndex([pd.Timestamp.max.tz_localize(index.tz)])
         return (index[1:] - pd.Timedelta(1, "ns")).append(max_ts)
 
     @cached_property
