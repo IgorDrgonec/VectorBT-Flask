@@ -72,7 +72,7 @@ class CCXTData(RemoteData):
         ```
     """
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.ccxt")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.ccxt")
 
     @classmethod
     def list_symbols(
@@ -111,10 +111,7 @@ class CCXTData(RemoteData):
         assert_can_import("ccxt")
         import ccxt
 
-        ccxt_cfg = cls.get_settings(key_id="custom")
-
-        if exchange is None:
-            exchange = ccxt_cfg["exchange"]
+        exchange = cls.resolve_custom_setting(exchange, "exchange")
         if isinstance(exchange, str):
             exchange = exchange.lower()
             exchange_name = exchange
@@ -125,9 +122,11 @@ class CCXTData(RemoteData):
         if exchange_config is None:
             exchange_config = {}
         has_exchange_config = len(exchange_config) > 0
-        exchange_config = cls.resolve_argument(
-            exchange_config, "exchange_config", exchange_name, is_dict=True, cfg=ccxt_cfg
-        )
+        if exchange_name is not None:
+            sub_path = "exchanges." + exchange_name
+        else:
+            sub_path = None
+        exchange_config = cls.resolve_custom_setting(exchange_config, "exchange_config", merge=True, sub_path=sub_path)
         if isinstance(exchange, str):
             if not hasattr(ccxt, exchange):
                 raise ValueError(f"Exchange '{exchange}' not found in CCXT")
@@ -196,28 +195,6 @@ class CCXTData(RemoteData):
         )
 
     @classmethod
-    def resolve_argument(
-        cls,
-        arg_value: tp.Any,
-        arg_name: str,
-        exchange_name: str,
-        is_dict: bool = False,
-        cfg: tp.Optional[dict] = None,
-    ) -> tp.Any:
-        """Resolve an argument with respect to global settings."""
-        if cfg is None:
-            cfg = cls.get_settings(key_id="custom")
-        if is_dict:
-            return merge_dicts(
-                cfg[arg_name],
-                cfg["exchanges"].get(exchange_name, {}).get(arg_name, {}),
-                arg_value,
-            )
-        if arg_value is not None:
-            return arg_value
-        return cfg["exchanges"].get(exchange_name, {}).get(arg_name, cfg[arg_name])
-
-    @classmethod
     def fetch_symbol(
         cls,
         symbol: str,
@@ -282,8 +259,6 @@ class CCXTData(RemoteData):
         assert_can_import("ccxt")
         import ccxt
 
-        ccxt_cfg = cls.get_settings(key_id="custom")
-
         if ":" in symbol:
             exchange, symbol = symbol.split(":")
         if exchange_config is None:
@@ -291,18 +266,22 @@ class CCXTData(RemoteData):
         exchange = cls.resolve_exchange(exchange=exchange, **exchange_config)
         exchange_name = type(exchange).__name__
 
-        start = cls.resolve_argument(start, "start", exchange_name, cfg=ccxt_cfg)
-        end = cls.resolve_argument(end, "end", exchange_name, cfg=ccxt_cfg)
-        timeframe = cls.resolve_argument(timeframe, "timeframe", exchange_name, cfg=ccxt_cfg)
-        tz = cls.resolve_argument(tz, "tz", exchange_name, cfg=ccxt_cfg)
-        find_earliest_date = cls.resolve_argument(find_earliest_date, "find_earliest_date", exchange_name, cfg=ccxt_cfg)
-        limit = cls.resolve_argument(limit, "limit", exchange_name, cfg=ccxt_cfg)
-        delay = cls.resolve_argument(delay, "delay", exchange_name, cfg=ccxt_cfg)
-        retries = cls.resolve_argument(retries, "retries", exchange_name, cfg=ccxt_cfg)
-        fetch_params = cls.resolve_argument(fetch_params, "fetch_params", exchange_name, is_dict=True, cfg=ccxt_cfg)
-        show_progress = cls.resolve_argument(show_progress, "show_progress", exchange_name, cfg=ccxt_cfg)
-        pbar_kwargs = cls.resolve_argument(pbar_kwargs, "pbar_kwargs", exchange_name, is_dict=True, cfg=ccxt_cfg)
-        silence_warnings = cls.resolve_argument(silence_warnings, "silence_warnings", exchange_name, cfg=ccxt_cfg)
+        if exchange_name is not None:
+            sub_path = "exchanges." + exchange_name
+        else:
+            sub_path = None
+        start = cls.resolve_custom_setting(start, "start", sub_path=sub_path)
+        end = cls.resolve_custom_setting(end, "end", sub_path=sub_path)
+        timeframe = cls.resolve_custom_setting(timeframe, "timeframe", sub_path=sub_path)
+        tz = cls.resolve_custom_setting(tz, "tz", sub_path=sub_path)
+        find_earliest_date = cls.resolve_custom_setting(find_earliest_date, "find_earliest_date", sub_path=sub_path)
+        limit = cls.resolve_custom_setting(limit, "limit", sub_path=sub_path)
+        delay = cls.resolve_custom_setting(delay, "delay", sub_path=sub_path)
+        retries = cls.resolve_custom_setting(retries, "retries", sub_path=sub_path)
+        fetch_params = cls.resolve_custom_setting(fetch_params, "fetch_params", merge=True, sub_path=sub_path)
+        show_progress = cls.resolve_custom_setting(show_progress, "show_progress", sub_path=sub_path)
+        pbar_kwargs = cls.resolve_custom_setting(pbar_kwargs, "pbar_kwargs", merge=True, sub_path=sub_path)
+        silence_warnings = cls.resolve_custom_setting(silence_warnings, "silence_warnings", sub_path=sub_path)
         if not exchange.has["fetchOHLCV"]:
             raise ValueError(f"Exchange {exchange} does not support OHLCV")
         if exchange.has["fetchOHLCV"] == "emulated":

@@ -471,7 +471,7 @@ class MetaData(type(Analyzable), type(DataWithFeatures)):
 class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     """Class that downloads, updates, and manages data coming from a data source."""
 
-    _setting_keys: tp.SettingsKeys = dict(base="data")
+    _settings_path: tp.SettingsPath = dict(base="data")
 
     _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {"_feature_config"}
 
@@ -984,6 +984,38 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         """Argument `missing` passed to `Data.align_columns`."""
         return self._missing_columns
 
+    # ############# Settings ############# #
+
+    @classmethod
+    def get_base_settings(cls, *args, **kwargs) -> dict:
+        """`CustomData.get_settings` with `path_id="base"`."""
+        return cls.get_settings(*args, path_id="base", **kwargs)
+
+    @classmethod
+    def has_base_settings(cls, *args, **kwargs) -> bool:
+        """`CustomData.has_settings` with `path_id="base"`."""
+        return cls.has_settings(*args, path_id="base", **kwargs)
+
+    @classmethod
+    def get_base_setting(cls, *args, **kwargs) -> tp.Any:
+        """`CustomData.get_setting` with `path_id="base"`."""
+        return cls.get_setting(*args, path_id="base", **kwargs)
+
+    @classmethod
+    def has_base_setting(cls, *args, **kwargs) -> bool:
+        """`CustomData.has_setting` with `path_id="base"`."""
+        return cls.has_setting(*args, path_id="base", **kwargs)
+
+    @classmethod
+    def resolve_base_setting(cls, *args, **kwargs) -> tp.Any:
+        """`CustomData.resolve_setting` with `path_id="base"`."""
+        return cls.resolve_setting(*args, path_id="base", **kwargs)
+
+    @classmethod
+    def set_base_settings(cls, *args, **kwargs) -> None:
+        """`CustomData.set_settings` with `path_id="base"`."""
+        cls.set_settings(*args, path_id="base", **kwargs)
+
     # ############# Getting ############# #
 
     def get_key_wrapper(
@@ -1288,17 +1320,13 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         See `vectorbtpro.utils.datetime_.to_timezone`.
 
         For defaults, see `vectorbtpro._settings.data`."""
-        data_cfg = cls.get_settings(key_id="base")
-
-        if tz_localize is None:
-            tz_localize = data_cfg["tz_localize"]
+        tz_localize = cls.resolve_base_setting(tz_localize, "tz_localize")
         if isinstance(tz_localize, bool):
             if tz_localize:
                 raise ValueError("tz_localize cannot be True")
             else:
                 tz_localize = None
-        if tz_convert is None:
-            tz_convert = data_cfg["tz_convert"]
+        tz_convert = cls.resolve_base_setting(tz_convert, "tz_convert")
         if isinstance(tz_convert, bool):
             if tz_convert:
                 raise ValueError("tz_convert cannot be True")
@@ -1330,12 +1358,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         * 'raise': raise an error
 
         For defaults, see `vectorbtpro._settings.data`."""
-        data_cfg = cls.get_settings(key_id="base")
-
-        if missing is None:
-            missing = data_cfg["missing_index"]
-        if silence_warnings is None:
-            silence_warnings = data_cfg["silence_warnings"]
+        missing = cls.resolve_base_setting(missing, "missing_index")
+        silence_warnings = cls.resolve_base_setting(silence_warnings, "silence_warnings")
 
         index = None
         for symbol, obj in data.items():
@@ -1379,12 +1403,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         if len(data) == 1:
             return data
 
-        data_cfg = cls.get_settings(key_id="base")
-
-        if missing is None:
-            missing = data_cfg["missing_columns"]
-        if silence_warnings is None:
-            silence_warnings = data_cfg["silence_warnings"]
+        missing = cls.resolve_base_setting(missing, "missing_columns")
+        silence_warnings = cls.resolve_base_setting(silence_warnings, "silence_warnings")
 
         columns = None
         multiple_columns = False
@@ -2026,8 +2046,6 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         symbols: tp.Union[None, dict, tp.MaybeSymbols] = None,
     ) -> tp.Kwargs:
         """Resolve metadata for keys."""
-        data_cfg = cls.get_settings(key_id="base")
-
         if keys is not None and features is not None:
             raise ValueError("Must provide either keys or features, not both")
         if keys is not None and symbols is not None:
@@ -2060,8 +2078,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 if keys_are_features is not None and keys_are_features:
                     raise TypeError("Keys are of type symbol_dict but keys_are_features is True")
                 keys_are_features = False
-            if keys_are_features is None:
-                keys_are_features = data_cfg["keys_are_features"]
+            keys_are_features = cls.resolve_base_setting(keys_are_features, "keys_are_features")
             if keys_are_features:
                 dict_type = feature_dict
             else:
@@ -2143,8 +2160,6 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
         For defaults, see `vectorbtpro._settings.data`.
         """
-        data_cfg = cls.get_settings(key_id="base")
-
         keys_meta = cls.resolve_keys_meta(
             keys=keys,
             keys_are_features=keys_are_features,
@@ -2195,12 +2210,10 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                                 _classes = {"symbol_class": _classes}
                         new_classes[k] = _classes
                 classes = new_classes
-        wrapper_kwargs = merge_dicts(data_cfg["wrapper_kwargs"], wrapper_kwargs)
-        if skip_on_error is None:
-            skip_on_error = data_cfg["skip_on_error"]
-        if silence_warnings is None:
-            silence_warnings = data_cfg["silence_warnings"]
-        execute_kwargs = merge_dicts(data_cfg["execute_kwargs"], execute_kwargs)
+        wrapper_kwargs = cls.resolve_base_setting(wrapper_kwargs, "wrapper_kwargs", merge=True)
+        skip_on_error = cls.resolve_base_setting(skip_on_error, "skip_on_error")
+        silence_warnings = cls.resolve_base_setting(silence_warnings, "silence_warnings")
+        execute_kwargs = cls.resolve_base_setting(execute_kwargs, "execute_kwargs", merge=True)
         if not single_key and "show_progress" not in execute_kwargs:
             execute_kwargs["show_progress"] = True
 
@@ -2439,13 +2452,9 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         !!! note
             Returns a new `Data` instance instead of changing the data in place.
         """
-        data_cfg = self.get_settings(key_id="base")
-
-        if skip_on_error is None:
-            skip_on_error = data_cfg["skip_on_error"]
-        if silence_warnings is None:
-            silence_warnings = data_cfg["silence_warnings"]
-        execute_kwargs = merge_dicts(data_cfg["execute_kwargs"], execute_kwargs)
+        skip_on_error = self.resolve_base_setting(skip_on_error, "skip_on_error")
+        silence_warnings = self.resolve_base_setting(silence_warnings, "silence_warnings")
+        execute_kwargs = self.resolve_base_setting(execute_kwargs, "execute_kwargs", merge=True)
         if "show_progress" not in execute_kwargs:
             execute_kwargs["show_progress"] = False
         if self.feature_oriented:
@@ -3438,7 +3447,11 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             engine_name = None
             if return_engine:
                 raise ValueError("Engine can be returned only if URL was provided")
-        to_utc = SQLData.resolve_argument(to_utc, "to_utc", engine_name=engine_name)
+        if engine_name is not None:
+            sub_path = "engines." + engine_name
+        else:
+            sub_path = None
+        to_utc = SQLData.resolve_custom_setting(to_utc, "to_utc", sub_path=sub_path)
 
         meta = self.dict_type()
         for k, v in self.data.items():
@@ -3569,9 +3582,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
         Merges `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
         `stats` from `vectorbtpro._settings.data`."""
-        data_stats_cfg = self.get_settings(key_id="base")["stats"]
-
-        return merge_dicts(Analyzable.stats_defaults.__get__(self), data_stats_cfg)
+        return merge_dicts(Analyzable.stats_defaults.__get__(self), self.get_base_settings()["stats"])
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
@@ -3711,9 +3722,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
         Merges `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
         `plots` from `vectorbtpro._settings.data`."""
-        data_plots_cfg = self.get_settings(key_id="base")["plots"]
-
-        return merge_dicts(Analyzable.plots_defaults.__get__(self), data_plots_cfg)
+        return merge_dicts(Analyzable.plots_defaults.__get__(self), self.get_base_settings()["plots"])
 
     _subplots: tp.ClassVar[Config] = HybridConfig(
         dict(

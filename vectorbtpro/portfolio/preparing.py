@@ -128,7 +128,7 @@ __pdoc__["base_arg_config"] = f"""Argument config for `BasePFPreparer`.
 class BasePFPreparer(BasePreparer):
     """Base class for preparing portfolio simulations."""
 
-    _setting_keys: tp.SettingsKeys = "portfolio"
+    _settings_path: tp.SettingsPath = "portfolio"
 
     @classmethod
     def find_target_func(cls, target_func_name: str) -> tp.Callable:
@@ -548,7 +548,7 @@ __pdoc__["fo_arg_config"] = f"""Argument config for `FOPreparer`.
 class FOPreparer(BasePFPreparer):
     """Class for preparing `vectorbtpro.portfolio.base.Portfolio.from_orders`."""
 
-    _setting_keys: tp.SettingsKeys = "portfolio.from_orders"
+    _settings_path: tp.SettingsPath = "portfolio.from_orders"
 
     # ############# Ready arguments ############# #
 
@@ -938,7 +938,7 @@ __pdoc__["fs_arg_config"] = f"""Argument config for `FSPreparer`.
 class FSPreparer(BasePFPreparer):
     """Class for preparing `vectorbtpro.portfolio.base.Portfolio.from_signals`."""
 
-    _setting_keys: tp.SettingsKeys = "portfolio.from_signals"
+    _settings_path: tp.SettingsPath = "portfolio.from_signals"
 
     # ############# Mode resolution ############# #
 
@@ -1580,7 +1580,7 @@ __pdoc__["fof_arg_config"] = f"""Argument config for `FOFPreparer`.
 class FOFPreparer(BasePFPreparer):
     """Class for preparing `vectorbtpro.portfolio.base.Portfolio.from_order_func`."""
 
-    _setting_keys: tp.SettingsKeys = "portfolio.from_order_func"
+    _settings_path: tp.SettingsPath = "portfolio.from_order_func"
 
     # ############# Mode resolution ############# #
 
@@ -1883,7 +1883,7 @@ __pdoc__["fdof_arg_config"] = f"""Argument config for `FDOFPreparer`.
 class FDOFPreparer(FOFPreparer):
     """Class for preparing `vectorbtpro.portfolio.base.Portfolio.from_def_order_func`."""
 
-    _setting_keys: tp.SettingsKeys = "portfolio.from_def_order_func"
+    _settings_path: tp.SettingsPath = "portfolio.from_def_order_func"
 
     # ############# Mode resolution ############# #
 

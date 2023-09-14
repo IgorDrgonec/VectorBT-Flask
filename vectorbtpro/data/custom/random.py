@@ -23,7 +23,7 @@ __pdoc__ = {}
 class RandomData(SyntheticData):
     """`SyntheticData` for data generated using `vectorbtpro.data.nb.generate_random_data_nb`."""
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.random")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.random")
 
     @classmethod
     def generate_key(
@@ -63,8 +63,6 @@ class RandomData(SyntheticData):
             `vectorbtpro.data.base.feature_dict`/`vectorbtpro.data.base.symbol_dict` or generally
             `vectorbtpro.data.base.key_dict`.
         """
-        random_cfg = cls.get_settings(key_id="custom")
-
         if checks.is_hashable(columns):
             columns = [columns]
             make_series = True
@@ -72,16 +70,11 @@ class RandomData(SyntheticData):
             make_series = False
         if not isinstance(columns, pd.Index):
             columns = pd.Index(columns)
-        if start_value is None:
-            start_value = random_cfg["start_value"]
-        if mean is None:
-            mean = random_cfg["mean"]
-        if std is None:
-            std = random_cfg["std"]
-        if symmetric is None:
-            symmetric = random_cfg["symmetric"]
-        if seed is None:
-            seed = random_cfg["seed"]
+        start_value = cls.resolve_custom_setting(start_value, "start_value")
+        mean = cls.resolve_custom_setting(mean, "mean")
+        std = cls.resolve_custom_setting(std, "std")
+        symmetric = cls.resolve_custom_setting(symmetric, "symmetric")
+        seed = cls.resolve_custom_setting(seed, "seed")
         if seed is not None:
             set_seed(seed)
 

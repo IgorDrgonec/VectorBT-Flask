@@ -5,6 +5,7 @@
 import warnings
 import inspect
 from copy import copy, deepcopy
+from pathlib import Path
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.checks import Comparable, is_deep_equal, assert_in, assert_instance_of
@@ -84,17 +85,38 @@ def convert_to_dict(dct: InConfigLikeT, nested: bool = True) -> dict:
     return dct
 
 
-def get_dict_item(dct: dict, k: tp.Hashable, populate: bool = False) -> tp.Any:
-    """Get dict item under the key `k`.
-
-    The key can be nested using the dot notation or tuple, and must be hashable."""
-    if k in dct:
-        return dct[k]
+def resolve_pathlike_key(k: tp.PathLikeKey) -> tp.Tuple[tp.Hashable, ...]:
+    """Convert a path-like key into a tuple."""
+    if isinstance(k, Path):
+        k = k.parts
     if isinstance(k, str) and "." in k:
         k = tuple(k.split("."))
     if isinstance(k, tuple):
-        if len(k) == 1:
-            return get_dict_item(dct, k[0], populate=populate)
+        return k
+    return (k,)
+
+
+def combine_pathlike_keys(k1: tp.PathLikeKey, k2: tp.PathLikeKey) -> tp.PathLikeKey:
+    """Combine two path-like keys."""
+    if isinstance(k1, Path) and isinstance(k2, Path):
+        return k1 / k2
+    if isinstance(k1, str) and isinstance(k2, str):
+        return k1 + "." + k2
+    k1 = resolve_pathlike_key(k1)
+    k2 = resolve_pathlike_key(k2)
+    return k1 + k2
+
+
+def get_dict_item(dct: dict, k: tp.PathLikeKey, populate: bool = False) -> tp.Any:
+    """Get dict item under the key `k`.
+
+    The key can be nested using the dot notation, `pathlib.Path`, or a tuple, and must be hashable."""
+    if k in dct:
+        return dct[k]
+    k = resolve_pathlike_key(k)
+    if len(k) == 1:
+        k = k[0]
+    else:
         return get_dict_item(get_dict_item(dct, k[0], populate=populate), k[1:], populate=populate)
     if k not in dct and populate:
         dct[k] = dict()
@@ -736,7 +758,7 @@ class Config(pdict):
         self,
         with_options: bool = False,
         replace: tp.DictLike = None,
-        path: str = None,
+        path: tp.PathLikeKey = None,
         htchar: str = "    ",
         lfchar: str = "\n",
         indent: int = 0,
@@ -855,7 +877,367 @@ class HybridConfig(Config):
 ConfiguredT = tp.TypeVar("ConfiguredT", bound="Configured")
 
 
-class Configured(Cacheable, Comparable, Pickleable, Prettified):
+class SettingsNotFoundError(KeyError):
+    """Gets raised if settings could not be found."""
+
+    pass
+
+
+class SettingNotFoundError(KeyError):
+    """Gets raised if a setting could not be found."""
+
+    pass
+
+
+HasSettingsT = tp.TypeVar("HasSettingsT", bound="HasSettings")
+
+
+class HasSettings:
+    """Class that has settings in `vectorbtpro._settings`."""
+
+    _settings_path: tp.SettingsPath = None
+    """Path(s) corresponding to this class in `vectorbtpro._settings`.
+
+    Must be either string (one path) or a dictionary of path ids and paths.
+
+    Lookup is done using `get_dict_item`."""
+
+    @classmethod
+    def get_path_settings(
+        cls,
+        path: tp.PathLikeKey,
+        sub_path: tp.Optional[tp.PathLikeKey] = None,
+        sub_path_only: bool = False,
+    ) -> dict:
+        """Get the settings under a path."""
+        from vectorbtpro._settings import settings
+
+        sub_path_settings = None
+        if sub_path is not None:
+            sub_path = combine_pathlike_keys(path, sub_path)
+            try:
+                sub_path_settings = cls.get_path_settings(sub_path)
+            except SettingsNotFoundError as e:
+                if sub_path_only:
+                    raise SettingsNotFoundError(f"Found no settings under the path '{sub_path}'")
+        try:
+            path_settings = get_dict_item(settings, path)
+        except KeyError as e:
+            raise SettingsNotFoundError(f"Found no settings under the path '{path}'")
+        if sub_path_settings is not None:
+            return merge_dicts(path_settings, sub_path_settings)
+        return path_settings
+
+    @classmethod
+    def resolve_settings_paths(
+        cls,
+        path_id: tp.Optional[tp.Hashable] = None,
+        inherit: bool = True,
+        super_first: bool = True,
+    ) -> tp.List[tp.Tuple[tp.Type[HasSettingsT], str]]:
+        """Resolve the settings paths associated with this class and its superclasses (if `inherit` is True)."""
+        paths = []
+        if inherit:
+            if super_first:
+                classes = cls.__mro__[::-1]
+            else:
+                classes = cls.__mro__
+        else:
+            classes = [cls]
+        for i, cls_ in enumerate(classes):
+            if issubclass(cls_, HasSettings):
+                path = getattr(cls_, "_settings_path")
+                if path is not None:
+                    if isinstance(path, dict):
+                        if path_id is None:
+                            raise ValueError("Must specify path id")
+                        if path_id not in path:
+                            continue
+                        path = path[path_id]
+                        if path is None:
+                            continue
+                    paths.append((cls_, path))
+        return paths
+
+    @classmethod
+    def get_settings(
+        cls,
+        path_id: tp.Optional[tp.Hashable] = None,
+        inherit: bool = True,
+        sub_path: tp.Optional[tp.PathLikeKey] = None,
+        sub_path_only: bool = False,
+    ) -> dict:
+        """Get the settings associated with this class and its superclasses (if `inherit` is True)."""
+        paths = cls.resolve_settings_paths(path_id=path_id, inherit=inherit)
+        if len(paths) == 0:
+            if path_id is not None:
+                raise SettingsNotFoundError(f"Found no settings associated with the path id '{path_id}'")
+            else:
+                raise SettingsNotFoundError(f"Found no settings associated with the class '{cls.__name__}'")
+        setting_dicts = []
+        for cls_, path in paths:
+            path_settings = cls_.get_path_settings(path, sub_path=sub_path, sub_path_only=sub_path_only)
+            setting_dicts.append(path_settings)
+        if len(setting_dicts) == 1:
+            return setting_dicts[0]
+        return merge_dicts(*setting_dicts)
+
+    @classmethod
+    def has_path_settings(
+        cls,
+        path: tp.PathLikeKey,
+        sub_path: tp.Optional[tp.PathLikeKey] = None,
+        sub_path_only: bool = False,
+    ) -> bool:
+        """Return whether the settings under a path exist."""
+        try:
+            cls.get_path_settings(path, sub_path=sub_path, sub_path_only=sub_path_only)
+            return True
+        except SettingsNotFoundError as e:
+            return False
+
+    @classmethod
+    def has_settings(
+        cls,
+        path_id: tp.Optional[tp.Hashable] = None,
+        inherit: bool = True,
+        sub_path: tp.Optional[tp.PathLikeKey] = None,
+        sub_path_only: bool = False,
+    ) -> bool:
+        """Return whether there the settings associated with this class and its superclasses
+        (if `inherit` is True) exist."""
+        try:
+            cls.get_settings(path_id=path_id, inherit=inherit, sub_path=sub_path, sub_path_only=sub_path_only)
+            return True
+        except SettingsNotFoundError as e:
+            return False
+
+    @classmethod
+    def get_path_setting(
+        cls,
+        path: tp.PathLikeKey,
+        key: str,
+        default: tp.Any = _RaiseKeyError,
+        sub_path: tp.Optional[tp.PathLikeKey] = None,
+        sub_path_only: bool = False,
+    ) -> tp.Any:
+        """Get a value from the settings under a path."""
+        from vectorbtpro._settings import settings
+
+        if sub_path is not None:
+            sub_path = combine_pathlike_keys(path, sub_path)
+            try:
+                sub_path_settings = cls.get_path_settings(sub_path)
+                try:
+                    return sub_path_settings[key]
+                except KeyError as e:
+                    if sub_path_only:
+                        raise SettingNotFoundError(f"Found no key '{key}' in the settings under the path '{sub_path}'")
+            except SettingsNotFoundError as e:
+                if sub_path_only:
+                    raise SettingsNotFoundError(f"Found no settings under the path '{sub_path}'")
+        try:
+            path_settings = get_dict_item(settings, path)
+        except KeyError as e:
+            raise SettingsNotFoundError(f"Found no settings under the path '{path}'")
+        try:
+            return path_settings[key]
+        except KeyError as e:
+            if default is _RaiseKeyError:
+                if sub_path is not None:
+                    raise SettingNotFoundError(
+                        f"Found no key '{key}' in the settings under the paths '{path}' and '{sub_path}'"
+                    )
+                else:
+                    raise SettingNotFoundError(f"Found no key '{key}' in the settings under the path '{path}'")
+        return default
+
+    @classmethod
+    def get_setting(
+        cls,
+        key: str,
+        default: tp.Any = _RaiseKeyError,
+        path_id: tp.Optional[tp.Hashable] = None,
+        inherit: bool = True,
+        sub_path: tp.Optional[tp.PathLikeKey] = None,
+        sub_path_only: bool = False,
+    ) -> tp.Any:
+        """Get a value under the settings associated with this class and its superclasses
+        (if `inherit` is True)."""
+        paths = cls.resolve_settings_paths(path_id=path_id, inherit=inherit, super_first=False)
+        if len(paths) == 0:
+            if path_id is not None:
+                raise SettingsNotFoundError(f"Found no settings associated with the path id '{path_id}'")
+            else:
+                raise SettingsNotFoundError(f"Found no settings associated with the class '{cls.__name__}'")
+        for cls_, path in paths:
+            try:
+                return cls_.get_path_setting(path, key, sub_path=sub_path, sub_path_only=sub_path_only)
+            except (SettingsNotFoundError, SettingNotFoundError) as e:
+                continue
+        if default is _RaiseKeyError:
+            if path_id is not None:
+                if sub_path is not None:
+                    raise SettingNotFoundError(
+                        f"Found no key '{key}' under the settings associated with the path id '{path_id}' "
+                        f"and sub-path '{sub_path}'"
+                    )
+                else:
+                    raise SettingNotFoundError(
+                        f"Found no key '{key}' under the settings associated with the path id '{path_id}'"
+                    )
+            else:
+                if sub_path is not None:
+                    raise SettingNotFoundError(
+                        f"Found no key '{key}' under the settings associated with the class '{cls.__name__}' "
+                        f"and sub-path '{sub_path}'"
+                    )
+                else:
+                    raise SettingNotFoundError(
+                        f"Found no key '{key}' under the settings associated with the class '{cls.__name__}'"
+                    )
+        return default
+
+    @classmethod
+    def has_path_setting(
+        cls,
+        path: tp.PathLikeKey,
+        key: str,
+        sub_path: tp.Optional[tp.PathLikeKey] = None,
+        sub_path_only: bool = False,
+    ) -> bool:
+        """Return whether the setting under a path exists."""
+        try:
+            cls.get_path_setting(path, key, sub_path=sub_path, sub_path_only=sub_path_only)
+            return True
+        except (SettingsNotFoundError, SettingNotFoundError) as e:
+            return False
+
+    @classmethod
+    def has_setting(
+        cls,
+        key: str,
+        path_id: tp.Optional[tp.Hashable] = None,
+        inherit: bool = True,
+        sub_path: tp.Optional[tp.PathLikeKey] = None,
+        sub_path_only: bool = False,
+    ) -> bool:
+        """Return whether the settings associated with this class and its superclasses
+        (if `inherit` is True) exists."""
+        try:
+            cls.get_setting(key, path_id=path_id, inherit=inherit, sub_path=sub_path, sub_path_only=sub_path_only)
+            return True
+        except (SettingsNotFoundError, SettingNotFoundError) as e:
+            return False
+
+    @classmethod
+    def resolve_setting(
+        cls,
+        value: tp.Optional[tp.Any],
+        key: str,
+        merge: bool = False,
+        default: tp.Any = _RaiseKeyError,
+        path_id: tp.Optional[tp.Hashable] = None,
+        inherit: bool = True,
+        sub_path: tp.Optional[tp.PathLikeKey] = None,
+        sub_path_only: bool = False,
+    ) -> tp.Any:
+        """Resolve a value that has a key under the settings in `vectorbtpro._settings`
+        associated with this class.
+
+        If the provided value is None, returns the setting, otherwise the value.
+        If the value is a dict and `merge` is True, merges it over the corresponding dict in the settings.
+
+        If `sub_path` is provided, appends it to the resolved path and gives it more priority.
+        If only the `sub_path` should be considered, set `sub_path_only` to True."""
+        if merge:
+            return merge_dicts(
+                cls.get_setting(
+                    key,
+                    default=default,
+                    path_id=path_id,
+                    inherit=inherit,
+                    sub_path=sub_path,
+                    sub_path_only=sub_path_only,
+                ),
+                value,
+            )
+        if value is None:
+            return cls.get_setting(
+                key,
+                default=default,
+                path_id=path_id,
+                inherit=inherit,
+                sub_path=sub_path,
+                sub_path_only=sub_path_only,
+            )
+        return value
+
+    @classmethod
+    def set_settings(
+        cls,
+        path_id: tp.Optional[tp.Hashable] = None,
+        sub_path: tp.Optional[tp.PathLikeKey] = None,
+        populate_: bool = False,
+        **kwargs,
+    ) -> None:
+        """Set the settings in `vectorbtpro._settings` associated with this class.
+
+        If the settings do not exist yet, pass `populate_=True`."""
+        from vectorbtpro._settings import settings
+
+        if isinstance(cls._settings_path, dict):
+            if path_id is None:
+                raise ValueError("Must specify path id")
+            if path_id not in cls._settings_path:
+                raise SettingsNotFoundError(f"Found no settings associated with the path id '{path_id}'")
+            path = cls._settings_path[path_id]
+        else:
+            path = cls._settings_path
+        if path is None:
+            raise SettingsNotFoundError(f"Found no settings associated with the class '{cls.__name__}'")
+        if sub_path is not None:
+            path = combine_pathlike_keys(path, sub_path)
+        cls_cfg = get_dict_item(settings, path, populate=populate_)
+        for k, v in kwargs.items():
+            if populate_:
+                cls_cfg[k] = v
+            else:
+                if k not in cls_cfg:
+                    raise SettingNotFoundError(f"Found no key '{k}' in the settings under the path '{path}'")
+                if isinstance(cls_cfg[k], dict) and isinstance(v, dict):
+                    cls_cfg[k] = merge_dicts(cls_cfg[k], v)
+                else:
+                    cls_cfg[k] = v
+
+    @classmethod
+    def reset_settings(
+        cls,
+        path_id: tp.Optional[tp.Hashable] = None,
+        sub_path: tp.Optional[tp.PathLikeKey] = None,
+    ) -> None:
+        """Reset the settings in `vectorbtpro._settings` associated with this class."""
+        from vectorbtpro._settings import settings
+
+        if isinstance(cls._settings_path, dict):
+            if path_id is None:
+                raise ValueError("Must specify path id")
+            if path_id not in cls._settings_path:
+                raise SettingsNotFoundError(f"Found no settings associated with the path id '{path_id}'")
+            path = cls._settings_path[path_id]
+        else:
+            path = cls._settings_path
+        if path is None:
+            raise SettingsNotFoundError(f"Found no settings associated with the class '{cls.__name__}'")
+        if sub_path is not None:
+            path = combine_pathlike_keys(path, sub_path)
+        if not cls.has_path_settings(path):
+            raise SettingsNotFoundError(f"Found no settings under the path '{path}'")
+        cls_cfg = get_dict_item(settings, path)
+        cls_cfg.reset(force=True)
+
+
+class Configured(HasSettings, Cacheable, Comparable, Pickleable, Prettified):
     """Class with an initialization config.
 
     All subclasses of `Configured` are initialized using `Config`, which makes it easier to pickle.
@@ -867,13 +1249,6 @@ class Configured(Cacheable, Comparable, Pickleable, Prettified):
         or if any `Configured.__init__` argument depends upon global defaults,
         their values won't be copied over. Make sure to pass them explicitly to
         make that the saved & loaded / copied instance is resilient to any changes in globals."""
-
-    _setting_keys: tp.SettingsKeys = None
-    """Keys corresponding to this class in `vectorbtpro._settings`.
-    
-    Must be either string (one key) or a dictionary of key ids and values.
-    
-    Lookup is done using `get_dict_item`."""
 
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = None
     """Set of expected keys."""
@@ -1049,114 +1424,6 @@ class Configured(Cacheable, Comparable, Pickleable, Prettified):
     def update_config(self, *args, **kwargs) -> None:
         """Force-update the config."""
         self.config.update(*args, **kwargs, force=True)
-
-    @classmethod
-    def get_settings(cls, key_id: tp.Optional[str] = None) -> dict:
-        """Get class-related settings from `vectorbtpro._settings`."""
-        from vectorbtpro._settings import settings
-
-        cls_cfgs = []
-        for c in cls.__mro__[::-1]:
-            if hasattr(c, "_setting_keys"):
-                c_setting_keys = getattr(c, "_setting_keys")
-                if c_setting_keys is not None:
-                    if isinstance(c_setting_keys, dict):
-                        if key_id is None:
-                            raise ValueError("Must specify key_id")
-                        if key_id not in c_setting_keys:
-                            continue
-                        c_settings_key = c_setting_keys[key_id]
-                        if c_settings_key is None:
-                            continue
-                    else:
-                        c_settings_key = c_setting_keys
-                    cls_cfgs.append(get_dict_item(settings, c_settings_key))
-        if len(cls_cfgs) == 0:
-            if key_id is None:
-                raise KeyError(f"No settings associated with the class '{cls.__name__}'")
-            else:
-                raise KeyError(f"Key id '{key_id}' not found among registered setting keys")
-        if len(cls_cfgs) == 1:
-            return cls_cfgs[0]
-        return merge_dicts(*cls_cfgs)
-
-    @classmethod
-    def get_setting(cls, k: str, key_id: tp.Optional[str] = None) -> dict:
-        """Get class-related settings from `vectorbtpro._settings`."""
-        from vectorbtpro._settings import settings
-
-        found_settings = False
-        for c in cls.__mro__:
-            if hasattr(c, "_setting_keys"):
-                c_setting_keys = getattr(c, "_setting_keys")
-                if c_setting_keys is not None:
-                    if isinstance(c_setting_keys, dict):
-                        if key_id is None:
-                            raise ValueError("Must specify key_id")
-                        if key_id not in c_setting_keys:
-                            continue
-                        c_settings_key = c_setting_keys[key_id]
-                        if c_settings_key is None:
-                            continue
-                    else:
-                        c_settings_key = c_setting_keys
-                    try:
-                        return get_dict_item(settings, (c_settings_key, k))
-                    except Exception as e:
-                        found_settings = True
-        if not found_settings:
-            if key_id is None:
-                raise KeyError(f"No settings associated with the class '{cls.__name__}'")
-            else:
-                raise KeyError(f"Key id '{key_id}' not found among registered setting keys")
-        raise KeyError(f"Key '{k}' not found among registered settings")
-
-    @classmethod
-    def set_settings(cls, key_id: tp.Optional[str] = None, populate_: bool = False, **kwargs) -> None:
-        """Set class-related settings in `vectorbtpro._settings`.
-
-        If the settings do not exist yet, pass `populate_=True`."""
-        from vectorbtpro._settings import settings
-
-        if isinstance(cls._setting_keys, dict):
-            if key_id is None:
-                raise ValueError("Must specify key_id")
-            if key_id not in cls._setting_keys:
-                raise KeyError(f"Key id '{key_id}' not found among registered setting keys")
-            cls_settings_key = cls._setting_keys[key_id]
-        else:
-            cls_settings_key = cls._setting_keys
-        if cls_settings_key is None:
-            raise ValueError(f"No settings associated with the class '{cls.__name__}'")
-        cls_cfg = get_dict_item(settings, cls_settings_key, populate=populate_)
-        for k, v in kwargs.items():
-            if populate_:
-                cls_cfg[k] = v
-            else:
-                if k not in cls_cfg:
-                    raise KeyError(f"Invalid key '{k}'")
-                if isinstance(cls_cfg[k], dict) and isinstance(v, dict):
-                    cls_cfg[k] = merge_dicts(cls_cfg[k], v)
-                else:
-                    cls_cfg[k] = v
-
-    @classmethod
-    def reset_settings(cls, key_id: tp.Optional[str] = None) -> None:
-        """Reset class-related settings in `vectorbtpro._settings`."""
-        from vectorbtpro._settings import settings
-
-        if isinstance(cls._setting_keys, dict):
-            if key_id is None:
-                raise ValueError("Must specify key_id")
-            if key_id not in cls._setting_keys:
-                raise KeyError(f"Key id '{key_id}' not found among registered setting keys")
-            cls_settings_key = cls._setting_keys[key_id]
-        else:
-            cls_settings_key = cls._setting_keys
-        if cls_settings_key is None:
-            raise ValueError(f"No settings associated with the class '{cls.__name__}'")
-        cls_cfg = get_dict_item(settings, cls_settings_key)
-        cls_cfg.reset(force=True)
 
     def prettify(self, **kwargs) -> str:
         return "%s(%s)" % (

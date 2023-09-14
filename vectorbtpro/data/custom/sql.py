@@ -29,7 +29,7 @@ __pdoc__ = {}
 class SQLData(DBData):
     """Data class for fetching data from a database using SQLAlchemy."""
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.sql")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.sql")
 
     @classmethod
     def resolve_engine(cls,
@@ -46,9 +46,7 @@ class SQLData(DBData):
         assert_can_import("sqlalchemy")
         from sqlalchemy import create_engine
 
-        cfg = cls.get_settings(key_id="custom")
-
-        engine = cls.resolve_argument(engine, "engine", cfg=cfg)
+        engine = cls.resolve_custom_setting(engine, "engine")
         if engine is None:
             raise ValueError("Must provide engine or URL (via engine argument)")
         if isinstance(engine, str):
@@ -56,13 +54,14 @@ class SQLData(DBData):
         else:
             engine_name = None
         if engine_name is not None:
-            if "engine" in cfg["engines"].get(engine_name, {}):
-                engine = cfg["engines"][engine_name]["engine"]
-
+            sub_path = "engines." + engine_name
+        else:
+            sub_path = None
+        if engine_name is not None:
+            if cls.has_custom_setting("engine", sub_path=sub_path, sub_path_only=True):
+                engine = cls.get_custom_setting("engine", sub_path=sub_path, sub_path_only=True)
         has_engine_config = len(engine_config) > 0
-        engine_config = cls.resolve_argument(
-            engine_config, "engine_config", is_dict=True, engine_name=engine_name, cfg=cfg
-        )
+        engine_config = cls.resolve_custom_setting(engine_config, "engine_config", merge=True, sub_path=sub_path)
         if isinstance(engine, str):
             engine = create_engine(engine, **engine_config)
             should_dispose = True
@@ -211,32 +210,6 @@ class SQLData(DBData):
         return sorted(all_tables)
 
     @classmethod
-    def resolve_argument(
-        cls,
-        arg_value: tp.Any,
-        arg_name: str,
-        is_dict: bool = False,
-        engine_name: tp.Optional[str] = None,
-        cfg: tp.Optional[dict] = None,
-    ) -> tp.Any:
-        """Resolve an argument with respect to global settings."""
-        if cfg is None:
-            cfg = cls.get_settings(key_id="custom")
-        if is_dict:
-            if engine_name is not None:
-                return merge_dicts(
-                    cfg[arg_name],
-                    cfg["engines"].get(engine_name, {}).get(arg_name, {}),
-                    arg_value,
-                )
-            return merge_dicts(cfg[arg_name], arg_value)
-        if arg_value is not None:
-            return arg_value
-        if engine_name is not None:
-            return cfg["engines"].get(engine_name, {}).get(arg_name, cfg[arg_name])
-        return cfg[arg_name]
-
-    @classmethod
     def fetch_table(
         cls,
         table_name: str,
@@ -263,8 +236,6 @@ class SQLData(DBData):
         assert_can_import("sqlalchemy")
         from sqlalchemy import MetaData, and_
 
-        cfg = cls.get_settings(key_id="custom")
-
         if engine_config is None:
             engine_config = {}
         engine_meta = cls.resolve_engine(
@@ -279,29 +250,31 @@ class SQLData(DBData):
             dispose_engine = should_dispose
         if ":" in table_name:
             schema, table_name = table_name.split(":")
-        if schema is None:
-            schema = cfg["schema"]
+        
+        if engine_name is not None:
+            sub_path = "engines." + engine_name
+        else:
+            sub_path = None
+        schema = cls.resolve_custom_setting(schema, "schema", sub_path=sub_path)
+        start = cls.resolve_custom_setting(start, "start", sub_path=sub_path)
+        end = cls.resolve_custom_setting(end, "end", sub_path=sub_path)
+        to_utc = cls.resolve_custom_setting(to_utc, "to_utc", sub_path=sub_path)
+        tz = cls.resolve_custom_setting(tz, "tz", sub_path=sub_path)
+        index_col = cls.resolve_custom_setting(index_col, "index_col", sub_path=sub_path)
+        if index_col is False:
+            index_col = None
+        columns = cls.resolve_custom_setting(columns, "columns", sub_path=sub_path)
+        parse_dates = cls.resolve_custom_setting(parse_dates, "parse_dates", sub_path=sub_path)
+        dtype = cls.resolve_custom_setting(dtype, "dtype", sub_path=sub_path)
+        chunksize = cls.resolve_custom_setting(chunksize, "chunksize", sub_path=sub_path)
+        chunk_func = cls.resolve_custom_setting(chunk_func, "chunk_func", sub_path=sub_path)
+        squeeze = cls.resolve_custom_setting(squeeze, "squeeze", sub_path=sub_path)
+        read_sql_kwargs = cls.resolve_custom_setting(read_sql_kwargs, "read_sql_kwargs", merge=True, sub_path=sub_path)
+
         metadata_obj = MetaData()
         metadata_obj.reflect(bind=engine, schema=schema, only=[table_name], views=True)
         table = metadata_obj.tables[table_name]
         table_column_names = [c.name for c in table.columns]
-
-        start = cls.resolve_argument(start, "start", engine_name=engine_name, cfg=cfg)
-        end = cls.resolve_argument(end, "end", engine_name=engine_name, cfg=cfg)
-        to_utc = cls.resolve_argument(to_utc, "to_utc", engine_name=engine_name, cfg=cfg)
-        tz = cls.resolve_argument(tz, "tz", engine_name=engine_name, cfg=cfg)
-        index_col = cls.resolve_argument(index_col, "index_col", engine_name=engine_name, cfg=cfg)
-        if index_col is False:
-            index_col = None
-        columns = cls.resolve_argument(columns, "columns", engine_name=engine_name, cfg=cfg)
-        parse_dates = cls.resolve_argument(parse_dates, "parse_dates", engine_name=engine_name, cfg=cfg)
-        dtype = cls.resolve_argument(dtype, "dtype", engine_name=engine_name, cfg=cfg)
-        chunksize = cls.resolve_argument(chunksize, "chunksize", engine_name=engine_name, cfg=cfg)
-        chunk_func = cls.resolve_argument(chunk_func, "chunk_func", engine_name=engine_name, cfg=cfg)
-        squeeze = cls.resolve_argument(squeeze, "squeeze", engine_name=engine_name, cfg=cfg)
-        read_sql_kwargs = cls.resolve_argument(
-            read_sql_kwargs, "read_sql_kwargs", is_dict=True, engine_name=engine_name, cfg=cfg
-        )
 
         def _resolve_columns(c):
             if checks.is_int(c):

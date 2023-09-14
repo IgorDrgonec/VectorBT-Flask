@@ -50,7 +50,7 @@ class NDLData(RemoteData):
         ```
     """
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.ndl")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.ndl")
 
     @classmethod
     def fetch_symbol(
@@ -98,18 +98,11 @@ class NDLData(RemoteData):
 
         import nasdaqdatalink
 
-        ndl_cfg = cls.get_settings(key_id="custom")
-
-        if api_key is None:
-            api_key = ndl_cfg["api_key"]
-        if start is None:
-            start = ndl_cfg["start"]
-        if end is None:
-            end = ndl_cfg["end"]
-        if tz is None:
-            tz = ndl_cfg["tz"]
-        if column_indices is None:
-            column_indices = ndl_cfg["column_indices"]
+        api_key = cls.resolve_custom_setting(api_key, "api_key")
+        start = cls.resolve_custom_setting(start, "start")
+        end = cls.resolve_custom_setting(end, "end")
+        tz = cls.resolve_custom_setting(tz, "tz")
+        column_indices = cls.resolve_custom_setting(column_indices, "column_indices")
         if column_indices is not None:
             if isinstance(column_indices, int):
                 dataset = symbol + "." + str(column_indices)
@@ -117,11 +110,9 @@ class NDLData(RemoteData):
                 dataset = [symbol + "." + str(index) for index in column_indices]
         else:
             dataset = symbol
-        if collapse is None:
-            collapse = ndl_cfg["collapse"]
-        if transform is None:
-            transform = ndl_cfg["transform"]
-        params = merge_dicts(ndl_cfg["params"], params)
+        collapse = cls.resolve_custom_setting(collapse, "collapse")
+        transform = cls.resolve_custom_setting(transform, "transform")
+        params = cls.resolve_custom_setting(params, "params", merge=True)
 
         # Establish the timestamps
         if start is not None:

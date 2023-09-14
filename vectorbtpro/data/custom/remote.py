@@ -15,4 +15,4 @@ __pdoc__ = {}
 class RemoteData(CustomData):
     """Data class for fetching remote data."""
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.remote")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.remote")

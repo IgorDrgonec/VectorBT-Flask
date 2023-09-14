@@ -26,7 +26,7 @@ class SyntheticData(CustomData):
     Exposes an abstract class method `SyntheticData.generate_symbol`.
     Everything else is taken care of."""
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.synthetic")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.synthetic")
 
     @classmethod
     def generate_key(cls, key: tp.Key, index: tp.Index, key_is_feature: bool = False, **kwargs) -> tp.KeyData:
@@ -71,22 +71,14 @@ class SyntheticData(CustomData):
         If `end` is `periods` are None, will set `end` to the current time.
 
         For defaults, see `custom.synthetic` in `vectorbtpro._settings.data`."""
-        synthetic_cfg = cls.get_settings(key_id="custom")
-
-        if start is None:
-            start = synthetic_cfg["start"]
-        if end is None:
-            end = synthetic_cfg["end"]
-        if freq is None:
-            freq = synthetic_cfg["freq"]
+        start = cls.resolve_custom_setting(start, "start")
+        end = cls.resolve_custom_setting(end, "end")
+        freq = cls.resolve_custom_setting(freq, "freq")
         if freq is not None:
             freq = prepare_freq(freq)
-        if tz is None:
-            tz = synthetic_cfg["tz"]
-        if normalize is None:
-            normalize = synthetic_cfg["normalize"]
-        if inclusive is None:
-            inclusive = synthetic_cfg["inclusive"]
+        tz = cls.resolve_custom_setting(tz, "tz")
+        normalize = cls.resolve_custom_setting(normalize, "normalize")
+        inclusive = cls.resolve_custom_setting(inclusive, "inclusive")
 
         if start is not None:
             start = to_timestamp(start, tz=tz)

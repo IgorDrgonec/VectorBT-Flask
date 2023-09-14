@@ -15,4 +15,4 @@ __pdoc__ = {}
 class DBData(LocalData):
     """Data class for fetching database data."""
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.db")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.db")

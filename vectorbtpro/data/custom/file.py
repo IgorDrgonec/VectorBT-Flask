@@ -23,7 +23,7 @@ FileDataT = tp.TypeVar("FileDataT", bound="FileData")
 class FileData(LocalData):
     """Data class for fetching file data."""
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.file")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.file")
 
     @classmethod
     def match_path(
@@ -106,8 +106,6 @@ class FileData(LocalData):
 
         For defaults, see `custom.local` in `vectorbtpro._settings.data`.
         """
-        local_cfg = cls.get_settings(key_id="custom")
-
         keys_meta = cls.resolve_keys_meta(
             keys=keys,
             keys_are_features=keys_are_features,
@@ -119,12 +117,9 @@ class FileData(LocalData):
         keys_are_features = keys_meta["keys_are_features"]
         dict_type = keys_meta["dict_type"]
 
-        if match_paths is None:
-            match_paths = local_cfg["match_paths"]
-        if match_regex is None:
-            match_regex = local_cfg["match_regex"]
-        if sort_paths is None:
-            sort_paths = local_cfg["sort_paths"]
+        match_paths = cls.resolve_custom_setting(match_paths, "match_paths")
+        match_regex = cls.resolve_custom_setting(match_regex, "match_regex")
+        sort_paths = cls.resolve_custom_setting(sort_paths, "sort_paths")
 
         if match_paths:
             sync = False

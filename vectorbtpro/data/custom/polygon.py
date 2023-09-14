@@ -78,7 +78,7 @@ class PolygonData(RemoteData):
         ```
     """
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.polygon")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.polygon")
 
     @classmethod
     def list_symbols(
@@ -117,14 +117,11 @@ class PolygonData(RemoteData):
         assert_can_import("polygon")
         from polygon import RESTClient
 
-        polygon_cfg = cls.get_settings(key_id="custom")
-
-        if client is None:
-            client = polygon_cfg["client"]
+        client = cls.resolve_custom_setting(client, "client")
         if client_config is None:
             client_config = {}
         has_client_config = len(client_config) > 0
-        client_config = merge_dicts(polygon_cfg["client_config"], client_config)
+        client_config = cls.resolve_custom_setting(client_config, "client_config", merge=True)
         if client is None:
             client = RESTClient(**client_config)
         elif has_client_config:
@@ -198,33 +195,22 @@ class PolygonData(RemoteData):
             If you're using a free plan that has an API rate limit of several requests per minute,
             make sure to set `delay` to a higher number, such as 12000 (which makes 5 requests per minute).
         """
-        polygon_cfg = cls.get_settings(key_id="custom")
-
         if client_config is None:
             client_config = {}
         client = cls.resolve_client(client=client, **client_config)
-        if start is None:
-            start = polygon_cfg["start"]
-        if end is None:
-            end = polygon_cfg["end"]
-        if timeframe is None:
-            timeframe = polygon_cfg["timeframe"]
-        if tz is None:
-            tz = polygon_cfg["tz"]
-        if adjusted is None:
-            adjusted = polygon_cfg["adjusted"]
-        if limit is None:
-            limit = polygon_cfg["limit"]
-        params = merge_dicts(polygon_cfg["params"], params)
-        if delay is None:
-            delay = polygon_cfg["delay"]
-        if retries is None:
-            retries = polygon_cfg["retries"]
-        if show_progress is None:
-            show_progress = polygon_cfg["show_progress"]
-        pbar_kwargs = merge_dicts(polygon_cfg["pbar_kwargs"], pbar_kwargs)
-        if silence_warnings is None:
-            silence_warnings = polygon_cfg["silence_warnings"]
+
+        start = cls.resolve_custom_setting(start, "start")
+        end = cls.resolve_custom_setting(end, "end")
+        timeframe = cls.resolve_custom_setting(timeframe, "timeframe")
+        tz = cls.resolve_custom_setting(tz, "tz")
+        adjusted = cls.resolve_custom_setting(adjusted, "adjusted")
+        limit = cls.resolve_custom_setting(limit, "limit")
+        params = cls.resolve_custom_setting(params, "params", merge=True)
+        delay = cls.resolve_custom_setting(delay, "delay")
+        retries = cls.resolve_custom_setting(retries, "retries")
+        show_progress = cls.resolve_custom_setting(show_progress, "show_progress")
+        pbar_kwargs = cls.resolve_custom_setting(pbar_kwargs, "pbar_kwargs", merge=True)
+        silence_warnings = cls.resolve_custom_setting(silence_warnings, "silence_warnings")
 
         # Resolve the timeframe
         freq = prepare_freq(timeframe)

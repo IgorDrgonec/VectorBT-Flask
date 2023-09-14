@@ -74,7 +74,7 @@ class AlpacaData(RemoteData):
         ```
     """
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.alpaca")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.alpaca")
 
     @classmethod
     def list_symbols(
@@ -105,12 +105,10 @@ class AlpacaData(RemoteData):
         from alpaca.trading.requests import GetAssetsRequest
         from alpaca.trading.enums import AssetStatus, AssetClass, AssetExchange
 
-        alpaca_cfg = cls.get_settings(key_id="custom")
-
         if client_config is None:
             client_config = {}
         has_client_config = len(client_config) > 0
-        client_config = merge_dicts(alpaca_cfg["client_config"], client_config)
+        client_config = cls.resolve_custom_setting(client_config, "client_config", merge=True)
         if trading_client is None:
             arg_names = get_func_arg_names(TradingClient.__init__)
             client_config = {k: v for k, v in client_config.items() if k in arg_names}
@@ -155,16 +153,12 @@ class AlpacaData(RemoteData):
         assert_can_import("alpaca")
         from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
 
-        alpaca_cfg = cls.get_settings(key_id="custom")
-
-        if client is None:
-            client = alpaca_cfg["client"]
-        if client_type is None:
-            client_type = alpaca_cfg["client_type"]
+        client = cls.resolve_custom_setting(client, "client")
+        client_type = cls.resolve_custom_setting(client_type, "client_type")
         if client_config is None:
             client_config = {}
         has_client_config = len(client_config) > 0
-        client_config = merge_dicts(alpaca_cfg["client_config"], client_config)
+        client_config = cls.resolve_custom_setting(client_config, "client_config", merge=True)
         if client is None:
             if client_type == "crypto":
                 arg_names = get_func_arg_names(CryptoHistoricalDataClient.__init__)
@@ -239,25 +233,17 @@ class AlpacaData(RemoteData):
         from alpaca.data.requests import CryptoBarsRequest, StockBarsRequest
         from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
-        alpaca_cfg = cls.get_settings(key_id="custom")
-
         if client_config is None:
             client_config = {}
         client = cls.resolve_client(client=client, client_type=client_type, **client_config)
-        if start is None:
-            start = alpaca_cfg["start"]
-        if end is None:
-            end = alpaca_cfg["end"]
-        if timeframe is None:
-            timeframe = alpaca_cfg["timeframe"]
-        if tz is None:
-            tz = alpaca_cfg["tz"]
-        if adjustment is None:
-            adjustment = alpaca_cfg["adjustment"]
-        if feed is None:
-            feed = alpaca_cfg["feed"]
-        if limit is None:
-            limit = alpaca_cfg["limit"]
+
+        start = cls.resolve_custom_setting(start, "start")
+        end = cls.resolve_custom_setting(end, "end")
+        timeframe = cls.resolve_custom_setting(timeframe, "timeframe")
+        tz = cls.resolve_custom_setting(tz, "tz")
+        adjustment = cls.resolve_custom_setting(adjustment, "adjustment")
+        feed = cls.resolve_custom_setting(feed, "feed")
+        limit = cls.resolve_custom_setting(limit, "limit")
 
         freq = prepare_freq(timeframe)
         split = split_freq_str(timeframe)

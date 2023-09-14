@@ -2447,7 +2447,7 @@ class TestFactory:
             "_rec_id",
             "_run",
             "_run_combs",
-            "_setting_keys",
+            "_settings_path",
             "_short_name",
             "_subplots",
             "_ts",

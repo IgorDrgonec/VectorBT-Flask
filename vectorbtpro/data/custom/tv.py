@@ -514,7 +514,7 @@ class TVData(RemoteData):
         ```
     """
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.tv")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.tv")
 
     @classmethod
     def list_symbols(
@@ -624,23 +624,23 @@ class TVData(RemoteData):
             ... )
             ```
         """
-        tv_cfg = cls.get_settings(key_id="custom")
-
-        if delay is None:
-            delay = tv_cfg["search"]["delay"]
-        if show_progress is None:
-            show_progress = tv_cfg["search"]["show_progress"]
-        pbar_kwargs = merge_dicts(tv_cfg["search"]["pbar_kwargs"], pbar_kwargs)
-        if markets is None:
-            markets = tv_cfg["scanner"]["markets"]
-        if fields is None:
-            fields = tv_cfg["scanner"]["fields"]
-        if filter_by is None:
-            filter_by = tv_cfg["scanner"]["filter_by"]
-        if groups is None:
-            groups = tv_cfg["scanner"]["groups"]
-        template_context = merge_dicts(tv_cfg["scanner"]["template_context"], template_context)
-        scanner_kwargs = merge_dicts(tv_cfg["scanner"]["scanner_kwargs"], scanner_kwargs)
+        delay = cls.resolve_custom_setting(delay, "delay", sub_path="search", only_sub_path=True)
+        show_progress = cls.resolve_custom_setting(
+            show_progress, "show_progress", sub_path="search", only_sub_path=True
+        )
+        pbar_kwargs = cls.resolve_custom_setting(
+            pbar_kwargs, "pbar_kwargs", merge=True, sub_path="search", only_sub_path=True
+        )
+        markets = cls.resolve_custom_setting(markets, "markets", sub_path="scanner", only_sub_path=True)
+        fields = cls.resolve_custom_setting(fields, "fields", sub_path="scanner", only_sub_path=True)
+        filter_by = cls.resolve_custom_setting(filter_by, "filter_by", sub_path="scanner", only_sub_path=True)
+        groups = cls.resolve_custom_setting(groups, "groups", sub_path="scanner", only_sub_path=True)
+        template_context = cls.resolve_custom_setting(
+            template_context, "template_context", merge=True, sub_path="scanner", only_sub_path=True
+        )
+        scanner_kwargs = cls.resolve_custom_setting(
+            scanner_kwargs, "scanner_kwargs", merge=True, sub_path="scanner", only_sub_path=True
+        )
 
         if market is None and text is None and exchange is None:
             market = "global"
@@ -730,14 +730,11 @@ class TVData(RemoteData):
         """Resolve the client.
 
         If provided, must be of the type `TVClient`. Otherwise, will be created using `client_config`."""
-        tv_cfg = cls.get_settings(key_id="custom")
-
-        if client is None:
-            client = tv_cfg["client"]
+        client = cls.resolve_custom_setting(client, "client")
         if client_config is None:
             client_config = {}
         has_client_config = len(client_config) > 0
-        client_config = merge_dicts(tv_cfg["client_config"], client_config)
+        client_config = cls.resolve_custom_setting(client_config, "client_config", merge=True)
         if client is None:
             client = TVClient(**client_config)
         elif has_client_config:
@@ -791,27 +788,18 @@ class TVData(RemoteData):
 
         For defaults, see `custom.tv` in `vectorbtpro._settings.data`.
         """
-        tv_cfg = cls.get_settings(key_id="custom")
-
         if client_config is None:
             client_config = {}
         client = cls.resolve_client(client=client, **client_config)
-        if exchange is None:
-            exchange = tv_cfg["exchange"]
-        if timeframe is None:
-            timeframe = tv_cfg["timeframe"]
-        if tz is None:
-            tz = tv_cfg["tz"]
-        if fut_contract is None:
-            fut_contract = tv_cfg["fut_contract"]
-        if adjustment is None:
-            adjustment = tv_cfg["adjustment"]
-        if extended_session is None:
-            extended_session = tv_cfg["extended_session"]
-        if pro_data is None:
-            pro_data = tv_cfg["pro_data"]
-        if limit is None:
-            limit = tv_cfg["limit"]
+
+        exchange = cls.resolve_custom_setting(exchange, "exchange")
+        timeframe = cls.resolve_custom_setting(timeframe, "timeframe")
+        tz = cls.resolve_custom_setting(tz, "tz")
+        fut_contract = cls.resolve_custom_setting(fut_contract, "fut_contract")
+        adjustment = cls.resolve_custom_setting(adjustment, "adjustment")
+        extended_session = cls.resolve_custom_setting(extended_session, "extended_session")
+        pro_data = cls.resolve_custom_setting(pro_data, "pro_data")
+        limit = cls.resolve_custom_setting(limit, "limit")
 
         freq = prepare_freq(timeframe)
         if not isinstance(timeframe, str):

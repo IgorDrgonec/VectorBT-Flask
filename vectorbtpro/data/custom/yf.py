@@ -42,7 +42,7 @@ class YFData(RemoteData):
         ```
     """
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.yf")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.yf")
 
     _feature_config: tp.ClassVar[Config] = HybridConfig(
         {
@@ -107,19 +107,12 @@ class YFData(RemoteData):
         assert_can_import("yfinance")
         import yfinance as yf
 
-        yf_cfg = cls.get_settings(key_id="custom")
-
-        if period is None:
-            period = yf_cfg["period"]
-        if start is None:
-            start = yf_cfg["start"]
-        if end is None:
-            end = yf_cfg["end"]
-        if timeframe is None:
-            timeframe = yf_cfg["timeframe"]
-        if tz is None:
-            tz = yf_cfg["tz"]
-        history_kwargs = merge_dicts(yf_cfg["history_kwargs"], history_kwargs)
+        period = cls.resolve_custom_setting(period, "period")
+        start = cls.resolve_custom_setting(start, "start")
+        end = cls.resolve_custom_setting(end, "end")
+        timeframe = cls.resolve_custom_setting(timeframe, "timeframe")
+        tz = cls.resolve_custom_setting(tz, "tz")
+        history_kwargs = cls.resolve_custom_setting(history_kwargs, "history_kwargs", merge=True)
 
         ticker = yf.Ticker(symbol)
         def_history_kwargs = get_func_kwargs(yf.Tickers.history)

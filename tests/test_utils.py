@@ -3359,6 +3359,34 @@ class TestChunking:
         np.testing.assert_array_equal(results[1][0], np.arange(3, 6))
         np.testing.assert_array_equal(results[1][1], np.arange(6, 10))
 
+        if pathos_available:
+
+            @vbt.chunked(
+                n_chunks=2,
+                size=vbt.LenSizer(arg_query="a"),
+                arg_take_spec=dict(a=vbt.ChunkSlicer()),
+                merge_func=np.concatenate,
+                engine="pathos",
+            )
+            def f7(a):
+                return a
+
+            np.testing.assert_array_equal(f7(np.arange(10)), np.arange(10))
+
+        if mpire_available:
+
+            @vbt.chunked(
+                n_chunks=2,
+                size=vbt.LenSizer(arg_query="a"),
+                arg_take_spec=dict(a=vbt.ChunkSlicer()),
+                merge_func=np.concatenate,
+                engine="mpire",
+            )
+            def f8(a):
+                return a
+
+            np.testing.assert_array_equal(f8(np.arange(10)), np.arange(10))
+
         if dask_available:
 
             @vbt.chunked(
@@ -3368,10 +3396,10 @@ class TestChunking:
                 merge_func=np.concatenate,
                 engine="dask",
             )
-            def f7(a):
+            def f9(a):
                 return a
 
-            np.testing.assert_array_equal(f7(np.arange(10)), np.arange(10))
+            np.testing.assert_array_equal(f9(np.arange(10)), np.arange(10))
 
         if ray_available:
 
@@ -3382,10 +3410,10 @@ class TestChunking:
                 merge_func=np.concatenate,
                 engine="ray",
             )
-            def f8(a):
+            def f10(a):
                 return a
 
-            np.testing.assert_array_equal(f8(np.arange(10)), np.arange(10))
+            np.testing.assert_array_equal(f10(np.arange(10)), np.arange(10))
 
 
 # ############# jitting ############# #

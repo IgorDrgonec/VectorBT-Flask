@@ -26,7 +26,7 @@ class GBMOHLCData(SyntheticData):
     """`SyntheticData` for data generated using `vectorbtpro.data.nb.generate_gbm_data_1d_nb`
     and then resampled using `vectorbtpro.ohlcv.nb.ohlc_every_1d_nb`."""
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.gbm_ohlc")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.gbm_ohlc")
 
     @classmethod
     def generate_symbol(
@@ -66,23 +66,15 @@ class GBMOHLCData(SyntheticData):
         !!! note
             When setting a seed, remember to pass a seed per symbol using `vectorbtpro.data.base.symbol_dict`.
         """
-        gbm_cfg = cls.get_settings(key_id="custom")
-
-        if n_ticks is None:
-            n_ticks = gbm_cfg["n_ticks"]
+        n_ticks = cls.resolve_custom_setting(n_ticks, "n_ticks")
         template_context = merge_dicts(dict(symbol=symbol, index=index), template_context)
         n_ticks = substitute_templates(n_ticks, template_context, sub_id="n_ticks")
         n_ticks = broadcast_array_to(n_ticks, len(index))
-        if start_value is None:
-            start_value = gbm_cfg["start_value"]
-        if mean is None:
-            mean = gbm_cfg["mean"]
-        if std is None:
-            std = gbm_cfg["std"]
-        if dt is None:
-            dt = gbm_cfg["dt"]
-        if seed is None:
-            seed = gbm_cfg["seed"]
+        start_value = cls.resolve_custom_setting(start_value, "start_value")
+        mean = cls.resolve_custom_setting(mean, "mean")
+        std = cls.resolve_custom_setting(std, "std")
+        dt = cls.resolve_custom_setting(dt, "dt")
+        seed = cls.resolve_custom_setting(seed, "seed")
         if seed is not None:
             set_seed(seed)
 

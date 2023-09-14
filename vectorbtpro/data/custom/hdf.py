@@ -43,7 +43,7 @@ HDFDataT = tp.TypeVar("HDFDataT", bound="HDFData")
 class HDFData(FileData):
     """Data class for fetching HDF data."""
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.hdf")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.hdf")
 
     @classmethod
     def list_paths(cls, path: tp.PathLike = ".", **match_path_kwargs) -> tp.List[Path]:
@@ -220,21 +220,14 @@ class HDFData(FileData):
 
         from pandas.io.pytables import TableIterator
 
-        hdf_cfg = cls.get_settings(key_id="custom")
-
-        if start is None:
-            start = hdf_cfg["start"]
-        if end is None:
-            end = hdf_cfg["end"]
-        if tz is None:
-            tz = hdf_cfg["tz"]
-        if start_row is None:
-            start_row = hdf_cfg["start_row"]
+        start = cls.resolve_custom_setting(start, "start")
+        end = cls.resolve_custom_setting(end, "end")
+        tz = cls.resolve_custom_setting(tz, "tz")
+        start_row = cls.resolve_custom_setting(start_row, "start_row")
         if start_row is None:
             start_row = 0
-        if end_row is None:
-            end_row = hdf_cfg["end_row"]
-        read_hdf_kwargs = merge_dicts(hdf_cfg["read_hdf_kwargs"], read_hdf_kwargs)
+        end_row = cls.resolve_custom_setting(end_row, "end_row")
+        read_hdf_kwargs = cls.resolve_custom_setting(read_hdf_kwargs, "read_hdf_kwargs", merge=True)
 
         if path is None:
             path = key

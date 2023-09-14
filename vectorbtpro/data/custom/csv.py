@@ -27,7 +27,7 @@ CSVDataT = tp.TypeVar("CSVDataT", bound="CSVData")
 class CSVData(FileData):
     """Data class for fetching CSV data."""
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.csv")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.csv")
 
     @classmethod
     def list_paths(cls, path: tp.PathLike = ".", **match_path_kwargs) -> tp.List[Path]:
@@ -118,35 +118,22 @@ class CSVData(FileData):
         from pandas.io.parsers import TextFileReader
         from pandas.api.types import is_object_dtype
 
-        csv_cfg = cls.get_settings(key_id="custom")
-
-        if start is None:
-            start = csv_cfg["start"]
-        if end is None:
-            end = csv_cfg["end"]
-        if tz is None:
-            tz = csv_cfg["tz"]
-        if start_row is None:
-            start_row = csv_cfg["start_row"]
+        start = cls.resolve_custom_setting(start, "start")
+        end = cls.resolve_custom_setting(end, "end")
+        tz = cls.resolve_custom_setting(tz, "tz")
+        start_row = cls.resolve_custom_setting(start_row, "start_row")
         if start_row is None:
             start_row = 0
-        if end_row is None:
-            end_row = csv_cfg["end_row"]
-        if header is None:
-            header = csv_cfg["header"]
-        if index_col is None:
-            index_col = csv_cfg["index_col"]
+        end_row = cls.resolve_custom_setting(end_row, "end_row")
+        header = cls.resolve_custom_setting(header, "header")
+        index_col = cls.resolve_custom_setting(index_col, "index_col")
         if index_col is False:
             index_col = None
-        if parse_dates is None:
-            parse_dates = csv_cfg["parse_dates"]
-        if chunksize is None:
-            chunksize = csv_cfg["chunksize"]
-        if chunk_func is None:
-            chunk_func = csv_cfg["chunk_func"]
-        if squeeze is None:
-            squeeze = csv_cfg["squeeze"]
-        read_csv_kwargs = merge_dicts(csv_cfg["read_csv_kwargs"], read_csv_kwargs)
+        parse_dates = cls.resolve_custom_setting(parse_dates, "parse_dates")
+        chunksize = cls.resolve_custom_setting(chunksize, "chunksize")
+        chunk_func = cls.resolve_custom_setting(chunk_func, "chunk_func")
+        squeeze = cls.resolve_custom_setting(squeeze, "squeeze")
+        read_csv_kwargs = cls.resolve_custom_setting(read_csv_kwargs, "read_csv_kwargs", merge=True)
 
         if path is None:
             path = key
