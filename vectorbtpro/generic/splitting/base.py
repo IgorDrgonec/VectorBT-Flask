@@ -1625,7 +1625,7 @@ class Splitter(Analyzable):
         objs = list(objs)
         for obj in objs:
             if not checks.is_instance_of(obj, Splitter):
-                raise TypeError("Each object to be merged must be an instance of Records")
+                raise TypeError("Each object to be merged must be an instance of Splitter")
         if "wrapper" not in kwargs:
             if wrapper_kwargs is None:
                 wrapper_kwargs = {}
@@ -1654,7 +1654,7 @@ class Splitter(Analyzable):
         objs = list(objs)
         for obj in objs:
             if not checks.is_instance_of(obj, Splitter):
-                raise TypeError("Each object to be merged must be an instance of Records")
+                raise TypeError("Each object to be merged must be an instance of Splitter")
         if "wrapper" not in kwargs:
             if wrapper_kwargs is None:
                 wrapper_kwargs = {}

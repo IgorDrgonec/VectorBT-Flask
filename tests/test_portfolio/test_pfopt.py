@@ -924,7 +924,7 @@ class TestPyPortfolioOpt:
 
 class TestPortfolioOptimizer:
     def test_indexing(self):
-        pf_opt = vbt.PortfolioOptimizer.from_random(
+        pfo = vbt.PortfolioOptimizer.from_random(
             prices.vbt.wrapper,
             seed=42,
             group_configs=[
@@ -932,12 +932,12 @@ class TestPortfolioOptimizer:
                 dict(on=[2, 4], _name="g2"),
             ],
         )
-        pf_opt2 = pf_opt.loc["2020-01-03":"2020-01-04", "g2"]
-        assert_index_equal(pf_opt2.wrapper.index, pf_opt.wrapper.index[2:4])
-        assert_index_equal(pf_opt2.wrapper.columns, pf_opt.wrapper.columns[5:])
-        assert_records_close(pf_opt2.alloc_records.values, np.array([(0, 0, 0)], dtype=alloc_point_dt))
-        np.testing.assert_array_equal(pf_opt2._allocations, pf_opt._allocations[[2]])
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo2 = pfo.loc["2020-01-03":"2020-01-04", "g2"]
+        assert_index_equal(pfo2.wrapper.index, pfo.wrapper.index[2:4])
+        assert_index_equal(pfo2.wrapper.columns, pfo.wrapper.columns[5:])
+        assert_records_close(pfo2.alloc_records.values, np.array([(0, 0, 0)], dtype=alloc_point_dt))
+        np.testing.assert_array_equal(pfo2._allocations, pfo._allocations[[2]])
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum(),
             vbt.Rep("index_slice"),
@@ -946,184 +946,184 @@ class TestPortfolioOptimizer:
                 dict(index_ranges=[2, 3], _name="g2"),
             ],
         )
-        pf_opt2 = pf_opt.loc["2020-01-03":"2020-01-04", "g2"]
-        assert_index_equal(pf_opt2.wrapper.index, pf_opt.wrapper.index[2:4])
-        assert_index_equal(pf_opt2.wrapper.columns, pf_opt.wrapper.columns[5:])
-        assert_records_close(pf_opt2.alloc_records.values, np.array([(0, 0, 0, 1, 1, 1)], dtype=alloc_range_dt))
-        np.testing.assert_array_equal(pf_opt2._allocations, pf_opt._allocations[[1]])
+        pfo2 = pfo.loc["2020-01-03":"2020-01-04", "g2"]
+        assert_index_equal(pfo2.wrapper.index, pfo.wrapper.index[2:4])
+        assert_index_equal(pfo2.wrapper.columns, pfo.wrapper.columns[5:])
+        assert_records_close(pfo2.alloc_records.values, np.array([(0, 0, 0, 1, 1, 1)], dtype=alloc_range_dt))
+        np.testing.assert_array_equal(pfo2._allocations, pfo._allocations[[1]])
 
     def test_from_optimize_func(self):
-        def get_allocations(pf_opt):
-            start_idx = pf_opt.alloc_records.values["start_idx"]
-            end_idx = pf_opt.alloc_records.values["end_idx"]
+        def get_allocations(pfo):
+            start_idx = pfo.alloc_records.values["start_idx"]
+            end_idx = pfo.alloc_records.values["end_idx"]
             return np.array(
-                [prices.values[start_idx[i] : end_idx[i]].sum(axis=0) for i in range(len(pf_opt.alloc_records.values))]
+                [prices.values[start_idx[i] : end_idx[i]].sum(axis=0) for i in range(len(pfo.alloc_records.values))]
             )
 
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum(),
             vbt.Rep("index_slice"),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
+        assert isinstance(pfo.alloc_records, vbt.AllocRanges)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0, 5, 5, 0)], dtype=alloc_range_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum().values,
             vbt.Rep("index_slice"),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
+        assert isinstance(pfo.alloc_records, vbt.AllocRanges)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0, 5, 5, 0)], dtype=alloc_range_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum().to_dict(),
             vbt.Rep("index_slice"),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
+        assert isinstance(pfo.alloc_records, vbt.AllocRanges)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0, 5, 5, 0)], dtype=alloc_range_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: {
                 k: v for k, v in prices.iloc[index_slice].sum().to_dict().items() if k in prices.columns[:-1]
             },
             vbt.Rep("index_slice"),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
+        assert isinstance(pfo.alloc_records, vbt.AllocRanges)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0, 5, 5, 0)], dtype=alloc_range_dt),
         )
-        allocations = get_allocations(pf_opt)
+        allocations = get_allocations(pfo)
         allocations[:, -1] = np.nan
         np.testing.assert_array_equal(
-            pf_opt._allocations,
+            pfo._allocations,
             allocations,
         )
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper, lambda index_slice: prices.iloc[index_slice].sum(), vbt.Rep("index_slice"), every="2D"
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
+        assert isinstance(pfo.alloc_records, vbt.AllocRanges)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0, 2, 2, 1), (1, 0, 2, 4, 4, 1)], dtype=alloc_range_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum(),
             vbt.Rep("index_slice"),
             every=vbt.RepEval("'2D'"),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
+        assert isinstance(pfo.alloc_records, vbt.AllocRanges)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0, 2, 2, 1), (1, 0, 2, 4, 4, 1)], dtype=alloc_range_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum(),
             vbt.Rep("index_slice"),
             index_ranges=[(0, 2), (2, 4)],
             alloc_wait=0,
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
+        assert isinstance(pfo.alloc_records, vbt.AllocRanges)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0, 2, 1, 1), (1, 0, 2, 4, 3, 1)], dtype=alloc_range_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum(),
             vbt.Rep("index_slice"),
             index_ranges=[(0, 2), (2, 4)],
             index_loc=[2, 4],
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
+        assert isinstance(pfo.alloc_records, vbt.AllocRanges)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0, 2, 2, 1), (1, 0, 2, 4, 4, 1)], dtype=alloc_range_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum(),
             vbt.Rep("index_slice"),
             index_ranges=vbt.RepEval("[(0, 2), (2, 4)]"),
             index_loc=vbt.RepEval("[2, 4]"),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
+        assert isinstance(pfo.alloc_records, vbt.AllocRanges)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0, 2, 2, 1), (1, 0, 2, 4, 4, 1)], dtype=alloc_range_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda i, index_ranges: prices.iloc[index_ranges[0][i] : index_ranges[1][i]].sum(),
             vbt.Rep("i"),
             vbt.Rep("index_ranges"),
             every="2D",
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
+        assert isinstance(pfo.alloc_records, vbt.AllocRanges)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0, 2, 2, 1), (1, 0, 2, 4, 4, 1)], dtype=alloc_range_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             njit(lambda i, from_idx, to_idx, prices: vbt.nb.nansum_nb(prices[from_idx:to_idx])),
             vbt.RepEval("prices.values", context=dict(prices=prices)),
             every="2D",
             jitted_loop=True,
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
+        assert isinstance(pfo.alloc_records, vbt.AllocRanges)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0, 2, 2, 1), (1, 0, 2, 4, 4, 1)], dtype=alloc_range_dt),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             njit(lambda i, from_idx, to_idx, prices: vbt.nb.nansum_nb(prices[from_idx:to_idx])),
             vbt.RepEval("prices.values", context=dict(prices=prices)),
@@ -1131,12 +1131,12 @@ class TestPortfolioOptimizer:
             jitted_loop=True,
             chunked=dict(arg_take_spec=dict(args=vbt.ArgsTaker(None))),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
+        assert isinstance(pfo.alloc_records, vbt.AllocRanges)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0, 2, 2, 1), (1, 0, 2, 4, 4, 1)], dtype=alloc_range_dt),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             njit(lambda i, from_idx, to_idx, prices: vbt.nb.nansum_nb(prices[from_idx:to_idx])),
             vbt.RepEval("prices.values", context=dict(prices=prices)),
@@ -1144,16 +1144,16 @@ class TestPortfolioOptimizer:
             jitted_loop=True,
             jitted=dict(parallel=True),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
+        assert isinstance(pfo.alloc_records, vbt.AllocRanges)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0, 2, 2, 1), (1, 0, 2, 4, 4, 1)], dtype=alloc_range_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             vbt.Rep("optimize_func"),
             vbt.RepEval("prices.values", context=dict(prices=prices)),
@@ -1163,63 +1163,63 @@ class TestPortfolioOptimizer:
                 optimize_func=njit(lambda i, from_idx, to_idx, prices: vbt.nb.nansum_nb(prices[from_idx:to_idx]))
             ),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
+        assert isinstance(pfo.alloc_records, vbt.AllocRanges)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0, 2, 2, 1), (1, 0, 2, 4, 4, 1)], dtype=alloc_range_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice, mult: prices.iloc[index_slice].sum() * mult,
             vbt.Rep("index_slice"),
             vbt.Param([1, 2]),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocRanges)
+        assert isinstance(pfo.alloc_records, vbt.AllocRanges)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0, 5, 5, 0), (0, 1, 0, 5, 5, 0)], dtype=alloc_range_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt) * np.array([[1], [2]]),
+            pfo._allocations,
+            get_allocations(pfo) * np.array([[1], [2]]),
         )
 
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper, lambda index_slice: prices.iloc[index_slice].sum(), vbt.Rep("index_slice")
         )
         assert_index_equal(
-            pf_opt.wrapper.grouper.group_by,
+            pfo.wrapper.grouper.group_by,
             pd.Index(["group", "group", "group", "group", "group"], name="group"),
         )
         assert_index_equal(
-            pf_opt.wrapper.columns,
+            pfo.wrapper.columns,
             pd.MultiIndex.from_tuples(
                 [("group", "XOM"), ("group", "RRC"), ("group", "BBY"), ("group", "MA"), ("group", "PFE")],
                 names=["group", None],
             ),
         )
-        assert pf_opt.wrapper.grouped_ndim == 1
+        assert pfo.wrapper.grouped_ndim == 1
         assert_index_equal(
-            pf_opt.alloc_records.wrapper.columns,
+            pfo.alloc_records.wrapper.columns,
             pd.Index(["group"], name="group"),
         )
-        assert pf_opt.alloc_records.wrapper.ndim == 1
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        assert pfo.alloc_records.wrapper.ndim == 1
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice, mult: prices.iloc[index_slice].sum() * mult,
             vbt.Rep("index_slice"),
             group_configs=[{"args_1": 1}, {"args_1": 2}],
         )
         assert_index_equal(
-            pf_opt.wrapper.grouper.group_by,
+            pfo.wrapper.grouper.group_by,
             pd.Index([0, 0, 0, 0, 0, 1, 1, 1, 1, 1], name="group_config"),
         )
         assert_index_equal(
-            pf_opt.wrapper.columns,
+            pfo.wrapper.columns,
             pd.MultiIndex.from_tuples(
                 [
                     (0, "XOM"),
@@ -1236,12 +1236,12 @@ class TestPortfolioOptimizer:
                 names=["group_config", None],
             ),
         )
-        assert pf_opt.wrapper.grouped_ndim == 2
+        assert pfo.wrapper.grouped_ndim == 2
         assert_index_equal(
-            pf_opt.alloc_records.wrapper.columns,
+            pfo.alloc_records.wrapper.columns,
             pd.Index([0, 1], name="group_config"),
         )
-        assert pf_opt.alloc_records.wrapper.ndim == 2
+        assert pfo.alloc_records.wrapper.ndim == 2
 
     def test_from_pypfopt(self):
         if pypfopt_available:
@@ -1258,160 +1258,160 @@ class TestPortfolioOptimizer:
             )
 
     def test_from_allocate_func(self):
-        def get_allocations(pf_opt):
-            idx = pf_opt.alloc_records.values["alloc_idx"]
-            return np.array([prices.values[idx[i]] for i in range(len(pf_opt.alloc_records.values))])
+        def get_allocations(pfo):
+            idx = pfo.alloc_records.values["alloc_idx"]
+            return np.array([prices.values[idx[i]] for i in range(len(pfo.alloc_records.values))])
 
-        pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+        pfo = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper,
             lambda index_point: prices.iloc[index_point],
             vbt.Rep("index_point"),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
+        assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+        pfo = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper,
             lambda index_point: prices.iloc[index_point].values,
             vbt.Rep("index_point"),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
+        assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+        pfo = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper,
             lambda index_point: prices.iloc[index_point].to_dict(),
             vbt.Rep("index_point"),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
+        assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+        pfo = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper,
             lambda index_point: {
                 k: v for k, v in prices.iloc[index_point].to_dict().items() if k in prices.columns[:-1]
             },
             vbt.Rep("index_point"),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
+        assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0)], dtype=alloc_point_dt),
         )
-        allocations = get_allocations(pf_opt)
+        allocations = get_allocations(pfo)
         allocations[:, -1] = np.nan
         np.testing.assert_array_equal(
-            pf_opt._allocations,
+            pfo._allocations,
             allocations,
         )
-        pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+        pfo = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper, lambda index_point: prices.iloc[index_point], vbt.Rep("index_point"), every="2D"
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
+        assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0), (1, 0, 2), (2, 0, 4)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+        pfo = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper,
             lambda index_point: prices.iloc[index_point],
             vbt.Rep("index_point"),
             every=vbt.RepEval("'2D'"),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
+        assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0), (1, 0, 2), (2, 0, 4)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+        pfo = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper,
             lambda index_point: prices.iloc[index_point],
             vbt.Rep("index_point"),
             index_points=[2, 4],
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
+        assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 2), (1, 0, 4)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+        pfo = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper,
             lambda index_point: prices.iloc[index_point],
             vbt.Rep("index_point"),
             index_points=vbt.RepEval("[2, 4]"),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
+        assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 2), (1, 0, 4)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+        pfo = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper,
             lambda i, index_points: prices.iloc[index_points[i]],
             vbt.Rep("i"),
             vbt.Rep("index_points"),
             every="2D",
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
+        assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0), (1, 0, 2), (2, 0, 4)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+        pfo = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper,
             njit(lambda i, idx, prices: prices[idx]),
             vbt.RepEval("prices.values", context=dict(prices=prices)),
             every="2D",
             jitted_loop=True,
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
+        assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0), (1, 0, 2), (2, 0, 4)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+        pfo = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper,
             njit(lambda i, idx, prices: prices[idx]),
             vbt.RepEval("prices.values", context=dict(prices=prices)),
@@ -1419,16 +1419,16 @@ class TestPortfolioOptimizer:
             jitted_loop=True,
             chunked=dict(arg_take_spec=dict(args=vbt.ArgsTaker(None))),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
+        assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0), (1, 0, 2), (2, 0, 4)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+        pfo = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper,
             njit(lambda i, idx, prices: prices[idx]),
             vbt.RepEval("prices.values", context=dict(prices=prices)),
@@ -1436,16 +1436,16 @@ class TestPortfolioOptimizer:
             jitted_loop=True,
             jitted=dict(parallel=True),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
+        assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0), (1, 0, 2), (2, 0, 4)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+        pfo = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper,
             vbt.Rep("allocate_func"),
             vbt.RepEval("prices.values", context=dict(prices=prices)),
@@ -1453,63 +1453,63 @@ class TestPortfolioOptimizer:
             jitted_loop=True,
             template_context=dict(allocate_func=njit(lambda i, idx, prices: prices[idx])),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
+        assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0), (1, 0, 2), (2, 0, 4)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt),
+            pfo._allocations,
+            get_allocations(pfo),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+        pfo = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper,
             lambda index_point, mult: prices.iloc[index_point] * mult,
             vbt.Rep("index_point"),
             vbt.Param([1, 2]),
         )
-        assert isinstance(pf_opt.alloc_records, vbt.AllocPoints)
+        assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0), (0, 1, 0)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
-            get_allocations(pf_opt) * np.array([[1], [2]]),
+            pfo._allocations,
+            get_allocations(pfo) * np.array([[1], [2]]),
         )
 
-        pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+        pfo = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper, lambda index_point: prices.iloc[index_point], vbt.Rep("index_point")
         )
         assert_index_equal(
-            pf_opt.wrapper.grouper.group_by,
+            pfo.wrapper.grouper.group_by,
             pd.Index(["group", "group", "group", "group", "group"], name="group"),
         )
         assert_index_equal(
-            pf_opt.wrapper.columns,
+            pfo.wrapper.columns,
             pd.MultiIndex.from_tuples(
                 [("group", "XOM"), ("group", "RRC"), ("group", "BBY"), ("group", "MA"), ("group", "PFE")],
                 names=["group", None],
             ),
         )
-        assert pf_opt.wrapper.grouped_ndim == 1
+        assert pfo.wrapper.grouped_ndim == 1
         assert_index_equal(
-            pf_opt.alloc_records.wrapper.columns,
+            pfo.alloc_records.wrapper.columns,
             pd.Index(["group"], name="group"),
         )
-        assert pf_opt.alloc_records.wrapper.ndim == 1
-        pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+        assert pfo.alloc_records.wrapper.ndim == 1
+        pfo = vbt.PortfolioOptimizer.from_allocate_func(
             prices.vbt.wrapper,
             lambda index_point, mult: prices.iloc[index_point] * mult,
             vbt.Rep("index_point"),
             group_configs=[dict(args_1=1), dict(args_1=2)],
         )
         assert_index_equal(
-            pf_opt.wrapper.grouper.group_by,
+            pfo.wrapper.grouper.group_by,
             pd.Index([0, 0, 0, 0, 0, 1, 1, 1, 1, 1], name="group_config"),
         )
         assert_index_equal(
-            pf_opt.wrapper.columns,
+            pfo.wrapper.columns,
             pd.MultiIndex.from_tuples(
                 [
                     (0, "XOM"),
@@ -1526,24 +1526,24 @@ class TestPortfolioOptimizer:
                 names=["group_config", None],
             ),
         )
-        assert pf_opt.wrapper.grouped_ndim == 2
+        assert pfo.wrapper.grouped_ndim == 2
         assert_index_equal(
-            pf_opt.alloc_records.wrapper.columns,
+            pfo.alloc_records.wrapper.columns,
             pd.Index([0, 1], name="group_config"),
         )
-        assert pf_opt.alloc_records.wrapper.ndim == 2
+        assert pfo.alloc_records.wrapper.ndim == 2
 
     def test_from_allocations(self):
-        pf_opt = vbt.PortfolioOptimizer.from_allocations(
+        pfo = vbt.PortfolioOptimizer.from_allocations(
             prices.vbt.wrapper,
             prices.iloc[::2],
         )
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0), (1, 0, 2), (2, 0, 4)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
+            pfo._allocations,
             prices.values[::2],
         )
         with pytest.raises(Exception):
@@ -1551,57 +1551,57 @@ class TestPortfolioOptimizer:
                 prices.vbt.wrapper,
                 prices.values[::2],
             )
-        pf_opt = vbt.PortfolioOptimizer.from_allocations(
+        pfo = vbt.PortfolioOptimizer.from_allocations(
             prices.vbt.wrapper,
             prices.values[::2],
             every="2D",
         )
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0), (1, 0, 2), (2, 0, 4)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
+            pfo._allocations,
             prices.values[::2],
         )
-        pf_opt = vbt.PortfolioOptimizer.from_allocations(
+        pfo = vbt.PortfolioOptimizer.from_allocations(
             prices.vbt.wrapper,
             prices.iloc[::2].to_dict(orient="records"),
             every="2D",
         )
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0), (1, 0, 2), (2, 0, 4)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
+            pfo._allocations,
             prices.values[::2],
         )
 
     def test_from_filled_allocations(self):
         filled_allocations = prices.copy()
         filled_allocations.iloc[1::2] = 0
-        pf_opt = vbt.PortfolioOptimizer.from_filled_allocations(filled_allocations)
+        pfo = vbt.PortfolioOptimizer.from_filled_allocations(filled_allocations)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0), (1, 0, 2), (2, 0, 4)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
+            pfo._allocations,
             prices.values[::2],
         )
-        pf_opt = vbt.PortfolioOptimizer.from_filled_allocations(
+        pfo = vbt.PortfolioOptimizer.from_filled_allocations(
             filled_allocations,
             valid_only=False,
             nonzero_only=False,
             unique_only=False,
         )
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 0), (1, 0, 1), (2, 0, 2), (3, 0, 3), (4, 0, 4)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
+            pfo._allocations,
             filled_allocations,
         )
         with pytest.raises(Exception):
@@ -1611,28 +1611,28 @@ class TestPortfolioOptimizer:
             )
 
     def test_from_uniform(self):
-        pf_opt = vbt.PortfolioOptimizer.from_uniform(prices.vbt.wrapper, on=3)
+        pfo = vbt.PortfolioOptimizer.from_uniform(prices.vbt.wrapper, on=3)
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 3)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
+            pfo._allocations,
             np.array([[1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5]]),
         )
 
     def test_from_random(self):
-        pf_opt = vbt.PortfolioOptimizer.from_random(
+        pfo = vbt.PortfolioOptimizer.from_random(
             prices.vbt.wrapper,
             seed=42,
             on=3,
         )
         assert_records_close(
-            pf_opt.alloc_records.values,
+            pfo.alloc_records.values,
             np.array([(0, 0, 3)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
-            pf_opt._allocations,
+            pfo._allocations,
             np.array(
                 [
                     [
@@ -1648,25 +1648,25 @@ class TestPortfolioOptimizer:
 
     def test_from_universal_algo(self):
         if universal_available:
-            pf_opt = vbt.PortfolioOptimizer.from_universal_algo(
+            pfo = vbt.PortfolioOptimizer.from_universal_algo(
                 "CRP",
                 prices,
             )
             assert_records_close(
-                pf_opt.alloc_records.values,
+                pfo.alloc_records.values,
                 np.array([(0, 0, 0)], dtype=alloc_point_dt),
             )
             np.testing.assert_array_equal(
-                pf_opt._allocations,
+                pfo._allocations,
                 np.array([[1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5]]),
             )
-            pf_opt = vbt.PortfolioOptimizer.from_universal_algo("CRP", prices, valid_only=False, unique_only=False)
+            pfo = vbt.PortfolioOptimizer.from_universal_algo("CRP", prices, valid_only=False, unique_only=False)
             assert_records_close(
-                pf_opt.alloc_records.values,
+                pfo.alloc_records.values,
                 np.array([(0, 0, 0), (1, 0, 1), (2, 0, 2), (3, 0, 3), (4, 0, 4)], dtype=alloc_point_dt),
             )
             np.testing.assert_array_equal(
-                pf_opt._allocations,
+                pfo._allocations,
                 np.array(
                     [
                         [1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5],
@@ -1677,59 +1677,59 @@ class TestPortfolioOptimizer:
                     ]
                 ),
             )
-            pf_opt = vbt.PortfolioOptimizer.from_universal_algo(
+            pfo = vbt.PortfolioOptimizer.from_universal_algo(
                 universal.algos.CRP,
                 prices,
             )
             assert_records_close(
-                pf_opt.alloc_records.values,
+                pfo.alloc_records.values,
                 np.array([(0, 0, 0)], dtype=alloc_point_dt),
             )
             np.testing.assert_array_equal(
-                pf_opt._allocations,
+                pfo._allocations,
                 np.array([[1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5]]),
             )
-            pf_opt = vbt.PortfolioOptimizer.from_universal_algo(
+            pfo = vbt.PortfolioOptimizer.from_universal_algo(
                 universal.algos.CRP(),
                 prices,
             )
             assert_records_close(
-                pf_opt.alloc_records.values,
+                pfo.alloc_records.values,
                 np.array([(0, 0, 0)], dtype=alloc_point_dt),
             )
             np.testing.assert_array_equal(
-                pf_opt._allocations,
+                pfo._allocations,
                 np.array([[1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5]]),
             )
-            pf_opt = vbt.PortfolioOptimizer.from_universal_algo(
+            pfo = vbt.PortfolioOptimizer.from_universal_algo(
                 universal.algos.CRP().run(prices),
                 wrapper=prices.vbt.wrapper,
             )
             assert_records_close(
-                pf_opt.alloc_records.values,
+                pfo.alloc_records.values,
                 np.array([(0, 0, 0)], dtype=alloc_point_dt),
             )
             np.testing.assert_array_equal(
-                pf_opt._allocations,
+                pfo._allocations,
                 np.array([[1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5]]),
             )
-            pf_opt = vbt.PortfolioOptimizer.from_universal_algo(
+            pfo = vbt.PortfolioOptimizer.from_universal_algo(
                 "DynamicCRP",
                 prices,
                 n=52,
                 min_history=8,
             )
             assert_records_close(
-                pf_opt.alloc_records.values,
+                pfo.alloc_records.values,
                 np.array([(0, 0, 0)], dtype=alloc_point_dt),
             )
             np.testing.assert_array_equal(
-                pf_opt._allocations,
+                pfo._allocations,
                 universal.algos.DynamicCRP(n=52, min_history=8).run(prices).weights.values[[0]],
             )
 
     def test_get_allocations(self):
-        pf_opt = vbt.PortfolioOptimizer.from_random(
+        pfo = vbt.PortfolioOptimizer.from_random(
             prices.vbt.wrapper,
             seed=42,
             on=[1, 3],
@@ -1751,7 +1751,7 @@ class TestPortfolioOptimizer:
             ],
         ]
         assert_frame_equal(
-            pf_opt.get_allocations(squeeze_groups=False),
+            pfo.get_allocations(squeeze_groups=False),
             pd.DataFrame(
                 target_arr,
                 index=pd.MultiIndex.from_arrays(
@@ -1764,14 +1764,14 @@ class TestPortfolioOptimizer:
             ),
         )
         assert_frame_equal(
-            pf_opt.get_allocations(squeeze_groups=True),
+            pfo.get_allocations(squeeze_groups=True),
             pd.DataFrame(
                 target_arr,
                 index=prices.index[[1, 3]],
                 columns=prices.columns,
             ),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_random(
+        pfo = vbt.PortfolioOptimizer.from_random(
             prices.vbt.wrapper,
             seed=42,
             group_configs=[dict(on=[1, 3], _name="g1"), dict(on=[2, 4], _name="g2")],
@@ -1791,7 +1791,7 @@ class TestPortfolioOptimizer:
             ]
         )
         assert_frame_equal(
-            pf_opt.get_allocations(squeeze_groups=False),
+            pfo.get_allocations(squeeze_groups=False),
             pd.DataFrame(
                 target_arr,
                 index=pd.MultiIndex.from_arrays(
@@ -1804,7 +1804,7 @@ class TestPortfolioOptimizer:
             ),
         )
         assert_frame_equal(
-            pf_opt.get_allocations(squeeze_groups=True),
+            pfo.get_allocations(squeeze_groups=True),
             pd.DataFrame(
                 target_arr,
                 index=pd.MultiIndex.from_arrays(
@@ -1816,14 +1816,14 @@ class TestPortfolioOptimizer:
                 columns=prices.columns,
             ),
         )
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum(),
             vbt.Rep("index_slice"),
             index_loc=4,
         )
         assert_frame_equal(
-            pf_opt.get_allocations(squeeze_groups=False),
+            pfo.get_allocations(squeeze_groups=False),
             pd.DataFrame(
                 prices.sum().values[None],
                 index=pd.Index(["group"], dtype="object", name="group"),
@@ -1831,7 +1831,7 @@ class TestPortfolioOptimizer:
             ),
         )
         assert_frame_equal(
-            pf_opt.get_allocations(squeeze_groups=True),
+            pfo.get_allocations(squeeze_groups=True),
             pd.DataFrame(
                 prices.sum().values[None],
                 index=prices.index[[4]],
@@ -1840,7 +1840,7 @@ class TestPortfolioOptimizer:
         )
 
     def test_fill_allocations(self):
-        pf_opt = vbt.PortfolioOptimizer.from_random(
+        pfo = vbt.PortfolioOptimizer.from_random(
             prices.vbt.wrapper,
             seed=42,
             on=[1, 3],
@@ -1873,7 +1873,7 @@ class TestPortfolioOptimizer:
         )
         target_df.iloc[[1, 3]] = target_arr
         assert_frame_equal(
-            pf_opt.fill_allocations(squeeze_groups=False),
+            pfo.fill_allocations(squeeze_groups=False),
             target_df,
         )
         target_df = pd.DataFrame(
@@ -1883,10 +1883,10 @@ class TestPortfolioOptimizer:
         )
         target_df.iloc[[1, 3]] = target_arr
         assert_frame_equal(
-            pf_opt.fill_allocations(squeeze_groups=True),
+            pfo.fill_allocations(squeeze_groups=True),
             target_df,
         )
-        pf_opt = vbt.PortfolioOptimizer.from_random(
+        pfo = vbt.PortfolioOptimizer.from_random(
             prices.vbt.wrapper,
             seed=42,
             group_configs=[dict(on=[1, 3], _name="g1"), dict(on=[2, 4], _name="g2")],
@@ -1917,9 +1917,9 @@ class TestPortfolioOptimizer:
         )
         target_df.iloc[[1, 3], 0:5] = target_arr[0:2]
         target_df.iloc[[2, 4], 5:10] = target_arr[2:4]
-        assert_frame_equal(pf_opt.fill_allocations(squeeze_groups=False), target_df)
-        assert_frame_equal(pf_opt.fill_allocations(squeeze_groups=True), target_df)
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        assert_frame_equal(pfo.fill_allocations(squeeze_groups=False), target_df)
+        assert_frame_equal(pfo.fill_allocations(squeeze_groups=True), target_df)
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum(),
             vbt.Rep("index_slice"),
@@ -1937,7 +1937,7 @@ class TestPortfolioOptimizer:
         )
         target_df.iloc[[4]] = prices.sum().values
         assert_frame_equal(
-            pf_opt.fill_allocations(squeeze_groups=False),
+            pfo.fill_allocations(squeeze_groups=False),
             target_df,
         )
         target_df = pd.DataFrame(
@@ -1947,12 +1947,12 @@ class TestPortfolioOptimizer:
         )
         target_df.iloc[[4]] = prices.sum().values
         assert_frame_equal(
-            pf_opt.fill_allocations(squeeze_groups=True),
+            pfo.fill_allocations(squeeze_groups=True),
             target_df,
         )
 
     def test_points_stats(self):
-        pf_opt = vbt.PortfolioOptimizer.from_random(
+        pfo = vbt.PortfolioOptimizer.from_random(
             prices.vbt.wrapper,
             seed=42,
             group_configs=[dict(on=[1, 3], _name="g1"), dict(on=[2, 4], _name="g2")],
@@ -1972,7 +1972,7 @@ class TestPortfolioOptimizer:
             dtype="object",
         )
         assert_series_equal(
-            pf_opt.stats(),
+            pfo.stats(),
             pd.Series(
                 [
                     pd.Timestamp("2020-01-01 00:00:00"),
@@ -1990,7 +1990,7 @@ class TestPortfolioOptimizer:
             ),
         )
         assert_series_equal(
-            pf_opt.stats(column="g1"),
+            pfo.stats(column="g1"),
             pd.Series(
                 [
                     pd.Timestamp("2020-01-01 00:00:00"),
@@ -2007,14 +2007,14 @@ class TestPortfolioOptimizer:
                 name="g1",
             ),
         )
-        assert_series_equal(pf_opt["g1"].stats(), pf_opt.stats(column="g1"))
-        stats_df = pf_opt.stats(agg_func=None)
+        assert_series_equal(pfo["g1"].stats(), pfo.stats(column="g1"))
+        stats_df = pfo.stats(agg_func=None)
         assert stats_df.shape == (2, 9)
-        assert_index_equal(stats_df.index, pf_opt.wrapper.get_columns())
+        assert_index_equal(stats_df.index, pfo.wrapper.get_columns())
         assert_index_equal(stats_df.columns, stats_index)
 
     def test_ranges_stats(self):
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum(),
             vbt.Rep("index_slice"),
@@ -2037,7 +2037,7 @@ class TestPortfolioOptimizer:
             dtype="object",
         )
         assert_series_equal(
-            pf_opt.stats(),
+            pfo.stats(),
             pd.Series(
                 [
                     pd.Timestamp("2020-01-01 00:00:00"),
@@ -2057,7 +2057,7 @@ class TestPortfolioOptimizer:
             ),
         )
         assert_series_equal(
-            pf_opt.stats(column="g1"),
+            pfo.stats(column="g1"),
             pd.Series(
                 [
                     pd.Timestamp("2020-01-01 00:00:00"),
@@ -2076,31 +2076,31 @@ class TestPortfolioOptimizer:
                 name="g1",
             ),
         )
-        assert_series_equal(pf_opt["g1"].stats(), pf_opt.stats(column="g1"))
-        stats_df = pf_opt.stats(agg_func=None)
+        assert_series_equal(pfo["g1"].stats(), pfo.stats(column="g1"))
+        stats_df = pfo.stats(agg_func=None)
         assert stats_df.shape == (2, 11)
-        assert_index_equal(stats_df.index, pf_opt.wrapper.get_columns())
+        assert_index_equal(stats_df.index, pfo.wrapper.get_columns())
         assert_index_equal(stats_df.columns, stats_index)
 
     def test_plots(self):
-        pf_opt = vbt.PortfolioOptimizer.from_random(
+        pfo = vbt.PortfolioOptimizer.from_random(
             prices.vbt.wrapper,
             seed=42,
             group_configs=[dict(on=[1, 3], _name="g1"), dict(on=[2, 4], _name="g2")],
         )
-        pf_opt["g1"].plot()
-        pf_opt[["g1"]].plot()
-        pf_opt.plot(column="g1")
+        pfo["g1"].plot()
+        pfo[["g1"]].plot()
+        pfo.plot(column="g1")
 
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum(),
             vbt.Rep("index_slice"),
             group_configs=[dict(index_ranges=[0, 2], _name="g1"), dict(index_ranges=[1, 3], _name="g2")],
         )
-        pf_opt["g1"].plot()
-        pf_opt[["g1"]].plot()
-        pf_opt.plot(column="g1")
+        pfo["g1"].plot()
+        pfo[["g1"]].plot()
+        pfo.plot(column="g1")
 
 
 # ############# Portfolio ############# #
@@ -2108,113 +2108,113 @@ class TestPortfolioOptimizer:
 
 class TestPortfolio:
     def test_from_optimizer(self):
-        pf_opt = vbt.PortfolioOptimizer.from_random(
+        pfo = vbt.PortfolioOptimizer.from_random(
             prices.vbt.wrapper,
             seed=42,
             group_configs=[dict(on=[1, 3], _name="g1"), dict(on=[2, 4], _name="g2")],
         )
-        pf = vbt.Portfolio.from_optimizer(prices, pf_opt)
+        pf = vbt.Portfolio.from_optimizer(prices, pfo)
         allocations = pf.get_asset_value(group_by=False).vbt / pf.value
         np.testing.assert_allclose(
             allocations.values[1][:5],
-            pf_opt.allocations.values[0],
+            pfo.allocations.values[0],
         )
         np.testing.assert_allclose(
             allocations.values[3][:5],
-            pf_opt.allocations.values[1],
+            pfo.allocations.values[1],
         )
         np.testing.assert_allclose(
             allocations.values[2][5:10],
-            pf_opt.allocations.values[2],
+            pfo.allocations.values[2],
         )
         np.testing.assert_allclose(
             allocations.values[4][5:10],
-            pf_opt.allocations.values[3],
+            pfo.allocations.values[3],
         )
         assert_frame_equal(
-            vbt.Portfolio.from_optimizer(prices, pf_opt, pf_method="from_orders", val_price=-np.inf)
+            vbt.Portfolio.from_optimizer(prices, pfo, pf_method="from_orders", val_price=-np.inf)
             .get_asset_value(group_by=False)
             .vbt
             / pf.value,
-            vbt.Portfolio.from_optimizer(prices, pf_opt, pf_method="from_signals", val_price=-np.inf)
+            vbt.Portfolio.from_optimizer(prices, pfo, pf_method="from_signals", val_price=-np.inf)
             .get_asset_value(group_by=False)
             .vbt
             / pf.value,
         )
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum() / prices.iloc[index_slice].sum().sum(),
             vbt.Rep("index_slice"),
             group_configs=[dict(index_ranges=[0, 2], _name="g1"), dict(index_ranges=[1, 3], _name="g2")],
         )
-        pf = vbt.Portfolio.from_optimizer(prices, pf_opt)
+        pf = vbt.Portfolio.from_optimizer(prices, pfo)
         allocations = pf.get_asset_value(group_by=False).vbt / pf.value
         np.testing.assert_allclose(
             allocations.values[2][:5],
-            pf_opt.allocations.values[0],
+            pfo.allocations.values[0],
         )
         np.testing.assert_allclose(
             allocations.values[3][5:10],
-            pf_opt.allocations.values[1],
+            pfo.allocations.values[1],
         )
         assert_frame_equal(
-            vbt.Portfolio.from_optimizer(prices, pf_opt, pf_method="from_orders", val_price=-np.inf)
+            vbt.Portfolio.from_optimizer(prices, pfo, pf_method="from_orders", val_price=-np.inf)
             .get_asset_value(group_by=False)
             .vbt
             / pf.value,
-            vbt.Portfolio.from_optimizer(prices, pf_opt, pf_method="from_signals", val_price=-np.inf)
+            vbt.Portfolio.from_optimizer(prices, pfo, pf_method="from_signals", val_price=-np.inf)
             .get_asset_value(group_by=False)
             .vbt
             / pf.value,
         )
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: prices.iloc[index_slice].sum(),
             vbt.Rep("index_slice"),
             group_configs=[dict(index_ranges=[0, 2], _name="g1"), dict(index_ranges=[1, 3], _name="g2")],
         )
-        pf = vbt.Portfolio.from_optimizer(prices, pf_opt, init_cash="auto", size_type="amount")
+        pf = vbt.Portfolio.from_optimizer(prices, pfo, init_cash="auto", size_type="amount")
         allocations = pf.asset_flow
         np.testing.assert_allclose(
             allocations.values[2][:5],
-            pf_opt.allocations.values[0],
+            pfo.allocations.values[0],
         )
         np.testing.assert_allclose(
             allocations.values[3][5:10],
-            pf_opt.allocations.values[1],
+            pfo.allocations.values[1],
         )
         assert_frame_equal(
-            vbt.Portfolio.from_optimizer(prices, pf_opt, pf_method="from_orders", init_cash="auto", size_type="amount")
+            vbt.Portfolio.from_optimizer(prices, pfo, pf_method="from_orders", init_cash="auto", size_type="amount")
             .get_asset_value(group_by=False)
             .vbt
             / pf.value,
-            vbt.Portfolio.from_optimizer(prices, pf_opt, pf_method="from_signals", init_cash="auto", size_type="amount")
+            vbt.Portfolio.from_optimizer(prices, pfo, pf_method="from_signals", init_cash="auto", size_type="amount")
             .get_asset_value(group_by=False)
             .vbt
             / pf.value,
         )
-        pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+        pfo = vbt.PortfolioOptimizer.from_optimize_func(
             prices.vbt.wrapper,
             lambda index_slice: -prices.iloc[index_slice].sum() / prices.iloc[index_slice].sum().sum(),
             vbt.Rep("index_slice"),
             group_configs=[dict(index_ranges=[0, 2], _name="g1"), dict(index_ranges=[1, 3], _name="g2")],
         )
-        pf = vbt.Portfolio.from_optimizer(prices, pf_opt)
+        pf = vbt.Portfolio.from_optimizer(prices, pfo)
         allocations = pf.get_asset_value(group_by=False).vbt / pf.value
         np.testing.assert_allclose(
             allocations.values[2][:5],
-            pf_opt.allocations.values[0],
+            pfo.allocations.values[0],
         )
         np.testing.assert_allclose(
             allocations.values[3][5:10],
-            pf_opt.allocations.values[1],
+            pfo.allocations.values[1],
         )
         assert_frame_equal(
-            vbt.Portfolio.from_optimizer(prices, pf_opt, pf_method="from_orders", val_price=-np.inf)
+            vbt.Portfolio.from_optimizer(prices, pfo, pf_method="from_orders", val_price=-np.inf)
             .get_asset_value(group_by=False)
             .vbt
             / pf.value,
-            vbt.Portfolio.from_optimizer(prices, pf_opt, pf_method="from_signals", val_price=-np.inf)
+            vbt.Portfolio.from_optimizer(prices, pfo, pf_method="from_signals", val_price=-np.inf)
             .get_asset_value(group_by=False)
             .vbt
             / pf.value,

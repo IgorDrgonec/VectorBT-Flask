@@ -1660,6 +1660,98 @@ PortfolioOptimizerT = tp.TypeVar("PortfolioOptimizerT", bound="PortfolioOptimize
 class PortfolioOptimizer(Analyzable):
     """Class that exposes methods for generating allocations."""
 
+    @classmethod
+    def row_stack(
+        cls: tp.Type[PortfolioOptimizerT],
+        *objs: tp.MaybeTuple[PortfolioOptimizerT],
+        wrapper_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> PortfolioOptimizerT:
+        """Stack multiple `PortfolioOptimizer` instances along rows.
+
+        Uses `vectorbtpro.base.wrapping.ArrayWrapper.row_stack` to stack the wrappers."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, PortfolioOptimizer):
+                raise TypeError("Each object to be merged must be an instance of PortfolioOptimizer")
+        if "wrapper" not in kwargs:
+            if wrapper_kwargs is None:
+                wrapper_kwargs = {}
+            kwargs["wrapper"] = ArrayWrapper.row_stack(
+                *[obj.wrapper for obj in objs],
+                stack_columns=False,
+                **wrapper_kwargs,
+            )
+        if "alloc_records" not in kwargs:
+            alloc_records_type = None
+            for obj in objs:
+                if alloc_records_type is None:
+                    alloc_records_type = type(obj.alloc_records)
+                elif not isinstance(obj.alloc_records, alloc_records_type):
+                    raise TypeError("Objects to be merged must have the same type for alloc_records")
+            kwargs["alloc_records"] = alloc_records_type.row_stack(
+                *[obj.alloc_records for obj in objs],
+                wrapper_kwargs=wrapper_kwargs,
+            )
+        if "allocations" not in kwargs:
+            record_indices = type(kwargs["alloc_records"]).get_row_stack_record_indices(
+                *[obj.alloc_records for obj in objs],
+                wrapper=kwargs["alloc_records"].wrapper,
+            )
+            kwargs["allocations"] = np.row_stack([obj._allocations for obj in objs])[record_indices]
+
+        kwargs = cls.resolve_row_stack_kwargs(*objs, **kwargs)
+        kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
+        return cls(**kwargs)
+
+    @classmethod
+    def column_stack(
+        cls: tp.Type[PortfolioOptimizerT],
+        *objs: tp.MaybeTuple[PortfolioOptimizerT],
+        wrapper_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> PortfolioOptimizerT:
+        """Stack multiple `PortfolioOptimizer` instances along columns.
+
+        Uses `vectorbtpro.base.wrapping.ArrayWrapper.column_stack` to stack the wrappers."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+        for obj in objs:
+            if not checks.is_instance_of(obj, PortfolioOptimizer):
+                raise TypeError("Each object to be merged must be an instance of PortfolioOptimizer")
+        if "wrapper" not in kwargs:
+            if wrapper_kwargs is None:
+                wrapper_kwargs = {}
+            kwargs["wrapper"] = ArrayWrapper.column_stack(
+                *[obj.wrapper for obj in objs],
+                union_index=False,
+                **wrapper_kwargs,
+            )
+        if "alloc_records" not in kwargs:
+            alloc_records_type = None
+            for obj in objs:
+                if alloc_records_type is None:
+                    alloc_records_type = type(obj.alloc_records)
+                elif not isinstance(obj.alloc_records, alloc_records_type):
+                    raise TypeError("Objects to be merged must have the same type for alloc_records")
+            kwargs["alloc_records"] = alloc_records_type.column_stack(
+                *[obj.alloc_records for obj in objs],
+                wrapper_kwargs=wrapper_kwargs,
+            )
+        if "allocations" not in kwargs:
+            record_indices = type(kwargs["alloc_records"]).get_column_stack_record_indices(
+                *[obj.alloc_records for obj in objs],
+                wrapper=kwargs["alloc_records"].wrapper,
+            )
+            kwargs["allocations"] = np.row_stack([obj._allocations for obj in objs])[record_indices]
+
+        kwargs = cls.resolve_column_stack_kwargs(*objs, **kwargs)
+        kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
+        return cls(**kwargs)
+
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Analyzable._expected_keys or set()) | {
         "alloc_records",
         "allocations",
@@ -1793,12 +1885,12 @@ class PortfolioOptimizer(Analyzable):
             >>> def uniform_allocate_func(n_cols):
             ...     return np.full(n_cols, 1 / n_cols)
 
-            >>> pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+            >>> pfo = vbt.PortfolioOptimizer.from_allocate_func(
             ...     close.vbt.wrapper,
             ...     uniform_allocate_func,
             ...     close.shape[1]
             ... )
-            >>> pf_opt.allocations
+            >>> pfo.allocations
             symbol                         MSFT      AMZN      AAPL
             Date
             2010-01-04 00:00:00+00:00  0.333333  0.333333  0.333333
@@ -1811,13 +1903,13 @@ class PortfolioOptimizer(Analyzable):
             ...     weights = np.random.uniform(size=n_cols)
             ...     return weights / weights.sum()
 
-            >>> pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+            >>> pfo = vbt.PortfolioOptimizer.from_allocate_func(
             ...     close.vbt.wrapper,
             ...     random_allocate_func,
             ...     close.shape[1],
             ...     every="AS-JAN"
             ... )
-            >>> pf_opt.allocations
+            >>> pfo.allocations
             symbol                         MSFT      AMZN      AAPL
             Date
             2011-01-03 00:00:00+00:00  0.160335  0.122434  0.717231
@@ -1834,13 +1926,13 @@ class PortfolioOptimizer(Analyzable):
             * Specify index points manually:
 
             ```pycon
-            >>> pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+            >>> pfo = vbt.PortfolioOptimizer.from_allocate_func(
             ...     close.vbt.wrapper,
             ...     random_allocate_func,
             ...     close.shape[1],
             ...     index_points=[0, 30, 60]
             ... )
-            >>> pf_opt.allocations
+            >>> pfo.allocations
             symbol                         MSFT      AMZN      AAPL
             Date
             2010-01-04 00:00:00+00:00  0.257878  0.308287  0.433835
@@ -1854,7 +1946,7 @@ class PortfolioOptimizer(Analyzable):
             >>> def manual_allocate_func(weights):
             ...     return weights
 
-            >>> pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+            >>> pfo = vbt.PortfolioOptimizer.from_allocate_func(
             ...     close.vbt.wrapper,
             ...     manual_allocate_func,
             ...     vbt.RepEval("weights[i]", context=dict(weights=[
@@ -1864,7 +1956,7 @@ class PortfolioOptimizer(Analyzable):
             ...     ])),
             ...     index_points=[0, 30, 60]
             ... )
-            >>> pf_opt.allocations
+            >>> pfo.allocations
             symbol                     MSFT  AMZN  AAPL
             Date
             2010-01-04 00:00:00+00:00     1     0     0
@@ -1882,14 +1974,14 @@ class PortfolioOptimizer(Analyzable):
             ...     weights = np.random.uniform(0, 1, n_cols)
             ...     return weights / weights.sum()
 
-            >>> pf_opt = vbt.PortfolioOptimizer.from_allocate_func(
+            >>> pfo = vbt.PortfolioOptimizer.from_allocate_func(
             ...     close.vbt.wrapper,
             ...     random_allocate_func_nb,
             ...     close.shape[1],
             ...     index_points=[0, 30, 60],
             ...     jitted_loop=True
             ... )
-            >>> pf_opt.allocations
+            >>> pfo.allocations
             symbol                         MSFT      AMZN      AAPL
             Date
             2010-01-04 00:00:00+00:00  0.231925  0.351085  0.416990
@@ -1971,6 +2063,9 @@ class PortfolioOptimizer(Analyzable):
                 index_stack_kwargs=index_stack_kwargs,
                 name_tuple_to_str=name_tuple_to_str,
             )
+            if param_columns is None:
+                n_param_configs = len(param_product[list(param_product.keys())[0]])
+                param_columns = pd.RangeIndex(stop=n_param_configs, name="param_config")
             product_group_configs = param_product_to_objs(paramable_kwargs, param_product)
             if len(group_configs) == 0:
                 group_configs = product_group_configs
@@ -2233,7 +2328,15 @@ class PortfolioOptimizer(Analyzable):
         and a Numba-compiled loop. Otherwise, uses a regular Python function to pick each allocation
         (which can be a dict, Series, etc.).
 
-        If `allocations` is a DataFrame, additionally uses its index as labels."""
+        If `allocations` is a DataFrame, additionally uses its index as labels.
+
+        If `allocations` is a Series or dict, uses it as a single allocation without index,
+        which by default gets assigned to the first index."""
+        if isinstance(allocations, pd.Series):
+            allocations = allocations.to_dict()
+        if isinstance(allocations, dict):
+            allocations = pd.DataFrame([allocations], columns=wrapper.columns)
+            allocations = allocations.values
         if isinstance(allocations, pd.DataFrame):
             kwargs = merge_dicts(
                 dict(on=allocations.index, kind="labels"),
@@ -2506,13 +2609,13 @@ class PortfolioOptimizer(Analyzable):
             ...     return sharpe / sharpe.sum()
 
             >>> df_arg = vbt.RepEval("close.iloc[index_slice]", context=dict(close=close))
-            >>> pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+            >>> pfo = vbt.PortfolioOptimizer.from_optimize_func(
             ...     close.vbt.wrapper,
             ...     optimize_func,
             ...     df_arg,
             ...     end="2015-01-01"
             ... )
-            >>> pf_opt.allocations
+            >>> pfo.allocations
             symbol                                     MSFT      AMZN      AAPL
             alloc_group Date
             group       2015-01-02 00:00:00+00:00  0.402459  0.309351  0.288191
@@ -2521,13 +2624,13 @@ class PortfolioOptimizer(Analyzable):
             * Allocate every first date of the year:
 
             ```pycon
-            >>> pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+            >>> pfo = vbt.PortfolioOptimizer.from_optimize_func(
             ...     close.vbt.wrapper,
             ...     optimize_func,
             ...     df_arg,
             ...     every="AS-JAN"
             ... )
-            >>> pf_opt.allocations
+            >>> pfo.allocations
             symbol                                     MSFT      AMZN      AAPL
             alloc_group Date
             group       2011-01-03 00:00:00+00:00  0.480693  0.257317  0.261990
@@ -2544,7 +2647,7 @@ class PortfolioOptimizer(Analyzable):
             * Specify index ranges manually:
 
             ```pycon
-            >>> pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+            >>> pfo = vbt.PortfolioOptimizer.from_optimize_func(
             ...     close.vbt.wrapper,
             ...     optimize_func,
             ...     df_arg,
@@ -2554,7 +2657,7 @@ class PortfolioOptimizer(Analyzable):
             ...         (60, 90)
             ...     ]
             ... )
-            >>> pf_opt.allocations
+            >>> pfo.allocations
             symbol                                     MSFT      AMZN      AAPL
             alloc_group Date
             group       2010-02-16 00:00:00+00:00  0.340641  0.285897  0.373462
@@ -2565,7 +2668,7 @@ class PortfolioOptimizer(Analyzable):
             * Test multiple combinations of one argument:
 
             ```pycon
-            >>> pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+            >>> pfo = vbt.PortfolioOptimizer.from_optimize_func(
             ...     close.vbt.wrapper,
             ...     optimize_func,
             ...     df_arg,
@@ -2573,7 +2676,7 @@ class PortfolioOptimizer(Analyzable):
             ...     start="2015-01-01",
             ...     lookback_period=vbt.Param(["3MS", "6MS"])
             ... )
-            >>> pf_opt.allocations
+            >>> pfo.allocations
             symbol                                         MSFT      AMZN      AAPL
             lookback_period Date
             3MS             2016-01-04 00:00:00+00:00  0.282725  0.234970  0.482305
@@ -2589,7 +2692,7 @@ class PortfolioOptimizer(Analyzable):
             * Test multiple cross-argument combinations:
 
             ```pycon
-            >>> pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+            >>> pfo = vbt.PortfolioOptimizer.from_optimize_func(
             ...     close.vbt.wrapper,
             ...     optimize_func,
             ...     df_arg,
@@ -2600,7 +2703,7 @@ class PortfolioOptimizer(Analyzable):
             ...         dict(end="2014-01-01")
             ...     ]
             ... )
-            >>> pf_opt.allocations
+            >>> pfo.allocations
             symbol                                      MSFT      AMZN      AAPL
             group_config Date
             0            2016-01-04 00:00:00+00:00  0.332212  0.141090  0.526698
@@ -2631,7 +2734,7 @@ class PortfolioOptimizer(Analyzable):
             ...     sharpe = mean / std
             ...     return sharpe / np.sum(sharpe)
 
-            >>> pf_opt = vbt.PortfolioOptimizer.from_optimize_func(
+            >>> pfo = vbt.PortfolioOptimizer.from_optimize_func(
             ...     close.vbt.wrapper,
             ...     optimize_func_nb,
             ...     np.asarray(close),
@@ -2642,7 +2745,7 @@ class PortfolioOptimizer(Analyzable):
             ...     ],
             ...     jitted_loop=True
             ... )
-            >>> pf_opt.allocations
+            >>> pfo.allocations
             symbol                         MSFT      AMZN      AAPL
             Date
             2010-02-17 00:00:00+00:00  0.336384  0.289598  0.374017
@@ -2730,6 +2833,9 @@ class PortfolioOptimizer(Analyzable):
                 index_stack_kwargs=index_stack_kwargs,
                 name_tuple_to_str=name_tuple_to_str,
             )
+            if param_columns is None:
+                n_param_configs = len(param_product[list(param_product.keys())[0]])
+                param_columns = pd.RangeIndex(stop=n_param_configs, name="param_config")
             product_group_configs = param_product_to_objs(paramable_kwargs, param_product)
             if len(group_configs) == 0:
                 group_configs = product_group_configs
@@ -3052,6 +3158,8 @@ class PortfolioOptimizer(Analyzable):
                 wrapper = ArrayWrapper.from_obj(kwargs["returns"])
             else:
                 raise TypeError("Must provide a wrapper if price and returns are not set")
+        else:
+            checks.assert_instance_of(wrapper, ArrayWrapper, arg_name="wrapper")
         if "prices" in kwargs and not isinstance(kwargs["prices"], CustomTemplate):
             kwargs["prices"] = RepFunc(lambda index_slice, _prices=kwargs["prices"]: _prices.iloc[index_slice])
         if "returns" in kwargs and not isinstance(kwargs["returns"], CustomTemplate):
@@ -3071,6 +3179,8 @@ class PortfolioOptimizer(Analyzable):
                 wrapper = ArrayWrapper.from_obj(returns)
             else:
                 raise TypeError("Must provide a wrapper if returns are a template")
+        else:
+            checks.assert_instance_of(wrapper, ArrayWrapper, arg_name="wrapper")
         if not isinstance(returns, CustomTemplate):
             returns = RepFunc(lambda index_slice, _returns=returns: _returns.iloc[index_slice])
         return cls.from_optimize_func(wrapper, riskfolio_optimize, returns, **kwargs)
@@ -3255,7 +3365,7 @@ class PortfolioOptimizer(Analyzable):
             >>> import vectorbtpro as vbt
             >>> import pandas as pd
 
-            >>> pf_opt = vbt.PortfolioOptimizer.from_random(
+            >>> pfo = vbt.PortfolioOptimizer.from_random(
             ...     vbt.ArrayWrapper(
             ...         index=pd.date_range("2020-01-01", "2021-01-01"),
             ...         columns=["MSFT", "AMZN", "AAPL"],
@@ -3264,7 +3374,7 @@ class PortfolioOptimizer(Analyzable):
             ...     every="MS",
             ...     seed=40
             ... )
-            >>> pf_opt.plot().show()
+            >>> pfo.plot().show()
             ```
 
             ![](/assets/images/api/pfopt_plot.svg){: .iimg loading=lazy }

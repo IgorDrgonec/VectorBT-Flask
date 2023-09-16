@@ -583,7 +583,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         objs = list(objs)
         for obj in objs:
             if not checks.is_instance_of(obj, Data):
-                raise TypeError("Each object to be merged must be an instance of Records")
+                raise TypeError("Each object to be merged must be an instance of Data")
         if "wrapper" not in kwargs:
             if wrapper_kwargs is None:
                 wrapper_kwargs = {}
@@ -640,7 +640,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         objs = list(objs)
         for obj in objs:
             if not checks.is_instance_of(obj, Data):
-                raise TypeError("Each object to be merged must be an instance of Records")
+                raise TypeError("Each object to be merged must be an instance of Data")
         if "wrapper" not in kwargs:
             if wrapper_kwargs is None:
                 wrapper_kwargs = {}

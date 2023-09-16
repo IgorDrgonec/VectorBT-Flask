@@ -3908,12 +3908,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ...     "AAPL": [1, 2, 3, 2, 1]
             ... }, index=pd.date_range(start="2020-01-01", periods=5))
 
-            >>> pf_opt = vbt.PortfolioOptimizer.from_random(
+            >>> pfo = vbt.PortfolioOptimizer.from_random(
             ...     close.vbt.wrapper,
             ...     every="2D",
             ...     seed=42
             ... )
-            >>> pf_opt.fill_allocations()
+            >>> pfo.fill_allocations()
                              MSFT      GOOG      AAPL
             2020-01-01   0.182059  0.462129  0.355812
             2020-01-02        NaN       NaN       NaN
@@ -3921,7 +3921,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             2020-01-04        NaN       NaN       NaN
             2020-01-05   0.038078  0.567845  0.394077
 
-            >>> pf = vbt.Portfolio.from_optimizer(close, pf_opt)
+            >>> pf = vbt.Portfolio.from_optimizer(close, pfo)
             >>> pf.get_asset_value(group_by=False).vbt / pf.value
             alloc_group                         group
                              MSFT      GOOG      AAPL
