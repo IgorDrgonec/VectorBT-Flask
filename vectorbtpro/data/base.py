@@ -558,6 +558,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         for attr in cls._key_dict_attrs:
             if attr in kwargs:
                 attr_value = kwargs[attr]
+                if attr_value is None:
+                    attr_value = {}
                 checks.assert_instance_of(attr_value, dict, arg_name=attr)
                 if not isinstance(attr_value, key_dict):
                     attr_value = data_type(attr_value)
@@ -1362,7 +1364,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         silence_warnings = cls.resolve_base_setting(silence_warnings, "silence_warnings")
 
         index = None
-        for symbol, obj in data.items():
+        index_changed = False
+        for k, obj in data.items():
             obj_index = obj.index.sort_values()
             if index is None:
                 index = obj_index
@@ -1375,6 +1378,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                                 stacklevel=2,
                             )
                         index = index.union(obj_index)
+                        index_changed = True
                     elif missing == "drop":
                         if not silence_warnings:
                             warnings.warn(
@@ -1382,12 +1386,15 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                                 stacklevel=2,
                             )
                         index = index.intersection(obj_index)
+                        index_changed = True
                     elif missing == "raise":
                         raise ValueError("Symbols have mismatching index")
                     else:
                         raise ValueError(f"Invalid option missing='{missing}'")
 
-        new_data = {symbol: obj.reindex(index=index) for symbol, obj in data.items()}
+        if not index_changed:
+            return data
+        new_data = {k: obj.reindex(index=index) for k, obj in data.items()}
         return type(data)(new_data)
 
     @classmethod
@@ -1409,7 +1416,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         columns = None
         multiple_columns = False
         name_is_none = False
-        for symbol, obj in data.items():
+        columns_changed = False
+        for k, obj in data.items():
             if isinstance(obj, pd.Series):
                 if obj.name is None:
                     name_is_none = True
@@ -1428,6 +1436,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                                 stacklevel=2,
                             )
                         columns = columns.union(obj_columns)
+                        columns_changed = True
                     elif missing == "drop":
                         if not silence_warnings:
                             warnings.warn(
@@ -1435,13 +1444,16 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                                 stacklevel=2,
                             )
                         columns = columns.intersection(obj_columns)
+                        columns_changed = True
                     elif missing == "raise":
                         raise ValueError("Symbols have mismatching columns")
                     else:
                         raise ValueError(f"Invalid option missing='{missing}'")
 
+        if not columns_changed:
+            return data
         new_data = {}
-        for symbol, obj in data.items():
+        for k, obj in data.items():
             if isinstance(obj, pd.Series):
                 obj = obj.to_frame()
             obj = obj.reindex(columns=columns)
@@ -1449,7 +1461,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 obj = obj[columns[0]]
                 if name_is_none:
                     obj = obj.rename(None)
-            new_data[symbol] = obj
+            new_data[k] = obj
         return type(data)(new_data)
 
     def switch_class(
@@ -1535,7 +1547,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         data = type(data)(data)
         for k, obj in data.items():
             obj = to_pd_array(obj)
-            obj = obj[~obj.index.duplicated(keep="last")]
+            if obj.index.has_duplicates:
+                obj = obj[~obj.index.duplicated(keep="last")]
             obj = cls_or_self.prepare_tzaware_index(obj, tz_localize=tz_localize, tz_convert=tz_convert)
             data[k] = obj
             if (isinstance(data, symbol_dict) and isinstance(last_index, symbol_dict)) or (

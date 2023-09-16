@@ -1387,12 +1387,12 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         return _self.wrap_reduced(np.full(_self.shape_2d[1], fill_value), **kwargs)
 
     def get_index_points(self, *args, **kwargs) -> tp.Array1d:
-        """See `vectorbtpro.base.accessors.BaseIDXAccessor.get_index_points`."""
-        return self.index_acc.get_index_points(*args, **kwargs)
+        """See `vectorbtpro.base.accessors.BaseIDXAccessor.get_points`."""
+        return self.index_acc.get_points(*args, **kwargs)
 
     def get_index_ranges(self, *args, **kwargs) -> tp.Tuple[tp.Array1d, tp.Array1d]:
-        """See `vectorbtpro.base.accessors.BaseIDXAccessor.get_index_ranges`."""
-        return self.index_acc.get_index_ranges(*args, **kwargs)
+        """See `vectorbtpro.base.accessors.BaseIDXAccessor.get_ranges`."""
+        return self.index_acc.get_ranges(*args, **kwargs)
 
     def fill_and_set(
         self,

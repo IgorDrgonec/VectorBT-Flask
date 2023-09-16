@@ -352,6 +352,9 @@ execution = frozen_cfg(
             pool_type="process",
             init_kwargs=flex_cfg(),
             timeout=None,
+            sleep=0.001,
+            show_progress=False,
+            pbar_kwargs=flex_cfg(),
         ),
         mpire=flex_cfg(
             cls="MpireEngine",
@@ -359,7 +362,6 @@ execution = frozen_cfg(
                 use_dill=True,
             ),
             apply_kwargs=flex_cfg(),
-            timeout=None,
         ),
         dask=flex_cfg(
             cls="DaskEngine",

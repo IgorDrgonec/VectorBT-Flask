@@ -399,11 +399,11 @@ class BaseIDXAccessor(Configured):
 
     # ############# Points and ranges ############# #
 
-    def get_index_points(self, *args, **kwargs) -> tp.Array1d:
+    def get_points(self, *args, **kwargs) -> tp.Array1d:
         """See `vectorbtpro.base.indexing.get_index_points`."""
         return get_index_points(self.obj, *args, **kwargs)
 
-    def get_index_ranges(self, *args, **kwargs) -> tp.Tuple[tp.Array1d, tp.Array1d]:
+    def get_ranges(self, *args, **kwargs) -> tp.Tuple[tp.Array1d, tp.Array1d]:
         """See `vectorbtpro.base.indexing.get_index_ranges`."""
         return get_index_ranges(self.obj, self.any_freq, *args, **kwargs)
 

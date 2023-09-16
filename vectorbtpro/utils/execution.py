@@ -62,8 +62,8 @@ class SerialEngine(ExecutionEngine):
 
     def __init__(
         self,
-        show_progress: tp.Optional[bool] = None,
         progress_desc: tp.Optional[tp.Sequence] = None,
+        show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
         clear_cache: tp.Union[None, bool, int] = None,
         collect_garbage: tp.Union[None, bool, int] = None,
@@ -95,14 +95,14 @@ class SerialEngine(ExecutionEngine):
         self._cooldown = cooldown
 
     @property
-    def show_progress(self) -> bool:
-        """Whether to show the progress bar using `vectorbtpro.utils.pbar.get_pbar`."""
-        return self._show_progress
-
-    @property
     def progress_desc(self) -> tp.Optional[tp.Sequence]:
         """Sequence used to describe each iteration of the progress bar."""
         return self._progress_desc
+
+    @property
+    def show_progress(self) -> bool:
+        """Whether to show the progress bar using `vectorbtpro.utils.pbar.get_pbar`."""
+        return self._show_progress
 
     @property
     def pbar_kwargs(self) -> tp.Kwargs:
@@ -199,8 +199,8 @@ class ThreadPoolEngine(ExecutionEngine):
                 future = executor.submit(func, *args, **kwargs)
                 futures[future] = i
             results = [None] * len(futures)
-            for fut in concurrent.futures.as_completed(futures):
-                results[futures[fut]] = fut.result(timeout=self.timeout)
+            for fut in concurrent.futures.as_completed(futures, timeout=self.timeout):
+                results[futures[fut]] = fut.result()
             return results
 
 
@@ -247,8 +247,8 @@ class ProcessPoolEngine(ExecutionEngine):
                 future = executor.submit(func, *args, **kwargs)
                 futures[future] = i
             results = [None] * len(futures)
-            for fut in concurrent.futures.as_completed(futures):
-                results[futures[fut]] = fut.result(timeout=self.timeout)
+            for fut in concurrent.futures.as_completed(futures, timeout=self.timeout):
+                results[futures[fut]] = fut.result()
             return results
 
 
@@ -268,6 +268,9 @@ class PathosEngine(ExecutionEngine):
         "pool_type",
         "init_kwargs",
         "timeout",
+        "sleep",
+        "show_progress",
+        "pbar_kwargs",
     }
 
     def __init__(
@@ -275,23 +278,35 @@ class PathosEngine(ExecutionEngine):
         pool_type: tp.Optional[str] = None,
         init_kwargs: tp.KwargsLike = None,
         timeout: tp.Optional[int] = None,
+        sleep: tp.Optional[float] = None,
+        show_progress: tp.Optional[bool] = None,
+        pbar_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> None:
         pool_type = self.resolve_setting(pool_type, "pool_type")
         init_kwargs = self.resolve_setting(init_kwargs, "init_kwargs", merge=True)
         timeout = self.resolve_setting(timeout, "timeout")
+        sleep = self.resolve_setting(sleep, "sleep")
+        show_progress = self.resolve_setting(show_progress, "show_progress")
+        pbar_kwargs = self.resolve_setting(pbar_kwargs, "pbar_kwargs", merge=True)
 
         ExecutionEngine.__init__(
             self,
             pool_type=pool_type,
             init_kwargs=init_kwargs,
             timeout=timeout,
+            sleep=sleep,
+            show_progress=show_progress,
+            pbar_kwargs=pbar_kwargs,
             **kwargs,
         )
 
         self._pool_type = pool_type
         self._init_kwargs = init_kwargs
         self._timeout = timeout
+        self._sleep = sleep
+        self._show_progress = show_progress
+        self._pbar_kwargs = pbar_kwargs
 
     @property
     def pool_type(self) -> str:
@@ -307,6 +322,21 @@ class PathosEngine(ExecutionEngine):
     def timeout(self) -> tp.Optional[int]:
         """Timeout."""
         return self._timeout
+
+    @property
+    def sleep(self) -> tp.Optional[float]:
+        """Number of seconds to sleep between checks."""
+        return self._timeout
+
+    @property
+    def show_progress(self) -> bool:
+        """Whether to show the progress bar using `vectorbtpro.utils.pbar.get_pbar`."""
+        return self._show_progress
+
+    @property
+    def pbar_kwargs(self) -> tp.Kwargs:
+        """Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`."""
+        return self._pbar_kwargs
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         from vectorbtpro.utils.module_ import assert_can_import
@@ -329,8 +359,27 @@ class PathosEngine(ExecutionEngine):
             for func, args, kwargs in funcs_args:
                 async_result = pool.apipe(func, *args, **kwargs)
                 async_results.append(async_result)
+            if self.timeout is not None or self.show_progress:
+                pending = set(async_results)
+                total_futures = len(pending)
+                if self.timeout is not None:
+                    end_time = self.timeout + time.monotonic()
+                with get_pbar(total=total_futures, show_progress=self.show_progress, **self.pbar_kwargs) as pbar:
+                    while pending:
+                        pending = {async_result for async_result in pending if not async_result.ready()}
+                        pbar.n = total_futures - len(pending)
+                        pbar.refresh()
+                        if len(pending) == 0:
+                            break
+                        if self.timeout is not None:
+                            if time.monotonic() > end_time:
+                                raise TimeoutError("%d (of %d) futures unfinished" % (len(pending), total_futures))
+                        if self.sleep is not None:
+                            time.sleep(self.sleep)
+            pool.close()
+            pool.join()
             pool.clear()
-        return [async_result.get(timeout=self.timeout) for async_result in async_results]
+        return [async_result.get() for async_result in async_results]
 
 
 class MpireEngine(ExecutionEngine):
@@ -350,24 +399,20 @@ class MpireEngine(ExecutionEngine):
         self,
         init_kwargs: tp.KwargsLike = None,
         apply_kwargs: tp.KwargsLike = None,
-        timeout: tp.Optional[int] = None,
         **kwargs,
     ) -> None:
         init_kwargs = self.resolve_setting(init_kwargs, "init_kwargs", merge=True)
         apply_kwargs = self.resolve_setting(apply_kwargs, "apply_kwargs", merge=True)
-        timeout = self.resolve_setting(timeout, "timeout")
 
         ExecutionEngine.__init__(
             self,
             init_kwargs=init_kwargs,
             apply_kwargs=apply_kwargs,
-            timeout=timeout,
             **kwargs,
         )
 
         self._init_kwargs = init_kwargs
         self._apply_kwargs = apply_kwargs
-        self._timeout = timeout
 
     @property
     def init_kwargs(self) -> tp.Kwargs:
@@ -378,11 +423,6 @@ class MpireEngine(ExecutionEngine):
     def apply_kwargs(self) -> tp.Kwargs:
         """Keyword arguments passed to `WorkerPool.async_apply`."""
         return self._apply_kwargs
-
-    @property
-    def timeout(self) -> tp.Optional[int]:
-        """Timeout."""
-        return self._timeout
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         from vectorbtpro.utils.module_ import assert_can_import
@@ -396,7 +436,7 @@ class MpireEngine(ExecutionEngine):
                 async_result = pool.apply_async(func, args=args, kwargs=kwargs, **self.apply_kwargs)
                 async_results.append(async_result)
             pool.stop_and_join()
-        return [async_result.get(timeout=self.timeout) for async_result in async_results]
+        return [async_result.get() for async_result in async_results]
 
 
 class DaskEngine(ExecutionEngine):
