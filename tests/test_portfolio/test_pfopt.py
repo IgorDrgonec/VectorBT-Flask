@@ -1270,7 +1270,7 @@ class TestPortfolioOptimizer:
         assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
             pfo.alloc_records.values,
-            np.array([(0, 0, 0)], dtype=alloc_point_dt),
+            np.array([(0, 0, 0), (1, 0, 1), (2, 0, 2), (3, 0, 3), (4, 0, 4)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
             pfo._allocations,
@@ -1284,7 +1284,7 @@ class TestPortfolioOptimizer:
         assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
             pfo.alloc_records.values,
-            np.array([(0, 0, 0)], dtype=alloc_point_dt),
+            np.array([(0, 0, 0), (1, 0, 1), (2, 0, 2), (3, 0, 3), (4, 0, 4)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
             pfo._allocations,
@@ -1298,7 +1298,7 @@ class TestPortfolioOptimizer:
         assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
             pfo.alloc_records.values,
-            np.array([(0, 0, 0)], dtype=alloc_point_dt),
+            np.array([(0, 0, 0), (1, 0, 1), (2, 0, 2), (3, 0, 3), (4, 0, 4)], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
             pfo._allocations,
@@ -1314,7 +1314,7 @@ class TestPortfolioOptimizer:
         assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
             pfo.alloc_records.values,
-            np.array([(0, 0, 0)], dtype=alloc_point_dt),
+            np.array([(0, 0, 0), (1, 0, 1), (2, 0, 2), (3, 0, 3), (4, 0, 4)], dtype=alloc_point_dt),
         )
         allocations = get_allocations(pfo)
         allocations[:, -1] = np.nan
@@ -1471,11 +1471,22 @@ class TestPortfolioOptimizer:
         assert isinstance(pfo.alloc_records, vbt.AllocPoints)
         assert_records_close(
             pfo.alloc_records.values,
-            np.array([(0, 0, 0), (0, 1, 0)], dtype=alloc_point_dt),
+            np.array([
+                (0, 0, 0),
+                (1, 0, 1),
+                (2, 0, 2),
+                (3, 0, 3),
+                (4, 0, 4),
+                (0, 1, 0),
+                (1, 1, 1),
+                (2, 1, 2),
+                (3, 1, 3),
+                (4, 1, 4),
+            ], dtype=alloc_point_dt),
         )
         np.testing.assert_array_equal(
             pfo._allocations,
-            get_allocations(pfo) * np.array([[1], [2]]),
+            get_allocations(pfo) * np.array([[1], [1], [1], [1], [1], [2], [2], [2], [2], [2]]),
         )
 
         pfo = vbt.PortfolioOptimizer.from_allocate_func(

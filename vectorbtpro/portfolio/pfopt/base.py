@@ -22,12 +22,12 @@ from vectorbtpro.utils.params import Param, combine_params, find_params_in_obj, 
 from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.base.indexes import combine_indexes, stack_indexes, select_levels
 from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.base.reshaping import to_pd_array, to_1d_array, to_2d_array, to_dict
+from vectorbtpro.base.reshaping import to_pd_array, to_1d_array, to_2d_array, to_dict, broadcast_array_to
 from vectorbtpro.base.indexing import point_idxr_defaults, range_idxr_defaults
 from vectorbtpro.data.base import Data
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.enums import RangeStatus
-from vectorbtpro.portfolio.enums import alloc_range_dt, alloc_point_dt, Direction
+from vectorbtpro.portfolio.enums import Direction
 from vectorbtpro.portfolio.pfopt import nb
 from vectorbtpro.portfolio.pfopt.records import AllocRanges, AllocPoints
 from vectorbtpro.registries.ch_registry import ch_reg
@@ -1869,7 +1869,7 @@ class PortfolioOptimizer(Analyzable):
         `vectorbtpro.portfolio.pfopt.records.AllocPoints`.
 
         Usage:
-            * Allocate uniformly:
+            * Allocate uniformly every day:
 
             ```pycon
             >>> import vectorbtpro as vbt
@@ -1893,7 +1893,19 @@ class PortfolioOptimizer(Analyzable):
             >>> pfo.allocations
             symbol                         MSFT      AMZN      AAPL
             Date
-            2010-01-04 00:00:00+00:00  0.333333  0.333333  0.333333
+            2010-01-04 00:00:00-05:00  0.333333  0.333333  0.333333
+            2010-01-05 00:00:00-05:00  0.333333  0.333333  0.333333
+            2010-01-06 00:00:00-05:00  0.333333  0.333333  0.333333
+            2010-01-07 00:00:00-05:00  0.333333  0.333333  0.333333
+            2010-01-08 00:00:00-05:00  0.333333  0.333333  0.333333
+            ...                             ...       ...       ...
+            2019-12-24 00:00:00-05:00  0.333333  0.333333  0.333333
+            2019-12-26 00:00:00-05:00  0.333333  0.333333  0.333333
+            2019-12-27 00:00:00-05:00  0.333333  0.333333  0.333333
+            2019-12-30 00:00:00-05:00  0.333333  0.333333  0.333333
+            2019-12-31 00:00:00-05:00  0.333333  0.333333  0.333333
+
+            [2516 rows x 3 columns]
             ```
 
             * Allocate randomly every first date of the year:
@@ -2320,18 +2332,20 @@ class PortfolioOptimizer(Analyzable):
         allocations: tp.ArrayLike,
         **kwargs,
     ) -> PortfolioOptimizerT:
-        """Pick allocations from an array.
+        """Pick allocations from a (flexible) array.
 
         Uses `PortfolioOptimizer.from_allocate_func`.
 
+        If `allocations` is a DataFrame, uses its index as labels. If it's a Series or dict, uses it
+        as a single allocation without index, which by default gets assigned to each index. If it's neither
+        one of the above nor a NumPy array, tries to convert it into a NumPy array.
+
         If `allocations` is a NumPy array, uses `vectorbtpro.portfolio.pfopt.nb.pick_idx_allocate_func_nb`
         and a Numba-compiled loop. Otherwise, uses a regular Python function to pick each allocation
-        (which can be a dict, Series, etc.).
+        (which can be a dict, Series, etc.). Selection of elements is done in a flexible manner,
+        meaning a single element will be applied to all rows, while one-dimensional arrays will be
+        also applied to all rows but also broadcast across columns (as opposed to rows)."""
 
-        If `allocations` is a DataFrame, additionally uses its index as labels.
-
-        If `allocations` is a Series or dict, uses it as a single allocation without index,
-        which by default gets assigned to the first index."""
         if isinstance(allocations, pd.Series):
             allocations = allocations.to_dict()
         if isinstance(allocations, dict):
@@ -2343,12 +2357,21 @@ class PortfolioOptimizer(Analyzable):
                 kwargs,
             )
             allocations = allocations.values
+        if not isinstance(allocations, np.ndarray):
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                try:
+                    new_allocations = np.asarray(allocations)
+                    if new_allocations.dtype != object:
+                        allocations = new_allocations
+                except Exception as e:
+                    pass
+
         if isinstance(allocations, np.ndarray):
 
             def _resolve_allocations(index_points):
-                if len(index_points) != len(allocations):
-                    raise ValueError(f"Allocation array must have {len(index_points)} rows")
-                return to_2d_array(allocations, expand_axis=0)
+                target_shape = (len(index_points), len(wrapper.columns))
+                return broadcast_array_to(allocations, target_shape, expand_axis=0)
 
             return cls.from_allocate_func(
                 wrapper,
@@ -2359,11 +2382,27 @@ class PortfolioOptimizer(Analyzable):
             )
 
         def _pick_allocate_func(index_points, i):
+            if not checks.is_sequence(allocations):
+                return allocations
+            if len(allocations) == 1:
+                return allocations[0]
             if len(index_points) != len(allocations):
                 raise ValueError(f"Allocation array must have {len(index_points)} rows")
             return allocations[i]
 
         return cls.from_allocate_func(wrapper, _pick_allocate_func, Rep("index_points"), Rep("i"), **kwargs)
+
+    @classmethod
+    def from_initial(
+        cls: tp.Type[PortfolioOptimizerT],
+        wrapper: ArrayWrapper,
+        allocations: tp.ArrayLike,
+        **kwargs,
+    ) -> PortfolioOptimizerT:
+        """Allocate once at the first index.
+
+        Uses `PortfolioOptimizer.from_allocations` with `on=0`."""
+        return cls.from_allocations(wrapper, allocations, on=0, **kwargs)
 
     @classmethod
     def from_filled_allocations(
@@ -2498,7 +2537,10 @@ class PortfolioOptimizer(Analyzable):
                 raise TypeError(f"Algo {_algo} not supported")
             if "on" not in kwargs:
                 group_config["on"] = nb.get_alloc_points_nb(
-                    weights, valid_only=valid_only, nonzero_only=nonzero_only, unique_only=unique_only
+                    weights,
+                    valid_only=valid_only,
+                    nonzero_only=nonzero_only,
+                    unique_only=unique_only,
                 )
             group_config["args"] = (weights,)
 

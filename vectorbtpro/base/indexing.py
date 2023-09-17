@@ -1183,9 +1183,9 @@ def get_index_points(
             start_used = True
         else:
             if kind.lower() in ("labels",):
-                on = index[0]
+                on = index
             else:
-                on = 0
+                on = np.arange(len(index))
     on = dt.prepare_dt_index(on)
 
     if at_time is not None:

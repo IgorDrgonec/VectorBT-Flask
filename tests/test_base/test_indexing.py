@@ -913,7 +913,7 @@ class TestIndexing:
             indexing.get_index_points(
                 index,
             ),
-            np.array([0]),
+            np.arange(len(index)),
         )
         np.testing.assert_array_equal(indexing.get_index_points(index, start=5), np.array([5]))
         np.testing.assert_array_equal(indexing.get_index_points(index, start=index[0]), np.array([0]))
