@@ -63,7 +63,7 @@ class BinanceData(RemoteData):
         ... )
         ```
 
-        * Fetch data:
+        * Pull data:
 
         ```pycon
         >>> data = vbt.BinanceData.pull(

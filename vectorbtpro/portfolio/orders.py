@@ -15,7 +15,7 @@ a portfolio and can be accessed as `vectorbtpro.portfolio.base.Portfolio.orders`
 ...     ['a', 'b'],
 ...     start=datetime(2020, 1, 1),
 ...     end=datetime(2020, 3, 1),
-...     seed=vbt.symbol_dict(a=42, b=43)
+...     seed=vbt.key_dict(a=42, b=43)
 ... ).get()
 ```
 

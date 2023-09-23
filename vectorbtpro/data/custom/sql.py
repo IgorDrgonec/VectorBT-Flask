@@ -10,7 +10,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.data.custom.db import DBData
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.datetime_ import to_tzaware_datetime, to_naive_datetime
+from vectorbtpro.utils.datetime_ import to_tzaware_datetime, to_naive_datetime, prepare_dt_index
 
 try:
     if not tp.TYPE_CHECKING:
@@ -18,6 +18,7 @@ try:
     from sqlalchemy import Engine as EngineT, Selectable as SelectableT
 except ImportError:
     EngineT = tp.Any
+    SelectableT = tp.Any
 
 __all__ = [
     "SQLData",
@@ -26,42 +27,159 @@ __all__ = [
 __pdoc__ = {}
 
 
+SQLDataT = tp.TypeVar("SQLDataT", bound="SQLData")
+
+
 class SQLData(DBData):
-    """Data class for fetching data from a database using SQLAlchemy."""
+    """Data class for fetching data from a database using SQLAlchemy.
+
+    See https://www.sqlalchemy.org/ for the SQLAlchemy's API.
+
+    See https://pandas.pydata.org/docs/reference/api/pandas.read_sql_query.html for the read method.
+
+    See `SQLData.pull` and `SQLData.fetch_key` for arguments.
+
+    Usage:
+        * Set up the engine settings globally (optional):
+
+        ```pycon
+        >>> import vectorbtpro as vbt
+
+        >>> vbt.SQLData.set_engine_settings(
+        ...     engine_name="postgresql",
+        ...     populate_=True,
+        ...     engine="postgresql+psycopg2://...",
+        ...     engine_config=dict(),
+        ...     schema="public"
+        ... )
+        ```
+
+        * Pull tables:
+
+        ```pycon
+        >>> data = vbt.SQLData.pull(
+        ...     ["TABLE1", "TABLE2"],
+        ...     engine="postgresql",
+        ...     start="2020-01-01",
+        ...     end="2021-01-01"
+        ... )
+        ```
+
+        * Pull queries:
+
+        ```pycon
+        >>> data = vbt.SQLData.pull(
+        ...     ["SYMBOL1", "SYMBOL2"],
+        ...     query=vbt.key_dict({
+        ...         "SYMBOL1": "SELECT * FROM TABLE1",
+        ...         "SYMBOL2": "SELECT * FROM TABLE2"
+        ...     }),
+        ...     engine="postgresql"
+        ... )
+        ```
+    """
 
     _settings_path: tp.SettingsPath = dict(custom="data.custom.sql")
 
     @classmethod
-    def resolve_engine(cls,
+    def get_engine_settings(cls, *args, engine_name: tp.Optional[str] = None, **kwargs) -> dict:
+        """`SQLData.get_custom_settings` with `sub_path=engine_name`."""
+        if engine_name is not None:
+            sub_path = "engines." + engine_name
+        else:
+            sub_path = None
+        return cls.get_custom_settings(*args, sub_path=sub_path, **kwargs)
+
+    @classmethod
+    def has_engine_settings(cls, *args, engine_name: tp.Optional[str] = None, **kwargs) -> bool:
+        """`SQLData.has_custom_settings` with `sub_path=engine_name`."""
+        if engine_name is not None:
+            sub_path = "engines." + engine_name
+        else:
+            sub_path = None
+        return cls.has_custom_settings(*args, sub_path=sub_path, **kwargs)
+
+    @classmethod
+    def get_engine_setting(cls, *args, engine_name: tp.Optional[str] = None, **kwargs) -> tp.Any:
+        """`SQLData.get_custom_setting` with `sub_path=engine_name`."""
+        if engine_name is not None:
+            sub_path = "engines." + engine_name
+        else:
+            sub_path = None
+        return cls.get_custom_setting(*args, sub_path=sub_path, **kwargs)
+
+    @classmethod
+    def has_engine_setting(cls, *args, engine_name: tp.Optional[str] = None, **kwargs) -> bool:
+        """`SQLData.has_custom_setting` with `sub_path=engine_name`."""
+        if engine_name is not None:
+            sub_path = "engines." + engine_name
+        else:
+            sub_path = None
+        return cls.has_custom_setting(*args, sub_path=sub_path, **kwargs)
+
+    @classmethod
+    def resolve_engine_setting(cls, *args, engine_name: tp.Optional[str] = None, **kwargs) -> tp.Any:
+        """`SQLData.resolve_custom_setting` with `sub_path=engine_name`."""
+        if engine_name is not None:
+            sub_path = "engines." + engine_name
+        else:
+            sub_path = None
+        return cls.resolve_custom_setting(*args, sub_path=sub_path, **kwargs)
+
+    @classmethod
+    def set_engine_settings(cls, *args, engine_name: tp.Optional[str] = None, **kwargs) -> None:
+        """`SQLData.set_custom_settings` with `sub_path=engine_name`."""
+        if engine_name is not None:
+            sub_path = "engines." + engine_name
+        else:
+            sub_path = None
+        cls.set_custom_settings(*args, sub_path=sub_path, **kwargs)
+
+    @classmethod
+    def resolve_engine(
+        cls,
         engine: tp.Union[None, str, EngineT] = None,
+        engine_name: tp.Optional[str] = None,
         return_meta: bool = False,
         **engine_config,
     ) -> tp.Union[EngineT, dict]:
         """Resolve the engine.
 
-        If provided, must be of the type `sqlalchemy.engine.base.Engine`.
-        Otherwise, will be created using `engine_config`."""
+        Argument `engine` can be
+
+        1) an object of the type `sqlalchemy.engine.base.Engine`,
+        2) a URL of the engine as a string, which will be used to create an engine with
+        `sqlalchemy.engine.create.create_engine` and `engine_config` passed as keyword arguments
+        (you should not include `url` in the `engine_config`), or
+        3) an engine name, which is the name of a sub-config with engine settings under `custom.sql.engines`
+        in `vectorbtpro._settings.data`. Such a sub-config can then contain the actual engine as an object or a URL.
+
+        Argument `engine_name` can be provided instead of `engine`, or also together with `engine`
+        to pull other settings from a sub-config. URLs can also be used as engine names, but not the
+        other way around."""
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("sqlalchemy")
         from sqlalchemy import create_engine
 
-        engine = cls.resolve_custom_setting(engine, "engine")
-        if engine is None:
-            raise ValueError("Must provide engine or URL (via engine argument)")
-        if isinstance(engine, str):
-            engine_name = engine
-        else:
-            engine_name = None
+        engine_name = cls.resolve_engine_setting(engine_name, "engine_name")
         if engine_name is not None:
-            sub_path = "engines." + engine_name
+            engine = cls.resolve_engine_setting(engine, "engine", engine_name=engine_name)
+            if engine is None:
+                raise ValueError("Must provide engine or URL (via engine argument)")
         else:
-            sub_path = None
-        if engine_name is not None:
-            if cls.has_custom_setting("engine", sub_path=sub_path, sub_path_only=True):
-                engine = cls.get_custom_setting("engine", sub_path=sub_path, sub_path_only=True)
+            engine = cls.resolve_engine_setting(engine, "engine")
+            if engine is None:
+                raise ValueError("Must provide engine or URL (via engine argument)")
+            if isinstance(engine, str):
+                engine_name = engine
+            else:
+                engine_name = None
+            if engine_name is not None:
+                if cls.has_engine_setting("engine", engine_name=engine_name, sub_path_only=True):
+                    engine = cls.get_engine_setting("engine", engine_name=engine_name, sub_path_only=True)
         has_engine_config = len(engine_config) > 0
-        engine_config = cls.resolve_custom_setting(engine_config, "engine_config", merge=True, sub_path=sub_path)
+        engine_config = cls.resolve_engine_setting(engine_config, "engine_config", merge=True, engine_name=engine_name)
         if isinstance(engine, str):
             engine = create_engine(engine, **engine_config)
             should_dispose = True
@@ -83,6 +201,7 @@ class SQLData(DBData):
         pattern: tp.Optional[str] = None,
         use_regex: bool = False,
         engine: tp.Union[None, str, EngineT] = None,
+        engine_name: tp.Optional[str] = None,
         engine_config: tp.KwargsLike = None,
         dispose_engine: tp.Optional[bool] = None,
         **kwargs,
@@ -103,6 +222,7 @@ class SQLData(DBData):
             engine_config = {}
         engine_meta = cls.resolve_engine(
             engine=engine,
+            engine_name=engine_name,
             return_meta=True,
             **engine_config,
         )
@@ -131,6 +251,7 @@ class SQLData(DBData):
         schema: tp.Optional[str] = None,
         incl_views: bool = True,
         engine: tp.Union[None, str, EngineT] = None,
+        engine_name: tp.Optional[str] = None,
         engine_config: tp.KwargsLike = None,
         dispose_engine: tp.Optional[bool] = None,
         **kwargs,
@@ -157,18 +278,22 @@ class SQLData(DBData):
             engine_config = {}
         engine_meta = cls.resolve_engine(
             engine=engine,
+            engine_name=engine_name,
             return_meta=True,
             **engine_config,
         )
         engine = engine_meta["engine"]
+        engine_name = engine_meta["engine_name"]
         should_dispose = engine_meta["should_dispose"]
         if dispose_engine is None:
             dispose_engine = should_dispose
+        schema = cls.resolve_engine_setting(schema, "schema", engine_name=engine_name)
         if schema is None:
             schemas = cls.list_schemas(
                 pattern=schema_pattern,
                 use_regex=use_regex,
                 engine=engine,
+                engine_name=engine_name,
                 **kwargs,
             )
             if len(schemas) == 0:
@@ -210,36 +335,290 @@ class SQLData(DBData):
         return sorted(all_tables)
 
     @classmethod
-    def fetch_table(
+    def resolve_keys_meta(
         cls,
-        table_name: str,
+        keys: tp.Union[None, dict, tp.MaybeKeys] = None,
+        keys_are_features: tp.Optional[bool] = None,
+        features: tp.Union[None, dict, tp.MaybeFeatures] = None,
+        symbols: tp.Union[None, dict, tp.MaybeSymbols] = None,
         schema: tp.Optional[str] = None,
+        incl_views: bool = True,
         engine: tp.Union[None, str, EngineT] = None,
+        engine_name: tp.Optional[str] = None,
+        engine_config: tp.KwargsLike = None,
+    ) -> tp.Kwargs:
+        keys_meta = DBData.resolve_keys_meta(
+            keys=keys,
+            keys_are_features=keys_are_features,
+            features=features,
+            symbols=symbols,
+        )
+        if keys_meta["keys"] is None:
+            if cls.has_key_dict(schema):
+                raise ValueError("Cannot populate keys if schema is defined per key")
+            if cls.has_key_dict(incl_views):
+                raise ValueError("Cannot populate keys if incl_views is defined per key")
+            if cls.has_key_dict(engine):
+                raise ValueError("Cannot populate keys if engine is defined per key")
+            if cls.has_key_dict(engine_config):
+                raise ValueError("Cannot populate keys if engine_config is defined per key")
+            keys_meta["keys"] = cls.list_tables(
+                schema=schema,
+                incl_views=incl_views,
+                engine=engine,
+                engine_name=engine_name,
+                engine_config=engine_config,
+            )
+        return keys_meta
+
+    @classmethod
+    def pull(
+        cls: tp.Type[SQLDataT],
+        keys: tp.Union[tp.MaybeKeys] = None,
+        *,
+        keys_are_features: tp.Optional[bool] = None,
+        features: tp.Union[tp.MaybeFeatures] = None,
+        symbols: tp.Union[tp.MaybeSymbols] = None,
+        schema: tp.Optional[str] = None,
+        incl_views: bool = True,
+        engine: tp.Union[None, str, EngineT] = None,
+        engine_name: tp.Optional[str] = None,
         engine_config: tp.KwargsLike = None,
         dispose_engine: tp.Optional[bool] = None,
-        start: tp.Optional[tp.DatetimeLike] = None,
-        end: tp.Optional[tp.DatetimeLike] = None,
+        share_engine: tp.Optional[bool] = None,
+        **kwargs,
+    ) -> SQLDataT:
+        """Override `vectorbtpro.data.base.Data.pull` to resolve and share the engine among the keys
+        and use the table names available in the database in case no keys were provided."""
+        if share_engine is None:
+            if (
+                not cls.has_key_dict(engine)
+                and not cls.has_key_dict(engine_name)
+                and not cls.has_key_dict(engine_config)
+            ):
+                share_engine = True
+            else:
+                share_engine = False
+        if share_engine:
+            if engine_config is None:
+                engine_config = {}
+            engine_meta = cls.resolve_engine(
+                engine=engine,
+                engine_name=engine_name,
+                return_meta=True,
+                **engine_config,
+            )
+            engine = engine_meta["engine"]
+            engine_name = engine_meta["engine_name"]
+            should_dispose = engine_meta["should_dispose"]
+            if dispose_engine is None:
+                dispose_engine = should_dispose
+        else:
+            engine_name = None
+        keys_meta = cls.resolve_keys_meta(
+            keys=keys,
+            keys_are_features=keys_are_features,
+            features=features,
+            symbols=symbols,
+            schema=schema,
+            incl_views=incl_views,
+            engine=engine,
+            engine_name=engine_name,
+            engine_config=engine_config,
+        )
+        keys = keys_meta["keys"]
+        keys_are_features = keys_meta["keys_are_features"]
+        outputs = super(DBData, cls).pull(
+            keys,
+            keys_are_features=keys_are_features,
+            schema=schema,
+            engine=engine,
+            engine_name=engine_name,
+            engine_config=engine_config,
+            dispose_engine=False if share_engine else dispose_engine,
+            **kwargs,
+        )
+        if share_engine and dispose_engine:
+            engine.dispose()
+        return outputs
+
+    @classmethod
+    def prepare_dt_columns(
+        cls,
+        df: tp.Frame,
+        to_utc: tp.Union[None, bool, str] = None,
+        parse_dates: tp.Union[None, bool, tp.List[tp.IntStr], tp.Dict[tp.IntStr, tp.Any]] = None,
+    ) -> tp.Frame:
+        """Prepare datetime columns.
+
+        If `parse_dates` is True, will try to convert any column (including index) with object data type
+        into a datetime format using `vectorbtpro.utils.datetime_.prepare_dt_index`.
+        If `parse_dates` is a list or dict, will first check whether the name of the column
+        is among the names that are in `parse_dates`.
+
+        If `to_utc` is True or `to_utc` is "index", will localize any naive datetime index
+        into the UTC timezone. If `to_utc` is True or `to_utc` is "columns", will localize any
+        naive datetime column into the UTC timezone."""
+        if parse_dates not in (None, False):
+            if not isinstance(df.index, (pd.DatetimeIndex, pd.MultiIndex)) and df.index.dtype == object:
+                if parse_dates is True or df.index.name in parse_dates:
+                    df = df.copy(deep=False)
+                    if to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "index"):
+                        df.index = prepare_dt_index(df.index, utc=True)
+                    else:
+                        df.index = prepare_dt_index(df.index)
+            has_potential_dt_column = False
+            for column_name in df.columns:
+                if df[column_name].dtype == object:
+                    if parse_dates is True or column_name in parse_dates:
+                        has_potential_dt_column = True
+                        break
+            if has_potential_dt_column:
+                df = df.copy(deep=False)
+                for column_name in df.columns:
+                    if df[column_name].dtype == object:
+                        if parse_dates is True or column_name in parse_dates:
+                            if to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "columns"):
+                                df[column_name] = prepare_dt_index(df[column_name], utc=True)
+                            else:
+                                df[column_name] = prepare_dt_index(df[column_name])
+        if to_utc is not False:
+            if to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "index"):
+                if isinstance(df.index, pd.DatetimeIndex):
+                    df = df.copy(deep=False)
+                    if df.index.tz is None:
+                        df.index = df.index.tz_localize("utc")
+            elif to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "columns"):
+                if isinstance(df, pd.Series):
+                    if hasattr(df, "dt"):
+                        if df.dt.tz is None:
+                            df = df.dt.tz_localize("utc")
+                else:
+                    has_dt_column = False
+                    for column_name in df.columns:
+                        if hasattr(df[column_name], "dt"):
+                            has_dt_column = True
+                            break
+                    if has_dt_column:
+                        df = df.copy(deep=False)
+                        for column_name in df.columns:
+                            if hasattr(df[column_name], "dt"):
+                                if df.dt.tz is None:
+                                    df[column_name] = df[column_name].dt.tz_localize("utc")
+        return df
+
+    @classmethod
+    def fetch_key(
+        cls,
+        key: str,
+        table_name: tp.Union[None, str] = None,
+        schema: tp.Optional[str] = None,
+        query: tp.Union[None, str, SelectableT] = None,
+        engine: tp.Union[None, str, EngineT] = None,
+        engine_name: tp.Optional[str] = None,
+        engine_config: tp.KwargsLike = None,
+        dispose_engine: tp.Optional[bool] = None,
+        start: tp.Optional[tp.Any] = None,
+        end: tp.Optional[tp.Any] = None,
+        align_dates: tp.Optional[bool] = None,
         to_utc: tp.Union[None, bool, str] = None,
         tz: tp.Optional[tp.TimezoneLike] = None,
         index_col: tp.Union[None, bool, tp.MaybeList[tp.IntStr]] = None,
         columns: tp.Optional[tp.MaybeList[tp.IntStr]] = None,
-        parse_dates: tp.Union[None, tp.List[tp.IntStr], tp.Dict[tp.IntStr, tp.Any]] = None,
+        parse_dates: tp.Union[None, bool, tp.List[tp.IntStr], tp.Dict[tp.IntStr, tp.Any]] = None,
         dtype: tp.Union[None, tp.DTypeLike, tp.Dict[tp.IntStr, tp.DTypeLike]] = None,
         chunksize: tp.Optional[int] = None,
         chunk_func: tp.Optional[tp.Callable] = None,
         squeeze: tp.Optional[bool] = None,
         **read_sql_kwargs,
     ) -> tp.KeyData:
-        """Fetch the table of a feature or symbol."""
+        """Fetch a feature or symbol from a SQL database.
+
+        Can use a table name (which defaults to the key) or a custom query.
+
+        Args:
+            key (str): Feature or symbol.
+
+                If `table_name` and `query` are both None, becomes the table name.
+
+                Key can be in the `SCHEMA:TABLE` format, in this case `schema` argument will be ignored.
+            table_name (str): Table name.
+
+                Cannot be used together with `query`.
+            schema (str): Schema.
+
+                Cannot be used together with `query`.
+            query (str or Selectable): Custom query.
+
+                Cannot be used together with `table_name` and `schema`.
+            engine (str or object): See `SQLData.resolve_engine`.
+            engine_name (str): See `SQLData.resolve_engine`.
+            engine_config (dict): See `SQLData.resolve_engine`.
+            dispose_engine (bool): See `SQLData.resolve_engine`.
+            start (any): Start datetime (if datetime index) or any other start value.
+
+                Will parse with `vectorbtpro.utils.datetime_.to_timestamp` if `align_dates` is True
+                and the index is a datetime index. Otherwise, you must ensure the correct type is provided.
+
+                If the index is a multi-index, start value must be a tuple.
+
+                Cannot be used together with `query`. Include the condition into the query.
+            end (any): End datetime (if datetime index) or any other end value.
+
+                Will parse with `vectorbtpro.utils.datetime_.to_timestamp` if `align_dates` is True
+                and the index is a datetime index. Otherwise, you must ensure the correct type is provided.
+
+                If the index is a multi-index, end value must be a tuple.
+
+                Cannot be used together with `query`. Include the condition into the query.
+            align_dates (bool): Whether to align `start` and `end` to the timezone of the index.
+
+                Will pull one row (using `LIMIT 1`) and use `SQLData.prepare_dt_columns` to get the index.
+            to_utc (bool): See `SQLData.prepare_dt_columns`.
+            tz (any): Timezone.
+
+                See `vectorbtpro.utils.datetime_.to_timezone`.
+            index_col (int, str, or list): One or more columns that should become the index.
+
+                If `query` is not used, will get mapped into column names. Otherwise,
+                usage of integers is not allowed and column names directly must be used.
+            columns (int, str, or list): One or more columns to select.
+
+                Will get mapped into column names. Cannot be used together with `query`.
+            parse_dates (bool, list, or dict): Whether to parse dates and how to do it.
+
+                If `query` is not used, will get mapped into column names. Otherwise,
+                usage of integers is not allowed and column names directly must be used.
+                If enabled, will also try to parse the datetime columns that couldn't be parsed
+                by Pandas after the object has been fetched.
+
+                For dict format, see `pd.read_sql_query`.
+            dtype (dtype_like or dict): Data type of each column.
+
+                If `query` is not used, will get mapped into column names. Otherwise,
+                usage of integers is not allowed and column names directly must be used.
+
+                For dict format, see `pd.read_sql_query`.
+            chunksize (int): See `pd.read_sql_query`.
+            chunk_func (callable): Function to select and concatenate chunks from `Iterator`.
+
+                Gets called only if `chunksize` is set.
+            squeeze (int): Whether to squeeze a DataFrame with one column into a Series.
+            **read_sql_kwargs: Other keyword arguments passed to `pd.read_sql_query`.
+
+        For defaults, see `custom.sql` in `vectorbtpro._settings.data`.
+        Global settings can be provided per engine name using the `engines` dictionary.
+        """
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("sqlalchemy")
-        from sqlalchemy import MetaData, and_
+        from sqlalchemy import MetaData, Selectable, Select, FromClause, and_
 
         if engine_config is None:
             engine_config = {}
         engine_meta = cls.resolve_engine(
             engine=engine,
+            engine_name=engine_name,
             return_meta=True,
             **engine_config,
         )
@@ -248,150 +627,214 @@ class SQLData(DBData):
         should_dispose = engine_meta["should_dispose"]
         if dispose_engine is None:
             dispose_engine = should_dispose
-        if ":" in table_name:
-            schema, table_name = table_name.split(":")
-        
-        if engine_name is not None:
-            sub_path = "engines." + engine_name
-        else:
-            sub_path = None
-        schema = cls.resolve_custom_setting(schema, "schema", sub_path=sub_path)
-        start = cls.resolve_custom_setting(start, "start", sub_path=sub_path)
-        end = cls.resolve_custom_setting(end, "end", sub_path=sub_path)
-        to_utc = cls.resolve_custom_setting(to_utc, "to_utc", sub_path=sub_path)
-        tz = cls.resolve_custom_setting(tz, "tz", sub_path=sub_path)
-        index_col = cls.resolve_custom_setting(index_col, "index_col", sub_path=sub_path)
-        if index_col is False:
-            index_col = None
-        columns = cls.resolve_custom_setting(columns, "columns", sub_path=sub_path)
-        parse_dates = cls.resolve_custom_setting(parse_dates, "parse_dates", sub_path=sub_path)
-        dtype = cls.resolve_custom_setting(dtype, "dtype", sub_path=sub_path)
-        chunksize = cls.resolve_custom_setting(chunksize, "chunksize", sub_path=sub_path)
-        chunk_func = cls.resolve_custom_setting(chunk_func, "chunk_func", sub_path=sub_path)
-        squeeze = cls.resolve_custom_setting(squeeze, "squeeze", sub_path=sub_path)
-        read_sql_kwargs = cls.resolve_custom_setting(read_sql_kwargs, "read_sql_kwargs", merge=True, sub_path=sub_path)
+        if table_name is not None and query is not None:
+            raise ValueError("Must provide either table name or query, not both")
+        if schema is not None and query is not None:
+            raise ValueError("Schema cannot be applied to custom queries")
+        if table_name is None and query is None:
+            if ":" in key:
+                schema, table_name = key.split(":")
+            else:
+                table_name = key
 
-        metadata_obj = MetaData()
-        metadata_obj.reflect(bind=engine, schema=schema, only=[table_name], views=True)
-        table = metadata_obj.tables[table_name]
-        table_column_names = [c.name for c in table.columns]
+        schema = cls.resolve_engine_setting(schema, "schema", engine_name=engine_name)
+        start = cls.resolve_engine_setting(start, "start", engine_name=engine_name)
+        end = cls.resolve_engine_setting(end, "end", engine_name=engine_name)
+        align_dates = cls.resolve_engine_setting(align_dates, "align_dates", engine_name=engine_name)
+        to_utc = cls.resolve_engine_setting(to_utc, "to_utc", engine_name=engine_name)
+        tz = cls.resolve_engine_setting(tz, "tz", engine_name=engine_name)
+        index_col = cls.resolve_engine_setting(index_col, "index_col", engine_name=engine_name)
+        columns = cls.resolve_engine_setting(columns, "columns", engine_name=engine_name)
+        parse_dates = cls.resolve_engine_setting(parse_dates, "parse_dates", engine_name=engine_name)
+        dtype = cls.resolve_engine_setting(dtype, "dtype", engine_name=engine_name)
+        chunksize = cls.resolve_engine_setting(chunksize, "chunksize", engine_name=engine_name)
+        chunk_func = cls.resolve_engine_setting(chunk_func, "chunk_func", engine_name=engine_name)
+        squeeze = cls.resolve_engine_setting(squeeze, "squeeze", engine_name=engine_name)
+        read_sql_kwargs = cls.resolve_engine_setting(
+            read_sql_kwargs, "read_sql_kwargs", merge=True, engine_name=engine_name
+        )
 
-        def _resolve_columns(c):
-            if checks.is_int(c):
-                c = table_column_names[int(c)]
-            elif not isinstance(c, str):
-                new_c = []
-                for _c in c:
-                    if checks.is_int(_c):
-                        new_c.append(table_column_names[int(_c)])
+        if query is None or isinstance(query, (Selectable, FromClause)):
+            if query is None:
+                metadata_obj = MetaData()
+                metadata_obj.reflect(bind=engine, schema=schema, only=[table_name], views=True)
+                if schema is not None and schema + "." + table_name in metadata_obj.tables:
+                    table = metadata_obj.tables[schema + "." + table_name]
+                else:
+                    table = metadata_obj.tables[table_name]
+            else:
+                table = query
+
+            table_column_names = []
+            for column in table.columns:
+                table_column_names.append(column.name)
+
+            def _resolve_columns(c):
+                if checks.is_int(c):
+                    c = table_column_names[int(c)]
+                elif not isinstance(c, str):
+                    new_c = []
+                    for _c in c:
+                        if checks.is_int(_c):
+                            new_c.append(table_column_names[int(_c)])
+                        else:
+                            if _c not in table_column_names:
+                                for __c in table_column_names:
+                                    if _c.lower() == __c.lower():
+                                        _c = __c
+                                        break
+                            new_c.append(_c)
+                    c = new_c
+                else:
+                    if c not in table_column_names:
+                        for _c in table_column_names:
+                            if c.lower() == _c.lower():
+                                return _c
+                return c
+
+            if index_col is False:
+                index_col = None
+            if index_col is not None:
+                index_col = _resolve_columns(index_col)
+                if isinstance(index_col, str):
+                    index_col = [index_col]
+            if columns is not None:
+                columns = _resolve_columns(columns)
+                if isinstance(columns, str):
+                    columns = [columns]
+            if parse_dates is not None:
+                if not isinstance(parse_dates, bool):
+                    if isinstance(parse_dates, dict):
+                        parse_dates = dict(zip(_resolve_columns(parse_dates.keys()), parse_dates.values()))
                     else:
-                        if _c not in table_column_names:
-                            for __c in table_column_names:
-                                if _c.lower() == __c.lower():
-                                    _c = __c
-                                    break
-                        new_c.append(_c)
-                c = new_c
+                        parse_dates = _resolve_columns(parse_dates)
+                    if isinstance(parse_dates, str):
+                        parse_dates = [parse_dates]
+            if dtype is not None:
+                if isinstance(dtype, dict):
+                    dtype = dict(zip(_resolve_columns(dtype.keys()), dtype.values()))
+
+            if not isinstance(table, Select):
+                query = table.select()
             else:
-                if c not in table_column_names:
-                    for _c in table_column_names:
-                        if c.lower() == _c.lower():
-                            return _c
-            return c
-
-        if index_col is not None:
-            index_col = _resolve_columns(index_col)
-            if isinstance(index_col, str):
-                index_col = [index_col]
-        if columns is not None:
-            columns = _resolve_columns(columns)
-            if isinstance(columns, str):
-                columns = [columns]
-        if parse_dates is not None:
-            if not isinstance(parse_dates, dict):
-                parse_dates = _resolve_columns(parse_dates)
-            else:
-                parse_dates = dict(zip(_resolve_columns(parse_dates.keys()), parse_dates.values()))
-        if dtype is not None:
-            if isinstance(dtype, dict):
-                dtype = dict(zip(_resolve_columns(dtype.keys()), dtype.values()))
-
-        selection = table.select()
-        if index_col is not None and columns is not None:
-            columns = index_col + columns
-        if columns is not None:
-            selection = selection.with_only_columns(*[table.c.get(c) for c in columns])
-        if start is not None or end is not None:
-            if index_col is None:
-                raise ValueError("Must provide index column for filtering by index")
-            first_obj = pd.read_sql(
-                selection.limit(1),
-                engine,
-                index_col=index_col,
-                parse_dates=parse_dates,
-                dtype=dtype,
-                chunksize=None,
-                **read_sql_kwargs,
-            )
-            if isinstance(first_obj.index, pd.DatetimeIndex):
-                if tz is None:
-                    tz = first_obj.index.tz
-                if first_obj.index.tz is not None:
-                    if start is not None:
-                        start = to_tzaware_datetime(start, naive_tz=tz, tz=first_obj.index.tz)
-                    if end is not None:
-                        end = to_tzaware_datetime(end, naive_tz=tz, tz=first_obj.index.tz)
-                else:
-                    if start is not None:
-                        if to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "index"):
-                            start = to_tzaware_datetime(start, naive_tz=tz, tz="utc")
-                            start = to_naive_datetime(start)
+                query = table
+            if index_col is not None and columns is not None:
+                pre_columns = []
+                for col in index_col:
+                    if col not in columns:
+                        pre_columns.append(col)
+                columns = pre_columns + columns
+            if columns is not None:
+                query = query.with_only_columns(*[table.columns.get(c) for c in columns])
+            if start is not None or end is not None:
+                if index_col is None:
+                    raise ValueError("Must provide index column for filtering by start and end")
+                if align_dates:
+                    first_obj = pd.read_sql(
+                        query.limit(1),
+                        engine,
+                        index_col=index_col,
+                        parse_dates=None if isinstance(parse_dates, bool) else parse_dates,  # bool not accepted
+                        dtype=dtype,
+                        chunksize=None,
+                        **read_sql_kwargs,
+                    )
+                    first_obj = cls.prepare_dt_columns(
+                        first_obj,
+                        to_utc=to_utc,
+                        parse_dates=parse_dates,
+                    )
+                    if isinstance(first_obj.index, pd.DatetimeIndex):
+                        if tz is None:
+                            tz = first_obj.index.tz
+                        if first_obj.index.tz is not None:
+                            if start is not None:
+                                start = to_tzaware_datetime(start, naive_tz=tz, tz=first_obj.index.tz)
+                            if end is not None:
+                                end = to_tzaware_datetime(end, naive_tz=tz, tz=first_obj.index.tz)
                         else:
-                            start = to_naive_datetime(start, tz=tz)
-                    if end is not None:
-                        if to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "index"):
-                            end = to_tzaware_datetime(end, naive_tz=tz, tz="utc")
-                            end = to_naive_datetime(end)
-                        else:
-                            end = to_naive_datetime(end, tz=tz)
+                            if start is not None:
+                                if to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "index"):
+                                    start = to_tzaware_datetime(start, naive_tz=tz, tz="utc")
+                                    start = to_naive_datetime(start)
+                                else:
+                                    start = to_naive_datetime(start, tz=tz)
+                            if end is not None:
+                                if to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "index"):
+                                    end = to_tzaware_datetime(end, naive_tz=tz, tz="utc")
+                                    end = to_naive_datetime(end)
+                                else:
+                                    end = to_naive_datetime(end, tz=tz)
 
-            def _to_native_type(x):
-                if checks.is_np_scalar(x):
-                    return x.item()
-                return x
+                def _to_native_type(x):
+                    if checks.is_np_scalar(x):
+                        return x.item()
+                    return x
 
-            and_list = []
+                and_list = []
+                if start is not None:
+                    if len(index_col) > 1:
+                        if not isinstance(start, tuple):
+                            raise TypeError("Start must be a tuple if the index is a multi-index")
+                        if len(start) != len(index_col):
+                            raise ValueError("Start tuple must match the number of levels in the multi-index")
+                        for i in range(len(index_col)):
+                            index_column = table.columns.get(index_col[i])
+                            and_list.append(index_column >= _to_native_type(start[i]))
+                    else:
+                        index_column = table.columns.get(index_col[0])
+                        and_list.append(index_column >= _to_native_type(start))
+                if end is not None:
+                    if len(index_col) > 1:
+                        if not isinstance(end, tuple):
+                            raise TypeError("End must be a tuple if the index is a multi-index")
+                        if len(end) != len(index_col):
+                            raise ValueError("End tuple must match the number of levels in the multi-index")
+                        for i in range(len(index_col)):
+                            index_column = table.columns.get(index_col[i])
+                            and_list.append(index_column < _to_native_type(end[i]))
+                    else:
+                        index_column = table.columns.get(index_col[0])
+                        and_list.append(index_column < _to_native_type(end))
+                query = query.where(and_(*and_list))
+        else:
+
+            def _check_columns(c, arg_name):
+                if checks.is_int(c):
+                    raise ValueError(f"Must provide column as a string for '{arg_name}'")
+                elif not isinstance(c, str):
+                    for _c in c:
+                        if checks.is_int(_c):
+                            raise ValueError(f"Must provide each column as a string for '{arg_name}'")
+
             if start is not None:
-                if len(index_col) > 1:
-                    if not isinstance(start, tuple):
-                        raise TypeError("Start must be a tuple if the index is a multi-index")
-                    if len(start) != len(index_col):
-                        raise ValueError("Start tuple must match the number of levels in the multi-index")
-                    for i in range(len(index_col)):
-                        index_column = table.c.get(index_col[i])
-                        and_list.append(index_column >= _to_native_type(start[i]))
-                else:
-                    index_column = table.c.get(index_col[0])
-                    and_list.append(index_column >= _to_native_type(start))
+                raise ValueError("Start cannot be applied to custom queries")
             if end is not None:
-                if len(index_col) > 1:
-                    if not isinstance(end, tuple):
-                        raise TypeError("End must be a tuple if the index is a multi-index")
-                    if len(end) != len(index_col):
-                        raise ValueError("End tuple must match the number of levels in the multi-index")
-                    for i in range(len(index_col)):
-                        index_column = table.c.get(index_col[i])
-                        and_list.append(index_column < _to_native_type(end[i]))
-                else:
-                    index_column = table.c.get(index_col[0])
-                    and_list.append(index_column < _to_native_type(end))
-            selection = selection.where(and_(*and_list))
+                raise ValueError("End cannot be applied to custom queries")
+            if index_col is False:
+                index_col = None
+            if index_col is not None:
+                _check_columns(index_col, "index_col")
+                if isinstance(index_col, str):
+                    index_col = [index_col]
+            if columns is not None:
+                raise ValueError("Columns cannot be applied to custom queries")
+            if parse_dates is not None:
+                if not isinstance(parse_dates, bool):
+                    if isinstance(parse_dates, dict):
+                        _check_columns(parse_dates.keys(), "parse_dates")
+                    else:
+                        _check_columns(parse_dates, "parse_dates")
+                    if isinstance(parse_dates, str):
+                        parse_dates = [parse_dates]
+            if dtype is not None:
+                _check_columns(dtype.keys(), "dtype")
 
-        obj = pd.read_sql(
-            selection,
+        obj = pd.read_sql_query(
+            query,
             engine,
             index_col=index_col,
-            parse_dates=parse_dates,
+            parse_dates=None if isinstance(parse_dates, bool) else parse_dates,  # bool not accepted
             dtype=dtype,
             chunksize=chunksize,
             **read_sql_kwargs,
@@ -401,35 +844,20 @@ class SQLData(DBData):
                 obj = pd.concat(list(obj), axis=0)
             else:
                 obj = chunk_func(obj)
+        obj = cls.prepare_dt_columns(
+            obj,
+            to_utc=to_utc,
+            parse_dates=parse_dates,
+        )
+        if not isinstance(obj.index, pd.MultiIndex):
+            if obj.index.name == "index":
+                obj.index.name = None
+        if isinstance(obj.index, pd.DatetimeIndex) and tz is None:
+            tz = obj.index.tz
         if isinstance(obj, pd.DataFrame) and squeeze:
             obj = obj.squeeze("columns")
         if isinstance(obj, pd.Series) and obj.name == "0":
             obj.name = None
-        if isinstance(obj.index, pd.DatetimeIndex) and tz is None:
-            tz = obj.index.tz
-        if to_utc is not False:
-            if to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "index"):
-                if isinstance(obj.index, pd.DatetimeIndex):
-                    obj = obj.copy(deep=False)
-                    if obj.index.tz is None:
-                        obj.index = obj.index.tz_localize("utc")
-            elif to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "columns"):
-                if isinstance(obj, pd.Series):
-                    if hasattr(obj, "dt"):
-                        if obj.dt.tz is None:
-                            obj = obj.dt.tz_localize("utc")
-                else:
-                    has_dt_column = False
-                    for c in range(len(obj.columns)):
-                        if hasattr(obj[c], "dt"):
-                            has_dt_column = True
-                            break
-                    if has_dt_column:
-                        obj = obj.copy(deep=False)
-                        for c in range(len(obj.columns)):
-                            if hasattr(obj[c], "dt"):
-                                if obj.dt.tz is None:
-                                    obj[c] = obj[c].dt.tz_localize("utc")
         if dispose_engine:
             engine.dispose()
         return obj, dict(tz_convert=tz)
@@ -439,19 +867,22 @@ class SQLData(DBData):
         """Fetch the table of a feature.
 
         Uses `SQLData.fetch_key`."""
-        return cls.fetch_table(feature, **kwargs)
+        return cls.fetch_key(feature, **kwargs)
 
     @classmethod
     def fetch_symbol(cls, symbol: str, **kwargs) -> tp.SymbolData:
         """Fetch the table for a symbol.
 
         Uses `SQLData.fetch_key`."""
-        return cls.fetch_table(symbol, **kwargs)
+        return cls.fetch_key(symbol, **kwargs)
 
     def update_key(self, key: str, **kwargs) -> tp.KeyData:
         """Update data of a feature or symbol."""
         fetch_kwargs = self.select_fetch_kwargs(key)
-        fetch_kwargs["start"] = self.select_last_index(key)
+        if (fetch_kwargs.get("query", None) is None and "query" not in kwargs) or (
+            "query" in kwargs and kwargs["query"] is None
+        ):
+            fetch_kwargs["start"] = self.select_last_index(key)
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         if self.feature_oriented:
             return self.fetch_feature(key, **kwargs)

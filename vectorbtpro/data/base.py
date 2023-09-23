@@ -1743,6 +1743,23 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             return self
         return self.invert(**kwargs)
 
+    @classmethod
+    def has_key_dict(
+        cls,
+        arg: tp.Any,
+        dict_type: tp.Optional[tp.Type[tp.Union[feature_dict, symbol_dict]]] = None,
+    ) -> bool:
+        """Check whether the argument contains any data dictionary."""
+        if dict_type is None:
+            dict_type = key_dict
+        if isinstance(arg, dict_type):
+            return True
+        if isinstance(arg, dict):
+            for k, v in arg.items():
+                if isinstance(v, dict_type):
+                    return True
+        return False
+
     @class_or_instancemethod
     def check_dict_type(
         cls_or_self,
@@ -1750,6 +1767,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         arg_name: tp.Optional[str] = None,
         dict_type: tp.Optional[tp.Type[tp.Union[feature_dict, symbol_dict]]] = None,
     ) -> None:
+        """Check whether the argument conforms to a data dictionary."""
         if isinstance(cls_or_self, type):
             checks.assert_not_none(dict_type, arg_name="dict_type")
         if dict_type is None:
@@ -3460,11 +3478,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             engine_name = None
             if return_engine:
                 raise ValueError("Engine can be returned only if URL was provided")
-        if engine_name is not None:
-            sub_path = "engines." + engine_name
-        else:
-            sub_path = None
-        to_utc = SQLData.resolve_custom_setting(to_utc, "to_utc", sub_path=sub_path)
+        to_utc = SQLData.resolve_engine_setting(to_utc, "to_utc", engine_name=engine_name)
 
         meta = self.dict_type()
         for k, v in self.data.items():

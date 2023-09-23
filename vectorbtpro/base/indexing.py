@@ -1501,6 +1501,19 @@ def get_index_ranges(
         ... ))
         array([[11, 18],
                [11, 25]])
+
+        >>> # Generate an expanding range that increments by week
+        >>> np.column_stack(vbt.get_index_ranges(
+        ...     index,
+        ...     every="W",
+        ...     start=0,
+        ...     exact_start=True,
+        ...     fixed_start=True
+        ... ))
+        array([[ 0,  4],
+               [ 0, 11],
+               [ 0, 18],
+               [ 0, 25]])
         ```
 
         * Use a look-back period (instead of an end index):

@@ -69,7 +69,6 @@ class CSVData(FileData):
         header: tp.Optional[tp.MaybeSequence[int]] = None,
         index_col: tp.Optional[int] = None,
         parse_dates: tp.Optional[bool] = None,
-        chunksize: tp.Optional[int] = None,
         chunk_func: tp.Optional[tp.Callable] = None,
         squeeze: tp.Optional[bool] = None,
         **read_csv_kwargs,
@@ -101,12 +100,11 @@ class CSVData(FileData):
 
                  If False, will pass None.
             parse_dates (bool): See `pd.read_csv`.
-            chunksize (int): See `pd.read_csv`.
             chunk_func (callable): Function to select and concatenate chunks from `TextFileReader`.
 
                 Gets called only if `iterator` or `chunksize` are set.
             squeeze (int): Whether to squeeze a DataFrame with one column into a Series.
-            **read_csv_kwargs: Keyword arguments passed to `pd.read_csv`.
+            **read_csv_kwargs: Other keyword arguments passed to `pd.read_csv`.
 
         `skiprows` and `nrows` will be automatically calculated based on `start_row` and `end_row`.
 
@@ -130,7 +128,6 @@ class CSVData(FileData):
         if index_col is False:
             index_col = None
         parse_dates = cls.resolve_custom_setting(parse_dates, "parse_dates")
-        chunksize = cls.resolve_custom_setting(chunksize, "chunksize")
         chunk_func = cls.resolve_custom_setting(chunk_func, "chunk_func")
         squeeze = cls.resolve_custom_setting(squeeze, "squeeze")
         read_csv_kwargs = cls.resolve_custom_setting(read_csv_kwargs, "read_csv_kwargs", merge=True)
@@ -172,7 +169,6 @@ class CSVData(FileData):
             parse_dates=parse_dates,
             skiprows=skiprows,
             nrows=nrows,
-            chunksize=chunksize,
             **read_csv_kwargs,
         )
 

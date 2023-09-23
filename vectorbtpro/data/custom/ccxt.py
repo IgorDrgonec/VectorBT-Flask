@@ -47,19 +47,17 @@ class CCXTData(RemoteData):
         ```pycon
         >>> import vectorbtpro as vbt
 
-        >>> vbt.CCXTData.set_custom_settings(
-        ...     exchanges=dict(
-        ...         binance=dict(
-        ...             exchange_config=dict(
-        ...                 apiKey="YOUR_KEY",
-        ...                 secret="YOUR_SECRET"
-        ...             )
-        ...         )
+        >>> vbt.CCXTData.set_exchange_settings(
+        ...     exchange_name="binance",
+        ...     populate_=True,
+        ...     exchange_config=dict(
+        ...         apiKey="YOUR_KEY",
+        ...         secret="YOUR_SECRET"
         ...     )
         ... )
         ```
 
-        * Fetch data:
+        * Pull data:
 
         ```pycon
         >>> data = vbt.CCXTData.pull(
@@ -73,6 +71,60 @@ class CCXTData(RemoteData):
     """
 
     _settings_path: tp.SettingsPath = dict(custom="data.custom.ccxt")
+
+    @classmethod
+    def get_exchange_settings(cls, *args, exchange_name: tp.Optional[str] = None, **kwargs) -> dict:
+        """`CCXTData.get_custom_settings` with `sub_path=exchange_name`."""
+        if exchange_name is not None:
+            sub_path = "exchanges." + exchange_name
+        else:
+            sub_path = None
+        return cls.get_custom_settings(*args, sub_path=sub_path, **kwargs)
+
+    @classmethod
+    def has_exchange_settings(cls, *args, exchange_name: tp.Optional[str] = None, **kwargs) -> bool:
+        """`CCXTData.has_custom_settings` with `sub_path=exchange_name`."""
+        if exchange_name is not None:
+            sub_path = "exchanges." + exchange_name
+        else:
+            sub_path = None
+        return cls.has_custom_settings(*args, sub_path=sub_path, **kwargs)
+
+    @classmethod
+    def get_exchange_setting(cls, *args, exchange_name: tp.Optional[str] = None, **kwargs) -> tp.Any:
+        """`CCXTData.get_custom_setting` with `sub_path=exchange_name`."""
+        if exchange_name is not None:
+            sub_path = "exchanges." + exchange_name
+        else:
+            sub_path = None
+        return cls.get_custom_setting(*args, sub_path=sub_path, **kwargs)
+
+    @classmethod
+    def has_exchange_setting(cls, *args, exchange_name: tp.Optional[str] = None, **kwargs) -> bool:
+        """`CCXTData.has_custom_setting` with `sub_path=exchange_name`."""
+        if exchange_name is not None:
+            sub_path = "exchanges." + exchange_name
+        else:
+            sub_path = None
+        return cls.has_custom_setting(*args, sub_path=sub_path, **kwargs)
+
+    @classmethod
+    def resolve_exchange_setting(cls, *args, exchange_name: tp.Optional[str] = None, **kwargs) -> tp.Any:
+        """`CCXTData.resolve_custom_setting` with `sub_path=exchange_name`."""
+        if exchange_name is not None:
+            sub_path = "exchanges." + exchange_name
+        else:
+            sub_path = None
+        return cls.resolve_custom_setting(*args, sub_path=sub_path, **kwargs)
+
+    @classmethod
+    def set_exchange_settings(cls, *args, exchange_name: tp.Optional[str] = None, **kwargs) -> None:
+        """`CCXTData.set_custom_settings` with `sub_path=exchange_name`."""
+        if exchange_name is not None:
+            sub_path = "exchanges." + exchange_name
+        else:
+            sub_path = None
+        cls.set_custom_settings(*args, sub_path=sub_path, **kwargs)
 
     @classmethod
     def list_symbols(
@@ -111,7 +163,7 @@ class CCXTData(RemoteData):
         assert_can_import("ccxt")
         import ccxt
 
-        exchange = cls.resolve_custom_setting(exchange, "exchange")
+        exchange = cls.resolve_exchange_setting(exchange, "exchange")
         if isinstance(exchange, str):
             exchange = exchange.lower()
             exchange_name = exchange
@@ -122,11 +174,9 @@ class CCXTData(RemoteData):
         if exchange_config is None:
             exchange_config = {}
         has_exchange_config = len(exchange_config) > 0
-        if exchange_name is not None:
-            sub_path = "exchanges." + exchange_name
-        else:
-            sub_path = None
-        exchange_config = cls.resolve_custom_setting(exchange_config, "exchange_config", merge=True, sub_path=sub_path)
+        exchange_config = cls.resolve_exchange_setting(
+            exchange_config, "exchange_config", merge=True, exchange_name=exchange_name
+        )
         if isinstance(exchange, str):
             if not hasattr(ccxt, exchange):
                 raise ValueError(f"Exchange '{exchange}' not found in CCXT")
@@ -266,22 +316,24 @@ class CCXTData(RemoteData):
         exchange = cls.resolve_exchange(exchange=exchange, **exchange_config)
         exchange_name = type(exchange).__name__
 
-        if exchange_name is not None:
-            sub_path = "exchanges." + exchange_name
-        else:
-            sub_path = None
-        start = cls.resolve_custom_setting(start, "start", sub_path=sub_path)
-        end = cls.resolve_custom_setting(end, "end", sub_path=sub_path)
-        timeframe = cls.resolve_custom_setting(timeframe, "timeframe", sub_path=sub_path)
-        tz = cls.resolve_custom_setting(tz, "tz", sub_path=sub_path)
-        find_earliest_date = cls.resolve_custom_setting(find_earliest_date, "find_earliest_date", sub_path=sub_path)
-        limit = cls.resolve_custom_setting(limit, "limit", sub_path=sub_path)
-        delay = cls.resolve_custom_setting(delay, "delay", sub_path=sub_path)
-        retries = cls.resolve_custom_setting(retries, "retries", sub_path=sub_path)
-        fetch_params = cls.resolve_custom_setting(fetch_params, "fetch_params", merge=True, sub_path=sub_path)
-        show_progress = cls.resolve_custom_setting(show_progress, "show_progress", sub_path=sub_path)
-        pbar_kwargs = cls.resolve_custom_setting(pbar_kwargs, "pbar_kwargs", merge=True, sub_path=sub_path)
-        silence_warnings = cls.resolve_custom_setting(silence_warnings, "silence_warnings", sub_path=sub_path)
+        start = cls.resolve_exchange_setting(start, "start", exchange_name=exchange_name)
+        end = cls.resolve_exchange_setting(end, "end", exchange_name=exchange_name)
+        timeframe = cls.resolve_exchange_setting(timeframe, "timeframe", exchange_name=exchange_name)
+        tz = cls.resolve_exchange_setting(tz, "tz", exchange_name=exchange_name)
+        find_earliest_date = cls.resolve_exchange_setting(
+            find_earliest_date, "find_earliest_date", exchange_name=exchange_name
+        )
+        limit = cls.resolve_exchange_setting(limit, "limit", exchange_name=exchange_name)
+        delay = cls.resolve_exchange_setting(delay, "delay", exchange_name=exchange_name)
+        retries = cls.resolve_exchange_setting(retries, "retries", exchange_name=exchange_name)
+        fetch_params = cls.resolve_exchange_setting(
+            fetch_params, "fetch_params", merge=True, exchange_name=exchange_name
+        )
+        show_progress = cls.resolve_exchange_setting(show_progress, "show_progress", exchange_name=exchange_name)
+        pbar_kwargs = cls.resolve_exchange_setting(pbar_kwargs, "pbar_kwargs", merge=True, exchange_name=exchange_name)
+        silence_warnings = cls.resolve_exchange_setting(
+            silence_warnings, "silence_warnings", exchange_name=exchange_name
+        )
         if not exchange.has["fetchOHLCV"]:
             raise ValueError(f"Exchange {exchange} does not support OHLCV")
         if exchange.has["fetchOHLCV"] == "emulated":

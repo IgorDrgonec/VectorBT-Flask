@@ -55,7 +55,7 @@ class PolygonData(RemoteData):
         ... )
         ```
 
-        * Fetch stock data:
+        * Pull stock data:
 
         ```pycon
         >>> data = vbt.PolygonData.pull(
@@ -66,7 +66,7 @@ class PolygonData(RemoteData):
         ... )
         ```
 
-        * Fetch crypto data:
+        * Pull crypto data:
 
         ```pycon
         >>> data = vbt.PolygonData.pull(

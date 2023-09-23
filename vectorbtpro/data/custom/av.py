@@ -58,7 +58,7 @@ class AVData(RemoteData):
         ... )
         ```
 
-        * Fetch data:
+        * Pull data:
 
         ```pycon
         >>> data = vbt.AVData.pull(

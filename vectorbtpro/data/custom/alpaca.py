@@ -50,7 +50,7 @@ class AlpacaData(RemoteData):
         ... )
         ```
 
-        * Fetch stock data:
+        * Pull stock data:
 
         ```pycon
         >>> data = vbt.AlpacaData.pull(
@@ -61,7 +61,7 @@ class AlpacaData(RemoteData):
         ... )
         ```
 
-        * Fetch crypto data:
+        * Pull crypto data:
 
         ```pycon
         >>> data = vbt.AlpacaData.pull(

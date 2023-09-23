@@ -644,7 +644,7 @@ def to_timestamp(
     tz: tp.Optional[tp.TimezoneLike] = None,
     to_fixed_offset: tp.Optional[bool] = None,
     **kwargs,
-) -> pd.Timestamp:
+) -> tp.Optional[pd.Timestamp]:
     """Parse the datetime as a `pd.Timestamp`.
 
     If the object is a string, will parse with Pandas and dateparser (`parse_with_dateparser` must be True).
@@ -707,7 +707,9 @@ def to_timestamp(
                     else:
                         raise ValueError(f"Could not parse the timestamp {dt}")
                 except Exception as e:
-                    pass
+                    raise ValueError(f"Could not parse the timestamp {dt}")
+            else:
+                raise ValueError(f"Could not parse the timestamp {dt}")
     elif not isinstance(dt, pd.Timestamp):
         dt = pd.Timestamp(dt, **kwargs)
     if tz is not None:

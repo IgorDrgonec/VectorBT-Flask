@@ -209,7 +209,7 @@ class HDFData(FileData):
             chunk_func (callable): Function to select and concatenate chunks from `TableIterator`.
 
                 Gets called only if `iterator` or `chunksize` are set.
-            **read_hdf_kwargs: Keyword arguments passed to `pd.read_hdf`.
+            **read_hdf_kwargs: Other keyword arguments passed to `pd.read_hdf`.
 
         See https://pandas.pydata.org/docs/reference/api/pandas.read_hdf.html for other arguments.
 

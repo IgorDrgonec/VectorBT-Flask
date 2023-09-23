@@ -504,7 +504,7 @@ class TVData(RemoteData):
         ... )
         ```
 
-        * Fetch data:
+        * Pull data:
 
         ```pycon
         >>> data = vbt.TVData.pull(

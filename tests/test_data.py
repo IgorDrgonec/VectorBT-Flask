@@ -6,9 +6,14 @@ import pytest
 import vectorbtpro as vbt
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.datetime_ import to_timezone
-from vectorbtpro.utils.checks import is_deep_equal
 
 from tests.utils import *
+
+sqlalchemy_available = True
+try:
+    import sqlalchemy
+except:
+    sqlalchemy_available = False
 
 seed = 42
 
@@ -2019,9 +2024,7 @@ class TestData:
     def test_select(self):
         data = MyData.pull(["S1", "S2", "S3"], shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented()
         assert data.select("S1") == MyData.pull("S1", shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented()
-        assert (
-            data.select(["S1"]) == MyData.pull(["S1"], shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented()
-        )
+        assert data.select(["S1"]) == MyData.pull(["S1"], shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented()
         assert data.select(["S1"]) != MyData.pull("S1", shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented()
         assert (
             data.select(["S1", "S3"])
@@ -3091,6 +3094,193 @@ class TestCustom:
 
         with pytest.raises(Exception):
             vbt.HDFData.pull(tmp_path / "data7/data/data.h5/folder/data4")
+
+    def test_sql_data(self, tmp_path):
+        if sqlalchemy_available:
+            from sqlalchemy import create_engine
+
+            engine_url = "sqlite:///" + str(tmp_path / "temp.db")
+            sr = pd.Series(np.arange(10), name="hello")
+            sr.to_sql("SR", engine_url, if_exists="replace")
+            sql_data = vbt.SQLData.pull("SR", engine=engine_url)
+            assert_series_equal(sql_data.get(), sr)
+            sql_data = vbt.SQLData.pull("SR", engine=engine_url, start=2)
+            assert_series_equal(sql_data.get(), sr.iloc[2:])
+            sql_data = vbt.SQLData.pull("SR", engine=engine_url, end=4)
+            assert_series_equal(sql_data.get(), sr.iloc[:4])
+            sql_data = vbt.SQLData.pull("SR", engine=engine_url, start=2, end=4)
+            assert_series_equal(sql_data.get(), sr.iloc[2:4])
+            sql_data = vbt.SQLData.pull("SR", engine=engine_url, start=2, align_dates=False)
+            assert_series_equal(sql_data.get(), sr.iloc[2:])
+            sql_data = vbt.SQLData.pull("SR", engine=engine_url, end=4, align_dates=False)
+            assert_series_equal(sql_data.get(), sr.iloc[:4])
+            sql_data = vbt.SQLData.pull("SR", engine=engine_url, start=2, end=4, align_dates=False)
+            assert_series_equal(sql_data.get(), sr.iloc[2:4])
+            sr = pd.Series(np.arange(10), index=pd.date_range("2020", periods=10, tz="utc"), name="hello")
+            sr.to_sql("SR", engine_url, if_exists="replace")
+            sql_data = vbt.SQLData.pull("SR", engine=engine_url)
+            assert_series_equal(sql_data.get(), sr)
+            sql_data = vbt.SQLData.pull("SR", engine=engine_url, start="2020-01-03")
+            assert_series_equal(sql_data.get(), sr.iloc[2:])
+            sql_data = vbt.SQLData.pull("SR", engine=engine_url, end="2020-01-05")
+            assert_series_equal(sql_data.get(), sr.iloc[:4])
+            sql_data = vbt.SQLData.pull("SR", engine=engine_url, start="2020-01-03", end="2020-01-05")
+            assert_series_equal(sql_data.get(), sr.iloc[2:4], check_freq=False)
+            sr = pd.Series(np.arange(10), index=pd.date_range("2020", periods=10, tz="America/New_York"), name="hello")
+            sr.tz_convert("utc").to_sql("SR", engine_url, if_exists="replace")
+            sql_data = vbt.SQLData.pull("SR", engine=engine_url, tz="America/New_York")
+            assert_series_equal(sql_data.get(), sr)
+            sql_data = vbt.SQLData.pull("SR", engine=engine_url, start="2020-01-03", tz="America/New_York")
+            assert_series_equal(sql_data.get(), sr.iloc[2:])
+            sql_data = vbt.SQLData.pull("SR", engine=engine_url, end="2020-01-05", tz="America/New_York")
+            assert_series_equal(sql_data.get(), sr.iloc[:4])
+            sql_data = vbt.SQLData.pull(
+                "SR", engine=engine_url, start="2020-01-03", end="2020-01-05", tz="America/New_York"
+            )
+            assert_series_equal(sql_data.get(), sr.iloc[2:4], check_freq=False)
+
+            sql_data = vbt.SQLData.pull("SR", engine=engine_url, end="2020-01-05", tz="America/New_York")
+            sql_data = sql_data.update(end=None)
+            assert_series_equal(sql_data.get(), sr)
+
+            df = pd.DataFrame(
+                np.arange(20).reshape((10, 2)),
+                index=pd.date_range("2020", periods=10, tz="utc"),
+                columns=pd.Index(["A", "B"]),
+            )
+            df.to_sql("DF", engine_url, if_exists="replace")
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url)
+            assert_frame_equal(sql_data.get(), df)
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, chunksize=1)
+            assert_frame_equal(sql_data.get(), df)
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, chunksize=1, chunk_func=lambda x: list(x)[-1])
+            assert_frame_equal(sql_data.get(), df.iloc[[-1]], check_freq=False)
+
+            df = pd.DataFrame(
+                np.arange(50).reshape((10, 5)),
+                columns=pd.Index(["A", "B", "C", "D", "E"]),
+            )
+            df.to_sql("DF", engine_url, if_exists="replace")
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, columns=[1], squeeze=False)
+            assert_frame_equal(sql_data.get(), df[["A"]])
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, columns=["A"], squeeze=False)
+            assert_frame_equal(sql_data.get(), df[["A"]])
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, columns=["a"], squeeze=False)
+            assert_frame_equal(sql_data.get(), df[["A"]])
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, columns=["index", "a"], squeeze=False)
+            assert_frame_equal(sql_data.get(), df[["A"]])
+
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, index_col=1)
+            assert_index_equal(sql_data.get().index, pd.Index(df["A"]))
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, index_col=[1])
+            assert_index_equal(sql_data.get().index, pd.Index(df["A"]))
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, index_col="A")
+            assert_index_equal(sql_data.get().index, pd.Index(df["A"]))
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, index_col=["A"])
+            assert_index_equal(sql_data.get().index, pd.Index(df["A"]))
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, index_col="a")
+            assert_index_equal(sql_data.get().index, pd.Index(df["A"]))
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, index_col=["a"])
+            assert_index_equal(sql_data.get().index, pd.Index(df["A"]))
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, index_col=["a", "b"])
+            assert_index_equal(sql_data.get().index, pd.MultiIndex.from_frame(df[["A", "B"]]))
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, index_col=["a", "b"], start=(20, 21))
+            assert_index_equal(sql_data.get().index, pd.MultiIndex.from_frame(df[["A", "B"]])[4:])
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, index_col=["a", "b"], end=(25, 26))
+            assert_index_equal(sql_data.get().index, pd.MultiIndex.from_frame(df[["A", "B"]])[:5])
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, index_col=["a", "b"], start=(20, 21), end=(25, 26))
+            assert_index_equal(sql_data.get().index, pd.MultiIndex.from_frame(df[["A", "B"]])[4:5])
+
+            sql_data = vbt.SQLData.pull(
+                "DF",
+                query='SELECT "index", "A" FROM DF',
+                engine=engine_url,
+                squeeze=False,
+                index_col="index",
+            )
+            assert_frame_equal(sql_data.get(), df[["A"]])
+            sql_data = vbt.SQLData.pull(
+                "DF",
+                query='SELECT "index", "A" FROM DF WHERE "index" >= 5',
+                engine=engine_url,
+                squeeze=False,
+                index_col="index",
+            )
+            assert_frame_equal(sql_data.get(), df[["A"]].iloc[5:])
+            sql_data = vbt.SQLData.pull(
+                "DF",
+                query='SELECT "index", "A" FROM DF WHERE "index" < 5',
+                engine=engine_url,
+                squeeze=False,
+                index_col="index",
+            )
+            sql_data = sql_data.update()
+            assert_frame_equal(sql_data.get(), df[["A"]].iloc[:5])
+            sql_data = sql_data.update(query='SELECT "index", "A" FROM DF WHERE "index" >= 5')
+            assert_frame_equal(sql_data.get(), df[["A"]])
+
+            sql_data = vbt.SQLData.pull(
+                "DF", engine=engine_url, parse_dates=["index"], to_utc=False, tz_localize=False, tz_convert=False
+            )
+            new_df = df.copy(deep=False)
+            new_df.index = pd.to_datetime(new_df.index, unit="s")
+            assert_frame_equal(sql_data.get(), new_df, check_freq=False)
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, parse_dates=0)
+            new_df = df.copy(deep=False)
+            new_df.index = pd.to_datetime(new_df.index, unit="s", utc=True)
+            assert_frame_equal(sql_data.get(), new_df, check_freq=False)
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, parse_dates=[0])
+            new_df = df.copy(deep=False)
+            new_df.index = pd.to_datetime(new_df.index, unit="s", utc=True)
+            assert_frame_equal(sql_data.get(), new_df, check_freq=False)
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, parse_dates="index")
+            new_df = df.copy(deep=False)
+            new_df.index = pd.to_datetime(new_df.index, unit="s", utc=True)
+            assert_frame_equal(sql_data.get(), new_df, check_freq=False)
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, parse_dates=["index"])
+            new_df = df.copy(deep=False)
+            new_df.index = pd.to_datetime(new_df.index, unit="s", utc=True)
+            assert_frame_equal(sql_data.get(), new_df, check_freq=False)
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, parse_dates={0: {"unit": "ns"}})
+            new_df = df.copy(deep=False)
+            new_df.index = pd.to_datetime(new_df.index, utc=True)
+            assert_frame_equal(sql_data.get(), new_df, check_freq=False)
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, parse_dates={"index": {"unit": "ns"}})
+            new_df = df.copy(deep=False)
+            new_df.index = pd.to_datetime(new_df.index, utc=True)
+            assert_frame_equal(sql_data.get(), new_df, check_freq=False)
+
+            engine_url = "sqlite:///" + str(tmp_path / "temp1.db")
+            sr1 = pd.Series(np.arange(0, 10), name="hello")
+            sr2 = pd.Series(np.arange(10, 20), name="hello")
+            sr1.to_sql("SR1", engine_url, if_exists="replace")
+            sr2.to_sql("SR2", engine_url, if_exists="replace")
+            sql_data = vbt.SQLData.pull(engine=engine_url)
+            assert_series_equal(sql_data.select("SR1").get(), sr1)
+            assert_series_equal(sql_data.select("SR2").get(), sr2)
+            sql_data = vbt.SQLData.pull(engine=create_engine(engine_url))
+            assert_series_equal(sql_data.select("SR1").get(), sr1)
+            assert_series_equal(sql_data.select("SR2").get(), sr2)
+            vbt.settings.data.custom["sql"]["engine"] = engine_url
+            sql_data = vbt.SQLData.pull()
+            assert_series_equal(sql_data.select("SR1").get(), sr1)
+            assert_series_equal(sql_data.select("SR2").get(), sr2)
+            vbt.settings.data.custom["sql"]["engines"]["sqlite"] = dict(engine=engine_url)
+            sql_data = vbt.SQLData.pull(engine="sqlite")
+            assert_series_equal(sql_data.select("SR1").get(), sr1)
+            assert_series_equal(sql_data.select("SR2").get(), sr2)
+            sql_data = vbt.SQLData.pull(engine_name="sqlite")
+            assert_series_equal(sql_data.select("SR1").get(), sr1)
+            assert_series_equal(sql_data.select("SR2").get(), sr2)
+            vbt.settings.data.custom["sql"]["engine"] = "sqlite"
+            sql_data = vbt.SQLData.pull()
+            assert_series_equal(sql_data.select("SR1").get(), sr1)
+            assert_series_equal(sql_data.select("SR2").get(), sr2)
+            vbt.settings.data.custom["sql"]["engine"] = None
+            vbt.settings.data.custom["sql"]["engine_name"] = "sqlite"
+            sql_data = vbt.SQLData.pull()
+            assert_series_equal(sql_data.select("SR1").get(), sr1)
+            assert_series_equal(sql_data.select("SR2").get(), sr2)
 
     def test_random_data(self):
         assert_series_equal(

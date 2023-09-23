@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from vectorbtpro.data.custom.ccxt import *
     from vectorbtpro.data.custom.csv import *
     from vectorbtpro.data.custom.custom import *
+    from vectorbtpro.data.custom.db import *
     from vectorbtpro.data.custom.file import *
     from vectorbtpro.data.custom.gbm import *
     from vectorbtpro.data.custom.gbm_ohlc import *
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
     from vectorbtpro.data.custom.random import *
     from vectorbtpro.data.custom.random_ohlc import *
     from vectorbtpro.data.custom.remote import *
+    from vectorbtpro.data.custom.sql import *
     from vectorbtpro.data.custom.synthetic import *
     from vectorbtpro.data.custom.tv import *
     from vectorbtpro.data.custom.yf import *

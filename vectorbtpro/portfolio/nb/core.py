@@ -2832,7 +2832,7 @@ def get_tsl_info_target_price_nb(tsl_info: tp.Record, position_now: float) -> fl
         return np.nan
     hit_below = position_now > 0
     return resolve_stop_price_nb(
-        init_price=tsl_info["init_price"],
+        init_price=tsl_info["peak_price"],
         stop=tsl_info["stop"],
         delta_format=tsl_info["delta_format"],
         hit_below=hit_below,

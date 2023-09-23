@@ -39,7 +39,7 @@ class NDLData(RemoteData):
         ... )
         ```
 
-        * Fetch data:
+        * Pull data:
 
         ```pycon
         >>> data = vbt.NDLData.pull(
