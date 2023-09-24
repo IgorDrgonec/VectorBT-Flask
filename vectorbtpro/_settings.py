@@ -900,6 +900,7 @@ _settings["data"] = data
 plotting = frozen_cfg(
     use_widgets=True,
     use_resampler=False,
+    auto_rangebreaks=False,
     pre_show_func=None,
     show_kwargs=flex_cfg(),
     use_gl=False,

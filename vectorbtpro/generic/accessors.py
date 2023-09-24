@@ -296,9 +296,7 @@ nb_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__[
-    "nb_config"
-] = f"""Config of Numba methods to be attached to `GenericAccessor`.
+__pdoc__["nb_config"] = f"""Config of Numba methods to be attached to `GenericAccessor`.
 
 ```python
 {nb_config.prettify()}
@@ -3871,8 +3869,10 @@ class GenericAccessor(BaseAccessor, Analyzable):
             if not checks.is_deep_equal(self_copy.mapping, reself.mapping):
                 if not silence_warnings:
                     warnings.warn(
-                        f"Changing the mapping will create a copy of this object. "
-                        f"Consider setting it upon object creation to re-use existing cache.",
+                        (
+                            f"Changing the mapping will create a copy of this object. "
+                            f"Consider setting it upon object creation to re-use existing cache."
+                        ),
                         stacklevel=2,
                     )
                 for alias in reself.self_aliases:
@@ -4416,7 +4416,13 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 x_labels = _self.wrapper.columns
             if y_labels is None:
                 y_labels = _self.wrapper.index
-            heatmap = Heatmap(data=_self.to_2d_array(), x_labels=x_labels, y_labels=y_labels, fig=fig, **kwargs)
+            heatmap = Heatmap(
+                data=_self.to_2d_array(),
+                x_labels=x_labels,
+                y_labels=y_labels,
+                fig=fig,
+                **kwargs,
+            )
             if return_fig:
                 return heatmap.fig
             return heatmap
@@ -4444,8 +4450,19 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         if slider_level is None:
             # No grouping
-            df = _self.unstack_to_df(index_levels=y_level, column_levels=x_level, symmetric=symmetric, sort=sort)
-            return df.vbt.heatmap(x_labels=x_labels, y_labels=y_labels, fig=fig, return_fig=return_fig, **kwargs)
+            df = _self.unstack_to_df(
+                index_levels=y_level,
+                column_levels=x_level,
+                symmetric=symmetric,
+                sort=sort,
+            )
+            return df.vbt.heatmap(
+                x_labels=x_labels,
+                y_labels=y_labels,
+                fig=fig,
+                return_fig=return_fig,
+                **kwargs,
+            )
 
         # Requires grouping
         # See https://plotly.com/python/sliders/
@@ -4456,7 +4473,12 @@ class GenericAccessor(BaseAccessor, Analyzable):
             if slider_labels is not None:
                 name = slider_labels[i]
             _slider_labels.append(name)
-            df = group.vbt.unstack_to_df(index_levels=y_level, column_levels=x_level, symmetric=symmetric, sort=sort)
+            df = group.vbt.unstack_to_df(
+                index_levels=y_level,
+                column_levels=x_level,
+                symmetric=symmetric,
+                sort=sort,
+            )
             if x_labels is None:
                 x_labels = df.columns
             if y_labels is None:
@@ -4468,7 +4490,13 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 kwargs,
             )
             default_size = fig is None and "height" not in _kwargs
-            fig = Heatmap(data=reshaping.to_2d_array(df), x_labels=x_labels, y_labels=y_labels, fig=fig, **_kwargs).fig
+            fig = Heatmap(
+                data=reshaping.to_2d_array(df),
+                x_labels=x_labels,
+                y_labels=y_labels,
+                fig=fig,
+                **_kwargs,
+            ).fig
             if default_size:
                 fig.layout["height"] += 100  # slider takes up space
         fig.data[active].visible = True
@@ -4486,7 +4514,14 @@ class GenericAccessor(BaseAccessor, Analyzable):
             if _self.wrapper.index.names[slider_level] is not None
             else None
         )
-        sliders = [dict(active=active, currentvalue={"prefix": prefix}, pad={"t": 50}, steps=steps)]
+        sliders = [
+            dict(
+                active=active,
+                currentvalue={"prefix": prefix},
+                pad={"t": 50},
+                steps=steps,
+            )
+        ]
         fig.update_layout(sliders=sliders)
         return fig
 
@@ -5048,9 +5083,7 @@ if settings["importing"]["sklearn"]:
     )
     """_"""
 
-    __pdoc__[
-        "transform_config"
-    ] = f"""Config of transform methods to be attached to `GenericAccessor`.
+    __pdoc__["transform_config"] = f"""Config of transform methods to be attached to `GenericAccessor`.
 
     ```python
     {transform_config.prettify()}

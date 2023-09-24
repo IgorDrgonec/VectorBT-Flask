@@ -119,7 +119,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_pd_array, to_1d_array, to_2d_array
+from vectorbtpro.base.reshaping import to_pd_array, to_1d_array, to_2d_array, tile
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.indexes import stack_indexes, combine_indexes, tile_index
 from vectorbtpro.generic import nb
@@ -1965,6 +1965,18 @@ class PatternRanges(Ranges):
         )
         if attach_as_close and "close" not in kwargs:
             kwargs["close"] = arr
+        if "open" in kwargs and kwargs["open"] is not None:
+            kwargs["open"] = to_2d_array(kwargs["open"])
+            kwargs["open"] = tile(kwargs["open"], len(wrapper.columns) // kwargs["open"].shape[1])
+        if "high" in kwargs and kwargs["high"] is not None:
+            kwargs["high"] = to_2d_array(kwargs["high"])
+            kwargs["high"] = tile(kwargs["high"], len(wrapper.columns) // kwargs["high"].shape[1])
+        if "low" in kwargs and kwargs["low"] is not None:
+            kwargs["low"] = to_2d_array(kwargs["low"])
+            kwargs["low"] = tile(kwargs["low"], len(wrapper.columns) // kwargs["low"].shape[1])
+        if "close" in kwargs and kwargs["close"] is not None:
+            kwargs["close"] = to_2d_array(kwargs["close"])
+            kwargs["close"] = tile(kwargs["close"], len(wrapper.columns) // kwargs["close"].shape[1])
         return cls(wrapper, records_arr, new_search_configs, **kwargs)
 
     def with_delta(self, *args, **kwargs):
@@ -2092,6 +2104,7 @@ class PatternRanges(Ranges):
         self,
         column: tp.Optional[tp.Label] = None,
         top_n: tp.Optional[int] = None,
+        fit_ranges: tp.Union[bool, tp.MaybeSequence[int]] = False,
         plot_patterns: bool = True,
         plot_max_error: bool = False,
         fill_distance: bool = True,
@@ -2111,6 +2124,9 @@ class PatternRanges(Ranges):
         Args:
             column (str): Name of the column to plot.
             top_n (int): Filter top N range records by maximum duration.
+            fit_ranges (bool, int, or sequence of int): Whether or which range records to fit.
+
+                True to fit to all range records, integer or a sequence of such to fit to specific range records.
             plot_patterns (bool or array_like): Whether to plot `PSC.pattern`.
             plot_max_error (array_like): Whether to plot `PSC.max_error`.
             fill_distance (bool): Whether to fill the space between close and pattern.
@@ -2133,7 +2149,17 @@ class PatternRanges(Ranges):
         if top_n is not None:
             self_col = self_col.apply_mask(self_col.duration.top_n_mask(top_n))
         search_config = self_col.search_configs[0]
-
+        if isinstance(fit_ranges, bool) and not fit_ranges:
+            fit_ranges = None
+        if fit_ranges is not None:
+            if fit_ranges is True:
+                self_col = self_col.iloc[self_col.values["start_idx"][0]: self_col.values["end_idx"][-1] + 1]
+            elif checks.is_int(fit_ranges):
+                self_col = self_col.apply_mask(self_col.id_arr == fit_ranges)
+                self_col = self_col.iloc[self_col.values["start_idx"][0]: self_col.values["end_idx"][0] + 1]
+            else:
+                self_col = self_col.apply_mask(np.isin(self_col.id_arr, fit_ranges))
+                self_col = self_col.iloc[self_col.values["start_idx"][0]: self_col.values["end_idx"][0] + 1]
         if pattern_trace_kwargs is None:
             pattern_trace_kwargs = {}
         if lower_max_error_trace_kwargs is None:

@@ -403,19 +403,25 @@ def prepare_dt_index(
     if index.dtype == object:
         if parse_index:
             try:
-                return pd.to_datetime(index, **kwargs)
-            except Exception as e:
-                if parse_with_dateparser:
-                    try:
-                        def _parse(x):
-                            _parsed_index = dateparser.parse(x, **dateparser_kwargs)
-                            if _parsed_index is None:
-                                raise Exception
-                            return _parsed_index
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    pd.to_datetime(index[[0]], **kwargs)
+                try:
+                    return pd.to_datetime(index, **kwargs)
+                except Exception as e:
+                    if parse_with_dateparser:
+                        try:
+                            def _parse(x):
+                                _parsed_index = dateparser.parse(x, **dateparser_kwargs)
+                                if _parsed_index is None:
+                                    raise Exception
+                                return _parsed_index
 
-                        return pd.to_datetime(index.map(_parse), **kwargs)
-                    except Exception as e2:
-                        pass
+                            return pd.to_datetime(index.map(_parse), **kwargs)
+                        except Exception as e2:
+                            pass
+            except Exception as e:
+                pass
     return index
 
 
