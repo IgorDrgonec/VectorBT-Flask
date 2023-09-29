@@ -565,6 +565,8 @@ class TVData(RemoteData):
             * List all symbols (market scanner):
 
             ```pycon
+            >>> import vectorbtpro as vbt
+
             >>> vbt.TVData.list_symbols()
             ```
 

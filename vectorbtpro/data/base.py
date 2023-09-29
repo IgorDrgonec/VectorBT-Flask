@@ -35,10 +35,9 @@ from vectorbtpro.utils.selection import _NoResult, NoResult, NoResultsException
 try:
     if not tp.TYPE_CHECKING:
         raise ImportError
-    from sqlalchemy import Engine as EngineT, Connection as ConnectionT
+    from sqlalchemy import Engine as EngineT
 except ImportError:
     EngineT = tp.Any
-    ConnectionT = tp.Any
 
 __all__ = [
     "key_dict",
@@ -3249,6 +3248,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     ) -> tp.Union[None, feature_dict, symbol_dict]:
         """Save data to CSV file(s).
 
+        Uses `pd.to_csv`.
+
         Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
         depending on the format of the data dictionary.
 
@@ -3344,6 +3345,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     ) -> tp.Union[None, feature_dict, symbol_dict]:
         """Save data to an HDF file.
 
+        Uses `pd.to_hdf`.
+
         Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
         depending on the format of the data dictionary.
 
@@ -3424,10 +3427,13 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
     def to_sql(
         self,
-        url_or_con: tp.Union[None, str, EngineT, ConnectionT, feature_dict, symbol_dict, CustomTemplate] = None,
-        name: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
+        engine: tp.Union[None, str, EngineT, feature_dict, symbol_dict, CustomTemplate] = None,
+        table_name: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
         schema: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
         to_utc: tp.Union[None, bool, str, feature_dict, symbol_dict, CustomTemplate] = None,
+        attach_row_number: tp.Union[bool, feature_dict, symbol_dict, CustomTemplate] = False,
+        from_row_number: tp.Union[int, feature_dict, symbol_dict, CustomTemplate] = 0,
+        row_number_column: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
         engine_config: tp.KwargsLike = None,
         dispose_engine: tp.Optional[bool] = None,
         check_dict_type: bool = True,
@@ -3438,12 +3444,14 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     ) -> tp.Union[None, feature_dict, symbol_dict, EngineT]:
         """Save data to a SQL database.
 
+        Uses `pd.to_sql`.
+
         Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
         depending on the format of the data dictionary.
 
         Each feature/symbol gets saved to a separate table.
 
-        If `url_or_con` is None or a string, will resolve an engine with
+        If `engine` is None or a string, will resolve an engine with
         `vectorbtpro.data.custom.sql.SQLData.resolve_engine` and dispose it afterwards if `dispose_engine`
         is None or True. It can additionally return the engine if `return_engine` is True or entire
         metadata (all passed arguments as `feature_dict` or `symbol_dict`). In this case, the engine
@@ -3456,17 +3464,19 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("sqlalchemy")
+        from sqlalchemy import inspect
+        from sqlalchemy.schema import CreateSchema
         from vectorbtpro.data.custom.sql import SQLData
 
         if engine_config is None:
             engine_config = {}
-        if url_or_con is None or isinstance(url_or_con, str):
+        if engine is None or isinstance(engine, str):
             engine_meta = SQLData.resolve_engine(
-                engine=url_or_con,
+                engine=engine,
                 return_meta=True,
                 **engine_config,
             )
-            url_or_con = engine_meta["engine"]
+            engine = engine_meta["engine"]
             engine_name = engine_meta["engine_name"]
             should_dispose = engine_meta["should_dispose"]
             if dispose_engine is None:
@@ -3478,7 +3488,6 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             engine_name = None
             if return_engine:
                 raise ValueError("Engine can be returned only if URL was provided")
-        to_utc = SQLData.resolve_engine_setting(to_utc, "to_utc", engine_name=engine_name)
 
         meta = self.dict_type()
         for k, v in self.data.items():
@@ -3487,20 +3496,21 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             else:
                 _template_context = merge_dicts(dict(data=v, symbol=k), template_context)
             if check_dict_type:
-                self.check_dict_type(url_or_con, arg_name="url_or_con")
-            if isinstance(url_or_con, key_dict):
-                _con = url_or_con[k]
+                self.check_dict_type(engine, arg_name="engine")
+            if isinstance(engine, key_dict):
+                _engine = engine[k]
             else:
-                _con = url_or_con
-            if isinstance(_con, CustomTemplate):
-                _con = _con.substitute(_template_context, sub_id="url_or_con")
-            if _con is None or isinstance(_con, str):
+                _engine = engine
+            if isinstance(_engine, CustomTemplate):
+                _engine = _engine.substitute(_template_context, sub_id="engine")
+            if _engine is None or isinstance(_engine, str):
                 _engine_meta = SQLData.resolve_engine(
-                    engine=_con,
+                    engine=_engine,
                     return_meta=True,
                     **engine_config,
                 )
-                _con = _engine_meta["engine"]
+                _engine = _engine_meta["engine"]
+                _engine_name = _engine_meta["engine_name"]
                 _should_dispose = _engine_meta["should_dispose"]
                 if dispose_engine is None:
                     if return_meta or return_engine:
@@ -3510,80 +3520,79 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 else:
                     _dispose_engine = dispose_engine
             else:
+                _engine_name = engine_name
                 if dispose_engine is None:
                     _dispose_engine = False
                 else:
                     _dispose_engine = dispose_engine
-            if name is None:
-                _name = k
+            if table_name is None:
+                _table_name = k
             else:
                 if check_dict_type:
-                    self.check_dict_type(name, arg_name="name")
-                if isinstance(name, key_dict):
-                    _name = name[k]
+                    self.check_dict_type(table_name, arg_name="table_name")
+                if isinstance(table_name, key_dict):
+                    _table_name = table_name[k]
                 else:
-                    _name = name
-                if isinstance(_name, CustomTemplate):
-                    _name = _name.substitute(_template_context, sub_id="name")
-            if schema is None:
-                _schema = None
-            else:
-                if check_dict_type:
-                    self.check_dict_type(schema, arg_name="schema")
-                if isinstance(schema, key_dict):
-                    _schema = schema[k]
-                else:
-                    _schema = schema
-                if isinstance(_schema, CustomTemplate):
-                    _schema = _schema.substitute(_template_context, sub_id="schema")
+                    _table_name = table_name
+                if isinstance(_table_name, CustomTemplate):
+                    _table_name = _table_name.substitute(_template_context, sub_id="table_name")
+            _schema = SQLData.resolve_engine_setting(schema, "schema", engine_name=_engine_name)
             if check_dict_type:
-                self.check_dict_type(to_utc, arg_name="to_utc")
-            if isinstance(to_utc, key_dict):
-                _to_utc = to_utc[k]
-            else:
-                _to_utc = to_utc
+                self.check_dict_type(_schema, arg_name="schema")
+            if isinstance(_schema, key_dict):
+                _schema = _schema[k]
+            if isinstance(_schema, CustomTemplate):
+                _schema = _schema.substitute(_template_context, sub_id="schema")
+            _to_utc = SQLData.resolve_engine_setting(to_utc, "to_utc", engine_name=_engine_name)
+            if check_dict_type:
+                self.check_dict_type(_to_utc, arg_name="to_utc")
+            if isinstance(_to_utc, key_dict):
+                _to_utc = _to_utc[k]
             if isinstance(_to_utc, CustomTemplate):
                 _to_utc = _to_utc.substitute(_template_context, sub_id="to_utc")
-            if _to_utc is not False:
-                if _to_utc is True or (isinstance(_to_utc, str) and _to_utc.lower() == "index"):
-                    if isinstance(v.index, pd.DatetimeIndex):
-                        v = v.copy(deep=False)
-                        if v.index.tz is not None:
-                            v.index = v.index.tz_convert("utc")
-                        else:
-                            v.index = v.index.tz_localize("utc")
-                elif _to_utc is True or (isinstance(_to_utc, str) and _to_utc.lower() == "columns"):
-                    if isinstance(v, pd.Series):
-                        if hasattr(v, "dt"):
-                            if v.dt.tz is not None:
-                                v = v.dt.tz_convert("utc")
-                            else:
-                                v = v.dt.tz_localize("utc")
-                    else:
-                        has_dt_column = False
-                        for c in range(len(v.columns)):
-                            if hasattr(v[c], "dt"):
-                                has_dt_column = True
-                                break
-                        if has_dt_column:
-                            v = v.copy(deep=False)
-                            for c in range(len(v.columns)):
-                                if hasattr(v[c], "dt"):
-                                    if v.dt.tz is not None:
-                                        v[c] = v[c].dt.tz_convert("utc")
-                                    else:
-                                        v[c] = v[c].dt.tz_localize("utc")
-                elif isinstance(_to_utc, str):
-                    raise ValueError(f"Invalid option to_utc='{to_utc}'")
-            meta[k] = {"name": _name, "con": _con, "schema": _schema, **kwargs}
+            v = SQLData.prepare_dt_columns(v, to_utc=_to_utc, parse_dates=False)
+            _attach_row_number = attach_row_number
+            if check_dict_type:
+                self.check_dict_type(_attach_row_number, arg_name="attach_row_number")
+            if isinstance(_attach_row_number, key_dict):
+                _attach_row_number = _attach_row_number[k]
+            if isinstance(_attach_row_number, CustomTemplate):
+                _attach_row_number = _attach_row_number.substitute(_template_context, sub_id="attach_row_number")
+            _from_row_number = from_row_number
+            if check_dict_type:
+                self.check_dict_type(_from_row_number, arg_name="from_row_number")
+            if isinstance(_from_row_number, key_dict):
+                _from_row_number = _from_row_number[k]
+            if isinstance(_from_row_number, CustomTemplate):
+                _from_row_number = _from_row_number.substitute(_template_context, sub_id="from_row_number")
+            _row_number_column = SQLData.resolve_engine_setting(
+                row_number_column, "row_number_column", engine_name=_engine_name
+            )
+            if check_dict_type:
+                self.check_dict_type(_row_number_column, arg_name="row_number_column")
+            if isinstance(_row_number_column, key_dict):
+                _row_number_column = _row_number_column[k]
+            if isinstance(_row_number_column, CustomTemplate):
+                _row_number_column = _row_number_column.substitute(_template_context, sub_id="row_number_column")
+            if _attach_row_number:
+                v = v.copy(deep=False)
+                if isinstance(v, pd.Series):
+                    v = v.to_frame()
+                v[_row_number_column] = np.arange(_from_row_number, _from_row_number + len(v.index))
+            if _schema is not None:
+                with _engine.connect() as connection:
+                    if not inspect(_engine).has_schema(_schema):
+                        connection.execute(CreateSchema(_schema))
+                        connection.commit()
+            meta[k] = {"name": _table_name, "con": _engine, "schema": _schema, **kwargs}
             v.to_sql(**meta[k])
             if _dispose_engine:
-                _con.dispose()
+                _engine.dispose()
 
         if return_meta:
             return meta
         if return_engine:
-            return url_or_con
+            return engine
         return None
 
     @classmethod

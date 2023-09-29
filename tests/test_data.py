@@ -3138,10 +3138,28 @@ class TestCustom:
                 "SR", engine=engine_url, start="2020-01-03", end="2020-01-05", tz="America/New_York"
             )
             assert_series_equal(sql_data.get(), sr.iloc[2:4], check_freq=False)
-
             sql_data = vbt.SQLData.pull("SR", engine=engine_url, end="2020-01-05", tz="America/New_York")
             sql_data = sql_data.update(end=None)
             assert_series_equal(sql_data.get(), sr)
+
+            df = pd.DataFrame(
+                np.arange(20).reshape((10, 2)),
+                index=pd.date_range("2020", periods=10, tz="utc"),
+                columns=pd.Index(["A", "B"]),
+            )
+            df["row_number"] = np.arange(len(df.index))
+            df.to_sql("DF", engine_url, if_exists="replace")
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url)
+            assert_frame_equal(sql_data.get(), df)
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, start_row=2)
+            assert_frame_equal(sql_data.get(), df.iloc[2:])
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, end_row=4)
+            assert_frame_equal(sql_data.get(), df.iloc[:4])
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, start_row=2, end_row=4)
+            assert_frame_equal(sql_data.get(), df.iloc[2:4], check_freq=False)
+            sql_data = vbt.SQLData.pull("DF", engine=engine_url, end_row=4)
+            sql_data = sql_data.update(end_row=None)
+            assert_frame_equal(sql_data.get(), df)
 
             df = pd.DataFrame(
                 np.arange(20).reshape((10, 2)),

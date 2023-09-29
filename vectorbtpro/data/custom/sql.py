@@ -162,7 +162,8 @@ class SQLData(DBData):
         assert_can_import("sqlalchemy")
         from sqlalchemy import create_engine
 
-        engine_name = cls.resolve_engine_setting(engine_name, "engine_name")
+        if engine is None and engine_name is None:
+            engine_name = cls.resolve_engine_setting(engine_name, "engine_name")
         if engine_name is not None:
             engine = cls.resolve_engine_setting(engine, "engine", engine_name=engine_name)
             if engine is None:
@@ -445,11 +446,11 @@ class SQLData(DBData):
     @classmethod
     def prepare_dt_columns(
         cls,
-        df: tp.Frame,
+        obj: tp.SeriesFrame,
         to_utc: tp.Union[None, bool, str] = None,
         parse_dates: tp.Union[None, bool, tp.List[tp.IntStr], tp.Dict[tp.IntStr, tp.Any]] = None,
     ) -> tp.Frame:
-        """Prepare datetime columns.
+        """Prepare datetime index and columns.
 
         If `parse_dates` is True, will try to convert any column (including index) with object data type
         into a datetime format using `vectorbtpro.utils.datetime_.prepare_dt_index`.
@@ -460,52 +461,60 @@ class SQLData(DBData):
         into the UTC timezone. If `to_utc` is True or `to_utc` is "columns", will localize any
         naive datetime column into the UTC timezone."""
         if parse_dates not in (None, False):
-            if not isinstance(df.index, (pd.DatetimeIndex, pd.MultiIndex)) and df.index.dtype == object:
-                if parse_dates is True or df.index.name in parse_dates:
-                    df = df.copy(deep=False)
+            if not isinstance(obj.index, (pd.DatetimeIndex, pd.MultiIndex)) and obj.index.dtype == object:
+                if parse_dates is True or obj.index.name in parse_dates:
+                    obj = obj.copy(deep=False)
                     if to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "index"):
-                        df.index = prepare_dt_index(df.index, utc=True)
+                        obj.index = prepare_dt_index(obj.index, utc=True)
                     else:
-                        df.index = prepare_dt_index(df.index)
+                        obj.index = prepare_dt_index(obj.index)
             has_potential_dt_column = False
-            for column_name in df.columns:
-                if df[column_name].dtype == object:
+            for column_name in obj.columns:
+                if obj[column_name].dtype == object:
                     if parse_dates is True or column_name in parse_dates:
                         has_potential_dt_column = True
                         break
             if has_potential_dt_column:
-                df = df.copy(deep=False)
-                for column_name in df.columns:
-                    if df[column_name].dtype == object:
+                obj = obj.copy(deep=False)
+                for column_name in obj.columns:
+                    if obj[column_name].dtype == object:
                         if parse_dates is True or column_name in parse_dates:
                             if to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "columns"):
-                                df[column_name] = prepare_dt_index(df[column_name], utc=True)
+                                obj[column_name] = prepare_dt_index(obj[column_name], utc=True)
                             else:
-                                df[column_name] = prepare_dt_index(df[column_name])
+                                obj[column_name] = prepare_dt_index(obj[column_name])
         if to_utc is not False:
             if to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "index"):
-                if isinstance(df.index, pd.DatetimeIndex):
-                    df = df.copy(deep=False)
-                    if df.index.tz is None:
-                        df.index = df.index.tz_localize("utc")
+                if isinstance(obj.index, pd.DatetimeIndex):
+                    obj = obj.copy(deep=False)
+                    if obj.index.tz is None:
+                        obj.index = obj.index.tz_localize("utc")
+                    else:
+                        obj.index = obj.index.tz_convert("utc")
             elif to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "columns"):
-                if isinstance(df, pd.Series):
-                    if hasattr(df, "dt"):
-                        if df.dt.tz is None:
-                            df = df.dt.tz_localize("utc")
+                if isinstance(obj, pd.Series):
+                    if hasattr(obj, "dt"):
+                        if obj.dt.tz is None:
+                            obj = obj.dt.tz_localize("utc")
+                        else:
+                            obj = obj.dt.tz_convert("utc")
                 else:
                     has_dt_column = False
-                    for column_name in df.columns:
-                        if hasattr(df[column_name], "dt"):
+                    for column_name in obj.columns:
+                        if hasattr(obj[column_name], "dt"):
                             has_dt_column = True
                             break
                     if has_dt_column:
-                        df = df.copy(deep=False)
-                        for column_name in df.columns:
-                            if hasattr(df[column_name], "dt"):
-                                if df.dt.tz is None:
-                                    df[column_name] = df[column_name].dt.tz_localize("utc")
-        return df
+                        obj = obj.copy(deep=False)
+                        for column_name in obj.columns:
+                            if hasattr(obj[column_name], "dt"):
+                                if obj.dt.tz is None:
+                                    obj[column_name] = obj[column_name].dt.tz_localize("utc")
+                                else:
+                                    obj[column_name] = obj[column_name].dt.tz_convert("utc")
+            elif isinstance(to_utc, str):
+                raise ValueError(f"Invalid option to_utc='{to_utc}'")
+        return obj
 
     @classmethod
     def fetch_key(
@@ -523,6 +532,10 @@ class SQLData(DBData):
         align_dates: tp.Optional[bool] = None,
         to_utc: tp.Union[None, bool, str] = None,
         tz: tp.Optional[tp.TimezoneLike] = None,
+        start_row: tp.Optional[int] = None,
+        end_row: tp.Optional[int] = None,
+        return_row_number: tp.Optional[bool] = None,
+        row_number_column: tp.Optional[str] = None,
         index_col: tp.Union[None, bool, tp.MaybeList[tp.IntStr]] = None,
         columns: tp.Optional[tp.MaybeList[tp.IntStr]] = None,
         parse_dates: tp.Union[None, bool, tp.List[tp.IntStr], tp.Dict[tp.IntStr, tp.Any]] = None,
@@ -578,6 +591,18 @@ class SQLData(DBData):
             tz (any): Timezone.
 
                 See `vectorbtpro.utils.datetime_.to_timezone`.
+            start_row (int): Start row.
+
+                Table must contain the column defined in `row_number_column`.
+
+                Cannot be used together with `query`. Include the condition into the query.
+            end_row (int): End row.
+
+                Table must contain the column defined in `row_number_column`.
+
+                Cannot be used together with `query`. Include the condition into the query.
+            return_row_number (bool): Whether to return the column defined in `row_number_column`.
+            row_number_column (str): Name of the column with row numbers.
             index_col (int, str, or list): One or more columns that should become the index.
 
                 If `query` is not used, will get mapped into column names. Otherwise,
@@ -612,7 +637,7 @@ class SQLData(DBData):
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("sqlalchemy")
-        from sqlalchemy import MetaData, Selectable, Select, FromClause, and_
+        from sqlalchemy import MetaData, Selectable, Select, FromClause, and_, text
 
         if engine_config is None:
             engine_config = {}
@@ -643,6 +668,10 @@ class SQLData(DBData):
         align_dates = cls.resolve_engine_setting(align_dates, "align_dates", engine_name=engine_name)
         to_utc = cls.resolve_engine_setting(to_utc, "to_utc", engine_name=engine_name)
         tz = cls.resolve_engine_setting(tz, "tz", engine_name=engine_name)
+        start_row = cls.resolve_engine_setting(start_row, "start_row", engine_name=engine_name)
+        end_row = cls.resolve_engine_setting(end_row, "end_row", engine_name=engine_name)
+        return_row_number = cls.resolve_engine_setting(return_row_number, "return_row_number", engine_name=engine_name)
+        row_number_column = cls.resolve_engine_setting(row_number_column, "row_number_column", engine_name=engine_name)
         index_col = cls.resolve_engine_setting(index_col, "index_col", engine_name=engine_name)
         columns = cls.resolve_engine_setting(columns, "columns", engine_name=engine_name)
         parse_dates = cls.resolve_engine_setting(parse_dates, "parse_dates", engine_name=engine_name)
@@ -724,8 +753,29 @@ class SQLData(DBData):
                     if col not in columns:
                         pre_columns.append(col)
                 columns = pre_columns + columns
+            if return_row_number and columns is not None:
+                if row_number_column in table_column_names and row_number_column not in columns:
+                    columns = [row_number_column] + columns
             if columns is not None:
                 query = query.with_only_columns(*[table.columns.get(c) for c in columns])
+
+            def _to_native_type(x):
+                if checks.is_np_scalar(x):
+                    return x.item()
+                return x
+
+            if start_row is not None or end_row is not None:
+                if start is not None or end is not None:
+                    raise ValueError("Can either filter by row numbers or by index, not both")
+                _row_number_column = table.columns.get(row_number_column)
+                if _row_number_column is None:
+                    raise ValueError(f"Row number column '{row_number_column}' not found")
+                and_list = []
+                if start_row is not None:
+                    and_list.append(_row_number_column >= _to_native_type(start_row))
+                if end_row is not None:
+                    and_list.append(_row_number_column < _to_native_type(end_row))
+                query = query.where(and_(*and_list))
             if start is not None or end is not None:
                 if index_col is None:
                     raise ValueError("Must provide index column for filtering by start and end")
@@ -765,11 +815,6 @@ class SQLData(DBData):
                                     end = to_naive_datetime(end)
                                 else:
                                     end = to_naive_datetime(end, tz=tz)
-
-                def _to_native_type(x):
-                    if checks.is_np_scalar(x):
-                        return x.item()
-                    return x
 
                 and_list = []
                 if start is not None:
@@ -811,6 +856,10 @@ class SQLData(DBData):
                 raise ValueError("Start cannot be applied to custom queries")
             if end is not None:
                 raise ValueError("End cannot be applied to custom queries")
+            if start_row is not None:
+                raise ValueError("Start row cannot be applied to custom queries")
+            if end_row is not None:
+                raise ValueError("End row cannot be applied to custom queries")
             if index_col is False:
                 index_col = None
             if index_col is not None:
@@ -830,6 +879,8 @@ class SQLData(DBData):
             if dtype is not None:
                 _check_columns(dtype.keys(), "dtype")
 
+        if isinstance(query, str):
+            query = text(query)
         obj = pd.read_sql_query(
             query,
             engine,
@@ -860,7 +911,7 @@ class SQLData(DBData):
             obj.name = None
         if dispose_engine:
             engine.dispose()
-        return obj, dict(tz_convert=tz)
+        return obj, dict(tz_convert=tz, row_number_column=row_number_column)
 
     @classmethod
     def fetch_feature(cls, feature: str, **kwargs) -> tp.FeatureData:
@@ -876,12 +927,45 @@ class SQLData(DBData):
         Uses `SQLData.fetch_key`."""
         return cls.fetch_key(symbol, **kwargs)
 
-    def update_key(self, key: str, **kwargs) -> tp.KeyData:
+    def update_key(
+        self,
+        key: str,
+        from_last_row: tp.Optional[bool] = None,
+        from_last_index: tp.Optional[bool] = None,
+        **kwargs,
+    ) -> tp.KeyData:
         """Update data of a feature or symbol."""
         fetch_kwargs = self.select_fetch_kwargs(key)
-        if (fetch_kwargs.get("query", None) is None and "query" not in kwargs) or (
-            "query" in kwargs and kwargs["query"] is None
-        ):
+        returned_kwargs = self.select_returned_kwargs(key)
+        pre_kwargs = merge_dicts(fetch_kwargs, kwargs)
+        if from_last_row is None:
+            if pre_kwargs.get("query", None) is not None:
+                from_last_row = False
+            elif from_last_index is True:
+                from_last_row = False
+            elif pre_kwargs.get("start", None) is not None or pre_kwargs.get("end", None) is not None:
+                from_last_row = False
+            elif "row_number_column" not in returned_kwargs:
+                from_last_row = False
+            elif returned_kwargs["row_number_column"] not in self.wrapper.columns:
+                from_last_row = False
+            else:
+                from_last_row = True
+        if from_last_index is None:
+            if pre_kwargs.get("query", None) is not None:
+                from_last_index = False
+            elif from_last_row is True:
+                from_last_index = False
+            elif pre_kwargs.get("start_row", None) is not None or pre_kwargs.get("end_row", None) is not None:
+                from_last_index = False
+            else:
+                from_last_index = True
+        if from_last_row:
+            if "row_number_column" not in returned_kwargs:
+                raise ValueError("Argument row_number_column must be in returned_kwargs for from_last_row")
+            row_number_column = returned_kwargs["row_number_column"]
+            fetch_kwargs["start_row"] = self.data[key][row_number_column].iloc[-1]
+        if from_last_index:
             fetch_kwargs["start"] = self.select_last_index(key)
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         if self.feature_oriented:
