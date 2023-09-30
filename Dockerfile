@@ -50,6 +50,7 @@ RUN pip install --quiet --no-cache-dir \
     'ccxt>=1.89.14' \
     'tables' \
     'SQLAlchemy>=2.0.0' \
+    'duckdb' \
     'polygon-api-client>=1.0.0' \
     'beautifulsoup4' \
     'nasdaq-data-link' \

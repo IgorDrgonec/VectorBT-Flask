@@ -1948,6 +1948,34 @@ class TestData:
             original_data.to_feature_oriented().get(["F1", "F2"])[0],
             pd.DataFrame(
                 [
+                    ["S1_F1_0", "S2_F1_0"],
+                    ["S1_F1_1", "S2_F1_1"],
+                    ["S1_F1_2", "S2_F1_2"],
+                    ["S1_F1_3", "S2_F1_3"],
+                    ["S1_F1_4", "S2_F1_4"],
+                ],
+                index=index,
+                columns=pd.Index(["S1", "S2"], name="symbol"),
+            ),
+        )
+        assert_frame_equal(
+            original_data.to_symbol_oriented().get(["F1", "F2"], per="symbol")[0],
+            pd.DataFrame(
+                [
+                    ["S1_F1_0", "S1_F2_0"],
+                    ["S1_F1_1", "S1_F2_1"],
+                    ["S1_F1_2", "S1_F2_2"],
+                    ["S1_F1_3", "S1_F2_3"],
+                    ["S1_F1_4", "S1_F2_4"],
+                ],
+                index=index,
+                columns=pd.Index(["F1", "F2"]),
+            ),
+        )
+        assert_frame_equal(
+            original_data.to_feature_oriented().get(["F1", "F2"], per="symbol")[0],
+            pd.DataFrame(
+                [
                     ["S1_F1_0", "S1_F2_0"],
                     ["S1_F1_1", "S1_F2_1"],
                     ["S1_F1_2", "S1_F2_2"],
@@ -1975,6 +2003,34 @@ class TestData:
         )
         assert_frame_equal(
             original_data.to_feature_oriented().get()[0],
+            pd.DataFrame(
+                [
+                    ["S1_F1_0", "S2_F1_0"],
+                    ["S1_F1_1", "S2_F1_1"],
+                    ["S1_F1_2", "S2_F1_2"],
+                    ["S1_F1_3", "S2_F1_3"],
+                    ["S1_F1_4", "S2_F1_4"],
+                ],
+                index=index,
+                columns=pd.Index(["S1", "S2"], name="symbol"),
+            ),
+        )
+        assert_frame_equal(
+            original_data.to_symbol_oriented().get(per="symbol")[0],
+            pd.DataFrame(
+                [
+                    ["S1_F1_0", "S1_F2_0", "S1_F3_0"],
+                    ["S1_F1_1", "S1_F2_1", "S1_F3_1"],
+                    ["S1_F1_2", "S1_F2_2", "S1_F3_2"],
+                    ["S1_F1_3", "S1_F2_3", "S1_F3_3"],
+                    ["S1_F1_4", "S1_F2_4", "S1_F3_4"],
+                ],
+                index=index,
+                columns=pd.Index(["F1", "F2", "F3"]),
+            ),
+        )
+        assert_frame_equal(
+            original_data.to_feature_oriented().get(per="symbol")[0],
             pd.DataFrame(
                 [
                     ["S1_F1_0", "S1_F2_0", "S1_F3_0"],
@@ -2493,10 +2549,10 @@ class TestData:
     def test_symbol_to_csv(self, tmp_path):
         data = MyData.pull(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented()
 
-        def _load_and_check_symbol(s, path, **kwargs):
+        def _load_and_check_symbol(k, path, **kwargs):
             df = pd.read_csv(path, parse_dates=True, index_col=0, **kwargs).squeeze("columns")
             df.index.freq = df.index.inferred_freq
-            assert_frame_equal(df, data.data[s])
+            assert_frame_equal(df, data.data[k])
 
         data.to_csv(tmp_path)
         _load_and_check_symbol("S1", tmp_path / "S1.csv")
@@ -2533,11 +2589,11 @@ class TestData:
     def test_feature_to_csv(self, tmp_path):
         data = MyData.pull(["S1", "S2", "S3"], shape=(5, 2), columns=["F1", "F2"]).to_feature_oriented()
 
-        def _load_and_check_feature(s, path, **kwargs):
+        def _load_and_check_feature(k, path, **kwargs):
             df = pd.read_csv(path, parse_dates=True, index_col=0, **kwargs).squeeze("columns")
             df.index.freq = df.index.inferred_freq
             df.columns.name = "symbol"
-            assert_frame_equal(df, data.data[s])
+            assert_frame_equal(df, data.data[k])
 
         data.to_csv(tmp_path)
         _load_and_check_feature("F1", tmp_path / "F1.csv")
@@ -2574,12 +2630,12 @@ class TestData:
     def test_symbol_to_hdf(self, tmp_path):
         data = MyData.pull(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented()
 
-        def _load_and_check_symbol(s, path, key=None, **kwargs):
+        def _load_and_check_symbol(k, path, key=None, **kwargs):
             if key is None:
-                key = s
+                key = k
             df = pd.read_hdf(path, key, **kwargs)
             df.index.freq = df.index.inferred_freq
-            assert_frame_equal(df, data.data[s])
+            assert_frame_equal(df, data.data[k])
 
         data.to_hdf(tmp_path)
         _load_and_check_symbol("S1", tmp_path / "MyData.h5")
@@ -2616,12 +2672,12 @@ class TestData:
     def test_feature_to_hdf(self, tmp_path):
         data = MyData.pull(["S1", "S2", "S3"], shape=(5, 2), columns=["F1", "F2"]).to_feature_oriented()
 
-        def _load_and_check_feature(s, path, key=None, **kwargs):
+        def _load_and_check_feature(k, path, key=None, **kwargs):
             if key is None:
-                key = s
+                key = k
             df = pd.read_hdf(path, key, **kwargs)
             df.index.freq = df.index.inferred_freq
-            assert_frame_equal(df, data.data[s])
+            assert_frame_equal(df, data.data[k])
 
         data.to_hdf(tmp_path)
         _load_and_check_feature("F1", tmp_path / "MyData.h5")
@@ -2654,6 +2710,62 @@ class TestData:
         )
         _load_and_check_feature("F1", tmp_path / "hdf_data/my_data.h5", key="df1")
         _load_and_check_feature("F2", tmp_path / "hdf_data/my_data.h5", key="df2")
+
+    def test_symbol_to_sql(self, tmp_path):
+        data = MyData.pull(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented()
+
+        def _load_and_check_symbol(k, table_name, engine_url, **kwargs):
+            df = pd.read_sql_table(table_name, engine_url, index_col="index", **kwargs).squeeze("columns")
+            df.index.freq = df.index.inferred_freq
+            df.index.name = None
+            df = df.tz_localize("utc")
+            assert_frame_equal(df, data.data[k])
+
+        engine_url = "sqlite:///" + str(tmp_path / "temp.db")
+        data.to_sql(engine_url)
+        _load_and_check_symbol("S1", "S1", engine_url)
+        _load_and_check_symbol("S2", "S2", engine_url)
+
+        engine_url1 = "sqlite:///" + str(tmp_path / "temp1.db")
+        engine_url2 = "sqlite:///" + str(tmp_path / "temp2.db")
+        data.to_sql(
+            vbt.symbol_dict({"S1": engine_url1, "S2": engine_url2}),
+            table_name=vbt.symbol_dict({"S1": "T1", "S2": "T2"}),
+        )
+        _load_and_check_symbol("S1", "T1", engine_url1)
+        _load_and_check_symbol("S2", "T2", engine_url2)
+
+    def test_feature_to_sql(self, tmp_path):
+        data = MyData.pull(["S1", "S2", "S3"], shape=(5, 2), columns=["F1", "F2"]).to_feature_oriented()
+
+        def _load_and_check_feature(k, table_name, engine_url, **kwargs):
+            df = pd.read_sql_table(table_name, engine_url, index_col="index", **kwargs).squeeze("columns")
+            df.index.freq = df.index.inferred_freq
+            df.index.name = None
+            df = df.tz_localize("utc")
+            df.columns.name = "symbol"
+            assert_frame_equal(df, data.data[k])
+
+        engine_url = "sqlite:///" + str(tmp_path / "temp.db")
+        data.to_sql(engine_url)
+        _load_and_check_feature("F1", "F1", engine_url)
+        _load_and_check_feature("F2", "F2", engine_url)
+
+        engine_url1 = "sqlite:///" + str(tmp_path / "temp1.db")
+        engine_url2 = "sqlite:///" + str(tmp_path / "temp2.db")
+        data.to_sql(
+            vbt.feature_dict({"F1": engine_url1, "F2": engine_url2}),
+            table_name=vbt.feature_dict({"F1": "T1", "F2": "T2"}),
+        )
+        _load_and_check_feature("F1", "T1", engine_url1)
+        _load_and_check_feature("F2", "T2", engine_url2)
+
+    def test_sql(self):
+        data = MyData.pull(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"])
+        target_df = data.concat()["F1"]
+        target_df.index.freq = None
+        target_df.columns.name = None
+        assert_frame_equal(data.sql("SELECT * FROM F1"), target_df)
 
     def test_symbol_stats(self):
         index_mask = vbt.symbol_dict({"S1": [False, True, True, True, True], "S2": [True, True, True, True, False]})

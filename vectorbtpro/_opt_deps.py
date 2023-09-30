@@ -133,7 +133,10 @@ opt_dep_config = HybridConfig(
         ),
         mpire=dict(
             link="https://github.com/sybrenjansen/mpire",
-        )
+        ),
+        duckdb=dict(
+            link="https://github.com/duckdb/duckdb",
+        ),
     )
 )
 """_"""

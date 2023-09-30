@@ -38,6 +38,12 @@ try:
     from sqlalchemy import Engine as EngineT
 except ImportError:
     EngineT = tp.Any
+try:
+    if not tp.TYPE_CHECKING:
+        raise ImportError
+    from duckdb import DuckDBPyConnection as DuckDBPyConnectionT
+except ImportError:
+    DuckDBPyConnectionT = tp.Any
 
 __all__ = [
     "key_dict",
@@ -1236,8 +1242,10 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         symbol: tp.Optional[tp.Symbol] = None,
         squeeze_features: bool = False,
         squeeze_symbols: bool = False,
+        per: str = "feature",
+        as_dict: bool = False,
         **kwargs,
-    ) -> tp.MaybeTuple[tp.SeriesFrame]:
+    ) -> tp.Union[tp.MaybeTuple[tp.SeriesFrame], dict]:
         """Get one or more features of one or more symbols of data."""
         if features is not None and feature is not None:
             raise ValueError("Must provide either features or feature, not both")
@@ -1286,24 +1294,54 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             symbol_idxs = self.get_symbol_idx(symbols, raise_error=True)
             symbols = self.symbols[symbol_idxs]
 
-        if self.feature_oriented:
-            if single_feature:
-                if self.single_symbol:
-                    return self.data[self.features[feature_idxs]]
-                return self.data[self.features[feature_idxs]].iloc[:, symbol_idxs]
-            concat_data = self.concat(keys=features, **kwargs)
-            if single_symbol:
-                return list(concat_data.values())[symbol_idxs]
-            return tuple([list(concat_data.values())[i] for i in symbol_idxs])
-        else:
-            if single_symbol:
-                if self.single_feature:
-                    return self.data[self.symbols[symbol_idxs]]
-                return self.data[self.symbols[symbol_idxs]].iloc[:, feature_idxs]
-            concat_data = self.concat(keys=symbols, **kwargs)
-            if single_feature:
-                return list(concat_data.values())[feature_idxs]
-            return tuple([list(concat_data.values())[i] for i in feature_idxs])
+        def _get_objs():
+            if self.feature_oriented:
+                if single_feature:
+                    if self.single_symbol:
+                        return list(self.data.values())[feature_idxs], features
+                    return list(self.data.values())[feature_idxs].iloc[:, symbol_idxs], features
+                if single_symbol:
+                    concat_data = self.concat(keys=features, **kwargs)
+                    return list(concat_data.values())[symbol_idxs], symbols
+                if per.lower() in ("symbol", "column"):
+                    concat_data = self.concat(keys=features, **kwargs)
+                    return tuple([list(concat_data.values())[i] for i in symbol_idxs]), symbols
+                if per.lower() in ("feature", "key"):
+                    if self.single_feature:
+                        if self.single_symbol:
+                            return list(self.data.values())[feature_idxs], features
+                        return list(self.data.values())[feature_idxs].iloc[:, symbol_idxs], features
+                    if self.single_symbol:
+                        return tuple([list(self.data.values())[i] for i in feature_idxs]), features
+                    return tuple([list(self.data.values())[i].iloc[:, symbol_idxs] for i in feature_idxs]), features
+                raise ValueError(f"Invalid option per='{per}'")
+            else:
+                if single_symbol:
+                    if self.single_feature:
+                        return self.data[self.symbols[symbol_idxs]], symbols
+                    return self.data[self.symbols[symbol_idxs]].iloc[:, feature_idxs], symbols
+                if single_feature:
+                    concat_data = self.concat(keys=symbols, **kwargs)
+                    return list(concat_data.values())[feature_idxs], features
+                if per.lower() in ("feature", "column"):
+                    concat_data = self.concat(keys=symbols, **kwargs)
+                    return tuple([list(concat_data.values())[i] for i in feature_idxs]), features
+                if per.lower() in ("symbol", "key"):
+                    if self.single_symbol:
+                        if self.single_feature:
+                            return list(self.data.values())[symbol_idxs], symbols
+                        return list(self.data.values())[symbol_idxs].iloc[:, feature_idxs], symbols
+                    if self.single_feature:
+                        return tuple([list(self.data.values())[i] for i in symbol_idxs]), symbols
+                    return tuple([list(self.data.values())[i].iloc[:, feature_idxs] for i in symbol_idxs]), symbols
+                raise ValueError(f"Invalid option per='{per}'")
+
+        objs, keys = _get_objs()
+        if as_dict:
+            if isinstance(objs, tuple):
+                return dict(zip(keys, objs))
+            return {keys: objs}
+        return objs
 
     # ############# Pre- and post-processing ############# #
 
@@ -3609,6 +3647,78 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
         data = data.update_fetch_kwargs(**fetch_kwargs)
         return data
+
+    # ############# Querying ############# #
+
+    def sql(
+        self,
+        query: str,
+        dbcon: tp.Optional[DuckDBPyConnectionT] = None,
+        database: str = ":memory:",
+        db_config: tp.KwargsLike = None,
+        alias: str = "",
+        params: tp.KwargsLike = None,
+        other_objs: tp.Optional[dict] = None,
+        date_as_object: bool = False,
+        align_dtypes: bool = True,
+        squeeze: bool = True,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Run a SQL query on this instance using DuckDB.
+
+        First, connection gets established. Then, `Data.get` gets invoked with `**kwargs` passed as
+        keyword arguments and `as_dict=True`. Then, each returned object gets registered within the
+        database. Finally, the query gets executed with `duckdb.sql` and the relation as a DataFrame
+        gets returned. If `squeeze` is True, a DataFrame with one column will be converted into a Series."""
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("duckdb")
+        from duckdb import connect
+
+        if db_config is None:
+            db_config = {}
+        if dbcon is None:
+            dbcon = connect(database=database, read_only=False, config=db_config)
+        if params is None:
+            params = {}
+
+        dtypes = {}
+        objs = self.get(**kwargs, as_dict=True)
+        for k, v in objs.items():
+            if not checks.is_default_index(v.index):
+                v = v.reset_index()
+            if isinstance(v, pd.Series):
+                v = v.to_frame()
+            for c in v.columns:
+                dtypes[c] = v[c].dtype
+            dbcon.register(k, v)
+        if other_objs is not None:
+            checks.assert_instance_of(other_objs, dict, arg_name="other_objs")
+            for k, v in other_objs.items():
+                if not checks.is_default_index(v.index):
+                    v = v.reset_index()
+                if isinstance(v, pd.Series):
+                    v = v.to_frame()
+                for c in v.columns:
+                    dtypes[c] = v[c].dtype
+                dbcon.register(k, v)
+        df = dbcon.sql(query, alias=alias, params=params).df(date_as_object=date_as_object)
+        if align_dtypes:
+            for c in df.columns:
+                if c in dtypes:
+                    df[c] = df[c].astype(dtypes[c])
+        if isinstance(self.index, pd.MultiIndex):
+            if set(self.index.names) <= set(df.columns):
+                df = df.set_index(self.index.names)
+        else:
+            if self.index.name is not None and self.index.name in df.columns:
+                df = df.set_index(self.index.name)
+            elif "index" in df.columns:
+                df = df.set_index("index")
+                df.index.name = None
+        if squeeze and len(df.columns) == 1:
+            df = df.iloc[:, 0]
+        return df
 
     # ############# Stats ############# #
 
