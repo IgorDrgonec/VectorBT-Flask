@@ -51,6 +51,7 @@ RUN pip install --quiet --no-cache-dir \
     'tables' \
     'SQLAlchemy>=2.0.0' \
     'duckdb' \
+    'duckdb-engine' \
     'polygon-api-client>=1.0.0' \
     'beautifulsoup4' \
     'nasdaq-data-link' \
@@ -81,7 +82,7 @@ RUN conda install --quiet --yes -c conda-forge cvxopt
 ADD ./vectorbtpro ./vectorbtpro
 ADD setup.py ./
 ADD extra-requirements.txt ./
-ADD LICENSE.md ./
+ADD LICENSE ./
 ADD README.md ./
 RUN pip install --quiet --no-cache-dir --no-deps .
 
