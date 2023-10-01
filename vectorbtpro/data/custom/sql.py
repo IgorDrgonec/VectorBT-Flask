@@ -237,10 +237,12 @@ class SQLData(DBData):
             if pattern is not None:
                 if not cls.key_match(schema, pattern, use_regex=use_regex):
                     continue
+            if schema == "information_schema":
+                continue
             all_schemas.append(schema)
         if dispose_engine:
             engine.dispose()
-        return sorted(all_schemas)
+        return sorted(set(all_schemas))
 
     @classmethod
     def list_tables(
@@ -333,7 +335,7 @@ class SQLData(DBData):
                     all_tables.append(table)
         if dispose_engine:
             engine.dispose()
-        return sorted(all_tables)
+        return sorted(set(all_tables))
 
     @classmethod
     def resolve_keys_meta(
