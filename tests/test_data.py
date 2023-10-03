@@ -1,6 +1,7 @@
 import os
 from datetime import datetime, timedelta, timezone
 
+import pandas as pd
 import pytest
 
 import vectorbtpro as vbt
@@ -2711,6 +2712,56 @@ class TestData:
         _load_and_check_feature("F1", tmp_path / "hdf_data/my_data.h5", key="df1")
         _load_and_check_feature("F2", tmp_path / "hdf_data/my_data.h5", key="df2")
 
+    def test_symbol_to_feather(self, tmp_path):
+        data = MyData.pull(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented()
+
+        def _load_and_check_symbol(k, path, **kwargs):
+            df = pd.read_feather(path, **kwargs)
+            if not isinstance(df.index, pd.DatetimeIndex):
+                df = df.set_index("index")
+                df.index.name = None
+            df.index.freq = df.index.inferred_freq
+            assert_frame_equal(df, data.data[k])
+
+        data.to_feather(tmp_path)
+        _load_and_check_symbol("S1", tmp_path / "S1.feather")
+        _load_and_check_symbol("S2", tmp_path / "S2.feather")
+
+        data.to_feather(tmp_path / "feather_data", mkdir_kwargs=dict(mkdir=True))
+        _load_and_check_symbol("S1", tmp_path / "feather_data/S1.feather")
+        _load_and_check_symbol("S2", tmp_path / "feather_data/S2.feather")
+
+        data.to_feather(
+            path_or_buf=vbt.symbol_dict({"S1": tmp_path / "my_S1.feather", "S2": tmp_path / "my_S2.feather"})
+        )
+        _load_and_check_symbol("S1", tmp_path / "my_S1.feather")
+        _load_and_check_symbol("S2", tmp_path / "my_S2.feather")
+
+    def test_feature_to_feather(self, tmp_path):
+        data = MyData.pull(["S1", "S2", "S3"], shape=(5, 2), columns=["F1", "F2"]).to_feature_oriented()
+
+        def _load_and_check_symbol(k, path, **kwargs):
+            df = pd.read_feather(path, **kwargs)
+            if not isinstance(df.index, pd.DatetimeIndex):
+                df = df.set_index("index")
+                df.index.name = None
+            df.index.freq = df.index.inferred_freq
+            assert_frame_equal(df, data.data[k])
+
+        data.to_feather(tmp_path)
+        _load_and_check_symbol("F1", tmp_path / "F1.feather")
+        _load_and_check_symbol("F2", tmp_path / "F2.feather")
+
+        data.to_feather(tmp_path / "feather_data", mkdir_kwargs=dict(mkdir=True))
+        _load_and_check_symbol("F1", tmp_path / "feather_data/F1.feather")
+        _load_and_check_symbol("F2", tmp_path / "feather_data/F2.feather")
+
+        data.to_feather(
+            path_or_buf=vbt.feature_dict({"F1": tmp_path / "my_F1.feather", "F2": tmp_path / "my_F2.feather"})
+        )
+        _load_and_check_symbol("F1", tmp_path / "my_F1.feather")
+        _load_and_check_symbol("F2", tmp_path / "my_F2.feather")
+
     def test_symbol_to_sql(self, tmp_path):
         data = MyData.pull(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented()
 
@@ -3206,6 +3257,17 @@ class TestCustom:
 
         with pytest.raises(Exception):
             vbt.HDFData.pull(tmp_path / "data7/data/data.h5/folder/data4")
+
+    def test_feather_data(self, tmp_path):
+        sr = pd.Series(np.arange(10), index=pd.date_range("2020", periods=10, tz="utc"), name="hello")
+        sr.to_frame().reset_index().to_feather(tmp_path / "temp.feather")
+        feather_data = vbt.FeatherData.pull(tmp_path / "temp.feather")
+        assert_series_equal(feather_data.get(), sr)
+        df = pd.DataFrame(np.arange(20).reshape((10, 2)), index=pd.date_range("2020", periods=10, tz="utc"))
+        df.columns = pd.Index(["0", "1"], dtype="object")
+        df.reset_index().to_feather(tmp_path / "temp.feather")
+        feather_data = vbt.FeatherData.pull(tmp_path / "temp.feather")
+        assert_frame_equal(feather_data.get(), df)
 
     def test_sql_data(self, tmp_path):
         if sqlalchemy_available:

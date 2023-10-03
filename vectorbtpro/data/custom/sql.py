@@ -633,6 +633,8 @@ class SQLData(DBData):
             squeeze (int): Whether to squeeze a DataFrame with one column into a Series.
             **read_sql_kwargs: Other keyword arguments passed to `pd.read_sql_query`.
 
+        See https://pandas.pydata.org/docs/reference/api/pandas.read_sql_query.html for other arguments.
+
         For defaults, see `custom.sql` in `vectorbtpro._settings.data`.
         Global settings can be provided per engine name using the `engines` dictionary.
         """
@@ -782,7 +784,7 @@ class SQLData(DBData):
                 if index_col is None:
                     raise ValueError("Must provide index column for filtering by start and end")
                 if align_dates:
-                    first_obj = pd.read_sql(
+                    first_obj = pd.read_sql_query(
                         query.limit(1),
                         engine,
                         index_col=index_col,

@@ -3277,7 +3277,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         self,
         dir_path: tp.Union[tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = ".",
         ext: tp.Union[str, feature_dict, symbol_dict, CustomTemplate] = "csv",
-        path_or_buf: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
+        path_or_buf: tp.Union[None, tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = None,
         mkdir_kwargs: tp.Union[tp.KwargsLike, feature_dict, symbol_dict] = None,
         check_dict_type: bool = True,
         template_context: tp.KwargsLike = None,
@@ -3286,7 +3286,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     ) -> tp.Union[None, feature_dict, symbol_dict]:
         """Save data to CSV file(s).
 
-        Uses `pd.to_csv`.
+        Uses https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_csv.html
 
         Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
         depending on the format of the data dictionary.
@@ -3294,8 +3294,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         Each feature/symbol gets saved to a separate file, that's why the first argument is the path
         to the directory, not file! If there's only one file, you can specify the file path via
         `path_or_buf`. If there are multiple files, use the same argument but wrap the multiple paths
-        with `feature_dict`/`symbol_dict`.
-        """
+        with `feature_dict`/`symbol_dict`."""
         meta = self.dict_type()
         for k, v in self.data.items():
             if self.feature_oriented:
@@ -3373,7 +3372,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         self,
         file_path: tp.Union[tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = ".",
         key: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
-        path_or_buf: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
+        path_or_buf: tp.Union[None, tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = None,
         mkdir_kwargs: tp.Union[tp.KwargsLike, feature_dict, symbol_dict] = None,
         format: str = "table",
         check_dict_type: bool = True,
@@ -3383,15 +3382,14 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     ) -> tp.Union[None, feature_dict, symbol_dict]:
         """Save data to an HDF file.
 
-        Uses `pd.to_hdf`.
+        Uses https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_hdf.html
 
         Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
         depending on the format of the data dictionary.
 
         If `file_path` exists, and it's a directory, will create inside it a file named
         after this class. This won't work with directories that do not exist, otherwise
-        they could be confused with file names.
-        """
+        they could be confused with file names."""
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("tables")
@@ -3463,6 +3461,82 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         data = data.update_fetch_kwargs(**fetch_kwargs)
         return data
 
+    def to_feather(
+        self,
+        dir_path: tp.Union[tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = ".",
+        path_or_buf: tp.Union[None, tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = None,
+        mkdir_kwargs: tp.Union[tp.KwargsLike, feature_dict, symbol_dict] = None,
+        check_dict_type: bool = True,
+        template_context: tp.KwargsLike = None,
+        return_meta: bool = False,
+        **kwargs,
+    ) -> tp.Union[None, feature_dict, symbol_dict]:
+        """Save data to Feather file(s).
+
+        Uses https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_feather.html
+
+        Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
+        depending on the format of the data dictionary.
+
+        Each feature/symbol gets saved to a separate file, that's why the first argument is the path
+        to the directory, not file! If there's only one file, you can specify the file path via
+        `path_or_buf`. If there are multiple files, use the same argument but wrap the multiple paths
+        with `feature_dict`/`symbol_dict`."""
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("pyarrow")
+
+        meta = self.dict_type()
+        for k, v in self.data.items():
+            if self.feature_oriented:
+                _template_context = merge_dicts(dict(data=v, feature=k), template_context)
+            else:
+                _template_context = merge_dicts(dict(data=v, symbol=k), template_context)
+            if check_dict_type:
+                self.check_dict_type(path_or_buf, arg_name="path_or_buf")
+            if path_or_buf is None:
+                if check_dict_type:
+                    self.check_dict_type(dir_path, arg_name="dir_path")
+                if isinstance(dir_path, key_dict):
+                    _dir_path = dir_path[k]
+                else:
+                    _dir_path = dir_path
+                if isinstance(_dir_path, CustomTemplate):
+                    _dir_path = _dir_path.substitute(_template_context, sub_id="dir_path")
+                _dir_path = Path(_dir_path)
+                _path_or_buf = str(Path(_dir_path) / f"{k}.feather")
+            elif isinstance(path_or_buf, key_dict):
+                _path_or_buf = path_or_buf[k]
+            else:
+                _path_or_buf = path_or_buf
+            if isinstance(_path_or_buf, CustomTemplate):
+                _path_or_buf = _path_or_buf.substitute(_template_context, sub_id="path_or_buf")
+            _kwargs = self.select_key_kwargs(k, kwargs, check_dict_type=check_dict_type)
+            if isinstance(_path_or_buf, (str, Path)):
+                _path_or_buf = Path(_path_or_buf)
+                if check_dict_type:
+                    self.check_dict_type(mkdir_kwargs, arg_name="mkdir_kwargs")
+                if isinstance(mkdir_kwargs, key_dict):
+                    _mkdir_kwargs = mkdir_kwargs[k]
+                else:
+                    _mkdir_kwargs = self.select_key_kwargs(k, mkdir_kwargs, check_dict_type=check_dict_type)
+                check_mkdir(_path_or_buf.parent, **_mkdir_kwargs)
+            meta[k] = {"path": _path_or_buf, **_kwargs}
+            if isinstance(v, pd.Series):
+                v = v.to_frame()
+            try:
+                v.to_feather(**meta[k])
+            except Exception as e:
+                if isinstance(e, ValueError) and "you can .reset_index()" in str(e):
+                    v = v.reset_index()
+                    v.to_feather(**meta[k])
+                else:
+                    raise e
+
+        if return_meta:
+            return meta
+        return None
+
     def to_sql(
         self,
         engine: tp.Union[None, str, EngineT, feature_dict, symbol_dict, CustomTemplate] = None,
@@ -3482,7 +3556,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     ) -> tp.Union[None, feature_dict, symbol_dict, EngineT]:
         """Save data to a SQL database.
 
-        Uses `pd.to_sql`.
+        Uses https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_sql.html
 
         Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
         depending on the format of the data dictionary.
@@ -3490,7 +3564,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         Each feature/symbol gets saved to a separate table.
 
         If `engine` is None or a string, will resolve an engine with
-        `vectorbtpro.data.custom.sql.SQLData.resolve_engine` and dispose it afterwards if `dispose_engine`
+        `vectorbtpro.data.custom.sql.SQLData.resolve_engine` and dispose it afterward if `dispose_engine`
         is None or True. It can additionally return the engine if `return_engine` is True or entire
         metadata (all passed arguments as `feature_dict` or `symbol_dict`). In this case, the engine
         won't be disposed by default.

@@ -52,6 +52,7 @@ RUN pip install --quiet --no-cache-dir \
     'SQLAlchemy>=2.0.0' \
     'duckdb' \
     'duckdb-engine' \
+    'pyarrow' \
     'polygon-api-client>=1.0.0' \
     'beautifulsoup4' \
     'nasdaq-data-link' \

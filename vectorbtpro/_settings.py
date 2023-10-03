@@ -697,6 +697,12 @@ data = frozen_cfg(
             end_row=None,
             read_hdf_kwargs=flex_cfg(),
         ),
+        feather=flex_cfg(
+            tz=None,
+            index_col=0,
+            squeeze=True,
+            read_feather_kwargs=flex_cfg(),
+        ),
         # Database
         db=flex_cfg(),
         sql=flex_cfg(

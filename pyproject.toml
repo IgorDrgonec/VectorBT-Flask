@@ -58,6 +58,7 @@ data-base = [
     "SQLAlchemy>=2.0.0",
     "duckdb",
     "duckdb-engine",
+    "pyarrow",
     "yfinance>=0.2.20",
 ]
 data = [

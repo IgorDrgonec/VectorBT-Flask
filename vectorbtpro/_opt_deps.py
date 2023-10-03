@@ -141,6 +141,9 @@ opt_dep_config = HybridConfig(
             dist_name="duckdb-engine",
             link="https://pypi.org/project/duckdb-engine/",
         ),
+        pyarrow=dict(
+            link="https://pypi.org/project/pyarrow/",
+        ),
     )
 )
 """_"""
