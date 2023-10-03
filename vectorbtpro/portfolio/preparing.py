@@ -12,6 +12,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base.preparing import BasePreparer
 from vectorbtpro.base.decorators import override_arg_config, attach_arg_properties
 from vectorbtpro.base.reshaping import broadcast_array_to, broadcast
+from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.portfolio import nb, enums
 from vectorbtpro.portfolio.call_seq import require_call_seq, build_call_seq
@@ -22,7 +23,7 @@ from vectorbtpro.utils import checks, chunking as ch
 from vectorbtpro.utils.config import Configured
 from vectorbtpro.utils.config import merge_dicts, ReadonlyConfig
 from vectorbtpro.utils.mapping import to_field_mapping
-from vectorbtpro.utils.template import CustomTemplate, substitute_templates
+from vectorbtpro.utils.template import CustomTemplate, substitute_templates, RepFunc
 from vectorbtpro.data.base import OHLCDataMixin, Data
 
 __all__ = [
@@ -260,7 +261,7 @@ class BasePFPreparer(BasePreparer):
         return self["call_seq"]
 
     @cachedproperty
-    def _pre_in_outputs(self) -> tp.Optional[tp.NamedTuple]:
+    def _pre_in_outputs(self) -> tp.Union[None, tp.NamedTuple, CustomTemplate]:
         """Argument `in_outputs` before broadcasting."""
         in_outputs = self["in_outputs"]
         if (
@@ -1060,6 +1061,8 @@ class FSPreparer(BasePFPreparer):
         """Argument `post_segment_func_nb`."""
         if self.dynamic_mode:
             if self["post_segment_func_nb"] is None:
+                if self.save_state or self.save_value or self.save_returns:
+                    return nb.save_post_segment_func_nb
                 return nb.no_post_func_nb
             return self["post_segment_func_nb"]
         return None
@@ -1090,7 +1093,10 @@ class FSPreparer(BasePFPreparer):
                 self.adapt_staticized_to_udf(staticized, self["adjust_func_nb"], "adjust_func_nb")
             if self["post_signal_func_nb"] is not None and isinstance(staticized, dict):
                 self.adapt_staticized_to_udf(staticized, self["post_signal_func_nb"], "post_signal_func_nb")
-            if self["post_segment_func_nb"] is not None and isinstance(staticized, dict):
+            if self["post_segment_func_nb"] is None:
+                if self.save_state or self.save_value or self.save_returns:
+                    self.adapt_staticized_to_udf(staticized, "save_post_segment_func_nb", "post_segment_func_nb")
+            elif isinstance(staticized, dict):
                 self.adapt_staticized_to_udf(staticized, self["post_segment_func_nb"], "post_segment_func_nb")
         return staticized
 
@@ -1098,32 +1104,6 @@ class FSPreparer(BasePFPreparer):
     def _pre_chunked(self) -> tp.ChunkedOption:
         """Argument `chunked` before template substitution."""
         return self["chunked"]
-
-    # ############# Ready arguments ############# #
-
-    @cachedproperty
-    def save_state(self) -> bool:
-        """Argument `save_state`."""
-        save_state = self["save_state"]
-        if save_state and self.dynamic_mode:
-            raise ValueError("Argument save_state cannot be used in dynamic mode. Write it in post_segment_func_nb.")
-        return save_state
-
-    @cachedproperty
-    def save_value(self) -> bool:
-        """Argument `save_value`."""
-        save_value = self["save_value"]
-        if save_value and self.dynamic_mode:
-            raise ValueError("Argument save_value cannot be used in dynamic mode. Write it in post_segment_func_nb.")
-        return save_value
-
-    @cachedproperty
-    def save_returns(self) -> bool:
-        """Argument `save_returns`."""
-        save_returns = self["save_returns"]
-        if save_returns and self.dynamic_mode:
-            raise ValueError("Argument save_returns cannot be used in dynamic mode. Write it in post_segment_func_nb.")
-        return save_returns
 
     # ############# Before broadcasting ############# #
 
@@ -1170,9 +1150,63 @@ class FSPreparer(BasePFPreparer):
         """Argument `max_log_records` before broadcasting."""
         return self["max_log_records"]
 
+    @classmethod
+    def init_in_outputs(
+        cls,
+        wrapper: ArrayWrapper,
+        group_lens: tp.GroupLens,
+        cash_sharing: bool,
+        save_state: bool = True,
+        save_value: bool = True,
+        save_returns: bool = True,
+    ) -> enums.FSInOutputs:
+        """Initialize `vectorbtpro.portfolio.enums.FSInOutputs`."""
+        if save_state:
+            position = np.full(wrapper.shape_2d, np.nan)
+            debt = np.full(wrapper.shape_2d, np.nan)
+            locked_cash = np.full(wrapper.shape_2d, np.nan)
+            if cash_sharing:
+                cash = np.full((wrapper.shape[0], len(group_lens)), np.nan)
+                free_cash = np.full((wrapper.shape[0], len(group_lens)), np.nan)
+            else:
+                cash = np.full(wrapper.shape_2d, np.nan)
+                free_cash = np.full(wrapper.shape_2d, np.nan)
+        else:
+            position = np.full((0, 0), np.nan)
+            debt = np.full((0, 0), np.nan)
+            locked_cash = np.full((0, 0), np.nan)
+            cash = np.full((0, 0), np.nan)
+            free_cash = np.full((0, 0), np.nan)
+        if save_value:
+            if cash_sharing:
+                value = np.full((wrapper.shape[0], len(group_lens)), np.nan)
+            else:
+                value = np.full(wrapper.shape_2d, np.nan)
+        else:
+            value = np.full((0, 0), np.nan)
+        if save_returns:
+            if cash_sharing:
+                returns = np.full((wrapper.shape[0], len(group_lens)), np.nan)
+            else:
+                returns = np.full(wrapper.shape_2d, np.nan)
+        else:
+            returns = np.full((0, 0), np.nan)
+        return enums.FSInOutputs(
+            position=position,
+            debt=debt,
+            locked_cash=locked_cash,
+            cash=cash,
+            free_cash=free_cash,
+            value=value,
+            returns=returns
+        )
+
     @cachedproperty
-    def _pre_in_outputs(self) -> tp.Optional[tp.NamedTuple]:
+    def _pre_in_outputs(self) -> tp.Union[None, tp.NamedTuple, CustomTemplate]:
         if self.dynamic_mode:
+            if self["post_segment_func_nb"] is None:
+                if self.save_state or self.save_value or self.save_returns:
+                    return RepFunc(self.init_in_outputs)
             return BasePFPreparer._pre_in_outputs.func(self)
         if self["in_outputs"] is not None:
             raise ValueError("Argument in_outputs cannot be used in fixed mode")
@@ -1439,6 +1473,19 @@ class FSPreparer(BasePFPreparer):
                         self.adjust_args,
                     )
         return self._post_signal_args
+
+    @cachedproperty
+    def post_segment_args(self) -> tp.Args:
+        """Argument `post_segment_args`."""
+        if self.dynamic_mode:
+            if self["post_segment_func_nb"] is None:
+                if self.save_state or self.save_value or self.save_returns:
+                    return (
+                        self.save_state,
+                        self.save_value,
+                        self.save_returns,
+                    )
+        return self._post_post_segment_args
 
     @cachedproperty
     def chunked(self) -> tp.ChunkedOption:
