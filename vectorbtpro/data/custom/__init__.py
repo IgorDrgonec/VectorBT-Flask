@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from vectorbtpro.data.custom.hdf import *
     from vectorbtpro.data.custom.local import *
     from vectorbtpro.data.custom.ndl import *
+    from vectorbtpro.data.custom.parquet import *
     from vectorbtpro.data.custom.polygon import *
     from vectorbtpro.data.custom.random import *
     from vectorbtpro.data.custom.random_ohlc import *

@@ -53,7 +53,7 @@ class CSVData(FileData):
             symbols=symbols,
         )
         if keys_meta["keys"] is None and paths is None:
-            keys_meta["keys"] = "*.csv"
+            keys_meta["keys"] = cls.list_paths()
         return keys_meta
 
     @classmethod
@@ -71,7 +71,7 @@ class CSVData(FileData):
         parse_dates: tp.Optional[bool] = None,
         chunk_func: tp.Optional[tp.Callable] = None,
         squeeze: tp.Optional[bool] = None,
-        **read_csv_kwargs,
+        **read_kwargs,
     ) -> tp.KeyData:
         """Fetch the CSV file of a feature or symbol.
 
@@ -104,7 +104,7 @@ class CSVData(FileData):
 
                 Gets called only if `iterator` or `chunksize` are set.
             squeeze (int): Whether to squeeze a DataFrame with one column into a Series.
-            **read_csv_kwargs: Other keyword arguments passed to `pd.read_csv`.
+            **read_kwargs: Other keyword arguments passed to `pd.read_csv`.
 
         `skiprows` and `nrows` will be automatically calculated based on `start_row` and `end_row`.
 
@@ -130,7 +130,7 @@ class CSVData(FileData):
         parse_dates = cls.resolve_custom_setting(parse_dates, "parse_dates")
         chunk_func = cls.resolve_custom_setting(chunk_func, "chunk_func")
         squeeze = cls.resolve_custom_setting(squeeze, "squeeze")
-        read_csv_kwargs = cls.resolve_custom_setting(read_csv_kwargs, "read_csv_kwargs", merge=True)
+        read_kwargs = cls.resolve_custom_setting(read_kwargs, "read_kwargs", merge=True)
 
         if path is None:
             path = key
@@ -146,7 +146,7 @@ class CSVData(FileData):
         else:
             nrows = None
 
-        sep = read_csv_kwargs.pop("sep", None)
+        sep = read_kwargs.pop("sep", None)
         if isinstance(path, (str, Path)):
             try:
                 _path = Path(path)
@@ -169,7 +169,7 @@ class CSVData(FileData):
             parse_dates=parse_dates,
             skiprows=skiprows,
             nrows=nrows,
-            **read_csv_kwargs,
+            **read_kwargs,
         )
 
         if isinstance(obj, TextFileReader):

@@ -41,7 +41,7 @@ HDFDataT = tp.TypeVar("HDFDataT", bound="HDFData")
 
 
 class HDFData(FileData):
-    """Data class for fetching HDF data."""
+    """Data class for fetching HDF data using PyTables."""
 
     _settings_path: tp.SettingsPath = dict(custom="data.custom.hdf")
 
@@ -158,7 +158,7 @@ class HDFData(FileData):
             symbols=symbols,
         )
         if keys_meta["keys"] is None and paths is None:
-            keys_meta["keys"] = "*.h5"
+            keys_meta["keys"] = cls.list_paths()
         return keys_meta
 
     @classmethod
@@ -172,7 +172,7 @@ class HDFData(FileData):
         start_row: tp.Optional[int] = None,
         end_row: tp.Optional[int] = None,
         chunk_func: tp.Optional[tp.Callable] = None,
-        **read_hdf_kwargs,
+        **read_kwargs,
     ) -> tp.KeyData:
         """Fetch the HDF object of a feature or symbol.
 
@@ -209,7 +209,7 @@ class HDFData(FileData):
             chunk_func (callable): Function to select and concatenate chunks from `TableIterator`.
 
                 Gets called only if `iterator` or `chunksize` are set.
-            **read_hdf_kwargs: Other keyword arguments passed to `pd.read_hdf`.
+            **read_kwargs: Other keyword arguments passed to `pd.read_hdf`.
 
         See https://pandas.pydata.org/docs/reference/api/pandas.read_hdf.html for other arguments.
 
@@ -227,7 +227,7 @@ class HDFData(FileData):
         if start_row is None:
             start_row = 0
         end_row = cls.resolve_custom_setting(end_row, "end_row")
-        read_hdf_kwargs = cls.resolve_custom_setting(read_hdf_kwargs, "read_hdf_kwargs", merge=True)
+        read_kwargs = cls.resolve_custom_setting(read_kwargs, "read_kwargs", merge=True)
 
         if path is None:
             path = key
@@ -237,7 +237,7 @@ class HDFData(FileData):
         if start is not None or end is not None:
             hdf_store_arg_names = get_func_arg_names(pd.HDFStore.__init__)
             hdf_store_kwargs = dict()
-            for k, v in read_hdf_kwargs.items():
+            for k, v in read_kwargs.items():
                 if k in hdf_store_arg_names:
                     hdf_store_kwargs[k] = v
             with pd.HDFStore(str(file_path), mode="r", **hdf_store_kwargs) as store:
@@ -269,7 +269,7 @@ class HDFData(FileData):
             start_row += mask_indices[0]
             end_row = start_row + mask_indices[-1] - mask_indices[0] + 1
 
-        obj = pd.read_hdf(file_path, key=key, start=start_row, stop=end_row, **read_hdf_kwargs)
+        obj = pd.read_hdf(file_path, key=key, start=start_row, stop=end_row, **read_kwargs)
         if isinstance(obj, TableIterator):
             if chunk_func is None:
                 obj = pd.concat(list(obj), axis=0)

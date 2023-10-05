@@ -2762,6 +2762,84 @@ class TestData:
         _load_and_check_symbol("F1", tmp_path / "my_F1.feather")
         _load_and_check_symbol("F2", tmp_path / "my_F2.feather")
 
+    def test_symbol_to_parquet(self, tmp_path):
+        data = MyData.pull(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented()
+
+        def _load_and_check_symbol(k, path, **kwargs):
+            df = pd.read_parquet(path, **kwargs)
+            df.index.freq = df.index.inferred_freq
+            df = df[data.data[k].columns].astype(object)
+            assert_frame_equal(df, data.data[k])
+
+        data.to_parquet(tmp_path)
+        _load_and_check_symbol("S1", tmp_path / "S1.parquet")
+        _load_and_check_symbol("S2", tmp_path / "S2.parquet")
+
+        data.to_parquet(tmp_path / "parquet_data", mkdir_kwargs=dict(mkdir=True))
+        _load_and_check_symbol("S1", tmp_path / "parquet_data/S1.parquet")
+        _load_and_check_symbol("S2", tmp_path / "parquet_data/S2.parquet")
+
+        data.to_parquet(
+            tmp_path / "parquet_data",
+            partition_cols=["F1"],
+            mkdir_kwargs=dict(mkdir=True),
+        )
+        _load_and_check_symbol("S1", tmp_path / "parquet_data/S1")
+        _load_and_check_symbol("S2", tmp_path / "parquet_data/S2")
+
+        data.to_parquet(
+            tmp_path / "parquet_data2",
+            partition_by=[0, 0, 0, 1, 1],
+            mkdir_kwargs=dict(mkdir=True),
+        )
+        _load_and_check_symbol("S1", tmp_path / "parquet_data2/S1")
+        _load_and_check_symbol("S2", tmp_path / "parquet_data2/S2")
+
+        data.to_parquet(
+            path_or_buf=vbt.symbol_dict({"S1": tmp_path / "my_S1.parquet", "S2": tmp_path / "my_S2.parquet"})
+        )
+        _load_and_check_symbol("S1", tmp_path / "my_S1.parquet")
+        _load_and_check_symbol("S2", tmp_path / "my_S2.parquet")
+
+    def test_feature_to_parquet(self, tmp_path):
+        data = MyData.pull(["S1", "S2", "S3"], shape=(5, 2), columns=["F1", "F2"]).to_feature_oriented()
+
+        def _load_and_check_feature(k, path, **kwargs):
+            df = pd.read_parquet(path, **kwargs)
+            df.index.freq = df.index.inferred_freq
+            df = df[data.data[k].columns].astype(object)
+            assert_frame_equal(df, data.data[k])
+
+        data.to_parquet(tmp_path)
+        _load_and_check_feature("F1", tmp_path / "F1.parquet")
+        _load_and_check_feature("F2", tmp_path / "F2.parquet")
+
+        data.to_parquet(tmp_path / "parquet_data", mkdir_kwargs=dict(mkdir=True))
+        _load_and_check_feature("F1", tmp_path / "parquet_data/F1.parquet")
+        _load_and_check_feature("F2", tmp_path / "parquet_data/F2.parquet")
+
+        data.to_parquet(
+            tmp_path / "parquet_data",
+            partition_cols=["S1"],
+            mkdir_kwargs=dict(mkdir=True),
+        )
+        _load_and_check_feature("F1", tmp_path / "parquet_data/F1")
+        _load_and_check_feature("F2", tmp_path / "parquet_data/F2")
+
+        data.to_parquet(
+            tmp_path / "parquet_data2",
+            partition_by=[0, 0, 0, 1, 1],
+            mkdir_kwargs=dict(mkdir=True),
+        )
+        _load_and_check_feature("F1", tmp_path / "parquet_data2/F1")
+        _load_and_check_feature("F2", tmp_path / "parquet_data2/F2")
+
+        data.to_parquet(
+            path_or_buf=vbt.feature_dict({"F1": tmp_path / "my_F1.parquet", "F2": tmp_path / "my_F2.parquet"})
+        )
+        _load_and_check_feature("F1", tmp_path / "my_F1.parquet")
+        _load_and_check_feature("F2", tmp_path / "my_F2.parquet")
+
     def test_symbol_to_sql(self, tmp_path):
         data = MyData.pull(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented()
 
@@ -3268,6 +3346,43 @@ class TestCustom:
         df.reset_index().to_feather(tmp_path / "temp.feather")
         feather_data = vbt.FeatherData.pull(tmp_path / "temp.feather")
         assert_frame_equal(feather_data.get(), df)
+
+    def test_parquet_data(self, tmp_path):
+        sr = pd.Series(np.arange(10), index=pd.date_range("2020", periods=10, tz="utc"), name="hello")
+        sr.to_frame().to_parquet(tmp_path / "temp.parquet")
+        parquet_data = vbt.ParquetData.pull(tmp_path / "temp.parquet")
+        assert_series_equal(parquet_data.get(), sr)
+        df = pd.DataFrame(np.arange(20).reshape((10, 2)), index=pd.date_range("2020", periods=10, tz="utc"))
+        df.columns = pd.Index(["0", "1"], dtype="object")
+        df.to_parquet(tmp_path / "temp.parquet")
+        parquet_data = vbt.ParquetData.pull(tmp_path / "temp.parquet")
+        assert_frame_equal(parquet_data.get(), df)
+        df = pd.DataFrame(np.arange(20).reshape((10, 2)), index=pd.date_range("2020", periods=10, tz="utc"))
+        df.columns = pd.Index(["0", "1"], dtype="object")
+        df["group"] = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
+        df.to_parquet(tmp_path / "temp", partition_cols=["group"])
+        parquet_data = vbt.ParquetData.pull(tmp_path / "temp")
+        assert_frame_equal(parquet_data.get(), df.drop("group", axis=1))
+        parquet_data = vbt.ParquetData.pull(tmp_path / "temp", keep_partition_cols=True)
+        assert_frame_equal(parquet_data.get().astype(int), df)
+        df = pd.DataFrame(np.arange(20).reshape((10, 2)), index=pd.date_range("2020", periods=10, tz="utc"))
+        df.columns = pd.Index(["0", "1"], dtype="object")
+        df["group_0"] = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
+        df["group_1"] = [0, 0, 1, 1, 1, 2, 2, 3, 3, 3]
+        df.to_parquet(tmp_path / "temp2", partition_cols=["group_0", "group_1"])
+        parquet_data = vbt.ParquetData.pull(tmp_path / "temp2")
+        assert_frame_equal(parquet_data.get(), df.drop(["group_0", "group_1"], axis=1))
+        parquet_data = vbt.ParquetData.pull(tmp_path / "temp2", keep_partition_cols=True)
+        assert_frame_equal(parquet_data.get().astype(int), df)
+        df = pd.DataFrame(np.arange(20).reshape((10, 2)), index=pd.date_range("2020", periods=10, tz="utc"))
+        df.columns = pd.Index(["0", "1"], dtype="object")
+        df["A"] = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
+        df["B"] = [0, 0, 1, 1, 1, 2, 2, 3, 3, 3]
+        df.to_parquet(tmp_path / "temp3", partition_cols=["A", "B"])
+        parquet_data = vbt.ParquetData.pull(tmp_path / "temp3", keep_partition_cols=False)
+        assert_frame_equal(parquet_data.get(), df.drop(["A", "B"], axis=1))
+        parquet_data = vbt.ParquetData.pull(tmp_path / "temp3")
+        assert_frame_equal(parquet_data.get().astype(int), df)
 
     def test_sql_data(self, tmp_path):
         if sqlalchemy_available:

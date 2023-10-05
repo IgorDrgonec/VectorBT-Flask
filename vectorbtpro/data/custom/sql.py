@@ -182,6 +182,8 @@ class SQLData(DBData):
         has_engine_config = len(engine_config) > 0
         engine_config = cls.resolve_engine_setting(engine_config, "engine_config", merge=True, engine_name=engine_name)
         if isinstance(engine, str):
+            if engine.startswith("duckdb:"):
+                assert_can_import("duckdb_engine")
             engine = create_engine(engine, **engine_config)
             should_dispose = True
         else:
@@ -536,7 +538,7 @@ class SQLData(DBData):
         tz: tp.Optional[tp.TimezoneLike] = None,
         start_row: tp.Optional[int] = None,
         end_row: tp.Optional[int] = None,
-        return_row_number: tp.Optional[bool] = None,
+        keep_row_number: tp.Optional[bool] = None,
         row_number_column: tp.Optional[str] = None,
         index_col: tp.Union[None, bool, tp.MaybeList[tp.IntStr]] = None,
         columns: tp.Optional[tp.MaybeList[tp.IntStr]] = None,
@@ -603,7 +605,7 @@ class SQLData(DBData):
                 Table must contain the column defined in `row_number_column`.
 
                 Cannot be used together with `query`. Include the condition into the query.
-            return_row_number (bool): Whether to return the column defined in `row_number_column`.
+            keep_row_number (bool): Whether to return the column defined in `row_number_column`.
             row_number_column (str): Name of the column with row numbers.
             index_col (int, str, or list): One or more columns that should become the index.
 
@@ -674,7 +676,7 @@ class SQLData(DBData):
         tz = cls.resolve_engine_setting(tz, "tz", engine_name=engine_name)
         start_row = cls.resolve_engine_setting(start_row, "start_row", engine_name=engine_name)
         end_row = cls.resolve_engine_setting(end_row, "end_row", engine_name=engine_name)
-        return_row_number = cls.resolve_engine_setting(return_row_number, "return_row_number", engine_name=engine_name)
+        keep_row_number = cls.resolve_engine_setting(keep_row_number, "keep_row_number", engine_name=engine_name)
         row_number_column = cls.resolve_engine_setting(row_number_column, "row_number_column", engine_name=engine_name)
         index_col = cls.resolve_engine_setting(index_col, "index_col", engine_name=engine_name)
         columns = cls.resolve_engine_setting(columns, "columns", engine_name=engine_name)
@@ -757,9 +759,12 @@ class SQLData(DBData):
                     if col not in columns:
                         pre_columns.append(col)
                 columns = pre_columns + columns
-            if return_row_number and columns is not None:
+            if keep_row_number and columns is not None:
                 if row_number_column in table_column_names and row_number_column not in columns:
                     columns = [row_number_column] + columns
+            elif not keep_row_number and columns is None:
+                if row_number_column in table_column_names:
+                    columns = [col for col in table_column_names if col != row_number_column]
             if columns is not None:
                 query = query.with_only_columns(*[table.columns.get(c) for c in columns])
 
@@ -915,7 +920,9 @@ class SQLData(DBData):
             obj.name = None
         if dispose_engine:
             engine.dispose()
-        return obj, dict(tz_convert=tz, row_number_column=row_number_column)
+        if keep_row_number:
+            return obj, dict(tz_convert=tz, row_number_column=row_number_column)
+        return obj, dict(tz_convert=tz)
 
     @classmethod
     def fetch_feature(cls, feature: str, **kwargs) -> tp.FeatureData:

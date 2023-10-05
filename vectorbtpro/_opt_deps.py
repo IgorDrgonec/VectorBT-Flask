@@ -144,6 +144,9 @@ opt_dep_config = HybridConfig(
         pyarrow=dict(
             link="https://pypi.org/project/pyarrow/",
         ),
+        fastparquet=dict(
+            link="https://pypi.org/project/fastparquet/",
+        ),
     )
 )
 """_"""

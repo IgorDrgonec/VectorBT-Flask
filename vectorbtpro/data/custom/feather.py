@@ -21,7 +21,7 @@ FeatherDataT = tp.TypeVar("FeatherDataT", bound="FeatherData")
 
 
 class FeatherData(FileData):
-    """Data class for fetching Feather data."""
+    """Data class for fetching Feather data using PyArrow."""
 
     _settings_path: tp.SettingsPath = dict(custom="data.custom.feather")
 
@@ -60,7 +60,7 @@ class FeatherData(FileData):
         tz: tp.Optional[tp.TimezoneLike] = None,
         index_col: tp.Optional[tp.MaybeSequence[tp.Union[int, str]]] = None,
         squeeze: tp.Optional[bool] = None,
-        **read_feather_kwargs,
+        **read_kwargs,
     ) -> tp.KeyData:
         """Fetch the Feather file of a feature or symbol.
 
@@ -76,7 +76,7 @@ class FeatherData(FileData):
 
                 Will only apply if the fetched object has a default index.
             squeeze (int): Whether to squeeze a DataFrame with one column into a Series.
-            **read_feather_kwargs: Other keyword arguments passed to `pd.read_feather`.
+            **read_kwargs: Other keyword arguments passed to `pd.read_feather`.
 
         See https://pandas.pydata.org/docs/reference/api/pandas.read_feather.html for other arguments.
 
@@ -90,11 +90,11 @@ class FeatherData(FileData):
         if index_col is False:
             index_col = None
         squeeze = cls.resolve_custom_setting(squeeze, "squeeze")
-        read_feather_kwargs = cls.resolve_custom_setting(read_feather_kwargs, "read_feather_kwargs", merge=True)
+        read_kwargs = cls.resolve_custom_setting(read_kwargs, "read_kwargs", merge=True)
 
         if path is None:
             path = key
-        obj = pd.read_feather(path, **read_feather_kwargs)
+        obj = pd.read_feather(path, **read_kwargs)
 
         if isinstance(obj, pd.DataFrame) and checks.is_default_index(obj.index):
             if index_col is not None:
@@ -113,7 +113,6 @@ class FeatherData(FileData):
                 if not isinstance(obj.index, pd.MultiIndex):
                     if obj.index.name == "index":
                         obj.index.name = None
-
         if isinstance(obj.index, pd.DatetimeIndex) and tz is None:
             tz = obj.index.tz
         if isinstance(obj, pd.DataFrame) and squeeze:

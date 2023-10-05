@@ -63,6 +63,7 @@ data-base = [
 ]
 data = [
     "vectorbtpro[data-base]",
+    "fastparquet",
     "python-binance>=1.0.16",
     "alpaca-py",
     "ccxt>=1.89.14",
