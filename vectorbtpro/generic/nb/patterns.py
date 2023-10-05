@@ -160,17 +160,29 @@ def fit_pattern_nb(
         fit_pattern = pmax + pmin - fit_pattern
     if rescale_mode == RescaleMode.Rebase:
         if not np.isnan(pmin):
-            pmin = pmin / fit_pattern[0] * arr[0]
+            if fit_pattern[0] == 0:
+                pmin = np.nan
+            else:
+                pmin = pmin / fit_pattern[0] * arr[0]
         if not np.isnan(pmax):
-            pmax = pmax / fit_pattern[0] * arr[0]
+            if fit_pattern[0] == 0:
+                pmax = np.nan
+            else:
+                pmax = pmax / fit_pattern[0] * arr[0]
     if rescale_mode == RescaleMode.Rebase:
-        fit_pattern = fit_pattern / fit_pattern[0] * arr[0]
+        if fit_pattern[0] == 0:
+            fit_pattern = np.nan
+        else:
+            fit_pattern = fit_pattern / fit_pattern[0] * arr[0]
         fit_max_error = fit_max_error * fit_pattern
     fit_pattern = np.clip(fit_pattern, pmin, pmax)
     if rescale_mode == RescaleMode.MinMax:
         fit_pattern = rescale_nb(fit_pattern, (pmin, pmax), (vmin, vmax))
         if error_type == ErrorType.Absolute:
-            fit_max_error = fit_max_error / (pmax - pmin) * (vmax - vmin)
+            if pmax - pmin == 0:
+                fit_max_error = np.nan
+            else:
+                fit_max_error = fit_max_error / (pmax - pmin) * (vmax - vmin)
         else:
             fit_max_error = fit_max_error * fit_pattern
     return fit_pattern, fit_max_error
@@ -275,9 +287,9 @@ def pattern_similarity_nb(
             return np.nan
         if pmin == pmax and rescale_mode == RescaleMode.MinMax:
             return np.nan
-        if not np.isnan(min_pct_change) and (vmax - vmin) / vmin < min_pct_change:
+        if not np.isnan(min_pct_change) and vmin != 0 and (vmax - vmin) / vmin < min_pct_change:
             return np.nan
-        if not np.isnan(max_pct_change) and (vmax - vmin) / vmin > max_pct_change:
+        if not np.isnan(max_pct_change) and vmin != 0 and (vmax - vmin) / vmin > max_pct_change:
             return np.nan
 
     first_pattern_elem = pattern[0]
@@ -285,9 +297,15 @@ def pattern_similarity_nb(
         first_pattern_elem = pmax + pmin - first_pattern_elem
     if rescale_mode == RescaleMode.Rebase:
         if not np.isnan(pmin):
-            pmin = pmin / first_pattern_elem * arr[0]
+            if first_pattern_elem == 0:
+                pmin = np.nan
+            else:
+                pmin = pmin / first_pattern_elem * arr[0]
         if not np.isnan(pmax):
-            pmax = pmax / first_pattern_elem * arr[0]
+            if first_pattern_elem == 0:
+                pmax = np.nan
+            else:
+                pmax = pmax / first_pattern_elem * arr[0]
     if rescale_mode == RescaleMode.Rebase or rescale_mode == RescaleMode.Disable:
         if not np.isnan(pmin) and not np.isnan(vmin):
             _min = min(pmin, vmin)
@@ -328,7 +346,10 @@ def pattern_similarity_nb(
             if invert:
                 pattern_elem = pmax + pmin - pattern_elem
             if rescale_mode == RescaleMode.Rebase:
-                pattern_elem = pattern_elem / first_pattern_elem * arr[0]
+                if first_pattern_elem == 0:
+                    pattern_elem = np.nan
+                else:
+                    pattern_elem = pattern_elem / first_pattern_elem * arr[0]
                 if error_type == ErrorType.Absolute:
                     _max_error = _max_error * pattern_elem
             if not np.isnan(vmin) and arr_elem < vmin:
@@ -340,20 +361,32 @@ def pattern_similarity_nb(
             if not np.isnan(pmax) and pattern_elem > pmax:
                 pattern_elem = pmax
             if rescale_mode == RescaleMode.MinMax:
-                pattern_elem = (pattern_elem - pmin) / (pmax - pmin) * (vmax - vmin) + vmin
+                if pmax - pmin == 0:
+                    pattern_elem = np.nan
+                else:
+                    pattern_elem = (pattern_elem - pmin) / (pmax - pmin) * (vmax - vmin) + vmin
                 if error_type == ErrorType.Absolute:
-                    _max_error = _max_error / (pmax - pmin) * (vmax - vmin)
+                    if pmax - pmin == 0:
+                        _max_error = np.nan
+                    else:
+                        _max_error = _max_error / (pmax - pmin) * (vmax - vmin)
 
             if distance_measure == DistanceMeasure.MAE:
                 if error_type == ErrorType.Absolute:
                     dist = abs(arr_elem - pattern_elem)
                 else:
-                    dist = abs(arr_elem - pattern_elem) / pattern_elem
+                    if pattern_elem == 0:
+                        dist = np.nan
+                    else:
+                        dist = abs(arr_elem - pattern_elem) / pattern_elem
             else:
                 if error_type == ErrorType.Absolute:
                     dist = (arr_elem - pattern_elem) ** 2
                 else:
-                    dist = ((arr_elem - pattern_elem) / pattern_elem) ** 2
+                    if pattern_elem == 0:
+                        dist = np.nan
+                    else:
+                        dist = ((arr_elem - pattern_elem) / pattern_elem) ** 2
             if max_error_as_maxdist:
                 if np.isnan(_max_error):
                     continue
@@ -363,12 +396,18 @@ def pattern_similarity_nb(
                     if error_type == ErrorType.Absolute:
                         maxdist = max(pattern_elem - _min, _max - pattern_elem)
                     else:
-                        maxdist = max(pattern_elem - _min, _max - pattern_elem) / pattern_elem
+                        if pattern_elem == 0:
+                            maxdist = np.nan
+                        else:
+                            maxdist = max(pattern_elem - _min, _max - pattern_elem) / pattern_elem
                 else:
                     if error_type == ErrorType.Absolute:
                         maxdist = max(pattern_elem - _min, _max - pattern_elem) ** 2
                     else:
-                        maxdist = (max(pattern_elem - _min, _max - pattern_elem) / pattern_elem) ** 2
+                        if pattern_elem == 0:
+                            maxdist = np.nan
+                        else:
+                            maxdist = (max(pattern_elem - _min, _max - pattern_elem) / pattern_elem) ** 2
             if dist > 0 and maxdist == 0:
                 return np.nan
             if not np.isnan(_max_error) and dist > _max_error:
@@ -391,19 +430,31 @@ def pattern_similarity_nb(
                             if error_type == ErrorType.Absolute:
                                 worst_maxdist = _max - _min
                             else:
-                                worst_maxdist = (_max - _min) / _min
+                                if _min == 0:
+                                    worst_maxdist = np.nan
+                                else:
+                                    worst_maxdist = (_max - _min) / _min
                         else:
                             if error_type == ErrorType.Absolute:
                                 worst_maxdist = (_max - _min) ** 2
                             else:
-                                worst_maxdist = ((_max - _min) / _min) ** 2
+                                if _min == 0:
+                                    worst_maxdist = np.nan
+                                else:
+                                    worst_maxdist = ((_max - _min) / _min) ** 2
                     worst_maxdistance_sum = maxdistance_sum + worst_maxdist * (max_size - i - 1)
                     if worst_maxdistance_sum == 0:
                         return np.nan
                     if distance_measure == DistanceMeasure.RMSE:
-                        best_similarity = 1 - np.sqrt(distance_sum) / np.sqrt(worst_maxdistance_sum)
+                        if worst_maxdistance_sum == 0:
+                            best_similarity = np.nan
+                        else:
+                            best_similarity = 1 - np.sqrt(distance_sum) / np.sqrt(worst_maxdistance_sum)
                     else:
-                        best_similarity = 1 - distance_sum / worst_maxdistance_sum
+                        if worst_maxdistance_sum == 0:
+                            best_similarity = np.nan
+                        else:
+                            best_similarity = 1 - distance_sum / worst_maxdistance_sum
                     if best_similarity < min_similarity:
                         return np.nan
 
@@ -412,9 +463,15 @@ def pattern_similarity_nb(
     if maxdistance_sum == 0:
         return np.nan
     if distance_measure == DistanceMeasure.RMSE:
-        similarity = 1 - np.sqrt(distance_sum) / np.sqrt(maxdistance_sum)
+        if maxdistance_sum == 0:
+            similarity = np.nan
+        else:
+            similarity = 1 - np.sqrt(distance_sum) / np.sqrt(maxdistance_sum)
     else:
-        similarity = 1 - distance_sum / maxdistance_sum
+        if maxdistance_sum == 0:
+            similarity = np.nan
+        else:
+            similarity = 1 - distance_sum / maxdistance_sum
     if not np.isnan(min_similarity):
         if similarity < min_similarity:
             return np.nan
