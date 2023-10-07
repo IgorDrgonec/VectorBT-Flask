@@ -56,8 +56,10 @@ def map_to_target_index_nb(
     out = np.empty(len(source_index), dtype=np.int_)
     from_j = 0
     for i in range(len(source_index)):
-        if i > 0 and source_index[i] <= source_index[i - 1]:
-            raise ValueError("Array index must be strictly increasing")
+        if i > 0 and source_index[i] < source_index[i - 1]:
+            raise ValueError("Source index must be increasing")
+        if i > 0 and source_index[i] == source_index[i - 1]:
+            out[i] = out[i - 1]
 
         found = False
         for j in range(from_j, len(target_index)):
@@ -86,7 +88,7 @@ def map_to_target_index_nb(
 
         if not found:
             if raise_missing:
-                raise ValueError("Resampling failed: cannot map some indices")
+                raise ValueError("Resampling failed: cannot map some source indices")
             out[i] = -1
     return out
 
