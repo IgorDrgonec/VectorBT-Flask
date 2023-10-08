@@ -120,6 +120,9 @@ opt_dep_config = HybridConfig(
         blosc=dict(
             link="https://pypi.org/project/blosc/",
         ),
+        blosc2=dict(
+            link="https://pypi.org/project/blosc2/",
+        ),
         tables=dict(
             link="https://pypi.org/project/tables/",
         ),

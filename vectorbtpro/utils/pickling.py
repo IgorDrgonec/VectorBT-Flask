@@ -70,7 +70,12 @@ def dumps(
     Keyword arguments `compress_kwargs` are passed to the `compress` method of the compressing package.
 
     Other keyword arguments are passed to the `dumps` method of the pickling package."""
-    from vectorbtpro.utils.module_ import warn_cannot_import, assert_can_import
+    from vectorbtpro.utils.module_ import (
+        warn_cannot_import,
+        assert_can_import,
+        assert_can_import_any,
+        check_installed,
+    )
 
     if warn_cannot_import("dill"):
         import pickle
@@ -108,12 +113,29 @@ def dumps(
             import lz4.frame
 
             bytes_ = lz4.frame.compress(bytes_, return_bytearray=True, **compress_kwargs)
-        elif compression.lower() in get_compression_extensions("blosc"):
+        elif compression.lower() in get_compression_extensions("blosc1"):
             assert_can_import("blosc")
 
             import blosc
 
             bytes_ = blosc.compress(bytes_, **compress_kwargs)
+        elif compression.lower() in get_compression_extensions("blosc2"):
+            assert_can_import("blosc2")
+
+            import blosc2
+
+            bytes_ = blosc2.compress(bytes_, **compress_kwargs)
+        elif compression.lower() in get_compression_extensions("blosc"):
+            assert_can_import_any("blosc2", "blosc")
+
+            if check_installed("blosc2"):
+                import blosc2
+
+                bytes_ = blosc2.compress(bytes_, **compress_kwargs)
+            else:
+                import blosc
+
+                bytes_ = blosc.compress(bytes_, **compress_kwargs)
         else:
             raise ValueError(f"Invalid compression format '{compression}'")
     return bytes_
@@ -125,7 +147,12 @@ def loads(bytes_: bytes, compression: tp.Union[None, bool, str] = None, **kwargs
     Accepts the same options for `compression` as in the `dumps` method.
 
     Other keyword arguments are passed to the `loads` method of the pickling package."""
-    from vectorbtpro.utils.module_ import warn_cannot_import, assert_can_import
+    from vectorbtpro.utils.module_ import (
+        warn_cannot_import,
+        assert_can_import,
+        assert_can_import_any,
+        check_installed,
+    )
 
     if warn_cannot_import("dill"):
         import pickle
@@ -159,12 +186,29 @@ def loads(bytes_: bytes, compression: tp.Union[None, bool, str] = None, **kwargs
             import lz4.frame
 
             bytes_ = lz4.frame.decompress(bytes_, return_bytearray=True)
-        elif compression.lower() in get_compression_extensions("blosc"):
+        elif compression.lower() in get_compression_extensions("blosc1"):
             assert_can_import("blosc")
 
             import blosc
 
             bytes_ = blosc.decompress(bytes_, as_bytearray=True)
+        elif compression.lower() in get_compression_extensions("blosc2"):
+            assert_can_import("blosc2")
+
+            import blosc2
+
+            bytes_ = blosc2.decompress(bytes_, as_bytearray=True)
+        elif compression.lower() in get_compression_extensions("blosc"):
+            assert_can_import_any("blosc2", "blosc")
+
+            if check_installed("blosc2"):
+                import blosc2
+
+                bytes_ = blosc2.decompress(bytes_, as_bytearray=True)
+            else:
+                import blosc
+
+                bytes_ = blosc.decompress(bytes_, as_bytearray=True)
         else:
             raise ValueError(f"Invalid compression format '{compression}'")
     return pickle.loads(bytes_, **kwargs)

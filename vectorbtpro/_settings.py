@@ -469,6 +469,8 @@ pickling = frozen_cfg(
             gzip={"gzip", "gz"},
             lzma={"lzma", "xz"},
             lz4={"lz4"},
+            blosc2={"blosc2"},
+            blosc1={"blosc1"},
             blosc={"blosc"},
         ),
     ),

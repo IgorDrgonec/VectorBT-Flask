@@ -91,8 +91,8 @@ pfopt = ["vectorbtpro[pfopt-base]", "universal-portfolios"]
 stats-base = ["quantstats>=0.0.37"]
 stats = ["vectorbtpro[stats-base]"]
 msg = ["python-telegram-bot"]
-io-base = ["dill"]
-io = ["vectorbtpro[io-base]", "blosc", "lz4"]
+io-base = ["dill", "blosc2"]
+io = ["vectorbtpro[io-base]", "lz4"]
 base = [
     "vectorbtpro[data-base,ind-base,perf-base,opt-base,exec-base,plot-base,pfopt-base,stats-base,io-base]"
 ]

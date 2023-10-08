@@ -74,7 +74,7 @@ RUN pip install --quiet --no-cache-dir \
     'python-telegram-bot>=13.4' \
     'dill' \
     'lz4' \
-    'blosc'
+    'blosc2'
 
 RUN pip install --quiet --no-cache-dir --no-deps 'universal-portfolios'
 RUN pip install --quiet --no-cache-dir 'pandas_datareader'
