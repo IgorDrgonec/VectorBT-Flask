@@ -30,12 +30,19 @@ class CSVData(FileData):
     _settings_path: tp.SettingsPath = dict(custom="data.custom.csv")
 
     @classmethod
-    def list_paths(cls, path: tp.PathLike = ".", **match_path_kwargs) -> tp.List[Path]:
+    def is_csv_file(cls, path: tp.PathLike) -> bool:
+        """Return whether the path is a CSV/TSV file."""
         if not isinstance(path, Path):
             path = Path(path)
-        if path.exists() and path.is_dir():
-            path = path / "*.csv"
-        return cls.match_path(path, **match_path_kwargs)
+        if path.exists() and path.is_file() and ".csv" in path.suffixes:
+            return True
+        if path.exists() and path.is_file() and ".tsv" in path.suffixes:
+            return True
+        return False
+
+    @classmethod
+    def is_file_match(cls, path: tp.PathLike) -> bool:
+        return cls.is_csv_file(path)
 
     @classmethod
     def resolve_keys_meta(

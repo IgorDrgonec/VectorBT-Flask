@@ -26,6 +26,16 @@ class FileData(LocalData):
     _settings_path: tp.SettingsPath = dict(custom="data.custom.file")
 
     @classmethod
+    def is_dir_match(cls, path: tp.PathLike) -> bool:
+        """Return whether a directory is a valid match."""
+        return False
+
+    @classmethod
+    def is_file_match(cls, path: tp.PathLike) -> bool:
+        """Return whether a file is a valid match."""
+        return True
+
+    @classmethod
     def match_path(
         cls,
         path: tp.PathLike,
@@ -34,12 +44,21 @@ class FileData(LocalData):
         recursive: bool = True,
         **kwargs,
     ) -> tp.List[Path]:
-        """Get the list of all paths matching a path."""
+        """Get the list of all paths matching a path.
+
+        If `FileData.is_dir_match` returns True for a directory, it gets returned as-is.
+        Otherwise, iterates through all files in that directory and invokes `FileData.is_file_match`.
+        If a pattern was provided, these methods aren't invoked."""
         if not isinstance(path, Path):
             path = Path(path)
         if path.exists():
-            if path.is_dir():
-                sub_paths = [p for p in path.iterdir() if p.is_file()]
+            if path.is_dir() and not cls.is_dir_match(path):
+                sub_paths = []
+                for p in path.iterdir():
+                    if p.is_dir() and cls.is_dir_match(p):
+                        sub_paths.append(p)
+                    if p.is_file() and cls.is_file_match(p):
+                        sub_paths.append(p)
             else:
                 sub_paths = [path]
         else:
@@ -53,10 +72,6 @@ class FileData(LocalData):
     @classmethod
     def list_paths(cls, path: tp.PathLike = ".", **match_path_kwargs) -> tp.List[Path]:
         """List all features or symbols under a path."""
-        if not isinstance(path, Path):
-            path = Path(path)
-        if path.exists() and path.is_dir():
-            path = path / "*"
         return cls.match_path(path, **match_path_kwargs)
 
     @classmethod

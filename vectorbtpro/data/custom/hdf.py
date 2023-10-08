@@ -11,10 +11,7 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.datetime_ import (
-    to_tzaware_timestamp,
-    to_naive_timestamp,
-)
+from vectorbtpro.utils.datetime_ import to_tzaware_timestamp, to_naive_timestamp
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.data.custom.file import FileData
 
@@ -46,12 +43,21 @@ class HDFData(FileData):
     _settings_path: tp.SettingsPath = dict(custom="data.custom.hdf")
 
     @classmethod
-    def list_paths(cls, path: tp.PathLike = ".", **match_path_kwargs) -> tp.List[Path]:
+    def is_hdf_file(cls, path: tp.PathLike) -> bool:
+        """Return whether the path is an HDF file."""
         if not isinstance(path, Path):
             path = Path(path)
-        if path.exists() and path.is_dir():
-            path = path / "*.h5"
-        return cls.match_path(path, **match_path_kwargs)
+        if path.exists() and path.is_file() and ".hdf" in path.suffixes:
+            return True
+        if path.exists() and path.is_file() and ".hdf5" in path.suffixes:
+            return True
+        if path.exists() and path.is_file() and ".h5" in path.suffixes:
+            return True
+        return False
+
+    @classmethod
+    def is_file_match(cls, path: tp.PathLike) -> bool:
+        return cls.is_hdf_file(path)
 
     @classmethod
     def split_hdf_path(
@@ -88,8 +94,13 @@ class HDFData(FileData):
         (path to file + key) matching a path."""
         path = Path(path)
         if path.exists():
-            if path.is_dir():
-                sub_paths = [p for p in path.iterdir() if p.is_file()]
+            if path.is_dir() and not cls.is_dir_match(path):
+                sub_paths = []
+                for p in path.iterdir():
+                    if p.is_dir() and cls.is_dir_match(p):
+                        sub_paths.append(p)
+                    if p.is_file() and cls.is_file_match(p):
+                        sub_paths.append(p)
                 key_paths = [p for sub_path in sub_paths for p in cls.match_path(sub_path, sort_paths=False, **kwargs)]
             else:
                 with pd.HDFStore(str(path), mode="r") as store:

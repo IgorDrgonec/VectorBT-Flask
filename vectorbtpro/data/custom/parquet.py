@@ -66,9 +66,12 @@ class ParquetData(FileData):
         return False
 
     @classmethod
-    def is_parquet_path(cls, path: tp.PathLike) -> bool:
-        """Return whether the path is a Parquet file or a directory with Parquet partitions."""
-        return cls.is_parquet_file(path) or cls.is_parquet_dir(path)
+    def is_dir_match(cls, path: tp.PathLike) -> bool:
+        return cls.is_parquet_dir(path)
+
+    @classmethod
+    def is_file_match(cls, path: tp.PathLike) -> bool:
+        return cls.is_parquet_file(path)
 
     @classmethod
     def list_partition_cols(cls, path: tp.PathLike) -> tp.List[str]:
@@ -96,48 +99,6 @@ class ParquetData(FileData):
     def is_default_partition_col(cls, level: str) -> bool:
         """Return whether a partitioning column is a default partitioning column."""
         return re.match(r"^(\bgroup\b)|(group_\d+)", level) is not None
-
-    @classmethod
-    def match_path(
-        cls,
-        path: tp.PathLike,
-        match_regex: tp.Optional[str] = None,
-        sort_paths: bool = True,
-        recursive: bool = True,
-        **kwargs,
-    ) -> tp.List[Path]:
-        if not isinstance(path, Path):
-            path = Path(path)
-        if path.exists():
-            if cls.is_parquet_path(path):
-                sub_paths = [path]
-            elif path.is_dir():
-                sub_paths = [p for p in path.iterdir() if p.is_file()]
-            else:
-                sub_paths = [path]
-        else:
-            sub_paths = list([Path(p) for p in glob(str(path), recursive=recursive)])
-        if match_regex is not None:
-            sub_paths = [p for p in sub_paths if re.match(match_regex, str(p))]
-        if sort_paths:
-            sub_paths = sorted(sub_paths)
-        return sub_paths
-
-    @classmethod
-    def list_paths(cls, path: tp.PathLike = ".", sort_paths: bool = True, **match_path_kwargs) -> tp.List[Path]:
-        if not isinstance(path, Path):
-            path = Path(path)
-        if path.exists() and path.is_dir():
-            if cls.is_parquet_dir(path):
-                return [path]
-            sub_paths = []
-            for p in path.iterdir():
-                if cls.is_parquet_path(p):
-                    sub_paths.append(p)
-            if sort_paths:
-                return sorted(sub_paths)
-            return sub_paths
-        return cls.match_path(path, sort_paths=sort_paths, **match_path_kwargs)
 
     @classmethod
     def resolve_keys_meta(
