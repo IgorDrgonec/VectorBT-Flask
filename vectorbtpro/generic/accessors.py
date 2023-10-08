@@ -2330,7 +2330,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
     # ############# Resampling ############# #
 
-    def latest_at_index(
+    def realign(
         self,
         index: tp.AnyRuleLike,
         freq: tp.Union[None, bool, tp.FrequencyLike] = None,
@@ -2343,7 +2343,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         wrap_kwargs: tp.KwargsLike = None,
         silence_warnings: tp.Optional[bool] = None,
     ) -> tp.MaybeSeriesFrame:
-        """See `vectorbtpro.generic.nb.base.latest_at_index_nb`.
+        """See `vectorbtpro.generic.nb.base.realign_nb`.
 
         `index` can be either an instance of `vectorbtpro.base.resampling.base.Resampler`,
         or any index-like object.
@@ -2359,7 +2359,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> d_index = pd.date_range('2020-01-01', '2020-01-05', freq='1d')
 
             >>> h_sr = pd.Series(range(len(h_index)), index=h_index)
-            >>> h_sr.vbt.latest_at_index(d_index)
+            >>> h_sr.vbt.realign(d_index)
             2020-01-01     0.0
             2020-01-02    24.0
             2020-01-03    48.0
@@ -2372,7 +2372,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
             ```pycon
             >>> d_sr = pd.Series(range(len(d_index)), index=d_index)
-            >>> d_sr.vbt.latest_at_index(h_index)
+            >>> d_sr.vbt.realign(h_index)
             2020-01-01 00:00:00    0.0
             2020-01-01 01:00:00    0.0
             2020-01-01 02:00:00    0.0
@@ -2442,7 +2442,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 nan_value = np.nan
 
-        func = jit_reg.resolve_option(nb.latest_at_index_nb, jitted)
+        func = jit_reg.resolve_option(nb.realign_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(
             self.to_2d_array(),
@@ -2461,18 +2461,18 @@ class GenericAccessor(BaseAccessor, Analyzable):
             return out.iloc[0]
         return out
 
-    def resample_opening(self, *args, **kwargs) -> tp.MaybeSeriesFrame:
-        """`GenericAccessor.latest_at_index` but creating a resampler and using the left bound
+    def realign_opening(self, *args, **kwargs) -> tp.MaybeSeriesFrame:
+        """`GenericAccessor.realign` but creating a resampler and using the left bound
         of the source and target index."""
-        return self.latest_at_index(*args, source_rbound=False, target_rbound=False, **kwargs)
+        return self.realign(*args, source_rbound=False, target_rbound=False, **kwargs)
 
-    def resample_closing(self, *args, **kwargs) -> tp.MaybeSeriesFrame:
-        """`GenericAccessor.latest_at_index` but creating a resampler and using the right bound
+    def realign_closing(self, *args, **kwargs) -> tp.MaybeSeriesFrame:
+        """`GenericAccessor.realign` but creating a resampler and using the right bound
         of the source and target index.
 
         !!! note
             The timestamps in the source and target index should denote the open time."""
-        return self.latest_at_index(*args, source_rbound=True, target_rbound=True, **kwargs)
+        return self.realign(*args, source_rbound=True, target_rbound=True, **kwargs)
 
     @class_or_instancemethod
     def resample_to_index(

@@ -2975,8 +2975,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         """Perform realigning on `Data`.
 
         Looks for `realign_func` of each feature in `Data.feature_config`. If no function provided,
-        resamples feature "open" with `vectorbtpro.generic.accessors.GenericAccessor.resample_opening`
-        and other features with `vectorbtpro.generic.accessors.GenericAccessor.resample_closing`."""
+        resamples feature "open" with `vectorbtpro.generic.accessors.GenericAccessor.realign_opening`
+        and other features with `vectorbtpro.generic.accessors.GenericAccessor.realign_closing`."""
         if rule is None:
             rule = self.wrapper.freq
         if wrapper_meta is None:
@@ -2989,8 +2989,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     return getattr(obj.vbt, realign_func)(wrapper_meta["resampler"], ffill=ffill)
                 return realign_func(self, obj, wrapper_meta["resampler"], ffill=ffill)
             if isinstance(feature, str) and feature.lower() == "open":
-                return obj.vbt.resample_opening(wrapper_meta["resampler"], ffill=ffill)
-            return obj.vbt.resample_closing(wrapper_meta["resampler"], ffill=ffill)
+                return obj.vbt.realign_opening(wrapper_meta["resampler"], ffill=ffill)
+            return obj.vbt.realign_closing(wrapper_meta["resampler"], ffill=ffill)
 
         new_data = self.dict_type()
         if self.feature_oriented:

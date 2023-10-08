@@ -195,7 +195,7 @@ def talib_func(func_name: str) -> tp.Callable:
                                 ffill=True,
                                 silence_warnings=True,
                             ), resolve_dict(realign_kwargs, i=i))
-                            new_output = GenericAccessor(target_wrapper, output).latest_at_index(
+                            new_output = GenericAccessor(target_wrapper, output).realign(
                                 wrapper.index,
                                 freq=wrapper.freq,
                                 **_realign_kwargs,
@@ -264,7 +264,7 @@ Set `timeframe` to a frequency to resample the input arrays to this frequency, r
 and then resample the output arrays back to the original frequency. Optionally, provide `resample_map`
 as a dictionary that maps input names to resample-apply function names. Keyword arguments 
 `resample_kwargs` are passed to `vectorbtpro.generic.accessors.GenericAccessor.resample_apply`
-while `realign_kwargs` are passed to `vectorbtpro.generic.accessors.GenericAccessor.latest_at_index`.
+while `realign_kwargs` are passed to `vectorbtpro.generic.accessors.GenericAccessor.realign`.
 Both can be also provided as sequences of dictionaries - one dictionary per input and output respectively.
 
 Set `skipna` to True to run the TA-Lib function on non-NA values only.

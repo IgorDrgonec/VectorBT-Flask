@@ -251,7 +251,7 @@ class SignalsAccessor(GenericAccessor):
     bshift = partialmethod(GenericAccessor.bshift, fill_value=False)
     fshift = partialmethod(GenericAccessor.fshift, fill_value=False)
     ago = partialmethod(GenericAccessor.ago, fill_value=False)
-    latest_at_index = partialmethod(GenericAccessor.latest_at_index, nan_value=False)
+    realign = partialmethod(GenericAccessor.realign, nan_value=False)
 
     # ############# Generation ############# #
 

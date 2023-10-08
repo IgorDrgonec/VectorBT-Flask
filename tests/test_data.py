@@ -2365,19 +2365,19 @@ class TestData:
             single_key=True,
         )
         ohlcv_data.feature_config["Other"] = dict(
-            realign_func=lambda self, obj, resampler, **kwargs: obj.vbt.resample_opening(resampler, **kwargs)
+            realign_func=lambda self, obj, resampler, **kwargs: obj.vbt.realign_opening(resampler, **kwargs)
         )
         for data in [ohlcv_data.to_symbol_oriented(), ohlcv_data.to_feature_oriented()]:
             assert_frame_equal(
                 data.realign(test_freq).get(),
                 pd.concat(
                     (
-                        data.get(["Open"]).vbt.resample_opening(test_freq),
-                        data.get(["High"]).vbt.resample_closing(test_freq),
-                        data.get(["Low"]).vbt.resample_closing(test_freq),
-                        data.get(["Close"]).vbt.resample_closing(test_freq),
-                        data.get(["Volume"]).vbt.resample_closing(test_freq),
-                        data.get(["Other"]).vbt.resample_opening(test_freq),
+                        data.get(["Open"]).vbt.realign_opening(test_freq),
+                        data.get(["High"]).vbt.realign_closing(test_freq),
+                        data.get(["Low"]).vbt.realign_closing(test_freq),
+                        data.get(["Close"]).vbt.realign_closing(test_freq),
+                        data.get(["Volume"]).vbt.realign_closing(test_freq),
+                        data.get(["Other"]).vbt.realign_opening(test_freq),
                     ),
                     axis=1,
                 ),

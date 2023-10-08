@@ -1868,39 +1868,39 @@ class TestAccessors:
         "test_freq",
         ["1h", "3d", "7d"],
     )
-    def test_latest_at_index(self, test_freq):
+    def test_realign(self, test_freq):
         target_index = df.resample(test_freq, closed="right", label="right").count().index
         np.testing.assert_array_equal(
-            df["a"].vbt.latest_at_index(target_index).values,
+            df["a"].vbt.realign(target_index).values,
             df["a"].resample(test_freq, closed="right", label="right").last().ffill().values,
         )
         np.testing.assert_array_equal(
-            df.vbt.latest_at_index(target_index).values,
+            df.vbt.realign(target_index).values,
             df.resample(test_freq, closed="right", label="right").last().ffill().values,
         )
         np.testing.assert_array_equal(
-            df.vbt.latest_at_index(target_index, ffill=False).values,
+            df.vbt.realign(target_index, ffill=False).values,
             df.resample(test_freq, closed="right", label="right").last().values,
         )
         np.testing.assert_array_equal(
-            df.vbt.latest_at_index(target_index, ffill=False, nan_value=-1).values,
+            df.vbt.realign(target_index, ffill=False, nan_value=-1).values,
             df.resample(test_freq, closed="right", label="right").last().fillna(-1).values,
         )
         np.testing.assert_array_equal(
-            df.vbt.latest_at_index(target_index, jitted=dict(parallel=True)).values,
-            df.vbt.latest_at_index(target_index, jitted=dict(parallel=False)).values,
+            df.vbt.realign(target_index, jitted=dict(parallel=True)).values,
+            df.vbt.realign(target_index, jitted=dict(parallel=False)).values,
         )
         assert_frame_equal(
-            df.vbt.latest_at_index(target_index, chunked=True),
-            df.vbt.latest_at_index(target_index, chunked=False),
+            df.vbt.realign(target_index, chunked=True),
+            df.vbt.realign(target_index, chunked=False),
         )
 
-    def test_latest_at_index_bounds(self):
+    def test_realign_bounds(self):
         source_index = np.array([1, 2, 3])
         target_index = np.array([0.5, 1, 1.5, 2.5, 3.0, 3.5])
         sr = pd.Series(np.arange(len(source_index)), index=source_index)
         np.testing.assert_array_equal(
-            sr.vbt.latest_at_index(
+            sr.vbt.realign(
                 target_index,
                 nan_value=-1,
                 source_rbound=True,
@@ -1912,7 +1912,7 @@ class TestAccessors:
         target_index = np.array([1.5, 2, 2.5])
         sr = pd.Series(np.arange(len(source_index)), index=source_index)
         np.testing.assert_array_equal(
-            sr.vbt.latest_at_index(
+            sr.vbt.realign(
                 target_index,
                 nan_value=-1,
                 source_rbound=True,
@@ -1924,7 +1924,7 @@ class TestAccessors:
         target_index = np.array([1, 2, 3])
         sr = pd.Series(np.arange(len(source_index)), index=source_index)
         np.testing.assert_array_equal(
-            sr.vbt.latest_at_index(
+            sr.vbt.realign(
                 target_index,
                 nan_value=-1,
                 source_rbound=True,
@@ -1936,7 +1936,7 @@ class TestAccessors:
         target_index = np.array([1, 2, 3])
         sr = pd.Series(np.arange(len(source_index)), index=source_index)
         np.testing.assert_array_equal(
-            sr.vbt.latest_at_index(
+            sr.vbt.realign(
                 target_index,
                 nan_value=-1,
                 source_rbound=True,
@@ -1948,7 +1948,7 @@ class TestAccessors:
         target_index = np.array([0.5, 1, 1.5, 2.5, 3.0, 3.5])
         sr = pd.Series(np.arange(len(source_index)), index=source_index)
         np.testing.assert_array_equal(
-            sr.vbt.latest_at_index(
+            sr.vbt.realign(
                 target_index,
                 nan_value=-1,
                 source_rbound=True,
@@ -1960,7 +1960,7 @@ class TestAccessors:
         target_index = np.array([1.5, 2, 2.5])
         sr = pd.Series(np.arange(len(source_index)), index=source_index)
         np.testing.assert_array_equal(
-            sr.vbt.latest_at_index(
+            sr.vbt.realign(
                 target_index,
                 nan_value=-1,
                 source_rbound=True,
@@ -1972,7 +1972,7 @@ class TestAccessors:
         target_index = np.array([1, 2, 3])
         sr = pd.Series(np.arange(len(source_index)), index=source_index)
         np.testing.assert_array_equal(
-            sr.vbt.latest_at_index(
+            sr.vbt.realign(
                 target_index,
                 nan_value=-1,
                 source_rbound=True,
@@ -1984,7 +1984,7 @@ class TestAccessors:
         target_index = np.array([1, 2, 3])
         sr = pd.Series(np.arange(len(source_index)), index=source_index)
         np.testing.assert_array_equal(
-            sr.vbt.latest_at_index(
+            sr.vbt.realign(
                 target_index,
                 nan_value=-1,
                 source_rbound=True,
@@ -1996,7 +1996,7 @@ class TestAccessors:
         target_index = np.array([0.5, 1, 1.5, 2.5, 3.0, 3.5])
         sr = pd.Series(np.arange(len(source_index)), index=source_index)
         np.testing.assert_array_equal(
-            sr.vbt.latest_at_index(
+            sr.vbt.realign(
                 target_index,
                 nan_value=-1,
                 source_rbound=False,
@@ -2008,7 +2008,7 @@ class TestAccessors:
         target_index = np.array([1.5, 2, 2.5])
         sr = pd.Series(np.arange(len(source_index)), index=source_index)
         np.testing.assert_array_equal(
-            sr.vbt.latest_at_index(
+            sr.vbt.realign(
                 target_index,
                 nan_value=-1,
                 source_rbound=False,
@@ -2020,7 +2020,7 @@ class TestAccessors:
         target_index = np.array([1, 2, 3])
         sr = pd.Series(np.arange(len(source_index)), index=source_index)
         np.testing.assert_array_equal(
-            sr.vbt.latest_at_index(
+            sr.vbt.realign(
                 target_index,
                 nan_value=-1,
                 source_rbound=False,
@@ -2032,7 +2032,7 @@ class TestAccessors:
         target_index = np.array([1, 2, 3])
         sr = pd.Series(np.arange(len(source_index)), index=source_index)
         np.testing.assert_array_equal(
-            sr.vbt.latest_at_index(
+            sr.vbt.realign(
                 target_index,
                 nan_value=-1,
                 source_rbound=False,
@@ -2044,7 +2044,7 @@ class TestAccessors:
         target_index = np.array([0.5, 1, 1.5, 2.5, 3.0, 3.5])
         sr = pd.Series(np.arange(len(source_index)), index=source_index)
         np.testing.assert_array_equal(
-            sr.vbt.latest_at_index(
+            sr.vbt.realign(
                 target_index,
                 nan_value=-1,
                 source_rbound=False,
@@ -2056,7 +2056,7 @@ class TestAccessors:
         target_index = np.array([1.5, 2, 2.5])
         sr = pd.Series(np.arange(len(source_index)), index=source_index)
         np.testing.assert_array_equal(
-            sr.vbt.latest_at_index(
+            sr.vbt.realign(
                 target_index,
                 nan_value=-1,
                 source_rbound=False,
@@ -2068,7 +2068,7 @@ class TestAccessors:
         target_index = np.array([1, 2, 3])
         sr = pd.Series(np.arange(len(source_index)), index=source_index)
         np.testing.assert_array_equal(
-            sr.vbt.latest_at_index(
+            sr.vbt.realign(
                 target_index,
                 nan_value=-1,
                 source_rbound=False,
@@ -2080,7 +2080,7 @@ class TestAccessors:
         target_index = np.array([1, 2, 3])
         sr = pd.Series(np.arange(len(source_index)), index=source_index)
         np.testing.assert_array_equal(
-            sr.vbt.latest_at_index(
+            sr.vbt.realign(
                 target_index,
                 nan_value=-1,
                 source_rbound=False,
