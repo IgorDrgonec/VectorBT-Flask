@@ -5410,6 +5410,31 @@ class TestFromSignals:
                 low=low,
                 sl_stop=[[0.05, 0.5, 0.75]],
                 price=1.1 * close,
+                slippage=slippage,
+                stop_exit_price="hardstop",
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 0, 16.52892561983471, 6.050000000000001, 0.0, 0, 0, -1),
+                    (1, 0, 0, 1, 1, 16.52892561983471, 4.75, 0.0, 1, 0, 0),
+                    (0, 1, 0, 0, 0, 16.52892561983471, 6.050000000000001, 0.0, 0, 0, -1),
+                    (1, 1, 0, 2, 2, 16.52892561983471, 2.5, 0.0, 1, 0, 0),
+                    (0, 2, 0, 0, 0, 16.52892561983471, 6.050000000000001, 0.0, 0, 0, -1),
+                    (1, 2, 0, 4, 4, 16.52892561983471, 1.25, 0.0, 1, 0, 0),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                open=open,
+                high=high,
+                low=low,
+                sl_stop=[[0.05, 0.5, 0.75]],
+                price=1.1 * close,
                 slippage=0.1,
                 stop_exit_price="close",
             ).order_records,

@@ -502,7 +502,8 @@ Attributes:
 
 class StopExitPriceT(tp.NamedTuple):
     Stop: int = -1
-    Close: int = -2
+    HardStop: int = -2
+    Close: int = -3
 
 
 StopExitPrice = StopExitPriceT()
@@ -521,7 +522,10 @@ Which price to use when exiting a position upon a stop signal?
 Attributes:
     Stop: Stop price. 
     
-        If the stop was hit before, the opening price at the next bar is used.
+        If the target price is first hit by the opening price, the opening price is used.
+    HardStop: Hard stop price.
+    
+        The stop price is used regardless of whether the target price is first hit by the opening price.
     Close: Closing price.
     
 !!! note

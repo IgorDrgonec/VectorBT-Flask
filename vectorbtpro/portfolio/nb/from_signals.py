@@ -1749,6 +1749,7 @@ def from_signals_nb(
                                 stop=last_sl_info["stop"][col],
                                 delta_format=last_sl_info["delta_format"][col],
                                 hit_below=True,
+                                hard_stop=last_sl_info["exit_price"][col] == StopExitPrice.HardStop,
                             )
 
                         # Check TSL and TTP
@@ -1793,6 +1794,7 @@ def from_signals_nb(
                                     stop=last_tsl_info["stop"][col],
                                     delta_format=last_tsl_info["delta_format"][col],
                                     hit_below=True,
+                                    hard_stop=last_tsl_info["exit_price"][col] == StopExitPrice.HardStop,
                                 )
                             # Update peak price using full bar
                             if last_position[col] > 0:
@@ -1837,6 +1839,7 @@ def from_signals_nb(
                                         delta_format=last_tsl_info["delta_format"][col],
                                         hit_below=True,
                                         can_use_ohlc=False,
+                                        hard_stop=last_tsl_info["exit_price"][col] == StopExitPrice.HardStop,
                                     )
 
                         # Check TP
@@ -1852,6 +1855,7 @@ def from_signals_nb(
                                 stop=last_tp_info["stop"][col],
                                 delta_format=last_tp_info["delta_format"][col],
                                 hit_below=False,
+                                hard_stop=last_tp_info["exit_price"][col] == StopExitPrice.HardStop,
                             )
 
                         # Check TD
@@ -4164,6 +4168,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                                 stop=last_sl_info["stop"][col],
                                 delta_format=last_sl_info["delta_format"][col],
                                 hit_below=True,
+                                hard_stop=last_sl_info["exit_price"][col] == StopExitPrice.HardStop,
                             )
 
                         # Check TSL and TTP
@@ -4208,6 +4213,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                                     stop=last_tsl_info["stop"][col],
                                     delta_format=last_tsl_info["delta_format"][col],
                                     hit_below=True,
+                                    hard_stop=last_tsl_info["exit_price"][col] == StopExitPrice.HardStop,
                                 )
                             # Update peak price using full bar
                             if last_position[col] > 0:
@@ -4252,6 +4258,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                                         delta_format=last_tsl_info["delta_format"][col],
                                         hit_below=True,
                                         can_use_ohlc=False,
+                                        hard_stop=last_tsl_info["exit_price"][col] == StopExitPrice.HardStop,
                                     )
 
                         # Check TP
@@ -4267,6 +4274,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                                 stop=last_tp_info["stop"][col],
                                 delta_format=last_tp_info["delta_format"][col],
                                 hit_below=False,
+                                hard_stop=last_tp_info["exit_price"][col] == StopExitPrice.HardStop,
                             )
 
                         # Check TD

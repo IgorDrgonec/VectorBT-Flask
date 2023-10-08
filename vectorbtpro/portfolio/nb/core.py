@@ -1893,12 +1893,13 @@ def check_price_hit_nb(
     hit_below: bool = True,
     can_use_ohlc: bool = True,
     check_open: bool = True,
+    hard_price: bool = False,
 ) -> tp.Tuple[float, bool, bool]:
     """Check whether a target price was hit.
 
-    If `can_use_ohlc` and `check_open` is True and the target price is hit before open, returns open.
+    If `can_use_ohlc`, `check_open`, and `hard_price` are True and the target price is hit by open, returns open.
 
-    Returns the stop price, whether it was hit before open, and whether it was hit during this bar."""
+    Returns the stop price, whether it was hit by open, and whether it was hit during this bar."""
     high, low = resolve_hl_nb(
         open=open,
         high=high,
@@ -1907,11 +1908,15 @@ def check_price_hit_nb(
     )
     if hit_below:
         if can_use_ohlc and check_open and open <= price:
+            if hard_price:
+                return price, True, True
             return open, True, True
         if close <= price or (can_use_ohlc and low <= price):
             return price, False, True
         return price, False, False
     if can_use_ohlc and check_open and open >= price:
+        if hard_price:
+            return price, True, True
         return open, True, True
     if close >= price or (can_use_ohlc and high >= price):
         return price, False, True
@@ -1925,7 +1930,7 @@ def resolve_stop_exit_price_nb(
     stop_exit_price: float,
 ) -> float:
     """Resolve the exit price of a stop order."""
-    if stop_exit_price == StopExitPrice.Stop:
+    if stop_exit_price == StopExitPrice.Stop or stop_exit_price == StopExitPrice.HardStop:
         return float(stop_price)
     elif stop_exit_price == StopExitPrice.Close:
         return float(close)
@@ -2190,12 +2195,11 @@ def check_stop_hit_nb(
     hit_below: bool = True,
     can_use_ohlc: bool = True,
     check_open: bool = True,
+    hard_stop: bool = False,
 ) -> tp.Tuple[float, bool, bool]:
     """Resolve the stop price using `resolve_stop_price_nb` and check whether it was hit.
 
-    If `can_use_ohlc` and `check_open` is True and the stop is hit before open, returns open.
-
-    Returns the stop price, whether it was hit before open, and whether it was hit during this bar."""
+    See `check_price_hit_nb`."""
     hit_below = (is_position_long and hit_below) or (not is_position_long and not hit_below)
     stop_price = resolve_stop_price_nb(
         init_price=init_price,
@@ -2212,6 +2216,7 @@ def check_stop_hit_nb(
         hit_below=hit_below,
         can_use_ohlc=can_use_ohlc,
         check_open=check_open,
+        hard_price=hard_stop,
     )
 
 
