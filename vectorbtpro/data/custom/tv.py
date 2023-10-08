@@ -626,22 +626,22 @@ class TVData(RemoteData):
             ... )
             ```
         """
-        delay = cls.resolve_custom_setting(delay, "delay", sub_path="search", only_sub_path=True)
+        delay = cls.resolve_custom_setting(delay, "delay", sub_path="search", sub_path_only=True)
         show_progress = cls.resolve_custom_setting(
-            show_progress, "show_progress", sub_path="search", only_sub_path=True
+            show_progress, "show_progress", sub_path="search", sub_path_only=True
         )
         pbar_kwargs = cls.resolve_custom_setting(
-            pbar_kwargs, "pbar_kwargs", merge=True, sub_path="search", only_sub_path=True
+            pbar_kwargs, "pbar_kwargs", merge=True, sub_path="search", sub_path_only=True
         )
-        markets = cls.resolve_custom_setting(markets, "markets", sub_path="scanner", only_sub_path=True)
-        fields = cls.resolve_custom_setting(fields, "fields", sub_path="scanner", only_sub_path=True)
-        filter_by = cls.resolve_custom_setting(filter_by, "filter_by", sub_path="scanner", only_sub_path=True)
-        groups = cls.resolve_custom_setting(groups, "groups", sub_path="scanner", only_sub_path=True)
+        markets = cls.resolve_custom_setting(markets, "markets", sub_path="scanner", sub_path_only=True)
+        fields = cls.resolve_custom_setting(fields, "fields", sub_path="scanner", sub_path_only=True)
+        filter_by = cls.resolve_custom_setting(filter_by, "filter_by", sub_path="scanner", sub_path_only=True)
+        groups = cls.resolve_custom_setting(groups, "groups", sub_path="scanner", sub_path_only=True)
         template_context = cls.resolve_custom_setting(
-            template_context, "template_context", merge=True, sub_path="scanner", only_sub_path=True
+            template_context, "template_context", merge=True, sub_path="scanner", sub_path_only=True
         )
         scanner_kwargs = cls.resolve_custom_setting(
-            scanner_kwargs, "scanner_kwargs", merge=True, sub_path="scanner", only_sub_path=True
+            scanner_kwargs, "scanner_kwargs", merge=True, sub_path="scanner", sub_path_only=True
         )
 
         if market is None and text is None and exchange is None:

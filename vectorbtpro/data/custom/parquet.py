@@ -71,26 +71,31 @@ class ParquetData(FileData):
         return cls.is_parquet_file(path) or cls.is_parquet_dir(path)
 
     @classmethod
-    def list_parquet_groups(cls, path: tp.PathLike) -> tp.List[str]:
-        """List groups of Parquet partitions under a path.
+    def list_partition_cols(cls, path: tp.PathLike) -> tp.List[str]:
+        """List partitioning columns under a path.
 
         !!! note
             Assumes the Hive partitioning scheme."""
         if not isinstance(path, Path):
             path = Path(path)
-        parquet_groups = []
-        found_last_group = False
-        while not found_last_group:
-            found_new_group = False
+        partition_cols = []
+        found_last_level = False
+        while not found_last_level:
+            found_new_level = False
             for p in path.iterdir():
                 if cls.is_parquet_group_dir(p):
-                    parquet_groups.append(p.name.split("=")[0])
+                    partition_cols.append(p.name.split("=")[0])
                     path = p
-                    found_new_group = True
+                    found_new_level = True
                     break
-            if not found_new_group:
-                found_last_group = True
-        return parquet_groups
+            if not found_new_level:
+                found_last_level = True
+        return partition_cols
+
+    @classmethod
+    def is_default_partition_col(cls, level: str) -> bool:
+        """Return whether a partitioning column is a default partitioning column."""
+        return re.match(r"^(\bgroup\b)|(group_\d+)", level) is not None
 
     @classmethod
     def match_path(
@@ -119,7 +124,7 @@ class ParquetData(FileData):
         return sub_paths
 
     @classmethod
-    def list_paths(cls, path: tp.PathLike = ".", **match_path_kwargs) -> tp.List[Path]:
+    def list_paths(cls, path: tp.PathLike = ".", sort_paths: bool = True, **match_path_kwargs) -> tp.List[Path]:
         if not isinstance(path, Path):
             path = Path(path)
         if path.exists() and path.is_dir():
@@ -129,8 +134,10 @@ class ParquetData(FileData):
             for p in path.iterdir():
                 if cls.is_parquet_path(p):
                     sub_paths.append(p)
+            if sort_paths:
+                return sorted(sub_paths)
             return sub_paths
-        return cls.match_path(path, **match_path_kwargs)
+        return cls.match_path(path, sort_paths=sort_paths, **match_path_kwargs)
 
     @classmethod
     def resolve_keys_meta(
@@ -177,7 +184,7 @@ class ParquetData(FileData):
 
                 If None, will remove any partitioning column that is "group" or "group_{index}".
 
-                Retrieves the list of partitioning columns with `ParquetData.list_parquet_groups`.
+                Retrieves the list of partitioning columns with `ParquetData.list_partition_cols`.
             engine (str): See `pd.read_parquet`.
             **read_kwargs: Other keyword arguments passed to `pd.read_parquet`.
 
@@ -208,11 +215,10 @@ class ParquetData(FileData):
         if keep_partition_cols in (None, False):
             if cls.is_parquet_dir(path):
                 drop_columns = []
-                parquet_groups = cls.list_parquet_groups(path)
+                partition_cols = cls.list_partition_cols(path)
                 for col in obj.columns:
-                    if col in parquet_groups:
-                        col_regex = r"^(\bgroup\b)|(group_\d+)"
-                        if keep_partition_cols is False or re.match(col_regex, col):
+                    if col in partition_cols:
+                        if keep_partition_cols is False or cls.is_default_partition_col(col):
                             drop_columns.append(col)
                 obj = obj.drop(drop_columns, axis=1)
         if isinstance(obj.index, pd.DatetimeIndex) and tz is None:
