@@ -554,6 +554,60 @@ def tail_ratio_nb(rets: tp.Array2d) -> tp.Array1d:
 
 
 @register_jitted(cache=True)
+def profit_factor_1d_nb(rets: tp.Array1d) -> float:
+    """Profit factor."""
+    numer = 0
+    denom = 0
+    for i in range(rets.shape[0]):
+        if not np.isnan(rets[i]):
+            if rets[i] > 0:
+                numer += rets[i]
+            elif rets[i] < 0:
+                denom += abs(rets[i])
+    if denom == 0:
+        if numer == 0:
+            return np.nan
+        return np.inf
+    return numer / denom
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="rets", axis=1),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1)),
+    merge_func="concat",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def profit_factor_nb(rets: tp.Array2d) -> tp.Array1d:
+    """2-dim version of `profit_factor_1d_nb`."""
+    out = np.empty(rets.shape[1], dtype=np.float_)
+    for col in prange(rets.shape[1]):
+        out[col] = profit_factor_1d_nb(rets[:, col])
+    return out
+
+
+@register_jitted(cache=True)
+def common_sense_ratio_1d_nb(rets: tp.Array1d) -> float:
+    """Common Sense Ratio."""
+    tail_ratio = tail_ratio_1d_nb(rets)
+    profit_factor = profit_factor_1d_nb(rets)
+    return tail_ratio * profit_factor
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="rets", axis=1),
+    arg_take_spec=dict(rets=ch.ArraySlicer(axis=1)),
+    merge_func="concat",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def common_sense_ratio_nb(rets: tp.Array2d) -> tp.Array1d:
+    """2-dim version of `common_sense_ratio_1d_nb`."""
+    out = np.empty(rets.shape[1], dtype=np.float_)
+    for col in prange(rets.shape[1]):
+        out[col] = common_sense_ratio_1d_nb(rets[:, col])
+    return out
+
+
+@register_jitted(cache=True)
 def value_at_risk_1d_nb(rets: tp.Array1d, cutoff: float = 0.05) -> float:
     """Value at risk (VaR) of a returns stream."""
     return np.nanpercentile(rets, 100 * cutoff)

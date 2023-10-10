@@ -136,7 +136,6 @@ from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, HybridConfig, Config
 from vectorbtpro.utils.datetime_ import freq_to_timedelta, PandasDatetimeIndex
 from vectorbtpro.utils.decorators import class_or_instanceproperty
-from vectorbtpro.utils.colors import adjust_opacity
 
 __all__ = [
     "ReturnsAccessor",
@@ -1161,16 +1160,48 @@ class ReturnsAccessor(GenericAccessor):
             func = jit_reg.resolve_option(nb.tail_ratio_1d_nb, jitted)
         return self.rolling_apply(window, func, minp=minp, jitted=jitted, **kwargs)
 
+    def profit_factor(
+        self,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
+        """Profit factor.
+
+        See `vectorbtpro.returns.nb.profit_factor_nb`."""
+        func = jit_reg.resolve_option(nb.profit_factor_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(self.to_2d_array())
+        wrap_kwargs = merge_dicts(dict(name_or_index="profit_factor"), wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
+
+    def rolling_profit_factor(
+        self,
+        window: tp.Optional[int] = None,
+        minp: tp.Optional[int] = None,
+        jitted: tp.JittedOption = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Rolling version of `ReturnsAccessor.profit_factor`."""
+        if window is None:
+            window = self.defaults["window"]
+        if minp is None:
+            minp = self.defaults["minp"]
+        func = jit_reg.resolve_option(nb.profit_factor_1d_nb, jitted)
+        return self.rolling_apply(window, func, minp=minp, jitted=jitted, **kwargs)
+
     def common_sense_ratio(
         self,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """Common Sense Ratio."""
-        tail_ratio = to_1d_array(self.tail_ratio(jitted=jitted, chunked=chunked))
-        annualized = to_1d_array(self.annualized(jitted=jitted, chunked=chunked))
-        out = tail_ratio * (1 + annualized)
+        """Common Sense Ratio.
+
+        See `vectorbtpro.returns.nb.common_sense_ratio_nb`."""
+        func = jit_reg.resolve_option(nb.common_sense_ratio_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(self.to_2d_array())
         wrap_kwargs = merge_dicts(dict(name_or_index="common_sense_ratio"), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
@@ -1179,18 +1210,15 @@ class ReturnsAccessor(GenericAccessor):
         window: tp.Optional[int] = None,
         minp: tp.Optional[int] = None,
         jitted: tp.JittedOption = None,
-        chunked: tp.ChunkedOption = None,
-        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.common_sense_ratio`."""
         if window is None:
             window = self.defaults["window"]
         if minp is None:
             minp = self.defaults["minp"]
-        rolling_tail_ratio = to_2d_array(self.rolling_tail_ratio(window, minp=minp, jitted=jitted, chunked=chunked))
-        rolling_annualized = to_2d_array(self.rolling_annualized(window, minp=minp, jitted=jitted, chunked=chunked))
-        out = rolling_tail_ratio * (1 + rolling_annualized)
-        return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+        func = jit_reg.resolve_option(nb.common_sense_ratio_1d_nb, jitted)
+        return self.rolling_apply(window, func, minp=minp, jitted=jitted, **kwargs)
 
     def value_at_risk(
         self,
