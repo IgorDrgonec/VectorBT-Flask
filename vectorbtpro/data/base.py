@@ -23,7 +23,7 @@ from vectorbtpro.data.decorators import attach_symbol_dict_methods
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig, copy_dict
-from vectorbtpro.utils.datetime_ import is_tz_aware, to_timezone, prepare_dt_index
+from vectorbtpro.utils.datetime_ import to_timezone, prepare_dt_index
 from vectorbtpro.utils.parsing import get_func_arg_names, extend_args
 from vectorbtpro.utils.path_ import check_mkdir
 from vectorbtpro.utils.template import RepEval, CustomTemplate, substitute_templates
@@ -1346,17 +1346,156 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     # ############# Pre- and post-processing ############# #
 
     @classmethod
+    def prepare_dt_index(
+        cls,
+        index: tp.Index,
+        parse_dates: bool = False,
+        tz_localize: tp.TimezoneLike = None,
+        tz_convert: tp.TimezoneLike = None,
+        force_tz_convert: bool = False,
+        remove_tz: bool = False,
+    ) -> tp.SeriesFrame:
+        """Prepare datetime index.
+
+        If `parse_dates` is True, will try to convert the index with an object data type
+        into a datetime format using `vectorbtpro.utils.datetime_.prepare_dt_index`.
+
+        If `tz_localize` is not None, will localize a datetime-naive index into this timezone.
+
+        If `tz_convert` is not None, will convert a datetime-aware index into this timezone.
+        If `force_tz_convert` is True, will convert regardless of whether the index is datetime-aware."""
+        if parse_dates:
+            if not isinstance(index, (pd.DatetimeIndex, pd.MultiIndex)) and index.dtype == object:
+                index = prepare_dt_index(index)
+        if isinstance(index, pd.DatetimeIndex):
+            if index.tz is None and tz_localize is not None:
+                index = index.tz_localize(to_timezone(tz_localize))
+            if tz_convert is not None:
+                if index.tz is not None or force_tz_convert:
+                    index = index.tz_convert(to_timezone(tz_convert))
+            if remove_tz and index.tz is not None:
+                index = index.tz_localize(None)
+        return index
+
+    @classmethod
+    def prepare_dt_column(
+        cls,
+        sr: tp.Series,
+        parse_dates: bool = False,
+        tz_localize: tp.TimezoneLike = None,
+        tz_convert: tp.TimezoneLike = None,
+        force_tz_convert: bool = False,
+        remove_tz: bool = False,
+    ) -> tp.Series:
+        """Prepare datetime column.
+
+        See `Data.prepare_dt_index` for arguments."""
+        index = cls.prepare_dt_index(
+            pd.Index(sr),
+            parse_dates=parse_dates,
+            tz_localize=tz_localize,
+            tz_convert=tz_convert,
+            force_tz_convert=force_tz_convert,
+            remove_tz=remove_tz,
+        )
+        if isinstance(index, pd.DatetimeIndex):
+            return pd.Series(index, index=sr.index, name=sr.name)
+        return sr
+
+    @classmethod
+    def prepare_dt(
+        cls,
+        obj: tp.SeriesFrame,
+        parse_dates: tp.Union[None, bool, tp.Sequence[str]] = True,
+        to_utc: tp.Union[None, bool, str, tp.Sequence[str]] = True,
+        remove_utc_tz: bool = False,
+    ) -> tp.Frame:
+        """Prepare datetime index and columns.
+
+        If `parse_dates` is True, will try to convert any index and column with object data type
+        into a datetime format using `vectorbtpro.utils.datetime_.prepare_dt_index`.
+        If `parse_dates` is a list or dict, will first check whether the name of the column
+        is among the names that are in `parse_dates`.
+
+        If `to_utc` is True or `to_utc` is "index" or `to_utc` is a sequence and index name is in this
+        sequence, will localize/convert any datetime index to the UTC timezone. If `to_utc` is True or
+        `to_utc` is "columns" or `to_utc` is a sequence and column name is in this sequence, will
+        localize/convert any datetime column to the UTC timezone."""
+        obj = obj.copy(deep=False)
+        made_frame = False
+        if isinstance(obj, pd.Series):
+            obj = obj.to_frame()
+            made_frame = True
+
+        index_parse_dates = False
+        if not isinstance(obj.index, pd.MultiIndex) and obj.index.dtype == object:
+            if parse_dates is True:
+                index_parse_dates = True
+            elif checks.is_sequence(parse_dates) and obj.index.name in parse_dates:
+                index_parse_dates = True
+        if (
+            to_utc is True
+            or (isinstance(to_utc, str) and to_utc.lower() == "index")
+            or (checks.is_sequence(to_utc) and obj.index.name in to_utc)
+        ):
+            index_tz_localize = "utc"
+            index_tz_convert = "utc"
+            index_remove_tz = remove_utc_tz
+        else:
+            index_tz_localize = None
+            index_tz_convert = None
+            index_remove_tz = False
+        obj.index = cls.prepare_dt_index(
+            obj.index,
+            parse_dates=index_parse_dates,
+            tz_localize=index_tz_localize,
+            tz_convert=index_tz_convert,
+            remove_tz=index_remove_tz,
+        )
+
+        for column_name in obj.columns:
+            column_parse_dates = False
+            if obj[column_name].dtype == object:
+                if parse_dates is True:
+                    column_parse_dates = True
+                elif checks.is_sequence(parse_dates) and column_name in parse_dates:
+                    column_parse_dates = True
+            elif not hasattr(obj[column_name], "dt"):
+                continue
+            if (
+                to_utc is True
+                or (isinstance(to_utc, str) and to_utc.lower() == "columns")
+                or (checks.is_sequence(to_utc) and column_name in to_utc)
+            ):
+                column_tz_localize = "utc"
+                column_tz_convert = "utc"
+                column_remove_tz = remove_utc_tz
+            else:
+                column_tz_localize = None
+                column_tz_convert = None
+                column_remove_tz = False
+            obj[column_name] = cls.prepare_dt_column(
+                obj[column_name],
+                parse_dates=column_parse_dates,
+                tz_localize=column_tz_localize,
+                tz_convert=column_tz_convert,
+                remove_tz=column_remove_tz,
+            )
+
+        if made_frame:
+            obj = obj.iloc[:, 0]
+        return obj
+
+    @classmethod
     def prepare_tzaware_index(
         cls,
         obj: tp.SeriesFrame,
         tz_localize: tp.Union[None, bool, tp.TimezoneLike] = None,
         tz_convert: tp.Union[None, bool, tp.TimezoneLike] = None,
     ) -> tp.SeriesFrame:
-        """Prepare a timezone-aware index of a pandas object.
+        """Prepare a timezone-aware index of a Pandas object.
 
-        If the index is tz-naive, convert to a timezone using `tz_localize`.
-        Convert the index from one timezone to another using `tz_convert`.
-        See `vectorbtpro.utils.datetime_.to_timezone`.
+        Uses `Data.prepare_dt_index` with `parse_dates=True` and `force_tz_convert=True`.
 
         For defaults, see `vectorbtpro._settings.data`."""
         tz_localize = cls.resolve_base_setting(tz_localize, "tz_localize")
@@ -1371,14 +1510,13 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 raise ValueError("tz_convert cannot be True")
             else:
                 tz_convert = None
-
-        if isinstance(obj.index, pd.DatetimeIndex):
-            if tz_localize is not None:
-                if not is_tz_aware(obj.index):
-                    obj = obj.tz_localize(to_timezone(tz_localize))
-            if tz_convert is not None:
-                obj = obj.tz_convert(to_timezone(tz_convert))
-        obj.index = prepare_dt_index(obj.index)
+        obj.index = cls.prepare_dt_index(
+            obj.index,
+            parse_dates=True,
+            tz_localize=tz_localize,
+            tz_convert=tz_convert,
+            force_tz_convert=True,
+        )
         return obj
 
     @classmethod
@@ -3353,9 +3491,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
     def to_csv(
         self,
-        dir_path: tp.Union[tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = ".",
+        path_or_buf: tp.Union[tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = ".",
         ext: tp.Union[str, feature_dict, symbol_dict, CustomTemplate] = "csv",
-        path_or_buf: tp.Union[None, tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = None,
         mkdir_kwargs: tp.Union[tp.KwargsLike, feature_dict, symbol_dict, CustomTemplate] = None,
         check_dict_type: bool = True,
         template_context: tp.KwargsLike = None,
@@ -3369,47 +3506,36 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
         depending on the format of the data dictionary.
 
-        Each feature/symbol gets saved to a separate file, that's why the first argument is the path
-        to the directory, not file! If there's only one file, you can specify the file path via
-        `path_or_buf`. If there are multiple files, use the same argument but wrap the multiple paths
-        with `feature_dict`/`symbol_dict`."""
+        If `path_or_buf` is a path to a directory, will save each feature/symbol to a separate file.
+        If there's only one file, you can specify the file path via `path_or_buf`. If there are
+        multiple files, use the same argument but wrap the multiple paths with `key_dict`."""
         meta = self.dict_type()
         for k, v in self.data.items():
             if self.feature_oriented:
                 _template_context = merge_dicts(dict(data=v, key=k, feature=k), template_context)
             else:
                 _template_context = merge_dicts(dict(data=v, key=k, symbol=k), template_context)
-            if check_dict_type:
-                self.check_dict_type(path_or_buf, arg_name="path_or_buf")
-            if path_or_buf is None:
-                _dir_path = self.resolve_key_arg(
-                    dir_path,
-                    k,
-                    "dir_path",
-                    check_dict_type=check_dict_type,
-                    template_context=_template_context,
-                )
-                _dir_path = Path(_dir_path)
-                _ext = self.resolve_key_arg(
-                    ext,
-                    k,
-                    "ext",
-                    check_dict_type=check_dict_type,
-                    template_context=_template_context,
-                )
-                _path_or_buf = str(Path(_dir_path) / f"{k}.{_ext}")
-            else:
-                _path_or_buf = self.resolve_key_arg(
-                    path_or_buf,
-                    k,
-                    "path_or_buf",
-                    check_dict_type=check_dict_type,
-                    template_context=_template_context,
-                )
             _kwargs = self.select_key_kwargs(k, kwargs, check_dict_type=check_dict_type)
             sep = _kwargs.pop("sep", None)
-            if isinstance(_path_or_buf, (str, Path)):
+            _path_or_buf = self.resolve_key_arg(
+                path_or_buf,
+                k,
+                "path_or_buf",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            if isinstance(_path_or_buf, str):
                 _path_or_buf = Path(_path_or_buf)
+            if isinstance(_path_or_buf, Path):
+                if (_path_or_buf.exists() and _path_or_buf.is_dir()) or _path_or_buf.suffix == "":
+                    _ext = self.resolve_key_arg(
+                        ext,
+                        k,
+                        "ext",
+                        check_dict_type=check_dict_type,
+                        template_context=_template_context,
+                    )
+                    _path_or_buf /= f"{k}.{_ext}"
                 _mkdir_kwargs = self.resolve_key_arg(
                     mkdir_kwargs,
                     k,
@@ -3425,6 +3551,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 if _path_or_buf.suffix.lower() == ".tsv":
                     if sep is None:
                         sep = "\t"
+                _path_or_buf = str(_path_or_buf)
             if sep is None:
                 sep = ","
             meta[k] = {"path_or_buf": _path_or_buf, "sep": sep, **_kwargs}
@@ -3450,9 +3577,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
     def to_hdf(
         self,
-        file_path: tp.Union[tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = ".",
+        path_or_buf: tp.Union[tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = ".",
         key: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
-        path_or_buf: tp.Union[None, tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = None,
         mkdir_kwargs: tp.Union[tp.KwargsLike, feature_dict, symbol_dict, CustomTemplate] = None,
         format: str = "table",
         check_dict_type: bool = True,
@@ -3467,9 +3593,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
         depending on the format of the data dictionary.
 
-        If `file_path` exists, and it's a directory, will create inside it a file named
-        after this class. This won't work with directories that do not exist, otherwise
-        they could be confused with file names."""
+        If `path_or_buf` exists and it's a directory, will create inside it a file named after this class."""
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("tables")
@@ -3480,20 +3604,18 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 _template_context = merge_dicts(dict(data=v, key=k, feature=k), template_context)
             else:
                 _template_context = merge_dicts(dict(data=v, key=k, symbol=k), template_context)
-            if check_dict_type:
-                self.check_dict_type(path_or_buf, arg_name="path_or_buf")
-            if path_or_buf is None:
-                _file_path = self.resolve_key_arg(
-                    file_path,
-                    k,
-                    "file_path",
-                    check_dict_type=check_dict_type,
-                    template_context=_template_context,
-                )
-                _file_path = Path(_file_path)
-                if _file_path.exists() and _file_path.is_dir():
-                    _file_path /= type(self).__name__ + ".h5"
-                _dir_path = _file_path.parent
+            _path_or_buf = self.resolve_key_arg(
+                path_or_buf,
+                k,
+                "path_or_buf",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            if isinstance(_path_or_buf, str):
+                _path_or_buf = Path(_path_or_buf)
+            if isinstance(_path_or_buf, Path):
+                if (_path_or_buf.exists() and _path_or_buf.is_dir()) or _path_or_buf.suffix == "":
+                    _path_or_buf /= type(self).__name__ + ".h5"
                 _mkdir_kwargs = self.resolve_key_arg(
                     mkdir_kwargs,
                     k,
@@ -3502,16 +3624,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     template_context=_template_context,
                     is_kwargs=True,
                 )
-                check_mkdir(_dir_path, **_mkdir_kwargs)
-                _path_or_buf = str(_file_path)
-            else:
-                _path_or_buf = self.resolve_key_arg(
-                    path_or_buf,
-                    k,
-                    "path_or_buf",
-                    check_dict_type=check_dict_type,
-                    template_context=_template_context,
-                )
+                check_mkdir(_path_or_buf.parent, **_mkdir_kwargs)
+                _path_or_buf = str(_path_or_buf)
             if key is None:
                 _key = str(k)
             else:
@@ -3546,8 +3660,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
     def to_feather(
         self,
-        dir_path: tp.Union[tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = ".",
-        path_or_buf: tp.Union[None, tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = None,
+        path_or_buf: tp.Union[tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = ".",
         mkdir_kwargs: tp.Union[tp.KwargsLike, feature_dict, symbol_dict, CustomTemplate] = None,
         check_dict_type: bool = True,
         template_context: tp.KwargsLike = None,
@@ -3561,10 +3674,9 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
         depending on the format of the data dictionary.
 
-        Each feature/symbol gets saved to a separate file, that's why the first argument is the path
-        to the directory, not file! If there's only one file, you can specify the file path via
-        `path_or_buf`. If there are multiple files, use the same argument but wrap the multiple paths
-        with `feature_dict`/`symbol_dict`."""
+        If `path_or_buf` is a path to a directory, will save each feature/symbol to a separate file.
+        If there's only one file, you can specify the file path via `path_or_buf`. If there are
+        multiple files, use the same argument but wrap the multiple paths with `key_dict`."""
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("pyarrow")
@@ -3575,26 +3687,18 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 _template_context = merge_dicts(dict(data=v, key=k, feature=k), template_context)
             else:
                 _template_context = merge_dicts(dict(data=v, key=k, symbol=k), template_context)
-            if path_or_buf is None:
-                _dir_path = self.resolve_key_arg(
-                    dir_path,
-                    k,
-                    "dir_path",
-                    check_dict_type=check_dict_type,
-                    template_context=_template_context,
-                )
-                _dir_path = Path(_dir_path)
-                _path_or_buf = str(Path(_dir_path) / f"{k}.feather")
-            else:
-                _path_or_buf = self.resolve_key_arg(
-                    path_or_buf,
-                    k,
-                    "path_or_buf",
-                    check_dict_type=check_dict_type,
-                    template_context=_template_context,
-                )
-            if isinstance(_path_or_buf, (str, Path)):
+            _path_or_buf = self.resolve_key_arg(
+                path_or_buf,
+                k,
+                "path_or_buf",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            if isinstance(_path_or_buf, str):
                 _path_or_buf = Path(_path_or_buf)
+            if isinstance(_path_or_buf, Path):
+                if (_path_or_buf.exists() and _path_or_buf.is_dir()) or _path_or_buf.suffix == "":
+                    _path_or_buf /= f"{k}.feather"
                 _mkdir_kwargs = self.resolve_key_arg(
                     mkdir_kwargs,
                     k,
@@ -3604,6 +3708,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     is_kwargs=True,
                 )
                 check_mkdir(_path_or_buf.parent, **_mkdir_kwargs)
+                _path_or_buf = str(_path_or_buf)
             _kwargs = self.select_key_kwargs(k, kwargs, check_dict_type=check_dict_type)
             meta[k] = {"path": _path_or_buf, **_kwargs}
             if isinstance(v, pd.Series):
@@ -3638,8 +3743,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
     def to_parquet(
         self,
-        dir_path: tp.Union[tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = ".",
-        path_or_buf: tp.Union[None, tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = None,
+        path_or_buf: tp.Union[tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = ".",
         mkdir_kwargs: tp.Union[tp.KwargsLike, feature_dict, symbol_dict, CustomTemplate] = None,
         partition_cols: tp.Union[None, tp.List[str], feature_dict, symbol_dict, CustomTemplate] = None,
         partition_by: tp.Union[None, tp.AnyGroupByLike, feature_dict, symbol_dict, CustomTemplate] = None,
@@ -3658,10 +3762,9 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
         depending on the format of the data dictionary.
 
-        Each feature/symbol gets saved to a separate file or folder with partitioned files, that's why
-        the first argument is the path to the directory, not file! If there's only one file or folder
-        with partitioned files, you can specify the file/folder path via `path_or_buf`. If there are multiple
-        files, use the same argument but wrap the multiple paths with `feature_dict`/`symbol_dict`.
+        If `path_or_buf` is a path to a directory, will save each feature/symbol to a separate file.
+        If there's only one file, you can specify the file path via `path_or_buf`. If there are
+        multiple files, use the same argument but wrap the multiple paths with `key_dict`.
 
         If `partition_cols` and `partition_by` are None, `path_or_buf` must be a file, otherwise
         it must be a directory. If `partition_by` is not None, will group the index by using
@@ -3692,29 +3795,21 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             )
             if _partition_cols is not None and _partition_by is not None:
                 raise ValueError("Must use either partition_cols or partition_by, not both")
-            if path_or_buf is None:
-                _dir_path = self.resolve_key_arg(
-                    dir_path,
-                    k,
-                    "dir_path",
-                    check_dict_type=check_dict_type,
-                    template_context=_template_context,
-                )
-                _dir_path = Path(_dir_path)
-                if _partition_cols is not None or _partition_by is not None:
-                    _path_or_buf = str(Path(_dir_path) / f"{k}")
-                else:
-                    _path_or_buf = str(Path(_dir_path) / f"{k}.parquet")
-            else:
-                _path_or_buf = self.resolve_key_arg(
-                    path_or_buf,
-                    k,
-                    "path_or_buf",
-                    check_dict_type=check_dict_type,
-                    template_context=_template_context,
-                )
-            if isinstance(_path_or_buf, (str, Path)):
+            _path_or_buf = self.resolve_key_arg(
+                path_or_buf,
+                k,
+                "path_or_buf",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            if isinstance(_path_or_buf, str):
                 _path_or_buf = Path(_path_or_buf)
+            if isinstance(_path_or_buf, Path):
+                if (_path_or_buf.exists() and _path_or_buf.is_dir()) or _path_or_buf.suffix == "":
+                    if _partition_cols is not None or _partition_by is not None:
+                        _path_or_buf /= f"{k}"
+                    else:
+                        _path_or_buf /= f"{k}.parquet"
                 _mkdir_kwargs = self.resolve_key_arg(
                     mkdir_kwargs,
                     k,
@@ -3724,6 +3819,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     is_kwargs=True,
                 )
                 check_mkdir(_path_or_buf.parent, **_mkdir_kwargs)
+                _path_or_buf = str(_path_or_buf)
             _engine = self.resolve_key_arg(
                 ParquetData.resolve_custom_setting(engine, "engine"),
                 k,
@@ -3803,9 +3899,10 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     def to_sql(
         self,
         engine: tp.Union[None, str, EngineT, feature_dict, symbol_dict, CustomTemplate] = None,
-        table_name: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
+        table: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
         schema: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
-        to_utc: tp.Union[None, bool, str, feature_dict, symbol_dict, CustomTemplate] = None,
+        to_utc: tp.Union[None, bool, str, tp.Sequence[str], feature_dict, symbol_dict, CustomTemplate] = None,
+        remove_utc_tz: tp.Union[bool, feature_dict, symbol_dict, CustomTemplate] = True,
         attach_row_number: tp.Union[bool, feature_dict, symbol_dict, CustomTemplate] = False,
         from_row_number: tp.Union[int, feature_dict, symbol_dict, CustomTemplate] = 0,
         row_number_column: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
@@ -3832,10 +3929,10 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         metadata (all passed arguments as `feature_dict` or `symbol_dict`). In this case, the engine
         won't be disposed by default.
 
-        If `to_utc` is True, will localize or convert any timezone-aware index or column to the UTC timezone,
-        which is a recommended practice. Disable this option if the database allows storing timezones.
-        If `to_utc` is "index" or "columns", will convert only the index and columns respectively.
-        If `to_utc` is None, uses the corresponding setting of `vectorbtpro.data.custom.sql.SQLData`."""
+        If `schema` is not None and it doesn't exist, will create a new schema.
+
+        For `to_utc` and `remove_utc_tz`, see `Data.prepare_dt`. If `to_utc` is None, uses the
+        corresponding setting of `vectorbtpro.data.custom.sql.SQLData`."""
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("sqlalchemy")
@@ -3845,7 +3942,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
         if engine_config is None:
             engine_config = {}
-        if engine is None or isinstance(engine, str):
+        if (engine is None or isinstance(engine, str)) and not self.has_key_dict(engine_config):
             engine_meta = SQLData.resolve_engine(
                 engine=engine,
                 return_meta=True,
@@ -3877,11 +3974,19 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 check_dict_type=check_dict_type,
                 template_context=_template_context,
             )
+            _engine_config = self.resolve_key_arg(
+                engine_config,
+                k,
+                "engine_config",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+                is_kwargs=True,
+            )
             if _engine is None or isinstance(_engine, str):
                 _engine_meta = SQLData.resolve_engine(
                     engine=_engine,
                     return_meta=True,
-                    **engine_config,
+                    **_engine_config,
                 )
                 _engine = _engine_meta["engine"]
                 _engine_name = _engine_meta["engine_name"]
@@ -3899,13 +4004,13 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     _dispose_engine = False
                 else:
                     _dispose_engine = dispose_engine
-            if table_name is None:
-                _table_name = k
+            if table is None:
+                _table = k
             else:
-                _table_name = self.resolve_key_arg(
-                    table_name,
+                _table = self.resolve_key_arg(
+                    table,
                     k,
-                    "table_name",
+                    "table",
                     check_dict_type=check_dict_type,
                     template_context=_template_context,
                 )
@@ -3920,6 +4025,13 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 SQLData.resolve_engine_setting(to_utc, "to_utc", engine_name=_engine_name),
                 k,
                 "to_utc",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _remove_utc_tz = self.resolve_key_arg(
+                remove_utc_tz,
+                k,
+                "remove_utc_tz",
                 check_dict_type=check_dict_type,
                 template_context=_template_context,
             )
@@ -3944,7 +4056,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 check_dict_type=check_dict_type,
                 template_context=_template_context,
             )
-            v = SQLData.prepare_dt_columns(v, to_utc=_to_utc, parse_dates=False)
+            v = SQLData.prepare_dt(v, to_utc=_to_utc, remove_utc_tz=_remove_utc_tz, parse_dates=False)
             if _attach_row_number:
                 v = v.copy(deep=False)
                 if isinstance(v, pd.Series):
@@ -3956,7 +4068,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                         connection.execute(CreateSchema(_schema))
                         connection.commit()
             _kwargs = self.select_key_kwargs(k, kwargs, check_dict_type=check_dict_type)
-            meta[k] = {"name": _table_name, "con": _engine, "schema": _schema, **_kwargs}
+            meta[k] = {"name": _table, "con": _engine, "schema": _schema, **_kwargs}
             v.to_sql(**meta[k])
             if _dispose_engine:
                 _engine.dispose()
@@ -3978,6 +4090,234 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         if fetch_kwargs is None:
             fetch_kwargs = {}
         data = SQLData.pull(*args, **kwargs)
+        data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
+        data = data.update_fetch_kwargs(**fetch_kwargs)
+        return data
+
+    def to_duckdb(
+        self,
+        connection: tp.Union[None, str, DuckDBPyConnectionT, feature_dict, symbol_dict, CustomTemplate] = None,
+        table: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
+        schema: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
+        catalog: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
+        write_format: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
+        write_path: tp.Union[tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = ".",
+        write_options: tp.Union[None, str, dict, feature_dict, symbol_dict, CustomTemplate] = None,
+        mkdir_kwargs: tp.Union[tp.KwargsLike, feature_dict, symbol_dict, CustomTemplate] = None,
+        to_utc: tp.Union[None, bool, str, tp.Sequence[str], feature_dict, symbol_dict, CustomTemplate] = None,
+        remove_utc_tz: tp.Union[bool, feature_dict, symbol_dict, CustomTemplate] = True,
+        drop_if_exists: tp.Union[None, bool, feature_dict, symbol_dict, CustomTemplate] = None,
+        connection_config: tp.KwargsLike = None,
+        check_dict_type: bool = True,
+        template_context: tp.KwargsLike = None,
+        return_meta: bool = False,
+        return_connection: bool = False,
+    ) -> tp.Union[None, feature_dict, symbol_dict, DuckDBPyConnectionT]:
+        """Save data to a DuckDB database.
+
+        Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
+        depending on the format of the data dictionary.
+
+        If `connection` is None or a string, will resolve a connection with
+        `vectorbtpro.data.custom.duckdb.DuckDBData.resolve_connection`. It can additionally return the
+        connection if `return_connection` is True or entire metadata (all passed arguments as `feature_dict`
+        or `symbol_dict`). In this case, the engine won't be disposed by default.
+
+        If `write_format` is None and `write_path` is a directory (default), will persist each feature/symbol
+        to a table (see https://duckdb.org/docs/guides/python/import_pandas).
+        If `catalog` is not None, will make it default for this connection. If `schema` is not None,
+        and it doesn't exist, will create a new schema in the current catalog and make it default
+        for this connection. Any new table will be automatically created under this schema.
+
+        If `write_format` is not None, it must be either "csv", "parquet", or "json". If `write_path` is
+        a directory or has no suffix (meaning it's not a file), each feature/symbol will be saved to a
+        separate file under that path and with the provided `write_format` as extension. The data will be
+        saved using a `COPY` mechanism (see https://duckdb.org/docs/sql/statements/copy.html).
+        To provide options to the write operation, pass them as a dictionary or an already formatted
+        string (without brackets). For example, `dict(compression="gzip")` is same as "COMPRESSION 'gzip'".
+
+        For `to_utc` and `remove_utc_tz`, see `Data.prepare_dt`. If `to_utc` is None, uses the
+        corresponding setting of `vectorbtpro.data.custom.duckdb.DuckDBData`."""
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("duckdb")
+        from vectorbtpro.data.custom.duckdb import DuckDBData
+
+        if connection_config is None:
+            connection_config = {}
+        if (connection is None or isinstance(connection, (str, Path))) and not self.has_key_dict(connection_config):
+            connection = DuckDBData.resolve_connection(connection=connection, **connection_config)
+        elif return_connection:
+            raise ValueError("Connection can be returned only if URL was provided")
+
+        meta = self.dict_type()
+        for k, v in self.data.items():
+            if self.feature_oriented:
+                _template_context = merge_dicts(dict(data=v, key=k, feature=k), template_context)
+            else:
+                _template_context = merge_dicts(dict(data=v, key=k, symbol=k), template_context)
+            _connection = self.resolve_key_arg(
+                connection,
+                k,
+                "connection",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _connection_config = self.resolve_key_arg(
+                connection_config,
+                k,
+                "connection_config",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+                is_kwargs=True,
+            )
+            if _connection is None or isinstance(_connection, (str, Path)):
+                _connection = DuckDBData.resolve_connection(connection=_connection, **_connection_config)
+            if table is None:
+                _table = k
+            else:
+                _table = self.resolve_key_arg(
+                    table,
+                    k,
+                    "table",
+                    check_dict_type=check_dict_type,
+                    template_context=_template_context,
+                )
+            _schema = self.resolve_key_arg(
+                DuckDBData.resolve_custom_setting(schema, "schema"),
+                k,
+                "schema",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _catalog = self.resolve_key_arg(
+                DuckDBData.resolve_custom_setting(catalog, "catalog"),
+                k,
+                "catalog",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _write_format = self.resolve_key_arg(
+                write_format,
+                k,
+                "write_format",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _write_path = self.resolve_key_arg(
+                write_path,
+                k,
+                "write_path",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _write_path = Path(_write_path)
+            is_not_file = (_write_path.exists() and _write_path.is_dir()) or _write_path.suffix == ""
+            if _write_format is not None and is_not_file:
+                if _write_format.upper() == "CSV":
+                    _write_path /= f"{k}.csv"
+                elif _write_format.upper() == "PARQUET":
+                    _write_path /= f"{k}.parquet"
+                elif _write_format.upper() == "JSON":
+                    _write_path /= f"{k}.json"
+                else:
+                    raise ValueError(f"Invalid write format '{_write_format}'")
+            if _write_path.suffix != "":
+                _mkdir_kwargs = self.resolve_key_arg(
+                    mkdir_kwargs,
+                    k,
+                    "mkdir_kwargs",
+                    check_dict_type=check_dict_type,
+                    template_context=_template_context,
+                    is_kwargs=True,
+                )
+                check_mkdir(_write_path.parent, **_mkdir_kwargs)
+                _write_path = str(_write_path)
+                use_write = True
+            else:
+                use_write = False
+            _to_utc = self.resolve_key_arg(
+                DuckDBData.resolve_custom_setting(to_utc, "to_utc"),
+                k,
+                "to_utc",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _remove_utc_tz = self.resolve_key_arg(
+                remove_utc_tz,
+                k,
+                "remove_utc_tz",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _drop_if_exists = self.resolve_key_arg(
+                drop_if_exists,
+                k,
+                "drop_if_exists",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            v = DuckDBData.prepare_dt(v, to_utc=_to_utc, remove_utc_tz=_remove_utc_tz, parse_dates=False)
+            v = v.reset_index()
+            if use_write:
+                _write_options = self.resolve_key_arg(
+                    write_options,
+                    k,
+                    "write_options",
+                    check_dict_type=check_dict_type,
+                    template_context=_template_context,
+                    is_kwargs=isinstance(write_options, dict),
+                )
+                if _write_options is not None:
+                    _write_options = DuckDBData.format_write_options(_write_options)
+                if _write_format is not None and _write_options is not None and "FORMAT" not in _write_options:
+                    _write_options = f"FORMAT {_write_format.upper()}, " + _write_options
+                elif _write_format is not None and _write_options is None:
+                    _write_options = f"FORMAT {_write_format.upper()}"
+                _connection.register("_" + k, v)
+                if _write_options is not None:
+                    _connection.execute(f"COPY (SELECT * FROM \"_{k}\") TO '{_write_path}' ({_write_options})")
+                else:
+                    _connection.execute(f"COPY (SELECT * FROM \"_{k}\") TO '{_write_path}'")
+                meta[k] = {"write_path": _write_path, "write_options": _write_options}
+            else:
+                if _catalog is not None:
+                    _connection.execute(f"USE {_catalog}")
+                elif _schema is not None:
+                    catalogs = DuckDBData.list_catalogs(connection=_connection)
+                    if len(catalogs) > 1:
+                        raise ValueError("Please select a catalog")
+                    _catalog = catalogs[0]
+                    _connection.execute(f"USE {_catalog}")
+                if _schema is not None:
+                    _connection.execute(f"CREATE SCHEMA IF NOT EXISTS \"{_schema}\"")
+                    _connection.execute(f"USE {_catalog}.{_schema}")
+                if _table in DuckDBData.list_tables(catalog=_catalog, schema=_schema, connection=_connection):
+                    if _drop_if_exists:
+                        _connection.execute(f"DROP TABLE \"{_table}\"")
+                    else:
+                        raise ValueError(f"Table '{_table}' already exists. Pass drop_if_exists=True to drop.")
+                _connection.register("_" + k, v)
+                _connection.execute(f"CREATE TABLE \"{_table}\" AS SELECT * FROM \"_{k}\"")
+                meta[k] = {"table": _table, "schema": _schema, "catalog": _catalog}
+
+        if return_meta:
+            return meta
+        if return_connection:
+            return connection
+        return None
+
+    @classmethod
+    def from_duckdb(cls: tp.Type[DataT], *args, fetch_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
+        """Use `vectorbtpro.data.custom.duckdb.DuckDBData` to load data from a DuckDB database and
+        switch the class back to this class.
+
+        Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
+        from vectorbtpro.data.custom.duckdb import DuckDBData
+
+        if fetch_kwargs is None:
+            fetch_kwargs = {}
+        data = DuckDBData.pull(*args, **kwargs)
         data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
         data = data.update_fetch_kwargs(**fetch_kwargs)
         return data

@@ -382,8 +382,10 @@ def prepare_dt_index(
         if isinstance(index, str):
             if parse_index:
                 try:
-                    index = pd.to_datetime(index, **kwargs)
-                    index = [index]
+                    parsed_index = pd.to_datetime(index, **kwargs)
+                    if not isinstance(parsed_index, pd.Timestamp) and "utc" not in kwargs:
+                        parsed_index = pd.to_datetime(index, utc=True, **kwargs)
+                    index = [parsed_index]
                 except Exception as e:
                     if parse_with_dateparser:
                         try:
@@ -407,10 +409,18 @@ def prepare_dt_index(
                     warnings.simplefilter("ignore")
                     pd.to_datetime(index[[0]], **kwargs)
                 try:
-                    return pd.to_datetime(index, **kwargs)
+                    parsed_index = pd.to_datetime(index, **kwargs)
+                    if (
+                        not isinstance(parsed_index, pd.DatetimeIndex)
+                        and isinstance(parsed_index[0], datetime)
+                        and "utc" not in kwargs
+                    ):
+                        parsed_index = pd.to_datetime(index, utc=True, **kwargs)
+                    return parsed_index
                 except Exception as e:
                     if parse_with_dateparser:
                         try:
+
                             def _parse(x):
                                 _parsed_index = dateparser.parse(x, **dateparser_kwargs)
                                 if _parsed_index is None:
@@ -647,7 +657,7 @@ def to_timestamp(
     parse_with_dateparser: tp.Optional[bool] = None,
     dateparser_kwargs: tp.KwargsLike = None,
     unit: str = "ns",
-    tz: tp.Optional[tp.TimezoneLike] = None,
+    tz: tp.TimezoneLike = None,
     to_fixed_offset: tp.Optional[bool] = None,
     **kwargs,
 ) -> tp.Optional[pd.Timestamp]:
@@ -728,8 +738,8 @@ def to_timestamp(
 
 def to_tzaware_timestamp(
     dt: tp.DatetimeLike,
-    naive_tz: tp.Optional[tp.TimezoneLike] = None,
-    tz: tp.Optional[tp.TimezoneLike] = None,
+    naive_tz: tp.TimezoneLike = None,
+    tz: tp.TimezoneLike = None,
     **kwargs,
 ) -> pd.Timestamp:
     """Parse the datetime as a timezone-aware `pd.Timestamp`.

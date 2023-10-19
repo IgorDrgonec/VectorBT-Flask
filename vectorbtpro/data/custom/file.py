@@ -42,6 +42,7 @@ class FileData(LocalData):
         match_regex: tp.Optional[str] = None,
         sort_paths: bool = True,
         recursive: bool = True,
+        extension: tp.Optional[str] = None,
         **kwargs,
     ) -> tp.List[Path]:
         """Get the list of all paths matching a path.
@@ -58,7 +59,8 @@ class FileData(LocalData):
                     if p.is_dir() and cls.is_dir_match(p):
                         sub_paths.append(p)
                     if p.is_file() and cls.is_file_match(p):
-                        sub_paths.append(p)
+                        if extension is None or p.suffix == "." + extension:
+                            sub_paths.append(p)
             else:
                 sub_paths = [path]
         else:

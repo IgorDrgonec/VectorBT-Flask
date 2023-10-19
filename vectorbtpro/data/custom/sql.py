@@ -10,15 +10,16 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.data.custom.db import DBData
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.datetime_ import to_tzaware_datetime, to_naive_datetime, prepare_dt_index
+from vectorbtpro.utils.datetime_ import to_tzaware_datetime, to_naive_datetime
 
 try:
     if not tp.TYPE_CHECKING:
         raise ImportError
-    from sqlalchemy import Engine as EngineT, Selectable as SelectableT
+    from sqlalchemy import Engine as EngineT, Selectable as SelectableT, Table as TableT
 except ImportError:
     EngineT = tp.Any
     SelectableT = tp.Any
+    TableT = tp.Any
 
 __all__ = [
     "SQLData",
@@ -234,17 +235,18 @@ class SQLData(DBData):
         if dispose_engine is None:
             dispose_engine = should_dispose
         inspector = inspect(engine)
-        all_schemas = []
-        for schema in inspector.get_schema_names(**kwargs):
+        all_schemas = inspector.get_schema_names(**kwargs)
+        schemas = set()
+        for schema in all_schemas:
             if pattern is not None:
                 if not cls.key_match(schema, pattern, use_regex=use_regex):
                     continue
             if schema == "information_schema":
                 continue
-            all_schemas.append(schema)
+            schemas.add(schema)
         if dispose_engine:
             engine.dispose()
-        return sorted(set(all_schemas))
+        return sorted(schemas)
 
     @classmethod
     def list_tables(
@@ -315,29 +317,29 @@ class SQLData(DBData):
             schemas = [schema]
             prefix_schema = False
         inspector = inspect(engine)
-        all_tables = []
+        tables = set()
         for schema in schemas:
-            table_names = inspector.get_table_names(schema, **kwargs)
+            all_tables = inspector.get_table_names(schema, **kwargs)
             if incl_views:
                 try:
-                    table_names += inspector.get_view_names(schema, **kwargs)
+                    all_tables += inspector.get_view_names(schema, **kwargs)
                 except NotImplementedError as e:
                     pass
                 try:
-                    table_names += inspector.get_materialized_view_names(schema, **kwargs)
+                    all_tables += inspector.get_materialized_view_names(schema, **kwargs)
                 except NotImplementedError as e:
                     pass
-            for table in table_names:
+            for table in all_tables:
                 if table_pattern is not None:
                     if not cls.key_match(table, table_pattern, use_regex=use_regex):
                         continue
                 if prefix_schema and schema is not None:
-                    all_tables.append(str(schema) + ":" + table)
+                    tables.add(str(schema) + ":" + table)
                 else:
-                    all_tables.append(table)
+                    tables.add(table)
         if dispose_engine:
             engine.dispose()
-        return sorted(set(all_tables))
+        return sorted(tables)
 
     @classmethod
     def resolve_keys_meta(
@@ -347,7 +349,7 @@ class SQLData(DBData):
         features: tp.Union[None, dict, tp.MaybeFeatures] = None,
         symbols: tp.Union[None, dict, tp.MaybeSymbols] = None,
         schema: tp.Optional[str] = None,
-        incl_views: bool = True,
+        list_tables_kwargs: tp.KwargsLike = None,
         engine: tp.Union[None, str, EngineT] = None,
         engine_name: tp.Optional[str] = None,
         engine_config: tp.KwargsLike = None,
@@ -361,18 +363,22 @@ class SQLData(DBData):
         if keys_meta["keys"] is None:
             if cls.has_key_dict(schema):
                 raise ValueError("Cannot populate keys if schema is defined per key")
-            if cls.has_key_dict(incl_views):
-                raise ValueError("Cannot populate keys if incl_views is defined per key")
+            if cls.has_key_dict(list_tables_kwargs):
+                raise ValueError("Cannot populate keys if list_tables_kwargs is defined per key")
             if cls.has_key_dict(engine):
                 raise ValueError("Cannot populate keys if engine is defined per key")
+            if cls.has_key_dict(engine_name):
+                raise ValueError("Cannot populate keys if engine_name is defined per key")
             if cls.has_key_dict(engine_config):
                 raise ValueError("Cannot populate keys if engine_config is defined per key")
+            if list_tables_kwargs is None:
+                list_tables_kwargs = {}
             keys_meta["keys"] = cls.list_tables(
                 schema=schema,
-                incl_views=incl_views,
                 engine=engine,
                 engine_name=engine_name,
                 engine_config=engine_config,
+                **list_tables_kwargs,
             )
         return keys_meta
 
@@ -385,7 +391,7 @@ class SQLData(DBData):
         features: tp.Union[tp.MaybeFeatures] = None,
         symbols: tp.Union[tp.MaybeSymbols] = None,
         schema: tp.Optional[str] = None,
-        incl_views: bool = True,
+        list_tables_kwargs: tp.KwargsLike = None,
         engine: tp.Union[None, str, EngineT] = None,
         engine_name: tp.Optional[str] = None,
         engine_config: tp.KwargsLike = None,
@@ -426,7 +432,7 @@ class SQLData(DBData):
             features=features,
             symbols=symbols,
             schema=schema,
-            incl_views=incl_views,
+            list_tables_kwargs=list_tables_kwargs,
             engine=engine,
             engine_name=engine_name,
             engine_config=engine_config,
@@ -448,83 +454,10 @@ class SQLData(DBData):
         return outputs
 
     @classmethod
-    def prepare_dt_columns(
-        cls,
-        obj: tp.SeriesFrame,
-        to_utc: tp.Union[None, bool, str] = None,
-        parse_dates: tp.Union[None, bool, tp.List[tp.IntStr], tp.Dict[tp.IntStr, tp.Any]] = None,
-    ) -> tp.Frame:
-        """Prepare datetime index and columns.
-
-        If `parse_dates` is True, will try to convert any column (including index) with object data type
-        into a datetime format using `vectorbtpro.utils.datetime_.prepare_dt_index`.
-        If `parse_dates` is a list or dict, will first check whether the name of the column
-        is among the names that are in `parse_dates`.
-
-        If `to_utc` is True or `to_utc` is "index", will localize any naive datetime index
-        into the UTC timezone. If `to_utc` is True or `to_utc` is "columns", will localize any
-        naive datetime column into the UTC timezone."""
-        if parse_dates not in (None, False):
-            if not isinstance(obj.index, (pd.DatetimeIndex, pd.MultiIndex)) and obj.index.dtype == object:
-                if parse_dates is True or obj.index.name in parse_dates:
-                    obj = obj.copy(deep=False)
-                    if to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "index"):
-                        obj.index = prepare_dt_index(obj.index, utc=True)
-                    else:
-                        obj.index = prepare_dt_index(obj.index)
-            has_potential_dt_column = False
-            for column_name in obj.columns:
-                if obj[column_name].dtype == object:
-                    if parse_dates is True or column_name in parse_dates:
-                        has_potential_dt_column = True
-                        break
-            if has_potential_dt_column:
-                obj = obj.copy(deep=False)
-                for column_name in obj.columns:
-                    if obj[column_name].dtype == object:
-                        if parse_dates is True or column_name in parse_dates:
-                            if to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "columns"):
-                                obj[column_name] = prepare_dt_index(obj[column_name], utc=True)
-                            else:
-                                obj[column_name] = prepare_dt_index(obj[column_name])
-        if to_utc is not False:
-            if to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "index"):
-                if isinstance(obj.index, pd.DatetimeIndex):
-                    obj = obj.copy(deep=False)
-                    if obj.index.tz is None:
-                        obj.index = obj.index.tz_localize("utc")
-                    else:
-                        obj.index = obj.index.tz_convert("utc")
-            elif to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "columns"):
-                if isinstance(obj, pd.Series):
-                    if hasattr(obj, "dt"):
-                        if obj.dt.tz is None:
-                            obj = obj.dt.tz_localize("utc")
-                        else:
-                            obj = obj.dt.tz_convert("utc")
-                else:
-                    has_dt_column = False
-                    for column_name in obj.columns:
-                        if hasattr(obj[column_name], "dt"):
-                            has_dt_column = True
-                            break
-                    if has_dt_column:
-                        obj = obj.copy(deep=False)
-                        for column_name in obj.columns:
-                            if hasattr(obj[column_name], "dt"):
-                                if obj.dt.tz is None:
-                                    obj[column_name] = obj[column_name].dt.tz_localize("utc")
-                                else:
-                                    obj[column_name] = obj[column_name].dt.tz_convert("utc")
-            elif isinstance(to_utc, str):
-                raise ValueError(f"Invalid option to_utc='{to_utc}'")
-        return obj
-
-    @classmethod
     def fetch_key(
         cls,
         key: str,
-        table_name: tp.Union[None, str] = None,
+        table: tp.Union[None, str, TableT] = None,
         schema: tp.Optional[str] = None,
         query: tp.Union[None, str, SelectableT] = None,
         engine: tp.Union[None, str, EngineT] = None,
@@ -534,15 +467,15 @@ class SQLData(DBData):
         start: tp.Optional[tp.Any] = None,
         end: tp.Optional[tp.Any] = None,
         align_dates: tp.Optional[bool] = None,
-        to_utc: tp.Union[None, bool, str] = None,
-        tz: tp.Optional[tp.TimezoneLike] = None,
+        parse_dates: tp.Union[None, bool, tp.List[tp.IntStr], tp.Dict[tp.IntStr, tp.Any]] = None,
+        to_utc: tp.Union[None, bool, str, tp.Sequence[str]] = None,
+        tz: tp.TimezoneLike = None,
         start_row: tp.Optional[int] = None,
         end_row: tp.Optional[int] = None,
         keep_row_number: tp.Optional[bool] = None,
         row_number_column: tp.Optional[str] = None,
         index_col: tp.Union[None, bool, tp.MaybeList[tp.IntStr]] = None,
         columns: tp.Optional[tp.MaybeList[tp.IntStr]] = None,
-        parse_dates: tp.Union[None, bool, tp.List[tp.IntStr], tp.Dict[tp.IntStr, tp.Any]] = None,
         dtype: tp.Union[None, tp.DTypeLike, tp.Dict[tp.IntStr, tp.DTypeLike]] = None,
         chunksize: tp.Optional[int] = None,
         chunk_func: tp.Optional[tp.Callable] = None,
@@ -556,10 +489,10 @@ class SQLData(DBData):
         Args:
             key (str): Feature or symbol.
 
-                If `table_name` and `query` are both None, becomes the table name.
+                If `table` and `query` are both None, becomes the table name.
 
                 Key can be in the `SCHEMA:TABLE` format, in this case `schema` argument will be ignored.
-            table_name (str): Table name.
+            table (str or Table): Table name or actual object.
 
                 Cannot be used together with `query`.
             schema (str): Schema.
@@ -567,7 +500,7 @@ class SQLData(DBData):
                 Cannot be used together with `query`.
             query (str or Selectable): Custom query.
 
-                Cannot be used together with `table_name` and `schema`.
+                Cannot be used together with `table` and `schema`.
             engine (str or object): See `SQLData.resolve_engine`.
             engine_name (str): See `SQLData.resolve_engine`.
             engine_config (dict): See `SQLData.resolve_engine`.
@@ -590,8 +523,16 @@ class SQLData(DBData):
                 Cannot be used together with `query`. Include the condition into the query.
             align_dates (bool): Whether to align `start` and `end` to the timezone of the index.
 
-                Will pull one row (using `LIMIT 1`) and use `SQLData.prepare_dt_columns` to get the index.
-            to_utc (bool): See `SQLData.prepare_dt_columns`.
+                Will pull one row (using `LIMIT 1`) and use `SQLData.prepare_dt` to get the index.
+            parse_dates (bool, list, or dict): Whether to parse dates and how to do it.
+
+                If `query` is not used, will get mapped into column names. Otherwise,
+                usage of integers is not allowed and column names directly must be used.
+                If enabled, will also try to parse the datetime columns that couldn't be parsed
+                by Pandas after the object has been fetched.
+
+                For dict format, see `pd.read_sql_query`.
+            to_utc (bool, str, or sequence of str): See `SQLData.prepare_dt`.
             tz (any): Timezone.
 
                 See `vectorbtpro.utils.datetime_.to_timezone`.
@@ -614,14 +555,6 @@ class SQLData(DBData):
             columns (int, str, or list): One or more columns to select.
 
                 Will get mapped into column names. Cannot be used together with `query`.
-            parse_dates (bool, list, or dict): Whether to parse dates and how to do it.
-
-                If `query` is not used, will get mapped into column names. Otherwise,
-                usage of integers is not allowed and column names directly must be used.
-                If enabled, will also try to parse the datetime columns that couldn't be parsed
-                by Pandas after the object has been fetched.
-
-                For dict format, see `pd.read_sql_query`.
             dtype (dtype_like or dict): Data type of each column.
 
                 If `query` is not used, will get mapped into column names. Otherwise,
@@ -658,20 +591,21 @@ class SQLData(DBData):
         should_dispose = engine_meta["should_dispose"]
         if dispose_engine is None:
             dispose_engine = should_dispose
-        if table_name is not None and query is not None:
+        if table is not None and query is not None:
             raise ValueError("Must provide either table name or query, not both")
         if schema is not None and query is not None:
             raise ValueError("Schema cannot be applied to custom queries")
-        if table_name is None and query is None:
+        if table is None and query is None:
             if ":" in key:
-                schema, table_name = key.split(":")
+                schema, table = key.split(":")
             else:
-                table_name = key
+                table = key
 
         schema = cls.resolve_engine_setting(schema, "schema", engine_name=engine_name)
         start = cls.resolve_engine_setting(start, "start", engine_name=engine_name)
         end = cls.resolve_engine_setting(end, "end", engine_name=engine_name)
         align_dates = cls.resolve_engine_setting(align_dates, "align_dates", engine_name=engine_name)
+        parse_dates = cls.resolve_engine_setting(parse_dates, "parse_dates", engine_name=engine_name)
         to_utc = cls.resolve_engine_setting(to_utc, "to_utc", engine_name=engine_name)
         tz = cls.resolve_engine_setting(tz, "tz", engine_name=engine_name)
         start_row = cls.resolve_engine_setting(start_row, "start_row", engine_name=engine_name)
@@ -680,7 +614,6 @@ class SQLData(DBData):
         row_number_column = cls.resolve_engine_setting(row_number_column, "row_number_column", engine_name=engine_name)
         index_col = cls.resolve_engine_setting(index_col, "index_col", engine_name=engine_name)
         columns = cls.resolve_engine_setting(columns, "columns", engine_name=engine_name)
-        parse_dates = cls.resolve_engine_setting(parse_dates, "parse_dates", engine_name=engine_name)
         dtype = cls.resolve_engine_setting(dtype, "dtype", engine_name=engine_name)
         chunksize = cls.resolve_engine_setting(chunksize, "chunksize", engine_name=engine_name)
         chunk_func = cls.resolve_engine_setting(chunk_func, "chunk_func", engine_name=engine_name)
@@ -691,12 +624,13 @@ class SQLData(DBData):
 
         if query is None or isinstance(query, (Selectable, FromClause)):
             if query is None:
-                metadata_obj = MetaData()
-                metadata_obj.reflect(bind=engine, schema=schema, only=[table_name], views=True)
-                if schema is not None and schema + "." + table_name in metadata_obj.tables:
-                    table = metadata_obj.tables[schema + "." + table_name]
-                else:
-                    table = metadata_obj.tables[table_name]
+                if isinstance(table, str):
+                    metadata_obj = MetaData()
+                    metadata_obj.reflect(bind=engine, schema=schema, only=[table], views=True)
+                    if schema is not None and schema + "." + table in metadata_obj.tables:
+                        table = metadata_obj.tables[schema + "." + table]
+                    else:
+                        table = metadata_obj.tables[table]
             else:
                 table = query
 
@@ -798,10 +732,10 @@ class SQLData(DBData):
                         chunksize=None,
                         **read_sql_kwargs,
                     )
-                    first_obj = cls.prepare_dt_columns(
+                    first_obj = cls.prepare_dt(
                         first_obj,
+                        parse_dates=list(parse_dates) if isinstance(parse_dates, dict) else parse_dates,
                         to_utc=to_utc,
-                        parse_dates=parse_dates,
                     )
                     if isinstance(first_obj.index, pd.DatetimeIndex):
                         if tz is None:
@@ -904,10 +838,10 @@ class SQLData(DBData):
                 obj = pd.concat(list(obj), axis=0)
             else:
                 obj = chunk_func(obj)
-        obj = cls.prepare_dt_columns(
+        obj = cls.prepare_dt(
             obj,
+            parse_dates=list(parse_dates) if isinstance(parse_dates, dict) else parse_dates,
             to_utc=to_utc,
-            parse_dates=parse_dates,
         )
         if not isinstance(obj.index, pd.MultiIndex):
             if obj.index.name == "index":

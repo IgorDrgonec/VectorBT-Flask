@@ -70,7 +70,7 @@ class CSVData(FileData):
         path: tp.Any = None,
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
-        tz: tp.Optional[tp.TimezoneLike] = None,
+        tz: tp.TimezoneLike = None,
         start_row: tp.Optional[int] = None,
         end_row: tp.Optional[int] = None,
         header: tp.Optional[tp.MaybeSequence[int]] = None,

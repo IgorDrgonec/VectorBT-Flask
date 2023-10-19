@@ -56,7 +56,7 @@ class SyntheticData(CustomData):
         end: tp.Optional[tp.DatetimeLike] = None,
         periods: tp.Optional[int] = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
-        tz: tp.Optional[tp.TimezoneLike] = None,
+        tz: tp.TimezoneLike = None,
         normalize: tp.Optional[bool] = None,
         inclusive: tp.Optional[str] = None,
         **kwargs,

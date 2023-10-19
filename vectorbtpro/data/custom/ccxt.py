@@ -191,7 +191,7 @@ class CCXTData(RemoteData):
         fetch_func: tp.Callable,
         start: tp.DatetimeLike = 0,
         end: tp.DatetimeLike = "now",
-        tz: tp.Optional[tp.TimezoneLike] = None,
+        tz: tp.TimezoneLike = None,
         for_internal_use: bool = False,
     ) -> tp.Optional[pd.Timestamp]:
         """Find the earliest date using binary search."""
@@ -253,7 +253,7 @@ class CCXTData(RemoteData):
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
-        tz: tp.Optional[tp.TimezoneLike] = None,
+        tz: tp.TimezoneLike = None,
         find_earliest_date: tp.Optional[bool] = None,
         limit: tp.Optional[int] = None,
         delay: tp.Optional[float] = None,

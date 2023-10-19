@@ -57,8 +57,8 @@ class FeatherData(FileData):
         cls,
         key: tp.Key,
         path: tp.Any = None,
-        tz: tp.Optional[tp.TimezoneLike] = None,
-        index_col: tp.Optional[tp.MaybeSequence[tp.Union[int, str]]] = None,
+        tz: tp.TimezoneLike = None,
+        index_col: tp.Optional[tp.MaybeSequence[tp.IntStr]] = None,
         squeeze: tp.Optional[bool] = None,
         **read_kwargs,
     ) -> tp.KeyData:

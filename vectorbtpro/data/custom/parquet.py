@@ -3,7 +3,6 @@
 """Module with `ParquetData`."""
 
 from pathlib import Path
-from glob import glob
 import re
 
 import pandas as pd
@@ -124,7 +123,7 @@ class ParquetData(FileData):
         cls,
         key: tp.Key,
         path: tp.Any = None,
-        tz: tp.Optional[tp.TimezoneLike] = None,
+        tz: tp.TimezoneLike = None,
         squeeze: tp.Optional[bool] = None,
         keep_partition_cols: tp.Optional[bool] = None,
         engine: tp.Optional[str] = None,

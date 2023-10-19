@@ -751,7 +751,7 @@ class TVData(RemoteData):
         client_config: tp.KwargsLike = None,
         exchange: tp.Optional[str] = None,
         timeframe: tp.Optional[str] = None,
-        tz: tp.Optional[tp.TimezoneLike] = None,
+        tz: tp.TimezoneLike = None,
         fut_contract: tp.Optional[int] = None,
         adjustment: tp.Optional[str] = None,
         extended_session: tp.Optional[bool] = None,

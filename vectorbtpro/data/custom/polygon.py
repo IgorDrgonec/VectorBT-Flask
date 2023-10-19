@@ -137,7 +137,7 @@ class PolygonData(RemoteData):
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
-        tz: tp.Optional[tp.TimezoneLike] = None,
+        tz: tp.TimezoneLike = None,
         adjusted: tp.Optional[bool] = None,
         limit: tp.Optional[int] = None,
         params: tp.KwargsLike = None,

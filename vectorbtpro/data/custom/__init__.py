@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from vectorbtpro.data.custom.csv import *
     from vectorbtpro.data.custom.custom import *
     from vectorbtpro.data.custom.db import *
+    from vectorbtpro.data.custom.duckdb import *
     from vectorbtpro.data.custom.feather import *
     from vectorbtpro.data.custom.file import *
     from vectorbtpro.data.custom.gbm import *

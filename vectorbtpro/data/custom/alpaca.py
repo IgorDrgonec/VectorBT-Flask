@@ -184,7 +184,7 @@ class AlpacaData(RemoteData):
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
-        tz: tp.Optional[tp.TimezoneLike] = None,
+        tz: tp.TimezoneLike = None,
         adjustment: tp.Optional[str] = None,
         feed: tp.Optional[str] = None,
         limit: tp.Optional[int] = None,

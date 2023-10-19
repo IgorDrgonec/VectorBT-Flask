@@ -158,7 +158,7 @@ class BinanceData(RemoteData):
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
-        tz: tp.Optional[tp.TimezoneLike] = None,
+        tz: tp.TimezoneLike = None,
         klines_type: tp.Union[None, int, str] = None,
         limit: tp.Optional[int] = None,
         delay: tp.Optional[float] = None,

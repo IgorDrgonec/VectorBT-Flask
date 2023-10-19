@@ -59,7 +59,7 @@ class NDLData(RemoteData):
         api_key: tp.Optional[str] = None,
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
-        tz: tp.Optional[tp.TimezoneLike] = None,
+        tz: tp.TimezoneLike = None,
         column_indices: tp.Optional[tp.MaybeIterable[int]] = None,
         collapse: tp.Optional[str] = None,
         transform: tp.Optional[str] = None,
