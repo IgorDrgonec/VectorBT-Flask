@@ -456,8 +456,6 @@ def from_orders_nb(
                 _cash_earnings = flex_select_nb(cash_earnings_, i, col)
                 _cash_dividends = flex_select_nb(cash_dividends_, i, col)
                 _cash_earnings += _cash_dividends * last_position[col]
-                if _cash_earnings < 0:
-                    _cash_earnings = max(_cash_earnings, -last_cash[group])
                 last_cash[group] += _cash_earnings
                 last_free_cash[group] += _cash_earnings
                 if track_cash_earnings:
