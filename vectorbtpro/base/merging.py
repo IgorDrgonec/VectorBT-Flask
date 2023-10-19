@@ -120,13 +120,16 @@ def concat_merge(
         new_obj = pd.concat(objs, axis=0, **kwargs)
         if index_stack_kwargs is None:
             index_stack_kwargs = {}
-        keys = concat_indexes(
-            *keys,
-            index_concat_method="append",
-            index_stack_kwargs=index_stack_kwargs,
-            verify_integrity=False,
-            axis=0,
-        )
+        if len(keys) == 1:
+            keys = keys[0]
+        else:
+            keys = concat_indexes(
+                *keys,
+                index_concat_method="append",
+                index_stack_kwargs=index_stack_kwargs,
+                verify_integrity=False,
+                axis=0,
+            )
         if default_index:
             new_obj.index = keys
         else:
@@ -245,13 +248,16 @@ def row_stack_merge(
         new_obj = pd.concat(objs, axis=0, **kwargs)
         if index_stack_kwargs is None:
             index_stack_kwargs = {}
-        keys = concat_indexes(
-            *keys,
-            index_concat_method="append",
-            index_stack_kwargs=index_stack_kwargs,
-            verify_integrity=False,
-            axis=0,
-        )
+        if len(keys) == 1:
+            keys = keys[0]
+        else:
+            keys = concat_indexes(
+                *keys,
+                index_concat_method="append",
+                index_stack_kwargs=index_stack_kwargs,
+                verify_integrity=False,
+                axis=0,
+            )
         if default_index:
             new_obj.index = keys
         else:
@@ -447,13 +453,16 @@ def column_stack_merge(
         new_obj = pd.concat(objs, axis=1, **kwargs)
         if index_stack_kwargs is None:
             index_stack_kwargs = {}
-        keys = concat_indexes(
-            *keys,
-            index_concat_method="append",
-            index_stack_kwargs=index_stack_kwargs,
-            verify_integrity=False,
-            axis=1,
-        )
+        if len(keys) == 1:
+            keys = keys[0]
+        else:
+            keys = concat_indexes(
+                *keys,
+                index_concat_method="append",
+                index_stack_kwargs=index_stack_kwargs,
+                verify_integrity=False,
+                axis=1,
+            )
         if default_columns:
             new_obj.columns = keys
         else:
