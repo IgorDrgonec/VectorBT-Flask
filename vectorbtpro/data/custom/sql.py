@@ -342,6 +342,152 @@ class SQLData(DBData):
         return sorted(tables)
 
     @classmethod
+    def has_schema(
+        cls,
+        schema: str,
+        engine: tp.Union[None, str, EngineT] = None,
+        engine_name: tp.Optional[str] = None,
+        engine_config: tp.KwargsLike = None,
+    ) -> bool:
+        """Check whether the database has a schema."""
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("sqlalchemy")
+        from sqlalchemy import inspect
+
+        if engine_config is None:
+            engine_config = {}
+        engine = cls.resolve_engine(
+            engine=engine,
+            engine_name=engine_name,
+            **engine_config,
+        )
+        return inspect(engine).has_schema(schema)
+
+    @classmethod
+    def create_schema(
+        cls,
+        schema: str,
+        engine: tp.Union[None, str, EngineT] = None,
+        engine_name: tp.Optional[str] = None,
+        engine_config: tp.KwargsLike = None,
+    ) -> None:
+        """Create a schema if it doesn't exist yet."""
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("sqlalchemy")
+        from sqlalchemy.schema import CreateSchema
+
+        if engine_config is None:
+            engine_config = {}
+        engine = cls.resolve_engine(
+            engine=engine,
+            engine_name=engine_name,
+            **engine_config,
+        )
+        if not cls.has_schema(schema, engine=engine):
+            with engine.connect() as connection:
+                connection.execute(CreateSchema(schema))
+                connection.commit()
+
+    @classmethod
+    def has_table(
+        cls,
+        table: str,
+        schema: tp.Optional[str] = None,
+        engine: tp.Union[None, str, EngineT] = None,
+        engine_name: tp.Optional[str] = None,
+        engine_config: tp.KwargsLike = None,
+    ) -> bool:
+        """Check whether the database has a table."""
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("sqlalchemy")
+        from sqlalchemy import inspect
+
+        if engine_config is None:
+            engine_config = {}
+        engine = cls.resolve_engine(
+            engine=engine,
+            engine_name=engine_name,
+            **engine_config,
+        )
+        return inspect(engine).has_table(table, schema=schema)
+
+    @classmethod
+    def get_table_relation(
+        cls,
+        table: str,
+        schema: tp.Optional[str] = None,
+        engine: tp.Union[None, str, EngineT] = None,
+        engine_name: tp.Optional[str] = None,
+        engine_config: tp.KwargsLike = None,
+    ) -> TableT:
+        """Get table relation."""
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("sqlalchemy")
+        from sqlalchemy import MetaData
+
+        if engine_config is None:
+            engine_config = {}
+        engine = cls.resolve_engine(
+            engine=engine,
+            engine_name=engine_name,
+            **engine_config,
+        )
+        schema = cls.resolve_engine_setting(schema, "schema", engine_name=engine_name)
+        metadata_obj = MetaData()
+        metadata_obj.reflect(bind=engine, schema=schema, only=[table], views=True)
+        if schema is not None and schema + "." + table in metadata_obj.tables:
+            return metadata_obj.tables[schema + "." + table]
+        return metadata_obj.tables[table]
+
+    @classmethod
+    def get_last_row_number(
+        cls,
+        table: str,
+        schema: tp.Optional[str] = None,
+        row_number_column: tp.Optional[str] = None,
+        engine: tp.Union[None, str, EngineT] = None,
+        engine_name: tp.Optional[str] = None,
+        engine_config: tp.KwargsLike = None,
+    ) -> TableT:
+        """Get last row number."""
+        if engine_config is None:
+            engine_config = {}
+        engine_meta = cls.resolve_engine(
+            engine=engine,
+            engine_name=engine_name,
+            return_meta=True,
+            **engine_config,
+        )
+        engine = engine_meta["engine"]
+        engine_name = engine_meta["engine_name"]
+        row_number_column = cls.resolve_engine_setting(
+            row_number_column,
+            "row_number_column",
+            engine_name=engine_name,
+        )
+        table_relation = cls.get_table_relation(table, schema=schema, engine=engine)
+        table_column_names = []
+        for column in table_relation.columns:
+            table_column_names.append(column.name)
+        if row_number_column not in table_column_names:
+            raise ValueError(f"Row number column '{row_number_column}' not found")
+        query = (
+            table_relation.select()
+            .with_only_columns(table_relation.columns.get(row_number_column))
+            .order_by(table_relation.columns.get(row_number_column).desc())
+            .limit(1)
+        )
+        with engine.connect() as connection:
+            results = connection.execute(query)
+            last_row_number = results.first()[0]
+            connection.commit()
+        return last_row_number
+
+    @classmethod
     def resolve_keys_meta(
         cls,
         keys: tp.Union[None, dict, tp.MaybeKeys] = None,
@@ -576,7 +722,7 @@ class SQLData(DBData):
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("sqlalchemy")
-        from sqlalchemy import MetaData, Selectable, Select, FromClause, and_, text
+        from sqlalchemy import Selectable, Select, FromClause, and_, text
 
         if engine_config is None:
             engine_config = {}
@@ -601,7 +747,6 @@ class SQLData(DBData):
             else:
                 table = key
 
-        schema = cls.resolve_engine_setting(schema, "schema", engine_name=engine_name)
         start = cls.resolve_engine_setting(start, "start", engine_name=engine_name)
         end = cls.resolve_engine_setting(end, "end", engine_name=engine_name)
         align_dates = cls.resolve_engine_setting(align_dates, "align_dates", engine_name=engine_name)
@@ -625,12 +770,7 @@ class SQLData(DBData):
         if query is None or isinstance(query, (Selectable, FromClause)):
             if query is None:
                 if isinstance(table, str):
-                    metadata_obj = MetaData()
-                    metadata_obj.reflect(bind=engine, schema=schema, only=[table], views=True)
-                    if schema is not None and schema + "." + table in metadata_obj.tables:
-                        table = metadata_obj.tables[schema + "." + table]
-                    else:
-                        table = metadata_obj.tables[table]
+                    table = cls.get_table_relation(table, schema=schema, engine=engine)
             else:
                 table = query
 

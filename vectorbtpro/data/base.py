@@ -3904,7 +3904,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         to_utc: tp.Union[None, bool, str, tp.Sequence[str], feature_dict, symbol_dict, CustomTemplate] = None,
         remove_utc_tz: tp.Union[bool, feature_dict, symbol_dict, CustomTemplate] = True,
         attach_row_number: tp.Union[bool, feature_dict, symbol_dict, CustomTemplate] = False,
-        from_row_number: tp.Union[int, feature_dict, symbol_dict, CustomTemplate] = 0,
+        from_row_number: tp.Union[None, int, feature_dict, symbol_dict, CustomTemplate] = None,
         row_number_column: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
         engine_config: tp.KwargsLike = None,
         dispose_engine: tp.Optional[bool] = None,
@@ -3936,8 +3936,6 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         from vectorbtpro.utils.module_ import assert_can_import
 
         assert_can_import("sqlalchemy")
-        from sqlalchemy import inspect
-        from sqlalchemy.schema import CreateSchema
         from vectorbtpro.data.custom.sql import SQLData
 
         if engine_config is None:
@@ -4057,17 +4055,27 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 template_context=_template_context,
             )
             v = SQLData.prepare_dt(v, to_utc=_to_utc, remove_utc_tz=_remove_utc_tz, parse_dates=False)
+            _kwargs = self.select_key_kwargs(k, kwargs, check_dict_type=check_dict_type)
             if _attach_row_number:
                 v = v.copy(deep=False)
                 if isinstance(v, pd.Series):
                     v = v.to_frame()
+                if _from_row_number is None:
+                    if not SQLData.has_table(_table, schema=_schema, engine=_engine):
+                        _from_row_number = 0
+                    elif _kwargs.get("if_exists", "fail") != "append":
+                        _from_row_number = 0
+                    else:
+                        last_row_number = SQLData.get_last_row_number(
+                            _table,
+                            schema=_schema,
+                            row_number_column=_row_number_column,
+                            engine=_engine,
+                        )
+                        _from_row_number = last_row_number + 1
                 v[_row_number_column] = np.arange(_from_row_number, _from_row_number + len(v.index))
             if _schema is not None:
-                with _engine.connect() as connection:
-                    if not inspect(_engine).has_schema(_schema):
-                        connection.execute(CreateSchema(_schema))
-                        connection.commit()
-            _kwargs = self.select_key_kwargs(k, kwargs, check_dict_type=check_dict_type)
+                SQLData.create_schema(_schema, engine=_engine)
             meta[k] = {"name": _table, "con": _engine, "schema": _schema, **_kwargs}
             v.to_sql(**meta[k])
             if _dispose_engine:
