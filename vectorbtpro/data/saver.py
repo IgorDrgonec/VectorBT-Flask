@@ -14,6 +14,7 @@ __all__ = [
     "CSVDataSaver",
     "HDFDataSaver",
     "SQLDataSaver",
+    "DuckDBDataSaver",
 ]
 
 logger = logging.getLogger(__name__)
@@ -116,7 +117,7 @@ class DataSaver(DataUpdater):
 
 
 class CSVDataSaver(DataSaver):
-    """Subclass of `DataSaver` for saving data to CSV files using `vectorbtpro.data.base.Data.to_csv`."""
+    """Subclass of `DataSaver` for saving data with `vectorbtpro.data.base.Data.to_csv`."""
 
     def init_save_data(self, **to_csv_kwargs) -> None:
         """Save initial data."""
@@ -148,7 +149,7 @@ class CSVDataSaver(DataSaver):
 
 
 class HDFDataSaver(DataSaver):
-    """Subclass of `DataSaver` for saving data to HDF files using `vectorbtpro.data.base.Data.to_hdf`."""
+    """Subclass of `DataSaver` for saving data with `vectorbtpro.data.base.Data.to_hdf`."""
 
     def init_save_data(self, **to_hdf_kwargs) -> None:
         """Save initial data."""
@@ -180,7 +181,7 @@ class HDFDataSaver(DataSaver):
 
 
 class SQLDataSaver(DataSaver):
-    """Subclass of `DataSaver` for saving data to CSV files using `vectorbtpro.data.base.Data.to_sql`."""
+    """Subclass of `DataSaver` for saving data with `vectorbtpro.data.base.Data.to_sql`."""
 
     def init_save_data(self, **to_sql_kwargs) -> None:
         """Save initial data."""
@@ -207,5 +208,37 @@ class SQLDataSaver(DataSaver):
         )
 
         self._data.to_sql(**to_sql_kwargs)
+        new_index = self.data.wrapper.index
+        logger.info(f"Saved {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")
+
+
+class DuckDBDataSaver(DataSaver):
+    """Subclass of `DataSaver` for saving data with `vectorbtpro.data.base.Data.to_duckdb`."""
+
+    def init_save_data(self, **to_duckdb_kwargs) -> None:
+        """Save initial data."""
+        # In case the method was called by the user
+        to_duckdb_kwargs = merge_dicts(
+            self.save_kwargs,
+            self.init_save_kwargs,
+            to_duckdb_kwargs,
+        )
+
+        self._data.to_duckdb(**to_duckdb_kwargs)
+        new_index = self.data.wrapper.index
+        logger.info(f"Saved initial {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")
+
+    def save_data(self, **to_duckdb_kwargs) -> None:
+        """Save data.
+
+        By default, appends new data without header."""
+        # In case the method was called by the user
+        to_duckdb_kwargs = merge_dicts(
+            dict(if_exists="append"),
+            self.save_kwargs,
+            to_duckdb_kwargs,
+        )
+
+        self._data.to_duckdb(**to_duckdb_kwargs)
         new_index = self.data.wrapper.index
         logger.info(f"Saved {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")

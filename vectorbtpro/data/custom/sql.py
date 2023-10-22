@@ -875,7 +875,7 @@ class SQLData(DBData):
                     first_obj = cls.prepare_dt(
                         first_obj,
                         parse_dates=list(parse_dates) if isinstance(parse_dates, dict) else parse_dates,
-                        to_utc=to_utc,
+                        to_utc=False,
                     )
                     if isinstance(first_obj.index, pd.DatetimeIndex):
                         if tz is None:
@@ -887,13 +887,21 @@ class SQLData(DBData):
                                 end = to_tzaware_datetime(end, naive_tz=tz, tz=first_obj.index.tz)
                         else:
                             if start is not None:
-                                if to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "index"):
+                                if (
+                                    to_utc is True
+                                    or (isinstance(to_utc, str) and to_utc.lower() == "index")
+                                    or (checks.is_sequence(to_utc) and first_obj.index.name in to_utc)
+                                ):
                                     start = to_tzaware_datetime(start, naive_tz=tz, tz="utc")
                                     start = to_naive_datetime(start)
                                 else:
                                     start = to_naive_datetime(start, tz=tz)
                             if end is not None:
-                                if to_utc is True or (isinstance(to_utc, str) and to_utc.lower() == "index"):
+                                if (
+                                    to_utc is True
+                                    or (isinstance(to_utc, str) and to_utc.lower() == "index")
+                                    or (checks.is_sequence(to_utc) and first_obj.index.name in to_utc)
+                                ):
                                     end = to_tzaware_datetime(end, naive_tz=tz, tz="utc")
                                     end = to_naive_datetime(end)
                                 else:

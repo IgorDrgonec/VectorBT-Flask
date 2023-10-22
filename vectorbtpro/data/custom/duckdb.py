@@ -12,6 +12,7 @@ from vectorbtpro.data.custom.db import DBData
 from vectorbtpro.data.custom.file import FileData
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts
+from vectorbtpro.utils.datetime_ import to_tzaware_datetime, to_naive_datetime
 
 try:
     if not tp.TYPE_CHECKING:
@@ -401,10 +402,7 @@ class DuckDBData(DBData):
         """Override `vectorbtpro.data.base.Data.pull` to resolve and share the connection among the keys
         and use the table names available in the database in case no keys were provided."""
         if share_connection is None:
-            if (
-                not cls.has_key_dict(connection)
-                and not cls.has_key_dict(connection_config)
-            ):
+            if not cls.has_key_dict(connection) and not cls.has_key_dict(connection_config):
                 share_connection = True
             else:
                 share_connection = False
@@ -524,6 +522,9 @@ class DuckDBData(DBData):
         query: tp.Union[None, str, DuckDBPyRelationT] = None,
         connection: tp.Union[None, str, DuckDBPyConnectionT] = None,
         connection_config: tp.KwargsLike = None,
+        start: tp.Optional[tp.Any] = None,
+        end: tp.Optional[tp.Any] = None,
+        align_dates: tp.Optional[bool] = None,
         parse_dates: tp.Union[None, bool, tp.Sequence[str]] = None,
         to_utc: tp.Union[None, bool, str, tp.Sequence[str]] = None,
         tz: tp.TimezoneLike = None,
@@ -569,6 +570,21 @@ class DuckDBData(DBData):
                 Cannot be used together with `catalog`, `schema`, and `table`.
             connection (str or object): See `DuckDBData.resolve_connection`.
             connection_config (dict): See `DuckDBData.resolve_connection`.
+            start (any): Start datetime (if datetime index) or any other start value.
+
+                Will parse with `vectorbtpro.utils.datetime_.to_timestamp` if `align_dates` is True
+                and the index is a datetime index. Otherwise, you must ensure the correct type is provided.
+
+                Cannot be used together with `query`. Include the condition into the query.
+            end (any): End datetime (if datetime index) or any other end value.
+
+                Will parse with `vectorbtpro.utils.datetime_.to_timestamp` if `align_dates` is True
+                and the index is a datetime index. Otherwise, you must ensure the correct type is provided.
+
+                Cannot be used together with `query`. Include the condition into the query.
+            align_dates (bool): Whether to align `start` and `end` to the timezone of the index.
+
+                Will pull one row (using `LIMIT 1`) and use `SQLData.prepare_dt` to get the index.
             parse_dates (bool or sequence of str): See `DuckDBData.prepare_dt`.
             to_utc (bool, str, or sequence of str): See `DuckDBData.prepare_dt`.
             tz (any): Timezone.
@@ -598,7 +614,7 @@ class DuckDBData(DBData):
             raise ValueError("Cannot use read_path and query together")
         if read_path is not None and (catalog is not None or schema is not None or table is not None):
             raise ValueError("Cannot use read_path and catalog/schema/table together")
-        if table is None and read_path is None and query is None:
+        if table is None and read_path is None and read_format is None and query is None:
             if ":" in key:
                 key_parts = key.split(":")
                 if len(key_parts) == 2:
@@ -610,6 +626,8 @@ class DuckDBData(DBData):
         if read_format is not None:
             read_format = read_format.lower()
             checks.assert_in(read_format, ["csv", "parquet", "json"], arg_name="read_format")
+            if read_path is None:
+                read_path = (Path(".") / key).with_suffix("." + read_format)
         else:
             if read_path is not None:
                 if isinstance(read_path, str):
@@ -627,6 +645,9 @@ class DuckDBData(DBData):
 
         catalog = cls.resolve_custom_setting(catalog, "catalog")
         schema = cls.resolve_custom_setting(schema, "schema")
+        start = cls.resolve_custom_setting(start, "start")
+        end = cls.resolve_custom_setting(end, "end")
+        align_dates = cls.resolve_custom_setting(align_dates, "align_dates")
         parse_dates = cls.resolve_custom_setting(parse_dates, "parse_dates")
         to_utc = cls.resolve_custom_setting(to_utc, "to_utc")
         tz = cls.resolve_custom_setting(tz, "tz")
@@ -650,11 +671,99 @@ class DuckDBData(DBData):
                             connection=connection,
                             connection_config=connection_config,
                         )
-                    query = f"SELECT * FROM \"{catalog}\".\"{schema}\".\"{table}\""
+                    query = f'SELECT * FROM "{catalog}"."{schema}"."{table}"'
                 elif schema is not None:
-                    query = f"SELECT * FROM \"{schema}\".\"{table}\""
+                    query = f'SELECT * FROM "{schema}"."{table}"'
                 else:
-                    query = f"SELECT * FROM \"{table}\""
+                    query = f'SELECT * FROM "{table}"'
+            if start is not None or end is not None:
+                if index_col is None:
+                    raise ValueError("Must provide index column for filtering by start and end")
+                if not checks.is_int(index_col) and not isinstance(index_col, str):
+                    raise ValueError("Index column must be integer or string for filtering by start and end")
+                if checks.is_int(index_col) or align_dates:
+                    metadata_df = connection.execute("DESCRIBE " + query + " LIMIT 1").df()
+                else:
+                    metadata_df = None
+                if checks.is_int(index_col):
+                    index_name = metadata_df["column_name"].tolist()[0]
+                else:
+                    index_name = index_col
+                if parse_dates:
+                    index_column_type = metadata_df[metadata_df["column_name"] == index_name]["column_type"].item()
+                    if index_column_type in (
+                        "TIMESTAMP_NS",
+                        "TIMESTAMP_MS",
+                        "TIMESTAMP_S",
+                        "TIMESTAMP",
+                        "DATETIME",
+                    ):
+                        if start is not None:
+                            if (
+                                to_utc is True
+                                or (isinstance(to_utc, str) and to_utc.lower() == "index")
+                                or (checks.is_sequence(to_utc) and index_name in to_utc)
+                            ):
+                                start = to_tzaware_datetime(start, naive_tz=tz, tz="utc")
+                                start = to_naive_datetime(start)
+                            else:
+                                start = to_naive_datetime(start, tz=tz)
+                        if end is not None:
+                            if (
+                                to_utc is True
+                                or (isinstance(to_utc, str) and to_utc.lower() == "index")
+                                or (checks.is_sequence(to_utc) and index_name in to_utc)
+                            ):
+                                end = to_tzaware_datetime(end, naive_tz=tz, tz="utc")
+                                end = to_naive_datetime(end)
+                            else:
+                                end = to_naive_datetime(end, tz=tz)
+                    elif index_column_type in ("TIMESTAMPTZ", "TIMESTAMP WITH TIME ZONE"):
+                        if start is not None:
+                            if (
+                                to_utc is True
+                                or (isinstance(to_utc, str) and to_utc.lower() == "index")
+                                or (checks.is_sequence(to_utc) and index_name in to_utc)
+                            ):
+                                start = to_tzaware_datetime(start, naive_tz=tz, tz="utc")
+                            else:
+                                start = to_tzaware_datetime(start, naive_tz=tz)
+                        if end is not None:
+                            if (
+                                to_utc is True
+                                or (isinstance(to_utc, str) and to_utc.lower() == "index")
+                                or (checks.is_sequence(to_utc) and index_name in to_utc)
+                            ):
+                                end = to_tzaware_datetime(end, naive_tz=tz, tz="utc")
+                            else:
+                                end = to_tzaware_datetime(end, naive_tz=tz)
+                if start is not None and end is not None:
+                    query += f" WHERE {index_name} >= $start AND {index_name} < $end"
+                elif start is not None:
+                    query += f" WHERE {index_name} >= $start"
+                elif end is not None:
+                    query += f" WHERE {index_name} < $end"
+                parameters = execute_kwargs.get("parameters", None)
+                if parameters is None:
+                    parameters = {}
+                else:
+                    parameters = dict(parameters)
+                if not isinstance(parameters, dict):
+                    raise ValueError("Parameters must be a dictionary for filtering by start and end")
+                if start is not None:
+                    if "start" in parameters:
+                        raise ValueError("Start is already in parameters")
+                    parameters["start"] = start
+                if end is not None:
+                    if "end" in parameters:
+                        raise ValueError("End is already in parameters")
+                    parameters["end"] = end
+                execute_kwargs["parameters"] = parameters
+        else:
+            if start is not None:
+                raise ValueError("Start cannot be applied to custom queries")
+            if end is not None:
+                raise ValueError("End cannot be applied to custom queries")
 
         if not isinstance(query, DuckDBPyRelation):
             relation = connection.execute(query, **execute_kwargs)
@@ -705,9 +814,17 @@ class DuckDBData(DBData):
         Uses `DuckDBData.fetch_key`."""
         return cls.fetch_key(symbol, **kwargs)
 
-    def update_key(self, key: str, **kwargs) -> tp.KeyData:
+    def update_key(self, key: str, from_last_index: tp.Optional[bool] = None, **kwargs) -> tp.KeyData:
         """Update data of a feature or symbol."""
         fetch_kwargs = self.select_fetch_kwargs(key)
+        pre_kwargs = merge_dicts(fetch_kwargs, kwargs)
+        if from_last_index is None:
+            if pre_kwargs.get("query", None) is not None:
+                from_last_index = False
+            else:
+                from_last_index = True
+        if from_last_index:
+            fetch_kwargs["start"] = self.select_last_index(key)
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         if self.feature_oriented:
             return self.fetch_feature(key, **kwargs)

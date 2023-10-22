@@ -4162,3 +4162,141 @@ class TestHDFDataSaver:
             data = data.update()
         assert_frame_equal(vbt.HDFData.pull(tmp_path / "saver.h5").data["S1"], data.data["S1"])
         assert_frame_equal(vbt.HDFData.pull(tmp_path / "saver.h5").data["S2"], data.data["S2"])
+
+
+class TestSQLDataSaver:
+    def test_update(self, tmp_path):
+        engine_url = "sqlite:///" + str(tmp_path / "temp.db")
+        data = MyData.pull(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"])
+
+        saver = vbt.SQLDataSaver(
+            data,
+            save_kwargs=dict(
+                engine=engine_url,
+            ),
+        )
+        saver.init_save_data()
+        saver.update(n=2)
+        updated_data = data.update(n=2, concat=False)
+        assert saver.data == updated_data
+        saved_result0 = pd.concat((data.data["S1"].iloc[:-1], updated_data.data["S1"]), axis=0)
+        saved_result0.index.freq = "D"
+        saved_result1 = pd.concat((data.data["S2"].iloc[:-1], updated_data.data["S2"]), axis=0)
+        saved_result1.index.freq = "D"
+        assert_frame_equal(vbt.SQLData.pull(engine=engine_url).data["S1"], saved_result0)
+        assert_frame_equal(vbt.SQLData.pull(engine=engine_url).data["S2"], saved_result1)
+
+        new_data = saver.data
+        new_saver = vbt.SQLDataSaver(
+            new_data,
+            save_kwargs=dict(
+                engine=engine_url,
+            ),
+        )
+        new_saver.update(n=2)
+        new_updated_data = new_data.update(n=2, concat=False)
+        assert new_saver.data == new_updated_data
+        new_saved_result0 = pd.concat(
+            (data.data["S1"].iloc[:-1], new_data.data["S1"].iloc[:-1], new_updated_data.data["S1"]), axis=0
+        )
+        new_saved_result0.index.freq = "D"
+        new_saved_result1 = pd.concat(
+            (data.data["S2"].iloc[:-1], new_data.data["S2"].iloc[:-1], new_updated_data.data["S2"]), axis=0
+        )
+        new_saved_result1.index.freq = "D"
+        assert_frame_equal(vbt.SQLData.pull(engine=engine_url).data["S1"], new_saved_result0)
+        assert_frame_equal(vbt.SQLData.pull(engine=engine_url).data["S2"], new_saved_result1)
+
+    def test_update_every(self, tmp_path):
+        engine_url = "sqlite:///" + str(tmp_path / "temp.db")
+        data = MyData.pull(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"])
+        call_count = [0]
+
+        class SQLDataSaver(vbt.SQLDataSaver):
+            def update(self, call_count, **kwargs):
+                super().update(**kwargs)
+                call_count[0] += 1
+                if call_count[0] == 5:
+                    raise vbt.CancelledError
+
+        saver = SQLDataSaver(
+            data,
+            save_kwargs=dict(
+                engine=engine_url,
+            ),
+        )
+        saver.init_save_data()
+        saver.update_every(call_count=call_count)
+        for i in range(5):
+            data = data.update()
+        assert_frame_equal(vbt.SQLData.pull(engine=engine_url).data["S1"], data.data["S1"])
+        assert_frame_equal(vbt.SQLData.pull(engine=engine_url).data["S2"], data.data["S2"])
+
+
+class TestDuckDBDataSaver:
+    def test_update(self, tmp_path):
+        connection_url = str(tmp_path / "database.duckdb")
+        data = MyData.pull(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"])
+
+        saver = vbt.DuckDBDataSaver(
+            data,
+            save_kwargs=dict(
+                connection=connection_url,
+            ),
+        )
+        saver.init_save_data()
+        saver.update(n=2)
+        updated_data = data.update(n=2, concat=False)
+        assert saver.data == updated_data
+        saved_result0 = pd.concat((data.data["S1"].iloc[:-1], updated_data.data["S1"]), axis=0)
+        saved_result0.index.freq = "D"
+        saved_result1 = pd.concat((data.data["S2"].iloc[:-1], updated_data.data["S2"]), axis=0)
+        saved_result1.index.freq = "D"
+        assert_frame_equal(vbt.DuckDBData.pull(connection=connection_url).data["S1"], saved_result0)
+        assert_frame_equal(vbt.DuckDBData.pull(connection=connection_url).data["S2"], saved_result1)
+
+        new_data = saver.data
+        new_saver = vbt.DuckDBDataSaver(
+            new_data,
+            save_kwargs=dict(
+                connection=connection_url,
+            ),
+        )
+        new_saver.update(n=2)
+        new_updated_data = new_data.update(n=2, concat=False)
+        assert new_saver.data == new_updated_data
+        new_saved_result0 = pd.concat(
+            (data.data["S1"].iloc[:-1], new_data.data["S1"].iloc[:-1], new_updated_data.data["S1"]), axis=0
+        )
+        new_saved_result0.index.freq = "D"
+        new_saved_result1 = pd.concat(
+            (data.data["S2"].iloc[:-1], new_data.data["S2"].iloc[:-1], new_updated_data.data["S2"]), axis=0
+        )
+        new_saved_result1.index.freq = "D"
+        assert_frame_equal(vbt.DuckDBData.pull(connection=connection_url).data["S1"], new_saved_result0)
+        assert_frame_equal(vbt.DuckDBData.pull(connection=connection_url).data["S2"], new_saved_result1)
+
+    def test_update_every(self, tmp_path):
+        connection_url = str(tmp_path / "database.duckdb")
+        data = MyData.pull(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"])
+        call_count = [0]
+
+        class DuckDBDataSaver(vbt.DuckDBDataSaver):
+            def update(self, call_count, **kwargs):
+                super().update(**kwargs)
+                call_count[0] += 1
+                if call_count[0] == 5:
+                    raise vbt.CancelledError
+
+        saver = DuckDBDataSaver(
+            data,
+            save_kwargs=dict(
+                connection=connection_url,
+            ),
+        )
+        saver.init_save_data()
+        saver.update_every(call_count=call_count)
+        for i in range(5):
+            data = data.update()
+        assert_frame_equal(vbt.DuckDBData.pull(connection=connection_url).data["S1"], data.data["S1"])
+        assert_frame_equal(vbt.DuckDBData.pull(connection=connection_url).data["S2"], data.data["S2"])

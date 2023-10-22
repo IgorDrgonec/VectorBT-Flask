@@ -3747,6 +3747,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         mkdir_kwargs: tp.Union[tp.KwargsLike, feature_dict, symbol_dict, CustomTemplate] = None,
         partition_cols: tp.Union[None, tp.List[str], feature_dict, symbol_dict, CustomTemplate] = None,
         partition_by: tp.Union[None, tp.AnyGroupByLike, feature_dict, symbol_dict, CustomTemplate] = None,
+        period_index_to: tp.Union[str, tp.AnyGroupByLike, feature_dict, symbol_dict, CustomTemplate] = "str",
         groupby_kwargs: tp.Union[None, tp.AnyGroupByLike, feature_dict, symbol_dict, CustomTemplate] = None,
         keep_groupby_names: tp.Union[bool, feature_dict, symbol_dict, CustomTemplate] = False,
         engine: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
@@ -3838,6 +3839,13 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             if isinstance(v, pd.Series):
                 v = v.to_frame()
             if _partition_by is not None:
+                _period_index_to = self.resolve_key_arg(
+                    period_index_to,
+                    k,
+                    "period_index_to",
+                    check_dict_type=check_dict_type,
+                    template_context=_template_context,
+                )
                 _groupby_kwargs = self.resolve_key_arg(
                     groupby_kwargs,
                     k,
@@ -3857,6 +3865,12 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 grouper = self.wrapper.get_index_grouper(_partition_by, **_groupby_kwargs)
                 partition_index = grouper.get_stretched_index()
                 _partition_cols = []
+
+                def _convert_period_index(index):
+                    if _period_index_to == "str":
+                        return index.map(str)
+                    return index.to_timestamp(how=_period_index_to)
+
                 if isinstance(partition_index, pd.MultiIndex):
                     for i in range(partition_index.nlevels):
                         partition_level = partition_index.get_level_values(i)
@@ -3864,6 +3878,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                             new_column_name = partition_level.name
                         else:
                             new_column_name = f"group_{i}"
+                        if isinstance(partition_level, pd.PeriodIndex):
+                            partition_level = _convert_period_index(partition_level)
                         v[new_column_name] = partition_level
                         _partition_cols.append(new_column_name)
                 else:
@@ -3871,6 +3887,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                         new_column_name = partition_index.name
                     else:
                         new_column_name = "group"
+                    if isinstance(partition_index, pd.PeriodIndex):
+                        partition_index = _convert_period_index(partition_index)
                     v[new_column_name] = partition_index
                     _partition_cols.append(new_column_name)
             _kwargs = self.select_key_kwargs(k, kwargs, check_dict_type=check_dict_type)
@@ -4114,7 +4132,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         mkdir_kwargs: tp.Union[tp.KwargsLike, feature_dict, symbol_dict, CustomTemplate] = None,
         to_utc: tp.Union[None, bool, str, tp.Sequence[str], feature_dict, symbol_dict, CustomTemplate] = None,
         remove_utc_tz: tp.Union[bool, feature_dict, symbol_dict, CustomTemplate] = True,
-        drop_if_exists: tp.Union[None, bool, feature_dict, symbol_dict, CustomTemplate] = None,
+        if_exists: tp.Union[str, feature_dict, symbol_dict, CustomTemplate] = "fail",
         connection_config: tp.KwargsLike = None,
         check_dict_type: bool = True,
         template_context: tp.KwargsLike = None,
@@ -4136,6 +4154,10 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         If `catalog` is not None, will make it default for this connection. If `schema` is not None,
         and it doesn't exist, will create a new schema in the current catalog and make it default
         for this connection. Any new table will be automatically created under this schema.
+
+        If `if_exists` is "fail", will raise an error if a table with the same name already exists.
+        If `if_exists` is "replace", will drop the existing table first. If `if_exists` is "append",
+        will append the new table to the existing one.
 
         If `write_format` is not None, it must be either "csv", "parquet", or "json". If `write_path` is
         a directory or has no suffix (meaning it's not a file), each feature/symbol will be saved to a
@@ -4258,10 +4280,10 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 check_dict_type=check_dict_type,
                 template_context=_template_context,
             )
-            _drop_if_exists = self.resolve_key_arg(
-                drop_if_exists,
+            _if_exists = self.resolve_key_arg(
+                if_exists,
                 k,
-                "drop_if_exists",
+                "if_exists",
                 check_dict_type=check_dict_type,
                 template_context=_template_context,
             )
@@ -4300,13 +4322,19 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 if _schema is not None:
                     _connection.execute(f"CREATE SCHEMA IF NOT EXISTS \"{_schema}\"")
                     _connection.execute(f"USE {_catalog}.{_schema}")
+                append = False
                 if _table in DuckDBData.list_tables(catalog=_catalog, schema=_schema, connection=_connection):
-                    if _drop_if_exists:
+                    if _if_exists.lower() == "fail":
+                        raise ValueError(f"Table '{_table}' already exists")
+                    elif _if_exists.lower() == "replace":
                         _connection.execute(f"DROP TABLE \"{_table}\"")
-                    else:
-                        raise ValueError(f"Table '{_table}' already exists. Pass drop_if_exists=True to drop.")
+                    elif _if_exists.lower() == "append":
+                        append = True
                 _connection.register("_" + k, v)
-                _connection.execute(f"CREATE TABLE \"{_table}\" AS SELECT * FROM \"_{k}\"")
+                if append:
+                    _connection.execute(f"INSERT INTO \"{_table}\" SELECT * FROM \"_{k}\"")
+                else:
+                    _connection.execute(f"CREATE TABLE \"{_table}\" AS SELECT * FROM \"_{k}\"")
                 meta[k] = {"table": _table, "schema": _schema, "catalog": _catalog}
 
         if return_meta:
