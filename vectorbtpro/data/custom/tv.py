@@ -15,10 +15,8 @@ from websocket import WebSocket
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import merge_dicts, Configured
 from vectorbtpro.utils.pbar import get_pbar
-from vectorbtpro.utils.datetime_ import (
-    split_freq_str,
-    prepare_freq,
-)
+from vectorbtpro.utils.datetime_ import split_freq_str, prepare_freq
+from vectorbtpro.utils.template import CustomTemplate
 from vectorbtpro.data.custom.remote import RemoteData
 
 __all__ = [
@@ -26,16 +24,139 @@ __all__ = [
     "TVData",
 ]
 
-__pdoc__ = {}
 
 SIGNIN_URL = "https://www.tradingview.com/accounts/signin/"
-SEARCH_URL = "https://symbol-search.tradingview.com/symbol_search/v3/?text={}&exchange={}&start={}&hl=2&lang=en&domain=production"
-SCAN_URL = "https://scanner.tradingview.com/{}/scan"
+"""Sign-in URL."""
+
+SEARCH_URL = (
+    "https://symbol-search.tradingview.com/symbol_search/v3/?"
+    "text={text}&"
+    "exchange={exchange}&"
+    "start={start}&"
+    "hl=2&"
+    "lang=en&"
+    "domain=production"
+)
+"""Symbol search URL."""
+
+SCAN_URL = "https://scanner.tradingview.com/{market}/scan"
+"""Market scanner URL."""
+
 ORIGIN_URL = "https://data.tradingview.com"
+"""Origin URL."""
+
 REFERER_URL = "https://www.tradingview.com"
+"""Referer URL."""
+
 WS_URL = "wss://data.tradingview.com/socket.io/websocket"
+"""Websocket URL."""
+
 PRO_WS_URL = "wss://prodata.tradingview.com/socket.io/websocket"
+"""Websocket URL (Pro)."""
+
 WS_TIMEOUT = 5
+"""Websocket timeout."""
+
+MARKET_LIST = [
+    "america",
+    "argentina",
+    "australia",
+    "austria",
+    "bahrain",
+    "bangladesh",
+    "belgium",
+    "brazil",
+    "canada",
+    "chile",
+    "china",
+    "colombia",
+    "cyprus",
+    "czech",
+    "denmark",
+    "egypt",
+    "estonia",
+    "euronext",
+    "finland",
+    "france",
+    "germany",
+    "greece",
+    "hongkong",
+    "hungary",
+    "iceland",
+    "india",
+    "indonesia",
+    "israel",
+    "italy",
+    "japan",
+    "kenya",
+    "korea",
+    "ksa",
+    "kuwait",
+    "latvia",
+    "lithuania",
+    "luxembourg",
+    "malaysia",
+    "mexico",
+    "morocco",
+    "netherlands",
+    "newzealand",
+    "nigeria",
+    "norway",
+    "pakistan",
+    "peru",
+    "philippines",
+    "poland",
+    "portugal",
+    "qatar",
+    "romania",
+    "rsa",
+    "russia",
+    "serbia",
+    "singapore",
+    "slovakia",
+    "spain",
+    "srilanka",
+    "sweden",
+    "switzerland",
+    "taiwan",
+    "thailand",
+    "tunisia",
+    "turkey",
+    "uae",
+    "uk",
+    "venezuela",
+    "vietnam",
+]
+"""List of markets supported by the market scanner (list may be incomplete)."""
+
+FIELD_LIST = [
+    "name",
+    "description",
+    "logoid",
+    "update_mode",
+    "type",
+    "typespecs",
+    "close",
+    "pricescale",
+    "minmov",
+    "fractional",
+    "minmove2",
+    "currency",
+    "change",
+    "change_abs",
+    "Recommend.All",
+    "volume",
+    "Value.Traded",
+    "market_cap_basic",
+    "fundamental_currency_code",
+    "Perf.1Y.MarketCap",
+    "price_earnings_ttm",
+    "earnings_per_share_basic_ttm",
+    "number_of_employees_fy",
+    "sector",
+    "market",
+]
+"""List of fields supported by the market scanner (list may be incomplete)."""
 
 
 class TVClient(Configured):
@@ -69,7 +190,7 @@ class TVClient(Configured):
         if auth_token is None:
             auth_token = self.auth(username, password, user_agent=user_agent)
         elif username is not None or password is not None:
-            raise ValueError("Either username and password, or auth_token must be provided")
+            raise ValueError("Must provide either username and password, or auth_token")
 
         self._auth_token = auth_token
         self._ws = None
@@ -96,8 +217,9 @@ class TVClient(Configured):
         """Chart session."""
         return self._chart_session
 
-    @staticmethod
+    @classmethod
     def auth(
+        cls,
         username: tp.Optional[str] = None,
         password: tp.Optional[str] = None,
         user_agent: tp.Optional[str] = None,
@@ -115,19 +237,19 @@ class TVClient(Configured):
                 raise ValueError(json)
             return json["user"]["auth_token"]
         if username is not None or password is not None:
-            raise ValueError("Both username and password must be provided")
+            raise ValueError("Must provide both username and password")
         return "unauthorized_user_token"
 
-    @staticmethod
-    def generate_session() -> str:
+    @classmethod
+    def generate_session(cls) -> str:
         """Generate session."""
         stringLength = 12
         letters = string.ascii_lowercase
         random_string = "".join(random.choice(letters) for _ in range(stringLength))
         return "qs_" + random_string
 
-    @staticmethod
-    def generate_chart_session() -> str:
+    @classmethod
+    def generate_chart_session(cls) -> str:
         """Generate chart session."""
         stringLength = 12
         letters = string.ascii_lowercase
@@ -139,24 +261,32 @@ class TVClient(Configured):
         from websocket import create_connection
 
         if pro_data:
-            self._ws = create_connection(PRO_WS_URL, headers=json.dumps({"Origin": ORIGIN_URL}), timeout=WS_TIMEOUT)
+            self._ws = create_connection(
+                PRO_WS_URL,
+                headers=json.dumps({"Origin": ORIGIN_URL}),
+                timeout=WS_TIMEOUT,
+            )
         else:
-            self._ws = create_connection(WS_URL, headers=json.dumps({"Origin": ORIGIN_URL}), timeout=WS_TIMEOUT)
+            self._ws = create_connection(
+                WS_URL,
+                headers=json.dumps({"Origin": ORIGIN_URL}),
+                timeout=WS_TIMEOUT,
+            )
 
-    @staticmethod
-    def filter_raw_message(text) -> tp.Tuple[str, str]:
+    @classmethod
+    def filter_raw_message(cls, text) -> tp.Tuple[str, str]:
         """Filter raw message."""
         found = re.search('"m":"(.+?)",', text).group(1)
         found2 = re.search('"p":(.+?"}"])}', text).group(1)
         return found, found2
 
-    @staticmethod
-    def prepend_header(st: str) -> str:
+    @classmethod
+    def prepend_header(cls, st: str) -> str:
         """Prepend a header."""
         return "~m~" + str(len(st)) + "~m~" + st
 
-    @staticmethod
-    def construct_message(func: str, param_list: tp.List[str]) -> str:
+    @classmethod
+    def construct_message(cls, func: str, param_list: tp.List[str]) -> str:
         """Construct a message."""
         return json.dumps({"m": func, "p": param_list}, separators=(",", ":"))
 
@@ -169,8 +299,8 @@ class TVClient(Configured):
         m = self.create_message(func, param_list)
         self.ws.send(m)
 
-    @staticmethod
-    def convert_raw_data(raw_data: str, symbol: str) -> pd.DataFrame:
+    @classmethod
+    def convert_raw_data(cls, raw_data: str, symbol: str) -> pd.DataFrame:
         """Process raw data into a DataFrame."""
         search_result = re.search(r'"s":\[(.+?)\}\]', raw_data)
         if search_result is None:
@@ -199,8 +329,8 @@ class TVClient(Configured):
         data.insert(0, "symbol", value=symbol)
         return data
 
-    @staticmethod
-    def format_symbol(symbol: str, exchange: str, fut_contract: tp.Optional[int] = None) -> str:
+    @classmethod
+    def format_symbol(cls, symbol: str, exchange: str, fut_contract: tp.Optional[int] = None) -> str:
         """Format a symbol."""
         if ":" in symbol:
             pass
@@ -292,8 +422,9 @@ class TVClient(Configured):
             return raw_data
         return self.convert_raw_data(raw_data, symbol)
 
-    @staticmethod
+    @classmethod
     def search_symbol(
+        cls,
         text: tp.Optional[str] = None,
         exchange: tp.Optional[str] = None,
         delay: tp.Optional[int] = None,
@@ -312,7 +443,7 @@ class TVClient(Configured):
         pbar = None
 
         while symbols_remaining is None or symbols_remaining > 0:
-            url = SEARCH_URL.format(text, exchange.upper(), len(symbols_list))
+            url = SEARCH_URL.format(text=text, exchange=exchange.upper(), start=len(symbols_list))
             resp = requests.get(url)
             symbols_data = json.loads(resp.text)
             symbols_remaining = symbols_data.get("symbols_remaining", 0)
@@ -332,11 +463,13 @@ class TVClient(Configured):
             pbar.close()
         return symbols_list
 
-    @staticmethod
-    def scan_symbols(market: str) -> tp.List[dict]:
+    @classmethod
+    def scan_symbols(cls, market: tp.Optional[str] = None, **kwargs) -> tp.List[dict]:
         """Scan symbols in a region/market."""
-        url = SCAN_URL.format(market.lower())
-        resp = requests.get(url)
+        if market is None:
+            market = "global"
+        url = SCAN_URL.format(market=market.lower())
+        resp = requests.post(url, json.dumps(kwargs))
         symbols_list = json.loads(resp.text)["data"]
         return symbols_list
 
@@ -371,7 +504,7 @@ class TVData(RemoteData):
         ... )
         ```
 
-        * Fetch data:
+        * Pull data:
 
         ```pycon
         >>> data = vbt.TVData.pull(
@@ -381,40 +514,143 @@ class TVData(RemoteData):
         ```
     """
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.tv")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.tv")
 
     @classmethod
     def list_symbols(
         cls,
-        pattern: tp.Optional[str] = None,
+        *,
+        exchange_pattern: tp.Optional[str] = None,
+        symbol_pattern: tp.Optional[str] = None,
         use_regex: bool = False,
-        market: tp.Optional[str] = None,
-        text: tp.Optional[str] = None,
-        exchange: tp.Optional[str] = None,
         client: tp.Optional[TVClient] = None,
         client_config: tp.DictLike = None,
+        text: tp.Optional[str] = None,
+        exchange: tp.Optional[str] = None,
         delay: tp.Optional[int] = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
+        market: tp.Optional[str] = None,
+        markets: tp.Optional[tp.List[str]] = None,
+        fields: tp.Optional[tp.MaybeIterable[str]] = None,
+        filter_by: tp.Union[None, tp.Callable, CustomTemplate] = None,
+        groups: tp.Optional[tp.MaybeIterable[tp.Dict[str, tp.MaybeIterable[str]]]] = None,
+        template_context: tp.KwargsLike = None,
+        **scanner_kwargs,
     ) -> tp.List[str]:
         """List all symbols.
 
-        Uses market scanner when `market` is provided (returns all symbols, big payload)
-        Uses symbol search when either `text` or `exchange` is provided (returns a subset of symbols)."""
-        tv_cfg = cls.get_settings(key_id="custom")
+        Uses symbol search when either `text` or `exchange` is provided (returns a subset of symbols).
+        Otherwise, uses the market scanner (returns all symbols, big payload).
+
+        When using the market scanner, use `market` to filter by one or multiple markets. For the list
+        of available markets, see `MARKET_LIST`.
+
+        Use `fields` to make the market scanner return additional information that can be used for
+        filtering with `filter_by`. Such information is passed to the function as a dictionary where
+        fields are keys. The function can also be a template that can use the same information provided
+        as a context, or a list of values that should be matched against the values corresponding to their fields.
+        For the list of available fields, see `FIELD_LIST`.
+
+        Use `groups` to provide a single dictionary or a list of dictionaries with groups.
+        Each dictionary can be provided either in a compressed format, such as `dict(index=index)`,
+        or in a full format, such as `dict(type="index", values=[index])`.
+
+        Keyword arguments `scanner_kwargs` are encoded and passed directly to the market scanner.
+
+        Uses `vectorbtpro.data.custom.custom.CustomData.key_match` to check each exchange against
+        `exchange_pattern` and each symbol against `symbol_pattern`.
+
+        Usage:
+            * List all symbols (market scanner):
+
+            ```pycon
+            >>> import vectorbtpro as vbt
+
+            >>> vbt.TVData.list_symbols()
+            ```
+
+            * Search for symbols matching a pattern (market scanner, client-side):
+
+            ```pycon
+            >>> vbt.TVData.list_symbols(symbol_pattern="BTC*")
+            ```
+
+            * Search for exchanges matching a pattern (market scanner, client-side):
+
+            ```pycon
+            >>> vbt.TVData.list_symbols(exchange_pattern="NASDAQ")
+            ```
+
+            * Search for symbols containing a text (symbol search, server-side):
+
+            ```pycon
+            >>> vbt.TVData.list_symbols(text="BTC")
+            ```
+
+            * List symbols from an exchange (symbol search):
+
+            ```pycon
+            >>> vbt.TVData.list_symbols(exchange="NASDAQ")
+            ```
+
+            * List symbols from a market (market scanner):
+
+            ```pycon
+            >>> vbt.TVData.list_symbols(market="poland")
+            ```
+
+            * List index constituents (market scanner):
+
+            ```pycon
+            >>> vbt.TVData.list_symbols(groups=dict(index="NASDAQ:NDX"))
+            ```
+
+            * Filter symbols by fields using a function (market scanner):
+
+            ```pycon
+            >>> vbt.TVData.list_symbols(
+            ...     market="america",
+            ...     fields=["sector"],
+            ...     filter_by=lambda context: context["sector"] == "Technology Services"
+            ... )
+            ```
+
+            * Filter symbols by fields using a template (market scanner):
+
+            ```pycon
+            >>> vbt.TVData.list_symbols(
+            ...     market="america",
+            ...     fields=["sector"],
+            ...     filter_by=vbt.RepEval("sector == 'Technology Services'")
+            ... )
+            ```
+        """
+        delay = cls.resolve_custom_setting(delay, "delay", sub_path="search", sub_path_only=True)
+        show_progress = cls.resolve_custom_setting(
+            show_progress, "show_progress", sub_path="search", sub_path_only=True
+        )
+        pbar_kwargs = cls.resolve_custom_setting(
+            pbar_kwargs, "pbar_kwargs", merge=True, sub_path="search", sub_path_only=True
+        )
+        markets = cls.resolve_custom_setting(markets, "markets", sub_path="scanner", sub_path_only=True)
+        fields = cls.resolve_custom_setting(fields, "fields", sub_path="scanner", sub_path_only=True)
+        filter_by = cls.resolve_custom_setting(filter_by, "filter_by", sub_path="scanner", sub_path_only=True)
+        groups = cls.resolve_custom_setting(groups, "groups", sub_path="scanner", sub_path_only=True)
+        template_context = cls.resolve_custom_setting(
+            template_context, "template_context", merge=True, sub_path="scanner", sub_path_only=True
+        )
+        scanner_kwargs = cls.resolve_custom_setting(
+            scanner_kwargs, "scanner_kwargs", merge=True, sub_path="scanner", sub_path_only=True
+        )
 
         if market is None and text is None and exchange is None:
-            raise ValueError("Please provide either market, or text and/or exchange")
+            market = "global"
         if market is not None and (text is not None or exchange is not None):
             raise ValueError("Please provide either market, or text and/or exchange")
         if client_config is None:
             client_config = {}
         client = cls.resolve_client(client=client, **client_config)
-        if delay is None:
-            delay = tv_cfg["delay"]
-        if show_progress is None:
-            show_progress = tv_cfg["show_progress"]
-        pbar_kwargs = merge_dicts(tv_cfg["pbar_kwargs"], pbar_kwargs)
 
         if market is None:
             data = client.search_symbol(
@@ -426,12 +662,67 @@ class TVData(RemoteData):
             )
             all_symbols = map(lambda x: x["exchange"] + ":" + x["symbol"], data)
         else:
-            data = client.scan_symbols(market.lower())
-            all_symbols = map(lambda x: x["s"], data)
+            if markets is not None:
+                scanner_kwargs["markets"] = markets
+            if fields is not None:
+                if "columns" in scanner_kwargs:
+                    raise ValueError("Use fields instead of columns")
+                if isinstance(fields, str):
+                    fields = [fields]
+                scanner_kwargs["columns"] = fields
+            if groups is not None:
+                if isinstance(groups, dict):
+                    groups = [groups]
+                new_groups = []
+                for group in groups:
+                    if "type" in group:
+                        new_groups.append(group)
+                    else:
+                        for k, v in group.items():
+                            if isinstance(v, str):
+                                v = [v]
+                            new_groups.append(dict(type=k, values=v))
+                groups = new_groups
+                if "symbols" in scanner_kwargs:
+                    scanner_kwargs["symbols"] = dict(scanner_kwargs["symbols"])
+                else:
+                    scanner_kwargs["symbols"] = dict()
+                scanner_kwargs["symbols"]["groups"] = groups
+            if filter_by is not None:
+                if isinstance(filter_by, str):
+                    filter_by = [filter_by]
+            data = client.scan_symbols(market.lower(), **scanner_kwargs)
+            all_symbols = []
+            for item in data:
+                if filter_by is not None:
+                    if fields is not None:
+                        context = merge_dicts(dict(zip(fields, item["d"])), template_context)
+                    else:
+                        raise ValueError("Must provide fields for filter_by")
+                    if isinstance(filter_by, CustomTemplate):
+                        if not filter_by.substitute(context, sub_id="filter_by"):
+                            continue
+                    elif callable(filter_by):
+                        if not filter_by(context):
+                            continue
+                    else:
+                        if len(fields) != len(filter_by):
+                            raise ValueError("Fields and filter_by must have the same number of values")
+                        conditions_met = True
+                        for i in range(len(fields)):
+                            if context[fields[i]] != filter_by[i]:
+                                conditions_met = False
+                                break
+                        if not conditions_met:
+                            continue
+                all_symbols.append(item["s"])
         found_symbols = []
         for symbol in all_symbols:
-            if pattern is not None:
-                if not cls.key_match(symbol.split(":")[1], pattern, use_regex=use_regex):
+            if exchange_pattern is not None:
+                if not cls.key_match(symbol.split(":")[0], exchange_pattern, use_regex=use_regex):
+                    continue
+            if symbol_pattern is not None:
+                if not cls.key_match(symbol.split(":")[1], symbol_pattern, use_regex=use_regex):
                     continue
             found_symbols.append(symbol)
         return sorted(found_symbols)
@@ -441,14 +732,11 @@ class TVData(RemoteData):
         """Resolve the client.
 
         If provided, must be of the type `TVClient`. Otherwise, will be created using `client_config`."""
-        tv_cfg = cls.get_settings(key_id="custom")
-
-        if client is None:
-            client = tv_cfg["client"]
+        client = cls.resolve_custom_setting(client, "client")
         if client_config is None:
             client_config = {}
         has_client_config = len(client_config) > 0
-        client_config = merge_dicts(tv_cfg["client_config"], client_config)
+        client_config = cls.resolve_custom_setting(client_config, "client_config", merge=True)
         if client is None:
             client = TVClient(**client_config)
         elif has_client_config:
@@ -463,7 +751,7 @@ class TVData(RemoteData):
         client_config: tp.KwargsLike = None,
         exchange: tp.Optional[str] = None,
         timeframe: tp.Optional[str] = None,
-        tz: tp.Optional[tp.TimezoneLike] = None,
+        tz: tp.TimezoneLike = None,
         fut_contract: tp.Optional[int] = None,
         adjustment: tp.Optional[str] = None,
         extended_session: tp.Optional[bool] = None,
@@ -502,27 +790,18 @@ class TVData(RemoteData):
 
         For defaults, see `custom.tv` in `vectorbtpro._settings.data`.
         """
-        tv_cfg = cls.get_settings(key_id="custom")
-
         if client_config is None:
             client_config = {}
         client = cls.resolve_client(client=client, **client_config)
-        if exchange is None:
-            exchange = tv_cfg["exchange"]
-        if timeframe is None:
-            timeframe = tv_cfg["timeframe"]
-        if tz is None:
-            tz = tv_cfg["tz"]
-        if fut_contract is None:
-            fut_contract = tv_cfg["fut_contract"]
-        if adjustment is None:
-            adjustment = tv_cfg["adjustment"]
-        if extended_session is None:
-            extended_session = tv_cfg["extended_session"]
-        if pro_data is None:
-            pro_data = tv_cfg["pro_data"]
-        if limit is None:
-            limit = tv_cfg["limit"]
+
+        exchange = cls.resolve_custom_setting(exchange, "exchange")
+        timeframe = cls.resolve_custom_setting(timeframe, "timeframe")
+        tz = cls.resolve_custom_setting(tz, "tz")
+        fut_contract = cls.resolve_custom_setting(fut_contract, "fut_contract")
+        adjustment = cls.resolve_custom_setting(adjustment, "adjustment")
+        extended_session = cls.resolve_custom_setting(extended_session, "extended_session")
+        pro_data = cls.resolve_custom_setting(pro_data, "pro_data")
+        limit = cls.resolve_custom_setting(limit, "limit")
 
         freq = prepare_freq(timeframe)
         if not isinstance(timeframe, str):
@@ -567,7 +846,7 @@ class TVData(RemoteData):
             },
             inplace=True,
         )
-        if isinstance(df.index, pd.DatetimeIndex) and df.index.tzinfo is None:
+        if isinstance(df.index, pd.DatetimeIndex) and df.index.tz is None:
             df = df.tz_localize("UTC")
 
         if "Symbol" in df:
@@ -586,9 +865,6 @@ class TVData(RemoteData):
         return df, dict(tz_convert=tz, freq=freq)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
+        fetch_kwargs = self.select_fetch_kwargs(symbol)
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)
-
-
-TVData.override_feature_config_doc(__pdoc__)

@@ -15,9 +15,7 @@ Here are the main properties of the `settings` config:
     one per sub-package (e.g., 'data'), module (e.g., 'wrapping'), or even class (e.g., 'configured').
     Each sub-config may consist of other sub-configs.
 * It has frozen keys - you cannot add other sub-configs or remove the existing ones, but you can modify them.
-* Each sub-config can either inherit the properties of the parent one by being an instance of
-    `vectorbtpro.utils.config.child_dict` or overwrite them by being an instance of
-    `vectorbtpro.utils.config.Config` or a regular `dict`. The main reason for defining an own config
+* Each sub-config can be `frozen_cfg` or `flex_cfg`. The main reason for defining a flexible config
     is to allow adding new keys (e.g., 'plotting.layout').
 
 For example, you can change default width and height of each plot:
@@ -125,29 +123,63 @@ from numba import config as nb_config
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.checks import is_instance_of
-from vectorbtpro.utils.config import child_dict, Config
-from vectorbtpro.utils.execution import (
-    SerialEngine,
-    ThreadPoolEngine,
-    ProcessPoolEngine,
-    PathosEngine,
-    DaskEngine,
-    RayEngine,
-)
-from vectorbtpro.utils.jitting import NumPyJitter, NumbaJitter
+from vectorbtpro.utils.config import Config
 from vectorbtpro.utils.template import Sub, RepEval, substitute_templates
 
 __all__ = [
     "settings",
 ]
 
-__pdoc__: dict = {}
+__pdoc__ = {}
 
 # ############# Settings sub-configs ############# #
 
+
+class frozen_cfg(Config):
+    """Class representing a frozen sub-config."""
+
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ) -> None:
+        options_ = kwargs.pop("options_", None)
+        if options_ is None:
+            options_ = {}
+        copy_kwargs = options_.pop("copy_kwargs", None)
+        if copy_kwargs is None:
+            copy_kwargs = {}
+        copy_kwargs["copy_mode"] = "deep"
+        options_["copy_kwargs"] = copy_kwargs
+        options_["frozen_keys"] = True
+        options_["as_attrs"] = True
+        Config.__init__(self, *args, options_=options_, **kwargs)
+
+
+class flex_cfg(Config):
+    """Class representing a flexible sub-config."""
+
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ) -> None:
+        options_ = kwargs.pop("options_", None)
+        if options_ is None:
+            options_ = {}
+        copy_kwargs = options_.pop("copy_kwargs", None)
+        if copy_kwargs is None:
+            copy_kwargs = {}
+        copy_kwargs["copy_mode"] = "deep"
+        options_["copy_kwargs"] = copy_kwargs
+        options_["frozen_keys"] = False
+        options_["as_attrs"] = False
+        Config.__init__(self, *args, options_=options_, **kwargs)
+
+
 _settings = {}
 
-importing = child_dict(
+importing = frozen_cfg(
     auto_import=True,
     clear_pycache=False,
     plotly=True,
@@ -173,7 +205,7 @@ ${config_doc}
 
 _settings["importing"] = importing
 
-caching = child_dict(
+caching = frozen_cfg(
     disable=False,
     disable_whitelist=False,
     disable_machinery=False,
@@ -198,32 +230,32 @@ ${config_doc}
 
 _settings["caching"] = caching
 
-jitting = child_dict(
+jitting = frozen_cfg(
     disable=False,
     disable_wrapping=False,
     disable_resolution=False,
     option=True,
     allow_new=False,
     register_new=False,
-    jitters=Config(
-        nb=Config(
-            cls=NumbaJitter,
+    jitters=flex_cfg(
+        nb=frozen_cfg(
+            cls="NumbaJitter",
             aliases={"numba"},
-            options=dict(),
-            override_options=dict(),
-            resolve_kwargs=dict(),
-            tasks=dict(),
+            options=flex_cfg(),
+            override_options=flex_cfg(),
+            resolve_kwargs=flex_cfg(),
+            tasks=flex_cfg(),
         ),
-        np=Config(
-            cls=NumPyJitter,
+        np=frozen_cfg(
+            cls="NumPyJitter",
             aliases={"numpy"},
-            options=dict(),
-            override_options=dict(),
-            resolve_kwargs=dict(),
-            tasks=dict(),
+            options=flex_cfg(),
+            override_options=flex_cfg(),
+            resolve_kwargs=flex_cfg(),
+            tasks=flex_cfg(),
         ),
     ),
-    template_context=Config(),
+    template_context=flex_cfg(),
 )
 """_"""
 
@@ -241,7 +273,7 @@ ${config_doc}
 
 _settings["jitting"] = jitting
 
-numba = child_dict(
+numba = frozen_cfg(
     disable=False,
     parallel=None,
     silence_warnings=False,
@@ -258,7 +290,7 @@ ${config_doc}
 
 _settings["numba"] = numba
 
-math = child_dict(
+math = frozen_cfg(
     use_tol=True,
     rel_tol=1e-9,  # 1,000,000,000 == 1,000,000,001
     abs_tol=1e-12,  # 0.000000000001 == 0.000000000002
@@ -278,7 +310,7 @@ ${config_doc}
 
 _settings["math"] = math
 
-execution = child_dict(
+execution = frozen_cfg(
     n_chunks=None,
     min_size=None,
     chunk_len=None,
@@ -294,45 +326,55 @@ execution = child_dict(
     post_execute_kwargs=None,
     post_execute_on_sorted=False,
     show_progress=True,
-    pbar_kwargs=Config(),
-    template_context=Config(),
-    engines=Config(
-        serial=Config(
-            cls=SerialEngine,
+    pbar_kwargs=flex_cfg(),
+    template_context=flex_cfg(),
+    engines=flex_cfg(
+        serial=flex_cfg(
+            cls="SerialEngine",
             show_progress=False,
-            pbar_kwargs=Config(),
+            pbar_kwargs=flex_cfg(),
             clear_cache=False,
             collect_garbage=False,
             cooldown=None,
         ),
-        threadpool=Config(
-            cls=ThreadPoolEngine,
-            init_kwargs=Config(),
+        threadpool=flex_cfg(
+            cls="ThreadPoolEngine",
+            init_kwargs=flex_cfg(),
+            timeout=None,
         ),
-        processpool=Config(
-            cls=ProcessPoolEngine,
-            init_kwargs=Config(),
+        processpool=flex_cfg(
+            cls="ProcessPoolEngine",
+            init_kwargs=flex_cfg(),
+            timeout=None,
         ),
-        pathos=Config(
-            cls=PathosEngine,
+        pathos=flex_cfg(
+            cls="PathosEngine",
             pool_type="process",
+            init_kwargs=flex_cfg(),
+            timeout=None,
             sleep=0.001,
-            init_kwargs=Config(),
             show_progress=False,
-            pbar_kwargs=Config(),
+            pbar_kwargs=flex_cfg(),
         ),
-        dask=Config(
-            cls=DaskEngine,
-            compute_kwargs=Config(),
+        mpire=flex_cfg(
+            cls="MpireEngine",
+            init_kwargs=flex_cfg(
+                use_dill=True,
+            ),
+            apply_kwargs=flex_cfg(),
         ),
-        ray=Config(
-            cls=RayEngine,
+        dask=flex_cfg(
+            cls="DaskEngine",
+            compute_kwargs=flex_cfg(),
+        ),
+        ray=flex_cfg(
+            cls="RayEngine",
             restart=False,
             reuse_refs=True,
             del_refs=True,
             shutdown=False,
-            init_kwargs=Config(),
-            remote_kwargs=Config(),
+            init_kwargs=flex_cfg(),
+            remote_kwargs=flex_cfg(),
         ),
     ),
 )
@@ -346,7 +388,7 @@ ${config_doc}
 
 _settings["execution"] = execution
 
-chunking = child_dict(
+chunking = frozen_cfg(
     disable=False,
     disable_wrapping=False,
     option=False,
@@ -355,10 +397,10 @@ chunking = child_dict(
     chunk_len=None,
     skip_one_chunk=True,
     silence_warnings=False,
-    template_context=Config(),
-    options=Config(),
-    override_setup_options=Config(),
-    override_options=Config(),
+    template_context=flex_cfg(),
+    options=flex_cfg(),
+    override_setup_options=flex_cfg(),
+    override_options=flex_cfg(),
 )
 """_"""
 
@@ -374,17 +416,17 @@ ${config_doc}
 
 _settings["chunking"] = chunking
 
-params = child_dict(
+params = frozen_cfg(
     search_except_types=None,
     search_max_len=None,
     search_max_depth=None,
     skip_single_param=True,
-    template_context=Config(),
+    template_context=flex_cfg(),
     random_subset=None,
     seed=None,
-    index_stack_kwargs=Config(),
+    index_stack_kwargs=flex_cfg(),
     name_tuple_to_str=True,
-    execute_kwargs=Config(),
+    execute_kwargs=flex_cfg(),
 )
 """_"""
 
@@ -396,12 +438,12 @@ ${config_doc}
 
 _settings["params"] = params
 
-template = child_dict(
+template = frozen_cfg(
     strict=True,
     except_types=(list, set, frozenset),
     max_len=None,
     max_depth=None,
-    context=Config(),
+    context=flex_cfg(),
 )
 """_"""
 
@@ -413,20 +455,22 @@ ${config_doc}
 
 _settings["template"] = template
 
-pickling = child_dict(
+pickling = frozen_cfg(
     pickle_classes=None,
     file_format="pickle",
     compression=None,
-    extensions=child_dict(
-        serialization=child_dict(
+    extensions=flex_cfg(
+        serialization=flex_cfg(
             pickle={"pickle", "pkl", "p"},
             config={"config", "cfg", "ini"},
         ),
-        compression=child_dict(
+        compression=flex_cfg(
             bz2={"bzip2", "bz2", "bz"},
             gzip={"gzip", "gz"},
             lzma={"lzma", "xz"},
             lz4={"lz4"},
+            blosc2={"blosc2"},
+            blosc1={"blosc1"},
             blosc={"blosc"},
         ),
     ),
@@ -441,8 +485,8 @@ ${config_doc}
 
 _settings["pickling"] = pickling
 
-config = child_dict(
-    options=Config(),
+config = frozen_cfg(
+    options=flex_cfg(),
 )
 """_"""
 
@@ -454,10 +498,10 @@ ${config_doc}
 
 _settings["config"] = config
 
-configured = child_dict(
+configured = frozen_cfg(
     check_expected_keys_=True,
-    config=child_dict(
-        options=dict(
+    config=frozen_cfg(
+        options=flex_cfg(
             readonly=True,
             nested=False,
         )
@@ -473,7 +517,7 @@ ${config_doc}
 
 _settings["configured"] = configured
 
-broadcasting = child_dict(
+broadcasting = frozen_cfg(
     align_index=True,
     align_columns=True,
     index_from="strict",
@@ -500,7 +544,7 @@ ${config_doc}
 
 _settings["broadcasting"] = broadcasting
 
-indexing = child_dict(
+indexing = frozen_cfg(
     rotate_rows=False,
     rotate_cols=False,
 )
@@ -517,7 +561,7 @@ ${config_doc}
 
 _settings["indexing"] = indexing
 
-wrapping = child_dict(
+wrapping = frozen_cfg(
     column_only_select=False,
     range_only_select=False,
     group_select=True,
@@ -543,7 +587,7 @@ When enabling `max_precision` and running your code for the first time, make sur
 
 _settings["wrapping"] = wrapping
 
-resampling = child_dict(
+resampling = frozen_cfg(
     silence_warnings=False,
 )
 """_"""
@@ -556,12 +600,15 @@ ${config_doc}
 
 _settings["resampling"] = resampling
 
-datetime = child_dict(
+datetime = frozen_cfg(
     naive_tz="tzlocal()",
     to_fixed_offset=None,
-    parse_with_pandas=True,
-    parse_with_dateparser=False,
-    parser_kwargs=Config(),
+    parse_with_dateparser=True,
+    index=frozen_cfg(
+        parse_index=True,
+        parse_with_dateparser=False,
+    ),
+    dateparser_kwargs=flex_cfg(),
 )
 """_"""
 
@@ -573,19 +620,19 @@ ${config_doc}
 
 _settings["datetime"] = datetime
 
-data = child_dict(
+data = frozen_cfg(
     keys_are_features=False,
-    wrapper_kwargs=Config(),
+    wrapper_kwargs=flex_cfg(),
     skip_on_error=False,
     silence_warnings=False,
-    execute_kwargs=Config(),
-    tz_localize="UTC",
-    tz_convert="UTC",
+    execute_kwargs=flex_cfg(),
+    tz_localize="utc",
+    tz_convert="utc",
     missing_index="nan",
     missing_columns="raise",
-    custom=Config(
+    custom=flex_cfg(
         # Synthetic
-        synthetic=Config(
+        synthetic=flex_cfg(
             start=None,
             end=None,
             freq=None,
@@ -593,14 +640,14 @@ data = child_dict(
             normalize=False,
             inclusive="left",
         ),
-        random=Config(
+        random=flex_cfg(
             start_value=100.0,
             mean=0.0,
             std=0.01,
             symmetric=False,
             seed=None,
         ),
-        random_ohlc=Config(
+        random_ohlc=flex_cfg(
             n_ticks=50,
             start_value=100.0,
             mean=0.0,
@@ -608,14 +655,14 @@ data = child_dict(
             symmetric=False,
             seed=None,
         ),
-        gbm=Config(
+        gbm=flex_cfg(
             start_value=100.0,
             mean=0.0,
             std=0.01,
             dt=1.0,
             seed=None,
         ),
-        gbm_ohlc=Config(
+        gbm_ohlc=flex_cfg(
             n_ticks=50,
             start_value=100.0,
             mean=0.0,
@@ -624,14 +671,14 @@ data = child_dict(
             seed=None,
         ),
         # Local
-        local=Config(),
+        local=flex_cfg(),
         # File
-        file=Config(
+        file=flex_cfg(
             match_paths=True,
             match_regex=None,
             sort_paths=True,
         ),
-        csv=Config(
+        csv=flex_cfg(
             start=None,
             end=None,
             tz=None,
@@ -640,68 +687,124 @@ data = child_dict(
             header=0,
             index_col=0,
             parse_dates=True,
+            chunk_func=None,
             squeeze=True,
-            read_csv_kwargs=dict(),
+            read_kwargs=flex_cfg(),
         ),
-        hdf=Config(
+        hdf=flex_cfg(
             start=None,
             end=None,
             tz=None,
             start_row=None,
             end_row=None,
-            read_hdf_kwargs=dict(),
+            read_kwargs=flex_cfg(),
+        ),
+        feather=flex_cfg(
+            tz=None,
+            index_col=0,
+            squeeze=True,
+            read_kwargs=flex_cfg(),
+        ),
+        parquet=flex_cfg(
+            tz=None,
+            squeeze=True,
+            keep_partition_cols=None,
+            engine="auto",
+            read_kwargs=flex_cfg(),
+        ),
+        # Database
+        db=flex_cfg(),
+        sql=flex_cfg(
+            engine=None,
+            engine_name=None,
+            engine_config=flex_cfg(),
+            schema=None,
+            start=None,
+            end=None,
+            align_dates=True,
+            parse_dates=True,
+            to_utc=True,
+            tz=None,
+            start_row=None,
+            end_row=None,
+            keep_row_number=True,
+            row_number_column="row_number",
+            index_col=0,
+            columns=None,
+            dtype=None,
+            chunksize=None,
+            chunk_func=None,
+            squeeze=True,
+            read_sql_kwargs=flex_cfg(),
+            engines=flex_cfg(),
+        ),
+        duckdb=flex_cfg(
+            connection=None,
+            connection_config=flex_cfg(),
+            schema=None,
+            catalog=None,
+            start=None,
+            end=None,
+            align_dates=True,
+            parse_dates=True,
+            to_utc=True,
+            tz=None,
+            index_col=0,
+            squeeze=True,
+            df_kwargs=flex_cfg(),
+            sql_kwargs=flex_cfg(),
         ),
         # Remote
-        remote=Config(),
-        yf=Config(
+        remote=flex_cfg(),
+        yf=flex_cfg(
             period="max",
             start=None,
             end=None,
             timeframe="1d",
             tz=None,
-            history_kwargs=dict(),
+            history_kwargs=flex_cfg(),
         ),
-        binance=Config(
+        binance=flex_cfg(
             client=None,
-            client_config=dict(
+            client_config=flex_cfg(
                 api_key=None,
                 api_secret=None,
             ),
             start=0,
             end="now",
             timeframe="1d",
-            tz="UTC",
+            tz="utc",
             klines_type="spot",
             limit=1000,
             delay=500,
             show_progress=True,
-            pbar_kwargs=dict(),
+            pbar_kwargs=flex_cfg(),
             silence_warnings=False,
-            get_klines_kwargs=dict(),
+            get_klines_kwargs=flex_cfg(),
         ),
-        ccxt=Config(
+        ccxt=flex_cfg(
             exchange="binance",
-            exchange_config=dict(
+            exchange_config=flex_cfg(
                 enableRateLimit=True,
             ),
             start=None,
             end=None,
             timeframe="1d",
-            tz="UTC",
+            tz="utc",
             find_earliest_date=False,
             limit=1000,
             delay=None,
             retries=3,
+            fetch_params=flex_cfg(),
             show_progress=True,
-            pbar_kwargs=dict(),
-            fetch_params=dict(),
-            exchanges=dict(),
+            pbar_kwargs=flex_cfg(),
             silence_warnings=False,
+            exchanges=flex_cfg(),
         ),
-        alpaca=Config(
+        alpaca=flex_cfg(
             client=None,
             client_type="stocks",
-            client_config=dict(
+            client_config=flex_cfg(
                 api_key=None,
                 secret_key=None,
                 oauth_token=None,
@@ -710,64 +813,64 @@ data = child_dict(
             start=0,
             end="now",
             timeframe="1d",
-            tz="UTC",
+            tz="utc",
             adjustment="raw",
             feed=None,
             limit=None,
         ),
-        polygon=Config(
+        polygon=flex_cfg(
             client=None,
-            client_config=dict(
+            client_config=flex_cfg(
                 api_key=None,
             ),
             start=0,
             end="now",
             timeframe="1d",
-            tz="UTC",
+            tz="utc",
             adjusted=True,
             limit=50000,
-            params=dict(),
+            params=flex_cfg(),
             delay=500,
             retries=3,
             show_progress=True,
-            pbar_kwargs=dict(),
+            pbar_kwargs=flex_cfg(),
             silence_warnings=False,
         ),
-        av=Config(
+        av=flex_cfg(
             apikey=None,
             api_meta=None,
             category=None,
             function=None,
             timeframe=None,
-            tz="UTC",
+            tz="utc",
             adjusted=False,
             extended=False,
             slice="year1month1",
             series_type="close",
             time_period=10,
             outputsize="full",
-            read_csv_kwargs=dict(
+            read_csv_kwargs=flex_cfg(
                 index_col=0,
                 parse_dates=True,
                 infer_datetime_format=True,
             ),
             match_params=True,
-            params=dict(),
+            params=flex_cfg(),
             silence_warnings=False,
         ),
-        ndl=Config(
+        ndl=flex_cfg(
             api_key=None,
             start=None,
             end=None,
-            tz="UTC",
+            tz="utc",
             column_indices=None,
             collapse=None,
             transform=None,
-            params=dict(),
+            params=flex_cfg(),
         ),
-        tv=Config(
+        tv=flex_cfg(
             client=None,
-            client_config=dict(
+            client_config=flex_cfg(
                 username=None,
                 password=None,
                 auth_token=None,
@@ -775,28 +878,38 @@ data = child_dict(
             ),
             exchange=None,
             timeframe="D",
-            tz="UTC",
+            tz="utc",
             fut_contract=None,
             adjustment="splits",
             extended_session=False,
             pro_data=True,
             limit=20000,
-            delay=None,
-            show_progress=True,
-            pbar_kwargs=Config(),
+            search=flex_cfg(
+                delay=None,
+                show_progress=True,
+                pbar_kwargs=flex_cfg(),
+            ),
+            scanner=flex_cfg(
+                markets=None,
+                fields=None,
+                filter_by=None,
+                groups=None,
+                template_context=flex_cfg(),
+                scanner_kwargs=flex_cfg(),
+            ),
         ),
     ),
-    stats=Config(
-        filters=Config(
-            is_feature_oriented=dict(
+    stats=flex_cfg(
+        filters=flex_cfg(
+            is_feature_oriented=flex_cfg(
                 filter_func=lambda self, metric_settings: self.feature_oriented,
             ),
-            is_symbol_oriented=dict(
+            is_symbol_oriented=flex_cfg(
                 filter_func=lambda self, metric_settings: self.symbol_oriented,
             ),
         )
     ),
-    plots=Config(),
+    plots=flex_cfg(),
 )
 """_"""
 
@@ -819,20 +932,21 @@ Alpaca:
 
 _settings["data"] = data
 
-plotting = child_dict(
+plotting = frozen_cfg(
     use_widgets=True,
     use_resampler=False,
+    auto_rangebreaks=False,
     pre_show_func=None,
-    show_kwargs=Config(),
+    show_kwargs=flex_cfg(),
     use_gl=False,
-    color_schema=Config(
+    color_schema=flex_cfg(
         increasing="#26a69a",
         decreasing="#ee534f",
         lightblue="#6ca6cd",
         lightpurple="#6c76cd",
         lightpink="#cd6ca6",
     ),
-    contrast_color_schema=Config(
+    contrast_color_schema=flex_cfg(
         blue="#4285F4",
         orange="#FFAA00",
         green="#37B13F",
@@ -841,9 +955,9 @@ plotting = child_dict(
         purple="#A661D5",
         pink="#DD59AA",
     ),
-    themes=child_dict(
-        light=child_dict(
-            color_schema=Config(
+    themes=flex_cfg(
+        light=frozen_cfg(
+            color_schema=flex_cfg(
                 blue="#1f77b4",
                 orange="#ff7f0e",
                 green="#2ca02c",
@@ -857,8 +971,8 @@ plotting = child_dict(
             ),
             path="__name__/templates/light.json",
         ),
-        dark=child_dict(
-            color_schema=Config(
+        dark=frozen_cfg(
+            color_schema=flex_cfg(
                 blue="#1f77b4",
                 orange="#ff7f0e",
                 green="#2ca02c",
@@ -872,8 +986,8 @@ plotting = child_dict(
             ),
             path="__name__/templates/dark.json",
         ),
-        seaborn=child_dict(
-            color_schema=Config(
+        seaborn=frozen_cfg(
+            color_schema=flex_cfg(
                 blue="rgb(76,114,176)",
                 orange="rgb(221,132,82)",
                 green="rgb(85,168,104)",
@@ -889,16 +1003,16 @@ plotting = child_dict(
         ),
     ),
     default_theme="light",
-    layout=Config(
+    layout=flex_cfg(
         width=700,
         height=350,
-        margin=dict(
+        margin=flex_cfg(
             t=30,
             b=30,
             l=30,
             r=30,
         ),
-        legend=dict(
+        legend=flex_cfg(
             orientation="h",
             yanchor="bottom",
             y=1.02,
@@ -920,29 +1034,29 @@ ${config_doc}
 
 _settings["plotting"] = plotting
 
-stats_builder = child_dict(
+stats_builder = frozen_cfg(
     metrics="all",
     tags="all",
     dropna=False,
     silence_warnings=False,
-    template_context=Config(),
-    filters=Config(
-        is_not_grouped=dict(
+    template_context=flex_cfg(),
+    filters=flex_cfg(
+        is_not_grouped=flex_cfg(
             filter_func=lambda self, metric_settings: not self.wrapper.grouper.is_grouped(
                 group_by=metric_settings["group_by"]
             ),
             warning_message=Sub("Metric '$metric_name' does not support grouped data"),
         ),
-        has_freq=dict(
+        has_freq=flex_cfg(
             filter_func=lambda self, metric_settings: self.wrapper.freq is not None,
             warning_message=Sub("Metric '$metric_name' requires frequency to be set"),
         ),
     ),
-    settings=Config(
+    settings=flex_cfg(
         to_timedelta=None,
         use_caching=True,
     ),
-    metric_settings=Config(),
+    metric_settings=flex_cfg(),
 )
 """_"""
 
@@ -955,39 +1069,39 @@ ${config_doc}
 
 _settings["stats_builder"] = stats_builder
 
-plots_builder = child_dict(
+plots_builder = frozen_cfg(
     subplots="all",
     tags="all",
     silence_warnings=False,
-    template_context=Config(),
-    filters=Config(
-        is_not_grouped=dict(
+    template_context=flex_cfg(),
+    filters=flex_cfg(
+        is_not_grouped=flex_cfg(
             filter_func=lambda self, subplot_settings: not self.wrapper.grouper.is_grouped(
                 group_by=subplot_settings["group_by"]
             ),
             warning_message=Sub("Subplot '$subplot_name' does not support grouped data"),
         ),
-        has_freq=dict(
+        has_freq=flex_cfg(
             filter_func=lambda self, subplot_settings: self.wrapper.freq is not None,
             warning_message=Sub("Subplot '$subplot_name' requires frequency to be set"),
         ),
     ),
-    settings=Config(
+    settings=flex_cfg(
         use_caching=True,
-        hline_shape_kwargs=dict(
+        hline_shape_kwargs=flex_cfg(
             type="line",
-            line=dict(
+            line=flex_cfg(
                 color="gray",
                 dash="dash",
             ),
         ),
     ),
-    subplot_settings=Config(),
+    subplot_settings=flex_cfg(),
     show_titles=True,
     hide_id_labels=True,
     group_id_labels=True,
-    make_subplots_kwargs=Config(),
-    layout_kwargs=Config(),
+    make_subplots_kwargs=flex_cfg(),
+    layout_kwargs=flex_cfg(),
 )
 """_"""
 
@@ -1000,11 +1114,11 @@ ${config_doc}
 
 _settings["plots_builder"] = plots_builder
 
-generic = child_dict(
+generic = frozen_cfg(
     use_jitted=False,
-    stats=Config(
-        filters=dict(
-            has_mapping=dict(
+    stats=flex_cfg(
+        filters=flex_cfg(
+            has_mapping=flex_cfg(
                 filter_func=lambda self, metric_settings: metric_settings.get(
                     "mapping",
                     self.mapping,
@@ -1012,11 +1126,11 @@ generic = child_dict(
                 is not None,
             )
         ),
-        settings=dict(
+        settings=flex_cfg(
             incl_all_keys=False,
         ),
     ),
-    plots=Config(),
+    plots=flex_cfg(),
 )
 """_"""
 
@@ -1028,9 +1142,9 @@ ${config_doc}
 
 _settings["generic"] = generic
 
-ranges = child_dict(
-    stats=Config(),
-    plots=Config(),
+ranges = frozen_cfg(
+    stats=flex_cfg(),
+    plots=flex_cfg(),
 )
 """_"""
 
@@ -1042,22 +1156,22 @@ ${config_doc}
 
 _settings["ranges"] = ranges
 
-splitter = child_dict(
-    stats=Config(
-        settings=dict(normalize=True),
-        filters=dict(
-            has_multiple_sets=dict(
+splitter = frozen_cfg(
+    stats=flex_cfg(
+        settings=flex_cfg(normalize=True),
+        filters=flex_cfg(
+            has_multiple_sets=flex_cfg(
                 filter_func=lambda self, metric_settings: self.get_n_sets(
                     set_group_by=metric_settings.get("set_group_by", None)
                 )
                 > 1,
             ),
-            normalize=dict(
+            normalize=flex_cfg(
                 filter_func=lambda self, metric_settings: metric_settings["normalize"],
             ),
         ),
     ),
-    plots=Config(),
+    plots=flex_cfg(),
 )
 """_"""
 
@@ -1069,13 +1183,13 @@ ${config_doc}
 
 _settings["splitter"] = splitter
 
-drawdowns = child_dict(
-    stats=Config(
-        settings=dict(
+drawdowns = frozen_cfg(
+    stats=flex_cfg(
+        settings=flex_cfg(
             incl_active=False,
         ),
     ),
-    plots=Config(),
+    plots=flex_cfg(),
 )
 """_"""
 
@@ -1087,11 +1201,11 @@ ${config_doc}
 
 _settings["drawdowns"] = drawdowns
 
-ohlcv = child_dict(
+ohlcv = frozen_cfg(
     ohlc_type="candlestick",
-    feature_map=Config(),
-    stats=Config(),
-    plots=Config(),
+    feature_map=flex_cfg(),
+    stats=flex_cfg(),
+    plots=flex_cfg(),
 )
 """_"""
 
@@ -1103,20 +1217,20 @@ ${config_doc}
 
 _settings["ohlcv"] = ohlcv
 
-signals = child_dict(
-    stats=Config(
-        filters=dict(
-            silent_has_other=dict(
+signals = frozen_cfg(
+    stats=flex_cfg(
+        filters=flex_cfg(
+            silent_has_other=flex_cfg(
                 filter_func=lambda self, metric_settings: metric_settings.get("other", None) is not None,
             ),
         ),
-        settings=dict(
+        settings=flex_cfg(
             other=None,
             other_name="Other",
             from_other=False,
         ),
     ),
-    plots=Config(),
+    plots=flex_cfg(),
 )
 """_"""
 
@@ -1128,10 +1242,10 @@ ${config_doc}
 
 _settings["signals"] = signals
 
-returns = child_dict(
+returns = frozen_cfg(
     year_freq="365 days",
     bm_returns=None,
-    defaults=Config(
+    defaults=flex_cfg(
         start_value=1.0,
         window=10,
         minp=None,
@@ -1141,13 +1255,13 @@ returns = child_dict(
         required_return=0.0,
         cutoff=0.05,
     ),
-    stats=Config(
-        filters=dict(
-            has_year_freq=dict(
+    stats=flex_cfg(
+        filters=flex_cfg(
+            has_year_freq=flex_cfg(
                 filter_func=lambda self, metric_settings: self.year_freq is not None,
                 warning_message=Sub("Metric '$metric_name' requires year frequency to be set"),
             ),
-            has_bm_returns=dict(
+            has_bm_returns=flex_cfg(
                 filter_func=lambda self, metric_settings: metric_settings.get(
                     "bm_returns",
                     self.bm_returns,
@@ -1156,11 +1270,11 @@ returns = child_dict(
                 warning_message=Sub("Metric '$metric_name' requires bm_returns to be set"),
             ),
         ),
-        settings=dict(
+        settings=flex_cfg(
             check_is_not_grouped=True,
         ),
     ),
-    plots=Config(),
+    plots=flex_cfg(),
 )
 """_"""
 
@@ -1172,8 +1286,8 @@ ${config_doc}
 
 _settings["returns"] = returns
 
-qs_adapter = child_dict(
-    defaults=Config(),
+qs_adapter = frozen_cfg(
+    defaults=flex_cfg(),
 )
 """_"""
 
@@ -1185,9 +1299,9 @@ ${config_doc}
 
 _settings["qs_adapter"] = qs_adapter
 
-records = child_dict(
-    stats=Config(),
-    plots=Config(),
+records = frozen_cfg(
+    stats=flex_cfg(),
+    plots=flex_cfg(),
 )
 """_"""
 
@@ -1199,10 +1313,10 @@ ${config_doc}
 
 _settings["records"] = records
 
-mapped_array = child_dict(
-    stats=Config(
-        filters=dict(
-            has_mapping=dict(
+mapped_array = frozen_cfg(
+    stats=flex_cfg(
+        filters=flex_cfg(
+            has_mapping=flex_cfg(
                 filter_func=lambda self, metric_settings: metric_settings.get(
                     "mapping",
                     self.mapping,
@@ -1210,11 +1324,11 @@ mapped_array = child_dict(
                 is not None,
             )
         ),
-        settings=dict(
+        settings=flex_cfg(
             incl_all_keys=False,
         ),
     ),
-    plots=Config(),
+    plots=flex_cfg(),
 )
 """_"""
 
@@ -1226,9 +1340,9 @@ ${config_doc}
 
 _settings["mapped_array"] = mapped_array
 
-orders = child_dict(
-    stats=Config(),
-    plots=Config(),
+orders = frozen_cfg(
+    stats=flex_cfg(),
+    plots=flex_cfg(),
 )
 """_"""
 
@@ -1240,14 +1354,14 @@ ${config_doc}
 
 _settings["orders"] = orders
 
-trades = child_dict(
-    stats=Config(
-        settings=dict(
+trades = frozen_cfg(
+    stats=flex_cfg(
+        settings=flex_cfg(
             incl_open=False,
         ),
-        template_context=dict(incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")),
+        template_context=flex_cfg(incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")),
     ),
-    plots=Config(),
+    plots=flex_cfg(),
 )
 """_"""
 
@@ -1259,8 +1373,8 @@ ${config_doc}
 
 _settings["trades"] = trades
 
-logs = child_dict(
-    stats=Config(),
+logs = frozen_cfg(
+    stats=flex_cfg(),
 )
 """_"""
 
@@ -1272,7 +1386,7 @@ ${config_doc}
 
 _settings["logs"] = logs
 
-portfolio = child_dict(
+portfolio = frozen_cfg(
     # Setup
     data=None,
     open=None,
@@ -1299,10 +1413,10 @@ portfolio = child_dict(
     seed=None,
     group_by=None,
     broadcast_named_args=None,
-    broadcast_kwargs=Config(
-        require_kwargs=dict(requirements="W"),
+    broadcast_kwargs=flex_cfg(
+        require_kwargs=flex_cfg(requirements="W"),
     ),
-    template_context=Config(),
+    template_context=flex_cfg(),
     keep_inout_flex=True,
     from_ago=None,
     call_seq=None,
@@ -1331,9 +1445,9 @@ portfolio = child_dict(
     allow_partial=True,
     raise_reject=False,
     log=False,
-    from_orders=Config(),
+    from_orders=flex_cfg(),
     # Signals
-    from_signals=Config(
+    from_signals=flex_cfg(
         direction="longonly",
         adjust_func_nb=None,
         adjust_args=(),
@@ -1379,7 +1493,7 @@ portfolio = child_dict(
     hold_direction="longonly",
     close_at_end=False,
     # Order function
-    from_order_func=Config(
+    from_order_func=flex_cfg(
         segment_mask=True,
         call_pre_segment=False,
         call_post_segment=False,
@@ -1407,7 +1521,7 @@ portfolio = child_dict(
         post_order_args=(),
         row_wise=False,
     ),
-    from_def_order_func=Config(
+    from_def_order_func=flex_cfg(
         flexible=False,
     ),
     # Portfolio
@@ -1415,13 +1529,13 @@ portfolio = child_dict(
     use_in_outputs=True,
     fillna_close=True,
     trades_type="exittrades",
-    stats=Config(
-        filters=dict(
-            has_year_freq=dict(
+    stats=flex_cfg(
+        filters=flex_cfg(
+            has_year_freq=flex_cfg(
                 filter_func=lambda self, metric_settings: metric_settings.get("year_freq", None) is not None,
                 warning_message=Sub("Metric '$metric_name' requires year frequency to be set"),
             ),
-            has_bm_returns=dict(
+            has_bm_returns=flex_cfg(
                 filter_func=lambda self, metric_settings: metric_settings.get(
                     "bm_returns",
                     self.bm_returns,
@@ -1429,24 +1543,24 @@ portfolio = child_dict(
                 is not None,
                 warning_message=Sub("Metric '$metric_name' requires bm_returns to be set"),
             ),
-            has_cash_deposits=dict(
+            has_cash_deposits=flex_cfg(
                 filter_func=lambda self, metric_settings: self._cash_deposits.size > 1
                 or self._cash_deposits.item() != 0,
             ),
-            has_cash_earnings=dict(
+            has_cash_earnings=flex_cfg(
                 filter_func=lambda self, metric_settings: self._cash_earnings.size > 1
                 or self._cash_earnings.item() != 0,
             ),
         ),
-        settings=dict(
+        settings=flex_cfg(
             use_asset_returns=False,
             incl_open=False,
         ),
-        template_context=dict(incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")),
+        template_context=flex_cfg(incl_open_tags=RepEval("['open', 'closed'] if incl_open else ['closed']")),
     ),
-    plots=Config(
+    plots=flex_cfg(
         subplots=["orders", "trade_pnl", "cum_returns"],
-        settings=dict(
+        settings=flex_cfg(
             use_asset_returns=False,
         ),
     ),
@@ -1461,8 +1575,8 @@ ${config_doc}
 
 _settings["portfolio"] = portfolio
 
-pfopt = child_dict(
-    pypfopt=Config(
+pfopt = frozen_cfg(
+    pypfopt=flex_cfg(
         target="max_sharpe",
         target_is_convex=True,
         weights_sum_to_one=True,
@@ -1480,7 +1594,7 @@ pfopt = child_dict(
         ignore_opt_errors=True,
         ignore_errors=False,
     ),
-    riskfolio=Config(
+    riskfolio=flex_cfg(
         nan_to_zero=True,
         dropna_rows=True,
         dropna_cols=True,
@@ -1501,23 +1615,23 @@ pfopt = child_dict(
         freq=None,
         year_freq=None,
         pre_opt=False,
-        pre_opt_kwargs=Config(),
+        pre_opt_kwargs=flex_cfg(),
         pre_opt_as_w=False,
-        func_kwargs=Config(),
+        func_kwargs=flex_cfg(),
         silence_warnings=True,
         return_port=False,
         ignore_errors=False,
     ),
-    stats=Config(
-        filters=dict(
-            alloc_ranges=dict(
+    stats=flex_cfg(
+        filters=flex_cfg(
+            alloc_ranges=flex_cfg(
                 filter_func=lambda self, metric_settings: is_instance_of(self.alloc_records, "AllocRanges"),
             )
         )
     ),
-    plots=Config(
-        filters=dict(
-            alloc_ranges=dict(
+    plots=flex_cfg(
+        filters=flex_cfg(
+            alloc_ranges=flex_cfg(
                 filter_func=lambda self, metric_settings: is_instance_of(self.alloc_records, "AllocRanges"),
             )
         )
@@ -1533,15 +1647,15 @@ ${config_doc}
 
 _settings["pfopt"] = pfopt
 
-messaging = child_dict(
-    telegram=Config(
+messaging = frozen_cfg(
+    telegram=flex_cfg(
         token=None,
         use_context=True,
         persistence=True,
-        defaults=Config(),
+        defaults=flex_cfg(),
         drop_pending_updates=True,
     ),
-    giphy=child_dict(
+    giphy=flex_cfg(
         api_key=None,
         weirdness=5,
     ),
@@ -1569,10 +1683,10 @@ GIPHY:
 
 _settings["messaging"] = messaging
 
-pbar = child_dict(
+pbar = frozen_cfg(
     disable=False,
     type="tqdm_auto",
-    kwargs=Config(),
+    kwargs=flex_cfg(),
 )
 """_"""
 
@@ -1584,8 +1698,8 @@ ${config_doc}
 
 _settings["pbar"] = pbar
 
-path = child_dict(
-    mkdir=child_dict(
+path = frozen_cfg(
+    mkdir=frozen_cfg(
         mkdir=False,
         mode=0o777,
         parents=True,
@@ -1608,6 +1722,23 @@ _settings["path"] = path
 
 class SettingsConfig(Config):
     """Extends `vectorbtpro.utils.config.Config` for global settings."""
+
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ) -> None:
+        options_ = kwargs.pop("options_", None)
+        if options_ is None:
+            options_ = {}
+        copy_kwargs = options_.pop("copy_kwargs", None)
+        if copy_kwargs is None:
+            copy_kwargs = {}
+        copy_kwargs["copy_mode"] = "deep"
+        options_["copy_kwargs"] = copy_kwargs
+        options_["frozen_keys"] = True
+        options_["as_attrs"] = True
+        Config.__init__(self, *args, options_=options_, **kwargs)
 
     def register_template(self, theme: str) -> None:
         """Register template of a theme."""
@@ -1654,15 +1785,7 @@ class SettingsConfig(Config):
                 )
 
 
-settings = SettingsConfig(
-    _settings,
-    options_=dict(
-        reset_dct_copy_kwargs=dict(copy_mode="deep"),
-        frozen_keys=True,
-        convert_children=Config,
-        as_attrs=True,
-    ),
-)
+settings = SettingsConfig(_settings)
 """Global settings config.
 
 Combines all sub-configs defined in this module."""

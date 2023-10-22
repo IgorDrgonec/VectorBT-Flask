@@ -89,6 +89,22 @@ def get_asset_value_nb(c: tp.Union[OrderContext, PostOrderContext, SignalContext
 
 
 @register_jitted
+def get_value_nb(c: tp.Union[OrderContext, PostOrderContext, SignalContext, PostSignalContext]) -> float:
+    """Get value of the current column or group with cash sharing."""
+    if c.cash_sharing:
+        return c.last_value[c.group]
+    return c.last_value[c.col]
+
+
+@register_jitted
+def get_allocation_nb(c: tp.Union[OrderContext, PostOrderContext, SignalContext, PostSignalContext]) -> float:
+    """Get asset value of the current column."""
+    if c.last_position[c.col] == 0:
+        return 0.0
+    return get_asset_value_nb(c) / get_value_nb(c)
+
+
+@register_jitted
 def order_filled_nb(c: tp.Union[PostOrderContext, PostSignalContext]) -> bool:
     """Check whether the order was filled."""
     return c.order_result.status == OrderStatus.Filled

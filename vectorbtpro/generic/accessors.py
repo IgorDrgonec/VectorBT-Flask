@@ -221,7 +221,7 @@ from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, Readonly
 from vectorbtpro.utils.decorators import class_or_instancemethod, class_or_instanceproperty
 from vectorbtpro.utils.mapping import apply_mapping, to_value_mapping
 from vectorbtpro.utils.template import substitute_templates
-from vectorbtpro.utils.datetime_ import freq_to_timedelta, freq_to_timedelta64, try_to_datetime_index, parse_timedelta
+from vectorbtpro.utils.datetime_ import freq_to_timedelta, freq_to_timedelta64, prepare_dt_index, parse_timedelta
 from vectorbtpro.utils.colors import adjust_opacity, map_value_to_cmap
 from vectorbtpro.utils.enum_ import map_enum_fields
 
@@ -296,9 +296,7 @@ nb_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__[
-    "nb_config"
-] = f"""Config of Numba methods to be attached to `GenericAccessor`.
+__pdoc__["nb_config"] = f"""Config of Numba methods to be attached to `GenericAccessor`.
 
 ```python
 {nb_config.prettify()}
@@ -2332,7 +2330,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
     # ############# Resampling ############# #
 
-    def latest_at_index(
+    def realign(
         self,
         index: tp.AnyRuleLike,
         freq: tp.Union[None, bool, tp.FrequencyLike] = None,
@@ -2345,7 +2343,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         wrap_kwargs: tp.KwargsLike = None,
         silence_warnings: tp.Optional[bool] = None,
     ) -> tp.MaybeSeriesFrame:
-        """See `vectorbtpro.generic.nb.base.latest_at_index_nb`.
+        """See `vectorbtpro.generic.nb.base.realign_nb`.
 
         `index` can be either an instance of `vectorbtpro.base.resampling.base.Resampler`,
         or any index-like object.
@@ -2361,7 +2359,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             >>> d_index = pd.date_range('2020-01-01', '2020-01-05', freq='1d')
 
             >>> h_sr = pd.Series(range(len(h_index)), index=h_index)
-            >>> h_sr.vbt.latest_at_index(d_index)
+            >>> h_sr.vbt.realign(d_index)
             2020-01-01     0.0
             2020-01-02    24.0
             2020-01-03    48.0
@@ -2374,7 +2372,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
             ```pycon
             >>> d_sr = pd.Series(range(len(d_index)), index=d_index)
-            >>> d_sr.vbt.latest_at_index(h_index)
+            >>> d_sr.vbt.realign(h_index)
             2020-01-01 00:00:00    0.0
             2020-01-01 01:00:00    0.0
             2020-01-01 02:00:00    0.0
@@ -2444,7 +2442,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             else:
                 nan_value = np.nan
 
-        func = jit_reg.resolve_option(nb.latest_at_index_nb, jitted)
+        func = jit_reg.resolve_option(nb.realign_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         out = func(
             self.to_2d_array(),
@@ -2463,18 +2461,18 @@ class GenericAccessor(BaseAccessor, Analyzable):
             return out.iloc[0]
         return out
 
-    def resample_opening(self, *args, **kwargs) -> tp.MaybeSeriesFrame:
-        """`GenericAccessor.latest_at_index` but creating a resampler and using the left bound
+    def realign_opening(self, *args, **kwargs) -> tp.MaybeSeriesFrame:
+        """`GenericAccessor.realign` but creating a resampler and using the left bound
         of the source and target index."""
-        return self.latest_at_index(*args, source_rbound=False, target_rbound=False, **kwargs)
+        return self.realign(*args, source_rbound=False, target_rbound=False, **kwargs)
 
-    def resample_closing(self, *args, **kwargs) -> tp.MaybeSeriesFrame:
-        """`GenericAccessor.latest_at_index` but creating a resampler and using the right bound
+    def realign_closing(self, *args, **kwargs) -> tp.MaybeSeriesFrame:
+        """`GenericAccessor.realign` but creating a resampler and using the right bound
         of the source and target index.
 
         !!! note
             The timestamps in the source and target index should denote the open time."""
-        return self.latest_at_index(*args, source_rbound=True, target_rbound=True, **kwargs)
+        return self.realign(*args, source_rbound=True, target_rbound=True, **kwargs)
 
     @class_or_instancemethod
     def resample_to_index(
@@ -2783,8 +2781,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
 
-        target_lbound_index = try_to_datetime_index(target_lbound_index)
-        target_rbound_index = try_to_datetime_index(target_rbound_index)
+        target_lbound_index = prepare_dt_index(target_lbound_index)
+        target_rbound_index = prepare_dt_index(target_rbound_index)
         if len(target_lbound_index) == 1 and len(target_rbound_index) > 1:
             target_lbound_index = repeat_index(target_lbound_index, len(target_rbound_index))
             if wrap_with_lbound is None:
@@ -3871,8 +3869,10 @@ class GenericAccessor(BaseAccessor, Analyzable):
             if not checks.is_deep_equal(self_copy.mapping, reself.mapping):
                 if not silence_warnings:
                     warnings.warn(
-                        f"Changing the mapping will create a copy of this object. "
-                        f"Consider setting it upon object creation to re-use existing cache.",
+                        (
+                            f"Changing the mapping will create a copy of this object. "
+                            f"Consider setting it upon object creation to re-use existing cache."
+                        ),
                         stacklevel=2,
                     )
                 for alias in reself.self_aliases:
@@ -4416,7 +4416,13 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 x_labels = _self.wrapper.columns
             if y_labels is None:
                 y_labels = _self.wrapper.index
-            heatmap = Heatmap(data=_self.to_2d_array(), x_labels=x_labels, y_labels=y_labels, fig=fig, **kwargs)
+            heatmap = Heatmap(
+                data=_self.to_2d_array(),
+                x_labels=x_labels,
+                y_labels=y_labels,
+                fig=fig,
+                **kwargs,
+            )
             if return_fig:
                 return heatmap.fig
             return heatmap
@@ -4444,8 +4450,19 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
         if slider_level is None:
             # No grouping
-            df = _self.unstack_to_df(index_levels=y_level, column_levels=x_level, symmetric=symmetric, sort=sort)
-            return df.vbt.heatmap(x_labels=x_labels, y_labels=y_labels, fig=fig, return_fig=return_fig, **kwargs)
+            df = _self.unstack_to_df(
+                index_levels=y_level,
+                column_levels=x_level,
+                symmetric=symmetric,
+                sort=sort,
+            )
+            return df.vbt.heatmap(
+                x_labels=x_labels,
+                y_labels=y_labels,
+                fig=fig,
+                return_fig=return_fig,
+                **kwargs,
+            )
 
         # Requires grouping
         # See https://plotly.com/python/sliders/
@@ -4456,7 +4473,12 @@ class GenericAccessor(BaseAccessor, Analyzable):
             if slider_labels is not None:
                 name = slider_labels[i]
             _slider_labels.append(name)
-            df = group.vbt.unstack_to_df(index_levels=y_level, column_levels=x_level, symmetric=symmetric, sort=sort)
+            df = group.vbt.unstack_to_df(
+                index_levels=y_level,
+                column_levels=x_level,
+                symmetric=symmetric,
+                sort=sort,
+            )
             if x_labels is None:
                 x_labels = df.columns
             if y_labels is None:
@@ -4468,7 +4490,13 @@ class GenericAccessor(BaseAccessor, Analyzable):
                 kwargs,
             )
             default_size = fig is None and "height" not in _kwargs
-            fig = Heatmap(data=reshaping.to_2d_array(df), x_labels=x_labels, y_labels=y_labels, fig=fig, **_kwargs).fig
+            fig = Heatmap(
+                data=reshaping.to_2d_array(df),
+                x_labels=x_labels,
+                y_labels=y_labels,
+                fig=fig,
+                **_kwargs,
+            ).fig
             if default_size:
                 fig.layout["height"] += 100  # slider takes up space
         fig.data[active].visible = True
@@ -4486,7 +4514,14 @@ class GenericAccessor(BaseAccessor, Analyzable):
             if _self.wrapper.index.names[slider_level] is not None
             else None
         )
-        sliders = [dict(active=active, currentvalue={"prefix": prefix}, pad={"t": 50}, steps=steps)]
+        sliders = [
+            dict(
+                active=active,
+                currentvalue={"prefix": prefix},
+                pad={"t": 50},
+                steps=steps,
+            )
+        ]
         fig.update_layout(sliders=sliders)
         return fig
 
@@ -5048,9 +5083,7 @@ if settings["importing"]["sklearn"]:
     )
     """_"""
 
-    __pdoc__[
-        "transform_config"
-    ] = f"""Config of transform methods to be attached to `GenericAccessor`.
+    __pdoc__["transform_config"] = f"""Config of transform methods to be attached to `GenericAccessor`.
 
     ```python
     {transform_config.prettify()}
@@ -5074,10 +5107,13 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
         obj: tp.Optional[tp.ArrayLike] = None,
         mapping: tp.Optional[tp.MappingLike] = None,
+        _full_init: bool = True,
         **kwargs,
     ) -> None:
-        BaseSRAccessor.__init__(self, wrapper, obj=obj, **kwargs)
-        GenericAccessor.__init__(self, wrapper, obj=obj, mapping=mapping, **kwargs)
+        BaseSRAccessor.__init__(self, wrapper, obj=obj, _full_init=False, **kwargs)
+
+        if _full_init:
+            GenericAccessor.__init__(self, wrapper, obj=obj, mapping=mapping, **kwargs)
 
     def fit_pattern(
         self,
@@ -5201,10 +5237,13 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
         obj: tp.Optional[tp.ArrayLike] = None,
         mapping: tp.Optional[tp.MappingLike] = None,
+        _full_init: bool = True,
         **kwargs,
     ) -> None:
-        BaseDFAccessor.__init__(self, wrapper, obj=obj, **kwargs)
-        GenericAccessor.__init__(self, wrapper, obj=obj, mapping=mapping, **kwargs)
+        BaseDFAccessor.__init__(self, wrapper, obj=obj, _full_init=False, **kwargs)
+
+        if _full_init:
+            GenericAccessor.__init__(self, wrapper, obj=obj, mapping=mapping, **kwargs)
 
     def plot_projections(
         self,

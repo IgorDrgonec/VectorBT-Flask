@@ -136,7 +136,6 @@ from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, HybridConfig, Config
 from vectorbtpro.utils.datetime_ import freq_to_timedelta, PandasDatetimeIndex
 from vectorbtpro.utils.decorators import class_or_instanceproperty
-from vectorbtpro.utils.colors import adjust_opacity
 
 __all__ = [
     "ReturnsAccessor",
@@ -303,7 +302,12 @@ class ReturnsAccessor(GenericAccessor):
         """Accessor class for `pd.DataFrame`."""
         return ReturnsDFAccessor
 
-    def indexing_func(self: ReturnsAccessorT, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> ReturnsAccessorT:
+    def indexing_func(
+        self: ReturnsAccessorT,
+        *args,
+        wrapper_meta: tp.DictLike = None,
+        **kwargs,
+    ) -> ReturnsAccessorT:
         """Perform indexing on `ReturnsAccessor`."""
         if wrapper_meta is None:
             wrapper_meta = self.wrapper.indexing_func_meta(*args, **kwargs)
@@ -401,7 +405,7 @@ class ReturnsAccessor(GenericAccessor):
 
     def deannualize(self, value: float) -> float:
         """Deannualize a value."""
-        return np.power(1 + value, 1. / self.ann_factor) - 1.
+        return np.power(1 + value, 1.0 / self.ann_factor) - 1.0
 
     @property
     def defaults(self) -> tp.Kwargs:
@@ -415,30 +419,28 @@ class ReturnsAccessor(GenericAccessor):
 
         return merge_dicts(returns_defaults_cfg, self._defaults)
 
-    def daily(self, jitted: tp.JittedOption = None, chunked: tp.ChunkedOption = None, **kwargs) -> tp.SeriesFrame:
-        """Daily returns."""
-        checks.assert_instance_of(self.wrapper.index, PandasDatetimeIndex)
-
-        func = jit_reg.resolve_option(nb.cum_returns_final_1d_nb, jitted)
-        chunked = ch.specialize_chunked_option(chunked, arg_take_spec=dict(args=ch.ArgsTaker(None, None)))
-        return self.resample_apply(
-            "1D",
-            func,
-            0.0,
-            self.log_returns,
-            jitted=jitted,
-            chunked=chunked,
-            **kwargs,
-        )
-
-    def annual(self, jitted: tp.JittedOption = None, chunked: tp.ChunkedOption = None, **kwargs) -> tp.SeriesFrame:
-        """Annual returns."""
+    def resample_returns(
+        self,
+        rule: tp.AnyRuleLike,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Resample returns to a custom frequency, date offset, or index."""
         checks.assert_instance_of(self.obj.index, PandasDatetimeIndex)
 
         func = jit_reg.resolve_option(nb.cum_returns_final_1d_nb, jitted)
-        chunked = ch.specialize_chunked_option(chunked, arg_take_spec=dict(args=ch.ArgsTaker(None, None)))
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(
+                args=ch.ArgsTaker(
+                    None,
+                    None,
+                )
+            ),
+        )
         return self.resample_apply(
-            self.year_freq,
+            rule,
             func,
             0.0,
             self.log_returns,
@@ -446,6 +448,24 @@ class ReturnsAccessor(GenericAccessor):
             chunked=chunked,
             **kwargs,
         )
+
+    def daily(
+        self,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Daily returns."""
+        return self.resample_returns("1D", jitted=jitted, chunked=chunked, **kwargs)
+
+    def annual(
+        self,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Annual returns."""
+        return self.resample_returns(self.year_freq, jitted=jitted, chunked=chunked, **kwargs)
 
     def cumulative(
         self,
@@ -521,7 +541,12 @@ class ReturnsAccessor(GenericAccessor):
         See `vectorbtpro.returns.nb.annualized_return_nb`."""
         func = jit_reg.resolve_option(nb.annualized_return_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array(), self.ann_factor, period=self.wrapper.dt_period, log_returns=self.log_returns)
+        out = func(
+            self.to_2d_array(),
+            self.ann_factor,
+            period=self.wrapper.dt_period,
+            log_returns=self.log_returns,
+        )
         wrap_kwargs = merge_dicts(dict(name_or_index="annualized_return"), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
@@ -538,7 +563,16 @@ class ReturnsAccessor(GenericAccessor):
             window = self.defaults["window"]
         if minp is None:
             minp = self.defaults["minp"]
-        chunked = ch.specialize_chunked_option(chunked, arg_take_spec=dict(args=ch.ArgsTaker(None, None, None)))
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(
+                args=ch.ArgsTaker(
+                    None,
+                    None,
+                    None,
+                )
+            ),
+        )
         return self.rolling_apply(
             window,
             jit_reg.resolve_option(nb.annualized_return_1d_nb, jitted),
@@ -591,7 +625,16 @@ class ReturnsAccessor(GenericAccessor):
             levy_alpha = self.defaults["levy_alpha"]
         if ddof is None:
             ddof = self.defaults["ddof"]
-        chunked = ch.specialize_chunked_option(chunked, arg_take_spec=dict(args=ch.ArgsTaker(None, None, None)))
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(
+                args=ch.ArgsTaker(
+                    None,
+                    None,
+                    None,
+                )
+            ),
+        )
         return self.rolling_apply(
             window,
             jit_reg.resolve_option(nb.annualized_volatility_1d_nb, jitted),
@@ -615,7 +658,12 @@ class ReturnsAccessor(GenericAccessor):
         See `vectorbtpro.returns.nb.calmar_ratio_nb`."""
         func = jit_reg.resolve_option(nb.calmar_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
-        out = func(self.to_2d_array(), self.ann_factor, period=self.wrapper.dt_period, log_returns=self.log_returns)
+        out = func(
+            self.to_2d_array(),
+            self.ann_factor,
+            period=self.wrapper.dt_period,
+            log_returns=self.log_returns,
+        )
         wrap_kwargs = merge_dicts(dict(name_or_index="calmar_ratio"), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
@@ -632,7 +680,16 @@ class ReturnsAccessor(GenericAccessor):
             window = self.defaults["window"]
         if minp is None:
             minp = self.defaults["minp"]
-        chunked = ch.specialize_chunked_option(chunked, arg_take_spec=dict(args=ch.ArgsTaker(None, None, None)))
+        chunked = ch.specialize_chunked_option(
+            chunked,
+            arg_take_spec=dict(
+                args=ch.ArgsTaker(
+                    None,
+                    None,
+                    None,
+                )
+            ),
+        )
         return self.rolling_apply(
             window,
             jit_reg.resolve_option(nb.calmar_ratio_1d_nb, jitted),
@@ -1051,7 +1108,13 @@ class ReturnsAccessor(GenericAccessor):
         bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
-            arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None)),
+            arg_take_spec=dict(
+                args=ch.ArgsTaker(
+                    ch.ArraySlicer(axis=1),
+                    ch.ArraySlicer(axis=1),
+                    None,
+                )
+            ),
         )
         return type(self).rolling_apply(
             window,
@@ -1112,7 +1175,13 @@ class ReturnsAccessor(GenericAccessor):
         bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
-            arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None)),
+            arg_take_spec=dict(
+                args=ch.ArgsTaker(
+                    ch.ArraySlicer(axis=1),
+                    ch.ArraySlicer(axis=1),
+                    None,
+                )
+            ),
         )
         return type(self).rolling_apply(
             window,
@@ -1161,16 +1230,48 @@ class ReturnsAccessor(GenericAccessor):
             func = jit_reg.resolve_option(nb.tail_ratio_1d_nb, jitted)
         return self.rolling_apply(window, func, minp=minp, jitted=jitted, **kwargs)
 
+    def profit_factor(
+        self,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeSeries:
+        """Profit factor.
+
+        See `vectorbtpro.returns.nb.profit_factor_nb`."""
+        func = jit_reg.resolve_option(nb.profit_factor_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(self.to_2d_array())
+        wrap_kwargs = merge_dicts(dict(name_or_index="profit_factor"), wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
+
+    def rolling_profit_factor(
+        self,
+        window: tp.Optional[int] = None,
+        minp: tp.Optional[int] = None,
+        jitted: tp.JittedOption = None,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Rolling version of `ReturnsAccessor.profit_factor`."""
+        if window is None:
+            window = self.defaults["window"]
+        if minp is None:
+            minp = self.defaults["minp"]
+        func = jit_reg.resolve_option(nb.profit_factor_1d_nb, jitted)
+        return self.rolling_apply(window, func, minp=minp, jitted=jitted, **kwargs)
+
     def common_sense_ratio(
         self,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeSeries:
-        """Common Sense Ratio."""
-        tail_ratio = to_1d_array(self.tail_ratio(jitted=jitted, chunked=chunked))
-        annualized = to_1d_array(self.annualized(jitted=jitted, chunked=chunked))
-        out = tail_ratio * (1 + annualized)
+        """Common Sense Ratio.
+
+        See `vectorbtpro.returns.nb.common_sense_ratio_nb`."""
+        func = jit_reg.resolve_option(nb.common_sense_ratio_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        out = func(self.to_2d_array())
         wrap_kwargs = merge_dicts(dict(name_or_index="common_sense_ratio"), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=False, **wrap_kwargs)
 
@@ -1179,18 +1280,15 @@ class ReturnsAccessor(GenericAccessor):
         window: tp.Optional[int] = None,
         minp: tp.Optional[int] = None,
         jitted: tp.JittedOption = None,
-        chunked: tp.ChunkedOption = None,
-        wrap_kwargs: tp.KwargsLike = None,
+        **kwargs,
     ) -> tp.SeriesFrame:
         """Rolling version of `ReturnsAccessor.common_sense_ratio`."""
         if window is None:
             window = self.defaults["window"]
         if minp is None:
             minp = self.defaults["minp"]
-        rolling_tail_ratio = to_2d_array(self.rolling_tail_ratio(window, minp=minp, jitted=jitted, chunked=chunked))
-        rolling_annualized = to_2d_array(self.rolling_annualized(window, minp=minp, jitted=jitted, chunked=chunked))
-        out = rolling_tail_ratio * (1 + rolling_annualized)
-        return self.wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
+        func = jit_reg.resolve_option(nb.common_sense_ratio_1d_nb, jitted)
+        return self.rolling_apply(window, func, minp=minp, jitted=jitted, **kwargs)
 
     def value_at_risk(
         self,
@@ -1239,7 +1337,15 @@ class ReturnsAccessor(GenericAccessor):
                 )
             ),
         )
-        return self.rolling_apply(window, func, cutoff, minp=minp, jitted=jitted, chunked=chunked, **kwargs)
+        return self.rolling_apply(
+            window,
+            func,
+            cutoff,
+            minp=minp,
+            jitted=jitted,
+            chunked=chunked,
+            **kwargs,
+        )
 
     def cond_value_at_risk(
         self,
@@ -1288,7 +1394,15 @@ class ReturnsAccessor(GenericAccessor):
                 )
             ),
         )
-        return self.rolling_apply(window, func, cutoff, minp=minp, jitted=jitted, chunked=chunked, **kwargs)
+        return self.rolling_apply(
+            window,
+            func,
+            cutoff,
+            minp=minp,
+            jitted=jitted,
+            chunked=chunked,
+            **kwargs,
+        )
 
     def capture_ratio(
         self,
@@ -1336,7 +1450,15 @@ class ReturnsAccessor(GenericAccessor):
         bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
-            arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None, None, None)),
+            arg_take_spec=dict(
+                args=ch.ArgsTaker(
+                    ch.ArraySlicer(axis=1),
+                    ch.ArraySlicer(axis=1),
+                    None,
+                    None,
+                    None,
+                )
+            ),
         )
         return type(self).rolling_apply(
             window,
@@ -1399,7 +1521,15 @@ class ReturnsAccessor(GenericAccessor):
         bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
-            arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None, None, None)),
+            arg_take_spec=dict(
+                args=ch.ArgsTaker(
+                    ch.ArraySlicer(axis=1),
+                    ch.ArraySlicer(axis=1),
+                    None,
+                    None,
+                    None,
+                )
+            ),
         )
         return type(self).rolling_apply(
             window,
@@ -1462,7 +1592,15 @@ class ReturnsAccessor(GenericAccessor):
         bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
-            arg_take_spec=dict(args=ch.ArgsTaker(ch.ArraySlicer(axis=1), ch.ArraySlicer(axis=1), None, None, None)),
+            arg_take_spec=dict(
+                args=ch.ArgsTaker(
+                    ch.ArraySlicer(axis=1),
+                    ch.ArraySlicer(axis=1),
+                    None,
+                    None,
+                    None,
+                )
+            ),
         )
         return type(self).rolling_apply(
             window,
@@ -1597,8 +1735,10 @@ class ReturnsAccessor(GenericAccessor):
             if self_copy.year_freq != reself.year_freq:
                 if not silence_warnings:
                     warnings.warn(
-                        f"Changing the year frequency will create a copy of this object. "
-                        f"Consider setting it upon object creation to re-use existing cache.",
+                        (
+                            f"Changing the year frequency will create a copy of this object. "
+                            f"Consider setting it upon object creation to re-use existing cache."
+                        ),
                         stacklevel=2,
                     )
                 for alias in reself.self_aliases:
@@ -1969,18 +2109,21 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
         bm_returns: tp.Optional[tp.ArrayLike] = None,
         year_freq: tp.Optional[tp.FrequencyLike] = None,
         defaults: tp.KwargsLike = None,
+        _full_init: bool = True,
         **kwargs,
     ) -> None:
-        GenericSRAccessor.__init__(self, wrapper, obj=obj, **kwargs)
-        ReturnsAccessor.__init__(
-            self,
-            wrapper,
-            obj=obj,
-            bm_returns=bm_returns,
-            year_freq=year_freq,
-            defaults=defaults,
-            **kwargs,
-        )
+        GenericSRAccessor.__init__(self, wrapper, obj=obj, _full_init=False, **kwargs)
+
+        if _full_init:
+            ReturnsAccessor.__init__(
+                self,
+                wrapper,
+                obj=obj,
+                bm_returns=bm_returns,
+                year_freq=year_freq,
+                defaults=defaults,
+                **kwargs,
+            )
 
 
 @register_df_vbt_accessor("returns")
@@ -1996,15 +2139,18 @@ class ReturnsDFAccessor(ReturnsAccessor, GenericDFAccessor):
         bm_returns: tp.Optional[tp.ArrayLike] = None,
         year_freq: tp.Optional[tp.FrequencyLike] = None,
         defaults: tp.KwargsLike = None,
+        _full_init: bool = True,
         **kwargs,
     ) -> None:
-        GenericDFAccessor.__init__(self, wrapper, obj=obj, **kwargs)
-        ReturnsAccessor.__init__(
-            self,
-            wrapper,
-            obj=obj,
-            bm_returns=bm_returns,
-            year_freq=year_freq,
-            defaults=defaults,
-            **kwargs,
-        )
+        GenericDFAccessor.__init__(self, wrapper, obj=obj, _full_init=False, **kwargs)
+
+        if _full_init:
+            ReturnsAccessor.__init__(
+                self,
+                wrapper,
+                obj=obj,
+                bm_returns=bm_returns,
+                year_freq=year_freq,
+                defaults=defaults,
+                **kwargs,
+            )

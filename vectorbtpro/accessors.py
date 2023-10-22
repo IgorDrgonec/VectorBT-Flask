@@ -90,10 +90,7 @@ class Accessor:
 
 
 class CachedAccessor:
-    """Cached accessor.
-
-    !!! warning
-        Does not prevent from using old index data if the object's index has been changed in-place."""
+    """Cached accessor."""
 
     def __init__(self, name: str, accessor: tp.Type[AccessorT]) -> None:
         self._name = name

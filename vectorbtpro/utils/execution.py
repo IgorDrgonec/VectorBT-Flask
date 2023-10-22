@@ -2,10 +2,9 @@
 
 """Engines for executing functions."""
 
-import time
 import multiprocessing
 import concurrent.futures
-import gc
+import time
 
 from numba.core.registry import CPUDispatcher
 
@@ -38,9 +37,6 @@ __all__ = [
 class ExecutionEngine(Configured):
     """Abstract class for executing functions."""
 
-    def __init__(self, **kwargs) -> None:
-        Configured.__init__(self, **kwargs)
-
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         """Run an iterable of tuples out of a function, arguments, and keyword arguments.
 
@@ -53,6 +49,8 @@ class SerialEngine(ExecutionEngine):
 
     For defaults, see `engines.serial` in `vectorbtpro._settings.execution`."""
 
+    _settings_path: tp.SettingsPath = "execution.engines.serial"
+
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
         "show_progress",
         "progress_desc",
@@ -64,34 +62,19 @@ class SerialEngine(ExecutionEngine):
 
     def __init__(
         self,
-        show_progress: tp.Optional[bool] = None,
         progress_desc: tp.Optional[tp.Sequence] = None,
+        show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
         clear_cache: tp.Union[None, bool, int] = None,
         collect_garbage: tp.Union[None, bool, int] = None,
         cooldown: tp.Optional[int] = None,
         **kwargs,
     ) -> None:
-        from vectorbtpro._settings import settings
-
-        serial_cfg = settings["execution"]["engines"]["serial"]
-
-        if show_progress is None:
-            show_progress = serial_cfg["show_progress"]
-        pbar_kwargs = merge_dicts(pbar_kwargs, serial_cfg["pbar_kwargs"])
-        if clear_cache is None:
-            clear_cache = serial_cfg["clear_cache"]
-        if collect_garbage is None:
-            collect_garbage = serial_cfg["collect_garbage"]
-        if cooldown is None:
-            cooldown = serial_cfg["cooldown"]
-
-        self._show_progress = show_progress
-        self._progress_desc = progress_desc
-        self._pbar_kwargs = pbar_kwargs
-        self._clear_cache = clear_cache
-        self._collect_garbage = collect_garbage
-        self._cooldown = cooldown
+        show_progress = self.resolve_setting(show_progress, "show_progress")
+        pbar_kwargs = self.resolve_setting(pbar_kwargs, "pbar_kwargs", merge=True)
+        clear_cache = self.resolve_setting(clear_cache, "clear_cache")
+        collect_garbage = self.resolve_setting(collect_garbage, "collect_garbage")
+        cooldown = self.resolve_setting(cooldown, "cooldown")
 
         ExecutionEngine.__init__(
             self,
@@ -104,15 +87,22 @@ class SerialEngine(ExecutionEngine):
             **kwargs,
         )
 
-    @property
-    def show_progress(self) -> bool:
-        """Whether to show the progress bar using `vectorbtpro.utils.pbar.get_pbar`."""
-        return self._show_progress
+        self._show_progress = show_progress
+        self._progress_desc = progress_desc
+        self._pbar_kwargs = pbar_kwargs
+        self._clear_cache = clear_cache
+        self._collect_garbage = collect_garbage
+        self._cooldown = cooldown
 
     @property
     def progress_desc(self) -> tp.Optional[tp.Sequence]:
         """Sequence used to describe each iteration of the progress bar."""
         return self._progress_desc
+
+    @property
+    def show_progress(self) -> bool:
+        """Whether to show the progress bar using `vectorbtpro.utils.pbar.get_pbar`."""
+        return self._show_progress
 
     @property
     def pbar_kwargs(self) -> tp.Kwargs:
@@ -139,8 +129,7 @@ class SerialEngine(ExecutionEngine):
         return self._cooldown
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
-        from vectorbtpro.registries.ca_registry import CAQueryDelegator
-        import time
+        from vectorbtpro.registries.ca_registry import clear_cache, collect_garbage
 
         results = []
         if n_calls is None and hasattr(funcs_args, "__len__"):
@@ -153,14 +142,14 @@ class SerialEngine(ExecutionEngine):
                 pbar.update(1)
                 if isinstance(self.clear_cache, bool):
                     if self.clear_cache:
-                        CAQueryDelegator().clear_cache()
+                        clear_cache()
                 elif i > 0 and (i + 1) % self.clear_cache == 0:
-                    CAQueryDelegator().clear_cache()
+                    clear_cache()
                 if isinstance(self.collect_garbage, bool):
                     if self.collect_garbage:
-                        gc.collect()
+                        collect_garbage()
                 elif i > 0 and (i + 1) % self.collect_garbage == 0:
-                    gc.collect()
+                    collect_garbage()
                 if self.cooldown is not None:
                     time.sleep(self.cooldown)
 
@@ -172,31 +161,45 @@ class ThreadPoolEngine(ExecutionEngine):
 
     For defaults, see `engines.threadpool` in `vectorbtpro._settings.execution`."""
 
+    _settings_path: tp.SettingsPath = "execution.engines.threadpool"
+
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
         "init_kwargs",
+        "timeout",
     }
 
-    def __init__(self, init_kwargs: tp.KwargsLike = None, **kwargs) -> None:
-        from vectorbtpro._settings import settings
+    def __init__(self, init_kwargs: tp.KwargsLike = None, timeout: tp.Optional[int] = None, **kwargs) -> None:
+        init_kwargs = self.resolve_setting(init_kwargs, "init_kwargs", merge=True)
+        timeout = self.resolve_setting(timeout, "timeout")
 
-        threadpool_cfg = settings["execution"]["engines"]["threadpool"]
-
-        init_kwargs = merge_dicts(init_kwargs, threadpool_cfg["init_kwargs"])
+        ExecutionEngine.__init__(
+            self,
+            init_kwargs=init_kwargs,
+            timeout=timeout,
+            **kwargs,
+        )
 
         self._init_kwargs = init_kwargs
-
-        ExecutionEngine.__init__(self, init_kwargs=init_kwargs, **kwargs)
+        self._timeout = timeout
 
     @property
     def init_kwargs(self) -> tp.Kwargs:
         """Keyword arguments used to initialize `ThreadPoolExecutor`."""
         return self._init_kwargs
 
+    @property
+    def timeout(self) -> tp.Optional[int]:
+        """Timeout."""
+        return self._timeout
+
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         with concurrent.futures.ThreadPoolExecutor(**self.init_kwargs) as executor:
-            futures = {executor.submit(func, *args, **kwargs): i for i, (func, args, kwargs) in enumerate(funcs_args)}
+            futures = {}
+            for i, (func, args, kwargs) in enumerate(funcs_args):
+                future = executor.submit(func, *args, **kwargs)
+                futures[future] = i
             results = [None] * len(futures)
-            for fut in concurrent.futures.as_completed(futures):
+            for fut in concurrent.futures.as_completed(futures, timeout=self.timeout):
                 results[futures[fut]] = fut.result()
             return results
 
@@ -206,27 +209,45 @@ class ProcessPoolEngine(ExecutionEngine):
 
     For defaults, see `engines.processpool` in `vectorbtpro._settings.execution`."""
 
-    def __init__(self, init_kwargs: tp.KwargsLike = None) -> None:
-        from vectorbtpro._settings import settings
+    _settings_path: tp.SettingsPath = "execution.engines.processpool"
 
-        processpool_cfg = settings["execution"]["engines"]["processpool"]
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+        "init_kwargs",
+        "timeout",
+    }
 
-        init_kwargs = merge_dicts(init_kwargs, processpool_cfg["init_kwargs"])
+    def __init__(self, init_kwargs: tp.KwargsLike = None, timeout: tp.Optional[int] = None, **kwargs) -> None:
+        init_kwargs = self.resolve_setting(init_kwargs, "init_kwargs", merge=True)
+        timeout = self.resolve_setting(timeout, "timeout")
+
+        ExecutionEngine.__init__(
+            self,
+            init_kwargs=init_kwargs,
+            timeout=timeout,
+            **kwargs,
+        )
 
         self._init_kwargs = init_kwargs
-
-        ExecutionEngine.__init__(self, init_kwargs=init_kwargs)
+        self._timeout = timeout
 
     @property
     def init_kwargs(self) -> tp.Kwargs:
         """Keyword arguments used to initialize `ProcessPoolExecutor`."""
         return self._init_kwargs
 
+    @property
+    def timeout(self) -> tp.Optional[int]:
+        """Timeout."""
+        return self._timeout
+
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         with concurrent.futures.ProcessPoolExecutor(**self.init_kwargs) as executor:
-            futures = {executor.submit(func, *args, **kwargs): i for i, (func, args, kwargs) in enumerate(funcs_args)}
+            futures = {}
+            for i, (func, args, kwargs) in enumerate(funcs_args):
+                future = executor.submit(func, *args, **kwargs)
+                futures[future] = i
             results = [None] * len(futures)
-            for fut in concurrent.futures.as_completed(futures):
+            for fut in concurrent.futures.as_completed(futures, timeout=self.timeout):
                 results[futures[fut]] = fut.result()
             return results
 
@@ -241,41 +262,51 @@ class PathosEngine(ExecutionEngine):
 
     For defaults, see `engines.pathos` in `vectorbtpro._settings.execution`."""
 
+    _settings_path: tp.SettingsPath = "execution.engines.pathos"
+
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
         "pool_type",
-        "sleep",
         "init_kwargs",
+        "timeout",
+        "sleep",
+        "show_progress",
+        "pbar_kwargs",
     }
 
     def __init__(
         self,
         pool_type: tp.Optional[str] = None,
-        sleep: tp.Optional[int] = None,
         init_kwargs: tp.KwargsLike = None,
+        timeout: tp.Optional[int] = None,
+        sleep: tp.Optional[float] = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> None:
-        from vectorbtpro._settings import settings
+        pool_type = self.resolve_setting(pool_type, "pool_type")
+        init_kwargs = self.resolve_setting(init_kwargs, "init_kwargs", merge=True)
+        timeout = self.resolve_setting(timeout, "timeout")
+        sleep = self.resolve_setting(sleep, "sleep")
+        show_progress = self.resolve_setting(show_progress, "show_progress")
+        pbar_kwargs = self.resolve_setting(pbar_kwargs, "pbar_kwargs", merge=True)
 
-        pathos_cfg = settings["execution"]["engines"]["pathos"]
-
-        if pool_type is None:
-            pool_type = pathos_cfg["pool_type"]
-        if sleep is None:
-            sleep = pathos_cfg["sleep"]
-        init_kwargs = merge_dicts(init_kwargs, pathos_cfg["init_kwargs"])
-        if show_progress is None:
-            show_progress = pathos_cfg["show_progress"]
-        pbar_kwargs = merge_dicts(pbar_kwargs, pathos_cfg["pbar_kwargs"])
+        ExecutionEngine.__init__(
+            self,
+            pool_type=pool_type,
+            init_kwargs=init_kwargs,
+            timeout=timeout,
+            sleep=sleep,
+            show_progress=show_progress,
+            pbar_kwargs=pbar_kwargs,
+            **kwargs,
+        )
 
         self._pool_type = pool_type
-        self._sleep = sleep
         self._init_kwargs = init_kwargs
+        self._timeout = timeout
+        self._sleep = sleep
         self._show_progress = show_progress
         self._pbar_kwargs = pbar_kwargs
-
-        ExecutionEngine.__init__(self, init_kwargs=init_kwargs, **kwargs)
 
     @property
     def pool_type(self) -> str:
@@ -283,12 +314,19 @@ class PathosEngine(ExecutionEngine):
         return self._pool_type
 
     @property
-    def sleep(self) -> tp.Optional[int]:
-        """Number of seconds between task checks.
+    def init_kwargs(self) -> tp.Kwargs:
+        """Keyword arguments used to initialize the pool."""
+        return self._init_kwargs
 
-        The higher, the less CPU it uses but also the more time it takes to gather the results.
-        Thus, should be in a millisecond range."""
-        return self._sleep
+    @property
+    def timeout(self) -> tp.Optional[int]:
+        """Timeout."""
+        return self._timeout
+
+    @property
+    def sleep(self) -> tp.Optional[float]:
+        """Number of seconds to sleep between checks."""
+        return self._timeout
 
     @property
     def show_progress(self) -> bool:
@@ -299,11 +337,6 @@ class PathosEngine(ExecutionEngine):
     def pbar_kwargs(self) -> tp.Kwargs:
         """Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`."""
         return self._pbar_kwargs
-
-    @property
-    def init_kwargs(self) -> tp.Kwargs:
-        """Keyword arguments used to initialize the pool."""
-        return self._init_kwargs
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         from vectorbtpro.utils.module_ import assert_can_import
@@ -321,21 +354,89 @@ class PathosEngine(ExecutionEngine):
         else:
             raise ValueError(f"Invalid option pool_type='{self.pool_type}'")
 
-        if n_calls is None and hasattr(funcs_args, "__len__"):
-            n_calls = len(funcs_args)
+        with Pool(**self.init_kwargs) as pool:
+            async_results = []
+            for func, args, kwargs in funcs_args:
+                async_result = pool.apipe(func, *args, **kwargs)
+                async_results.append(async_result)
+            if self.timeout is not None or self.show_progress:
+                pending = set(async_results)
+                total_futures = len(pending)
+                if self.timeout is not None:
+                    end_time = self.timeout + time.monotonic()
+                with get_pbar(total=total_futures, show_progress=self.show_progress, **self.pbar_kwargs) as pbar:
+                    while pending:
+                        pending = {async_result for async_result in pending if not async_result.ready()}
+                        pbar.n = total_futures - len(pending)
+                        pbar.refresh()
+                        if len(pending) == 0:
+                            break
+                        if self.timeout is not None:
+                            if time.monotonic() > end_time:
+                                raise TimeoutError("%d (of %d) futures unfinished" % (len(pending), total_futures))
+                        if self.sleep is not None:
+                            time.sleep(self.sleep)
+            pool.close()
+            pool.join()
+            pool.clear()
+        return [async_result.get() for async_result in async_results]
 
-        with get_pbar(total=n_calls, show_progress=self.show_progress, **self.pbar_kwargs) as pbar:
-            with Pool(**self.init_kwargs) as pool:
-                futures = [pool.apipe(func, *args, **kwargs) for (func, args, kwargs) in funcs_args]
-                tasks = set(futures)
-                while tasks:
-                    ready_tasks = {task for task in tasks if task.ready()}
-                    if ready_tasks:
-                        pbar.update(len(ready_tasks))
-                        tasks -= ready_tasks
-                    if self.sleep is not None:
-                        time.sleep(self.sleep)
-                return [f.get() for f in futures]
+
+class MpireEngine(ExecutionEngine):
+    """Class for executing functions using `WorkerPool` from `mpire`.
+
+    For defaults, see `engines.mpire` in `vectorbtpro._settings.execution`."""
+
+    _settings_path: tp.SettingsPath = "execution.engines.mpire"
+
+    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+        "init_kwargs",
+        "apply_kwargs",
+        "timeout",
+    }
+
+    def __init__(
+        self,
+        init_kwargs: tp.KwargsLike = None,
+        apply_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> None:
+        init_kwargs = self.resolve_setting(init_kwargs, "init_kwargs", merge=True)
+        apply_kwargs = self.resolve_setting(apply_kwargs, "apply_kwargs", merge=True)
+
+        ExecutionEngine.__init__(
+            self,
+            init_kwargs=init_kwargs,
+            apply_kwargs=apply_kwargs,
+            **kwargs,
+        )
+
+        self._init_kwargs = init_kwargs
+        self._apply_kwargs = apply_kwargs
+
+    @property
+    def init_kwargs(self) -> tp.Kwargs:
+        """Keyword arguments used to initialize `WorkerPool`."""
+        return self._init_kwargs
+
+    @property
+    def apply_kwargs(self) -> tp.Kwargs:
+        """Keyword arguments passed to `WorkerPool.async_apply`."""
+        return self._apply_kwargs
+
+    def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("mpire")
+        from mpire import WorkerPool
+
+        with WorkerPool(**self.init_kwargs) as pool:
+            async_results = []
+            for i, (func, args, kwargs) in enumerate(funcs_args):
+                async_result = pool.apply_async(func, args=args, kwargs=kwargs, **self.apply_kwargs)
+                async_results.append(async_result)
+            pool.stop_and_join()
+        return [async_result.get() for async_result in async_results]
 
 
 class DaskEngine(ExecutionEngine):
@@ -347,20 +448,22 @@ class DaskEngine(ExecutionEngine):
         Use multi-threading mainly on numeric code that releases the GIL
         (like NumPy, Pandas, Scikit-Learn, Numba)."""
 
+    _settings_path: tp.SettingsPath = "execution.engines.dask"
+
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
         "compute_kwargs",
     }
 
     def __init__(self, compute_kwargs: tp.KwargsLike = None, **kwargs) -> None:
-        from vectorbtpro._settings import settings
+        compute_kwargs = self.resolve_setting(compute_kwargs, "compute_kwargs", merge=True)
 
-        dask_cfg = settings["execution"]["engines"]["dask"]
-
-        compute_kwargs = merge_dicts(compute_kwargs, dask_cfg["compute_kwargs"])
+        ExecutionEngine.__init__(
+            self,
+            compute_kwargs=compute_kwargs,
+            **kwargs,
+        )
 
         self._compute_kwargs = compute_kwargs
-
-        ExecutionEngine.__init__(self, compute_kwargs=compute_kwargs, **kwargs)
 
     @property
     def compute_kwargs(self) -> tp.Kwargs:
@@ -390,6 +493,8 @@ class RayEngine(ExecutionEngine):
         a considerable amount of time compared to this copying operation, otherwise there will be
         a little to no speedup."""
 
+    _settings_path: tp.SettingsPath = "execution.engines.ray"
+
     _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
         "restart",
         "reuse_refs",
@@ -409,27 +514,12 @@ class RayEngine(ExecutionEngine):
         remote_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> None:
-        from vectorbtpro._settings import settings
-
-        ray_cfg = settings["execution"]["engines"]["ray"]
-
-        if restart is None:
-            restart = ray_cfg["restart"]
-        if reuse_refs is None:
-            reuse_refs = ray_cfg["reuse_refs"]
-        if del_refs is None:
-            del_refs = ray_cfg["del_refs"]
-        if shutdown is None:
-            shutdown = ray_cfg["shutdown"]
-        init_kwargs = merge_dicts(init_kwargs, ray_cfg["init_kwargs"])
-        remote_kwargs = merge_dicts(remote_kwargs, ray_cfg["remote_kwargs"])
-
-        self._restart = restart
-        self._reuse_refs = reuse_refs
-        self._del_refs = del_refs
-        self._shutdown = shutdown
-        self._init_kwargs = init_kwargs
-        self._remote_kwargs = remote_kwargs
+        restart = self.resolve_setting(restart, "restart")
+        reuse_refs = self.resolve_setting(reuse_refs, "reuse_refs")
+        del_refs = self.resolve_setting(del_refs, "del_refs")
+        shutdown = self.resolve_setting(shutdown, "shutdown")
+        init_kwargs = self.resolve_setting(init_kwargs, "init_kwargs", merge=True)
+        remote_kwargs = self.resolve_setting(remote_kwargs, "remote_kwargs", merge=True)
 
         ExecutionEngine.__init__(
             self,
@@ -441,6 +531,13 @@ class RayEngine(ExecutionEngine):
             remote_kwargs=remote_kwargs,
             **kwargs,
         )
+
+        self._restart = restart
+        self._reuse_refs = reuse_refs
+        self._del_refs = del_refs
+        self._shutdown = shutdown
+        self._init_kwargs = init_kwargs
+        self._remote_kwargs = remote_kwargs
 
     @property
     def restart(self) -> bool:
@@ -473,8 +570,9 @@ class RayEngine(ExecutionEngine):
         """Keyword arguments passed to `ray.remote`."""
         return self._remote_kwargs
 
-    @staticmethod
+    @classmethod
     def get_ray_refs(
+        cls,
         funcs_args: tp.FuncsArgs,
         reuse_refs: bool = True,
         remote_kwargs: tp.KwargsLike = None,
@@ -701,6 +799,12 @@ def execute(
             engine = engines_cfg[engine]["cls"]
         else:
             raise ValueError(f"Invalid engine name '{engine}'")
+    if isinstance(engine, str):
+        globals_dict = globals()
+        if engine in globals_dict:
+            engine = globals_dict[engine]
+        else:
+            raise ValueError(f"Invalid engine name '{engine}'")
     if isinstance(engine, type) and issubclass(engine, ExecutionEngine):
         for k, v in engines_cfg.items():
             if v["cls"] is engine:
@@ -847,7 +951,7 @@ def execute(
             _n_calls = n_calls
         else:
             if isinstance(funcs_args, CustomTemplate):
-                raise ValueError("When funcs_args is a template, n_calls must be provided")
+                raise ValueError("When funcs_args is a template, must provide n_calls")
             funcs_args = list(funcs_args)
             _n_calls = len(funcs_args)
         if isinstance(n_chunks, str) and n_chunks.lower() == "auto":

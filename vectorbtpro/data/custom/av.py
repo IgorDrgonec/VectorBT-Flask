@@ -58,7 +58,7 @@ class AVData(RemoteData):
         ... )
         ```
 
-        * Fetch data:
+        * Pull data:
 
         ```pycon
         >>> data = vbt.AVData.pull(
@@ -87,15 +87,13 @@ class AVData(RemoteData):
         ```
     """
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.av")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.av")
 
     @classmethod
     def list_symbols(cls, keywords: str, apikey: tp.Optional[str] = None) -> tp.List[str]:
         """List all symbols."""
-        av_cfg = cls.get_settings(key_id="custom")
+        apikey = cls.resolve_custom_setting(apikey, "apikey")
 
-        if apikey is None:
-            apikey = av_cfg["apikey"]
         query = dict()
         query["function"] = "SYMBOL_SEARCH"
         query["keywords"] = keywords
@@ -159,7 +157,7 @@ class AVData(RemoteData):
         category: tp.Optional[str] = None,
         function: tp.Optional[str] = None,
         timeframe: tp.Optional[str] = None,
-        tz: tp.Optional[tp.TimezoneLike] = None,
+        tz: tp.TimezoneLike = None,
         adjusted: tp.Optional[bool] = None,
         extended: tp.Optional[bool] = None,
         slice: tp.Optional[str] = None,
@@ -235,38 +233,22 @@ class AVData(RemoteData):
 
         For defaults, see `custom.av` in `vectorbtpro._settings.data`.
         """
-        av_cfg = cls.get_settings(key_id="custom")
-
-        if apikey is None:
-            apikey = av_cfg["apikey"]
-        if api_meta is None:
-            api_meta = av_cfg["api_meta"]
-        if category is None:
-            category = av_cfg["category"]
-        if function is None:
-            function = av_cfg["function"]
-        if timeframe is None:
-            timeframe = av_cfg["timeframe"]
-        if tz is None:
-            tz = av_cfg["tz"]
-        if adjusted is None:
-            adjusted = av_cfg["adjusted"]
-        if extended is None:
-            extended = av_cfg["extended"]
-        if slice is None:
-            slice = av_cfg["slice"]
-        if series_type is None:
-            series_type = av_cfg["series_type"]
-        if time_period is None:
-            time_period = av_cfg["time_period"]
-        if outputsize is None:
-            outputsize = av_cfg["outputsize"]
-        read_csv_kwargs = merge_dicts(av_cfg["read_csv_kwargs"], read_csv_kwargs)
-        if match_params is None:
-            match_params = av_cfg["match_params"]
-        params = merge_dicts(av_cfg["params"], params)
-        if silence_warnings is None:
-            silence_warnings = av_cfg["silence_warnings"]
+        apikey = cls.resolve_custom_setting(apikey, "apikey")
+        api_meta = cls.resolve_custom_setting(api_meta, "api_meta")
+        category = cls.resolve_custom_setting(category, "category")
+        function = cls.resolve_custom_setting(function, "function")
+        timeframe = cls.resolve_custom_setting(timeframe, "timeframe")
+        tz = cls.resolve_custom_setting(tz, "tz")
+        adjusted = cls.resolve_custom_setting(adjusted, "adjusted")
+        extended = cls.resolve_custom_setting(extended, "extended")
+        slice = cls.resolve_custom_setting(slice, "slice")
+        series_type = cls.resolve_custom_setting(series_type, "series_type")
+        time_period = cls.resolve_custom_setting(time_period, "time_period")
+        outputsize = cls.resolve_custom_setting(outputsize, "outputsize")
+        read_csv_kwargs = cls.resolve_custom_setting(read_csv_kwargs, "read_csv_kwargs", merge=True)
+        match_params = cls.resolve_custom_setting(match_params, "match_params")
+        params = cls.resolve_custom_setting(params, "params", merge=True)
+        silence_warnings = cls.resolve_custom_setting(silence_warnings, "silence_warnings")
 
         if api_meta is None and (function is None or match_params):
             if not silence_warnings and cls.parse_api_meta.cache_info().misses == 0:
@@ -424,12 +406,12 @@ class AVData(RemoteData):
         df = df.rename(columns=dict(zip(df.columns, new_columns)))
         if not df.empty and df.index[0] > df.index[1]:
             df = df.iloc[::-1]
-        if isinstance(df.index, pd.DatetimeIndex) and df.index.tzinfo is None:
-            df = df.tz_localize("UTC")
+        if isinstance(df.index, pd.DatetimeIndex) and df.index.tz is None:
+            df = df.tz_localize("utc")
 
         return df, dict(tz_convert=tz, freq=freq)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
+        fetch_kwargs = self.select_fetch_kwargs(symbol)
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)

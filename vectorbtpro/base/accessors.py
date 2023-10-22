@@ -16,7 +16,12 @@ from pandas.tseries.frequencies import to_offset
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import combining, reshaping, indexes
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.base.indexing import point_idxr_defaults, range_idxr_defaults, get_index_points, get_index_ranges
+from vectorbtpro.base.indexing import (
+    point_idxr_defaults,
+    range_idxr_defaults,
+    get_index_points,
+    get_index_ranges,
+)
 from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.utils import checks
@@ -29,7 +34,7 @@ from vectorbtpro.utils.datetime_ import (
     infer_index_freq,
     freq_to_timedelta64,
     parse_timedelta,
-    try_to_datetime_index,
+    prepare_dt_index,
     to_ns,
 )
 from vectorbtpro.utils.eval_ import multiline_eval
@@ -378,7 +383,7 @@ class BaseIDXAccessor(Configured):
         if return_pd_resampler:
             raise TypeError("Cannot convert Resampler to Pandas Resampler")
         if checks.is_dt_like(rule) or checks.is_iterable(rule):
-            rule = try_to_datetime_index(rule)
+            rule = prepare_dt_index(rule)
             rule = Resampler(
                 source_index=self.obj,
                 target_index=rule,
@@ -394,11 +399,11 @@ class BaseIDXAccessor(Configured):
 
     # ############# Points and ranges ############# #
 
-    def get_index_points(self, *args, **kwargs) -> tp.Array1d:
+    def get_points(self, *args, **kwargs) -> tp.Array1d:
         """See `vectorbtpro.base.indexing.get_index_points`."""
         return get_index_points(self.obj, *args, **kwargs)
 
-    def get_index_ranges(self, *args, **kwargs) -> tp.Tuple[tp.Array1d, tp.Array1d]:
+    def get_ranges(self, *args, **kwargs) -> tp.Tuple[tp.Array1d, tp.Array1d]:
         """See `vectorbtpro.base.indexing.get_index_ranges`."""
         return get_index_ranges(self.obj, self.any_freq, *args, **kwargs)
 
@@ -1776,15 +1781,18 @@ class BaseSRAccessor(BaseAccessor):
         self,
         wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
         obj: tp.Optional[tp.ArrayLike] = None,
+        _full_init: bool = True,
         **kwargs,
     ) -> None:
-        if wrapper.ndim == 2:
-            if wrapper.shape[1] == 1:
-                wrapper = wrapper.replace(ndim=1)
-            else:
-                raise TypeError("Series accessors work only one one-dimensional data")
+        if _full_init:
+            if isinstance(wrapper, ArrayWrapper):
+                if wrapper.ndim == 2:
+                    if wrapper.shape[1] == 1:
+                        wrapper = wrapper.replace(ndim=1)
+                    else:
+                        raise TypeError("Series accessors work only one one-dimensional data")
 
-        BaseAccessor.__init__(self, wrapper, obj=obj, **kwargs)
+            BaseAccessor.__init__(self, wrapper, obj=obj, **kwargs)
 
     @class_or_instanceproperty
     def ndim(cls_or_self) -> int:
@@ -1808,12 +1816,15 @@ class BaseDFAccessor(BaseAccessor):
         self,
         wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
         obj: tp.Optional[tp.ArrayLike] = None,
+        _full_init: bool = True,
         **kwargs,
     ) -> None:
-        if wrapper.ndim == 1:
-            wrapper = wrapper.replace(ndim=2)
+        if _full_init:
+            if isinstance(wrapper, ArrayWrapper):
+                if wrapper.ndim == 1:
+                    wrapper = wrapper.replace(ndim=2)
 
-        BaseAccessor.__init__(self, wrapper, obj=obj, **kwargs)
+            BaseAccessor.__init__(self, wrapper, obj=obj, **kwargs)
 
     @class_or_instanceproperty
     def ndim(cls_or_self) -> int:

@@ -6,9 +6,12 @@ import numpy as np
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.datetime_ import DTCNT
+from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.registries.jit_registry import register_jitted
 
 __all__ = []
+
+__pdoc__ = {}
 
 us_ns = 1000
 """Microsecond (nanoseconds)."""
@@ -354,28 +357,126 @@ def index_matches_dtc_nb(index: tp.Array1d, other_dtc: DTCNT) -> tp.Array1d:
     return out
 
 
+class DTCST(tp.NamedTuple):
+    SU: int = -3
+    EU: int = -2
+    U: int = -1
+    O: int = 0
+    I: int = 1
+
+
+DTCS = DTCST()
+"""_"""
+
+__pdoc__[
+    "DTCS"
+] = f"""Status returned by `within_fixed_dtc_nb` and `within_periodic_dtc_nb`.
+
+```python
+{prettify(DTCS)}
+```
+
+Attributes:
+    SU: Start matched, rest unknown. Move down the stack.
+    EU: End matched, rest unknown. Move down the stack.
+    U: Unknown. Move down the stack.
+    O: Outside
+    I: Inside
+"""
+
+
 @register_jitted(cache=True)
 def within_fixed_dtc_nb(
     c: int,
     start_c: tp.Optional[int] = None,
     end_c: tp.Optional[int] = None,
+    prev_status: int = DTCS.U,
+    closed_start: bool = True,
     closed_end: bool = False,
     is_last: bool = False,
 ) -> int:
     """Return whether a single datetime component is within a fixed range.
 
-    Returns either -1 (not within), 0 (within, continue matching), or 1 (within, stop matching)."""
-    if start_c is not None:
-        if c < start_c:
-            return -1
-    if end_c is not None:
-        if c > end_c:
-            return -1
-        if not closed_end and is_last and c == end_c:
-            return -1
-        if c < end_c:
-            return 1
-    return 0
+    Returns a status of the type `DTCS`."""
+    if prev_status == DTCS.U:
+        _start_c = start_c
+        _end_c = end_c
+    elif prev_status == DTCS.SU:
+        _start_c = start_c
+        _end_c = None
+    elif prev_status == DTCS.EU:
+        _start_c = None
+        _end_c = end_c
+    else:
+        raise ValueError("Invalid previous DTC status")
+
+    # Numba cannot unify int and None
+    if _start_c is None:
+        a = 0
+    else:
+        a = _start_c
+    if _end_c is None:
+        b = 0
+    else:
+        b = _end_c
+
+    if _start_c is None and _end_c is None:
+        return DTCS.U
+    if _start_c is not None and _end_c is None:
+        if c < a:
+            return DTCS.O
+        if c == a:
+            if closed_start:
+                if is_last:
+                    return DTCS.I
+            else:
+                if is_last:
+                    return DTCS.O
+            return DTCS.SU
+        if c > a:
+            return DTCS.I
+    if _start_c is None and _end_c is not None:
+        if c < b:
+            return DTCS.I
+        if c == b:
+            if closed_end:
+                if is_last:
+                    return DTCS.I
+            else:
+                if is_last:
+                    return DTCS.O
+            return DTCS.EU
+        if c > b:
+            return DTCS.O
+    if _start_c is not None and _end_c is not None:
+        if c < a or c > b:
+            return DTCS.O
+        if c == a and c == b:
+            if closed_start and closed_end:
+                if is_last:
+                    return DTCS.I
+            else:
+                if is_last:
+                    return DTCS.O
+            return DTCS.U
+        if c == a:
+            if closed_start:
+                if is_last:
+                    return DTCS.I
+            else:
+                if is_last:
+                    return DTCS.O
+            return DTCS.SU
+        if c == b:
+            if closed_end:
+                if is_last:
+                    return DTCS.I
+            else:
+                if is_last:
+                    return DTCS.O
+            return DTCS.EU
+        if c > a and c < b:
+            return DTCS.I
 
 
 @register_jitted(cache=True)
@@ -383,36 +484,140 @@ def within_periodic_dtc_nb(
     c: int,
     start_c: tp.Optional[int] = None,
     end_c: tp.Optional[int] = None,
+    prev_status: int = DTCS.U,
+    closed_start: bool = True,
     closed_end: bool = False,
+    overflow_later: bool = False,
     is_last: bool = False,
 ) -> int:
     """Return whether a single datetime component is within a periodic range.
 
-    Returns either -1 (not within), 0 (within, continue matching), or 1 (within, stop matching)."""
-    if start_c is not None:
-        if c < start_c:
-            if end_c is not None and end_c < start_c:
-                if c > end_c:
-                    return -1
-                if not closed_end and is_last and c == end_c:
-                    return -1
-                if c < end_c:
-                    return 1
-            else:
-                return -1
-    if end_c is not None:
-        if c > end_c:
-            if start_c is not None and start_c > end_c:
-                if c < start_c:
-                    return -1
-                return 1
-            else:
-                return -1
-        if not closed_end and is_last and c == end_c:
-            return -1
-        if c < end_c:
-            return 1
-    return 0
+    Returns a status of the type `DTCS`."""
+    if prev_status == DTCS.U:
+        _start_c = start_c
+        _end_c = end_c
+    elif prev_status == DTCS.SU:
+        _start_c = start_c
+        _end_c = None
+    elif prev_status == DTCS.EU:
+        _start_c = None
+        _end_c = end_c
+    else:
+        raise ValueError("Invalid previous DTC status")
+
+    # Numba cannot unify int and None
+    if _start_c is None:
+        a = 0
+    else:
+        a = _start_c
+    if _end_c is None:
+        b = 0
+    else:
+        b = _end_c
+
+    if _start_c is not None and _end_c is not None and a == b:
+        if overflow_later:
+            return DTCS.U
+    if _start_c is not None and _end_c is not None and a > b:
+        status_after_start = within_fixed_dtc_nb(
+            c,
+            start_c=_start_c,
+            end_c=None,
+            prev_status=prev_status,
+            closed_start=closed_start,
+            closed_end=closed_end,
+            is_last=is_last
+        )
+        status_before_end = within_fixed_dtc_nb(
+            c,
+            start_c=None,
+            end_c=_end_c,
+            prev_status=prev_status,
+            closed_start=closed_start,
+            closed_end=closed_end,
+            is_last=is_last
+        )
+        if status_after_start == DTCS.O and status_before_end == DTCS.O:
+            return DTCS.O
+        if status_after_start == DTCS.I or status_before_end == DTCS.I:
+            return DTCS.I
+        if status_after_start == DTCS.SU:
+            return DTCS.SU
+        if status_before_end == DTCS.EU:
+            return DTCS.EU
+        return DTCS.U
+
+    return within_fixed_dtc_nb(
+        c,
+        start_c=_start_c,
+        end_c=_end_c,
+        prev_status=prev_status,
+        closed_start=closed_start,
+        closed_end=closed_end,
+        is_last=is_last
+    )
+
+
+@register_jitted(cache=True)
+def must_resolve_dtc_nb(
+    c: tp.Optional[int] = None,
+    start_c: tp.Optional[int] = None,
+    end_c: tp.Optional[int] = None,
+) -> bool:
+    """Return whether the component must be resolved."""
+    if c is None:
+        return False
+    if start_c is None and end_c is None:
+        return False
+    return True
+
+
+@register_jitted(cache=True)
+def start_dtc_lt_nb(
+    c: tp.Optional[int] = None,
+    start_c: tp.Optional[int] = None,
+    end_c: tp.Optional[int] = None,
+) -> bool:
+    """Return whether the start component is less than the end component."""
+    if c is None:
+        return False
+    if start_c is None:
+        return False
+    if end_c is None:
+        return False
+    return start_c < end_c
+
+
+@register_jitted(cache=True)
+def start_dtc_eq_nb(
+    c: tp.Optional[int] = None,
+    start_c: tp.Optional[int] = None,
+    end_c: tp.Optional[int] = None,
+) -> bool:
+    """Return whether the start component equals to the end component."""
+    if c is None:
+        return False
+    if start_c is None:
+        return False
+    if end_c is None:
+        return False
+    return start_c == end_c
+
+
+@register_jitted(cache=True)
+def start_dtc_gt_nb(
+    c: tp.Optional[int] = None,
+    start_c: tp.Optional[int] = None,
+    end_c: tp.Optional[int] = None,
+) -> bool:
+    """Return whether the start component is greater than the end component."""
+    if c is None:
+        return False
+    if start_c is None:
+        return False
+    if end_c is None:
+        return False
+    return start_c > end_c
 
 
 @register_jitted(cache=True)
@@ -424,124 +629,190 @@ def within_dtc_range_nb(
     closed_end: bool = False,
 ) -> bool:
     """Return whether one or more datetime components are within a range."""
-    if not closed_start and matches_dtc_nb(dtc, start_dtc):
-        return False
-
     last = -1
-    if dtc.year is not None and (start_dtc.year is not None or end_dtc.year is not None):
+    overflow_possible = True
+    first_overflow = -1
+    if must_resolve_dtc_nb(c=dtc.year, start_c=start_dtc.year, end_c=end_dtc.year):
         last = 0
-    if dtc.month is not None and (start_dtc.month is not None or end_dtc.month is not None):
+        overflow_possible = False
+    if must_resolve_dtc_nb(c=dtc.month, start_c=start_dtc.month, end_c=end_dtc.month):
         last = 1
-    if dtc.day is not None and (start_dtc.day is not None or end_dtc.day is not None):
+        if overflow_possible and first_overflow == -1:
+            if start_dtc_lt_nb(c=dtc.month, start_c=start_dtc.month, end_c=end_dtc.month):
+                overflow_possible = False
+        if overflow_possible and first_overflow == -1:
+            if start_dtc_gt_nb(c=dtc.month, start_c=start_dtc.month, end_c=end_dtc.month):
+                first_overflow = last
+    if must_resolve_dtc_nb(c=dtc.day, start_c=start_dtc.day, end_c=end_dtc.day):
         last = 2
-    if dtc.weekday is not None and (start_dtc.weekday is not None or end_dtc.weekday is not None):
+        if overflow_possible and first_overflow == -1:
+            if start_dtc_lt_nb(c=dtc.day, start_c=start_dtc.day, end_c=end_dtc.day):
+                overflow_possible = False
+        if overflow_possible and first_overflow == -1:
+            if start_dtc_gt_nb(c=dtc.day, start_c=start_dtc.day, end_c=end_dtc.day):
+                first_overflow = last
+    if must_resolve_dtc_nb(c=dtc.weekday, start_c=start_dtc.weekday, end_c=end_dtc.weekday):
         last = 3
-    if dtc.hour is not None and (start_dtc.hour is not None or end_dtc.hour is not None):
+        if overflow_possible and first_overflow == -1:
+            if start_dtc_lt_nb(c=dtc.weekday, start_c=start_dtc.weekday, end_c=end_dtc.weekday):
+                overflow_possible = False
+        if overflow_possible and first_overflow == -1:
+            if start_dtc_gt_nb(c=dtc.weekday, start_c=start_dtc.weekday, end_c=end_dtc.weekday):
+                first_overflow = last
+    if must_resolve_dtc_nb(c=dtc.hour, start_c=start_dtc.hour, end_c=end_dtc.hour):
         last = 4
-    if dtc.minute is not None and (start_dtc.minute is not None or end_dtc.minute is not None):
+        if overflow_possible and first_overflow == -1:
+            if start_dtc_lt_nb(c=dtc.hour, start_c=start_dtc.hour, end_c=end_dtc.hour):
+                overflow_possible = False
+        if overflow_possible and first_overflow == -1:
+            if start_dtc_gt_nb(c=dtc.hour, start_c=start_dtc.hour, end_c=end_dtc.hour):
+                first_overflow = last
+    if must_resolve_dtc_nb(c=dtc.minute, start_c=start_dtc.minute, end_c=end_dtc.minute):
         last = 5
-    if dtc.second is not None and (start_dtc.second is not None or end_dtc.second is not None):
+        if overflow_possible and first_overflow == -1:
+            if start_dtc_lt_nb(c=dtc.minute, start_c=start_dtc.minute, end_c=end_dtc.minute):
+                overflow_possible = False
+        if overflow_possible and first_overflow == -1:
+            if start_dtc_gt_nb(c=dtc.minute, start_c=start_dtc.minute, end_c=end_dtc.minute):
+                first_overflow = last
+    if must_resolve_dtc_nb(c=dtc.second, start_c=start_dtc.second, end_c=end_dtc.second):
         last = 6
-    if dtc.nanosecond is not None and (start_dtc.nanosecond is not None or end_dtc.nanosecond is not None):
+        if overflow_possible and first_overflow == -1:
+            if start_dtc_lt_nb(c=dtc.second, start_c=start_dtc.second, end_c=end_dtc.second):
+                overflow_possible = False
+        if overflow_possible and first_overflow == -1:
+            if start_dtc_gt_nb(c=dtc.second, start_c=start_dtc.second, end_c=end_dtc.second):
+                first_overflow = last
+    if must_resolve_dtc_nb(c=dtc.nanosecond, start_c=start_dtc.nanosecond, end_c=end_dtc.nanosecond):
         last = 7
+        if overflow_possible and first_overflow == -1:
+            if start_dtc_lt_nb(c=dtc.nanosecond, start_c=start_dtc.nanosecond, end_c=end_dtc.nanosecond):
+                overflow_possible = False
+        if overflow_possible and first_overflow == -1:
+            if start_dtc_gt_nb(c=dtc.nanosecond, start_c=start_dtc.nanosecond, end_c=end_dtc.nanosecond):
+                first_overflow = last
     if last == -1:
         return True
 
+    prev_status = DTCS.U
     if dtc.year is not None:
-        year_status = within_fixed_dtc_nb(
+        prev_status = within_fixed_dtc_nb(
             dtc.year,
-            start_dtc.year,
-            end_dtc.year,
+            start_c=start_dtc.year,
+            end_c=end_dtc.year,
+            prev_status=prev_status,
+            closed_start=closed_start,
             closed_end=closed_end,
             is_last=last == 0,
         )
-        if year_status == -1:
+        if prev_status == DTCS.O:
             return False
-        if year_status == 1:
+        if prev_status == DTCS.I:
             return True
     if dtc.month is not None:
-        month_status = within_periodic_dtc_nb(
+        prev_status = within_periodic_dtc_nb(
             dtc.month,
-            start_dtc.month,
-            end_dtc.month,
+            start_c=start_dtc.month,
+            end_c=end_dtc.month,
+            prev_status=prev_status,
+            closed_start=closed_start,
             closed_end=closed_end,
+            overflow_later=first_overflow > 1,
             is_last=last == 1,
         )
-        if month_status == -1:
+        if prev_status == DTCS.O:
             return False
-        if month_status == 1:
+        if prev_status == DTCS.I:
             return True
     if dtc.day is not None:
-        day_status = within_periodic_dtc_nb(
+        prev_status = within_periodic_dtc_nb(
             dtc.day,
-            start_dtc.day,
-            end_dtc.day,
+            start_c=start_dtc.day,
+            end_c=end_dtc.day,
+            prev_status=prev_status,
+            closed_start=closed_start,
             closed_end=closed_end,
+            overflow_later=first_overflow > 2,
             is_last=last == 2,
         )
-        if day_status == -1:
+        if prev_status == DTCS.O:
             return False
-        if day_status == 1:
+        if prev_status == DTCS.I:
             return True
     if dtc.weekday is not None:
-        weekday_status = within_periodic_dtc_nb(
+        prev_status = within_periodic_dtc_nb(
             dtc.weekday,
-            start_dtc.weekday,
-            end_dtc.weekday,
+            start_c=start_dtc.weekday,
+            end_c=end_dtc.weekday,
+            prev_status=prev_status,
+            closed_start=closed_start,
             closed_end=closed_end,
+            overflow_later=first_overflow > 3,
             is_last=last == 3,
         )
-        if weekday_status == -1:
+        if prev_status == DTCS.O:
             return False
-        if weekday_status == 1:
+        if prev_status == DTCS.I:
             return True
     if dtc.hour is not None:
-        hour_status = within_periodic_dtc_nb(
+        prev_status = within_periodic_dtc_nb(
             dtc.hour,
-            start_dtc.hour,
-            end_dtc.hour,
+            start_c=start_dtc.hour,
+            end_c=end_dtc.hour,
+            prev_status=prev_status,
+            closed_start=closed_start,
             closed_end=closed_end,
+            overflow_later=first_overflow > 4,
             is_last=last == 4,
         )
-        if hour_status == -1:
+        if prev_status == DTCS.O:
             return False
-        if hour_status == 1:
+        if prev_status == DTCS.I:
             return True
     if dtc.minute is not None:
-        minute_status = within_periodic_dtc_nb(
+        prev_status = within_periodic_dtc_nb(
             dtc.minute,
-            start_dtc.minute,
-            end_dtc.minute,
+            start_c=start_dtc.minute,
+            end_c=end_dtc.minute,
+            prev_status=prev_status,
+            closed_start=closed_start,
             closed_end=closed_end,
+            overflow_later=first_overflow > 5,
             is_last=last == 5,
         )
-        if minute_status == -1:
+        if prev_status == DTCS.O:
             return False
-        if minute_status == 1:
+        if prev_status == DTCS.I:
             return True
     if dtc.second is not None:
-        second_status = within_periodic_dtc_nb(
+        prev_status = within_periodic_dtc_nb(
             dtc.second,
-            start_dtc.second,
-            end_dtc.second,
+            start_c=start_dtc.second,
+            end_c=end_dtc.second,
+            prev_status=prev_status,
+            closed_start=closed_start,
             closed_end=closed_end,
+            overflow_later=first_overflow > 6,
             is_last=last == 6,
         )
-        if second_status == -1:
+        if prev_status == DTCS.O:
             return False
-        if second_status == 1:
+        if prev_status == DTCS.I:
             return True
     if dtc.nanosecond is not None:
-        nanosecond_status = within_periodic_dtc_nb(
+        prev_status = within_periodic_dtc_nb(
             dtc.nanosecond,
-            start_dtc.nanosecond,
-            end_dtc.nanosecond,
+            start_c=start_dtc.nanosecond,
+            end_c=end_dtc.nanosecond,
+            prev_status=prev_status,
+            closed_start=closed_start,
             closed_end=closed_end,
+            overflow_later=first_overflow > 7,
             is_last=last == 7,
         )
-        if nanosecond_status == -1:
+        if prev_status == DTCS.O:
             return False
-        if nanosecond_status == 1:
+        if prev_status == DTCS.I:
             return True
 
     return True

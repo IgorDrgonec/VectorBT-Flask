@@ -457,14 +457,14 @@ def drop_levels(
             if level < 0:
                 new_level = index.nlevels + level
                 if new_level < 0:
-                    raise KeyError(f"Level {level} not found")
+                    raise KeyError(f"Level at position {level} not found")
                 level = new_level
             if 0 <= level < index.nlevels:
                 levels_to_drop.add(level)
             else:
-                raise KeyError(f"Level {level} not found")
+                raise KeyError(f"Level at position {level} not found")
         elif strict:
-            raise KeyError(f"Level {level} not found")
+            raise KeyError(f"Level '{level}' not found")
     if except_mode:
         levels_to_drop = set(range(index.nlevels)).difference(levels_to_drop)
     if len(levels_to_drop) == 0:
@@ -498,7 +498,7 @@ def rename_levels(index: tp.Index, name_dict: tp.Dict[tp.Level, tp.Any], strict:
             if k < 0:
                 new_k = nlevels + k
                 if new_k < 0:
-                    raise KeyError(f"Level {k} not found")
+                    raise KeyError(f"Level at position {k} not found")
                 k = new_k
             if 0 <= k < nlevels:
                 if isinstance(index, pd.MultiIndex):
@@ -506,9 +506,9 @@ def rename_levels(index: tp.Index, name_dict: tp.Dict[tp.Level, tp.Any], strict:
                 else:
                     index = index.rename(v)
             else:
-                raise KeyError(f"Level {k} not found")
+                raise KeyError(f"Level at position {k} not found")
         elif strict:
-            raise KeyError(f"Level {k} not found")
+            raise KeyError(f"Level '{k}' not found")
     return index
 
 
@@ -545,15 +545,15 @@ def select_levels(
             if level < 0:
                 new_level = index.nlevels + level
                 if new_level < 0:
-                    raise KeyError(f"Level {level} not found")
+                    raise KeyError(f"Level at position {level} not found")
                 level = new_level
             if 0 <= level < index.nlevels:
                 if level not in levels_to_select:
                     levels_to_select.append(level)
             else:
-                raise KeyError(f"Level {level} not found")
+                raise KeyError(f"Level at position {level} not found")
         elif strict:
-            raise KeyError(f"Level {level} not found")
+            raise KeyError(f"Level '{level}' not found")
     if except_mode:
         levels_to_select = list(set(range(index.nlevels)).difference(levels_to_select))
     if len(levels_to_select) == 0:

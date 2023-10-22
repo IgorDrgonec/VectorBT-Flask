@@ -6,7 +6,6 @@ from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
-from vectorbtpro.base.flex_indexing import flex_select_nb
 from vectorbtpro.generic.enums import BarZone
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
@@ -580,7 +579,7 @@ def from_basic_signals_nb(
         returns = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
     else:
         returns = np.full((0, 0), np.nan, dtype=np.float_)
-    in_outputs = FOInOutputs(
+    in_outputs = FSInOutputs(
         cash=cash,
         position=position,
         debt=debt,
@@ -991,8 +990,6 @@ def from_basic_signals_nb(
                 _cash_earnings = flex_select_nb(cash_earnings_, i, col)
                 _cash_dividends = flex_select_nb(cash_dividends_, i, col)
                 _cash_earnings += _cash_dividends * last_position[col]
-                if _cash_earnings < 0:
-                    _cash_earnings = max(_cash_earnings, -last_cash[group])
                 last_cash[group] += _cash_earnings
                 last_free_cash[group] += _cash_earnings
                 if track_cash_earnings:
@@ -1334,7 +1331,7 @@ def from_signals_nb(
         returns = np.full((target_shape[0], len(group_lens)), np.nan, dtype=np.float_)
     else:
         returns = np.full((0, 0), np.nan, dtype=np.float_)
-    in_outputs = FOInOutputs(
+    in_outputs = FSInOutputs(
         cash=cash,
         position=position,
         debt=debt,
@@ -1750,6 +1747,7 @@ def from_signals_nb(
                                 stop=last_sl_info["stop"][col],
                                 delta_format=last_sl_info["delta_format"][col],
                                 hit_below=True,
+                                hard_stop=last_sl_info["exit_price"][col] == StopExitPrice.HardStop,
                             )
 
                         # Check TSL and TTP
@@ -1794,6 +1792,7 @@ def from_signals_nb(
                                     stop=last_tsl_info["stop"][col],
                                     delta_format=last_tsl_info["delta_format"][col],
                                     hit_below=True,
+                                    hard_stop=last_tsl_info["exit_price"][col] == StopExitPrice.HardStop,
                                 )
                             # Update peak price using full bar
                             if last_position[col] > 0:
@@ -1838,6 +1837,7 @@ def from_signals_nb(
                                         delta_format=last_tsl_info["delta_format"][col],
                                         hit_below=True,
                                         can_use_ohlc=False,
+                                        hard_stop=last_tsl_info["exit_price"][col] == StopExitPrice.HardStop,
                                     )
 
                         # Check TP
@@ -1853,6 +1853,7 @@ def from_signals_nb(
                                 stop=last_tp_info["stop"][col],
                                 delta_format=last_tp_info["delta_format"][col],
                                 hit_below=False,
+                                hard_stop=last_tp_info["exit_price"][col] == StopExitPrice.HardStop,
                             )
 
                         # Check TD
@@ -3237,8 +3238,6 @@ def from_signals_nb(
                 _cash_earnings = flex_select_nb(cash_earnings_, i, col)
                 _cash_dividends = flex_select_nb(cash_dividends_, i, col)
                 _cash_earnings += _cash_dividends * last_position[col]
-                if _cash_earnings < 0:
-                    _cash_earnings = max(_cash_earnings, -last_cash[group])
                 last_cash[group] += _cash_earnings
                 last_free_cash[group] += _cash_earnings
                 if track_cash_earnings:
@@ -4165,6 +4164,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                                 stop=last_sl_info["stop"][col],
                                 delta_format=last_sl_info["delta_format"][col],
                                 hit_below=True,
+                                hard_stop=last_sl_info["exit_price"][col] == StopExitPrice.HardStop,
                             )
 
                         # Check TSL and TTP
@@ -4209,6 +4209,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                                     stop=last_tsl_info["stop"][col],
                                     delta_format=last_tsl_info["delta_format"][col],
                                     hit_below=True,
+                                    hard_stop=last_tsl_info["exit_price"][col] == StopExitPrice.HardStop,
                                 )
                             # Update peak price using full bar
                             if last_position[col] > 0:
@@ -4253,6 +4254,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                                         delta_format=last_tsl_info["delta_format"][col],
                                         hit_below=True,
                                         can_use_ohlc=False,
+                                        hard_stop=last_tsl_info["exit_price"][col] == StopExitPrice.HardStop,
                                     )
 
                         # Check TP
@@ -4268,6 +4270,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                                 stop=last_tp_info["stop"][col],
                                 delta_format=last_tp_info["delta_format"][col],
                                 hit_below=False,
+                                hard_stop=last_tp_info["exit_price"][col] == StopExitPrice.HardStop,
                             )
 
                         # Check TD
@@ -5733,13 +5736,9 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                 _cash_dividends = flex_select_nb(cash_dividends_, i, col)
                 _cash_earnings += _cash_dividends * last_position[col]
                 if cash_sharing:
-                    if _cash_earnings < 0:
-                        _cash_earnings = max(_cash_earnings, -last_cash[group])
                     last_cash[group] += _cash_earnings
                     last_free_cash[group] += _cash_earnings
                 else:
-                    if _cash_earnings < 0:
-                        _cash_earnings = max(_cash_earnings, -last_cash[col])
                     last_cash[col] += _cash_earnings
                     last_free_cash[col] += _cash_earnings
                 if track_cash_earnings:
@@ -6104,6 +6103,44 @@ def order_signal_func_nb(  # % line.replace("order_signal_func_nb", "signal_func
             return False, True, False, False
         return False, False, True, False
     return False, False, False, False
+
+
+# % </block>
+
+
+# % <block save_post_segment_func_nb>
+# % blocks["post_segment_func_nb"]
+@register_jitted
+def save_post_segment_func_nb(  # % line.replace("save_post_segment_func_nb", "post_segment_func_nb")
+    c: SignalSegmentContext,
+    save_state: bool = True,
+    save_value: bool = True,
+    save_returns: bool = True,
+) -> None:
+    if save_state:
+        for col in range(c.from_col, c.to_col):
+            c.in_outputs.position[c.i, col] = c.last_position[col]
+            c.in_outputs.debt[c.i, col] = c.last_debt[col]
+            c.in_outputs.locked_cash[c.i, col] = c.last_locked_cash[col]
+        if c.cash_sharing:
+            c.in_outputs.cash[c.i, c.group] = c.last_cash[c.group]
+            c.in_outputs.free_cash[c.i, c.group] = c.last_free_cash[c.group]
+        else:
+            for col in range(c.from_col, c.to_col):
+                c.in_outputs.cash[c.i, col] = c.last_cash[col]
+                c.in_outputs.free_cash[c.i, col] = c.last_free_cash[col]
+    if save_value:
+        if c.cash_sharing:
+            c.in_outputs.value[c.i, c.group] = c.last_value[c.group]
+        else:
+            for col in range(c.from_col, c.to_col):
+                c.in_outputs.value[c.i, col] = c.last_value[col]
+    if save_returns:
+        if c.cash_sharing:
+            c.in_outputs.returns[c.i, c.group] = c.last_return[c.group]
+        else:
+            for col in range(c.from_col, c.to_col):
+                c.in_outputs.returns[c.i, col] = c.last_return[col]
 
 
 # % </block>

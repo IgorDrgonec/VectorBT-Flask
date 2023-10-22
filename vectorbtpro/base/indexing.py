@@ -840,7 +840,7 @@ class DatetimeIdxr(UniIdxr):
             return slice(None, None, None)
         if index is None:
             raise ValueError("Index is required")
-        index = dt.try_to_datetime_index(index)
+        index = dt.prepare_dt_index(index)
         checks.assert_instance_of(index, pd.DatetimeIndex)
         if not index.is_unique:
             raise ValueError("Datetime index must be unique")
@@ -910,7 +910,7 @@ class DTCIdxr(UniIdxr):
             parse_kwargs = {}
         if index is None:
             raise ValueError("Index is required")
-        index = dt.try_to_datetime_index(index)
+        index = dt.prepare_dt_index(index)
         ns_index = dt.to_ns(index)
         checks.assert_instance_of(index, pd.DatetimeIndex)
         if not index.is_unique:
@@ -1115,7 +1115,7 @@ def get_index_points(
         array([ 6, 13])
         ```
     """
-    index = dt.try_to_datetime_index(index)
+    index = dt.prepare_dt_index(index)
     if on is not None and isinstance(on, str):
         on = dt.try_align_dt_to_index(on, index)
     if start is not None and isinstance(start, str):
@@ -1154,7 +1154,7 @@ def get_index_points(
                 start_date,
                 end_date,
                 freq=dt.parse_timedelta(every),
-                tz=index.tzinfo,
+                tz=index.tz,
                 normalize=normalize_every,
             )
             if exact_start and on[0] > start_date:
@@ -1171,7 +1171,7 @@ def get_index_points(
             else:
                 kind = "indices"
         else:
-            on = dt.try_to_datetime_index(on)
+            on = dt.prepare_dt_index(on)
             if pd.api.types.is_integer_dtype(on):
                 kind = "indices"
             else:
@@ -1183,10 +1183,10 @@ def get_index_points(
             start_used = True
         else:
             if kind.lower() in ("labels",):
-                on = index[0]
+                on = index
             else:
-                on = 0
-    on = dt.try_to_datetime_index(on)
+                on = np.arange(len(index))
+    on = dt.prepare_dt_index(on)
 
     if at_time is not None:
         checks.assert_instance_of(on, pd.DatetimeIndex)
@@ -1501,6 +1501,19 @@ def get_index_ranges(
         ... ))
         array([[11, 18],
                [11, 25]])
+
+        >>> # Generate an expanding range that increments by week
+        >>> np.column_stack(vbt.get_index_ranges(
+        ...     index,
+        ...     every="W",
+        ...     start=0,
+        ...     exact_start=True,
+        ...     fixed_start=True
+        ... ))
+        array([[ 0,  4],
+               [ 0, 11],
+               [ 0, 18],
+               [ 0, 25]])
         ```
 
         * Use a look-back period (instead of an end index):
@@ -1576,7 +1589,7 @@ def get_index_ranges(
     from vectorbtpro.base.indexes import repeat_index
     from vectorbtpro.base.resampling.base import Resampler
 
-    index = dt.try_to_datetime_index(index)
+    index = dt.prepare_dt_index(index)
     if isinstance(index, pd.DatetimeIndex):
         if start is not None:
             start = dt.try_align_to_dt_index(start, index)
@@ -2101,7 +2114,7 @@ class Idxr(IdxrBase):
         template_context: tp.KwargsLike = None,
     ) -> tp.Tuple[tp.MaybeIndexArray, tp.MaybeIndexArray]:
         if len(self.idxrs) == 0:
-            raise ValueError("At least one indexer must be provided")
+            raise ValueError("Must provide at least one indexer")
         elif len(self.idxrs) == 1:
             idxr = self.idxrs[0]
             if isinstance(idxr, CustomTemplate):
@@ -2130,7 +2143,7 @@ class Idxr(IdxrBase):
             row_idxr = self.idxrs[0]
             col_idxr = self.idxrs[1]
         else:
-            raise ValueError("At most two indexers must be provided")
+            raise ValueError("Must provide at most two indexers")
         if not isinstance(row_idxr, RowIdxr):
             if isinstance(row_idxr, (ColIdxr, Idxr)):
                 raise TypeError(f"Indexer {type(row_idxr)} not supported as a row indexer")

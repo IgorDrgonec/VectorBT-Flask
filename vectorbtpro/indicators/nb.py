@@ -1742,7 +1742,7 @@ def signal_detection_nb(
     upper_band = np.empty(close.shape, dtype=np.float_)
     lower_band = np.empty(close.shape, dtype=np.float_)
     for col in prange(close.shape[1]):
-        signal, upper_band, lower_band = signal_detection_1d_nb(
+        signal[:, col], upper_band[:, col], lower_band[:, col] = signal_detection_1d_nb(
             close[:, col],
             lag=flex_select_1d_nb(lag_, col),
             factor=flex_select_col_nb(factor_, col),

@@ -11,120 +11,144 @@ __pdoc__ = {}
 opt_dep_config = HybridConfig(
     dict(
         yfinance=dict(
-            link="https://github.com/ranaroussi/yfinance",
+            link="https://pypi.org/project/yfinance/",
             version=">=0.2.20",
         ),
         binance=dict(
             dist_name="python-binance",
-            link="https://github.com/sammchardy/python-binance",
+            link="https://pypi.org/project/python-binance/",
             version=">=1.0.16",
         ),
         ccxt=dict(
-            link="https://github.com/ccxt/ccxt",
+            link="https://pypi.org/project/ccxt/",
             version=">=1.89.14",
         ),
         ta=dict(
-            link="https://github.com/bukosabino/ta",
+            link="https://pypi.org/project/ta/",
         ),
         pandas_ta=dict(
-            link="https://github.com/twopirllc/pandas-ta",
+            link="https://pypi.org/project/pandas-ta/",
         ),
         talib=dict(
             dist_name="TA-Lib",
-            link="https://github.com/mrjbq7/ta-lib",
+            link="https://pypi.org/project/TA-Lib/",
         ),
         bottleneck=dict(
-            link="https://github.com/pydata/bottleneck",
+            link="https://pypi.org/project/Bottleneck/",
         ),
         numexpr=dict(
-            link="https://github.com/pydata/numexpr",
+            link="https://pypi.org/project/numexpr/",
         ),
         ray=dict(
-            link="https://github.com/ray-project/ray",
+            link="https://pypi.org/project/ray/",
             version=">=1.4.1",
         ),
         dask=dict(
-            link="https://github.com/dask/dask",
+            link="https://pypi.org/project/dask/",
         ),
         matplotlib=dict(
-            link="https://github.com/matplotlib/matplotlib",
+            link="https://pypi.org/project/matplotlib/",
             version=">=3.2.0",
         ),
         plotly=dict(
-            link="https://github.com/plotly/plotly.py",
+            link="https://pypi.org/project/plotly/",
             version=">=5.0.0",
         ),
         ipywidgets=dict(
-            link="https://github.com/jupyter-widgets/ipywidgets",
+            link="https://pypi.org/project/ipywidgets/",
             version=">=7.0.0",
         ),
         kaleido=dict(
-            link="https://github.com/plotly/Kaleido",
+            link="https://pypi.org/project/kaleido/",
         ),
         telegram=dict(
             dist_name="python-telegram-bot",
-            link="https://github.com/python-telegram-bot/python-telegram-bot",
+            link="https://pypi.org/project/python-telegram-bot/",
             version=">=13.4",
         ),
         quantstats=dict(
-            link="https://github.com/ranaroussi/quantstats",
+            link="https://pypi.org/project/QuantStats/",
             version=">=0.0.37",
         ),
         dill=dict(
-            link="https://github.com/uqfoundation/dill",
+            link="https://pypi.org/project/dill/",
         ),
         alpaca=dict(
             dist_name="alpaca-py",
-            link="https://github.com/alpacahq/alpaca-py",
+            link="https://pypi.org/project/alpaca-py/",
         ),
         polygon=dict(
             dist_name="polygon-api-client",
-            link="https://github.com/polygon-io/client-python",
+            link="https://pypi.org/project/polygon-api-client/",
             version=">=1.0.0",
         ),
         bs4=dict(
             dist_name="beautifulsoup4",
-            link="https://www.crummy.com/software/BeautifulSoup/bs4/doc/",
+            link="https://pypi.org/project/beautifulsoup4/",
         ),
         nasdaqdatalink=dict(
-            dist_name="nasdaq-data-link",
-            link="https://github.com/Nasdaq/data-link-python",
+            dist_name="Nasdaq-Data-Link",
+            link="https://pypi.org/project/Nasdaq-Data-Link/",
         ),
         pypfopt=dict(
             dist_name="PyPortfolioOpt",
-            link="https://github.com/robertmartin8/PyPortfolioOpt",
+            link="https://pypi.org/project/pyportfolioopt/",
             version=">=1.5.1",
         ),
         universal=dict(
             dist_name="universal-portfolios",
-            link="https://github.com/Marigold/universal-portfolios",
+            link="https://pypi.org/project/universal-portfolios/",
         ),
         plotly_resampler=dict(
             dist_name="plotly-resampler",
-            link="https://github.com/predict-idlab/plotly-resampler",
+            link="https://pypi.org/project/plotly-resampler/",
         ),
         technical=dict(
-            link="https://github.com/freqtrade/technical",
+            link="https://pypi.org/project/technical/",
         ),
         riskfolio=dict(
             dist_name="Riskfolio-Lib",
-            link="https://github.com/dcajasn/Riskfolio-Lib",
+            link="https://pypi.org/project/Riskfolio-Lib/",
             version=">=3.3.0",
         ),
         pathos=dict(
-            link="https://github.com/uqfoundation/pathos",
+            link="https://pypi.org/project/pathos/",
         ),
         lz4=dict(
-            link="https://github.com/python-lz4/python-lz4",
+            link="https://pypi.org/project/lz4/",
         ),
         blosc=dict(
-            link="https://github.com/Blosc/python-blosc",
+            link="https://pypi.org/project/blosc/",
+        ),
+        blosc2=dict(
+            link="https://pypi.org/project/blosc2/",
         ),
         tables=dict(
-            link="https://github.com/PyTables/PyTables",
+            link="https://pypi.org/project/tables/",
         ),
         optuna=dict(
-            link="https://github.com/optuna/optuna",
+            link="https://pypi.org/project/optuna/",
+        ),
+        sqlalchemy=dict(
+            dist_name="SQLAlchemy",
+            link="https://pypi.org/project/SQLAlchemy/",
+            version=">=2.0.0",
+        ),
+        mpire=dict(
+            link="https://pypi.org/project/mpire/",
+        ),
+        duckdb=dict(
+            link="https://pypi.org/project/duckdb/",
+        ),
+        duckdb_engine=dict(
+            dist_name="duckdb-engine",
+            link="https://pypi.org/project/duckdb-engine/",
+        ),
+        pyarrow=dict(
+            link="https://pypi.org/project/pyarrow/",
+        ),
+        fastparquet=dict(
+            link="https://pypi.org/project/fastparquet/",
         ),
     )
 )

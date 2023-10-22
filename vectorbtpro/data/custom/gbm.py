@@ -23,7 +23,7 @@ __pdoc__ = {}
 class GBMData(SyntheticData):
     """`SyntheticData` for data generated using `vectorbtpro.data.nb.generate_gbm_data_nb`."""
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.gbm")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.gbm")
 
     @classmethod
     def generate_key(
@@ -63,8 +63,6 @@ class GBMData(SyntheticData):
             `vectorbtpro.data.base.feature_dict`/`vectorbtpro.data.base.symbol_dict` or generally
             `vectorbtpro.data.base.key_dict`.
         """
-        gbm_cfg = cls.get_settings(key_id="custom")
-
         if checks.is_hashable(columns):
             columns = [columns]
             make_series = True
@@ -72,16 +70,11 @@ class GBMData(SyntheticData):
             make_series = False
         if not isinstance(columns, pd.Index):
             columns = pd.Index(columns)
-        if start_value is None:
-            start_value = gbm_cfg["start_value"]
-        if mean is None:
-            mean = gbm_cfg["mean"]
-        if std is None:
-            std = gbm_cfg["std"]
-        if dt is None:
-            dt = gbm_cfg["dt"]
-        if seed is None:
-            seed = gbm_cfg["seed"]
+        start_value = cls.resolve_custom_setting(start_value, "start_value")
+        mean = cls.resolve_custom_setting(mean, "mean")
+        std = cls.resolve_custom_setting(std, "std")
+        dt = cls.resolve_custom_setting(dt, "dt")
+        seed = cls.resolve_custom_setting(seed, "seed")
         if seed is not None:
             set_seed(seed)
 
@@ -98,11 +91,8 @@ class GBMData(SyntheticData):
         return pd.DataFrame(out, index=index, columns=columns)
 
     def update_key(self, key: tp.Key, key_is_feature: bool = False, **kwargs) -> tp.KeyData:
-        if key_is_feature:
-            fetch_kwargs = self.select_feature_kwargs(key, self.fetch_kwargs)
-        else:
-            fetch_kwargs = self.select_symbol_kwargs(key, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[key]
+        fetch_kwargs = self.select_fetch_kwargs(key)
+        fetch_kwargs["start"] = self.select_last_index(key)
         _ = fetch_kwargs.pop("start_value", None)
         start_value = self.data[key].iloc[-2]
         fetch_kwargs["seed"] = None

@@ -523,16 +523,17 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         return self._field_config
 
     @classmethod
-    def row_stack_records_arrs(cls, *objs: tp.MaybeTuple[tp.RecordArray], **kwargs):
+    def row_stack_records_arrs(cls, *objs: tp.MaybeTuple[tp.RecordArray], **kwargs) -> tp.RecordArray:
         """Stack multiple record arrays along rows."""
         if len(objs) == 1:
             objs = objs[0]
         objs = list(objs)
+
         records_arrs = []
         for col in range(kwargs["wrapper"].shape_2d[1]):
             n_rows_sum = 0
             from_id = defaultdict(int)
-            for i, obj in enumerate(objs):
+            for obj in objs:
                 col_idxs, col_lens = obj.col_mapper.col_map
                 if len(col_idxs) > 0:
                     col_records = None
@@ -557,9 +558,41 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
                                 from_id[field] = col_records[field].max() + 1
                         records_arrs.append(col_records)
                 n_rows_sum += obj.wrapper.shape_2d[0]
+
         if len(records_arrs) == 0:
             return np.array([], dtype=objs[0].values.dtype)
         return np.concatenate(records_arrs)
+
+    @classmethod
+    def get_row_stack_record_indices(cls, *objs: tp.MaybeTuple[tp.RecordArray], **kwargs) -> tp.Array1d:
+        """Get the indices that map concatenated record arrays into the row-stacked record array."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+
+        record_indices = []
+        cum_n_rows_sum = []
+        for i in range(len(objs)):
+            if i == 0:
+                cum_n_rows_sum.append(0)
+            else:
+                cum_n_rows_sum.append(cum_n_rows_sum[-1] + len(objs[i - 1].values))
+        for col in range(kwargs["wrapper"].shape_2d[1]):
+            for i, obj in enumerate(objs):
+                col_idxs, col_lens = obj.col_mapper.col_map
+                if len(col_idxs) > 0:
+                    if col > 0 and obj.wrapper.shape_2d[1] == 1:
+                        _record_indices = col_idxs + cum_n_rows_sum[i]
+                        record_indices.append(_record_indices)
+                    elif col_lens[col] > 0:
+                        col_end_idxs = np.cumsum(col_lens)
+                        col_start_idxs = col_end_idxs - col_lens
+                        _record_indices = col_idxs[col_start_idxs[col]: col_end_idxs[col]] + cum_n_rows_sum[i]
+                        record_indices.append(_record_indices)
+
+        if len(record_indices) == 0:
+            return np.array([], dtype=np.int_)
+        return np.concatenate(record_indices)
 
     @classmethod
     def row_stack(
@@ -604,23 +637,25 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         *objs: tp.MaybeTuple[tp.RecordArray],
         get_indexer_kwargs: tp.KwargsLike = None,
         **kwargs,
-    ):
+    ) -> tp.RecordArray:
         """Stack multiple record arrays along columns."""
         if len(objs) == 1:
             objs = objs[0]
         objs = list(objs)
+
         if get_indexer_kwargs is None:
             get_indexer_kwargs = {}
+
         records_arrs = []
         col_sum = 0
-        for i, obj in enumerate(objs):
+        for obj in objs:
             col_idxs, col_lens = obj.col_mapper.col_map
             if len(col_idxs) > 0:
                 col_end_idxs = np.cumsum(col_lens)
                 col_start_idxs = col_end_idxs - col_lens
-                for obj_col in range(len(col_lens)):
-                    if col_lens[obj_col] > 0:
-                        col_records = obj.records_arr[col_idxs[col_start_idxs[obj_col] : col_end_idxs[obj_col]]]
+                for col in range(len(col_lens)):
+                    if col_lens[col] > 0:
+                        col_records = obj.records_arr[col_idxs[col_start_idxs[col] : col_end_idxs[col]]]
                         col_records = col_records.copy()
                         for field in obj.values.dtype.names:
                             field_mapping = cls.field_config.get("settings", {}).get(field, {}).get("mapping", None)
@@ -638,9 +673,38 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
                                 col_records[field][:] = new_idxs
                         records_arrs.append(col_records)
             col_sum += obj.wrapper.shape_2d[1]
+
         if len(records_arrs) == 0:
             return np.array([], dtype=objs[0].values.dtype)
         return np.concatenate(records_arrs)
+
+    @classmethod
+    def get_column_stack_record_indices(cls, *objs: tp.MaybeTuple[tp.RecordArray], **kwargs) -> tp.Array1d:
+        """Get the indices that map concatenated record arrays into the column-stacked record array."""
+        if len(objs) == 1:
+            objs = objs[0]
+        objs = list(objs)
+
+        record_indices = []
+        cum_n_rows_sum = []
+        for i in range(len(objs)):
+            if i == 0:
+                cum_n_rows_sum.append(0)
+            else:
+                cum_n_rows_sum.append(cum_n_rows_sum[-1] + len(objs[i - 1].values))
+        for i, obj in enumerate(objs):
+            col_idxs, col_lens = obj.col_mapper.col_map
+            if len(col_idxs) > 0:
+                col_end_idxs = np.cumsum(col_lens)
+                col_start_idxs = col_end_idxs - col_lens
+                for col in range(len(col_lens)):
+                    if col_lens[col] > 0:
+                        _record_indices = col_idxs[col_start_idxs[col] : col_end_idxs[col]] + cum_n_rows_sum[i]
+                        record_indices.append(_record_indices)
+
+        if len(record_indices) == 0:
+            return np.array([], dtype=np.int_)
+        return np.concatenate(record_indices)
 
     @classmethod
     def column_stack(
@@ -703,7 +767,6 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         col_mapper: tp.Optional[ColumnMapper] = None,
         **kwargs,
     ) -> None:
-
         # Check fields
         records_arr = np.asarray(records_arr)
         checks.assert_not_none(records_arr.dtype.fields)

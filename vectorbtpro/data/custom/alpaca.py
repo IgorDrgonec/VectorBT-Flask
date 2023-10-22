@@ -26,8 +26,6 @@ __all__ = [
     "AlpacaData",
 ]
 
-__pdoc__ = {}
-
 AlpacaDataT = tp.TypeVar("AlpacaDataT", bound="AlpacaData")
 
 
@@ -52,7 +50,7 @@ class AlpacaData(RemoteData):
         ... )
         ```
 
-        * Fetch stock data:
+        * Pull stock data:
 
         ```pycon
         >>> data = vbt.AlpacaData.pull(
@@ -63,7 +61,7 @@ class AlpacaData(RemoteData):
         ... )
         ```
 
-        * Fetch crypto data:
+        * Pull crypto data:
 
         ```pycon
         >>> data = vbt.AlpacaData.pull(
@@ -76,7 +74,7 @@ class AlpacaData(RemoteData):
         ```
     """
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.alpaca")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.alpaca")
 
     @classmethod
     def list_symbols(
@@ -91,7 +89,7 @@ class AlpacaData(RemoteData):
     ) -> tp.List[str]:
         """List all symbols.
 
-        Uses `CustomData.key_match` to check each symbol against `pattern`.
+        Uses `vectorbtpro.data.custom.custom.CustomData.key_match` to check each symbol against `pattern`.
 
         Arguments `status`, `asset_class`, and `exchange` can be strings, such as `asset_class="crypto"`.
         For possible values, take a look into `alpaca.trading.enums`.
@@ -107,12 +105,10 @@ class AlpacaData(RemoteData):
         from alpaca.trading.requests import GetAssetsRequest
         from alpaca.trading.enums import AssetStatus, AssetClass, AssetExchange
 
-        alpaca_cfg = cls.get_settings(key_id="custom")
-
         if client_config is None:
             client_config = {}
         has_client_config = len(client_config) > 0
-        client_config = merge_dicts(alpaca_cfg["client_config"], client_config)
+        client_config = cls.resolve_custom_setting(client_config, "client_config", merge=True)
         if trading_client is None:
             arg_names = get_func_arg_names(TradingClient.__init__)
             client_config = {k: v for k, v in client_config.items() if k in arg_names}
@@ -157,16 +153,12 @@ class AlpacaData(RemoteData):
         assert_can_import("alpaca")
         from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
 
-        alpaca_cfg = cls.get_settings(key_id="custom")
-
-        if client is None:
-            client = alpaca_cfg["client"]
-        if client_type is None:
-            client_type = alpaca_cfg["client_type"]
+        client = cls.resolve_custom_setting(client, "client")
+        client_type = cls.resolve_custom_setting(client_type, "client_type")
         if client_config is None:
             client_config = {}
         has_client_config = len(client_config) > 0
-        client_config = merge_dicts(alpaca_cfg["client_config"], client_config)
+        client_config = cls.resolve_custom_setting(client_config, "client_config", merge=True)
         if client is None:
             if client_type == "crypto":
                 arg_names = get_func_arg_names(CryptoHistoricalDataClient.__init__)
@@ -192,7 +184,7 @@ class AlpacaData(RemoteData):
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
-        tz: tp.Optional[tp.TimezoneLike] = None,
+        tz: tp.TimezoneLike = None,
         adjustment: tp.Optional[str] = None,
         feed: tp.Optional[str] = None,
         limit: tp.Optional[int] = None,
@@ -241,25 +233,17 @@ class AlpacaData(RemoteData):
         from alpaca.data.requests import CryptoBarsRequest, StockBarsRequest
         from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
-        alpaca_cfg = cls.get_settings(key_id="custom")
-
         if client_config is None:
             client_config = {}
         client = cls.resolve_client(client=client, client_type=client_type, **client_config)
-        if start is None:
-            start = alpaca_cfg["start"]
-        if end is None:
-            end = alpaca_cfg["end"]
-        if timeframe is None:
-            timeframe = alpaca_cfg["timeframe"]
-        if tz is None:
-            tz = alpaca_cfg["tz"]
-        if adjustment is None:
-            adjustment = alpaca_cfg["adjustment"]
-        if feed is None:
-            feed = alpaca_cfg["feed"]
-        if limit is None:
-            limit = alpaca_cfg["limit"]
+
+        start = cls.resolve_custom_setting(start, "start")
+        end = cls.resolve_custom_setting(end, "end")
+        timeframe = cls.resolve_custom_setting(timeframe, "timeframe")
+        tz = cls.resolve_custom_setting(tz, "tz")
+        adjustment = cls.resolve_custom_setting(adjustment, "adjustment")
+        feed = cls.resolve_custom_setting(feed, "feed")
+        limit = cls.resolve_custom_setting(limit, "limit")
 
         freq = prepare_freq(timeframe)
         split = split_freq_str(timeframe)
@@ -282,12 +266,12 @@ class AlpacaData(RemoteData):
         timeframe = TimeFrame(multiplier, unit)
 
         if start is not None:
-            start = to_tzaware_datetime(start, naive_tz=tz, tz="UTC")
+            start = to_tzaware_datetime(start, naive_tz=tz, tz="utc")
             start_str = start.replace(tzinfo=None).isoformat("T")
         else:
             start_str = None
         if end is not None:
-            end = to_tzaware_datetime(end, naive_tz=tz, tz="UTC")
+            end = to_tzaware_datetime(end, naive_tz=tz, tz="utc")
             end_str = end.replace(tzinfo=None).isoformat("T")
         else:
             end_str = None
@@ -329,8 +313,8 @@ class AlpacaData(RemoteData):
             },
             inplace=True,
         )
-        if isinstance(df.index, pd.DatetimeIndex) and df.index.tzinfo is None:
-            df = df.tz_localize("UTC")
+        if isinstance(df.index, pd.DatetimeIndex) and df.index.tz is None:
+            df = df.tz_localize("utc")
 
         if "Open" in df.columns:
             df["Open"] = df["Open"].astype(float)
@@ -349,20 +333,17 @@ class AlpacaData(RemoteData):
 
         if not df.empty:
             if start is not None:
-                start = to_timestamp(start, tz=df.index.tzinfo)
+                start = to_timestamp(start, tz=df.index.tz)
                 if df.index[0] < start:
                     df = df[df.index >= start]
             if end is not None:
-                end = to_timestamp(end, tz=df.index.tzinfo)
+                end = to_timestamp(end, tz=df.index.tz)
                 if df.index[-1] >= end:
                     df = df[df.index < end]
         return df, dict(tz_convert=tz, freq=freq)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[symbol]
+        fetch_kwargs = self.select_fetch_kwargs(symbol)
+        fetch_kwargs["start"] = self.select_last_index(symbol)
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)
-
-
-AlpacaData.override_feature_config_doc(__pdoc__)

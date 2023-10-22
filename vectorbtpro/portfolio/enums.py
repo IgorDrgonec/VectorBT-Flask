@@ -391,10 +391,10 @@ __pdoc__[
 In which format a delta is provided?
 
 Attributes:
-    Absolute: Absolute format
-    Percent: Percentage format where 0.01 means 1%
-    Percent100: Percentage format where 1.0 means 1%
-    Target: Target format
+    Absolute: Absolute format where 0.1 is the absolute difference between the initial and target value
+    Percent: Percentage format where 0.1 is 10% applied to the initial value to get the target value
+    Percent100: Percentage format where 0.1 is 0.1% applied to the initial value to get the target value
+    Target: Target format where 0.1 is the target value
 """
 
 
@@ -502,7 +502,8 @@ Attributes:
 
 class StopExitPriceT(tp.NamedTuple):
     Stop: int = -1
-    Close: int = -2
+    HardStop: int = -2
+    Close: int = -3
 
 
 StopExitPrice = StopExitPriceT()
@@ -521,7 +522,10 @@ Which price to use when exiting a position upon a stop signal?
 Attributes:
     Stop: Stop price. 
     
-        If the stop was hit before, the opening price at the next bar is used.
+        If the target price is first hit by the opening price, the opening price is used.
+    HardStop: Hard stop price.
+    
+        The stop price is used regardless of whether the target price is first hit by the opening price.
     Close: Closing price.
     
 !!! note
@@ -2524,6 +2528,7 @@ class FSInOutputs(tp.NamedTuple):
     debt: tp.Array2d
     locked_cash: tp.Array2d
     free_cash: tp.Array2d
+    value: tp.Array2d
     returns: tp.Array2d
 
 
@@ -2533,6 +2538,7 @@ __pdoc__["FSInOutputs.position"] = "See `FOInOutputs.position`."
 __pdoc__["FSInOutputs.debt"] = "See `FOInOutputs.debt`."
 __pdoc__["FSInOutputs.locked_cash"] = "See `FOInOutputs.locked_cash`."
 __pdoc__["FSInOutputs.free_cash"] = "See `FOInOutputs.free_cash`."
+__pdoc__["FSInOutputs.value"] = "See `FOInOutputs.value`."
 __pdoc__["FSInOutputs.returns"] = "See `FOInOutputs.returns`."
 
 # ############# Records ############# #

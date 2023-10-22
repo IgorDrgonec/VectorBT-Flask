@@ -968,7 +968,7 @@ class IndicatorBase(Analyzable):
         objs = list(objs)
         for obj in objs:
             if not checks.is_instance_of(obj, IndicatorBase):
-                raise TypeError("Each object to be merged must be an instance of Records")
+                raise TypeError("Each object to be merged must be an instance of IndicatorBase")
         if "wrapper" not in kwargs:
             if wrapper_kwargs is None:
                 wrapper_kwargs = {}
@@ -1014,7 +1014,7 @@ class IndicatorBase(Analyzable):
         objs = list(objs)
         for obj in objs:
             if not checks.is_instance_of(obj, IndicatorBase):
-                raise TypeError("Each object to be merged must be an instance of Records")
+                raise TypeError("Each object to be merged must be an instance of IndicatorBase")
         if "wrapper" not in kwargs:
             if wrapper_kwargs is None:
                 wrapper_kwargs = {}
@@ -3923,7 +3923,7 @@ Other keyword arguments are passed to `{0}.run`.
                 for c in out.columns:
                     if len(out.columns) == len(config["output_names"]):
                         outputs.append(out[c].values)
-                    elif c not in ("open", "high", "low", "close", "volume", "data"):
+                    elif c.replace(" ", "").lower() not in ("open", "high", "low", "close", "volume", "data"):
                         outputs.append(out[c].values)
                 return tuple(outputs)
             return out.values

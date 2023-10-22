@@ -63,7 +63,7 @@ class BinanceData(RemoteData):
         ... )
         ```
 
-        * Fetch data:
+        * Pull data:
 
         ```pycon
         >>> data = vbt.BinanceData.pull(
@@ -75,7 +75,7 @@ class BinanceData(RemoteData):
         ```
     """
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.binance")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.binance")
 
     _feature_config: tp.ClassVar[Config] = HybridConfig(
         {
@@ -115,14 +115,11 @@ class BinanceData(RemoteData):
         assert_can_import("binance")
         from binance.client import Client
 
-        binance_cfg = cls.get_settings(key_id="custom")
-
-        if client is None:
-            client = binance_cfg["client"]
+        client = cls.resolve_custom_setting(client, "client")
         if client_config is None:
             client_config = {}
         has_client_config = len(client_config) > 0
-        client_config = merge_dicts(binance_cfg["client_config"], client_config)
+        client_config = cls.resolve_custom_setting(client_config, "client_config", merge=True)
         if client is None:
             client = Client(**client_config)
         elif has_client_config:
@@ -139,7 +136,7 @@ class BinanceData(RemoteData):
     ) -> tp.List[str]:
         """List all symbols.
 
-        Uses `CustomData.key_match` to check each symbol against `pattern`."""
+        Uses `vectorbtpro.data.custom.custom.CustomData.key_match` to check each symbol against `pattern`."""
         if client_config is None:
             client_config = {}
         client = cls.resolve_client(client=client, **client_config)
@@ -161,7 +158,7 @@ class BinanceData(RemoteData):
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
-        tz: tp.Optional[tp.TimezoneLike] = None,
+        tz: tp.TimezoneLike = None,
         klines_type: tp.Union[None, int, str] = None,
         limit: tp.Optional[int] = None,
         delay: tp.Optional[float] = None,
@@ -209,35 +206,25 @@ class BinanceData(RemoteData):
         assert_can_import("binance")
         from binance.enums import HistoricalKlinesType
 
-        binance_cfg = cls.get_settings(key_id="custom")
-
         if client_config is None:
             client_config = {}
         client = cls.resolve_client(client=client, **client_config)
-        if start is None:
-            start = binance_cfg["start"]
-        if end is None:
-            end = binance_cfg["end"]
-        if timeframe is None:
-            timeframe = binance_cfg["timeframe"]
-        if tz is None:
-            tz = binance_cfg["tz"]
-        if klines_type is None:
-            klines_type = binance_cfg["klines_type"]
+
+        start = cls.resolve_custom_setting(start, "start")
+        end = cls.resolve_custom_setting(end, "end")
+        timeframe = cls.resolve_custom_setting(timeframe, "timeframe")
+        tz = cls.resolve_custom_setting(tz, "tz")
+        klines_type = cls.resolve_custom_setting(klines_type, "klines_type")
         if isinstance(klines_type, str):
             klines_type = map_enum_fields(klines_type, HistoricalKlinesType)
         if isinstance(klines_type, int):
             klines_type = {i.value: i for i in HistoricalKlinesType}[klines_type]
-        if limit is None:
-            limit = binance_cfg["limit"]
-        if delay is None:
-            delay = binance_cfg["delay"]
-        if show_progress is None:
-            show_progress = binance_cfg["show_progress"]
-        pbar_kwargs = merge_dicts(binance_cfg["pbar_kwargs"], pbar_kwargs)
-        if silence_warnings is None:
-            silence_warnings = binance_cfg["silence_warnings"]
-        get_klines_kwargs = merge_dicts(binance_cfg["get_klines_kwargs"], get_klines_kwargs)
+        limit = cls.resolve_custom_setting(limit, "limit")
+        delay = cls.resolve_custom_setting(delay, "delay")
+        show_progress = cls.resolve_custom_setting(show_progress, "show_progress")
+        pbar_kwargs = cls.resolve_custom_setting(pbar_kwargs, "pbar_kwargs", merge=True)
+        silence_warnings = cls.resolve_custom_setting(silence_warnings, "silence_warnings")
+        get_klines_kwargs = cls.resolve_custom_setting(get_klines_kwargs, "get_klines_kwargs", merge=True)
 
         # Prepare parameters
         freq = prepare_freq(timeframe)
@@ -250,14 +237,14 @@ class BinanceData(RemoteData):
                 unit = "w"
             timeframe = str(multiplier) + unit
         if start is not None:
-            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="UTC"))
+            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="utc"))
             first_valid_ts = client._get_earliest_valid_timestamp(symbol, timeframe, klines_type)
             start_ts = max(start_ts, first_valid_ts)
         else:
             start_ts = None
         prev_end_ts = None
         if end is not None:
-            end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz="UTC"))
+            end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz="utc"))
         else:
             end_ts = None
 
@@ -360,8 +347,8 @@ class BinanceData(RemoteData):
         return df, dict(tz_convert=tz, freq=freq)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[symbol]
+        fetch_kwargs = self.select_fetch_kwargs(symbol)
+        fetch_kwargs["start"] = self.select_last_index(symbol)
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)
 

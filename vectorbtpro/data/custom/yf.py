@@ -42,7 +42,7 @@ class YFData(RemoteData):
         ```
     """
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.yf")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.yf")
 
     _feature_config: tp.ClassVar[Config] = HybridConfig(
         {
@@ -73,7 +73,7 @@ class YFData(RemoteData):
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         timeframe: tp.Optional[str] = None,
-        tz: tp.Optional[tp.TimezoneLike] = None,
+        tz: tp.TimezoneLike = None,
         **history_kwargs,
     ) -> tp.SymbolData:
         """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Yahoo Finance.
@@ -107,19 +107,12 @@ class YFData(RemoteData):
         assert_can_import("yfinance")
         import yfinance as yf
 
-        yf_cfg = cls.get_settings(key_id="custom")
-
-        if period is None:
-            period = yf_cfg["period"]
-        if start is None:
-            start = yf_cfg["start"]
-        if end is None:
-            end = yf_cfg["end"]
-        if timeframe is None:
-            timeframe = yf_cfg["timeframe"]
-        if tz is None:
-            tz = yf_cfg["tz"]
-        history_kwargs = merge_dicts(yf_cfg["history_kwargs"], history_kwargs)
+        period = cls.resolve_custom_setting(period, "period")
+        start = cls.resolve_custom_setting(start, "start")
+        end = cls.resolve_custom_setting(end, "end")
+        timeframe = cls.resolve_custom_setting(timeframe, "timeframe")
+        tz = cls.resolve_custom_setting(tz, "tz")
+        history_kwargs = cls.resolve_custom_setting(history_kwargs, "history_kwargs", merge=True)
 
         ticker = yf.Ticker(symbol)
         def_history_kwargs = get_func_kwargs(yf.Tickers.history)
@@ -146,7 +139,7 @@ class YFData(RemoteData):
             timeframe = str(multiplier) + unit
 
         df = ticker.history(period=period, start=start, end=end, interval=timeframe, **history_kwargs)
-        if isinstance(df.index, pd.DatetimeIndex) and df.index.tzinfo is None:
+        if isinstance(df.index, pd.DatetimeIndex) and df.index.tz is None:
             df = df.tz_localize(ticker_tz)
 
         if not df.empty:
@@ -159,8 +152,8 @@ class YFData(RemoteData):
         return df, dict(tz_convert=tz, freq=freq)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[symbol]
+        fetch_kwargs = self.select_fetch_kwargs(symbol)
+        fetch_kwargs["start"] = self.select_last_index(symbol)
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)
 

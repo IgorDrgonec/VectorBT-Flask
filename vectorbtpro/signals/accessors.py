@@ -251,7 +251,7 @@ class SignalsAccessor(GenericAccessor):
     bshift = partialmethod(GenericAccessor.bshift, fill_value=False)
     fshift = partialmethod(GenericAccessor.fshift, fill_value=False)
     ago = partialmethod(GenericAccessor.ago, fill_value=False)
-    latest_at_index = partialmethod(GenericAccessor.latest_at_index, nan_value=False)
+    realign = partialmethod(GenericAccessor.realign, nan_value=False)
 
     # ############# Generation ############# #
 
@@ -309,7 +309,7 @@ class SignalsAccessor(GenericAccessor):
             wrapper = shape
             shape = wrapper.shape
         if len(args) > 0 and place_args is not None:
-            raise ValueError("Either *args or place_args must be provided, not both")
+            raise ValueError("Must provide either *args or place_args, not both")
         if place_args is None:
             place_args = args
         if broadcast_named_args is None:
@@ -449,9 +449,9 @@ class SignalsAccessor(GenericAccessor):
             wrapper = shape
             shape = wrapper.shape
         if len(args) > 0 and entry_place_args is not None:
-            raise ValueError("Either *args or entry_place_args must be provided, not both")
+            raise ValueError("Must provide either *args or entry_place_args, not both")
         if len(args) > 0 and exit_place_args is not None:
-            raise ValueError("Either *args or exit_place_args must be provided, not both")
+            raise ValueError("Must provide either *args or exit_place_args, not both")
         if entry_place_args is None:
             entry_place_args = args
         if exit_place_args is None:
@@ -535,7 +535,7 @@ class SignalsAccessor(GenericAccessor):
             ```
         """
         if len(args) > 0 and exit_place_args is not None:
-            raise ValueError("Either *args or exit_place_args must be provided, not both")
+            raise ValueError("Must provide either *args or exit_place_args, not both")
         if exit_place_args is None:
             exit_place_args = args
         if broadcast_named_args is None:
@@ -701,12 +701,12 @@ class SignalsAccessor(GenericAccessor):
         """
         if isinstance(shape, ArrayWrapper):
             if "wrapper" in kwargs:
-                raise ValueError("Wrapper must be provided either via shape or wrapper, not both")
+                raise ValueError("Must provide wrapper either via shape or wrapper, not both")
             kwargs["wrapper"] = shape
             shape = kwargs["wrapper"].shape
         shape_2d = cls.resolve_shape(shape)
         if n is not None and prob is not None:
-            raise ValueError("Either n or prob must be provided, not both")
+            raise ValueError("Must provide either n or prob, not both")
 
         if seed is not None:
             set_seed_nb(seed)
@@ -749,7 +749,7 @@ class SignalsAccessor(GenericAccessor):
                 chunked=chunked,
                 **kwargs,
             )
-        raise ValueError("At least n or prob must be provided")
+        raise ValueError("Must provide at least n or prob")
 
     @classmethod
     def generate_random_both(
@@ -840,7 +840,7 @@ class SignalsAccessor(GenericAccessor):
             shape = wrapper.shape
         shape_2d = cls.resolve_shape(shape)
         if n is not None and (entry_prob is not None or exit_prob is not None):
-            raise ValueError("Either n or any of the entry_prob and exit_prob must be provided, not both")
+            raise ValueError("Must provide either n or any of the entry_prob and exit_prob, not both")
 
         if seed is not None:
             set_seed_nb(seed)
@@ -883,7 +883,7 @@ class SignalsAccessor(GenericAccessor):
                 wrapper=wrapper,
                 wrap_kwargs=wrap_kwargs,
             )
-        raise ValueError("At least n, or entry_prob and exit_prob must be provided")
+        raise ValueError("Must provide at least n, or entry_prob and exit_prob")
 
     def generate_random_exits(
         self,
@@ -1582,7 +1582,7 @@ class SignalsAccessor(GenericAccessor):
 
         Set `as_mapped` to True to return an instance of `vectorbtpro.records.mapped_array.MappedArray`."""
         if len(args) > 0 and rank_args is not None:
-            raise ValueError("Either *args or rank_args must be provided, not both")
+            raise ValueError("Must provide either *args or rank_args, not both")
         if rank_args is None:
             rank_args = args
         if broadcast_named_args is None:
@@ -2625,10 +2625,13 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
         self,
         wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
         obj: tp.Optional[tp.ArrayLike] = None,
+        _full_init: bool = True,
         **kwargs,
     ) -> None:
-        GenericSRAccessor.__init__(self, wrapper, obj=obj, **kwargs)
-        SignalsAccessor.__init__(self, wrapper, obj=obj, **kwargs)
+        GenericSRAccessor.__init__(self, wrapper, obj=obj, _full_init=False, **kwargs)
+
+        if _full_init:
+            SignalsAccessor.__init__(self, wrapper, obj=obj, **kwargs)
 
 
 @register_df_vbt_accessor("signals")
@@ -2641,7 +2644,10 @@ class SignalsDFAccessor(SignalsAccessor, GenericDFAccessor):
         self,
         wrapper: tp.Union[ArrayWrapper, tp.ArrayLike],
         obj: tp.Optional[tp.ArrayLike] = None,
+        _full_init: bool = True,
         **kwargs,
     ) -> None:
-        GenericDFAccessor.__init__(self, wrapper, obj=obj, **kwargs)
-        SignalsAccessor.__init__(self, wrapper, obj=obj, **kwargs)
+        GenericDFAccessor.__init__(self, wrapper, obj=obj, _full_init=False, **kwargs)
+
+        if _full_init:
+            SignalsAccessor.__init__(self, wrapper, obj=obj, **kwargs)

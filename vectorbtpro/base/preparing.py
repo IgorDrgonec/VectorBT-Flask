@@ -88,7 +88,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
 
     _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {"_arg_config"}
 
-    _setting_keys: tp.SettingsKeys = None
+    _settings_path: tp.SettingsPath = None
 
     def __init__(self, **kwargs) -> None:
         Configured.__init__(self, **kwargs)
@@ -185,7 +185,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
 
     def get_raw_arg_default(self, arg_name: str, is_dict: bool = False) -> tp.Any:
         """Get raw argument default."""
-        if self._setting_keys is None:
+        if self._settings_path is None:
             if is_dict:
                 return {}
             return None

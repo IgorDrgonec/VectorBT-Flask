@@ -10,7 +10,7 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import Configured
-from vectorbtpro.utils.datetime_ import freq_to_timedelta64, try_to_datetime_index, infer_index_freq
+from vectorbtpro.utils.datetime_ import freq_to_timedelta64, prepare_dt_index, infer_index_freq
 from vectorbtpro.utils.decorators import cached_property, class_or_instancemethod
 from vectorbtpro.base.resampling import nb
 from vectorbtpro.base.indexes import repeat_index
@@ -54,8 +54,8 @@ class Resampler(Configured):
         target_freq: tp.Union[None, bool, tp.FrequencyLike] = None,
         silence_warnings: tp.Optional[bool] = None,
     ) -> None:
-        source_index = try_to_datetime_index(source_index)
-        target_index = try_to_datetime_index(target_index)
+        source_index = prepare_dt_index(source_index)
+        target_index = prepare_dt_index(target_index)
         infer_source_freq = True
         if isinstance(source_freq, bool):
             if not source_freq:
@@ -220,11 +220,11 @@ class Resampler(Configured):
         """Get the left bound of a datetime index.
 
         If `freq` is None, calculates the leftmost bound."""
-        index = try_to_datetime_index(index)
+        index = prepare_dt_index(index)
         checks.assert_instance_of(index, pd.DatetimeIndex)
         if freq is not None:
             return index.shift(-1, freq=freq) + pd.Timedelta(1, "ns")
-        min_ts = pd.DatetimeIndex([pd.Timestamp.min.tz_localize(index.tzinfo)])
+        min_ts = pd.DatetimeIndex([pd.Timestamp.min.tz_localize(index.tz)])
         return (index[:-1] + pd.Timedelta(1, "ns")).append(min_ts)
 
     @classmethod
@@ -232,11 +232,11 @@ class Resampler(Configured):
         """Get the right bound of a datetime index.
 
         If `freq` is None, calculates the rightmost bound."""
-        index = try_to_datetime_index(index)
+        index = prepare_dt_index(index)
         checks.assert_instance_of(index, pd.DatetimeIndex)
         if freq is not None:
             return index.shift(1, freq=freq) - pd.Timedelta(1, "ns")
-        max_ts = pd.DatetimeIndex([pd.Timestamp.max.tz_localize(index.tzinfo)])
+        max_ts = pd.DatetimeIndex([pd.Timestamp.max.tz_localize(index.tz)])
         return (index[1:] - pd.Timedelta(1, "ns")).append(max_ts)
 
     @cached_property
@@ -350,22 +350,22 @@ class Resampler(Configured):
                 if isinstance(target_lbound_index, str) and target_lbound_index.lower() == "pandas":
                     target_lbound_index = cls_or_self.target_lbound_index
                 else:
-                    target_lbound_index = try_to_datetime_index(target_lbound_index)
+                    target_lbound_index = prepare_dt_index(target_lbound_index)
                 target_rbound_index = cls_or_self.target_index
             if target_rbound_index is not None:
                 target_lbound_index = cls_or_self.target_index
                 if isinstance(target_rbound_index, str) and target_rbound_index.lower() == "pandas":
                     target_rbound_index = cls_or_self.target_rbound_index
                 else:
-                    target_rbound_index = try_to_datetime_index(target_rbound_index)
+                    target_rbound_index = prepare_dt_index(target_rbound_index)
             if len(target_lbound_index) == 1 and len(target_rbound_index) > 1:
                 target_lbound_index = repeat_index(target_lbound_index, len(target_rbound_index))
             elif len(target_lbound_index) > 1 and len(target_rbound_index) == 1:
                 target_rbound_index = repeat_index(target_rbound_index, len(target_lbound_index))
         else:
-            source_index = try_to_datetime_index(source_index)
-            target_lbound_index = try_to_datetime_index(target_lbound_index)
-            target_rbound_index = try_to_datetime_index(target_rbound_index)
+            source_index = prepare_dt_index(source_index)
+            target_lbound_index = prepare_dt_index(target_lbound_index)
+            target_rbound_index = prepare_dt_index(target_rbound_index)
 
         checks.assert_len_equal(target_rbound_index, target_lbound_index)
         func = jit_reg.resolve_option(nb.map_bounds_to_source_ranges_nb, jitted)

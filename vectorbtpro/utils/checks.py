@@ -60,6 +60,11 @@ def is_number(arg: tp.Any) -> bool:
     return is_int(arg) or is_float(arg)
 
 
+def is_np_scalar(arg: tp.Any) -> bool:
+    """Check whether the argument is a NumPy scalar."""
+    return isinstance(arg, np.generic)
+
+
 def is_td(arg: tp.Any) -> bool:
     """Check whether the argument is a timedelta object."""
     return isinstance(arg, (pd.Timedelta, datetime.timedelta, np.timedelta64))
@@ -465,10 +470,14 @@ def safe_assert(arg: bool, msg: tp.Optional[str] = None) -> None:
         raise AssertionError(msg)
 
 
-def assert_in(arg1: tp.Any, arg2: tp.Sequence) -> None:
+def assert_in(arg1: tp.Any, arg2: tp.Sequence, arg_name: tp.Optional[str] = None) -> None:
     """Raise exception if the first argument is not in the second argument."""
+    if arg_name is None:
+        x = ""
+    else:
+        x = f"for '{arg_name}'"
     if arg1 not in arg2:
-        raise AssertionError(f"{arg1} not found in {arg2}")
+        raise AssertionError(f"{arg1} not found in {arg2}{x}")
 
 
 def assert_numba_func(func: tp.Callable) -> None:

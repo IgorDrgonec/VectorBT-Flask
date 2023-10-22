@@ -23,7 +23,17 @@ FileDataT = tp.TypeVar("FileDataT", bound="FileData")
 class FileData(LocalData):
     """Data class for fetching file data."""
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.file")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.file")
+
+    @classmethod
+    def is_dir_match(cls, path: tp.PathLike) -> bool:
+        """Return whether a directory is a valid match."""
+        return False
+
+    @classmethod
+    def is_file_match(cls, path: tp.PathLike) -> bool:
+        """Return whether a file is a valid match."""
+        return True
 
     @classmethod
     def match_path(
@@ -32,14 +42,25 @@ class FileData(LocalData):
         match_regex: tp.Optional[str] = None,
         sort_paths: bool = True,
         recursive: bool = True,
+        extension: tp.Optional[str] = None,
         **kwargs,
     ) -> tp.List[Path]:
-        """Get the list of all paths matching a path."""
+        """Get the list of all paths matching a path.
+
+        If `FileData.is_dir_match` returns True for a directory, it gets returned as-is.
+        Otherwise, iterates through all files in that directory and invokes `FileData.is_file_match`.
+        If a pattern was provided, these methods aren't invoked."""
         if not isinstance(path, Path):
             path = Path(path)
         if path.exists():
-            if path.is_dir():
-                sub_paths = [p for p in path.iterdir() if p.is_file()]
+            if path.is_dir() and not cls.is_dir_match(path):
+                sub_paths = []
+                for p in path.iterdir():
+                    if p.is_dir() and cls.is_dir_match(p):
+                        sub_paths.append(p)
+                    if p.is_file() and cls.is_file_match(p):
+                        if extension is None or p.suffix == "." + extension:
+                            sub_paths.append(p)
             else:
                 sub_paths = [path]
         else:
@@ -51,9 +72,30 @@ class FileData(LocalData):
         return sub_paths
 
     @classmethod
+    def list_paths(cls, path: tp.PathLike = ".", **match_path_kwargs) -> tp.List[Path]:
+        """List all features or symbols under a path."""
+        return cls.match_path(path, **match_path_kwargs)
+
+    @classmethod
     def path_to_key(cls, path: tp.PathLike, **kwargs) -> str:
         """Convert a path into a feature or symbol."""
         return Path(path).stem
+
+    @classmethod
+    def resolve_keys_meta(
+        cls,
+        keys: tp.Union[None, dict, tp.MaybeKeys] = None,
+        keys_are_features: tp.Optional[bool] = None,
+        features: tp.Union[None, dict, tp.MaybeFeatures] = None,
+        symbols: tp.Union[None, dict, tp.MaybeSymbols] = None,
+        paths: tp.Any = None,
+    ) -> tp.Kwargs:
+        return LocalData.resolve_keys_meta(
+            keys=keys,
+            keys_are_features=keys_are_features,
+            features=features,
+            symbols=symbols,
+        )
 
     @classmethod
     def pull(
@@ -81,24 +123,20 @@ class FileData(LocalData):
 
         For defaults, see `custom.local` in `vectorbtpro._settings.data`.
         """
-        local_cfg = cls.get_settings(key_id="custom")
-
         keys_meta = cls.resolve_keys_meta(
             keys=keys,
             keys_are_features=keys_are_features,
             features=features,
             symbols=symbols,
+            paths=paths,
         )
         keys = keys_meta["keys"]
         keys_are_features = keys_meta["keys_are_features"]
         dict_type = keys_meta["dict_type"]
 
-        if match_paths is None:
-            match_paths = local_cfg["match_paths"]
-        if match_regex is None:
-            match_regex = local_cfg["match_regex"]
-        if sort_paths is None:
-            sort_paths = local_cfg["sort_paths"]
+        match_paths = cls.resolve_custom_setting(match_paths, "match_paths")
+        match_regex = cls.resolve_custom_setting(match_regex, "match_regex")
+        sort_paths = cls.resolve_custom_setting(sort_paths, "sort_paths")
 
         if match_paths:
             sync = False

@@ -315,7 +315,7 @@ class PriceRecords(Records):
     def get_bar_close_time(self, **kwargs) -> MappedArray:
         """Get a mapped array with the closing time of the bar."""
         if self.wrapper.freq is None:
-            raise ValueError("Frequency must be provided")
+            raise ValueError("Must provide frequency")
         return self.map_array(Resampler.get_rbound_index(
             index=self.wrapper.index[self.idx_arr],
             freq=self.wrapper.freq

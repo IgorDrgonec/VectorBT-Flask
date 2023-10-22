@@ -60,20 +60,12 @@ FigureMixinT = tp.TypeVar("FigureMixinT", bound="FigureMixin")
 
 
 class FigureMixin:
-    def show(self, *args, **kwargs) -> None:
-        """Display the figure."""
-        raise NotImplementedError
-
-    def show_png(self, **kwargs) -> None:
-        """Display the figure in PNG format."""
-        self.show(renderer="png", **kwargs)
-
-    def show_svg(self, **kwargs) -> None:
-        """Display the figure in SVG format."""
-        self.show(renderer="svg", **kwargs)
+    """Mixin class for figures."""
 
     def auto_rangebreaks(self: FigureMixinT, index: tp.Optional[tp.IndexLike] = None, **kwargs) -> FigureMixinT:
-        """Set range breaks automatically based on `vectorbtpro.utils.datetime_.get_rangebreaks`."""
+        """Set range breaks automatically based on `vectorbtpro.utils.datetime_.get_rangebreaks`.
+
+        Changes the figure in place and returns it."""
         if index is None:
             for d in self.data:
                 if "x" in d:
@@ -89,12 +81,61 @@ class FigureMixin:
         rangebreaks = get_rangebreaks(index, **kwargs)
         return self.update_xaxes(rangebreaks=rangebreaks)
 
+    def skip_index(self: FigureMixinT, skip_index: tp.IndexLike) -> FigureMixinT:
+        """Skip index values.
+
+        Changes the figure in place and returns it."""
+        return self.update_xaxes(rangebreaks=[dict(values=skip_index)])
+
+    def resolve_show_args(
+        self,
+        *args,
+        auto_rangebreaks: tp.Union[None, bool, dict] = None,
+        **kwargs,
+    ) -> tp.Tuple[tp.Args, tp.Kwargs]:
+        """Display the figure."""
+        from vectorbtpro._settings import settings
+
+        plotting_cfg = settings["plotting"]
+
+        _self = self
+        if auto_rangebreaks is None:
+            auto_rangebreaks = plotting_cfg["auto_rangebreaks"]
+        if auto_rangebreaks not in (False, None):
+            if auto_rangebreaks is True:
+                _self.auto_rangebreaks()
+            elif isinstance(auto_rangebreaks, dict):
+                _self.auto_rangebreaks(**auto_rangebreaks)
+            else:
+                raise TypeError("Argument auto_rangebreaks must be either bool or dict")
+        pre_show_func = plotting_cfg.get("pre_show_func", None)
+        if pre_show_func is not None:
+            __self = pre_show_func(_self)
+            if __self is not None:
+                _self = __self
+        fig_kwargs = dict(width=_self.layout.width, height=_self.layout.height)
+        kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
+        return args, kwargs
+
+    def show(self, *args, **kwargs) -> None:
+        """Display the figure."""
+        raise NotImplementedError
+
+    def show_png(self, **kwargs) -> None:
+        """Display the figure in PNG format."""
+        self.show(renderer="png", **kwargs)
+
+    def show_svg(self, **kwargs) -> None:
+        """Display the figure in SVG format."""
+        self.show(renderer="svg", **kwargs)
+
 
 class Figure(_Figure, FigureMixin):
-    """Figure."""
+    """Figure.
+
+    Extends `plotly.graph_objects.Figure`."""
 
     def __init__(self, *args, **kwargs) -> None:
-        """Extends `plotly.graph_objects.Figure`."""
         from vectorbtpro._settings import settings
 
         plotting_cfg = settings["plotting"]
@@ -104,26 +145,16 @@ class Figure(_Figure, FigureMixin):
         self.update_layout(**merge_dicts(plotting_cfg["layout"], layout))
 
     def show(self, *args, **kwargs) -> None:
-        """Show the figure."""
-        from vectorbtpro._settings import settings
-
-        plotting_cfg = settings["plotting"]
-
-        pre_show_func = plotting_cfg.get("pre_show_func", None)
-        if pre_show_func is not None:
-            _self = pre_show_func(self)
-        else:
-            _self = self
-        fig_kwargs = dict(width=_self.layout.width, height=_self.layout.height)
-        show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
-        _Figure.show(_self, *args, **show_kwargs)
+        args, kwargs = self.resolve_show_args(*args, **kwargs)
+        _Figure.show(self, *args, **kwargs)
 
 
 class FigureWidget(_FigureWidget, FigureMixin):
-    """Figure widget."""
+    """Figure widget.
+
+    Extends `plotly.graph_objects.FigureWidget`."""
 
     def __init__(self, *args, **kwargs) -> None:
-        """Extends `plotly.graph_objects.FigureWidget`."""
         from vectorbtpro._settings import settings
 
         plotting_cfg = settings["plotting"]
@@ -133,29 +164,19 @@ class FigureWidget(_FigureWidget, FigureMixin):
         self.update_layout(**merge_dicts(plotting_cfg["layout"], layout))
 
     def show(self, *args, **kwargs) -> None:
-        """Show the figure."""
-        from vectorbtpro._settings import settings
-
-        plotting_cfg = settings["plotting"]
-
-        pre_show_func = plotting_cfg.get("pre_show_func", None)
-        if pre_show_func is not None:
-            _self = pre_show_func(self)
-        else:
-            _self = self
-        fig_kwargs = dict(width=_self.layout.width, height=_self.layout.height)
-        show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
-        _Figure.show(_self, *args, **show_kwargs)
+        args, kwargs = self.resolve_show_args(*args, **kwargs)
+        _FigureWidget.show(self, *args, **kwargs)
 
 
 try:
     from plotly_resampler import FigureResampler as _FigureResampler, FigureWidgetResampler as _FigureWidgetResampler
 
     class FigureResampler(_FigureResampler, FigureMixin):
-        """Figure resampler."""
+        """Figure resampler.
+
+        Extends `plotly.graph_objects.Figure`."""
 
         def __init__(self, *args, **kwargs) -> None:
-            """Extends `plotly.graph_objects.Figure`."""
             from vectorbtpro._settings import settings
 
             plotting_cfg = settings["plotting"]
@@ -165,25 +186,15 @@ try:
             self.update_layout(**merge_dicts(plotting_cfg["layout"], layout))
 
         def show(self, *args, **kwargs) -> None:
-            """Show the figure."""
-            from vectorbtpro._settings import settings
-
-            plotting_cfg = settings["plotting"]
-
-            pre_show_func = plotting_cfg.get("pre_show_func", None)
-            if pre_show_func is not None:
-                _self = pre_show_func(self)
-            else:
-                _self = self
-            fig_kwargs = dict(width=_self.layout.width, height=_self.layout.height)
-            show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
-            _Figure.show(_self, *args, **show_kwargs)
+            args, kwargs = self.resolve_show_args(*args, **kwargs)
+            _FigureResampler.show(self, *args, **kwargs)
 
     class FigureWidgetResampler(_FigureWidgetResampler, FigureMixin):
-        """Figure widget resampler."""
+        """Figure widget resampler.
+
+        Extends `plotly.graph_objects.FigureWidget`."""
 
         def __init__(self, *args, **kwargs) -> None:
-            """Extends `plotly.graph_objects.FigureWidget`."""
             from vectorbtpro._settings import settings
 
             plotting_cfg = settings["plotting"]
@@ -193,19 +204,8 @@ try:
             self.update_layout(**merge_dicts(plotting_cfg["layout"], layout))
 
         def show(self, *args, **kwargs) -> None:
-            """Show the figure."""
-            from vectorbtpro._settings import settings
-
-            plotting_cfg = settings["plotting"]
-
-            pre_show_func = plotting_cfg.get("pre_show_func", None)
-            if pre_show_func is not None:
-                _self = pre_show_func(self)
-            else:
-                _self = self
-            fig_kwargs = dict(width=_self.layout.width, height=_self.layout.height)
-            show_kwargs = merge_dicts(fig_kwargs, plotting_cfg["show_kwargs"], kwargs)
-            _Figure.show(_self, *args, **show_kwargs)
+            args, kwargs = self.resolve_show_args(*args, **kwargs)
+            _FigureWidgetResampler.show(self, *args, **kwargs)
 
 except ImportError:
     FigureResampler = Figure

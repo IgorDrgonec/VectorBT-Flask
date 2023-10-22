@@ -23,7 +23,7 @@ from vectorbtpro.data.decorators import attach_symbol_dict_methods
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig, copy_dict
-from vectorbtpro.utils.datetime_ import is_tz_aware, to_timezone, try_to_datetime_index
+from vectorbtpro.utils.datetime_ import to_timezone, prepare_dt_index
 from vectorbtpro.utils.parsing import get_func_arg_names, extend_args
 from vectorbtpro.utils.path_ import check_mkdir
 from vectorbtpro.utils.template import RepEval, CustomTemplate, substitute_templates
@@ -31,6 +31,19 @@ from vectorbtpro.utils.pickling import pdict, RecState
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.decorators import cached_property, class_or_instancemethod
 from vectorbtpro.utils.selection import _NoResult, NoResult, NoResultsException
+
+try:
+    if not tp.TYPE_CHECKING:
+        raise ImportError
+    from sqlalchemy import Engine as EngineT
+except ImportError:
+    EngineT = tp.Any
+try:
+    if not tp.TYPE_CHECKING:
+        raise ImportError
+    from duckdb import DuckDBPyConnection as DuckDBPyConnectionT
+except ImportError:
+    DuckDBPyConnectionT = tp.Any
 
 __all__ = [
     "key_dict",
@@ -463,7 +476,7 @@ class MetaData(type(Analyzable), type(DataWithFeatures)):
 class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     """Class that downloads, updates, and manages data coming from a data source."""
 
-    _setting_keys: tp.SettingsKeys = dict(base="data")
+    _settings_path: tp.SettingsPath = dict(base="data")
 
     _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {"_feature_config"}
 
@@ -550,6 +563,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         for attr in cls._key_dict_attrs:
             if attr in kwargs:
                 attr_value = kwargs[attr]
+                if attr_value is None:
+                    attr_value = {}
                 checks.assert_instance_of(attr_value, dict, arg_name=attr)
                 if not isinstance(attr_value, key_dict):
                     attr_value = data_type(attr_value)
@@ -573,7 +588,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         objs = list(objs)
         for obj in objs:
             if not checks.is_instance_of(obj, Data):
-                raise TypeError("Each object to be merged must be an instance of Records")
+                raise TypeError("Each object to be merged must be an instance of Data")
         if "wrapper" not in kwargs:
             if wrapper_kwargs is None:
                 wrapper_kwargs = {}
@@ -630,7 +645,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         objs = list(objs)
         for obj in objs:
             if not checks.is_instance_of(obj, Data):
-                raise TypeError("Each object to be merged must be an instance of Records")
+                raise TypeError("Each object to be merged must be an instance of Data")
         if "wrapper" not in kwargs:
             if wrapper_kwargs is None:
                 wrapper_kwargs = {}
@@ -976,16 +991,53 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         """Argument `missing` passed to `Data.align_columns`."""
         return self._missing_columns
 
+    # ############# Settings ############# #
+
+    @classmethod
+    def get_base_settings(cls, *args, **kwargs) -> dict:
+        """`CustomData.get_settings` with `path_id="base"`."""
+        return cls.get_settings(*args, path_id="base", **kwargs)
+
+    @classmethod
+    def has_base_settings(cls, *args, **kwargs) -> bool:
+        """`CustomData.has_settings` with `path_id="base"`."""
+        return cls.has_settings(*args, path_id="base", **kwargs)
+
+    @classmethod
+    def get_base_setting(cls, *args, **kwargs) -> tp.Any:
+        """`CustomData.get_setting` with `path_id="base"`."""
+        return cls.get_setting(*args, path_id="base", **kwargs)
+
+    @classmethod
+    def has_base_setting(cls, *args, **kwargs) -> bool:
+        """`CustomData.has_setting` with `path_id="base"`."""
+        return cls.has_setting(*args, path_id="base", **kwargs)
+
+    @classmethod
+    def resolve_base_setting(cls, *args, **kwargs) -> tp.Any:
+        """`CustomData.resolve_setting` with `path_id="base"`."""
+        return cls.resolve_setting(*args, path_id="base", **kwargs)
+
+    @classmethod
+    def set_base_settings(cls, *args, **kwargs) -> None:
+        """`CustomData.set_settings` with `path_id="base"`."""
+        cls.set_settings(*args, path_id="base", **kwargs)
+
     # ############# Getting ############# #
 
     def get_key_wrapper(
         self,
         keys: tp.Optional[tp.MaybeKeys] = None,
-        stack_classes: bool = True,
+        attach_classes: bool = True,
         index_stack_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> ArrayWrapper:
-        """Get wrapper with keys as columns."""
+        """Get wrapper with keys as columns.
+
+        If `attach_classes` is True, attaches `Data.classes` by stacking them over
+        the keys using `vectorbtpro.base.indexes.stack_indexes`.
+
+        Other keyword arguments are passed to the constructor of the wrapper."""
         if index_stack_kwargs is None:
             index_stack_kwargs = {}
         if keys is None:
@@ -1013,7 +1065,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             **kwargs,
         )
 
-        if stack_classes:
+        if attach_classes:
             classes = []
             all_have_classes = True
             for key in wrapper.columns:
@@ -1039,6 +1091,11 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 key_columns = stack_indexes((classes_columns, wrapper.columns), **index_stack_kwargs)
                 wrapper = wrapper.replace(columns=key_columns)
         return wrapper
+
+    @cached_property
+    def key_wrapper(self) -> ArrayWrapper:
+        """Key wrapper."""
+        return self.get_key_wrapper()
 
     def get_feature_wrapper(self, features: tp.Optional[tp.MaybeFeatures] = None, **kwargs) -> ArrayWrapper:
         """Get wrapper with features as columns."""
@@ -1139,14 +1196,14 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     def concat(
         self,
         keys: tp.Optional[tp.Symbols] = None,
-        stack_classes: bool = True,
+        attach_classes: bool = True,
         index_stack_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.Union[feature_dict, symbol_dict]:
         """Concatenate keys along columns."""
         key_wrapper = self.get_key_wrapper(
             keys=keys,
-            stack_classes=stack_classes,
+            attach_classes=attach_classes,
             index_stack_kwargs=index_stack_kwargs,
             **kwargs,
         )
@@ -1185,13 +1242,15 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         symbol: tp.Optional[tp.Symbol] = None,
         squeeze_features: bool = False,
         squeeze_symbols: bool = False,
+        per: str = "feature",
+        as_dict: bool = False,
         **kwargs,
-    ) -> tp.MaybeTuple[tp.SeriesFrame]:
+    ) -> tp.Union[tp.MaybeTuple[tp.SeriesFrame], dict]:
         """Get one or more features of one or more symbols of data."""
         if features is not None and feature is not None:
-            raise ValueError("Either features or feature must be provided, not both")
+            raise ValueError("Must provide either features or feature, not both")
         if symbols is not None and symbol is not None:
-            raise ValueError("Either symbols or symbol must be provided, not both")
+            raise ValueError("Must provide either symbols or symbol, not both")
 
         if feature is not None:
             features = feature
@@ -1235,26 +1294,197 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             symbol_idxs = self.get_symbol_idx(symbols, raise_error=True)
             symbols = self.symbols[symbol_idxs]
 
-        if self.feature_oriented:
-            if single_feature:
-                if self.single_symbol:
-                    return self.data[self.features[feature_idxs]]
-                return self.data[self.features[feature_idxs]].iloc[:, symbol_idxs]
-            concat_data = self.concat(keys=features, **kwargs)
-            if single_symbol:
-                return list(concat_data.values())[symbol_idxs]
-            return tuple([list(concat_data.values())[i] for i in symbol_idxs])
-        else:
-            if single_symbol:
-                if self.single_feature:
-                    return self.data[self.symbols[symbol_idxs]]
-                return self.data[self.symbols[symbol_idxs]].iloc[:, feature_idxs]
-            concat_data = self.concat(keys=symbols, **kwargs)
-            if single_feature:
-                return list(concat_data.values())[feature_idxs]
-            return tuple([list(concat_data.values())[i] for i in feature_idxs])
+        def _get_objs():
+            if self.feature_oriented:
+                if single_feature:
+                    if self.single_symbol:
+                        return list(self.data.values())[feature_idxs], features
+                    return list(self.data.values())[feature_idxs].iloc[:, symbol_idxs], features
+                if single_symbol:
+                    concat_data = self.concat(keys=features, **kwargs)
+                    return list(concat_data.values())[symbol_idxs], symbols
+                if per.lower() in ("symbol", "column"):
+                    concat_data = self.concat(keys=features, **kwargs)
+                    return tuple([list(concat_data.values())[i] for i in symbol_idxs]), symbols
+                if per.lower() in ("feature", "key"):
+                    if self.single_feature:
+                        if self.single_symbol:
+                            return list(self.data.values())[feature_idxs], features
+                        return list(self.data.values())[feature_idxs].iloc[:, symbol_idxs], features
+                    if self.single_symbol:
+                        return tuple([list(self.data.values())[i] for i in feature_idxs]), features
+                    return tuple([list(self.data.values())[i].iloc[:, symbol_idxs] for i in feature_idxs]), features
+                raise ValueError(f"Invalid option per='{per}'")
+            else:
+                if single_symbol:
+                    if self.single_feature:
+                        return self.data[self.symbols[symbol_idxs]], symbols
+                    return self.data[self.symbols[symbol_idxs]].iloc[:, feature_idxs], symbols
+                if single_feature:
+                    concat_data = self.concat(keys=symbols, **kwargs)
+                    return list(concat_data.values())[feature_idxs], features
+                if per.lower() in ("feature", "column"):
+                    concat_data = self.concat(keys=symbols, **kwargs)
+                    return tuple([list(concat_data.values())[i] for i in feature_idxs]), features
+                if per.lower() in ("symbol", "key"):
+                    if self.single_symbol:
+                        if self.single_feature:
+                            return list(self.data.values())[symbol_idxs], symbols
+                        return list(self.data.values())[symbol_idxs].iloc[:, feature_idxs], symbols
+                    if self.single_feature:
+                        return tuple([list(self.data.values())[i] for i in symbol_idxs]), symbols
+                    return tuple([list(self.data.values())[i].iloc[:, feature_idxs] for i in symbol_idxs]), symbols
+                raise ValueError(f"Invalid option per='{per}'")
+
+        objs, keys = _get_objs()
+        if as_dict:
+            if isinstance(objs, tuple):
+                return dict(zip(keys, objs))
+            return {keys: objs}
+        return objs
 
     # ############# Pre- and post-processing ############# #
+
+    @classmethod
+    def prepare_dt_index(
+        cls,
+        index: tp.Index,
+        parse_dates: bool = False,
+        tz_localize: tp.TimezoneLike = None,
+        tz_convert: tp.TimezoneLike = None,
+        force_tz_convert: bool = False,
+        remove_tz: bool = False,
+    ) -> tp.SeriesFrame:
+        """Prepare datetime index.
+
+        If `parse_dates` is True, will try to convert the index with an object data type
+        into a datetime format using `vectorbtpro.utils.datetime_.prepare_dt_index`.
+
+        If `tz_localize` is not None, will localize a datetime-naive index into this timezone.
+
+        If `tz_convert` is not None, will convert a datetime-aware index into this timezone.
+        If `force_tz_convert` is True, will convert regardless of whether the index is datetime-aware."""
+        if parse_dates:
+            if not isinstance(index, (pd.DatetimeIndex, pd.MultiIndex)) and index.dtype == object:
+                index = prepare_dt_index(index)
+        if isinstance(index, pd.DatetimeIndex):
+            if index.tz is None and tz_localize is not None:
+                index = index.tz_localize(to_timezone(tz_localize))
+            if tz_convert is not None:
+                if index.tz is not None or force_tz_convert:
+                    index = index.tz_convert(to_timezone(tz_convert))
+            if remove_tz and index.tz is not None:
+                index = index.tz_localize(None)
+        return index
+
+    @classmethod
+    def prepare_dt_column(
+        cls,
+        sr: tp.Series,
+        parse_dates: bool = False,
+        tz_localize: tp.TimezoneLike = None,
+        tz_convert: tp.TimezoneLike = None,
+        force_tz_convert: bool = False,
+        remove_tz: bool = False,
+    ) -> tp.Series:
+        """Prepare datetime column.
+
+        See `Data.prepare_dt_index` for arguments."""
+        index = cls.prepare_dt_index(
+            pd.Index(sr),
+            parse_dates=parse_dates,
+            tz_localize=tz_localize,
+            tz_convert=tz_convert,
+            force_tz_convert=force_tz_convert,
+            remove_tz=remove_tz,
+        )
+        if isinstance(index, pd.DatetimeIndex):
+            return pd.Series(index, index=sr.index, name=sr.name)
+        return sr
+
+    @classmethod
+    def prepare_dt(
+        cls,
+        obj: tp.SeriesFrame,
+        parse_dates: tp.Union[None, bool, tp.Sequence[str]] = True,
+        to_utc: tp.Union[None, bool, str, tp.Sequence[str]] = True,
+        remove_utc_tz: bool = False,
+    ) -> tp.Frame:
+        """Prepare datetime index and columns.
+
+        If `parse_dates` is True, will try to convert any index and column with object data type
+        into a datetime format using `vectorbtpro.utils.datetime_.prepare_dt_index`.
+        If `parse_dates` is a list or dict, will first check whether the name of the column
+        is among the names that are in `parse_dates`.
+
+        If `to_utc` is True or `to_utc` is "index" or `to_utc` is a sequence and index name is in this
+        sequence, will localize/convert any datetime index to the UTC timezone. If `to_utc` is True or
+        `to_utc` is "columns" or `to_utc` is a sequence and column name is in this sequence, will
+        localize/convert any datetime column to the UTC timezone."""
+        obj = obj.copy(deep=False)
+        made_frame = False
+        if isinstance(obj, pd.Series):
+            obj = obj.to_frame()
+            made_frame = True
+
+        index_parse_dates = False
+        if not isinstance(obj.index, pd.MultiIndex) and obj.index.dtype == object:
+            if parse_dates is True:
+                index_parse_dates = True
+            elif checks.is_sequence(parse_dates) and obj.index.name in parse_dates:
+                index_parse_dates = True
+        if (
+            to_utc is True
+            or (isinstance(to_utc, str) and to_utc.lower() == "index")
+            or (checks.is_sequence(to_utc) and obj.index.name in to_utc)
+        ):
+            index_tz_localize = "utc"
+            index_tz_convert = "utc"
+            index_remove_tz = remove_utc_tz
+        else:
+            index_tz_localize = None
+            index_tz_convert = None
+            index_remove_tz = False
+        obj.index = cls.prepare_dt_index(
+            obj.index,
+            parse_dates=index_parse_dates,
+            tz_localize=index_tz_localize,
+            tz_convert=index_tz_convert,
+            remove_tz=index_remove_tz,
+        )
+
+        for column_name in obj.columns:
+            column_parse_dates = False
+            if obj[column_name].dtype == object:
+                if parse_dates is True:
+                    column_parse_dates = True
+                elif checks.is_sequence(parse_dates) and column_name in parse_dates:
+                    column_parse_dates = True
+            elif not hasattr(obj[column_name], "dt"):
+                continue
+            if (
+                to_utc is True
+                or (isinstance(to_utc, str) and to_utc.lower() == "columns")
+                or (checks.is_sequence(to_utc) and column_name in to_utc)
+            ):
+                column_tz_localize = "utc"
+                column_tz_convert = "utc"
+                column_remove_tz = remove_utc_tz
+            else:
+                column_tz_localize = None
+                column_tz_convert = None
+                column_remove_tz = False
+            obj[column_name] = cls.prepare_dt_column(
+                obj[column_name],
+                parse_dates=column_parse_dates,
+                tz_localize=column_tz_localize,
+                tz_convert=column_tz_convert,
+                remove_tz=column_remove_tz,
+            )
+
+        if made_frame:
+            obj = obj.iloc[:, 0]
+        return obj
 
     @classmethod
     def prepare_tzaware_index(
@@ -1263,37 +1493,30 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         tz_localize: tp.Union[None, bool, tp.TimezoneLike] = None,
         tz_convert: tp.Union[None, bool, tp.TimezoneLike] = None,
     ) -> tp.SeriesFrame:
-        """Prepare a timezone-aware index of a pandas object.
+        """Prepare a timezone-aware index of a Pandas object.
 
-        If the index is tz-naive, convert to a timezone using `tz_localize`.
-        Convert the index from one timezone to another using `tz_convert`.
-        See `vectorbtpro.utils.datetime_.to_timezone`.
+        Uses `Data.prepare_dt_index` with `parse_dates=True` and `force_tz_convert=True`.
 
         For defaults, see `vectorbtpro._settings.data`."""
-        data_cfg = cls.get_settings(key_id="base")
-
-        if tz_localize is None:
-            tz_localize = data_cfg["tz_localize"]
+        tz_localize = cls.resolve_base_setting(tz_localize, "tz_localize")
         if isinstance(tz_localize, bool):
             if tz_localize:
                 raise ValueError("tz_localize cannot be True")
             else:
                 tz_localize = None
-        if tz_convert is None:
-            tz_convert = data_cfg["tz_convert"]
+        tz_convert = cls.resolve_base_setting(tz_convert, "tz_convert")
         if isinstance(tz_convert, bool):
             if tz_convert:
                 raise ValueError("tz_convert cannot be True")
             else:
                 tz_convert = None
-
-        if isinstance(obj.index, pd.DatetimeIndex):
-            if tz_localize is not None:
-                if not is_tz_aware(obj.index):
-                    obj = obj.tz_localize(to_timezone(tz_localize))
-            if tz_convert is not None:
-                obj = obj.tz_convert(to_timezone(tz_convert))
-        obj.index = try_to_datetime_index(obj.index)
+        obj.index = cls.prepare_dt_index(
+            obj.index,
+            parse_dates=True,
+            tz_localize=tz_localize,
+            tz_convert=tz_convert,
+            force_tz_convert=True,
+        )
         return obj
 
     @classmethod
@@ -1312,15 +1535,12 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         * 'raise': raise an error
 
         For defaults, see `vectorbtpro._settings.data`."""
-        data_cfg = cls.get_settings(key_id="base")
-
-        if missing is None:
-            missing = data_cfg["missing_index"]
-        if silence_warnings is None:
-            silence_warnings = data_cfg["silence_warnings"]
+        missing = cls.resolve_base_setting(missing, "missing_index")
+        silence_warnings = cls.resolve_base_setting(silence_warnings, "silence_warnings")
 
         index = None
-        for symbol, obj in data.items():
+        index_changed = False
+        for k, obj in data.items():
             obj_index = obj.index.sort_values()
             if index is None:
                 index = obj_index
@@ -1333,6 +1553,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                                 stacklevel=2,
                             )
                         index = index.union(obj_index)
+                        index_changed = True
                     elif missing == "drop":
                         if not silence_warnings:
                             warnings.warn(
@@ -1340,12 +1561,15 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                                 stacklevel=2,
                             )
                         index = index.intersection(obj_index)
+                        index_changed = True
                     elif missing == "raise":
                         raise ValueError("Symbols have mismatching index")
                     else:
                         raise ValueError(f"Invalid option missing='{missing}'")
 
-        new_data = {symbol: obj.reindex(index=index) for symbol, obj in data.items()}
+        if not index_changed:
+            return data
+        new_data = {k: obj.reindex(index=index) for k, obj in data.items()}
         return type(data)(new_data)
 
     @classmethod
@@ -1361,17 +1585,14 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         if len(data) == 1:
             return data
 
-        data_cfg = cls.get_settings(key_id="base")
-
-        if missing is None:
-            missing = data_cfg["missing_columns"]
-        if silence_warnings is None:
-            silence_warnings = data_cfg["silence_warnings"]
+        missing = cls.resolve_base_setting(missing, "missing_columns")
+        silence_warnings = cls.resolve_base_setting(silence_warnings, "silence_warnings")
 
         columns = None
         multiple_columns = False
         name_is_none = False
-        for symbol, obj in data.items():
+        columns_changed = False
+        for k, obj in data.items():
             if isinstance(obj, pd.Series):
                 if obj.name is None:
                     name_is_none = True
@@ -1390,6 +1611,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                                 stacklevel=2,
                             )
                         columns = columns.union(obj_columns)
+                        columns_changed = True
                     elif missing == "drop":
                         if not silence_warnings:
                             warnings.warn(
@@ -1397,13 +1619,16 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                                 stacklevel=2,
                             )
                         columns = columns.intersection(obj_columns)
+                        columns_changed = True
                     elif missing == "raise":
                         raise ValueError("Symbols have mismatching columns")
                     else:
                         raise ValueError(f"Invalid option missing='{missing}'")
 
+        if not columns_changed:
+            return data
         new_data = {}
-        for symbol, obj in data.items():
+        for k, obj in data.items():
             if isinstance(obj, pd.Series):
                 obj = obj.to_frame()
             obj = obj.reindex(columns=columns)
@@ -1411,7 +1636,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 obj = obj[columns[0]]
                 if name_is_none:
                     obj = obj.rename(None)
-            new_data[symbol] = obj
+            new_data[k] = obj
         return type(data)(new_data)
 
     def switch_class(
@@ -1497,7 +1722,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         data = type(data)(data)
         for k, obj in data.items():
             obj = to_pd_array(obj)
-            obj = obj[~obj.index.duplicated(keep="last")]
+            if obj.index.has_duplicates:
+                obj = obj[~obj.index.duplicated(keep="last")]
             obj = cls_or_self.prepare_tzaware_index(obj, tz_localize=tz_localize, tz_convert=tz_convert)
             data[k] = obj
             if (isinstance(data, symbol_dict) and isinstance(last_index, symbol_dict)) or (
@@ -1648,13 +1874,13 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             **kwargs,
         )
 
-    def invert(self: DataT, get_wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
+    def invert(self: DataT, key_wrapper_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
         """Invert data and return a new instance."""
-        if get_wrapper_kwargs is None:
-            get_wrapper_kwargs = {}
-        new_data = self.concat(stack_classes=False)
+        if key_wrapper_kwargs is None:
+            key_wrapper_kwargs = {}
+        new_data = self.concat(attach_classes=False)
         if "wrapper" not in kwargs:
-            kwargs["wrapper"] = self.get_key_wrapper(**get_wrapper_kwargs)
+            kwargs["wrapper"] = self.get_key_wrapper(**key_wrapper_kwargs)
         if "classes" not in kwargs:
             kwargs["classes"] = self.column_type()
         if "single_key" not in kwargs:
@@ -1692,31 +1918,50 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             return self
         return self.invert(**kwargs)
 
+    @classmethod
+    def has_key_dict(
+        cls,
+        arg: tp.Any,
+        dict_type: tp.Optional[tp.Type[tp.Union[feature_dict, symbol_dict]]] = None,
+    ) -> bool:
+        """Check whether the argument contains any data dictionary."""
+        if dict_type is None:
+            dict_type = key_dict
+        if isinstance(arg, dict_type):
+            return True
+        if isinstance(arg, dict):
+            for k, v in arg.items():
+                if isinstance(v, dict_type):
+                    return True
+        return False
+
     @class_or_instancemethod
     def check_dict_type(
         cls_or_self,
         arg: tp.Any,
-        arg_name: str,
+        arg_name: tp.Optional[str] = None,
         dict_type: tp.Optional[tp.Type[tp.Union[feature_dict, symbol_dict]]] = None,
     ) -> None:
+        """Check whether the argument conforms to a data dictionary."""
         if isinstance(cls_or_self, type):
             checks.assert_not_none(dict_type, arg_name="dict_type")
         if dict_type is None:
             dict_type = cls_or_self.dict_type
-        if issubclass(dict_type, feature_dict) and isinstance(arg, symbol_dict):
-            raise TypeError(f"Argument '{arg_name}' must be an instance of feature_dict, not symbol_dict")
-        if issubclass(dict_type, symbol_dict) and isinstance(arg, feature_dict):
-            raise TypeError(f"Argument '{arg_name}' must be an instance of symbol_dict, not feature_dict")
+        if issubclass(dict_type, feature_dict):
+            checks.assert_not_instance_of(arg, symbol_dict, arg_name=arg_name)
+        if issubclass(dict_type, symbol_dict):
+            checks.assert_not_instance_of(arg, feature_dict, arg_name=arg_name)
 
     @class_or_instancemethod
     def select_key_kwargs(
         cls_or_self,
         key: tp.Key,
-        kwargs: tp.DictLike,
+        kwargs: tp.KwargsLike,
+        kwargs_name: str = "kwargs",
         dict_type: tp.Optional[tp.Type[tp.Union[feature_dict, symbol_dict]]] = None,
         check_dict_type: bool = True,
-    ) -> dict:
-        """Select keyword arguments belonging to a feature or symbol."""
+    ) -> tp.Kwargs:
+        """Select the keyword arguments belonging to a feature or symbol."""
         if isinstance(cls_or_self, type):
             checks.assert_not_none(dict_type, arg_name="dict_type")
         if dict_type is None:
@@ -1724,15 +1969,15 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         if kwargs is None:
             return {}
         if check_dict_type:
-            cls_or_self.check_dict_type(kwargs, "kwargs", dict_type=dict_type)
+            cls_or_self.check_dict_type(kwargs, arg_name=kwargs_name, dict_type=dict_type)
         if isinstance(kwargs, (key_dict, dict_type)):
             if key not in kwargs:
                 return {}
-            kwargs = kwargs[key]
+            kwargs = dict(kwargs[key])
         _kwargs = {}
         for k, v in kwargs.items():
             if check_dict_type:
-                cls_or_self.check_dict_type(v, k, dict_type=dict_type)
+                cls_or_self.check_dict_type(v, arg_name=f"{kwargs_name}[{k}]", dict_type=dict_type)
             if isinstance(v, (key_dict, dict_type)):
                 if key in v:
                     _kwargs[k] = v[key]
@@ -1741,14 +1986,42 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         return _kwargs
 
     @classmethod
-    def select_feature_kwargs(cls, feature: tp.Feature, kwargs: tp.DictLike, check_dict_type: bool = True) -> dict:
-        """Select keyword arguments belonging to a feature."""
-        return cls.select_key_kwargs(feature, kwargs, feature_dict, check_dict_type=check_dict_type)
+    def select_feature_kwargs(cls, feature: tp.Feature, kwargs: tp.KwargsLike, **kwargs_) -> tp.Kwargs:
+        """Select the keyword arguments belonging to a feature."""
+        return cls.select_key_kwargs(feature, kwargs, dict_type=feature_dict, **kwargs_)
 
     @classmethod
-    def select_symbol_kwargs(cls, symbol: tp.Symbol, kwargs: tp.DictLike, check_dict_type: bool = True) -> dict:
-        """Select keyword arguments belonging to a symbol."""
-        return cls.select_key_kwargs(symbol, kwargs, symbol_dict, check_dict_type=check_dict_type)
+    def select_symbol_kwargs(cls, symbol: tp.Symbol, kwargs: tp.KwargsLike, **kwargs_) -> tp.Kwargs:
+        """Select the keyword arguments belonging to a symbol."""
+        return cls.select_key_kwargs(symbol, kwargs, dict_type=symbol_dict, **kwargs_)
+
+    @class_or_instancemethod
+    def select_key_from_dict(
+        cls_or_self,
+        key: tp.Key,
+        dct: key_dict,
+        dct_name: str = "dct",
+        dict_type: tp.Optional[tp.Type[tp.Union[feature_dict, symbol_dict]]] = None,
+        check_dict_type: bool = True,
+    ) -> tp.Any:
+        """Select the dictionary value belonging to a feature or symbol."""
+        if isinstance(cls_or_self, type):
+            checks.assert_not_none(dict_type, arg_name="dict_type")
+        if dict_type is None:
+            dict_type = cls_or_self.dict_type
+        if check_dict_type:
+            cls_or_self.check_dict_type(dct, arg_name=dct_name, dict_type=dict_type)
+        return dct[key]
+
+    @classmethod
+    def select_feature_from_dict(cls, feature: tp.Feature, dct: feature_dict, **kwargs) -> tp.Any:
+        """Select the dictionary value belonging to a feature."""
+        return cls.select_key_kwargs(feature, dct, dict_type=feature_dict, **kwargs)
+
+    @classmethod
+    def select_symbol_from_dict(cls, symbol: tp.Symbol, dct: symbol_dict, **kwargs) -> tp.Any:
+        """Select the dictionary value belonging to a symbol."""
+        return cls.select_key_kwargs(symbol, dct, dict_type=symbol_dict, **kwargs)
 
     @classmethod
     def select_from_dict(cls, dct: dict, keys: tp.Keys, raise_error: bool = False) -> dict:
@@ -1973,14 +2246,12 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     @classmethod
     def resolve_keys_meta(
         cls,
-        keys: tp.Union[tp.MaybeKeys] = None,
+        keys: tp.Union[None, dict, tp.MaybeKeys] = None,
         keys_are_features: tp.Optional[bool] = None,
-        features: tp.Union[tp.MaybeFeatures] = None,
-        symbols: tp.Union[tp.MaybeSymbols] = None,
+        features: tp.Union[None, dict, tp.MaybeFeatures] = None,
+        symbols: tp.Union[None, dict, tp.MaybeSymbols] = None,
     ) -> tp.Kwargs:
         """Resolve metadata for keys."""
-        data_cfg = cls.get_settings(key_id="base")
-
         if keys is not None and features is not None:
             raise ValueError("Must provide either keys or features, not both")
         if keys is not None and symbols is not None:
@@ -1989,16 +2260,31 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             raise ValueError("Must provide either features or symbols, not both")
         if keys is None:
             if features is not None:
+                if isinstance(features, dict):
+                    cls.check_dict_type(features, "features", dict_type=feature_dict)
                 keys = features
                 keys_are_features = True
                 dict_type = feature_dict
+            elif symbols is not None:
+                if isinstance(symbols, dict):
+                    cls.check_dict_type(symbols, "symbols", dict_type=symbol_dict)
+                keys = symbols
+                keys_are_features = False
+                dict_type = symbol_dict
             else:
                 keys = symbols
                 keys_are_features = False
                 dict_type = symbol_dict
         else:
-            if keys_are_features is None:
-                keys_are_features = data_cfg["keys_are_features"]
+            if isinstance(keys, feature_dict):
+                if keys_are_features is not None and not keys_are_features:
+                    raise TypeError("Keys are of type feature_dict but keys_are_features is False")
+                keys_are_features = True
+            elif isinstance(keys, symbol_dict):
+                if keys_are_features is not None and keys_are_features:
+                    raise TypeError("Keys are of type symbol_dict but keys_are_features is True")
+                keys_are_features = False
+            keys_are_features = cls.resolve_base_setting(keys_are_features, "keys_are_features")
             if keys_are_features:
                 dict_type = feature_dict
             else:
@@ -2012,11 +2298,11 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     @classmethod
     def pull(
         cls: tp.Type[DataT],
-        keys: tp.Union[tp.MaybeKeys] = None,
+        keys: tp.Union[None, dict, tp.MaybeKeys] = None,
         *,
         keys_are_features: tp.Optional[bool] = None,
-        features: tp.Union[tp.MaybeFeatures] = None,
-        symbols: tp.Union[tp.MaybeSymbols] = None,
+        features: tp.Union[None, dict, tp.MaybeFeatures] = None,
+        symbols: tp.Union[None, dict, tp.MaybeSymbols] = None,
         classes: tp.Optional[tp.MaybeSequence[tp.Union[tp.Hashable, dict]]] = None,
         level_name: tp.Union[None, bool, tp.MaybeIterable[tp.Hashable]] = None,
         tz_localize: tp.Union[None, bool, tp.TimezoneLike] = None,
@@ -2080,8 +2366,6 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
         For defaults, see `vectorbtpro._settings.data`.
         """
-        data_cfg = cls.get_settings(key_id="base")
-
         keys_meta = cls.resolve_keys_meta(
             keys=keys,
             keys_are_features=keys_are_features,
@@ -2109,7 +2393,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             single_key = True
             keys = [keys]
         if classes is not None:
-            cls.check_dict_type(classes, "classes", dict_type=dict_type)
+            cls.check_dict_type(classes, arg_name="classes", dict_type=dict_type)
             if not isinstance(classes, key_dict):
                 new_classes = {}
                 single_class = checks.is_hashable(classes) or isinstance(classes, dict)
@@ -2132,12 +2416,10 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                                 _classes = {"symbol_class": _classes}
                         new_classes[k] = _classes
                 classes = new_classes
-        wrapper_kwargs = merge_dicts(data_cfg["wrapper_kwargs"], wrapper_kwargs)
-        if skip_on_error is None:
-            skip_on_error = data_cfg["skip_on_error"]
-        if silence_warnings is None:
-            silence_warnings = data_cfg["silence_warnings"]
-        execute_kwargs = merge_dicts(data_cfg["execute_kwargs"], execute_kwargs)
+        wrapper_kwargs = cls.resolve_base_setting(wrapper_kwargs, "wrapper_kwargs", merge=True)
+        skip_on_error = cls.resolve_base_setting(skip_on_error, "skip_on_error")
+        silence_warnings = cls.resolve_base_setting(silence_warnings, "silence_warnings")
+        execute_kwargs = cls.resolve_base_setting(execute_kwargs, "execute_kwargs", merge=True)
         if not single_key and "show_progress" not in execute_kwargs:
             execute_kwargs["show_progress"] = True
 
@@ -2376,13 +2658,9 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         !!! note
             Returns a new `Data` instance instead of changing the data in place.
         """
-        data_cfg = self.get_settings(key_id="base")
-
-        if skip_on_error is None:
-            skip_on_error = data_cfg["skip_on_error"]
-        if silence_warnings is None:
-            silence_warnings = data_cfg["silence_warnings"]
-        execute_kwargs = merge_dicts(data_cfg["execute_kwargs"], execute_kwargs)
+        skip_on_error = self.resolve_base_setting(skip_on_error, "skip_on_error")
+        silence_warnings = self.resolve_base_setting(silence_warnings, "silence_warnings")
+        execute_kwargs = self.resolve_base_setting(execute_kwargs, "execute_kwargs", merge=True)
         if "show_progress" not in execute_kwargs:
             execute_kwargs["show_progress"] = False
         if self.feature_oriented:
@@ -2591,6 +2869,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         per_feature: bool = False,
         per_symbol: bool = False,
         pass_frame: bool = False,
+        key_wrapper_kwargs: tp.KwargsLike = None,
+        template_context: tp.KwargsLike = None,
         **kwargs,
     ) -> DataT:
         """Transform data.
@@ -2601,6 +2881,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         if `pass_frame` is False or as a DataFrame with one column if `pass_frame` is True.
         If both are False, concatenates all features and symbols into a single DataFrame
         and calls `transform_func` on it. Then, splits the data by key and builds a new `Data` instance.
+        Keyword arguments `key_wrapper_kwargs` are passed to `Data.get_key_wrapper` to control,
+        for example, attachment of classes.
 
         After the transformation, the new data is aligned using `Data.align_data`.
 
@@ -2612,32 +2894,47 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             To add new columns, use either column stacking or `Data.merge`.
 
             Index, on the other hand, can be changed freely."""
-        if (self.feature_oriented and per_feature) or (self.symbol_oriented and per_symbol):
+        if key_wrapper_kwargs is None:
+            key_wrapper_kwargs = {}
+        if template_context is None:
+            template_context = {}
+
+        def _transform(data, _template_context=None):
+            _transform_func = substitute_templates(transform_func, _template_context, sub_id="transform_func")
+            _args = substitute_templates(args, _template_context, sub_id="args")
+            _kwargs = substitute_templates(kwargs, _template_context, sub_id="kwargs")
+            return _transform_func(data, *_args, **_kwargs)
+
+        if (self.feature_oriented and (per_feature and not per_symbol)) or (
+            self.symbol_oriented and (per_symbol and not per_feature)
+        ):
             new_data = self.dict_type()
             for k in self.keys:
-                if (self.feature_oriented and per_symbol) or (self.symbol_oriented and per_feature):
-                    if isinstance(self.data[k], pd.Series):
-                        new_data[k] = transform_func(self.data[k], *args, **kwargs)
-                    else:
-                        _new_data = []
-                        for i in range(len(self.data[k].columns)):
-                            if pass_frame:
-                                _new_data.append(transform_func(self.data[k].iloc[:, [i]], *args, **kwargs))
-                            else:
-                                new_obj = transform_func(self.data[k].iloc[:, i], *args, **kwargs)
-                                checks.assert_meta_equal(new_obj, self.data[k].iloc[:, i], axis=1)
-                                new_obj = new_obj.to_frame()
-                                new_obj.columns = self.data[k].columns[[i]]
-                                _new_data.append(new_obj)
-                        new_data[k] = pd.concat(_new_data, axis=1)
+                if self.feature_oriented:
+                    _template_context = merge_dicts(dict(key=k, feature=k), template_context)
                 else:
-                    new_data[k] = transform_func(self.data[k], *args, **kwargs)
+                    _template_context = merge_dicts(dict(key=k, symbol=k), template_context)
+                new_data[k] = _transform(self.data[k], _template_context)
                 checks.assert_meta_equal(new_data[k], self.data[k], axis=1)
-        elif (self.feature_oriented and per_symbol) or (self.symbol_oriented and per_feature):
+        elif (self.feature_oriented and (per_symbol and not per_feature)) or (
+            self.symbol_oriented and (per_feature and not per_symbol)
+        ):
             first_data = self.data[list(self.data.keys())[0]]
             if isinstance(first_data, pd.Series):
                 concat_data = pd.concat(self.data.values(), axis=1)
-                new_concat_data = transform_func(concat_data, *args, **kwargs)
+                key_wrapper = self.get_key_wrapper(**key_wrapper_kwargs)
+                concat_data.columns = key_wrapper.columns
+                if self.feature_oriented:
+                    _template_context = merge_dicts(
+                        dict(column=self.wrapper.columns[0], symbol=self.wrapper.columns[0]),
+                        template_context,
+                    )
+                else:
+                    _template_context = merge_dicts(
+                        dict(column=self.wrapper.columns[0], feature=self.wrapper.columns[0]),
+                        template_context,
+                    )
+                new_concat_data = _transform(concat_data, _template_context)
                 checks.assert_meta_equal(new_concat_data, concat_data, axis=1)
                 new_data = self.dict_type()
                 for i, k in enumerate(self.keys):
@@ -2647,7 +2944,19 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 all_concat_data = []
                 for i in range(len(first_data.columns)):
                     concat_data = pd.concat([self.data[k].iloc[:, [i]] for k in self.keys], axis=1)
-                    new_concat_data = transform_func(concat_data, *args, **kwargs)
+                    key_wrapper = self.get_key_wrapper(**key_wrapper_kwargs)
+                    concat_data.columns = key_wrapper.columns
+                    if self.feature_oriented:
+                        _template_context = merge_dicts(
+                            dict(column=self.wrapper.columns[i], symbol=self.wrapper.columns[i]),
+                            template_context,
+                        )
+                    else:
+                        _template_context = merge_dicts(
+                            dict(column=self.wrapper.columns[i], feature=self.wrapper.columns[i]),
+                            template_context,
+                        )
+                    new_concat_data = _transform(concat_data, _template_context)
                     checks.assert_meta_equal(new_concat_data, concat_data, axis=1)
                     all_concat_data.append(new_concat_data)
                 new_data = self.dict_type()
@@ -2656,14 +2965,48 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     for c in range(len(first_data.columns)):
                         new_objs.append(all_concat_data[c].iloc[:, [i]])
                     new_data[k] = pd.concat(new_objs, axis=1)
+                    new_data[k].columns = first_data.columns
         else:
-            if isinstance(self.level_name, tuple):
-                keys = pd.MultiIndex.from_tuples(self.keys, names=self.level_name)
+            key_wrapper = self.get_key_wrapper(**key_wrapper_kwargs)
+            concat_data = pd.concat(self.data.values(), axis=1, keys=key_wrapper.columns)
+            if (self.feature_oriented and (per_feature and per_symbol)) or (
+                self.symbol_oriented and (per_symbol and per_feature)
+            ):
+                new_concat_data = []
+                for i in range(len(concat_data.columns)):
+                    if self.feature_oriented:
+                        _template_context = merge_dicts(
+                            dict(
+                                key=self.keys[i // len(self.wrapper.columns)],
+                                column=self.wrapper.columns[i % len(self.wrapper.columns)],
+                                feature=self.keys[i // len(self.wrapper.columns)],
+                                symbol=self.wrapper.columns[i % len(self.wrapper.columns)],
+                            ),
+                            template_context,
+                        )
+                    else:
+                        _template_context = merge_dicts(
+                            dict(
+                                key=self.wrapper.columns[i % len(self.wrapper.columns)],
+                                column=self.keys[i // len(self.wrapper.columns)],
+                                feature=self.wrapper.columns[i % len(self.wrapper.columns)],
+                                symbol=self.keys[i // len(self.wrapper.columns)],
+                            ),
+                            template_context,
+                        )
+                    if pass_frame:
+                        new_obj = _transform(concat_data.iloc[:, [i]], _template_context)
+                        checks.assert_meta_equal(new_obj, concat_data.iloc[:, [i]], axis=1)
+                    else:
+                        new_obj = _transform(concat_data.iloc[:, i], _template_context)
+                        checks.assert_meta_equal(new_obj, concat_data.iloc[:, i], axis=1)
+                    new_concat_data.append(new_obj)
+                new_concat_data = pd.concat(new_concat_data, axis=1)
             else:
-                keys = pd.Index(self.keys, name=self.level_name)
-            concat_data = pd.concat(self.data.values(), axis=1, keys=keys)
-            new_concat_data = transform_func(concat_data, *args, **kwargs)
-            checks.assert_meta_equal(new_concat_data, concat_data, axis=1)
+                new_concat_data = _transform(concat_data)
+                checks.assert_meta_equal(new_concat_data, concat_data, axis=1)
+            native_concat_data = pd.concat(self.data.values(), axis=1, keys=None)
+            new_concat_data.columns = native_concat_data.columns
             new_data = self.dict_type()
             first_data = self.data[list(self.data.keys())[0]]
             for i, k in enumerate(self.keys):
@@ -2770,8 +3113,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         """Perform realigning on `Data`.
 
         Looks for `realign_func` of each feature in `Data.feature_config`. If no function provided,
-        resamples feature "open" with `vectorbtpro.generic.accessors.GenericAccessor.resample_opening`
-        and other features with `vectorbtpro.generic.accessors.GenericAccessor.resample_closing`."""
+        resamples feature "open" with `vectorbtpro.generic.accessors.GenericAccessor.realign_opening`
+        and other features with `vectorbtpro.generic.accessors.GenericAccessor.realign_closing`."""
         if rule is None:
             rule = self.wrapper.freq
         if wrapper_meta is None:
@@ -2784,8 +3127,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     return getattr(obj.vbt, realign_func)(wrapper_meta["resampler"], ffill=ffill)
                 return realign_func(self, obj, wrapper_meta["resampler"], ffill=ffill)
             if isinstance(feature, str) and feature.lower() == "open":
-                return obj.vbt.resample_opening(wrapper_meta["resampler"], ffill=ffill)
-            return obj.vbt.resample_closing(wrapper_meta["resampler"], ffill=ffill)
+                return obj.vbt.realign_opening(wrapper_meta["resampler"], ffill=ffill)
+            return obj.vbt.realign_closing(wrapper_meta["resampler"], ffill=ffill)
 
         new_data = self.dict_type()
         if self.feature_oriented:
@@ -3121,58 +3464,86 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
     # ############# Persisting ############# #
 
+    def resolve_key_arg(
+        self,
+        arg: tp.Any,
+        k: tp.Key,
+        arg_name: str,
+        check_dict_type: bool = True,
+        template_context: tp.KwargsLike = None,
+        is_kwargs: bool = False,
+    ) -> tp.Any:
+        """Resolve argument."""
+        if check_dict_type:
+            self.check_dict_type(arg, arg_name=arg_name)
+        if isinstance(arg, key_dict):
+            _arg = arg[k]
+        else:
+            if is_kwargs:
+                _arg = self.select_key_kwargs(k, arg, check_dict_type=check_dict_type)
+            else:
+                _arg = arg
+        if isinstance(_arg, CustomTemplate):
+            _arg = _arg.substitute(template_context, sub_id=arg_name)
+        elif is_kwargs:
+            _arg = substitute_templates(_arg, template_context, sub_id=arg_name)
+        return _arg
+
     def to_csv(
         self,
-        dir_path: tp.Union[tp.PathLike, feature_dict, symbol_dict] = ".",
-        ext: tp.Union[str, feature_dict, symbol_dict] = "csv",
-        path_or_buf: tp.Union[None, str, feature_dict, symbol_dict] = None,
-        mkdir_kwargs: tp.Union[tp.KwargsLike, feature_dict, symbol_dict] = None,
+        path_or_buf: tp.Union[tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = ".",
+        ext: tp.Union[str, feature_dict, symbol_dict, CustomTemplate] = "csv",
+        mkdir_kwargs: tp.Union[tp.KwargsLike, feature_dict, symbol_dict, CustomTemplate] = None,
         check_dict_type: bool = True,
+        template_context: tp.KwargsLike = None,
+        return_meta: bool = False,
         **kwargs,
-    ) -> None:
-        """Save data into CSV file(s).
+    ) -> tp.Union[None, feature_dict, symbol_dict]:
+        """Save data to CSV file(s).
+
+        Uses https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_csv.html
 
         Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
         depending on the format of the data dictionary.
 
-        Each feature/symbol gets saved to a separate file, that's why the first argument is the path
-        to the directory, not file! If there's only one file, you can specify the file path via
-        `path_or_buf`. If there are multiple files, use the same argument but wrap the multiple paths
-        with `feature_dict`/`symbol_dict`."""
+        If `path_or_buf` is a path to a directory, will save each feature/symbol to a separate file.
+        If there's only one file, you can specify the file path via `path_or_buf`. If there are
+        multiple files, use the same argument but wrap the multiple paths with `key_dict`."""
+        meta = self.dict_type()
         for k, v in self.data.items():
-            if check_dict_type:
-                self.check_dict_type(path_or_buf, "path_or_buf")
-            if path_or_buf is None:
-                if check_dict_type:
-                    self.check_dict_type(dir_path, "dir_path")
-                if isinstance(dir_path, key_dict):
-                    _dir_path = dir_path[k]
-                else:
-                    _dir_path = dir_path
-                _dir_path = Path(_dir_path)
-                if check_dict_type:
-                    self.check_dict_type(ext, "ext")
-                if isinstance(ext, key_dict):
-                    _ext = ext[k]
-                else:
-                    _ext = ext
-                _path_or_buf = str(Path(_dir_path) / f"{k}.{_ext}")
-            elif isinstance(path_or_buf, key_dict):
-                _path_or_buf = path_or_buf[k]
+            if self.feature_oriented:
+                _template_context = merge_dicts(dict(data=v, key=k, feature=k), template_context)
             else:
-                _path_or_buf = path_or_buf
-            if isinstance(_path_or_buf, CustomTemplate):
-                _path_or_buf = _path_or_buf.substitute(dict(symbol=k, data=v), sub_id="path_or_buf")
+                _template_context = merge_dicts(dict(data=v, key=k, symbol=k), template_context)
             _kwargs = self.select_key_kwargs(k, kwargs, check_dict_type=check_dict_type)
             sep = _kwargs.pop("sep", None)
-            if isinstance(_path_or_buf, (str, Path)):
+            _path_or_buf = self.resolve_key_arg(
+                path_or_buf,
+                k,
+                "path_or_buf",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            if isinstance(_path_or_buf, str):
                 _path_or_buf = Path(_path_or_buf)
-                if check_dict_type:
-                    self.check_dict_type(mkdir_kwargs, "mkdir_kwargs")
-                if isinstance(mkdir_kwargs, key_dict):
-                    _mkdir_kwargs = mkdir_kwargs[k]
-                else:
-                    _mkdir_kwargs = self.select_key_kwargs(k, mkdir_kwargs, check_dict_type=check_dict_type)
+            if isinstance(_path_or_buf, Path):
+                if (_path_or_buf.exists() and _path_or_buf.is_dir()) or _path_or_buf.suffix == "":
+                    _ext = self.resolve_key_arg(
+                        ext,
+                        k,
+                        "ext",
+                        check_dict_type=check_dict_type,
+                        template_context=_template_context,
+                    )
+                    _path_or_buf /= f"{k}.{_ext}"
+                _mkdir_kwargs = self.resolve_key_arg(
+                    mkdir_kwargs,
+                    k,
+                    "mkdir_kwargs",
+                    check_dict_type=check_dict_type,
+                    template_context=_template_context,
+                    is_kwargs=True,
+                )
                 check_mkdir(_path_or_buf.parent, **_mkdir_kwargs)
                 if _path_or_buf.suffix.lower() == ".csv":
                     if sep is None:
@@ -3180,76 +3551,19 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 if _path_or_buf.suffix.lower() == ".tsv":
                     if sep is None:
                         sep = "\t"
+                _path_or_buf = str(_path_or_buf)
             if sep is None:
                 sep = ","
-            v.to_csv(path_or_buf=_path_or_buf, sep=sep, **_kwargs)
+            meta[k] = {"path_or_buf": _path_or_buf, "sep": sep, **_kwargs}
+            v.to_csv(**meta[k])
 
-    def to_hdf(
-        self,
-        file_path: tp.Union[tp.PathLike, feature_dict, symbol_dict] = ".",
-        key: tp.Union[None, str, feature_dict, symbol_dict] = None,
-        path_or_buf: tp.Union[None, str, feature_dict, symbol_dict] = None,
-        mkdir_kwargs: tp.Union[tp.KwargsLike, feature_dict, symbol_dict] = None,
-        format: str = "table",
-        check_dict_type: bool = True,
-        **kwargs,
-    ) -> None:
-        """Save data into an HDF file.
-
-        Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
-        depending on the format of the data dictionary.
-
-        If `file_path` exists, and it's a directory, will create inside it a file named
-        after this class. This won't work with directories that do not exist, otherwise
-        they could be confused with file names."""
-        from vectorbtpro.utils.module_ import assert_can_import
-
-        assert_can_import("tables")
-
-        for k, v in self.data.items():
-            if check_dict_type:
-                self.check_dict_type(path_or_buf, "path_or_buf")
-            if path_or_buf is None:
-                if check_dict_type:
-                    self.check_dict_type(file_path, "file_path")
-                if isinstance(file_path, key_dict):
-                    _file_path = file_path[k]
-                else:
-                    _file_path = file_path
-                _file_path = Path(_file_path)
-                if _file_path.exists() and _file_path.is_dir():
-                    _file_path /= type(self).__name__ + ".h5"
-                _dir_path = _file_path.parent
-                if check_dict_type:
-                    self.check_dict_type(mkdir_kwargs, "mkdir_kwargs")
-                if isinstance(mkdir_kwargs, key_dict):
-                    _mkdir_kwargs = mkdir_kwargs[k]
-                else:
-                    _mkdir_kwargs = self.select_key_kwargs(k, mkdir_kwargs, check_dict_type=check_dict_type)
-                check_mkdir(_dir_path, **_mkdir_kwargs)
-                _path_or_buf = str(_file_path)
-            elif isinstance(path_or_buf, key_dict):
-                _path_or_buf = path_or_buf[k]
-            else:
-                _path_or_buf = path_or_buf
-            if isinstance(_path_or_buf, CustomTemplate):
-                _path_or_buf = _path_or_buf.substitute(dict(symbol=k, data=v), sub_id="path_or_buf")
-            if check_dict_type:
-                self.check_dict_type(key, "key")
-            if key is None:
-                _key = str(k)
-            elif isinstance(key, key_dict):
-                _key = key[k]
-            else:
-                _key = key
-            if isinstance(_key, CustomTemplate):
-                _key = _key.substitute(dict(symbol=k, data=v), sub_id="key")
-            _kwargs = self.select_key_kwargs(k, kwargs, check_dict_type=check_dict_type)
-            v.to_hdf(path_or_buf=_path_or_buf, key=_key, format=format, **_kwargs)
+        if return_meta:
+            return meta
+        return None
 
     @classmethod
     def from_csv(cls: tp.Type[DataT], *args, fetch_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
-        """Use `CSVData` to load data from CSV and switch the class back to this class.
+        """Use `vectorbtpro.data.custom.csv.CSVData` to load data from CSV and switch the class back to this class.
 
         Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
         from vectorbtpro.data.custom.csv import CSVData
@@ -3261,21 +3575,860 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         data = data.update_fetch_kwargs(**fetch_kwargs)
         return data
 
+    def to_hdf(
+        self,
+        path_or_buf: tp.Union[tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = ".",
+        key: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
+        mkdir_kwargs: tp.Union[tp.KwargsLike, feature_dict, symbol_dict, CustomTemplate] = None,
+        format: str = "table",
+        check_dict_type: bool = True,
+        template_context: tp.KwargsLike = None,
+        return_meta: bool = False,
+        **kwargs,
+    ) -> tp.Union[None, feature_dict, symbol_dict]:
+        """Save data to an HDF file using PyTables.
+
+        Uses https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_hdf.html
+
+        Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
+        depending on the format of the data dictionary.
+
+        If `path_or_buf` exists and it's a directory, will create inside it a file named after this class."""
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("tables")
+
+        meta = self.dict_type()
+        for k, v in self.data.items():
+            if self.feature_oriented:
+                _template_context = merge_dicts(dict(data=v, key=k, feature=k), template_context)
+            else:
+                _template_context = merge_dicts(dict(data=v, key=k, symbol=k), template_context)
+            _path_or_buf = self.resolve_key_arg(
+                path_or_buf,
+                k,
+                "path_or_buf",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            if isinstance(_path_or_buf, str):
+                _path_or_buf = Path(_path_or_buf)
+            if isinstance(_path_or_buf, Path):
+                if (_path_or_buf.exists() and _path_or_buf.is_dir()) or _path_or_buf.suffix == "":
+                    _path_or_buf /= type(self).__name__ + ".h5"
+                _mkdir_kwargs = self.resolve_key_arg(
+                    mkdir_kwargs,
+                    k,
+                    "mkdir_kwargs",
+                    check_dict_type=check_dict_type,
+                    template_context=_template_context,
+                    is_kwargs=True,
+                )
+                check_mkdir(_path_or_buf.parent, **_mkdir_kwargs)
+                _path_or_buf = str(_path_or_buf)
+            if key is None:
+                _key = str(k)
+            else:
+                _key = self.resolve_key_arg(
+                    key,
+                    k,
+                    "key",
+                    check_dict_type=check_dict_type,
+                    template_context=_template_context,
+                )
+            _kwargs = self.select_key_kwargs(k, kwargs, check_dict_type=check_dict_type)
+            meta[k] = {"path_or_buf": _path_or_buf, "key": _key, "format": format, **_kwargs}
+            v.to_hdf(**meta[k])
+
+        if return_meta:
+            return meta
+        return None
+
     @classmethod
     def from_hdf(cls: tp.Type[DataT], *args, fetch_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
-        """Use `HDFData` to load data from HDF and switch the class back to this class.
+        """Use `vectorbtpro.data.custom.hdf.HDFData` to load data from HDF and switch the class back to this class.
 
         Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
         from vectorbtpro.data.custom.hdf import HDFData
 
         if fetch_kwargs is None:
             fetch_kwargs = {}
-        if len(args) == 0 and "keys" not in kwargs and "features" not in kwargs and "symbols" not in kwargs:
-            args = (cls.__name__ + ".h5",)
         data = HDFData.pull(*args, **kwargs)
         data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
         data = data.update_fetch_kwargs(**fetch_kwargs)
         return data
+
+    def to_feather(
+        self,
+        path_or_buf: tp.Union[tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = ".",
+        mkdir_kwargs: tp.Union[tp.KwargsLike, feature_dict, symbol_dict, CustomTemplate] = None,
+        check_dict_type: bool = True,
+        template_context: tp.KwargsLike = None,
+        return_meta: bool = False,
+        **kwargs,
+    ) -> tp.Union[None, feature_dict, symbol_dict]:
+        """Save data to Feather file(s) using PyArrow.
+
+        Uses https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_feather.html
+
+        Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
+        depending on the format of the data dictionary.
+
+        If `path_or_buf` is a path to a directory, will save each feature/symbol to a separate file.
+        If there's only one file, you can specify the file path via `path_or_buf`. If there are
+        multiple files, use the same argument but wrap the multiple paths with `key_dict`."""
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("pyarrow")
+
+        meta = self.dict_type()
+        for k, v in self.data.items():
+            if self.feature_oriented:
+                _template_context = merge_dicts(dict(data=v, key=k, feature=k), template_context)
+            else:
+                _template_context = merge_dicts(dict(data=v, key=k, symbol=k), template_context)
+            _path_or_buf = self.resolve_key_arg(
+                path_or_buf,
+                k,
+                "path_or_buf",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            if isinstance(_path_or_buf, str):
+                _path_or_buf = Path(_path_or_buf)
+            if isinstance(_path_or_buf, Path):
+                if (_path_or_buf.exists() and _path_or_buf.is_dir()) or _path_or_buf.suffix == "":
+                    _path_or_buf /= f"{k}.feather"
+                _mkdir_kwargs = self.resolve_key_arg(
+                    mkdir_kwargs,
+                    k,
+                    "mkdir_kwargs",
+                    check_dict_type=check_dict_type,
+                    template_context=_template_context,
+                    is_kwargs=True,
+                )
+                check_mkdir(_path_or_buf.parent, **_mkdir_kwargs)
+                _path_or_buf = str(_path_or_buf)
+            _kwargs = self.select_key_kwargs(k, kwargs, check_dict_type=check_dict_type)
+            meta[k] = {"path": _path_or_buf, **_kwargs}
+            if isinstance(v, pd.Series):
+                v = v.to_frame()
+            try:
+                v.to_feather(**meta[k])
+            except Exception as e:
+                if isinstance(e, ValueError) and "you can .reset_index()" in str(e):
+                    v = v.reset_index()
+                    v.to_feather(**meta[k])
+                else:
+                    raise e
+
+        if return_meta:
+            return meta
+        return None
+
+    @classmethod
+    def from_feather(cls: tp.Type[DataT], *args, fetch_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
+        """Use `vectorbtpro.data.custom.feather.FeatherData` to load data from Feather and
+        switch the class back to this class.
+
+        Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
+        from vectorbtpro.data.custom.feather import FeatherData
+
+        if fetch_kwargs is None:
+            fetch_kwargs = {}
+        data = FeatherData.pull(*args, **kwargs)
+        data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
+        data = data.update_fetch_kwargs(**fetch_kwargs)
+        return data
+
+    def to_parquet(
+        self,
+        path_or_buf: tp.Union[tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = ".",
+        mkdir_kwargs: tp.Union[tp.KwargsLike, feature_dict, symbol_dict, CustomTemplate] = None,
+        partition_cols: tp.Union[None, tp.List[str], feature_dict, symbol_dict, CustomTemplate] = None,
+        partition_by: tp.Union[None, tp.AnyGroupByLike, feature_dict, symbol_dict, CustomTemplate] = None,
+        period_index_to: tp.Union[str, tp.AnyGroupByLike, feature_dict, symbol_dict, CustomTemplate] = "str",
+        groupby_kwargs: tp.Union[None, tp.AnyGroupByLike, feature_dict, symbol_dict, CustomTemplate] = None,
+        keep_groupby_names: tp.Union[bool, feature_dict, symbol_dict, CustomTemplate] = False,
+        engine: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
+        check_dict_type: bool = True,
+        template_context: tp.KwargsLike = None,
+        return_meta: bool = False,
+        **kwargs,
+    ) -> tp.Union[None, feature_dict, symbol_dict]:
+        """Save data to Parquet file(s) using PyArrow or FastParquet.
+
+        Uses https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_parquet.html
+
+        Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
+        depending on the format of the data dictionary.
+
+        If `path_or_buf` is a path to a directory, will save each feature/symbol to a separate file.
+        If there's only one file, you can specify the file path via `path_or_buf`. If there are
+        multiple files, use the same argument but wrap the multiple paths with `key_dict`.
+
+        If `partition_cols` and `partition_by` are None, `path_or_buf` must be a file, otherwise
+        it must be a directory. If `partition_by` is not None, will group the index by using
+        `vectorbtpro.base.wrapping.ArrayWrapper.get_index_grouper` with `**groupby_kwargs` and
+        put it inside `partition_cols`. In this case, `partition_cols` must be None."""
+        from vectorbtpro.utils.module_ import assert_can_import, assert_can_import_any
+        from vectorbtpro.data.custom.parquet import ParquetData
+
+        meta = self.dict_type()
+        for k, v in self.data.items():
+            if self.feature_oriented:
+                _template_context = merge_dicts(dict(data=v, key=k, feature=k), template_context)
+            else:
+                _template_context = merge_dicts(dict(data=v, key=k, symbol=k), template_context)
+            _partition_cols = self.resolve_key_arg(
+                partition_cols,
+                k,
+                "partition_cols",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _partition_by = self.resolve_key_arg(
+                partition_by,
+                k,
+                "partition_by",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            if _partition_cols is not None and _partition_by is not None:
+                raise ValueError("Must use either partition_cols or partition_by, not both")
+            _path_or_buf = self.resolve_key_arg(
+                path_or_buf,
+                k,
+                "path_or_buf",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            if isinstance(_path_or_buf, str):
+                _path_or_buf = Path(_path_or_buf)
+            if isinstance(_path_or_buf, Path):
+                if (_path_or_buf.exists() and _path_or_buf.is_dir()) or _path_or_buf.suffix == "":
+                    if _partition_cols is not None or _partition_by is not None:
+                        _path_or_buf /= f"{k}"
+                    else:
+                        _path_or_buf /= f"{k}.parquet"
+                _mkdir_kwargs = self.resolve_key_arg(
+                    mkdir_kwargs,
+                    k,
+                    "mkdir_kwargs",
+                    check_dict_type=check_dict_type,
+                    template_context=_template_context,
+                    is_kwargs=True,
+                )
+                check_mkdir(_path_or_buf.parent, **_mkdir_kwargs)
+                _path_or_buf = str(_path_or_buf)
+            _engine = self.resolve_key_arg(
+                ParquetData.resolve_custom_setting(engine, "engine"),
+                k,
+                "engine",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            if _engine == "pyarrow":
+                assert_can_import("pyarrow")
+            elif _engine == "fastparquet":
+                assert_can_import("fastparquet")
+            elif _engine == "auto":
+                assert_can_import_any("pyarrow", "fastparquet")
+            else:
+                raise ValueError(f"Invalid option engine='{_engine}'")
+            if isinstance(v, pd.Series):
+                v = v.to_frame()
+            if _partition_by is not None:
+                _period_index_to = self.resolve_key_arg(
+                    period_index_to,
+                    k,
+                    "period_index_to",
+                    check_dict_type=check_dict_type,
+                    template_context=_template_context,
+                )
+                _groupby_kwargs = self.resolve_key_arg(
+                    groupby_kwargs,
+                    k,
+                    "groupby_kwargs",
+                    check_dict_type=check_dict_type,
+                    template_context=_template_context,
+                    is_kwargs=True,
+                )
+                _keep_groupby_names = self.resolve_key_arg(
+                    keep_groupby_names,
+                    k,
+                    "keep_groupby_names",
+                    check_dict_type=check_dict_type,
+                    template_context=_template_context,
+                )
+                v = v.copy(deep=False)
+                grouper = self.wrapper.get_index_grouper(_partition_by, **_groupby_kwargs)
+                partition_index = grouper.get_stretched_index()
+                _partition_cols = []
+
+                def _convert_period_index(index):
+                    if _period_index_to == "str":
+                        return index.map(str)
+                    return index.to_timestamp(how=_period_index_to)
+
+                if isinstance(partition_index, pd.MultiIndex):
+                    for i in range(partition_index.nlevels):
+                        partition_level = partition_index.get_level_values(i)
+                        if _keep_groupby_names:
+                            new_column_name = partition_level.name
+                        else:
+                            new_column_name = f"group_{i}"
+                        if isinstance(partition_level, pd.PeriodIndex):
+                            partition_level = _convert_period_index(partition_level)
+                        v[new_column_name] = partition_level
+                        _partition_cols.append(new_column_name)
+                else:
+                    if _keep_groupby_names:
+                        new_column_name = partition_index.name
+                    else:
+                        new_column_name = "group"
+                    if isinstance(partition_index, pd.PeriodIndex):
+                        partition_index = _convert_period_index(partition_index)
+                    v[new_column_name] = partition_index
+                    _partition_cols.append(new_column_name)
+            _kwargs = self.select_key_kwargs(k, kwargs, check_dict_type=check_dict_type)
+            meta[k] = {"path": _path_or_buf, "partition_cols": _partition_cols, "engine": _engine, **_kwargs}
+            v.to_parquet(**meta[k])
+
+        if return_meta:
+            return meta
+        return None
+
+    @classmethod
+    def from_parquet(cls: tp.Type[DataT], *args, fetch_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
+        """Use `vectorbtpro.data.custom.parquet.ParquetData` to load data from Parquet and
+        switch the class back to this class.
+
+        Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
+        from vectorbtpro.data.custom.parquet import ParquetData
+
+        if fetch_kwargs is None:
+            fetch_kwargs = {}
+        data = ParquetData.pull(*args, **kwargs)
+        data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
+        data = data.update_fetch_kwargs(**fetch_kwargs)
+        return data
+
+    def to_sql(
+        self,
+        engine: tp.Union[None, str, EngineT, feature_dict, symbol_dict, CustomTemplate] = None,
+        table: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
+        schema: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
+        to_utc: tp.Union[None, bool, str, tp.Sequence[str], feature_dict, symbol_dict, CustomTemplate] = None,
+        remove_utc_tz: tp.Union[bool, feature_dict, symbol_dict, CustomTemplate] = True,
+        attach_row_number: tp.Union[bool, feature_dict, symbol_dict, CustomTemplate] = False,
+        from_row_number: tp.Union[None, int, feature_dict, symbol_dict, CustomTemplate] = None,
+        row_number_column: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
+        engine_config: tp.KwargsLike = None,
+        dispose_engine: tp.Optional[bool] = None,
+        check_dict_type: bool = True,
+        template_context: tp.KwargsLike = None,
+        return_meta: bool = False,
+        return_engine: bool = False,
+        **kwargs,
+    ) -> tp.Union[None, feature_dict, symbol_dict, EngineT]:
+        """Save data to a SQL database using SQLAlchemy.
+
+        Uses https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_sql.html
+
+        Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
+        depending on the format of the data dictionary.
+
+        Each feature/symbol gets saved to a separate table.
+
+        If `engine` is None or a string, will resolve an engine with
+        `vectorbtpro.data.custom.sql.SQLData.resolve_engine` and dispose it afterward if `dispose_engine`
+        is None or True. It can additionally return the engine if `return_engine` is True or entire
+        metadata (all passed arguments as `feature_dict` or `symbol_dict`). In this case, the engine
+        won't be disposed by default.
+
+        If `schema` is not None and it doesn't exist, will create a new schema.
+
+        For `to_utc` and `remove_utc_tz`, see `Data.prepare_dt`. If `to_utc` is None, uses the
+        corresponding setting of `vectorbtpro.data.custom.sql.SQLData`."""
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("sqlalchemy")
+        from vectorbtpro.data.custom.sql import SQLData
+
+        if engine_config is None:
+            engine_config = {}
+        if (engine is None or isinstance(engine, str)) and not self.has_key_dict(engine_config):
+            engine_meta = SQLData.resolve_engine(
+                engine=engine,
+                return_meta=True,
+                **engine_config,
+            )
+            engine = engine_meta["engine"]
+            engine_name = engine_meta["engine_name"]
+            should_dispose = engine_meta["should_dispose"]
+            if dispose_engine is None:
+                if return_meta or return_engine:
+                    dispose_engine = False
+                else:
+                    dispose_engine = should_dispose
+        else:
+            engine_name = None
+            if return_engine:
+                raise ValueError("Engine can be returned only if URL was provided")
+
+        meta = self.dict_type()
+        for k, v in self.data.items():
+            if self.feature_oriented:
+                _template_context = merge_dicts(dict(data=v, key=k, feature=k), template_context)
+            else:
+                _template_context = merge_dicts(dict(data=v, key=k, symbol=k), template_context)
+            _engine = self.resolve_key_arg(
+                engine,
+                k,
+                "engine",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _engine_config = self.resolve_key_arg(
+                engine_config,
+                k,
+                "engine_config",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+                is_kwargs=True,
+            )
+            if _engine is None or isinstance(_engine, str):
+                _engine_meta = SQLData.resolve_engine(
+                    engine=_engine,
+                    return_meta=True,
+                    **_engine_config,
+                )
+                _engine = _engine_meta["engine"]
+                _engine_name = _engine_meta["engine_name"]
+                _should_dispose = _engine_meta["should_dispose"]
+                if dispose_engine is None:
+                    if return_meta or return_engine:
+                        _dispose_engine = False
+                    else:
+                        _dispose_engine = _should_dispose
+                else:
+                    _dispose_engine = dispose_engine
+            else:
+                _engine_name = engine_name
+                if dispose_engine is None:
+                    _dispose_engine = False
+                else:
+                    _dispose_engine = dispose_engine
+            if table is None:
+                _table = k
+            else:
+                _table = self.resolve_key_arg(
+                    table,
+                    k,
+                    "table",
+                    check_dict_type=check_dict_type,
+                    template_context=_template_context,
+                )
+            _schema = self.resolve_key_arg(
+                SQLData.resolve_engine_setting(schema, "schema", engine_name=_engine_name),
+                k,
+                "schema",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _to_utc = self.resolve_key_arg(
+                SQLData.resolve_engine_setting(to_utc, "to_utc", engine_name=_engine_name),
+                k,
+                "to_utc",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _remove_utc_tz = self.resolve_key_arg(
+                remove_utc_tz,
+                k,
+                "remove_utc_tz",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _attach_row_number = self.resolve_key_arg(
+                attach_row_number,
+                k,
+                "attach_row_number",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _from_row_number = self.resolve_key_arg(
+                from_row_number,
+                k,
+                "from_row_number",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _row_number_column = self.resolve_key_arg(
+                SQLData.resolve_engine_setting(row_number_column, "row_number_column", engine_name=_engine_name),
+                k,
+                "row_number_column",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            v = SQLData.prepare_dt(v, to_utc=_to_utc, remove_utc_tz=_remove_utc_tz, parse_dates=False)
+            _kwargs = self.select_key_kwargs(k, kwargs, check_dict_type=check_dict_type)
+            if _attach_row_number:
+                v = v.copy(deep=False)
+                if isinstance(v, pd.Series):
+                    v = v.to_frame()
+                if _from_row_number is None:
+                    if not SQLData.has_table(_table, schema=_schema, engine=_engine):
+                        _from_row_number = 0
+                    elif _kwargs.get("if_exists", "fail") != "append":
+                        _from_row_number = 0
+                    else:
+                        last_row_number = SQLData.get_last_row_number(
+                            _table,
+                            schema=_schema,
+                            row_number_column=_row_number_column,
+                            engine=_engine,
+                        )
+                        _from_row_number = last_row_number + 1
+                v[_row_number_column] = np.arange(_from_row_number, _from_row_number + len(v.index))
+            if _schema is not None:
+                SQLData.create_schema(_schema, engine=_engine)
+            meta[k] = {"name": _table, "con": _engine, "schema": _schema, **_kwargs}
+            v.to_sql(**meta[k])
+            if _dispose_engine:
+                _engine.dispose()
+
+        if return_meta:
+            return meta
+        if return_engine:
+            return engine
+        return None
+
+    @classmethod
+    def from_sql(cls: tp.Type[DataT], *args, fetch_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
+        """Use `vectorbtpro.data.custom.sql.SQLData` to load data from a SQL database and switch the class
+        back to this class.
+
+        Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
+        from vectorbtpro.data.custom.sql import SQLData
+
+        if fetch_kwargs is None:
+            fetch_kwargs = {}
+        data = SQLData.pull(*args, **kwargs)
+        data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
+        data = data.update_fetch_kwargs(**fetch_kwargs)
+        return data
+
+    def to_duckdb(
+        self,
+        connection: tp.Union[None, str, DuckDBPyConnectionT, feature_dict, symbol_dict, CustomTemplate] = None,
+        table: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
+        schema: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
+        catalog: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
+        write_format: tp.Union[None, str, feature_dict, symbol_dict, CustomTemplate] = None,
+        write_path: tp.Union[tp.PathLike, feature_dict, symbol_dict, CustomTemplate] = ".",
+        write_options: tp.Union[None, str, dict, feature_dict, symbol_dict, CustomTemplate] = None,
+        mkdir_kwargs: tp.Union[tp.KwargsLike, feature_dict, symbol_dict, CustomTemplate] = None,
+        to_utc: tp.Union[None, bool, str, tp.Sequence[str], feature_dict, symbol_dict, CustomTemplate] = None,
+        remove_utc_tz: tp.Union[bool, feature_dict, symbol_dict, CustomTemplate] = True,
+        if_exists: tp.Union[str, feature_dict, symbol_dict, CustomTemplate] = "fail",
+        connection_config: tp.KwargsLike = None,
+        check_dict_type: bool = True,
+        template_context: tp.KwargsLike = None,
+        return_meta: bool = False,
+        return_connection: bool = False,
+    ) -> tp.Union[None, feature_dict, symbol_dict, DuckDBPyConnectionT]:
+        """Save data to a DuckDB database.
+
+        Any argument can be provided per feature using `feature_dict` or per symbol using `symbol_dict`,
+        depending on the format of the data dictionary.
+
+        If `connection` is None or a string, will resolve a connection with
+        `vectorbtpro.data.custom.duckdb.DuckDBData.resolve_connection`. It can additionally return the
+        connection if `return_connection` is True or entire metadata (all passed arguments as `feature_dict`
+        or `symbol_dict`). In this case, the engine won't be disposed by default.
+
+        If `write_format` is None and `write_path` is a directory (default), will persist each feature/symbol
+        to a table (see https://duckdb.org/docs/guides/python/import_pandas).
+        If `catalog` is not None, will make it default for this connection. If `schema` is not None,
+        and it doesn't exist, will create a new schema in the current catalog and make it default
+        for this connection. Any new table will be automatically created under this schema.
+
+        If `if_exists` is "fail", will raise an error if a table with the same name already exists.
+        If `if_exists` is "replace", will drop the existing table first. If `if_exists` is "append",
+        will append the new table to the existing one.
+
+        If `write_format` is not None, it must be either "csv", "parquet", or "json". If `write_path` is
+        a directory or has no suffix (meaning it's not a file), each feature/symbol will be saved to a
+        separate file under that path and with the provided `write_format` as extension. The data will be
+        saved using a `COPY` mechanism (see https://duckdb.org/docs/sql/statements/copy.html).
+        To provide options to the write operation, pass them as a dictionary or an already formatted
+        string (without brackets). For example, `dict(compression="gzip")` is same as "COMPRESSION 'gzip'".
+
+        For `to_utc` and `remove_utc_tz`, see `Data.prepare_dt`. If `to_utc` is None, uses the
+        corresponding setting of `vectorbtpro.data.custom.duckdb.DuckDBData`."""
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("duckdb")
+        from vectorbtpro.data.custom.duckdb import DuckDBData
+
+        if connection_config is None:
+            connection_config = {}
+        if (connection is None or isinstance(connection, (str, Path))) and not self.has_key_dict(connection_config):
+            connection = DuckDBData.resolve_connection(connection=connection, **connection_config)
+        elif return_connection:
+            raise ValueError("Connection can be returned only if URL was provided")
+
+        meta = self.dict_type()
+        for k, v in self.data.items():
+            if self.feature_oriented:
+                _template_context = merge_dicts(dict(data=v, key=k, feature=k), template_context)
+            else:
+                _template_context = merge_dicts(dict(data=v, key=k, symbol=k), template_context)
+            _connection = self.resolve_key_arg(
+                connection,
+                k,
+                "connection",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _connection_config = self.resolve_key_arg(
+                connection_config,
+                k,
+                "connection_config",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+                is_kwargs=True,
+            )
+            if _connection is None or isinstance(_connection, (str, Path)):
+                _connection = DuckDBData.resolve_connection(connection=_connection, **_connection_config)
+            if table is None:
+                _table = k
+            else:
+                _table = self.resolve_key_arg(
+                    table,
+                    k,
+                    "table",
+                    check_dict_type=check_dict_type,
+                    template_context=_template_context,
+                )
+            _schema = self.resolve_key_arg(
+                DuckDBData.resolve_custom_setting(schema, "schema"),
+                k,
+                "schema",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _catalog = self.resolve_key_arg(
+                DuckDBData.resolve_custom_setting(catalog, "catalog"),
+                k,
+                "catalog",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _write_format = self.resolve_key_arg(
+                write_format,
+                k,
+                "write_format",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _write_path = self.resolve_key_arg(
+                write_path,
+                k,
+                "write_path",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _write_path = Path(_write_path)
+            is_not_file = (_write_path.exists() and _write_path.is_dir()) or _write_path.suffix == ""
+            if _write_format is not None and is_not_file:
+                if _write_format.upper() == "CSV":
+                    _write_path /= f"{k}.csv"
+                elif _write_format.upper() == "PARQUET":
+                    _write_path /= f"{k}.parquet"
+                elif _write_format.upper() == "JSON":
+                    _write_path /= f"{k}.json"
+                else:
+                    raise ValueError(f"Invalid write format '{_write_format}'")
+            if _write_path.suffix != "":
+                _mkdir_kwargs = self.resolve_key_arg(
+                    mkdir_kwargs,
+                    k,
+                    "mkdir_kwargs",
+                    check_dict_type=check_dict_type,
+                    template_context=_template_context,
+                    is_kwargs=True,
+                )
+                check_mkdir(_write_path.parent, **_mkdir_kwargs)
+                _write_path = str(_write_path)
+                use_write = True
+            else:
+                use_write = False
+            _to_utc = self.resolve_key_arg(
+                DuckDBData.resolve_custom_setting(to_utc, "to_utc"),
+                k,
+                "to_utc",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _remove_utc_tz = self.resolve_key_arg(
+                remove_utc_tz,
+                k,
+                "remove_utc_tz",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            _if_exists = self.resolve_key_arg(
+                if_exists,
+                k,
+                "if_exists",
+                check_dict_type=check_dict_type,
+                template_context=_template_context,
+            )
+            v = DuckDBData.prepare_dt(v, to_utc=_to_utc, remove_utc_tz=_remove_utc_tz, parse_dates=False)
+            v = v.reset_index()
+            if use_write:
+                _write_options = self.resolve_key_arg(
+                    write_options,
+                    k,
+                    "write_options",
+                    check_dict_type=check_dict_type,
+                    template_context=_template_context,
+                    is_kwargs=isinstance(write_options, dict),
+                )
+                if _write_options is not None:
+                    _write_options = DuckDBData.format_write_options(_write_options)
+                if _write_format is not None and _write_options is not None and "FORMAT" not in _write_options:
+                    _write_options = f"FORMAT {_write_format.upper()}, " + _write_options
+                elif _write_format is not None and _write_options is None:
+                    _write_options = f"FORMAT {_write_format.upper()}"
+                _connection.register("_" + k, v)
+                if _write_options is not None:
+                    _connection.sql(f"COPY (SELECT * FROM \"_{k}\") TO '{_write_path}' ({_write_options})")
+                else:
+                    _connection.sql(f"COPY (SELECT * FROM \"_{k}\") TO '{_write_path}'")
+                meta[k] = {"write_path": _write_path, "write_options": _write_options}
+            else:
+                if _catalog is not None:
+                    _connection.sql(f"USE {_catalog}")
+                elif _schema is not None:
+                    catalogs = DuckDBData.list_catalogs(connection=_connection)
+                    if len(catalogs) > 1:
+                        raise ValueError("Please select a catalog")
+                    _catalog = catalogs[0]
+                    _connection.sql(f"USE {_catalog}")
+                if _schema is not None:
+                    _connection.sql(f"CREATE SCHEMA IF NOT EXISTS \"{_schema}\"")
+                    _connection.sql(f"USE {_catalog}.{_schema}")
+                append = False
+                if _table in DuckDBData.list_tables(catalog=_catalog, schema=_schema, connection=_connection):
+                    if _if_exists.lower() == "fail":
+                        raise ValueError(f"Table '{_table}' already exists")
+                    elif _if_exists.lower() == "replace":
+                        _connection.sql(f"DROP TABLE \"{_table}\"")
+                    elif _if_exists.lower() == "append":
+                        append = True
+                _connection.register("_" + k, v)
+                if append:
+                    _connection.sql(f"INSERT INTO \"{_table}\" SELECT * FROM \"_{k}\"")
+                else:
+                    _connection.sql(f"CREATE TABLE \"{_table}\" AS SELECT * FROM \"_{k}\"")
+                meta[k] = {"table": _table, "schema": _schema, "catalog": _catalog}
+
+        if return_meta:
+            return meta
+        if return_connection:
+            return connection
+        return None
+
+    @classmethod
+    def from_duckdb(cls: tp.Type[DataT], *args, fetch_kwargs: tp.KwargsLike = None, **kwargs) -> DataT:
+        """Use `vectorbtpro.data.custom.duckdb.DuckDBData` to load data from a DuckDB database and
+        switch the class back to this class.
+
+        Use `fetch_kwargs` to provide keyword arguments that were originally used in fetching."""
+        from vectorbtpro.data.custom.duckdb import DuckDBData
+
+        if fetch_kwargs is None:
+            fetch_kwargs = {}
+        data = DuckDBData.pull(*args, **kwargs)
+        data = data.switch_class(cls, clear_fetch_kwargs=True, clear_returned_kwargs=True)
+        data = data.update_fetch_kwargs(**fetch_kwargs)
+        return data
+
+    # ############# Querying ############# #
+
+    def sql(
+        self,
+        query: str,
+        dbcon: tp.Optional[DuckDBPyConnectionT] = None,
+        database: str = ":memory:",
+        db_config: tp.KwargsLike = None,
+        alias: str = "",
+        params: tp.KwargsLike = None,
+        other_objs: tp.Optional[dict] = None,
+        date_as_object: bool = False,
+        align_dtypes: bool = True,
+        squeeze: bool = True,
+        **kwargs,
+    ) -> tp.SeriesFrame:
+        """Run a SQL query on this instance using DuckDB.
+
+        First, connection gets established. Then, `Data.get` gets invoked with `**kwargs` passed as
+        keyword arguments and `as_dict=True`. Then, each returned object gets registered within the
+        database. Finally, the query gets executed with `duckdb.sql` and the relation as a DataFrame
+        gets returned. If `squeeze` is True, a DataFrame with one column will be converted into a Series."""
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("duckdb")
+        from duckdb import connect
+
+        if db_config is None:
+            db_config = {}
+        if dbcon is None:
+            dbcon = connect(database=database, read_only=False, config=db_config)
+        if params is None:
+            params = {}
+
+        dtypes = {}
+        objs = self.get(**kwargs, as_dict=True)
+        for k, v in objs.items():
+            if not checks.is_default_index(v.index):
+                v = v.reset_index()
+            if isinstance(v, pd.Series):
+                v = v.to_frame()
+            for c in v.columns:
+                dtypes[c] = v[c].dtype
+            dbcon.register(k, v)
+        if other_objs is not None:
+            checks.assert_instance_of(other_objs, dict, arg_name="other_objs")
+            for k, v in other_objs.items():
+                if not checks.is_default_index(v.index):
+                    v = v.reset_index()
+                if isinstance(v, pd.Series):
+                    v = v.to_frame()
+                for c in v.columns:
+                    dtypes[c] = v[c].dtype
+                dbcon.register(k, v)
+        df = dbcon.sql(query, alias=alias, params=params).df(date_as_object=date_as_object)
+        if align_dtypes:
+            for c in df.columns:
+                if c in dtypes:
+                    df[c] = df[c].astype(dtypes[c])
+        if isinstance(self.index, pd.MultiIndex):
+            if set(self.index.names) <= set(df.columns):
+                df = df.set_index(self.index.names)
+        else:
+            if self.index.name is not None and self.index.name in df.columns:
+                df = df.set_index(self.index.name)
+            elif "index" in df.columns:
+                df = df.set_index("index")
+                df.index.name = None
+        if squeeze and len(df.columns) == 1:
+            df = df.iloc[:, 0]
+        return df
 
     # ############# Stats ############# #
 
@@ -3285,9 +4438,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
         Merges `vectorbtpro.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
         `stats` from `vectorbtpro._settings.data`."""
-        data_stats_cfg = self.get_settings(key_id="base")["stats"]
-
-        return merge_dicts(Analyzable.stats_defaults.__get__(self), data_stats_cfg)
+        return merge_dicts(Analyzable.stats_defaults.__get__(self), self.get_base_settings()["stats"])
 
     _metrics: tp.ClassVar[Config] = HybridConfig(
         dict(
@@ -3427,9 +4578,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
         Merges `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots_defaults` and
         `plots` from `vectorbtpro._settings.data`."""
-        data_plots_cfg = self.get_settings(key_id="base")["plots"]
-
-        return merge_dicts(Analyzable.plots_defaults.__get__(self), data_plots_cfg)
+        return merge_dicts(Analyzable.plots_defaults.__get__(self), self.get_base_settings()["plots"])
 
     _subplots: tp.ClassVar[Config] = HybridConfig(
         dict(

@@ -18,22 +18,37 @@ __pdoc__ = {}
 class CustomData(Data):
     """Data class for fetching custom data."""
 
-    _setting_keys: tp.SettingsKeys = dict(custom=None)
+    _settings_path: tp.SettingsPath = dict(custom=None)
 
     @classmethod
-    def get_custom_settings(cls) -> dict:
-        """`CustomData.get_settings` with `key_id="custom"`."""
-        return cls.get_settings(key_id="custom")
+    def get_custom_settings(cls, *args, **kwargs) -> dict:
+        """`CustomData.get_settings` with `path_id="custom"`."""
+        return cls.get_settings(*args, path_id="custom", **kwargs)
 
     @classmethod
-    def set_custom_settings(cls, **kwargs) -> None:
-        """`CustomData.set_settings` with `key_id="custom"`."""
-        cls.set_settings(key_id="custom", **kwargs)
+    def has_custom_settings(cls, *args, **kwargs) -> bool:
+        """`CustomData.has_settings` with `path_id="custom"`."""
+        return cls.has_settings(*args, path_id="custom", **kwargs)
 
     @classmethod
-    def reset_custom_settings(cls) -> None:
-        """`CustomData.reset_settings` with `key_id="custom"`."""
-        cls.reset_settings(key_id="custom")
+    def get_custom_setting(cls, *args, **kwargs) -> tp.Any:
+        """`CustomData.get_setting` with `path_id="custom"`."""
+        return cls.get_setting(*args, path_id="custom", **kwargs)
+
+    @classmethod
+    def has_custom_setting(cls, *args, **kwargs) -> bool:
+        """`CustomData.has_setting` with `path_id="custom"`."""
+        return cls.has_setting(*args, path_id="custom", **kwargs)
+
+    @classmethod
+    def resolve_custom_setting(cls, *args, **kwargs) -> tp.Any:
+        """`CustomData.resolve_setting` with `path_id="custom"`."""
+        return cls.resolve_setting(*args, path_id="custom", **kwargs)
+
+    @classmethod
+    def set_custom_settings(cls, *args, **kwargs) -> None:
+        """`CustomData.set_settings` with `path_id="custom"`."""
+        cls.set_settings(*args, path_id="custom", **kwargs)
 
     @staticmethod
     def key_match(key: str, pattern: str, use_regex: bool = False):

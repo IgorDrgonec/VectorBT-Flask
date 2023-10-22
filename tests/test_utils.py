@@ -42,6 +42,12 @@ try:
 except:
     pathos_available = False
 
+mpire_available = True
+try:
+    import mpire
+except:
+    mpire_available = False
+
 dask_available = True
 try:
     import dask
@@ -2227,7 +2233,7 @@ class TestDatetime:
         assert datetime_.is_tz_aware(pd.Timestamp("2020-01-01", tz=datetime_.get_utc_tz()))
 
     def test_to_timezone(self):
-        assert datetime_.to_timezone("UTC", to_fixed_offset=True) == _timezone.utc
+        assert datetime_.to_timezone("utc", to_fixed_offset=True) == _timezone.utc
         assert isinstance(datetime_.to_timezone("Europe/Berlin", to_fixed_offset=True), _timezone)
         assert datetime_.to_timezone("+0500") == _timezone(_timedelta(hours=5))
         assert datetime_.to_timezone(_timezone(_timedelta(hours=1))) == _timezone(_timedelta(hours=1))
@@ -2632,6 +2638,8 @@ class TestExecution:
             assert execution.execute(funcs_args, engine="ray") == [10, 35, 60]
         assert execution.execute(funcs_args, engine="threadpool") == [10, 35, 60]
         assert execution.execute(funcs_args, engine="processpool") == [10, 35, 60]
+        if mpire_available:
+            assert execution.execute(funcs_args, engine="mpire") == [10, 35, 60]
         if pathos_available:
             assert execution.execute(funcs_args, engine="pathos", pool_type="thread") == [10, 35, 60]
             assert execution.execute(funcs_args, engine="pathos", pool_type="process") == [10, 35, 60]
@@ -3351,6 +3359,34 @@ class TestChunking:
         np.testing.assert_array_equal(results[1][0], np.arange(3, 6))
         np.testing.assert_array_equal(results[1][1], np.arange(6, 10))
 
+        if pathos_available:
+
+            @vbt.chunked(
+                n_chunks=2,
+                size=vbt.LenSizer(arg_query="a"),
+                arg_take_spec=dict(a=vbt.ChunkSlicer()),
+                merge_func=np.concatenate,
+                engine="pathos",
+            )
+            def f7(a):
+                return a
+
+            np.testing.assert_array_equal(f7(np.arange(10)), np.arange(10))
+
+        if mpire_available:
+
+            @vbt.chunked(
+                n_chunks=2,
+                size=vbt.LenSizer(arg_query="a"),
+                arg_take_spec=dict(a=vbt.ChunkSlicer()),
+                merge_func=np.concatenate,
+                engine="mpire",
+            )
+            def f8(a):
+                return a
+
+            np.testing.assert_array_equal(f8(np.arange(10)), np.arange(10))
+
         if dask_available:
 
             @vbt.chunked(
@@ -3360,10 +3396,10 @@ class TestChunking:
                 merge_func=np.concatenate,
                 engine="dask",
             )
-            def f7(a):
+            def f9(a):
                 return a
 
-            np.testing.assert_array_equal(f7(np.arange(10)), np.arange(10))
+            np.testing.assert_array_equal(f9(np.arange(10)), np.arange(10))
 
         if ray_available:
 
@@ -3374,10 +3410,10 @@ class TestChunking:
                 merge_func=np.concatenate,
                 engine="ray",
             )
-            def f8(a):
+            def f10(a):
                 return a
 
-            np.testing.assert_array_equal(f8(np.arange(10)), np.arange(10))
+            np.testing.assert_array_equal(f10(np.arange(10)), np.arange(10))
 
 
 # ############# jitting ############# #

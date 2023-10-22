@@ -39,7 +39,7 @@ class NDLData(RemoteData):
         ... )
         ```
 
-        * Fetch data:
+        * Pull data:
 
         ```pycon
         >>> data = vbt.NDLData.pull(
@@ -50,7 +50,7 @@ class NDLData(RemoteData):
         ```
     """
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.ndl")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.ndl")
 
     @classmethod
     def fetch_symbol(
@@ -59,7 +59,7 @@ class NDLData(RemoteData):
         api_key: tp.Optional[str] = None,
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
-        tz: tp.Optional[tp.TimezoneLike] = None,
+        tz: tp.TimezoneLike = None,
         column_indices: tp.Optional[tp.MaybeIterable[int]] = None,
         collapse: tp.Optional[str] = None,
         transform: tp.Optional[str] = None,
@@ -98,18 +98,11 @@ class NDLData(RemoteData):
 
         import nasdaqdatalink
 
-        ndl_cfg = cls.get_settings(key_id="custom")
-
-        if api_key is None:
-            api_key = ndl_cfg["api_key"]
-        if start is None:
-            start = ndl_cfg["start"]
-        if end is None:
-            end = ndl_cfg["end"]
-        if tz is None:
-            tz = ndl_cfg["tz"]
-        if column_indices is None:
-            column_indices = ndl_cfg["column_indices"]
+        api_key = cls.resolve_custom_setting(api_key, "api_key")
+        start = cls.resolve_custom_setting(start, "start")
+        end = cls.resolve_custom_setting(end, "end")
+        tz = cls.resolve_custom_setting(tz, "tz")
+        column_indices = cls.resolve_custom_setting(column_indices, "column_indices")
         if column_indices is not None:
             if isinstance(column_indices, int):
                 dataset = symbol + "." + str(column_indices)
@@ -117,20 +110,18 @@ class NDLData(RemoteData):
                 dataset = [symbol + "." + str(index) for index in column_indices]
         else:
             dataset = symbol
-        if collapse is None:
-            collapse = ndl_cfg["collapse"]
-        if transform is None:
-            transform = ndl_cfg["transform"]
-        params = merge_dicts(ndl_cfg["params"], params)
+        collapse = cls.resolve_custom_setting(collapse, "collapse")
+        transform = cls.resolve_custom_setting(transform, "transform")
+        params = cls.resolve_custom_setting(params, "params", merge=True)
 
         # Establish the timestamps
         if start is not None:
-            start = to_tzaware_datetime(start, naive_tz=tz, tz="UTC")
+            start = to_tzaware_datetime(start, naive_tz=tz, tz="utc")
             start_date = pd.Timestamp(start).isoformat()
         else:
             start_date = None
         if end is not None:
-            end = to_tzaware_datetime(end, naive_tz=tz, tz="UTC")
+            end = to_tzaware_datetime(end, naive_tz=tz, tz="utc")
             end_date = pd.Timestamp(end).isoformat()
         else:
             end_date = None
@@ -155,21 +146,21 @@ class NDLData(RemoteData):
             new_columns.append(new_c)
         df = df.rename(columns=dict(zip(df.columns, new_columns)))
 
-        if isinstance(df.index, pd.DatetimeIndex) and df.index.tzinfo is None:
-            df = df.tz_localize("UTC")
+        if isinstance(df.index, pd.DatetimeIndex) and df.index.tz is None:
+            df = df.tz_localize("utc")
         if not df.empty:
             if start is not None:
-                start = to_timestamp(start, tz=df.index.tzinfo)
+                start = to_timestamp(start, tz=df.index.tz)
                 if df.index[0] < start:
                     df = df[df.index >= start]
             if end is not None:
-                end = to_timestamp(end, tz=df.index.tzinfo)
+                end = to_timestamp(end, tz=df.index.tz)
                 if df.index[-1] >= end:
                     df = df[df.index < end]
         return df, dict(tz_convert=tz)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
-        fetch_kwargs = self.select_symbol_kwargs(symbol, self.fetch_kwargs)
-        fetch_kwargs["start"] = self.last_index[symbol]
+        fetch_kwargs = self.select_fetch_kwargs(symbol)
+        fetch_kwargs["start"] = self.select_last_index(symbol)
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         return self.fetch_symbol(symbol, **kwargs)

@@ -11,10 +11,7 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.datetime_ import (
-    to_tzaware_timestamp,
-    to_naive_timestamp,
-)
+from vectorbtpro.utils.datetime_ import to_tzaware_timestamp, to_naive_timestamp
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.data.custom.file import FileData
 
@@ -41,28 +38,26 @@ HDFDataT = tp.TypeVar("HDFDataT", bound="HDFData")
 
 
 class HDFData(FileData):
-    """Data class for fetching HDF data."""
+    """Data class for fetching HDF data using PyTables."""
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.hdf")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.hdf")
 
     @classmethod
-    def list_keys(cls, path: tp.PathLike = ".", **match_path_kwargs) -> tp.List[tp.Key]:
-        """List all features or symbols under a path."""
+    def is_hdf_file(cls, path: tp.PathLike) -> bool:
+        """Return whether the path is an HDF file."""
         if not isinstance(path, Path):
             path = Path(path)
-        if path.exists() and path.is_dir():
-            path = path / "**" / "*.h5"
-        return list(map(str, cls.match_path(path, **match_path_kwargs)))
+        if path.exists() and path.is_file() and ".hdf" in path.suffixes:
+            return True
+        if path.exists() and path.is_file() and ".hdf5" in path.suffixes:
+            return True
+        if path.exists() and path.is_file() and ".h5" in path.suffixes:
+            return True
+        return False
 
     @classmethod
-    def list_features(cls, path: tp.PathLike = ".", **match_path_kwargs) -> tp.List[tp.Feature]:
-        """List all features under a path."""
-        return cls.list_keys(path=path, **match_path_kwargs)
-
-    @classmethod
-    def list_symbols(cls, path: tp.PathLike = ".", **match_path_kwargs) -> tp.List[tp.Symbol]:
-        """List all symbols under a path."""
-        return cls.list_keys(path=path, **match_path_kwargs)
+    def is_file_match(cls, path: tp.PathLike) -> bool:
+        return cls.is_hdf_file(path)
 
     @classmethod
     def split_hdf_path(
@@ -99,8 +94,13 @@ class HDFData(FileData):
         (path to file + key) matching a path."""
         path = Path(path)
         if path.exists():
-            if path.is_dir():
-                sub_paths = [p for p in path.iterdir() if p.is_file()]
+            if path.is_dir() and not cls.is_dir_match(path):
+                sub_paths = []
+                for p in path.iterdir():
+                    if p.is_dir() and cls.is_dir_match(p):
+                        sub_paths.append(p)
+                    if p.is_file() and cls.is_file_match(p):
+                        sub_paths.append(p)
                 key_paths = [p for sub_path in sub_paths for p in cls.match_path(sub_path, sort_paths=False, **kwargs)]
             else:
                 with pd.HDFStore(str(path), mode="r") as store:
@@ -154,19 +154,38 @@ class HDFData(FileData):
         return key_paths
 
     @classmethod
+    def resolve_keys_meta(
+        cls,
+        keys: tp.Union[None, dict, tp.MaybeKeys] = None,
+        keys_are_features: tp.Optional[bool] = None,
+        features: tp.Union[None, dict, tp.MaybeFeatures] = None,
+        symbols: tp.Union[None, dict, tp.MaybeSymbols] = None,
+        paths: tp.Any = None,
+    ) -> tp.Kwargs:
+        keys_meta = FileData.resolve_keys_meta(
+            keys=keys,
+            keys_are_features=keys_are_features,
+            features=features,
+            symbols=symbols,
+        )
+        if keys_meta["keys"] is None and paths is None:
+            keys_meta["keys"] = cls.list_paths()
+        return keys_meta
+
+    @classmethod
     def fetch_key(
         cls,
         key: tp.Key,
         path: tp.Any = None,
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
-        tz: tp.Optional[tp.TimezoneLike] = None,
+        tz: tp.TimezoneLike = None,
         start_row: tp.Optional[int] = None,
         end_row: tp.Optional[int] = None,
         chunk_func: tp.Optional[tp.Callable] = None,
-        **read_hdf_kwargs,
+        **read_kwargs,
     ) -> tp.KeyData:
-        """Load the HDF object for a feature or symbol.
+        """Fetch the HDF object of a feature or symbol.
 
         Args:
             key (hashable): Feature or symbol.
@@ -201,7 +220,7 @@ class HDFData(FileData):
             chunk_func (callable): Function to select and concatenate chunks from `TableIterator`.
 
                 Gets called only if `iterator` or `chunksize` are set.
-            **read_hdf_kwargs: Keyword arguments passed to `pd.read_hdf`.
+            **read_kwargs: Other keyword arguments passed to `pd.read_hdf`.
 
         See https://pandas.pydata.org/docs/reference/api/pandas.read_hdf.html for other arguments.
 
@@ -212,21 +231,14 @@ class HDFData(FileData):
 
         from pandas.io.pytables import TableIterator
 
-        hdf_cfg = cls.get_settings(key_id="custom")
-
-        if start is None:
-            start = hdf_cfg["start"]
-        if end is None:
-            end = hdf_cfg["end"]
-        if tz is None:
-            tz = hdf_cfg["tz"]
-        if start_row is None:
-            start_row = hdf_cfg["start_row"]
+        start = cls.resolve_custom_setting(start, "start")
+        end = cls.resolve_custom_setting(end, "end")
+        tz = cls.resolve_custom_setting(tz, "tz")
+        start_row = cls.resolve_custom_setting(start_row, "start_row")
         if start_row is None:
             start_row = 0
-        if end_row is None:
-            end_row = hdf_cfg["end_row"]
-        read_hdf_kwargs = merge_dicts(hdf_cfg["read_hdf_kwargs"], read_hdf_kwargs)
+        end_row = cls.resolve_custom_setting(end_row, "end_row")
+        read_kwargs = cls.resolve_custom_setting(read_kwargs, "read_kwargs", merge=True)
 
         if path is None:
             path = key
@@ -236,7 +248,7 @@ class HDFData(FileData):
         if start is not None or end is not None:
             hdf_store_arg_names = get_func_arg_names(pd.HDFStore.__init__)
             hdf_store_kwargs = dict()
-            for k, v in read_hdf_kwargs.items():
+            for k, v in read_kwargs.items():
                 if k in hdf_store_arg_names:
                     hdf_store_kwargs[k] = v
             with pd.HDFStore(str(file_path), mode="r", **hdf_store_kwargs) as store:
@@ -246,12 +258,12 @@ class HDFData(FileData):
             if not isinstance(index, pd.DatetimeIndex):
                 raise TypeError("Cannot filter index that is not DatetimeIndex")
             if tz is None:
-                tz = index.tzinfo
-            if index.tzinfo is not None:
+                tz = index.tz
+            if index.tz is not None:
                 if start is not None:
-                    start = to_tzaware_timestamp(start, naive_tz=tz, tz=index.tzinfo)
+                    start = to_tzaware_timestamp(start, naive_tz=tz, tz=index.tz)
                 if end is not None:
-                    end = to_tzaware_timestamp(end, naive_tz=tz, tz=index.tzinfo)
+                    end = to_tzaware_timestamp(end, naive_tz=tz, tz=index.tz)
             else:
                 if start is not None:
                     start = to_naive_timestamp(start, tz=tz)
@@ -268,50 +280,48 @@ class HDFData(FileData):
             start_row += mask_indices[0]
             end_row = start_row + mask_indices[-1] - mask_indices[0] + 1
 
-        obj = pd.read_hdf(file_path, key=key, start=start_row, stop=end_row, **read_hdf_kwargs)
+        obj = pd.read_hdf(file_path, key=key, start=start_row, stop=end_row, **read_kwargs)
         if isinstance(obj, TableIterator):
             if chunk_func is None:
                 obj = pd.concat(list(obj), axis=0)
             else:
                 obj = chunk_func(obj)
         if isinstance(obj.index, pd.DatetimeIndex) and tz is None:
-            tz = obj.index.tzinfo
+            tz = obj.index.tz
         return obj, dict(last_row=start_row + len(obj.index) - 1, tz_convert=tz)
 
     @classmethod
     def fetch_feature(cls, feature: tp.Feature, **kwargs) -> tp.FeatureData:
-        """Load the HDF object for a feature.
+        """Fetch the HDF object of a feature.
 
-        Calls `HDFData.fetch_key`."""
+        Uses `HDFData.fetch_key`."""
         return cls.fetch_key(feature, **kwargs)
 
     @classmethod
     def fetch_symbol(cls, symbol: tp.Symbol, **kwargs) -> tp.SymbolData:
         """Load the HDF object for a symbol.
 
-        Calls `HDFData.fetch_key`."""
+        Uses `HDFData.fetch_key`."""
         return cls.fetch_key(symbol, **kwargs)
 
     def update_key(self, key: tp.Key, key_is_feature: bool = False, **kwargs) -> tp.KeyData:
-        """Update data for a feature or symbol."""
-        if key_is_feature:
-            fetch_kwargs = self.select_feature_kwargs(key, self.fetch_kwargs)
-        else:
-            fetch_kwargs = self.select_symbol_kwargs(key, self.fetch_kwargs)
-        fetch_kwargs["start_row"] = self.returned_kwargs[key]["last_row"]
+        """Update data of a feature or symbol."""
+        fetch_kwargs = self.select_fetch_kwargs(key)
+        returned_kwargs = self.select_returned_kwargs(key)
+        fetch_kwargs["start_row"] = returned_kwargs["last_row"]
         kwargs = merge_dicts(fetch_kwargs, kwargs)
         if key_is_feature:
             return self.fetch_feature(key, **kwargs)
         return self.fetch_symbol(key, **kwargs)
 
     def update_feature(self, feature: tp.Feature, **kwargs) -> tp.FeatureData:
-        """Update data for a feature.
+        """Update data of a feature.
 
-        Calls `HDFData.update_key` with `key_is_feature=True`."""
+        Uses `HDFData.update_key` with `key_is_feature=True`."""
         return self.update_key(feature, key_is_feature=True, **kwargs)
 
     def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SymbolData:
         """Update data for a symbol.
 
-        Calls `HDFData.update_key` with `key_is_feature=False`."""
+        Uses `HDFData.update_key` with `key_is_feature=False`."""
         return self.update_key(symbol, key_is_feature=False, **kwargs)

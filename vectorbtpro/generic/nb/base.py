@@ -1506,7 +1506,7 @@ def to_renko_ohlc_1d_nb(
 # ############# Resampling ############# #
 
 
-def _latest_at_index_1d_nb(
+def _realign_1d_nb(
     arr,
     source_index,
     target_index,
@@ -1632,11 +1632,11 @@ def _latest_at_index_1d_nb(
     return impl
 
 
-ol_latest_at_index_1d_nb = overload(_latest_at_index_1d_nb)(_latest_at_index_1d_nb)
+ol_realign_1d_nb = overload(_realign_1d_nb)(_realign_1d_nb)
 
 
 @register_jitted(cache=True)
-def latest_at_index_1d_nb(
+def realign_1d_nb(
     arr: tp.Array1d,
     source_index: tp.Array1d,
     target_index: tp.Array1d,
@@ -1657,7 +1657,7 @@ def latest_at_index_1d_nb(
         Both index arrays must be increasing. Repeating values are allowed.
 
         If `arr` contains bar data, both indexes must represent the opening time."""
-    return _latest_at_index_1d_nb(
+    return _realign_1d_nb(
         arr,
         source_index,
         target_index,
@@ -1670,7 +1670,7 @@ def latest_at_index_1d_nb(
     )
 
 
-def _latest_at_index_nb(
+def _realign_nb(
     arr,
     source_index,
     target_index,
@@ -1703,7 +1703,7 @@ def _latest_at_index_nb(
     ):
         out = np.empty((target_index.shape[0], arr.shape[1]), dtype=dtype)
         for col in prange(arr.shape[1]):
-            out[:, col] = latest_at_index_1d_nb(
+            out[:, col] = realign_1d_nb(
                 arr[:, col],
                 source_index,
                 target_index,
@@ -1732,7 +1732,7 @@ def _latest_at_index_nb(
     return impl
 
 
-ol_latest_at_index_nb = overload(_latest_at_index_nb)(_latest_at_index_nb)
+ol_realign_nb = overload(_realign_nb)(_realign_nb)
 
 
 @register_chunkable(
@@ -1751,7 +1751,7 @@ ol_latest_at_index_nb = overload(_latest_at_index_nb)(_latest_at_index_nb)
     merge_func="column_stack",
 )
 @register_jitted(cache=True, tags={"can_parallel"})
-def latest_at_index_nb(
+def realign_nb(
     arr: tp.Array2d,
     source_index: tp.Array1d,
     target_index: tp.Array1d,
@@ -1762,8 +1762,8 @@ def latest_at_index_nb(
     nan_value: tp.Scalar = np.nan,
     ffill: bool = True,
 ) -> tp.Array2d:
-    """2-dim version of `latest_at_index_1d_nb`."""
-    return _latest_at_index_nb(
+    """2-dim version of `realign_1d_nb`."""
+    return _realign_nb(
         arr,
         source_index,
         target_index,

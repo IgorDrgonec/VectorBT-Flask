@@ -166,7 +166,7 @@ class OHLCVDFAccessor(OHLCDataMixin, GenericDFAccessor):
         **kwargs,
     ) -> tp.SeriesFrame:
         if features is not None and feature is not None:
-            raise ValueError("Either features or feature must be provided, not both")
+            raise ValueError("Must provide either features or feature, not both")
         if symbols is not None or symbol is not None:
             raise ValueError("Cannot provide symbols")
         if feature is not None:

@@ -11,10 +11,8 @@ __all__ = [
 
 __pdoc__ = {}
 
-LocalDataT = tp.TypeVar("LocalDataT", bound="LocalData")
-
 
 class LocalData(CustomData):
     """Data class for fetching local data."""
 
-    _setting_keys: tp.SettingsKeys = dict(custom="data.custom.local")
+    _settings_path: tp.SettingsPath = dict(custom="data.custom.local")

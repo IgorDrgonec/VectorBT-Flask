@@ -384,7 +384,6 @@ else:
     import platform
     import signal
     import warnings
-    import threading
 
     from telegram import Update
     from telegram.ext import (
