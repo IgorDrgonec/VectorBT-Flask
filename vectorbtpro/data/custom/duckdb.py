@@ -136,7 +136,7 @@ class DuckDBData(DBData):
         if connection_config is None:
             connection_config = {}
         connection = cls.resolve_connection(connection, **connection_config)
-        schemata_df = connection.execute("SELECT * FROM information_schema.schemata").df()
+        schemata_df = connection.sql("SELECT * FROM information_schema.schemata").df()
         catalogs = set()
         for catalog in schemata_df["catalog_name"].tolist():
             if pattern is not None:
@@ -186,7 +186,7 @@ class DuckDBData(DBData):
         else:
             catalogs = [catalog]
             prefix_catalog = False
-        schemata_df = connection.execute("SELECT * FROM information_schema.schemata").df()
+        schemata_df = connection.sql("SELECT * FROM information_schema.schemata").df()
         schemas = set()
         for catalog in catalogs:
             all_schemas = schemata_df[schemata_df["catalog_name"] == catalog]["schema_name"].tolist()
@@ -214,7 +214,7 @@ class DuckDBData(DBData):
         if connection_config is None:
             connection_config = {}
         connection = cls.resolve_connection(connection, **connection_config)
-        return connection.execute("SELECT current_schema()").fetchall()[0][0]
+        return connection.sql("SELECT current_schema()").fetchall()[0][0]
 
     @classmethod
     def list_tables(
@@ -287,7 +287,7 @@ class DuckDBData(DBData):
             for catalog in catalogs:
                 catalogs_schemas.append((catalog, schema))
             prefix_schema = prefix_catalog
-        tables_df = connection.execute("SELECT * FROM information_schema.tables").df()
+        tables_df = connection.sql("SELECT * FROM information_schema.tables").df()
         tables = set()
         for catalog, schema in catalogs_schemas:
             all_tables = []
@@ -531,7 +531,7 @@ class DuckDBData(DBData):
         index_col: tp.Optional[tp.MaybeSequence[tp.IntStr]] = None,
         squeeze: tp.Optional[bool] = None,
         df_kwargs: tp.KwargsLike = None,
-        **execute_kwargs,
+        **sql_kwargs,
     ) -> tp.KeyData:
         """Fetch a feature or symbol from a DuckDB database.
 
@@ -593,7 +593,7 @@ class DuckDBData(DBData):
             index_col (int, str, or list): One or more columns that should become the index.
             squeeze (int): Whether to squeeze a DataFrame with one column into a Series.
             df_kwargs (dict): Keyword arguments passed to `relation.df` to convert a relation to a DataFrame.
-            **execute_kwargs: Other keyword arguments passed to `connection.execute` to run a SQL query.
+            **sql_kwargs: Other keyword arguments passed to `connection.execute` to run a SQL query.
 
         For defaults, see `custom.duckdb` in `vectorbtpro._settings.data`."""
         from vectorbtpro.utils.module_ import assert_can_import
@@ -654,7 +654,7 @@ class DuckDBData(DBData):
         index_col = cls.resolve_custom_setting(index_col, "index_col")
         squeeze = cls.resolve_custom_setting(squeeze, "squeeze")
         df_kwargs = cls.resolve_custom_setting(df_kwargs, "df_kwargs", merge=True)
-        execute_kwargs = cls.resolve_custom_setting(execute_kwargs, "execute_kwargs", merge=True)
+        sql_kwargs = cls.resolve_custom_setting(sql_kwargs, "sql_kwargs", merge=True)
 
         if query is None:
             if read_path is not None:
@@ -682,7 +682,7 @@ class DuckDBData(DBData):
                 if not checks.is_int(index_col) and not isinstance(index_col, str):
                     raise ValueError("Index column must be integer or string for filtering by start and end")
                 if checks.is_int(index_col) or align_dates:
-                    metadata_df = connection.execute("DESCRIBE " + query + " LIMIT 1").df()
+                    metadata_df = connection.sql("DESCRIBE " + query + " LIMIT 1").df()
                 else:
                     metadata_df = None
                 if checks.is_int(index_col):
@@ -743,22 +743,22 @@ class DuckDBData(DBData):
                     query += f" WHERE {index_name} >= $start"
                 elif end is not None:
                     query += f" WHERE {index_name} < $end"
-                parameters = execute_kwargs.get("parameters", None)
-                if parameters is None:
-                    parameters = {}
+                params = sql_kwargs.get("params", None)
+                if params is None:
+                    params = {}
                 else:
-                    parameters = dict(parameters)
-                if not isinstance(parameters, dict):
+                    params = dict(params)
+                if not isinstance(params, dict):
                     raise ValueError("Parameters must be a dictionary for filtering by start and end")
                 if start is not None:
-                    if "start" in parameters:
-                        raise ValueError("Start is already in parameters")
-                    parameters["start"] = start
+                    if "start" in params:
+                        raise ValueError("Start is already in params")
+                    params["start"] = start
                 if end is not None:
-                    if "end" in parameters:
-                        raise ValueError("End is already in parameters")
-                    parameters["end"] = end
-                execute_kwargs["parameters"] = parameters
+                    if "end" in params:
+                        raise ValueError("End is already in params")
+                    params["end"] = end
+                sql_kwargs["params"] = params
         else:
             if start is not None:
                 raise ValueError("Start cannot be applied to custom queries")
@@ -766,7 +766,7 @@ class DuckDBData(DBData):
                 raise ValueError("End cannot be applied to custom queries")
 
         if not isinstance(query, DuckDBPyRelation):
-            relation = connection.execute(query, **execute_kwargs)
+            relation = connection.sql(query, **sql_kwargs)
         else:
             relation = query
         obj = relation.df(**df_kwargs)

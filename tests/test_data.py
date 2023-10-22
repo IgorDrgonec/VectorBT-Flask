@@ -3744,7 +3744,7 @@ class TestCustom:
             query="SELECT * FROM DF WHERE index < $end",
             connection=connection,
             tz="America/New_York",
-            parameters=dict(
+            params=dict(
                 end=pd.Timestamp("2020-01-06", tz="America/New_York")
                 .tz_convert("utc")
                 .tz_localize(None)

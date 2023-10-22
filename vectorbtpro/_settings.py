@@ -752,7 +752,7 @@ data = frozen_cfg(
             index_col=0,
             squeeze=True,
             df_kwargs=flex_cfg(),
-            execute_kwargs=flex_cfg(),
+            sql_kwargs=flex_cfg(),
         ),
         # Remote
         remote=flex_cfg(),

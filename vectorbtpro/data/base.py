@@ -4306,35 +4306,35 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     _write_options = f"FORMAT {_write_format.upper()}"
                 _connection.register("_" + k, v)
                 if _write_options is not None:
-                    _connection.execute(f"COPY (SELECT * FROM \"_{k}\") TO '{_write_path}' ({_write_options})")
+                    _connection.sql(f"COPY (SELECT * FROM \"_{k}\") TO '{_write_path}' ({_write_options})")
                 else:
-                    _connection.execute(f"COPY (SELECT * FROM \"_{k}\") TO '{_write_path}'")
+                    _connection.sql(f"COPY (SELECT * FROM \"_{k}\") TO '{_write_path}'")
                 meta[k] = {"write_path": _write_path, "write_options": _write_options}
             else:
                 if _catalog is not None:
-                    _connection.execute(f"USE {_catalog}")
+                    _connection.sql(f"USE {_catalog}")
                 elif _schema is not None:
                     catalogs = DuckDBData.list_catalogs(connection=_connection)
                     if len(catalogs) > 1:
                         raise ValueError("Please select a catalog")
                     _catalog = catalogs[0]
-                    _connection.execute(f"USE {_catalog}")
+                    _connection.sql(f"USE {_catalog}")
                 if _schema is not None:
-                    _connection.execute(f"CREATE SCHEMA IF NOT EXISTS \"{_schema}\"")
-                    _connection.execute(f"USE {_catalog}.{_schema}")
+                    _connection.sql(f"CREATE SCHEMA IF NOT EXISTS \"{_schema}\"")
+                    _connection.sql(f"USE {_catalog}.{_schema}")
                 append = False
                 if _table in DuckDBData.list_tables(catalog=_catalog, schema=_schema, connection=_connection):
                     if _if_exists.lower() == "fail":
                         raise ValueError(f"Table '{_table}' already exists")
                     elif _if_exists.lower() == "replace":
-                        _connection.execute(f"DROP TABLE \"{_table}\"")
+                        _connection.sql(f"DROP TABLE \"{_table}\"")
                     elif _if_exists.lower() == "append":
                         append = True
                 _connection.register("_" + k, v)
                 if append:
-                    _connection.execute(f"INSERT INTO \"{_table}\" SELECT * FROM \"_{k}\"")
+                    _connection.sql(f"INSERT INTO \"{_table}\" SELECT * FROM \"_{k}\"")
                 else:
-                    _connection.execute(f"CREATE TABLE \"{_table}\" AS SELECT * FROM \"_{k}\"")
+                    _connection.sql(f"CREATE TABLE \"{_table}\" AS SELECT * FROM \"_{k}\"")
                 meta[k] = {"table": _table, "schema": _schema, "catalog": _catalog}
 
         if return_meta:
