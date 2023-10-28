@@ -81,8 +81,7 @@ RUN pip install --quiet --no-cache-dir 'pandas_datareader'
 RUN conda install --quiet --yes -c conda-forge cvxopt
 
 ADD ./vectorbtpro ./vectorbtpro
-ADD setup.py ./
-ADD extra-requirements.txt ./
+ADD pyproject.toml ./
 ADD LICENSE ./
 ADD README.md ./
 RUN pip install --quiet --no-cache-dir --no-deps .

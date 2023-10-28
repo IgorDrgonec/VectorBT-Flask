@@ -2,6 +2,9 @@
 requires = ["setuptools>=61.0.0"]
 build-backend = "setuptools.build_meta"
 
+[tool.distutils.bdist_wheel]
+universal = true
+
 [project]
 name = "vectorbtpro"
 version = "2023.10.22"
