@@ -271,6 +271,7 @@ class PathosEngine(ExecutionEngine):
         "sleep",
         "show_progress",
         "pbar_kwargs",
+        "join_pool",
     }
 
     def __init__(
@@ -281,6 +282,7 @@ class PathosEngine(ExecutionEngine):
         sleep: tp.Optional[float] = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
+        join_pool: tp.Optional[bool] = None,
         **kwargs,
     ) -> None:
         pool_type = self.resolve_setting(pool_type, "pool_type")
@@ -289,6 +291,7 @@ class PathosEngine(ExecutionEngine):
         sleep = self.resolve_setting(sleep, "sleep")
         show_progress = self.resolve_setting(show_progress, "show_progress")
         pbar_kwargs = self.resolve_setting(pbar_kwargs, "pbar_kwargs", merge=True)
+        join_pool = self.resolve_setting(join_pool, "join_pool")
 
         ExecutionEngine.__init__(
             self,
@@ -298,6 +301,7 @@ class PathosEngine(ExecutionEngine):
             sleep=sleep,
             show_progress=show_progress,
             pbar_kwargs=pbar_kwargs,
+            join_pool=join_pool,
             **kwargs,
         )
 
@@ -307,6 +311,7 @@ class PathosEngine(ExecutionEngine):
         self._sleep = sleep
         self._show_progress = show_progress
         self._pbar_kwargs = pbar_kwargs
+        self._join_pool = join_pool
 
     @property
     def pool_type(self) -> str:
@@ -337,6 +342,11 @@ class PathosEngine(ExecutionEngine):
     def pbar_kwargs(self) -> tp.Kwargs:
         """Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`."""
         return self._pbar_kwargs
+
+    @property
+    def join_pool(self) -> bool:
+        """Whether to join the pool."""
+        return self._join_pool
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         from vectorbtpro.utils.module_ import assert_can_import
@@ -376,9 +386,10 @@ class PathosEngine(ExecutionEngine):
                                 raise TimeoutError("%d (of %d) futures unfinished" % (len(pending), total_futures))
                         if self.sleep is not None:
                             time.sleep(self.sleep)
-            pool.close()
-            pool.join()
-            pool.clear()
+            if self.join_pool:
+                pool.close()
+                pool.join()
+                pool.clear()
         return [async_result.get() for async_result in async_results]
 
 

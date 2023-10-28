@@ -355,6 +355,7 @@ execution = frozen_cfg(
             sleep=0.001,
             show_progress=False,
             pbar_kwargs=flex_cfg(),
+            join_pool=False,
         ),
         mpire=flex_cfg(
             cls="MpireEngine",
