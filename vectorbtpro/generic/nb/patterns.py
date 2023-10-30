@@ -171,7 +171,7 @@ def fit_pattern_nb(
                 pmax = pmax / fit_pattern[0] * arr[0]
     if rescale_mode == RescaleMode.Rebase:
         if fit_pattern[0] == 0:
-            fit_pattern = np.nan
+            fit_pattern = np.full(fit_pattern.shape, np.nan)
         else:
             fit_pattern = fit_pattern / fit_pattern[0] * arr[0]
         fit_max_error = fit_max_error * fit_pattern
@@ -180,7 +180,7 @@ def fit_pattern_nb(
         fit_pattern = rescale_nb(fit_pattern, (pmin, pmax), (vmin, vmax))
         if error_type == ErrorType.Absolute:
             if pmax - pmin == 0:
-                fit_max_error = np.nan
+                fit_max_error = np.full(fit_max_error.shape, np.nan)
             else:
                 fit_max_error = fit_max_error / (pmax - pmin) * (vmax - vmin)
         else:
