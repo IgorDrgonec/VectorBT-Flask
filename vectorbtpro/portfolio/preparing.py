@@ -1073,31 +1073,27 @@ class FSPreparer(BasePFPreparer):
         staticized = self._pre_staticized
         if isinstance(staticized, dict):
             staticized = dict(staticized)
-        if self.dynamic_mode:
-            if self["signal_func_nb"] is None:
-                if self.ls_mode:
-                    if isinstance(staticized, dict):
+            if self.dynamic_mode:
+                if self["signal_func_nb"] is None:
+                    if self.ls_mode:
                         self.adapt_staticized_to_udf(staticized, "ls_signal_func_nb", "signal_func_nb")
                         staticized["suggest_fname"] = "from_ls_signal_func_nb"
-                elif self.signals_mode:
-                    if isinstance(staticized, dict):
+                    elif self.signals_mode:
                         self.adapt_staticized_to_udf(staticized, "dir_signal_func_nb", "signal_func_nb")
                         staticized["suggest_fname"] = "from_dir_signal_func_nb"
-                elif self.order_mode:
-                    if isinstance(staticized, dict):
+                    elif self.order_mode:
                         self.adapt_staticized_to_udf(staticized, "order_signal_func_nb", "signal_func_nb")
                         staticized["suggest_fname"] = "from_order_signal_func_nb"
-            elif isinstance(staticized, dict):
-                self.adapt_staticized_to_udf(staticized, self["signal_func_nb"], "signal_func_nb")
-            if self["adjust_func_nb"] is not None and isinstance(staticized, dict):
-                self.adapt_staticized_to_udf(staticized, self["adjust_func_nb"], "adjust_func_nb")
-            if self["post_signal_func_nb"] is not None and isinstance(staticized, dict):
-                self.adapt_staticized_to_udf(staticized, self["post_signal_func_nb"], "post_signal_func_nb")
-            if self["post_segment_func_nb"] is None:
-                if self.save_state or self.save_value or self.save_returns:
+                else:
+                    self.adapt_staticized_to_udf(staticized, self["signal_func_nb"], "signal_func_nb")
+                if self["adjust_func_nb"] is not None:
+                    self.adapt_staticized_to_udf(staticized, self["adjust_func_nb"], "adjust_func_nb")
+                if self["post_signal_func_nb"] is not None:
+                    self.adapt_staticized_to_udf(staticized, self["post_signal_func_nb"], "post_signal_func_nb")
+                if self["post_segment_func_nb"] is not None:
+                    self.adapt_staticized_to_udf(staticized, self["post_segment_func_nb"], "post_segment_func_nb")
+                elif self.save_state or self.save_value or self.save_returns:
                     self.adapt_staticized_to_udf(staticized, "save_post_segment_func_nb", "post_segment_func_nb")
-            elif isinstance(staticized, dict):
-                self.adapt_staticized_to_udf(staticized, self["post_segment_func_nb"], "post_segment_func_nb")
         return staticized
 
     @cachedproperty
@@ -1198,7 +1194,7 @@ class FSPreparer(BasePFPreparer):
             cash=cash,
             free_cash=free_cash,
             value=value,
-            returns=returns
+            returns=returns,
         )
 
     @cachedproperty
