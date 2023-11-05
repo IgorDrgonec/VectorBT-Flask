@@ -89,6 +89,8 @@ def save_animation(
         for i in pbar:
             pbar.set_description("{} - {}".format(str(index[i]), str(index[i + delta - 1])))
             fig = plot_func(index[i : i + delta], *args, **kwargs)
+            if fig is None:
+                continue
             if isinstance(fig, (go.Figure, go.FigureWidget)):
                 fig = fig.to_image(format="png", **to_image_kwargs)
             if not isinstance(fig, np.ndarray):
