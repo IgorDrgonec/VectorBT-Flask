@@ -471,13 +471,82 @@ def column_stack_merge(
     return pd.concat(objs, axis=1, keys=keys, **kwargs)
 
 
+def imageio_merge(
+    *objs,
+    keys: tp.Optional[tp.Index] = None,
+    to_image_kwargs: tp.KwargsLike = None,
+    imread_kwargs: tp.KwargsLike = None,
+    **imwrite_kwargs,
+) -> tp.MaybeTuple[tp.Union[None, bytes]]:
+    """Merge multiple figure-like objects by writing them with `imageio`.
+
+    Keyword arguments `to_image_kwargs` are passed to `plotly.graph_objects.Figure.to_image`.
+    Keyword arguments `imread_kwargs` and `**imwrite_kwargs` are passed to
+    `imageio.imread` and `imageio.imwrite` respectively.
+
+    Keys are not used in any way."""
+    from vectorbtpro.utils.module_ import assert_can_import
+
+    assert_can_import("plotly")
+    import plotly.graph_objects as go
+    import imageio.v3 as iio
+
+    if len(objs) == 1:
+        objs = objs[0]
+    objs = list(objs)
+    if len(objs) == 0:
+        raise ValueError("No objects to be merged")
+
+    if isinstance(objs[0], tuple):
+        if len(objs[0]) == 1:
+            out_tuple = (
+                imageio_merge(
+                    list(map(lambda x: x[0], objs)),
+                    keys=keys,
+                    imread_kwargs=imread_kwargs,
+                    to_image_kwargs=to_image_kwargs,
+                    **imwrite_kwargs,
+                ),
+            )
+        else:
+            out_tuple = tuple(
+                map(
+                    lambda x: imageio_merge(
+                        x,
+                        keys=keys,
+                        imread_kwargs=imread_kwargs,
+                        to_image_kwargs=to_image_kwargs,
+                        **imwrite_kwargs,
+                    ),
+                    zip(*objs),
+                )
+            )
+        if checks.is_namedtuple(objs[0]):
+            return type(objs[0])(*out_tuple)
+        return type(objs[0])(out_tuple)
+
+    if imread_kwargs is None:
+        imread_kwargs = {}
+    if to_image_kwargs is None:
+        to_image_kwargs = {}
+
+    frames = []
+    for obj in objs:
+        if obj is None:
+            continue
+        if isinstance(obj, (go.Figure, go.FigureWidget)):
+            obj = obj.to_image(**to_image_kwargs)
+        if not isinstance(obj, np.ndarray):
+            obj = iio.imread(obj, **imread_kwargs)
+        frames.append(obj)
+    return iio.imwrite(image=frames, **imwrite_kwargs)
+
+
 def mixed_merge(
     *objs,
     func_names: tp.Optional[tp.Tuple[str, ...]] = None,
-    wrap: tp.Union[None, str, bool] = None,
-    wrapper: tp.Optional[ArrayWrapper] = None,
-    wrap_kwargs: tp.KwargsLikeSequence = None,
     keys: tp.Optional[tp.Index] = None,
+    mixed_kwargs: tp.Optional[tp.Tuple[tp.KwargsLike]] = None,
     **kwargs,
 ) -> tp.MaybeTuple[tp.AnyArray]:
     """Merge objects of mixed types."""
@@ -495,14 +564,11 @@ def mixed_merge(
     for i, obj_kind in enumerate(zip(*objs)):
         func_name = func_names[i]
         merge_func = resolve_merge_func(func_name)
-        output = merge_func(
-            obj_kind,
-            keys=keys,
-            wrap=wrap,
-            wrapper=wrapper,
-            wrap_kwargs=wrap_kwargs,
-            **kwargs,
-        )
+        if mixed_kwargs is None:
+            _kwargs = kwargs
+        else:
+            _kwargs = merge_dicts(kwargs, mixed_kwargs[i])
+        output = merge_func(obj_kind, keys=keys, **_kwargs)
         outputs.append(output)
     return tuple(outputs)
 
@@ -511,12 +577,13 @@ def resolve_merge_func(func_name: tp.MaybeTuple[str]) -> tp.Callable:
     """Resolve merging function based on name.
 
     * Tuple of strings: `mixed_merge` with `func_names=func_name`
-    * String "concat": `concat_merge`
-    * String "row_stack": `column_stack_merge`
-    * String "column_stack": `column_stack_merge`
-    * String "reset_column_stack": `column_stack_merge` with `reset_index=True`
-    * String "from_start_column_stack": `column_stack_merge` with `reset_index="from_start"`
-    * String "from_end_column_stack": `column_stack_merge` with `reset_index="from_end"`
+    * "concat": `concat_merge`
+    * "row_stack": `column_stack_merge`
+    * "column_stack": `column_stack_merge`
+    * "reset_column_stack": `column_stack_merge` with `reset_index=True`
+    * "from_start_column_stack": `column_stack_merge` with `reset_index="from_start"`
+    * "from_end_column_stack": `column_stack_merge` with `reset_index="from_end"`
+    * "imageio": `imageio_merge`
     """
     if isinstance(func_name, tuple):
         return partial(mixed_merge, func_names=func_name)
@@ -532,4 +599,6 @@ def resolve_merge_func(func_name: tp.MaybeTuple[str]) -> tp.Callable:
         return partial(column_stack_merge, reset_index="from_start")
     if func_name.lower() == "from_end_column_stack":
         return partial(column_stack_merge, reset_index="from_end")
+    if func_name.lower() == "imageio":
+        return imageio_merge
     raise ValueError(f"Invalid merging function name '{func_name}'")

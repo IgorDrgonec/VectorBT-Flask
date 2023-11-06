@@ -2,7 +2,6 @@
 
 """Utilities for images."""
 
-import imageio
 import numpy as np
 
 from vectorbtpro import _typing as tp
@@ -72,6 +71,7 @@ def save_animation(
 
     assert_can_import("plotly")
     import plotly.graph_objects as go
+    import imageio
 
     if writer_kwargs is None:
         writer_kwargs = {}
