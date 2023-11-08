@@ -406,8 +406,6 @@ class AVData(RemoteData):
         df = df.rename(columns=dict(zip(df.columns, new_columns)))
         if not df.empty and df.index[0] > df.index[1]:
             df = df.iloc[::-1]
-        if isinstance(df.index, pd.DatetimeIndex) and df.index.tz is None:
-            df = df.tz_localize("utc")
 
         return df, dict(tz_convert=tz, freq=freq)
 
