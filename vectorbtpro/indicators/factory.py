@@ -56,7 +56,7 @@ from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.indicators.expr import expr_func_config, expr_res_func_config, wqa101_expr_config
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, Configured
+from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, Configured, HybridConfig
 from vectorbtpro.utils.decorators import classproperty, cacheable_property, class_or_instancemethod
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.eval_ import multiline_eval
@@ -1870,6 +1870,8 @@ class IndicatorFactory(Configured):
         """Built indicator class."""
         return self._Indicator
 
+    # ############# Construction ############# #
+
     def with_custom_func(
         self,
         custom_func: tp.Callable,
@@ -2903,6 +2905,44 @@ Other keyword arguments are passed to `{0}.run`.
 
         return self.with_custom_func(custom_func, pass_packed=True, **kwargs)
 
+    # ############# Exploration ############# #
+
+    _custom_indicators: tp.ClassVar[Config] = HybridConfig()
+
+    @classproperty
+    def custom_indicators(cls) -> Config:
+        """Custom indicators."""
+        return cls._custom_indicators
+
+    @classmethod
+    def register_custom_indicator(cls, indicator: tp.Type[IndicatorBase], name: tp.Optional[str] = None) -> None:
+        """Register a custom indicator."""
+        if name is None:
+            name = indicator.__name__
+        cls.custom_indicators[name] = indicator
+
+    @classmethod
+    def deregister_custom_indicator(cls, name: str) -> None:
+        """Deregister a custom indicator."""
+        del cls.custom_indicators[name]
+
+    @classmethod
+    def get_custom_indicator(cls, name: str) -> tp.Type[IndicatorBase]:
+        """Get a custom indicator."""
+        name = name.upper().strip()
+        for k, v in cls.custom_indicators.items():
+            k = k.upper().strip()
+            if k == name:
+                return v
+        raise KeyError(f"Could not find a custom indicator with the name '{name}'")
+
+    @classmethod
+    def list_custom_indicators(cls, uppercase: bool = False) -> tp.List[str]:
+        """List custom indicators."""
+        if uppercase:
+            return sorted(map(lambda x: x.upper(), cls.custom_indicators.keys()))
+        return sorted(cls.custom_indicators.keys())
+
     @classmethod
     def list_vbt_indicators(cls) -> tp.List[str]:
         """List all vectorbt indicators."""
@@ -2923,6 +2963,7 @@ Other keyword arguments are passed to `{0}.run`.
     def list_locations(cls) -> tp.List[str]:
         """List supported locations."""
         return [
+            "custom",
             "vbt",
             "talib_func",
             "talib",
@@ -2966,6 +3007,7 @@ Other keyword arguments are passed to `{0}.run`.
                 from vectorbtpro.utils.module_ import check_installed
 
                 all_indicators = [
+                    *map(lambda x: "custom:" + x if prepend_location else x, cls.list_custom_indicators()),
                     *map(lambda x: "vbt:" + x if prepend_location else x, cls.list_vbt_indicators()),
                     *map(
                         lambda x: "talib:" + x if prepend_location else x,
@@ -3052,6 +3094,8 @@ Other keyword arguments are passed to `{0}.run`.
         if name is not None:
             name = name.upper().strip()
             if location is not None:
+                if location == "custom":
+                    return cls.get_custom_indicator(name)
                 if location == "vbt":
                     import vectorbtpro as vbt
 
@@ -3073,19 +3117,21 @@ Other keyword arguments are passed to `{0}.run`.
                 import vectorbtpro as vbt
                 from vectorbtpro.utils.module_ import check_installed
 
+                if name in cls.list_custom_indicators(uppercase=True):
+                    return cls.get_custom_indicator(name)
                 if hasattr(vbt, name):
                     return getattr(vbt, name)
                 if str(name).isnumeric():
                     return cls.from_wqa101(int(name))
-                if check_installed("technical") and name in IndicatorFactory.list_techcon_indicators():
+                if check_installed("technical") and name in cls.list_techcon_indicators():
                     return cls.from_techcon(name)
-                if check_installed("talib") and name in IndicatorFactory.list_talib_indicators():
+                if check_installed("talib") and name in cls.list_talib_indicators():
                     return cls.from_talib(name)
-                if check_installed("ta") and name in IndicatorFactory.list_ta_indicators(uppercase=True):
+                if check_installed("ta") and name in cls.list_ta_indicators(uppercase=True):
                     return cls.from_ta(name)
-                if check_installed("pandas_ta") and name in IndicatorFactory.list_pandas_ta_indicators():
+                if check_installed("pandas_ta") and name in cls.list_pandas_ta_indicators():
                     return cls.from_pandas_ta(name)
-                if check_installed("technical") and name in IndicatorFactory.list_technical_indicators():
+                if check_installed("technical") and name in cls.list_technical_indicators():
                     return cls.from_technical(name)
         raise ValueError(f"Indicator '{name}' not found")
 
@@ -4100,7 +4146,7 @@ Other keyword arguments are passed to `{0}.run`.
         if cls_name.lower() in ("MACON".lower(), "MovingAverageConsensus".lower()):
             from technical.consensus.movingaverage import MovingAverageConsensus
 
-            return IndicatorFactory.from_custom_techcon(
+            return cls.from_custom_techcon(
                 MovingAverageConsensus,
                 factory_kwargs=dict(module_name=__name__ + ".techcon", class_name="MACON"),
                 **kwargs,
@@ -4108,7 +4154,7 @@ Other keyword arguments are passed to `{0}.run`.
         if cls_name.lower() in ("OSCCON".lower(), "OscillatorConsensus".lower()):
             from technical.consensus.oscillator import OscillatorConsensus
 
-            return IndicatorFactory.from_custom_techcon(
+            return cls.from_custom_techcon(
                 OscillatorConsensus,
                 factory_kwargs=dict(module_name=__name__ + ".techcon", class_name="OSCCON"),
                 **kwargs,
@@ -4116,7 +4162,7 @@ Other keyword arguments are passed to `{0}.run`.
         if cls_name.lower() in ("SUMCON".lower(), "SummaryConsensus".lower()):
             from technical.consensus.summary import SummaryConsensus
 
-            return IndicatorFactory.from_custom_techcon(
+            return cls.from_custom_techcon(
                 SummaryConsensus,
                 factory_kwargs=dict(module_name=__name__ + ".techcon", class_name="SUMCON"),
                 **kwargs,
@@ -4424,7 +4470,7 @@ Other keyword arguments are passed to `{0}.run`.
                         ind_name = var_name[4:]
                         if ind_name.startswith("talib_"):
                             ind_name = ind_name[6:]
-                            I = IndicatorFactory.from_talib(ind_name)
+                            I = cls_or_self.from_talib(ind_name)
                         else:
                             I = kwargs[ind_name]
                         if not issubclass(I, IndicatorBase):
