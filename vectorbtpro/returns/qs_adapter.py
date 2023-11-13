@@ -167,7 +167,7 @@ def attach_qs_methods(cls: tp.Type[tp.T], replace_signature: bool = True) -> tp.
                     else:
                         returns = returns.rename(str(returns.name))
                     null_mask = returns.isnull()
-                    if "benchmark" in pass_kwargs:
+                    if "benchmark" in pass_kwargs and pass_kwargs["benchmark"] is not None:
                         benchmark = pass_kwargs["benchmark"]
                         benchmark = self.returns_acc.select_col_from_obj(
                             benchmark,

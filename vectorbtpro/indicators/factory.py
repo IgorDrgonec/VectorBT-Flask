@@ -2914,6 +2914,7 @@ Other keyword arguments are passed to `{0}.run`.
                 for attr in dir(vbt)
                 if not attr.startswith("_")
                 and isinstance(getattr(vbt, attr), type)
+                and getattr(vbt, attr) is not IndicatorBase
                 and issubclass(getattr(vbt, attr), IndicatorBase)
             ]
         )
@@ -2962,13 +2963,30 @@ Other keyword arguments are passed to `{0}.run`.
                 location = location.lower()
                 all_indicators = getattr(cls, f"list_{location.lower()}_indicators")()
             else:
+                from vectorbtpro.utils.module_ import check_installed
+
                 all_indicators = [
                     *map(lambda x: "vbt:" + x if prepend_location else x, cls.list_vbt_indicators()),
-                    *map(lambda x: "talib:" + x if prepend_location else x, cls.list_talib_indicators()),
-                    *map(lambda x: "pandas_ta:" + x if prepend_location else x, cls.list_pandas_ta_indicators()),
-                    *map(lambda x: "ta:" + x if prepend_location else x, cls.list_ta_indicators()),
-                    *map(lambda x: "technical:" + x if prepend_location else x, cls.list_technical_indicators()),
-                    *map(lambda x: "techcon:" + x if prepend_location else x, cls.list_techcon_indicators()),
+                    *map(
+                        lambda x: "talib:" + x if prepend_location else x,
+                        cls.list_talib_indicators() if check_installed("talib") else [],
+                    ),
+                    *map(
+                        lambda x: "pandas_ta:" + x if prepend_location else x,
+                        cls.list_pandas_ta_indicators() if check_installed("pandas_ta") else [],
+                    ),
+                    *map(
+                        lambda x: "ta:" + x if prepend_location else x,
+                        cls.list_ta_indicators() if check_installed("ta") else [],
+                    ),
+                    *map(
+                        lambda x: "technical:" + x if prepend_location else x,
+                        cls.list_technical_indicators() if check_installed("technical") else [],
+                    ),
+                    *map(
+                        lambda x: "techcon:" + x if prepend_location else x,
+                        cls.list_techcon_indicators() if check_installed("technical") else [],
+                    ),
                     *map(lambda x: "wqa101:" + str(x) if prepend_location else str(x), range(1, 102)),
                 ]
         found_indicators = []
