@@ -5245,6 +5245,104 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         if _full_init:
             GenericAccessor.__init__(self, wrapper, obj=obj, mapping=mapping, **kwargs)
 
+    def band(self, band_name: str, return_meta: bool = False) -> tp.Union[tp.Series, dict]:
+        """Calculate the band by its name.
+
+        Examples for the band name:
+
+        * "50%": 50th quantile
+        * "Q=50%": 50th quantile
+        * "Q=0.5": 50th quantile
+        * "Z=1.96": Z-score of 1.96
+        * "P=95%": One-tailed significance level of 0.95 (translated into z-score)
+        * "P=0.95": One-tailed significance level of 0.95 (translated into z-score)
+        * "median": Median (50th quantile)
+        * "mean": Mean across all columns
+        * "min": Min across all columns
+        * "max": Max across all columns
+        * "lowest": Column with the lowest final value
+        * "highest": Column with the highest final value
+        """
+        band_name = band_name.lower().replace(" ", "")
+        if band_name == "median":
+            band_name = "50%"
+        if "%" in band_name and not band_name.startswith("q=") and not band_name.startswith("p="):
+            band_name = f"q={band_name}"
+        if band_name.startswith("q="):
+            if "%" in band_name:
+                q = float(band_name.replace("q=", "").replace("%", "")) / 100
+            else:
+                q = float(band_name.replace("q=", ""))
+            q_readable = np.around(q * 100, decimals=2)
+            if q_readable.is_integer():
+                q_readable = int(q_readable)
+            band_title = f"Q={q_readable}% (proj)"
+
+            def band_func(df, _q=q):
+                return df.quantile(_q, axis=1)
+
+        elif band_name.startswith("z="):
+            z = float(band_name.replace("z=", ""))
+            z_readable = np.around(z, decimals=2)
+            if z_readable.is_integer():
+                z_readable = int(z_readable)
+            band_title = f"Z={z_readable} (proj)"
+
+            def band_func(df, _z=z):
+                return df.mean(axis=1) + _z * df.std(axis=1)
+
+        elif band_name.startswith("p="):
+            import scipy.stats as st
+
+            if "%" in band_name:
+                p = float(band_name.replace("p=", "").replace("%", "")) / 100
+            else:
+                p = float(band_name.replace("p=", ""))
+            p_readable = np.around(p * 100, decimals=2)
+            if p_readable.is_integer():
+                p_readable = int(p_readable)
+            band_title = f"P={p_readable}% (proj)"
+            z = st.norm.ppf(p)
+
+            def band_func(df, _z=z):
+                return df.mean(axis=1) + _z * df.std(axis=1)
+
+        elif band_name == "mean":
+            band_title = "Mean (proj)"
+
+            def band_func(df):
+                return df.mean(axis=1)
+
+        elif band_name == "min":
+            band_title = "Min (proj)"
+
+            def band_func(df):
+                return df.min(axis=1)
+
+        elif band_name == "max":
+            band_title = "Max (proj)"
+
+            def band_func(df):
+                return df.max(axis=1)
+
+        elif band_name == "lowest":
+            band_title = "Lowest (proj)"
+
+            def band_func(df):
+                return df[df.ffill().iloc[-1].idxmin()]
+
+        elif band_name == "highest":
+            band_title = "Highest (proj)"
+
+            def band_func(df):
+                return df[df.ffill().iloc[-1].idxmax()]
+
+        else:
+            raise ValueError(f"Invalid option band_name='{band_name}'")
+        if return_meta:
+            return dict(band_name=band_name, band_title=band_title, band_func=band_func)
+        return band_func(self.obj)
+
     def plot_projections(
         self,
         plot_projections: bool = True,
@@ -5274,19 +5372,8 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
 
         * True: Plot the band using the default quantile (20/50/80)
         * False: Do not plot the band
-        * "50%": 50th quantile
-        * "Q=50%": 50th quantile
-        * "Q=0.5": 50th quantile
-        * "Z=1.96": Z-score of 1.96
-        * "P=95%": One-tailed significance level of 0.95 (translated into z-score)
-        * "P=0.95": One-tailed significance level of 0.95 (translated into z-score)
-        * "median": Median (50th quantile)
-        * "mean": Mean across all projections
-        * "min": Min across all projections
-        * "max": Max across all projections
-        * "lowest": Projection with the lowest final value
-        * "highest": Projection with the highest final value
         * callable: Custom function that accepts DataFrame and reduces it across columns
+        * For other options see `GenericDFAccessor.band`
 
         !!! note
             When providing z-scores, the upper should be positive, the middle should be "mean", and
@@ -5365,64 +5452,15 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
             else:
                 plot_aux_middle = None
 
-        def _resolve_band_and_name(plot_band, arg_name):
-            band_name = None
-            if isinstance(plot_band, str):
-                plot_band = plot_band.lower().replace(" ", "")
-                if plot_band == "median":
-                    plot_band = "50%"
-                if "%" in plot_band and not plot_band.startswith("q=") and not plot_band.startswith("p="):
-                    plot_band = f"q={plot_band}"
-                if plot_band.startswith("q="):
-                    if "%" in plot_band:
-                        q = float(plot_band.replace("q=", "").replace("%", "")) / 100
-                    else:
-                        q = float(plot_band.replace("q=", ""))
-                    q_readable = np.around(q * 100, decimals=2)
-                    if q_readable.is_integer():
-                        q_readable = int(q_readable)
-                    band_name = f"Q={q_readable}% (proj)"
-                    plot_band = lambda df, _q=q: df.quantile(_q, axis=1)
-                elif plot_band.startswith("z="):
-                    z = float(plot_band.replace("z=", ""))
-                    z_readable = np.around(z, decimals=2)
-                    if z_readable.is_integer():
-                        z_readable = int(z_readable)
-                    band_name = f"Z={z_readable} (proj)"
-                    plot_band = lambda df, _z=z: df.mean(axis=1) + _z * df.std(axis=1)
-                elif plot_band.startswith("p="):
-                    import scipy.stats as st
-
-                    if "%" in plot_band:
-                        p = float(plot_band.replace("p=", "").replace("%", "")) / 100
-                    else:
-                        p = float(plot_band.replace("p=", ""))
-                    p_readable = np.around(p * 100, decimals=2)
-                    if p_readable.is_integer():
-                        p_readable = int(p_readable)
-                    band_name = f"P={p_readable}% (proj)"
-                    z = st.norm.ppf(p)
-                    plot_band = lambda df, _z=z: df.mean(axis=1) + _z * df.std(axis=1)
-                elif plot_band == "mean":
-                    band_name = "Mean (proj)"
-                    plot_band = lambda df: df.mean(axis=1)
-                elif plot_band == "min":
-                    band_name = "Min (proj)"
-                    plot_band = lambda df: df.min(axis=1)
-                elif plot_band == "max":
-                    band_name = "Max (proj)"
-                    plot_band = lambda df: df.max(axis=1)
-                elif plot_band == "lowest":
-                    band_name = "Lowest (proj)"
-                    plot_band = lambda df: df[df.ffill().iloc[-1].idxmin()]
-                elif plot_band == "highest":
-                    band_name = "Highest (proj)"
-                    plot_band = lambda df: df[df.ffill().iloc[-1].idxmax()]
-                else:
-                    raise ValueError(f"Argument {arg_name} has wrong value '{plot_band}'")
-            if plot_band is not None and not callable(plot_band):
-                raise TypeError(f"Argument {arg_name} has wrong type '{type(plot_band)}'")
-            return plot_band, band_name
+        def _resolve_band_and_name(band_func, arg_name):
+            band_title = None
+            if isinstance(band_func, str):
+                band_func_meta = self.band(band_func, return_meta=True)
+                band_title = band_func_meta["band_title"]
+                band_func = band_func_meta["band_func"]
+            if band_func is not None and not callable(band_func):
+                raise TypeError(f"Argument {arg_name} has wrong type '{type(band_func)}'")
+            return band_func, band_title
 
         plot_lower, lower_name = _resolve_band_and_name(plot_lower, "plot_lower")
         if lower_name is None:
