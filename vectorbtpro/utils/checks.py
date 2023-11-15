@@ -462,6 +462,22 @@ def is_valid_variable_name(arg: str) -> bool:
     return arg.isidentifier() and not iskeyword(arg)
 
 
+def is_notebook() -> bool:
+    """Check whether the code runs in a notebook.
+
+    Credit: https://stackoverflow.com/a/39662359"""
+    try:
+        shell = get_ipython().__class__.__name__
+        if shell == "ZMQInteractiveShell":
+            return True
+        elif shell == "TerminalInteractiveShell":
+            return False
+        else:
+            return False
+    except NameError:
+        return False
+
+
 # ############# Asserts ############# #
 
 
