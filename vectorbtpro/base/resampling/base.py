@@ -191,7 +191,9 @@ class Resampler(Configured):
                     source_freq = None
         if source_freq is None:
             if not warned and not silence_warnings:
-                warnings.warn("Using right bound of source index without frequency. Set source_freq.", stacklevel=2)
+                warnings.warn(
+                    "Using right bound of source index without frequency. Set source frequency.", stacklevel=2
+                )
         return source_freq
 
     def get_np_target_freq(self, silence_warnings: tp.Optional[bool] = None) -> tp.AnyPandasFrequency:
@@ -212,7 +214,9 @@ class Resampler(Configured):
                     target_freq = None
         if target_freq is None:
             if not warned and not silence_warnings:
-                warnings.warn("Using right bound of target index without frequency. Set target_freq.", stacklevel=2)
+                warnings.warn(
+                    "Using right bound of target index without frequency. Set target frequency.", stacklevel=2
+                )
         return target_freq
 
     @classmethod

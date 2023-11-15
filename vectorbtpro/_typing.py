@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from vectorbtpro.utils.template import CustomTemplate
     from vectorbtpro.utils.datetime_ import DTC, DTCNT
     from vectorbtpro.utils.selection import PosSel, LabelSel
+    from vectorbtpro.utils.merging import MergeFunc
     from vectorbtpro.base.indexing import hslice
     from vectorbtpro.base.grouping.base import Grouper
     from vectorbtpro.base.resampling.base import Resampler
@@ -58,6 +59,7 @@ else:
     DTCNT = "DTCNT"
     PosSel = "PosSel"
     LabelSel = "LabelSel"
+    MergeFunc = "MergeFunc"
     hslice = "hslice"
     Grouper = "Grouper"
     Resampler = "Resampler"
@@ -237,6 +239,9 @@ EngineLike = Union[str, type, ExecutionEngine, Callable]
 JittedOption = Union[None, bool, str, Callable, Kwargs]
 JitterLike = Union[str, Jitter, Type[Jitter]]
 TaskId = Union[Hashable, Callable]
+
+# Merging
+MergeFuncLike = MaybeSequence[Union[None, str, Callable, MergeFunc]]
 
 # Chunking
 SizeFunc = Callable[[AnnArgs], int]

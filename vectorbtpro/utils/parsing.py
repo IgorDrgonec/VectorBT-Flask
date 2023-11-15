@@ -5,11 +5,11 @@
 import ast
 import inspect
 import re
-import sys
 import io
 import contextlib
 import warnings
 import attr
+import sys
 
 from vectorbtpro import _typing as tp
 

@@ -2,6 +2,7 @@
 
 """Functions for merging arrays."""
 
+import attr
 from functools import partial
 
 import numpy as np
@@ -9,7 +10,8 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.config import resolve_dict, merge_dicts
+from vectorbtpro.utils.config import resolve_dict, merge_dicts, HybridConfig
+from vectorbtpro.utils.merging import MergeFunc
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.base.reshaping import column_stack, to_2d_array
 from vectorbtpro.base.indexes import stack_indexes, concat_indexes
@@ -18,7 +20,11 @@ __all__ = [
     "concat_merge",
     "row_stack_merge",
     "column_stack_merge",
+    "imageio_merge",
+    "mixed_merge",
 ]
+
+__pdoc__ = {}
 
 
 def concat_merge(
@@ -544,9 +550,9 @@ def imageio_merge(
 
 def mixed_merge(
     *objs,
-    func_names: tp.Optional[tp.Tuple[str, ...]] = None,
+    merge_funcs: tp.Optional[tp.MergeFuncLike] = None,
     keys: tp.Optional[tp.Index] = None,
-    mixed_kwargs: tp.Optional[tp.Tuple[tp.KwargsLike]] = None,
+    mixed_kwargs: tp.Optional[tp.Sequence[tp.KwargsLike]] = None,
     **kwargs,
 ) -> tp.MaybeTuple[tp.AnyArray]:
     """Merge objects of mixed types."""
@@ -555,50 +561,63 @@ def mixed_merge(
     objs = list(objs)
     if len(objs) == 0:
         raise ValueError("No objects to be merged")
-    if func_names is None:
-        raise ValueError("Merging function names are required")
+    if merge_funcs is None:
+        raise ValueError("Merging functions or their names are required")
     if not isinstance(objs[0], tuple):
         raise ValueError("Mixed merging must be applied on tuples")
 
     outputs = []
-    for i, obj_kind in enumerate(zip(*objs)):
-        func_name = func_names[i]
-        merge_func = resolve_merge_func(func_name)
-        if mixed_kwargs is None:
-            _kwargs = kwargs
+    for i, output_objs in enumerate(zip(*objs)):
+        output_objs = list(output_objs)
+        merge_func = resolve_merge_func(merge_funcs[i])
+        if merge_func is None:
+            outputs.append(output_objs)
         else:
-            _kwargs = merge_dicts(kwargs, mixed_kwargs[i])
-        output = merge_func(obj_kind, keys=keys, **_kwargs)
-        outputs.append(output)
+            if mixed_kwargs is None:
+                _kwargs = kwargs
+            else:
+                _kwargs = merge_dicts(kwargs, mixed_kwargs[i])
+            output = merge_func(output_objs, keys=keys, **_kwargs)
+            outputs.append(output)
     return tuple(outputs)
 
 
-def resolve_merge_func(func_name: tp.MaybeTuple[str]) -> tp.Callable:
-    """Resolve merging function based on name.
+merge_func_config = HybridConfig(
+    dict(
+        concat=concat_merge,
+        row_stack=row_stack_merge,
+        column_stack=column_stack_merge,
+        reset_column_stack=partial(column_stack_merge, reset_index=True),
+        from_start_column_stack=partial(column_stack_merge, reset_index="from_start"),
+        from_end_column_stack=partial(column_stack_merge, reset_index="from_end"),
+        imageio=imageio_merge,
+    )
+)
+"""_"""
 
-    * Tuple of strings: `mixed_merge` with `func_names=func_name`
-    * "concat": `concat_merge`
-    * "row_stack": `column_stack_merge`
-    * "column_stack": `column_stack_merge`
-    * "reset_column_stack": `column_stack_merge` with `reset_index=True`
-    * "from_start_column_stack": `column_stack_merge` with `reset_index="from_start"`
-    * "from_end_column_stack": `column_stack_merge` with `reset_index="from_end"`
-    * "imageio": `imageio_merge`
-    """
-    if isinstance(func_name, tuple):
-        return partial(mixed_merge, func_names=func_name)
-    if func_name.lower() == "concat":
-        return concat_merge
-    if func_name.lower() == "row_stack":
-        return row_stack_merge
-    if func_name.lower() == "column_stack":
-        return column_stack_merge
-    if func_name.lower() == "reset_column_stack":
-        return partial(column_stack_merge, reset_index=True)
-    if func_name.lower() == "from_start_column_stack":
-        return partial(column_stack_merge, reset_index="from_start")
-    if func_name.lower() == "from_end_column_stack":
-        return partial(column_stack_merge, reset_index="from_end")
-    if func_name.lower() == "imageio":
-        return imageio_merge
-    raise ValueError(f"Invalid merging function name '{func_name}'")
+__pdoc__[
+    "merge_func_config"
+] = f"""Config for merging functions.
+
+```python
+{merge_func_config.prettify()}
+```
+"""
+
+
+def resolve_merge_func(merge_func: tp.MergeFuncLike) -> tp.Optional[tp.Callable]:
+    """Resolve a merging function into a callable.
+
+    Uses `merge_func_config`. Also, if a tuple of strings uses `mixed_merge` with `merge_funcs=merge_func`."""
+    if merge_func is None:
+        return None
+    if isinstance(merge_func, str):
+        if merge_func.lower() not in merge_func_config:
+            raise ValueError(f"Invalid merging function name '{merge_func}'")
+        return merge_func_config[merge_func.lower()]
+    if checks.is_sequence(merge_func):
+        return partial(mixed_merge, merge_funcs=merge_func)
+    if isinstance(merge_func, MergeFunc):
+        return merge_func.resolve_merge_func()
+    return merge_func
+

@@ -18,16 +18,22 @@ from vectorbtpro.utils.config import merge_dicts, Config
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.parsing import annotate_args, match_ann_arg, get_func_arg_names, Regex
 from vectorbtpro.utils.template import substitute_templates, Rep
+from vectorbtpro.utils.annotations import get_annotations, Annotatable, A
+from vectorbtpro.utils.merging import MergeFunc
 
 __all__ = [
     "ChunkMeta",
     "ArgChunkMeta",
     "LenChunkMeta",
+    "Sizer",
     "ArgSizer",
+    "CountSizer",
     "LenSizer",
     "ShapeSizer",
     "ArraySizer",
     "ChunkMapper",
+    "DontChunk",
+    "ChunkTaker",
     "ChunkSelector",
     "ChunkSlicer",
     "CountAdapter",
@@ -35,6 +41,7 @@ __all__ = [
     "ShapeSlicer",
     "ArraySelector",
     "ArraySlicer",
+    "ContainerTaker",
     "SequenceTaker",
     "MappingTaker",
     "ArgsTaker",
@@ -48,21 +55,17 @@ __pdoc__ = {}
 # ############# Universal ############# #
 
 
-def _assert_value_not_none(instance: object, attribute: attr.Attribute, value: tp.Any) -> None:
-    """Assert that value is not None."""
-    if value is None:
-        raise ValueError("Please provide {}".format(attribute.name))
-
-
 @attr.s(frozen=True)
 class ArgGetter:
     """Class for getting an argument from annotated arguments."""
 
-    arg_query: tp.Optional[tp.AnnArgQuery] = attr.ib(default=None, validator=_assert_value_not_none)
+    arg_query: tp.Optional[tp.AnnArgQuery] = attr.ib(default=None)
     """Query for annotated argument to derive the size from."""
 
     def get_arg(self, ann_args: tp.AnnArgs) -> tp.Any:
         """Get argument using `vectorbtpro.utils.parsing.match_ann_arg`."""
+        if self.arg_query is None:
+            raise ValueError("Please provide arg_query")
         return match_ann_arg(ann_args, self.arg_query)
 
 
@@ -85,19 +88,19 @@ class DimRetainer:
 # ############# Chunk sizing ############# #
 
 
-class Sizer:
+class Sizer(Annotatable):
     """Abstract class for getting the size from annotated arguments.
 
     !!! note
         Use `Sizer.apply` instead of `Sizer.get_size`."""
 
-    def apply(self, ann_args: tp.AnnArgs) -> int:
-        """Apply the sizer."""
-        return self.get_size(ann_args)
-
     def get_size(self, ann_args: tp.AnnArgs) -> int:
         """Get the size given the annotated arguments."""
         raise NotImplementedError
+
+    def apply(self, ann_args: tp.AnnArgs) -> int:
+        """Apply the sizer."""
+        return self.get_size(ann_args)
 
 
 @attr.s(frozen=True)
@@ -107,6 +110,9 @@ class ArgSizer(Sizer, ArgGetter):
     single_type: tp.Optional[tp.TypeLike] = attr.ib(default=None)
     """One or multiple types to consider as a single value."""
 
+    def get_size(self, ann_args: tp.AnnArgs) -> int:
+        return self.get_arg(ann_args)
+
     def apply(self, ann_args: tp.AnnArgs) -> int:
         arg = self.get_arg(ann_args)
         if self.single_type is not None:
@@ -114,52 +120,84 @@ class ArgSizer(Sizer, ArgGetter):
                 return 1
         return self.get_size(ann_args)
 
+
+class CountSizer(ArgSizer):
+    """Class for getting the size from a count."""
+
+    @classmethod
+    def get_obj_size(cls, obj: int, single_type: tp.Optional[type] = None) -> int:
+        """Get size of an object."""
+        if single_type is not None:
+            if checks.is_instance_of(obj, single_type):
+                return 1
+        return obj
+
     def get_size(self, ann_args: tp.AnnArgs) -> int:
-        return self.get_arg(ann_args)
+        return self.get_obj_size(self.get_arg(ann_args), single_type=self.single_type)
 
 
 class LenSizer(ArgSizer):
     """Class for getting the size from the length of an argument."""
 
+    @classmethod
+    def get_obj_size(cls, obj: tp.Sequence, single_type: tp.Optional[type] = None) -> int:
+        """Get size of an object."""
+        if single_type is not None:
+            if checks.is_instance_of(obj, single_type):
+                return 1
+        return len(obj)
+
     def get_size(self, ann_args: tp.AnnArgs) -> int:
-        return len(self.get_arg(ann_args))
+        return self.get_obj_size(self.get_arg(ann_args), single_type=self.single_type)
 
 
 @attr.s(frozen=True)
 class ShapeSizer(ArgSizer, AxisSpecifier):
     """Class for getting the size from the length of an axis in a shape."""
 
-    def get_size(self, ann_args: tp.AnnArgs) -> int:
-        arg = self.get_arg(ann_args)
-        if len(arg) == 0:
+    @classmethod
+    def get_obj_size(cls, obj: tp.ShapeLike, axis: int, single_type: tp.Optional[type] = None) -> int:
+        """Get size of an object."""
+        if single_type is not None:
+            if checks.is_instance_of(obj, single_type):
+                return 1
+        if checks.is_int(obj):
+            obj = (obj,)
+        if len(obj) == 0:
             return 0
-        axis = self.axis
         if axis is None:
-            if len(arg) == 1:
+            if len(obj) == 1:
                 axis = 0
-            else:
-                raise ValueError("Axis is required")
-        if axis <= len(arg) - 1:
-            return arg[axis]
+        checks.assert_not_none(axis, arg_name="axis")
+        if axis <= len(obj) - 1:
+            return obj[axis]
         return 0
+
+    def get_size(self, ann_args: tp.AnnArgs) -> int:
+        return self.get_obj_size(self.get_arg(ann_args), self.axis, single_type=self.single_type)
 
 
 class ArraySizer(ShapeSizer):
     """Class for getting the size from the length of an axis in an array."""
 
-    def get_size(self, ann_args: tp.AnnArgs) -> int:
-        arg = self.get_arg(ann_args)
-        if len(arg.shape) == 0:
+    @classmethod
+    def get_obj_size(cls, obj: tp.AnyArray, axis: int, single_type: tp.Optional[type] = None) -> int:
+        """Get size of an object."""
+        if single_type is not None:
+            if checks.is_instance_of(obj, single_type):
+                return 1
+        if len(obj.shape) == 0:
             return 0
-        axis = self.axis
         if axis is None:
-            if len(arg.shape) == 1:
+            if len(obj.shape) == 1:
                 axis = 0
-            else:
-                raise ValueError("Axis is required")
-        if axis <= len(arg.shape) - 1:
-            return arg.shape[axis]
+        checks.assert_not_none(axis, arg_name="axis")
+        if axis <= len(obj.shape) - 1:
+            return obj.shape[axis]
         return 0
+
+    def get_size(self, ann_args: tp.AnnArgs) -> int:
+        return self.get_obj_size(self.get_arg(ann_args), self.axis, single_type=self.single_type)
 
 
 # ############# Chunk generation ############# #
@@ -390,7 +428,12 @@ class ChunkMapper:
 
 
 @attr.s(frozen=True)
-class ChunkTaker:
+class DontChunk(Annotatable):
+    """Class that represents an argument that shouldn't be chunked."""
+
+
+@attr.s(frozen=True)
+class ChunkTaker(Annotatable):
     """Abstract class for taking one or more elements based on the chunk index or range.
 
     !!! note
@@ -405,8 +448,18 @@ class ChunkTaker:
     mapper: tp.Optional[ChunkMapper] = attr.ib(default=None)
     """Chunk mapper of type `ChunkMapper`."""
 
+    def get_size(self, obj: tp.Any) -> int:
+        """Get the actual size of the argument."""
+        raise NotImplementedError
+
+    def suggest_size(self, obj: tp.Any) -> tp.Optional[int]:
+        """Suggest a global size based on the argument's size."""
+        if self.mapper is not None:
+            return None
+        return self.get_size(obj)
+
     def should_take(self, obj: tp.Any, chunk_meta: ChunkMeta, **kwargs) -> bool:
-        """Check whether should take a chunk or leave the argument as it is."""
+        """Check whether to take a chunk or leave the argument as it is."""
         if self.ignore_none and obj is None:
             return False
         if self.single_type is not None:
@@ -435,6 +488,12 @@ class ChunkTaker:
 class ChunkSelector(ChunkTaker, DimRetainer):
     """Class for selecting one element based on the chunk index."""
 
+    def get_size(self, obj: tp.Sequence) -> int:
+        return LenSizer.get_obj_size(obj, single_type=self.single_type)
+
+    def suggest_size(self, obj: tp.Sequence) -> tp.Optional[int]:
+        return None
+
     def take(self, obj: tp.Sequence, chunk_meta: ChunkMeta, **kwargs) -> tp.Any:
         if self.keep_dims:
             return obj[chunk_meta.idx : chunk_meta.idx + 1]
@@ -444,6 +503,9 @@ class ChunkSelector(ChunkTaker, DimRetainer):
 class ChunkSlicer(ChunkTaker):
     """Class for slicing multiple elements based on the chunk range."""
 
+    def get_size(self, obj: tp.Sequence) -> int:
+        return LenSizer.get_obj_size(obj, single_type=self.single_type)
+
     def take(self, obj: tp.Sequence, chunk_meta: ChunkMeta, **kwargs) -> tp.Sequence:
         if chunk_meta.indices is not None:
             return obj[chunk_meta.indices]
@@ -452,6 +514,9 @@ class ChunkSlicer(ChunkTaker):
 
 class CountAdapter(ChunkSlicer):
     """Class for adapting a count based on the chunk range."""
+
+    def get_size(self, obj: int) -> int:
+        return CountSizer.get_obj_size(obj, single_type=self.single_type)
 
     def take(self, obj: int, chunk_meta: ChunkMeta, **kwargs) -> int:
         checks.assert_instance_of(obj, int)
@@ -469,7 +534,12 @@ class CountAdapter(ChunkSlicer):
 class ShapeSelector(ChunkSelector, AxisSpecifier):
     """Class for selecting one element from a shape's axis based on the chunk index."""
 
-    def take(self, obj: tp.Shape, chunk_meta: ChunkMeta, **kwargs) -> tp.Shape:
+    def get_size(self, obj: tp.ShapeLike) -> int:
+        return ShapeSizer.get_obj_size(obj, self.axis, single_type=self.single_type)
+
+    def take(self, obj: tp.ShapeLike, chunk_meta: ChunkMeta, **kwargs) -> tp.Shape:
+        if checks.is_int(obj):
+            obj = (obj,)
         checks.assert_instance_of(obj, tuple)
         if len(obj) == 0:
             return ()
@@ -477,8 +547,7 @@ class ShapeSelector(ChunkSelector, AxisSpecifier):
         if axis is None:
             if len(obj) == 1:
                 axis = 0
-            else:
-                raise ValueError("Axis is required")
+        checks.assert_not_none(axis, arg_name="axis")
         if axis >= len(obj):
             raise IndexError(f"Shape is {len(obj)}-dimensional, but {axis} were indexed")
         if chunk_meta.idx >= obj[axis]:
@@ -495,7 +564,12 @@ class ShapeSelector(ChunkSelector, AxisSpecifier):
 class ShapeSlicer(ChunkSlicer, AxisSpecifier):
     """Class for slicing multiple elements from a shape's axis based on the chunk range."""
 
-    def take(self, obj: tp.Shape, chunk_meta: ChunkMeta, **kwargs) -> tp.Shape:
+    def get_size(self, obj: tp.ShapeLike) -> int:
+        return ShapeSizer.get_obj_size(obj, self.axis, single_type=self.single_type)
+
+    def take(self, obj: tp.ShapeLike, chunk_meta: ChunkMeta, **kwargs) -> tp.Shape:
+        if checks.is_int(obj):
+            obj = (obj,)
         checks.assert_instance_of(obj, tuple)
         if len(obj) == 0:
             return ()
@@ -503,8 +577,7 @@ class ShapeSlicer(ChunkSlicer, AxisSpecifier):
         if axis is None:
             if len(obj) == 1:
                 axis = 0
-            else:
-                raise ValueError("Axis is required")
+        checks.assert_not_none(axis, arg_name="axis")
         if axis >= len(obj):
             raise IndexError(f"Shape is {len(obj)}-dimensional, but {axis} were indexed")
         obj = list(obj)
@@ -524,6 +597,9 @@ class ShapeSlicer(ChunkSlicer, AxisSpecifier):
 class ArraySelector(ShapeSelector):
     """Class for selecting one element from an array's axis based on the chunk index."""
 
+    def get_size(self, obj: tp.AnyArray) -> int:
+        return ArraySizer.get_obj_size(obj, self.axis, single_type=self.single_type)
+
     def take(self, obj: tp.AnyArray, chunk_meta: ChunkMeta, **kwargs) -> tp.ArrayLike:
         checks.assert_instance_of(obj, (pd.Series, pd.DataFrame, np.ndarray))
         if len(obj.shape) == 0:
@@ -532,10 +608,9 @@ class ArraySelector(ShapeSelector):
         if axis is None:
             if len(obj.shape) == 1:
                 axis = 0
-            else:
-                raise ValueError("Axis is required")
+        checks.assert_not_none(axis, arg_name="axis")
         if axis >= len(obj.shape):
-            raise IndexError(f"Array is {obj.ndim}-dimensional, but {axis} were indexed")
+            raise IndexError(f"Array is {len(obj.shape)}-dimensional, but {axis} were indexed")
         slc = [slice(None)] * len(obj.shape)
         if self.keep_dims:
             slc[axis] = slice(chunk_meta.idx, chunk_meta.idx + 1)
@@ -549,6 +624,9 @@ class ArraySelector(ShapeSelector):
 class ArraySlicer(ShapeSlicer):
     """Class for slicing multiple elements from an array's axis based on the chunk range."""
 
+    def get_size(self, obj: tp.AnyArray) -> int:
+        return ArraySizer.get_obj_size(obj, self.axis, single_type=self.single_type)
+
     def take(self, obj: tp.AnyArray, chunk_meta: ChunkMeta, **kwargs) -> tp.AnyArray:
         checks.assert_instance_of(obj, (pd.Series, pd.DataFrame, np.ndarray))
         if len(obj.shape) == 0:
@@ -557,10 +635,9 @@ class ArraySlicer(ShapeSlicer):
         if axis is None:
             if len(obj.shape) == 1:
                 axis = 0
-            else:
-                raise ValueError("Axis is required")
+        checks.assert_not_none(axis, arg_name="axis")
         if axis >= len(obj.shape):
-            raise IndexError(f"Array is {obj.ndim}-dimensional, but {axis} were indexed")
+            raise IndexError(f"Array is {len(obj.shape)}-dimensional, but {axis} were indexed")
         slc = [slice(None)] * len(obj.shape)
         if chunk_meta.indices is not None:
             slc[axis] = np.asarray(chunk_meta.indices)
@@ -577,7 +654,7 @@ class ContainerTaker(ChunkTaker):
 
     Accepts the specification of the container."""
 
-    cont_take_spec: tp.Optional[tp.ContainerTakeSpec] = attr.ib(default=None, validator=_assert_value_not_none)
+    cont_take_spec: tp.Optional[tp.ContainerTakeSpec] = attr.ib(default=None)
     """Specification of the container."""
 
     def __init__(
@@ -586,13 +663,21 @@ class ContainerTaker(ChunkTaker):
         single_type: tp.Optional[tp.TypeLike] = None,
         ignore_none: bool = True,
         mapper: tp.Optional[ChunkMapper] = None,
-    ):
+    ) -> None:
         self.__attrs_init__(
             single_type=single_type,
             ignore_none=ignore_none,
             mapper=mapper,
             cont_take_spec=cont_take_spec,
         )
+
+    def get_size(self, obj: tp.Sequence) -> int:
+        raise NotImplementedError
+
+    def check_cont_take_spec(self) -> None:
+        """Check that `ContainerTaker.cont_take_spec` is not None."""
+        if self.cont_take_spec is None:
+            raise ValueError("Please provide cont_take_spec")
 
     def take(self, obj: tp.Any, chunk_meta: ChunkMeta, **kwargs) -> tp.Any:
         raise NotImplementedError
@@ -603,15 +688,68 @@ class SequenceTaker(ContainerTaker):
 
     Calls `take_from_arg` on each element."""
 
-    def take(self, obj: tp.Sequence, chunk_meta: ChunkMeta, silence_warnings: bool = False, **kwargs) -> tp.Sequence:
+    def adapt_cont_take_spec(self, obj: tp.Sequence) -> tp.ContainerTakeSpec:
+        """Prepare the specification of the container to the object."""
+        cont_take_spec = list(self.cont_take_spec)
+        if len(cont_take_spec) >= 2:
+            if isinstance(cont_take_spec[-1], type(...)):
+                if len(obj) >= len(cont_take_spec):
+                    cont_take_spec = cont_take_spec[:-1]
+                    cont_take_spec.extend([cont_take_spec[-1]] * (len(obj) - len(cont_take_spec)))
+        return cont_take_spec
+
+    def suggest_size(self, obj: tp.Sequence) -> tp.Optional[int]:
+        if self.mapper is not None:
+            return None
+        self.check_cont_take_spec()
+        cont_take_spec = self.adapt_cont_take_spec(obj)
+        size_i = None
+        size = None
+        for i, v in enumerate(obj):
+            if i < len(cont_take_spec):
+                take_spec = cont_take_spec[i]
+                if isinstance(take_spec, type) and issubclass(take_spec, ChunkTaker):
+                    take_spec = take_spec()
+                if isinstance(take_spec, ChunkTaker):
+                    try:
+                        new_size = take_spec.suggest_size(v)
+                        if new_size is not None:
+                            if size is None:
+                                size_i = i
+                                size = new_size
+                            elif size != new_size:
+                                warnings.warn(
+                                    (
+                                        f"Arguments at indices {size_i} and {i} have conflicting sizes "
+                                        f"{size} and {new_size}. Setting size to None."
+                                    ),
+                                    stacklevel=2,
+                                )
+                                return None
+                    except NotImplementedError as e:
+                        pass
+        return size
+
+    def take(
+        self,
+        obj: tp.Sequence,
+        chunk_meta: ChunkMeta,
+        silence_warnings: bool = False,
+        **kwargs,
+    ) -> tp.Sequence:
+        self.check_cont_take_spec()
+        cont_take_spec = self.adapt_cont_take_spec(obj)
         new_obj = []
         for i, v in enumerate(obj):
-            if i < len(self.cont_take_spec):
-                take_spec = self.cont_take_spec[i]
+            if i < len(cont_take_spec):
+                take_spec = cont_take_spec[i]
             else:
                 if not silence_warnings:
                     warnings.warn(
-                        f"Argument at index {i} not found in SequenceTaker.cont_take_spec. Setting to None.",
+                        (
+                            f"Argument at index {i} not found in SequenceTaker.cont_take_spec. "
+                            "Setting its specification to None."
+                        ),
                         stacklevel=2,
                     )
                 take_spec = None
@@ -626,15 +764,56 @@ class MappingTaker(ContainerTaker):
 
     Calls `take_from_arg` on each element."""
 
-    def take(self, obj: tp.Mapping, chunk_meta: ChunkMeta, silence_warnings: bool = False, **kwargs) -> tp.Mapping:
+    def suggest_size(self, obj: tp.Mapping) -> tp.Optional[int]:
+        if self.mapper is not None:
+            return None
+        self.check_cont_take_spec()
+        size_k = None
+        size = None
+        for k, v in dict(obj).items():
+            if k in self.cont_take_spec:
+                take_spec = self.cont_take_spec[k]
+                if isinstance(take_spec, type) and issubclass(take_spec, ChunkTaker):
+                    take_spec = take_spec()
+                if isinstance(take_spec, ChunkTaker):
+                    try:
+                        new_size = take_spec.suggest_size(v)
+                        if new_size is not None:
+                            if size is None:
+                                size_k = k
+                                size = new_size
+                            elif size != new_size:
+                                warnings.warn(
+                                    (
+                                        f"Arguments with keys '{size_k}' and '{k}' have conflicting sizes "
+                                        f"{size} and {new_size}. Setting size to None."
+                                    ),
+                                    stacklevel=2,
+                                )
+                                return None
+                    except NotImplementedError as e:
+                        pass
+        return size
+
+    def take(
+        self,
+        obj: tp.Mapping,
+        chunk_meta: ChunkMeta,
+        silence_warnings: bool = False,
+        **kwargs,
+    ) -> tp.Mapping:
+        self.check_cont_take_spec()
         new_obj = {}
-        for k, v in obj.items():
+        for k, v in dict(obj).items():
             if k in self.cont_take_spec:
                 take_spec = self.cont_take_spec[k]
             else:
                 if not silence_warnings:
                     warnings.warn(
-                        f"Argument with key '{k}' not found in MappingTaker.cont_take_spec. Setting to None.",
+                        (
+                            f"Argument with key '{k}' not found in MappingTaker.cont_take_spec. "
+                            "Setting its specification to None."
+                        ),
                         stacklevel=2,
                     )
                 take_spec = None
@@ -651,7 +830,7 @@ class ArgsTaker(SequenceTaker):
         single_type: tp.Optional[tp.TypeLike] = None,
         ignore_none: bool = True,
         mapper: tp.Optional[ChunkMapper] = None,
-    ):
+    ) -> None:
         self.__attrs_init__(
             single_type=single_type,
             ignore_none=ignore_none,
@@ -669,7 +848,7 @@ class KwargsTaker(MappingTaker):
         ignore_none: bool = True,
         mapper: tp.Optional[ChunkMapper] = None,
         **kwargs,
-    ):
+    ) -> None:
         self.__attrs_init__(
             single_type=single_type,
             ignore_none=ignore_none,
@@ -686,6 +865,8 @@ def take_from_arg(arg: tp.Any, take_spec: tp.TakeSpec, chunk_meta: ChunkMeta, **
     `**kwargs` are passed to `ChunkTaker.apply`."""
     if take_spec is None:
         return arg
+    if isinstance(take_spec, type) and issubclass(take_spec, ChunkTaker):
+        take_spec = take_spec()
     if isinstance(take_spec, ChunkTaker):
         return take_spec.apply(arg, chunk_meta, **kwargs)
     raise TypeError(f"Specification of type {type(take_spec)} is not supported")
@@ -796,9 +977,105 @@ def yield_arg_chunks(
             chunk_arg_take_spec = arg_take_spec
             if not checks.is_mapping(chunk_arg_take_spec):
                 chunk_arg_take_spec = dict(zip(range(len(chunk_arg_take_spec)), chunk_arg_take_spec))
-            chunk_arg_take_spec = substitute_templates(chunk_arg_take_spec, context=context, sub_id="chunk_arg_take_spec")
+            chunk_arg_take_spec = substitute_templates(
+                chunk_arg_take_spec, context=context, sub_id="chunk_arg_take_spec"
+            )
             chunk_args, chunk_kwargs = take_from_args(chunk_ann_args, chunk_arg_take_spec, _chunk_meta, **kwargs)
         yield func, chunk_args, chunk_kwargs
+
+
+def parse_sizer(func: tp.Callable) -> tp.Optional[Sizer]:
+    """Parser the sizer from the function's annotations."""
+    annotations = get_annotations(func)
+    sizer = None
+    for k, v in annotations.items():
+        if not isinstance(v, A):
+            v = A(v)
+        for obj in v.get_objs():
+            if isinstance(obj, type) and issubclass(obj, Sizer):
+                obj = obj()
+            if isinstance(obj, Sizer):
+                if isinstance(obj, ArgGetter):
+                    if obj.arg_query is None:
+                        obj = attr.evolve(obj, arg_query=k)
+                if sizer is not None:
+                    raise ValueError(f"Two sizers found in annotations: {sizer} and {obj}")
+                sizer = obj
+    return sizer
+
+
+def parse_arg_take_spec(func: tp.Callable) -> tp.ArgTakeSpec:
+    """Parse the chunk taking specification from the function's annotations."""
+    annotations = get_annotations(func)
+    arg_take_spec = {}
+    for k, v in annotations.items():
+        if not isinstance(v, A):
+            v = A(v)
+        for obj in v.get_objs():
+            if isinstance(obj, type) and issubclass(obj, ChunkTaker):
+                obj = obj()
+            if isinstance(obj, ChunkTaker):
+                if isinstance(obj, ArgGetter):
+                    if obj.arg_query is None:
+                        obj = attr.evolve(obj, arg_query=k)
+                if k in arg_take_spec:
+                    raise ValueError(
+                        f"Two specifications found in annotations for the key '{k}': {arg_take_spec[k]} and {obj}"
+                    )
+                arg_take_spec[k] = obj
+    return arg_take_spec
+
+
+def parse_merge_func(func: tp.Callable) -> tp.Optional[MergeFunc]:
+    """Parser the merging function from the function's annotations."""
+    annotations = get_annotations(func)
+    merge_func = None
+    for k, v in annotations.items():
+        if k == "return":
+            if not isinstance(v, A):
+                v = A(v)
+            for obj in v.get_objs():
+                if checks.is_sequence(obj):
+                    for o in obj:
+                        if o is None or isinstance(o, MergeFunc):
+                            if merge_func is None:
+                                merge_func = []
+                            elif not isinstance(merge_func, list):
+                                raise ValueError(f"Two merging functions found in annotations: {merge_func} and {o}")
+                            merge_func.append(o)
+                elif isinstance(obj, MergeFunc):
+                    if merge_func is not None:
+                        raise ValueError(f"Two merging functions found in annotations: {merge_func} and {obj}")
+                    merge_func = obj
+    return merge_func
+
+
+def suggest_size(ann_args: tp.AnnArgs, arg_take_spec: tp.ArgTakeSpec) -> tp.Optional[int]:
+    """Suggest a global size given the annotated arguments and the chunk taking specification."""
+    size_k = None
+    size = None
+    for k, v in arg_take_spec.items():
+        if isinstance(v, type) and issubclass(v, ChunkTaker):
+            v = v()
+        if isinstance(v, ChunkTaker):
+            try:
+                new_size = v.suggest_size(ann_args[k]["value"])
+                if new_size is not None:
+                    if size is None:
+                        size_k = k
+                        size = new_size
+                    elif size != new_size:
+                        warnings.warn(
+                            (
+                                f"Arguments '{size_k}' and '{k}' have conflicting sizes "
+                                f"{size} and {new_size}. Setting size to None."
+                            ),
+                            stacklevel=2,
+                        )
+                        return None
+            except NotImplementedError as e:
+                pass
+    return size
 
 
 def chunked(
@@ -812,7 +1089,7 @@ def chunked(
     arg_take_spec: tp.Optional[tp.ArgTakeSpecLike] = None,
     template_context: tp.KwargsLike = None,
     prepend_chunk_meta: tp.Optional[bool] = None,
-    merge_func: tp.Union[None, str, tuple, tp.Callable] = None,
+    merge_func: tp.Optional[tp.MergeFuncLike] = None,
     merge_kwargs: tp.KwargsLike = None,
     return_raw_chunks: bool = False,
     silence_warnings: tp.Optional[bool] = None,
@@ -1067,8 +1344,10 @@ def chunked(
             arg_take_spec = kwargs.pop("_arg_take_spec", wrapper.options["arg_take_spec"])
             if arg_take_spec is None:
                 arg_take_spec = {}
-            if isinstance(arg_take_spec, dict) and "chunk_meta" not in arg_take_spec:
-                arg_take_spec["chunk_meta"] = None
+            if checks.is_mapping(arg_take_spec):
+                arg_take_spec = dict(arg_take_spec)
+                if "chunk_meta" not in arg_take_spec:
+                    arg_take_spec["chunk_meta"] = None
             template_context = merge_dicts(wrapper.options["template_context"], kwargs.pop("_template_context", {}))
             execute_kwargs = merge_dicts(wrapper.options["execute_kwargs"], kwargs.pop("_execute_kwargs", {}))
             merge_func = kwargs.pop("_merge_func", wrapper.options["merge_func"])
@@ -1093,7 +1372,30 @@ def chunked(
             if prepend_chunk_meta:
                 args = (Rep("chunk_meta"), *args)
 
+            parsed_sizer = parse_sizer(func)
+            if parsed_sizer is not None:
+                if size is not None:
+                    raise ValueError(f"Two conflicting sizers: {parsed_sizer} (annotations) and {size} (size)")
+                size = parsed_sizer
+            parsed_arg_take_spec = parse_arg_take_spec(func)
+            if len(parsed_arg_take_spec) > 0:
+                if not isinstance(arg_take_spec, dict) or parsed_arg_take_spec.keys() & arg_take_spec.keys():
+                    raise ValueError(
+                        f"Two conflicting specifications: {parsed_arg_take_spec} (annotations) "
+                        f"and {arg_take_spec} (arg_take_spec)"
+                    )
+                arg_take_spec = {**parsed_arg_take_spec, **arg_take_spec}
+            parsed_merge_func = parse_merge_func(func)
+            if parsed_merge_func is not None:
+                if merge_func is not None:
+                    raise ValueError(
+                        f"Two conflicting merge functions: {parsed_merge_func} (annotations) and {merge_func} (size)"
+                    )
+                merge_func = parsed_merge_func
+
             ann_args = annotate_args(func, args, kwargs)
+            if size is None and isinstance(arg_take_spec, dict):
+                size = suggest_size(ann_args, arg_take_spec)
             chunk_meta = list(
                 get_chunk_meta_from_args(
                     ann_args,
@@ -1128,12 +1430,11 @@ def chunked(
             results = execute(funcs_args, n_calls=len(chunk_meta), **execute_kwargs)
             if merge_func is not None:
                 context["funcs_args"] = funcs_args
-                if isinstance(merge_func, (str, tuple)):
-                    from vectorbtpro.base.merging import resolve_merge_func
-
-                    merge_func = resolve_merge_func(merge_func)
-                merge_kwargs = substitute_templates(merge_kwargs, context, sub_id="merge_kwargs")
-                return merge_func(results, **merge_kwargs)
+                if isinstance(merge_func, MergeFunc):
+                    merge_func = merge_func.evolve(merge_kwargs=merge_kwargs, context=context)
+                else:
+                    merge_func = MergeFunc(merge_func, merge_kwargs=merge_kwargs, context=context)
+                return merge_func(results)
             return results
 
         wrapper.func = func
@@ -1160,7 +1461,7 @@ def chunked(
             options_=dict(
                 frozen_keys=True,
                 as_attrs=True,
-            )
+            ),
         )
 
         if prepend_chunk_meta:
