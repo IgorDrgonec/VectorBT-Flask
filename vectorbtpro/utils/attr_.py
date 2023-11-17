@@ -209,8 +209,8 @@ class AttrResolverMixin:
         # Resolve attribute
         cls = type(self)
         _attr = self.pre_resolve_attr(attr, final_kwargs=final_kwargs)
-        if "get_" + attr in dir(cls):
-            _attr = "get_" + attr
+        if "get_" + _attr in dir(cls):
+            _attr = "get_" + _attr
         if inspect.ismethod(getattr(cls, _attr)) or inspect.isfunction(getattr(cls, _attr)):
             attr_func = getattr(self, _attr)
             attr_func_kwargs = dict()

@@ -7056,7 +7056,7 @@ class TestPortfolio:
         )
         assert_frame_equal(
             pf.stats(metrics="total_trades", agg_func=None, settings=dict(trades_type="entry_trades")),
-            pd.DataFrame([3, 2, 2], index=close_na.columns, columns=["Total Trades"]),
+            pd.DataFrame([3, 3, 2], index=close_na.columns, columns=["Total Trades"]),
         )
         assert_frame_equal(
             pf.stats(metrics="total_trades", agg_func=None, settings=dict(trades_type="exit_trades")),
@@ -7064,7 +7064,7 @@ class TestPortfolio:
         )
         assert_frame_equal(
             pf.stats(metrics="total_trades", agg_func=None, settings=dict(trades_type="positions")),
-            pd.DataFrame([3, 2, 2], index=close_na.columns, columns=["Total Trades"]),
+            pd.DataFrame([2, 1, 1], index=close_na.columns, columns=["Total Trades"]),
         )
         assert_series_equal(pf["c"].stats(), pf.stats(column="c"))
         assert_series_equal(pf["c"].stats(), pf_grouped.stats(column="c", group_by=False))
