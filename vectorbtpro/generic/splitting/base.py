@@ -17,7 +17,15 @@ from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridCo
 from vectorbtpro.utils.colors import adjust_opacity
 from vectorbtpro.utils.template import CustomTemplate, Rep, RepFunc, substitute_templates
 from vectorbtpro.utils.decorators import class_or_instancemethod
-from vectorbtpro.utils.parsing import get_func_arg_names
+from vectorbtpro.utils.parsing import (
+    get_func_arg_names,
+    annotate_args,
+    flatten_ann_args,
+    unflatten_ann_args,
+    ann_args_to_args,
+)
+from vectorbtpro.utils.annotations import Annotatable, has_annotatables
+from vectorbtpro.utils.merging import parse_merge_func, MergeFunc
 from vectorbtpro.utils.datetime_ import (
     prepare_dt_index,
     try_align_dt_to_index,
@@ -33,7 +41,12 @@ from vectorbtpro.base.reshaping import to_dict
 from vectorbtpro.base.accessors import BaseIDXAccessor
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.grouping.base import Grouper
-from vectorbtpro.base.merging import row_stack_merge, column_stack_merge, resolve_merge_func
+from vectorbtpro.base.merging import (
+    row_stack_merge,
+    column_stack_merge,
+    resolve_merge_func,
+    is_merge_func_from_config,
+)
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.splitting import nb
 
@@ -298,12 +311,15 @@ class RelRange:
 _DEF = object()
 """Default value for internal purposes."""
 
+_RaiseValueError = object()
+"""Gets raised if not substituted by a real value."""
+
 
 @attr.s(frozen=True)
-class Takeable:
+class Takeable(Annotatable):
     """Class that represents an object from which a range can be taken."""
 
-    obj: tp.Any = attr.ib()
+    obj: tp.Any = attr.ib(default=_RaiseValueError)
     """Takeable object."""
 
     remap_to_obj: bool = attr.ib(default=_DEF)
@@ -321,6 +337,11 @@ class Takeable:
 
     point_wise: bool = attr.ib(default=_DEF)
     """Whether to select one range point at a time and return a tuple."""
+
+    def check_obj(self) -> None:
+        """Check whether value is missing."""
+        if self.obj is _RaiseValueError:
+            raise ValueError("Takeable object is missing")
 
 
 class Splitter(Analyzable):
@@ -3053,6 +3074,29 @@ class Splitter(Analyzable):
 
     # ############# Applying ############# #
 
+    @classmethod
+    def parse_and_inject_takeables(cls, flat_ann_args: tp.FlatAnnArgs) -> tp.FlatAnnArgs:
+        """Parse `Takeable` instances from function annotations and inject them into flattened annotated arguments."""
+        new_flat_ann_args = dict()
+        for k, v in flat_ann_args.items():
+            new_flat_ann_args[k] = v = dict(v)
+            if "annotation" in v:
+                if isinstance(v["annotation"], type) and issubclass(v["annotation"], Takeable):
+                    v["annotation"] = v["annotation"]()
+                if isinstance(v["annotation"], Takeable):
+                    if "value" in v:
+                        if not isinstance(v["value"], Takeable):
+                            v["value"] = attr.evolve(v["annotation"], obj=v["value"])
+                        else:
+                            v["value"] = attr.evolve(
+                                v["value"],
+                                **merge_dicts(
+                                    attr.asdict(v["annotation"]),
+                                    attr.asdict(v["value"]),
+                                ),
+                            )
+        return new_flat_ann_args
+
     def apply(
         self,
         apply_func: tp.Callable,
@@ -3218,6 +3262,13 @@ class Splitter(Analyzable):
             index_combine_kwargs = {}
         if execute_kwargs is None:
             execute_kwargs = {}
+        parsed_merge_func = parse_merge_func(apply_func)
+        if parsed_merge_func is not None:
+            if merge_func is not None:
+                raise ValueError(
+                    f"Two conflicting merge functions: {parsed_merge_func} (annotations) and {merge_func} (merge_func)"
+                )
+            merge_func = parsed_merge_func
         if merge_kwargs is None:
             merge_kwargs = {}
 
@@ -3259,6 +3310,18 @@ class Splitter(Analyzable):
             template_context,
         )
 
+        if has_annotatables(apply_func):
+            ann_args = annotate_args(
+                apply_func,
+                apply_args,
+                apply_kwargs,
+                attach_annotations=True,
+            )
+            flat_ann_args = flatten_ann_args(ann_args)
+            flat_ann_args = self.parse_and_inject_takeables(flat_ann_args)
+            ann_args = unflatten_ann_args(flat_ann_args)
+            apply_args, apply_kwargs = ann_args_to_args(ann_args)
+
         def _get_range_meta(i, j, _template_context):
             split_idx = split_group_indices[i]
             set_idx = set_group_indices[j]
@@ -3278,6 +3341,7 @@ class Splitter(Analyzable):
             return range_meta
 
         def _take_range(takeable, range_, _template_context):
+            takeable.check_obj()
             obj_meta, obj_range_meta = self.get_ready_obj_range(
                 takeable.obj,
                 range_,
@@ -3566,11 +3630,21 @@ class Splitter(Analyzable):
             if merge_func is not None:
                 template_context["funcs_args"] = funcs_args
                 template_context["keys"] = keys
-                if isinstance(merge_func, (str, tuple)):
-                    merge_func = resolve_merge_func(merge_func)
-                    merge_kwargs = {**dict(keys=keys), **merge_kwargs}
-                merge_kwargs = substitute_templates(merge_kwargs, template_context, sub_id="merge_kwargs")
-                return merge_func(results, **merge_kwargs)
+                if is_merge_func_from_config(merge_func):
+                    merge_kwargs = merge_dicts(dict(keys=keys), merge_kwargs)
+                if isinstance(merge_func, MergeFunc):
+                    merge_func = attr.evolve(
+                        merge_func,
+                        merge_kwargs=merge_kwargs,
+                        context=template_context,
+                    )
+                else:
+                    merge_func = MergeFunc(
+                        merge_func,
+                        merge_kwargs=merge_kwargs,
+                        context=template_context,
+                    )
+                return merge_func(results)
             if wrap_results:
                 if isinstance(results[0], tuple):
                     return tuple(map(_wrap_output, zip(*results)))
@@ -3637,14 +3711,23 @@ class Splitter(Analyzable):
                     _results, minor_keys_wbounds = _skip_iterations(_results, keys=minor_keys_wbounds)
                     if len(_results) > 0:
                         _template_context["keys"] = minor_keys_wbounds
-                        if isinstance(merge_func, (str, tuple)):
-                            _merge_func = resolve_merge_func(merge_func)
-                            _merge_kwargs = {**dict(keys=minor_keys_wbounds), **merge_kwargs}
+                        if is_merge_func_from_config(merge_func):
+                            _merge_kwargs = merge_dicts(dict(keys=minor_keys_wbounds), merge_kwargs)
                         else:
-                            _merge_func = merge_func
                             _merge_kwargs = merge_kwargs
-                        _merge_kwargs = substitute_templates(_merge_kwargs, _template_context, sub_id="merge_kwargs")
-                        merged_results.append(_merge_func(_results, **_merge_kwargs))
+                        if isinstance(merge_func, MergeFunc):
+                            _merge_func = attr.evolve(
+                                merge_func,
+                                merge_kwargs=_merge_kwargs,
+                                context=_template_context,
+                            )
+                        else:
+                            _merge_func = MergeFunc(
+                                merge_func,
+                                merge_kwargs=_merge_kwargs,
+                                context=_template_context,
+                            )
+                        merged_results.append(_merge_func(_results))
                         keep_major_indices.append(i)
             if len(merged_results) == 0:
                 raise NoResultsException

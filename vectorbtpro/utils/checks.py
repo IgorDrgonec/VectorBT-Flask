@@ -164,6 +164,13 @@ def is_sequence(arg: tp.Any) -> bool:
         return False
 
 
+def is_complex_sequence(arg: tp.Any) -> bool:
+    """Check whether the argument is a sequence but not a string or bytes object."""
+    if isinstance(arg, (str, bytes)):
+        return False
+    return is_sequence(arg)
+
+
 def is_iterable(arg: tp.Any) -> bool:
     """Check whether the argument is iterable."""
     try:

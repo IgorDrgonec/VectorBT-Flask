@@ -12,6 +12,7 @@ import attr
 import sys
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils.annotations import get_annotations, VarArgs, VarKwargs
 
 __all__ = [
     "Regex",
@@ -91,6 +92,7 @@ def annotate_args(
     kwargs: tp.Kwargs,
     only_passed: bool = False,
     allow_partial: bool = False,
+    attach_annotations: bool = False,
 ) -> tp.AnnArgs:
     """Annotate arguments and keyword arguments using the function's signature.
 
@@ -101,6 +103,10 @@ def annotate_args(
     if not allow_partial:
         signature.bind(*args, **kwargs)
     ann_args = dict()
+    if attach_annotations:
+        annotations = get_annotations(func)
+    else:
+        annotations = dict()
 
     last_pos = None
     var_positional = False
@@ -146,6 +152,9 @@ def annotate_args(
             var_keyword = True
             if not only_passed or len(kwargs) > 0:
                 ann_args[p.name] = dict(kind=p.kind, value=kwargs)
+        if p.name in ann_args and p.name in annotations:
+            ann_args[p.name]["annotation"] = annotations[p.name]
+
     if not var_positional:
         if len(args) == 1:
             raise TypeError(f"{func.__name__}() got an unexpected positional argument after '{last_pos}'")
@@ -183,18 +192,39 @@ def flatten_ann_args(ann_args: tp.AnnArgs) -> tp.FlatAnnArgs:
     for arg_name, ann_arg in ann_args.items():
         if ann_arg["kind"] == inspect.Parameter.VAR_POSITIONAL:
             for i, v in enumerate(ann_arg["value"]):
-                flat_ann_args[f"{arg_name}_{i}"] = dict(var_name=arg_name, kind=ann_arg["kind"], value=v)
+                dct = dict(var_name=arg_name, kind=ann_arg["kind"], value=v)
+                if "annotation" in ann_arg:
+                    if isinstance(ann_arg["annotation"], VarArgs):
+                        dct["annotation"] = ann_arg["annotation"].args[i]
+                        dct["var_annotation"] = ann_arg["annotation"]
+                    else:
+                        if isinstance(ann_arg["annotation"], VarKwargs):
+                            raise TypeError("VarKwargs used for variable positional arguments")
+                        dct["annotation"] = ann_arg["annotation"]
+                flat_ann_args[f"{arg_name}_{i}"] = dct
         elif ann_arg["kind"] == inspect.Parameter.VAR_KEYWORD:
             for var_arg_name, var_value in ann_arg["value"].items():
-                flat_ann_args[var_arg_name] = dict(var_name=arg_name, kind=ann_arg["kind"], value=var_value)
+                dct = dict(var_name=arg_name, kind=ann_arg["kind"], value=var_value)
+                if "annotation" in ann_arg:
+                    if isinstance(ann_arg["annotation"], VarKwargs):
+                        dct["annotation"] = ann_arg["annotation"].kwargs[var_arg_name]
+                        dct["var_annotation"] = ann_arg["annotation"]
+                    else:
+                        if isinstance(ann_arg["annotation"], VarArgs):
+                            raise TypeError("VarArgs used for variable keyword arguments")
+                        dct["annotation"] = ann_arg["annotation"]
+                flat_ann_args[var_arg_name] = dct
         else:
-            flat_ann_args[arg_name] = dict(kind=ann_arg["kind"])
+            dct = dict(kind=ann_arg["kind"])
             if "value" in ann_arg:
-                flat_ann_args[arg_name]["value"] = ann_arg["value"]
+                dct["value"] = ann_arg["value"]
+            if "annotation" in ann_arg:
+                dct["annotation"] = ann_arg["annotation"]
+            flat_ann_args[arg_name] = dct
     return flat_ann_args
 
 
-def unflatten_ann_args(flat_ann_args: tp.FlatAnnArgs) -> tp.AnnArgs:
+def unflatten_ann_args(flat_ann_args: tp.FlatAnnArgs, partial_ann_args: tp.Optional[tp.AnnArgs] = None) -> tp.AnnArgs:
     """Unflatten annotated arguments."""
     ann_args = dict()
     for arg_name, ann_arg in flat_ann_args.items():
@@ -202,15 +232,35 @@ def unflatten_ann_args(flat_ann_args: tp.FlatAnnArgs) -> tp.AnnArgs:
         if ann_arg["kind"] == inspect.Parameter.VAR_POSITIONAL:
             var_arg_name = ann_arg.pop("var_name")
             if var_arg_name not in ann_args:
-                ann_args[var_arg_name] = dict(value=(), kind=ann_arg["kind"])
+                dct = dict(value=(), kind=ann_arg["kind"])
+                if "var_annotation" in ann_arg:
+                    dct["annotation"] = ann_arg["var_annotation"]
+                elif "annotation" in ann_arg:
+                    dct["annotation"] = ann_arg["annotation"]
+                ann_args[var_arg_name] = dct
             ann_args[var_arg_name]["value"] = ann_args[var_arg_name]["value"] + (ann_arg["value"],)
         elif ann_arg["kind"] == inspect.Parameter.VAR_KEYWORD:
             var_arg_name = ann_arg.pop("var_name")
             if var_arg_name not in ann_args:
-                ann_args[var_arg_name] = dict(value={}, kind=ann_arg["kind"])
+                dct = dict(value={}, kind=ann_arg["kind"])
+                if "var_annotation" in ann_arg:
+                    dct["annotation"] = ann_arg["var_annotation"]
+                elif "annotation" in ann_arg:
+                    dct["annotation"] = ann_arg["annotation"]
+                ann_args[var_arg_name] = dct
             ann_args[var_arg_name]["value"][arg_name] = ann_arg["value"]
         else:
             ann_args[arg_name] = ann_arg
+    if partial_ann_args is not None:
+        if ann_args.keys() > partial_ann_args.keys():
+            raise ValueError("Unflattened annotated arguments contain unexpected keys")
+        for k, v in partial_ann_args.items():
+            if k not in ann_args:
+                ann_args[k] = v
+        new_ann_args = dict()
+        for k in partial_ann_args:
+            new_ann_args[k] = ann_args[k]
+        return new_ann_args
     return ann_args
 
 

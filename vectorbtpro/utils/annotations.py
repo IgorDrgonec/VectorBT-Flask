@@ -8,7 +8,10 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils.decorators import class_or_instancemethod
 
 __all__ = [
+    "Annotatable",
     "A",
+    "VarArgs",
+    "VarKwargs",
 ]
 
 __pdoc__ = {}
@@ -108,6 +111,17 @@ class Annotatable(metaclass=MetaAnnotatable):
         return A(self, other)
 
 
+def has_annotatables(func: tp.Callable, target_cls=Annotatable) -> bool:
+    """Check if a function has subclasses or instances of `Annotatable` in its signature."""
+    annotations = get_annotations(func)
+    for k, v in annotations.items():
+        if isinstance(v, type) and issubclass(v, target_cls):
+            return True
+        if not isinstance(v, type) and isinstance(v, target_cls):
+            return True
+    return False
+
+
 @attr.s(frozen=True, init=False)
 class A(Annotatable):
     """Class representing an annotation consisting of one to multiple objects."""
@@ -137,3 +151,25 @@ class A(Annotatable):
         if isinstance(other, type(self)):
             return type(self)(self, other)
         return A(self, other)
+
+
+@attr.s(frozen=True, init=False)
+class VarArgs(Annotatable):
+    """Class representing an annotation for variable positional arguments."""
+
+    args: tp.Args = attr.ib()
+    """Annotation objects."""
+
+    def __init__(self, *args) -> None:
+        self.__attrs_init__(args=args)
+
+
+@attr.s(frozen=True, init=False)
+class VarKwargs(Annotatable):
+    """Class representing an annotation for variable keyword arguments."""
+
+    kwargs: tp.Kwargs = attr.ib()
+    """Annotation objects."""
+
+    def __init__(self, **kwargs) -> None:
+        self.__attrs_init__(kwargs=kwargs)

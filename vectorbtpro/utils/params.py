@@ -18,8 +18,10 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import Config, merge_dicts
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.template import CustomTemplate, substitute_templates
-from vectorbtpro.utils.parsing import annotate_args, flatten_ann_args, ann_args_to_args
+from vectorbtpro.utils.parsing import annotate_args, flatten_ann_args, unflatten_ann_args, ann_args_to_args
 from vectorbtpro.utils.selection import PosSel, LabelSel, _NoResult, NoResultsException
+from vectorbtpro.utils.annotations import Annotatable, has_annotatables
+from vectorbtpro.utils.merging import MergeFunc, parse_merge_func
 
 __all__ = [
     "generate_param_combs",
@@ -132,14 +134,22 @@ def params_to_list(params: tp.Params, is_tuple: bool, is_array_like: bool) -> li
     return new_params
 
 
+_RaiseValueError = object()
+"""Gets raised if not substituted by a real value."""
+
+
 ParamT = tp.TypeVar("ParamT", bound="Param")
 
 
 @attr.s(frozen=True)
-class Param:
+class Param(Annotatable):
     """Class that represents a parameter."""
 
-    value: tp.Union[tp.Param, tp.Dict[tp.Hashable, tp.Param], tp.Sequence[tp.Param]] = attr.ib()
+    value: tp.Union[
+        tp.Param,
+        tp.Dict[tp.Hashable, tp.Param],
+        tp.Sequence[tp.Param],
+    ] = attr.ib(default=_RaiseValueError)
     """One or more parameter values."""
 
     is_tuple: bool = attr.ib(default=False)
@@ -198,14 +208,22 @@ class Param:
     mono_reduce: bool = attr.ib(default=False)
     """Whether to reduce a mono-chunk of the same values into one value."""
 
-    mono_merge_func: tp.Optional[tp.Callable] = attr.ib(default=None)
-    """Merge function to apply when building a mono-chunk."""
+    mono_merge_func: tp.MergeFuncLike = attr.ib(default=None)
+    """Merge function to apply when building a mono-chunk.
+    
+    Resolved using `vectorbtpro.base.merging.resolve_merge_func`."""
 
     mono_merge_kwargs: tp.KwargsLike = attr.ib(default=None)
     """Keyword arguments passed to `Param.mono_merge_func`."""
 
+    def check_value(self) -> None:
+        """Check whether value is missing."""
+        if self.value is _RaiseValueError:
+            raise ValueError("Parameter value is missing")
+
     def map_value(self: ParamT, func: tp.Callable) -> ParamT:
         """Execute a function on each value in `Param.value` and create a new `Param` instance."""
+        self.check_value()
         attr_dct = attr.asdict(self)
         if isinstance(attr_dct["value"], dict):
             attr_dct["value"] = {k: v for k, v in attr_dct["value"].items()}
@@ -288,6 +306,7 @@ def combine_params(
         else:
             keys = None
 
+        p.check_value()
         value = p.value
         if isinstance(value, dict):
             if not p.hide and keys is None:
@@ -614,6 +633,29 @@ def param_product_to_objs(obj: tp.Any, param_product: dict) -> tp.List[dict]:
     return new_objs
 
 
+def parse_and_inject_params(flat_ann_args: tp.FlatAnnArgs) -> tp.FlatAnnArgs:
+    """Parse `Param` instances from function annotations and inject them into flattened annotated arguments."""
+    new_flat_ann_args = dict()
+    for k, v in flat_ann_args.items():
+        new_flat_ann_args[k] = v = dict(v)
+        if "annotation" in v:
+            if isinstance(v["annotation"], type) and issubclass(v["annotation"], Param):
+                v["annotation"] = v["annotation"]()
+            if isinstance(v["annotation"], Param):
+                if "value" in v:
+                    if not isinstance(v["value"], Param):
+                        v["value"] = attr.evolve(v["annotation"], value=v["value"])
+                    else:
+                        v["value"] = attr.evolve(
+                            v["value"],
+                            **merge_dicts(
+                                attr.asdict(v["annotation"]),
+                                attr.asdict(v["value"]),
+                            ),
+                        )
+    return new_flat_ann_args
+
+
 def parameterized(
     *args,
     search_except_types: tp.Optional[tp.Sequence[type]] = None,
@@ -625,7 +667,7 @@ def parameterized(
     seed: tp.Optional[int] = None,
     index_stack_kwargs: tp.KwargsLike = None,
     name_tuple_to_str: tp.Union[None, bool, tp.Callable] = None,
-    merge_func: tp.Union[None, str, tuple, tp.Callable] = None,
+    merge_func: tp.Optional[tp.MergeFuncLike] = None,
     merge_kwargs: tp.KwargsLike = None,
     selection: tp.Optional[tp.Selection] = None,
     forward_kwargs_as: tp.KwargsLike = None,
@@ -633,7 +675,7 @@ def parameterized(
     mono_min_size: tp.Optional[int] = None,
     mono_chunk_len: tp.Optional[tp.Union[str, int]] = None,
     mono_chunk_meta: tp.Optional[tp.Iterable[tp.ChunkMeta]] = None,
-    mono_merge_func: tp.Union[tp.Callable, tp.Kwargs] = None,
+    mono_merge_func: tp.Union[tp.MergeFuncLike, tp.Dict[str, tp.MergeFuncLike]] = None,
     mono_merge_kwargs: tp.KwargsLike = None,
     mono_reduce: tp.Union[bool, tp.Kwargs] = None,
     return_meta: bool = False,
@@ -686,12 +728,7 @@ def parameterized(
     If `skip_single_param` is True, won't use the execution engine, but will execute and
     return the result right away.
 
-    Argument `merge_func` also accepts one of the following strings:
-
-    * 'concat': uses `vectorbtpro.base.merging.concat_merge`
-    * 'row_stack': uses `vectorbtpro.base.merging.row_stack_merge`
-    * 'column_stack': uses `vectorbtpro.base.merging.column_stack_merge`
-
+    Argument `merge_func` is resolved using `vectorbtpro.base.merging.resolve_merge_func`.
     When defining a custom merging function, make sure to use `param_index` (via templates) to build the final
     index/column hierarchy.
 
@@ -818,6 +855,31 @@ def parameterized(
         5             3.5  1.5  4.000000  2.000000
         6             2.5  0.5  3.000000  1.000000
         ```
+
+        * Using annotations:
+
+        ```pycon
+        >>> @vbt.parameterized
+        ... def my_ma(
+        ...     sr_or_df,
+        ...     window: vbt.Param,
+        ...     wtype: vbt.Param = "simple",
+        ...     minp=0,
+        ...     adjust=False
+        ... ) -> vbt.MergeFunc("column_stack"):
+        ...     return sr_or_df.vbt.ma(window, wtype=wtype, minp=minp, adjust=adjust)
+
+        >>> my_ma(sr, [3, 4, 5], ["simple", "exp"])
+        window         3                4                5
+        wtype     simple       exp simple       exp simple       exp
+        0       1.000000  1.000000    1.0  1.000000    1.0  1.000000
+        1       1.500000  1.500000    1.5  1.400000    1.5  1.333333
+        2       2.000000  2.250000    2.0  2.040000    2.0  1.888889
+        3       3.000000  3.125000    2.5  2.824000    2.5  2.592593
+        4       3.333333  3.062500    3.0  2.894400    2.6  2.728395
+        5       3.000000  2.531250    3.0  2.536640    2.8  2.485597
+        6       2.000000  1.765625    2.5  1.921984    2.6  1.990398
+        ```
     """
 
     def decorator(func: tp.Callable) -> tp.Callable:
@@ -859,6 +921,14 @@ def parameterized(
             if name_tuple_to_str is None:
                 name_tuple_to_str = params_cfg["name_tuple_to_str"]
             merge_func = kwargs.pop("_merge_func", wrapper.options["merge_func"])
+            parsed_merge_func = parse_merge_func(func)
+            if parsed_merge_func is not None:
+                if merge_func is not None:
+                    raise ValueError(
+                        f"Two conflicting merge functions: {parsed_merge_func} (annotations) "
+                        f"and {merge_func} (merge_func)"
+                    )
+                merge_func = parsed_merge_func
             merge_kwargs = merge_dicts(wrapper.options["merge_kwargs"], kwargs.pop("_merge_kwargs", {}))
             selection = kwargs.pop("_selection", wrapper.options["selection"])
             mono_n_chunks = kwargs.pop("_mono_n_chunks", wrapper.options["mono_n_chunks"])
@@ -896,8 +966,20 @@ def parameterized(
                 param_configs = []
 
             # Annotate arguments
-            template_context["ann_args"] = annotate_args(func, args, kwargs, allow_partial=True)
+            template_context["ann_args"] = annotate_args(
+                func,
+                args,
+                kwargs,
+                allow_partial=True,
+                attach_annotations=True,
+            )
             template_context["flat_ann_args"] = flatten_ann_args(template_context["ann_args"])
+            if has_annotatables(func):
+                template_context["flat_ann_args"] = parse_and_inject_params(template_context["flat_ann_args"])
+                template_context["ann_args"] = unflatten_ann_args(
+                    template_context["flat_ann_args"],
+                    partial_ann_args=template_context["ann_args"],
+                )
             var_args_name = None
             var_kwargs_name = None
             for k, v in template_context["ann_args"].items():
@@ -1224,18 +1306,21 @@ def parameterized(
                         if k_reduce:
                             new_param_config[k] = new_param_config[k][0]
                         elif k_merge_func is not None:
-                            if isinstance(k_merge_func, (str, tuple)):
-                                from vectorbtpro.base.merging import resolve_merge_func
-
-                                k_merge_func = resolve_merge_func(k_merge_func)
-                            k_merge_kwargs = substitute_templates(
-                                k_merge_kwargs,
-                                template_context,
-                                sub_id="mono_merge_kwargs",
-                            )
-                            if k_merge_kwargs is None:
-                                k_merge_kwargs = {}
-                            new_param_config[k] = k_merge_func(v, **k_merge_kwargs)
+                            if isinstance(k_merge_func, MergeFunc):
+                                k_merge_func = attr.evolve(
+                                    k_merge_func,
+                                    merge_kwargs=k_merge_kwargs,
+                                    context=template_context,
+                                    sub_id_prefix="mono_",
+                                )
+                            else:
+                                k_merge_func = MergeFunc(
+                                    k_merge_func,
+                                    merge_kwargs=k_merge_kwargs,
+                                    context=template_context,
+                                    sub_id_prefix="mono_",
+                                )
+                            new_param_config[k] = k_merge_func(v)
 
                     new_param_configs.append(_roll_param_config(new_param_config))
                 template_context["param_configs"] = new_param_configs
@@ -1284,15 +1369,17 @@ def parameterized(
 
             # Merge the results
             if merge_func is not None:
-                if isinstance(merge_func, (str, tuple)):
-                    from vectorbtpro.base.merging import resolve_merge_func
+                from vectorbtpro.base.merging import is_merge_func_from_config
 
-                    merge_func = resolve_merge_func(merge_func)
-                    merge_kwargs = {**dict(keys=template_context["param_index"]), **merge_kwargs}
-                merge_kwargs = substitute_templates(merge_kwargs, template_context, sub_id="merge_kwargs")
+                if is_merge_func_from_config(merge_func):
+                    merge_kwargs = merge_dicts(dict(keys=template_context["param_index"]), merge_kwargs)
+                if isinstance(merge_func, MergeFunc):
+                    merge_func = attr.evolve(merge_func, merge_kwargs=merge_kwargs, context=template_context)
+                else:
+                    merge_func = MergeFunc(merge_func, merge_kwargs=merge_kwargs, context=template_context)
                 if return_param_index:
-                    return merge_func(results, **merge_kwargs), template_context["param_index"]
-                return merge_func(results, **merge_kwargs)
+                    return merge_func(results), template_context["param_index"]
+                return merge_func(results)
             if return_param_index:
                 return results, template_context["param_index"]
             return results

@@ -19,7 +19,7 @@ from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.parsing import annotate_args, match_ann_arg, get_func_arg_names, Regex
 from vectorbtpro.utils.template import substitute_templates, Rep
 from vectorbtpro.utils.annotations import get_annotations, Annotatable, A
-from vectorbtpro.utils.merging import MergeFunc
+from vectorbtpro.utils.merging import MergeFunc, parse_merge_func
 
 __all__ = [
     "ChunkMeta",
@@ -1026,30 +1026,6 @@ def parse_arg_take_spec(func: tp.Callable) -> tp.ArgTakeSpec:
     return arg_take_spec
 
 
-def parse_merge_func(func: tp.Callable) -> tp.Optional[MergeFunc]:
-    """Parser the merging function from the function's annotations."""
-    annotations = get_annotations(func)
-    merge_func = None
-    for k, v in annotations.items():
-        if k == "return":
-            if not isinstance(v, A):
-                v = A(v)
-            for obj in v.get_objs():
-                if checks.is_sequence(obj):
-                    for o in obj:
-                        if o is None or isinstance(o, MergeFunc):
-                            if merge_func is None:
-                                merge_func = []
-                            elif not isinstance(merge_func, list):
-                                raise ValueError(f"Two merging functions found in annotations: {merge_func} and {o}")
-                            merge_func.append(o)
-                elif isinstance(obj, MergeFunc):
-                    if merge_func is not None:
-                        raise ValueError(f"Two merging functions found in annotations: {merge_func} and {obj}")
-                    merge_func = obj
-    return merge_func
-
-
 def suggest_size(ann_args: tp.AnnArgs, arg_take_spec: tp.ArgTakeSpec) -> tp.Optional[int]:
     """Suggest a global size given the annotated arguments and the chunk taking specification."""
     size_k = None
@@ -1143,6 +1119,28 @@ def chunked(
         ...     arg_take_spec=dict(a=vbt.ChunkSlicer())
         ... )
         ... def f(a):
+        ...     return np.mean(a)
+
+        >>> f(np.arange(10))
+        [2.0, 7.0]
+        ```
+
+        Same can be done using annotations:
+
+        ```pycon
+        >>> @vbt.chunked(n_chunks=2)
+        ... def f(a: vbt.LenSizer() | vbt.ChunkSlicer()):
+        ...     return np.mean(a)
+
+        >>> f(np.arange(10))
+        [2.0, 7.0]
+        ```
+
+        Or simply:
+
+        ```pycon
+        >>> @vbt.chunked(n_chunks=2)
+        ... def f(a: vbt.ChunkSlicer()):
         ...     return np.mean(a)
 
         >>> f(np.arange(10))
@@ -1250,6 +1248,17 @@ def chunked(
         array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
         ```
 
+        The same using annotations:
+
+        ```pycon
+        >>> @vbt.chunked(n_chunks=2)
+        ... def f(a: vbt.ChunkSlicer()) -> vbt.MergeFunc("concat"):
+        ...     return a
+
+        >>> f(np.arange(10))
+        array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        ```
+
         Instead of (or in addition to) specifying `arg_take_spec`, we can define our function with the
         first argument being `chunk_meta` to be able to split the arguments during the execution.
         The `chunked` decorator will automatically recognize and replace it with the actual `ChunkMeta` object:
@@ -1335,6 +1344,11 @@ def chunked(
 
             n_chunks = kwargs.pop("_n_chunks", wrapper.options["n_chunks"])
             size = kwargs.pop("_size", wrapper.options["size"])
+            parsed_sizer = parse_sizer(func)
+            if parsed_sizer is not None:
+                if size is not None:
+                    raise ValueError(f"Two conflicting sizers: {parsed_sizer} (annotations) and {size} (size)")
+                size = parsed_sizer
             min_size = kwargs.pop("_min_size", wrapper.options["min_size"])
             chunk_len = kwargs.pop("_chunk_len", wrapper.options["chunk_len"])
             skip_one_chunk = kwargs.pop("_skip_one_chunk", wrapper.options["skip_one_chunk"])
@@ -1348,9 +1362,25 @@ def chunked(
                 arg_take_spec = dict(arg_take_spec)
                 if "chunk_meta" not in arg_take_spec:
                     arg_take_spec["chunk_meta"] = None
+            parsed_arg_take_spec = parse_arg_take_spec(func)
+            if len(parsed_arg_take_spec) > 0:
+                if not isinstance(arg_take_spec, dict) or parsed_arg_take_spec.keys() & arg_take_spec.keys():
+                    raise ValueError(
+                        f"Two conflicting specifications: {parsed_arg_take_spec} (annotations) "
+                        f"and {arg_take_spec} (arg_take_spec)"
+                    )
+                arg_take_spec = {**parsed_arg_take_spec, **arg_take_spec}
             template_context = merge_dicts(wrapper.options["template_context"], kwargs.pop("_template_context", {}))
             execute_kwargs = merge_dicts(wrapper.options["execute_kwargs"], kwargs.pop("_execute_kwargs", {}))
             merge_func = kwargs.pop("_merge_func", wrapper.options["merge_func"])
+            parsed_merge_func = parse_merge_func(func)
+            if parsed_merge_func is not None:
+                if merge_func is not None:
+                    raise ValueError(
+                        f"Two conflicting merge functions: {parsed_merge_func} (annotations) "
+                        f"and {merge_func} (merge_func)"
+                    )
+                merge_func = parsed_merge_func
             merge_kwargs = merge_dicts(wrapper.options["merge_kwargs"], kwargs.pop("_merge_kwargs", {}))
             return_raw_chunks = kwargs.pop("_return_raw_chunks", wrapper.options["return_raw_chunks"])
             silence_warnings = kwargs.pop("_silence_warnings", wrapper.options["silence_warnings"])
@@ -1371,27 +1401,6 @@ def chunked(
 
             if prepend_chunk_meta:
                 args = (Rep("chunk_meta"), *args)
-
-            parsed_sizer = parse_sizer(func)
-            if parsed_sizer is not None:
-                if size is not None:
-                    raise ValueError(f"Two conflicting sizers: {parsed_sizer} (annotations) and {size} (size)")
-                size = parsed_sizer
-            parsed_arg_take_spec = parse_arg_take_spec(func)
-            if len(parsed_arg_take_spec) > 0:
-                if not isinstance(arg_take_spec, dict) or parsed_arg_take_spec.keys() & arg_take_spec.keys():
-                    raise ValueError(
-                        f"Two conflicting specifications: {parsed_arg_take_spec} (annotations) "
-                        f"and {arg_take_spec} (arg_take_spec)"
-                    )
-                arg_take_spec = {**parsed_arg_take_spec, **arg_take_spec}
-            parsed_merge_func = parse_merge_func(func)
-            if parsed_merge_func is not None:
-                if merge_func is not None:
-                    raise ValueError(
-                        f"Two conflicting merge functions: {parsed_merge_func} (annotations) and {merge_func} (size)"
-                    )
-                merge_func = parsed_merge_func
 
             ann_args = annotate_args(func, args, kwargs)
             if size is None and isinstance(arg_take_spec, dict):
@@ -1418,7 +1427,7 @@ def chunked(
             )
             if return_raw_chunks:
                 return chunk_meta, funcs_args
-            context = merge_dicts(
+            template_context = merge_dicts(
                 dict(
                     ann_args=ann_args,
                     chunk_meta=chunk_meta,
@@ -1426,14 +1435,14 @@ def chunked(
                 ),
                 template_context,
             )
-            execute_kwargs = substitute_templates(execute_kwargs, context, sub_id="execute_kwargs")
+            execute_kwargs = substitute_templates(execute_kwargs, template_context, sub_id="execute_kwargs")
             results = execute(funcs_args, n_calls=len(chunk_meta), **execute_kwargs)
             if merge_func is not None:
-                context["funcs_args"] = funcs_args
+                template_context["funcs_args"] = funcs_args
                 if isinstance(merge_func, MergeFunc):
-                    merge_func = merge_func.evolve(merge_kwargs=merge_kwargs, context=context)
+                    merge_func = attr.evolve(merge_func, merge_kwargs=merge_kwargs, context=template_context)
                 else:
-                    merge_func = MergeFunc(merge_func, merge_kwargs=merge_kwargs, context=context)
+                    merge_func = MergeFunc(merge_func, merge_kwargs=merge_kwargs, context=template_context)
                 return merge_func(results)
             return results
 
@@ -1506,7 +1515,7 @@ def resolve_chunked_option(option: tp.ChunkedOption = None) -> tp.KwargsLike:
     raise TypeError(f"Type {type(option)} is invalid for a chunking option")
 
 
-def specialize_chunked_option(option: tp.ChunkedOption = None, **kwargs):
+def specialize_chunked_option(option: tp.ChunkedOption = None, **kwargs) -> tp.KwargsLike:
     """Resolve `option` and merge it with `kwargs` if it's not None so the dict can be passed
     as an option to other functions."""
     chunked_kwargs = resolve_chunked_option(option)

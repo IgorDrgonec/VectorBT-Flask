@@ -608,7 +608,9 @@ __pdoc__[
 def resolve_merge_func(merge_func: tp.MergeFuncLike) -> tp.Optional[tp.Callable]:
     """Resolve a merging function into a callable.
 
-    Uses `merge_func_config`. Also, if a tuple of strings uses `mixed_merge` with `merge_funcs=merge_func`."""
+    If a string, looks up into `merge_func_config`. If a sequence, uses `mixed_merge` with
+    `merge_funcs=merge_func`. If an instance of `vectorbtpro.utils.merging.MergeFunc`, calls
+    `vectorbtpro.utils.merging.MergeFunc.resolve_merge_func` to get the actual callable."""
     if merge_func is None:
         return None
     if isinstance(merge_func, str):
@@ -620,4 +622,17 @@ def resolve_merge_func(merge_func: tp.MergeFuncLike) -> tp.Optional[tp.Callable]
     if isinstance(merge_func, MergeFunc):
         return merge_func.resolve_merge_func()
     return merge_func
+
+
+def is_merge_func_from_config(merge_func: tp.MergeFuncLike) -> bool:
+    """Return whether the merging function can be found in `merge_func_config`."""
+    if merge_func is None:
+        return False
+    if isinstance(merge_func, str):
+        return merge_func.lower() in merge_func_config
+    if checks.is_sequence(merge_func):
+        return all(map(is_merge_func_from_config, merge_func))
+    if isinstance(merge_func, MergeFunc):
+        return is_merge_func_from_config(merge_func.merge_func)
+    return False
 
