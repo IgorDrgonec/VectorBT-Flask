@@ -133,7 +133,7 @@ class AttrResolverMixin:
     def resolve_self(
         self: AttrResolverMixinT,
         cond_kwargs: tp.KwargsLike = None,
-        custom_arg_names: tp.ClassVar[tp.Optional[tp.Set[str]]] = None,
+        custom_arg_names: tp.Optional[tp.Set[str]] = None,
         impacts_caching: bool = True,
         silence_warnings: bool = False,
     ) -> AttrResolverMixinT:

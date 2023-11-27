@@ -220,7 +220,7 @@ QSAdapterT = tp.TypeVar("QSAdapterT", bound="QSAdapter")
 class QSAdapter(Configured):
     """Adapter class for quantstats."""
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Configured._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (Configured._expected_keys or set()) | {
         "returns_acc",
         "defaults",
     }

@@ -310,7 +310,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
 
     Accessible via `pd.Series.vbt` and `pd.DataFrame.vbt`."""
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (BaseAccessor._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (BaseAccessor._expected_keys or set()) | {
         "mapping",
     }
 
@@ -3842,7 +3842,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
     def resolve_self(
         self: GenericAccessorT,
         cond_kwargs: tp.KwargsLike = None,
-        custom_arg_names: tp.ClassVar[tp.Optional[tp.Set[str]]] = None,
+        custom_arg_names: tp.Optional[tp.Set[str]] = None,
         impacts_caching: bool = True,
         silence_warnings: bool = False,
     ) -> GenericAccessorT:

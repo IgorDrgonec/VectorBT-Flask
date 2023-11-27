@@ -33,7 +33,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
 
     Required to be a subclass of `vectorbtpro.base.wrapping.Wrapping`."""
 
-    _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {"_subplots"}
+    _writeable_attrs: tp.WriteableAttrs = {"_subplots"}
 
     def __init__(self) -> None:
         checks.assert_instance_of(self, Wrapping)

@@ -32,7 +32,7 @@ class DataSaver(DataUpdater):
         **kwargs: Keyword arguments passed to the constructor of `DataUpdater`.
     """
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (DataUpdater._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (DataUpdater._expected_keys or set()) | {
         "save_kwargs",
         "init_save_kwargs",
     }

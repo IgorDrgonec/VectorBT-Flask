@@ -51,7 +51,7 @@ class SerialEngine(ExecutionEngine):
 
     _settings_path: tp.SettingsPath = "execution.engines.serial"
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (ExecutionEngine._expected_keys or set()) | {
         "show_progress",
         "progress_desc",
         "pbar_kwargs",
@@ -163,7 +163,7 @@ class ThreadPoolEngine(ExecutionEngine):
 
     _settings_path: tp.SettingsPath = "execution.engines.threadpool"
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (ExecutionEngine._expected_keys or set()) | {
         "init_kwargs",
         "timeout",
     }
@@ -211,7 +211,7 @@ class ProcessPoolEngine(ExecutionEngine):
 
     _settings_path: tp.SettingsPath = "execution.engines.processpool"
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (ExecutionEngine._expected_keys or set()) | {
         "init_kwargs",
         "timeout",
     }
@@ -264,7 +264,7 @@ class PathosEngine(ExecutionEngine):
 
     _settings_path: tp.SettingsPath = "execution.engines.pathos"
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (ExecutionEngine._expected_keys or set()) | {
         "pool_type",
         "init_kwargs",
         "timeout",
@@ -400,7 +400,7 @@ class MpireEngine(ExecutionEngine):
 
     _settings_path: tp.SettingsPath = "execution.engines.mpire"
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (ExecutionEngine._expected_keys or set()) | {
         "init_kwargs",
         "apply_kwargs",
         "timeout",
@@ -461,7 +461,7 @@ class DaskEngine(ExecutionEngine):
 
     _settings_path: tp.SettingsPath = "execution.engines.dask"
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (ExecutionEngine._expected_keys or set()) | {
         "compute_kwargs",
     }
 
@@ -506,7 +506,7 @@ class RayEngine(ExecutionEngine):
 
     _settings_path: tp.SettingsPath = "execution.engines.ray"
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (ExecutionEngine._expected_keys or set()) | {
         "restart",
         "reuse_refs",
         "del_refs",
@@ -750,7 +750,7 @@ def execute(
     * Callable - passes `funcs_args`, `n_calls` (if not None), and `kwargs` and `engine_kwargs`
 
     Can execute per chunk if `chunk_meta` is provided. Otherwise, if any of `n_chunks` and `chunk_len`
-    are set, passes them to `vectorbtpro.utils.chunking.yield_chunk_meta` to generate `chunk_meta`.
+    are set, passes them to `vectorbtpro.utils.chunking.Chunker.yield_chunk_meta` to generate `chunk_meta`.
     Arguments `n_chunks` and `chunk_len` can be set globally in the engine-specific settings.
     Set `n_chunks` and `chunk_len` to 'auto' to set them to the number of cores.
 
@@ -954,7 +954,7 @@ def execute(
 
     if chunk_meta is None:
         # Generate chunk metadata
-        from vectorbtpro.utils.chunking import yield_chunk_meta
+        from vectorbtpro.utils.chunking import Chunker
 
         if not isinstance(funcs_args, CustomTemplate) and hasattr(funcs_args, "__len__"):
             _n_calls = len(funcs_args)
@@ -969,7 +969,7 @@ def execute(
             n_chunks = multiprocessing.cpu_count()
         if isinstance(chunk_len, str) and chunk_len.lower() == "auto":
             chunk_len = multiprocessing.cpu_count()
-        chunk_meta = yield_chunk_meta(
+        chunk_meta = Chunker.yield_chunk_meta(
             n_chunks=n_chunks,
             size=_n_calls,
             min_size=min_size,

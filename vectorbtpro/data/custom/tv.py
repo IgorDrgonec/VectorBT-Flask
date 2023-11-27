@@ -162,7 +162,7 @@ FIELD_LIST = [
 class TVClient(Configured):
     """Client for TradingView."""
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Configured._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (Configured._expected_keys or set()) | {
         "username",
         "password",
         "auth_token",

@@ -201,7 +201,10 @@ def flatten_ann_args(ann_args: tp.AnnArgs) -> tp.FlatAnnArgs:
                         if isinstance(ann_arg["annotation"], VarKwargs):
                             raise TypeError("VarKwargs used for variable positional arguments")
                         dct["annotation"] = ann_arg["annotation"]
-                flat_ann_args[f"{arg_name}_{i}"] = dct
+                new_arg_name = f"{arg_name}_{i}"
+                if new_arg_name in flat_ann_args:
+                    raise ValueError(f"Unpacked key {new_arg_name} already exists in annotated arguments")
+                flat_ann_args[new_arg_name] = dct
         elif ann_arg["kind"] == inspect.Parameter.VAR_KEYWORD:
             for var_arg_name, var_value in ann_arg["value"].items():
                 dct = dict(var_name=arg_name, kind=ann_arg["kind"], value=var_value)
@@ -213,6 +216,8 @@ def flatten_ann_args(ann_args: tp.AnnArgs) -> tp.FlatAnnArgs:
                         if isinstance(ann_arg["annotation"], VarArgs):
                             raise TypeError("VarArgs used for variable keyword arguments")
                         dct["annotation"] = ann_arg["annotation"]
+                if var_arg_name in flat_ann_args:
+                    raise ValueError(f"Unpacked key {var_arg_name} already exists in annotated arguments")
                 flat_ann_args[var_arg_name] = dct
         else:
             dct = dict(kind=ann_arg["kind"])

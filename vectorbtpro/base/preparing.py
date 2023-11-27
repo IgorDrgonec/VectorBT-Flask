@@ -86,7 +86,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
     !!! warning
         Most properties are force-cached - create a new instance to override any attribute."""
 
-    _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {"_arg_config"}
+    _writeable_attrs: tp.WriteableAttrs = {"_arg_config"}
 
     _settings_path: tp.SettingsPath = None
 

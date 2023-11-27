@@ -7,7 +7,7 @@ from functools import partial
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.annotations import get_annotations, Annotatable, A
+from vectorbtpro.utils.annotations import get_annotations, Annotatable, Union
 from vectorbtpro.utils.template import substitute_templates
 from vectorbtpro.utils.config import merge_dicts
 
@@ -78,24 +78,24 @@ def parse_merge_func(func: tp.Callable) -> tp.Optional[MergeFunc]:
     merge_func = None
     for k, v in annotations.items():
         if k == "return":
-            if not isinstance(v, A):
-                v = A(v)
-            for obj in v.get_objs():
-                if isinstance(obj, str):
+            if not isinstance(v, Union):
+                v = Union(v)
+            for annotation in v.annotations:
+                if isinstance(annotation, str):
                     from vectorbtpro.base.merging import merge_func_config
 
-                    if obj in merge_func_config:
-                        obj = MergeFunc(obj)
-                if checks.is_complex_sequence(obj):
-                    for o in obj:
+                    if annotation in merge_func_config:
+                        annotation = MergeFunc(annotation)
+                if checks.is_complex_sequence(annotation):
+                    for o in annotation:
                         if o is None or isinstance(o, (str, MergeFunc)):
                             if merge_func is None:
                                 merge_func = []
                             elif not isinstance(merge_func, list):
                                 raise ValueError(f"Two merging functions found in annotations: {merge_func} and {o}")
                             merge_func.append(o)
-                elif isinstance(obj, MergeFunc):
+                elif isinstance(annotation, MergeFunc):
                     if merge_func is not None:
-                        raise ValueError(f"Two merging functions found in annotations: {merge_func} and {obj}")
-                    merge_func = obj
+                        raise ValueError(f"Two merging functions found in annotations: {merge_func} and {annotation}")
+                    merge_func = annotation
     return merge_func

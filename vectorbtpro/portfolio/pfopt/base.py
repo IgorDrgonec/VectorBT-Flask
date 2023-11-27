@@ -1752,7 +1752,7 @@ class PortfolioOptimizer(Analyzable):
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
         return cls(**kwargs)
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Analyzable._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (Analyzable._expected_keys or set()) | {
         "alloc_records",
         "allocations",
     }

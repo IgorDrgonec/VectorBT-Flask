@@ -38,7 +38,7 @@ class Resampler(Configured):
             Set to False to force-set the frequency to None.
         silence_warnings (bool): Whether to silence all warnings."""
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Configured._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (Configured._expected_keys or set()) | {
         "source_index",
         "target_index",
         "source_freq",

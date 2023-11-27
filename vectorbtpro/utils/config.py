@@ -1250,10 +1250,10 @@ class Configured(HasSettings, Cacheable, Comparable, Pickleable, Prettified):
         their values won't be copied over. Make sure to pass them explicitly to
         make that the saved & loaded / copied instance is resilient to any changes in globals."""
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = None
+    _expected_keys: tp.ExpectedKeys = None
     """Set of expected keys."""
 
-    _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = None
+    _writeable_attrs: tp.WriteableAttrs = None
     """Set of writeable attributes that will be saved/copied along with the config."""
 
     def __init__(self, **config) -> None:

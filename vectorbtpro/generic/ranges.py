@@ -2029,7 +2029,7 @@ class PatternRanges(Ranges):
         kwargs["search_configs"] = [search_config for obj in objs for search_config in obj.search_configs]
         return kwargs
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Ranges._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (Ranges._expected_keys or set()) | {
         "search_configs",
     }
 

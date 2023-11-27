@@ -1208,14 +1208,14 @@ def parameterized(
 
             if mono_n_chunks is not None or mono_chunk_len is not None or mono_chunk_meta is not None:
                 # Prepare mono-chunks
-                from vectorbtpro.utils.chunking import yield_chunk_meta
+                from vectorbtpro.utils.chunking import Chunker
 
                 if mono_chunk_meta is None:
                     if isinstance(mono_n_chunks, str) and mono_n_chunks.lower() == "auto":
                         n_chunks = multiprocessing.cpu_count()
                     if isinstance(mono_chunk_len, str) and mono_chunk_len.lower() == "auto":
                         chunk_len = multiprocessing.cpu_count()
-                    mono_chunk_meta = yield_chunk_meta(
+                    mono_chunk_meta = Chunker.yield_chunk_meta(
                         n_chunks=mono_n_chunks,
                         size=len(template_context["param_configs"]),
                         min_size=mono_min_size,

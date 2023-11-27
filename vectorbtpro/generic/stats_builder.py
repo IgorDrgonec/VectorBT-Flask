@@ -36,7 +36,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
 
     Required to be a subclass of `vectorbtpro.base.wrapping.Wrapping`."""
 
-    _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {"_metrics"}
+    _writeable_attrs: tp.WriteableAttrs = {"_metrics"}
 
     def __init__(self) -> None:
         checks.assert_instance_of(self, Wrapping)

@@ -2,6 +2,7 @@
 
 """Base class for working with data sources."""
 
+import attr
 import warnings
 from pathlib import Path
 import traceback
@@ -15,6 +16,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_any_array, to_pd_array, to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.indexes import stack_indexes
+from vectorbtpro.base.merging import is_merge_func_from_config
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.drawdowns import Drawdowns
@@ -31,6 +33,7 @@ from vectorbtpro.utils.pickling import pdict, RecState
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.decorators import cached_property, class_or_instancemethod
 from vectorbtpro.utils.selection import _NoResult, NoResult, NoResultsException
+from vectorbtpro.utils.merging import MergeFunc
 
 try:
     if not tp.TYPE_CHECKING:
@@ -478,7 +481,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
     _settings_path: tp.SettingsPath = dict(base="data")
 
-    _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {"_feature_config"}
+    _writeable_attrs: tp.WriteableAttrs = {"_feature_config"}
 
     _feature_config: tp.ClassVar[Config] = HybridConfig()
 
@@ -695,7 +698,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         kwargs = cls.fix_dict_types_in_kwargs(type(kwargs["data"]), **kwargs)
         return cls(**kwargs)
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Analyzable._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (Analyzable._expected_keys or set()) | {
         "data",
         "single_key",
         "classes",
@@ -3191,7 +3194,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         silence_warnings: bool = False,
         raise_errors: bool = False,
         execute_kwargs: tp.KwargsLike = None,
-        merge_func: tp.Union[None, str, tuple, tp.Callable] = None,
+        merge_func: tp.MergeFuncLike = None,
         merge_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
         return_keys: bool = False,
@@ -3273,7 +3276,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     _kwargs[k] = v
             return _kwargs
 
-        if checks.is_iterable(func) and not isinstance(func, str):
+        if checks.is_complex_iterable(func):
             funcs_args = []
             keys = []
             for i, f in enumerate(func):
@@ -3344,15 +3347,15 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             if merge_func is None and concat:
                 merge_func = "column_stack"
             if merge_func is not None:
-                if isinstance(merge_func, (str, tuple)):
-                    from vectorbtpro.base.merging import resolve_merge_func
-
-                    merge_func = resolve_merge_func(merge_func)
-                    merge_kwargs = {**dict(keys=keys), **merge_kwargs}
-                merge_kwargs = substitute_templates(merge_kwargs, template_context, sub_id="merge_kwargs")
+                if is_merge_func_from_config(merge_func):
+                    merge_kwargs = merge_dicts(dict(keys=keys), merge_kwargs)
+                if isinstance(merge_func, MergeFunc):
+                    merge_func = attr.evolve(merge_func, merge_kwargs=merge_kwargs, context=template_context)
+                else:
+                    merge_func = MergeFunc(merge_func, merge_kwargs=merge_kwargs, context=template_context)
                 if return_keys:
-                    return merge_func(results, **merge_kwargs), keys
-                return merge_func(results, **merge_kwargs)
+                    return merge_func(results), keys
+                return merge_func(results)
             if return_keys:
                 return results, keys
             return results

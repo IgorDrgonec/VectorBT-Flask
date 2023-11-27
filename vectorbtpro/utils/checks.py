@@ -180,6 +180,13 @@ def is_iterable(arg: tp.Any) -> bool:
         return False
 
 
+def is_complex_iterable(arg: tp.Any) -> bool:
+    """Check whether the argument is iterable but not a string or bytes object."""
+    if isinstance(arg, (str, bytes)):
+        return False
+    return is_iterable(arg)
+
+
 def is_numba_enabled() -> bool:
     """Check whether Numba is enabled globally."""
     return numba.config.DISABLE_JIT != 1

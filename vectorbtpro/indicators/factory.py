@@ -1066,7 +1066,7 @@ class IndicatorBase(Analyzable):
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
         return cls(**kwargs)
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Analyzable._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (Analyzable._expected_keys or set()) | {
         "input_list",
         "input_mapper",
         "in_output_list",
@@ -1271,7 +1271,7 @@ class IndicatorBase(Analyzable):
 
 
 class IndicatorFactory(Configured):
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Configured._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (Configured._expected_keys or set()) | {
         "class_name",
         "class_docstring",
         "module_name",
