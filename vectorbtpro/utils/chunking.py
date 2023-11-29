@@ -15,7 +15,6 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts, Config, Configured
-from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.parsing import annotate_args, ann_args_to_args, match_ann_arg, get_func_arg_names, Regex
 from vectorbtpro.utils.template import substitute_templates, Rep
 from vectorbtpro.utils.annotations import get_annotations, flatten_annotations, Annotatable, Union
@@ -47,11 +46,19 @@ __all__ = [
     "ArgsTaker",
     "KwargsTaker",
     "Chunkable",
+    "Chunked",
+    "ChunkedCount",
+    "ChunkedShape",
+    "ChunkedArray",
     "Chunker",
     "chunked",
 ]
 
 __pdoc__ = {}
+
+
+class _DEF:
+    pass
 
 
 # ############# Universal ############# #
@@ -96,13 +103,13 @@ class Sizer(Annotatable):
     !!! note
         Use `Sizer.apply` instead of `Sizer.get_size`."""
 
-    def get_size(self, ann_args: tp.AnnArgs) -> int:
+    def get_size(self, ann_args: tp.AnnArgs, **kwargs) -> int:
         """Get the size given the annotated arguments."""
         raise NotImplementedError
 
-    def apply(self, ann_args: tp.AnnArgs) -> int:
+    def apply(self, ann_args: tp.AnnArgs, **kwargs) -> int:
         """Apply the sizer."""
-        return self.get_size(ann_args)
+        return self.get_size(ann_args, **kwargs)
 
 
 @attr.s(frozen=True)
@@ -112,15 +119,15 @@ class ArgSizer(Sizer, ArgGetter):
     single_type: tp.Optional[tp.TypeLike] = attr.ib(default=None)
     """One or multiple types to consider as a single value."""
 
-    def get_size(self, ann_args: tp.AnnArgs) -> int:
+    def get_size(self, ann_args: tp.AnnArgs, **kwargs) -> int:
         return self.get_arg(ann_args)
 
-    def apply(self, ann_args: tp.AnnArgs) -> int:
+    def apply(self, ann_args: tp.AnnArgs, **kwargs) -> int:
         arg = self.get_arg(ann_args)
         if self.single_type is not None:
             if checks.is_instance_of(arg, self.single_type):
                 return 1
-        return self.get_size(ann_args)
+        return self.get_size(ann_args, **kwargs)
 
 
 class CountSizer(ArgSizer):
@@ -134,7 +141,7 @@ class CountSizer(ArgSizer):
                 return 1
         return obj
 
-    def get_size(self, ann_args: tp.AnnArgs) -> int:
+    def get_size(self, ann_args: tp.AnnArgs, **kwargs) -> int:
         return self.get_obj_size(self.get_arg(ann_args), single_type=self.single_type)
 
 
@@ -149,7 +156,7 @@ class LenSizer(ArgSizer):
                 return 1
         return len(obj)
 
-    def get_size(self, ann_args: tp.AnnArgs) -> int:
+    def get_size(self, ann_args: tp.AnnArgs, **kwargs) -> int:
         return self.get_obj_size(self.get_arg(ann_args), single_type=self.single_type)
 
 
@@ -175,7 +182,7 @@ class ShapeSizer(ArgSizer, AxisSpecifier):
             return obj[axis]
         return 0
 
-    def get_size(self, ann_args: tp.AnnArgs) -> int:
+    def get_size(self, ann_args: tp.AnnArgs, **kwargs) -> int:
         return self.get_obj_size(self.get_arg(ann_args), self.axis, single_type=self.single_type)
 
 
@@ -198,7 +205,7 @@ class ArraySizer(ShapeSizer):
             return obj.shape[axis]
         return 0
 
-    def get_size(self, ann_args: tp.AnnArgs) -> int:
+    def get_size(self, ann_args: tp.AnnArgs, **kwargs) -> int:
         return self.get_obj_size(self.get_arg(ann_args), self.axis, single_type=self.single_type)
 
 
@@ -232,7 +239,7 @@ class ChunkMeta:
 class ChunkMetaGenerator:
     """Abstract class for generating chunk metadata from annotated arguments."""
 
-    def get_chunk_meta(self, ann_args: tp.AnnArgs) -> tp.Iterable[ChunkMeta]:
+    def get_chunk_meta(self, ann_args: tp.AnnArgs, **kwargs) -> tp.Iterable[ChunkMeta]:
         """Get chunk metadata."""
         raise NotImplementedError
 
@@ -240,14 +247,14 @@ class ChunkMetaGenerator:
 class ArgChunkMeta(ChunkMetaGenerator, ArgGetter):
     """Class for generating chunk metadata from an argument."""
 
-    def get_chunk_meta(self, ann_args: tp.AnnArgs) -> tp.Iterable[ChunkMeta]:
+    def get_chunk_meta(self, ann_args: tp.AnnArgs, **kwargs) -> tp.Iterable[ChunkMeta]:
         return self.get_arg(ann_args)
 
 
 class LenChunkMeta(ArgChunkMeta):
     """Class for generating chunk metadata from a sequence of chunk lengths."""
 
-    def get_chunk_meta(self, ann_args: tp.AnnArgs) -> tp.Iterable[ChunkMeta]:
+    def get_chunk_meta(self, ann_args: tp.AnnArgs, **kwargs) -> tp.Iterable[ChunkMeta]:
         arg = self.get_arg(ann_args)
         start = 0
         end = 0
@@ -318,15 +325,15 @@ class ChunkTaker(Annotatable):
     mapper: tp.Optional[ChunkMapper] = attr.ib(default=None)
     """Chunk mapper of type `ChunkMapper`."""
 
-    def get_size(self, obj: tp.Any) -> int:
+    def get_size(self, obj: tp.Any, **kwargs) -> int:
         """Get the actual size of the argument."""
         raise NotImplementedError
 
-    def suggest_size(self, obj: tp.Any) -> tp.Optional[int]:
+    def suggest_size(self, obj: tp.Any, **kwargs) -> tp.Optional[int]:
         """Suggest a global size based on the argument's size."""
         if self.mapper is not None:
             return None
-        return self.get_size(obj)
+        return self.get_size(obj, **kwargs)
 
     def should_take(self, obj: tp.Any, chunk_meta: ChunkMeta, **kwargs) -> bool:
         """Check whether to take a chunk or leave the argument as it is."""
@@ -358,10 +365,10 @@ class ChunkTaker(Annotatable):
 class ChunkSelector(ChunkTaker, DimRetainer):
     """Class for selecting one element based on the chunk index."""
 
-    def get_size(self, obj: tp.Sequence) -> int:
+    def get_size(self, obj: tp.Sequence, **kwargs) -> int:
         return LenSizer.get_obj_size(obj, single_type=self.single_type)
 
-    def suggest_size(self, obj: tp.Sequence) -> tp.Optional[int]:
+    def suggest_size(self, obj: tp.Sequence, **kwargs) -> tp.Optional[int]:
         return None
 
     def take(self, obj: tp.Sequence, chunk_meta: ChunkMeta, **kwargs) -> tp.Any:
@@ -373,7 +380,7 @@ class ChunkSelector(ChunkTaker, DimRetainer):
 class ChunkSlicer(ChunkTaker):
     """Class for slicing multiple elements based on the chunk range."""
 
-    def get_size(self, obj: tp.Sequence) -> int:
+    def get_size(self, obj: tp.Sequence, **kwargs) -> int:
         return LenSizer.get_obj_size(obj, single_type=self.single_type)
 
     def take(self, obj: tp.Sequence, chunk_meta: ChunkMeta, **kwargs) -> tp.Sequence:
@@ -385,7 +392,7 @@ class ChunkSlicer(ChunkTaker):
 class CountAdapter(ChunkSlicer):
     """Class for adapting a count based on the chunk range."""
 
-    def get_size(self, obj: int) -> int:
+    def get_size(self, obj: int, **kwargs) -> int:
         return CountSizer.get_obj_size(obj, single_type=self.single_type)
 
     def take(self, obj: int, chunk_meta: ChunkMeta, **kwargs) -> int:
@@ -404,7 +411,7 @@ class CountAdapter(ChunkSlicer):
 class ShapeSelector(ChunkSelector, AxisSpecifier):
     """Class for selecting one element from a shape's axis based on the chunk index."""
 
-    def get_size(self, obj: tp.ShapeLike) -> int:
+    def get_size(self, obj: tp.ShapeLike, **kwargs) -> int:
         return ShapeSizer.get_obj_size(obj, self.axis, single_type=self.single_type)
 
     def take(self, obj: tp.ShapeLike, chunk_meta: ChunkMeta, **kwargs) -> tp.Shape:
@@ -434,7 +441,7 @@ class ShapeSelector(ChunkSelector, AxisSpecifier):
 class ShapeSlicer(ChunkSlicer, AxisSpecifier):
     """Class for slicing multiple elements from a shape's axis based on the chunk range."""
 
-    def get_size(self, obj: tp.ShapeLike) -> int:
+    def get_size(self, obj: tp.ShapeLike, **kwargs) -> int:
         return ShapeSizer.get_obj_size(obj, self.axis, single_type=self.single_type)
 
     def take(self, obj: tp.ShapeLike, chunk_meta: ChunkMeta, **kwargs) -> tp.Shape:
@@ -467,7 +474,7 @@ class ShapeSlicer(ChunkSlicer, AxisSpecifier):
 class ArraySelector(ShapeSelector):
     """Class for selecting one element from an array's axis based on the chunk index."""
 
-    def get_size(self, obj: tp.AnyArray) -> int:
+    def get_size(self, obj: tp.AnyArray, **kwargs) -> int:
         return ArraySizer.get_obj_size(obj, self.axis, single_type=self.single_type)
 
     def take(self, obj: tp.AnyArray, chunk_meta: ChunkMeta, **kwargs) -> tp.ArrayLike:
@@ -494,7 +501,7 @@ class ArraySelector(ShapeSelector):
 class ArraySlicer(ShapeSlicer):
     """Class for slicing multiple elements from an array's axis based on the chunk range."""
 
-    def get_size(self, obj: tp.AnyArray) -> int:
+    def get_size(self, obj: tp.AnyArray, **kwargs) -> int:
         return ArraySizer.get_obj_size(obj, self.axis, single_type=self.single_type)
 
     def take(self, obj: tp.AnyArray, chunk_meta: ChunkMeta, **kwargs) -> tp.AnyArray:
@@ -541,7 +548,7 @@ class ContainerTaker(ChunkTaker):
             cont_take_spec=cont_take_spec,
         )
 
-    def get_size(self, obj: tp.Sequence) -> int:
+    def get_size(self, obj: tp.Sequence, **kwargs) -> int:
         raise NotImplementedError
 
     def check_cont_take_spec(self) -> None:
@@ -551,10 +558,6 @@ class ContainerTaker(ChunkTaker):
 
     def take(self, obj: tp.Any, chunk_meta: ChunkMeta, **kwargs) -> tp.Any:
         raise NotImplementedError
-
-
-_WarnNoTakeSpec = object()
-"""Gets raised if an argument has no specification."""
 
 
 class SequenceTaker(ContainerTaker):
@@ -572,18 +575,18 @@ class SequenceTaker(ContainerTaker):
                     cont_take_spec.extend([cont_take_spec[-1]] * (len(obj) - len(cont_take_spec)))
         return cont_take_spec
 
-    def suggest_size(self, obj: tp.Sequence) -> tp.Optional[int]:
+    def suggest_size(self, obj: tp.Sequence, chunker: tp.Optional["Chunker"] = None, **kwargs) -> tp.Optional[int]:
         if self.mapper is not None:
             return None
         self.check_cont_take_spec()
         cont_take_spec = self.adapt_cont_take_spec(obj)
+        if chunker is None:
+            chunker = Chunker
         size_i = None
         size = None
         for i, v in enumerate(obj):
-            if i < len(cont_take_spec) and cont_take_spec[i] is not _WarnNoTakeSpec:
-                take_spec = cont_take_spec[i]
-                if isinstance(take_spec, type) and issubclass(take_spec, ChunkTaker):
-                    take_spec = take_spec()
+            if i < len(cont_take_spec) and cont_take_spec[i] is not _DEF:
+                take_spec = chunker.resolve_take_spec(cont_take_spec[i])
                 if isinstance(take_spec, ChunkTaker):
                     try:
                         new_size = take_spec.suggest_size(v)
@@ -614,9 +617,11 @@ class SequenceTaker(ContainerTaker):
     ) -> tp.Sequence:
         self.check_cont_take_spec()
         cont_take_spec = self.adapt_cont_take_spec(obj)
+        if chunker is None:
+            chunker = Chunker
         new_obj = []
         for i, v in enumerate(obj):
-            if i < len(cont_take_spec) and cont_take_spec[i] is not _WarnNoTakeSpec:
+            if i < len(cont_take_spec) and cont_take_spec[i] is not _DEF:
                 take_spec = cont_take_spec[i]
             else:
                 if not silence_warnings:
@@ -628,9 +633,16 @@ class SequenceTaker(ContainerTaker):
                         stacklevel=2,
                     )
                 take_spec = None
-            if chunker is None:
-                chunker = Chunker
-            new_obj.append(chunker.take_from_arg(v, take_spec, chunk_meta, **kwargs))
+            new_obj.append(
+                chunker.take_from_arg(
+                    v,
+                    take_spec,
+                    chunk_meta,
+                    chunker=chunker,
+                    silence_warnings=silence_warnings,
+                    **kwargs,
+                )
+            )
         if checks.is_namedtuple(obj):
             return type(obj)(*new_obj)
         return type(obj)(new_obj)
@@ -656,18 +668,18 @@ class MappingTaker(ContainerTaker):
                     cont_take_spec[k] = ellipsis_take_spec
         return cont_take_spec
 
-    def suggest_size(self, obj: tp.Mapping) -> tp.Optional[int]:
+    def suggest_size(self, obj: tp.Mapping, chunker: tp.Optional["Chunker"] = None, **kwargs) -> tp.Optional[int]:
         if self.mapper is not None:
             return None
         self.check_cont_take_spec()
         cont_take_spec = self.adapt_cont_take_spec(obj)
+        if chunker is None:
+            chunker = Chunker
         size_k = None
         size = None
         for k, v in dict(obj).items():
-            if k in cont_take_spec and cont_take_spec[k] is not _WarnNoTakeSpec:
-                take_spec = cont_take_spec[k]
-                if isinstance(take_spec, type) and issubclass(take_spec, ChunkTaker):
-                    take_spec = take_spec()
+            if k in cont_take_spec and cont_take_spec[k] is not _DEF:
+                take_spec = chunker.resolve_take_spec(cont_take_spec[k])
                 if isinstance(take_spec, ChunkTaker):
                     try:
                         new_size = take_spec.suggest_size(v)
@@ -698,9 +710,11 @@ class MappingTaker(ContainerTaker):
     ) -> tp.Mapping:
         self.check_cont_take_spec()
         cont_take_spec = self.adapt_cont_take_spec(obj)
+        if chunker is None:
+            chunker = Chunker
         new_obj = {}
         for k, v in dict(obj).items():
-            if k in cont_take_spec and cont_take_spec[k] is not _WarnNoTakeSpec:
+            if k in cont_take_spec and cont_take_spec[k] is not _DEF:
                 take_spec = cont_take_spec[k]
             else:
                 if not silence_warnings:
@@ -712,9 +726,14 @@ class MappingTaker(ContainerTaker):
                         stacklevel=2,
                     )
                 take_spec = None
-            if chunker is None:
-                chunker = Chunker
-            new_obj[k] = chunker.take_from_arg(v, take_spec, chunk_meta, **kwargs)
+            new_obj[k] = chunker.take_from_arg(
+                v,
+                take_spec,
+                chunk_meta,
+                chunker=chunker,
+                silence_warnings=silence_warnings,
+                **kwargs,
+            )
         return type(obj)(new_obj)
 
 
@@ -754,18 +773,147 @@ class KwargsTaker(MappingTaker):
         )
 
 
-# ############# Chunker ############# #
+# ############# Chunkables ############# #
 
 
-@attr.s(frozen=True)
 class Chunkable:
-    """Class for a chunkable value."""
+    """Abstract class representing a value and a chunk taking specification."""
 
-    value: tp.Any = attr.ib()
+    def get_value(self) -> tp.Any:
+        """Get the value."""
+        raise NotImplementedError
+
+    def get_take_spec(self) -> tp.TakeSpec:
+        """Get the chunk taking specification."""
+        raise NotImplementedError
+
+
+@attr.s(frozen=True, init=False)
+class Chunked(Chunkable, Annotatable):
+    """Class representing a chunkable value.
+
+    Can take a variable number of keyword arguments, which will be used as `Chunked.take_spec_kwargs`."""
+
+    value: tp.Any = attr.ib(default=_DEF)
     """Value."""
 
-    take_spec: tp.TakeSpec = attr.ib(default=_WarnNoTakeSpec)
+    take_spec: tp.TakeSpec = attr.ib(default=_DEF)
     """Chunk taking specification."""
+
+    take_spec_kwargs: tp.KwargsLike = attr.ib(default=None)
+    """Keyword arguments passed to the respective `ChunkTaker` subclass.
+
+    If `Chunked.take_spec` is an instance rather than a class, will "evolve" it."""
+
+    select: bool = attr.ib(default=False)
+    """Whether to chunk by selection."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        attr_names = [a.name for a in self.__attrs_attrs__]
+        if attr_names.index("take_spec_kwargs") < len(args):
+            new_args = list(args)
+            take_spec_kwargs = new_args[attr_names.index("take_spec_kwargs")]
+            if take_spec_kwargs is None:
+                take_spec_kwargs = {}
+            else:
+                take_spec_kwargs = dict(take_spec_kwargs)
+            take_spec_kwargs.update({k: kwargs.pop(k) for k in list(kwargs.keys()) if k not in attr_names})
+            new_args[attr_names.index("take_spec_kwargs")] = take_spec_kwargs
+            args = tuple(new_args)
+        else:
+            take_spec_kwargs = kwargs.pop("take_spec_kwargs", None)
+            if take_spec_kwargs is None:
+                take_spec_kwargs = {}
+            else:
+                take_spec_kwargs = dict(take_spec_kwargs)
+            take_spec_kwargs.update({k: kwargs.pop(k) for k in list(kwargs.keys()) if k not in attr_names})
+            kwargs["take_spec_kwargs"] = take_spec_kwargs
+
+        self.__attrs_init__(*args, **kwargs)
+
+    @property
+    def value_missing(self) -> bool:
+        """Check whether `Chunked.value` is missing."""
+        return self.value is _DEF
+
+    @property
+    def take_spec_missing(self) -> bool:
+        """Check whether `Chunked.take_spec` is missing."""
+        return self.take_spec is _DEF
+
+    def check_value(self) -> None:
+        """Check whether value is missing."""
+        if self.value_missing:
+            raise ValueError("Parameter value is missing")
+
+    def get_value(self) -> tp.Any:
+        self.check_value()
+        return self.value
+
+    def resolve_take_spec(self) -> tp.TakeSpec:
+        """Resolve `take_spec`."""
+        if self.take_spec_missing:
+            if self.select:
+                return ChunkSelector
+            return ChunkSlicer
+        return self.take_spec
+
+    def get_take_spec(self) -> tp.TakeSpec:
+        take_spec = self.resolve_take_spec()
+        take_spec_kwargs = self.take_spec_kwargs
+        if take_spec_kwargs is None:
+            take_spec_kwargs = {}
+        if isinstance(take_spec, type) and issubclass(take_spec, ChunkTaker):
+            take_spec = take_spec(**take_spec_kwargs)
+        elif isinstance(take_spec, ChunkTaker):
+            take_spec = attr.evolve(take_spec, **take_spec_kwargs)
+        return take_spec
+
+
+class ChunkedCount(Chunked):
+    """Class representing a chunkable count."""
+
+    def resolve_take_spec(self) -> tp.TakeSpec:
+        if self.take_spec_missing:
+            return CountAdapter
+        return self.take_spec
+
+
+class ChunkedShape(Chunked):
+    """Class representing a chunkable shape."""
+
+    def resolve_take_spec(self) -> tp.TakeSpec:
+        if self.take_spec_missing:
+            if self.select:
+                return ShapeSelector
+            return ShapeSlicer
+        return self.take_spec
+
+
+@attr.s(frozen=True, init=False)
+class ChunkedArray(Chunked):
+    """Class representing a chunkable array."""
+
+    flex: bool = attr.ib(default=False)
+    """Whether the array is flexible."""
+
+    def resolve_take_spec(self) -> tp.TakeSpec:
+        if self.take_spec_missing:
+            if self.flex:
+                if self.select:
+                    from vectorbtpro.base.chunking import FlexArraySelector
+
+                    return FlexArraySelector
+                from vectorbtpro.base.chunking import FlexArraySlicer
+
+                return FlexArraySlicer
+            if self.select:
+                return ArraySelector
+            return ArraySlicer
+        return self.take_spec
+
+
+# ############# Chunker ############# #
 
 
 class Chunker(Configured):
@@ -1021,6 +1169,7 @@ class Chunker(Configured):
         min_size: tp.Optional[int] = None,
         chunk_len: tp.Optional[tp.SizeLike] = None,
         chunk_meta: tp.Optional[tp.ChunkMetaLike] = None,
+        **kwargs,
     ) -> tp.Iterable[ChunkMeta]:
         """Get chunk metadata from annotated arguments.
 
@@ -1029,7 +1178,7 @@ class Chunker(Configured):
             n_chunks (int, Sizer, or callable): Number of chunks.
 
                 Can be an integer, an instance of `Sizer`, or a callable taking the annotated arguments
-                and returning an integer.
+                and other keyword arguments and returning an integer.
             size (int, Sizer, or callable): Size of the space to split.
 
                 Can be an integer, an instance of `Sizer`, or a callable taking the annotated arguments
@@ -1042,36 +1191,48 @@ class Chunker(Configured):
             chunk_meta (iterable of ChunkMeta, ChunkMetaGenerator, or callable): Chunk meta.
 
                 Can be an iterable of `ChunkMeta`, an instance of `ChunkMetaGenerator`, or
-                a callable taking the annotated arguments and returning an iterable.
+                a callable taking the annotated arguments and other arguments and returning an iterable.
+            **kwargs: Other keyword arguments passed to any callable.
         """
         if chunk_meta is None:
             if n_chunks is not None:
                 if isinstance(n_chunks, Sizer):
-                    n_chunks = n_chunks.apply(ann_args)
+                    n_chunks = n_chunks.apply(ann_args, **kwargs)
                 elif callable(n_chunks):
-                    n_chunks = n_chunks(ann_args)
+                    n_chunks = n_chunks(ann_args, **kwargs)
                 elif not isinstance(n_chunks, (int, str)):
                     raise TypeError(f"Type {type(n_chunks)} for n_chunks is not supported")
             if size is not None:
                 if isinstance(size, Sizer):
-                    size = size.apply(ann_args)
+                    size = size.apply(ann_args, **kwargs)
                 elif callable(size):
-                    size = size(ann_args)
+                    size = size(ann_args, **kwargs)
                 elif not isinstance(size, int):
                     raise TypeError(f"Type {type(size)} for size is not supported")
             if chunk_len is not None:
                 if isinstance(chunk_len, Sizer):
-                    chunk_len = chunk_len.apply(ann_args)
+                    chunk_len = chunk_len.apply(ann_args, **kwargs)
                 elif callable(chunk_len):
-                    chunk_len = chunk_len(ann_args)
+                    chunk_len = chunk_len(ann_args, **kwargs)
                 elif not isinstance(chunk_len, (int, str)):
                     raise TypeError(f"Type {type(chunk_len)} for chunk_len is not supported")
             return cls.yield_chunk_meta(n_chunks=n_chunks, size=size, min_size=min_size, chunk_len=chunk_len)
         if isinstance(chunk_meta, ChunkMetaGenerator):
-            return chunk_meta.get_chunk_meta(ann_args)
+            return chunk_meta.get_chunk_meta(ann_args, **kwargs)
         if callable(chunk_meta):
-            return chunk_meta(ann_args)
+            return chunk_meta(ann_args, **kwargs)
         return chunk_meta
+
+    @classmethod
+    def resolve_take_spec(cls, take_spec: tp.TakeSpec) -> tp.TakeSpec:
+        """Resolve the chunk taking specification."""
+        if isinstance(take_spec, type) and issubclass(take_spec, Chunked):
+            take_spec = take_spec()
+        if isinstance(take_spec, Chunkable):
+            take_spec = take_spec.get_take_spec()
+        if isinstance(take_spec, type) and issubclass(take_spec, (DontChunk, ChunkTaker)):
+            take_spec = take_spec()
+        return take_spec
 
     @classmethod
     def take_from_arg(cls, arg: tp.Any, take_spec: tp.TakeSpec, chunk_meta: ChunkMeta, **kwargs) -> tp.Any:
@@ -1083,8 +1244,7 @@ class Chunker(Configured):
         `**kwargs` are passed to `ChunkTaker.apply`."""
         if take_spec is None:
             return arg
-        if isinstance(take_spec, type) and issubclass(take_spec, (DontChunk, ChunkTaker)):
-            take_spec = take_spec()
+        take_spec = cls.resolve_take_spec(take_spec)
         if isinstance(take_spec, DontChunk):
             return arg
         if isinstance(take_spec, ChunkTaker):
@@ -1092,7 +1252,7 @@ class Chunker(Configured):
         raise TypeError(f"Specification of type {type(take_spec)} is not supported")
 
     @classmethod
-    def resolve_take_spec(
+    def find_take_spec(
         cls,
         i: int,
         ann_arg_name: str,
@@ -1124,16 +1284,21 @@ class Chunker(Configured):
                     found_take_spec = v
                     break
         if take_spec_found:
-            if isinstance(found_take_spec, type) and issubclass(found_take_spec, (DontChunk, ChunkTaker)):
-                found_take_spec = found_take_spec()
+            found_take_spec = cls.resolve_take_spec(found_take_spec)
             if ann_arg["kind"] == inspect.Parameter.VAR_POSITIONAL:
                 if not isinstance(found_take_spec, ContainerTaker):
-                    found_take_spec = SequenceTaker([found_take_spec, ...])
+                    if checks.is_sequence(found_take_spec):
+                        found_take_spec = SequenceTaker(found_take_spec)
+                    else:
+                        found_take_spec = SequenceTaker([found_take_spec, ...])
             elif ann_arg["kind"] == inspect.Parameter.VAR_KEYWORD:
                 if not isinstance(found_take_spec, ContainerTaker):
-                    found_take_spec = MappingTaker({...: found_take_spec})
+                    if checks.is_mapping(found_take_spec):
+                        found_take_spec = MappingTaker(found_take_spec)
+                    else:
+                        found_take_spec = MappingTaker({...: found_take_spec})
             return found_take_spec
-        return _WarnNoTakeSpec
+        return _DEF
 
     @classmethod
     def take_from_args(
@@ -1141,8 +1306,6 @@ class Chunker(Configured):
         ann_args: tp.AnnArgs,
         arg_take_spec: tp.ArgTakeSpec,
         chunk_meta: ChunkMeta,
-        chunker: tp.Optional["Chunker"] = None,
-        template_context: tp.KwargsLike = None,
         silence_warnings: bool = False,
         **kwargs,
     ) -> tp.Tuple[tp.Args, tp.Kwargs]:
@@ -1158,8 +1321,8 @@ class Chunker(Configured):
         new_args = ()
         new_kwargs = dict()
         for i, (k, v) in enumerate(ann_args.items()):
-            take_spec = cls.resolve_take_spec(i, k, v, arg_take_spec)
-            if take_spec is _WarnNoTakeSpec:
+            take_spec = cls.find_take_spec(i, k, v, arg_take_spec)
+            if take_spec is _DEF:
                 take_spec = None
                 if not silence_warnings:
                     warnings.warn(
@@ -1172,8 +1335,6 @@ class Chunker(Configured):
                 chunk_meta,
                 ann_args=ann_args,
                 arg_take_spec=arg_take_spec,
-                chunker=chunker,
-                template_context=template_context,
                 silence_warnings=silence_warnings,
                 **kwargs,
             )
@@ -1220,13 +1381,14 @@ class Chunker(Configured):
             template_context = {}
 
         for _chunk_meta in chunk_meta:
-            _template_context = merge_dicts(dict(ann_args=ann_args, chunk_meta=_chunk_meta), template_context)
+            _template_context = dict(template_context)
+            _template_context["ann_args"] = ann_args
+            _template_context["chunk_meta"] = _chunk_meta
             chunk_ann_args = substitute_templates(ann_args, _template_context, sub_id="chunk_ann_args")
-            if "chunk_ann_args" not in _template_context:
-                _template_context["chunk_ann_args"] = chunk_ann_args
+            _template_context["chunk_ann_args"] = chunk_ann_args
             chunk_arg_take_spec = substitute_templates(arg_take_spec, _template_context, sub_id="chunk_arg_take_spec")
-            if "chunk_arg_take_spec" not in _template_context:
-                _template_context["chunk_arg_take_spec"] = chunk_arg_take_spec
+            _template_context["chunk_arg_take_spec"] = chunk_arg_take_spec
+
             if callable(chunk_arg_take_spec):
                 chunk_args, chunk_kwargs = chunk_arg_take_spec(
                     chunk_ann_args,
@@ -1274,8 +1436,7 @@ class Chunker(Configured):
             if not isinstance(v, Union):
                 v = Union(v)
             for annotation in v.annotations:
-                if isinstance(annotation, type) and issubclass(annotation, ChunkTaker):
-                    annotation = annotation()
+                annotation = cls.resolve_take_spec(annotation)
                 if isinstance(annotation, ChunkTaker):
                     if isinstance(annotation, ArgGetter):
                         if annotation.arg_query is None:
@@ -1315,7 +1476,7 @@ class Chunker(Configured):
                             var_args_name = var_args_map[k]
                         i = int(k.split("_")[-1])
                         if i > len(var_args_specs):
-                            var_args_specs.extend([_WarnNoTakeSpec] * (i - len(var_args_specs)))
+                            var_args_specs.extend([_DEF] * (i - len(var_args_specs)))
                         var_args_specs.append(flat_arg_take_spec[k])
                 if len(var_args_specs) > 0:
                     arg_take_spec[var_args_name] = ArgsTaker(*var_args_specs)
@@ -1342,7 +1503,9 @@ class Chunker(Configured):
         """Parse the chunk taking specification from (annotated) arguments."""
         arg_take_spec = {}
         for k, v in ann_args.items():
-            if v["kind"] == inspect.Parameter.VAR_POSITIONAL:
+            if isinstance(v["value"], Chunkable):
+                arg_take_spec[k] = v["value"].get_take_spec()
+            elif v["kind"] == inspect.Parameter.VAR_POSITIONAL:
                 chunkable_found = False
                 for v2 in v["value"]:
                     if isinstance(v2, Chunkable):
@@ -1352,9 +1515,9 @@ class Chunker(Configured):
                     take_spec = []
                     for v2 in v["value"]:
                         if isinstance(v2, Chunkable):
-                            take_spec.append(v2.take_spec)
+                            take_spec.append(v2.get_take_spec())
                         else:
-                            take_spec.append(_WarnNoTakeSpec)
+                            take_spec.append(_DEF)
                     arg_take_spec[k] = ArgsTaker(*take_spec)
             elif v["kind"] == inspect.Parameter.VAR_KEYWORD:
                 chunkable_found = False
@@ -1366,12 +1529,10 @@ class Chunker(Configured):
                     take_spec = {}
                     for k2, v2 in v["value"].items():
                         if isinstance(v2, Chunkable):
-                            take_spec[k2] = v2.take_spec
+                            take_spec[k2] = v2.get_take_spec()
                         else:
-                            take_spec[k2] = _WarnNoTakeSpec
+                            take_spec[k2] = _DEF
                     arg_take_spec[k] = KwargsTaker(**take_spec)
-            elif isinstance(v, Chunkable):
-                arg_take_spec[k] = v.take_spec
         return arg_take_spec
 
     @classmethod
@@ -1381,12 +1542,12 @@ class Chunker(Configured):
         for k, v in ann_args.items():
             new_ann_args[k] = v = dict(v)
             if isinstance(v["value"], Chunkable):
-                v["value"] = v["value"].value
+                v["value"] = v["value"].get_value()
             elif v["kind"] == inspect.Parameter.VAR_POSITIONAL:
                 new_value = []
                 for v2 in v["value"]:
                     if isinstance(v2, Chunkable):
-                        new_value.append(v2.value)
+                        new_value.append(v2.get_value())
                     else:
                         new_value.append(v2)
                 v["value"] = tuple(new_value)
@@ -1394,22 +1555,22 @@ class Chunker(Configured):
                 new_value = {}
                 for k2, v2 in v["value"].items():
                     if isinstance(v2, Chunkable):
-                        new_value[k2] = v2.value
+                        new_value[k2] = v2.get_value()
                     else:
                         new_value[k2] = v2
                 v["value"] = new_value
         return new_ann_args
 
     @classmethod
-    def suggest_size(cls, ann_args: tp.AnnArgs, arg_take_spec: tp.ArgTakeSpec) -> tp.Optional[int]:
+    def suggest_size(cls, ann_args: tp.AnnArgs, arg_take_spec: tp.ArgTakeSpec, **kwargs) -> tp.Optional[int]:
         """Suggest a global size given the annotated arguments and the chunk taking specification."""
         size_k = None
         size = None
         for i, (k, v) in enumerate(ann_args.items()):
-            take_spec = cls.resolve_take_spec(i, k, v, arg_take_spec)
+            take_spec = cls.find_take_spec(i, k, v, arg_take_spec)
             if isinstance(take_spec, ChunkTaker):
                 try:
-                    new_size = take_spec.suggest_size(v["value"])
+                    new_size = take_spec.suggest_size(v["value"], **kwargs)
                     if new_size is not None:
                         if size is None:
                             size_k = k
@@ -1442,6 +1603,8 @@ class Chunker(Configured):
 
         For defaults, see `vectorbtpro._settings.chunking`.
         """
+        from vectorbtpro.utils.execution import execute
+
         n_chunks = self.resolve_setting(self.n_chunks, "n_chunks")
         size = self.resolve_setting(self.size, "size")
         min_size = self.resolve_setting(self.min_size, "min_size")
@@ -1509,8 +1672,7 @@ class Chunker(Configured):
         if parsed_merge_func is not None:
             if merge_func is not None:
                 raise ValueError(
-                    f"Two conflicting merge functions: {parsed_merge_func} (annotations) "
-                    f"and {merge_func} (merge_func)"
+                    f"Two conflicting merge functions: {parsed_merge_func} (annotations) and {merge_func} (merge_func)"
                 )
             merge_func = parsed_merge_func
 
@@ -1525,9 +1687,19 @@ class Chunker(Configured):
             arg_take_spec = {**parsed_arg_take_spec, **arg_take_spec}
         ann_args = self.adapt_ann_args(ann_args)
         args, kwargs = ann_args_to_args(ann_args)
+        template_context["chunker"] = self
+        template_context["arg_take_spec"] = arg_take_spec
+        template_context["ann_args"] = ann_args
 
         if size is None and isinstance(arg_take_spec, dict):
-            size = self.suggest_size(ann_args, arg_take_spec)
+            size = self.suggest_size(
+                ann_args,
+                arg_take_spec,
+                template_context=template_context,
+                silence_warnings=silence_warnings,
+                chunker=self,
+            )
+        template_context["size"] = size
         chunk_meta = list(
             self.get_chunk_meta_from_args(
                 ann_args,
@@ -1536,8 +1708,12 @@ class Chunker(Configured):
                 min_size=min_size,
                 chunk_len=chunk_len,
                 chunk_meta=chunk_meta,
+                template_context=template_context,
+                silence_warnings=silence_warnings,
+                chunker=self,
             )
         )
+        template_context["chunk_meta"] = chunk_meta
         if len(chunk_meta) < 2 and skip_one_chunk:
             return self.func(*args, **kwargs)
         funcs_args = self.yield_arg_chunks(
@@ -1546,19 +1722,11 @@ class Chunker(Configured):
             chunk_meta,
             arg_take_spec=arg_take_spec,
             template_context=template_context,
-            chunker=self,
             silence_warnings=silence_warnings,
+            chunker=self,
         )
         if return_raw_chunks:
             return chunk_meta, funcs_args
-        template_context = merge_dicts(
-            dict(
-                ann_args=ann_args,
-                chunk_meta=chunk_meta,
-                arg_take_spec=arg_take_spec,
-            ),
-            template_context,
-        )
         execute_kwargs = substitute_templates(execute_kwargs, template_context, sub_id="execute_kwargs")
         results = execute(funcs_args, n_calls=len(chunk_meta), **execute_kwargs)
         if merge_func is not None:
@@ -1581,6 +1749,7 @@ class Chunker(Configured):
 
 def chunked(
     *args,
+    chunker_cls: tp.Type[Chunker] = Chunker,
     n_chunks: tp.Optional[tp.SizeLike] = None,
     size: tp.Optional[tp.SizeLike] = None,
     min_size: tp.Optional[int] = None,
@@ -1610,7 +1779,8 @@ def chunked(
     can be disabled by using the global setting `disable_wrapping` (=> returns the wrapped function).
 
     Usage:
-        For testing purposes, let's divide the input array into 2 chunks and compute the mean in a sequential manner:
+        For testing purposes, let's divide the input array into 2 chunks and compute
+        the mean in a sequential manner:
 
         ```pycon
         >>> import vectorbtpro as vbt
@@ -1639,7 +1809,7 @@ def chunked(
         [2.0, 7.0]
         ```
 
-        Or simply:
+        Sizer can be omitted most of the time:
 
         ```pycon
         >>> @vbt.chunked(n_chunks=2)
@@ -1647,6 +1817,28 @@ def chunked(
         ...     return np.mean(a)
 
         >>> f(np.arange(10))
+        [2.0, 7.0]
+        ```
+
+        Another way is by using specialized `Chunker` subclasses that depend on the type of the argument:
+
+        ```pycon
+        >>> @vbt.chunked(n_chunks=2)
+        ... def f(a: vbt.ChunkedArray()):
+        ...     return np.mean(a)
+
+        >>> f(np.arange(10))
+        ```
+
+        Also, instead of specifying the chunk taking specification beforehand, it can be passed
+        dynamically by wrapping each value to be chunked with `Chunked` or any of its subclasses:
+
+        ```pycon
+        >>> @vbt.chunked(n_chunks=2)
+        ... def f(a):
+        ...     return np.mean(a)
+
+        >>> f(vbt.ChunkedArray(np.arange(10)))
         [2.0, 7.0]
         ```
 
@@ -1837,7 +2029,6 @@ def chunked(
 
         @wraps(func)
         def wrapper(*args, **kwargs) -> tp.Any:
-
             def _resolve_key(key, is_dict=False):
                 if "_" + key in kwargs:
                     if is_dict:
@@ -1845,7 +2036,12 @@ def chunked(
                     return kwargs.pop("_" + key)
                 return wrapper.options[key]
 
-            return Chunker(
+            chunker_cls = wrapper.options["chunker_cls"]
+            if chunker_cls is None:
+                chunker_cls = chunking_cfg["chunker_cls"]
+            if chunker_cls is None:
+                chunker_cls = Chunker
+            return chunker_cls(
                 func,
                 disable=_resolve_key("disable"),
                 n_chunks=_resolve_key("n_chunks"),
@@ -1870,6 +2066,7 @@ def chunked(
         wrapper.is_chunked = True
         wrapper.options = Config(
             dict(
+                chunker_cls=chunker_cls,
                 n_chunks=n_chunks,
                 size=size,
                 min_size=min_size,

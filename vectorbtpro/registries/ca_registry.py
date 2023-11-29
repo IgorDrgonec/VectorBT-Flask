@@ -432,7 +432,9 @@ __all__ = [
 
 __pdoc__ = {}
 
-_GARBAGE = object()
+
+class _GARBAGE:
+    pass
 
 
 def is_cacheable_function(cacheable: tp.Any) -> bool:

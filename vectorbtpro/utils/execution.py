@@ -13,6 +13,7 @@ from vectorbtpro.utils.config import merge_dicts, Configured
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.template import CustomTemplate, substitute_templates
+from vectorbtpro.utils.chunking import Chunker
 
 try:
     if not tp.TYPE_CHECKING:
@@ -717,6 +718,7 @@ def execute(
     funcs_args: tp.FuncsArgs,
     engine: tp.EngineLike = "serial",
     n_calls: tp.Optional[int] = None,
+    chunker_cls: tp.Optional[Chunker] = None,
     n_chunks: tp.Optional[tp.Union[str, int]] = None,
     min_size: tp.Optional[int] = None,
     chunk_len: tp.Optional[tp.Union[str, int]] = None,
@@ -800,6 +802,7 @@ def execute(
 
     execution_cfg = settings["execution"]
     engines_cfg = execution_cfg["engines"]
+    chunking_cfg = settings["chunking"]
 
     engine_kwargs = merge_dicts(kwargs, engine_kwargs)
 
@@ -841,6 +844,14 @@ def execute(
         if "pbar_kwargs" in func_arg_names and "pbar_kwargs" not in engine_kwargs:
             engine_kwargs["pbar_kwargs"] = pbar_kwargs
 
+    if chunker_cls is None:
+        chunker_cls = engine_cfg.get("chunker_cls", None)
+    if chunker_cls is None:
+        chunker_cls = execution_cfg["chunker_cls"]
+    if chunker_cls is None:
+        chunker_cls = chunking_cfg["chunker_cls"]
+    if chunker_cls is None:
+        chunker_cls = Chunker
     if n_chunks is None:
         n_chunks = engine_cfg.get("n_chunks", execution_cfg["n_chunks"])
     if min_size is None:
@@ -954,8 +965,6 @@ def execute(
 
     if chunk_meta is None:
         # Generate chunk metadata
-        from vectorbtpro.utils.chunking import Chunker
-
         if not isinstance(funcs_args, CustomTemplate) and hasattr(funcs_args, "__len__"):
             _n_calls = len(funcs_args)
         elif n_calls is not None:
@@ -969,7 +978,7 @@ def execute(
             n_chunks = multiprocessing.cpu_count()
         if isinstance(chunk_len, str) and chunk_len.lower() == "auto":
             chunk_len = multiprocessing.cpu_count()
-        chunk_meta = Chunker.yield_chunk_meta(
+        chunk_meta = chunker_cls.yield_chunk_meta(
             n_chunks=n_chunks,
             size=_n_calls,
             min_size=min_size,

@@ -22,6 +22,7 @@ from vectorbtpro.utils.parsing import annotate_args, flatten_ann_args, unflatten
 from vectorbtpro.utils.selection import PosSel, LabelSel, _NoResult, NoResultsException
 from vectorbtpro.utils.annotations import Annotatable, has_annotatables
 from vectorbtpro.utils.merging import MergeFunc, parse_merge_func
+from vectorbtpro.utils.chunking import Chunker
 
 __all__ = [
     "generate_param_combs",
@@ -29,6 +30,10 @@ __all__ = [
     "combine_params",
     "parameterized",
 ]
+
+
+class _DEF:
+    pass
 
 
 def to_typed_list(lst: list) -> List:
@@ -134,10 +139,6 @@ def params_to_list(params: tp.Params, is_tuple: bool, is_array_like: bool) -> li
     return new_params
 
 
-_RaiseValueError = object()
-"""Gets raised if not substituted by a real value."""
-
-
 ParamT = tp.TypeVar("ParamT", bound="Param")
 
 
@@ -149,7 +150,7 @@ class Param(Annotatable):
         tp.Param,
         tp.Dict[tp.Hashable, tp.Param],
         tp.Sequence[tp.Param],
-    ] = attr.ib(default=_RaiseValueError)
+    ] = attr.ib(default=_DEF)
     """One or more parameter values."""
 
     is_tuple: bool = attr.ib(default=False)
@@ -218,7 +219,7 @@ class Param(Annotatable):
 
     def check_value(self) -> None:
         """Check whether value is missing."""
-        if self.value is _RaiseValueError:
+        if self.value is _DEF:
             raise ValueError("Parameter value is missing")
 
     def map_value(self: ParamT, func: tp.Callable) -> ParamT:
@@ -671,6 +672,7 @@ def parameterized(
     merge_kwargs: tp.KwargsLike = None,
     selection: tp.Optional[tp.Selection] = None,
     forward_kwargs_as: tp.KwargsLike = None,
+    mono_chunker_cls: tp.Optional[tp.Type[Chunker]] = None,
     mono_n_chunks: tp.Optional[tp.Union[str, int]] = None,
     mono_min_size: tp.Optional[int] = None,
     mono_chunk_len: tp.Optional[tp.Union[str, int]] = None,
@@ -886,6 +888,7 @@ def parameterized(
         from vectorbtpro._settings import settings
 
         params_cfg = settings["params"]
+        chunking_cfg = settings["chunking"]
 
         @wraps(func)
         def wrapper(*args, **kwargs) -> tp.Any:
@@ -931,6 +934,13 @@ def parameterized(
                 merge_func = parsed_merge_func
             merge_kwargs = merge_dicts(wrapper.options["merge_kwargs"], kwargs.pop("_merge_kwargs", {}))
             selection = kwargs.pop("_selection", wrapper.options["selection"])
+            mono_chunker_cls = kwargs.pop("_mono_chunker_cls", wrapper.options["mono_chunker_cls"])
+            if mono_chunker_cls is None:
+                mono_chunker_cls = params_cfg["chunker_cls"]
+            if mono_chunker_cls is None:
+                mono_chunker_cls = chunking_cfg["chunker_cls"]
+            if mono_chunker_cls is None:
+                mono_chunker_cls = Chunker
             mono_n_chunks = kwargs.pop("_mono_n_chunks", wrapper.options["mono_n_chunks"])
             mono_min_size = kwargs.pop("_mono_min_size", wrapper.options["mono_min_size"])
             mono_chunk_len = kwargs.pop("_mono_chunk_len", wrapper.options["mono_chunk_len"])
@@ -1208,14 +1218,12 @@ def parameterized(
 
             if mono_n_chunks is not None or mono_chunk_len is not None or mono_chunk_meta is not None:
                 # Prepare mono-chunks
-                from vectorbtpro.utils.chunking import Chunker
-
                 if mono_chunk_meta is None:
                     if isinstance(mono_n_chunks, str) and mono_n_chunks.lower() == "auto":
                         n_chunks = multiprocessing.cpu_count()
                     if isinstance(mono_chunk_len, str) and mono_chunk_len.lower() == "auto":
                         chunk_len = multiprocessing.cpu_count()
-                    mono_chunk_meta = Chunker.yield_chunk_meta(
+                    mono_chunk_meta = mono_chunker_cls.yield_chunk_meta(
                         n_chunks=mono_n_chunks,
                         size=len(template_context["param_configs"]),
                         min_size=mono_min_size,
@@ -1402,6 +1410,7 @@ def parameterized(
                 merge_kwargs=merge_kwargs,
                 selection=selection,
                 forward_kwargs_as=forward_kwargs_as,
+                mono_chunker_cls=mono_chunker_cls,
                 mono_n_chunks=mono_n_chunks,
                 mono_min_size=mono_min_size,
                 mono_chunk_len=mono_chunk_len,

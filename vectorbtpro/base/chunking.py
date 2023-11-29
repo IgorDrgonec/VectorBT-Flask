@@ -19,18 +19,22 @@ from vectorbtpro.utils.chunking import (
     ShapeSlicer,
     ArraySelector,
     ArraySlicer,
+    Chunked,
 )
 from vectorbtpro.utils.parsing import Regex
 
 __all__ = [
     "GroupLensSizer",
     "GroupLensSlicer",
+    "ChunkedGroupLens",
     "GroupLensMapper",
     "GroupMapSlicer",
+    "ChunkedGroupMap",
     "GroupIdxsMapper",
     "FlexArraySizer",
     "FlexArraySelector",
     "FlexArraySlicer",
+    "ChunkedFlexArray",
     "shape_gl_slicer",
     "flex_1d_array_gl_slicer",
     "flex_array_gl_slicer",
@@ -53,20 +57,31 @@ class GroupLensSizer(ArgSizer):
             return len(obj[1])
         return len(obj)
 
-    def get_size(self, ann_args: tp.AnnArgs) -> int:
+    def get_size(self, ann_args: tp.AnnArgs, **kwargs) -> int:
         return self.get_obj_size(self.get_arg(ann_args), single_type=self.single_type)
 
 
 class GroupLensSlicer(ChunkSlicer):
     """Class for slicing multiple elements from group lengths based on the chunk range."""
 
-    def get_size(self, obj: tp.Union[tp.GroupLens, tp.GroupMap]) -> int:
+    def get_size(self, obj: tp.Union[tp.GroupLens, tp.GroupMap], **kwargs) -> int:
         return GroupLensSizer.get_obj_size(obj, single_type=self.single_type)
 
     def take(self, obj: tp.Union[tp.GroupLens, tp.GroupMap], chunk_meta: ChunkMeta, **kwargs) -> tp.GroupMap:
         if isinstance(obj, tuple):
             return obj[1][chunk_meta.start : chunk_meta.end]
         return obj[chunk_meta.start : chunk_meta.end]
+
+
+class ChunkedGroupLens(Chunked):
+    """Class representing chunkable group lengths."""
+
+    def resolve_take_spec(self) -> tp.TakeSpec:
+        if self.take_spec_missing:
+            if self.select:
+                raise ValueError("Selection is not supported")
+            return GroupLensSlicer
+        return self.take_spec
 
 
 def get_group_lens_slice(group_lens: tp.Array1d, chunk_meta: ChunkMeta) -> slice:
@@ -104,13 +119,24 @@ group_lens_mapper = GroupLensMapper(arg_query=Regex(r"(group_lens|group_map)"))
 class GroupMapSlicer(ChunkSlicer):
     """Class for slicing multiple elements from a group map based on the chunk range."""
 
-    def get_size(self, obj: tp.GroupMap) -> int:
+    def get_size(self, obj: tp.GroupMap, **kwargs) -> int:
         return GroupLensSizer.get_obj_size(obj, single_type=self.single_type)
 
     def take(self, obj: tp.GroupMap, chunk_meta: ChunkMeta, **kwargs) -> tp.GroupMap:
         group_idxs, group_lens = obj
         group_lens = group_lens[chunk_meta.start : chunk_meta.end]
         return np.arange(np.sum(group_lens)), group_lens
+
+
+class ChunkedGroupMap(Chunked):
+    """Class representing a chunkable group map."""
+
+    def resolve_take_spec(self) -> tp.TakeSpec:
+        if self.take_spec_missing:
+            if self.select:
+                raise ValueError("Selection is not supported")
+            return GroupMapSlicer
+        return self.take_spec
 
 
 @attr.s(frozen=True)
@@ -171,10 +197,10 @@ class FlexArraySelector(ArraySelector):
     The result is intended to be used together with `vectorbtpro.base.flex_indexing.flex_select_1d_nb`
     and `vectorbtpro.base.flex_indexing.flex_select_nb`."""
 
-    def get_size(self, obj: tp.ArrayLike) -> int:
+    def get_size(self, obj: tp.ArrayLike, **kwargs) -> int:
         return FlexArraySizer.get_obj_size(obj, self.axis, single_type=self.single_type)
 
-    def suggest_size(self, obj: tp.ArrayLike) -> tp.Optional[int]:
+    def suggest_size(self, obj: tp.ArrayLike, **kwargs) -> tp.Optional[int]:
         return None
 
     def take(
@@ -223,10 +249,10 @@ class FlexArraySlicer(ArraySlicer):
     The result is intended to be used together with `vectorbtpro.base.flex_indexing.flex_select_1d_nb`
     and `vectorbtpro.base.flex_indexing.flex_select_nb`."""
 
-    def get_size(self, obj: tp.ArrayLike) -> int:
+    def get_size(self, obj: tp.ArrayLike, **kwargs) -> int:
         return FlexArraySizer.get_obj_size(obj, self.axis, single_type=self.single_type)
 
-    def suggest_size(self, obj: tp.ArrayLike) -> tp.Optional[int]:
+    def suggest_size(self, obj: tp.ArrayLike, **kwargs) -> tp.Optional[int]:
         return None
 
     def take(
@@ -260,6 +286,17 @@ class FlexArraySlicer(ArraySlicer):
                 return obj
             return obj[chunk_meta.start : chunk_meta.end, :]
         raise ValueError(f"FlexArraySlicer supports max 2 dimensions, not {len(obj.shape)}")
+
+
+class ChunkedFlexArray(Chunked):
+    """Class representing a chunkable flexible array."""
+
+    def resolve_take_spec(self) -> tp.TakeSpec:
+        if self.take_spec_missing:
+            if self.select:
+                return FlexArraySelector
+            return FlexArraySlicer
+        return self.take_spec
 
 
 shape_gl_slicer = ShapeSlicer(axis=1, mapper=group_lens_mapper)

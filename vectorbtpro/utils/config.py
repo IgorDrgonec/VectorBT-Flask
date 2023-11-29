@@ -29,6 +29,10 @@ __all__ = [
 ]
 
 
+class _DEF:
+    pass
+
+
 class hdict(dict):
     """Hashable dict."""
 
@@ -348,9 +352,6 @@ class child_dict(pdict):
     pass
 
 
-_RaiseKeyError = object()
-
-
 ConfigT = tp.TypeVar("ConfigT", bound="Config")
 
 
@@ -587,13 +588,13 @@ class Config(pdict):
             raise KeyError(f"Config keys are frozen")
         dict.__delitem__(self, k)
 
-    def pop(self, k: str, v: tp.Any = _RaiseKeyError, force: bool = False) -> tp.Any:
+    def pop(self, k: str, v: tp.Any = _DEF, force: bool = False) -> tp.Any:
         """Remove and return the pair by the key."""
         if not force and self.get_option("readonly"):
             raise TypeError("Config is read-only")
         if not force and self.get_option("frozen_keys"):
             raise KeyError(f"Config keys are frozen")
-        if v is _RaiseKeyError:
+        if v is _DEF:
             result = dict.pop(self, k)
         else:
             result = dict.pop(self, k, v)
@@ -1017,7 +1018,7 @@ class HasSettings:
         cls,
         path: tp.PathLikeKey,
         key: str,
-        default: tp.Any = _RaiseKeyError,
+        default: tp.Any = _DEF,
         sub_path: tp.Optional[tp.PathLikeKey] = None,
         sub_path_only: bool = False,
     ) -> tp.Any:
@@ -1043,7 +1044,7 @@ class HasSettings:
         try:
             return path_settings[key]
         except KeyError as e:
-            if default is _RaiseKeyError:
+            if default is _DEF:
                 if sub_path is not None:
                     raise SettingNotFoundError(
                         f"Found no key '{key}' in the settings under the paths '{path}' and '{sub_path}'"
@@ -1056,7 +1057,7 @@ class HasSettings:
     def get_setting(
         cls,
         key: str,
-        default: tp.Any = _RaiseKeyError,
+        default: tp.Any = _DEF,
         path_id: tp.Optional[tp.Hashable] = None,
         inherit: bool = True,
         sub_path: tp.Optional[tp.PathLikeKey] = None,
@@ -1075,7 +1076,7 @@ class HasSettings:
                 return cls_.get_path_setting(path, key, sub_path=sub_path, sub_path_only=sub_path_only)
             except (SettingsNotFoundError, SettingNotFoundError) as e:
                 continue
-        if default is _RaiseKeyError:
+        if default is _DEF:
             if path_id is not None:
                 if sub_path is not None:
                     raise SettingNotFoundError(
@@ -1136,7 +1137,7 @@ class HasSettings:
         value: tp.Optional[tp.Any],
         key: str,
         merge: bool = False,
-        default: tp.Any = _RaiseKeyError,
+        default: tp.Any = _DEF,
         path_id: tp.Optional[tp.Hashable] = None,
         inherit: bool = True,
         sub_path: tp.Optional[tp.PathLikeKey] = None,

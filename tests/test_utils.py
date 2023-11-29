@@ -3309,7 +3309,7 @@ class TestChunking:
 
         @vbt.chunked(
             n_chunks=2,
-            size=lambda ann_args: len(ann_args["a"]["value"]),
+            size=lambda ann_args, **kwargs: len(ann_args["a"]["value"]),
             arg_take_spec=dict(a=vbt.ChunkSlicer()),
         )
         def f5(a):
@@ -3397,10 +3397,32 @@ class TestChunking:
             return produce_out(*args, **kwargs)
 
         results = f10(
-            vbt.Chunkable(np.arange(0, 10), vbt.ArraySlicer),
-            vbt.Chunkable(np.arange(10, 20), vbt.ArraySlicer),
-            a=vbt.Chunkable(np.arange(20, 30), vbt.ArraySlicer),
-            b=vbt.Chunkable(np.arange(30, 40), vbt.ArraySlicer),
+            vbt.Chunked(np.arange(0, 10), vbt.ArraySlicer),
+            vbt.Chunked(np.arange(10, 20), vbt.ArraySlicer),
+            a=vbt.Chunked(np.arange(20, 30), vbt.ArraySlicer),
+            b=vbt.Chunked(np.arange(30, 40), vbt.ArraySlicer),
+            _n_chunks=2,
+        )
+        np.testing.assert_array_equal(results[0], np.array([60, 64, 68, 72, 76]))
+        np.testing.assert_array_equal(results[1], np.array([80, 84, 88, 92, 96]))
+
+        @vbt.chunked
+        def f11(*args: vbt.ChunkedArray, **kwargs: vbt.ChunkedArray):
+            return produce_out(*args, **kwargs)
+
+        results = f11(np.arange(0, 10), np.arange(10, 20), a=np.arange(20, 30), b=np.arange(30, 40), _n_chunks=2)
+        np.testing.assert_array_equal(results[0], np.array([60, 64, 68, 72, 76]))
+        np.testing.assert_array_equal(results[1], np.array([80, 84, 88, 92, 96]))
+
+        @vbt.chunked
+        def f12(*args, **kwargs):
+            return produce_out(*args, **kwargs)
+
+        results = f12(
+            vbt.ChunkedArray(np.arange(0, 10)),
+            vbt.ChunkedArray(np.arange(10, 20)),
+            a=vbt.ChunkedArray(np.arange(20, 30)),
+            b=vbt.ChunkedArray(np.arange(30, 40)),
             _n_chunks=2,
         )
         np.testing.assert_array_equal(results[0], np.array([60, 64, 68, 72, 76]))

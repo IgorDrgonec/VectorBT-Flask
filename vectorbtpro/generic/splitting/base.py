@@ -41,12 +41,7 @@ from vectorbtpro.base.reshaping import to_dict
 from vectorbtpro.base.accessors import BaseIDXAccessor
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.grouping.base import Grouper
-from vectorbtpro.base.merging import (
-    row_stack_merge,
-    column_stack_merge,
-    resolve_merge_func,
-    is_merge_func_from_config,
-)
+from vectorbtpro.base.merging import row_stack_merge, column_stack_merge, is_merge_func_from_config
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.splitting import nb
 
@@ -64,6 +59,10 @@ __all__ = [
 ]
 
 __pdoc__ = {}
+
+
+class _DEF:
+    pass
 
 
 SplitterT = tp.TypeVar("SplitterT", bound="Splitter")
@@ -308,18 +307,11 @@ class RelRange:
         return slice(start, stop)
 
 
-_DEF = object()
-"""Default value for internal purposes."""
-
-_RaiseValueError = object()
-"""Gets raised if not substituted by a real value."""
-
-
 @attr.s(frozen=True)
 class Takeable(Annotatable):
     """Class that represents an object from which a range can be taken."""
 
-    obj: tp.Any = attr.ib(default=_RaiseValueError)
+    obj: tp.Any = attr.ib(default=_DEF)
     """Takeable object."""
 
     remap_to_obj: bool = attr.ib(default=_DEF)
@@ -340,7 +332,7 @@ class Takeable(Annotatable):
 
     def check_obj(self) -> None:
         """Check whether value is missing."""
-        if self.obj is _RaiseValueError:
+        if self.obj is _DEF:
             raise ValueError("Takeable object is missing")
 
 

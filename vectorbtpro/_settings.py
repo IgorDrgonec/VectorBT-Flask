@@ -311,6 +311,7 @@ ${config_doc}
 _settings["math"] = math
 
 execution = frozen_cfg(
+    chunker_cls=None,
     n_chunks=None,
     min_size=None,
     chunk_len=None,
@@ -393,6 +394,7 @@ chunking = frozen_cfg(
     disable=False,
     disable_wrapping=False,
     option=False,
+    chunker_cls=None,
     n_chunks=None,
     size=None,
     min_size=None,
@@ -427,6 +429,7 @@ ${config_doc}
 _settings["chunking"] = chunking
 
 params = frozen_cfg(
+    chunker_cls=None,
     search_except_types=None,
     search_max_len=None,
     search_max_depth=None,
