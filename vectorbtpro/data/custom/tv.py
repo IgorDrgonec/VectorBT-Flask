@@ -536,8 +536,9 @@ class TVData(RemoteData):
         filter_by: tp.Union[None, tp.Callable, CustomTemplate] = None,
         groups: tp.Optional[tp.MaybeIterable[tp.Dict[str, tp.MaybeIterable[str]]]] = None,
         template_context: tp.KwargsLike = None,
+        return_field_data: bool = False,
         **scanner_kwargs,
-    ) -> tp.List[str]:
+    ) -> tp.Union[tp.List[str], tp.List[tp.Kwargs]]:
         """List all symbols.
 
         Uses symbol search when either `text` or `exchange` is provided (returns a subset of symbols).
@@ -550,7 +551,8 @@ class TVData(RemoteData):
         filtering with `filter_by`. Such information is passed to the function as a dictionary where
         fields are keys. The function can also be a template that can use the same information provided
         as a context, or a list of values that should be matched against the values corresponding to their fields.
-        For the list of available fields, see `FIELD_LIST`.
+        For the list of available fields, see `FIELD_LIST`. Argument `fields` can also be "all".
+        Set `return_field_data` to True to return a list with (filtered) field data.
 
         Use `groups` to provide a single dictionary or a list of dictionaries with groups.
         Each dictionary can be provided either in a compressed format, such as `dict(index=index)`,
@@ -661,6 +663,7 @@ class TVData(RemoteData):
                 pbar_kwargs=pbar_kwargs,
             )
             all_symbols = map(lambda x: x["exchange"] + ":" + x["symbol"], data)
+            return_field_data = False
         else:
             if markets is not None:
                 scanner_kwargs["markets"] = markets
@@ -668,7 +671,10 @@ class TVData(RemoteData):
                 if "columns" in scanner_kwargs:
                     raise ValueError("Use fields instead of columns")
                 if isinstance(fields, str):
-                    fields = [fields]
+                    if fields.lower() == "all":
+                        fields = FIELD_LIST
+                    else:
+                        fields = [fields]
                 scanner_kwargs["columns"] = fields
             if groups is not None:
                 if isinstance(groups, dict):
@@ -692,11 +698,17 @@ class TVData(RemoteData):
                 if isinstance(filter_by, str):
                     filter_by = [filter_by]
             data = client.scan_symbols(market.lower(), **scanner_kwargs)
+            if data is None:
+                raise ValueError("No data returned by TradingView")
             all_symbols = []
             for item in data:
+                if fields is not None:
+                    item = {"symbol": item["s"], **dict(zip(fields, item["d"]))}
+                else:
+                    item = {"symbol": item["s"]}
                 if filter_by is not None:
                     if fields is not None:
-                        context = merge_dicts(dict(zip(fields, item["d"])), template_context)
+                        context = merge_dicts(item, template_context)
                     else:
                         raise ValueError("Must provide fields for filter_by")
                     if isinstance(filter_by, CustomTemplate):
@@ -715,16 +727,28 @@ class TVData(RemoteData):
                                 break
                         if not conditions_met:
                             continue
-                all_symbols.append(item["s"])
+                if return_field_data:
+                    all_symbols.append(item)
+                else:
+                    all_symbols.append(item["symbol"])
         found_symbols = []
         for symbol in all_symbols:
+            if return_field_data:
+                item = symbol
+                symbol = item["symbol"]
+            else:
+                item = symbol
+            if "\"symbol\"" in symbol:
+                continue
             if exchange_pattern is not None:
                 if not cls.key_match(symbol.split(":")[0], exchange_pattern, use_regex=use_regex):
                     continue
             if symbol_pattern is not None:
                 if not cls.key_match(symbol.split(":")[1], symbol_pattern, use_regex=use_regex):
                     continue
-            found_symbols.append(symbol)
+            found_symbols.append(item)
+        if return_field_data:
+            return sorted(found_symbols, key=lambda x: x["symbol"])
         return sorted(found_symbols)
 
     @classmethod
