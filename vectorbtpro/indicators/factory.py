@@ -473,7 +473,7 @@ class IndicatorBase(Analyzable):
                 Pass "outputs" to only return outputs.
             use_raw (bool): Takes the raw results and uses them instead of running `custom_func`.
             wrapper_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.wrapping.ArrayWrapper`.
-            seed (int): Set seed to make output deterministic.
+            seed (int): Seed to make output deterministic.
             **kwargs: Keyword arguments passed to the `custom_func`.
 
                 Some common arguments include `return_cache` to return cache and `use_cache` to use cache.

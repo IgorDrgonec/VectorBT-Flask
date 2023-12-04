@@ -311,9 +311,8 @@ ${config_doc}
 _settings["math"] = math
 
 execution = frozen_cfg(
-    chunker_cls=None,
-    n_chunks=None,
     min_size=None,
+    n_chunks=None,
     chunk_len=None,
     distribute="calls",
     warmup=False,
@@ -395,13 +394,13 @@ chunking = frozen_cfg(
     disable_wrapping=False,
     option=False,
     chunker_cls=None,
-    n_chunks=None,
     size=None,
     min_size=None,
+    n_chunks=None,
     chunk_len=None,
     chunk_meta=None,
     prepend_chunk_meta=None,
-    skip_one_chunk=True,
+    skip_single_chunk=True,
     arg_take_spec=None,
     template_context=flex_cfg(),
     merge_func=None,
@@ -429,16 +428,27 @@ ${config_doc}
 _settings["chunking"] = chunking
 
 params = frozen_cfg(
-    chunker_cls=None,
-    search_except_types=None,
-    search_max_len=None,
-    search_max_depth=None,
-    skip_single_param=True,
+    parameterizer_cls=None,
+    param_search_kwargs=flex_cfg(),
+    skip_single_comb=True,
     template_context=flex_cfg(),
     random_subset=None,
     seed=None,
     index_stack_kwargs=flex_cfg(),
     name_tuple_to_str=True,
+    merge_func=None,
+    merge_kwargs=flex_cfg(),
+    selection=None,
+    forward_kwargs_as=flex_cfg(),
+    mono_min_size=None,
+    mono_n_chunks=None,
+    mono_chunk_len=None,
+    mono_chunk_meta=None,
+    mono_merge_func=None,
+    mono_merge_kwargs=flex_cfg(),
+    mono_reduce=None,
+    return_meta=False,
+    return_param_index=False,
     execute_kwargs=flex_cfg(),
 )
 """_"""
@@ -453,9 +463,7 @@ _settings["params"] = params
 
 template = frozen_cfg(
     strict=True,
-    except_types=(list, set, frozenset),
-    max_len=None,
-    max_depth=None,
+    search_kwargs=flex_cfg(),
     context=flex_cfg(),
 )
 """_"""
@@ -1728,6 +1736,21 @@ ${config_doc}
 ```""")
 
 _settings["path"] = path
+
+search = frozen_cfg(
+    except_types=(list, set, frozenset),
+    max_len=None,
+    max_depth=None,
+)
+"""_"""
+
+__pdoc__["search"] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.search`.
+
+```python
+${config_doc}
+```""")
+
+_settings["search"] = search
 
 
 # ############# Settings config ############# #

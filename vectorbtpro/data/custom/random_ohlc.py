@@ -57,7 +57,7 @@ class RandomOHLCData(SyntheticData):
             mean (float): Drift, or mean of the percentage change.
             std (float): Standard deviation of the percentage change.
             symmetric (bool): Whether to diminish negative returns and make them symmetric to positive ones.
-            seed (int): Set seed to make output deterministic.
+            seed (int): Seed to make output deterministic.
             jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
             template_context (dict): Template context.
 

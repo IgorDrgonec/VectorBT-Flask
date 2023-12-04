@@ -2,7 +2,6 @@
 
 """Engines for executing functions."""
 
-import multiprocessing
 import concurrent.futures
 import time
 
@@ -13,7 +12,6 @@ from vectorbtpro.utils.config import merge_dicts, Configured
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.template import CustomTemplate, substitute_templates
-from vectorbtpro.utils.chunking import Chunker
 
 try:
     if not tp.TYPE_CHECKING:
@@ -718,9 +716,8 @@ def execute(
     funcs_args: tp.FuncsArgs,
     engine: tp.EngineLike = "serial",
     n_calls: tp.Optional[int] = None,
-    chunker_cls: tp.Optional[Chunker] = None,
-    n_chunks: tp.Optional[tp.Union[str, int]] = None,
     min_size: tp.Optional[int] = None,
+    n_chunks: tp.Optional[tp.Union[str, int]] = None,
     chunk_len: tp.Optional[tp.Union[str, int]] = None,
     chunk_meta: tp.Optional[tp.Iterable[tp.ChunkMeta]] = None,
     distribute: tp.Optional[str] = None,
@@ -752,7 +749,7 @@ def execute(
     * Callable - passes `funcs_args`, `n_calls` (if not None), and `kwargs` and `engine_kwargs`
 
     Can execute per chunk if `chunk_meta` is provided. Otherwise, if any of `n_chunks` and `chunk_len`
-    are set, passes them to `vectorbtpro.utils.chunking.Chunker.yield_chunk_meta` to generate `chunk_meta`.
+    are set, passes them to `vectorbtpro.utils.chunking.yield_chunk_meta` to generate `chunk_meta`.
     Arguments `n_chunks` and `chunk_len` can be set globally in the engine-specific settings.
     Set `n_chunks` and `chunk_len` to 'auto' to set them to the number of cores.
 
@@ -802,7 +799,6 @@ def execute(
 
     execution_cfg = settings["execution"]
     engines_cfg = execution_cfg["engines"]
-    chunking_cfg = settings["chunking"]
 
     engine_kwargs = merge_dicts(kwargs, engine_kwargs)
 
@@ -844,18 +840,10 @@ def execute(
         if "pbar_kwargs" in func_arg_names and "pbar_kwargs" not in engine_kwargs:
             engine_kwargs["pbar_kwargs"] = pbar_kwargs
 
-    if chunker_cls is None:
-        chunker_cls = engine_cfg.get("chunker_cls", None)
-    if chunker_cls is None:
-        chunker_cls = execution_cfg["chunker_cls"]
-    if chunker_cls is None:
-        chunker_cls = chunking_cfg["chunker_cls"]
-    if chunker_cls is None:
-        chunker_cls = Chunker
-    if n_chunks is None:
-        n_chunks = engine_cfg.get("n_chunks", execution_cfg["n_chunks"])
     if min_size is None:
         min_size = engine_cfg.get("min_size", execution_cfg["min_size"])
+    if n_chunks is None:
+        n_chunks = engine_cfg.get("n_chunks", execution_cfg["n_chunks"])
     if chunk_len is None:
         chunk_len = engine_cfg.get("chunk_len", execution_cfg["chunk_len"])
     if distribute is None:
@@ -964,6 +952,8 @@ def execute(
         return _call_post_execute_func(_execute(funcs_args, n_calls))
 
     if chunk_meta is None:
+        from vectorbtpro.utils.chunking import yield_chunk_meta
+
         # Generate chunk metadata
         if not isinstance(funcs_args, CustomTemplate) and hasattr(funcs_args, "__len__"):
             _n_calls = len(funcs_args)
@@ -974,14 +964,10 @@ def execute(
                 raise ValueError("When funcs_args is a template, must provide n_calls")
             funcs_args = list(funcs_args)
             _n_calls = len(funcs_args)
-        if isinstance(n_chunks, str) and n_chunks.lower() == "auto":
-            n_chunks = multiprocessing.cpu_count()
-        if isinstance(chunk_len, str) and chunk_len.lower() == "auto":
-            chunk_len = multiprocessing.cpu_count()
-        chunk_meta = chunker_cls.yield_chunk_meta(
-            n_chunks=n_chunks,
+        chunk_meta = yield_chunk_meta(
             size=_n_calls,
             min_size=min_size,
+            n_chunks=n_chunks,
             chunk_len=chunk_len,
         )
         if "chunk_meta" not in template_context:

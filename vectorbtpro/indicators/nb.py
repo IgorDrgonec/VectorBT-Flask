@@ -1418,7 +1418,7 @@ def modes_nb(pivots: tp.Array2d) -> tp.Array2d:
 
 @register_jitted(cache=True)
 def iter_med_price_nb(high: float, low: float) -> float:
-    """Mdian price at one iteration."""
+    """Median price at one iteration."""
     return (high + low) / 2
 
 

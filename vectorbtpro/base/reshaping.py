@@ -886,7 +886,7 @@ def broadcast(
         random_subset (int): Select a random subset of parameter values.
 
             Seed can be set using NumPy before calling this function.
-        seed (int): Set seed to make output deterministic.
+        seed (int): Seed to make output deterministic.
         keep_wrap_default (bool): Whether to keep wrapping with `vectorbtpro.base.reshaping.Default`.
         return_wrapper (bool): Whether to also return the wrapper associated with the operation.
         wrapper_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.wrapping.ArrayWrapper`.

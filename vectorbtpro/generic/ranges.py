@@ -793,7 +793,7 @@ class Ranges(PriceRecords):
             last_n (int): Select last N range records.
             top_n (int): Select top N range records by maximum duration.
             random_n (int): Select N range records randomly.
-            seed (int): Set seed to make output deterministic.
+            seed (int): Seed to make output deterministic.
             proj_start (str, int, or frequency_like): See `Ranges.get_projections`.
 
                 Allows an additional option "current_or_{value}", which sets `proj_start` to

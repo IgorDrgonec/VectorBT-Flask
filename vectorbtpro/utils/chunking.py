@@ -19,11 +19,13 @@ from vectorbtpro.utils.parsing import annotate_args, ann_args_to_args, match_ann
 from vectorbtpro.utils.template import substitute_templates, Rep
 from vectorbtpro.utils.annotations import get_annotations, flatten_annotations, Annotatable, Union
 from vectorbtpro.utils.merging import MergeFunc, parse_merge_func
+from vectorbtpro.utils.execution import execute
 
 __all__ = [
     "ChunkMeta",
     "ArgChunkMeta",
     "LenChunkMeta",
+    "yield_chunk_meta",
     "Sizer",
     "ArgSizer",
     "CountSizer",
@@ -262,6 +264,81 @@ class LenChunkMeta(ArgChunkMeta):
             end += chunk_len
             yield ChunkMeta(uuid=str(uuid.uuid4()), idx=i, start=start, end=end, indices=None)
             start = end
+
+
+def yield_chunk_meta(
+    size: tp.Optional[int] = None,
+    min_size: tp.Optional[int] = None,
+    n_chunks: tp.Optional[int] = None,
+    chunk_len: tp.Optional[int] = None,
+) -> tp.Generator[ChunkMeta, None, None]:
+    """Yield meta of each successive chunk from a sequence with a number of elements.
+
+    If both `n_chunks` and `chunk_len` are None (after resolving them from settings),
+    sets `n_chunks` to the number of cores.
+
+    For defaults, see `vectorbtpro._settings.chunking`."""
+    from vectorbtpro._settings import settings
+
+    chunking_cfg = settings["chunking"]
+
+    if min_size is None:
+        min_size = chunking_cfg["min_size"]
+    if n_chunks is None:
+        n_chunks = chunking_cfg["n_chunks"]
+    if chunk_len is None:
+        chunk_len = chunking_cfg["chunk_len"]
+
+    if size is not None and min_size is not None and size < min_size:
+        yield ChunkMeta(uuid=str(uuid.uuid4()), idx=0, start=0, end=size, indices=None)
+    else:
+        if n_chunks is None and chunk_len is None and size is None:
+            raise ValueError("Must provide at least n_chunks, chunk_len, or size")
+        if n_chunks is None and chunk_len is None:
+            n_chunks = "auto"
+        if n_chunks is not None and chunk_len is not None:
+            raise ValueError("Must provide either n_chunks or chunk_len, not both")
+        if n_chunks is not None:
+            if isinstance(n_chunks, str):
+                if n_chunks.lower() == "auto":
+                    n_chunks = multiprocessing.cpu_count()
+                else:
+                    raise ValueError(f"Invalid option n_chunks='{n_chunks}'")
+            if n_chunks == 0:
+                raise ValueError("Chunk count cannot be zero")
+            if size is not None:
+                if n_chunks > size:
+                    n_chunks = size
+                d, r = divmod(size, n_chunks)
+                for i in range(n_chunks):
+                    si = (d + 1) * (i if i < r else r) + d * (0 if i < r else i - r)
+                    yield ChunkMeta(
+                        uuid=str(uuid.uuid4()),
+                        idx=i,
+                        start=si,
+                        end=si + (d + 1 if i < r else d),
+                        indices=None,
+                    )
+            else:
+                for i in range(n_chunks):
+                    yield ChunkMeta(uuid=str(uuid.uuid4()), idx=i, start=None, end=None, indices=None)
+        if chunk_len is not None:
+            checks.assert_not_none(size)
+            if isinstance(chunk_len, str):
+                if chunk_len.lower() == "auto":
+                    chunk_len = multiprocessing.cpu_count()
+                else:
+                    raise ValueError(f"Invalid option chunk_len='{chunk_len}'")
+            if chunk_len == 0:
+                raise ValueError("Chunk length cannot be zero")
+            for chunk_i, i in enumerate(range(0, size, chunk_len)):
+                yield ChunkMeta(
+                    uuid=str(uuid.uuid4()),
+                    idx=chunk_i,
+                    start=i,
+                    end=min(i + chunk_len, size),
+                    indices=None,
+                )
 
 
 # ############# Chunk mapping ############# #
@@ -917,18 +994,18 @@ class ChunkedArray(Chunked):
 
 
 class Chunker(Configured):
-    """Class responsible for chunking arguments of a function and running those chunks."""
+    """Class responsible for chunking arguments of a function and running the function."""
 
     _settings_path: tp.SettingsPath = "chunking"
 
     _expected_keys: tp.ExpectedKeys = (Configured._expected_keys or set()) | {
         "func",
-        "n_chunks",
         "size",
         "min_size",
+        "n_chunks",
         "chunk_len",
         "chunk_meta",
-        "skip_one_chunk",
+        "skip_single_chunk",
         "arg_take_spec",
         "template_context",
         "prepend_chunk_meta",
@@ -944,13 +1021,13 @@ class Chunker(Configured):
     def __init__(
         self,
         func: tp.Callable,
-        n_chunks: tp.Optional[tp.SizeLike] = None,
         size: tp.Optional[tp.SizeLike] = None,
         min_size: tp.Optional[int] = None,
+        n_chunks: tp.Optional[tp.SizeLike] = None,
         chunk_len: tp.Optional[tp.SizeLike] = None,
         chunk_meta: tp.Optional[tp.ChunkMetaLike] = None,
         prepend_chunk_meta: tp.Optional[bool] = None,
-        skip_one_chunk: tp.Optional[bool] = None,
+        skip_single_chunk: tp.Optional[bool] = None,
         arg_take_spec: tp.Optional[tp.ArgTakeSpecLike] = None,
         template_context: tp.KwargsLike = None,
         merge_func: tp.Optional[tp.MergeFuncLike] = None,
@@ -965,13 +1042,13 @@ class Chunker(Configured):
         Configured.__init__(
             self,
             func=func,
-            n_chunks=n_chunks,
             size=size,
             min_size=min_size,
+            n_chunks=n_chunks,
             chunk_len=chunk_len,
             chunk_meta=chunk_meta,
             prepend_chunk_meta=prepend_chunk_meta,
-            skip_one_chunk=skip_one_chunk,
+            skip_single_chunk=skip_single_chunk,
             arg_take_spec=arg_take_spec,
             template_context=template_context,
             merge_func=merge_func,
@@ -985,13 +1062,13 @@ class Chunker(Configured):
         )
 
         self._func = func
-        self._n_chunks = n_chunks
         self._size = size
         self._min_size = min_size
+        self._n_chunks = n_chunks
         self._chunk_len = chunk_len
         self._chunk_meta = chunk_meta
         self._prepend_chunk_meta = prepend_chunk_meta
-        self._skip_one_chunk = skip_one_chunk
+        self._skip_single_chunk = skip_single_chunk
         self._arg_take_spec = arg_take_spec
         self._template_context = template_context
         self._merge_func = merge_func
@@ -1008,19 +1085,19 @@ class Chunker(Configured):
         return self._func
 
     @property
-    def n_chunks(self) -> tp.Optional[tp.SizeLike]:
-        """See `Chunker.get_chunk_meta_from_args`."""
-        return self._n_chunks
-
-    @property
     def size(self) -> tp.Optional[tp.SizeLike]:
-        """See `Chunker.get_chunk_meta_from_args`."""
+        """See `yield_chunk_meta`."""
         return self._size
 
     @property
     def min_size(self) -> tp.Optional[int]:
         """See `Chunker.get_chunk_meta_from_args`."""
         return self._min_size
+
+    @property
+    def n_chunks(self) -> tp.Optional[tp.SizeLike]:
+        """See `Chunker.get_chunk_meta_from_args`."""
+        return self._n_chunks
 
     @property
     def chunk_len(self) -> tp.Optional[tp.SizeLike]:
@@ -1040,9 +1117,9 @@ class Chunker(Configured):
         return self._prepend_chunk_meta
 
     @property
-    def skip_one_chunk(self) -> tp.Optional[bool]:
+    def skip_single_chunk(self) -> tp.Optional[bool]:
         """Whether to execute the function directly if there's only one chunk."""
-        return self._skip_one_chunk
+        return self._skip_single_chunk
 
     @property
     def arg_take_spec(self) -> tp.Optional[tp.ArgTakeSpecLike]:
@@ -1087,7 +1164,9 @@ class Chunker(Configured):
 
     @property
     def forward_kwargs_as(self) -> tp.KwargsLike:
-        """Map to rename keyword arguments."""
+        """Map to rename keyword arguments.
+
+        Can also pass any variable from the scope of `Chunker.run`"""
         return self._forward_kwargs_as
 
     @property
@@ -1096,77 +1175,12 @@ class Chunker(Configured):
         return self._execute_kwargs
 
     @classmethod
-    def yield_chunk_meta(
-        cls,
-        n_chunks: tp.Optional[int] = None,
-        size: tp.Optional[int] = None,
-        min_size: tp.Optional[int] = None,
-        chunk_len: tp.Optional[int] = None,
-    ) -> tp.Generator[ChunkMeta, None, None]:
-        """Yield meta of each successive chunk from a sequence with a number of elements.
-
-        If both `n_chunks` and `chunk_len` are None (after resolving them from settings),
-        sets `n_chunks` to the number of cores.
-
-        For defaults, see `vectorbtpro._settings.chunking`."""
-        if size is not None and min_size is not None and size < min_size:
-            yield ChunkMeta(uuid=str(uuid.uuid4()), idx=0, start=0, end=size, indices=None)
-        else:
-            if n_chunks is None and chunk_len is None and size is None:
-                raise ValueError("Must provide at least n_chunks, chunk_len, or size")
-            if n_chunks is None and chunk_len is None:
-                n_chunks = "auto"
-            if n_chunks is not None and chunk_len is not None:
-                raise ValueError("Must provide either n_chunks or chunk_len, not both")
-            if n_chunks is not None:
-                if isinstance(n_chunks, str):
-                    if n_chunks.lower() == "auto":
-                        n_chunks = multiprocessing.cpu_count()
-                    else:
-                        raise ValueError(f"Invalid option n_chunks='{n_chunks}'")
-                if n_chunks == 0:
-                    raise ValueError("Chunk count cannot be zero")
-                if size is not None:
-                    if n_chunks > size:
-                        n_chunks = size
-                    d, r = divmod(size, n_chunks)
-                    for i in range(n_chunks):
-                        si = (d + 1) * (i if i < r else r) + d * (0 if i < r else i - r)
-                        yield ChunkMeta(
-                            uuid=str(uuid.uuid4()),
-                            idx=i,
-                            start=si,
-                            end=si + (d + 1 if i < r else d),
-                            indices=None,
-                        )
-                else:
-                    for i in range(n_chunks):
-                        yield ChunkMeta(uuid=str(uuid.uuid4()), idx=i, start=None, end=None, indices=None)
-            if chunk_len is not None:
-                checks.assert_not_none(size)
-                if isinstance(chunk_len, str):
-                    if chunk_len.lower() == "auto":
-                        chunk_len = multiprocessing.cpu_count()
-                    else:
-                        raise ValueError(f"Invalid option chunk_len='{chunk_len}'")
-                if chunk_len == 0:
-                    raise ValueError("Chunk length cannot be zero")
-                for chunk_i, i in enumerate(range(0, size, chunk_len)):
-                    yield ChunkMeta(
-                        uuid=str(uuid.uuid4()),
-                        idx=chunk_i,
-                        start=i,
-                        end=min(i + chunk_len, size),
-                        indices=None,
-                    )
-
-    @classmethod
     def get_chunk_meta_from_args(
         cls,
         ann_args: tp.AnnArgs,
-        n_chunks: tp.Optional[tp.SizeLike] = None,
         size: tp.Optional[tp.SizeLike] = None,
         min_size: tp.Optional[int] = None,
+        n_chunks: tp.Optional[tp.SizeLike] = None,
         chunk_len: tp.Optional[tp.SizeLike] = None,
         chunk_meta: tp.Optional[tp.ChunkMetaLike] = None,
         **kwargs,
@@ -1175,15 +1189,15 @@ class Chunker(Configured):
 
         Args:
             ann_args (dict): Arguments annotated with `vectorbtpro.utils.parsing.annotate_args`.
-            n_chunks (int, Sizer, or callable): Number of chunks.
-
-                Can be an integer, an instance of `Sizer`, or a callable taking the annotated arguments
-                and other keyword arguments and returning an integer.
             size (int, Sizer, or callable): Size of the space to split.
 
                 Can be an integer, an instance of `Sizer`, or a callable taking the annotated arguments
                 and returning an integer.
             min_size (int): If `size` is lower than this number, returns a single chunk.
+            n_chunks (int, Sizer, or callable): Number of chunks.
+
+                Can be an integer, an instance of `Sizer`, or a callable taking the annotated arguments
+                and other keyword arguments and returning an integer.
             chunk_len (int, Sizer, or callable): Length of each chunk.
 
                 Can be an integer, an instance of `Sizer`, or a callable taking the annotated arguments
@@ -1195,13 +1209,6 @@ class Chunker(Configured):
             **kwargs: Other keyword arguments passed to any callable.
         """
         if chunk_meta is None:
-            if n_chunks is not None:
-                if isinstance(n_chunks, Sizer):
-                    n_chunks = n_chunks.apply(ann_args, **kwargs)
-                elif callable(n_chunks):
-                    n_chunks = n_chunks(ann_args, **kwargs)
-                elif not isinstance(n_chunks, (int, str)):
-                    raise TypeError(f"Type {type(n_chunks)} for n_chunks is not supported")
             if size is not None:
                 if isinstance(size, Sizer):
                     size = size.apply(ann_args, **kwargs)
@@ -1209,6 +1216,13 @@ class Chunker(Configured):
                     size = size(ann_args, **kwargs)
                 elif not isinstance(size, int):
                     raise TypeError(f"Type {type(size)} for size is not supported")
+            if n_chunks is not None:
+                if isinstance(n_chunks, Sizer):
+                    n_chunks = n_chunks.apply(ann_args, **kwargs)
+                elif callable(n_chunks):
+                    n_chunks = n_chunks(ann_args, **kwargs)
+                elif not isinstance(n_chunks, (int, str)):
+                    raise TypeError(f"Type {type(n_chunks)} for n_chunks is not supported")
             if chunk_len is not None:
                 if isinstance(chunk_len, Sizer):
                     chunk_len = chunk_len.apply(ann_args, **kwargs)
@@ -1216,7 +1230,7 @@ class Chunker(Configured):
                     chunk_len = chunk_len(ann_args, **kwargs)
                 elif not isinstance(chunk_len, (int, str)):
                     raise TypeError(f"Type {type(chunk_len)} for chunk_len is not supported")
-            return cls.yield_chunk_meta(n_chunks=n_chunks, size=size, min_size=min_size, chunk_len=chunk_len)
+            return yield_chunk_meta(size=size, min_size=min_size, n_chunks=n_chunks, chunk_len=chunk_len)
         if isinstance(chunk_meta, ChunkMetaGenerator):
             return chunk_meta.get_chunk_meta(ann_args, **kwargs)
         if callable(chunk_meta):
@@ -1603,15 +1617,13 @@ class Chunker(Configured):
 
         For defaults, see `vectorbtpro._settings.chunking`.
         """
-        from vectorbtpro.utils.execution import execute
-
-        n_chunks = self.resolve_setting(self.n_chunks, "n_chunks")
         size = self.resolve_setting(self.size, "size")
         min_size = self.resolve_setting(self.min_size, "min_size")
+        n_chunks = self.resolve_setting(self.n_chunks, "n_chunks")
         chunk_len = self.resolve_setting(self.chunk_len, "chunk_len")
         chunk_meta = self.resolve_setting(self.chunk_meta, "chunk_meta")
         prepend_chunk_meta = self.resolve_setting(self.prepend_chunk_meta, "prepend_chunk_meta")
-        skip_one_chunk = self.resolve_setting(self.skip_one_chunk, "skip_one_chunk")
+        skip_single_chunk = self.resolve_setting(self.skip_single_chunk, "skip_single_chunk")
         arg_take_spec = self.resolve_setting(self.arg_take_spec, "arg_take_spec")
         template_context = self.resolve_setting(self.template_context, "template_context", merge=True)
         merge_func = self.resolve_setting(self.merge_func, "merge_func")
@@ -1703,9 +1715,9 @@ class Chunker(Configured):
         chunk_meta = list(
             self.get_chunk_meta_from_args(
                 ann_args,
-                n_chunks=n_chunks,
                 size=size,
                 min_size=min_size,
+                n_chunks=n_chunks,
                 chunk_len=chunk_len,
                 chunk_meta=chunk_meta,
                 template_context=template_context,
@@ -1714,7 +1726,7 @@ class Chunker(Configured):
             )
         )
         template_context["chunk_meta"] = chunk_meta
-        if len(chunk_meta) < 2 and skip_one_chunk:
+        if len(chunk_meta) < 2 and skip_single_chunk:
             return self.func(*args, **kwargs)
         funcs_args = self.yield_arg_chunks(
             self.func,
@@ -1749,14 +1761,14 @@ class Chunker(Configured):
 
 def chunked(
     *args,
-    chunker_cls: tp.Type[Chunker] = Chunker,
-    n_chunks: tp.Optional[tp.SizeLike] = None,
+    chunker_cls: tp.Optional[tp.Type[Chunker]] = None,
     size: tp.Optional[tp.SizeLike] = None,
     min_size: tp.Optional[int] = None,
+    n_chunks: tp.Optional[tp.SizeLike] = None,
     chunk_len: tp.Optional[tp.SizeLike] = None,
     chunk_meta: tp.Optional[tp.ChunkMetaLike] = None,
     prepend_chunk_meta: tp.Optional[bool] = None,
-    skip_one_chunk: tp.Optional[bool] = None,
+    skip_single_chunk: tp.Optional[bool] = None,
     arg_take_spec: tp.Optional[tp.ArgTakeSpecLike] = None,
     template_context: tp.KwargsLike = None,
     merge_func: tp.Optional[tp.MergeFuncLike] = None,
@@ -1772,8 +1784,10 @@ def chunked(
 
     Returns a new function with the same signature as the passed one.
 
-    Each parameter can be modified in the `options` attribute of the wrapper function or
+    Each option can be modified in the `options` attribute of the wrapper function or
     directly passed as a keyword argument with a leading underscore.
+
+    Keyword arguments `**kwargs` are passed directly to `vectorbtpro.utils.execution.execute`.
 
     Chunking can be disabled using `disable` argument. Additionally, the entire wrapping mechanism
     can be disabled by using the global setting `disable_wrapping` (=> returns the wrapped function).
@@ -1869,7 +1883,7 @@ def chunked(
         Chunk metadata contains the chunk index that can be used to split any input:
 
         ```pycon
-        >>> list(vbt.Chunker.yield_chunk_meta(n_chunks=2))
+        >>> list(vbt.yield_chunk_meta(n_chunks=2))
         [ChunkMeta(uuid='84d64eed-fbac-41e7-ad61-c917e809b3b8', idx=0, start=None, end=None, indices=None),
          ChunkMeta(uuid='577817c4-fdee-4ceb-ab38-dcd663d9ab11', idx=1, start=None, end=None, indices=None)]
         ```
@@ -1878,7 +1892,7 @@ def chunked(
         The space can be defined by the length of an input array, for example. In our case:
 
         ```pycon
-        >>> list(vbt.Chunker.yield_chunk_meta(n_chunks=2, size=10))
+        >>> list(vbt.yield_chunk_meta(n_chunks=2, size=10))
         [ChunkMeta(uuid='c1593842-dc31-474c-a089-e47200baa2be', idx=0, start=0, end=5, indices=None),
          ChunkMeta(uuid='6d0265e7-1204-497f-bc2c-c7b7800ec57d', idx=1, start=5, end=10, indices=None)]
         ```
@@ -2029,9 +2043,9 @@ def chunked(
 
         @wraps(func)
         def wrapper(*args, **kwargs) -> tp.Any:
-            def _resolve_key(key, is_dict=False):
+            def _resolve_key(key, merge=False):
                 if "_" + key in kwargs:
-                    if is_dict:
+                    if merge:
                         return merge_dicts(wrapper.options[key], kwargs.pop("_" + key))
                     return kwargs.pop("_" + key)
                 return wrapper.options[key]
@@ -2044,21 +2058,21 @@ def chunked(
             return chunker_cls(
                 func,
                 disable=_resolve_key("disable"),
-                n_chunks=_resolve_key("n_chunks"),
                 size=_resolve_key("size"),
                 min_size=_resolve_key("min_size"),
+                n_chunks=_resolve_key("n_chunks"),
                 chunk_len=_resolve_key("chunk_len"),
-                skip_one_chunk=_resolve_key("skip_one_chunk"),
+                skip_single_chunk=_resolve_key("skip_single_chunk"),
                 chunk_meta=_resolve_key("chunk_meta"),
                 prepend_chunk_meta=prepend_chunk_meta,
                 arg_take_spec=_resolve_key("arg_take_spec"),
-                template_context=_resolve_key("template_context", is_dict=True),
-                execute_kwargs=_resolve_key("execute_kwargs", is_dict=True),
+                template_context=_resolve_key("template_context", merge=True),
+                execute_kwargs=_resolve_key("execute_kwargs", merge=True),
                 merge_func=_resolve_key("merge_func"),
-                merge_kwargs=_resolve_key("merge_kwargs", is_dict=True),
+                merge_kwargs=_resolve_key("merge_kwargs", merge=True),
                 return_raw_chunks=_resolve_key("return_raw_chunks"),
                 silence_warnings=_resolve_key("silence_warnings"),
-                forward_kwargs_as=_resolve_key("forward_kwargs_as", is_dict=True),
+                forward_kwargs_as=_resolve_key("forward_kwargs_as", merge=True),
             ).run(*args, **kwargs)
 
         wrapper.func = func
@@ -2067,12 +2081,12 @@ def chunked(
         wrapper.options = Config(
             dict(
                 chunker_cls=chunker_cls,
-                n_chunks=n_chunks,
                 size=size,
                 min_size=min_size,
+                n_chunks=n_chunks,
                 chunk_len=chunk_len,
                 chunk_meta=chunk_meta,
-                skip_one_chunk=skip_one_chunk,
+                skip_single_chunk=skip_single_chunk,
                 arg_take_spec=arg_take_spec,
                 template_context=template_context,
                 merge_func=merge_func,
