@@ -181,12 +181,18 @@ def attach_qs_methods(cls: tp.Type[tp.T], replace_signature: bool = True) -> tp.
                         bm_null_mask = benchmark.isnull()
                         null_mask = null_mask | bm_null_mask
                         benchmark = benchmark.loc[~null_mask]
-                        if isinstance(benchmark.index, (pd.DatetimeIndex, pd.PeriodIndex)):
-                            benchmark = benchmark.tz_localize(None)
+                        if isinstance(benchmark.index, pd.DatetimeIndex):
+                            if benchmark.index.tz is not None:
+                                benchmark = benchmark.tz_convert("utc")
+                            if benchmark.index.tz is not None:
+                                benchmark = benchmark.tz_localize(None)
                         pass_kwargs["benchmark"] = benchmark
                     returns = returns.loc[~null_mask]
-                    if isinstance(returns.index, (pd.DatetimeIndex, pd.PeriodIndex)):
-                        returns = returns.tz_localize(None)
+                    if isinstance(returns.index, pd.DatetimeIndex):
+                        if returns.index.tz is not None:
+                            returns = returns.tz_convert("utc")
+                        if returns.index.tz is not None:
+                            returns = returns.tz_localize(None)
 
                     signature(_func).bind(returns=returns, **pass_kwargs)
                     return _func(returns=returns, **pass_kwargs)
