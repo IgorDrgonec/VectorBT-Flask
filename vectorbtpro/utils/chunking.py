@@ -275,20 +275,7 @@ def yield_chunk_meta(
     """Yield meta of each successive chunk from a sequence with a number of elements.
 
     If both `n_chunks` and `chunk_len` are None (after resolving them from settings),
-    sets `n_chunks` to the number of cores.
-
-    For defaults, see `vectorbtpro._settings.chunking`."""
-    from vectorbtpro._settings import settings
-
-    chunking_cfg = settings["chunking"]
-
-    if min_size is None:
-        min_size = chunking_cfg["min_size"]
-    if n_chunks is None:
-        n_chunks = chunking_cfg["n_chunks"]
-    if chunk_len is None:
-        chunk_len = chunking_cfg["chunk_len"]
-
+    sets `n_chunks` to the number of cores."""
     if size is not None and min_size is not None and size < min_size:
         yield ChunkMeta(uuid=str(uuid.uuid4()), idx=0, start=0, end=size, indices=None)
     else:

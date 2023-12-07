@@ -1909,6 +1909,211 @@ class TestParams:
             ("c", "f", 1): vbt.Param([1, 2, 3]),
         }
 
+    def test_combine_params(self):
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(2)),
+                "b": vbt.Param(np.arange(2)),
+                "c": vbt.Param(np.arange(2))
+            },
+            build_grid=False,
+        )[0]
+        assert param_product["a"] == [0, 0, 0, 0, 1, 1, 1, 1]
+        assert param_product["b"] == [0, 0, 1, 1, 0, 0, 1, 1]
+        assert param_product["c"] == [0, 1, 0, 1, 0, 1, 0, 1]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(1000)),
+                "b": vbt.Param(np.arange(1000)),
+                "c": vbt.Param(np.arange(1000))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+        )[0]
+        assert param_product["a"] == [85, 94, 201, 433, 438, 526, 654, 697, 773, 858]
+        assert param_product["b"] == [945, 177, 469, 15, 878, 478, 571, 368, 956, 597]
+        assert param_product["c"] == [638, 347, 535, 233, 436, 978, 513, 26, 41, 915]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(1000)),
+                "b": vbt.Param(np.arange(1000)),
+                "c": vbt.Param(np.arange(1000))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+            random_sort=False,
+        )[0]
+        assert param_product["a"] == [654, 433, 201, 773, 438, 858, 85, 94, 697, 526]
+        assert param_product["b"] == [571, 15, 469, 956, 878, 597, 945, 177, 368, 478]
+        assert param_product["c"] == [513, 233, 535, 41, 436, 915, 638, 347, 26, 978]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(1000)),
+                "b": vbt.Param(np.arange(1000)),
+                "c": vbt.Param(np.arange(1000))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+            grid_indices=slice(None, None, 1000),
+        )[0]
+        assert param_product["a"] == [85, 89, 94, 201, 433, 438, 654, 697, 773, 858]
+        assert param_product["b"] == [945, 250, 177, 469, 13, 875, 566, 366, 949, 594]
+        assert param_product["c"] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(1000), condition="a > b"),
+                "b": vbt.Param(np.arange(1000), condition="b > c"),
+                "c": vbt.Param(np.arange(1000))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+        )[0]
+        assert param_product["a"] == [450, 475, 700, 781, 786, 822, 858, 905, 922, 967]
+        assert param_product["b"] == [227, 330, 354, 643, 513, 545, 827, 370, 744, 410]
+        assert param_product["c"] == [92, 226, 67, 402, 128, 443, 276, 76, 366, 325]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(1000), condition="a > b"),
+                "b": vbt.Param(np.arange(1000), condition="b > c"),
+                "c": vbt.Param(np.arange(1000))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+            random_sort=False,
+        )[0]
+        assert param_product["a"] == [786, 781, 822, 450, 858, 700, 922, 967, 905, 475]
+        assert param_product["b"] == [513, 643, 545, 227, 827, 354, 744, 410, 370, 330]
+        assert param_product["c"] == [128, 402, 443, 92, 276, 67, 366, 325, 76, 226]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(5), condition="a > b"),
+                "b": vbt.Param(np.arange(5), condition="b > c"),
+                "c": vbt.Param(np.arange(5))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+            random_replace=False,
+        )[0]
+        assert param_product["a"] == [2, 3, 3, 3, 4, 4, 4, 4, 4, 4]
+        assert param_product["b"] == [1, 1, 2, 2, 1, 2, 2, 3, 3, 3]
+        assert param_product["c"] == [0, 0, 0, 1, 0, 0, 1, 0, 1, 2]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(5), condition="a > b"),
+                "b": vbt.Param(np.arange(5), condition="b > c"),
+                "c": vbt.Param(np.arange(5))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+            random_replace=True,
+        )[0]
+        assert param_product["a"] == [2, 2, 3, 3, 4, 4, 4, 4, 4, 4]
+        assert param_product["b"] == [1, 1, 1, 2, 1, 1, 2, 2, 3, 3]
+        assert param_product["c"] == [0, 0, 0, 0, 0, 0, 0, 1, 1, 1]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(5), condition="a > b"),
+                "b": vbt.Param(np.arange(5), condition="b > c"),
+                "c": vbt.Param(np.arange(5))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+            random_replace=True,
+            max_guesses=2.0,
+        )[0]
+        assert param_product["a"] == [2, 3, 3]
+        assert param_product["b"] == [1, 1, 2]
+        assert param_product["c"] == [0, 0, 0]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(5), condition="a > b"),
+                "b": vbt.Param(np.arange(5), condition="b > c"),
+                "c": vbt.Param(np.arange(5))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+            random_replace=True,
+            max_misses=2.0,
+        )[0]
+        assert param_product["a"] == [2, 3, 3, 4, 4, 4]
+        assert param_product["b"] == [1, 1, 2, 1, 2, 3]
+        assert param_product["c"] == [0, 0, 0, 0, 1, 1]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(1000), condition="a > b"),
+                "b": vbt.Param(np.arange(1000), condition="b > c"),
+                "c": vbt.Param(np.arange(1000))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+            grid_indices=slice(None, None, 1000),
+        )[0]
+        assert param_product["a"] == [228, 368, 777, 780, 784, 966, 970, 982, 982, 995]
+        assert param_product["b"] == [106, 65, 281, 379, 709, 161, 98, 561, 863, 122]
+        assert param_product["c"] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(2)),
+                "b": vbt.Param(np.arange(2)),
+                "c": vbt.Param(np.arange(2))
+            },
+            build_grid=True,
+        )[0]
+        assert param_product["a"] == [0, 0, 0, 0, 1, 1, 1, 1]
+        assert param_product["b"] == [0, 0, 1, 1, 0, 0, 1, 1]
+        assert param_product["c"] == [0, 1, 0, 1, 0, 1, 0, 1]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(2)),
+                "b": vbt.Param(np.arange(2)),
+                "c": vbt.Param(np.arange(2))
+            },
+            build_grid=True,
+            grid_indices=slice(None, None, 2),
+        )[0]
+        assert param_product["a"] == [0, 0, 1, 1]
+        assert param_product["b"] == [0, 1, 0, 1]
+        assert param_product["c"] == [0, 0, 0, 0]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(5), condition="a > b"),
+                "b": vbt.Param(np.arange(5), condition="b > c"),
+                "c": vbt.Param(np.arange(5))
+            },
+            build_grid=True,
+            seed=seed,
+            random_subset=10,
+            random_replace=False,
+        )[0]
+        assert param_product["a"] == [2, 3, 3, 3, 4, 4, 4, 4, 4, 4]
+        assert param_product["b"] == [1, 1, 2, 2, 1, 2, 2, 3, 3, 3]
+        assert param_product["c"] == [0, 0, 0, 1, 0, 0, 1, 0, 1, 2]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(5), condition="a > b"),
+                "b": vbt.Param(np.arange(5), condition="b > c"),
+                "c": vbt.Param(np.arange(5))
+            },
+            build_grid=True,
+            seed=seed,
+            random_subset=10,
+            random_replace=True,
+        )[0]
+        assert param_product["a"] == [2, 2, 2, 3, 4, 4, 4, 4, 4, 4]
+        assert param_product["b"] == [1, 1, 1, 2, 1, 1, 2, 2, 3, 3]
+        assert param_product["c"] == [0, 0, 0, 0, 0, 0, 1, 1, 0, 1]
+
     def test_parameterized(self):
         def f(a, *my_args, b=2, **my_kwargs):
             return a, my_args, b, my_kwargs
@@ -1952,6 +2157,7 @@ class TestParams:
                 names=["c_d_1_e", "f_1"],
             ),
         )
+
         assert fp(1, **kwargs, _selection=1) == (1, (), 2, {"c": dict(d=(2, dict(e=3))), "f": (5, 7)})
         assert fp(1, **kwargs, _selection=1, _skip_single_comb=False)[0] == [
             (1, (), 2, {"c": dict(d=(2, dict(e=3))), "f": (5, 7)}),

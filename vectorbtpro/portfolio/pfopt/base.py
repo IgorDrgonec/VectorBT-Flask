@@ -2014,6 +2014,7 @@ class PortfolioOptimizer(Analyzable):
             parameterizer_cls = params_cfg["parameterizer_cls"]
         if parameterizer_cls is None:
             parameterizer_cls = Parameterizer
+        param_search_kwargs = merge_dicts(params_cfg["param_search_kwargs"], param_search_kwargs)
         if index_stack_kwargs is None:
             index_stack_kwargs = {}
         if pbar_kwargs is None:
@@ -2070,8 +2071,6 @@ class PortfolioOptimizer(Analyzable):
             **{f"args_{i}": args[i] for i in range(len(args))},
             **kwargs,
         }
-        if param_search_kwargs is None:
-            param_search_kwargs = {}
         param_dct = parameterizer_cls.find_params_in_obj(paramable_kwargs, **param_search_kwargs)
         param_columns = None
         if len(param_dct) > 0:
@@ -2814,6 +2813,7 @@ class PortfolioOptimizer(Analyzable):
             parameterizer_cls = params_cfg["parameterizer_cls"]
         if parameterizer_cls is None:
             parameterizer_cls = Parameterizer
+        param_search_kwargs = merge_dicts(params_cfg["param_search_kwargs"], param_search_kwargs)
         if index_stack_kwargs is None:
             index_stack_kwargs = {}
         if pbar_kwargs is None:
@@ -2876,8 +2876,6 @@ class PortfolioOptimizer(Analyzable):
             **{f"args_{i}": args[i] for i in range(len(args))},
             **kwargs,
         }
-        if param_search_kwargs is None:
-            param_search_kwargs = {}
         param_dct = parameterizer_cls.find_params_in_obj(paramable_kwargs, **param_search_kwargs)
         param_columns = None
         if len(param_dct) > 0:
