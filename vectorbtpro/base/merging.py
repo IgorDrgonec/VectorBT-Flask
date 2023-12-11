@@ -96,6 +96,17 @@ def concat_merge(
         wrap = wrapper is not None or keys is not None or len(wrap_kwargs) > 0
     if not checks.is_iterable(objs[0]) or isinstance(objs[0], str):
         if wrap:
+            if keys is not None and isinstance(keys[0], pd.Index):
+                if len(keys) == 1:
+                    keys = keys[0]
+                else:
+                    keys = concat_indexes(
+                        *keys,
+                        index_concat_method="append",
+                        index_stack_kwargs=index_stack_kwargs,
+                        verify_integrity=False,
+                        axis=0,
+                    )
             wrap_kwargs = merge_dicts(dict(index=keys), wrap_kwargs)
             return pd.Series(objs, **wrap_kwargs)
         return np.asarray(objs)
