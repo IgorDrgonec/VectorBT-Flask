@@ -864,12 +864,13 @@ data = frozen_cfg(
             silence_warnings=False,
         ),
         av=flex_cfg(
+            use_parser=None,
             apikey=None,
             api_meta=None,
             category=None,
             function=None,
             timeframe=None,
-            tz="utc",
+            tz=None,
             adjusted=False,
             extended=False,
             slice="year1month1",
@@ -879,7 +880,6 @@ data = frozen_cfg(
             read_csv_kwargs=flex_cfg(
                 index_col=0,
                 parse_dates=True,
-                infer_datetime_format=True,
             ),
             match_params=True,
             params=flex_cfg(),

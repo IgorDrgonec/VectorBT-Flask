@@ -70,6 +70,7 @@ data = [
     "polygon-api-client>=1.0.0",
     "beautifulsoup4",
     "nasdaq-data-link",
+    "alpha_vantage",
 ]
 ind-base = ["TA-Lib"]
 ind = ["vectorbtpro[ind-base]", "ta", "pandas_ta", "technical"]

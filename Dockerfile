@@ -56,6 +56,7 @@ RUN pip install --quiet --no-cache-dir \
     'polygon-api-client>=1.0.0' \
     'beautifulsoup4' \
     'nasdaq-data-link' \
+    'alpha_vantage' \
     'TA-Lib==0.4.21' \
     'ta' \
     'pandas_ta' \

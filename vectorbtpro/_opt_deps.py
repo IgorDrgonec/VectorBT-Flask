@@ -153,6 +153,9 @@ opt_dep_config = HybridConfig(
         tabulate=dict(
             link="https://pypi.org/project/tabulate/",
         ),
+        alpha_vantage=dict(
+            link="https://pypi.org/project/alpha_vantage/",
+        ),
     )
 )
 """_"""
