@@ -29,7 +29,7 @@ RUN pip install --quiet --no-cache-dir 'pybind11'
 RUN pip install --quiet --no-cache-dir --ignore-installed 'llvmlite'
 
 RUN pip install --quiet --no-cache-dir \
-    'numpy==1.23.3' \
+    'numpy==1.23.5' \
     'pandas>=1.5.0' \
     'numba==0.56.4' \
     'scipy' \
@@ -57,6 +57,7 @@ RUN pip install --quiet --no-cache-dir \
     'beautifulsoup4' \
     'nasdaq-data-link' \
     'alpha_vantage' \
+    'databento' \
     'TA-Lib==0.4.21' \
     'ta' \
     'pandas_ta' \

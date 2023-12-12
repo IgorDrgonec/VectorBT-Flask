@@ -925,6 +925,21 @@ data = frozen_cfg(
                 scanner_kwargs=flex_cfg(),
             ),
         ),
+        bento=flex_cfg(
+            client=None,
+            client_config=flex_cfg(
+                key=None,
+            ),
+            start=None,
+            end=None,
+            resolve_dates=True,
+            timeframe=None,
+            tz="utc",
+            dataset=None,
+            schema=None,
+            df_kwargs=flex_cfg(),
+            params=flex_cfg(),
+        ),
     ),
     stats=flex_cfg(
         filters=flex_cfg(

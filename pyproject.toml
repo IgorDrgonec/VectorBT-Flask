@@ -71,6 +71,7 @@ data = [
     "beautifulsoup4",
     "nasdaq-data-link",
     "alpha_vantage",
+    "databento",
 ]
 ind-base = ["TA-Lib"]
 ind = ["vectorbtpro[ind-base]", "ta", "pandas_ta", "technical"]

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from vectorbtpro.data.custom.alpaca import *
     from vectorbtpro.data.custom.av import *
+    from vectorbtpro.data.custom.bento import *
     from vectorbtpro.data.custom.binance import *
     from vectorbtpro.data.custom.ccxt import *
     from vectorbtpro.data.custom.csv import *
