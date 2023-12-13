@@ -21,7 +21,7 @@ __all__ = [
 
 
 class BentoData(RemoteData):
-    """Data class for fetching from DataBento.
+    """Data class for fetching from Databento.
 
     See https://github.com/databento/databento-python for API.
 
@@ -127,7 +127,7 @@ class BentoData(RemoteData):
         df_kwargs: tp.KwargsLike = None,
         **params,
     ) -> tp.Union[float, tp.SymbolData]:
-        """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from DataBento.
+        """Override `vectorbtpro.data.base.Data.fetch_symbol` to fetch a symbol from Databento.
 
         Args:
             symbol (str): Symbol.
