@@ -2837,7 +2837,14 @@ class TestData:
         data = MyData.pull(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented()
 
         def _load_and_check_symbol(k, name, engine_url, **kwargs):
-            df = pd.read_sql_table(name, engine_url, index_col="index", **kwargs).squeeze("columns")
+            from sqlalchemy import create_engine
+
+            df = pd.read_sql_table(
+                name,
+                create_engine(engine_url).connect(),
+                index_col="index",
+                **kwargs,
+            ).squeeze("columns")
             df.index.freq = df.index.inferred_freq
             df.index.name = None
             df = df.tz_localize("utc")
@@ -2861,7 +2868,14 @@ class TestData:
         data = MyData.pull(["S1", "S2", "S3"], shape=(5, 2), columns=["F1", "F2"]).to_feature_oriented()
 
         def _load_and_check_feature(k, name, engine_url, **kwargs):
-            df = pd.read_sql_table(name, engine_url, index_col="index", **kwargs).squeeze("columns")
+            from sqlalchemy import create_engine
+
+            df = pd.read_sql_table(
+                name,
+                create_engine(engine_url).connect(),
+                index_col="index",
+                **kwargs,
+            ).squeeze("columns")
             df.index.freq = df.index.inferred_freq
             df.index.name = None
             df = df.tz_localize("utc")
