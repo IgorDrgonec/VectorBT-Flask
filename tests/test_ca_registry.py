@@ -961,66 +961,66 @@ class TestCacheableRegistry:
             "creation_time",
             "last_update_time",
         ]
-        status_overview = query_delegator.get_status_overview(readable=False, short_str=False)
-        assert_index_equal(status_overview.columns, pd.Index(columns))
-        np.testing.assert_array_equal(status_overview.index.values, np.array([str(class_setup1)]))
-        np.testing.assert_array_equal(status_overview["hash"].values, np.array([hash(class_setup1)]))
-        np.testing.assert_array_equal(status_overview["use_cache"].values, np.array([class_setup1.use_cache]))
-        np.testing.assert_array_equal(status_overview["whitelist"].values, np.array([class_setup1.whitelist]))
+        stats = query_delegator.get_stats(readable=False, short_str=False)
+        assert_index_equal(stats.columns, pd.Index(columns))
+        np.testing.assert_array_equal(stats.index.values, np.array([str(class_setup1)]))
+        np.testing.assert_array_equal(stats["hash"].values, np.array([hash(class_setup1)]))
+        np.testing.assert_array_equal(stats["use_cache"].values, np.array([class_setup1.use_cache]))
+        np.testing.assert_array_equal(stats["whitelist"].values, np.array([class_setup1.whitelist]))
         np.testing.assert_array_equal(
-            status_overview["caching_enabled"].values,
+            stats["caching_enabled"].values,
             np.array([class_setup1.caching_enabled]),
         )
-        np.testing.assert_array_equal(status_overview["hits"].values, np.array([class_setup1.hits]))
-        np.testing.assert_array_equal(status_overview["misses"].values, np.array([class_setup1.misses]))
-        np.testing.assert_array_equal(status_overview["total_size"].values, np.array([class_setup1.total_size]))
+        np.testing.assert_array_equal(stats["hits"].values, np.array([class_setup1.hits]))
+        np.testing.assert_array_equal(stats["misses"].values, np.array([class_setup1.misses]))
+        np.testing.assert_array_equal(stats["total_size"].values, np.array([class_setup1.total_size]))
         np.testing.assert_array_equal(
-            status_overview["total_elapsed"].values,
+            stats["total_elapsed"].values,
             pd.to_timedelta(np.array([class_setup1.total_elapsed])),
         )
         np.testing.assert_array_equal(
-            status_overview["total_saved"].values,
+            stats["total_saved"].values,
             pd.to_timedelta(np.array([class_setup1.total_saved])),
         )
         np.testing.assert_array_equal(
-            status_overview["first_run_time"].values,
+            stats["first_run_time"].values,
             pd.to_datetime([class_setup1.first_run_time]).values,
         )
         np.testing.assert_array_equal(
-            status_overview["last_run_time"].values,
+            stats["last_run_time"].values,
             pd.to_datetime([class_setup1.last_run_time]).values,
         )
         np.testing.assert_array_equal(
-            status_overview["first_hit_time"].values,
+            stats["first_hit_time"].values,
             pd.to_datetime([class_setup1.first_hit_time]).values,
         )
         np.testing.assert_array_equal(
-            status_overview["last_hit_time"].values,
+            stats["last_hit_time"].values,
             pd.to_datetime([class_setup1.last_hit_time]).values,
         )
         np.testing.assert_array_equal(
-            status_overview["creation_time"].values,
+            stats["creation_time"].values,
             pd.to_datetime([class_setup1.creation_time]).values,
         )
         np.testing.assert_array_equal(
-            status_overview["last_update_time"].values,
+            stats["last_update_time"].values,
             pd.to_datetime([class_setup1.last_update_time]).values,
         )
 
-        status_overview = query_delegator.get_status_overview()
-        assert_index_equal(status_overview.columns, pd.Index(columns))
-        status_overview = query_delegator.get_status_overview(include=columns)
-        assert_index_equal(status_overview.columns, pd.Index(columns))
-        status_overview = query_delegator.get_status_overview(include=columns[0])
-        assert_index_equal(status_overview.columns, pd.Index([columns[0]]))
-        status_overview = query_delegator.get_status_overview(include=[columns[0]])
-        assert_index_equal(status_overview.columns, pd.Index([columns[0]]))
-        status_overview = query_delegator.get_status_overview(exclude=columns)
-        assert status_overview is None
-        status_overview = query_delegator.get_status_overview(exclude=columns[0])
-        assert_index_equal(status_overview.columns, pd.Index(columns[1:]))
-        status_overview = query_delegator.get_status_overview(exclude=[columns[0]])
-        assert_index_equal(status_overview.columns, pd.Index(columns[1:]))
+        stats = query_delegator.get_stats()
+        assert_index_equal(stats.columns, pd.Index(columns))
+        stats = query_delegator.get_stats(include=columns)
+        assert_index_equal(stats.columns, pd.Index(columns))
+        stats = query_delegator.get_stats(include=columns[0])
+        assert_index_equal(stats.columns, pd.Index([columns[0]]))
+        stats = query_delegator.get_stats(include=[columns[0]])
+        assert_index_equal(stats.columns, pd.Index([columns[0]]))
+        stats = query_delegator.get_stats(exclude=columns)
+        assert stats is None
+        stats = query_delegator.get_stats(exclude=columns[0])
+        assert_index_equal(stats.columns, pd.Index(columns[1:]))
+        stats = query_delegator.get_stats(exclude=[columns[0]])
+        assert_index_equal(stats.columns, pd.Index(columns[1:]))
 
     def test_disable_machinery(self):
         vbt.settings["caching"]["disable_machinery"] = True
