@@ -134,6 +134,8 @@ def params_to_list(params: tp.Params, is_tuple: bool, is_array_like: bool) -> li
         check_against.append(np.ndarray)
     if isinstance(params, tuple(check_against)):
         new_params = list(params)
+    elif isinstance(params, range):
+        new_params = list(params)
     else:
         new_params = [params]
     return new_params
@@ -322,6 +324,8 @@ def combine_params(
     contexts = {}
     names = {}
     for k, p in param_dct.items():
+        if not isinstance(p, Param):
+            p = Param(p)
         if p.condition is not None:
             conditions[k] = p.condition
             if p.context is not None:

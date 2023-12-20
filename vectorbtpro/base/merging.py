@@ -2,7 +2,6 @@
 
 """Functions for merging arrays."""
 
-import attr
 from functools import partial
 
 import numpy as np
@@ -93,7 +92,7 @@ def concat_merge(
     if wrap_kwargs is None:
         wrap_kwargs = {}
     if wrap is None:
-        wrap = wrapper is not None or keys is not None or len(wrap_kwargs) > 0
+        wrap = isinstance(objs[0], pd.Series) or wrapper is not None or keys is not None or len(wrap_kwargs) > 0
     if not checks.is_iterable(objs[0]) or isinstance(objs[0], str):
         if wrap:
             if keys is not None and isinstance(keys[0], pd.Index):
@@ -130,8 +129,9 @@ def concat_merge(
                 if default_index and not checks.is_default_index(new_objs[-1].index, check_names=True):
                     default_index = False
             objs = new_objs
-        else:
-            return np.concatenate(objs)
+
+    if not wrap:
+        return np.concatenate(objs)
 
     if keys is not None and isinstance(keys[0], pd.Index):
         new_obj = pd.concat(objs, axis=0, **kwargs)
@@ -226,7 +226,12 @@ def row_stack_merge(
     if wrap_kwargs is None:
         wrap_kwargs = {}
     if wrap is None:
-        wrap = wrapper is not None or keys is not None or len(wrap_kwargs) > 0
+        wrap = (
+            isinstance(objs[0], (pd.Series, pd.DataFrame))
+            or wrapper is not None
+            or keys is not None
+            or len(wrap_kwargs) > 0
+        )
     if isinstance(objs[0], pd.Index):
         objs = list(map(lambda x: x.to_series(), objs))
 
@@ -258,8 +263,9 @@ def row_stack_merge(
                 if default_index and not checks.is_default_index(new_objs[-1].index, check_names=True):
                     default_index = False
             objs = new_objs
-        else:
-            return np.row_stack(objs)
+
+    if not wrap:
+        return np.row_stack(objs)
 
     if keys is not None and isinstance(keys[0], pd.Index):
         new_obj = pd.concat(objs, axis=0, **kwargs)
@@ -385,7 +391,12 @@ def column_stack_merge(
     if wrap_kwargs is None:
         wrap_kwargs = {}
     if wrap is None:
-        wrap = wrapper is not None or keys is not None or len(wrap_kwargs) > 0
+        wrap = (
+            isinstance(objs[0], (pd.Series, pd.DataFrame))
+            or wrapper is not None
+            or keys is not None
+            or len(wrap_kwargs) > 0
+        )
     if isinstance(objs[0], pd.Index):
         objs = list(map(lambda x: x.to_series(), objs))
 
@@ -421,35 +432,36 @@ def column_stack_merge(
                 ):
                     default_columns = False
             objs = new_objs
-        else:
-            if reset_index is not None:
-                min_n_rows = None
-                max_n_rows = None
-                n_cols = 0
-                new_objs = []
-                for obj in objs:
-                    new_obj = to_2d_array(obj)
-                    new_objs.append(new_obj)
-                    if min_n_rows is None or new_obj.shape[0] < min_n_rows:
-                        min_n_rows = new_obj.shape[0]
-                    if max_n_rows is None or new_obj.shape[0] > min_n_rows:
-                        max_n_rows = new_obj.shape[0]
-                    n_cols += new_obj.shape[1]
-                if min_n_rows == max_n_rows:
-                    return column_stack(new_objs)
-                new_obj = np.full((max_n_rows, n_cols), fill_value)
-                start_col = 0
-                for obj in new_objs:
-                    end_col = start_col + obj.shape[1]
-                    if isinstance(reset_index, str) and reset_index.lower() == "from_start":
-                        new_obj[: len(obj), start_col:end_col] = obj
-                    elif isinstance(reset_index, str) and reset_index.lower() == "from_end":
-                        new_obj[-len(obj) :, start_col:end_col] = obj
-                    else:
-                        raise ValueError(f"Invalid index resetting option '{reset_index}'")
-                    start_col = end_col
-                return new_obj
-            return column_stack(objs)
+
+    if not wrap:
+        if reset_index is not None:
+            min_n_rows = None
+            max_n_rows = None
+            n_cols = 0
+            new_objs = []
+            for obj in objs:
+                new_obj = to_2d_array(obj)
+                new_objs.append(new_obj)
+                if min_n_rows is None or new_obj.shape[0] < min_n_rows:
+                    min_n_rows = new_obj.shape[0]
+                if max_n_rows is None or new_obj.shape[0] > min_n_rows:
+                    max_n_rows = new_obj.shape[0]
+                n_cols += new_obj.shape[1]
+            if min_n_rows == max_n_rows:
+                return column_stack(new_objs)
+            new_obj = np.full((max_n_rows, n_cols), fill_value)
+            start_col = 0
+            for obj in new_objs:
+                end_col = start_col + obj.shape[1]
+                if isinstance(reset_index, str) and reset_index.lower() == "from_start":
+                    new_obj[: len(obj), start_col:end_col] = obj
+                elif isinstance(reset_index, str) and reset_index.lower() == "from_end":
+                    new_obj[-len(obj) :, start_col:end_col] = obj
+                else:
+                    raise ValueError(f"Invalid index resetting option '{reset_index}'")
+                start_col = end_col
+            return new_obj
+        return column_stack(objs)
 
     if reset_index is not None:
         max_length = max(map(len, objs))
@@ -606,9 +618,7 @@ merge_func_config = HybridConfig(
 )
 """_"""
 
-__pdoc__[
-    "merge_func_config"
-] = f"""Config for merging functions.
+__pdoc__["merge_func_config"] = f"""Config for merging functions.
 
 ```python
 {merge_func_config.prettify()}
@@ -646,4 +656,3 @@ def is_merge_func_from_config(merge_func: tp.MergeFuncLike) -> bool:
     if isinstance(merge_func, MergeFunc):
         return is_merge_func_from_config(merge_func.merge_func)
     return False
-

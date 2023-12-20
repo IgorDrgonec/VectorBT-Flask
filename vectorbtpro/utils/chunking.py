@@ -33,7 +33,7 @@ __all__ = [
     "ShapeSizer",
     "ArraySizer",
     "ChunkMapper",
-    "DontChunk",
+    "NotChunked",
     "ChunkTaker",
     "ChunkSelector",
     "ChunkSlicer",
@@ -280,7 +280,7 @@ def yield_chunk_meta(
         yield ChunkMeta(uuid=str(uuid.uuid4()), idx=0, start=0, end=size, indices=None)
     else:
         if n_chunks is None and chunk_len is None and size is None:
-            raise ValueError("Must provide at least n_chunks, chunk_len, or size")
+            n_chunks = 1
         if n_chunks is None and chunk_len is None:
             n_chunks = "auto"
         if n_chunks is not None and chunk_len is not None:
@@ -310,7 +310,7 @@ def yield_chunk_meta(
                 for i in range(n_chunks):
                     yield ChunkMeta(uuid=str(uuid.uuid4()), idx=i, start=None, end=None, indices=None)
         if chunk_len is not None:
-            checks.assert_not_none(size)
+            checks.assert_not_none(size, arg_name="size")
             if isinstance(chunk_len, str):
                 if chunk_len.lower() == "auto":
                     chunk_len = multiprocessing.cpu_count()
@@ -369,7 +369,7 @@ class ChunkMapper:
 
 
 @attr.s(frozen=True)
-class DontChunk(Annotatable):
+class NotChunked(Annotatable):
     """Class that represents an argument that shouldn't be chunked."""
 
 
@@ -1231,7 +1231,7 @@ class Chunker(Configured):
             take_spec = take_spec()
         if isinstance(take_spec, Chunkable):
             take_spec = take_spec.get_take_spec()
-        if isinstance(take_spec, type) and issubclass(take_spec, (DontChunk, ChunkTaker)):
+        if isinstance(take_spec, type) and issubclass(take_spec, (NotChunked, ChunkTaker)):
             take_spec = take_spec()
         return take_spec
 
@@ -1239,14 +1239,14 @@ class Chunker(Configured):
     def take_from_arg(cls, arg: tp.Any, take_spec: tp.TakeSpec, chunk_meta: ChunkMeta, **kwargs) -> tp.Any:
         """Take from the argument given the specification `take_spec`.
 
-        If `take_spec` is None or it's an instance of `DontChunk`, returns the original object.
+        If `take_spec` is None or it's an instance of `NotChunked`, returns the original object.
         Otherwise, must be an instance of `ChunkTaker`.
 
         `**kwargs` are passed to `ChunkTaker.apply`."""
         if take_spec is None:
             return arg
         take_spec = cls.resolve_take_spec(take_spec)
-        if isinstance(take_spec, DontChunk):
+        if isinstance(take_spec, NotChunked):
             return arg
         if isinstance(take_spec, ChunkTaker):
             return take_spec.apply(arg, chunk_meta, **kwargs)
@@ -1537,6 +1537,15 @@ class Chunker(Configured):
         return arg_take_spec
 
     @classmethod
+    def fill_arg_take_spec(cls, arg_take_spec: tp.ArgTakeSpec, ann_args: tp.AnnArgs) -> tp.ArgTakeSpec:
+        """Fill the chunk taking specification with None to avoid warnings."""
+        arg_take_spec = dict(arg_take_spec)
+        for k, v in ann_args.items():
+            if k not in arg_take_spec:
+                arg_take_spec[k] = None
+        return arg_take_spec
+
+    @classmethod
     def adapt_ann_args(cls, ann_args: tp.AnnArgs) -> tp.AnnArgs:
         """Adapt annotated arguments."""
         new_ann_args = {}
@@ -1624,9 +1633,12 @@ class Chunker(Configured):
         if arg_take_spec is None:
             arg_take_spec = {}
         if checks.is_mapping(arg_take_spec):
+            main_arg_take_spec = dict(arg_take_spec)
             arg_take_spec = dict(arg_take_spec)
             if "chunk_meta" not in arg_take_spec:
                 arg_take_spec["chunk_meta"] = None
+        else:
+            main_arg_take_spec = None
 
         if forward_kwargs_as is None:
             forward_kwargs_as = {}
@@ -1674,7 +1686,6 @@ class Chunker(Configured):
                     f"Two conflicting merge functions: {parsed_merge_func} (annotations) and {merge_func} (merge_func)"
                 )
             merge_func = parsed_merge_func
-
         ann_args = annotate_args(self.func, args, kwargs)
         parsed_arg_take_spec = self.parse_spec_from_args(ann_args)
         if len(parsed_arg_take_spec) > 0:
@@ -1684,6 +1695,8 @@ class Chunker(Configured):
                     f"and {arg_take_spec} (arg_take_spec & annotations)"
                 )
             arg_take_spec = {**parsed_arg_take_spec, **arg_take_spec}
+        if main_arg_take_spec is not None and len(main_arg_take_spec) == 0 and len(arg_take_spec) > 0:
+            arg_take_spec = self.fill_arg_take_spec(arg_take_spec, ann_args)
         ann_args = self.adapt_ann_args(ann_args)
         args, kwargs = ann_args_to_args(ann_args)
         template_context["chunker"] = self

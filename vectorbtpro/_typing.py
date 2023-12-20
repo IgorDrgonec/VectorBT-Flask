@@ -35,7 +35,7 @@ except ImportError:
 if TYPE_CHECKING:
     from vectorbtpro.utils.parsing import Regex
     from vectorbtpro.utils.execution import ExecutionEngine
-    from vectorbtpro.utils.chunking import Sizer, DontChunk, ChunkTaker, ChunkMeta, ChunkMetaGenerator
+    from vectorbtpro.utils.chunking import Sizer, NotChunked, ChunkTaker, ChunkMeta, ChunkMetaGenerator
     from vectorbtpro.utils.jitting import Jitter
     from vectorbtpro.utils.template import CustomTemplate
     from vectorbtpro.utils.datetime_ import DTC, DTCNT
@@ -49,7 +49,7 @@ else:
     Regex = "Regex"
     ExecutionEngine = "ExecutionEngine"
     Sizer = "Sizer"
-    DontChunk = "DontChunk"
+    NotChunked = "NotChunked"
     ChunkTaker = "ChunkTaker"
     ChunkMeta = "ChunkMeta"
     ChunkMetaGenerator = "ChunkMetaGenerator"
@@ -255,7 +255,7 @@ SizeFunc = Callable[[AnnArgs], int]
 SizeLike = Union[int, Sizer, SizeFunc]
 ChunkMetaFunc = Callable[[AnnArgs], Iterable[ChunkMeta]]
 ChunkMetaLike = Union[Iterable[ChunkMeta], ChunkMetaGenerator, ChunkMetaFunc]
-TakeSpec = Union[None, Type[DontChunk], Type[ChunkTaker], DontChunk, ChunkTaker]
+TakeSpec = Union[None, Type[NotChunked], Type[ChunkTaker], NotChunked, ChunkTaker]
 ArgTakeSpec = Mapping[AnnArgQuery, TakeSpec]
 ArgTakeSpecFunc = Callable[[AnnArgs, ChunkMeta], Tuple[Args, Kwargs]]
 ArgTakeSpecLike = Union[Sequence[TakeSpec], ArgTakeSpec, ArgTakeSpecFunc, CustomTemplate]

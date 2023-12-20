@@ -21,7 +21,7 @@ __pdoc__ = {}
 MergeFuncT = tp.TypeVar("MergeFuncT", bound="MergeFunc")
 
 
-@attr.s(frozen=True)
+@attr.s(frozen=True, init=False)
 class MergeFunc(Annotatable):
     """Class representing a merging function and its keyword arguments.
 
@@ -29,9 +29,7 @@ class MergeFunc(Annotatable):
     arguments attached) merging function."""
 
     merge_func: tp.MergeFuncLike = attr.ib()
-    """Merging function.
-    
-    Can be a name or a callable."""
+    """Merging function."""
 
     merge_kwargs: tp.KwargsLike = attr.ib(default=None)
     """Keyword arguments passed to the merging function."""
@@ -41,6 +39,29 @@ class MergeFunc(Annotatable):
 
     sub_id_prefix: str = attr.ib(default="")
     """Prefix for the substitution id."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        attr_names = [a.name for a in self.__attrs_attrs__]
+        if attr_names.index("merge_kwargs") < len(args):
+            new_args = list(args)
+            merge_kwargs = new_args[attr_names.index("merge_kwargs")]
+            if merge_kwargs is None:
+                merge_kwargs = {}
+            else:
+                merge_kwargs = dict(merge_kwargs)
+            merge_kwargs.update({k: kwargs.pop(k) for k in list(kwargs.keys()) if k not in attr_names})
+            new_args[attr_names.index("merge_kwargs")] = merge_kwargs
+            args = tuple(new_args)
+        else:
+            merge_kwargs = kwargs.pop("merge_kwargs", None)
+            if merge_kwargs is None:
+                merge_kwargs = {}
+            else:
+                merge_kwargs = dict(merge_kwargs)
+            merge_kwargs.update({k: kwargs.pop(k) for k in list(kwargs.keys()) if k not in attr_names})
+            kwargs["merge_kwargs"] = merge_kwargs
+
+        self.__attrs_init__(*args, **kwargs)
 
     def evolve(self: MergeFuncT, merge_kwargs: tp.KwargsLike = None, context: tp.KwargsLike = None) -> MergeFuncT:
         """Evolve the instance with new keyword arguments and context."""
