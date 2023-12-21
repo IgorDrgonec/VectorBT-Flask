@@ -887,12 +887,11 @@ data = frozen_cfg(
         ),
         ndl=flex_cfg(
             api_key=None,
+            data_format="dataset",
             start=None,
             end=None,
             tz="utc",
             column_indices=None,
-            collapse=None,
-            transform=None,
             params=flex_cfg(),
         ),
         tv=flex_cfg(
