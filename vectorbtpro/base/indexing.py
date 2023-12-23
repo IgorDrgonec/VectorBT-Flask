@@ -51,6 +51,10 @@ __all__ = [
 __pdoc__ = {}
 
 
+class _DEF:
+    pass
+
+
 class IndexingError(Exception):
     """Exception raised when an indexing error has occurred."""
 
@@ -489,10 +493,6 @@ def build_param_indexer(
 
 
 hsliceT = tp.TypeVar("hsliceT", bound="hslice")
-
-
-_DEF = object()
-"""Default value for internal purposes."""
 
 
 @attr.s(frozen=True, init=False)

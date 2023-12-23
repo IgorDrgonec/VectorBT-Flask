@@ -42,11 +42,11 @@ try:
 except:
     pathos_available = False
 
-mpire_available = True
-try:
-    import mpire
-except:
-    mpire_available = False
+mpire_available = False
+# try:
+#     import mpire
+# except:
+#     mpire_available = False
 
 dask_available = True
 try:
@@ -54,11 +54,11 @@ try:
 except:
     dask_available = False
 
-ray_available = True
-try:
-    import ray
-except:
-    ray_available = False
+ray_available = False
+# try:
+#     import ray
+# except:
+#     ray_available = False
 
 seed = 42
 
@@ -1897,17 +1897,222 @@ class TestParams:
         ]
 
     def test_find_params(self):
-        assert params.find_params_in_obj(
+        assert vbt.Parameterizer.find_params_in_obj(
             {
                 "a": 1,
-                "b": params.Param([1, 2, 3]),
-                "c": {"d": 2, "e": params.Param([1, 2, 3]), "f": (3, params.Param([1, 2, 3]))},
+                "b": vbt.Param([1, 2, 3]),
+                "c": {"d": 2, "e": vbt.Param([1, 2, 3]), "f": (3, vbt.Param([1, 2, 3]))},
             }
         ) == {
-            "b": params.Param([1, 2, 3]),
-            ("c", "e"): params.Param([1, 2, 3]),
-            ("c", "f", 1): params.Param([1, 2, 3]),
+            "b": vbt.Param([1, 2, 3]),
+            ("c", "e"): vbt.Param([1, 2, 3]),
+            ("c", "f", 1): vbt.Param([1, 2, 3]),
         }
+
+    def test_combine_params(self):
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(2)),
+                "b": vbt.Param(np.arange(2)),
+                "c": vbt.Param(np.arange(2))
+            },
+            build_grid=False,
+        )[0]
+        assert param_product["a"] == [0, 0, 0, 0, 1, 1, 1, 1]
+        assert param_product["b"] == [0, 0, 1, 1, 0, 0, 1, 1]
+        assert param_product["c"] == [0, 1, 0, 1, 0, 1, 0, 1]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(1000)),
+                "b": vbt.Param(np.arange(1000)),
+                "c": vbt.Param(np.arange(1000))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+        )[0]
+        assert param_product["a"] == [85, 94, 201, 433, 438, 526, 654, 697, 773, 858]
+        assert param_product["b"] == [945, 177, 469, 15, 878, 478, 571, 368, 956, 597]
+        assert param_product["c"] == [638, 347, 535, 233, 436, 978, 513, 26, 41, 915]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(1000)),
+                "b": vbt.Param(np.arange(1000)),
+                "c": vbt.Param(np.arange(1000))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+            random_sort=False,
+        )[0]
+        assert param_product["a"] == [654, 433, 201, 773, 438, 858, 85, 94, 697, 526]
+        assert param_product["b"] == [571, 15, 469, 956, 878, 597, 945, 177, 368, 478]
+        assert param_product["c"] == [513, 233, 535, 41, 436, 915, 638, 347, 26, 978]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(1000)),
+                "b": vbt.Param(np.arange(1000)),
+                "c": vbt.Param(np.arange(1000))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+            grid_indices=slice(None, None, 1000),
+        )[0]
+        assert param_product["a"] == [85, 89, 94, 201, 433, 438, 654, 697, 773, 858]
+        assert param_product["b"] == [945, 250, 177, 469, 13, 875, 566, 366, 949, 594]
+        assert param_product["c"] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(1000), condition="a > b"),
+                "b": vbt.Param(np.arange(1000), condition="b > c"),
+                "c": vbt.Param(np.arange(1000))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+        )[0]
+        assert param_product["a"] == [450, 475, 700, 781, 786, 822, 858, 905, 922, 967]
+        assert param_product["b"] == [227, 330, 354, 643, 513, 545, 827, 370, 744, 410]
+        assert param_product["c"] == [92, 226, 67, 402, 128, 443, 276, 76, 366, 325]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(1000), condition="a > b"),
+                "b": vbt.Param(np.arange(1000), condition="b > c"),
+                "c": vbt.Param(np.arange(1000))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+            random_sort=False,
+        )[0]
+        assert param_product["a"] == [786, 781, 822, 450, 858, 700, 922, 967, 905, 475]
+        assert param_product["b"] == [513, 643, 545, 227, 827, 354, 744, 410, 370, 330]
+        assert param_product["c"] == [128, 402, 443, 92, 276, 67, 366, 325, 76, 226]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(5), condition="a > b"),
+                "b": vbt.Param(np.arange(5), condition="b > c"),
+                "c": vbt.Param(np.arange(5))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+            random_replace=False,
+        )[0]
+        assert param_product["a"] == [2, 3, 3, 3, 4, 4, 4, 4, 4, 4]
+        assert param_product["b"] == [1, 1, 2, 2, 1, 2, 2, 3, 3, 3]
+        assert param_product["c"] == [0, 0, 0, 1, 0, 0, 1, 0, 1, 2]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(5), condition="a > b"),
+                "b": vbt.Param(np.arange(5), condition="b > c"),
+                "c": vbt.Param(np.arange(5))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+            random_replace=True,
+        )[0]
+        assert param_product["a"] == [2, 2, 3, 3, 4, 4, 4, 4, 4, 4]
+        assert param_product["b"] == [1, 1, 1, 2, 1, 1, 2, 2, 3, 3]
+        assert param_product["c"] == [0, 0, 0, 0, 0, 0, 0, 1, 1, 1]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(5), condition="a > b"),
+                "b": vbt.Param(np.arange(5), condition="b > c"),
+                "c": vbt.Param(np.arange(5))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+            random_replace=True,
+            max_guesses=2.0,
+        )[0]
+        assert param_product["a"] == [2, 3, 3]
+        assert param_product["b"] == [1, 1, 2]
+        assert param_product["c"] == [0, 0, 0]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(5), condition="a > b"),
+                "b": vbt.Param(np.arange(5), condition="b > c"),
+                "c": vbt.Param(np.arange(5))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+            random_replace=True,
+            max_misses=2.0,
+        )[0]
+        assert param_product["a"] == [2, 3, 3, 4, 4, 4]
+        assert param_product["b"] == [1, 1, 2, 1, 2, 3]
+        assert param_product["c"] == [0, 0, 0, 0, 1, 1]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(1000), condition="a > b"),
+                "b": vbt.Param(np.arange(1000), condition="b > c"),
+                "c": vbt.Param(np.arange(1000))
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+            grid_indices=slice(None, None, 1000),
+        )[0]
+        assert param_product["a"] == [228, 368, 777, 780, 784, 966, 970, 982, 982, 995]
+        assert param_product["b"] == [106, 65, 281, 379, 709, 161, 98, 561, 863, 122]
+        assert param_product["c"] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(2)),
+                "b": vbt.Param(np.arange(2)),
+                "c": vbt.Param(np.arange(2))
+            },
+            build_grid=True,
+        )[0]
+        assert param_product["a"] == [0, 0, 0, 0, 1, 1, 1, 1]
+        assert param_product["b"] == [0, 0, 1, 1, 0, 0, 1, 1]
+        assert param_product["c"] == [0, 1, 0, 1, 0, 1, 0, 1]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(2)),
+                "b": vbt.Param(np.arange(2)),
+                "c": vbt.Param(np.arange(2))
+            },
+            build_grid=True,
+            grid_indices=slice(None, None, 2),
+        )[0]
+        assert param_product["a"] == [0, 0, 1, 1]
+        assert param_product["b"] == [0, 1, 0, 1]
+        assert param_product["c"] == [0, 0, 0, 0]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(5), condition="a > b"),
+                "b": vbt.Param(np.arange(5), condition="b > c"),
+                "c": vbt.Param(np.arange(5))
+            },
+            build_grid=True,
+            seed=seed,
+            random_subset=10,
+            random_replace=False,
+        )[0]
+        assert param_product["a"] == [2, 3, 3, 3, 4, 4, 4, 4, 4, 4]
+        assert param_product["b"] == [1, 1, 2, 2, 1, 2, 2, 3, 3, 3]
+        assert param_product["c"] == [0, 0, 0, 1, 0, 0, 1, 0, 1, 2]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(5), condition="a > b"),
+                "b": vbt.Param(np.arange(5), condition="b > c"),
+                "c": vbt.Param(np.arange(5))
+            },
+            build_grid=True,
+            seed=seed,
+            random_subset=10,
+            random_replace=True,
+        )[0]
+        assert param_product["a"] == [2, 2, 2, 3, 4, 4, 4, 4, 4, 4]
+        assert param_product["b"] == [1, 1, 1, 2, 1, 1, 2, 2, 3, 3]
+        assert param_product["c"] == [0, 0, 0, 0, 0, 0, 1, 1, 0, 1]
 
     def test_parameterized(self):
         def f(a, *my_args, b=2, **my_kwargs):
@@ -1916,7 +2121,7 @@ class TestParams:
         def merge_func(results, param_index):
             return results, param_index
 
-        fp = params.parameterized(f, merge_func=merge_func, merge_kwargs=dict(param_index=template.Rep("param_index")))
+        fp = vbt.parameterized(f, merge_func=merge_func, merge_kwargs=dict(param_index=template.Rep("param_index")))
         assert fp(1) == (1, (), 2, {})
         assert fp(1, 2) == (1, (2,), 2, {})
         assert fp(1, 2, 3) == (1, (2, 3), 2, {})
@@ -1952,12 +2157,13 @@ class TestParams:
                 names=["c_d_1_e", "f_1"],
             ),
         )
+
         assert fp(1, **kwargs, _selection=1) == (1, (), 2, {"c": dict(d=(2, dict(e=3))), "f": (5, 7)})
-        assert fp(1, **kwargs, _selection=1, _skip_single_param=False)[0] == [
+        assert fp(1, **kwargs, _selection=1, _skip_single_comb=False)[0] == [
             (1, (), 2, {"c": dict(d=(2, dict(e=3))), "f": (5, 7)}),
         ]
         assert_index_equal(
-            fp(1, **kwargs, _selection=1, _skip_single_param=False)[1],
+            fp(1, **kwargs, _selection=1, _skip_single_comb=False)[1],
             pd.MultiIndex.from_tuples(
                 [
                     (3, 7),
@@ -1966,11 +2172,11 @@ class TestParams:
             ),
         )
         assert fp(1, **kwargs, _selection=(3, 7)) == (1, (), 2, {"c": dict(d=(2, dict(e=3))), "f": (5, 7)})
-        assert fp(1, **kwargs, _selection=(3, 7), _skip_single_param=False)[0] == [
+        assert fp(1, **kwargs, _selection=(3, 7), _skip_single_comb=False)[0] == [
             (1, (), 2, {"c": dict(d=(2, dict(e=3))), "f": (5, 7)}),
         ]
         assert_index_equal(
-            fp(1, **kwargs, _selection=(3, 7), _skip_single_param=False)[1],
+            fp(1, **kwargs, _selection=(3, 7), _skip_single_comb=False)[1],
             pd.MultiIndex.from_tuples(
                 [
                     (3, 7),
@@ -2916,10 +3122,10 @@ class TestChunking:
 
     def test_yield_chunk_meta(self):
         with pytest.raises(Exception):
-            list(chunking.yield_chunk_meta(n_chunks=0))
+            list(vbt.yield_chunk_meta(n_chunks=0))
 
         chunk_meta_equal(
-            list(chunking.yield_chunk_meta(n_chunks=4)),
+            list(vbt.yield_chunk_meta(n_chunks=4)),
             [
                 chunking.ChunkMeta(uuid="", idx=0, start=None, end=None, indices=None),
                 chunking.ChunkMeta(uuid="", idx=1, start=None, end=None, indices=None),
@@ -2928,18 +3134,18 @@ class TestChunking:
             ],
         )
         chunk_meta_equal(
-            list(chunking.yield_chunk_meta(n_chunks=1, size=4)),
+            list(vbt.yield_chunk_meta(n_chunks=1, size=4)),
             [chunking.ChunkMeta(uuid="", idx=0, start=0, end=4, indices=None)],
         )
         chunk_meta_equal(
-            list(chunking.yield_chunk_meta(n_chunks=2, size=4)),
+            list(vbt.yield_chunk_meta(n_chunks=2, size=4)),
             [
                 chunking.ChunkMeta(uuid="", idx=0, start=0, end=2, indices=None),
                 chunking.ChunkMeta(uuid="", idx=1, start=2, end=4, indices=None),
             ],
         )
         chunk_meta_equal(
-            list(chunking.yield_chunk_meta(n_chunks=3, size=4)),
+            list(vbt.yield_chunk_meta(n_chunks=3, size=4)),
             [
                 chunking.ChunkMeta(uuid="", idx=0, start=0, end=2, indices=None),
                 chunking.ChunkMeta(uuid="", idx=1, start=2, end=3, indices=None),
@@ -2947,7 +3153,7 @@ class TestChunking:
             ],
         )
         chunk_meta_equal(
-            list(chunking.yield_chunk_meta(n_chunks=4, size=4)),
+            list(vbt.yield_chunk_meta(n_chunks=4, size=4)),
             [
                 chunking.ChunkMeta(uuid="", idx=0, start=0, end=1, indices=None),
                 chunking.ChunkMeta(uuid="", idx=1, start=1, end=2, indices=None),
@@ -2956,7 +3162,7 @@ class TestChunking:
             ],
         )
         chunk_meta_equal(
-            list(chunking.yield_chunk_meta(n_chunks=5, size=4)),
+            list(vbt.yield_chunk_meta(n_chunks=5, size=4)),
             [
                 chunking.ChunkMeta(uuid="", idx=0, start=0, end=1, indices=None),
                 chunking.ChunkMeta(uuid="", idx=1, start=1, end=2, indices=None),
@@ -2965,9 +3171,9 @@ class TestChunking:
             ],
         )
         with pytest.raises(Exception):
-            list(chunking.yield_chunk_meta(chunk_len=0, size=4))
+            list(vbt.yield_chunk_meta(chunk_len=0, size=4))
         chunk_meta_equal(
-            list(chunking.yield_chunk_meta(chunk_len=1, size=4)),
+            list(vbt.yield_chunk_meta(chunk_len=1, size=4)),
             [
                 chunking.ChunkMeta(uuid="", idx=0, start=0, end=1, indices=None),
                 chunking.ChunkMeta(uuid="", idx=1, start=1, end=2, indices=None),
@@ -2976,40 +3182,40 @@ class TestChunking:
             ],
         )
         chunk_meta_equal(
-            list(chunking.yield_chunk_meta(chunk_len=2, size=4)),
+            list(vbt.yield_chunk_meta(chunk_len=2, size=4)),
             [
                 chunking.ChunkMeta(uuid="", idx=0, start=0, end=2, indices=None),
                 chunking.ChunkMeta(uuid="", idx=1, start=2, end=4, indices=None),
             ],
         )
         chunk_meta_equal(
-            list(chunking.yield_chunk_meta(chunk_len=3, size=4)),
+            list(vbt.yield_chunk_meta(chunk_len=3, size=4)),
             [
                 chunking.ChunkMeta(uuid="", idx=0, start=0, end=3, indices=None),
                 chunking.ChunkMeta(uuid="", idx=1, start=3, end=4, indices=None),
             ],
         )
         chunk_meta_equal(
-            list(chunking.yield_chunk_meta(chunk_len=4, size=4)),
+            list(vbt.yield_chunk_meta(chunk_len=4, size=4)),
             [chunking.ChunkMeta(uuid="", idx=0, start=0, end=4, indices=None)],
         )
         chunk_meta_equal(
-            list(chunking.yield_chunk_meta(chunk_len=5, size=4)),
+            list(vbt.yield_chunk_meta(chunk_len=5, size=4)),
             [chunking.ChunkMeta(uuid="", idx=0, start=0, end=4, indices=None)],
         )
         chunk_meta_equal(
-            list(chunking.yield_chunk_meta(n_chunks=2, size=2, min_size=2)),
+            list(vbt.yield_chunk_meta(n_chunks=2, size=2, min_size=2)),
             [
                 chunking.ChunkMeta(uuid="", idx=0, start=0, end=1, indices=None),
                 chunking.ChunkMeta(uuid="", idx=1, start=1, end=2, indices=None),
             ],
         )
         chunk_meta_equal(
-            list(chunking.yield_chunk_meta(n_chunks=2, size=2, min_size=3)),
+            list(vbt.yield_chunk_meta(n_chunks=2, size=2, min_size=3)),
             [chunking.ChunkMeta(uuid="", idx=0, start=0, end=2, indices=None)],
         )
         with pytest.raises(Exception):
-            list(chunking.yield_chunk_meta(n_chunks=2, size=4, chunk_len=2))
+            list(vbt.yield_chunk_meta(n_chunks=2, size=4, chunk_len=2))
 
     def test_chunk_meta_generators(self):
         def f(a):
@@ -3037,10 +3243,10 @@ class TestChunking:
         ]
 
         ann_args = parsing.annotate_args(f, (2, 3, 1), dict(b=[1, 2, 3]))
-        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(ann_args, size=3, n_chunks=3)), chunk_meta)
+        chunk_meta_equal(list(vbt.Chunker.get_chunk_meta_from_args(ann_args, size=3, n_chunks=3)), chunk_meta)
         chunk_meta_equal(
             list(
-                chunking.get_chunk_meta_from_args(
+                vbt.Chunker.get_chunk_meta_from_args(
                     ann_args,
                     size=3,
                     n_chunks=lambda ann_args: ann_args["args"]["value"][0],
@@ -3049,16 +3255,16 @@ class TestChunking:
             chunk_meta,
         )
         chunk_meta_equal(
-            list(chunking.get_chunk_meta_from_args(ann_args, size=3, n_chunks=chunking.ArgSizer(arg_query=1))),
+            list(vbt.Chunker.get_chunk_meta_from_args(ann_args, size=3, n_chunks=chunking.ArgSizer(arg_query=1))),
             chunk_meta,
         )
         with pytest.raises(Exception):
-            list(chunking.get_chunk_meta_from_args(ann_args, size=3, n_chunks="a"))
+            list(vbt.Chunker.get_chunk_meta_from_args(ann_args, size=3, n_chunks="a"))
 
-        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(ann_args, chunk_len=1, size=3)), chunk_meta)
+        chunk_meta_equal(list(vbt.Chunker.get_chunk_meta_from_args(ann_args, chunk_len=1, size=3)), chunk_meta)
         chunk_meta_equal(
             list(
-                chunking.get_chunk_meta_from_args(
+                vbt.Chunker.get_chunk_meta_from_args(
                     ann_args,
                     chunk_len=1,
                     size=lambda ann_args: ann_args["args"]["value"][0],
@@ -3067,16 +3273,16 @@ class TestChunking:
             chunk_meta,
         )
         chunk_meta_equal(
-            list(chunking.get_chunk_meta_from_args(ann_args, chunk_len=1, size=chunking.ArgSizer(arg_query=1))),
+            list(vbt.Chunker.get_chunk_meta_from_args(ann_args, chunk_len=1, size=chunking.ArgSizer(arg_query=1))),
             chunk_meta,
         )
         with pytest.raises(Exception):
-            list(chunking.get_chunk_meta_from_args(ann_args, chunk_len=1, size="a"))
+            list(vbt.Chunker.get_chunk_meta_from_args(ann_args, chunk_len=1, size="a"))
 
-        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(ann_args, size=3, chunk_len=1)), chunk_meta)
+        chunk_meta_equal(list(vbt.Chunker.get_chunk_meta_from_args(ann_args, size=3, chunk_len=1)), chunk_meta)
         chunk_meta_equal(
             list(
-                chunking.get_chunk_meta_from_args(
+                vbt.Chunker.get_chunk_meta_from_args(
                     ann_args,
                     size=3,
                     chunk_len=lambda ann_args: ann_args["args"]["value"][1],
@@ -3085,15 +3291,15 @@ class TestChunking:
             chunk_meta,
         )
         chunk_meta_equal(
-            list(chunking.get_chunk_meta_from_args(ann_args, size=3, chunk_len=chunking.ArgSizer(arg_query=2))),
+            list(vbt.Chunker.get_chunk_meta_from_args(ann_args, size=3, chunk_len=chunking.ArgSizer(arg_query=2))),
             chunk_meta,
         )
         with pytest.raises(Exception):
-            list(chunking.get_chunk_meta_from_args(ann_args, size=3, chunk_len="a"))
+            list(vbt.Chunker.get_chunk_meta_from_args(ann_args, size=3, chunk_len="a"))
 
-        chunk_meta_equal(list(chunking.get_chunk_meta_from_args(ann_args, chunk_meta=chunk_meta)), chunk_meta)
+        chunk_meta_equal(list(vbt.Chunker.get_chunk_meta_from_args(ann_args, chunk_meta=chunk_meta)), chunk_meta)
         chunk_meta_equal(
-            list(chunking.get_chunk_meta_from_args(ann_args, chunk_meta=chunking.LenChunkMeta("b"))),
+            list(vbt.Chunker.get_chunk_meta_from_args(ann_args, chunk_meta=chunking.LenChunkMeta("b"))),
             [
                 chunking.ChunkMeta(uuid="", idx=0, start=0, end=1, indices=None),
                 chunking.ChunkMeta(uuid="", idx=1, start=1, end=3, indices=None),
@@ -3101,7 +3307,7 @@ class TestChunking:
             ],
         )
         chunk_meta_equal(
-            list(chunking.get_chunk_meta_from_args(ann_args, chunk_meta=lambda ann_args: chunk_meta)),
+            list(vbt.Chunker.get_chunk_meta_from_args(ann_args, chunk_meta=lambda ann_args: chunk_meta)),
             chunk_meta,
         )
 
@@ -3122,7 +3328,7 @@ class TestChunking:
             d=chunking.ChunkSelector(),
             kwargs=chunking.KwargsTaker(f=chunking.MappingTaker(cont_take_spec=dict(h=chunking.ChunkSlicer()))),
         )
-        args, kwargs = chunking.take_from_args(
+        args, kwargs = vbt.Chunker.take_from_args(
             ann_args,
             arg_take_spec,
             chunking.ChunkMeta(uuid="", idx=0, start=1, end=3, indices=None),
@@ -3237,18 +3443,7 @@ class TestChunking:
         ]
         arg_take_spec = dict(b=chunking.ChunkSelector())
         result = [(f, (2, 3, 1), {"b": 1}), (f, (2, 3, 1), {"b": 2}), (f, (2, 3, 1), {"b": 3})]
-        assert list(chunking.yield_arg_chunks(f, ann_args, chunk_meta, arg_take_spec=arg_take_spec)) == result
-        assert (
-            list(
-                chunking.yield_arg_chunks(
-                    f,
-                    ann_args,
-                    chunk_meta,
-                    arg_take_spec=lambda ann_args, chunk_meta: ((2, 3, 1), dict(b=[1, 2, 3][chunk_meta.idx])),
-                )
-            )
-            == result
-        )
+        assert list(vbt.Chunker.yield_arg_chunks(f, ann_args, chunk_meta, arg_take_spec=arg_take_spec)) == result
         ann_args = parsing.annotate_args(
             f,
             (template.RepEval('ann_args["args"]["value"][1] + 1'), 3, 1),
@@ -3256,7 +3451,7 @@ class TestChunking:
         )
         assert (
             list(
-                chunking.yield_arg_chunks(
+                vbt.Chunker.yield_arg_chunks(
                     f,
                     ann_args,
                     chunk_meta,
@@ -3288,10 +3483,10 @@ class TestChunking:
         np.testing.assert_array_equal(results[2], np.arange(6, 8))
         np.testing.assert_array_equal(results[3], np.arange(8, 10))
 
-        results = f(np.arange(10), _n_chunks=1, _skip_one_chunk=False)
+        results = f(np.arange(10), _n_chunks=1, _skip_single_chunk=False)
         np.testing.assert_array_equal(results[0], np.arange(10))
 
-        results = f(np.arange(10), _n_chunks=1, _skip_one_chunk=True)
+        results = f(np.arange(10), _n_chunks=1, _skip_single_chunk=True)
         np.testing.assert_array_equal(results, np.arange(10))
 
         @vbt.chunked(n_chunks=2, size=vbt.LenSizer(arg_query="a"))
@@ -3320,7 +3515,7 @@ class TestChunking:
 
         @vbt.chunked(
             n_chunks=2,
-            size=lambda ann_args: len(ann_args["a"]["value"]),
+            size=lambda ann_args, **kwargs: len(ann_args["a"]["value"]),
             arg_take_spec=dict(a=vbt.ChunkSlicer()),
         )
         def f5(a):
@@ -3359,61 +3554,85 @@ class TestChunking:
         np.testing.assert_array_equal(results[1][0], np.arange(3, 6))
         np.testing.assert_array_equal(results[1][1], np.arange(6, 10))
 
-        if pathos_available:
+        def produce_out(*args, **kwargs):
+            out = None
+            for v in args:
+                if out is None:
+                    out = v
+                else:
+                    out += v
+            for k, v in kwargs.items():
+                if out is None:
+                    out = v
+                else:
+                    out += v
+            return out
 
-            @vbt.chunked(
-                n_chunks=2,
-                size=vbt.LenSizer(arg_query="a"),
-                arg_take_spec=dict(a=vbt.ChunkSlicer()),
-                merge_func=np.concatenate,
-                engine="pathos",
-            )
-            def f7(a):
-                return a
+        @vbt.chunked
+        def f7(*args: vbt.ArraySlicer, **kwargs: vbt.ArraySlicer):
+            return produce_out(*args, **kwargs)
 
-            np.testing.assert_array_equal(f7(np.arange(10)), np.arange(10))
+        results = f7(np.arange(0, 10), np.arange(10, 20), a=np.arange(20, 30), b=np.arange(30, 40), _n_chunks=2)
+        np.testing.assert_array_equal(results[0], np.array([60, 64, 68, 72, 76]))
+        np.testing.assert_array_equal(results[1], np.array([80, 84, 88, 92, 96]))
 
-        if mpire_available:
+        @vbt.chunked
+        def f8(
+            *args: vbt.ArgsTaker(vbt.ArraySlicer, vbt.ArraySlicer),
+            **kwargs: vbt.KwargsTaker(a=vbt.ArraySlicer, b=vbt.ArraySlicer),
+        ):
+            return produce_out(*args, **kwargs)
 
-            @vbt.chunked(
-                n_chunks=2,
-                size=vbt.LenSizer(arg_query="a"),
-                arg_take_spec=dict(a=vbt.ChunkSlicer()),
-                merge_func=np.concatenate,
-                engine="mpire",
-            )
-            def f8(a):
-                return a
+        results = f8(np.arange(0, 10), np.arange(10, 20), a=np.arange(20, 30), b=np.arange(30, 40), _n_chunks=2)
+        np.testing.assert_array_equal(results[0], np.array([60, 64, 68, 72, 76]))
+        np.testing.assert_array_equal(results[1], np.array([80, 84, 88, 92, 96]))
 
-            np.testing.assert_array_equal(f8(np.arange(10)), np.arange(10))
+        @vbt.chunked
+        def f9(
+            *args: vbt.VarArgs(vbt.ArraySlicer, vbt.ArraySlicer),
+            **kwargs: vbt.VarKwargs(a=vbt.ArraySlicer, b=vbt.ArraySlicer),
+        ):
+            return produce_out(*args, **kwargs)
 
-        if dask_available:
+        results = f9(np.arange(0, 10), np.arange(10, 20), a=np.arange(20, 30), b=np.arange(30, 40), _n_chunks=2)
+        np.testing.assert_array_equal(results[0], np.array([60, 64, 68, 72, 76]))
+        np.testing.assert_array_equal(results[1], np.array([80, 84, 88, 92, 96]))
 
-            @vbt.chunked(
-                n_chunks=2,
-                size=vbt.LenSizer(arg_query="a"),
-                arg_take_spec=dict(a=vbt.ChunkSlicer()),
-                merge_func=np.concatenate,
-                engine="dask",
-            )
-            def f9(a):
-                return a
+        @vbt.chunked
+        def f10(*args, **kwargs):
+            return produce_out(*args, **kwargs)
 
-            np.testing.assert_array_equal(f9(np.arange(10)), np.arange(10))
+        results = f10(
+            vbt.Chunked(np.arange(0, 10), vbt.ArraySlicer),
+            vbt.Chunked(np.arange(10, 20), vbt.ArraySlicer),
+            a=vbt.Chunked(np.arange(20, 30), vbt.ArraySlicer),
+            b=vbt.Chunked(np.arange(30, 40), vbt.ArraySlicer),
+            _n_chunks=2,
+        )
+        np.testing.assert_array_equal(results[0], np.array([60, 64, 68, 72, 76]))
+        np.testing.assert_array_equal(results[1], np.array([80, 84, 88, 92, 96]))
 
-        if ray_available:
+        @vbt.chunked
+        def f11(*args: vbt.ChunkedArray, **kwargs: vbt.ChunkedArray):
+            return produce_out(*args, **kwargs)
 
-            @vbt.chunked(
-                n_chunks=2,
-                size=vbt.LenSizer(arg_query="a"),
-                arg_take_spec=dict(a=vbt.ChunkSlicer()),
-                merge_func=np.concatenate,
-                engine="ray",
-            )
-            def f10(a):
-                return a
+        results = f11(np.arange(0, 10), np.arange(10, 20), a=np.arange(20, 30), b=np.arange(30, 40), _n_chunks=2)
+        np.testing.assert_array_equal(results[0], np.array([60, 64, 68, 72, 76]))
+        np.testing.assert_array_equal(results[1], np.array([80, 84, 88, 92, 96]))
 
-            np.testing.assert_array_equal(f10(np.arange(10)), np.arange(10))
+        @vbt.chunked
+        def f12(*args, **kwargs):
+            return produce_out(*args, **kwargs)
+
+        results = f12(
+            vbt.ChunkedArray(np.arange(0, 10)),
+            vbt.ChunkedArray(np.arange(10, 20)),
+            a=vbt.ChunkedArray(np.arange(20, 30)),
+            b=vbt.ChunkedArray(np.arange(30, 40)),
+            _n_chunks=2,
+        )
+        np.testing.assert_array_equal(results[0], np.array([60, 64, 68, 72, 76]))
+        np.testing.assert_array_equal(results[1], np.array([80, 84, 88, 92, 96]))
 
 
 # ############# jitting ############# #

@@ -41,7 +41,7 @@ class SignalFactory(IndicatorFactory):
     Other arguments are passed to `vectorbtpro.indicators.factory.IndicatorFactory`.
     """
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (IndicatorFactory._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (IndicatorFactory._expected_keys or set()) | {
         "mode",
     }
 

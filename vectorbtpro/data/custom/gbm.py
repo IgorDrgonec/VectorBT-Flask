@@ -53,7 +53,7 @@ class GBMData(SyntheticData):
             mean (float): Drift, or mean of the percentage change.
             std (float): Standard deviation of the percentage change.
             dt (float): Time change (one period of time).
-            seed (int): Set seed to make output deterministic.
+            seed (int): Seed to make output deterministic.
             jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
 
         For defaults, see `custom.gbm` in `vectorbtpro._settings.data`.

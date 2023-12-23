@@ -425,7 +425,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
 
         return cls(**ArrayWrapper.resolve_stack_kwargs(*wrappers, **kwargs))
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Configured._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (Configured._expected_keys or set()) | {
         "index",
         "columns",
         "ndim",
@@ -1775,7 +1775,7 @@ class Wrapping(Configured, ExtPandasIndexer, AttrResolverMixin):
         Should use `ArrayWrapper.column_stack`."""
         raise NotImplementedError
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Configured._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (Configured._expected_keys or set()) | {
         "wrapper",
     }
 
@@ -1848,7 +1848,7 @@ class Wrapping(Configured, ExtPandasIndexer, AttrResolverMixin):
     def resolve_self(
         self: AttrResolverMixinT,
         cond_kwargs: tp.KwargsLike = None,
-        custom_arg_names: tp.ClassVar[tp.Optional[tp.Set[str]]] = None,
+        custom_arg_names: tp.Optional[tp.Set[str]] = None,
         impacts_caching: bool = True,
         silence_warnings: tp.Optional[bool] = None,
     ) -> AttrResolverMixinT:

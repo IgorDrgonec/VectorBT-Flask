@@ -865,7 +865,7 @@ class SQLData(DBData):
                 if align_dates:
                     first_obj = pd.read_sql_query(
                         query.limit(1),
-                        engine,
+                        engine.connect(),
                         index_col=index_col,
                         parse_dates=None if isinstance(parse_dates, bool) else parse_dates,  # bool not accepted
                         dtype=dtype,
@@ -974,7 +974,7 @@ class SQLData(DBData):
             query = text(query)
         obj = pd.read_sql_query(
             query,
-            engine,
+            engine.connect(),
             index_col=index_col,
             parse_dates=None if isinstance(parse_dates, bool) else parse_dates,  # bool not accepted
             dtype=dtype,

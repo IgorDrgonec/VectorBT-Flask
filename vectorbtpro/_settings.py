@@ -125,6 +125,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils.checks import is_instance_of
 from vectorbtpro.utils.config import Config
 from vectorbtpro.utils.template import Sub, RepEval, substitute_templates
+from vectorbtpro.utils.module_ import check_installed
 
 __all__ = [
     "settings",
@@ -311,8 +312,8 @@ ${config_doc}
 _settings["math"] = math
 
 execution = frozen_cfg(
-    n_chunks=None,
     min_size=None,
+    n_chunks=None,
     chunk_len=None,
     distribute="calls",
     warmup=False,
@@ -355,6 +356,7 @@ execution = frozen_cfg(
             sleep=0.001,
             show_progress=False,
             pbar_kwargs=flex_cfg(),
+            join_pool=False,
         ),
         mpire=flex_cfg(
             cls="MpireEngine",
@@ -392,12 +394,22 @@ chunking = frozen_cfg(
     disable=False,
     disable_wrapping=False,
     option=False,
-    n_chunks=None,
+    chunker_cls=None,
+    size=None,
     min_size=None,
+    n_chunks=None,
     chunk_len=None,
-    skip_one_chunk=True,
-    silence_warnings=False,
+    chunk_meta=None,
+    prepend_chunk_meta=None,
+    skip_single_chunk=True,
+    arg_take_spec=None,
     template_context=flex_cfg(),
+    merge_func=None,
+    merge_kwargs=flex_cfg(),
+    return_raw_chunks=False,
+    silence_warnings=False,
+    forward_kwargs_as=flex_cfg(),
+    execute_kwargs=flex_cfg(),
     options=flex_cfg(),
     override_setup_options=flex_cfg(),
     override_options=flex_cfg(),
@@ -417,15 +429,33 @@ ${config_doc}
 _settings["chunking"] = chunking
 
 params = frozen_cfg(
-    search_except_types=None,
-    search_max_len=None,
-    search_max_depth=None,
-    skip_single_param=True,
+    parameterizer_cls=None,
+    param_search_kwargs=flex_cfg(),
+    skip_single_comb=True,
     template_context=flex_cfg(),
+    build_grid=None,
+    grid_indices=None,
     random_subset=None,
+    random_replace=False,
+    random_sort=True,
+    max_guesses=None,
+    max_misses=None,
     seed=None,
     index_stack_kwargs=flex_cfg(),
     name_tuple_to_str=True,
+    merge_func=None,
+    merge_kwargs=flex_cfg(),
+    selection=None,
+    forward_kwargs_as=flex_cfg(),
+    mono_min_size=None,
+    mono_n_chunks=None,
+    mono_chunk_len=None,
+    mono_chunk_meta=None,
+    mono_merge_func=None,
+    mono_merge_kwargs=flex_cfg(),
+    mono_reduce=None,
+    return_meta=False,
+    return_param_index=False,
     execute_kwargs=flex_cfg(),
 )
 """_"""
@@ -440,9 +470,7 @@ _settings["params"] = params
 
 template = frozen_cfg(
     strict=True,
-    except_types=(list, set, frozenset),
-    max_len=None,
-    max_depth=None,
+    search_kwargs=flex_cfg(),
     context=flex_cfg(),
 )
 """_"""
@@ -837,12 +865,13 @@ data = frozen_cfg(
             silence_warnings=False,
         ),
         av=flex_cfg(
+            use_parser=None,
             apikey=None,
             api_meta=None,
             category=None,
             function=None,
             timeframe=None,
-            tz="utc",
+            tz=None,
             adjusted=False,
             extended=False,
             slice="year1month1",
@@ -852,7 +881,6 @@ data = frozen_cfg(
             read_csv_kwargs=flex_cfg(
                 index_col=0,
                 parse_dates=True,
-                infer_datetime_format=True,
             ),
             match_params=True,
             params=flex_cfg(),
@@ -860,12 +888,11 @@ data = frozen_cfg(
         ),
         ndl=flex_cfg(
             api_key=None,
+            data_format="dataset",
             start=None,
             end=None,
             tz="utc",
             column_indices=None,
-            collapse=None,
-            transform=None,
             params=flex_cfg(),
         ),
         tv=flex_cfg(
@@ -897,6 +924,21 @@ data = frozen_cfg(
                 template_context=flex_cfg(),
                 scanner_kwargs=flex_cfg(),
             ),
+        ),
+        bento=flex_cfg(
+            client=None,
+            client_config=flex_cfg(
+                key=None,
+            ),
+            start=None,
+            end=None,
+            resolve_dates=True,
+            timeframe=None,
+            tz="utc",
+            dataset=None,
+            schema=None,
+            df_kwargs=flex_cfg(),
+            params=flex_cfg(),
         ),
     ),
     stats=flex_cfg(
@@ -1243,6 +1285,8 @@ ${config_doc}
 _settings["signals"] = signals
 
 returns = frozen_cfg(
+    inf_to_nan=False,
+    nan_to_zero=False,
     year_freq="365 days",
     bm_returns=None,
     defaults=flex_cfg(
@@ -1716,6 +1760,21 @@ ${config_doc}
 
 _settings["path"] = path
 
+search = frozen_cfg(
+    except_types=(list, set, frozenset),
+    max_len=None,
+    max_depth=None,
+)
+"""_"""
+
+__pdoc__["search"] = Sub("""Sub-config with settings applied across `vectorbtpro.utils.search`.
+
+```python
+${config_doc}
+```""")
+
+_settings["search"] = search
+
 
 # ############# Settings config ############# #
 
@@ -1742,19 +1801,20 @@ class SettingsConfig(Config):
 
     def register_template(self, theme: str) -> None:
         """Register template of a theme."""
-        import plotly.io as pio
-        import plotly.graph_objects as go
+        if check_installed("plotly"):
+            import plotly.io as pio
+            import plotly.graph_objects as go
 
-        template_path = self["plotting"]["themes"][theme]["path"]
-        if template_path is None:
-            raise ValueError(f"Must provide template path for the theme '{theme}'")
-        if template_path.startswith("__name__/"):
-            template_path = template_path.replace("__name__/", "")
-            template = Config(json.loads(pkgutil.get_data(__name__, template_path)))
-        else:
-            with open(template_path, "r") as f:
-                template = Config(json.load(f))
-        pio.templates["vbt_" + theme] = go.layout.Template(template)
+            template_path = self["plotting"]["themes"][theme]["path"]
+            if template_path is None:
+                raise ValueError(f"Must provide template path for the theme '{theme}'")
+            if template_path.startswith("__name__/"):
+                template_path = template_path.replace("__name__/", "")
+                template = Config(json.loads(pkgutil.get_data(__name__, template_path)))
+            else:
+                with open(template_path, "r") as f:
+                    template = Config(json.load(f))
+            pio.templates["vbt_" + theme] = go.layout.Template(template)
 
     def register_templates(self) -> None:
         """Register templates of all themes."""
@@ -1797,14 +1857,9 @@ if "VBT_SETTINGS_PATH" in os.environ:
 elif settings.file_exists(settings_name):
     settings.load_update(settings_name)
 
-try:
-    settings.reset_theme()
-    settings.register_templates()
-except ImportError:
-    pass
-
+settings.reset_theme()
+settings.register_templates()
 settings.make_checkpoint()
-
 settings.substitute_sub_config_docs(__pdoc__)
 
 if settings["numba"]["disable"]:

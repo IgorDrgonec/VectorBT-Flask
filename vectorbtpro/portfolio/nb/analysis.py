@@ -763,7 +763,8 @@ def returns_nb(
         input_value = flex_select_1d_pc_nb(init_value, col)
         for i in range(value.shape[0]):
             output_value = value[i, col]
-            adj_output_value = output_value - flex_select_nb(cash_deposits_, i, col)
+            _cash_deposits = flex_select_nb(cash_deposits_, i, col)
+            adj_output_value = output_value - _cash_deposits
             out[i, col] = returns_nb_.get_return_nb(input_value, adj_output_value, log_returns=log_returns)
             input_value = output_value
     return out

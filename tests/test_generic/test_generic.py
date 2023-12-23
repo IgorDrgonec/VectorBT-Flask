@@ -418,13 +418,19 @@ class TestAccessors:
     def test_ewm_mean(self, test_window, test_minp, test_adjust):
         if test_minp is None:
             test_minp = test_window
+
+        def _adjust_minp(pd_obj, pd_result):
+            valid_mask = (~pd_obj.isnull()).rolling(test_window, min_periods=1).sum() >= test_minp
+            pd_result[~valid_mask] = np.nan
+            return pd_result
+
         assert_series_equal(
             df["a"].vbt.ewm_mean(test_window, minp=test_minp, adjust=test_adjust),
-            df["a"].ewm(span=test_window, min_periods=test_minp, adjust=test_adjust).mean(),
+            _adjust_minp(df["a"], df["a"].ewm(span=test_window, adjust=test_adjust).mean()),
         )
         assert_frame_equal(
             df.vbt.ewm_mean(test_window, minp=test_minp, adjust=test_adjust),
-            df.ewm(span=test_window, min_periods=test_minp, adjust=test_adjust).mean(),
+            _adjust_minp(df, df.ewm(span=test_window, adjust=test_adjust).mean()),
         )
         assert_frame_equal(df.vbt.ewm_mean(test_window), df.ewm(span=test_window).mean())
         assert_frame_equal(
@@ -442,13 +448,19 @@ class TestAccessors:
     def test_ewm_std(self, test_window, test_minp, test_adjust):
         if test_minp is None:
             test_minp = test_window
+
+        def _adjust_minp(pd_obj, pd_result):
+            valid_mask = (~pd_obj.isnull()).rolling(test_window, min_periods=1).sum() >= test_minp
+            pd_result[~valid_mask] = np.nan
+            return pd_result
+
         assert_series_equal(
             df["a"].vbt.ewm_std(test_window, minp=test_minp, adjust=test_adjust),
-            df["a"].ewm(span=test_window, min_periods=test_minp, adjust=test_adjust).std(),
+            _adjust_minp(df["a"], df["a"].ewm(span=test_window, min_periods=test_minp, adjust=test_adjust).std()),
         )
         assert_frame_equal(
             df.vbt.ewm_std(test_window, minp=test_minp, adjust=test_adjust),
-            df.ewm(span=test_window, min_periods=test_minp, adjust=test_adjust).std(),
+            _adjust_minp(df, df.ewm(span=test_window, min_periods=test_minp, adjust=test_adjust).std()),
         )
         assert_frame_equal(df.vbt.ewm_std(test_window), df.ewm(span=test_window).std())
         assert_frame_equal(
@@ -465,13 +477,19 @@ class TestAccessors:
     def test_wwm_mean(self, test_window, test_minp):
         if test_minp is None:
             test_minp = test_window
+
+        def _adjust_minp(pd_obj, pd_result):
+            valid_mask = (~pd_obj.isnull()).rolling(2 * test_window - 1, min_periods=1).sum() >= test_minp
+            pd_result[~valid_mask] = np.nan
+            return pd_result
+
         assert_series_equal(
             df["a"].vbt.wwm_mean(test_window, minp=test_minp),
-            df["a"].ewm(alpha=1 / test_window, min_periods=test_minp).mean(),
+            _adjust_minp(df["a"], df["a"].ewm(alpha=1 / test_window, min_periods=test_minp).mean()),
         )
         assert_frame_equal(
             df.vbt.wwm_mean(test_window, minp=test_minp),
-            df.ewm(alpha=1 / test_window, min_periods=test_minp).mean(),
+            _adjust_minp(df, df.ewm(alpha=1 / test_window, min_periods=test_minp).mean()),
         )
         assert_frame_equal(df.vbt.wwm_mean(test_window), df.ewm(alpha=1 / test_window).mean())
         assert_frame_equal(
@@ -488,13 +506,19 @@ class TestAccessors:
     def test_wwm_std(self, test_window, test_minp):
         if test_minp is None:
             test_minp = test_window
+
+        def _adjust_minp(pd_obj, pd_result):
+            valid_mask = (~pd_obj.isnull()).rolling(2 * test_window - 1, min_periods=1).sum() >= test_minp
+            pd_result[~valid_mask] = np.nan
+            return pd_result
+
         assert_series_equal(
             df["a"].vbt.wwm_std(test_window, minp=test_minp),
-            df["a"].ewm(alpha=1 / test_window, min_periods=test_minp).std(),
+            _adjust_minp(df["a"], df["a"].ewm(alpha=1 / test_window, min_periods=test_minp).std()),
         )
         assert_frame_equal(
             df.vbt.wwm_std(test_window, minp=test_minp),
-            df.ewm(alpha=1 / test_window, min_periods=test_minp).std(),
+            _adjust_minp(df, df.ewm(alpha=1 / test_window, min_periods=test_minp).std()),
         )
         assert_frame_equal(df.vbt.wwm_std(test_window), df.ewm(alpha=1 / test_window).std())
         assert_frame_equal(

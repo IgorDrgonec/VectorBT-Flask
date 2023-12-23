@@ -608,7 +608,10 @@ def ewm_mean_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, ad
 
     Numba equivalent to `pd.Series(arr).ewm(span=span, min_periods=minp, adjust=adjust).mean()`.
 
-    Adaptation of `pd._libs.window.aggregations.window_aggregations.ewma` with default arguments."""
+    Adaptation of `pd._libs.window.aggregations.window_aggregations.ewma` with default arguments.
+
+    !!! note
+        In contrast to the Pandas implementation, `minp` is effective within `span`."""
     if minp is None:
         minp = span
     if minp > span:
@@ -620,15 +623,19 @@ def ewm_mean_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, ad
     alpha = 1.0 / (1.0 + com)
     weighted_avg = float(arr[0]) + 0.0  # cast to np.float_
     nobs = 0
+    n_obs_lagged = 0
     old_wt = 1.0
 
     for i in range(len(arr)):
+        if i >= span:
+            if not np.isnan(arr[i - span]):
+                n_obs_lagged += 1
         in_state = EWMMeanAIS(
             i=i,
             value=arr[i],
             old_wt=old_wt,
             weighted_avg=weighted_avg,
-            nobs=nobs,
+            nobs=nobs - n_obs_lagged,
             alpha=alpha,
             minp=minp,
             adjust=adjust,
@@ -636,7 +643,7 @@ def ewm_mean_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, ad
         out_state = ewm_mean_acc_nb(in_state)
         old_wt = out_state.old_wt
         weighted_avg = out_state.weighted_avg
-        nobs = out_state.nobs
+        nobs = out_state.nobs + n_obs_lagged
         out[i] = out_state.value
 
     return out
@@ -747,7 +754,10 @@ def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, adj
 
     Numba equivalent to `pd.Series(arr).ewm(span=span, min_periods=minp).std()`.
 
-    Adaptation of `pd._libs.window.aggregations.window_aggregations.ewmcov` with default arguments."""
+    Adaptation of `pd._libs.window.aggregations.window_aggregations.ewmcov` with default arguments.
+
+    !!! note
+        In contrast to the Pandas implementation, `minp` is effective within `span`."""
     if minp is None:
         minp = span
     if minp > span:
@@ -760,12 +770,16 @@ def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, adj
     mean_x = float(arr[0]) + 0.0  # cast to np.float_
     mean_y = float(arr[0]) + 0.0  # cast to np.float_
     nobs = 0
+    n_obs_lagged = 0
     cov = 0.0
     sum_wt = 1.0
     sum_wt2 = 1.0
     old_wt = 1.0
 
     for i in range(len(arr)):
+        if i >= span:
+            if not np.isnan(arr[i - span]):
+                n_obs_lagged += 1
         in_state = EWMStdAIS(
             i=i,
             value=arr[i],
@@ -775,7 +789,7 @@ def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, adj
             sum_wt=sum_wt,
             sum_wt2=sum_wt2,
             old_wt=old_wt,
-            nobs=nobs,
+            nobs=nobs - n_obs_lagged,
             alpha=alpha,
             minp=minp,
             adjust=adjust,
@@ -787,7 +801,7 @@ def ewm_std_1d_nb(arr: tp.Array1d, span: int, minp: tp.Optional[int] = None, adj
         sum_wt = out_state.sum_wt
         sum_wt2 = out_state.sum_wt2
         old_wt = out_state.old_wt
-        nobs = out_state.nobs
+        nobs = out_state.nobs + n_obs_lagged
         out[i] = out_state.value
 
     return np.sqrt(out)

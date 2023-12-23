@@ -29,7 +29,7 @@ RUN pip install --quiet --no-cache-dir 'pybind11'
 RUN pip install --quiet --no-cache-dir --ignore-installed 'llvmlite'
 
 RUN pip install --quiet --no-cache-dir \
-    'numpy==1.23.3' \
+    'numpy==1.23.5' \
     'pandas>=1.5.0' \
     'numba==0.56.4' \
     'scipy' \
@@ -56,6 +56,8 @@ RUN pip install --quiet --no-cache-dir \
     'polygon-api-client>=1.0.0' \
     'beautifulsoup4' \
     'nasdaq-data-link' \
+    'alpha_vantage' \
+    'databento' \
     'TA-Lib==0.4.21' \
     'ta' \
     'pandas_ta' \
@@ -74,15 +76,15 @@ RUN pip install --quiet --no-cache-dir \
     'python-telegram-bot>=13.4' \
     'dill' \
     'lz4' \
-    'blosc2'
+    'blosc2' \
+    'tabulate'
 
 RUN pip install --quiet --no-cache-dir --no-deps 'universal-portfolios'
 RUN pip install --quiet --no-cache-dir 'pandas_datareader'
 RUN conda install --quiet --yes -c conda-forge cvxopt
 
 ADD ./vectorbtpro ./vectorbtpro
-ADD setup.py ./
-ADD extra-requirements.txt ./
+ADD pyproject.toml ./
 ADD LICENSE ./
 ADD README.md ./
 RUN pip install --quiet --no-cache-dir --no-deps .

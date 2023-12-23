@@ -2,7 +2,6 @@
 
 """Engines for executing functions."""
 
-import multiprocessing
 import concurrent.futures
 import time
 
@@ -51,7 +50,7 @@ class SerialEngine(ExecutionEngine):
 
     _settings_path: tp.SettingsPath = "execution.engines.serial"
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (ExecutionEngine._expected_keys or set()) | {
         "show_progress",
         "progress_desc",
         "pbar_kwargs",
@@ -163,7 +162,7 @@ class ThreadPoolEngine(ExecutionEngine):
 
     _settings_path: tp.SettingsPath = "execution.engines.threadpool"
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (ExecutionEngine._expected_keys or set()) | {
         "init_kwargs",
         "timeout",
     }
@@ -211,7 +210,7 @@ class ProcessPoolEngine(ExecutionEngine):
 
     _settings_path: tp.SettingsPath = "execution.engines.processpool"
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (ExecutionEngine._expected_keys or set()) | {
         "init_kwargs",
         "timeout",
     }
@@ -264,13 +263,14 @@ class PathosEngine(ExecutionEngine):
 
     _settings_path: tp.SettingsPath = "execution.engines.pathos"
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (ExecutionEngine._expected_keys or set()) | {
         "pool_type",
         "init_kwargs",
         "timeout",
         "sleep",
         "show_progress",
         "pbar_kwargs",
+        "join_pool",
     }
 
     def __init__(
@@ -281,6 +281,7 @@ class PathosEngine(ExecutionEngine):
         sleep: tp.Optional[float] = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
+        join_pool: tp.Optional[bool] = None,
         **kwargs,
     ) -> None:
         pool_type = self.resolve_setting(pool_type, "pool_type")
@@ -289,6 +290,7 @@ class PathosEngine(ExecutionEngine):
         sleep = self.resolve_setting(sleep, "sleep")
         show_progress = self.resolve_setting(show_progress, "show_progress")
         pbar_kwargs = self.resolve_setting(pbar_kwargs, "pbar_kwargs", merge=True)
+        join_pool = self.resolve_setting(join_pool, "join_pool")
 
         ExecutionEngine.__init__(
             self,
@@ -298,6 +300,7 @@ class PathosEngine(ExecutionEngine):
             sleep=sleep,
             show_progress=show_progress,
             pbar_kwargs=pbar_kwargs,
+            join_pool=join_pool,
             **kwargs,
         )
 
@@ -307,6 +310,7 @@ class PathosEngine(ExecutionEngine):
         self._sleep = sleep
         self._show_progress = show_progress
         self._pbar_kwargs = pbar_kwargs
+        self._join_pool = join_pool
 
     @property
     def pool_type(self) -> str:
@@ -337,6 +341,11 @@ class PathosEngine(ExecutionEngine):
     def pbar_kwargs(self) -> tp.Kwargs:
         """Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`."""
         return self._pbar_kwargs
+
+    @property
+    def join_pool(self) -> bool:
+        """Whether to join the pool."""
+        return self._join_pool
 
     def execute(self, funcs_args: tp.FuncsArgs, n_calls: tp.Optional[int] = None) -> list:
         from vectorbtpro.utils.module_ import assert_can_import
@@ -376,9 +385,10 @@ class PathosEngine(ExecutionEngine):
                                 raise TimeoutError("%d (of %d) futures unfinished" % (len(pending), total_futures))
                         if self.sleep is not None:
                             time.sleep(self.sleep)
-            pool.close()
-            pool.join()
-            pool.clear()
+            if self.join_pool:
+                pool.close()
+                pool.join()
+                pool.clear()
         return [async_result.get() for async_result in async_results]
 
 
@@ -389,7 +399,7 @@ class MpireEngine(ExecutionEngine):
 
     _settings_path: tp.SettingsPath = "execution.engines.mpire"
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (ExecutionEngine._expected_keys or set()) | {
         "init_kwargs",
         "apply_kwargs",
         "timeout",
@@ -450,7 +460,7 @@ class DaskEngine(ExecutionEngine):
 
     _settings_path: tp.SettingsPath = "execution.engines.dask"
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (ExecutionEngine._expected_keys or set()) | {
         "compute_kwargs",
     }
 
@@ -495,7 +505,7 @@ class RayEngine(ExecutionEngine):
 
     _settings_path: tp.SettingsPath = "execution.engines.ray"
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (ExecutionEngine._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (ExecutionEngine._expected_keys or set()) | {
         "restart",
         "reuse_refs",
         "del_refs",
@@ -706,8 +716,8 @@ def execute(
     funcs_args: tp.FuncsArgs,
     engine: tp.EngineLike = "serial",
     n_calls: tp.Optional[int] = None,
-    n_chunks: tp.Optional[tp.Union[str, int]] = None,
     min_size: tp.Optional[int] = None,
+    n_chunks: tp.Optional[tp.Union[str, int]] = None,
     chunk_len: tp.Optional[tp.Union[str, int]] = None,
     chunk_meta: tp.Optional[tp.Iterable[tp.ChunkMeta]] = None,
     distribute: tp.Optional[str] = None,
@@ -830,10 +840,10 @@ def execute(
         if "pbar_kwargs" in func_arg_names and "pbar_kwargs" not in engine_kwargs:
             engine_kwargs["pbar_kwargs"] = pbar_kwargs
 
-    if n_chunks is None:
-        n_chunks = engine_cfg.get("n_chunks", execution_cfg["n_chunks"])
     if min_size is None:
         min_size = engine_cfg.get("min_size", execution_cfg["min_size"])
+    if n_chunks is None:
+        n_chunks = engine_cfg.get("n_chunks", execution_cfg["n_chunks"])
     if chunk_len is None:
         chunk_len = engine_cfg.get("chunk_len", execution_cfg["chunk_len"])
     if distribute is None:
@@ -942,9 +952,9 @@ def execute(
         return _call_post_execute_func(_execute(funcs_args, n_calls))
 
     if chunk_meta is None:
-        # Generate chunk metadata
         from vectorbtpro.utils.chunking import yield_chunk_meta
 
+        # Generate chunk metadata
         if not isinstance(funcs_args, CustomTemplate) and hasattr(funcs_args, "__len__"):
             _n_calls = len(funcs_args)
         elif n_calls is not None:
@@ -954,14 +964,10 @@ def execute(
                 raise ValueError("When funcs_args is a template, must provide n_calls")
             funcs_args = list(funcs_args)
             _n_calls = len(funcs_args)
-        if isinstance(n_chunks, str) and n_chunks.lower() == "auto":
-            n_chunks = multiprocessing.cpu_count()
-        if isinstance(chunk_len, str) and chunk_len.lower() == "auto":
-            chunk_len = multiprocessing.cpu_count()
         chunk_meta = yield_chunk_meta(
-            n_chunks=n_chunks,
             size=_n_calls,
             min_size=min_size,
+            n_chunks=n_chunks,
             chunk_len=chunk_len,
         )
         if "chunk_meta" not in template_context:

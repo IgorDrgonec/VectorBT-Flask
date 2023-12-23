@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0.0"]
+requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "vectorbtpro"
-version = "2023.10.22"
+version = "2023.12.23"
 description = "Next-Generation Quantitative Analysis Tool"
 license = { file = "LICENSE" }
 authors = [{ name = "Oleg Polakow", email = "olegpolakow@vectorbt.pro" }]
@@ -70,6 +70,8 @@ data = [
     "polygon-api-client>=1.0.0",
     "beautifulsoup4",
     "nasdaq-data-link",
+    "alpha_vantage",
+    "databento",
 ]
 ind-base = ["TA-Lib"]
 ind = ["vectorbtpro[ind-base]", "ta", "pandas_ta", "technical"]
@@ -93,6 +95,8 @@ stats = ["vectorbtpro[stats-base]"]
 msg = ["python-telegram-bot"]
 io-base = ["dill", "blosc2"]
 io = ["vectorbtpro[io-base]", "lz4"]
+other-base = ["tabulate"]
+other = ["vectorbtpro[other-base]"]
 base = [
     "vectorbtpro[data-base,ind-base,perf-base,opt-base,exec-base,plot-base,pfopt-base,stats-base,io-base]"
 ]

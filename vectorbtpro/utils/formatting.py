@@ -6,6 +6,7 @@ import attr
 import inspect
 
 import numpy as np
+import pandas as pd
 
 from vectorbtpro import _typing as tp
 
@@ -13,6 +14,7 @@ __all__ = [
     "prettify",
     "format_func",
     "pprint",
+    "ptable",
     "phelp",
     "pdir",
 ]
@@ -184,6 +186,58 @@ def prettify(
     return repr(obj)
 
 
+def pprint(*args, **kwargs) -> None:
+    """Print the output of `prettify`."""
+    print(prettify(*args, **kwargs))
+
+
+def format_array(array: tp.ArrayLike, tabulate: tp.Optional[bool] = None, html: bool = False, **kwargs) -> str:
+    """Format an array.
+
+    Arguments are passed to `pd.DataFrame.to_string` or `pd.DataFrame.to_html` if `tabulate` is False,
+    otherwise to `tabulate.tabulate`. If `tabulate` is None, will be set to True if the `tabulate`
+    library is installed and `html` is disabled."""
+    from vectorbtpro.base.reshaping import to_pd_array
+
+    pd_array = to_pd_array(array)
+    if tabulate is None:
+        from vectorbtpro.utils.module_ import check_installed
+
+        tabulate = check_installed("tabulate") and not html
+    if tabulate:
+        from vectorbtpro.utils.module_ import assert_can_import
+
+        assert_can_import("tabulate")
+        from tabulate import tabulate
+
+        if isinstance(pd_array, pd.Series):
+            pd_array = pd_array.to_frame()
+        if html:
+            return tabulate(pd_array, headers="keys", tablefmt="html", **kwargs)
+        return tabulate(pd_array, headers="keys", **kwargs)
+    if html:
+        if isinstance(pd_array, pd.Series):
+            pd_array = pd_array.to_frame()
+        return pd_array.to_html(**kwargs)
+    return pd_array.to_string(**kwargs)
+
+
+def ptable(*args, display_html: tp.Optional[bool] = None, **kwargs) -> None:
+    """Print the output of `format_array`.
+
+    If `display_html` is None, checks whether the code runs in a IPython notebook, and if so, becomes True.
+    If `display_html` is True, displays the table in HTML format."""
+    from vectorbtpro.utils.checks import is_notebook
+
+    if display_html is None:
+        display_html = is_notebook()
+    if display_html:
+        from IPython.display import display, HTML
+        display(HTML(format_array(*args, html=True, **kwargs)))
+    else:
+        print(format_array(*args, **kwargs))
+
+
 def format_parameter(param: inspect.Parameter, annotate: bool = False) -> str:
     """Format a parameter of a signature."""
     kind = param.kind
@@ -274,11 +328,6 @@ def format_func(func: tp.Callable, incl_doc: bool = True, **kwargs) -> str:
         func_name,
         format_signature(inspect.signature(func), **kwargs),
     )
-
-
-def pprint(*args, **kwargs) -> None:
-    """Print the output of `prettify`."""
-    print(prettify(*args, **kwargs))
 
 
 def phelp(*args, **kwargs) -> None:

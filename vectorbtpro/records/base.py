@@ -493,7 +493,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
             Useful if any subclass wants to extend the config.
     """
 
-    _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {"_field_config"}
+    _writeable_attrs: tp.WriteableAttrs = {"_field_config"}
 
     _field_config: tp.ClassVar[Config] = HybridConfig(
         dict(
@@ -755,7 +755,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
         return cls(**kwargs)
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Analyzable._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (Analyzable._expected_keys or set()) | {
         "records_arr",
         "col_mapper",
     }

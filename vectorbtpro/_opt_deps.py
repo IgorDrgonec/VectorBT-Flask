@@ -150,6 +150,15 @@ opt_dep_config = HybridConfig(
         fastparquet=dict(
             link="https://pypi.org/project/fastparquet/",
         ),
+        tabulate=dict(
+            link="https://pypi.org/project/tabulate/",
+        ),
+        alpha_vantage=dict(
+            link="https://pypi.org/project/alpha_vantage/",
+        ),
+        databento=dict(
+            link="https://pypi.org/project/databento/",
+        ),
     )
 )
 """_"""

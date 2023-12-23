@@ -9,7 +9,8 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.config import resolve_dict, merge_dicts
+from vectorbtpro.utils.config import resolve_dict, merge_dicts, HybridConfig
+from vectorbtpro.utils.merging import MergeFunc
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.base.reshaping import column_stack, to_2d_array
 from vectorbtpro.base.indexes import stack_indexes, concat_indexes
@@ -18,7 +19,11 @@ __all__ = [
     "concat_merge",
     "row_stack_merge",
     "column_stack_merge",
+    "imageio_merge",
+    "mixed_merge",
 ]
+
+__pdoc__ = {}
 
 
 def concat_merge(
@@ -87,9 +92,20 @@ def concat_merge(
     if wrap_kwargs is None:
         wrap_kwargs = {}
     if wrap is None:
-        wrap = wrapper is not None or keys is not None or len(wrap_kwargs) > 0
+        wrap = isinstance(objs[0], pd.Series) or wrapper is not None or keys is not None or len(wrap_kwargs) > 0
     if not checks.is_iterable(objs[0]) or isinstance(objs[0], str):
         if wrap:
+            if keys is not None and isinstance(keys[0], pd.Index):
+                if len(keys) == 1:
+                    keys = keys[0]
+                else:
+                    keys = concat_indexes(
+                        *keys,
+                        index_concat_method="append",
+                        index_stack_kwargs=index_stack_kwargs,
+                        verify_integrity=False,
+                        axis=0,
+                    )
             wrap_kwargs = merge_dicts(dict(index=keys), wrap_kwargs)
             return pd.Series(objs, **wrap_kwargs)
         return np.asarray(objs)
@@ -113,8 +129,9 @@ def concat_merge(
                 if default_index and not checks.is_default_index(new_objs[-1].index, check_names=True):
                     default_index = False
             objs = new_objs
-        else:
-            return np.concatenate(objs)
+
+    if not wrap:
+        return np.concatenate(objs)
 
     if keys is not None and isinstance(keys[0], pd.Index):
         new_obj = pd.concat(objs, axis=0, **kwargs)
@@ -209,7 +226,12 @@ def row_stack_merge(
     if wrap_kwargs is None:
         wrap_kwargs = {}
     if wrap is None:
-        wrap = wrapper is not None or keys is not None or len(wrap_kwargs) > 0
+        wrap = (
+            isinstance(objs[0], (pd.Series, pd.DataFrame))
+            or wrapper is not None
+            or keys is not None
+            or len(wrap_kwargs) > 0
+        )
     if isinstance(objs[0], pd.Index):
         objs = list(map(lambda x: x.to_series(), objs))
 
@@ -241,8 +263,9 @@ def row_stack_merge(
                 if default_index and not checks.is_default_index(new_objs[-1].index, check_names=True):
                     default_index = False
             objs = new_objs
-        else:
-            return np.row_stack(objs)
+
+    if not wrap:
+        return np.row_stack(objs)
 
     if keys is not None and isinstance(keys[0], pd.Index):
         new_obj = pd.concat(objs, axis=0, **kwargs)
@@ -368,7 +391,12 @@ def column_stack_merge(
     if wrap_kwargs is None:
         wrap_kwargs = {}
     if wrap is None:
-        wrap = wrapper is not None or keys is not None or len(wrap_kwargs) > 0
+        wrap = (
+            isinstance(objs[0], (pd.Series, pd.DataFrame))
+            or wrapper is not None
+            or keys is not None
+            or len(wrap_kwargs) > 0
+        )
     if isinstance(objs[0], pd.Index):
         objs = list(map(lambda x: x.to_series(), objs))
 
@@ -404,35 +432,36 @@ def column_stack_merge(
                 ):
                     default_columns = False
             objs = new_objs
-        else:
-            if reset_index is not None:
-                min_n_rows = None
-                max_n_rows = None
-                n_cols = 0
-                new_objs = []
-                for obj in objs:
-                    new_obj = to_2d_array(obj)
-                    new_objs.append(new_obj)
-                    if min_n_rows is None or new_obj.shape[0] < min_n_rows:
-                        min_n_rows = new_obj.shape[0]
-                    if max_n_rows is None or new_obj.shape[0] > min_n_rows:
-                        max_n_rows = new_obj.shape[0]
-                    n_cols += new_obj.shape[1]
-                if min_n_rows == max_n_rows:
-                    return column_stack(new_objs)
-                new_obj = np.full((max_n_rows, n_cols), fill_value)
-                start_col = 0
-                for obj in new_objs:
-                    end_col = start_col + obj.shape[1]
-                    if isinstance(reset_index, str) and reset_index.lower() == "from_start":
-                        new_obj[: len(obj), start_col:end_col] = obj
-                    elif isinstance(reset_index, str) and reset_index.lower() == "from_end":
-                        new_obj[-len(obj) :, start_col:end_col] = obj
-                    else:
-                        raise ValueError(f"Invalid index resetting option '{reset_index}'")
-                    start_col = end_col
-                return new_obj
-            return column_stack(objs)
+
+    if not wrap:
+        if reset_index is not None:
+            min_n_rows = None
+            max_n_rows = None
+            n_cols = 0
+            new_objs = []
+            for obj in objs:
+                new_obj = to_2d_array(obj)
+                new_objs.append(new_obj)
+                if min_n_rows is None or new_obj.shape[0] < min_n_rows:
+                    min_n_rows = new_obj.shape[0]
+                if max_n_rows is None or new_obj.shape[0] > min_n_rows:
+                    max_n_rows = new_obj.shape[0]
+                n_cols += new_obj.shape[1]
+            if min_n_rows == max_n_rows:
+                return column_stack(new_objs)
+            new_obj = np.full((max_n_rows, n_cols), fill_value)
+            start_col = 0
+            for obj in new_objs:
+                end_col = start_col + obj.shape[1]
+                if isinstance(reset_index, str) and reset_index.lower() == "from_start":
+                    new_obj[: len(obj), start_col:end_col] = obj
+                elif isinstance(reset_index, str) and reset_index.lower() == "from_end":
+                    new_obj[-len(obj) :, start_col:end_col] = obj
+                else:
+                    raise ValueError(f"Invalid index resetting option '{reset_index}'")
+                start_col = end_col
+            return new_obj
+        return column_stack(objs)
 
     if reset_index is not None:
         max_length = max(map(len, objs))
@@ -471,13 +500,82 @@ def column_stack_merge(
     return pd.concat(objs, axis=1, keys=keys, **kwargs)
 
 
+def imageio_merge(
+    *objs,
+    keys: tp.Optional[tp.Index] = None,
+    to_image_kwargs: tp.KwargsLike = None,
+    imread_kwargs: tp.KwargsLike = None,
+    **imwrite_kwargs,
+) -> tp.MaybeTuple[tp.Union[None, bytes]]:
+    """Merge multiple figure-like objects by writing them with `imageio`.
+
+    Keyword arguments `to_image_kwargs` are passed to `plotly.graph_objects.Figure.to_image`.
+    Keyword arguments `imread_kwargs` and `**imwrite_kwargs` are passed to
+    `imageio.imread` and `imageio.imwrite` respectively.
+
+    Keys are not used in any way."""
+    from vectorbtpro.utils.module_ import assert_can_import
+
+    assert_can_import("plotly")
+    import plotly.graph_objects as go
+    import imageio.v3 as iio
+
+    if len(objs) == 1:
+        objs = objs[0]
+    objs = list(objs)
+    if len(objs) == 0:
+        raise ValueError("No objects to be merged")
+
+    if isinstance(objs[0], tuple):
+        if len(objs[0]) == 1:
+            out_tuple = (
+                imageio_merge(
+                    list(map(lambda x: x[0], objs)),
+                    keys=keys,
+                    imread_kwargs=imread_kwargs,
+                    to_image_kwargs=to_image_kwargs,
+                    **imwrite_kwargs,
+                ),
+            )
+        else:
+            out_tuple = tuple(
+                map(
+                    lambda x: imageio_merge(
+                        x,
+                        keys=keys,
+                        imread_kwargs=imread_kwargs,
+                        to_image_kwargs=to_image_kwargs,
+                        **imwrite_kwargs,
+                    ),
+                    zip(*objs),
+                )
+            )
+        if checks.is_namedtuple(objs[0]):
+            return type(objs[0])(*out_tuple)
+        return type(objs[0])(out_tuple)
+
+    if imread_kwargs is None:
+        imread_kwargs = {}
+    if to_image_kwargs is None:
+        to_image_kwargs = {}
+
+    frames = []
+    for obj in objs:
+        if obj is None:
+            continue
+        if isinstance(obj, (go.Figure, go.FigureWidget)):
+            obj = obj.to_image(**to_image_kwargs)
+        if not isinstance(obj, np.ndarray):
+            obj = iio.imread(obj, **imread_kwargs)
+        frames.append(obj)
+    return iio.imwrite(image=frames, **imwrite_kwargs)
+
+
 def mixed_merge(
     *objs,
-    func_names: tp.Optional[tp.Tuple[str, ...]] = None,
-    wrap: tp.Union[None, str, bool] = None,
-    wrapper: tp.Optional[ArrayWrapper] = None,
-    wrap_kwargs: tp.KwargsLikeSequence = None,
+    merge_funcs: tp.Optional[tp.MergeFuncLike] = None,
     keys: tp.Optional[tp.Index] = None,
+    mixed_kwargs: tp.Optional[tp.Sequence[tp.KwargsLike]] = None,
     **kwargs,
 ) -> tp.MaybeTuple[tp.AnyArray]:
     """Merge objects of mixed types."""
@@ -486,50 +584,75 @@ def mixed_merge(
     objs = list(objs)
     if len(objs) == 0:
         raise ValueError("No objects to be merged")
-    if func_names is None:
-        raise ValueError("Merging function names are required")
+    if merge_funcs is None:
+        raise ValueError("Merging functions or their names are required")
     if not isinstance(objs[0], tuple):
         raise ValueError("Mixed merging must be applied on tuples")
 
     outputs = []
-    for i, obj_kind in enumerate(zip(*objs)):
-        func_name = func_names[i]
-        merge_func = resolve_merge_func(func_name)
-        output = merge_func(
-            obj_kind,
-            keys=keys,
-            wrap=wrap,
-            wrapper=wrapper,
-            wrap_kwargs=wrap_kwargs,
-            **kwargs,
-        )
-        outputs.append(output)
+    for i, output_objs in enumerate(zip(*objs)):
+        output_objs = list(output_objs)
+        merge_func = resolve_merge_func(merge_funcs[i])
+        if merge_func is None:
+            outputs.append(output_objs)
+        else:
+            if mixed_kwargs is None:
+                _kwargs = kwargs
+            else:
+                _kwargs = merge_dicts(kwargs, mixed_kwargs[i])
+            output = merge_func(output_objs, keys=keys, **_kwargs)
+            outputs.append(output)
     return tuple(outputs)
 
 
-def resolve_merge_func(func_name: tp.MaybeTuple[str]) -> tp.Callable:
-    """Resolve merging function based on name.
+merge_func_config = HybridConfig(
+    dict(
+        concat=concat_merge,
+        row_stack=row_stack_merge,
+        column_stack=column_stack_merge,
+        reset_column_stack=partial(column_stack_merge, reset_index=True),
+        from_start_column_stack=partial(column_stack_merge, reset_index="from_start"),
+        from_end_column_stack=partial(column_stack_merge, reset_index="from_end"),
+        imageio=imageio_merge,
+    )
+)
+"""_"""
 
-    * Tuple of strings: `mixed_merge` with `func_names=func_name`
-    * String "concat": `concat_merge`
-    * String "row_stack": `column_stack_merge`
-    * String "column_stack": `column_stack_merge`
-    * String "reset_column_stack": `column_stack_merge` with `reset_index=True`
-    * String "from_start_column_stack": `column_stack_merge` with `reset_index="from_start"`
-    * String "from_end_column_stack": `column_stack_merge` with `reset_index="from_end"`
-    """
-    if isinstance(func_name, tuple):
-        return partial(mixed_merge, func_names=func_name)
-    if func_name.lower() == "concat":
-        return concat_merge
-    if func_name.lower() == "row_stack":
-        return row_stack_merge
-    if func_name.lower() == "column_stack":
-        return column_stack_merge
-    if func_name.lower() == "reset_column_stack":
-        return partial(column_stack_merge, reset_index=True)
-    if func_name.lower() == "from_start_column_stack":
-        return partial(column_stack_merge, reset_index="from_start")
-    if func_name.lower() == "from_end_column_stack":
-        return partial(column_stack_merge, reset_index="from_end")
-    raise ValueError(f"Invalid merging function name '{func_name}'")
+__pdoc__["merge_func_config"] = f"""Config for merging functions.
+
+```python
+{merge_func_config.prettify()}
+```
+"""
+
+
+def resolve_merge_func(merge_func: tp.MergeFuncLike) -> tp.Optional[tp.Callable]:
+    """Resolve a merging function into a callable.
+
+    If a string, looks up into `merge_func_config`. If a sequence, uses `mixed_merge` with
+    `merge_funcs=merge_func`. If an instance of `vectorbtpro.utils.merging.MergeFunc`, calls
+    `vectorbtpro.utils.merging.MergeFunc.resolve_merge_func` to get the actual callable."""
+    if merge_func is None:
+        return None
+    if isinstance(merge_func, str):
+        if merge_func.lower() not in merge_func_config:
+            raise ValueError(f"Invalid merging function name '{merge_func}'")
+        return merge_func_config[merge_func.lower()]
+    if checks.is_sequence(merge_func):
+        return partial(mixed_merge, merge_funcs=merge_func)
+    if isinstance(merge_func, MergeFunc):
+        return merge_func.resolve_merge_func()
+    return merge_func
+
+
+def is_merge_func_from_config(merge_func: tp.MergeFuncLike) -> bool:
+    """Return whether the merging function can be found in `merge_func_config`."""
+    if merge_func is None:
+        return False
+    if isinstance(merge_func, str):
+        return merge_func.lower() in merge_func_config
+    if checks.is_sequence(merge_func):
+        return all(map(is_merge_func_from_config, merge_func))
+    if isinstance(merge_func, MergeFunc):
+        return is_merge_func_from_config(merge_func.merge_func)
+    return False

@@ -188,8 +188,12 @@ def split(
                 if return_splitter:
                     return splitter
 
-            ann_args = annotate_args(func, args, kwargs)
+            ann_args = annotate_args(func, args, kwargs, attach_annotations=True)
             flat_ann_args = flatten_ann_args(ann_args)
+            if isinstance(splitter, splitter_cls):
+                flat_ann_args = splitter.parse_and_inject_takeables(flat_ann_args)
+            else:
+                flat_ann_args = splitter_cls.parse_and_inject_takeables(flat_ann_args)
             for k, v in flat_ann_args.items():
                 if isinstance(v["value"], Takeable):
                     takeable_args.add(k)

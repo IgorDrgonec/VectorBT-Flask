@@ -35,11 +35,12 @@ except ImportError:
 if TYPE_CHECKING:
     from vectorbtpro.utils.parsing import Regex
     from vectorbtpro.utils.execution import ExecutionEngine
-    from vectorbtpro.utils.chunking import Sizer, ChunkTaker, ChunkMeta, ChunkMetaGenerator
+    from vectorbtpro.utils.chunking import Sizer, NotChunked, ChunkTaker, ChunkMeta, ChunkMetaGenerator
     from vectorbtpro.utils.jitting import Jitter
     from vectorbtpro.utils.template import CustomTemplate
     from vectorbtpro.utils.datetime_ import DTC, DTCNT
     from vectorbtpro.utils.selection import PosSel, LabelSel
+    from vectorbtpro.utils.merging import MergeFunc
     from vectorbtpro.base.indexing import hslice
     from vectorbtpro.base.grouping.base import Grouper
     from vectorbtpro.base.resampling.base import Resampler
@@ -48,6 +49,7 @@ else:
     Regex = "Regex"
     ExecutionEngine = "ExecutionEngine"
     Sizer = "Sizer"
+    NotChunked = "NotChunked"
     ChunkTaker = "ChunkTaker"
     ChunkMeta = "ChunkMeta"
     ChunkMetaGenerator = "ChunkMetaGenerator"
@@ -58,6 +60,7 @@ else:
     DTCNT = "DTCNT"
     PosSel = "PosSel"
     LabelSel = "LabelSel"
+    MergeFunc = "MergeFunc"
     hslice = "hslice"
     Grouper = "Grouper"
     Resampler = "Resampler"
@@ -172,8 +175,10 @@ Kwargs = Dict[str, Any]
 KwargsLike = Union[None, Kwargs]
 KwargsLikeSequence = MaybeSequence[KwargsLike]
 PathLike = Union[str, Path]
-SettingsPath = ClassVar[Union[None, Hashable, Dict[Hashable, Hashable]]]
 PathLikeKey = Union[Hashable, Path]
+SettingsPath = ClassVar[Union[None, Hashable, Dict[Hashable, Hashable]]]
+WriteableAttrs = ClassVar[Optional[Set[str]]]
+ExpectedKeys = ClassVar[Optional[Set[str]]]
 
 # Data
 Column = Key = Feature = Symbol = Hashable
@@ -223,6 +228,10 @@ Params = Sequence[Param]
 MappingLike = Union[str, Mapping, NamedTuple, EnumMeta, IndexLike]
 RecordsLike = Union[SeriesFrame, RecordArray, Sequence[MappingLike]]
 
+# Annotations
+Annotation = object
+Annotations = Dict[str, Annotation]
+
 # Parsing
 AnnArgs = Dict[str, Kwargs]
 FlatAnnArgs = Dict[str, Kwargs]
@@ -238,15 +247,18 @@ JittedOption = Union[None, bool, str, Callable, Kwargs]
 JitterLike = Union[str, Jitter, Type[Jitter]]
 TaskId = Union[Hashable, Callable]
 
+# Merging
+MergeFuncLike = MaybeSequence[Union[None, str, Callable, MergeFunc]]
+
 # Chunking
 SizeFunc = Callable[[AnnArgs], int]
 SizeLike = Union[int, Sizer, SizeFunc]
 ChunkMetaFunc = Callable[[AnnArgs], Iterable[ChunkMeta]]
 ChunkMetaLike = Union[Iterable[ChunkMeta], ChunkMetaGenerator, ChunkMetaFunc]
-TakeSpec = Union[None, ChunkTaker]
+TakeSpec = Union[None, Type[NotChunked], Type[ChunkTaker], NotChunked, ChunkTaker]
 ArgTakeSpec = Mapping[AnnArgQuery, TakeSpec]
 ArgTakeSpecFunc = Callable[[AnnArgs, ChunkMeta], Tuple[Args, Kwargs]]
-ArgTakeSpecLike = Union[Sequence[TakeSpec], ArgTakeSpec, ArgTakeSpecFunc]
+ArgTakeSpecLike = Union[Sequence[TakeSpec], ArgTakeSpec, ArgTakeSpecFunc, CustomTemplate]
 MappingTakeSpec = Mapping[Hashable, TakeSpec]
 SequenceTakeSpec = Sequence[TakeSpec]
 ContainerTakeSpec = Union[MappingTakeSpec, SequenceTakeSpec]

@@ -259,7 +259,7 @@ class ReturnsAccessor(GenericAccessor):
                 )
         return kwargs
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (GenericAccessor._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (GenericAccessor._expected_keys or set()) | {
         "bm_returns",
         "log_returns",
         "year_freq",
@@ -1708,7 +1708,7 @@ class ReturnsAccessor(GenericAccessor):
     def resolve_self(
         self: ReturnsAccessorT,
         cond_kwargs: tp.KwargsLike = None,
-        custom_arg_names: tp.ClassVar[tp.Optional[tp.Set[str]]] = None,
+        custom_arg_names: tp.Optional[tp.Set[str]] = None,
         impacts_caching: bool = True,
         silence_warnings: bool = False,
     ) -> ReturnsAccessorT:

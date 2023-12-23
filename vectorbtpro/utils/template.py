@@ -11,11 +11,11 @@ import pandas as pd
 
 import vectorbtpro as vbt
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils import checks
-from vectorbtpro.utils.config import set_dict_item, merge_dicts
+from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.hashing import Hashable
 from vectorbtpro.utils.parsing import get_func_arg_names
+from vectorbtpro.utils.search import any_in_obj, find_and_replace_in_obj
 
 __all__ = [
     "CustomTemplate",
@@ -221,89 +221,38 @@ class RepFunc(CustomTemplate):
         return self
 
 
-def has_templates(
-    obj: tp.Any,
-    except_types: tp.Optional[tp.Sequence[type]] = None,
-    max_len: tp.Optional[int] = None,
-    max_depth: tp.Optional[int] = None,
-    _depth: int = 0,
-) -> tp.Any:
+def has_templates(obj: tp.Any, **kwargs) -> tp.Any:
     """Check if the object has any templates.
 
-    For arguments, see `substitute_templates`."""
+    Uses `vectorbtpro.utils.search.any_in_obj`.
+
+    Default can be overridden with `search_kwargs` under `vectorbtpro._settings.template`."""
     from vectorbtpro._settings import settings
 
     template_cfg = settings["template"]
 
-    if except_types is None:
-        except_types = template_cfg["except_types"]
-    if max_len is None:
-        max_len = template_cfg["max_len"]
-    if max_depth is None:
-        max_depth = template_cfg["max_depth"]
+    search_kwargs = merge_dicts(template_cfg["search_kwargs"], kwargs)
 
-    if except_types is not None and checks.is_instance_of(obj, except_types):
-        return False
-    if isinstance(obj, (Template, CustomTemplate)):
-        return True
-    if max_depth is None or _depth < max_depth:
-        if isinstance(obj, dict):
-            if max_len is None or len(obj) <= max_len:
-                for k, v in obj.items():
-                    if has_templates(
-                        v,
-                        except_types=except_types,
-                        max_len=max_len,
-                        max_depth=max_depth,
-                        _depth=_depth + 1,
-                    ):
-                        return True
-        if isinstance(obj, (tuple, list, set, frozenset)):
-            if max_len is None or len(obj) <= max_len:
-                for v in obj:
-                    if has_templates(
-                        v,
-                        except_types=except_types,
-                        max_len=max_len,
-                        max_depth=max_depth,
-                        _depth=_depth + 1,
-                    ):
-                        return True
-    return False
+    def _match_func(k, v):
+        return isinstance(v, (CustomTemplate, Template))
+
+    return any_in_obj(obj, _match_func, **search_kwargs)
 
 
 def substitute_templates(
     obj: tp.Any,
     context: tp.KwargsLike = None,
     strict: tp.Optional[bool] = None,
-    make_copy: bool = True,
     sub_id: tp.Optional[Hashable] = None,
-    except_types: tp.Optional[tp.Sequence[type]] = None,
-    max_len: tp.Optional[int] = None,
-    max_depth: tp.Optional[int] = None,
-    _depth: int = 0,
+    **kwargs,
 ) -> tp.Any:
     """Traverses the object recursively and, if any template found, substitutes it using a context.
 
-    Traverses tuples, lists, dicts and (frozen-)sets. Does not look for templates in keys.
-
-    If `except_types` is not None, uses `vectorbtpro.utils.checks.is_instance_of` to check whether
-    the object is one of the types that are blacklisted. If so, the object is simply returned.
-    By default, out of all sequences, only dicts and tuples are substituted.
-
-    If `max_len` is not None, processes any object only if it's shorter than the specified length.
-
-    If `max_depth` is not None, processes any object only up to a certain recursion level.
-    Level of 0 means dicts and other iterables are not processed, only templates are expected.
+    Uses `vectorbtpro.utils.search.find_and_replace_in_obj`.
 
     If `strict` is True, raises an error if processing template fails. Otherwise, returns the original template.
 
-    For defaults, see `vectorbtpro._settings.template`.
-
-    !!! note
-        If the object is deep (such as a dict or a list), creates a copy of it if any template found inside,
-        thus loosing the reference to the original. Make sure to do a deep or hybrid copy of the object
-        before proceeding for consistent behavior, or disable `make_copy` to override the original in place.
+    Default can be overridden with `search_kwargs` under `vectorbtpro._settings.template`.
 
     Usage:
         ```pycon
@@ -333,85 +282,15 @@ def substitute_templates(
 
     template_cfg = settings["template"]
 
-    if except_types is None:
-        except_types = template_cfg["except_types"]
-    if max_len is None:
-        max_len = template_cfg["max_len"]
-    if max_depth is None:
-        max_depth = template_cfg["max_depth"]
-    if context is None:
-        context = {}
+    search_kwargs = merge_dicts(template_cfg["search_kwargs"], kwargs)
 
-    if not has_templates(
-        obj,
-        except_types=except_types,
-        max_len=max_len,
-        max_depth=max_depth,
-        _depth=_depth,
-    ):
-        return obj
+    def _match_func(k, v):
+        return isinstance(v, (CustomTemplate, Template))
 
-    if isinstance(obj, CustomTemplate):
-        return obj.substitute(context=context, strict=strict, sub_id=sub_id)
-    if isinstance(obj, Template):
-        return obj.substitute(context=context)
-    if max_depth is None or _depth < max_depth:
-        if except_types is not None and checks.is_instance_of(obj, except_types):
-            return obj
-        if isinstance(obj, dict):
-            if max_len is None or len(obj) <= max_len:
-                if make_copy:
-                    obj = copy(obj)
-                for k, v in obj.items():
-                    set_dict_item(
-                        obj,
-                        k,
-                        substitute_templates(
-                            v,
-                            context=context,
-                            strict=strict,
-                            sub_id=sub_id,
-                            except_types=except_types,
-                            max_len=max_len,
-                            max_depth=max_depth,
-                            _depth=_depth + 1,
-                        ),
-                        force=True,
-                    )
-                return obj
-        if isinstance(obj, list):
-            if max_len is None or len(obj) <= max_len:
-                if make_copy:
-                    obj = copy(obj)
-                for i in range(len(obj)):
-                    obj[i] = substitute_templates(
-                        obj[i],
-                        context=context,
-                        strict=strict,
-                        sub_id=sub_id,
-                        except_types=except_types,
-                        max_len=max_len,
-                        max_depth=max_depth,
-                        _depth=_depth + 1,
-                    )
-                return obj
-        if isinstance(obj, (tuple, set, frozenset)):
-            if max_len is None or len(obj) <= max_len:
-                result = []
-                for o in obj:
-                    result.append(
-                        substitute_templates(
-                            o,
-                            context=context,
-                            strict=strict,
-                            sub_id=sub_id,
-                            except_types=except_types,
-                            max_len=max_len,
-                            max_depth=max_depth,
-                            _depth=_depth + 1,
-                        )
-                    )
-                if checks.is_namedtuple(obj):
-                    return type(obj)(*result)
-                return type(obj)(result)
-    return obj
+    def _replace_func(k, v):
+        if isinstance(v, CustomTemplate):
+            return v.substitute(context=context, strict=strict, sub_id=sub_id)
+        if isinstance(v, Template):
+            return v.substitute(context=context)
+
+    return find_and_replace_in_obj(obj, _match_func, _replace_func, **search_kwargs)

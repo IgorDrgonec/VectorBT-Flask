@@ -108,7 +108,11 @@ def merge_sim_outs(
 merge_sim_outs_config = ReadonlyConfig(
     dict(
         merge_func=merge_sim_outs,
-        merge_kwargs=dict(chunk_meta=Rep("chunk_meta"), ann_args=Rep("ann_args"), mapper=base_ch.group_lens_mapper),
+        merge_kwargs=dict(
+            chunk_meta=Rep("chunk_meta"),
+            ann_args=Rep("ann_args"),
+            mapper=base_ch.group_lens_mapper,
+        ),
     )
 )
 """Config for merging using `merge_sim_outs`."""

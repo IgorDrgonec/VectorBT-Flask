@@ -104,7 +104,7 @@ class ColumnMapper(Wrapping):
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
         return cls(**kwargs)
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Wrapping._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (Wrapping._expected_keys or set()) | {
         "col_arr",
     }
 

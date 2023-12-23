@@ -47,7 +47,7 @@ class BaseIDXAccessor(Configured):
 
     Accessible via `pd.Index.vbt` and all child accessors."""
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Configured._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (Configured._expected_keys or set()) | {
         "obj",
         "freq",
     }
@@ -633,7 +633,7 @@ class BaseAccessor(Wrapping):
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
         return cls.df_accessor_cls(**kwargs)
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Wrapping._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (Wrapping._expected_keys or set()) | {
         "obj",
     }
 

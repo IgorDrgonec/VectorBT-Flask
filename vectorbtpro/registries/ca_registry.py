@@ -51,7 +51,7 @@ To access the cache or any metric of interest, we can ask the setup:
 >>> my_setup = my_ca_func.get_ca_setup()
 
 >>> # Cache is empty
->>> my_setup.get_status()
+>>> my_setup.get_stats()
 {
     'hash': 4792160544297109364,
     'string': '<bound func __main__.<lambda>>',
@@ -73,7 +73,7 @@ To access the cache or any metric of interest, we can ask the setup:
 
 >>> # The result is cached
 >>> my_ca_func()
->>> my_setup.get_status()
+>>> my_setup.get_stats()
 {
     'hash': 4792160544297109364,
     'string': '<bound func __main__.<lambda>>',
@@ -95,7 +95,7 @@ To access the cache or any metric of interest, we can ask the setup:
 
 >>> # The cached result is retrieved
 >>> my_ca_func()
->>> my_setup.get_status()
+>>> my_setup.get_stats()
 {
     'hash': 4792160544297109364,
     'string': '<bound func __main__.<lambda>>',
@@ -304,7 +304,7 @@ and 2) enable caching on the unbound function.
 True
 ```
 
-## Getting overview
+## Getting statistics
 
 The main advantage of having a central registry of setups is that we can easily find any setup
 registered in any part of vectorbt that matches some condition using `CacheableRegistry.match_setups`.
@@ -345,11 +345,11 @@ Let's get the runnable setup of any property and method called `f2`:
 }
 ```
 
-But there is a better way to get an overview: `CAQueryDelegator.get_status_overview`.
-It returns a DataFrame with setup statuses as rows:
+But there is a better way to get the stats: `CAQueryDelegator.get_stats`.
+It returns a DataFrame with setup stats as rows:
 
 ```pycon
->>> vbt.CAQueryDelegator('f2', kind='runnable').get_status_overview()
+>>> vbt.CAQueryDelegator('f2', kind='runnable').get_stats()
                                                string  use_cache  whitelist  \\
 hash
  3506416602224216137  <instance method __main__.C.f2>       True      False
@@ -418,21 +418,31 @@ from vectorbtpro.utils.caching import Cacheable
 from vectorbtpro.utils.datetime_ import to_naive_datetime
 from vectorbtpro.utils.decorators import cacheableT, cacheable_property
 from vectorbtpro.utils.hashing import Hashable
-from vectorbtpro.utils.parsing import Regex, hash_args, UnhashableArgsError
+from vectorbtpro.utils.parsing import Regex, hash_args, UnhashableArgsError, get_func_arg_names
 from vectorbtpro.utils.profiling import Timer
+from vectorbtpro.utils.formatting import ptable
 
 __all__ = [
     "ca_reg",
     "CAQuery",
+    "CARule",
     "CAQueryDelegator",
+    "get_cache_stats",
+    "print_cache_stats",
     "clear_cache",
     "collect_garbage",
     "flush",
+    "disable_caching",
+    "enable_caching",
+    "CachingDisabled",
+    "CachingEnabled",
 ]
 
 __pdoc__ = {}
 
-_GARBAGE = object()
+
+class _GARBAGE:
+    pass
 
 
 def is_cacheable_function(cacheable: tp.Any) -> bool:
@@ -734,6 +744,76 @@ class CAQuery(Hashable):
         )
 
 
+@attr.s(frozen=True, eq=False)
+class CARule(Hashable):
+    """Data class that represents a rule that should be enforced on setups that match a query."""
+
+    query: CAQuery = attr.ib()
+    """`CAQuery` used in matching."""
+
+    enforce_func: tp.Optional[tp.Callable] = attr.ib()
+    """Function to run on the setup if it has been matched."""
+
+    kind: tp.Optional[tp.MaybeIterable[str]] = attr.ib(default=None)
+    """Kind of a setup to match."""
+
+    exclude: tp.Optional[tp.MaybeIterable["CABaseSetup"]] = attr.ib(default=None)
+    """One or multiple setups to exclude."""
+
+    filter_func: tp.Optional[tp.Callable] = attr.ib(default=None)
+    """Function to filter out a setup."""
+
+    def matches_setup(self, setup: "CABaseSetup") -> bool:
+        """Return whether the setup matches the rule."""
+        if not self.query.matches_setup(setup):
+            return False
+        if self.kind is not None:
+            kind = self.kind
+            if isinstance(kind, str):
+                kind = {kind}
+            else:
+                kind = set(kind)
+            if isinstance(setup, CAClassSetup):
+                setup_kind = "class"
+            elif isinstance(setup, CAInstanceSetup):
+                setup_kind = "instance"
+            elif isinstance(setup, CAUnboundSetup):
+                setup_kind = "unbound"
+            else:
+                setup_kind = "runnable"
+            if setup_kind not in kind:
+                return False
+        if self.exclude is not None:
+            exclude = self.exclude
+            if exclude is None:
+                exclude = set()
+            if isinstance(exclude, CABaseSetup):
+                exclude = {exclude}
+            else:
+                exclude = set(exclude)
+            if setup in exclude:
+                return False
+        if self.filter_func is not None:
+            if not self.filter_func(setup):
+                return False
+        return True
+
+    def enforce(self, setup: "CABaseSetup") -> None:
+        """Run `CARule.enforce_func` on the setup if it has been matched."""
+        if self.matches_setup(setup):
+            self.enforce_func(setup)
+
+    @property
+    def hash_key(self) -> tuple:
+        return (
+            self.query,
+            self.enforce_func,
+            self.kind,
+            self.exclude if isinstance(self.exclude, CABaseSetup) else tuple(self.exclude),
+            self.filter_func,
+        )
+
+
 class CacheableRegistry:
     """Class that registers setups of cacheables."""
 
@@ -742,6 +822,7 @@ class CacheableRegistry:
         self._instance_setups = dict()
         self._unbound_setups = dict()
         self._run_setups = dict()
+        self._rules = []
 
     @property
     def class_setups(self) -> tp.Dict[int, "CAClassSetup"]:
@@ -763,6 +844,16 @@ class CacheableRegistry:
         """Dict of registered `CARunSetup` instances by their hash."""
         return self._run_setups
 
+    @property
+    def setups(self) -> tp.Dict[int, "CABaseSetup"]:
+        """Dict of registered `CABaseSetup` instances by their hash."""
+        return {**self.class_setups, **self.instance_setups, **self.unbound_setups, **self.run_setups}
+
+    @property
+    def rules(self) -> tp.List[CARule]:
+        """List of registered `CARule` instances."""
+        return self._rules
+
     def get_setup_by_hash(self, hash_: int) -> tp.Optional["CABaseSetup"]:
         """Get the setup by its hash."""
         if hash_ in self.class_setups:
@@ -774,6 +865,10 @@ class CacheableRegistry:
         if hash_ in self.run_setups:
             return self.run_setups[hash_]
         return None
+
+    def setup_registered(self, setup: "CABaseSetup") -> bool:
+        """Return whether the setup is registered."""
+        return self.get_setup_by_hash(hash(setup)) is not None
 
     def register_setup(self, setup: "CABaseSetup") -> None:
         """Register a new setup of type `CABaseSetup`."""
@@ -790,7 +885,7 @@ class CacheableRegistry:
         setups[hash(setup)] = setup
 
     def deregister_setup(self, setup: "CABaseSetup") -> None:
-        """Deregister a new setup of type `CABaseSetup`
+        """Deregister a new setup of type `CABaseSetup`.
 
         Removes the setup from its respective collection.
 
@@ -807,6 +902,14 @@ class CacheableRegistry:
             raise TypeError(str(type(setup)))
         if hash(setup) in setups:
             del setups[hash(setup)]
+
+    def register_rule(self, rule: CARule) -> None:
+        """Register a new rule of type `CARule`."""
+        self.rules.append(rule)
+
+    def deregister_rule(self, rule: CARule) -> None:
+        """Deregister a rule of type `CARule`."""
+        self.rules.remove(rule)
 
     def get_run_setup(
         self,
@@ -840,7 +943,7 @@ class CacheableRegistry:
         self,
         query_like: tp.MaybeIterable[tp.Any] = None,
         collapse: bool = False,
-        kind: tp.Optional[tp.MaybeIterable[str]] = "runnable",
+        kind: tp.Optional[tp.MaybeIterable[str]] = None,
         exclude: tp.Optional[tp.MaybeIterable["CABaseSetup"]] = None,
         exclude_children: bool = True,
         filter_func: tp.Optional[tp.Callable] = None,
@@ -1050,6 +1153,9 @@ class CABaseSetup(CAMetrics, Hashable):
     whitelist: tp.Optional[bool] = attr.ib(default=None)
     """Whether to cache even if caching was disabled globally."""
 
+    active: bool = attr.ib(default=True)
+    """Whether to register and/or return setup when requested."""
+
     def __attrs_post_init__(self) -> None:
         object.__setattr__(self, "_creation_time", datetime.now(timezone.utc))
         object.__setattr__(self, "_use_cache_lut", None)
@@ -1094,6 +1200,24 @@ class CABaseSetup(CAMetrics, Hashable):
     def deregister(self) -> None:
         """Register setup using `CacheableRegistry.deregister_setup`."""
         self.registry.deregister_setup(self)
+
+    @property
+    def registered(self) -> bool:
+        """Return whether setup is registered."""
+        return self.registry.setup_registered(self)
+
+    def enforce_rules(self) -> None:
+        """Enforce registry rules."""
+        for rule in self.registry.rules:
+            rule.enforce(self)
+
+    def activate(self) -> None:
+        """Activate."""
+        object.__setattr__(self, "active", True)
+
+    def deactivate(self) -> None:
+        """Deactivate."""
+        object.__setattr__(self, "active", False)
 
     def enable_whitelist(self) -> None:
         """Enable whitelisting."""
@@ -1203,8 +1327,8 @@ class CABaseSetup(CAMetrics, Hashable):
         """Convert this setup into a readable string."""
         return f"{self.readable_name}:{self.position_among_similar}"
 
-    def get_status(self, readable: bool = True, short_str: bool = False) -> dict:
-        """Get status of the setup as a dict with metrics."""
+    def get_stats(self, readable: bool = True, short_str: bool = False) -> dict:
+        """Get stats of the setup as a dict with metrics."""
         if short_str:
             string = self.short_str
         else:
@@ -1430,7 +1554,7 @@ class CASetupDelegatorMixin(CAMetrics):
             return None
         return list(sorted(last_hit_times))[-1]
 
-    def get_status_overview(
+    def get_stats(
         self,
         readable: bool = True,
         short_str: bool = False,
@@ -1439,12 +1563,12 @@ class CASetupDelegatorMixin(CAMetrics):
         include: tp.Optional[tp.MaybeSequence[str]] = None,
         exclude: tp.Optional[tp.MaybeSequence[str]] = None,
     ) -> tp.Optional[tp.Frame]:
-        """Get a DataFrame out of status dicts of child setups."""
+        """Get a DataFrame out of stats dicts of child setups."""
         if len(self.child_setups) == 0:
             return None
         df = pd.DataFrame(
             [
-                setup.get_status(readable=readable, short_str=short_str)
+                setup.get_stats(readable=readable, short_str=short_str)
                 for setup in self.child_setups
                 if filter_func is None or filter_func(setup)
             ]
@@ -1478,7 +1602,7 @@ class CABaseDelegatorSetup(CABaseSetup, CASetupDelegatorMixin):
     @property
     def child_setups(self) -> tp.Set[CABaseSetup]:
         """Get child setups that match `CABaseDelegatorSetup.query`."""
-        return self.registry.match_setups(self.query, kind="collapse")
+        return self.registry.match_setups(self.query, collapse=True)
 
     def deregister(self, **kwargs) -> None:
         CASetupDelegatorMixin.deregister(self, **kwargs)
@@ -1530,25 +1654,6 @@ class CAClassSetup(CABaseDelegatorSetup):
 
     cls: tp.Type[Cacheable] = attr.ib(default=None, validator=_assert_value_not_none)
     """Cacheable class."""
-
-    def __attrs_post_init__(self) -> None:
-        CABaseSetup.__attrs_post_init__(self)
-
-        checks.assert_subclass_of(self.cls, Cacheable)
-
-        use_cache = self.use_cache
-        whitelist = self.whitelist
-        if use_cache is None or whitelist is None:
-            superclass_setups = self.superclass_setups[::-1]
-            for setup in superclass_setups:
-                if use_cache is None:
-                    if setup.use_cache is not None:
-                        object.__setattr__(self, "use_cache", setup.use_cache)
-                if whitelist is None:
-                    if setup.whitelist is not None:
-                        object.__setattr__(self, "whitelist", setup.whitelist)
-
-        self.register()
 
     @staticmethod
     def get_hash(cls: tp.Type[Cacheable]) -> int:
@@ -1627,8 +1732,31 @@ class CAClassSetup(CABaseDelegatorSetup):
 
         setup = registry.get_class_setup(cls_)
         if setup is not None:
+            if not setup.active:
+                return None
             return setup
-        return cls(cls=cls_, registry=registry, **kwargs)
+        instance = cls(cls=cls_, registry=registry, **kwargs)
+        instance.enforce_rules()
+        if instance.active:
+            instance.register()
+        return instance
+
+    def __attrs_post_init__(self) -> None:
+        CABaseSetup.__attrs_post_init__(self)
+
+        checks.assert_subclass_of(self.cls, Cacheable)
+
+        use_cache = self.use_cache
+        whitelist = self.whitelist
+        if use_cache is None or whitelist is None:
+            superclass_setups = self.superclass_setups[::-1]
+            for setup in superclass_setups:
+                if use_cache is None:
+                    if setup.use_cache is not None:
+                        object.__setattr__(self, "use_cache", setup.use_cache)
+                if whitelist is None:
+                    if setup.whitelist is not None:
+                        object.__setattr__(self, "whitelist", setup.whitelist)
 
     @property
     def query(self) -> CAQuery:
@@ -1715,25 +1843,6 @@ class CAInstanceSetup(CABaseDelegatorSetup):
     instance: tp.Union[Cacheable, ReferenceType] = attr.ib(default=None, validator=_assert_value_not_none)
     """Cacheable instance."""
 
-    def __attrs_post_init__(self) -> None:
-        CABaseSetup.__attrs_post_init__(self)
-
-        if not isinstance(self.instance, ReferenceType):
-            checks.assert_instance_of(self.instance, Cacheable)
-            instance_ref = ref(self.instance, lambda ref: self.registry.deregister_setup(self))
-            object.__setattr__(self, "instance", instance_ref)
-
-        if self.use_cache is None or self.whitelist is None:
-            class_setup = self.class_setup
-            if self.use_cache is None:
-                if class_setup.use_cache is not None:
-                    object.__setattr__(self, "use_cache", class_setup.use_cache)
-            if self.whitelist is None:
-                if class_setup.whitelist is not None:
-                    object.__setattr__(self, "whitelist", class_setup.whitelist)
-
-        self.register()
-
     @staticmethod
     def get_hash(instance: Cacheable) -> int:
         return hash((get_obj_id(instance),))
@@ -1757,8 +1866,31 @@ class CAInstanceSetup(CABaseDelegatorSetup):
 
         setup = registry.get_instance_setup(instance)
         if setup is not None:
+            if not setup.active:
+                return None
             return setup
-        return cls(instance=instance, registry=registry, **kwargs)
+        instance = cls(instance=instance, registry=registry, **kwargs)
+        instance.enforce_rules()
+        if instance.active:
+            instance.register()
+        return instance
+
+    def __attrs_post_init__(self) -> None:
+        CABaseSetup.__attrs_post_init__(self)
+
+        if not isinstance(self.instance, ReferenceType):
+            checks.assert_instance_of(self.instance, Cacheable)
+            instance_ref = ref(self.instance, lambda ref: self.registry.deregister_setup(self))
+            object.__setattr__(self, "instance", instance_ref)
+
+        if self.use_cache is None or self.whitelist is None:
+            class_setup = self.class_setup
+            if self.use_cache is None:
+                if class_setup.use_cache is not None:
+                    object.__setattr__(self, "use_cache", class_setup.use_cache)
+            if self.whitelist is None:
+                if class_setup.whitelist is not None:
+                    object.__setattr__(self, "whitelist", class_setup.whitelist)
 
     @property
     def query(self) -> CAQuery:
@@ -1852,14 +1984,6 @@ class CAUnboundSetup(CABaseDelegatorSetup):
     cacheable: cacheableT = attr.ib(default=None, validator=_assert_value_not_none)
     """Cacheable object."""
 
-    def __attrs_post_init__(self) -> None:
-        CABaseSetup.__attrs_post_init__(self)
-
-        if not is_bindable_cacheable(self.cacheable):
-            raise TypeError("cacheable must be either cacheable_property or cacheable_method")
-
-        self.register()
-
     @staticmethod
     def get_hash(cacheable: cacheableT) -> int:
         return hash((cacheable,))
@@ -1883,8 +2007,20 @@ class CAUnboundSetup(CABaseDelegatorSetup):
 
         setup = registry.get_unbound_setup(cacheable)
         if setup is not None:
+            if not setup.active:
+                return None
             return setup
-        return cls(cacheable=cacheable, registry=registry, **kwargs)
+        instance = cls(cacheable=cacheable, registry=registry, **kwargs)
+        instance.enforce_rules()
+        if instance.active:
+            instance.register()
+        return instance
+
+    def __attrs_post_init__(self) -> None:
+        CABaseSetup.__attrs_post_init__(self)
+
+        if not is_bindable_cacheable(self.cacheable):
+            raise TypeError("cacheable must be either cacheable_property or cacheable_method")
 
     @property
     def query(self) -> CAQuery:
@@ -2033,6 +2169,39 @@ class CARunSetup(CABaseSetup):
     cache: tp.Dict[int, CARunResult] = attr.ib(factory=dict)
     """Dict of cached `CARunResult` instances by their hash."""
 
+    @staticmethod
+    def get_hash(cacheable: cacheableT, instance: tp.Optional[Cacheable] = None) -> int:
+        return hash((cacheable, get_obj_id(instance) if instance is not None else None))
+
+    @classmethod
+    def get(
+        cls: tp.Type[CARunSetupT],
+        cacheable: cacheableT,
+        instance: tp.Optional[Cacheable] = None,
+        registry: CacheableRegistry = ca_reg,
+        **kwargs,
+    ) -> tp.Optional[CARunSetupT]:
+        """Get setup from `CacheableRegistry` or register a new one.
+
+        `**kwargs` are passed to `CARunSetup.__init__`."""
+        from vectorbtpro._settings import settings
+
+        caching_cfg = settings["caching"]
+
+        if caching_cfg["disable_machinery"]:
+            return None
+
+        setup = registry.get_run_setup(cacheable, instance=instance)
+        if setup is not None:
+            if not setup.active:
+                return None
+            return setup
+        instance = cls(cacheable=cacheable, instance=instance, registry=registry, **kwargs)
+        instance.enforce_rules()
+        if instance.active:
+            instance.register()
+        return instance
+
     def __attrs_post_init__(self) -> None:
         CABaseSetup.__attrs_post_init__(self)
 
@@ -2094,35 +2263,6 @@ class CARunSetup(CABaseSetup):
                     object.__setattr__(self, "whitelist", instance_setup.whitelist)
                 elif unbound_setup is not None and unbound_setup.whitelist is not None:
                     object.__setattr__(self, "whitelist", unbound_setup.whitelist)
-
-        self.register()
-
-    @staticmethod
-    def get_hash(cacheable: cacheableT, instance: tp.Optional[Cacheable] = None) -> int:
-        return hash((cacheable, get_obj_id(instance) if instance is not None else None))
-
-    @classmethod
-    def get(
-        cls: tp.Type[CARunSetupT],
-        cacheable: cacheableT,
-        instance: tp.Optional[Cacheable] = None,
-        registry: CacheableRegistry = ca_reg,
-        **kwargs,
-    ) -> tp.Optional[CARunSetupT]:
-        """Get setup from `CacheableRegistry` or register a new one.
-
-        `**kwargs` are passed to `CARunSetup.__init__`."""
-        from vectorbtpro._settings import settings
-
-        caching_cfg = settings["caching"]
-
-        if caching_cfg["disable_machinery"]:
-            return None
-
-        setup = registry.get_run_setup(cacheable, instance=instance)
-        if setup is not None:
-            return setup
-        return cls(cacheable=cacheable, instance=instance, registry=registry, **kwargs)
 
     @property
     def query(self) -> CAQuery:
@@ -2362,8 +2502,30 @@ class CAQueryDelegator(CASetupDelegatorMixin):
         return self.registry.match_setups(*self.args, **self.kwargs)
 
 
-clear_cache = CAQueryDelegator().clear_cache
-"""Clear cache globally."""
+def get_cache_stats(*args, **kwargs) -> tp.Optional[tp.Frame]:
+    """Get cache stats globally or of an object."""
+    delegator_kwargs = {}
+    stats_kwargs = {}
+    if len(kwargs) > 0:
+        overview_arg_names = get_func_arg_names(CAQueryDelegator.get_stats)
+        for k in list(kwargs.keys()):
+            if k in overview_arg_names:
+                stats_kwargs[k] = kwargs.pop(k)
+            else:
+                delegator_kwargs[k] = kwargs.pop(k)
+    else:
+        delegator_kwargs = kwargs
+    return CAQueryDelegator(*args, **delegator_kwargs).get_stats(**stats_kwargs)
+
+
+def print_cache_stats(*args, **kwargs) -> None:
+    """Print cache stats globally or of an object."""
+    ptable(get_cache_stats(*args, **kwargs))
+
+
+def clear_cache(*args, **kwargs) -> None:
+    """Clear cache globally or of an object."""
+    return CAQueryDelegator(*args, **kwargs).clear_cache()
 
 
 def collect_garbage() -> None:
@@ -2377,3 +2539,360 @@ def flush() -> None:
     """Clear cache and collect garbage."""
     clear_cache()
     collect_garbage()
+
+
+def disable_caching(clear_cache: bool = True) -> None:
+    """Disable caching globally."""
+    from vectorbtpro._settings import settings
+
+    settings.caching["disable"] = True
+    settings.caching["disable_whitelist"] = True
+    settings.caching["disable_machinery"] = True
+
+    if clear_cache:
+        CAQueryDelegator().clear_cache()
+
+
+def enable_caching() -> None:
+    """Enable caching globally."""
+    from vectorbtpro._settings import settings
+
+    settings.caching["disable"] = False
+    settings.caching["disable_whitelist"] = False
+    settings.caching["disable_machinery"] = False
+
+
+CachingDisabledT = tp.TypeVar("CachingDisabledT", bound="CachingDisabled")
+
+
+class CachingDisabled:
+    """Context manager to disable caching."""
+
+    def __init__(
+        self,
+        query_like: tp.Optional[tp.Any] = None,
+        use_base_cls: bool = True,
+        kind: tp.Optional[tp.MaybeIterable[str]] = None,
+        exclude: tp.Optional[tp.MaybeIterable["CABaseSetup"]] = None,
+        filter_func: tp.Optional[tp.Callable] = None,
+        registry: CacheableRegistry = ca_reg,
+        disable_whitelist: bool = True,
+        disable_machinery: bool = True,
+        clear_cache: bool = True,
+        silence_warnings: bool = False,
+    ) -> None:
+        self._query_like = query_like
+        self._use_base_cls = use_base_cls
+        self._kind = kind
+        self._exclude = exclude
+        self._filter_func = filter_func
+        self._registry = registry
+        self._disable_whitelist = disable_whitelist
+        self._disable_machinery = disable_machinery
+        self._clear_cache = clear_cache
+        self._silence_warnings = silence_warnings
+
+        self._rule = None
+        self._init_settings = None
+        self._init_setup_settings = None
+
+    @property
+    def query_like(self) -> tp.Optional[tp.Any]:
+        """See `CAQuery.parse`."""
+        return self._query_like
+
+    @property
+    def use_base_cls(self) -> bool:
+        """See `CAQuery.parse`."""
+        return self._use_base_cls
+
+    @property
+    def kind(self) -> tp.Optional[tp.MaybeIterable[str]]:
+        """See `CARule.kind`."""
+        return self._kind
+
+    @property
+    def exclude(self) -> tp.Optional[tp.MaybeIterable["CABaseSetup"]]:
+        """See `CARule.exclude`."""
+        return self._exclude
+
+    @property
+    def filter_func(self) -> tp.Optional[tp.Callable]:
+        """See `CARule.filter_func`."""
+        return self._filter_func
+
+    @property
+    def registry(self) -> CacheableRegistry:
+        """Registry of type `CacheableRegistry`."""
+        return self._registry
+
+    @property
+    def disable_whitelist(self) -> bool:
+        """Whether to disable whitelist."""
+        return self._disable_whitelist
+
+    @property
+    def disable_machinery(self) -> bool:
+        """Whether to disable machinery."""
+        return self._disable_machinery
+
+    @property
+    def clear_cache(self) -> bool:
+        """Whether to clear global cache when entering or local cache when disabling caching."""
+        return self._clear_cache
+
+    @property
+    def silence_warnings(self) -> bool:
+        """Whether to silence warnings."""
+        return self._silence_warnings
+
+    @property
+    def rule(self) -> tp.Optional[CARule]:
+        """Rule."""
+        return self._rule
+
+    @property
+    def init_settings(self) -> tp.Kwargs:
+        """Initial caching settings."""
+        return self._init_settings
+
+    @property
+    def init_setup_settings(self) -> tp.Dict[int, dict]:
+        """Initial setup settings."""
+        return self._init_setup_settings
+
+    def __enter__(self: CachingDisabledT) -> CachingDisabledT:
+        if self.query_like is None:
+            from vectorbtpro._settings import settings
+
+            self._init_settings = dict(
+                disable=settings.caching["disable"],
+                disable_whitelist=settings.caching["disable_whitelist"],
+                disable_machinery=settings.caching["disable_machinery"],
+            )
+
+            settings.caching["disable"] = True
+            settings.caching["disable_whitelist"] = self.disable_whitelist
+            settings.caching["disable_machinery"] = self.disable_machinery
+
+            if self.clear_cache:
+                clear_cache()
+        else:
+
+            def _enforce_func(setup):
+                if self.disable_machinery:
+                    setup.deactivate()
+                if self.disable_whitelist:
+                    setup.disable_whitelist()
+                setup.disable_caching(clear_cache=self.clear_cache)
+
+            query = CAQuery.parse(self.query_like, use_base_cls=self.use_base_cls)
+            rule = CARule(
+                query,
+                _enforce_func,
+                kind=self.kind,
+                exclude=self.exclude,
+                filter_func=self.filter_func,
+            )
+            self._rule = rule
+            self.registry.register_rule(rule)
+
+            init_setup_settings = dict()
+            for setup_hash, setup in self.registry.setups.items():
+                init_setup_settings[setup_hash] = dict(
+                    active=setup.active,
+                    whitelist=setup.whitelist,
+                    use_cache=setup.use_cache,
+                )
+                rule.enforce(setup)
+            self._init_setup_settings = init_setup_settings
+
+        return self
+
+    def __exit__(self, *args) -> None:
+        if self.query_like is None:
+            from vectorbtpro._settings import settings
+
+            settings.caching["disable"] = self.init_settings["disable"]
+            settings.caching["disable_whitelist"] = self.init_settings["disable_whitelist"]
+            settings.caching["disable_machinery"] = self.init_settings["disable_machinery"]
+        else:
+            self.registry.deregister_rule(self.rule)
+
+            for setup_hash, setup_settings in self.init_setup_settings.items():
+                if setup_hash in self.registry.setups:
+                    setup = self.registry.setups[setup_hash]
+                    if self.disable_machinery and setup_settings["active"]:
+                        setup.activate()
+                    if self.disable_whitelist and setup_settings["whitelist"]:
+                        setup.enable_whitelist()
+                    if setup_settings["use_cache"]:
+                        setup.enable_caching(silence_warnings=self.silence_warnings)
+
+
+CachingEnabledT = tp.TypeVar("CachingEnabledT", bound="CachingEnabled")
+
+
+class CachingEnabled:
+    """Context manager to enable caching."""
+
+    def __init__(
+        self,
+        query_like: tp.Optional[tp.Any] = None,
+        use_base_cls: bool = True,
+        kind: tp.Optional[tp.MaybeIterable[str]] = None,
+        exclude: tp.Optional[tp.MaybeIterable["CABaseSetup"]] = None,
+        filter_func: tp.Optional[tp.Callable] = None,
+        registry: CacheableRegistry = ca_reg,
+        enable_whitelist: bool = True,
+        enable_machinery: bool = True,
+        clear_cache: bool = True,
+        silence_warnings: bool = False,
+    ) -> None:
+        self._query_like = query_like
+        self._use_base_cls = use_base_cls
+        self._kind = kind
+        self._exclude = exclude
+        self._filter_func = filter_func
+        self._registry = registry
+        self._enable_whitelist = enable_whitelist
+        self._enable_machinery = enable_machinery
+        self._clear_cache = clear_cache
+        self._silence_warnings = silence_warnings
+
+        self._rule = None
+        self._init_settings = None
+        self._init_setup_settings = None
+
+    @property
+    def query_like(self) -> tp.Optional[tp.Any]:
+        """See `CAQuery.parse`."""
+        return self._query_like
+
+    @property
+    def use_base_cls(self) -> bool:
+        """See `CAQuery.parse`."""
+        return self._use_base_cls
+
+    @property
+    def kind(self) -> tp.Optional[tp.MaybeIterable[str]]:
+        """See `CARule.kind`."""
+        return self._kind
+
+    @property
+    def exclude(self) -> tp.Optional[tp.MaybeIterable["CABaseSetup"]]:
+        """See `CARule.exclude`."""
+        return self._exclude
+
+    @property
+    def filter_func(self) -> tp.Optional[tp.Callable]:
+        """See `CARule.filter_func`."""
+        return self._filter_func
+
+    @property
+    def registry(self) -> CacheableRegistry:
+        """Registry of type `CacheableRegistry`."""
+        return self._registry
+
+    @property
+    def enable_whitelist(self) -> bool:
+        """Whether to enable whitelist."""
+        return self._enable_whitelist
+
+    @property
+    def enable_machinery(self) -> bool:
+        """Whether to enable machinery."""
+        return self._enable_machinery
+
+    @property
+    def clear_cache(self) -> bool:
+        """Whether to clear global cache when exiting or local cache when disabling caching."""
+        return self._clear_cache
+
+    @property
+    def silence_warnings(self) -> bool:
+        """Whether to silence warnings."""
+        return self._silence_warnings
+
+    @property
+    def rule(self) -> tp.Optional[CARule]:
+        """Rule."""
+        return self._rule
+
+    @property
+    def init_settings(self) -> tp.Kwargs:
+        """Initial caching settings."""
+        return self._init_settings
+
+    @property
+    def init_setup_settings(self) -> tp.Dict[int, dict]:
+        """Initial setup settings."""
+        return self._init_setup_settings
+
+    def __enter__(self: CachingEnabledT) -> CachingEnabledT:
+        if self.query_like is None:
+            from vectorbtpro._settings import settings
+
+            self._init_settings = dict(
+                disable=settings.caching["disable"],
+                disable_whitelist=settings.caching["disable_whitelist"],
+                disable_machinery=settings.caching["disable_machinery"],
+            )
+
+            settings.caching["disable"] = False
+            settings.caching["disable_whitelist"] = not self.enable_whitelist
+            settings.caching["disable_machinery"] = not self.enable_machinery
+        else:
+
+            def _enforce_func(setup):
+                if self.enable_machinery:
+                    setup.activate()
+                if self.enable_whitelist:
+                    setup.enable_whitelist()
+                setup.enable_caching(silence_warnings=self.silence_warnings)
+
+            query = CAQuery.parse(self.query_like, use_base_cls=self.use_base_cls)
+            rule = CARule(
+                query,
+                _enforce_func,
+                kind=self.kind,
+                exclude=self.exclude,
+                filter_func=self.filter_func,
+            )
+            self._rule = rule
+            self.registry.register_rule(rule)
+
+            init_setup_settings = dict()
+            for setup_hash, setup in self.registry.setups.items():
+                init_setup_settings[setup_hash] = dict(
+                    active=setup.active,
+                    whitelist=setup.whitelist,
+                    use_cache=setup.use_cache,
+                )
+                rule.enforce(setup)
+            self._init_setup_settings = init_setup_settings
+
+        return self
+
+    def __exit__(self, *args) -> None:
+        if self.query_like is None:
+            from vectorbtpro._settings import settings
+
+            settings.caching["disable"] = self.init_settings["disable"]
+            settings.caching["disable_whitelist"] = self.init_settings["disable_whitelist"]
+            settings.caching["disable_machinery"] = self.init_settings["disable_machinery"]
+
+            if self.clear_cache:
+                clear_cache()
+        else:
+            self.registry.deregister_rule(self.rule)
+
+            for setup_hash, setup_settings in self.init_setup_settings.items():
+                if setup_hash in self.registry.setups:
+                    setup = self.registry.setups[setup_hash]
+                    if self.enable_machinery and not setup_settings["active"]:
+                        setup.deactivate()
+                    if self.enable_whitelist and not setup_settings["whitelist"]:
+                        setup.disable_whitelist()
+                    if not setup_settings["use_cache"]:
+                        setup.disable_caching(clear_cache=self.clear_cache)

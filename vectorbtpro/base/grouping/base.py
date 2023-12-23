@@ -113,7 +113,7 @@ class Grouper(Configured):
     !!! note
         This class is meant to be immutable. To change any attribute, use `Grouper.replace`."""
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Configured._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (Configured._expected_keys or set()) | {
         "index",
         "group_by",
         "def_lvl_name",

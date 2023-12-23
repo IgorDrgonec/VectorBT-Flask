@@ -5,6 +5,7 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from vectorbtpro.utils.annotations import *
     from vectorbtpro.utils.array_ import *
     from vectorbtpro.utils.attr_ import *
     from vectorbtpro.utils.caching import *
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
     from vectorbtpro.utils.magic_decorators import *
     from vectorbtpro.utils.mapping import *
     from vectorbtpro.utils.math_ import *
+    from vectorbtpro.utils.merging import *
     from vectorbtpro.utils.module_ import *
     from vectorbtpro.utils.params import *
     from vectorbtpro.utils.parsing import *
@@ -37,6 +39,8 @@ if TYPE_CHECKING:
     from vectorbtpro.utils.random_ import *
     from vectorbtpro.utils.requests_ import *
     from vectorbtpro.utils.schedule_ import *
+    from vectorbtpro.utils.search import *
+    from vectorbtpro.utils.selection import *
     from vectorbtpro.utils.tagging import *
     from vectorbtpro.utils.template import *
 

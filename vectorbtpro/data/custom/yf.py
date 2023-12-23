@@ -7,11 +7,7 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
-from vectorbtpro.utils.datetime_ import (
-    to_tzaware_datetime,
-    split_freq_str,
-    prepare_freq,
-)
+from vectorbtpro.utils.datetime_ import to_tzaware_datetime, split_freq_str, prepare_freq
 from vectorbtpro.utils.parsing import get_func_kwargs
 from vectorbtpro.data.custom.remote import RemoteData
 

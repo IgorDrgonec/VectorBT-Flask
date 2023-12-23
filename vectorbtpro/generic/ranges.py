@@ -158,6 +158,11 @@ __all__ = [
 
 __pdoc__ = {}
 
+
+class _DEF:
+    pass
+
+
 # ############# Ranges ############# #
 
 ranges_field_config = ReadonlyConfig(
@@ -174,9 +179,7 @@ ranges_field_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__[
-    "ranges_field_config"
-] = f"""Field config for `Ranges`.
+__pdoc__["ranges_field_config"] = f"""Field config for `Ranges`.
 
 ```python
 {ranges_field_config.prettify()}
@@ -186,9 +189,7 @@ __pdoc__[
 ranges_attach_field_config = ReadonlyConfig(dict(status=dict(attach_filters=True)))
 """_"""
 
-__pdoc__[
-    "ranges_attach_field_config"
-] = f"""Config of fields to be attached to `Ranges`.
+__pdoc__["ranges_attach_field_config"] = f"""Config of fields to be attached to `Ranges`.
 
 ```python
 {ranges_attach_field_config.prettify()}
@@ -215,9 +216,7 @@ ranges_shortcut_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__[
-    "ranges_shortcut_config"
-] = f"""Config of shortcut properties to be attached to `Ranges`.
+__pdoc__["ranges_shortcut_config"] = f"""Config of shortcut properties to be attached to `Ranges`.
 
 ```python
 {ranges_shortcut_config.prettify()}
@@ -794,7 +793,7 @@ class Ranges(PriceRecords):
             last_n (int): Select last N range records.
             top_n (int): Select top N range records by maximum duration.
             random_n (int): Select N range records randomly.
-            seed (int): Set seed to make output deterministic.
+            seed (int): Seed to make output deterministic.
             proj_start (str, int, or frequency_like): See `Ranges.get_projections`.
 
                 Allows an additional option "current_or_{value}", which sets `proj_start` to
@@ -1540,10 +1539,6 @@ Ranges.override_subplots_doc(__pdoc__)
 PatternRangesT = tp.TypeVar("PatternRangesT", bound="PatternRanges")
 
 
-_DEF = object()
-"""Default value for internal purposes."""
-
-
 @attr.s(frozen=True, eq=False)
 class PSC:
     """Class that represents a pattern search config.
@@ -1696,9 +1691,7 @@ pattern_ranges_field_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__[
-    "pattern_ranges_field_config"
-] = f"""Field config for `PatternRanges`.
+__pdoc__["pattern_ranges_field_config"] = f"""Field config for `PatternRanges`.
 
 ```python
 {pattern_ranges_field_config.prettify()}
@@ -2029,7 +2022,7 @@ class PatternRanges(Ranges):
         kwargs["search_configs"] = [search_config for obj in objs for search_config in obj.search_configs]
         return kwargs
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Ranges._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (Ranges._expected_keys or set()) | {
         "search_configs",
     }
 
@@ -2153,13 +2146,13 @@ class PatternRanges(Ranges):
             fit_ranges = None
         if fit_ranges is not None:
             if fit_ranges is True:
-                self_col = self_col.iloc[self_col.values["start_idx"][0]: self_col.values["end_idx"][-1] + 1]
+                self_col = self_col.iloc[self_col.values["start_idx"][0] : self_col.values["end_idx"][-1] + 1]
             elif checks.is_int(fit_ranges):
                 self_col = self_col.apply_mask(self_col.id_arr == fit_ranges)
-                self_col = self_col.iloc[self_col.values["start_idx"][0]: self_col.values["end_idx"][0] + 1]
+                self_col = self_col.iloc[self_col.values["start_idx"][0] : self_col.values["end_idx"][0] + 1]
             else:
                 self_col = self_col.apply_mask(np.isin(self_col.id_arr, fit_ranges))
-                self_col = self_col.iloc[self_col.values["start_idx"][0]: self_col.values["end_idx"][0] + 1]
+                self_col = self_col.iloc[self_col.values["start_idx"][0] : self_col.values["end_idx"][0] + 1]
         if pattern_trace_kwargs is None:
             pattern_trace_kwargs = {}
         if lower_max_error_trace_kwargs is None:

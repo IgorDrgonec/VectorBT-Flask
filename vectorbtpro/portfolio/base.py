@@ -497,7 +497,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     !!! note
         This class is meant to be immutable. To change any attribute, use `Portfolio.replace`."""
 
-    _writeable_attrs: tp.ClassVar[tp.Optional[tp.Set[str]]] = {"_in_output_config"}
+    _writeable_attrs: tp.WriteableAttrs = {"_in_output_config"}
 
     @classmethod
     def row_stack_objs(
@@ -1237,7 +1237,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
         return cls(**kwargs)
 
-    _expected_keys: tp.ClassVar[tp.Optional[tp.Set[str]]] = (Analyzable._expected_keys or set()) | {
+    _expected_keys: tp.ExpectedKeys = (Analyzable._expected_keys or set()) | {
         "order_records",
         "close",
         "open",

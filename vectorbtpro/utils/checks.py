@@ -164,6 +164,13 @@ def is_sequence(arg: tp.Any) -> bool:
         return False
 
 
+def is_complex_sequence(arg: tp.Any) -> bool:
+    """Check whether the argument is a sequence but not a string or bytes object."""
+    if isinstance(arg, (str, bytes)):
+        return False
+    return is_sequence(arg)
+
+
 def is_iterable(arg: tp.Any) -> bool:
     """Check whether the argument is iterable."""
     try:
@@ -171,6 +178,13 @@ def is_iterable(arg: tp.Any) -> bool:
         return True
     except TypeError:
         return False
+
+
+def is_complex_iterable(arg: tp.Any) -> bool:
+    """Check whether the argument is iterable but not a string or bytes object."""
+    if isinstance(arg, (str, bytes)):
+        return False
+    return is_iterable(arg)
 
 
 def is_numba_enabled() -> bool:
@@ -460,6 +474,22 @@ def is_mapping_like(arg: tp.Any) -> bool:
 def is_valid_variable_name(arg: str) -> bool:
     """Check whether the argument is a valid variable name."""
     return arg.isidentifier() and not iskeyword(arg)
+
+
+def is_notebook() -> bool:
+    """Check whether the code runs in a notebook.
+
+    Credit: https://stackoverflow.com/a/39662359"""
+    try:
+        shell = get_ipython().__class__.__name__
+        if shell == "ZMQInteractiveShell":
+            return True
+        elif shell == "TerminalInteractiveShell":
+            return False
+        else:
+            return False
+    except NameError:
+        return False
 
 
 # ############# Asserts ############# #

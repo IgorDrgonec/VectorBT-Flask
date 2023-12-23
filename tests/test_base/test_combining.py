@@ -637,7 +637,7 @@ class TestMerging:
                     ([0, 1, 2], [3, 4, 5], [6, 7, 8]),
                     ([9, 10, 11], [12, 13, 14], [15, 16, 17]),
                 ],
-                func_names=("concat", "row_stack", "column_stack"),
+                merge_funcs=("concat", "row_stack", "column_stack"),
             )[0],
             np.array([0, 1, 2, 9, 10, 11]),
         )
@@ -647,7 +647,7 @@ class TestMerging:
                     ([0, 1, 2], [3, 4, 5], [6, 7, 8]),
                     ([9, 10, 11], [12, 13, 14], [15, 16, 17]),
                 ],
-                func_names=("concat", "row_stack", "column_stack"),
+                merge_funcs=("concat", "row_stack", "column_stack"),
             )[1],
             np.array([[3, 4, 5], [12, 13, 14]]),
         )
@@ -657,7 +657,7 @@ class TestMerging:
                     ([0, 1, 2], [3, 4, 5], [6, 7, 8]),
                     ([9, 10, 11], [12, 13, 14], [15, 16, 17]),
                 ],
-                func_names=("concat", "row_stack", "column_stack"),
+                merge_funcs=("concat", "row_stack", "column_stack"),
             )[2],
             np.array([[6, 15], [7, 16], [8, 17]]),
         )
