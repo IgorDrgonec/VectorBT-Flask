@@ -125,6 +125,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils.checks import is_instance_of
 from vectorbtpro.utils.config import Config
 from vectorbtpro.utils.template import Sub, RepEval, substitute_templates
+from vectorbtpro.utils.module_ import check_installed
 
 __all__ = [
     "settings",
@@ -1284,6 +1285,8 @@ ${config_doc}
 _settings["signals"] = signals
 
 returns = frozen_cfg(
+    inf_to_nan=False,
+    nan_to_zero=False,
     year_freq="365 days",
     bm_returns=None,
     defaults=flex_cfg(
@@ -1798,19 +1801,20 @@ class SettingsConfig(Config):
 
     def register_template(self, theme: str) -> None:
         """Register template of a theme."""
-        import plotly.io as pio
-        import plotly.graph_objects as go
+        if check_installed("plotly"):
+            import plotly.io as pio
+            import plotly.graph_objects as go
 
-        template_path = self["plotting"]["themes"][theme]["path"]
-        if template_path is None:
-            raise ValueError(f"Must provide template path for the theme '{theme}'")
-        if template_path.startswith("__name__/"):
-            template_path = template_path.replace("__name__/", "")
-            template = Config(json.loads(pkgutil.get_data(__name__, template_path)))
-        else:
-            with open(template_path, "r") as f:
-                template = Config(json.load(f))
-        pio.templates["vbt_" + theme] = go.layout.Template(template)
+            template_path = self["plotting"]["themes"][theme]["path"]
+            if template_path is None:
+                raise ValueError(f"Must provide template path for the theme '{theme}'")
+            if template_path.startswith("__name__/"):
+                template_path = template_path.replace("__name__/", "")
+                template = Config(json.loads(pkgutil.get_data(__name__, template_path)))
+            else:
+                with open(template_path, "r") as f:
+                    template = Config(json.load(f))
+            pio.templates["vbt_" + theme] = go.layout.Template(template)
 
     def register_templates(self) -> None:
         """Register templates of all themes."""
@@ -1853,14 +1857,9 @@ if "VBT_SETTINGS_PATH" in os.environ:
 elif settings.file_exists(settings_name):
     settings.load_update(settings_name)
 
-try:
-    settings.reset_theme()
-    settings.register_templates()
-except ImportError:
-    pass
-
+settings.reset_theme()
+settings.register_templates()
 settings.make_checkpoint()
-
 settings.substitute_sub_config_docs(__pdoc__)
 
 if settings["numba"]["disable"]:

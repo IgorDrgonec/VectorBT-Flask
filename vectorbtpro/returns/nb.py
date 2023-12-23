@@ -16,6 +16,7 @@ import numpy as np
 from numba import prange
 
 from vectorbtpro import _typing as tp
+from vectorbtpro._settings import settings
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.reshaping import to_1d_array_nb
 from vectorbtpro.base.flex_indexing import flex_select_1d_pc_nb
@@ -28,21 +29,38 @@ from vectorbtpro.utils.math_ import add_nb
 
 __all__ = []
 
+_inf_to_nan = settings["returns"]["inf_to_nan"]
+_nan_to_zero = settings["returns"]["nan_to_zero"]
+
 
 # ############# Metrics ############# #
 
 
 @register_jitted(cache=True)
-def get_return_nb(input_value: float, output_value: float, log_returns: bool = False) -> float:
+def get_return_nb(
+    input_value: float,
+    output_value: float,
+    log_returns: bool = False,
+    inf_to_nan: bool = _inf_to_nan,
+    nan_to_zero: bool = _nan_to_zero,
+) -> float:
     """Calculate return from input and output value."""
     if input_value == 0:
         if output_value == 0:
-            return 0.0
-        return np.inf * np.sign(output_value)
-    return_value = add_nb(output_value, -input_value) / input_value
-    if log_returns:
-        return np.log1p(return_value)
-    return return_value
+            r = 0.0
+        else:
+            r = np.inf * np.sign(output_value)
+    else:
+        return_value = add_nb(output_value, -input_value) / input_value
+        if log_returns:
+            r = np.log1p(return_value)
+        else:
+            r = return_value
+    if inf_to_nan and np.isinf(r):
+        r = np.nan
+    if nan_to_zero and np.isnan(r):
+        r = 0.0
+    return r
 
 
 @register_jitted(cache=True)
