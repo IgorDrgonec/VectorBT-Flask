@@ -1443,6 +1443,7 @@ portfolio = frozen_cfg(
     init_position=0.0,
     init_price=np.nan,
     cash_deposits=0.0,
+    cash_deposits_as_input=False,
     cash_earnings=0.0,
     cash_dividends=0.0,
     cash_sharing=False,

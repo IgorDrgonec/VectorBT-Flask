@@ -1249,6 +1249,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         "init_position",
         "init_price",
         "cash_deposits",
+        "cash_deposits_as_input",
         "cash_earnings",
         "call_seq",
         "in_outputs",
@@ -1280,6 +1281,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         init_position: tp.ArrayLike = 0.0,
         init_price: tp.ArrayLike = np.nan,
         cash_deposits: tp.ArrayLike = 0.0,
+        cash_deposits_as_input: tp.Optional[bool] = None,
         cash_earnings: tp.ArrayLike = 0.0,
         call_seq: tp.Optional[tp.Array2d] = None,
         in_outputs: tp.Optional[tp.NamedTuple] = None,
@@ -1325,6 +1327,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             init_position=init_position,
             init_price=init_price,
             cash_deposits=cash_deposits,
+            cash_deposits_as_input=cash_deposits_as_input,
             cash_earnings=cash_earnings,
             call_seq=call_seq,
             in_outputs=in_outputs,
@@ -1357,6 +1360,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         init_price = to_1d_array(init_price)
         cash_deposits = to_2d_array(cash_deposits)
         cash_earnings = to_2d_array(cash_earnings)
+        if cash_deposits_as_input is None:
+            cash_deposits_as_input = portfolio_cfg["cash_deposits_as_input"]
         if bm_close is not None and not isinstance(bm_close, bool):
             bm_close = to_2d_array(bm_close)
         if log_records is None:
@@ -1381,6 +1386,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         self._init_position = init_position
         self._init_price = init_price
         self._cash_deposits = cash_deposits
+        self._cash_deposits_as_input = cash_deposits_as_input
         self._cash_earnings = cash_earnings
         self._call_seq = call_seq
         self._in_outputs = in_outputs
@@ -4847,6 +4853,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
         return self.wrapper.wrap(call_seq, group_by=False)
 
+    @property
+    def cash_deposits_as_input(self) -> bool:
+        """Whether to add cash deposits to the input value when calculating returns.
+
+        Otherwise, will subtract them from the output value."""
+        return self._cash_deposits_as_input
+
     # ############# Price ############# #
 
     @custom_property(group_by_aware=False, resample_func="first")
@@ -6260,6 +6273,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         group_by: tp.GroupByLike = None,
         init_value: tp.Optional[tp.MaybeSeries] = None,
         cash_deposits: tp.Optional[tp.ArrayLike] = None,
+        cash_deposits_as_input: tp.Optional[bool] = None,
         value: tp.Optional[tp.SeriesFrame] = None,
         log_returns: bool = False,
         daily_returns: bool = False,
@@ -6285,6 +6299,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     chunked=chunked,
                     keep_flex=True,
                 )
+            if cash_deposits_as_input is None:
+                cash_deposits_as_input = cls_or_self.cash_deposits_as_input
             if value is None:
                 value = cls_or_self.resolve_shortcut_attr("value", group_by=group_by, jitted=jitted, chunked=chunked)
             if wrapper is None:
@@ -6293,6 +6309,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             checks.assert_not_none(init_value)
             if cash_deposits is None:
                 cash_deposits = 0.0
+            if cash_deposits_as_input is None:
+                cash_deposits_as_input = False
             checks.assert_not_none(value)
             checks.assert_not_none(wrapper)
 
@@ -6302,6 +6320,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             to_2d_array(value),
             to_1d_array(init_value),
             cash_deposits=to_2d_array(cash_deposits),
+            cash_deposits_as_input=cash_deposits_as_input,
             log_returns=log_returns,
         )
         returns = wrapper.wrap(returns, group_by=group_by, **resolve_dict(wrap_kwargs))
@@ -6507,6 +6526,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         group_by: tp.GroupByLike = None,
         init_value: tp.Optional[tp.MaybeSeries] = None,
         cash_deposits: tp.Optional[tp.ArrayLike] = None,
+        cash_deposits_as_input: tp.Optional[bool] = None,
         market_value: tp.Optional[tp.SeriesFrame] = None,
         log_returns: bool = False,
         daily_returns: bool = False,
@@ -6532,6 +6552,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     chunked=chunked,
                     keep_flex=True,
                 )
+            if cash_deposits_as_input is None:
+                cash_deposits_as_input = cls_or_self.cash_deposits_as_input
             if market_value is None:
                 market_value = cls_or_self.resolve_shortcut_attr(
                     "market_value",
@@ -6545,6 +6567,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             checks.assert_not_none(init_value)
             if cash_deposits is None:
                 cash_deposits = 0.0
+            if cash_deposits_as_input is None:
+                cash_deposits_as_input = False
             checks.assert_not_none(market_value)
             checks.assert_not_none(wrapper)
 
@@ -6554,6 +6578,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             to_2d_array(market_value),
             to_1d_array(init_value),
             cash_deposits=to_2d_array(cash_deposits),
+            cash_deposits_as_input=cash_deposits_as_input,
             log_returns=log_returns,
         )
         market_returns = wrapper.wrap(market_returns, group_by=group_by, **resolve_dict(wrap_kwargs))

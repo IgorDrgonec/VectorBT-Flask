@@ -8,8 +8,8 @@ Also make sure to join our private [Discord server](https://discord.gg/eQ9sVr5vb
 
 ## Terms
 
-> __It is illegal to vendor, publish, distribute, or commercialize the vectorbtpro source code without a separate 
-permission. Violation of the licensing terms will trigger a ban followed by a legal pursuit__.
+> __It is illegal to vendor, publish, distribute, or commercialize the vectorbtpro source code without 
+a separate permission. Violation of the licensing terms will trigger a ban followed by a legal pursuit__.
 > 
 > Any licensed user, developer, team, or company, having obtained paid access to the vectorbtpro 
 repository from us, can use vectorbtpro as a dependency, subject to the terms and limitations 
