@@ -3030,6 +3030,17 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             data=new_data,
         )
 
+    def dropna(self: DataT, **kwargs) -> DataT:
+        """Drop missing values.
+
+        Keyword arguments are passed to `Data.transform` and then to `pd.Series.dropna`
+        or `pd.DataFrame.dropna`."""
+
+        def _dropna(df, **_kwargs):
+            return df.dropna(**_kwargs)
+
+        return self.transform(_dropna, **kwargs)
+
     def resample(self: DataT, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> DataT:
         """Perform resampling on `Data`.
 
@@ -4323,21 +4334,21 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     _catalog = catalogs[0]
                     _connection.sql(f"USE {_catalog}")
                 if _schema is not None:
-                    _connection.sql(f"CREATE SCHEMA IF NOT EXISTS \"{_schema}\"")
+                    _connection.sql(f'CREATE SCHEMA IF NOT EXISTS "{_schema}"')
                     _connection.sql(f"USE {_catalog}.{_schema}")
                 append = False
                 if _table in DuckDBData.list_tables(catalog=_catalog, schema=_schema, connection=_connection):
                     if _if_exists.lower() == "fail":
                         raise ValueError(f"Table '{_table}' already exists")
                     elif _if_exists.lower() == "replace":
-                        _connection.sql(f"DROP TABLE \"{_table}\"")
+                        _connection.sql(f'DROP TABLE "{_table}"')
                     elif _if_exists.lower() == "append":
                         append = True
                 _connection.register("_" + k, v)
                 if append:
-                    _connection.sql(f"INSERT INTO \"{_table}\" SELECT * FROM \"_{k}\"")
+                    _connection.sql(f'INSERT INTO "{_table}" SELECT * FROM "_{k}"')
                 else:
-                    _connection.sql(f"CREATE TABLE \"{_table}\" AS SELECT * FROM \"_{k}\"")
+                    _connection.sql(f'CREATE TABLE "{_table}" AS SELECT * FROM "_{k}"')
                 meta[k] = {"table": _table, "schema": _schema, "catalog": _catalog}
 
         if return_meta:

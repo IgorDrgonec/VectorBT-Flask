@@ -1269,6 +1269,16 @@ class IndicatorBase(Analyzable):
         out = self.to_dict(include_all=include_all)
         return pd.concat(list(out.values()), axis=1, keys=pd.Index(list(out.keys()), name="output"))
 
+    def dropna(self: IndicatorBaseT, include_all: bool = True, **kwargs) -> IndicatorBaseT:
+        """Drop missing values.
+
+        Keyword arguments are passed to `pd.Series.dropna` or `pd.DataFrame.dropna`."""
+        df = self.to_frame(include_all=include_all)
+        new_df = df.dropna(**kwargs)
+        if new_df.index.equals(df.index):
+            return self
+        return self.loc[new_df.index]
+
 
 class IndicatorFactory(Configured):
     _expected_keys: tp.ExpectedKeys = (Configured._expected_keys or set()) | {

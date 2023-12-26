@@ -2469,6 +2469,7 @@ class TestFactory:
             "decode_config",
             "decode_config_node",
             "deep_getattr",
+            "dropna",
             "dumps",
             "encode_config",
             "encode_config_node",
