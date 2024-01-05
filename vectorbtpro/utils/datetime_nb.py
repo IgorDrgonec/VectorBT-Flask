@@ -136,7 +136,7 @@ def hour_nb(ts: int) -> int:
 
 @register_jitted(cache=True)
 def days_nb(ts: int) -> int:
-    """Get the number of hours."""
+    """Get the number of days."""
     return ts // d_ns
 
 
