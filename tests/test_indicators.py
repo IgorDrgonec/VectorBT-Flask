@@ -3152,6 +3152,45 @@ class TestFactory:
                 ),
             )
 
+    def test_custom_indicators(self):
+        custom_ma = lambda x: x
+        vbt.IF.register_custom_indicator(custom_ma, "MA")
+        assert vbt.IF.get_indicator("MA") == custom_ma
+        custom1_ma = lambda x: x
+        vbt.IF.register_custom_indicator(custom1_ma, "MA", location="custom1")
+        assert vbt.IF.get_indicator("MA", location="custom1") == custom1_ma
+        custom2_ma = lambda x: x
+        vbt.IF.register_custom_indicator(custom2_ma, "custom2:MA")
+        assert vbt.IF.get_indicator("custom2:MA") == custom2_ma
+        vbt.IF.register_custom_indicator("vbt:MA", location="CUSTOM3")
+        assert vbt.IF.get_indicator("MA", location="custom3") == vbt.MA
+        with pytest.raises(Exception):
+            vbt.IF.register_custom_indicator(vbt.MA, "MA", location="custom3")
+        with pytest.raises(Exception):
+            vbt.IF.register_custom_indicator(vbt.MA, "ma", location="custom3")
+        with pytest.raises(Exception):
+            vbt.IF.register_custom_indicator(vbt.MA, "MA", location="CUSTOM3")
+        with pytest.raises(Exception):
+            vbt.IF.register_custom_indicator(vbt.MA, "MA", location="talib")
+        with pytest.raises(Exception):
+            vbt.IF.register_custom_indicator(vbt.MA, "MA MA", location="custom4")
+        with pytest.raises(Exception):
+            vbt.IF.register_custom_indicator(vbt.MA, "MA", location="MA MA")
+        assert vbt.IF.list_custom_locations() == ["custom", "custom1", "custom2", "CUSTOM3"]
+        assert vbt.IF.list_custom_indicators() == ["custom:MA", "custom1:MA", "custom2:MA", "CUSTOM3:MA"]
+        vbt.IF.deregister_custom_indicator("ma", location="custom")
+        assert vbt.IF.list_custom_locations() == ["custom1", "custom2", "CUSTOM3"]
+        vbt.IF.deregister_custom_indicator("custom1:ma")
+        assert vbt.IF.list_custom_locations() == ["custom2", "CUSTOM3"]
+        vbt.IF.deregister_custom_indicator(location="custom2")
+        assert vbt.IF.list_custom_locations() == ["CUSTOM3"]
+        vbt.IF.deregister_custom_indicator("ma")
+        assert vbt.IF.list_custom_locations() == []
+        vbt.IF.register_custom_indicator(vbt.MA, "custom1:MA")
+        vbt.IF.register_custom_indicator(vbt.MA, "custom2:MA")
+        vbt.IF.deregister_custom_indicator()
+        assert vbt.IF.list_custom_locations() == []
+
 
 # ############# custom ############# #
 
