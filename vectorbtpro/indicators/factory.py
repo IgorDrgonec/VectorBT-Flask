@@ -3156,7 +3156,7 @@ Other keyword arguments are passed to `{0}.run`.
         if pattern is not None:
             if not case_sensitive:
                 pattern = pattern.lower()
-            if location is None and pattern.lower() in cls.list_locations():
+            if location is None and cls.match_location(pattern) is not None:
                 location = pattern
                 pattern = None
         if prepend_location is None:
@@ -3171,7 +3171,7 @@ Other keyword arguments are passed to `{0}.run`.
                 if matched_location is not None:
                     location = matched_location
                 if location in cls.list_custom_locations():
-                    all_indicators = cls.list_custom_indicators(prepend_location=prepend_location)
+                    all_indicators = cls.list_custom_indicators(location=location, prepend_location=prepend_location)
                 else:
                     all_indicators = map(
                         lambda x: location + ":" + x if prepend_location else x,

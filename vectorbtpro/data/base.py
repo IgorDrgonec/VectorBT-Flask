@@ -3521,6 +3521,41 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 warnings.warn(func_name + ": " + str(e), stacklevel=2)
         return NoResult
 
+    @classmethod
+    def select_run_func_args(cls, i: int, func_name: str, args: tp.Args) -> tuple:
+        """Select positional arguments that correspond to a runnable function index or name."""
+        _args = ()
+        for v in args:
+            if isinstance(v, run_func_dict):
+                if func_name in v:
+                    _args += (v[func_name],)
+                elif i in v:
+                    _args += (v[i],)
+                elif "_def" in v:
+                    _args += (v["_def"],)
+            else:
+                _args += (v,)
+        return _args
+
+    @classmethod
+    def select_run_func_kwargs(cls, i: int, func_name: str, kwargs: tp.Kwargs) -> dict:
+        """Select keyword arguments that correspond to a runnable function index or name."""
+        _kwargs = {}
+        for k, v in kwargs.items():
+            if isinstance(v, run_func_dict):
+                if func_name in v:
+                    _kwargs[k] = v[func_name]
+                elif i in v:
+                    _kwargs[k] = v[i]
+                elif "_def" in v:
+                    _kwargs[k] = v["_def"]
+            elif isinstance(v, run_arg_dict):
+                if func_name == k or i == k:
+                    _kwargs.update(v)
+            else:
+                _kwargs[k] = v
+        return _kwargs
+
     def run(
         self,
         func: tp.MaybeIterable[tp.Union[tp.Hashable, tp.Callable]],
@@ -3534,6 +3569,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         prepend_location: tp.Optional[bool] = None,
         unpack: tp.Union[bool, str] = False,
         concat: bool = True,
+        data_kwargs: tp.KwargsLike = None,
         silence_warnings: bool = False,
         raise_errors: bool = False,
         execute_kwargs: tp.KwargsLike = None,
@@ -3541,6 +3577,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         merge_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
         return_keys: bool = False,
+        _func_name: tp.Optional[str] = None,
         **kwargs,
     ) -> tp.Any:
         """Run a function on data.
@@ -3574,6 +3611,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         from vectorbtpro.indicators.talib_ import talib_func
         from vectorbtpro.portfolio.base import Portfolio
 
+        if data_kwargs is None:
+            data_kwargs = {}
         if execute_kwargs is None:
             execute_kwargs = {}
         if merge_kwargs is None:
@@ -3588,37 +3627,6 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         if pass_as_first:
             return func(_self, *args, **kwargs)
 
-        def _select_func_args(i, func_name, args) -> tuple:
-            _args = ()
-            for v in args:
-                if isinstance(v, run_func_dict):
-                    if func_name in v:
-                        _args += (v[func_name],)
-                    elif i in v:
-                        _args += (v[i],)
-                    elif "_def" in v:
-                        _args += (v["_def"],)
-                else:
-                    _args += (v,)
-            return _args
-
-        def _select_func_kwargs(i, func_name, kwargs) -> dict:
-            _kwargs = {}
-            for k, v in kwargs.items():
-                if isinstance(v, run_func_dict):
-                    if func_name in v:
-                        _kwargs[k] = v[func_name]
-                    elif i in v:
-                        _kwargs[k] = v[i]
-                    elif "_def" in v:
-                        _kwargs[k] = v["_def"]
-                elif isinstance(v, run_arg_dict):
-                    if func_name == k or i == k:
-                        _kwargs.update(v)
-                else:
-                    _kwargs[k] = v
-            return _kwargs
-
         if checks.is_complex_iterable(func):
             funcs_args = []
             keys = []
@@ -3629,6 +3637,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 elif isinstance(f, str):
                     if _location is not None:
                         func_name = f.lower().strip()
+                        if func_name == "*":
+                            func_name = "all"
                         if prepend_location is True:
                             func_name = _location + "_" + func_name
                     else:
@@ -3636,14 +3646,16 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                         if f is None:
                             raise ValueError("Sequence of locations is not supported")
                         func_name = f.lower().strip()
+                        if func_name == "*":
+                            func_name = "all"
                         if _location is not None:
                             if prepend_location in (None, True):
                                 func_name = _location + "_" + func_name
                 else:
                     func_name = f
-                new_args = _select_func_args(i, func_name, args)
+                new_args = _self.select_run_func_args(i, func_name, args)
                 new_args = (_self, func_name, f, *new_args)
-                new_kwargs = _select_func_kwargs(i, func_name, kwargs)
+                new_kwargs = _self.select_run_func_kwargs(i, func_name, kwargs)
                 if concat and _location == "talib_func":
                     new_kwargs["unpack_to"] = "frame"
                 new_kwargs = {
@@ -3654,6 +3666,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                         prepend_location=prepend_location,
                         unpack="frame" if concat else unpack,
                         concat=concat,
+                        data_kwargs=data_kwargs,
                         silence_warnings=silence_warnings,
                         raise_errors=raise_errors,
                         execute_kwargs=execute_kwargs,
@@ -3661,6 +3674,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                         merge_kwargs=merge_kwargs,
                         template_context=template_context,
                         return_keys=return_keys,
+                        _func_name=func_name,
                     ),
                     **new_kwargs,
                 }
@@ -3713,9 +3727,11 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 return pf
             if location is None:
                 location, func_name = IndicatorFactory.split_indicator_name(func_name)
-            if location is not None and (func_name is None or func_name == "all"):
-                location = location.lower().strip()
-                if func_name == "all":
+            if location is not None and (func_name is None or func_name == "all" or func_name == "*"):
+                matched_location = IndicatorFactory.match_location(location)
+                if matched_location is not None:
+                    location = matched_location
+                if func_name == "all" or func_name == "*":
                     if prepend_location is None:
                         prepend_location = True
                 else:
@@ -3734,6 +3750,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     prepend_location=prepend_location,
                     unpack=unpack,
                     concat=concat,
+                    data_kwargs=data_kwargs,
                     silence_warnings=silence_warnings,
                     raise_errors=raise_errors,
                     execute_kwargs=execute_kwargs,
@@ -3744,7 +3761,9 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     **kwargs,
                 )
             if location is not None:
-                location = location.lower().strip()
+                matched_location = IndicatorFactory.match_location(location)
+                if matched_location is not None:
+                    location = matched_location
                 if location == "talib_func":
                     func = talib_func(func_name)
                 else:
@@ -3797,13 +3816,27 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         elif isinstance(unpack, str) and unpack.lower() == "dict":
             if isinstance(out, IndicatorBase):
                 out = out.to_dict()
-            elif isinstance(out, pd.Series):
-                out = {func.__name__: out}
+            else:
+                if _func_name is None:
+                    feature_name = func.__name__
+                else:
+                    feature_name = _func_name
+                out = {feature_name: out}
         elif isinstance(unpack, str) and unpack.lower() == "frame":
             if isinstance(out, IndicatorBase):
                 out = out.to_frame()
             elif isinstance(out, pd.Series):
                 out = out.to_frame()
+        elif isinstance(unpack, str) and unpack.lower() == "data":
+            if isinstance(out, IndicatorBase):
+                out = feature_dict(out.to_dict())
+            else:
+                if _func_name is None:
+                    feature_name = func.__name__
+                else:
+                    feature_name = _func_name
+                out = feature_dict({feature_name: out})
+            out = Data.from_data(out, **data_kwargs)
         else:
             raise ValueError(f"Invalid option unpack='{unpack}'")
         return out
