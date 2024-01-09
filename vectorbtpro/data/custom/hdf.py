@@ -154,6 +154,10 @@ class HDFData(FileData):
         return key_paths
 
     @classmethod
+    def path_to_key(cls, path: tp.PathLike, **kwargs) -> str:
+        return Path(path).name
+
+    @classmethod
     def resolve_keys_meta(
         cls,
         keys: tp.Union[None, dict, tp.MaybeKeys] = None,
