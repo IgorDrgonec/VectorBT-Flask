@@ -247,7 +247,9 @@ class HDFData(FileData):
         if path is None:
             path = key
         path = Path(path)
-        file_path, key = cls.split_hdf_path(path)
+        file_path, file_key = cls.split_hdf_path(path)
+        if file_key is not None:
+            key = file_key
 
         if start is not None or end is not None:
             hdf_store_arg_names = get_func_arg_names(pd.HDFStore.__init__)

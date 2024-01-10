@@ -3428,9 +3428,9 @@ class TestCustom:
         hdf_data = vbt.HDFData.pull(
             vbt.symbol_dict(
                 {
-                    "DATA1": tmp_path / "data/data1.h5",
-                    "DATA2": tmp_path / "data/data2.h5",
-                    "DATA3": tmp_path / "data/data3.h5",
+                    "DATA1": tmp_path / "data/data1.h5/data1",
+                    "DATA2": tmp_path / "data/data2.h5/data2",
+                    "DATA3": tmp_path / "data/data3.h5/data3",
                 }
             )
         )
