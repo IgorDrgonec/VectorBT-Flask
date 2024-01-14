@@ -90,6 +90,7 @@ def attach_binary_magic_methods(
                 return _translate_func(self, other, _func)
 
             new_method.__name__ = target_name
+            new_method.__module__ = cls.__module__
             new_method.__qualname__ = f"{cls.__name__}.{new_method.__name__}"
             setattr(cls, target_name, new_method)
         return cls
@@ -151,6 +152,7 @@ def attach_unary_magic_methods(
                 return _translate_func(self, _func)
 
             new_method.__name__ = target_name
+            new_method.__module__ = cls.__module__
             new_method.__qualname__ = f"{cls.__name__}.{new_method.__name__}"
             setattr(cls, target_name, new_method)
         return cls

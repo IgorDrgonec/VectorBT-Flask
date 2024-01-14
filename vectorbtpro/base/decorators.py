@@ -55,6 +55,7 @@ def attach_arg_properties(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
                     return self.get_arg(_arg_name)
 
                 pre_arg_prop.__name__ = target_pre_name
+                pre_arg_prop.__module__ = cls.__module__
                 pre_arg_prop.__qualname__ = f"{cls.__name__}.{pre_arg_prop.__name__}"
                 if broadcast and substitute_templates:
                     pre_arg_prop.__doc__ = f"Argument `{arg_name}` before broadcasting and template substitution."
@@ -71,6 +72,7 @@ def attach_arg_properties(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
                     return self.prepare_post_arg(_arg_name)
 
                 post_arg_prop.__name__ = target_post_name
+                post_arg_prop.__module__ = cls.__module__
                 post_arg_prop.__qualname__ = f"{cls.__name__}.{post_arg_prop.__name__}"
                 if broadcast and substitute_templates:
                     post_arg_prop.__doc__ = f"Argument `{arg_name}` after broadcasting and template substitution."
@@ -87,6 +89,7 @@ def attach_arg_properties(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
                     return getattr(self, _target_post_name)
 
                 arg_prop.__name__ = target_name
+                arg_prop.__module__ = cls.__module__
                 arg_prop.__qualname__ = f"{cls.__name__}.{arg_prop.__name__}"
                 arg_prop.__doc__ = f"Argument `{arg_name}`."
                 setattr(cls, arg_prop.__name__, cachedproperty(arg_prop))
@@ -97,6 +100,7 @@ def attach_arg_properties(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
                     return self.get_arg(_arg_name)
 
                 arg_prop.__name__ = arg_name
+                arg_prop.__module__ = cls.__module__
                 arg_prop.__qualname__ = f"{cls.__name__}.{arg_prop.__name__}"
                 arg_prop.__doc__ = f"Argument `{arg_name}`."
                 setattr(cls, arg_prop.__name__, cachedproperty(arg_prop))

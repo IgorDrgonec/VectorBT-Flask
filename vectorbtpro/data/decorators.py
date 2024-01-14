@@ -34,6 +34,7 @@ def attach_symbol_dict_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
             )
 
         select_method.__name__ = "select_" + target_name
+        select_method.__module__ = cls.__module__
         select_method.__qualname__ = f"{cls.__name__}.{select_method.__name__}"
         select_method.__doc__ = f"""Select a feature or symbol from `Data.{target_name}`."""
         setattr(cls, select_method.__name__, select_method)
@@ -57,6 +58,7 @@ def attach_symbol_dict_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
                 return self.replace(**{_target_name: new_kwargs})
 
             update_method.__name__ = "update_" + target_name
+            update_method.__module__ = cls.__module__
             update_method.__qualname__ = f"{cls.__name__}.{update_method.__name__}"
             update_method.__doc__ = f"""Update `Data.{target_name}`. Returns a new instance."""
             setattr(cls, update_method.__name__, update_method)

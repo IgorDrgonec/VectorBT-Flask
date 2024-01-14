@@ -1502,6 +1502,7 @@ class IndicatorFactory(Configured):
                 return self.wrapper.wrap(old_input[:, input_mapper])
 
             input_prop.__name__ = input_name
+            input_prop.__module__ = Indicator.__module__
             input_prop.__qualname__ = f"{Indicator.__name__}.{input_prop.__name__}"
             if make_cacheable:
                 setattr(Indicator, input_name, cacheable_property(input_prop))
@@ -1519,6 +1520,7 @@ class IndicatorFactory(Configured):
                 output_prop.__doc__ = """Output array."""
 
             output_prop.__name__ = output_name
+            output_prop.__module__ = Indicator.__module__
             output_prop.__qualname__ = f"{Indicator.__name__}.{output_prop.__name__}"
             if output_name in output_flags:
                 _output_flags = output_flags[output_name]
@@ -1570,6 +1572,7 @@ class IndicatorFactory(Configured):
         # Add user-defined outputs
         for prop_name, prop in lazy_outputs.items():
             prop.__name__ = prop_name
+            prop.__module__ = Indicator.__module__
             prop.__qualname__ = f"{Indicator.__name__}.{prop.__name__}"
             if prop.__doc__ is None:
                 prop.__doc__ = f"""Custom property."""
@@ -1624,6 +1627,7 @@ class IndicatorFactory(Configured):
                 return out
 
             combine_method.__name__ = f"{attr_name}_{func_name}"
+            combine_method.__module__ = Indicator.__module__
             combine_method.__qualname__ = f"{Indicator.__name__}.{combine_method.__name__}"
             combine_method.__doc__ = docstring
             setattr(Indicator, f"{attr_name}_{func_name}", combine_method)
@@ -1644,6 +1648,7 @@ class IndicatorFactory(Configured):
                     return getattr(self, _attr_name).vbt(mapping=_mapping).apply_mapping(enum_unkval=_enum_unkval)
 
                 attr_readable.__name__ = f"{attr_name}_readable"
+                attr_readable.__module__ = Indicator.__module__
                 attr_readable.__qualname__ = f"{Indicator.__name__}.{attr_readable.__name__}"
                 attr_readable.__doc__ = inspect.cleandoc(
                     """`{attr_name}` in readable format based on the following mapping: 
@@ -1664,6 +1669,7 @@ class IndicatorFactory(Configured):
                     return getattr(self, _attr_name).vbt(mapping=_mapping).stats(*args, **kwargs)
 
                 attr_stats.__name__ = f"{attr_name}_stats"
+                attr_stats.__module__ = Indicator.__module__
                 attr_stats.__qualname__ = f"{Indicator.__name__}.{attr_stats.__name__}"
                 attr_stats.__doc__ = inspect.cleandoc("""Stats of `{attr_name}` based on the following mapping: 
 
@@ -1708,6 +1714,7 @@ class IndicatorFactory(Configured):
                     return getattr(self, _attr_name).vbt.stats(*args, **kwargs)
 
                 attr_stats.__name__ = f"{attr_name}_stats"
+                attr_stats.__module__ = Indicator.__module__
                 attr_stats.__qualname__ = f"{Indicator.__name__}.{attr_stats.__name__}"
                 attr_stats.__doc__ = f"""Stats of `{attr_name}` as generic."""
                 setattr(Indicator, f"{attr_name}_stats", attr_stats)
@@ -1728,6 +1735,7 @@ class IndicatorFactory(Configured):
                     return getattr(self, _attr_name).vbt.signals.stats(*args, **kwargs)
 
                 attr_stats.__name__ = f"{attr_name}_stats"
+                attr_stats.__module__ = Indicator.__module__
                 attr_stats.__qualname__ = f"{Indicator.__name__}.{attr_stats.__name__}"
                 attr_stats.__doc__ = f"""Stats of `{attr_name}` as signals."""
                 setattr(Indicator, f"{attr_name}_stats", attr_stats)
@@ -1750,6 +1758,7 @@ class IndicatorFactory(Configured):
                     return stats_defaults(self)
 
             stats_defaults_prop.__name__ = "stats_defaults"
+            stats_defaults_prop.__module__ = Indicator.__module__
             stats_defaults_prop.__qualname__ = f"{Indicator.__name__}.{stats_defaults_prop.__name__}"
             setattr(Indicator, "stats_defaults", property(stats_defaults_prop))
 
@@ -1771,6 +1780,7 @@ class IndicatorFactory(Configured):
                     return plots_defaults(self)
 
             plots_defaults_prop.__name__ = "plots_defaults"
+            plots_defaults_prop.__module__ = Indicator.__module__
             plots_defaults_prop.__qualname__ = f"{Indicator.__name__}.{plots_defaults_prop.__name__}"
             setattr(Indicator, "plots_defaults", property(plots_defaults_prop))
 
@@ -2223,6 +2233,7 @@ Other keyword arguments are passed to `{0}.run_pipeline`.""".format(
         )
         run = compile_run_function("run", run_docstring, def_run_kwargs)
         run.__name__ = "run"
+        run.__module__ = Indicator.__module__
         run.__qualname__ = f"{Indicator.__name__}.{run.__name__}"
         setattr(Indicator, "run", run)
 
@@ -2358,7 +2369,8 @@ Other keyword arguments are passed to `{0}.run`.
             )
             run_combs = compile_run_function("run_combs", run_combs_docstring, def_run_combs_kwargs)
             run_combs.__name__ = "run_combs"
-            run.__qualname__ = f"{Indicator.__name__}.{run_combs.__name__}"
+            run_combs.__module__ = Indicator.__module__
+            run_combs.__qualname__ = f"{Indicator.__name__}.{run_combs.__name__}"
             setattr(Indicator, "run_combs", run_combs)
 
         return Indicator
