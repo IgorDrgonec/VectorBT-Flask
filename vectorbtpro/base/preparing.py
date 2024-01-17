@@ -19,6 +19,7 @@ from vectorbtpro.base.reshaping import BCO, Default, Ref
 from vectorbtpro.base.reshaping import broadcast
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.decorators import override_arg_config, attach_arg_properties
+from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import Configured
@@ -35,7 +36,7 @@ from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.module_ import import_module_from_path
 from vectorbtpro.utils.params import Param
 from vectorbtpro.utils.random_ import set_seed
-from vectorbtpro.utils.template import CustomTemplate, RepEval, RepFunc, substitute_templates
+from vectorbtpro.utils.template import CustomTemplate, RepFunc, substitute_templates
 from vectorbtpro.utils.parsing import get_func_arg_names
 
 __all__ = [
@@ -59,9 +60,7 @@ base_arg_config = ReadonlyConfig(
 )
 """_"""
 
-__pdoc__[
-    "base_arg_config"
-] = f"""Argument config for `BasePreparer`.
+__pdoc__["base_arg_config"] = f"""Argument config for `BasePreparer`.
 
 ```python
 {base_arg_config.prettify()}
@@ -147,24 +146,31 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         return td_obj
 
     @classmethod
-    def prepare_dt_obj(cls, dt_obj: object, ns_ago: int = 0) -> object:
+    def prepare_dt_obj(cls, dt_obj: object) -> object:
         """Prepare a datetime object for broadcasting."""
         if isinstance(dt_obj, Param):
-            return dt_obj.map_value(partial(cls.prepare_dt_obj, ns_ago=ns_ago))
+            return dt_obj.map_value(partial(cls.prepare_dt_obj))
 
         if isinstance(dt_obj, (str, time, timedelta, pd.DateOffset, pd.Timedelta)):
-            dt_obj_dt_template = RepEval(
-                "try_align_to_dt_index([dt_obj], wrapper.index).vbt.to_ns() - ns_ago",
-                context=dict(try_align_to_dt_index=try_align_to_dt_index, dt_obj=dt_obj, ns_ago=ns_ago),
-            )
-            dt_obj_td_template = RepEval(
-                "wrapper.index.vbt.to_period_ns(parse_timedelta(dt_obj)) - ns_ago",
-                context=dict(parse_timedelta=parse_timedelta, dt_obj=dt_obj, ns_ago=ns_ago),
-            )
-            dt_obj_time_template = RepEval(
-                '(wrapper.index.floor("1d") + time_to_timedelta(dt_obj)).vbt.to_ns() - ns_ago',
-                context=dict(time_to_timedelta=time_to_timedelta, dt_obj=dt_obj, ns_ago=ns_ago),
-            )
+
+            def _to_dt(wrapper, _dt_obj=dt_obj):
+                target_index = try_align_to_dt_index([_dt_obj], wrapper.index)
+                return target_index.vbt.to_ns()
+
+            def _to_td(wrapper, _dt_obj=dt_obj):
+                period_index = wrapper.index.vbt.to_period(parse_timedelta(_dt_obj), shift=True)
+                resampler = Resampler(wrapper.index, period_index.to_timestamp(), source_freq=wrapper.freq)
+                last_indices = resampler.last_before_target_index(incl_source=False)
+                return np.where(last_indices != -1, resampler.source_rbound_index.vbt.to_ns()[last_indices], -1)
+
+            def _to_time(wrapper, _dt_obj=dt_obj):
+                floor_index = wrapper.index.floor("1d") + time_to_timedelta(_dt_obj)
+                target_index = floor_index.where(wrapper.index < floor_index, floor_index + pd.Timedelta(days=1))
+                return target_index.vbt.to_ns()
+
+            dt_obj_dt_template = RepFunc(_to_dt)
+            dt_obj_td_template = RepFunc(_to_td)
+            dt_obj_time_template = RepFunc(_to_time)
             if isinstance(dt_obj, str):
                 try:
                     time.fromisoformat(dt_obj)
@@ -245,7 +251,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             if arg_config.get("is_td", False):
                 arg = self.prepare_td_obj(arg)
             if arg_config.get("is_dt", False):
-                arg = self.prepare_dt_obj(arg, ns_ago=arg_config.get("ns_ago", 0))
+                arg = self.prepare_dt_obj(arg)
         return arg
 
     def get_arg(self, arg_name: str, use_idx_setter: bool = True, use_default: bool = True) -> tp.Any:
@@ -265,7 +271,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             if arg_config.get("is_td", False):
                 arg = self.prepare_td_obj(arg)
             if arg_config.get("is_dt", False):
-                arg = self.prepare_dt_obj(arg, ns_ago=arg_config.get("ns_ago", 0))
+                arg = self.prepare_dt_obj(arg)
         return arg
 
     def __getitem__(self, arg_name) -> tp.Any:

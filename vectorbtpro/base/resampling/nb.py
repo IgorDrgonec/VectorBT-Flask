@@ -327,3 +327,37 @@ def resample_source_mask_nb(
                     break
 
     return out
+
+
+@register_jitted(cache=True)
+def last_before_target_index_nb(
+    source_index: tp.Array1d,
+    target_index: tp.Array1d,
+    incl_source: bool = True,
+) -> tp.Array1d:
+    """For each source index, find the last source index between the original source index and
+    the corresponding target index."""
+    out = np.empty(len(source_index), dtype=np.int_)
+
+    last_j = -1
+    for i in range(len(source_index)):
+        if i > 0 and source_index[i] < source_index[i - 1]:
+            raise ValueError("Source index must be increasing")
+        if i > 0 and target_index[i] < target_index[i - 1]:
+            raise ValueError("Target index must be increasing")
+        if last_j == -1:
+            from_i = i + 1
+        else:
+            from_i = last_j
+        if incl_source:
+            last_j = i
+        else:
+            last_j = -1
+        for j in range(from_i, len(source_index)):
+            if source_index[j] < target_index[i]:
+                last_j = j
+            else:
+                break
+        out[i] = last_j
+
+    return out

@@ -405,3 +405,8 @@ class Resampler(Configured):
             source_freq,
             target_freq,
         )
+
+    def last_before_target_index(self, incl_source: bool = True, jitted: tp.JittedOption = None) -> tp.Array1d:
+        """See `vectorbtpro.base.resampling.nb.last_before_target_index_nb`."""
+        func = jit_reg.resolve_option(nb.last_before_target_index_nb, jitted)
+        return func(self.source_index.values, self.target_index.values, incl_source=incl_source)

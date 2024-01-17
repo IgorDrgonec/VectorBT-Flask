@@ -835,7 +835,6 @@ fs_arg_config = ReadonlyConfig(
         dt_stop=dict(
             broadcast=True,
             is_dt=True,
-            ns_ago=1,
             subdtype=np.integer,
             broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=-1)),
         ),
