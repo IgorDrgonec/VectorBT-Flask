@@ -374,7 +374,7 @@ class BasePFPreparer(BasePreparer):
         """Arguments to be passed to the portfolio."""
         kwargs = dict()
         for k, v in self.config.items():
-            if k not in self.arg_config:
+            if k not in self.arg_config and k != "arg_config":
                 kwargs[k] = v
         return dict(
             wrapper=self.wrapper,

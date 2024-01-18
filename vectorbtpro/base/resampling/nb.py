@@ -334,9 +334,10 @@ def last_before_target_index_nb(
     source_index: tp.Array1d,
     target_index: tp.Array1d,
     incl_source: bool = True,
+    incl_target: bool = False,
 ) -> tp.Array1d:
-    """For each source index, find the last source index between the original source index and
-    the corresponding target index."""
+    """For each source index, find the position of the last source index between the original
+    source index and the corresponding target index."""
     out = np.empty(len(source_index), dtype=np.int_)
 
     last_j = -1
@@ -345,6 +346,8 @@ def last_before_target_index_nb(
             raise ValueError("Source index must be increasing")
         if i > 0 and target_index[i] < target_index[i - 1]:
             raise ValueError("Target index must be increasing")
+        if source_index[i] > target_index[i]:
+            raise ValueError("Target index must be equal to or greater than source index")
         if last_j == -1:
             from_i = i + 1
         else:
@@ -355,6 +358,8 @@ def last_before_target_index_nb(
             last_j = -1
         for j in range(from_i, len(source_index)):
             if source_index[j] < target_index[i]:
+                last_j = j
+            elif incl_target and source_index[j] == target_index[i]:
                 last_j = j
             else:
                 break

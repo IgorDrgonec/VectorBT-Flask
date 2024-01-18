@@ -20,6 +20,7 @@ from vectorbtpro.base.reshaping import broadcast
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.decorators import override_arg_config, attach_arg_properties
 from vectorbtpro.base.resampling.base import Resampler
+from vectorbtpro.base.indexes import repeat_index
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import Configured
@@ -29,7 +30,7 @@ from vectorbtpro.utils.datetime_ import (
     freq_to_timedelta64,
     parse_timedelta,
     time_to_timedelta,
-    try_align_to_dt_index,
+    try_align_dt_to_index,
     to_ns,
 )
 from vectorbtpro.utils.enum_ import map_enum_fields
@@ -89,11 +90,13 @@ class BasePreparer(Configured, metaclass=MetaArgs):
 
     _settings_path: tp.SettingsPath = None
 
-    def __init__(self, **kwargs) -> None:
-        Configured.__init__(self, **kwargs)
+    def __init__(self, arg_config: tp.KwargsLike = None, **kwargs) -> None:
+        Configured.__init__(self, arg_config=arg_config, **kwargs)
 
         # Copy writeable attrs
         self._arg_config = type(self)._arg_config.copy()
+        if arg_config is not None:
+            self._arg_config = merge_dicts(self._arg_config, arg_config)
 
     _arg_config: tp.ClassVar[Config] = HybridConfig()
 
@@ -146,26 +149,48 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         return td_obj
 
     @classmethod
-    def prepare_dt_obj(cls, dt_obj: object) -> object:
+    def prepare_dt_obj(cls, dt_obj: object, before: tp.Optional[bool] = None) -> object:
         """Prepare a datetime object for broadcasting."""
         if isinstance(dt_obj, Param):
             return dt_obj.map_value(partial(cls.prepare_dt_obj))
 
         if isinstance(dt_obj, (str, time, timedelta, pd.DateOffset, pd.Timedelta)):
 
-            def _to_dt(wrapper, _dt_obj=dt_obj):
-                target_index = try_align_to_dt_index([_dt_obj], wrapper.index)
+            def _apply_before(source_index, target_index, source_freq):
+                resampler = Resampler(source_index, target_index, source_freq=source_freq)
+                last_indices = resampler.last_before_target_index(incl_source=False)
+                source_rbound_ns = resampler.source_rbound_index.vbt.to_ns()
+                return np.where(last_indices != -1, source_rbound_ns[last_indices], -1)
+
+            def _to_dt(wrapper, _dt_obj=dt_obj, _before=before):
+                if _before is None:
+                    _before = False
+                _dt_obj = try_align_dt_to_index(_dt_obj, wrapper.index)
+                source_index = wrapper.index[wrapper.index < _dt_obj]
+                target_index = repeat_index(pd.Index([_dt_obj]), len(source_index))
+                if _before:
+                    target_ns = _apply_before(source_index, target_index, wrapper.freq)
+                else:
+                    target_ns = target_index.vbt.to_ns()
+                if len(target_ns) < len(target_index):
+                    target_ns = np.concatenate((target_ns, np.full(len(target_index) - len(target_ns), -1)))
+                return target_ns
+
+            def _to_td(wrapper, _dt_obj=dt_obj, _before=before):
+                if _before is None:
+                    _before = True
+                target_index = wrapper.index.vbt.to_period(parse_timedelta(_dt_obj), shift=True).to_timestamp()
+                if _before:
+                    return _apply_before(wrapper.index, target_index, wrapper.freq)
                 return target_index.vbt.to_ns()
 
-            def _to_td(wrapper, _dt_obj=dt_obj):
-                period_index = wrapper.index.vbt.to_period(parse_timedelta(_dt_obj), shift=True)
-                resampler = Resampler(wrapper.index, period_index.to_timestamp(), source_freq=wrapper.freq)
-                last_indices = resampler.last_before_target_index(incl_source=False)
-                return np.where(last_indices != -1, resampler.source_rbound_index.vbt.to_ns()[last_indices], -1)
-
-            def _to_time(wrapper, _dt_obj=dt_obj):
+            def _to_time(wrapper, _dt_obj=dt_obj, _before=before):
+                if _before is None:
+                    _before = False
                 floor_index = wrapper.index.floor("1d") + time_to_timedelta(_dt_obj)
                 target_index = floor_index.where(wrapper.index < floor_index, floor_index + pd.Timedelta(days=1))
+                if _before:
+                    return _apply_before(wrapper.index, target_index, wrapper.freq)
                 return target_index.vbt.to_ns()
 
             dt_obj_dt_template = RepFunc(_to_dt)
@@ -251,7 +276,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             if arg_config.get("is_td", False):
                 arg = self.prepare_td_obj(arg)
             if arg_config.get("is_dt", False):
-                arg = self.prepare_dt_obj(arg)
+                arg = self.prepare_dt_obj(arg, before=arg_config.get("before", None))
         return arg
 
     def get_arg(self, arg_name: str, use_idx_setter: bool = True, use_default: bool = True) -> tp.Any:
@@ -271,7 +296,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             if arg_config.get("is_td", False):
                 arg = self.prepare_td_obj(arg)
             if arg_config.get("is_dt", False):
-                arg = self.prepare_dt_obj(arg)
+                arg = self.prepare_dt_obj(arg, before=arg_config.get("before", None))
         return arg
 
     def __getitem__(self, arg_name) -> tp.Any:
