@@ -784,6 +784,7 @@ fs_arg_config = ReadonlyConfig(
         limit_expiry=dict(
             broadcast=True,
             is_dt=True,
+            last_before=False,
             subdtype=np.integer,
             broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=-1)),
         ),
