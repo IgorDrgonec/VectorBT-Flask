@@ -1150,51 +1150,23 @@ class FSPreparer(BasePFPreparer):
     def init_in_outputs(
         cls,
         wrapper: ArrayWrapper,
-        group_lens: tp.GroupLens,
-        cash_sharing: bool,
+        group_lens: tp.Optional[tp.GroupLens] = None,
+        cash_sharing: bool = False,
         save_state: bool = True,
         save_value: bool = True,
         save_returns: bool = True,
     ) -> enums.FSInOutputs:
         """Initialize `vectorbtpro.portfolio.enums.FSInOutputs`."""
-        if save_state:
-            position = np.full(wrapper.shape_2d, np.nan)
-            debt = np.full(wrapper.shape_2d, np.nan)
-            locked_cash = np.full(wrapper.shape_2d, np.nan)
-            if cash_sharing:
-                cash = np.full((wrapper.shape[0], len(group_lens)), np.nan)
-                free_cash = np.full((wrapper.shape[0], len(group_lens)), np.nan)
-            else:
-                cash = np.full(wrapper.shape_2d, np.nan)
-                free_cash = np.full(wrapper.shape_2d, np.nan)
-        else:
-            position = np.full((0, 0), np.nan)
-            debt = np.full((0, 0), np.nan)
-            locked_cash = np.full((0, 0), np.nan)
-            cash = np.full((0, 0), np.nan)
-            free_cash = np.full((0, 0), np.nan)
-        if save_value:
-            if cash_sharing:
-                value = np.full((wrapper.shape[0], len(group_lens)), np.nan)
-            else:
-                value = np.full(wrapper.shape_2d, np.nan)
-        else:
-            value = np.full((0, 0), np.nan)
-        if save_returns:
-            if cash_sharing:
-                returns = np.full((wrapper.shape[0], len(group_lens)), np.nan)
-            else:
-                returns = np.full(wrapper.shape_2d, np.nan)
-        else:
-            returns = np.full((0, 0), np.nan)
-        return enums.FSInOutputs(
-            position=position,
-            debt=debt,
-            locked_cash=locked_cash,
-            cash=cash,
-            free_cash=free_cash,
-            value=value,
-            returns=returns,
+        if cash_sharing:
+            if group_lens is None:
+                group_lens = wrapper.grouper.get_group_lens()
+        return nb.init_FSInOutputs_nb(
+            wrapper.shape_2d,
+            group_lens,
+            cash_sharing=cash_sharing,
+            save_state=save_state,
+            save_value=save_value,
+            save_returns=save_returns,
         )
 
     @cachedproperty
