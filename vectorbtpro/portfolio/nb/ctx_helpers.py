@@ -340,7 +340,7 @@ def get_entry_trade_records_nb(
         PostSignalContext,
     ],
     init_position: tp.FlexArray1dLike = 0.0,
-    init_price: tp.Optional[tp.FlexArray1dLike] = None,
+    init_price: tp.FlexArray1dLike = np.nan,
 ) -> tp.Array1d:
     """Get entry trade records up to this point."""
     order_records = get_order_records_nb(c)
@@ -364,7 +364,7 @@ def get_exit_trade_records_nb(
         PostSignalContext,
     ],
     init_position: tp.FlexArray1dLike = 0.0,
-    init_price: tp.Optional[tp.FlexArray1dLike] = None,
+    init_price: tp.FlexArray1dLike = np.nan,
 ) -> tp.Array1d:
     """Get exit trade records up to this point."""
     order_records = get_order_records_nb(c)
@@ -388,7 +388,7 @@ def get_position_records_nb(
         PostSignalContext,
     ],
     init_position: tp.FlexArray1dLike = 0.0,
-    init_price: tp.Optional[tp.FlexArray1dLike] = None,
+    init_price: tp.FlexArray1dLike = np.nan,
 ) -> tp.Array1d:
     """Get position records up to this point."""
     exit_trade_records = get_exit_trade_records_nb(c, init_position=init_position, init_price=init_price)

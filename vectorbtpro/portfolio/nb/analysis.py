@@ -507,14 +507,11 @@ def cash_grouped_nb(
 def init_position_value_nb(
     n_cols: int,
     init_position: tp.FlexArray1dLike = 0.0,
-    init_price: tp.Optional[tp.FlexArray1dLike] = None,
+    init_price: tp.FlexArray1dLike = np.nan,
 ) -> tp.Array1d:
     """Get initial position value per column."""
     init_position_ = to_1d_array_nb(np.asarray(init_position))
-    if init_price is None:
-        init_price_ = to_1d_array_nb(np.asarray(np.nan))
-    else:
-        init_price_ = to_1d_array_nb(np.asarray(init_price))
+    init_price_ = to_1d_array_nb(np.asarray(init_price))
 
     out = np.empty(n_cols, dtype=np.float_)
     for col in range(n_cols):
@@ -666,17 +663,14 @@ def total_profit_nb(
     order_records: tp.RecordArray,
     col_map: tp.GroupMap,
     init_position: tp.FlexArray1dLike = 0.0,
-    init_price: tp.Optional[tp.FlexArray1dLike] = None,
+    init_price: tp.FlexArray1dLike = np.nan,
     cash_earnings: tp.FlexArray2dLike = 0.0,
 ) -> tp.Array1d:
     """Get total profit per column.
 
     A much faster version than the one based on `value_nb`."""
     init_position_ = to_1d_array_nb(np.asarray(init_position))
-    if init_price is None:
-        init_price_ = to_1d_array_nb(np.asarray(np.nan))
-    else:
-        init_price_ = to_1d_array_nb(np.asarray(init_price))
+    init_price_ = to_1d_array_nb(np.asarray(init_price))
     cash_earnings_ = to_2d_array_nb(np.asarray(cash_earnings))
 
     col_idxs, col_lens = col_map
