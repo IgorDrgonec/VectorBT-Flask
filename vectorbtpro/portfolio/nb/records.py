@@ -188,7 +188,7 @@ def get_entry_trades_nb(
     close: tp.Array2d,
     col_map: tp.GroupMap,
     init_position: tp.FlexArray1dLike = 0.0,
-    init_price: tp.FlexArray1dLike = np.nan,
+    init_price: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.RecordArray:
     """Fill entry trade records by aggregating order records.
 
@@ -265,7 +265,10 @@ def get_entry_trades_nb(
         ```
     """
     init_position_ = to_1d_array_nb(np.asarray(init_position))
-    init_price_ = to_1d_array_nb(np.asarray(init_price))
+    if init_price is None:
+        init_price_ = to_1d_array_nb(np.asarray(np.nan))
+    else:
+        init_price_ = to_1d_array_nb(np.asarray(init_price))
 
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
@@ -482,7 +485,7 @@ def get_exit_trades_nb(
     close: tp.Array2d,
     col_map: tp.GroupMap,
     init_position: tp.FlexArray1dLike = 0.0,
-    init_price: tp.FlexArray1dLike = np.nan,
+    init_price: tp.Optional[tp.FlexArray1dLike] = None,
 ) -> tp.RecordArray:
     """Fill exit trade records by aggregating order records.
 
@@ -526,7 +529,10 @@ def get_exit_trades_nb(
         ```
     """
     init_position_ = to_1d_array_nb(np.asarray(init_position))
-    init_price_ = to_1d_array_nb(np.asarray(init_price))
+    if init_price is None:
+        init_price_ = to_1d_array_nb(np.asarray(np.nan))
+    else:
+        init_price_ = to_1d_array_nb(np.asarray(init_price))
 
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens

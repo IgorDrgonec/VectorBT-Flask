@@ -448,7 +448,7 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
     call_seq: tp.Optional[tp.Array2d] = None,
     init_cash: tp.FlexArray1dLike = 100.0,
     init_position: tp.FlexArray1dLike = 0.0,
-    init_price: tp.FlexArray1dLike = np.nan,
+    init_price: tp.Optional[tp.FlexArray1dLike] = None,
     cash_deposits: tp.FlexArray2dLike = 0.0,
     cash_earnings: tp.FlexArray2dLike = 0.0,
     segment_mask: tp.FlexArray2dLike = True,
@@ -472,11 +472,11 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
     post_order_args: tp.Args = (),
     index: tp.Optional[tp.Array1d] = None,
     freq: tp.Optional[int] = None,
-    open: tp.FlexArray2dLike = np.nan,
-    high: tp.FlexArray2dLike = np.nan,
-    low: tp.FlexArray2dLike = np.nan,
-    close: tp.FlexArray2dLike = np.nan,
-    bm_close: tp.FlexArray2dLike = np.nan,
+    open: tp.Optional[tp.FlexArray2dLike] = None,
+    high: tp.Optional[tp.FlexArray2dLike] = None,
+    low: tp.Optional[tp.FlexArray2dLike] = None,
+    close: tp.Optional[tp.FlexArray2dLike] = None,
+    bm_close: tp.Optional[tp.FlexArray2dLike] = None,
     ffill_val_price: bool = True,
     update_value: bool = False,
     fill_pos_info: bool = True,
@@ -831,15 +831,33 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
 
     init_cash_ = to_1d_array_nb(np.asarray(init_cash))
     init_position_ = to_1d_array_nb(np.asarray(init_position))
-    init_price_ = to_1d_array_nb(np.asarray(init_price))
+    if init_price is None:
+        init_price_ = to_1d_array_nb(np.asarray(np.nan))
+    else:
+        init_price_ = to_1d_array_nb(np.asarray(init_price))
     cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
     cash_earnings_ = to_2d_array_nb(np.asarray(cash_earnings))
     segment_mask_ = to_2d_array_nb(np.asarray(segment_mask))
-    open_ = to_2d_array_nb(np.asarray(open))
-    high_ = to_2d_array_nb(np.asarray(high))
-    low_ = to_2d_array_nb(np.asarray(low))
-    close_ = to_2d_array_nb(np.asarray(close))
-    bm_close_ = to_2d_array_nb(np.asarray(bm_close))
+    if open is None:
+        open_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        open_ = to_2d_array_nb(np.asarray(open))
+    if high is None:
+        high_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        high_ = to_2d_array_nb(np.asarray(high))
+    if low is None:
+        low_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        low_ = to_2d_array_nb(np.asarray(low))
+    if close is None:
+        close_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        close_ = to_2d_array_nb(np.asarray(close))
+    if bm_close is None:
+        bm_close_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        bm_close_ = to_2d_array_nb(np.asarray(bm_close))
 
     order_records, log_records = prepare_records_nb(target_shape, max_order_records, max_log_records)
     last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)
@@ -1671,7 +1689,7 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
     call_seq: tp.Optional[tp.Array2d] = None,
     init_cash: tp.FlexArray1dLike = 100.0,
     init_position: tp.FlexArray1dLike = 0.0,
-    init_price: tp.FlexArray1dLike = np.nan,
+    init_price: tp.Optional[tp.FlexArray1dLike] = None,
     cash_deposits: tp.FlexArray2dLike = 0.0,
     cash_earnings: tp.FlexArray2dLike = 0.0,
     segment_mask: tp.FlexArray2dLike = True,
@@ -1695,11 +1713,11 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
     post_order_args: tp.Args = (),
     index: tp.Optional[tp.Array1d] = None,
     freq: tp.Optional[int] = None,
-    open: tp.FlexArray2dLike = np.nan,
-    high: tp.FlexArray2dLike = np.nan,
-    low: tp.FlexArray2dLike = np.nan,
-    close: tp.FlexArray2dLike = np.nan,
-    bm_close: tp.FlexArray2dLike = np.nan,
+    open: tp.Optional[tp.FlexArray2dLike] = None,
+    high: tp.Optional[tp.FlexArray2dLike] = None,
+    low: tp.Optional[tp.FlexArray2dLike] = None,
+    close: tp.Optional[tp.FlexArray2dLike] = None,
+    bm_close: tp.Optional[tp.FlexArray2dLike] = None,
     ffill_val_price: bool = True,
     update_value: bool = False,
     fill_pos_info: bool = True,
@@ -1817,15 +1835,33 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
 
     init_cash_ = to_1d_array_nb(np.asarray(init_cash))
     init_position_ = to_1d_array_nb(np.asarray(init_position))
-    init_price_ = to_1d_array_nb(np.asarray(init_price))
+    if init_price is None:
+        init_price_ = to_1d_array_nb(np.asarray(np.nan))
+    else:
+        init_price_ = to_1d_array_nb(np.asarray(init_price))
     cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
     cash_earnings_ = to_2d_array_nb(np.asarray(cash_earnings))
     segment_mask_ = to_2d_array_nb(np.asarray(segment_mask))
-    open_ = to_2d_array_nb(np.asarray(open))
-    high_ = to_2d_array_nb(np.asarray(high))
-    low_ = to_2d_array_nb(np.asarray(low))
-    close_ = to_2d_array_nb(np.asarray(close))
-    bm_close_ = to_2d_array_nb(np.asarray(bm_close))
+    if open is None:
+        open_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        open_ = to_2d_array_nb(np.asarray(open))
+    if high is None:
+        high_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        high_ = to_2d_array_nb(np.asarray(high))
+    if low is None:
+        low_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        low_ = to_2d_array_nb(np.asarray(low))
+    if close is None:
+        close_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        close_ = to_2d_array_nb(np.asarray(close))
+    if bm_close is None:
+        bm_close_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        bm_close_ = to_2d_array_nb(np.asarray(bm_close))
 
     order_records, log_records = prepare_records_nb(target_shape, max_order_records, max_log_records)
     last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)
@@ -2640,7 +2676,7 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
     cash_sharing: bool,
     init_cash: tp.FlexArray1dLike = 100.0,
     init_position: tp.FlexArray1dLike = 0.0,
-    init_price: tp.FlexArray1dLike = np.nan,
+    init_price: tp.Optional[tp.FlexArray1dLike] = None,
     cash_deposits: tp.FlexArray2dLike = 0.0,
     cash_earnings: tp.FlexArray2dLike = 0.0,
     segment_mask: tp.FlexArray2dLike = True,
@@ -2664,11 +2700,11 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
     post_order_args: tp.Args = (),
     index: tp.Optional[tp.Array1d] = None,
     freq: tp.Optional[int] = None,
-    open: tp.FlexArray2dLike = np.nan,
-    high: tp.FlexArray2dLike = np.nan,
-    low: tp.FlexArray2dLike = np.nan,
-    close: tp.FlexArray2dLike = np.nan,
-    bm_close: tp.FlexArray2dLike = np.nan,
+    open: tp.Optional[tp.FlexArray2dLike] = None,
+    high: tp.Optional[tp.FlexArray2dLike] = None,
+    low: tp.Optional[tp.FlexArray2dLike] = None,
+    close: tp.Optional[tp.FlexArray2dLike] = None,
+    bm_close: tp.Optional[tp.FlexArray2dLike] = None,
     ffill_val_price: bool = True,
     update_value: bool = False,
     fill_pos_info: bool = True,
@@ -2860,15 +2896,33 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
 
     init_cash_ = to_1d_array_nb(np.asarray(init_cash))
     init_position_ = to_1d_array_nb(np.asarray(init_position))
-    init_price_ = to_1d_array_nb(np.asarray(init_price))
+    if init_price is None:
+        init_price_ = to_1d_array_nb(np.asarray(np.nan))
+    else:
+        init_price_ = to_1d_array_nb(np.asarray(init_price))
     cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
     cash_earnings_ = to_2d_array_nb(np.asarray(cash_earnings))
     segment_mask_ = to_2d_array_nb(np.asarray(segment_mask))
-    open_ = to_2d_array_nb(np.asarray(open))
-    high_ = to_2d_array_nb(np.asarray(high))
-    low_ = to_2d_array_nb(np.asarray(low))
-    close_ = to_2d_array_nb(np.asarray(close))
-    bm_close_ = to_2d_array_nb(np.asarray(bm_close))
+    if open is None:
+        open_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        open_ = to_2d_array_nb(np.asarray(open))
+    if high is None:
+        high_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        high_ = to_2d_array_nb(np.asarray(high))
+    if low is None:
+        low_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        low_ = to_2d_array_nb(np.asarray(low))
+    if close is None:
+        close_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        close_ = to_2d_array_nb(np.asarray(close))
+    if bm_close is None:
+        bm_close_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        bm_close_ = to_2d_array_nb(np.asarray(bm_close))
 
     order_records, log_records = prepare_records_nb(target_shape, max_order_records, max_log_records)
     last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)
@@ -3652,7 +3706,7 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
     cash_sharing: bool,
     init_cash: tp.FlexArray1dLike = 100.0,
     init_position: tp.FlexArray1dLike = 0.0,
-    init_price: tp.FlexArray1dLike = np.nan,
+    init_price: tp.Optional[tp.FlexArray1dLike] = None,
     cash_deposits: tp.FlexArray2dLike = 0.0,
     cash_earnings: tp.FlexArray2dLike = 0.0,
     segment_mask: tp.FlexArray2dLike = True,
@@ -3676,11 +3730,11 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
     post_order_args: tp.Args = (),
     index: tp.Optional[tp.Array1d] = None,
     freq: tp.Optional[int] = None,
-    open: tp.FlexArray2dLike = np.nan,
-    high: tp.FlexArray2dLike = np.nan,
-    low: tp.FlexArray2dLike = np.nan,
-    close: tp.FlexArray2dLike = np.nan,
-    bm_close: tp.FlexArray2dLike = np.nan,
+    open: tp.Optional[tp.FlexArray2dLike] = None,
+    high: tp.Optional[tp.FlexArray2dLike] = None,
+    low: tp.Optional[tp.FlexArray2dLike] = None,
+    close: tp.Optional[tp.FlexArray2dLike] = None,
+    bm_close: tp.Optional[tp.FlexArray2dLike] = None,
     ffill_val_price: bool = True,
     update_value: bool = False,
     fill_pos_info: bool = True,
@@ -3745,15 +3799,33 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
 
     init_cash_ = to_1d_array_nb(np.asarray(init_cash))
     init_position_ = to_1d_array_nb(np.asarray(init_position))
-    init_price_ = to_1d_array_nb(np.asarray(init_price))
+    if init_price is None:
+        init_price_ = to_1d_array_nb(np.asarray(np.nan))
+    else:
+        init_price_ = to_1d_array_nb(np.asarray(init_price))
     cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
     cash_earnings_ = to_2d_array_nb(np.asarray(cash_earnings))
     segment_mask_ = to_2d_array_nb(np.asarray(segment_mask))
-    open_ = to_2d_array_nb(np.asarray(open))
-    high_ = to_2d_array_nb(np.asarray(high))
-    low_ = to_2d_array_nb(np.asarray(low))
-    close_ = to_2d_array_nb(np.asarray(close))
-    bm_close_ = to_2d_array_nb(np.asarray(bm_close))
+    if open is None:
+        open_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        open_ = to_2d_array_nb(np.asarray(open))
+    if high is None:
+        high_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        high_ = to_2d_array_nb(np.asarray(high))
+    if low is None:
+        low_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        low_ = to_2d_array_nb(np.asarray(low))
+    if close is None:
+        close_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        close_ = to_2d_array_nb(np.asarray(close))
+    if bm_close is None:
+        bm_close_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        bm_close_ = to_2d_array_nb(np.asarray(bm_close))
 
     order_records, log_records = prepare_records_nb(target_shape, max_order_records, max_log_records)
     last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)

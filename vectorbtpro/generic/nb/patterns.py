@@ -120,13 +120,16 @@ def fit_pattern_nb(
     pmax: float = np.nan,
     invert: bool = False,
     error_type: int = ErrorType.Absolute,
-    max_error: tp.FlexArray1dLike = np.nan,
+    max_error: tp.Optional[tp.FlexArray1dLike] = None,
     max_error_interp_mode: tp.Optional[int] = None,
 ) -> tp.Tuple[tp.Array1d, tp.Array1d]:
     """Fit pattern.
 
     Returns the resized and rescaled pattern and max error."""
-    max_error_ = to_1d_array_nb(np.asarray(max_error))
+    if max_error is None:
+        max_error_ = to_1d_array_nb(np.asarray(np.nan))
+    else:
+        max_error_ = to_1d_array_nb(np.asarray(max_error))
 
     if max_error_interp_mode is None:
         max_error_interp_mode = interp_mode
@@ -201,7 +204,7 @@ def pattern_similarity_nb(
     invert: bool = False,
     error_type: int = ErrorType.Absolute,
     distance_measure: int = DistanceMeasure.MAE,
-    max_error: tp.FlexArray1dLike = np.nan,
+    max_error: tp.Optional[tp.FlexArray1dLike] = None,
     max_error_interp_mode: tp.Optional[int] = None,
     max_error_as_maxdist: bool = False,
     max_error_strict: bool = False,
@@ -216,7 +219,10 @@ def pattern_similarity_nb(
     Then, the absolute distance between the actual and expected value is calculated (= error).
     This error is then divided by the maximum error at this position to get a relative value between 0 and 1.
     Finally, all relative errors are added together and subtracted from 1 to get the similarity measure."""
-    max_error_ = to_1d_array_nb(np.asarray(max_error))
+    if max_error is None:
+        max_error_ = to_1d_array_nb(np.asarray(np.nan))
+    else:
+        max_error_ = to_1d_array_nb(np.asarray(max_error))
 
     if len(arr) == 0:
         return np.nan

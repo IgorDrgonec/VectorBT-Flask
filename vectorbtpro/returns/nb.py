@@ -90,11 +90,14 @@ def returns_1d_nb(arr: tp.Array1d, init_value: float = np.nan, log_returns: bool
 @register_jitted(cache=True, tags={"can_parallel"})
 def returns_nb(
     arr: tp.Array2d,
-    init_value: tp.FlexArray1dLike = np.nan,
+    init_value: tp.Optional[tp.FlexArray1dLike] = None,
     log_returns: bool = False,
 ) -> tp.Array2d:
     """2-dim version of `returns_1d_nb`."""
-    init_value_ = to_1d_array_nb(np.asarray(init_value))
+    if init_value is None:
+        init_value_ = to_1d_array_nb(np.asarray(np.nan))
+    else:
+        init_value_ = to_1d_array_nb(np.asarray(init_value))
 
     out = np.empty(arr.shape, dtype=np.float_)
     for col in prange(out.shape[1]):

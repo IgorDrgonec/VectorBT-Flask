@@ -6,7 +6,6 @@ from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
-from vectorbtpro.base.flex_indexing import flex_select_nb
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.registries.ch_registry import register_chunkable
@@ -66,13 +65,13 @@ from vectorbtpro.utils.array_ import insert_argsort_nb
 def from_orders_nb(
     target_shape: tp.Shape,
     group_lens: tp.Array1d,
-    open: tp.FlexArray2dLike = np.nan,
-    high: tp.FlexArray2dLike = np.nan,
-    low: tp.FlexArray2dLike = np.nan,
-    close: tp.FlexArray2dLike = np.nan,
+    open: tp.Optional[tp.FlexArray2dLike] = None,
+    high: tp.Optional[tp.FlexArray2dLike] = None,
+    low: tp.Optional[tp.FlexArray2dLike] = None,
+    close: tp.Optional[tp.FlexArray2dLike] = None,
     init_cash: tp.FlexArray1dLike = 100.0,
     init_position: tp.FlexArray1dLike = 0.0,
-    init_price: tp.FlexArray1dLike = np.nan,
+    init_price: tp.Optional[tp.FlexArray1dLike] = None,
     cash_deposits: tp.FlexArray2dLike = 0.0,
     cash_earnings: tp.FlexArray2dLike = 0.0,
     cash_dividends: tp.FlexArray2dLike = 0.0,
@@ -83,9 +82,9 @@ def from_orders_nb(
     fees: tp.FlexArray2dLike = 0.0,
     fixed_fees: tp.FlexArray2dLike = 0.0,
     slippage: tp.FlexArray2dLike = 0.0,
-    min_size: tp.FlexArray2dLike = np.nan,
-    max_size: tp.FlexArray2dLike = np.nan,
-    size_granularity: tp.FlexArray2dLike = np.nan,
+    min_size: tp.Optional[tp.FlexArray2dLike] = None,
+    max_size: tp.Optional[tp.FlexArray2dLike] = None,
+    size_granularity: tp.Optional[tp.FlexArray2dLike] = None,
     leverage: tp.FlexArray2dLike = 1.0,
     leverage_mode: tp.FlexArray2dLike = LeverageMode.Lazy,
     reject_prob: tp.FlexArray2dLike = 0.0,
@@ -142,13 +141,28 @@ def from_orders_nb(
     check_group_lens_nb(group_lens, target_shape[1])
     cash_sharing = is_grouped_nb(group_lens)
 
-    open_ = to_2d_array_nb(np.asarray(open))
-    high_ = to_2d_array_nb(np.asarray(high))
-    low_ = to_2d_array_nb(np.asarray(low))
-    close_ = to_2d_array_nb(np.asarray(close))
+    if open is None:
+        open_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        open_ = to_2d_array_nb(np.asarray(open))
+    if high is None:
+        high_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        high_ = to_2d_array_nb(np.asarray(high))
+    if low is None:
+        low_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        low_ = to_2d_array_nb(np.asarray(low))
+    if close is None:
+        close_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        close_ = to_2d_array_nb(np.asarray(close))
     init_cash_ = to_1d_array_nb(np.asarray(init_cash))
     init_position_ = to_1d_array_nb(np.asarray(init_position))
-    init_price_ = to_1d_array_nb(np.asarray(init_price))
+    if init_price is None:
+        init_price_ = to_1d_array_nb(np.asarray(np.nan))
+    else:
+        init_price_ = to_1d_array_nb(np.asarray(init_price))
     cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
     cash_earnings_ = to_2d_array_nb(np.asarray(cash_earnings))
     cash_dividends_ = to_2d_array_nb(np.asarray(cash_dividends))
@@ -159,9 +173,18 @@ def from_orders_nb(
     fees_ = to_2d_array_nb(np.asarray(fees))
     fixed_fees_ = to_2d_array_nb(np.asarray(fixed_fees))
     slippage_ = to_2d_array_nb(np.asarray(slippage))
-    min_size_ = to_2d_array_nb(np.asarray(min_size))
-    max_size_ = to_2d_array_nb(np.asarray(max_size))
-    size_granularity_ = to_2d_array_nb(np.asarray(size_granularity))
+    if min_size is None:
+        min_size_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        min_size_ = to_2d_array_nb(np.asarray(min_size))
+    if max_size is None:
+        max_size_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        max_size_ = to_2d_array_nb(np.asarray(max_size))
+    if size_granularity is None:
+        size_granularity_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        size_granularity_ = to_2d_array_nb(np.asarray(size_granularity))
     leverage_ = to_2d_array_nb(np.asarray(leverage))
     leverage_mode_ = to_2d_array_nb(np.asarray(leverage_mode))
     reject_prob_ = to_2d_array_nb(np.asarray(reject_prob))

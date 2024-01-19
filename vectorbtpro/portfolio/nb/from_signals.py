@@ -418,13 +418,13 @@ def signal_to_size_nb(
 def from_basic_signals_nb(
     target_shape: tp.Shape,
     group_lens: tp.Array1d,
-    open: tp.FlexArray2dLike = np.nan,
-    high: tp.FlexArray2dLike = np.nan,
-    low: tp.FlexArray2dLike = np.nan,
-    close: tp.FlexArray2dLike = np.nan,
+    open: tp.Optional[tp.FlexArray2dLike] = None,
+    high: tp.Optional[tp.FlexArray2dLike] = None,
+    low: tp.Optional[tp.FlexArray2dLike] = None,
+    close: tp.Optional[tp.FlexArray2dLike] = None,
     init_cash: tp.FlexArray1dLike = 100.0,
     init_position: tp.FlexArray1dLike = 0.0,
-    init_price: tp.FlexArray1dLike = np.nan,
+    init_price: tp.Optional[tp.FlexArray1dLike] = None,
     cash_deposits: tp.FlexArray2dLike = 0.0,
     cash_earnings: tp.FlexArray2dLike = 0.0,
     cash_dividends: tp.FlexArray2dLike = 0.0,
@@ -438,9 +438,9 @@ def from_basic_signals_nb(
     fees: tp.FlexArray2dLike = 0.0,
     fixed_fees: tp.FlexArray2dLike = 0.0,
     slippage: tp.FlexArray2dLike = 0.0,
-    min_size: tp.FlexArray2dLike = np.nan,
-    max_size: tp.FlexArray2dLike = np.nan,
-    size_granularity: tp.FlexArray2dLike = np.nan,
+    min_size: tp.Optional[tp.FlexArray2dLike] = None,
+    max_size: tp.Optional[tp.FlexArray2dLike] = None,
+    size_granularity: tp.Optional[tp.FlexArray2dLike] = None,
     leverage: tp.FlexArray2dLike = 1.0,
     leverage_mode: tp.FlexArray2dLike = LeverageMode.Lazy,
     reject_prob: tp.FlexArray2dLike = 0.0,
@@ -475,13 +475,28 @@ def from_basic_signals_nb(
     check_group_lens_nb(group_lens, target_shape[1])
     cash_sharing = is_grouped_nb(group_lens)
 
-    open_ = to_2d_array_nb(np.asarray(open))
-    high_ = to_2d_array_nb(np.asarray(high))
-    low_ = to_2d_array_nb(np.asarray(low))
-    close_ = to_2d_array_nb(np.asarray(close))
+    if open is None:
+        open_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        open_ = to_2d_array_nb(np.asarray(open))
+    if high is None:
+        high_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        high_ = to_2d_array_nb(np.asarray(high))
+    if low is None:
+        low_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        low_ = to_2d_array_nb(np.asarray(low))
+    if close is None:
+        close_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        close_ = to_2d_array_nb(np.asarray(close))
     init_cash_ = to_1d_array_nb(np.asarray(init_cash))
     init_position_ = to_1d_array_nb(np.asarray(init_position))
-    init_price_ = to_1d_array_nb(np.asarray(init_price))
+    if init_price is None:
+        init_price_ = to_1d_array_nb(np.asarray(np.nan))
+    else:
+        init_price_ = to_1d_array_nb(np.asarray(init_price))
     cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
     cash_earnings_ = to_2d_array_nb(np.asarray(cash_earnings))
     cash_dividends_ = to_2d_array_nb(np.asarray(cash_dividends))
@@ -495,9 +510,18 @@ def from_basic_signals_nb(
     fees_ = to_2d_array_nb(np.asarray(fees))
     fixed_fees_ = to_2d_array_nb(np.asarray(fixed_fees))
     slippage_ = to_2d_array_nb(np.asarray(slippage))
-    min_size_ = to_2d_array_nb(np.asarray(min_size))
-    max_size_ = to_2d_array_nb(np.asarray(max_size))
-    size_granularity_ = to_2d_array_nb(np.asarray(size_granularity))
+    if min_size is None:
+        min_size_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        min_size_ = to_2d_array_nb(np.asarray(min_size))
+    if max_size is None:
+        max_size_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        max_size_ = to_2d_array_nb(np.asarray(max_size))
+    if size_granularity is None:
+        size_granularity_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        size_granularity_ = to_2d_array_nb(np.asarray(size_granularity))
     leverage_ = to_2d_array_nb(np.asarray(leverage))
     leverage_mode_ = to_2d_array_nb(np.asarray(leverage_mode))
     reject_prob_ = to_2d_array_nb(np.asarray(reject_prob))
@@ -1116,13 +1140,13 @@ def from_signals_nb(
     group_lens: tp.Array1d,
     index: tp.Optional[tp.Array1d] = None,
     freq: tp.Optional[int] = None,
-    open: tp.FlexArray2dLike = np.nan,
-    high: tp.FlexArray2dLike = np.nan,
-    low: tp.FlexArray2dLike = np.nan,
-    close: tp.FlexArray2dLike = np.nan,
+    open: tp.Optional[tp.FlexArray2dLike] = None,
+    high: tp.Optional[tp.FlexArray2dLike] = None,
+    low: tp.Optional[tp.FlexArray2dLike] = None,
+    close: tp.Optional[tp.FlexArray2dLike] = None,
     init_cash: tp.FlexArray1dLike = 100.0,
     init_position: tp.FlexArray1dLike = 0.0,
-    init_price: tp.FlexArray1dLike = np.nan,
+    init_price: tp.Optional[tp.FlexArray1dLike] = None,
     cash_deposits: tp.FlexArray2dLike = 0.0,
     cash_earnings: tp.FlexArray2dLike = 0.0,
     cash_dividends: tp.FlexArray2dLike = 0.0,
@@ -1136,9 +1160,9 @@ def from_signals_nb(
     fees: tp.FlexArray2dLike = 0.0,
     fixed_fees: tp.FlexArray2dLike = 0.0,
     slippage: tp.FlexArray2dLike = 0.0,
-    min_size: tp.FlexArray2dLike = np.nan,
-    max_size: tp.FlexArray2dLike = np.nan,
-    size_granularity: tp.FlexArray2dLike = np.nan,
+    min_size: tp.Optional[tp.FlexArray2dLike] = None,
+    max_size: tp.Optional[tp.FlexArray2dLike] = None,
+    size_granularity: tp.Optional[tp.FlexArray2dLike] = None,
     leverage: tp.FlexArray2dLike = 1.0,
     leverage_mode: tp.FlexArray2dLike = LeverageMode.Lazy,
     reject_prob: tp.FlexArray2dLike = 0.0,
@@ -1153,7 +1177,7 @@ def from_signals_nb(
     upon_dir_conflict: tp.FlexArray2dLike = DirectionConflictMode.Ignore,
     upon_opposite_entry: tp.FlexArray2dLike = OppositeEntryMode.ReverseReduce,
     order_type: tp.FlexArray2dLike = OrderType.Market,
-    limit_delta: tp.FlexArray2dLike = np.nan,
+    limit_delta: tp.Optional[tp.FlexArray2dLike] = None,
     limit_tif: tp.FlexArray2dLike = -1,
     limit_expiry: tp.FlexArray2dLike = -1,
     limit_reverse: tp.FlexArray2dLike = False,
@@ -1161,17 +1185,17 @@ def from_signals_nb(
     upon_opp_limit_conflict: tp.FlexArray2dLike = PendingConflictMode.CancelExecute,
     use_stops: bool = True,
     stop_ladder: int = StopLadderMode.Disabled,
-    sl_stop: tp.FlexArray2dLike = np.nan,
-    tsl_stop: tp.FlexArray2dLike = np.nan,
-    tsl_th: tp.FlexArray2dLike = np.nan,
-    tp_stop: tp.FlexArray2dLike = np.nan,
+    sl_stop: tp.Optional[tp.FlexArray2dLike] = None,
+    tsl_stop: tp.Optional[tp.FlexArray2dLike] = None,
+    tsl_th: tp.Optional[tp.FlexArray2dLike] = None,
+    tp_stop: tp.Optional[tp.FlexArray2dLike] = None,
     td_stop: tp.FlexArray2dLike = -1,
     dt_stop: tp.FlexArray2dLike = -1,
     stop_entry_price: tp.FlexArray2dLike = StopEntryPrice.Close,
     stop_exit_price: tp.FlexArray2dLike = StopExitPrice.Stop,
     stop_exit_type: tp.FlexArray2dLike = StopExitType.Close,
     stop_order_type: tp.FlexArray2dLike = OrderType.Market,
-    stop_limit_delta: tp.FlexArray2dLike = np.nan,
+    stop_limit_delta: tp.Optional[tp.FlexArray2dLike] = None,
     upon_stop_update: tp.FlexArray2dLike = StopUpdateMode.Keep,
     upon_adj_stop_conflict: tp.FlexArray2dLike = PendingConflictMode.KeepExecute,
     upon_opp_stop_conflict: tp.FlexArray2dLike = PendingConflictMode.KeepExecute,
@@ -1198,13 +1222,28 @@ def from_signals_nb(
     check_group_lens_nb(group_lens, target_shape[1])
     cash_sharing = is_grouped_nb(group_lens)
 
-    open_ = to_2d_array_nb(np.asarray(open))
-    high_ = to_2d_array_nb(np.asarray(high))
-    low_ = to_2d_array_nb(np.asarray(low))
-    close_ = to_2d_array_nb(np.asarray(close))
+    if open is None:
+        open_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        open_ = to_2d_array_nb(np.asarray(open))
+    if high is None:
+        high_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        high_ = to_2d_array_nb(np.asarray(high))
+    if low is None:
+        low_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        low_ = to_2d_array_nb(np.asarray(low))
+    if close is None:
+        close_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        close_ = to_2d_array_nb(np.asarray(close))
     init_cash_ = to_1d_array_nb(np.asarray(init_cash))
     init_position_ = to_1d_array_nb(np.asarray(init_position))
-    init_price_ = to_1d_array_nb(np.asarray(init_price))
+    if init_price is None:
+        init_price_ = to_1d_array_nb(np.asarray(np.nan))
+    else:
+        init_price_ = to_1d_array_nb(np.asarray(init_price))
     cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
     cash_earnings_ = to_2d_array_nb(np.asarray(cash_earnings))
     cash_dividends_ = to_2d_array_nb(np.asarray(cash_dividends))
@@ -1218,9 +1257,18 @@ def from_signals_nb(
     fees_ = to_2d_array_nb(np.asarray(fees))
     fixed_fees_ = to_2d_array_nb(np.asarray(fixed_fees))
     slippage_ = to_2d_array_nb(np.asarray(slippage))
-    min_size_ = to_2d_array_nb(np.asarray(min_size))
-    max_size_ = to_2d_array_nb(np.asarray(max_size))
-    size_granularity_ = to_2d_array_nb(np.asarray(size_granularity))
+    if min_size is None:
+        min_size_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        min_size_ = to_2d_array_nb(np.asarray(min_size))
+    if max_size is None:
+        max_size_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        max_size_ = to_2d_array_nb(np.asarray(max_size))
+    if size_granularity is None:
+        size_granularity_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        size_granularity_ = to_2d_array_nb(np.asarray(size_granularity))
     leverage_ = to_2d_array_nb(np.asarray(leverage))
     leverage_mode_ = to_2d_array_nb(np.asarray(leverage_mode))
     reject_prob_ = to_2d_array_nb(np.asarray(reject_prob))
@@ -1235,23 +1283,41 @@ def from_signals_nb(
     upon_dir_conflict_ = to_2d_array_nb(np.asarray(upon_dir_conflict))
     upon_opposite_entry_ = to_2d_array_nb(np.asarray(upon_opposite_entry))
     order_type_ = to_2d_array_nb(np.asarray(order_type))
-    limit_delta_ = to_2d_array_nb(np.asarray(limit_delta))
+    if limit_delta is None:
+        limit_delta_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        limit_delta_ = to_2d_array_nb(np.asarray(limit_delta))
     limit_tif_ = to_2d_array_nb(np.asarray(limit_tif))
     limit_expiry_ = to_2d_array_nb(np.asarray(limit_expiry))
     limit_reverse_ = to_2d_array_nb(np.asarray(limit_reverse))
     upon_adj_limit_conflict_ = to_2d_array_nb(np.asarray(upon_adj_limit_conflict))
     upon_opp_limit_conflict_ = to_2d_array_nb(np.asarray(upon_opp_limit_conflict))
-    sl_stop_ = to_2d_array_nb(np.asarray(sl_stop))
-    tsl_stop_ = to_2d_array_nb(np.asarray(tsl_stop))
-    tsl_th_ = to_2d_array_nb(np.asarray(tsl_th))
-    tp_stop_ = to_2d_array_nb(np.asarray(tp_stop))
+    if sl_stop is None:
+        sl_stop_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        sl_stop_ = to_2d_array_nb(np.asarray(sl_stop))
+    if tsl_stop is None:
+        tsl_stop_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        tsl_stop_ = to_2d_array_nb(np.asarray(tsl_stop))
+    if tsl_th is None:
+        tsl_th_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        tsl_th_ = to_2d_array_nb(np.asarray(tsl_th))
+    if tp_stop is None:
+        tp_stop_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        tp_stop_ = to_2d_array_nb(np.asarray(tp_stop))
     td_stop_ = to_2d_array_nb(np.asarray(td_stop))
     dt_stop_ = to_2d_array_nb(np.asarray(dt_stop))
     stop_entry_price_ = to_2d_array_nb(np.asarray(stop_entry_price))
     stop_exit_price_ = to_2d_array_nb(np.asarray(stop_exit_price))
     stop_exit_type_ = to_2d_array_nb(np.asarray(stop_exit_type))
     stop_order_type_ = to_2d_array_nb(np.asarray(stop_order_type))
-    stop_limit_delta_ = to_2d_array_nb(np.asarray(stop_limit_delta))
+    if stop_limit_delta is None:
+        stop_limit_delta_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        stop_limit_delta_ = to_2d_array_nb(np.asarray(stop_limit_delta))
     upon_stop_update_ = to_2d_array_nb(np.asarray(upon_stop_update))
     upon_adj_stop_conflict_ = to_2d_array_nb(np.asarray(upon_adj_stop_conflict))
     upon_opp_stop_conflict_ = to_2d_array_nb(np.asarray(upon_opp_stop_conflict))
@@ -3494,13 +3560,13 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     cash_sharing: bool,
     index: tp.Optional[tp.Array1d] = None,
     freq: tp.Optional[int] = None,
-    open: tp.FlexArray2dLike = np.nan,
-    high: tp.FlexArray2dLike = np.nan,
-    low: tp.FlexArray2dLike = np.nan,
-    close: tp.FlexArray2dLike = np.nan,
+    open: tp.Optional[tp.FlexArray2dLike] = None,
+    high: tp.Optional[tp.FlexArray2dLike] = None,
+    low: tp.Optional[tp.FlexArray2dLike] = None,
+    close: tp.Optional[tp.FlexArray2dLike] = None,
     init_cash: tp.FlexArray1dLike = 100.0,
     init_position: tp.FlexArray1dLike = 0.0,
-    init_price: tp.FlexArray1dLike = np.nan,
+    init_price: tp.Optional[tp.FlexArray1dLike] = None,
     cash_deposits: tp.FlexArray2dLike = 0.0,
     cash_earnings: tp.FlexArray2dLike = 0.0,
     cash_dividends: tp.FlexArray2dLike = 0.0,
@@ -3516,9 +3582,9 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     fees: tp.FlexArray2dLike = 0.0,
     fixed_fees: tp.FlexArray2dLike = 0.0,
     slippage: tp.FlexArray2dLike = 0.0,
-    min_size: tp.FlexArray2dLike = np.nan,
-    max_size: tp.FlexArray2dLike = np.nan,
-    size_granularity: tp.FlexArray2dLike = np.nan,
+    min_size: tp.Optional[tp.FlexArray2dLike] = None,
+    max_size: tp.Optional[tp.FlexArray2dLike] = None,
+    size_granularity: tp.Optional[tp.FlexArray2dLike] = None,
     leverage: tp.FlexArray2dLike = 1.0,
     leverage_mode: tp.FlexArray2dLike = LeverageMode.Lazy,
     reject_prob: tp.FlexArray2dLike = 0.0,
@@ -3533,7 +3599,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     upon_dir_conflict: tp.FlexArray2dLike = DirectionConflictMode.Ignore,
     upon_opposite_entry: tp.FlexArray2dLike = OppositeEntryMode.ReverseReduce,
     order_type: tp.FlexArray2dLike = OrderType.Market,
-    limit_delta: tp.FlexArray2dLike = np.nan,
+    limit_delta: tp.Optional[tp.FlexArray2dLike] = None,
     limit_tif: tp.FlexArray2dLike = -1,
     limit_expiry: tp.FlexArray2dLike = -1,
     limit_reverse: tp.FlexArray2dLike = False,
@@ -3541,17 +3607,17 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     upon_opp_limit_conflict: tp.FlexArray2dLike = PendingConflictMode.CancelExecute,
     use_stops: bool = True,
     stop_ladder: int = StopLadderMode.Disabled,
-    sl_stop: tp.FlexArray2dLike = np.nan,
-    tsl_stop: tp.FlexArray2dLike = np.nan,
-    tsl_th: tp.FlexArray2dLike = np.nan,
-    tp_stop: tp.FlexArray2dLike = np.nan,
+    sl_stop: tp.Optional[tp.FlexArray2dLike] = None,
+    tsl_stop: tp.Optional[tp.FlexArray2dLike] = None,
+    tsl_th: tp.Optional[tp.FlexArray2dLike] = None,
+    tp_stop: tp.Optional[tp.FlexArray2dLike] = None,
     td_stop: tp.FlexArray2dLike = -1,
     dt_stop: tp.FlexArray2dLike = -1,
     stop_entry_price: tp.FlexArray2dLike = StopEntryPrice.Close,
     stop_exit_price: tp.FlexArray2dLike = StopExitPrice.Stop,
     stop_exit_type: tp.FlexArray2dLike = StopExitType.Close,
     stop_order_type: tp.FlexArray2dLike = OrderType.Market,
-    stop_limit_delta: tp.FlexArray2dLike = np.nan,
+    stop_limit_delta: tp.Optional[tp.FlexArray2dLike] = None,
     upon_stop_update: tp.FlexArray2dLike = StopUpdateMode.Keep,
     upon_adj_stop_conflict: tp.FlexArray2dLike = PendingConflictMode.KeepExecute,
     upon_opp_stop_conflict: tp.FlexArray2dLike = PendingConflictMode.KeepExecute,
@@ -3584,13 +3650,28 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     """
     check_group_lens_nb(group_lens, target_shape[1])
 
-    open_ = to_2d_array_nb(np.asarray(open))
-    high_ = to_2d_array_nb(np.asarray(high))
-    low_ = to_2d_array_nb(np.asarray(low))
-    close_ = to_2d_array_nb(np.asarray(close))
+    if open is None:
+        open_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        open_ = to_2d_array_nb(np.asarray(open))
+    if high is None:
+        high_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        high_ = to_2d_array_nb(np.asarray(high))
+    if low is None:
+        low_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        low_ = to_2d_array_nb(np.asarray(low))
+    if close is None:
+        close_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        close_ = to_2d_array_nb(np.asarray(close))
     init_cash_ = to_1d_array_nb(np.asarray(init_cash))
     init_position_ = to_1d_array_nb(np.asarray(init_position))
-    init_price_ = to_1d_array_nb(np.asarray(init_price))
+    if init_price is None:
+        init_price_ = to_1d_array_nb(np.asarray(np.nan))
+    else:
+        init_price_ = to_1d_array_nb(np.asarray(init_price))
     cash_deposits_ = to_2d_array_nb(np.asarray(cash_deposits))
     cash_earnings_ = to_2d_array_nb(np.asarray(cash_earnings))
     cash_dividends_ = to_2d_array_nb(np.asarray(cash_dividends))
@@ -3600,9 +3681,18 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     fees_ = to_2d_array_nb(np.asarray(fees))
     fixed_fees_ = to_2d_array_nb(np.asarray(fixed_fees))
     slippage_ = to_2d_array_nb(np.asarray(slippage))
-    min_size_ = to_2d_array_nb(np.asarray(min_size))
-    max_size_ = to_2d_array_nb(np.asarray(max_size))
-    size_granularity_ = to_2d_array_nb(np.asarray(size_granularity))
+    if min_size is None:
+        min_size_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        min_size_ = to_2d_array_nb(np.asarray(min_size))
+    if max_size is None:
+        max_size_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        max_size_ = to_2d_array_nb(np.asarray(max_size))
+    if size_granularity is None:
+        size_granularity_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        size_granularity_ = to_2d_array_nb(np.asarray(size_granularity))
     leverage_ = to_2d_array_nb(np.asarray(leverage))
     leverage_mode_ = to_2d_array_nb(np.asarray(leverage_mode))
     reject_prob_ = to_2d_array_nb(np.asarray(reject_prob))
@@ -3617,23 +3707,41 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     upon_dir_conflict_ = to_2d_array_nb(np.asarray(upon_dir_conflict))
     upon_opposite_entry_ = to_2d_array_nb(np.asarray(upon_opposite_entry))
     order_type_ = to_2d_array_nb(np.asarray(order_type))
-    limit_delta_ = to_2d_array_nb(np.asarray(limit_delta))
+    if limit_delta is None:
+        limit_delta_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        limit_delta_ = to_2d_array_nb(np.asarray(limit_delta))
     limit_tif_ = to_2d_array_nb(np.asarray(limit_tif))
     limit_expiry_ = to_2d_array_nb(np.asarray(limit_expiry))
     limit_reverse_ = to_2d_array_nb(np.asarray(limit_reverse))
     upon_adj_limit_conflict_ = to_2d_array_nb(np.asarray(upon_adj_limit_conflict))
     upon_opp_limit_conflict_ = to_2d_array_nb(np.asarray(upon_opp_limit_conflict))
-    sl_stop_ = to_2d_array_nb(np.asarray(sl_stop))
-    tsl_stop_ = to_2d_array_nb(np.asarray(tsl_stop))
-    tsl_th_ = to_2d_array_nb(np.asarray(tsl_th))
-    tp_stop_ = to_2d_array_nb(np.asarray(tp_stop))
+    if sl_stop is None:
+        sl_stop_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        sl_stop_ = to_2d_array_nb(np.asarray(sl_stop))
+    if tsl_stop is None:
+        tsl_stop_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        tsl_stop_ = to_2d_array_nb(np.asarray(tsl_stop))
+    if tsl_th is None:
+        tsl_th_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        tsl_th_ = to_2d_array_nb(np.asarray(tsl_th))
+    if tp_stop is None:
+        tp_stop_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        tp_stop_ = to_2d_array_nb(np.asarray(tp_stop))
     td_stop_ = to_2d_array_nb(np.asarray(td_stop))
     dt_stop_ = to_2d_array_nb(np.asarray(dt_stop))
     stop_entry_price_ = to_2d_array_nb(np.asarray(stop_entry_price))
     stop_exit_price_ = to_2d_array_nb(np.asarray(stop_exit_price))
     stop_exit_type_ = to_2d_array_nb(np.asarray(stop_exit_type))
     stop_order_type_ = to_2d_array_nb(np.asarray(stop_order_type))
-    stop_limit_delta_ = to_2d_array_nb(np.asarray(stop_limit_delta))
+    if stop_limit_delta is None:
+        stop_limit_delta_ = to_2d_array_nb(np.asarray(np.nan))
+    else:
+        stop_limit_delta_ = to_2d_array_nb(np.asarray(stop_limit_delta))
     upon_stop_update_ = to_2d_array_nb(np.asarray(upon_stop_update))
     upon_adj_stop_conflict_ = to_2d_array_nb(np.asarray(upon_adj_stop_conflict))
     upon_opp_stop_conflict_ = to_2d_array_nb(np.asarray(upon_opp_stop_conflict))

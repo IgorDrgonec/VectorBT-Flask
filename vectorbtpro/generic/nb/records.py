@@ -468,7 +468,7 @@ def find_pattern_1d_nb(
     invert: bool = False,
     error_type: int = ErrorType.Absolute,
     distance_measure: int = DistanceMeasure.MAE,
-    max_error: tp.FlexArray1dLike = np.nan,
+    max_error: tp.Optional[tp.FlexArray1dLike] = None,
     max_error_interp_mode: tp.Optional[int] = None,
     max_error_as_maxdist: bool = False,
     max_error_strict: bool = False,
@@ -495,7 +495,10 @@ def find_pattern_1d_nb(
 
     By default, creates an empty record array of the same size as the number of rows in `arr`.
     This can be increased or decreased using `max_records`."""
-    max_error_ = to_1d_array_nb(np.asarray(max_error))
+    if max_error is None:
+        max_error_ = to_1d_array_nb(np.asarray(np.nan))
+    else:
+        max_error_ = to_1d_array_nb(np.asarray(max_error))
 
     if window is None:
         window = pattern.shape[0]
@@ -685,7 +688,7 @@ def find_pattern_nb(
     invert: bool = False,
     error_type: int = ErrorType.Absolute,
     distance_measure: int = DistanceMeasure.MAE,
-    max_error: tp.FlexArray1dLike = np.nan,
+    max_error: tp.Optional[tp.FlexArray1dLike] = None,
     max_error_interp_mode: tp.Optional[int] = None,
     max_error_as_maxdist: bool = False,
     max_error_strict: bool = False,
@@ -697,7 +700,10 @@ def find_pattern_nb(
     max_records: tp.Optional[int] = None,
 ) -> tp.RecordArray:
     """2-dim version of `find_pattern_1d_nb`."""
-    max_error_ = to_1d_array_nb(np.asarray(max_error))
+    if max_error is None:
+        max_error_ = to_1d_array_nb(np.asarray(np.nan))
+    else:
+        max_error_ = to_1d_array_nb(np.asarray(max_error))
 
     if window is None:
         window = pattern.shape[0]
