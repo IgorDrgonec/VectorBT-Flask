@@ -421,13 +421,21 @@ def get_api_ref(
         if qualname is None:
             return md_url + "#" + module.__name__.replace(".", "")
         return md_url + "#" + module.__name__.replace(".", "") + qualname.replace(".", "")
-    if qualname is None:
-        search_query = module.__name__
+    if resolve:
+        if qualname is None:
+            search_query = module.__name__
+        else:
+            search_query = module.__name__ + "." + qualname
     else:
-        search_query = module.__name__ + "." + qualname
+        search_query = refname
     return "https://duckduckgo.com/?q=!ducky+" + urllib.request.pathname2url(search_query)
 
 
-def open_api_ref(obj: tp.Any, **kwargs) -> None:
+def open_api_ref(
+    obj: tp.Any,
+    module: tp.Union[None, str, ModuleType] = None,
+    resolve: bool = True,
+    **kwargs,
+) -> None:
     """Open the API reference to an object."""
-    webbrowser.open(get_api_ref(obj), **kwargs)
+    webbrowser.open(get_api_ref(obj, module=module, resolve=resolve), **kwargs)
