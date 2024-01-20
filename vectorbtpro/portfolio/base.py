@@ -51,7 +51,7 @@ from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, Readonly
 from vectorbtpro.utils.decorators import custom_property, cached_property, class_or_instancemethod
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.parsing import get_func_kwargs
-from vectorbtpro.utils.template import Rep, RepEval, RepFunc, substitute_templates
+from vectorbtpro.utils.template import Rep, RepEval, RepFunc
 
 try:
     if not tp.TYPE_CHECKING:

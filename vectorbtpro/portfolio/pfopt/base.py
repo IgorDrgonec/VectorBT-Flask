@@ -42,7 +42,7 @@ try:
     if not tp.TYPE_CHECKING:
         raise ImportError
     from pypfopt.base_optimizer import BaseOptimizer as BaseOptimizerT
-except ImportError as e:
+except ImportError:
     BaseOptimizerT = tp.Any
 try:
     if not tp.TYPE_CHECKING:
@@ -50,7 +50,7 @@ try:
     from riskfolio import Portfolio as RPortfolio, HCPortfolio as RHCPortfolio
 
     RPortfolioT = tp.TypeVar("RPortfolioT", bound=tp.Union[RPortfolio, RHCPortfolio])
-except ImportError as e:
+except ImportError:
     RPortfolioT = tp.Any
 try:
     if not tp.TYPE_CHECKING:
@@ -60,7 +60,7 @@ try:
 
     AlgoT = tp.TypeVar("AlgoT", bound=Algo)
     AlgoResultT = tp.TypeVar("AlgoResultT", bound=AlgoResult)
-except ImportError as e:
+except ImportError:
     AlgoT = tp.Any
     AlgoResultT = tp.Any
 

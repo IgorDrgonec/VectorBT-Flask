@@ -1911,11 +1911,7 @@ class TestParams:
 
     def test_combine_params(self):
         param_product = vbt.combine_params(
-            param_dct={
-                "a": vbt.Param(np.arange(2)),
-                "b": vbt.Param(np.arange(2)),
-                "c": vbt.Param(np.arange(2))
-            },
+            param_dct={"a": vbt.Param(np.arange(2)), "b": vbt.Param(np.arange(2)), "c": vbt.Param(np.arange(2))},
             build_grid=False,
         )[0]
         assert param_product["a"] == [0, 0, 0, 0, 1, 1, 1, 1]
@@ -1925,7 +1921,7 @@ class TestParams:
             param_dct={
                 "a": vbt.Param(np.arange(1000)),
                 "b": vbt.Param(np.arange(1000)),
-                "c": vbt.Param(np.arange(1000))
+                "c": vbt.Param(np.arange(1000)),
             },
             build_grid=False,
             seed=seed,
@@ -1938,7 +1934,7 @@ class TestParams:
             param_dct={
                 "a": vbt.Param(np.arange(1000)),
                 "b": vbt.Param(np.arange(1000)),
-                "c": vbt.Param(np.arange(1000))
+                "c": vbt.Param(np.arange(1000)),
             },
             build_grid=False,
             seed=seed,
@@ -1952,7 +1948,7 @@ class TestParams:
             param_dct={
                 "a": vbt.Param(np.arange(1000)),
                 "b": vbt.Param(np.arange(1000)),
-                "c": vbt.Param(np.arange(1000))
+                "c": vbt.Param(np.arange(1000)),
             },
             build_grid=False,
             seed=seed,
@@ -1966,7 +1962,7 @@ class TestParams:
             param_dct={
                 "a": vbt.Param(np.arange(1000), condition="a > b"),
                 "b": vbt.Param(np.arange(1000), condition="b > c"),
-                "c": vbt.Param(np.arange(1000))
+                "c": vbt.Param(np.arange(1000)),
             },
             build_grid=False,
             seed=seed,
@@ -1979,7 +1975,7 @@ class TestParams:
             param_dct={
                 "a": vbt.Param(np.arange(1000), condition="a > b"),
                 "b": vbt.Param(np.arange(1000), condition="b > c"),
-                "c": vbt.Param(np.arange(1000))
+                "c": vbt.Param(np.arange(1000)),
             },
             build_grid=False,
             seed=seed,
@@ -1993,7 +1989,7 @@ class TestParams:
             param_dct={
                 "a": vbt.Param(np.arange(5), condition="a > b"),
                 "b": vbt.Param(np.arange(5), condition="b > c"),
-                "c": vbt.Param(np.arange(5))
+                "c": vbt.Param(np.arange(5)),
             },
             build_grid=False,
             seed=seed,
@@ -2007,7 +2003,7 @@ class TestParams:
             param_dct={
                 "a": vbt.Param(np.arange(5), condition="a > b"),
                 "b": vbt.Param(np.arange(5), condition="b > c"),
-                "c": vbt.Param(np.arange(5))
+                "c": vbt.Param(np.arange(5)),
             },
             build_grid=False,
             seed=seed,
@@ -2021,7 +2017,7 @@ class TestParams:
             param_dct={
                 "a": vbt.Param(np.arange(5), condition="a > b"),
                 "b": vbt.Param(np.arange(5), condition="b > c"),
-                "c": vbt.Param(np.arange(5))
+                "c": vbt.Param(np.arange(5)),
             },
             build_grid=False,
             seed=seed,
@@ -2036,7 +2032,7 @@ class TestParams:
             param_dct={
                 "a": vbt.Param(np.arange(5), condition="a > b"),
                 "b": vbt.Param(np.arange(5), condition="b > c"),
-                "c": vbt.Param(np.arange(5))
+                "c": vbt.Param(np.arange(5)),
             },
             build_grid=False,
             seed=seed,
@@ -2051,7 +2047,7 @@ class TestParams:
             param_dct={
                 "a": vbt.Param(np.arange(1000), condition="a > b"),
                 "b": vbt.Param(np.arange(1000), condition="b > c"),
-                "c": vbt.Param(np.arange(1000))
+                "c": vbt.Param(np.arange(1000)),
             },
             build_grid=False,
             seed=seed,
@@ -2063,22 +2059,14 @@ class TestParams:
         assert param_product["c"] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
         param_product = vbt.combine_params(
-            param_dct={
-                "a": vbt.Param(np.arange(2)),
-                "b": vbt.Param(np.arange(2)),
-                "c": vbt.Param(np.arange(2))
-            },
+            param_dct={"a": vbt.Param(np.arange(2)), "b": vbt.Param(np.arange(2)), "c": vbt.Param(np.arange(2))},
             build_grid=True,
         )[0]
         assert param_product["a"] == [0, 0, 0, 0, 1, 1, 1, 1]
         assert param_product["b"] == [0, 0, 1, 1, 0, 0, 1, 1]
         assert param_product["c"] == [0, 1, 0, 1, 0, 1, 0, 1]
         param_product = vbt.combine_params(
-            param_dct={
-                "a": vbt.Param(np.arange(2)),
-                "b": vbt.Param(np.arange(2)),
-                "c": vbt.Param(np.arange(2))
-            },
+            param_dct={"a": vbt.Param(np.arange(2)), "b": vbt.Param(np.arange(2)), "c": vbt.Param(np.arange(2))},
             build_grid=True,
             grid_indices=slice(None, None, 2),
         )[0]
@@ -2089,7 +2077,7 @@ class TestParams:
             param_dct={
                 "a": vbt.Param(np.arange(5), condition="a > b"),
                 "b": vbt.Param(np.arange(5), condition="b > c"),
-                "c": vbt.Param(np.arange(5))
+                "c": vbt.Param(np.arange(5)),
             },
             build_grid=True,
             seed=seed,
@@ -2103,7 +2091,7 @@ class TestParams:
             param_dct={
                 "a": vbt.Param(np.arange(5), condition="a > b"),
                 "b": vbt.Param(np.arange(5), condition="b > c"),
-                "c": vbt.Param(np.arange(5))
+                "c": vbt.Param(np.arange(5)),
             },
             build_grid=True,
             seed=seed,
@@ -2371,17 +2359,21 @@ class TestParams:
             fp(vbt.Param([1, 2]), param_configs=param_configs, _mono_chunk_len=2)[1][1],
             pd.MultiIndex.from_tuples([(2, 0), (2, 1)], names=["a", "param_config"]),
         )
-        assert fp(
-            vbt.Param([1, 2]),
-            param_configs=param_configs,
-            _mono_chunk_len=2,
-            _mono_merge_func=sum,
-        )[0] == fp(
-            vbt.Param([1, 2], mono_merge_func=sum),
-            param_configs=param_configs,
-            _mono_chunk_len=2,
-            _mono_merge_func=dict(b=sum),
-        )[0]
+        assert (
+            fp(
+                vbt.Param([1, 2]),
+                param_configs=param_configs,
+                _mono_chunk_len=2,
+                _mono_merge_func=sum,
+            )[0]
+            == fp(
+                vbt.Param([1, 2], mono_merge_func=sum),
+                param_configs=param_configs,
+                _mono_chunk_len=2,
+                _mono_merge_func=dict(b=sum),
+            )[0]
+        )
+
 
 # ############# datetime_ ############# #
 
@@ -3721,3 +3713,89 @@ class TestJitting:
             pass
 
         assert dict(func_my.config) == dict(test="test")
+
+
+# ############# module_ ############# #
+
+
+class TestModule:
+    def test_get_api_ref(self):
+        pf = vbt.PF.from_holding([1, 2, 3])
+
+        assert vbt.get_refname(vbt) == "vectorbtpro"
+        assert vbt.get_refname(vbt.utils) == "vectorbtpro.utils"
+        assert vbt.get_refname(vbt.utils.datetime_) == "vectorbtpro.utils.datetime_"
+        assert vbt.get_refname(vbt.dt) == "vectorbtpro.utils.datetime_"
+        assert vbt.get_refname(vbt.nb) == "vectorbtpro.generic.nb"
+        assert vbt.get_refname(vbt.nb.rolling_mean_nb) == "vectorbtpro.generic.nb.rolling.rolling_mean_nb"
+        assert vbt.get_refname(vbt.settings) == "vectorbtpro._settings.settings"
+        assert vbt.get_refname(vbt.Portfolio) == "vectorbtpro.portfolio.base.Portfolio"
+        assert vbt.get_refname(vbt.PF) == "vectorbtpro.portfolio.base.Portfolio"
+        assert vbt.get_refname(vbt.Data.fetch_symbol) == "vectorbtpro.data.base.Data.fetch_symbol"
+        assert vbt.get_refname(vbt.YFData.fetch_symbol) == "vectorbtpro.data.custom.yf.YFData.fetch_symbol"
+        assert vbt.get_refname(vbt.Data.run) == "vectorbtpro.data.base.Data.run"
+        assert vbt.get_refname(vbt.YFData.run) == "vectorbtpro.data.base.Data.run"
+        assert vbt.get_refname(vbt.PF.cash_sharing) == "vectorbtpro.portfolio.base.Portfolio.cash_sharing"
+        assert vbt.get_refname(vbt.PF.close) == "vectorbtpro.portfolio.base.Portfolio.close"
+        assert vbt.get_refname(vbt.PF.plot_value) == "vectorbtpro.portfolio.base.Portfolio.plot_value"
+        assert vbt.get_refname(vbt.PF.get_filled_close) == "vectorbtpro.portfolio.base.Portfolio.get_filled_close"
+        assert vbt.get_refname(vbt.PF.get_sharpe_ratio) == "vectorbtpro.portfolio.base.Portfolio.get_sharpe_ratio"
+        assert vbt.get_refname(vbt.PF.sharpe_ratio) == "vectorbtpro.portfolio.base.Portfolio.sharpe_ratio"
+        assert vbt.get_refname(vbt.ADX) == "vectorbtpro.indicators.custom.adx.ADX"
+        assert vbt.get_refname(vbt.ADX.adx) == "vectorbtpro.indicators.custom.adx.ADX.adx"
+        assert vbt.get_refname(vbt.ADX.adx_above) == "vectorbtpro.indicators.custom.adx.ADX.adx_above"
+        assert vbt.get_refname(pf.plot_value) == "vectorbtpro.portfolio.base.Portfolio.plot_value"
+        assert vbt.get_refname(pf.get_filled_close) == "vectorbtpro.portfolio.base.Portfolio.get_filled_close"
+        assert vbt.get_refname(pf.get_sharpe_ratio) == "vectorbtpro.portfolio.base.Portfolio.get_sharpe_ratio"
+
+        assert vbt.get_refname((vbt, "utils")) == "vectorbtpro.utils"
+        assert vbt.get_refname((vbt, "utils", "datetime_")) == "vectorbtpro.utils.datetime_"
+        assert vbt.get_refname((vbt, "utils.datetime_")) == "vectorbtpro.utils.datetime_"
+        assert vbt.get_refname((vbt.utils, "datetime_")) == "vectorbtpro.utils.datetime_"
+        assert vbt.get_refname((vbt, "dt")) == "vectorbtpro.utils.datetime_"
+        assert vbt.get_refname((vbt, "nb")) == "vectorbtpro.generic.nb"
+        assert vbt.get_refname((vbt, "nb", "rolling_mean_nb")) == "vectorbtpro.generic.nb.rolling.rolling_mean_nb"
+        assert vbt.get_refname((vbt, "settings")) == "vectorbtpro._settings.settings"
+        assert vbt.get_refname((vbt, "Portfolio")) == "vectorbtpro.portfolio.base.Portfolio"
+        assert vbt.get_refname((vbt, "PF")) == "vectorbtpro.portfolio.base.Portfolio"
+        assert vbt.get_refname((vbt, "Data", "fetch_symbol")) == "vectorbtpro.data.base.Data.fetch_symbol"
+        assert vbt.get_refname((vbt, "YFData", "fetch_symbol")) == "vectorbtpro.data.custom.yf.YFData.fetch_symbol"
+        assert vbt.get_refname((vbt, "Data", "run")) == "vectorbtpro.data.base.Data.run"
+        assert vbt.get_refname((vbt, "YFData", "run")) == "vectorbtpro.data.base.Data.run"
+        assert vbt.get_refname((pf, "cash_sharing")) == "vectorbtpro.portfolio.base.Portfolio.cash_sharing"
+        assert vbt.get_refname((pf, "close")) == "vectorbtpro.portfolio.base.Portfolio.close"
+        assert vbt.get_refname((pf, "plot_value")) == "vectorbtpro.portfolio.base.Portfolio.plot_value"
+        assert vbt.get_refname((pf, "get_filled_close")) == "vectorbtpro.portfolio.base.Portfolio.get_filled_close"
+        assert vbt.get_refname((pf, "get_sharpe_ratio")) == "vectorbtpro.portfolio.base.Portfolio.get_sharpe_ratio"
+        assert vbt.get_refname((pf, "sharpe_ratio")) == "vectorbtpro.portfolio.base.Portfolio.sharpe_ratio"
+
+        assert vbt.get_refname("vbt") == "vectorbtpro"
+        assert vbt.get_refname("vectorbtpro") == "vectorbtpro"
+        assert vbt.get_refname("vbt.utils") == "vectorbtpro.utils"
+        assert vbt.get_refname("utils") == "vectorbtpro.utils"
+        assert vbt.get_refname("vbt.utils.datetime_") == "vectorbtpro.utils.datetime_"
+        assert vbt.get_refname("datetime_") == "vectorbtpro.utils.datetime_"
+        assert vbt.get_refname("vbt.dt") == "vectorbtpro.utils.datetime_"
+        assert vbt.get_refname("vbt.nb") == "vectorbtpro.generic.nb"
+        assert vbt.get_refname("vbt.nb.rolling_mean_nb") == "vectorbtpro.generic.nb.rolling.rolling_mean_nb"
+        assert vbt.get_refname("rolling_mean_nb") == "vectorbtpro.generic.nb.rolling.rolling_mean_nb"
+        assert vbt.get_refname("vbt._settings.settings") == "vectorbtpro._settings.settings"
+        assert vbt.get_refname("vbt.settings") == "vectorbtpro._settings.settings"
+        assert vbt.get_refname("settings") == "vectorbtpro._settings.settings"
+        assert vbt.get_refname("vbt.Portfolio") == "vectorbtpro.portfolio.base.Portfolio"
+        assert vbt.get_refname("vbt.PF") == "vectorbtpro.portfolio.base.Portfolio"
+        assert vbt.get_refname("Portfolio") == "vectorbtpro.portfolio.base.Portfolio"
+        assert vbt.get_refname("PF") == "vectorbtpro.portfolio.base.Portfolio"
+        assert vbt.get_refname("Data.fetch_symbol") == "vectorbtpro.data.base.Data.fetch_symbol"
+        assert vbt.get_refname("YFData.fetch_symbol") == "vectorbtpro.data.custom.yf.YFData.fetch_symbol"
+        assert vbt.get_refname("Data.run") == "vectorbtpro.data.base.Data.run"
+        assert vbt.get_refname("YFData.run") == "vectorbtpro.data.base.Data.run"
+        assert vbt.get_refname("PF.cash_sharing") == "vectorbtpro.portfolio.base.Portfolio.cash_sharing"
+        assert vbt.get_refname("PF.close") == "vectorbtpro.portfolio.base.Portfolio.close"
+        assert vbt.get_refname("PF.plot_value") == "vectorbtpro.portfolio.base.Portfolio.plot_value"
+        assert vbt.get_refname("PF.get_filled_close") == "vectorbtpro.portfolio.base.Portfolio.get_filled_close"
+        assert vbt.get_refname("PF.get_sharpe_ratio") == "vectorbtpro.portfolio.base.Portfolio.get_sharpe_ratio"
+        assert vbt.get_refname("PF.sharpe_ratio") == "vectorbtpro.portfolio.base.Portfolio.sharpe_ratio"
+        assert vbt.get_refname("ADX") == "vectorbtpro.indicators.custom.adx.ADX"
+        assert vbt.get_refname("ADX.adx") == "vectorbtpro.indicators.custom.adx.ADX.adx"
+        assert vbt.get_refname("ADX.adx_above") == "vectorbtpro.indicators.custom.adx.ADX.adx_above"
