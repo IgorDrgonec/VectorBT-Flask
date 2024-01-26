@@ -54,6 +54,12 @@ class YFData(RemoteData):
                     generic_nb.nonzero_prod_reduce_nb,
                 )
             ),
+            "Capital Gains": dict(
+                resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(
+                    resampler,
+                    generic_nb.sum_reduce_nb,
+                )
+            ),
         }
     )
 

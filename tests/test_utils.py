@@ -2609,8 +2609,14 @@ class TestTemplate:
         assert template.substitute_templates(template.Sub("$hello"), {"hello": 100}) == "100"
         with pytest.raises(Exception):
             template.substitute_templates(template.Sub("$hello2"), {"hello": 100})
-        assert template.substitute_templates([template.Rep("hello")], {"hello": 100}, except_types=()) == [100]
-        assert template.substitute_templates({template.Rep("hello")}, {"hello": 100}, except_types=()) == {100}
+        assert template.substitute_templates([template.Rep("hello")], {"hello": 100}, excl_types=()) == [100]
+        assert template.substitute_templates({template.Rep("hello")}, {"hello": 100}, excl_types=()) == {100}
+        assert template.substitute_templates([template.Rep("hello")], {"hello": 100}, excl_types=False) == [100]
+        assert template.substitute_templates({template.Rep("hello")}, {"hello": 100}, excl_types=False) == {100}
+        assert template.substitute_templates([template.Rep("hello")], {"hello": 100}, incl_types=list) == [100]
+        assert template.substitute_templates({template.Rep("hello")}, {"hello": 100}, incl_types=set) == {100}
+        assert template.substitute_templates([template.Rep("hello")], {"hello": 100}, incl_types=True) == [100]
+        assert template.substitute_templates({template.Rep("hello")}, {"hello": 100}, incl_types=True) == {100}
         assert template.substitute_templates({"test": template.Rep("hello")}, {"hello": 100}) == {"test": 100}
         Tup = namedtuple("Tup", ["a"])
         tup = Tup(template.Rep("hello"))

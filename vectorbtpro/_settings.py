@@ -1762,7 +1762,8 @@ ${config_doc}
 _settings["path"] = path
 
 search = frozen_cfg(
-    except_types=(list, set, frozenset),
+    excl_types=(list, set, frozenset),
+    incl_types=None,
     max_len=None,
     max_depth=None,
 )

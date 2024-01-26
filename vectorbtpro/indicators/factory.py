@@ -63,7 +63,13 @@ from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.mapping import to_value_mapping, apply_mapping
 from vectorbtpro.utils.params import to_typed_list, broadcast_params, create_param_product, params_to_list
-from vectorbtpro.utils.parsing import get_expr_var_names, get_func_arg_names, get_func_kwargs, supress_stdout
+from vectorbtpro.utils.parsing import (
+    get_expr_var_names,
+    get_func_arg_names,
+    get_func_kwargs,
+    suppress_stdout,
+    WarningsFiltered,
+)
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import has_templates, substitute_templates, Rep
 from vectorbtpro.utils.module_ import search_package_for_funcs
@@ -3176,8 +3182,7 @@ Other keyword arguments are passed to `{0}.run`.
                 prepend_location = False
             else:
                 prepend_location = True
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+        with WarningsFiltered():
             if location is not None:
                 matched_location = cls.match_location(location)
                 if matched_location is not None:
@@ -3508,7 +3513,7 @@ Other keyword arguments are passed to `{0}.run`.
             index=[datetime(2020, 1, 1) + timedelta(days=i) for i in range(test_index_len)],
         )
         new_args = merge_dicts({c: test_df[c] for c in input_names}, kwargs)
-        result = supress_stdout(func)(**new_args)
+        result = suppress_stdout(func)(**new_args)
 
         # Concatenate Series/DataFrames if the result is a tuple
         if isinstance(result, tuple):
@@ -3698,7 +3703,7 @@ Other keyword arguments are passed to `{0}.run`.
             n_input_cols = 1 if is_series else len(input_tuple[0].columns)
             outputs = []
             for col in range(n_input_cols):
-                output = supress_stdout(func)(
+                output = suppress_stdout(func)(
                     **{
                         name: input_tuple[i] if is_series else input_tuple[i].iloc[:, col]
                         for i, name in enumerate(config["input_names"])
@@ -3975,7 +3980,7 @@ Other keyword arguments are passed to `{0}.run`.
             if name is None and sr.name is None:
                 raise ValueError("Couldn't parse the output: missing output name")
 
-        out = supress_stdout(func)(*args)
+        out = suppress_stdout(func)(*args)
         if isinstance(out, list):
             out = np.asarray(out)
         if isinstance(out, np.ndarray):
@@ -4138,7 +4143,7 @@ Other keyword arguments are passed to `{0}.run`.
                 else:
                     break
 
-            out = supress_stdout(func)(*__args, *_args, **_kwargs)
+            out = suppress_stdout(func)(*__args, *_args, **_kwargs)
             if isinstance(out, list):
                 out = np.asarray(out)
             if isinstance(out, np.ndarray):

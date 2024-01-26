@@ -265,7 +265,7 @@ def substitute_templates(
         100100
         >>> vbt.substitute_templates(vbt.Rep('key'), {'key': 100})
         100
-        >>> vbt.substitute_templates([vbt.Rep('key'), vbt.Sub('$key$key')], {'key': 100}, except_types=())
+        >>> vbt.substitute_templates([vbt.Rep('key'), vbt.Sub('$key$key')], {'key': 100}, incl_types=list)
         [100, '100100']
         >>> vbt.substitute_templates(vbt.RepFunc(lambda key: key == 100), {'key': 100})
         True

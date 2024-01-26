@@ -6,6 +6,8 @@ from vectorbtpro.utils.module_ import assert_can_import
 
 assert_can_import("plotly")
 
+from pathlib import Path
+
 import pandas as pd
 
 from plotly.graph_objects import Figure as _Figure, FigureWidget as _FigureWidget
@@ -14,6 +16,7 @@ from plotly.subplots import make_subplots as _make_subplots
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.datetime_ import get_rangebreaks
+from vectorbtpro.utils.path_ import check_mkdir
 
 __all__ = [
     "Figure",
@@ -128,6 +131,32 @@ class FigureMixin:
     def show_svg(self, **kwargs) -> None:
         """Display the figure in SVG format."""
         self.show(renderer="svg", **kwargs)
+
+    def save_svg_for_docs(
+        self,
+        figure_name: str,
+        dir_path: tp.PathLike = Path("./svg"),
+        mkdir_kwargs: tp.KwargsLike = None,
+        show: bool = True,
+        show_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> None:
+        """Save the figure in both light and dark SVG format for documentation."""
+        if not isinstance(dir_path, Path):
+            dir_path = Path(dir_path)
+        if mkdir_kwargs is None:
+            mkdir_kwargs = {}
+        if "mkdir" not in mkdir_kwargs:
+            mkdir_kwargs["mkdir"] = True
+        check_mkdir(dir_path, **mkdir_kwargs)
+        self.update_layout(template="vbt_light")
+        self.write_image(dir_path / (figure_name + ".light.svg"), **kwargs)
+        self.update_layout(template="vbt_dark")
+        self.write_image(dir_path / (figure_name + ".dark.svg"), **kwargs)
+        if show:
+            if show_kwargs is None:
+                show_kwargs = {}
+            self.show_svg(**show_kwargs)
 
 
 class Figure(_Figure, FigureMixin):

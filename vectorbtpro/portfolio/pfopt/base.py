@@ -11,7 +11,7 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.returns.accessors import ReturnsAccessor
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.parsing import get_func_arg_names, warn_stdout
+from vectorbtpro.utils.parsing import get_func_arg_names, warn_stdout, WarningsFiltered
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.template import substitute_templates, Rep, RepFunc, CustomTemplate
 from vectorbtpro.utils.execution import execute
@@ -692,10 +692,7 @@ def pypfopt_optimize(
         kwargs["used_arg_names"] = set()
 
     try:
-        with warnings.catch_warnings():
-            if silence_warnings:
-                warnings.simplefilter("ignore")
-
+        with WarningsFiltered(entries="ignore" if silence_warnings else None):
             optimizer = kwargs["optimizer"] = resolve_pypfopt_optimizer(**kwargs)
 
             if objectives is not None:
@@ -1331,10 +1328,7 @@ def riskfolio_optimize(
     unused_arg_names = set(kwargs.keys())
 
     try:
-        with warnings.catch_warnings():
-            if silence_warnings:
-                warnings.simplefilter("ignore")
-
+        with WarningsFiltered(entries="ignore" if silence_warnings else None):
             # Prepare returns
             new_returns = prepare_returns(
                 returns,
@@ -2363,8 +2357,7 @@ class PortfolioOptimizer(Analyzable):
             )
             allocations = allocations.values
         if not isinstance(allocations, np.ndarray):
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
+            with WarningsFiltered():
                 try:
                     new_allocations = np.asarray(allocations)
                     if new_allocations.dtype != object:
