@@ -389,7 +389,8 @@ We can build histograms and boxplots of `MappedArray` directly:
 >>> ma.boxplot().show()
 ```
 
-![](/assets/images/api/mapped_boxplot.svg){: .iimg loading=lazy }
+![](/assets/images/api/mapped_boxplot.light.svg#only-light){: .iimg loading=lazy }
+![](/assets/images/api/mapped_boxplot.dark.svg#only-dark){: .iimg loading=lazy }
 
 To use scatterplots or any other plots that require index, convert to pandas first:
 
@@ -397,7 +398,8 @@ To use scatterplots or any other plots that require index, convert to pandas fir
 >>> ma.to_pd().vbt.plot().show()
 ```
 
-![](/assets/images/api/mapped_to_pd_plot.svg){: .iimg loading=lazy }
+![](/assets/images/api/mapped_to_pd_plot.light.svg#only-light){: .iimg loading=lazy }
+![](/assets/images/api/mapped_to_pd_plot.dark.svg#only-dark){: .iimg loading=lazy }
 
 !!! hint
     See `vectorbtpro.generic.plots_builder.PlotsBuilderMixin.plots` and `MappedArray.subplots`.

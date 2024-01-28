@@ -45,7 +45,8 @@ class _MEANLB(MEANLB):
             >>> vbt.MEANLB.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/MEANLB.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/MEANLB.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/MEANLB.dark.svg#only-dark){: .iimg loading=lazy }
         """
         self_col = self.select_col(column=column, group_by=False)
         return self_col.close.rename("Close").vbt.overlay_with_heatmap(self_col.labels.rename("Labels"), **kwargs)

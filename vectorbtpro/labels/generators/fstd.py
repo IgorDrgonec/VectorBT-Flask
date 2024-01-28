@@ -59,7 +59,8 @@ class _FSTD(FSTD):
             >>> vbt.FSTD.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/FSTD.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/FSTD.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/FSTD.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings

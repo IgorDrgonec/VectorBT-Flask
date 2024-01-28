@@ -64,7 +64,8 @@ class _MSD(MSD):
             >>> vbt.MSD.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/MSD.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/MSD.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/MSD.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro._settings import settings
 

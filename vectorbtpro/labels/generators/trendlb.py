@@ -43,7 +43,8 @@ class _TRENDLB(TRENDLB):
             >>> vbt.TRENDLB.run(ohlcv['High'], ohlcv['Low'], up_th=0.2, down_th=0.2).plot().show()
             ```
 
-            ![](/assets/images/api/TRENDLB.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/TRENDLB.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/TRENDLB.dark.svg#only-dark){: .iimg loading=lazy }
         """
         self_col = self.select_col(column=column, group_by=False)
         median = (self_col.high + self_col.low) / 2

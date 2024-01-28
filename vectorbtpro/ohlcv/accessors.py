@@ -28,9 +28,7 @@ By default, vectorbt searches for columns with names 'open', 'high', 'low', 'clo
 ...     'my_close4': [2.5, 3.5, 4, 3, 2],
 ...     'my_volume5': [10, 11, 10, 9, 10]
 ... })
-
->>> # vectorbt can't find columns
->>> df.vbt.ohlcv.get_column('open')
+>>> df.vbt.ohlcv.get_feature('open')
 None
 
 >>> my_feature_map = {
@@ -41,7 +39,7 @@ None
 ...     "my_volume5": "Volume",
 ... }
 >>> ohlcv_acc = df.vbt.ohlcv(freq='d', feature_map=my_feature_map)
->>> ohlcv_acc.get_column('open')
+>>> ohlcv_acc.get_feature('open')
 0    2.0
 1    3.0
 2    4.0
@@ -82,7 +80,8 @@ Name: agg_stats, dtype: object
 >>> ohlcv_acc.plots(settings=dict(ohlc_type='candlestick')).show()
 ```
 
-![](/assets/images/api/ohlcv_plots.svg){: .iimg loading=lazy }
+![](/assets/images/api/ohlcv_plots.light.svg#only-light){: .iimg loading=lazy }
+![](/assets/images/api/ohlcv_plots.dark.svg#only-dark){: .iimg loading=lazy }
 """
 
 import numpy as np
@@ -483,7 +482,8 @@ class OHLCVDFAccessor(OHLCDataMixin, GenericDFAccessor):
 
             [=100% "100%"]{: .candystripe}
 
-            ![](/assets/images/api/ohlcv_plot.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/ohlcv_plot.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/ohlcv_plot.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 

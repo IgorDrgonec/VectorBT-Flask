@@ -114,7 +114,8 @@ dtype: object
 >>> ret_acc.plots().show()
 ```
 
-![](/assets/images/api/returns_plots.svg){: .iimg loading=lazy }
+![](/assets/images/api/returns_plots.light.svg#only-light){: .iimg loading=lazy }
+![](/assets/images/api/returns_plots.dark.svg#only-dark){: .iimg loading=lazy }
 """
 
 import warnings
@@ -1965,8 +1966,9 @@ class ReturnsAccessor(GenericAccessor):
 
         Usage:
             ```pycon
-            >>> import pandas as pd
             >>> import numpy as np
+            >>> import pandas as pd
+            >>> import vectorbtpro as vbt
 
             >>> np.random.seed(0)
             >>> rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
@@ -1974,7 +1976,8 @@ class ReturnsAccessor(GenericAccessor):
             >>> rets.vbt.returns.plot_cumulative(bm_returns=bm_returns).show()
             ```
 
-            ![](/assets/images/api/plot_cumulative.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/plot_cumulative.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/plot_cumulative.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure, get_domain
         from vectorbtpro._settings import settings

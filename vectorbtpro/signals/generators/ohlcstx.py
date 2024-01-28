@@ -143,7 +143,8 @@ def bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:
         >>> ohlcstx.iloc[:, 0].plot().show()
         ```
 
-        ![](/assets/images/api/OHLCSTX.svg){: .iimg loading=lazy }
+        ![](/assets/images/api/OHLCSTX.light.svg#only-light){: .iimg loading=lazy }
+        ![](/assets/images/api/OHLCSTX.dark.svg#only-dark){: .iimg loading=lazy }
     """
     return plot
 
@@ -187,7 +188,8 @@ class _OHLCSTX(OHLCSTX):
         ...     tsl_th=[np.nan, np.nan, 0.2, np.nan],
         ...     tsl_stop=[np.nan, 0.1, 0.3, np.nan],
         ...     tp_stop=[np.nan, np.nan, np.nan, 0.1],
-        ...     is_entry_open=True)
+        ...     is_entry_open=True
+        ... )
 
         >>> ohlcstx.entries
         ohlcstx_sl_stop      0.1    NaN    NaN    NaN

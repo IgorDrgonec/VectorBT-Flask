@@ -492,6 +492,13 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
     ]
     """Attributes that subclass the data dict type."""
 
+    _updatable_attrs = [
+        "fetch_kwargs",
+        "returned_kwargs",
+        "classes",
+    ]
+    """Attributes that have a method for updating."""
+
     @property
     def feature_config(self) -> Config:
         """Column config of `${cls_name}`.
@@ -2002,7 +2009,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             return {}
         if check_dict_type:
             cls_or_self.check_dict_type(kwargs, arg_name=kwargs_name, dict_type=dict_type)
-        if isinstance(kwargs, (key_dict, dict_type)):
+        if type(kwargs) is key_dict or isinstance(kwargs, dict_type):
             if key not in kwargs:
                 return {}
             kwargs = dict(kwargs[key])
@@ -2010,7 +2017,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         for k, v in kwargs.items():
             if check_dict_type:
                 cls_or_self.check_dict_type(v, arg_name=f"{kwargs_name}[{k}]", dict_type=dict_type)
-            if isinstance(v, (key_dict, dict_type)):
+            if type(v) is key_dict or isinstance(v, dict_type):
                 if key in v:
                     _kwargs[k] = v[key]
             else:
@@ -4922,13 +4929,15 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
 
             * Plot OHLC(V) of one symbol (only if data contains the respective features):
 
-            ![](/assets/images/api/data_plot.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/data_plot.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/data_plot.dark.svg#only-dark){: .iimg loading=lazy }
 
             ```pycon
             >>> data.plot(symbol='BTC-USD').show()
             ```
 
-            ![](/assets/images/api/data_plot_ohlcv.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/data_plot_ohlcv.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/data_plot_ohlcv.dark.svg#only-dark){: .iimg loading=lazy }
         """
         if column is not None:
             if self.feature_oriented:

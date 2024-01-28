@@ -37,7 +37,8 @@ class _PIVOTLB(PIVOTLB):
             >>> vbt.PIVOTLB.run(ohlcv['High'], ohlcv['Low'], up_th=0.2, down_th=0.2).plot().show()
             ```
 
-            ![](/assets/images/api/PIVOTLB.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/PIVOTLB.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/PIVOTLB.dark.svg#only-dark){: .iimg loading=lazy }
         """
         self_col = self.select_col(column=column, group_by=False)
         median = (self_col.high + self_col.low) / 2

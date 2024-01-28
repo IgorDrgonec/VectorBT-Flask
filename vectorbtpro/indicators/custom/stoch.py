@@ -93,7 +93,8 @@ class _STOCH(STOCH):
             >>> vbt.STOCH.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/STOCH.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/STOCH.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/STOCH.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro._settings import settings
 

@@ -120,7 +120,8 @@ class Gauge(Configured, TraceUpdater):
             >>> gauge.fig.show()
             ```
 
-            ![](/assets/images/api/Gauge.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/Gauge.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/Gauge.dark.svg#only-dark){: .iimg loading=lazy }
         """
         Configured.__init__(
             self,
@@ -248,7 +249,8 @@ class Bar(Configured, TraceUpdater):
             >>> bar.fig.show()
             ```
 
-            ![](/assets/images/api/Bar.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/Bar.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/Bar.dark.svg#only-dark){: .iimg loading=lazy }
         """
         Configured.__init__(
             self,
@@ -361,7 +363,8 @@ class Scatter(Configured, TraceUpdater):
             >>> scatter.fig.show()
             ```
 
-            ![](/assets/images/api/Scatter.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/Scatter.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/Scatter.dark.svg#only-dark){: .iimg loading=lazy }
         """
         Configured.__init__(
             self,
@@ -508,7 +511,8 @@ class Histogram(Configured, TraceUpdater):
             >>> hist.fig.show()
             ```
 
-            ![](/assets/images/api/Histogram.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/Histogram.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/Histogram.dark.svg#only-dark){: .iimg loading=lazy }
         """
         Configured.__init__(
             self,
@@ -673,7 +677,8 @@ class Box(Configured, TraceUpdater):
             >>> box.fig.show()
             ```
 
-            ![](/assets/images/api/Box.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/Box.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/Box.dark.svg#only-dark){: .iimg loading=lazy }
         """
         Configured.__init__(
             self,
@@ -845,7 +850,8 @@ class Heatmap(Configured, TraceUpdater):
             >>> heatmap.fig.show()
             ```
 
-            ![](/assets/images/api/Heatmap.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/Heatmap.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/Heatmap.dark.svg#only-dark){: .iimg loading=lazy }
         """
         Configured.__init__(
             self,
@@ -980,7 +986,8 @@ class Volume(Configured, TraceUpdater):
             >>> volume.fig.show()
             ```
 
-            ![](/assets/images/api/Volume.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/Volume.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/Volume.dark.svg#only-dark){: .iimg loading=lazy }
         """
         Configured.__init__(
             self,

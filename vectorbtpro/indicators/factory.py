@@ -3379,7 +3379,8 @@ Other keyword arguments are passed to `{0}.run`.
             >>> sma.plot(column=(2, 'a')).show()
             ```
 
-            ![](/assets/images/api/talib_plot.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/talib_plot.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/talib_plot.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 

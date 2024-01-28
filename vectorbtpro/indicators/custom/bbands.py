@@ -95,7 +95,8 @@ class _BBANDS(BBANDS):
             >>> vbt.BBANDS.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/BBANDS.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/BBANDS.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/BBANDS.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings

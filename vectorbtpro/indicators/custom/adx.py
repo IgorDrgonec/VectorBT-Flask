@@ -68,7 +68,8 @@ class _ADX(ADX):
             >>> vbt.ADX.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/ADX.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/ADX.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/ADX.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings

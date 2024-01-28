@@ -43,7 +43,8 @@ class _BOLB(BOLB):
             >>> vbt.BOLB.run(ohlcv['High'], ohlcv['Low'], up_th=0.2, down_th=0.2).plot().show()
             ```
 
-            ![](/assets/images/api/BOLB.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/BOLB.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/BOLB.dark.svg#only-dark){: .iimg loading=lazy }
         """
         self_col = self.select_col(column=column, group_by=False)
         median = (self_col.high + self_col.low) / 2

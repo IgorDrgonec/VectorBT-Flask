@@ -821,7 +821,8 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
         >>> vbt.Scatter(data=asset_value).fig.show()
         ```
 
-        ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg loading=lazy }
+        ![](/assets/images/api/from_order_func_nb_example.light.svg#only-light){: .iimg loading=lazy }
+        ![](/assets/images/api/from_order_func_nb_example.dark.svg#only-dark){: .iimg loading=lazy }
 
         Note that the last order in a group with cash sharing is always disadvantaged
         as it has a bit less funds than the previous orders due to costs, which are not

@@ -109,7 +109,8 @@ Name: group, dtype: object
 >>> ranges['a'].plots().show()
 ```
 
-![](/assets/images/api/ranges_plots.svg){: .iimg loading=lazy }
+![](/assets/images/api/ranges_plots.light.svg#only-light){: .iimg loading=lazy }
+![](/assets/images/api/ranges_plots.dark.svg#only-dark){: .iimg loading=lazy }
 """
 
 import attr
@@ -854,7 +855,8 @@ class Ranges(PriceRecords):
             ... ).show()
             ```
 
-            ![](/assets/images/api/ranges_plot_projections.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/ranges_plot_projections.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/ranges_plot_projections.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -1113,7 +1115,8 @@ class Ranges(PriceRecords):
             ... ).show()
             ```
 
-            ![](/assets/images/api/ranges_plot_shapes.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/ranges_plot_shapes.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/ranges_plot_shapes.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -1292,7 +1295,8 @@ class Ranges(PriceRecords):
             >>> vbt.Ranges.from_array(price >= 2).plot().show()
             ```
 
-            ![](/assets/images/api/ranges_plot.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/ranges_plot.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/ranges_plot.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 

@@ -62,7 +62,8 @@ class _FMEAN(FMEAN):
             >>> vbt.FMEAN.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/FMEAN.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/FMEAN.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/FMEAN.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings

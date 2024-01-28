@@ -3422,7 +3422,8 @@ class PortfolioOptimizer(Analyzable):
             >>> pfo.plot().show()
             ```
 
-            ![](/assets/images/api/pfopt_plot.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/pfopt_plot.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/pfopt_plot.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 

@@ -2692,7 +2692,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> pf.get_asset_value(group_by=False).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/from_orders.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_orders.dark.svg#only-dark){: .iimg loading=lazy }
 
             * Test 10 random weight combinations:
 
@@ -4375,7 +4376,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> pf.get_asset_value(group_by=False).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/from_order_func.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_order_func.dark.svg#only-dark){: .iimg loading=lazy }
 
             Templates are a very powerful tool to prepare any custom arguments after they are broadcast and
             before they are passed to the simulation function. In the example above, we use `broadcast_named_args`
@@ -4392,13 +4394,18 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> group_by = ['g1', 'g1', 'g1', 'g2', 'g2', 'g2']  # 2 groups instead of 1
             >>> # Replace close and group_by in the example above
 
-            >>> pf['g1'].get_asset_value(group_by=False).vbt.plot()
+            >>> pf['g1'].get_asset_value(group_by=False).vbt.plot().show()
+            ```
+
+            ![](/assets/images/api/from_order_func_g1.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_order_func_g1.dark.svg#only-dark){: .iimg loading=lazy }
+
+            ```pycon
             >>> pf['g2'].get_asset_value(group_by=False).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/from_order_func_g1.svg){: .iimg loading=lazy }
-
-            ![](/assets/images/api/from_order_func_g2.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/from_order_func_g2.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_order_func_g2.dark.svg#only-dark){: .iimg loading=lazy }
 
             * Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit:
 
@@ -4717,7 +4724,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> asset_value.vbt.plot().show()
             ```
 
-            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/from_def_order_func.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_def_order_func.dark.svg#only-dark){: .iimg loading=lazy }
         """
         if isinstance(close, FDOFPreparer):
             preparer = close

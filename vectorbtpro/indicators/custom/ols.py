@@ -85,7 +85,8 @@ class _OLS(OLS):
             >>> vbt.OLS.run(np.arange(len(ohlcv)), ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/OLS.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/OLS.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/OLS.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -151,10 +152,11 @@ class _OLS(OLS):
 
         Usage:
             ```pycon
-            >>> vbt.OLS.run(np.arange(len(ohlcv)), ohlcv['Close']).plot().show()
+            >>> vbt.OLS.run(np.arange(len(ohlcv)), ohlcv['Close']).plot_zscore().show()
             ```
 
-            ![](/assets/images/api/OLS_zscore.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/OLS_zscore.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/OLS_zscore.dark.svg#only-dark){: .iimg loading=lazy }
         """
         import scipy.stats as st
         from vectorbtpro.utils.figure import make_figure
