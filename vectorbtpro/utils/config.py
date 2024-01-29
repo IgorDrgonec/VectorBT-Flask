@@ -13,6 +13,7 @@ from vectorbtpro.utils.caching import Cacheable
 from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.formatting import Prettified, prettify_dict, prettify_inited
 from vectorbtpro.utils.pickling import RecState, Pickleable, pdict
+from vectorbtpro.utils.chaining import Chainable
 
 __all__ = [
     "hdict",
@@ -1238,7 +1239,7 @@ class HasSettings:
         cls_cfg.reset(force=True)
 
 
-class Configured(HasSettings, Cacheable, Comparable, Pickleable, Prettified):
+class Configured(HasSettings, Cacheable, Comparable, Pickleable, Prettified, Chainable):
     """Class with an initialization config.
 
     All subclasses of `Configured` are initialized using `Config`, which makes it easier to pickle.

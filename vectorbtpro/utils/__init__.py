@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from vectorbtpro.utils.array_ import *
     from vectorbtpro.utils.attr_ import *
     from vectorbtpro.utils.caching import *
+    from vectorbtpro.utils.chaining import *
     from vectorbtpro.utils.checks import *
     from vectorbtpro.utils.chunking import *
     from vectorbtpro.utils.colors import *
