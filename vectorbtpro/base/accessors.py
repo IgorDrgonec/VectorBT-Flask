@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Custom Pandas accessors for base operations with Pandas objects."""
 
@@ -77,16 +77,22 @@ class BaseIDXAccessor(Configured):
         Timestamps will be converted to nanoseconds."""
         return to_ns(self.obj)
 
-    def to_period_ns(self, freq: tp.FrequencyLike, shift: bool = True) -> tp.Array1d:
-        """Convert index to period and then to an 64-bit integer array.
-
-        Timestamps will be converted to nanoseconds."""
+    def to_period(self, freq: tp.FrequencyLike, shift: bool = False) -> pd.PeriodIndex:
+        """Convert index to period."""
         index = self.obj
         if isinstance(index, pd.DatetimeIndex):
             index = index.tz_localize(None).to_period(freq)
             if shift:
                 index = index.shift()
-        return to_ns(index)
+        if not isinstance(index, pd.PeriodIndex):
+            raise TypeError(f"Cannot convert index of type {type(index)} to period")
+        return index
+
+    def to_period_ns(self, freq: tp.FrequencyLike, shift: bool = True) -> tp.Array1d:
+        """Convert index to period and then to an 64-bit integer array.
+
+        Timestamps will be converted to nanoseconds."""
+        return to_ns(self.to_period(freq, shift=shift))
 
     @classmethod
     def from_values(cls, *args, **kwargs) -> tp.Index:
@@ -342,7 +348,7 @@ class BaseIDXAccessor(Configured):
             try:
                 by = to_offset(parse_timedelta(by))
                 if by.n == 1:
-                    return Grouper(index=self.obj, group_by=self.obj.tz_localize(None).to_period(by), **kwargs)
+                    return Grouper(index=self.obj, group_by=self.to_period(by), **kwargs)
             except Exception as e:
                 pass
             try:

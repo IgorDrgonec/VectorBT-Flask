@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Module with `RSI`."""
 
@@ -71,7 +71,8 @@ class _RSI(RSI):
             >>> vbt.RSI.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/RSI.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/RSI.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/RSI.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro._settings import settings
 

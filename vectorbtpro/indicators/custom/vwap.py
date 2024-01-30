@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Module with `VWAP`."""
 
@@ -79,7 +79,8 @@ class _VWAP(VWAP):
             ... ).plot().show()
             ```
 
-            ![](/assets/images/api/VWAP.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/VWAP.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/VWAP.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings

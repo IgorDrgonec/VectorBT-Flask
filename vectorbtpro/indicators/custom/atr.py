@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Module with `ATR`."""
 
@@ -68,7 +68,8 @@ class _ATR(ATR):
             >>> vbt.ATR.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/ATR.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/ATR.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/ATR.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings

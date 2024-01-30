@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Global settings of vectorbtpro.
 
@@ -1443,6 +1443,7 @@ portfolio = frozen_cfg(
     init_position=0.0,
     init_price=np.nan,
     cash_deposits=0.0,
+    cash_deposits_as_input=False,
     cash_earnings=0.0,
     cash_dividends=0.0,
     cash_sharing=False,
@@ -1761,7 +1762,8 @@ ${config_doc}
 _settings["path"] = path
 
 search = frozen_cfg(
-    except_types=(list, set, frozenset),
+    excl_types=(list, set, frozenset),
+    incl_types=None,
     max_len=None,
     max_depth=None,
 )

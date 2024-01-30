@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Factory for building indicators.
 
@@ -63,7 +63,13 @@ from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.mapping import to_value_mapping, apply_mapping
 from vectorbtpro.utils.params import to_typed_list, broadcast_params, create_param_product, params_to_list
-from vectorbtpro.utils.parsing import get_expr_var_names, get_func_arg_names, get_func_kwargs, supress_stdout
+from vectorbtpro.utils.parsing import (
+    get_expr_var_names,
+    get_func_arg_names,
+    get_func_kwargs,
+    suppress_stdout,
+    WarningsFiltered,
+)
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import has_templates, substitute_templates, Rep
 from vectorbtpro.utils.module_ import search_package_for_funcs
@@ -1269,6 +1275,16 @@ class IndicatorBase(Analyzable):
         out = self.to_dict(include_all=include_all)
         return pd.concat(list(out.values()), axis=1, keys=pd.Index(list(out.keys()), name="output"))
 
+    def dropna(self: IndicatorBaseT, include_all: bool = True, **kwargs) -> IndicatorBaseT:
+        """Drop missing values.
+
+        Keyword arguments are passed to `pd.Series.dropna` or `pd.DataFrame.dropna`."""
+        df = self.to_frame(include_all=include_all)
+        new_df = df.dropna(**kwargs)
+        if new_df.index.equals(df.index):
+            return self
+        return self.loc[new_df.index]
+
 
 class IndicatorFactory(Configured):
     _expected_keys: tp.ExpectedKeys = (Configured._expected_keys or set()) | {
@@ -1492,6 +1508,7 @@ class IndicatorFactory(Configured):
                 return self.wrapper.wrap(old_input[:, input_mapper])
 
             input_prop.__name__ = input_name
+            input_prop.__module__ = Indicator.__module__
             input_prop.__qualname__ = f"{Indicator.__name__}.{input_prop.__name__}"
             if make_cacheable:
                 setattr(Indicator, input_name, cacheable_property(input_prop))
@@ -1509,6 +1526,7 @@ class IndicatorFactory(Configured):
                 output_prop.__doc__ = """Output array."""
 
             output_prop.__name__ = output_name
+            output_prop.__module__ = Indicator.__module__
             output_prop.__qualname__ = f"{Indicator.__name__}.{output_prop.__name__}"
             if output_name in output_flags:
                 _output_flags = output_flags[output_name]
@@ -1560,6 +1578,7 @@ class IndicatorFactory(Configured):
         # Add user-defined outputs
         for prop_name, prop in lazy_outputs.items():
             prop.__name__ = prop_name
+            prop.__module__ = Indicator.__module__
             prop.__qualname__ = f"{Indicator.__name__}.{prop.__name__}"
             if prop.__doc__ is None:
                 prop.__doc__ = f"""Custom property."""
@@ -1614,6 +1633,7 @@ class IndicatorFactory(Configured):
                 return out
 
             combine_method.__name__ = f"{attr_name}_{func_name}"
+            combine_method.__module__ = Indicator.__module__
             combine_method.__qualname__ = f"{Indicator.__name__}.{combine_method.__name__}"
             combine_method.__doc__ = docstring
             setattr(Indicator, f"{attr_name}_{func_name}", combine_method)
@@ -1634,6 +1654,7 @@ class IndicatorFactory(Configured):
                     return getattr(self, _attr_name).vbt(mapping=_mapping).apply_mapping(enum_unkval=_enum_unkval)
 
                 attr_readable.__name__ = f"{attr_name}_readable"
+                attr_readable.__module__ = Indicator.__module__
                 attr_readable.__qualname__ = f"{Indicator.__name__}.{attr_readable.__name__}"
                 attr_readable.__doc__ = inspect.cleandoc(
                     """`{attr_name}` in readable format based on the following mapping: 
@@ -1654,6 +1675,7 @@ class IndicatorFactory(Configured):
                     return getattr(self, _attr_name).vbt(mapping=_mapping).stats(*args, **kwargs)
 
                 attr_stats.__name__ = f"{attr_name}_stats"
+                attr_stats.__module__ = Indicator.__module__
                 attr_stats.__qualname__ = f"{Indicator.__name__}.{attr_stats.__name__}"
                 attr_stats.__doc__ = inspect.cleandoc("""Stats of `{attr_name}` based on the following mapping: 
 
@@ -1698,6 +1720,7 @@ class IndicatorFactory(Configured):
                     return getattr(self, _attr_name).vbt.stats(*args, **kwargs)
 
                 attr_stats.__name__ = f"{attr_name}_stats"
+                attr_stats.__module__ = Indicator.__module__
                 attr_stats.__qualname__ = f"{Indicator.__name__}.{attr_stats.__name__}"
                 attr_stats.__doc__ = f"""Stats of `{attr_name}` as generic."""
                 setattr(Indicator, f"{attr_name}_stats", attr_stats)
@@ -1718,6 +1741,7 @@ class IndicatorFactory(Configured):
                     return getattr(self, _attr_name).vbt.signals.stats(*args, **kwargs)
 
                 attr_stats.__name__ = f"{attr_name}_stats"
+                attr_stats.__module__ = Indicator.__module__
                 attr_stats.__qualname__ = f"{Indicator.__name__}.{attr_stats.__name__}"
                 attr_stats.__doc__ = f"""Stats of `{attr_name}` as signals."""
                 setattr(Indicator, f"{attr_name}_stats", attr_stats)
@@ -1740,6 +1764,7 @@ class IndicatorFactory(Configured):
                     return stats_defaults(self)
 
             stats_defaults_prop.__name__ = "stats_defaults"
+            stats_defaults_prop.__module__ = Indicator.__module__
             stats_defaults_prop.__qualname__ = f"{Indicator.__name__}.{stats_defaults_prop.__name__}"
             setattr(Indicator, "stats_defaults", property(stats_defaults_prop))
 
@@ -1761,6 +1786,7 @@ class IndicatorFactory(Configured):
                     return plots_defaults(self)
 
             plots_defaults_prop.__name__ = "plots_defaults"
+            plots_defaults_prop.__module__ = Indicator.__module__
             plots_defaults_prop.__qualname__ = f"{Indicator.__name__}.{plots_defaults_prop.__name__}"
             setattr(Indicator, "plots_defaults", property(plots_defaults_prop))
 
@@ -2213,6 +2239,7 @@ Other keyword arguments are passed to `{0}.run_pipeline`.""".format(
         )
         run = compile_run_function("run", run_docstring, def_run_kwargs)
         run.__name__ = "run"
+        run.__module__ = Indicator.__module__
         run.__qualname__ = f"{Indicator.__name__}.{run.__name__}"
         setattr(Indicator, "run", run)
 
@@ -2348,7 +2375,8 @@ Other keyword arguments are passed to `{0}.run`.
             )
             run_combs = compile_run_function("run_combs", run_combs_docstring, def_run_combs_kwargs)
             run_combs.__name__ = "run_combs"
-            run.__qualname__ = f"{Indicator.__name__}.{run_combs.__name__}"
+            run_combs.__module__ = Indicator.__module__
+            run_combs.__qualname__ = f"{Indicator.__name__}.{run_combs.__name__}"
             setattr(Indicator, "run_combs", run_combs)
 
         return Indicator
@@ -2911,37 +2939,208 @@ Other keyword arguments are passed to `{0}.run`.
 
     @classproperty
     def custom_indicators(cls) -> Config:
-        """Custom indicators."""
+        """Custom indicators keyed by custom locations."""
         return cls._custom_indicators
 
     @classmethod
-    def register_custom_indicator(cls, indicator: tp.Type[IndicatorBase], name: tp.Optional[str] = None) -> None:
-        """Register a custom indicator."""
+    def list_custom_locations(cls) -> tp.List[str]:
+        """List custom locations.
+
+        Appear in the order they were registered."""
+        return list(cls.custom_indicators.keys())
+
+    @classmethod
+    def list_builtin_locations(cls) -> tp.List[str]:
+        """List built-in locations.
+
+        Appear in the order as defined by the author."""
+        return [
+            "vbt",
+            "talib_func",
+            "talib",
+            "pandas_ta",
+            "ta",
+            "technical",
+            "techcon",
+            "wqa101",
+        ]
+
+    @classmethod
+    def list_locations(cls) -> tp.List[str]:
+        """List all supported locations.
+
+        First come custom locations, then built-in locations."""
+        return [*cls.list_custom_locations(), *cls.list_builtin_locations()]
+
+    @classmethod
+    def match_location(cls, location: str) -> tp.Optional[str]:
+        """Match location."""
+        for k in cls.list_locations():
+            if k.lower() == location.lower():
+                return k
+        return None
+
+    @classmethod
+    def split_indicator_name(cls, name: str) -> tp.Tuple[tp.Optional[str], tp.Optional[str]]:
+        """Split an indicator name into location and actual name."""
+        locations = cls.list_locations()
+
+        matched_location = cls.match_location(name)
+        if matched_location is not None:
+            return matched_location, None
+        if ":" in name:
+            location = name.split(":")[0].strip()
+            name = name.split(":")[1].strip()
+        else:
+            location = None
+            found_location = False
+            if "_" in name:
+                for location in locations:
+                    if name.lower().startswith(location.lower() + "_"):
+                        found_location = True
+                        break
+            if found_location:
+                name = name[len(location) + 1 :]
+            else:
+                location = None
+        return location, name
+
+    @classmethod
+    def register_custom_indicator(
+        cls,
+        indicator: tp.Union[str, tp.Type[IndicatorBase]],
+        name: tp.Optional[str] = None,
+        location: tp.Optional[str] = None,
+    ) -> None:
+        """Register a custom indicator under a custom location."""
+        if isinstance(indicator, str):
+            indicator = cls.get_indicator(indicator)
         if name is None:
             name = indicator.__name__
-        cls.custom_indicators[name] = indicator
+        elif location is None:
+            location, name = cls.split_indicator_name(name)
+        if location is None:
+            location = "custom"
+        else:
+            matched_location = cls.match_location(location)
+            if matched_location is not None:
+                location = matched_location
+        if not name.isidentifier():
+            raise ValueError(f"Custom name '{name}' must be a valid variable name")
+        if not location.isidentifier():
+            raise ValueError(f"Custom location '{location}' must be a valid variable name")
+        if location in cls.list_builtin_locations():
+            raise ValueError(f"Custom location '{location}' shadows a built-in location with the same name")
+        if location not in cls.custom_indicators:
+            cls.custom_indicators[location] = dict()
+        for k in cls.custom_indicators[location]:
+            if name.upper() == k.upper():
+                raise ValueError(f"Indicator with name '{name}' already exists under location '{location}'")
+        cls.custom_indicators[location][name] = indicator
 
     @classmethod
-    def deregister_custom_indicator(cls, name: str) -> None:
-        """Deregister a custom indicator."""
-        del cls.custom_indicators[name]
+    def deregister_custom_indicator(
+        cls,
+        name: tp.Optional[str] = None,
+        location: tp.Optional[str] = None,
+        remove_location: bool = True,
+    ) -> None:
+        """Deregister a custom indicator by its name and location.
+
+        If `location` is None, deregisters all indicators with the same name across all custom locations."""
+        if location is not None:
+            matched_location = cls.match_location(location)
+            if matched_location is not None:
+                location = matched_location
+        if name is None:
+            if location is None:
+                for k in list(cls.custom_indicators.keys()):
+                    del cls.custom_indicators[k]
+            else:
+                del cls.custom_indicators[location]
+        else:
+            if location is None:
+                location, name = cls.split_indicator_name(name)
+            if location is None:
+                for k, v in list(cls.custom_indicators.items()):
+                    for k2 in list(cls.custom_indicators[k].keys()):
+                        if name.upper() == k2.upper():
+                            del cls.custom_indicators[k][k2]
+                            if remove_location and len(cls.custom_indicators[k]) == 0:
+                                del cls.custom_indicators[k]
+            else:
+                for k in list(cls.custom_indicators[location].keys()):
+                    if name.upper() == k.upper():
+                        del cls.custom_indicators[location][k]
+                        if remove_location and len(cls.custom_indicators[location]) == 0:
+                            del cls.custom_indicators[location]
 
     @classmethod
-    def get_custom_indicator(cls, name: str) -> tp.Type[IndicatorBase]:
+    def get_custom_indicator(
+        cls,
+        name: str,
+        location: tp.Optional[str] = None,
+        return_first: bool = False,
+    ) -> tp.Type[IndicatorBase]:
         """Get a custom indicator."""
-        name = name.upper().strip()
-        for k, v in cls.custom_indicators.items():
-            k = k.upper().strip()
-            if k == name:
-                return v
-        raise KeyError(f"Could not find a custom indicator with the name '{name}'")
+        if location is None:
+            location, name = cls.split_indicator_name(name)
+        else:
+            matched_location = cls.match_location(location)
+            if matched_location is not None:
+                location = matched_location
+        name = name.upper()
+        if location is None:
+            found_indicators = []
+            for k, v in cls.custom_indicators.items():
+                for k2, v2 in v.items():
+                    k2 = k2.upper()
+                    if k2 == name:
+                        found_indicators.append(v2)
+            if len(found_indicators) == 1:
+                return found_indicators[0]
+            if len(found_indicators) > 1:
+                if return_first:
+                    return found_indicators[0]
+                raise KeyError(f"Found multiple custom indicators with name '{name}'")
+            raise KeyError(f"Found no custom indicator with name '{name}'")
+        else:
+            for k, v in cls.custom_indicators[location].items():
+                k = k.upper()
+                if k == name:
+                    return v
+            raise KeyError(f"Found no custom indicator with name '{name}' under location '{location}'")
 
     @classmethod
-    def list_custom_indicators(cls, uppercase: bool = False) -> tp.List[str]:
+    def list_custom_indicators(
+        cls,
+        uppercase: bool = False,
+        location: tp.Optional[str] = None,
+        prepend_location: tp.Optional[bool] = None,
+    ) -> tp.List[str]:
         """List custom indicators."""
-        if uppercase:
-            return sorted(map(lambda x: x.upper(), cls.custom_indicators.keys()))
-        return sorted(cls.custom_indicators.keys())
+        if location is not None:
+            matched_location = cls.match_location(location)
+            if matched_location is not None:
+                location = matched_location
+        locations_names = []
+        non_custom_location = False
+        for k, v in cls.custom_indicators.items():
+            if location is not None:
+                if k != location:
+                    continue
+            for k2, v2 in v.items():
+                if uppercase:
+                    k2 = k2.upper()
+                if not non_custom_location and k != "custom":
+                    non_custom_location = True
+                locations_names.append((k, k2))
+        locations_names = sorted(locations_names, key=lambda x: (x[0].upper(), x[1]))
+        if prepend_location is None:
+            prepend_location = location is None and non_custom_location
+        if prepend_location:
+            return list(map(lambda x: x[0] + ":" + x[1], locations_names))
+        return list(map(lambda x: x[1], locations_names))
 
     @classmethod
     def list_vbt_indicators(cls) -> tp.List[str]:
@@ -2960,21 +3159,6 @@ Other keyword arguments are passed to `{0}.run`.
         )
 
     @classmethod
-    def list_locations(cls) -> tp.List[str]:
-        """List supported locations."""
-        return [
-            "custom",
-            "vbt",
-            "talib_func",
-            "talib",
-            "pandas_ta",
-            "ta",
-            "technical",
-            "techcon",
-            "wqa101",
-        ]
-
-    @classmethod
     def list_indicators(
         cls,
         pattern: tp.Optional[str] = None,
@@ -2990,7 +3174,7 @@ Other keyword arguments are passed to `{0}.run`.
         if pattern is not None:
             if not case_sensitive:
                 pattern = pattern.lower()
-            if location is None and pattern.lower() in cls.list_locations():
+            if location is None and cls.match_location(pattern) is not None:
                 location = pattern
                 pattern = None
         if prepend_location is None:
@@ -2998,16 +3182,23 @@ Other keyword arguments are passed to `{0}.run`.
                 prepend_location = False
             else:
                 prepend_location = True
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+        with WarningsFiltered():
             if location is not None:
-                location = location.lower()
-                all_indicators = getattr(cls, f"list_{location.lower()}_indicators")()
+                matched_location = cls.match_location(location)
+                if matched_location is not None:
+                    location = matched_location
+                if location in cls.list_custom_locations():
+                    all_indicators = cls.list_custom_indicators(location=location, prepend_location=prepend_location)
+                else:
+                    all_indicators = map(
+                        lambda x: location + ":" + x if prepend_location else x,
+                        getattr(cls, f"list_{location}_indicators")(),
+                    )
             else:
                 from vectorbtpro.utils.module_ import check_installed
 
                 all_indicators = [
-                    *map(lambda x: "custom:" + x if prepend_location else x, cls.list_custom_indicators()),
+                    *cls.list_custom_indicators(prepend_location=prepend_location),
                     *map(lambda x: "vbt:" + x if prepend_location else x, cls.list_vbt_indicators()),
                     *map(
                         lambda x: "talib:" + x if prepend_location else x,
@@ -3058,31 +3249,6 @@ Other keyword arguments are passed to `{0}.run`.
         return found_indicators
 
     @classmethod
-    def split_indicator_name(cls, name: str) -> tp.Tuple[tp.Optional[str], tp.Optional[str]]:
-        """Split an indicator name into location and actual name."""
-        locations = cls.list_locations()
-
-        if name.lower().strip() in locations:
-            return name.lower().strip(), None
-        if ":" in name:
-            location = name.split(":")[0].lower().strip()
-            name = name.split(":")[1].strip()
-        else:
-            location = None
-            name = name.lower().strip()
-            found_location = False
-            if "_" in name:
-                for location in locations:
-                    if name.startswith(location + "_"):
-                        found_location = True
-                        break
-            if found_location:
-                name = name[len(location) + 1 :]
-            else:
-                location = None
-        return location, name
-
-    @classmethod
     def get_indicator(cls, name: str, location: tp.Optional[str] = None) -> tp.Type[IndicatorBase]:
         """Get the indicator class by its name.
 
@@ -3091,11 +3257,15 @@ Other keyword arguments are passed to `{0}.run`.
         searched throughout all indicators, including the vectorbt's ones."""
         if location is None:
             location, name = cls.split_indicator_name(name)
+        else:
+            matched_location = cls.match_location(location)
+            if matched_location is not None:
+                location = matched_location
         if name is not None:
-            name = name.upper().strip()
+            name = name.upper()
             if location is not None:
-                if location == "custom":
-                    return cls.get_custom_indicator(name)
+                if location in cls.list_custom_locations():
+                    return cls.get_custom_indicator(name, location=location)
                 if location == "vbt":
                     import vectorbtpro as vbt
 
@@ -3117,8 +3287,8 @@ Other keyword arguments are passed to `{0}.run`.
                 import vectorbtpro as vbt
                 from vectorbtpro.utils.module_ import check_installed
 
-                if name in cls.list_custom_indicators(uppercase=True):
-                    return cls.get_custom_indicator(name)
+                if name in cls.list_custom_indicators(uppercase=True, prepend_location=False):
+                    return cls.get_custom_indicator(name, return_first=True)
                 if hasattr(vbt, name):
                     return getattr(vbt, name)
                 if str(name).isnumeric():
@@ -3209,7 +3379,8 @@ Other keyword arguments are passed to `{0}.run`.
             >>> sma.plot(column=(2, 'a')).show()
             ```
 
-            ![](/assets/images/api/talib_plot.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/talib_plot.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/talib_plot.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -3343,7 +3514,7 @@ Other keyword arguments are passed to `{0}.run`.
             index=[datetime(2020, 1, 1) + timedelta(days=i) for i in range(test_index_len)],
         )
         new_args = merge_dicts({c: test_df[c] for c in input_names}, kwargs)
-        result = supress_stdout(func)(**new_args)
+        result = suppress_stdout(func)(**new_args)
 
         # Concatenate Series/DataFrames if the result is a tuple
         if isinstance(result, tuple):
@@ -3533,7 +3704,7 @@ Other keyword arguments are passed to `{0}.run`.
             n_input_cols = 1 if is_series else len(input_tuple[0].columns)
             outputs = []
             for col in range(n_input_cols):
-                output = supress_stdout(func)(
+                output = suppress_stdout(func)(
                     **{
                         name: input_tuple[i] if is_series else input_tuple[i].iloc[:, col]
                         for i, name in enumerate(config["input_names"])
@@ -3810,7 +3981,7 @@ Other keyword arguments are passed to `{0}.run`.
             if name is None and sr.name is None:
                 raise ValueError("Couldn't parse the output: missing output name")
 
-        out = supress_stdout(func)(*args)
+        out = suppress_stdout(func)(*args)
         if isinstance(out, list):
             out = np.asarray(out)
         if isinstance(out, np.ndarray):
@@ -3973,7 +4144,7 @@ Other keyword arguments are passed to `{0}.run`.
                 else:
                     break
 
-            out = supress_stdout(func)(*__args, *_args, **_kwargs)
+            out = suppress_stdout(func)(*__args, *_args, **_kwargs)
             if isinstance(out, list):
                 out = np.asarray(out)
             if isinstance(out, np.ndarray):

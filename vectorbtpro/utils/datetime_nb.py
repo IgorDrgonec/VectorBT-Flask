@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Numba-compiled utilities for working with dates and time."""
 
@@ -136,7 +136,7 @@ def hour_nb(ts: int) -> int:
 
 @register_jitted(cache=True)
 def days_nb(ts: int) -> int:
-    """Get the number of hours."""
+    """Get the number of days."""
     return ts // d_ns
 
 

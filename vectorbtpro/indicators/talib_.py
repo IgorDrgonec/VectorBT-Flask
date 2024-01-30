@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Helper functions for TA-Lib."""
 
@@ -412,9 +412,9 @@ def talib_plot_func(func_name: str) -> tp.Callable:
                     type="rect",
                     xref=xaxis,
                     yref=yaxis,
-                    x0=outputs[0].index[0],
+                    x0=outputs[output_names[0]].index[0],
                     y0=limits[0],
-                    x1=outputs[0].index[-1],
+                    x1=outputs[output_names[0]].index[-1],
                     y1=limits[1],
                     fillcolor="mediumslateblue",
                     opacity=0.2,

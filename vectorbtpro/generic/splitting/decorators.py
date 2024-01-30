@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Decorators for splitting."""
 
@@ -298,7 +298,7 @@ def cv_split(
     is 'all', executes the grid on each set and returns along with the selection.
     Otherwise, returns only the selection.
 
-    If `vectorbtpro.utils.selection.NoResultException` is raised or `skip_errored` is True and
+    If `vectorbtpro.utils.selection.NoResultsException` is raised or `skip_errored` is True and
     any exception is raised, will skip the current iteration and remove it from the final index.
 
     Usage:

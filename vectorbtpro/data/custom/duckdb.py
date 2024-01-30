@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Module with `DuckDBData`."""
 
@@ -738,11 +738,11 @@ class DuckDBData(DBData):
                             else:
                                 end = to_tzaware_datetime(end, naive_tz=tz)
                 if start is not None and end is not None:
-                    query += f" WHERE {index_name} >= $start AND {index_name} < $end"
+                    query += f' WHERE "{index_name}" >= $start AND "{index_name}" < $end'
                 elif start is not None:
-                    query += f" WHERE {index_name} >= $start"
+                    query += f' WHERE "{index_name}" >= $start'
                 elif end is not None:
-                    query += f" WHERE {index_name} < $end"
+                    query += f' WHERE "{index_name}" < $end'
                 params = sql_kwargs.get("params", None)
                 if params is None:
                     params = {}

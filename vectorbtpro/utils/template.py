@@ -1,13 +1,11 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Utilities for working with templates."""
 
-from copy import copy
 from string import Template
 
 import attr
-import numpy as np
-import pandas as pd
+import importlib
 
 import vectorbtpro as vbt
 from vectorbtpro import _typing as tp
@@ -16,6 +14,7 @@ from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.hashing import Hashable
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.search import any_in_obj, find_and_replace_in_obj
+from vectorbtpro.utils.module_ import package_shortcut_config
 
 __all__ = [
     "CustomTemplate",
@@ -83,16 +82,16 @@ class CustomTemplate:
             context,
             **context_merge_kwargs,
         )
-        new_context = merge_dicts(
-            dict(
-                context=new_context,
-                sub_id=sub_id,
-                np=np,
-                pd=pd,
-                vbt=vbt,
-            ),
-            new_context,
-        )
+        if "context" not in new_context:
+            new_context["context"] = dict(new_context)
+        if "sub_id" not in new_context:
+            new_context["sub_id"] = sub_id
+        for k, v in package_shortcut_config.items():
+            if k not in new_context:
+                try:
+                    new_context[k] = importlib.import_module(v)
+                except ImportError:
+                    pass
         return new_context
 
     def resolve_strict(self, strict: tp.Optional[bool] = None) -> bool:
@@ -266,7 +265,7 @@ def substitute_templates(
         100100
         >>> vbt.substitute_templates(vbt.Rep('key'), {'key': 100})
         100
-        >>> vbt.substitute_templates([vbt.Rep('key'), vbt.Sub('$key$key')], {'key': 100}, except_types=())
+        >>> vbt.substitute_templates([vbt.Rep('key'), vbt.Sub('$key$key')], {'key': 100}, incl_types=list)
         [100, '100100']
         >>> vbt.substitute_templates(vbt.RepFunc(lambda key: key == 100), {'key': 100})
         True

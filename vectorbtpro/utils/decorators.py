@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Class and function decorators."""
 
@@ -23,8 +23,13 @@ class classproperty(object):
     """Property that can be called on a class."""
 
     def __init__(self, func: tp.Callable) -> None:
-        self.func = func
+        self._func = func
         self.__doc__ = getattr(func, "__doc__")
+
+    @property
+    def func(self) -> tp.Callable:
+        """Wrapped function."""
+        return self._func
 
     def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
         return self.func(owner)
@@ -38,8 +43,13 @@ class class_or_instanceproperty(object):
     otherwise to an instance."""
 
     def __init__(self, func: tp.Callable) -> None:
-        self.func = func
+        self._func = func
         self.__doc__ = getattr(func, "__doc__")
+
+    @property
+    def func(self) -> tp.Callable:
+        """Wrapped function."""
+        return self._func
 
     def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
         if instance is None:

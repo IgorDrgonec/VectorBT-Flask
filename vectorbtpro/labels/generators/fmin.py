@@ -51,7 +51,8 @@ class _FMIN(FMIN):
             >>> vbt.FMIN.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/FMIN.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/FMIN.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/FMIN.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings

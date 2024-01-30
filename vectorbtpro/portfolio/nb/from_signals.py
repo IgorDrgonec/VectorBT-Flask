@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for portfolio simulation based on signals."""
 
@@ -3274,6 +3274,57 @@ def from_signals_nb(
         cash_earnings=cash_earnings_out,
         call_seq=call_seq,
         in_outputs=in_outputs,
+    )
+
+
+@register_jitted(cache=True)
+def init_FSInOutputs_nb(
+    target_shape: tp.Shape,
+    group_lens: tp.GroupLens,
+    cash_sharing: bool = False,
+    save_state: bool = True,
+    save_value: bool = True,
+    save_returns: bool = True,
+):
+    """Initialize `vectorbtpro.portfolio.enums.FSInOutputs`."""
+    if save_state:
+        position = np.full(target_shape, np.nan)
+        debt = np.full(target_shape, np.nan)
+        locked_cash = np.full(target_shape, np.nan)
+        if cash_sharing:
+            cash = np.full((target_shape[0], len(group_lens)), np.nan)
+            free_cash = np.full((target_shape[0], len(group_lens)), np.nan)
+        else:
+            cash = np.full(target_shape, np.nan)
+            free_cash = np.full(target_shape, np.nan)
+    else:
+        position = np.full((0, 0), np.nan)
+        debt = np.full((0, 0), np.nan)
+        locked_cash = np.full((0, 0), np.nan)
+        cash = np.full((0, 0), np.nan)
+        free_cash = np.full((0, 0), np.nan)
+    if save_value:
+        if cash_sharing:
+            value = np.full((target_shape[0], len(group_lens)), np.nan)
+        else:
+            value = np.full(target_shape, np.nan)
+    else:
+        value = np.full((0, 0), np.nan)
+    if save_returns:
+        if cash_sharing:
+            returns = np.full((target_shape[0], len(group_lens)), np.nan)
+        else:
+            returns = np.full(target_shape, np.nan)
+    else:
+        returns = np.full((0, 0), np.nan)
+    return FSInOutputs(
+        position=position,
+        debt=debt,
+        locked_cash=locked_cash,
+        cash=cash,
+        free_cash=free_cash,
+        value=value,
+        returns=returns,
     )
 
 

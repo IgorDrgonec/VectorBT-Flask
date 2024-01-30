@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Utilities for validation during runtime."""
 
@@ -534,9 +534,9 @@ def assert_instance_of(arg: tp.Any, types: tp.TypeLike, arg_name: tp.Optional[st
         x = f"Argument '{arg_name}'"
     if not is_instance_of(arg, types):
         if isinstance(types, tuple):
-            raise AssertionError(f"{x} must be of one of the types {types}")
+            raise AssertionError(f"{x} must be of one of the types {types}, not {type(arg)}")
         else:
-            raise AssertionError(f"{x} must be of the type {types}")
+            raise AssertionError(f"{x} must be of the type {types}, not {type(arg)}")
 
 
 def assert_not_instance_of(arg: tp.Any, types: tp.TypeLike, arg_name: tp.Optional[str] = None) -> None:

@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Module with `PATSIM`."""
 
@@ -118,7 +118,8 @@ class _PATSIM(PATSIM):
             >>> vbt.PATSIM.run(ohlcv['Close'], np.array([1, 2, 3, 2, 1]), 30).plot().show()
             ```
 
-            ![](/assets/images/api/PATSIM.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/PATSIM.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/PATSIM.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro._settings import settings
 
@@ -170,7 +171,8 @@ class _PATSIM(PATSIM):
             >>> vbt.PATSIM.run(ohlcv['Close'], np.array([1, 2, 3, 2, 1]), 30).overlay_with_heatmap().show()
             ```
 
-            ![](/assets/images/api/PATSIM_heatmap.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/PATSIM_heatmap.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/PATSIM_heatmap.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro._settings import settings
 

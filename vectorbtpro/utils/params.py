@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Utilities for working with parameters."""
 
@@ -1477,9 +1477,9 @@ class Parameterizer(Configured):
             if "value" in v:
                 paramable_kwargs[k] = v["value"]
         param_dct = self.find_params_in_obj(paramable_kwargs, **param_search_kwargs)
-        param_columns = None
+        param_index = None
         if len(param_dct) > 0:
-            param_product, param_columns = combine_params(
+            param_product, param_index = combine_params(
                 param_dct,
                 build_grid=build_grid,
                 grid_indices=grid_indices,
@@ -1505,15 +1505,15 @@ class Parameterizer(Configured):
                 param_configs = new_param_configs
 
         n_config_params = len(pc_names)
-        if param_columns is not None:
+        if param_index is not None:
             if n_config_params == 0 or (n_config_params == 1 and pc_names_none):
-                new_param_index = param_columns
+                new_param_index = param_index
             else:
                 from vectorbtpro.base.indexes import combine_indexes
 
                 new_param_index = combine_indexes(
                     (
-                        param_columns,
+                        param_index,
                         pd.Index(pc_names, name="param_config"),
                     ),
                     **index_stack_kwargs,

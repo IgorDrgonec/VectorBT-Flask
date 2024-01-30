@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Utilities for working with dates and time."""
 
@@ -15,6 +15,7 @@ import re
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts
+from vectorbtpro.utils.parsing import WarningsFiltered
 
 __all__ = [
     "DTC",
@@ -405,8 +406,7 @@ def prepare_dt_index(
     if index.dtype == object:
         if parse_index:
             try:
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
+                with WarningsFiltered():
                     pd.to_datetime(index[[0]], **kwargs)
                 try:
                     parsed_index = pd.to_datetime(index, **kwargs)

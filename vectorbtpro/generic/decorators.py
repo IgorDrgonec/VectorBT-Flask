@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Class decorators for generic accessors."""
 
@@ -91,6 +91,7 @@ def attach_nb_methods(config: Config) -> tp.ClassWrapper:
                 new_method.__signature__ = source_sig.replace(parameters=new_parameters)
 
             new_method.__name__ = target_name
+            new_method.__module__ = cls.__module__
             new_method.__qualname__ = f"{cls.__name__}.{new_method.__name__}"
             new_method.__doc__ = f"See `{func.__module__ + '.' + func.__name__}`."
             setattr(cls, target_name, new_method)
@@ -150,6 +151,7 @@ def attach_transform_methods(config: Config) -> tp.ClassWrapper:
                     new_method.__signature__ = source_sig
 
             new_method.__name__ = target_name
+            new_method.__module__ = cls.__module__
             new_method.__qualname__ = f"{cls.__name__}.{new_method.__name__}"
             new_method.__doc__ = docstring
             setattr(cls, target_name, new_method)

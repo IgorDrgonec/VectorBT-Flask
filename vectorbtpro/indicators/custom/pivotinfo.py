@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Module with `PIVOTINFO`."""
 
@@ -106,7 +106,8 @@ class _PIVOTINFO(PIVOTINFO):
             >>> vbt.PIVOTINFO.run(ohlcv['High'], ohlcv['Low'], 0.1, 0.1).plot(fig=fig).show()
             ```
 
-            ![](/assets/images/api/PIVOTINFO.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/PIVOTINFO.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/PIVOTINFO.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings
@@ -168,7 +169,8 @@ class _PIVOTINFO(PIVOTINFO):
             >>> vbt.PIVOTINFO.run(ohlcv['High'], ohlcv['Low'], 0.1, 0.1).plot_zigzag(fig=fig).show()
             ```
 
-            ![](/assets/images/api/PIVOTINFO_zigzag.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/PIVOTINFO_zigzag.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/PIVOTINFO_zigzag.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings

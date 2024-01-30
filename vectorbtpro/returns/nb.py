@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for returns.
 
@@ -390,6 +390,8 @@ def downside_risk_1d_nb(adj_rets: tp.Array1d, ann_factor: float) -> float:
                 adj_ret_sqrd_sum = 0.0
             if adj_rets[i] <= 0:
                 adj_ret_sqrd_sum += adj_rets[i] ** 2
+    if cnt == 0:
+        return np.nan
     adj_ret_sqrd_mean = adj_ret_sqrd_sum / cnt
     return np.sqrt(adj_ret_sqrd_mean) * np.sqrt(ann_factor)
 

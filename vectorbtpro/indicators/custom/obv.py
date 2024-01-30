@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Module with `OBV`."""
 
@@ -50,7 +50,8 @@ class _OBV(OBV):
             >>> vbt.OBV.run(ohlcv['Close'], ohlcv['Volume']).plot().show()
             ```
 
-            ![](/assets/images/api/OBV.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/OBV.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/OBV.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings

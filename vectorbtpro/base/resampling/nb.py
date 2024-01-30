@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for resampling."""
 
@@ -325,5 +325,44 @@ def resample_source_mask_nb(
                 if source_rbound is None or (target_rbound is not None and target_rbound <= source_rbound):
                     out[i] = True
                     break
+
+    return out
+
+
+@register_jitted(cache=True)
+def last_before_target_index_nb(
+    source_index: tp.Array1d,
+    target_index: tp.Array1d,
+    incl_source: bool = True,
+    incl_target: bool = False,
+) -> tp.Array1d:
+    """For each source index, find the position of the last source index between the original
+    source index and the corresponding target index."""
+    out = np.empty(len(source_index), dtype=np.int_)
+
+    last_j = -1
+    for i in range(len(source_index)):
+        if i > 0 and source_index[i] < source_index[i - 1]:
+            raise ValueError("Source index must be increasing")
+        if i > 0 and target_index[i] < target_index[i - 1]:
+            raise ValueError("Target index must be increasing")
+        if source_index[i] > target_index[i]:
+            raise ValueError("Target index must be equal to or greater than source index")
+        if last_j == -1:
+            from_i = i + 1
+        else:
+            from_i = last_j
+        if incl_source:
+            last_j = i
+        else:
+            last_j = -1
+        for j in range(from_i, len(source_index)):
+            if source_index[j] < target_index[i]:
+                last_j = j
+            elif incl_target and source_index[j] == target_index[i]:
+                last_j = j
+            else:
+                break
+        out[i] = last_j
 
     return out

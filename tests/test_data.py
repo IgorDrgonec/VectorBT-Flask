@@ -2071,6 +2071,39 @@ class TestData:
             MyData.pull("S1", shape=(5, 3), columns=["F1", "F2", "F3"]).to_feature_oriented().get(["F1"]),
         )
 
+    def test_add(self):
+        data1 = MyData.pull(["S1", "S2", "S3"], shape=(5, 3), columns=["F1", "F2", "F3"])
+        data2 = MyData.pull(["S1", "S2"], shape=(5, 2), columns=["F4", "F5"])
+        added_data = data1.add("F4", data2.get("F4"))
+        added_data = added_data.add("F5", data2.get("F5"))
+        assert added_data.features == ["F1", "F2", "F3", "F4", "F5"]
+        assert added_data.symbols == ["S1", "S2", "S3"]
+        data3 = MyData.pull(["S1", "S2", "S3"], shape=(5, 3), columns=["F1", "F2", "F3"])
+        data4 = MyData.pull(["S4", "S5"], shape=(5, 2), columns=["F1", "F2"])
+        added_data = data3.add("S4", data4.get(symbol="S4"))
+        added_data = added_data.add("S5", data4.get(symbol="S5"))
+        assert added_data.features == ["F1", "F2", "F3"]
+        assert added_data.symbols == ["S1", "S2", "S3", "S4", "S5"]
+
+    def test_remove(self):
+        data = MyData.pull(["S1", "S2", "S3"], shape=(5, 3), columns=["F1", "F2", "F3"])
+        removed_data = data.remove("S1")
+        assert removed_data.features == ["F1", "F2", "F3"]
+        assert removed_data.symbols == ["S2", "S3"]
+        removed_data = data.remove(["S1", "S2"])
+        assert removed_data.features == ["F1", "F2", "F3"]
+        assert removed_data.symbols == ["S3"]
+        with pytest.raises(Exception):
+            data.remove(["S1", "S2", "S3"])
+        removed_data = data.remove("F1")
+        assert removed_data.features == ["F2", "F3"]
+        assert removed_data.symbols == ["S1", "S2", "S3"]
+        removed_data = data.remove(["F1", "F2"])
+        assert removed_data.features == ["F3"]
+        assert removed_data.symbols == ["S1", "S2", "S3"]
+        with pytest.raises(Exception):
+            data.remove(["F1", "F2", "F3"])
+
     def test_select(self):
         data = MyData.pull(["S1", "S2", "S3"], shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented()
         assert data.select("S1") == MyData.pull("S1", shape=(5, 3), columns=["F1", "F2", "F3"]).to_symbol_oriented()
@@ -2121,17 +2154,32 @@ class TestData:
         assert list(renamed_data.delisted.keys()) == ["S1", "S2", "S3"]
 
     def test_merge(self):
+        def _fix(data):
+            return data.replace(missing_index="nan", missing_columns="nan")
+
         data = MyData.pull(["S1", "S2", "S3"], shape=(5, 3), columns=["F1", "F2", "F3"])
         data01 = MyData.pull(["S1", "S2"], shape=(5, 3), columns=["F1", "F2", "F3"])
         data2 = MyData.pull(["S3"], shape=(5, 3), columns=["F1", "F2", "F3"])
-        assert MyData.merge(data01.to_symbol_oriented(), data2.to_symbol_oriented()) == data.to_symbol_oriented()
-        assert MyData.merge(data01.to_feature_oriented(), data2.to_feature_oriented()) == data.to_feature_oriented()
+        assert MyData.merge(
+            data01.to_symbol_oriented(),
+            data2.to_symbol_oriented(),
+        ) == _fix(data.to_symbol_oriented())
+        assert MyData.merge(
+            data01.to_feature_oriented(),
+            data2.to_feature_oriented(),
+        ) == _fix(data.to_feature_oriented())
         data12 = MyData.pull(["S2", "S3"], shape=(5, 3), columns=["F1", "F2", "F3"])
-        assert MyData.merge(data01.to_symbol_oriented(), data12.to_symbol_oriented()) == data.to_symbol_oriented()
-        assert MyData.merge(data01.to_feature_oriented(), data12.to_feature_oriented()) == data.to_feature_oriented()
+        assert MyData.merge(
+            data01.to_symbol_oriented(),
+            data12.to_symbol_oriented(),
+        ) == _fix(data.to_symbol_oriented())
+        assert MyData.merge(
+            data01.to_feature_oriented(),
+            data12.to_feature_oriented(),
+        ) == _fix(data.to_feature_oriented())
         data12 = MyData.pull(["S2", "S3"], shape=(3, 2), start_date=datetime(2020, 1, 3), columns=["F3", "F4"])
-        merged_data1 = MyData.merge(data01.to_symbol_oriented(), data12.to_symbol_oriented(), missing_columns="nan")
-        merged_data2 = MyData.merge(data01.to_feature_oriented(), data12.to_feature_oriented(), missing_columns="nan")
+        merged_data1 = MyData.merge(data01.to_symbol_oriented(), data12.to_symbol_oriented())
+        merged_data2 = MyData.merge(data01.to_feature_oriented(), data12.to_feature_oriented())
         assert_frame_equal(
             merged_data1.data["S1"],
             pd.DataFrame(
@@ -3380,9 +3428,9 @@ class TestCustom:
         hdf_data = vbt.HDFData.pull(
             vbt.symbol_dict(
                 {
-                    "DATA1": tmp_path / "data/data1.h5",
-                    "DATA2": tmp_path / "data/data2.h5",
-                    "DATA3": tmp_path / "data/data3.h5",
+                    "DATA1": tmp_path / "data/data1.h5/data1",
+                    "DATA2": tmp_path / "data/data2.h5/data2",
+                    "DATA3": tmp_path / "data/data3.h5/data3",
                 }
             )
         )

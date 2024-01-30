@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Class decorators for portfolio."""
 
@@ -58,6 +58,7 @@ def attach_returns_acc_methods(config: Config) -> tp.ClassWrapper:
                 return ret_method(**kwargs)
 
             new_method.__name__ = "get_" + target_name
+            new_method.__module__ = cls.__module__
             new_method.__qualname__ = f"{cls.__name__}.{new_method.__name__}"
             new_method.__doc__ = docstring
             setattr(cls, new_method.__name__, new_method)
@@ -127,6 +128,7 @@ def attach_shortcut_properties(config: Config) -> tp.ClassWrapper:
                 return getattr(self, _method_name)(**_method_kwargs)
 
             new_prop.__name__ = target_name
+            new_prop.__module__ = cls.__module__
             new_prop.__qualname__ = f"{cls.__name__}.{new_prop.__name__}"
             new_prop.__doc__ = docstring
             setattr(cls, new_prop.__name__, decorator(new_prop, **settings))

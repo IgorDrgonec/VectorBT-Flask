@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Module with `MA`."""
 
@@ -70,7 +70,8 @@ class _MA(MA):
             >>> vbt.MA.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/MA.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/MA.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/MA.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.figure import make_figure
         from vectorbtpro._settings import settings

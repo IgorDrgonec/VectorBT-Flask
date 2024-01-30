@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Module with `YFData`."""
 
@@ -52,6 +52,12 @@ class YFData(RemoteData):
                 resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(
                     resampler,
                     generic_nb.nonzero_prod_reduce_nb,
+                )
+            ),
+            "Capital Gains": dict(
+                resample_func=lambda self, obj, resampler: obj.vbt.resample_apply(
+                    resampler,
+                    generic_nb.sum_reduce_nb,
                 )
             ),
         }

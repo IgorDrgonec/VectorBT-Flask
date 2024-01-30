@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Pandas accessors for Plotly Express.
 
@@ -96,7 +96,8 @@ class PXAccessor(BaseAccessor):
         >>> pd.Series([1, 2, 3]).vbt.px.bar().show()
         ```
 
-        ![](/assets/images/api/px_bar.svg){: .iimg loading=lazy }
+        ![](/assets/images/api/px_bar.light.svg#only-light){: .iimg loading=lazy }
+        ![](/assets/images/api/px_bar.dark.svg#only-dark){: .iimg loading=lazy }
     """
 
     def __init__(

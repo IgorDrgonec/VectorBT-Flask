@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Numba-compiled functions for portfolio analysis."""
 
@@ -744,6 +744,7 @@ def total_profit_grouped_nb(total_profit: tp.Array1d, group_lens: tp.Array1d) ->
         value=ch.ArraySlicer(axis=1),
         init_value=base_ch.FlexArraySlicer(),
         cash_deposits=base_ch.FlexArraySlicer(axis=1),
+        cash_deposits_as_input=None,
         log_returns=None,
     ),
     merge_func="column_stack",
@@ -753,6 +754,7 @@ def returns_nb(
     value: tp.Array2d,
     init_value: tp.FlexArray1d,
     cash_deposits: tp.FlexArray2dLike = 0.0,
+    cash_deposits_as_input: bool = False,
     log_returns: bool = False,
 ) -> tp.Array2d:
     """Get return series per column/group."""
@@ -762,10 +764,14 @@ def returns_nb(
     for col in prange(value.shape[1]):
         input_value = flex_select_1d_pc_nb(init_value, col)
         for i in range(value.shape[0]):
-            output_value = value[i, col]
             _cash_deposits = flex_select_nb(cash_deposits_, i, col)
-            adj_output_value = output_value - _cash_deposits
-            out[i, col] = returns_nb_.get_return_nb(input_value, adj_output_value, log_returns=log_returns)
+            output_value = value[i, col]
+            if cash_deposits_as_input:
+                adj_input_value = input_value + _cash_deposits
+                out[i, col] = returns_nb_.get_return_nb(adj_input_value, output_value, log_returns=log_returns)
+            else:
+                adj_output_value = output_value - _cash_deposits
+                out[i, col] = returns_nb_.get_return_nb(input_value, adj_output_value, log_returns=log_returns)
             input_value = output_value
     return out
 

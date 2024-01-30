@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Base class for working with drawdown records.
 
@@ -162,7 +162,8 @@ Name: group, dtype: object
 >>> drawdowns['a'].plots().show()
 ```
 
-![](/assets/images/api/drawdowns_plots.svg){: .iimg loading=lazy }
+![](/assets/images/api/drawdowns_plots.light.svg#only-light){: .iimg loading=lazy }
+![](/assets/images/api/drawdowns_plots.dark.svg#only-dark){: .iimg loading=lazy }
 """
 
 import numpy as np
@@ -818,7 +819,8 @@ class Drawdowns(Ranges):
             >>> vbt.Drawdowns.from_price(price, wrapper_kwargs=dict(freq='1 day')).plot().show()
             ```
 
-            ![](/assets/images/api/drawdowns_plot.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/drawdowns_plot.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/drawdowns_plot.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 

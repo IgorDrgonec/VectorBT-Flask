@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Module with `MACD`."""
 
@@ -99,7 +99,8 @@ class _MACD(MACD):
             >>> vbt.MACD.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/MACD.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/MACD.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/MACD.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
         from vectorbtpro._settings import settings

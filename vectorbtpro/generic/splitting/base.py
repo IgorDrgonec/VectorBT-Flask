@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Base class for splitting."""
 
@@ -549,7 +549,8 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_rolling_1.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/from_rolling_1.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_rolling_1.dark.svg#only-dark){: .iimg loading=lazy }
 
             * Divide a range into ranges, each split into 1/2:
 
@@ -563,7 +564,8 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_rolling_2.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/from_rolling_2.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_rolling_2.dark.svg#only-dark){: .iimg loading=lazy }
 
             * Make the ranges above non-overlapping by using the right bound of the last
             set as an offset anchor:
@@ -579,7 +581,8 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_rolling_3.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/from_rolling_3.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_rolling_3.dark.svg#only-dark){: .iimg loading=lazy }
         """
         index = prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -711,7 +714,8 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_n_rolling.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/from_n_rolling.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_n_rolling.dark.svg#only-dark){: .iimg loading=lazy }
         """
         index = prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -863,7 +867,8 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_expanding.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/from_expanding.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_expanding.dark.svg#only-dark){: .iimg loading=lazy }
         """
         index = prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -967,7 +972,8 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_n_expanding.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/from_n_expanding.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_n_expanding.dark.svg#only-dark){: .iimg loading=lazy }
         """
         index = prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -1052,7 +1058,8 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_ranges_1.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/from_ranges_1.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_ranges_1.dark.svg#only-dark){: .iimg loading=lazy }
 
             * In addition to the above, reserve the last month for testing purposes:
 
@@ -1066,7 +1073,8 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_ranges_2.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/from_ranges_2.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_ranges_2.dark.svg#only-dark){: .iimg loading=lazy }
         """
         index = prepare_dt_index(index)
         if split_range_kwargs is None:
@@ -1140,7 +1148,8 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_grouper.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/from_grouper.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_grouper.dark.svg#only-dark){: .iimg loading=lazy }
         """
         index = prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -1240,7 +1249,8 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_n_random.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/from_n_random.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_n_random.dark.svg#only-dark){: .iimg loading=lazy }
         """
         index = prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -1497,7 +1507,8 @@ class Splitter(Analyzable):
             >>> splitter.plot().show()
             ```
 
-            ![](/assets/images/api/from_split_func.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/from_split_func.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_split_func.dark.svg#only-dark){: .iimg loading=lazy }
         """
         index = prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
@@ -3227,13 +3238,12 @@ class Splitter(Analyzable):
             >>> splitter.apply(
             ...     apply_func,
             ...     vbt.Takeable(data),
-            ...     iteration="set_wise",
-            ...     merge_func="row_stack",
-            ...     merge_all=False,
-            ... ).T.vbt.drop_levels("split", axis=0).vbt.plot().show()
+            ...     merge_func="row_stack"
+            ... ).unstack("set").vbt.drop_levels("split", axis=0).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/Splitter_apply.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/Splitter_apply.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/Splitter_apply.dark.svg#only-dark){: .iimg loading=lazy }
         """
         if isinstance(attach_bounds, bool):
             if attach_bounds:
@@ -4868,17 +4878,20 @@ class Splitter(Analyzable):
             **layout_kwargs: Keyword arguments for layout.
 
         Usage:
-        ```pycon
-        >>> import vectorbtpro as vbt
-        >>> import pandas as pd
-        >>> from sklearn.model_selection import TimeSeriesSplit
+            * Plot a scikit-learn splitter:
 
-        >>> index = pd.date_range("2020", "2021", freq="D")
-        >>> splitter = vbt.Splitter.from_sklearn(index, TimeSeriesSplit())
-        >>> splitter.plot().show()
-        ```
+            ```pycon
+            >>> import vectorbtpro as vbt
+            >>> import pandas as pd
+            >>> from sklearn.model_selection import TimeSeriesSplit
 
-        ![](/assets/images/api/Splitter.svg){: .iimg loading=lazy }
+            >>> index = pd.date_range("2020", "2021", freq="D")
+            >>> splitter = vbt.Splitter.from_sklearn(index, TimeSeriesSplit())
+            >>> splitter.plot().show()
+            ```
+
+            ![](/assets/images/api/Splitter.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/Splitter.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 
@@ -4972,7 +4985,8 @@ class Splitter(Analyzable):
             >>> splitter.plot_coverage().show()
             ```
 
-            ![](/assets/images/api/Splitter_coverage_area.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/Splitter_coverage_area.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/Splitter_coverage_area.dark.svg#only-dark){: .iimg loading=lazy }
 
             * Line plot:
 
@@ -4980,7 +4994,8 @@ class Splitter(Analyzable):
             >>> splitter.plot_coverage(stacked=False).show()
             ```
 
-            ![](/assets/images/api/Splitter_coverage_line.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/Splitter_coverage_line.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/Splitter_coverage_line.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 

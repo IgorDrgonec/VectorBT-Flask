@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Base functions and classes for portfolio optimization."""
 
@@ -11,7 +11,7 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.returns.accessors import ReturnsAccessor
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.parsing import get_func_arg_names, warn_stdout
+from vectorbtpro.utils.parsing import get_func_arg_names, warn_stdout, WarningsFiltered
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.template import substitute_templates, Rep, RepFunc, CustomTemplate
 from vectorbtpro.utils.execution import execute
@@ -42,7 +42,7 @@ try:
     if not tp.TYPE_CHECKING:
         raise ImportError
     from pypfopt.base_optimizer import BaseOptimizer as BaseOptimizerT
-except ImportError as e:
+except ImportError:
     BaseOptimizerT = tp.Any
 try:
     if not tp.TYPE_CHECKING:
@@ -50,7 +50,7 @@ try:
     from riskfolio import Portfolio as RPortfolio, HCPortfolio as RHCPortfolio
 
     RPortfolioT = tp.TypeVar("RPortfolioT", bound=tp.Union[RPortfolio, RHCPortfolio])
-except ImportError as e:
+except ImportError:
     RPortfolioT = tp.Any
 try:
     if not tp.TYPE_CHECKING:
@@ -60,7 +60,7 @@ try:
 
     AlgoT = tp.TypeVar("AlgoT", bound=Algo)
     AlgoResultT = tp.TypeVar("AlgoResultT", bound=AlgoResult)
-except ImportError as e:
+except ImportError:
     AlgoT = tp.Any
     AlgoResultT = tp.Any
 
@@ -692,10 +692,7 @@ def pypfopt_optimize(
         kwargs["used_arg_names"] = set()
 
     try:
-        with warnings.catch_warnings():
-            if silence_warnings:
-                warnings.simplefilter("ignore")
-
+        with WarningsFiltered(entries="ignore" if silence_warnings else None):
             optimizer = kwargs["optimizer"] = resolve_pypfopt_optimizer(**kwargs)
 
             if objectives is not None:
@@ -1331,10 +1328,7 @@ def riskfolio_optimize(
     unused_arg_names = set(kwargs.keys())
 
     try:
-        with warnings.catch_warnings():
-            if silence_warnings:
-                warnings.simplefilter("ignore")
-
+        with WarningsFiltered(entries="ignore" if silence_warnings else None):
             # Prepare returns
             new_returns = prepare_returns(
                 returns,
@@ -2363,8 +2357,7 @@ class PortfolioOptimizer(Analyzable):
             )
             allocations = allocations.values
         if not isinstance(allocations, np.ndarray):
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
+            with WarningsFiltered():
                 try:
                     new_allocations = np.asarray(allocations)
                     if new_allocations.dtype != object:
@@ -3429,7 +3422,8 @@ class PortfolioOptimizer(Analyzable):
             >>> pfo.plot().show()
             ```
 
-            ![](/assets/images/api/pfopt_plot.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/pfopt_plot.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/pfopt_plot.dark.svg#only-dark){: .iimg loading=lazy }
         """
         from vectorbtpro.utils.module_ import assert_can_import
 

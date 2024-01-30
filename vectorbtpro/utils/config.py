@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Utilities for configuration."""
 
@@ -13,6 +13,7 @@ from vectorbtpro.utils.caching import Cacheable
 from vectorbtpro.utils.decorators import class_or_instancemethod
 from vectorbtpro.utils.formatting import Prettified, prettify_dict, prettify_inited
 from vectorbtpro.utils.pickling import RecState, Pickleable, pdict
+from vectorbtpro.utils.chaining import Chainable
 
 __all__ = [
     "hdict",
@@ -1238,7 +1239,7 @@ class HasSettings:
         cls_cfg.reset(force=True)
 
 
-class Configured(HasSettings, Cacheable, Comparable, Pickleable, Prettified):
+class Configured(HasSettings, Cacheable, Comparable, Pickleable, Prettified, Chainable):
     """Class with an initialization config.
 
     All subclasses of `Configured` are initialized using `Config`, which makes it easier to pickle.
@@ -1301,37 +1302,60 @@ class Configured(HasSettings, Cacheable, Comparable, Pickleable, Prettified):
         return writeable_attrs
 
     @classmethod
-    def resolve_merge_kwargs(cls, *configs: tp.MaybeTuple[ConfigT], **kwargs) -> tp.Kwargs:
+    def resolve_merge_kwargs(
+        cls,
+        *configs: tp.MaybeTuple[ConfigT],
+        on_merge_conflict: tp.Union[str, dict] = "error",
+        **kwargs,
+    ) -> tp.Kwargs:
         """Resolve keyword arguments for initializing `Configured` after merging."""
         if len(configs) == 1:
             configs = configs[0]
         configs = list(configs)
 
-        common_keys = set()
+        all_keys = set()
         for config in configs:
-            common_keys = common_keys.union(set(config.keys()))
+            all_keys = all_keys.union(set(config.keys()))
         init_config = configs[0]
-        for i in range(1, len(configs)):
-            config = configs[i]
-            for k in common_keys:
-                if k not in kwargs:
-                    same_k = True
-                    try:
-                        if k in config:
-                            if not is_deep_equal(init_config[k], config[k]):
-                                same_k = False
-                        else:
-                            same_k = False
-                    except KeyError as e:
-                        same_k = False
-                    if not same_k:
-                        raise ValueError(f"Objects to be merged must have compatible '{k}'. Pass to override.")
-        for k in common_keys:
+
+        for k in all_keys:
             if k not in kwargs:
-                if k in init_config:
-                    kwargs[k] = init_config[k]
-                else:
-                    raise ValueError(f"Objects to be merged must have compatible '{k}'. Pass to override.")
+                v = None
+                for i in range(1, len(configs)):
+                    config = configs[i]
+                    if isinstance(on_merge_conflict, dict):
+                        if k in on_merge_conflict:
+                            _on_merge_conflict = on_merge_conflict[k]
+                        elif "_def" in on_merge_conflict:
+                            _on_merge_conflict = on_merge_conflict["_def"]
+                        else:
+                            _on_merge_conflict = "error"
+                    else:
+                        _on_merge_conflict = on_merge_conflict
+                    if _on_merge_conflict.lower() == "error":
+                        same_k = True
+                        try:
+                            if k in config:
+                                if not is_deep_equal(init_config[k], config[k]):
+                                    same_k = False
+                            else:
+                                same_k = False
+                        except KeyError as e:
+                            same_k = False
+                        if not same_k:
+                            raise ValueError(f"Objects to be merged must have compatible '{k}'. Pass to override.")
+                        else:
+                            v = config[k]
+                    elif _on_merge_conflict.lower() == "first":
+                        if k in config:
+                            v = config[k]
+                            break
+                    elif _on_merge_conflict.lower() == "last":
+                        if k in config:
+                            v = config[k]
+                    else:
+                        raise ValueError(f"Invalid option on_merge_conflict='{_on_merge_conflict}'")
+                kwargs[k] = v
         return kwargs
 
     def replace(

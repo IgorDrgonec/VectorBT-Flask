@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Base class for simulating a portfolio and measuring its performance."""
 
@@ -51,7 +51,7 @@ from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, Readonly
 from vectorbtpro.utils.decorators import custom_property, cached_property, class_or_instancemethod
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.parsing import get_func_kwargs
-from vectorbtpro.utils.template import Rep, RepEval, RepFunc, substitute_templates
+from vectorbtpro.utils.template import Rep, RepEval, RepFunc
 
 try:
     if not tp.TYPE_CHECKING:
@@ -1249,6 +1249,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         "init_position",
         "init_price",
         "cash_deposits",
+        "cash_deposits_as_input",
         "cash_earnings",
         "call_seq",
         "in_outputs",
@@ -1280,6 +1281,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         init_position: tp.ArrayLike = 0.0,
         init_price: tp.ArrayLike = np.nan,
         cash_deposits: tp.ArrayLike = 0.0,
+        cash_deposits_as_input: tp.Optional[bool] = None,
         cash_earnings: tp.ArrayLike = 0.0,
         call_seq: tp.Optional[tp.Array2d] = None,
         in_outputs: tp.Optional[tp.NamedTuple] = None,
@@ -1325,6 +1327,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             init_position=init_position,
             init_price=init_price,
             cash_deposits=cash_deposits,
+            cash_deposits_as_input=cash_deposits_as_input,
             cash_earnings=cash_earnings,
             call_seq=call_seq,
             in_outputs=in_outputs,
@@ -1357,6 +1360,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         init_price = to_1d_array(init_price)
         cash_deposits = to_2d_array(cash_deposits)
         cash_earnings = to_2d_array(cash_earnings)
+        if cash_deposits_as_input is None:
+            cash_deposits_as_input = portfolio_cfg["cash_deposits_as_input"]
         if bm_close is not None and not isinstance(bm_close, bool):
             bm_close = to_2d_array(bm_close)
         if log_records is None:
@@ -1381,6 +1386,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         self._init_position = init_position
         self._init_price = init_price
         self._cash_deposits = cash_deposits
+        self._cash_deposits_as_input = cash_deposits_as_input
         self._cash_earnings = cash_earnings
         self._call_seq = call_seq
         self._in_outputs = in_outputs
@@ -2686,7 +2692,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> pf.get_asset_value(group_by=False).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/from_orders.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_orders.dark.svg#only-dark){: .iimg loading=lazy }
 
             * Test 10 random weight combinations:
 
@@ -4369,7 +4376,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> pf.get_asset_value(group_by=False).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/from_order_func.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_order_func.dark.svg#only-dark){: .iimg loading=lazy }
 
             Templates are a very powerful tool to prepare any custom arguments after they are broadcast and
             before they are passed to the simulation function. In the example above, we use `broadcast_named_args`
@@ -4386,13 +4394,18 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> group_by = ['g1', 'g1', 'g1', 'g2', 'g2', 'g2']  # 2 groups instead of 1
             >>> # Replace close and group_by in the example above
 
-            >>> pf['g1'].get_asset_value(group_by=False).vbt.plot()
+            >>> pf['g1'].get_asset_value(group_by=False).vbt.plot().show()
+            ```
+
+            ![](/assets/images/api/from_order_func_g1.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_order_func_g1.dark.svg#only-dark){: .iimg loading=lazy }
+
+            ```pycon
             >>> pf['g2'].get_asset_value(group_by=False).vbt.plot().show()
             ```
 
-            ![](/assets/images/api/from_order_func_g1.svg){: .iimg loading=lazy }
-
-            ![](/assets/images/api/from_order_func_g2.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/from_order_func_g2.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_order_func_g2.dark.svg#only-dark){: .iimg loading=lazy }
 
             * Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit:
 
@@ -4711,7 +4724,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             >>> asset_value.vbt.plot().show()
             ```
 
-            ![](/assets/images/api/from_order_func_nb_example.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/from_def_order_func.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/from_def_order_func.dark.svg#only-dark){: .iimg loading=lazy }
         """
         if isinstance(close, FDOFPreparer):
             preparer = close
@@ -4846,6 +4860,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             return None
 
         return self.wrapper.wrap(call_seq, group_by=False)
+
+    @property
+    def cash_deposits_as_input(self) -> bool:
+        """Whether to add cash deposits to the input value when calculating returns.
+
+        Otherwise, will subtract them from the output value."""
+        return self._cash_deposits_as_input
 
     # ############# Price ############# #
 
@@ -6260,6 +6281,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         group_by: tp.GroupByLike = None,
         init_value: tp.Optional[tp.MaybeSeries] = None,
         cash_deposits: tp.Optional[tp.ArrayLike] = None,
+        cash_deposits_as_input: tp.Optional[bool] = None,
         value: tp.Optional[tp.SeriesFrame] = None,
         log_returns: bool = False,
         daily_returns: bool = False,
@@ -6285,6 +6307,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     chunked=chunked,
                     keep_flex=True,
                 )
+            if cash_deposits_as_input is None:
+                cash_deposits_as_input = cls_or_self.cash_deposits_as_input
             if value is None:
                 value = cls_or_self.resolve_shortcut_attr("value", group_by=group_by, jitted=jitted, chunked=chunked)
             if wrapper is None:
@@ -6293,6 +6317,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             checks.assert_not_none(init_value)
             if cash_deposits is None:
                 cash_deposits = 0.0
+            if cash_deposits_as_input is None:
+                cash_deposits_as_input = False
             checks.assert_not_none(value)
             checks.assert_not_none(wrapper)
 
@@ -6302,6 +6328,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             to_2d_array(value),
             to_1d_array(init_value),
             cash_deposits=to_2d_array(cash_deposits),
+            cash_deposits_as_input=cash_deposits_as_input,
             log_returns=log_returns,
         )
         returns = wrapper.wrap(returns, group_by=group_by, **resolve_dict(wrap_kwargs))
@@ -6507,6 +6534,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         group_by: tp.GroupByLike = None,
         init_value: tp.Optional[tp.MaybeSeries] = None,
         cash_deposits: tp.Optional[tp.ArrayLike] = None,
+        cash_deposits_as_input: tp.Optional[bool] = None,
         market_value: tp.Optional[tp.SeriesFrame] = None,
         log_returns: bool = False,
         daily_returns: bool = False,
@@ -6532,6 +6560,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                     chunked=chunked,
                     keep_flex=True,
                 )
+            if cash_deposits_as_input is None:
+                cash_deposits_as_input = cls_or_self.cash_deposits_as_input
             if market_value is None:
                 market_value = cls_or_self.resolve_shortcut_attr(
                     "market_value",
@@ -6545,6 +6575,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             checks.assert_not_none(init_value)
             if cash_deposits is None:
                 cash_deposits = 0.0
+            if cash_deposits_as_input is None:
+                cash_deposits_as_input = False
             checks.assert_not_none(market_value)
             checks.assert_not_none(wrapper)
 
@@ -6554,6 +6586,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             to_2d_array(market_value),
             to_1d_array(init_value),
             cash_deposits=to_2d_array(cash_deposits),
+            cash_deposits_as_input=cash_deposits_as_input,
             log_returns=log_returns,
         )
         market_returns = wrapper.wrap(market_returns, group_by=group_by, **resolve_dict(wrap_kwargs))

@@ -33,7 +33,8 @@ class _FIXLB(FIXLB):
             >>> vbt.FIXLB.run(ohlcv['Close']).plot().show()
             ```
 
-            ![](/assets/images/api/FIXLB.svg){: .iimg loading=lazy }
+            ![](/assets/images/api/FIXLB.light.svg#only-light){: .iimg loading=lazy }
+            ![](/assets/images/api/FIXLB.dark.svg#only-dark){: .iimg loading=lazy }
         """
         self_col = self.select_col(column=column, group_by=False)
         return self_col.close.rename("Close").vbt.overlay_with_heatmap(self_col.labels.rename("Labels"), **kwargs)

@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2023 Oleg Polakow. All rights reserved.
+# Copyright (c) 2021-2024 Oleg Polakow. All rights reserved.
 
 """Utilities for searching."""
 
@@ -12,7 +12,8 @@ from vectorbtpro.utils.config import set_dict_item
 def find_in_obj(
     obj: tp.Any,
     match_func: tp.Callable,
-    except_types: tp.Union[None, bool, tp.Sequence[type]] = None,
+    excl_types: tp.Union[None, bool, tp.Sequence[type]] = None,
+    incl_types: tp.Union[None, bool, tp.Sequence[type]] = None,
     max_len: tp.Optional[int] = None,
     max_depth: tp.Optional[int] = None,
     _key: tp.Optional[tp.Hashable] = None,
@@ -23,9 +24,9 @@ def find_in_obj(
 
     Traverses dicts, tuples, lists and (frozen-)sets. Does not look for matches in keys.
 
-    If `except_types` is not None, uses `vectorbtpro.utils.checks.is_instance_of` to check whether
+    If `excl_types` is not None, uses `vectorbtpro.utils.checks.is_instance_of` to check whether
     the object is one of the types that are blacklisted. If so, the object is simply returned.
-    By default, out of all sequences, only dicts and tuples are substituted.
+    Same for `incl_types` for whitelisting, but it has a priority over `excl_types`.
 
     If `max_len` is not None, processes any object only if it's shorter than the specified length.
 
@@ -39,10 +40,14 @@ def find_in_obj(
 
     search_cfg = settings["search"]
 
-    if except_types is None:
-        except_types = search_cfg["except_types"]
-    if isinstance(except_types, bool) and except_types:
-        raise ValueError("Argument except_types cannot be True")
+    if excl_types is None:
+        excl_types = search_cfg["excl_types"]
+    if isinstance(excl_types, bool) and excl_types:
+        raise ValueError("Argument excl_types cannot be True")
+    if incl_types is None:
+        incl_types = search_cfg["incl_types"]
+    if isinstance(incl_types, bool) and not incl_types:
+        raise ValueError("Argument incl_types cannot be False")
     if max_len is None:
         max_len = search_cfg["max_len"]
     if max_depth is None:
@@ -51,8 +56,9 @@ def find_in_obj(
     if match_func(_key, obj, **kwargs):
         return {_key: obj}
     if max_depth is None or _depth < max_depth:
-        if except_types not in (None, False) and checks.is_instance_of(obj, except_types):
-            return {}
+        if excl_types not in (None, False) and checks.is_instance_of(obj, excl_types):
+            if incl_types is None or not (incl_types is True or checks.is_instance_of(obj, incl_types)):
+                return {}
         if isinstance(obj, dict):
             if max_len is None or len(obj) <= max_len:
                 match_dct = {}
@@ -62,7 +68,8 @@ def find_in_obj(
                         find_in_obj(
                             v,
                             match_func,
-                            except_types=except_types,
+                            excl_types=excl_types,
+                            incl_types=incl_types,
                             max_len=max_len,
                             max_depth=max_depth,
                             _key=new_key,
@@ -80,7 +87,8 @@ def find_in_obj(
                         find_in_obj(
                             o,
                             match_func,
-                            except_types=except_types,
+                            excl_types=excl_types,
+                            incl_types=incl_types,
                             max_len=max_len,
                             max_depth=max_depth,
                             _key=new_key,
@@ -144,7 +152,8 @@ def replace_in_obj(obj: tp.Any, match_dct: dict, _key: tp.Optional[tp.Hashable] 
 def any_in_obj(
     obj: tp.Any,
     match_func: tp.Callable,
-    except_types: tp.Union[None, bool, tp.Sequence[type]] = None,
+    excl_types: tp.Union[None, bool, tp.Sequence[type]] = None,
+    incl_types: tp.Union[None, bool, tp.Sequence[type]] = None,
     max_len: tp.Optional[int] = None,
     max_depth: tp.Optional[int] = None,
     _key: tp.Optional[tp.Hashable] = None,
@@ -158,10 +167,14 @@ def any_in_obj(
 
     search_cfg = settings["search"]
 
-    if except_types is None:
-        except_types = search_cfg["except_types"]
-    if isinstance(except_types, bool) and except_types:
-        raise ValueError("Argument except_types cannot be True")
+    if excl_types is None:
+        excl_types = search_cfg["excl_types"]
+    if isinstance(excl_types, bool) and excl_types:
+        raise ValueError("Argument excl_types cannot be True")
+    if incl_types is None:
+        incl_types = search_cfg["incl_types"]
+    if isinstance(incl_types, bool) and not incl_types:
+        raise ValueError("Argument incl_types cannot be False")
     if max_len is None:
         max_len = search_cfg["max_len"]
     if max_depth is None:
@@ -170,8 +183,9 @@ def any_in_obj(
     if match_func(_key, obj, **kwargs):
         return True
     if max_depth is None or _depth < max_depth:
-        if except_types not in (None, False) and checks.is_instance_of(obj, except_types):
-            return False
+        if excl_types not in (None, False) and checks.is_instance_of(obj, excl_types):
+            if incl_types is None or not (incl_types is True or checks.is_instance_of(obj, incl_types)):
+                return False
         if isinstance(obj, dict):
             if max_len is None or len(obj) <= max_len:
                 for k, v in obj.items():
@@ -179,7 +193,8 @@ def any_in_obj(
                     if find_in_obj(
                         v,
                         match_func,
-                        except_types=except_types,
+                        excl_types=excl_types,
+                        incl_types=incl_types,
                         max_len=max_len,
                         max_depth=max_depth,
                         _key=new_key,
@@ -194,7 +209,8 @@ def any_in_obj(
                     if find_in_obj(
                         o,
                         match_func,
-                        except_types=except_types,
+                        excl_types=excl_types,
+                        incl_types=incl_types,
                         max_len=max_len,
                         max_depth=max_depth,
                         _key=new_key,
@@ -209,7 +225,8 @@ def find_and_replace_in_obj(
     obj: tp.Any,
     match_func: tp.Callable,
     replace_func: tp.Callable,
-    except_types: tp.Union[None, bool, tp.Sequence[type]] = None,
+    excl_types: tp.Union[None, bool, tp.Sequence[type]] = None,
+    incl_types: tp.Union[None, bool, tp.Sequence[type]] = None,
     max_len: tp.Optional[int] = None,
     max_depth: tp.Optional[int] = None,
     make_copy: bool = True,
@@ -231,10 +248,14 @@ def find_and_replace_in_obj(
 
     search_cfg = settings["search"]
 
-    if except_types is None:
-        except_types = search_cfg["except_types"]
-    if isinstance(except_types, bool) and except_types:
-        raise ValueError("Argument except_types cannot be True")
+    if excl_types is None:
+        excl_types = search_cfg["excl_types"]
+    if isinstance(excl_types, bool) and excl_types:
+        raise ValueError("Argument excl_types cannot be True")
+    if incl_types is None:
+        incl_types = search_cfg["incl_types"]
+    if isinstance(incl_types, bool) and not incl_types:
+        raise ValueError("Argument incl_types cannot be False")
     if max_len is None:
         max_len = search_cfg["max_len"]
     if max_depth is None:
@@ -243,7 +264,8 @@ def find_and_replace_in_obj(
     if check_any_first and not any_in_obj(
         obj,
         match_func,
-        except_types=except_types,
+        excl_types=excl_types,
+        incl_types=incl_types,
         max_len=max_len,
         max_depth=max_depth,
         _key=_key,
@@ -255,8 +277,9 @@ def find_and_replace_in_obj(
     if match_func(_key, obj, **kwargs):
         return replace_func(_key, obj, **kwargs)
     if max_depth is None or _depth < max_depth:
-        if except_types is not None and checks.is_instance_of(obj, except_types):
-            return obj
+        if excl_types not in (None, False) and checks.is_instance_of(obj, excl_types):
+            if incl_types is None or not (incl_types is True or checks.is_instance_of(obj, incl_types)):
+                return obj
         if isinstance(obj, dict):
             if max_len is None or len(obj) <= max_len:
                 if make_copy:
@@ -270,7 +293,8 @@ def find_and_replace_in_obj(
                             v,
                             match_func,
                             replace_func,
-                            except_types=except_types,
+                            excl_types=excl_types,
+                            incl_types=incl_types,
                             max_len=max_len,
                             max_depth=max_depth,
                             make_copy=make_copy,
@@ -292,7 +316,8 @@ def find_and_replace_in_obj(
                         obj[i],
                         match_func,
                         replace_func,
-                        except_types=except_types,
+                        excl_types=excl_types,
+                        incl_types=incl_types,
                         max_len=max_len,
                         max_depth=max_depth,
                         make_copy=make_copy,
@@ -312,7 +337,8 @@ def find_and_replace_in_obj(
                             o,
                             match_func,
                             replace_func,
-                            except_types=except_types,
+                            excl_types=excl_types,
+                            incl_types=incl_types,
                             max_len=max_len,
                             max_depth=max_depth,
                             make_copy=make_copy,
