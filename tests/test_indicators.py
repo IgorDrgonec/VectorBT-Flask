@@ -2525,6 +2525,7 @@ class TestFactory:
             "p2_loc",
             "param_defaults",
             "param_names",
+            "pipe",
             "plots",
             "plots_defaults",
             "post_resolve_attr",

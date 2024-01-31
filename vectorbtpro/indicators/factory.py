@@ -3011,8 +3011,11 @@ Other keyword arguments are passed to `{0}.run`.
         indicator: tp.Union[str, tp.Type[IndicatorBase]],
         name: tp.Optional[str] = None,
         location: tp.Optional[str] = None,
+        if_exists: str = "raise",
     ) -> None:
-        """Register a custom indicator under a custom location."""
+        """Register a custom indicator under a custom location.
+
+        Argument `if_exists` can be "raise", "skip", or "override"."""
         if isinstance(indicator, str):
             indicator = cls.get_indicator(indicator)
         if name is None:
@@ -3035,7 +3038,13 @@ Other keyword arguments are passed to `{0}.run`.
             cls.custom_indicators[location] = dict()
         for k in cls.custom_indicators[location]:
             if name.upper() == k.upper():
-                raise ValueError(f"Indicator with name '{name}' already exists under location '{location}'")
+                if if_exists.lower() == "raise":
+                    raise ValueError(f"Indicator with name '{name}' already exists under location '{location}'")
+                if if_exists.lower() == "skip":
+                    return None
+                if if_exists.lower() == "override":
+                    break
+                raise ValueError(f"Invalid option if_exists='{if_exists}'")
         cls.custom_indicators[location][name] = indicator
 
     @classmethod
