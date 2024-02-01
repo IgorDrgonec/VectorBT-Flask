@@ -9,10 +9,7 @@ for example, to compute various statistics by column, such as standard deviation
 Consider the following example:
 
 ```pycon
->>> import numpy as np
->>> import pandas as pd
->>> from numba import njit
->>> import vectorbtpro as vbt
+>>> from vectorbtpro import *
 
 >>> a = np.array([10., 11., 12., 13., 14., 15., 16., 17., 18.])
 >>> col_arr = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2])

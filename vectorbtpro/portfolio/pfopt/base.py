@@ -574,7 +574,7 @@ def pypfopt_optimize(
         and efficient frontier:
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> data = vbt.YFData.pull(["MSFT", "AMZN", "KO", "MA"])
         ```
@@ -1175,7 +1175,7 @@ def riskfolio_optimize(
         * Classic Mean Risk Optimization:
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> data = vbt.YFData.pull(["MSFT", "AMZN", "KO", "MA"])
         >>> returns = data.close.vbt.to_returns()
@@ -1866,8 +1866,7 @@ class PortfolioOptimizer(Analyzable):
             * Allocate uniformly every day:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import numpy as np
+            >>> from vectorbtpro import *
 
             >>> data = vbt.YFData.pull(
             ...     ["MSFT", "AMZN", "AAPL"],
@@ -1973,8 +1972,6 @@ class PortfolioOptimizer(Analyzable):
             * Use Numba-compiled loop:
 
             ```pycon
-            >>> from numba import njit
-
             >>> @njit
             ... def random_allocate_func_nb(i, idx, n_cols):
             ...     weights = np.random.uniform(0, 1, n_cols)
@@ -2635,7 +2632,7 @@ class PortfolioOptimizer(Analyzable):
             * Allocate once:
 
             ```pycon
-            >>> import vectorbtpro as vbt
+            >>> from vectorbtpro import *
 
             >>> data = vbt.YFData.pull(
             ...     ["MSFT", "AMZN", "AAPL"],
@@ -2764,9 +2761,6 @@ class PortfolioOptimizer(Analyzable):
             * Use Numba-compiled loop:
 
             ```pycon
-            >>> from numba import njit
-            >>> import numpy as np
-
             >>> @njit
             ... def optimize_func_nb(i, from_idx, to_idx, close):
             ...     mean = vbt.nb.nanmean_nb(close[from_idx:to_idx])
@@ -3407,8 +3401,7 @@ class PortfolioOptimizer(Analyzable):
             * Continuing with the examples under `PortfolioOptimizer.from_optimize_func`:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
+            >>> from vectorbtpro import *
 
             >>> pfo = vbt.PortfolioOptimizer.from_random(
             ...     vbt.ArrayWrapper(

@@ -71,7 +71,7 @@ def generate_param_combs(op_tree: tp.Tuple, depth: int = 0) -> tp.List[tp.List]:
 
     Usage:
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> vbt.generate_param_combs(("product", ("combinations", [0, 1, 2, 3], 2), [4, 5]))
         [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2],
@@ -1702,8 +1702,7 @@ def parameterized(
         * No parameters, no parameter configs:
 
         ```pycon
-        >>> import vectorbtpro as vbt
-        >>> import pandas as pd
+        >>> from vectorbtpro import *
 
         >>> @vbt.parameterized(merge_func="column_stack")
         ... def my_ma(sr_or_df, window, wtype="simple", minp=0, adjust=False):

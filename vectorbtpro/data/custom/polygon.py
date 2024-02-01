@@ -46,7 +46,7 @@ class PolygonData(RemoteData):
         * Set up the API key globally:
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> vbt.PolygonData.set_custom_settings(
         ...     client_config=dict(

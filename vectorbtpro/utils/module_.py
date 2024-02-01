@@ -359,15 +359,16 @@ def resolve_refname(refname: str, module: tp.Union[None, str, ModuleType] = None
     refnames = []
     visited_modules = set()
     for k, v in module.__dict__.items():
-        if inspect.ismodule(v) and v.__name__.startswith(module.__name__) and v.__name__ not in visited_modules:
-            visited_modules.add(v.__name__)
-            new_refname = resolve_refname(".".join(refname_parts), module=v)
-            if new_refname is not None:
-                if isinstance(new_refname, str):
-                    new_refname = [new_refname]
-                for r in new_refname:
-                    if r not in refnames:
-                        refnames.append(r)
+        if v is not module:
+            if inspect.ismodule(v) and v.__name__.startswith(module.__name__) and v.__name__ not in visited_modules:
+                visited_modules.add(v.__name__)
+                new_refname = resolve_refname(".".join(refname_parts), module=v)
+                if new_refname is not None:
+                    if isinstance(new_refname, str):
+                        new_refname = [new_refname]
+                    for r in new_refname:
+                        if r not in refnames:
+                            refnames.append(r)
     if len(refnames) > 1:
         return refnames
     if len(refnames) == 1:

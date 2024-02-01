@@ -27,7 +27,7 @@ class YFData(RemoteData):
 
     Usage:
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> data = vbt.YFData.pull(
         ...     "BTC-USD",

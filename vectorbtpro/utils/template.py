@@ -255,7 +255,7 @@ def substitute_templates(
 
     Usage:
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> vbt.substitute_templates(vbt.Sub('$key', {'key': 100}))
         100

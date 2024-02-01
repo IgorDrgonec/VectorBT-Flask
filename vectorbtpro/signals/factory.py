@@ -325,9 +325,7 @@ class SignalFactory(IndicatorFactory):
             * The simplest signal indicator that places True at the very first index:
 
             ```pycon
-            >>> from numba import njit
-            >>> import vectorbtpro as vbt
-            >>> import numpy as np
+            >>> from vectorbtpro import *
 
             >>> @njit
             ... def entry_place_func_nb(c):
@@ -363,7 +361,6 @@ class SignalFactory(IndicatorFactory):
             Test three different `n` values.
 
             ```pycon
-            >>> from numba import njit
             >>> from vectorbtpro.signals.factory import SignalFactory
 
             >>> @njit
@@ -417,9 +414,6 @@ class SignalFactory(IndicatorFactory):
             Here is an example of combining two random generators using "OR" rule (the first signal wins):
 
             ```pycon
-            >>> import numpy as np
-            >>> from numba import njit
-            >>> from collections import namedtuple
             >>> from vectorbtpro.indicators.configs import flex_elem_param_config
             >>> from vectorbtpro.signals.factory import SignalFactory
             >>> from vectorbtpro.signals.nb import rand_by_prob_place_nb

@@ -22,8 +22,7 @@ registered setup per each cacheable function globally at a time. To avoid creati
 function over and over again, each setup can be uniquely identified by its function through hashing:
 
 ```pycon
->>> import vectorbtpro as vbt
->>> import numpy as np
+>>> from vectorbtpro import *
 
 >>> my_func = lambda: np.random.uniform(size=1000000)
 
@@ -528,8 +527,6 @@ class CAQuery(Hashable):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
-
             >>> vbt.CAQuery.parse(lambda x: x)
             CAQuery(cacheable=<function <lambda> at 0x7fd4766c7730>, instance=None, cls=None, base_cls=None, options=None)
 
@@ -604,8 +601,6 @@ class CAQuery(Hashable):
             Let's evaluate various queries:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-
             >>> class A(vbt.Cacheable):
             ...     @vbt.cached_method(my_option=True)
             ...     def f(self):

@@ -97,7 +97,7 @@ if __version_info__ < (20, 0, 0, "alpha", 1):
             ```python
             import ccxt
             import logging
-            import vectorbtpro as vbt
+            from vectorbtpro import *
 
             from telegram.ext import CommandHandler
             from telegram import __version__ as TG_VER
@@ -440,7 +440,7 @@ else:
             ```python
             import ccxt
             import logging
-            import vectorbtpro as vbt
+            from vectorbtpro import *
 
             from telegram.ext import CommandHandler
             from telegram import __version__ as TG_VER

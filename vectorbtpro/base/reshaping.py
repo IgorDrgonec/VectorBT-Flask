@@ -911,9 +911,7 @@ def broadcast(
         * Without broadcasting index and columns:
 
         ```pycon
-        >>> import numpy as np
-        >>> import pandas as pd
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> v = 0
         >>> a = np.array([1, 2, 3])
@@ -1740,8 +1738,7 @@ def broadcast_to(
 
     Usage:
         ```pycon
-        >>> import numpy as np
-        >>> import pandas as pd
+        >>> from vectorbtpro import *
         >>> from vectorbtpro.base.reshaping import broadcast_to
 
         >>> a = np.array([1, 2, 3])
@@ -1796,7 +1793,7 @@ def broadcast_to_array_of(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> tp.Array:
 
     Usage:
         ```pycon
-        >>> import numpy as np
+        >>> from vectorbtpro import *
         >>> from vectorbtpro.base.reshaping import broadcast_to_array_of
 
         >>> broadcast_to_array_of([0.1, 0.2], np.empty((2, 2)))
@@ -1855,7 +1852,7 @@ def broadcast_combs(
 
     Usage:
         ```pycon
-        >>> import numpy as np
+        >>> from vectorbtpro import *
         >>> from vectorbtpro.base.reshaping import broadcast_combs
 
         >>> df = pd.DataFrame([[1, 2, 3], [3, 4, 5]], columns=pd.Index(['a', 'b', 'c'], name='df_param'))
@@ -1945,7 +1942,7 @@ def unstack_to_array(
 
     Usage:
         ```pycon
-        >>> import pandas as pd
+        >>> from vectorbtpro import *
         >>> from vectorbtpro.base.reshaping import unstack_to_array
 
         >>> index = pd.MultiIndex.from_arrays(
@@ -2008,7 +2005,7 @@ def make_symmetric(arg: tp.SeriesFrame, sort: bool = True) -> tp.Frame:
 
     Usage:
         ```pycon
-        >>> import pandas as pd
+        >>> from vectorbtpro import *
         >>> from vectorbtpro.base.reshaping import make_symmetric
 
         >>> df = pd.DataFrame([[1, 2], [3, 4]], index=['a', 'b'], columns=['c', 'd'])
@@ -2076,7 +2073,7 @@ def unstack_to_df(
 
     Usage:
         ```pycon
-        >>> import pandas as pd
+        >>> from vectorbtpro import *
         >>> from vectorbtpro.base.reshaping import unstack_to_df
 
         >>> index = pd.MultiIndex.from_arrays(

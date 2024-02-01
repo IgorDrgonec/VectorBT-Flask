@@ -48,11 +48,7 @@ which is impossible to represent in a matrix form without duplicating index entr
 Consider the following example:
 
 ```pycon
->>> import numpy as np
->>> import pandas as pd
->>> from numba import njit
->>> from collections import namedtuple
->>> import vectorbtpro as vbt
+>>> from vectorbtpro import *
 
 >>> example_dt = np.dtype([
 ...     ('id', np.int_),

@@ -53,7 +53,7 @@ class BinanceData(RemoteData):
         * Set up the API key globally (optional):
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> vbt.BinanceData.set_custom_settings(
         ...     client_config=dict(

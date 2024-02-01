@@ -58,9 +58,7 @@ def split(
         * Split a Series and return its sum:
 
         ```pycon
-        >>> import vectorbtpro as vbt
-        >>> import numpy as np
-        >>> import pandas as pd
+        >>> from vectorbtpro import *
 
         >>> @vbt.split(
         ...     splitter="from_n_rolling",
@@ -306,9 +304,7 @@ def cv_split(
         Cross-validate based on the highest picked value:
 
         ```pycon
-        >>> import vectorbtpro as vbt
-        >>> import numpy as np
-        >>> import pandas as pd
+        >>> from vectorbtpro import *
 
         >>> @vbt.cv_split(
         ...     splitter="from_n_rolling",

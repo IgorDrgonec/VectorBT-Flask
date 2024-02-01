@@ -12,9 +12,7 @@ they subclass `vectorbtpro.generic.ranges.Ranges`.
 Using `Drawdowns.from_price`, you can generate drawdown records for any time series and analyze them right away.
 
 ```pycon
->>> import numpy as np
->>> import pandas as pd
->>> import vectorbtpro as vbt
+>>> from vectorbtpro import *
 
 >>> price = vbt.YFData.pull(
 ...     "BTC-USD",
@@ -811,9 +809,6 @@ class Drawdowns(Ranges):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
-
             >>> index = pd.date_range("2020", periods=8)
             >>> price = pd.Series([1, 2, 1, 2, 3, 2, 1, 2], index=index)
             >>> vbt.Drawdowns.from_price(price, wrapper_kwargs=dict(freq='1 day')).plot().show()

@@ -32,7 +32,7 @@ class NDLData(RemoteData):
         * Set up the API key globally (optional):
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> vbt.NDLData.set_custom_settings(
         ...     api_key="YOUR_KEY"

@@ -6,10 +6,7 @@ Order records capture information on filled orders. Orders are mainly populated 
 a portfolio and can be accessed as `vectorbtpro.portfolio.base.Portfolio.orders`.
 
 ```pycon
->>> import pandas as pd
->>> import numpy as np
->>> from datetime import datetime, timedelta
->>> import vectorbtpro as vbt
+>>> from vectorbtpro import *
 
 >>> price = vbt.RandomData.pull(
 ...     ['a', 'b'],
@@ -339,9 +336,6 @@ class Orders(PriceRecords):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
-
             >>> index = pd.date_range("2020", periods=5)
             >>> price = pd.Series([1., 2., 3., 2., 1.], index=index)
             >>> size = pd.Series([1., 1., 1., 1., -1.], index=index)

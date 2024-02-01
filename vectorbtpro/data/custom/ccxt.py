@@ -45,7 +45,7 @@ class CCXTData(RemoteData):
         * Set up the API key globally (optional):
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> vbt.CCXTData.set_exchange_settings(
         ...     exchange_name="binance",

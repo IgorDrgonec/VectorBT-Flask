@@ -56,7 +56,7 @@ class AVData(RemoteData):
         * Set up the API key globally (optional):
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> vbt.AVData.set_custom_settings(
         ...     apikey="YOUR_KEY"

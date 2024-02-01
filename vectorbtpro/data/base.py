@@ -4914,7 +4914,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             * Plot the lines of one feature across all symbols:
 
             ```pycon
-            >>> import vectorbtpro as vbt
+            >>> from vectorbtpro import *
 
             >>> start = '2021-01-01 UTC'  # crypto is in UTC
             >>> end = '2021-06-01 UTC'

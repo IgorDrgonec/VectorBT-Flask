@@ -442,9 +442,7 @@ class BaseAccessor(Wrapping):
         * Build a symmetric matrix:
 
         ```pycon
-        >>> import numpy as np
-        >>> import pandas as pd
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> # vectorbtpro.base.accessors.BaseAccessor.make_symmetric
         >>> pd.Series([1, 2, 3]).vbt.make_symmetric()

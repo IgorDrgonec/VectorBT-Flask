@@ -21,7 +21,7 @@ Here are the main properties of the `settings` config:
 For example, you can change default width and height of each plot:
 
 ```pycon
->>> import vectorbtpro as vbt
+>>> from vectorbtpro import *
 
 >>> vbt.settings['plotting']['layout']['width'] = 800
 >>> vbt.settings['plotting']['layout']['height'] = 400
@@ -181,8 +181,9 @@ class flex_cfg(Config):
 _settings = {}
 
 importing = frozen_cfg(
-    auto_import=True,
     clear_pycache=False,
+    auto_import=True,
+    import_star="minimal",
     plotly=True,
     telegram=True,
     quantstats=True,

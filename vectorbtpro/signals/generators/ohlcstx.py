@@ -166,9 +166,7 @@ class _OHLCSTX(OHLCSTX):
         Test each stop type:
 
         ```pycon
-        >>> import vectorbtpro as vbt
-        >>> import pandas as pd
-        >>> import numpy as np
+        >>> from vectorbtpro import *
 
         >>> entries = pd.Series([True, False, False, False, False, False])
         >>> price = pd.DataFrame({

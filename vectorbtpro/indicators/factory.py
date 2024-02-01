@@ -5,11 +5,7 @@
 Run for the examples below:
 
 ```pycon
->>> import vectorbtpro as vbt
->>> import numpy as np
->>> import pandas as pd
->>> from numba import njit
->>> from datetime import datetime
+>>> from vectorbtpro import *
 
 >>> price = pd.DataFrame({
 ...     'a': [1, 2, 3, 4, 5],

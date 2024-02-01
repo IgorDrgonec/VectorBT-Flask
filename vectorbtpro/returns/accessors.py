@@ -18,9 +18,7 @@ Methods can be accessed as follows:
 There are three options to compute returns and get the accessor:
 
 ```pycon
->>> import numpy as np
->>> import pandas as pd
->>> import vectorbtpro as vbt
+>>> from vectorbtpro import *
 
 >>> price = pd.Series([1.1, 1.2, 1.3, 1.2, 1.1])
 
@@ -1966,10 +1964,6 @@ class ReturnsAccessor(GenericAccessor):
 
         Usage:
             ```pycon
-            >>> import numpy as np
-            >>> import pandas as pd
-            >>> import vectorbtpro as vbt
-
             >>> np.random.seed(0)
             >>> rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
             >>> bm_returns = pd.Series(np.random.uniform(-0.05, 0.05, size=100))

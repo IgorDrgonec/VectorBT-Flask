@@ -44,7 +44,7 @@ class SQLData(DBData):
         * Set up the engine settings globally (optional):
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> vbt.SQLData.set_engine_settings(
         ...     engine_name="postgresql",

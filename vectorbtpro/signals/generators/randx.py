@@ -37,8 +37,7 @@ class _RANDX(RANDX):
         Generate an exit for each entry:
 
         ```pycon
-        >>> import vectorbtpro as vbt
-        >>> import pandas as pd
+        >>> from vectorbtpro import *
 
         >>> entries = pd.Series([True, False, False, True, False, False])
         >>> randx = vbt.RANDX.run(entries, seed=42)

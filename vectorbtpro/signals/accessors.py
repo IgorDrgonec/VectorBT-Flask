@@ -8,12 +8,7 @@ Methods can be accessed as follows:
 * `SignalsDFAccessor` -> `pd.DataFrame.vbt.signals.*`
 
 ```pycon
->>> import vectorbtpro as vbt
->>> from vectorbtpro.signals.enums import StopType
->>> import numpy as np
->>> import pandas as pd
->>> from numba import njit
->>> from datetime import datetime
+>>> from vectorbtpro import *
 
 >>> # vectorbtpro.signals.accessors.SignalsAccessor.pos_rank
 >>> pd.Series([False, True, True, True, False]).vbt.signals.pos_rank()
@@ -1269,7 +1264,7 @@ class SignalsAccessor(GenericAccessor):
             2020-01-04   NaN  10.8  10.8
             2020-01-05   NaN   NaN   NaN
 
-            >>> out_dict['stop_type'].vbt(mapping=StopType).apply_mapping()
+            >>> out_dict['stop_type'].vbt(mapping=vbt.sig_enums.StopType).apply_mapping()
                            a     b     c
             2020-01-01  None  None  None
             2020-01-02    TP    TP  None
@@ -1315,7 +1310,7 @@ class SignalsAccessor(GenericAccessor):
             2020-01-04   NaN  10.8  10.8
             2020-01-05   NaN   NaN   NaN
 
-            >>> out_dict['stop_type'].vbt(mapping=StopType).apply_mapping()
+            >>> out_dict['stop_type'].vbt(mapping=vbt.sig_enums.StopType).apply_mapping()
                            a     b     c
             2020-01-01  None  None  None
             2020-01-02    TP    TP    TP

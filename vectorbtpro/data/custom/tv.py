@@ -492,7 +492,7 @@ class TVData(RemoteData):
         * Set up the credentials globally (optional):
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> vbt.TVData.set_custom_settings(
         ...     client_config=dict(
@@ -567,7 +567,7 @@ class TVData(RemoteData):
             * List all symbols (market scanner):
 
             ```pycon
-            >>> import vectorbtpro as vbt
+            >>> from vectorbtpro import *
 
             >>> vbt.TVData.list_symbols()
             ```

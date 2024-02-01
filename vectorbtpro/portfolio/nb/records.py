@@ -196,9 +196,7 @@ def get_entry_trades_nb(
 
     Usage:
         ```pycon
-        >>> import numpy as np
-        >>> import pandas as pd
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> close = order_price = np.array([
         ...     [1, 6],

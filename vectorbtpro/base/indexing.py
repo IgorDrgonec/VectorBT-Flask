@@ -170,7 +170,7 @@ class PandasIndexer(IndexingBase):
 
     Usage:
         ```pycon
-        >>> import pandas as pd
+        >>> from vectorbtpro import *
         >>> from vectorbtpro.base.indexing import PandasIndexer
 
         >>> class C(PandasIndexer):
@@ -421,7 +421,7 @@ def build_param_indexer(
 
     Usage:
         ```pycon
-        >>> import pandas as pd
+        >>> from vectorbtpro import *
         >>> from vectorbtpro.base.indexing import build_param_indexer, indexing_on_mapper
 
         >>> MyParamIndexer = build_param_indexer(['my_param'])
@@ -1054,8 +1054,7 @@ def get_index_points(
         * Provide nothing to generate at the beginning:
 
         ```pycon
-        >>> import vectorbtpro as vbt
-        >>> import pandas as pd
+        >>> from vectorbtpro import *
 
         >>> index = pd.date_range("2020-01", "2020-02", freq="1d")
 
@@ -1399,9 +1398,7 @@ def get_index_ranges(
         * Provide nothing to generate one largest index range:
 
         ```pycon
-        >>> import vectorbtpro as vbt
-        >>> import pandas as pd
-        >>> import numpy as np
+        >>> from vectorbtpro import *
 
         >>> index = pd.date_range("2020-01", "2020-02", freq="1d")
 

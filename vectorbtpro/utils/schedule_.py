@@ -186,8 +186,7 @@ class ScheduleManager:
 
         Usage:
             ```pycon
-            >>> import datetime
-            >>> import vectorbtpro as vbt
+            >>> from vectorbtpro import *
 
             >>> def job_func(message="I'm working..."):
             ...     print(message)
@@ -225,7 +224,7 @@ class ScheduleManager:
             >>> my_manager.every('day', '10:30').do(job_func)
             Every 1 day at 10:30:00 do job_func() (last run: [never], next run: 2021-03-19 10:30:00)
 
-            >>> my_manager.every('day', datetime.time(9, 30, tzinfo="utc")).do(job_func)
+            >>> my_manager.every('day', time(9, 30, tzinfo="utc")).do(job_func)
             Every 1 day at 10:30:00 do job_func() (last run: [never], next run: 2021-03-19 10:30:00)
 
             >>> my_manager.every('monday').do(job_func)

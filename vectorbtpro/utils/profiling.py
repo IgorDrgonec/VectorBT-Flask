@@ -24,11 +24,10 @@ class Timer:
 
     Usage:
         ```pycon
-        >>> import vectorbtpro as vbt
-        >>> import time
+        >>> from vectorbtpro import *
 
         >>> with vbt.Timer() as timer:
-        >>>     time.sleep(1)
+        >>>     sleep(1)
 
         >>> timer.elapsed()
         '1.01 seconds'
@@ -95,8 +94,7 @@ class MemTracer:
 
     Usage:
         ```pycon
-        >>> import vectorbtpro as vbt
-        >>> import numpy as np
+        >>> from vectorbtpro import *
 
         >>> with vbt.MemTracer() as tracer:
         >>>     np.random.uniform(size=1000000)

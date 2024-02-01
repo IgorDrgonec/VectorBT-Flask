@@ -1411,9 +1411,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
             * Set a single row:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
-            >>> import numpy as np
+            >>> from vectorbtpro import *
 
             >>> index = pd.date_range("2020", periods=5)
             >>> columns = pd.Index(["a", "b", "c"])

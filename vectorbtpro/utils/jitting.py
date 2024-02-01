@@ -306,7 +306,7 @@ def jitted(*args, tags: tp.Optional[set] = None, **jitted_kwargs) -> tp.Callable
 
     Usage:
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> @vbt.jitted
         ... def my_func_nb():

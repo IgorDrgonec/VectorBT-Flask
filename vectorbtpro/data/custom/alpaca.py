@@ -40,7 +40,7 @@ class AlpacaData(RemoteData):
         * Set up the API key globally (optional for crypto):
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> vbt.AlpacaData.set_custom_settings(
         ...     client_config=dict(

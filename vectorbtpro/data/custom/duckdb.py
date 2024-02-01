@@ -41,7 +41,7 @@ class DuckDBData(DBData):
         * Set up the connection settings globally (optional):
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> vbt.DuckDBData.set_custom_settings(connection="database.duckdb")
         ```

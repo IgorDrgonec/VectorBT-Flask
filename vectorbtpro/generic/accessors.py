@@ -8,10 +8,7 @@ Methods can be accessed as follows:
 * `GenericDFAccessor` -> `pd.DataFrame.vbt.*`
 
 ```pycon
->>> import vectorbtpro as vbt
->>> import numpy as np
->>> import pandas as pd
->>> from numba import njit
+>>> from vectorbtpro import *
 
 >>> # vectorbtpro.generic.accessors.GenericAccessor.rolling_mean
 >>> pd.Series([1, 2, 3, 4]).vbt.rolling_mean(2)

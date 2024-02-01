@@ -540,8 +540,7 @@ class Splitter(Analyzable):
             * Divide a range into a set of non-overlapping ranges:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
+            >>> from vectorbtpro import *
 
             >>> index = pd.date_range("2020", "2021", freq="D")
 
@@ -699,8 +698,7 @@ class Splitter(Analyzable):
             * Roll 10 ranges with 100 elements, and split it into 3/4:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
+            >>> from vectorbtpro import *
 
             >>> index = pd.date_range("2020", "2021", freq="D")
 
@@ -852,8 +850,7 @@ class Splitter(Analyzable):
             * Roll an expanding range with a length of 10 and an offset of 10, and split it into 3/4:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
+            >>> from vectorbtpro import *
 
             >>> index = pd.date_range("2020", "2021", freq="D")
 
@@ -957,8 +954,7 @@ class Splitter(Analyzable):
             * Roll 10 expanding ranges with a minimum length of 100, while reserving 50 elements for test:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
+            >>> from vectorbtpro import *
 
             >>> index = pd.date_range("2020", "2021", freq="D")
 
@@ -1049,8 +1045,7 @@ class Splitter(Analyzable):
             * Translate each quarter into a range:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
+            >>> from vectorbtpro import *
 
             >>> index = pd.date_range("2020", "2021", freq="D")
 
@@ -1131,8 +1126,7 @@ class Splitter(Analyzable):
             * Map each month into a range:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
+            >>> from vectorbtpro import *
 
             >>> index = pd.date_range("2020", "2021", freq="D")
 
@@ -1233,8 +1227,7 @@ class Splitter(Analyzable):
             * Generate 20 random ranges with a length from [40, 100], and split each into 3/4:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
+            >>> from vectorbtpro import *
 
             >>> index = pd.date_range("2020", "2021", freq="D")
 
@@ -1475,8 +1468,7 @@ class Splitter(Analyzable):
             * Rolling window of 30 elements, 20 for train and 10 for test:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
+            >>> from vectorbtpro import *
 
             >>> index = pd.date_range("2020", "2021", freq="D")
 
@@ -2737,9 +2729,7 @@ class Splitter(Analyzable):
             * Roll a window and stack it along columns by keeping the index:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import numpy as np
-            >>> import pandas as pd
+            >>> from vectorbtpro import *
 
             >>> data = vbt.YFData.pull(
             ...     "BTC-USD",
@@ -3185,9 +3175,7 @@ class Splitter(Analyzable):
             * Get the return of each data range:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import numpy as np
-            >>> import pandas as pd
+            >>> from vectorbtpro import *
 
             >>> data = vbt.YFData.pull(
             ...     "BTC-USD",
@@ -4881,8 +4869,7 @@ class Splitter(Analyzable):
             * Plot a scikit-learn splitter:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
+            >>> from vectorbtpro import *
             >>> from sklearn.model_selection import TimeSeriesSplit
 
             >>> index = pd.date_range("2020", "2021", freq="D")
@@ -4976,8 +4963,7 @@ class Splitter(Analyzable):
             * Area plot:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
+            >>> from vectorbtpro import *
             >>> from sklearn.model_selection import TimeSeriesSplit
 
             >>> index = pd.date_range("2020", "2021", freq="D")
@@ -5107,8 +5093,7 @@ if settings["importing"]["sklearn"]:
             * Replicate `TimeSeriesSplit` from scikit-learn:
 
             ```pycon
-            >>> import numpy as np
-            >>> import vectorbtpro as vbt
+            >>> from vectorbtpro import *
 
             >>> X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]])
             >>> y = np.array([1, 2, 3, 4])

@@ -14,9 +14,7 @@ are 0 and 20 (not 19!) respectively.
     Make sure to account for this when computing custom metrics involving duration.
 
 ```pycon
->>> import numpy as np
->>> import pandas as pd
->>> import vectorbtpro as vbt
+>>> from vectorbtpro import *
 
 >>> start = '2019-01-01 UTC'  # crypto is in UTC
 >>> end = '2020-01-01 UTC'
@@ -836,9 +834,6 @@ class Ranges(PriceRecords):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
-
             >>> price = pd.Series(
             ...     [11, 12, 13, 14, 11, 12, 13, 12, 11, 12],
             ...     index=pd.date_range("2020", periods=10),
@@ -1098,9 +1093,6 @@ class Ranges(PriceRecords):
             * Plot zones colored by duration:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
-
             >>> price = pd.Series(
             ...     [1, 2, 1, 2, 3, 2, 1, 2, 3],
             ...     index=pd.date_range("2020", periods=9),
@@ -1285,9 +1277,6 @@ class Ranges(PriceRecords):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
-
             >>> price = pd.Series(
             ...     [1, 2, 1, 2, 3, 2, 1, 2, 3],
             ...     index=pd.date_range("2020", periods=9),

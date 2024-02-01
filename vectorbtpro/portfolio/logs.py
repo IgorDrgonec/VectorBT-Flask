@@ -6,10 +6,7 @@ Order records capture information on simulation logs. Logs are populated when
 simulating a portfolio and can be accessed as `vectorbtpro.portfolio.base.Portfolio.logs`.
 
 ```pycon
->>> import pandas as pd
->>> import numpy as np
->>> from datetime import datetime, timedelta
->>> import vectorbtpro as vbt
+>>> from vectorbtpro import *
 
 >>> np.random.seed(42)
 >>> price = pd.DataFrame({

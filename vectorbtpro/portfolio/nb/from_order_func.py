@@ -672,10 +672,7 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
         that rebalances every second tick, all without leaving Numba:
 
         ```pycon
-        >>> import numpy as np
-        >>> import pandas as pd
-        >>> import vectorbtpro as vbt
-        >>> from numba import njit
+        >>> from vectorbtpro import *
 
         >>> @njit
         ... def pre_sim_func_nb(c):
@@ -2717,9 +2714,7 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
         * The same example as in `from_order_func_nb`:
 
         ```pycon
-        >>> import numpy as np
-        >>> from numba import njit
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> @njit
         ... def pre_sim_func_nb(c):
