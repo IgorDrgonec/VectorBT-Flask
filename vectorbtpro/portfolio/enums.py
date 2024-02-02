@@ -40,6 +40,7 @@ __pdoc__all__ = __all__ = [
     "TradeStatus",
     "TradesType",
     "OrderPriceStatus",
+    "PositionFeature",
     "PriceArea",
     "NoPriceArea",
     "AccountState",
@@ -910,6 +911,24 @@ Attributes:
     AboveHigh: Order price is above high.
     BelowLow: Order price is below low.
     Unknown: High and/or low are unknown.
+"""
+
+
+class PositionFeatureT(tp.NamedTuple):
+    EntryPrice: int = 0
+    ExitPrice: int = 1
+
+
+PositionFeature = PositionFeatureT()
+"""_"""
+
+__pdoc__[
+    "PositionFeature"
+] = f"""Position feature.
+
+```python
+{prettify(PositionFeature)}
+```
 """
 
 

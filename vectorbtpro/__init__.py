@@ -120,8 +120,8 @@ elif import_star.lower() == "minimal":
     vbt = sys.modules[__name__]
     more_stuff = _import_more_stuff()
     globals().update(more_stuff)
-    imported_stuff = {"vbt": vbt, **more_stuff}
-    __all__ = ["vbt", *more_stuff.keys()]
+    imported_stuff = {"vbt": vbt, "tp": tp, **more_stuff}
+    __all__ = ["vbt", "tp", *more_stuff.keys()]
 elif import_star.lower() == "none":
     imported_stuff = dict()
     __all__ = []

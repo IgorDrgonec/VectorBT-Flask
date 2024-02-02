@@ -309,6 +309,8 @@ shortcut_config = ReadonlyConfig(
             obj_type="red_array",
             method_kwargs=dict(direction="shortonly"),
         ),
+        "position_entry_price": dict(group_by_aware=False),
+        "position_exit_price": dict(group_by_aware=False),
         "init_cash": dict(obj_type="red_array"),
         "cash_deposits": dict(resample_func="sum", resample_kwargs=dict(wrap_kwargs=dict(fillna=0.0))),
         "cash_earnings": dict(resample_func="sum", resample_kwargs=dict(wrap_kwargs=dict(fillna=0.0))),
@@ -5454,6 +5456,96 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         )
         wrap_kwargs = merge_dicts(dict(name_or_index="position_coverage"), wrap_kwargs)
         return wrapper.wrap_reduced(position_coverage, group_by=group_by, **wrap_kwargs)
+
+    @class_or_instancemethod
+    def get_position_entry_price(
+        cls_or_self,
+        orders: tp.Optional[Orders] = None,
+        init_position: tp.Optional[tp.ArrayLike] = None,
+        init_price: tp.Optional[tp.ArrayLike] = None,
+        fill_closed_position: bool = False,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """Get the position's entry price at each time step."""
+        if not isinstance(cls_or_self, type):
+            if orders is None:
+                orders = cls_or_self.orders
+            if init_position is None:
+                init_position = cls_or_self._init_position
+            if init_price is None:
+                init_price = cls_or_self._init_price
+            if wrapper is None:
+                wrapper = cls_or_self.wrapper
+        else:
+            checks.assert_not_none(orders)
+            if init_position is None:
+                init_position = 0.0
+            if init_price is None:
+                init_price = np.nan
+            if wrapper is None:
+                wrapper = orders.wrapper
+
+        func = jit_reg.resolve_option(nb.get_position_feature_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        entry_price = func(
+            orders.values,
+            to_2d_array(orders.close),
+            orders.col_mapper.col_map,
+            feature=enums.PositionFeature.EntryPrice,
+            init_position=to_1d_array(init_position),
+            init_price=to_1d_array(init_price),
+            fill_closed_position=fill_closed_position,
+        )
+        return wrapper.wrap(entry_price, group_by=False, **resolve_dict(wrap_kwargs))
+
+    @class_or_instancemethod
+    def get_position_exit_price(
+        cls_or_self,
+        orders: tp.Optional[Orders] = None,
+        init_position: tp.Optional[tp.ArrayLike] = None,
+        init_price: tp.Optional[tp.ArrayLike] = None,
+        fill_closed_position: bool = False,
+        fill_exit_price: bool = True,
+        jitted: tp.JittedOption = None,
+        chunked: tp.ChunkedOption = None,
+        wrapper: tp.Optional[ArrayWrapper] = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """Get the position's exit price at each time step."""
+        if not isinstance(cls_or_self, type):
+            if orders is None:
+                orders = cls_or_self.orders
+            if init_position is None:
+                init_position = cls_or_self._init_position
+            if init_price is None:
+                init_price = cls_or_self._init_price
+            if wrapper is None:
+                wrapper = cls_or_self.wrapper
+        else:
+            checks.assert_not_none(orders)
+            if init_position is None:
+                init_position = 0.0
+            if init_price is None:
+                init_price = np.nan
+            if wrapper is None:
+                wrapper = orders.wrapper
+
+        func = jit_reg.resolve_option(nb.get_position_feature_nb, jitted)
+        func = ch_reg.resolve_option(func, chunked)
+        exit_price = func(
+            orders.values,
+            to_2d_array(orders.close),
+            orders.col_mapper.col_map,
+            feature=enums.PositionFeature.ExitPrice,
+            init_position=to_1d_array(init_position),
+            init_price=to_1d_array(init_price),
+            fill_closed_position=fill_closed_position,
+            fill_exit_price=fill_exit_price,
+        )
+        return wrapper.wrap(exit_price, group_by=False, **resolve_dict(wrap_kwargs))
 
     # ############# Cash ############# #
 

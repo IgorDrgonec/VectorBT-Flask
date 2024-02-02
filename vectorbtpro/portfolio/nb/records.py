@@ -888,6 +888,194 @@ def get_positions_nb(trade_records: tp.RecordArray, col_map: tp.GroupMap) -> tp.
     return generic_nb.repartition_nb(new_records, counts)
 
 
+@register_chunkable(
+    size=base_ch.GroupLensSizer(arg_query="col_map"),
+    arg_take_spec=dict(
+        order_records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
+        close=ch.ArraySlicer(axis=1),
+        col_map=base_ch.GroupMapSlicer(),
+        feature=None,
+        init_position=base_ch.FlexArraySlicer(),
+        init_price=base_ch.FlexArraySlicer(),
+        fill_closed_position=None,
+        fill_exit_price=None,
+    ),
+    merge_func="column_stack",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def get_position_feature_nb(
+    order_records: tp.RecordArray,
+    close: tp.Array2d,
+    col_map: tp.GroupMap,
+    feature: int = PositionFeature.EntryPrice,
+    init_position: tp.FlexArray1dLike = 0.0,
+    init_price: tp.FlexArray1dLike = np.nan,
+    fill_closed_position: bool = False,
+    fill_exit_price: bool = True,
+) -> tp.Array2d:
+    """Get the position's feature at each time step.
+
+    For the list of supported features see `vectorbtpro.portfolio.enums.PositionFeature`.
+
+    If `fill_exit_price` is True and a part of the position is not closed yet, will fill
+    the exit price as if the part was closed using the current close.
+
+    If `fill_closed_position` is True, will forward-fill missing values with the prices of the
+    previously closed position."""
+    init_position_ = to_1d_array_nb(np.asarray(init_position))
+    init_price_ = to_1d_array_nb(np.asarray(init_price))
+
+    out = np.full(close.shape, np.nan, dtype=np.float_)
+
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+
+    for col in prange(col_lens.shape[0]):
+        _init_position = float(flex_select_1d_pc_nb(init_position_, col))
+        _init_price = float(flex_select_1d_pc_nb(init_price_, col))
+        if _init_position != 0:
+            # Prepare initial position
+            in_position = True
+            was_in_position = True
+            if _init_position >= 0:
+                direction = TradeDirection.Long
+            else:
+                direction = TradeDirection.Short
+            entry_size_sum = abs(_init_position)
+            entry_gross_sum = abs(_init_position) * _init_price
+            exit_size_sum = 0.0
+            exit_gross_sum = 0.0
+            last_order_idx = 0
+        else:
+            in_position = False
+            was_in_position = False
+
+        col_len = col_lens[col]
+        if col_len == 0 and not in_position:
+            continue
+        last_id = -1
+
+        for c in range(col_len):
+            order_record = order_records[col_idxs[col_start_idxs[col] + c]]
+
+            if order_record["id"] < last_id:
+                raise ValueError("Ids must come in ascending order per column")
+            last_id = order_record["id"]
+
+            order_idx = order_record["idx"]
+            order_size = order_record["size"]
+            order_price = order_record["price"]
+            order_side = order_record["side"]
+
+            if order_size <= 0.0:
+                raise ValueError(invalid_size_msg)
+            if order_price < 0.0:
+                raise ValueError(invalid_price_msg)
+
+            if in_position:
+                if feature == PositionFeature.EntryPrice:
+                    if entry_size_sum != 0:
+                        entry_price = entry_gross_sum / entry_size_sum
+                        out[last_order_idx:order_idx, col] = entry_price
+                elif feature == PositionFeature.ExitPrice:
+                    if fill_exit_price:
+                        remaining_size = add_nb(entry_size_sum, -exit_size_sum)
+                        for i in range(last_order_idx, order_idx):
+                            open_exit_size_sum = entry_size_sum
+                            open_exit_gross_sum = exit_gross_sum + remaining_size * close[i, col]
+                            exit_price = open_exit_gross_sum / open_exit_size_sum
+                            out[i, col] = exit_price
+                    else:
+                        if exit_size_sum != 0:
+                            exit_price = exit_gross_sum / exit_size_sum
+                            out[last_order_idx:order_idx, col] = exit_price
+            else:
+                if was_in_position and fill_closed_position:
+                    if feature == PositionFeature.EntryPrice:
+                        if entry_size_sum != 0:
+                            entry_price = entry_gross_sum / entry_size_sum
+                            out[last_order_idx:order_idx, col] = entry_price
+                    elif feature == PositionFeature.ExitPrice:
+                        if exit_size_sum != 0:
+                            exit_price = exit_gross_sum / exit_size_sum
+                            out[last_order_idx:order_idx, col] = exit_price
+
+                # New position opened
+                in_position = True
+                was_in_position = True
+                if order_side == OrderSide.Buy:
+                    direction = TradeDirection.Long
+                else:
+                    direction = TradeDirection.Short
+                entry_size_sum = 0.0
+                entry_gross_sum = 0.0
+                exit_size_sum = 0.0
+                exit_gross_sum = 0.0
+
+            if (direction == TradeDirection.Long and order_side == OrderSide.Buy) or (
+                direction == TradeDirection.Short and order_side == OrderSide.Sell
+            ):
+                # Position increased
+                entry_size_sum += order_size
+                entry_gross_sum += order_size * order_price
+            elif (direction == TradeDirection.Long and order_side == OrderSide.Sell) or (
+                direction == TradeDirection.Short and order_side == OrderSide.Buy
+            ):
+                if is_close_nb(exit_size_sum + order_size, entry_size_sum):
+                    # Position closed
+                    in_position = False
+                    exit_size_sum = entry_size_sum
+                    exit_gross_sum += order_size * order_price
+                elif is_less_nb(exit_size_sum + order_size, entry_size_sum):
+                    # Position decreased
+                    exit_size_sum += order_size
+                    exit_gross_sum += order_size * order_price
+                else:
+                    # Position closed
+                    remaining_size = add_nb(entry_size_sum, -exit_size_sum)
+
+                    # New position opened
+                    if order_side == OrderSide.Buy:
+                        direction = TradeDirection.Long
+                    else:
+                        direction = TradeDirection.Short
+                    entry_size_sum = add_nb(order_size, -remaining_size)
+                    entry_gross_sum = entry_size_sum * order_price
+                    exit_size_sum = 0.0
+                    exit_gross_sum = 0.0
+
+            last_order_idx = order_idx
+
+        if in_position:
+            if feature == PositionFeature.EntryPrice:
+                if entry_size_sum != 0:
+                    entry_price = entry_gross_sum / entry_size_sum
+                    out[last_order_idx:close.shape[0], col] = entry_price
+            elif feature == PositionFeature.ExitPrice:
+                if fill_exit_price:
+                    remaining_size = add_nb(entry_size_sum, -exit_size_sum)
+                    for i in range(last_order_idx, close.shape[0]):
+                        open_exit_size_sum = entry_size_sum
+                        open_exit_gross_sum = exit_gross_sum + remaining_size * close[i, col]
+                        exit_price = open_exit_gross_sum / open_exit_size_sum
+                        out[i, col] = exit_price
+                else:
+                    if exit_size_sum != 0:
+                        exit_price = exit_gross_sum / exit_size_sum
+                        out[last_order_idx:close.shape[0], col] = exit_price
+        elif was_in_position and fill_closed_position:
+            if feature == PositionFeature.EntryPrice:
+                if entry_size_sum != 0:
+                    entry_price = entry_gross_sum / entry_size_sum
+                    out[last_order_idx:close.shape[0], col] = entry_price
+            elif feature == PositionFeature.ExitPrice:
+                if exit_size_sum != 0:
+                    exit_price = exit_gross_sum / exit_size_sum
+                    out[last_order_idx:close.shape[0], col] = exit_price
+
+    return out
+
+
 @register_jitted(cache=True)
 def price_status_nb(
     records: tp.RecordArray,
