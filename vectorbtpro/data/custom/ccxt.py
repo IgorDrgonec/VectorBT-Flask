@@ -164,6 +164,8 @@ class CCXTData(RemoteData):
         import ccxt
 
         exchange = cls.resolve_exchange_setting(exchange, "exchange")
+        if exchange is None:
+            exchange = "binance"
         if isinstance(exchange, str):
             exchange = exchange.lower()
             exchange_name = exchange
@@ -309,7 +311,7 @@ class CCXTData(RemoteData):
         assert_can_import("ccxt")
         import ccxt
 
-        if ":" in symbol:
+        if exchange is None and ":" in symbol:
             exchange, symbol = symbol.split(":")
         if exchange_config is None:
             exchange_config = {}

@@ -812,7 +812,7 @@ data = frozen_cfg(
             get_klines_kwargs=flex_cfg(),
         ),
         ccxt=flex_cfg(
-            exchange="binance",
+            exchange=None,
             exchange_config=flex_cfg(
                 enableRateLimit=True,
             ),
