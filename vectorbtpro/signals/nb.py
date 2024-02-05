@@ -802,6 +802,52 @@ def ohlc_stop_place_nb(
     return last_i
 
 
+# ############# Reshaping ############# #
+
+
+@register_jitted(cache=True)
+def unravel_nb(mask: tp.Array2d) -> tp.Tuple[tp.Array2d, tp.Array1d, tp.Array1d]:
+    """Unravel each True value to a separate column.
+
+    Returns the new mask, the row index of each True value in a ('F'-order) flattened
+    input mask, and the column index of each True value in the original input mask."""
+    true_idxs = np.flatnonzero(mask.transpose())
+
+    start_idxs = np.full(mask.shape[1], -1, dtype=np.int_)
+    end_idxs = np.full(mask.shape[1], 0, dtype=np.int_)
+    for i in range(len(true_idxs)):
+        col = true_idxs[i] // mask.shape[0]
+        if i == 0:
+            prev_col = -1
+        else:
+            prev_col = true_idxs[i - 1] // mask.shape[0]
+        if col != prev_col:
+            start_idxs[col] = i
+        end_idxs[col] = i + 1
+
+    n_cols = (end_idxs - start_idxs).sum()
+    new_mask = np.full((mask.shape[0], n_cols), False, dtype=np.bool_)
+    row_idxs = np.full(n_cols, -1, dtype=np.int_)
+    col_idxs = np.empty(n_cols, dtype=np.int_)
+    j = 0
+    for i in range(len(start_idxs)):
+        start_idx = start_idxs[i]
+        end_idx = end_idxs[i]
+        if start_idx != -1:
+            for k in range(start_idx, end_idx):
+                new_mask[true_idxs[k] % mask.shape[0], j] = True
+                row_idxs[j] = true_idxs[k]
+                col_idxs[j] = true_idxs[k] // mask.shape[0]
+                j += 1
+        else:
+            if j == 0:
+                col_idxs[j] = 0
+            else:
+                col_idxs[j] = col_idxs[j - 1] + 1
+            j += 1
+    return new_mask, row_idxs, col_idxs
+
+
 # ############# Ranking ############# #
 
 

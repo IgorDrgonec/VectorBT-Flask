@@ -178,8 +178,7 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.accessors import register_vbt_accessor, register_df_vbt_accessor, register_sr_vbt_accessor
-from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.base import reshaping
+from vectorbtpro.base import chunking as base_ch, reshaping, indexes
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
@@ -1548,6 +1547,48 @@ class SignalsAccessor(GenericAccessor):
             out_dict["stop_price"] = wrapper.wrap(stop_price, group_by=False, **wrap_kwargs)
             out_dict["stop_type"] = wrapper.wrap(stop_type, group_by=False, **wrap_kwargs)
             return exits
+
+    # ############# Reshaping ############# #
+
+    def unravel(
+        self,
+        force_signal_index: bool = False,
+        signal_index_type: str = "range",
+        jitted: tp.JittedOption = None,
+        index_stack_kwargs: tp.KwargsLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """See `vectorbtpro.signals.nb.unravel_nb`."""
+        if index_stack_kwargs is None:
+            index_stack_kwargs = {}
+        if wrap_kwargs is None:
+            wrap_kwargs = {}
+
+        func = jit_reg.resolve_option(nb.unravel_nb, jitted)
+        new_mask, row_idxs, col_idxs = func(self.to_2d_array())
+        if new_mask.shape == self.wrapper.shape_2d and not force_signal_index:
+            return self.wrapper.wrap(new_mask)
+        if signal_index_type.lower() == "range":
+            one_points = np.concatenate((np.array([0]), col_idxs[1:] - col_idxs[:-1]))
+            basic_range = np.arange(len(col_idxs))
+            range_points = np.where(one_points == 1, basic_range, one_points)
+            signal_range = basic_range - np.maximum.accumulate(range_points)
+            signal_range[row_idxs == -1] = -1
+            signal_index = pd.Index(signal_range, name="signal")
+        elif signal_index_type.lower() == "positions":
+            signal_positions = row_idxs % self.wrapper.shape[0]
+            signal_positions[row_idxs == -1] = -1
+            signal_index = pd.Index(signal_positions, name="signal")
+        elif signal_index_type.lower() == "labels":
+            if -1 in row_idxs:
+                raise ValueError("Some columns have no signals. Use other signal index types.")
+            signal_positions = row_idxs % self.wrapper.shape[0]
+            signal_labels = self.wrapper.index[signal_positions]
+            signal_index = pd.Index(signal_labels, name="signal")
+        else:
+            raise ValueError(f"Invalid option signal_index_type='{signal_index_type}'")
+        new_columns = indexes.stack_indexes((signal_index, self.wrapper.columns[col_idxs]), **index_stack_kwargs)
+        return self.wrapper.wrap(new_mask, columns=new_columns, group_by=False, **wrap_kwargs)
 
     # ############# Ranking ############# #
 

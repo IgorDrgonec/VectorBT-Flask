@@ -637,7 +637,7 @@ ol_nanprod_nb = overload(_nanprod_nb)(_nanprod_nb)
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
     merge_func="concat",
 )
-@register_jitted(cache=True, tags={"can_parallel"})
+@register_jitted(cache=True)
 def nanprod_nb(arr: tp.Array2d) -> tp.Array1d:
     """Numba equivalent of `np.nanprod` along axis 0."""
     return _nanprod_nb(arr)
@@ -671,7 +671,7 @@ ol_nancumsum_nb = overload(_nancumsum_nb)(_nancumsum_nb)
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
     merge_func="column_stack",
 )
-@register_jitted(cache=True, tags={"can_parallel"})
+@register_jitted(cache=True)
 def nancumsum_nb(arr: tp.Array2d) -> tp.Array2d:
     """Numba equivalent of `np.nancumsum` along axis 0."""
     return _nancumsum_nb(arr)
@@ -705,34 +705,10 @@ ol_nancumprod_nb = overload(_nancumprod_nb)(_nancumprod_nb)
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
     merge_func="column_stack",
 )
-@register_jitted(cache=True, tags={"can_parallel"})
+@register_jitted(cache=True)
 def nancumprod_nb(arr: tp.Array2d) -> tp.Array2d:
     """Numba equivalent of `np.nancumprod` along axis 0."""
     return _nancumprod_nb(arr)
-
-
-@register_jitted(cache=True)
-def nancnt_1d_nb(arr: tp.Array1d) -> int:
-    """Compute count while ignoring NaNs and not allocating any arrays."""
-    cnt = 0
-    for i in range(arr.shape[0]):
-        if not np.isnan(arr[i]):
-            cnt += 1
-    return cnt
-
-
-@register_chunkable(
-    size=ch.ArraySizer(arg_query="arr", axis=1),
-    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
-    merge_func="concat",
-)
-@register_jitted(cache=True, tags={"can_parallel"})
-def nancnt_nb(arr: tp.Array2d) -> tp.Array1d:
-    """2-dim version of `nancnt_1d_nb`."""
-    out = np.empty(arr.shape[1], dtype=np.int_)
-    for col in prange(arr.shape[1]):
-        out[col] = nancnt_1d_nb(arr[:, col])
-    return out
 
 
 def _nansum_nb(arr):
@@ -763,10 +739,34 @@ ol_nansum_nb = overload(_nansum_nb)(_nansum_nb)
     arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
     merge_func="concat",
 )
-@register_jitted(cache=True, tags={"can_parallel"})
+@register_jitted(cache=True)
 def nansum_nb(arr: tp.Array2d) -> tp.Array1d:
     """Numba equivalent of `np.nansum` along axis 0."""
     return _nansum_nb(arr)
+
+
+@register_jitted(cache=True)
+def nancnt_1d_nb(arr: tp.Array1d) -> int:
+    """Compute count while ignoring NaNs and not allocating any arrays."""
+    cnt = 0
+    for i in range(arr.shape[0]):
+        if not np.isnan(arr[i]):
+            cnt += 1
+    return cnt
+
+
+@register_chunkable(
+    size=ch.ArraySizer(arg_query="arr", axis=1),
+    arg_take_spec=dict(arr=ch.ArraySlicer(axis=1)),
+    merge_func="concat",
+)
+@register_jitted(cache=True, tags={"can_parallel"})
+def nancnt_nb(arr: tp.Array2d) -> tp.Array1d:
+    """2-dim version of `nancnt_1d_nb`."""
+    out = np.empty(arr.shape[1], dtype=np.int_)
+    for col in prange(arr.shape[1]):
+        out[col] = nancnt_1d_nb(arr[:, col])
+    return out
 
 
 @register_chunkable(
@@ -1750,7 +1750,7 @@ ol_realign_nb = overload(_realign_nb)(_realign_nb)
     ),
     merge_func="column_stack",
 )
-@register_jitted(cache=True, tags={"can_parallel"})
+@register_jitted(cache=True)
 def realign_nb(
     arr: tp.Array2d,
     source_index: tp.Array1d,
