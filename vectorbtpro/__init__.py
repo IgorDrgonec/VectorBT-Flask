@@ -108,13 +108,13 @@ def _import_more_stuff():
     return locals()
 
 
-import_star = settings["importing"]["import_star"]
-if import_star.lower() == "all":
+star_import = settings["importing"]["star_import"]
+if star_import.lower() == "all":
     globals().update(_import_more_stuff())
     imported_stuff = globals()
-elif import_star.lower() == "vbt":
+elif star_import.lower() == "vbt":
     imported_stuff = globals()
-elif import_star.lower() == "minimal":
+elif star_import.lower() == "minimal":
     import sys
 
     vbt = sys.modules[__name__]
@@ -122,11 +122,11 @@ elif import_star.lower() == "minimal":
     globals().update(more_stuff)
     imported_stuff = {"vbt": vbt, "tp": tp, **more_stuff}
     __all__ = ["vbt", "tp", *more_stuff.keys()]
-elif import_star.lower() == "none":
+elif star_import.lower() == "none":
     imported_stuff = dict()
     __all__ = []
 else:
-    raise ValueError(f"Invalid option '{import_star}'")
+    raise ValueError(f"Invalid option '{star_import}'")
 
 __pdoc__ = dict()
 __pdoc__["_settings"] = True
