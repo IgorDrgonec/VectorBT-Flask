@@ -8,7 +8,6 @@ import warnings
 
 import numpy as np
 import pandas as pd
-from pandas.tseries.frequencies import to_offset
 from pandas.api.types import is_scalar
 from pandas.core.groupby import GroupBy as PandasGroupBy
 from pandas.core.resample import Resampler as PandasResampler
@@ -1481,7 +1480,6 @@ class BaseAccessor(Wrapping):
             1.02 s ± 927 µs per loop (mean ± std. dev. of 7 runs, 1 loop each)
             ```
         """
-        checks.assert_not_none(apply_func)
         if broadcast_named_args is None:
             broadcast_named_args = {}
         if broadcast_kwargs is None:

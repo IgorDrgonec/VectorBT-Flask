@@ -2358,10 +2358,15 @@ class CARunSetup(CABaseSetup):
             return self.cacheable.func(self.instance_obj, *args, **kwargs)
         return self.cacheable.func(*args, **kwargs)
 
-    def get_args_hash(self, *args, **kwargs) -> int:
+    def get_args_hash(self, *args, **kwargs) -> tp.Optional[int]:
         """Get the hash of the passed arguments.
 
-        `CARunSetup.ignore_args` gets extended with `ignore_args` under `vectorbtpro._settings.caching`."""
+        `CARunSetup.ignore_args` gets extended with `ignore_args` under `vectorbtpro._settings.caching`.
+
+        If no arguments were passed, hashes None."""
+        if len(args) == 0 and len(kwargs) == 0:
+            return hash(None)
+
         from vectorbtpro._settings import settings
 
         caching_cfg = settings["caching"]

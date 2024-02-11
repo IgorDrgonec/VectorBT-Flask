@@ -1043,7 +1043,7 @@ class MappedArray(Analyzable):
 
         `**kwargs` are passed to `MappedArray.replace`."""
         if isinstance(cls_or_self, type):
-            checks.assert_not_none(col_mapper)
+            checks.assert_not_none(col_mapper, arg_name="col_mapper")
             col_map = col_mapper.get_col_map(group_by=group_by if apply_per_group else False)
             func = jit_reg.resolve_option(nb.apply_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
@@ -1175,7 +1175,7 @@ class MappedArray(Analyzable):
         * `vectorbtpro.records.nb.reduce_mapped_to_idx_array_meta_nb` if `returns_array` is True and `returns_idx` is True
         """
         if isinstance(cls_or_self, type):
-            checks.assert_not_none(col_mapper)
+            checks.assert_not_none(col_mapper, arg_name="col_mapper")
             col_map = col_mapper.get_col_map(group_by=group_by)
             if not returns_array:
                 if not returns_idx:
@@ -1183,7 +1183,7 @@ class MappedArray(Analyzable):
                     func = ch_reg.resolve_option(func, chunked)
                     out = func(col_map, fill_value, reduce_func_nb, *args)
                 else:
-                    checks.assert_not_none(idx_arr)
+                    checks.assert_not_none(idx_arr, arg_name="idx_arr")
                     func = jit_reg.resolve_option(nb.reduce_mapped_to_idx_meta_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
                     out = func(col_map, idx_arr, fill_value, reduce_func_nb, *args)
@@ -1193,7 +1193,7 @@ class MappedArray(Analyzable):
                     func = ch_reg.resolve_option(func, chunked)
                     out = func(col_map, fill_value, reduce_func_nb, *args)
                 else:
-                    checks.assert_not_none(idx_arr)
+                    checks.assert_not_none(idx_arr, arg_name="idx_arr")
                     func = jit_reg.resolve_option(nb.reduce_mapped_to_idx_array_meta_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
                     out = func(col_map, idx_arr, fill_value, reduce_func_nb, *args)
@@ -1211,7 +1211,7 @@ class MappedArray(Analyzable):
                     func = ch_reg.resolve_option(func, chunked)
                     out = func(cls_or_self.values, col_map, fill_value, reduce_func_nb, *args)
                 else:
-                    checks.assert_not_none(idx_arr)
+                    checks.assert_not_none(idx_arr, arg_name="idx_arr")
                     func = jit_reg.resolve_option(nb.reduce_mapped_to_idx_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
                     out = func(cls_or_self.values, col_map, idx_arr, fill_value, reduce_func_nb, *args)
@@ -1221,7 +1221,7 @@ class MappedArray(Analyzable):
                     func = ch_reg.resolve_option(func, chunked)
                     out = func(cls_or_self.values, col_map, fill_value, reduce_func_nb, *args)
                 else:
-                    checks.assert_not_none(idx_arr)
+                    checks.assert_not_none(idx_arr, arg_name="idx_arr")
                     func = jit_reg.resolve_option(nb.reduce_mapped_to_idx_array_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
                     out = func(cls_or_self.values, col_map, idx_arr, fill_value, reduce_func_nb, *args)
@@ -1574,7 +1574,7 @@ class MappedArray(Analyzable):
         if axis == 0:
             if idx_arr is None:
                 idx_arr = self.idx_arr
-            checks.assert_not_none(idx_arr)
+            checks.assert_not_none(idx_arr, arg_name="idx_arr")
             func = jit_reg.resolve_option(nb.mapped_value_counts_per_row_nb, jitted)
             value_counts = func(mapped_codes, len(mapped_uniques), idx_arr, self.wrapper.shape[0])
         elif axis == 1:

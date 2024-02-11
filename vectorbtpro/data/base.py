@@ -1890,7 +1890,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             missing_columns=missing_columns,
             silence_warnings=silence_warnings,
         )
-        wrapper = ArrayWrapper.from_obj(data[list(data.keys())[0]], **wrapper_kwargs)
+        first_data = data[list(data.keys())[0]]
+        wrapper = ArrayWrapper.from_obj(first_data, **wrapper_kwargs)
         attr_dicts = cls.fix_dict_types_in_kwargs(
             type(data),
             classes=classes,

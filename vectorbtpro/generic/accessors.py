@@ -913,7 +913,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
             args = substitute_templates(args, template_context, sub_id="args")
             func = jit_reg.resolve_option(nb.map_meta_nb, jitted)
@@ -1031,7 +1031,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper, axis=axis), template_context)
             args = substitute_templates(args, template_context, sub_id="args")
             if axis == 0:
@@ -1180,7 +1180,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
         else:
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -1336,7 +1336,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
             by = substitute_templates(by, template_context, sub_id="by")
         else:
@@ -1445,7 +1445,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
             by = substitute_templates(by, template_context, sub_id="by")
         else:
@@ -1568,7 +1568,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
             rule = substitute_templates(rule, template_context, sub_id="rule")
         else:
@@ -1729,7 +1729,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
             apply_args = substitute_templates(apply_args, template_context, sub_id="apply_args")
             reduce_args = substitute_templates(reduce_args, template_context, sub_id="reduce_args")
@@ -1931,7 +1931,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(
                 broadcast_named_args,
                 dict(
@@ -2105,7 +2105,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
         else:
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -2233,7 +2233,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(
                 broadcast_named_args,
                 dict(wrapper=wrapper, group_by=group_by),
@@ -2606,7 +2606,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
             index = substitute_templates(index, template_context, sub_id="index")
         else:
@@ -2765,7 +2765,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
             target_lbound_index = substitute_templates(
                 target_lbound_index, template_context, sub_id="target_lbound_index"

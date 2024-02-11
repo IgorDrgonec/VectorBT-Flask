@@ -50,7 +50,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         Use methods that begin with `get_` to get group-aware results."""
 
     @classmethod
-    def from_obj(cls: tp.Type[ArrayWrapperT], obj: tp.ArrayLike, *args, **kwargs) -> ArrayWrapperT:
+    def from_obj(cls: tp.Type[ArrayWrapperT], obj: tp.ArrayLike, **kwargs) -> ArrayWrapperT:
         """Derive metadata from an object."""
         from vectorbtpro.base.reshaping import to_pd_array
         from vectorbtpro.data.base import Data
@@ -69,7 +69,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         kwargs.pop("index", None)
         kwargs.pop("columns", None)
         kwargs.pop("ndim", None)
-        return cls(index, columns, ndim, *args, **kwargs)
+        return cls(index, columns, ndim, **kwargs)
 
     @classmethod
     def from_shape(
@@ -194,16 +194,14 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         kwargs["index"] = index
 
         if freq is None:
-            freq = dt.infer_index_freq(index)
-            if freq is None:
-                new_freq = None
-                for wrapper in wrappers:
-                    if new_freq is None:
-                        new_freq = wrapper.freq
-                    else:
-                        if new_freq is not None and wrapper.freq is not None and new_freq != wrapper.freq:
-                            raise ValueError("Objects to be merged must have the same frequency")
-                freq = new_freq
+            new_freq = None
+            for wrapper in wrappers:
+                if new_freq is None:
+                    new_freq = wrapper.freq
+                else:
+                    if new_freq is not None and wrapper.freq is not None and new_freq != wrapper.freq:
+                        raise ValueError("Objects to be merged must have the same frequency")
+            freq = new_freq
         kwargs["freq"] = freq
 
         if columns is None:
@@ -330,16 +328,14 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         kwargs["index"] = index
 
         if freq is None:
-            freq = dt.infer_index_freq(index)
-            if freq is None:
-                new_freq = None
-                for wrapper in wrappers:
-                    if new_freq is None:
-                        new_freq = wrapper.freq
-                    else:
-                        if new_freq is not None and wrapper.freq is not None and new_freq != wrapper.freq:
-                            raise ValueError("Objects to be merged must have the same frequency")
-                freq = new_freq
+            new_freq = None
+            for wrapper in wrappers:
+                if new_freq is None:
+                    new_freq = wrapper.freq
+                else:
+                    if new_freq is not None and wrapper.freq is not None and new_freq != wrapper.freq:
+                        raise ValueError("Objects to be merged must have the same frequency")
+            freq = new_freq
         kwargs["freq"] = freq
 
         if columns is None:
@@ -451,8 +447,9 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         grouper: tp.Optional[Grouper] = None,
         **kwargs,
     ) -> None:
-        checks.assert_not_none(index)
+        checks.assert_not_none(index, arg_name="index")
         index = dt.prepare_dt_index(index, parse_index=parse_index)
+        freq = dt.infer_index_freq(index, freq=freq)
         if columns is None:
             columns = [None]
         if not isinstance(columns, pd.Index):
@@ -1211,7 +1208,6 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         if silence_warnings is None:
             silence_warnings = wrapping_cfg["silence_warnings"]
 
-        checks.assert_not_none(self.ndim)
         _self = self.resolve(group_by=group_by)
 
         if columns is None:

@@ -1166,7 +1166,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
 
         `**kwargs` are passed to `Records.map_array`."""
         if isinstance(cls_or_self, type):
-            checks.assert_not_none(col_mapper)
+            checks.assert_not_none(col_mapper, arg_name="col_mapper")
             func = jit_reg.resolve_option(nb.map_records_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             mapped_arr = func(len(col_mapper.col_arr), map_func_nb, *args)
@@ -1202,7 +1202,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
 
         `**kwargs` are passed to `Records.map_array`."""
         if isinstance(cls_or_self, type):
-            checks.assert_not_none(col_mapper)
+            checks.assert_not_none(col_mapper, arg_name="col_mapper")
             col_map = col_mapper.get_col_map(group_by=group_by if apply_per_group else False)
             func = jit_reg.resolve_option(nb.apply_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)

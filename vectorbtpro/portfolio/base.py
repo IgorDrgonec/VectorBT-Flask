@@ -4936,8 +4936,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(close)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(close, arg_name="close")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         func = jit_reg.resolve_option(generic_nb.fbfill_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -4976,8 +4976,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(bm_close)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(bm_close, arg_name="bm_close")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         func = jit_reg.resolve_option(generic_nb.fbfill_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -5023,8 +5023,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if orders_cls is None:
                 orders_cls = cls_or_self.orders_cls
         else:
-            checks.assert_not_none(order_records)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(order_records, arg_name="order_records")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
             if orders_cls is None:
                 orders_cls = Orders
 
@@ -5075,8 +5075,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if logs_cls is None:
                 logs_cls = cls_or_self.logs_cls
         else:
-            checks.assert_not_none(log_records)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(log_records, arg_name="log_records")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
             if logs_cls is None:
                 logs_cls = Logs
 
@@ -5113,7 +5113,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if entry_trades_cls is None:
                 entry_trades_cls = cls_or_self.entry_trades_cls
         else:
-            checks.assert_not_none(orders)
+            checks.assert_not_none(orders, arg_name="orders")
             if init_position is None:
                 init_position = 0.0
             if entry_trades_cls is None:
@@ -5149,7 +5149,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if exit_trades_cls is None:
                 exit_trades_cls = cls_or_self.exit_trades_cls
         else:
-            checks.assert_not_none(orders)
+            checks.assert_not_none(orders, arg_name="orders")
             if init_position is None:
                 init_position = 0.0
             if exit_trades_cls is None:
@@ -5179,7 +5179,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if positions_cls is None:
                 positions_cls = cls_or_self.positions_cls
         else:
-            checks.assert_not_none(trades)
+            checks.assert_not_none(trades, arg_name="trades")
             if positions_cls is None:
                 positions_cls = Positions
 
@@ -5264,7 +5264,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if drawdowns_cls is None:
                 drawdowns_cls = cls_or_self.drawdowns_cls
         else:
-            checks.assert_not_none(value)
+            checks.assert_not_none(value, arg_name="value")
             if drawdowns_cls is None:
                 drawdowns_cls = Drawdowns
 
@@ -5286,8 +5286,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(init_position_raw)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(init_position_raw, arg_name="init_position_raw")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         init_position = broadcast_array_to(init_position_raw, wrapper.shape_2d[1])
         wrap_kwargs = merge_dicts(dict(name_or_index="init_position"), wrap_kwargs)
@@ -5315,7 +5315,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(orders)
+            checks.assert_not_none(orders, arg_name="orders")
             if init_position is None:
                 init_position = 0.0
             if wrapper is None:
@@ -5360,10 +5360,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(asset_flow)
+            checks.assert_not_none(asset_flow, arg_name="asset_flow")
             if init_position is None:
                 init_position = 0.0
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         direction = map_enum_fields(direction, enums.Direction)
         func = jit_reg.resolve_option(nb.assets_nb, jitted)
@@ -5402,8 +5402,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(assets)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(assets, arg_name="assets")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         position_mask = to_2d_array(assets) != 0
         if wrapper.grouper.is_grouped(group_by=group_by):
@@ -5445,8 +5445,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(position_mask)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(position_mask, arg_name="position_mask")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         position_coverage = position_mask.vbt(wrapper=wrapper).reduce(
             jit_reg.resolve_option(generic_nb.mean_reduce_nb, jitted),
@@ -5480,7 +5480,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(orders)
+            checks.assert_not_none(orders, arg_name="orders")
             if init_position is None:
                 init_position = 0.0
             if init_price is None:
@@ -5525,7 +5525,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(orders)
+            checks.assert_not_none(orders, arg_name="orders")
             if init_position is None:
                 init_position = 0.0
             if init_price is None:
@@ -5576,8 +5576,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         else:
             if cash_deposits_raw is None:
                 cash_deposits_raw = 0.0
-            checks.assert_not_none(cash_sharing)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(cash_sharing, arg_name="cash_sharing")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         cash_deposits_raw = to_2d_array(cash_deposits_raw)
         if wrapper.grouper.is_grouped(group_by=group_by):
@@ -5627,7 +5627,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         else:
             if cash_earnings_raw is None:
                 cash_earnings_raw = 0.0
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         cash_earnings_raw = to_2d_array(cash_earnings_raw)
         if wrapper.grouper.is_grouped(group_by=group_by):
@@ -5674,7 +5674,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(orders)
+            checks.assert_not_none(orders, arg_name="orders")
             if cash_earnings is None:
                 cash_earnings = 0.0
             if wrapper is None:
@@ -5719,9 +5719,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(init_cash_raw)
-            checks.assert_not_none(cash_sharing)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(init_cash_raw, arg_name="init_cash_raw")
+            checks.assert_not_none(cash_sharing, arg_name="cash_sharing")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         if checks.is_int(init_cash_raw) and init_cash_raw in enums.InitCashMode:
             if not isinstance(cls_or_self, type):
@@ -5742,7 +5742,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                         keep_flex=True,
                     )
             else:
-                checks.assert_not_none(free_cash_flow)
+                checks.assert_not_none(free_cash_flow, arg_name="free_cash_flow")
                 if cash_deposits is None:
                     cash_deposits = 0.0
             func = jit_reg.resolve_option(nb.align_init_cash_nb, jitted)
@@ -5793,11 +5793,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(init_cash)
+            checks.assert_not_none(init_cash, arg_name="init_cash")
             if cash_deposits is None:
                 cash_deposits = 0.0
-            checks.assert_not_none(cash_flow)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(cash_flow, arg_name="cash_flow")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         if wrapper.grouper.is_grouped(group_by=group_by):
             if not isinstance(cls_or_self, type):
@@ -5868,8 +5868,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(init_price_raw)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(init_price_raw, arg_name="init_price_raw")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         init_price = broadcast_array_to(init_price_raw, wrapper.shape_2d[1])
         wrap_kwargs = merge_dicts(dict(name_or_index="init_price"), wrap_kwargs)
@@ -5895,8 +5895,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         else:
             if init_position is None:
                 init_position = 0.0
-            checks.assert_not_none(init_price)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(init_price, arg_name="init_price")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         func = jit_reg.resolve_option(nb.init_position_value_nb, jitted)
         init_position_value = func(
@@ -5936,9 +5936,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(init_position_value)
-            checks.assert_not_none(init_cash)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(init_position_value, arg_name="init_position_value")
+            checks.assert_not_none(init_cash, arg_name="init_cash")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         if wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
@@ -5981,11 +5981,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(cash_sharing)
-            checks.assert_not_none(init_value)
+            checks.assert_not_none(cash_sharing, arg_name="cash_sharing")
+            checks.assert_not_none(init_value, arg_name="init_value")
             if cash_deposits_raw is None:
                 cash_deposits_raw = 0.0
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         cash_deposits_raw = to_2d_array(cash_deposits_raw)
         cash_deposits_sum = cash_deposits_raw.sum(axis=0)
@@ -6030,9 +6030,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(close)
-            checks.assert_not_none(assets)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(close, arg_name="close")
+            checks.assert_not_none(assets, arg_name="assets")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         func = jit_reg.resolve_option(nb.asset_value_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -6099,9 +6099,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(asset_value)
-            checks.assert_not_none(value)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(asset_value, arg_name="asset_value")
+            checks.assert_not_none(value, arg_name="value")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         func = jit_reg.resolve_option(nb.gross_exposure_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -6140,9 +6140,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(long_exposure)
-            checks.assert_not_none(short_exposure)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(long_exposure, arg_name="long_exposure")
+            checks.assert_not_none(short_exposure, arg_name="short_exposure")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         net_exposure = to_2d_array(long_exposure) - to_2d_array(short_exposure)
         return wrapper.wrap(net_exposure, group_by=group_by, **resolve_dict(wrap_kwargs))
@@ -6176,9 +6176,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(cash)
-            checks.assert_not_none(asset_value)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(cash, arg_name="cash")
+            checks.assert_not_none(asset_value, arg_name="asset_value")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         func = jit_reg.resolve_option(nb.value_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -6217,9 +6217,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(asset_value)
-            checks.assert_not_none(value)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(asset_value, arg_name="asset_value")
+            checks.assert_not_none(value, arg_name="value")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
         func = jit_reg.resolve_option(nb.allocations_nb, jitted)
@@ -6261,11 +6261,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(orders)
+            checks.assert_not_none(orders, arg_name="orders")
             if close is None:
                 close = orders.close
-            checks.assert_not_none(close)
-            checks.assert_not_none(init_price)
+            checks.assert_not_none(close, arg_name="close")
+            checks.assert_not_none(init_price, arg_name="init_price")
             if init_position is None:
                 init_position = 0.0
             if cash_earnings is None:
@@ -6321,9 +6321,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(input_value)
-            checks.assert_not_none(total_profit)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(input_value, arg_name="input_value")
+            checks.assert_not_none(total_profit, arg_name="total_profit")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         final_value = to_1d_array(input_value) + to_1d_array(total_profit)
         wrap_kwargs = merge_dicts(dict(name_or_index="final_value"), wrap_kwargs)
@@ -6359,9 +6359,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(input_value)
-            checks.assert_not_none(total_profit)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(input_value, arg_name="input_value")
+            checks.assert_not_none(total_profit, arg_name="total_profit")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         total_return = to_1d_array(total_profit) / to_1d_array(input_value)
         wrap_kwargs = merge_dicts(dict(name_or_index="total_return"), wrap_kwargs)
@@ -6406,13 +6406,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(init_value)
+            checks.assert_not_none(init_value, arg_name="init_value")
             if cash_deposits is None:
                 cash_deposits = 0.0
             if cash_deposits_as_input is None:
                 cash_deposits_as_input = False
-            checks.assert_not_none(value)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(value, arg_name="value")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         func = jit_reg.resolve_option(nb.returns_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -6461,10 +6461,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(init_position_value)
-            checks.assert_not_none(asset_value)
-            checks.assert_not_none(cash_flow)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(init_position_value, arg_name="init_position_value")
+            checks.assert_not_none(asset_value, arg_name="asset_value")
+            checks.assert_not_none(cash_flow, arg_name="cash_flow")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         func = jit_reg.resolve_option(nb.asset_pnl_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -6515,10 +6515,10 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(init_position_value)
-            checks.assert_not_none(asset_value)
-            checks.assert_not_none(cash_flow)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(init_position_value, arg_name="init_position_value")
+            checks.assert_not_none(asset_value, arg_name="asset_value")
+            checks.assert_not_none(cash_flow, arg_name="cash_flow")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         func = jit_reg.resolve_option(nb.asset_returns_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -6560,11 +6560,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(close)
-            checks.assert_not_none(init_value)
+            checks.assert_not_none(close, arg_name="close")
+            checks.assert_not_none(init_value, arg_name="init_value")
             if cash_deposits is None:
                 cash_deposits = 0.0
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         if wrapper.grouper.is_grouped(group_by=group_by):
             if not isinstance(cls_or_self, type):
@@ -6664,13 +6664,13 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(init_value)
+            checks.assert_not_none(init_value, arg_name="init_value")
             if cash_deposits is None:
                 cash_deposits = 0.0
             if cash_deposits_as_input is None:
                 cash_deposits_as_input = False
-            checks.assert_not_none(market_value)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(market_value, arg_name="market_value")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         func = jit_reg.resolve_option(nb.returns_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -6786,9 +6786,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
         else:
-            checks.assert_not_none(input_value)
-            checks.assert_not_none(market_value)
-            checks.assert_not_none(wrapper)
+            checks.assert_not_none(input_value, arg_name="input_value")
+            checks.assert_not_none(market_value, arg_name="market_value")
+            checks.assert_not_none(wrapper, arg_name="wrapper")
 
         input_value = to_1d_array(input_value)
         final_value = to_2d_array(market_value)[-1]
@@ -6850,7 +6850,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             if freq is None:
                 freq = cls_or_self.wrapper.freq
         else:
-            checks.assert_not_none(returns)
+            checks.assert_not_none(returns, arg_name="returns")
 
         if daily_returns:
             freq = "D"

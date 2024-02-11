@@ -638,7 +638,8 @@ datetime = frozen_cfg(
         parse_with_dateparser=False,
     ),
     dateparser_kwargs=flex_cfg(),
-    detect_freq=False,
+    detect_freq=True,
+    detect_freq_n=20,
 )
 """_"""
 

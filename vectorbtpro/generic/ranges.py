@@ -591,7 +591,7 @@ class Ranges(PriceRecords):
         """
         if close is None:
             close = self.close
-            checks.assert_not_none(close)
+            checks.assert_not_none(close, arg_name="close")
         else:
             close = self.wrapper.wrap(close, group_by=False)
         if proj_start is None:

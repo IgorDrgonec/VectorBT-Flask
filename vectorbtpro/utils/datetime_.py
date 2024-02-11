@@ -17,6 +17,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.parsing import WarningsFiltered
+from vectorbtpro.utils.array_ import min_count_nb
 
 __all__ = [
     "DTC",
@@ -1049,27 +1050,44 @@ def try_align_dt_to_index(dt: tp.DatetimeLike, target_index: tp.Index, **kwargs)
     return dt
 
 
+def auto_detect_freq(index: pd.Index) -> tp.Optional[tp.PandasFrequency]:
+    """Auto-detect frequency from a datetime index.
+
+    Returns the minimal frequency if it's being encountered in most of the index."""
+    diff_values = index.values[1:] - index.values[:-1]
+    if len(diff_values) > 0:
+        mini, _, minc = min_count_nb(diff_values)
+        if minc / len(index) > 0.5:
+            return index[mini + 1] - index[mini]
+    return None
+
+
 def infer_index_freq(
     index: pd.Index,
     freq: tp.Optional[tp.FrequencyLike] = None,
     allow_offset: bool = True,
     allow_numeric: bool = True,
     detect_freq: tp.Union[None, bool, str, tp.Callable] = None,
+    detect_freq_n: tp.Optional[int] = None,
 ) -> tp.Union[None, int, float, tp.PandasFrequency]:
     """Infer frequency of a datetime index if `freq` is None, otherwise convert `freq`.
 
     Argument `detect_freq` can be one of the following:
     * False: don't detect the frequency
-    * True: return the smallest difference between each pair of indices
-    * string: apply a function name to the difference between each pair of indices (such as "mean")
-    * callable: run a custom function that takes the index and returns a frequency
-    """
+    * True: detect the frequency with `auto_detect_freq`
+    * string: call a method of the difference between each pair of indices (such as "mean")
+    * callable: call a custom function that takes the index and returns a frequency
+
+    If `detect_freq_n` is a positive or negative number, limits the index to the first or the
+    last N index points respectively."""
     from vectorbtpro._settings import settings
 
     datetime_cfg = settings["datetime"]
 
     if detect_freq is None:
         detect_freq = datetime_cfg["detect_freq"]
+    if detect_freq_n is None:
+        detect_freq_n = datetime_cfg["detect_freq_n"]
 
     if freq is None and isinstance(index, pd.DatetimeIndex):
         if index.freqstr is not None:
@@ -1080,12 +1098,20 @@ def infer_index_freq(
             freq = pd.infer_freq(index)
             if freq is not None:
                 freq = to_freq(freq)
-    if freq is None and detect_freq is not False:
-        if detect_freq is True:
-            return (index[1:] - index[:-1]).min()
-        if isinstance(detect_freq, str):
-            return getattr(index[1:] - index[:-1], detect_freq.lower())()
-        return detect_freq(index)
+        if freq is None and detect_freq is not False:
+            if detect_freq_n is None:
+                index_subset = index
+            else:
+                if detect_freq_n >= 0:
+                    index_subset = index[:detect_freq_n]
+                else:
+                    index_subset = index[detect_freq_n:]
+            if detect_freq is True:
+                freq = auto_detect_freq(index_subset)
+            elif isinstance(detect_freq, str):
+                freq = getattr(index_subset[1:] - index_subset[:-1], detect_freq.lower())()
+            else:
+                freq = detect_freq(index_subset)
     if freq is None:
         return None
     if checks.is_number(freq) and allow_numeric:

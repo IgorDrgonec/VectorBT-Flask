@@ -493,7 +493,7 @@ class IndicatorBase(Analyzable):
         if len(params) == 0 and per_column:
             raise ValueError("per_column cannot be enabled without parameters")
         if require_input_shape:
-            checks.assert_not_none(input_shape)
+            checks.assert_not_none(input_shape, arg_name="input_shape")
             if pass_input_shape is None:
                 pass_input_shape = True
         if pass_input_shape is None:

@@ -1023,7 +1023,7 @@ class ReturnsAccessor(GenericAccessor):
             ddof = self.defaults["ddof"]
         if bm_returns is None:
             bm_returns = self.bm_returns
-        checks.assert_not_none(bm_returns)
+        checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
         func = jit_reg.resolve_option(nb.information_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1050,7 +1050,7 @@ class ReturnsAccessor(GenericAccessor):
             ddof = self.defaults["ddof"]
         if bm_returns is None:
             bm_returns = self.bm_returns
-        checks.assert_not_none(bm_returns)
+        checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
@@ -1085,7 +1085,7 @@ class ReturnsAccessor(GenericAccessor):
             ddof = self.defaults["ddof"]
         if bm_returns is None:
             bm_returns = self.bm_returns
-        checks.assert_not_none(bm_returns)
+        checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
         func = jit_reg.resolve_option(nb.beta_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1112,7 +1112,7 @@ class ReturnsAccessor(GenericAccessor):
             ddof = self.defaults["ddof"]
         if bm_returns is None:
             bm_returns = self.bm_returns
-        checks.assert_not_none(bm_returns)
+        checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
@@ -1152,7 +1152,7 @@ class ReturnsAccessor(GenericAccessor):
             risk_free = self.defaults["risk_free"]
         if bm_returns is None:
             bm_returns = self.bm_returns
-        checks.assert_not_none(bm_returns)
+        checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
         func = jit_reg.resolve_option(nb.alpha_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1179,7 +1179,7 @@ class ReturnsAccessor(GenericAccessor):
             risk_free = self.defaults["risk_free"]
         if bm_returns is None:
             bm_returns = self.bm_returns
-        checks.assert_not_none(bm_returns)
+        checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
@@ -1424,7 +1424,7 @@ class ReturnsAccessor(GenericAccessor):
         See `vectorbtpro.returns.nb.capture_ratio_nb`."""
         if bm_returns is None:
             bm_returns = self.bm_returns
-        checks.assert_not_none(bm_returns)
+        checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
         func = jit_reg.resolve_option(nb.capture_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1454,7 +1454,7 @@ class ReturnsAccessor(GenericAccessor):
             minp = self.defaults["minp"]
         if bm_returns is None:
             bm_returns = self.bm_returns
-        checks.assert_not_none(bm_returns)
+        checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
@@ -1495,7 +1495,7 @@ class ReturnsAccessor(GenericAccessor):
         See `vectorbtpro.returns.nb.up_capture_ratio_nb`."""
         if bm_returns is None:
             bm_returns = self.bm_returns
-        checks.assert_not_none(bm_returns)
+        checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
         func = jit_reg.resolve_option(nb.up_capture_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1525,7 +1525,7 @@ class ReturnsAccessor(GenericAccessor):
             minp = self.defaults["minp"]
         if bm_returns is None:
             bm_returns = self.bm_returns
-        checks.assert_not_none(bm_returns)
+        checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
@@ -1566,7 +1566,7 @@ class ReturnsAccessor(GenericAccessor):
         See `vectorbtpro.returns.nb.down_capture_ratio_nb`."""
         if bm_returns is None:
             bm_returns = self.bm_returns
-        checks.assert_not_none(bm_returns)
+        checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
         func = jit_reg.resolve_option(nb.down_capture_ratio_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
@@ -1596,7 +1596,7 @@ class ReturnsAccessor(GenericAccessor):
             minp = self.defaults["minp"]
         if bm_returns is None:
             bm_returns = self.bm_returns
-        checks.assert_not_none(bm_returns)
+        checks.assert_not_none(bm_returns, arg_name="bm_returns")
         bm_returns = broadcast_to(bm_returns, self.obj)
         chunked = ch.specialize_chunked_option(
             chunked,
