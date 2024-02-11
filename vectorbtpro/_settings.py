@@ -638,6 +638,7 @@ datetime = frozen_cfg(
         parse_with_dateparser=False,
     ),
     dateparser_kwargs=flex_cfg(),
+    detect_freq=False,
 )
 """_"""
 
@@ -664,7 +665,7 @@ data = frozen_cfg(
         synthetic=flex_cfg(
             start=None,
             end=None,
-            freq=None,
+            timeframe=None,
             tz=None,
             normalize=False,
             inclusive="left",

@@ -3,8 +3,8 @@
 """Module with `BentoData`."""
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.datetime_ import to_tzaware_timestamp, split_freq_str, prepare_freq
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.data.custom.remote import RemoteData
 
@@ -189,12 +189,10 @@ class BentoData(RemoteData):
             schema = "ohlcv-1d"
             freq = "1d"
         elif timeframe is not None:
-            freq = prepare_freq(timeframe)
-            split = split_freq_str(timeframe)
+            freq = timeframe
+            split = dt.split_freq_str(timeframe)
             if split is not None:
                 multiplier, unit = split
-                if unit == "t":
-                    unit = "m"
                 timeframe = str(multiplier) + unit
                 if schema is None or schema.lower() == "ohlcv":
                     schema = f"ohlcv-{timeframe}"
@@ -202,21 +200,21 @@ class BentoData(RemoteData):
                     raise ValueError("Timeframe cannot be used together with schema")
         else:
             if schema.startswith("ohlcv-"):
-                freq = prepare_freq(schema[len("ohlcv-"):])
+                freq = schema[len("ohlcv-"):]
             else:
                 freq = None
         if resolve_dates:
             dataset_range = client.metadata.get_dataset_range(dataset)
-            start_date = to_tzaware_timestamp(dataset_range["start_date"], naive_tz="utc", tz="utc")
-            end_date = to_tzaware_timestamp(dataset_range["end_date"], naive_tz="utc", tz="utc")
+            start_date = dt.to_tzaware_timestamp(dataset_range["start_date"], naive_tz="utc", tz="utc")
+            end_date = dt.to_tzaware_timestamp(dataset_range["end_date"], naive_tz="utc", tz="utc")
             if start is not None:
-                start = to_tzaware_timestamp(start, naive_tz=tz, tz="utc")
+                start = dt.to_tzaware_timestamp(start, naive_tz=tz, tz="utc")
                 if start < start_date:
                     start = start_date
             else:
                 start = start_date
             if end is not None:
-                end = to_tzaware_timestamp(end, naive_tz=tz, tz="utc")
+                end = dt.to_tzaware_timestamp(end, naive_tz=tz, tz="utc")
                 if end > end_date:
                     end = end_date
             else:

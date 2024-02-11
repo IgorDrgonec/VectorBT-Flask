@@ -3024,7 +3024,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             limit_tif (frequency_like or array_like): Time in force for limit signals.
                 Will broadcast.
 
-                Any frequency-like object is converted using `vectorbtpro.utils.datetime_.freq_to_timedelta64`.
+                Any frequency-like object is converted using `vectorbtpro.utils.datetime_.to_timedelta64`.
                 Any array must either contain timedeltas or integers, and will be cast into integer format
                 after broadcasting. If the object provided is of data type `object`, will be converted
                 to timedelta automatically.

@@ -6,13 +6,13 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import broadcast_array_to
-from vectorbtpro.data import nb
-from vectorbtpro.ohlcv import nb as ohlcv_nb
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.random_ import set_seed
 from vectorbtpro.utils.template import substitute_templates
+from vectorbtpro.base.reshaping import broadcast_array_to
+from vectorbtpro.ohlcv import nb as ohlcv_nb
+from vectorbtpro.data import nb
 from vectorbtpro.data.custom.synthetic import SyntheticData
 
 __all__ = [

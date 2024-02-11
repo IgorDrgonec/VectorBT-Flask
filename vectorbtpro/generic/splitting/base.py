@@ -11,7 +11,7 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro._settings import settings
 from vectorbtpro.registries.jit_registry import jit_reg
-from vectorbtpro.utils import checks
+from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.array_ import is_range
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.colors import adjust_opacity
@@ -26,12 +26,6 @@ from vectorbtpro.utils.parsing import (
 )
 from vectorbtpro.utils.annotations import Annotatable, has_annotatables
 from vectorbtpro.utils.merging import parse_merge_func, MergeFunc
-from vectorbtpro.utils.datetime_ import (
-    prepare_dt_index,
-    try_align_dt_to_index,
-    try_align_to_dt_index,
-    parse_timedelta,
-)
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.selection import _NoResult, NoResultsException, PosSel, LabelSel
 from vectorbtpro.base.wrapping import ArrayWrapper
@@ -166,7 +160,7 @@ class RelRange:
     ) -> slice:
         """Convert the relative range into a slice."""
         if index is not None:
-            index = prepare_dt_index(index)
+            index = dt.prepare_dt_index(index)
             freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         offset_anchor = self.offset_anchor
         offset = self.offset
@@ -219,7 +213,7 @@ class RelRange:
                     raise TypeError(f"Floating number for offset ({offset}) must be between 0 and 1")
                 offset = offset_anchor + int(offset)
             elif not checks.is_int(offset):
-                offset = offset_anchor + parse_timedelta(offset)
+                offset = offset_anchor + dt.to_freq(offset)
                 if index[0] <= offset <= index[-1]:
                     offset = index.get_indexer([offset], method="ffill")[0]
                 elif offset < index[0]:
@@ -258,7 +252,7 @@ class RelRange:
                     raise TypeError(f"Floating number for length ({length}) must be between 0 and 1")
                 length = int(length)
             elif not checks.is_int(length):
-                length = parse_timedelta(length)
+                length = dt.to_freq(length)
 
         start = offset
         if checks.is_int(length):
@@ -369,7 +363,7 @@ class Splitter(Analyzable):
 
         Labels for splits and sets can be provided via `split_labels` and `set_labels` respectively.
         Both arguments can be provided as templates. The split array will be available as `splits`."""
-        index = prepare_dt_index(index)
+        index = dt.prepare_dt_index(index)
         if split_range_kwargs is None:
             split_range_kwargs = {}
 
@@ -583,7 +577,7 @@ class Splitter(Analyzable):
             ![](/assets/images/api/from_rolling_3.light.svg#only-light){: .iimg loading=lazy }
             ![](/assets/images/api/from_rolling_3.dark.svg#only-dark){: .iimg loading=lazy }
         """
-        index = prepare_dt_index(index)
+        index = dt.prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         if isinstance(backwards, str):
             if backwards.lower() == "sorted":
@@ -715,7 +709,7 @@ class Splitter(Analyzable):
             ![](/assets/images/api/from_n_rolling.light.svg#only-light){: .iimg loading=lazy }
             ![](/assets/images/api/from_n_rolling.dark.svg#only-dark){: .iimg loading=lazy }
         """
-        index = prepare_dt_index(index)
+        index = dt.prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         if split_range_kwargs is None:
             split_range_kwargs = {}
@@ -792,7 +786,7 @@ class Splitter(Analyzable):
             offsets = np.arange(len(index))
             offsets = offsets[offsets + length <= len(index)]
         else:
-            length = parse_timedelta(length)
+            length = dt.to_freq(length)
             if freq is None:
                 raise ValueError("Must provide freq")
             if length < freq or length > index[-1] + freq - index[0]:
@@ -867,7 +861,7 @@ class Splitter(Analyzable):
             ![](/assets/images/api/from_expanding.light.svg#only-light){: .iimg loading=lazy }
             ![](/assets/images/api/from_expanding.dark.svg#only-dark){: .iimg loading=lazy }
         """
-        index = prepare_dt_index(index)
+        index = dt.prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         if split_range_kwargs is None:
             split_range_kwargs = {}
@@ -971,7 +965,7 @@ class Splitter(Analyzable):
             ![](/assets/images/api/from_n_expanding.light.svg#only-light){: .iimg loading=lazy }
             ![](/assets/images/api/from_n_expanding.dark.svg#only-dark){: .iimg loading=lazy }
         """
-        index = prepare_dt_index(index)
+        index = dt.prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         if split_range_kwargs is None:
             split_range_kwargs = {}
@@ -993,7 +987,7 @@ class Splitter(Analyzable):
             lengths = np.arange(1, len(index) + 1)
             lengths = lengths[lengths >= min_length]
         else:
-            min_length = parse_timedelta(min_length)
+            min_length = dt.to_freq(min_length)
             if freq is None:
                 raise ValueError("Must provide freq")
             if min_length < freq or min_length > index[-1] + freq - index[0]:
@@ -1071,7 +1065,7 @@ class Splitter(Analyzable):
             ![](/assets/images/api/from_ranges_2.light.svg#only-light){: .iimg loading=lazy }
             ![](/assets/images/api/from_ranges_2.dark.svg#only-dark){: .iimg loading=lazy }
         """
-        index = prepare_dt_index(index)
+        index = dt.prepare_dt_index(index)
         if split_range_kwargs is None:
             split_range_kwargs = {}
         func_arg_names = get_func_arg_names(get_index_ranges)
@@ -1145,7 +1139,7 @@ class Splitter(Analyzable):
             ![](/assets/images/api/from_grouper.light.svg#only-light){: .iimg loading=lazy }
             ![](/assets/images/api/from_grouper.dark.svg#only-dark){: .iimg loading=lazy }
         """
-        index = prepare_dt_index(index)
+        index = dt.prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         if split_range_kwargs is None:
             split_range_kwargs = {}
@@ -1245,7 +1239,7 @@ class Splitter(Analyzable):
             ![](/assets/images/api/from_n_random.light.svg#only-light){: .iimg loading=lazy }
             ![](/assets/images/api/from_n_random.dark.svg#only-dark){: .iimg loading=lazy }
         """
-        index = prepare_dt_index(index)
+        index = dt.prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         if split_range_kwargs is None:
             split_range_kwargs = {}
@@ -1269,7 +1263,7 @@ class Splitter(Analyzable):
             else:
                 if not isinstance(index, pd.DatetimeIndex):
                     raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
-                min_start = try_align_dt_to_index(min_start, index)
+                min_start = dt.try_align_dt_to_index(min_start, index)
                 if not isinstance(min_start, pd.Timestamp):
                     raise ValueError(f"Minimum start ({min_start}) could not be parsed")
                 if min_start < index[0] or min_start > index[-1]:
@@ -1290,7 +1284,7 @@ class Splitter(Analyzable):
         else:
             if not isinstance(index, pd.DatetimeIndex):
                 raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
-            max_end = try_align_dt_to_index(max_end, index)
+            max_end = dt.try_align_dt_to_index(max_end, index)
             if not isinstance(max_end, pd.Timestamp):
                 raise ValueError(f"Maximum end ({max_end}) could not be parsed")
             if freq is None:
@@ -1326,7 +1320,7 @@ class Splitter(Analyzable):
             if min_length < 1 or min_length > space_len:
                 raise TypeError(f"Minimum length must be within [{1}, {space_len}]")
         else:
-            min_length = parse_timedelta(min_length)
+            min_length = dt.to_freq(min_length)
             if freq is None:
                 raise ValueError("Must provide freq")
             if min_length < freq or min_length > index_space_len:
@@ -1342,7 +1336,7 @@ class Splitter(Analyzable):
                 if max_length < min_length or max_length > space_len:
                     raise TypeError(f"Maximum length must be within [{min_length}, {space_len}]")
             else:
-                max_length = parse_timedelta(max_length)
+                max_length = dt.to_freq(max_length)
                 if freq is None:
                     raise ValueError("Must provide freq")
                 if max_length < min_length or max_length > index_space_len:
@@ -1418,7 +1412,7 @@ class Splitter(Analyzable):
         Uses `Splitter.from_splits` to prepare the splits array and labels, and to build the instance."""
         from sklearn.model_selection import BaseCrossValidator
 
-        index = prepare_dt_index(index)
+        index = dt.prepare_dt_index(index)
         checks.assert_instance_of(splitter, BaseCrossValidator)
         if set_labels is None:
             set_labels = ["train", "test"]
@@ -1502,7 +1496,7 @@ class Splitter(Analyzable):
             ![](/assets/images/api/from_split_func.light.svg#only-light){: .iimg loading=lazy }
             ![](/assets/images/api/from_split_func.dark.svg#only-dark){: .iimg loading=lazy }
         """
-        index = prepare_dt_index(index)
+        index = dt.prepare_dt_index(index)
         freq = BaseIDXAccessor(index, freq=freq).get_freq(allow_numeric=False)
         if split_range_kwargs is None:
             split_range_kwargs = {}
@@ -1698,7 +1692,7 @@ class Splitter(Analyzable):
     ) -> None:
         if wrapper.grouper.is_grouped():
             raise ValueError("Splitter cannot be grouped")
-        index = prepare_dt_index(index)
+        index = dt.prepare_dt_index(index)
         if splits_arr.shape[0] != wrapper.shape_2d[0]:
             raise ValueError("Number of splits must match wrapper index")
         if splits_arr.shape[1] != wrapper.shape_2d[1]:
@@ -1937,7 +1931,7 @@ class Splitter(Analyzable):
                 raise ValueError("Must provide index")
             index = cls_or_self.index
         else:
-            index = prepare_dt_index(index)
+            index = dt.prepare_dt_index(index)
         if range_format.lower() not in (
             "any",
             "indices",
@@ -2009,14 +2003,14 @@ class Splitter(Analyzable):
             if not checks.is_int(start):
                 if not isinstance(index, pd.DatetimeIndex):
                     raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
-                start = try_align_dt_to_index(start, index)
+                start = dt.try_align_dt_to_index(start, index)
                 if not isinstance(start, pd.Timestamp):
                     raise ValueError(f"Range start ({start}) could not be parsed")
                 meta["was_datetime"] = True
             if not checks.is_int(stop):
                 if not isinstance(index, pd.DatetimeIndex):
                     raise TypeError(f"Index must be of type pandas.DatetimeIndex, not {index.dtype}")
-                stop = try_align_dt_to_index(stop, index)
+                stop = dt.try_align_dt_to_index(stop, index)
                 if not isinstance(stop, pd.Timestamp):
                     raise ValueError(f"Range start ({stop}) could not be parsed")
                 meta["was_datetime"] = True
@@ -2083,7 +2077,7 @@ class Splitter(Analyzable):
                         range_ = slice(meta["start"], meta["stop"])
             else:
                 if not np.issubdtype(range_.dtype, np.integer):
-                    range_ = try_align_to_dt_index(range_, index)
+                    range_ = dt.try_align_to_dt_index(range_, index)
                     if not isinstance(range_, pd.DatetimeIndex):
                         raise ValueError("Range array could not be parsed")
                     range_ = index.get_indexer(range_, method=None)
@@ -2172,7 +2166,7 @@ class Splitter(Analyzable):
                 raise ValueError("Must provide index")
             index = cls_or_self.index
         else:
-            index = prepare_dt_index(index)
+            index = dt.prepare_dt_index(index)
 
         # Prepare source range
         range_meta = cls_or_self.get_ready_range(
@@ -2220,7 +2214,7 @@ class Splitter(Analyzable):
             else:
                 new_split = (1.0, new_split)
         elif checks.is_td_like(new_split):
-            new_split = parse_timedelta(new_split)
+            new_split = dt.to_freq(new_split)
             if new_split < pd.Timedelta(0):
                 backwards = not backwards
                 new_split = abs(new_split)
@@ -2335,7 +2329,7 @@ class Splitter(Analyzable):
                 raise ValueError("Must provide index")
             index = cls_or_self.index
         else:
-            index = prepare_dt_index(index)
+            index = dt.prepare_dt_index(index)
         all_hslices = True
         all_masks = True
         new_ranges = []
@@ -2568,10 +2562,10 @@ class Splitter(Analyzable):
                 raise ValueError("Must provide index")
             index = cls_or_self.index
         else:
-            index = prepare_dt_index(index)
+            index = dt.prepare_dt_index(index)
         if target_index is None:
             raise ValueError("Must provide target index")
-        target_index = prepare_dt_index(target_index)
+        target_index = dt.prepare_dt_index(target_index)
         if index.equals(target_index):
             return range_
 
@@ -2623,7 +2617,7 @@ class Splitter(Analyzable):
                 raise ValueError("Must provide index")
             index = cls_or_self.index
         else:
-            index = prepare_dt_index(index)
+            index = dt.prepare_dt_index(index)
         if remap_to_obj and (
             isinstance(obj, (pd.Index, pd.Series, pd.DataFrame, PandasIndexer)) or obj_index is not None
         ):
@@ -4104,7 +4098,7 @@ class Splitter(Analyzable):
                 raise ValueError("Must provide index")
             index = cls_or_self.index
         else:
-            index = prepare_dt_index(index)
+            index = dt.prepare_dt_index(index)
         if right_inclusive:
             return index[start], index[stop - 1]
         if stop == len(index):
@@ -4134,7 +4128,7 @@ class Splitter(Analyzable):
                 raise ValueError("Must provide index")
             index = cls_or_self.index
         else:
-            index = prepare_dt_index(index)
+            index = dt.prepare_dt_index(index)
         range_meta = cls_or_self.get_ready_range(
             range_,
             template_context=template_context,
@@ -4288,7 +4282,7 @@ class Splitter(Analyzable):
                 raise ValueError("Must provide index")
             index = cls_or_self.index
         else:
-            index = prepare_dt_index(index)
+            index = dt.prepare_dt_index(index)
         range_ = cls_or_self.get_ready_range(
             range_,
             allow_zero_len=True,

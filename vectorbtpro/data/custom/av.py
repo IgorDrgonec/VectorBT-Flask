@@ -12,8 +12,8 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.datetime_ import split_freq_str, prepare_freq
 from vectorbtpro.utils.module_ import check_installed
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.data.custom.remote import RemoteData
@@ -281,17 +281,17 @@ class AVData(RemoteData):
             except Exception as e:
                 raise ValueError("Can't fetch/parse the API documentation. Specify function and disable match_params.")
 
-        freq = prepare_freq(timeframe)
+        freq = timeframe
         interval = None
         interval_type = None
         if timeframe is not None:
             if not isinstance(timeframe, str):
                 raise ValueError(f"Invalid timeframe '{timeframe}'")
-            split = split_freq_str(timeframe)
+            split = dt.split_freq_str(timeframe)
             if split is None:
                 raise ValueError(f"Invalid timeframe '{timeframe}'")
             multiplier, unit = split
-            if unit == "t":
+            if unit == "m":
                 interval = str(multiplier) + "min"
                 interval_type = "intraday"
             elif unit == "h":

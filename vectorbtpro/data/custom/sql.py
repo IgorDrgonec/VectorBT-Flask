@@ -7,10 +7,9 @@ from typing import Iterator
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.data.custom.db import DBData
-from vectorbtpro.utils import checks
+from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.datetime_ import to_tzaware_datetime, to_naive_datetime
+from vectorbtpro.data.custom.db import DBData
 
 try:
     if not tp.TYPE_CHECKING:
@@ -882,9 +881,9 @@ class SQLData(DBData):
                             tz = first_obj.index.tz
                         if first_obj.index.tz is not None:
                             if start is not None:
-                                start = to_tzaware_datetime(start, naive_tz=tz, tz=first_obj.index.tz)
+                                start = dt.to_tzaware_datetime(start, naive_tz=tz, tz=first_obj.index.tz)
                             if end is not None:
-                                end = to_tzaware_datetime(end, naive_tz=tz, tz=first_obj.index.tz)
+                                end = dt.to_tzaware_datetime(end, naive_tz=tz, tz=first_obj.index.tz)
                         else:
                             if start is not None:
                                 if (
@@ -892,20 +891,20 @@ class SQLData(DBData):
                                     or (isinstance(to_utc, str) and to_utc.lower() == "index")
                                     or (checks.is_sequence(to_utc) and first_obj.index.name in to_utc)
                                 ):
-                                    start = to_tzaware_datetime(start, naive_tz=tz, tz="utc")
-                                    start = to_naive_datetime(start)
+                                    start = dt.to_tzaware_datetime(start, naive_tz=tz, tz="utc")
+                                    start = dt.to_naive_datetime(start)
                                 else:
-                                    start = to_naive_datetime(start, tz=tz)
+                                    start = dt.to_naive_datetime(start, tz=tz)
                             if end is not None:
                                 if (
                                     to_utc is True
                                     or (isinstance(to_utc, str) and to_utc.lower() == "index")
                                     or (checks.is_sequence(to_utc) and first_obj.index.name in to_utc)
                                 ):
-                                    end = to_tzaware_datetime(end, naive_tz=tz, tz="utc")
-                                    end = to_naive_datetime(end)
+                                    end = dt.to_tzaware_datetime(end, naive_tz=tz, tz="utc")
+                                    end = dt.to_naive_datetime(end)
                                 else:
-                                    end = to_naive_datetime(end, tz=tz)
+                                    end = dt.to_naive_datetime(end, tz=tz)
 
                 and_list = []
                 if start is not None:

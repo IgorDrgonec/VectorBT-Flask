@@ -412,9 +412,8 @@ import humanize
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils import checks
+from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.caching import Cacheable
-from vectorbtpro.utils.datetime_ import to_naive_datetime
 from vectorbtpro.utils.decorators import cacheableT, cacheable_property
 from vectorbtpro.utils.hashing import Hashable
 from vectorbtpro.utils.parsing import Regex, hash_args, UnhashableArgsError, get_func_arg_names
@@ -1349,33 +1348,33 @@ class CABaseSetup(CAMetrics, Hashable):
                 total_saved = humanize.precisedelta(total_saved, minimum_unit)
             if first_run_time is not None:
                 first_run_time = humanize.naturaltime(
-                    to_naive_datetime(first_run_time),
-                    when=to_naive_datetime(datetime.now(timezone.utc)),
+                    dt.to_naive_datetime(first_run_time),
+                    when=dt.to_naive_datetime(datetime.now(timezone.utc)),
                 )
             if last_run_time is not None:
                 last_run_time = humanize.naturaltime(
-                    to_naive_datetime(last_run_time),
-                    when=to_naive_datetime(datetime.now(timezone.utc)),
+                    dt.to_naive_datetime(last_run_time),
+                    when=dt.to_naive_datetime(datetime.now(timezone.utc)),
                 )
             if first_hit_time is not None:
                 first_hit_time = humanize.naturaltime(
-                    to_naive_datetime(first_hit_time),
-                    when=to_naive_datetime(datetime.now(timezone.utc)),
+                    dt.to_naive_datetime(first_hit_time),
+                    when=dt.to_naive_datetime(datetime.now(timezone.utc)),
                 )
             if last_hit_time is not None:
                 last_hit_time = humanize.naturaltime(
-                    to_naive_datetime(last_hit_time),
-                    when=to_naive_datetime(datetime.now(timezone.utc)),
+                    dt.to_naive_datetime(last_hit_time),
+                    when=dt.to_naive_datetime(datetime.now(timezone.utc)),
                 )
             if creation_time is not None:
                 creation_time = humanize.naturaltime(
-                    to_naive_datetime(creation_time),
-                    when=to_naive_datetime(datetime.now(timezone.utc)),
+                    dt.to_naive_datetime(creation_time),
+                    when=dt.to_naive_datetime(datetime.now(timezone.utc)),
                 )
             if last_update_time is not None:
                 last_update_time = humanize.naturaltime(
-                    to_naive_datetime(last_update_time),
-                    when=to_naive_datetime(datetime.now(timezone.utc)),
+                    dt.to_naive_datetime(last_update_time),
+                    when=dt.to_naive_datetime(datetime.now(timezone.utc)),
                 )
 
         return dict(

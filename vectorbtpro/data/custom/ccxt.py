@@ -10,13 +10,8 @@ from functools import wraps, partial
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.datetime_ import (
-    to_tzaware_datetime,
-    datetime_to_ms,
-    split_freq_str,
-    prepare_freq,
-)
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.data.custom.remote import RemoteData
 
@@ -198,7 +193,7 @@ class CCXTData(RemoteData):
     ) -> tp.Optional[pd.Timestamp]:
         """Find the earliest date using binary search."""
         if start is not None:
-            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="utc"))
+            start_ts = dt.datetime_to_ms(dt.to_tzaware_datetime(start, naive_tz=tz, tz="utc"))
             fetched_data = fetch_func(start_ts, 1)
             if for_internal_use and len(fetched_data) > 0:
                 return pd.Timestamp(start_ts, unit="ms", tz="utc")
@@ -210,14 +205,14 @@ class CCXTData(RemoteData):
                 return pd.Timestamp(0, unit="ms", tz="utc")
         if len(fetched_data) == 0:
             if start is not None:
-                start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="utc"))
+                start_ts = dt.datetime_to_ms(dt.to_tzaware_datetime(start, naive_tz=tz, tz="utc"))
             else:
-                start_ts = datetime_to_ms(to_tzaware_datetime(0, naive_tz=tz, tz="utc"))
+                start_ts = dt.datetime_to_ms(dt.to_tzaware_datetime(0, naive_tz=tz, tz="utc"))
             start_ts = start_ts - start_ts % 86400000
             if end is not None:
-                end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz="utc"))
+                end_ts = dt.datetime_to_ms(dt.to_tzaware_datetime(end, naive_tz=tz, tz="utc"))
             else:
-                end_ts = datetime_to_ms(to_tzaware_datetime("now", naive_tz=tz, tz="utc"))
+                end_ts = dt.datetime_to_ms(dt.to_tzaware_datetime("now", naive_tz=tz, tz="utc"))
             end_ts = end_ts - end_ts % 86400000 + 86400000
             start_time = start_ts
             end_time = end_ts
@@ -342,13 +337,11 @@ class CCXTData(RemoteData):
             if not silence_warnings:
                 warnings.warn("Using emulated OHLCV candles", stacklevel=2)
 
-        freq = prepare_freq(timeframe)
-        split = split_freq_str(timeframe)
+        freq = timeframe
+        split = dt.split_freq_str(timeframe)
         if split is not None:
             multiplier, unit = split
-            if unit == "t":
-                unit = "m"
-            elif unit == "W":
+            if unit == "W":
                 unit = "w"
             elif unit == "Y":
                 unit = "y"
@@ -389,11 +382,11 @@ class CCXTData(RemoteData):
         if find_earliest_date and start is not None:
             start = cls._find_earliest_date(_fetch, start=start, end=end, tz=tz, for_internal_use=True)
         if start is not None:
-            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="utc"))
+            start_ts = dt.datetime_to_ms(dt.to_tzaware_datetime(start, naive_tz=tz, tz="utc"))
         else:
             start_ts = None
         if end is not None:
-            end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz="UTC"))
+            end_ts = dt.datetime_to_ms(dt.to_tzaware_datetime(end, naive_tz=tz, tz="UTC"))
         else:
             end_ts = None
         prev_end_ts = None

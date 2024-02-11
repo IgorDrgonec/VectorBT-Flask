@@ -11,8 +11,7 @@ from datetime import datetime, timedelta, time as dt_time
 from schedule import Scheduler, Job, CancelJob
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils import checks
-from vectorbtpro.utils.datetime_ import tzaware_to_naive_time
+from vectorbtpro.utils import checks, datetime_ as dt
 
 __all__ = [
     "AsyncJob",
@@ -299,7 +298,7 @@ class ScheduleManager:
             if isinstance(at, dt_time):
                 if job.unit == "days" or job.start_day:
                     if at.tzinfo is not None:
-                        at = tzaware_to_naive_time(at, None)
+                        at = dt.tzaware_to_naive_time(at, None)
                 at = at.isoformat()
                 if job.unit == "hours":
                     at = ":".join(at.split(":")[1:])

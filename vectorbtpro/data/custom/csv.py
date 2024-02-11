@@ -8,11 +8,8 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.datetime_ import (
-    to_tzaware_timestamp,
-    to_naive_timestamp,
-)
 from vectorbtpro.data.custom.file import FileData
 
 __all__ = [
@@ -199,14 +196,14 @@ class CSVData(FileData):
                 raise TypeError("Cannot filter index that is not DatetimeIndex")
             if obj.index.tz is not None:
                 if start is not None:
-                    start = to_tzaware_timestamp(start, naive_tz=tz, tz=obj.index.tz)
+                    start = dt.to_tzaware_timestamp(start, naive_tz=tz, tz=obj.index.tz)
                 if end is not None:
-                    end = to_tzaware_timestamp(end, naive_tz=tz, tz=obj.index.tz)
+                    end = dt.to_tzaware_timestamp(end, naive_tz=tz, tz=obj.index.tz)
             else:
                 if start is not None:
-                    start = to_naive_timestamp(start, tz=tz)
+                    start = dt.to_naive_timestamp(start, tz=tz)
                 if end is not None:
-                    end = to_naive_timestamp(end, tz=tz)
+                    end = dt.to_naive_timestamp(end, tz=tz)
             mask = True
             if start is not None:
                 mask &= obj.index >= start

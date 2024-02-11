@@ -14,10 +14,9 @@ from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.indexing import IndexingError, ExtPandasIndexer, index_dict, IdxSetter, IdxSetterFactory, IdxDict
 from vectorbtpro.base.indexes import stack_indexes, concat_indexes
-from vectorbtpro.utils import checks
+from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
 from vectorbtpro.utils.config import Configured, merge_dicts, resolve_dict
-from vectorbtpro.utils.datetime_ import infer_index_freq, prepare_dt_index
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method, cached_property
 from vectorbtpro.utils.array_ import is_range, cast_to_min_precision, cast_to_max_precision
@@ -195,7 +194,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         kwargs["index"] = index
 
         if freq is None:
-            freq = infer_index_freq(index)
+            freq = dt.infer_index_freq(index)
             if freq is None:
                 new_freq = None
                 for wrapper in wrappers:
@@ -331,7 +330,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         kwargs["index"] = index
 
         if freq is None:
-            freq = infer_index_freq(index)
+            freq = dt.infer_index_freq(index)
             if freq is None:
                 new_freq = None
                 for wrapper in wrappers:
@@ -453,7 +452,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         **kwargs,
     ) -> None:
         checks.assert_not_none(index)
-        index = prepare_dt_index(index, parse_index=parse_index)
+        index = dt.prepare_dt_index(index, parse_index=parse_index)
         if columns is None:
             columns = [None]
         if not isinstance(columns, pd.Index):
@@ -853,7 +852,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         if "index" not in wrapper_kwargs:
             wrapper_kwargs["index"] = _resampler.target_index
         if "freq" not in wrapper_kwargs:
-            wrapper_kwargs["freq"] = infer_index_freq(wrapper_kwargs["index"], freq=_resampler.target_freq)
+            wrapper_kwargs["freq"] = dt.infer_index_freq(wrapper_kwargs["index"], freq=_resampler.target_freq)
         new_wrapper = self.replace(**wrapper_kwargs)
         return dict(resampler=resampler, new_wrapper=new_wrapper)
 
@@ -942,7 +941,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         return self.index_acc.get_freq(*args, **kwargs)
 
     @property
-    def freq(self) -> tp.Optional[pd.Timedelta]:
+    def freq(self) -> tp.Optional[tp.PandasFrequency]:
         """See `vectorbtpro.base.accessors.BaseIDXAccessor.freq`."""
         return self.index_acc.freq
 

@@ -244,7 +244,10 @@ def resolve_pypfopt_func_kwargs(
                     pass_kwargs[orig_arg_name] = _get_kwarg(arg_name)
             else:
                 if arg_name == "frequency":
-                    ann_factor = ReturnsAccessor.get_ann_factor(_get_kwarg("year_freq", None), _get_kwarg("freq", None))
+                    ann_factor = ReturnsAccessor.get_ann_factor(
+                        _get_kwarg("year_freq", None),
+                        _get_kwarg("freq", None),
+                    )
                     if ann_factor is not None:
                         pass_kwargs[orig_arg_name] = ann_factor
                 elif arg_name == "prices":

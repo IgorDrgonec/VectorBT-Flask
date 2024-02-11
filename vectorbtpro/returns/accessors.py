@@ -130,11 +130,9 @@ from vectorbtpro.generic.drawdowns import Drawdowns
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.returns import nb
-from vectorbtpro.utils import checks
-from vectorbtpro.utils import chunking as ch
+from vectorbtpro.utils import checks, chunking as ch, datetime_ as dt
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, HybridConfig, Config
-from vectorbtpro.utils.datetime_ import freq_to_timedelta, PandasDatetimeIndex
-from vectorbtpro.utils.decorators import class_or_instanceproperty
+from vectorbtpro.utils.decorators import class_or_instanceproperty, class_or_instancemethod
 
 __all__ = [
     "ReturnsAccessor",
@@ -358,7 +356,7 @@ class ReturnsAccessor(GenericAccessor):
         return self._log_returns
 
     @property
-    def year_freq(self) -> tp.Optional[pd.Timedelta]:
+    def year_freq(self) -> tp.Optional[tp.PandasFrequency]:
         """Year frequency for annualization purposes."""
         if self._year_freq is None:
             from vectorbtpro._settings import settings
@@ -368,39 +366,50 @@ class ReturnsAccessor(GenericAccessor):
             year_freq = returns_cfg["year_freq"]
             if year_freq is None:
                 return None
-            return freq_to_timedelta(year_freq)
-        return freq_to_timedelta(self._year_freq)
+            return dt.to_freq(year_freq)
+        return dt.to_freq(self._year_freq)
 
-    @staticmethod
+    @class_or_instancemethod
     def get_ann_factor(
+        cls_or_self,
         year_freq: tp.Optional[tp.FrequencyLike] = None,
         freq: tp.Optional[tp.FrequencyLike] = None,
+        raise_error: bool = False,
     ) -> tp.Optional[float]:
         """Get the annualization factor from the year and data frequency."""
-        from vectorbtpro._settings import settings
+        if isinstance(cls_or_self, type):
+            from vectorbtpro._settings import settings
 
-        returns_cfg = settings["returns"]
-        wrapping_cfg = settings["wrapping"]
+            returns_cfg = settings["returns"]
+            wrapping_cfg = settings["wrapping"]
 
+            if year_freq is None:
+                year_freq = returns_cfg["year_freq"]
+            if freq is None:
+                freq = wrapping_cfg["freq"]
+        else:
+            if year_freq is None:
+                year_freq = cls_or_self.year_freq
+            if freq is None:
+                freq = cls_or_self.wrapper.freq
         if year_freq is None:
-            year_freq = returns_cfg["year_freq"]
+            if not raise_error:
+                return None
+            raise ValueError(
+                "Year frequency is None. Pass it as `year_freq` or define it globally under `settings.returns`."
+            )
         if freq is None:
-            freq = wrapping_cfg["freq"]
-        if year_freq is None or freq is None:
-            return None
-
-        return freq_to_timedelta(year_freq) / freq_to_timedelta(freq)
-
-    @property
-    def ann_factor(self) -> float:
-        """Get annualization factor."""
-        if self.wrapper.freq is None:
+            if not raise_error:
+                return None
             raise ValueError(
                 "Index frequency is None. Pass it as `freq` or define it globally under `settings.wrapping`."
             )
-        if self.year_freq is None:
-            raise ValueError("Year frequency is None. Pass `year_freq` or define it globally under `settings.returns`.")
-        return self.year_freq / self.wrapper.freq
+        return dt.to_timedelta(year_freq, approximate=True) / dt.to_timedelta(freq, approximate=True)
+
+    @property
+    def ann_factor(self) -> float:
+        """Annualization factor."""
+        return self.get_ann_factor(raise_error=True)
 
     def deannualize(self, value: float) -> float:
         """Deannualize a value."""
@@ -426,7 +435,7 @@ class ReturnsAccessor(GenericAccessor):
         **kwargs,
     ) -> tp.SeriesFrame:
         """Resample returns to a custom frequency, date offset, or index."""
-        checks.assert_instance_of(self.obj.index, PandasDatetimeIndex)
+        checks.assert_instance_of(self.obj.index, dt.PandasDatetimeIndex)
 
         func = jit_reg.resolve_option(nb.cum_returns_final_1d_nb, jitted)
         chunked = ch.specialize_chunked_option(

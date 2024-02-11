@@ -22,10 +22,9 @@ from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.drawdowns import Drawdowns
 from vectorbtpro.returns.accessors import ReturnsAccessor
 from vectorbtpro.data.decorators import attach_symbol_dict_methods
-from vectorbtpro.utils import checks
+from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig, copy_dict
-from vectorbtpro.utils.datetime_ import to_timezone, prepare_dt_index
 from vectorbtpro.utils.parsing import get_func_arg_names, extend_args
 from vectorbtpro.utils.path_ import check_mkdir
 from vectorbtpro.utils.template import RepEval, CustomTemplate, substitute_templates
@@ -1166,7 +1165,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         return self.symbol_wrapper.index
 
     @property
-    def freq(self) -> tp.Optional[pd.Timedelta]:
+    def freq(self) -> tp.Optional[tp.PandasFrequency]:
         """Frequency.
 
         Based on the default symbol wrapper."""
@@ -1405,13 +1404,13 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         If `force_tz_convert` is True, will convert regardless of whether the index is datetime-aware."""
         if parse_dates:
             if not isinstance(index, (pd.DatetimeIndex, pd.MultiIndex)) and index.dtype == object:
-                index = prepare_dt_index(index)
+                index = dt.prepare_dt_index(index)
         if isinstance(index, pd.DatetimeIndex):
             if index.tz is None and tz_localize is not None:
-                index = index.tz_localize(to_timezone(tz_localize))
+                index = index.tz_localize(dt.to_timezone(tz_localize))
             if tz_convert is not None:
                 if index.tz is not None or force_tz_convert:
-                    index = index.tz_convert(to_timezone(tz_convert))
+                    index = index.tz_convert(dt.to_timezone(tz_convert))
             if remove_tz and index.tz is not None:
                 index = index.tz_localize(None)
         return index

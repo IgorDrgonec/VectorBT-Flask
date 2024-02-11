@@ -2109,11 +2109,12 @@ class Trades(Ranges):
             exit_price = self_col.get_field_arr("exit_price")
             pnl = self_col.get_field_arr("pnl")
             status = self_col.get_field_arr("status")
-
             duration = to_1d_array(
-                self_col.wrapper.arr_to_timedelta(self_col.duration.values, to_pd=True, silence_warnings=True).astype(
-                    str
-                )
+                self_col.wrapper.arr_to_timedelta(
+                    self_col.duration.values,
+                    to_pd=True,
+                    silence_warnings=True,
+                ).astype(str)
             )
 
             if plot_markers:

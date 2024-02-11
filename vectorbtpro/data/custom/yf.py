@@ -5,10 +5,10 @@
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.generic import nb as generic_nb
+from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
-from vectorbtpro.utils.datetime_ import to_tzaware_datetime, split_freq_str, prepare_freq
 from vectorbtpro.utils.parsing import get_func_kwargs
+from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.data.custom.remote import RemoteData
 
 __all__ = [
@@ -125,16 +125,14 @@ class YFData(RemoteData):
         if tz is None:
             tz = ticker_tz
         if start is not None:
-            start = to_tzaware_datetime(start, naive_tz=tz, tz=ticker_tz)
+            start = dt.to_tzaware_datetime(start, naive_tz=tz, tz=ticker_tz)
         if end is not None:
-            end = to_tzaware_datetime(end, naive_tz=tz, tz=ticker_tz)
-        freq = prepare_freq(timeframe)
-        split = split_freq_str(timeframe)
+            end = dt.to_tzaware_datetime(end, naive_tz=tz, tz=ticker_tz)
+        freq = timeframe
+        split = dt.split_freq_str(timeframe)
         if split is not None:
             multiplier, unit = split
-            if unit == "t":
-                unit = "m"
-            elif unit == "W":
+            if unit == "W":
                 unit = "wk"
             elif unit == "M":
                 unit = "mo"

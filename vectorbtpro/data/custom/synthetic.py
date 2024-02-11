@@ -2,15 +2,9 @@
 
 """Module with `SyntheticData`."""
 
-import pandas as pd
-
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.datetime_ import (
-    to_timestamp,
-    to_naive_timestamp,
-    prepare_freq,
-)
 from vectorbtpro.data.custom.custom import CustomData
 
 __all__ = [
@@ -55,7 +49,7 @@ class SyntheticData(CustomData):
         start: tp.Optional[tp.DatetimeLike] = None,
         end: tp.Optional[tp.DatetimeLike] = None,
         periods: tp.Optional[int] = None,
-        freq: tp.Optional[tp.FrequencyLike] = None,
+        timeframe: tp.Optional[tp.FrequencyLike] = None,
         tz: tp.TimezoneLike = None,
         normalize: tp.Optional[bool] = None,
         inclusive: tp.Optional[str] = None,
@@ -63,47 +57,22 @@ class SyntheticData(CustomData):
     ) -> tp.KeyData:
         """Generate data of a feature or symbol.
 
-        Generates datetime index using `pd.date_range` and passes it to `SyntheticData.generate_key`
-        to fill the Series/DataFrame with generated data.
-
-        If `start` and `periods` are None, will set `start` to the beginning of the Unix epoch.
-
-        If `end` is `periods` are None, will set `end` to the current time.
+        Generates datetime index using `vectorbtpro.utils.datetime_.date_range` and passes it to
+        `SyntheticData.generate_key` to fill the Series/DataFrame with generated data.
 
         For defaults, see `custom.synthetic` in `vectorbtpro._settings.data`."""
         start = cls.resolve_custom_setting(start, "start")
         end = cls.resolve_custom_setting(end, "end")
-        freq = cls.resolve_custom_setting(freq, "freq")
-        if freq is not None:
-            freq = prepare_freq(freq)
+        timeframe = cls.resolve_custom_setting(timeframe, "timeframe")
         tz = cls.resolve_custom_setting(tz, "tz")
         normalize = cls.resolve_custom_setting(normalize, "normalize")
         inclusive = cls.resolve_custom_setting(inclusive, "inclusive")
 
-        if start is not None:
-            start = to_timestamp(start, tz=tz)
-        if end is not None:
-            end = to_timestamp(end, tz=tz)
-        if start is None and periods is None:
-            if tz is not None:
-                start = to_timestamp(0, tz=tz)
-            elif end is not None and end.tz is not None:
-                start = to_timestamp(0, tz=end.tz)
-            else:
-                start = to_naive_timestamp(0)
-        if end is None and periods is None:
-            if tz is not None:
-                end = to_timestamp("now", tz=tz)
-            elif start is not None and start.tz is not None:
-                end = to_timestamp("now", tz=start.tz)
-            else:
-                end = to_naive_timestamp("now")
-
-        index = pd.date_range(
+        index = dt.date_range(
             start=start,
             end=end,
             periods=periods,
-            freq=freq,
+            freq=timeframe,
             normalize=normalize,
             inclusive=inclusive,
         )
@@ -112,8 +81,8 @@ class SyntheticData(CustomData):
         if len(index) == 0:
             raise ValueError("Date range is empty")
         if key_is_feature:
-            return cls.generate_feature(key, index, **kwargs), dict(tz_convert=tz, freq=freq)
-        return cls.generate_symbol(key, index, **kwargs), dict(tz_convert=tz, freq=freq)
+            return cls.generate_feature(key, index, **kwargs), dict(tz_convert=tz, freq=timeframe)
+        return cls.generate_symbol(key, index, **kwargs), dict(tz_convert=tz, freq=timeframe)
 
     @classmethod
     def fetch_feature(cls, feature: tp.Feature, **kwargs) -> tp.FeatureData:

@@ -99,7 +99,6 @@ def _import_more_stuff():
 
     import numpy as np
     import pandas as pd
-    from pandas.tseries.frequencies import to_offset
     from numba import njit, prange
 
     X = True

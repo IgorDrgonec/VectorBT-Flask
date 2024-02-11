@@ -2380,15 +2380,15 @@ class TestParams:
 
 class TestDatetime:
     def test_to_timedelta(self):
-        assert datetime_.freq_to_timedelta("d") == pd.to_timedelta("1d")
-        assert datetime_.freq_to_timedelta("day") == pd.to_timedelta("1d")
-        assert datetime_.freq_to_timedelta("m") == pd.to_timedelta("1min")
-        assert datetime_.freq_to_timedelta("1m") == pd.to_timedelta("1min")
-        assert datetime_.freq_to_timedelta("1 m") == pd.to_timedelta("1min")
-        assert datetime_.freq_to_timedelta("1 minute") == pd.to_timedelta("1min")
-        assert datetime_.freq_to_timedelta("2 minutes") == pd.to_timedelta("2min")
-        with pytest.raises(Exception):
-            datetime_.freq_to_timedelta("1")
+        assert datetime_.to_timedelta("d") == pd.to_timedelta("1d")
+        assert datetime_.to_timedelta("day") == pd.to_timedelta("1d")
+        assert datetime_.to_timedelta("m") == pd.to_timedelta("1min")
+        assert datetime_.to_timedelta("1m") == pd.to_timedelta("1min")
+        assert datetime_.to_timedelta("1 m") == pd.to_timedelta("1min")
+        assert datetime_.to_timedelta("1 minute") == pd.to_timedelta("1min")
+        assert datetime_.to_timedelta("2 minutes") == pd.to_timedelta("2min")
+        assert datetime_.to_timedelta("1 hour, 2 minutes") == pd.to_timedelta("1h 2min")
+        assert datetime_.to_timedelta("1 hour; 2 minutes") == pd.to_timedelta("1h 2min")
 
     def test_get_utc_tz(self):
         assert datetime_.get_utc_tz().utcoffset(_datetime.now()) == _timedelta(0)
