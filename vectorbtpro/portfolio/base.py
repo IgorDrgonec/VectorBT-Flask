@@ -11,6 +11,14 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils import checks
+from vectorbtpro.utils.attr_ import get_dict_attr
+from vectorbtpro.utils.colors import adjust_opacity
+from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig, atomic_dict
+from vectorbtpro.utils.decorators import custom_property, cached_property, class_or_instancemethod
+from vectorbtpro.utils.enum_ import map_enum_fields
+from vectorbtpro.utils.parsing import get_func_kwargs
+from vectorbtpro.utils.template import Rep, RepEval, RepFunc
 from vectorbtpro.base.reshaping import (
     to_1d_array,
     to_2d_array,
@@ -19,6 +27,7 @@ from vectorbtpro.base.reshaping import (
     to_pd_array,
     to_2d_shape,
 )
+from vectorbtpro.base.merging import row_stack_arrays
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.base.indexes import ExceptLevel
@@ -44,14 +53,6 @@ from vectorbtpro.records.base import Records
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.returns.accessors import ReturnsAccessor
-from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import get_dict_attr
-from vectorbtpro.utils.colors import adjust_opacity
-from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig, atomic_dict
-from vectorbtpro.utils.decorators import custom_property, cached_property, class_or_instancemethod
-from vectorbtpro.utils.enum_ import map_enum_fields
-from vectorbtpro.utils.parsing import get_func_kwargs
-from vectorbtpro.utils.template import Rep, RepEval, RepFunc
 
 try:
     if not tp.TYPE_CHECKING:
@@ -772,7 +773,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                             if i > 0:
                                 cash_deposits_obj[0] = init_cash_objs[i]
                             cash_deposits_objs.append(cash_deposits_obj)
-                        kwargs["cash_deposits"] = np.row_stack(cash_deposits_objs)
+                        kwargs["cash_deposits"] = row_stack_arrays(cash_deposits_objs)
                         kwargs["init_cash"] = init_cash_objs[0]
                     else:
                         kwargs["init_cash"] = np.asarray(init_cash_objs).sum(axis=0)

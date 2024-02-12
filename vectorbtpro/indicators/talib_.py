@@ -9,7 +9,8 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_pd_array, column_stack, broadcast_arrays, broadcast
+from vectorbtpro.base.reshaping import to_pd_array, broadcast_arrays, broadcast
+from vectorbtpro.base.merging import column_stack_arrays
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import GenericAccessor
@@ -213,7 +214,7 @@ def talib_func(func_name: str) -> tp.Callable:
                 col_outputs = _run_talib_func(col_inputs, *other_args, **kwargs)
                 outputs.append(col_outputs)
             outputs = list(zip(*outputs))
-            outputs = tuple(map(column_stack, outputs))
+            outputs = tuple(map(column_stack_arrays, outputs))
         if wrap is None:
             wrap = is_pandas
         if wrap:

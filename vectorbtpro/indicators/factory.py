@@ -44,7 +44,8 @@ from numba.typed import List
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import indexes, reshaping, combining
 from vectorbtpro.base.indexing import build_param_indexer
-from vectorbtpro.base.reshaping import broadcast_array_to, Default, resolve_ref, column_stack
+from vectorbtpro.base.reshaping import broadcast_array_to, Default, resolve_ref
+from vectorbtpro.base.merging import row_stack_arrays, column_stack_arrays
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import BaseAccessor
@@ -981,17 +982,17 @@ class IndicatorBase(Analyzable):
         if "input_list" not in kwargs:
             new_input_list = []
             for input_name in cls.input_names:
-                new_input_list.append(np.row_stack([getattr(obj, f"_{input_name}") for obj in objs]))
+                new_input_list.append(row_stack_arrays([getattr(obj, f"_{input_name}") for obj in objs]))
             kwargs["input_list"] = new_input_list
         if "in_output_list" not in kwargs:
             new_in_output_list = []
             for in_output_name in cls.in_output_names:
-                new_in_output_list.append(np.row_stack([getattr(obj, f"_{in_output_name}") for obj in objs]))
+                new_in_output_list.append(row_stack_arrays([getattr(obj, f"_{in_output_name}") for obj in objs]))
             kwargs["in_output_list"] = new_in_output_list
         if "output_list" not in kwargs:
             new_output_list = []
             for output_name in cls.output_names:
-                new_output_list.append(np.row_stack([getattr(obj, f"_{output_name}") for obj in objs]))
+                new_output_list.append(row_stack_arrays([getattr(obj, f"_{output_name}") for obj in objs]))
             kwargs["output_list"] = new_output_list
 
         kwargs = cls.resolve_row_stack_kwargs(*objs, **kwargs)
@@ -1036,12 +1037,12 @@ class IndicatorBase(Analyzable):
         if "in_output_list" not in kwargs:
             new_in_output_list = []
             for in_output_name in cls.in_output_names:
-                new_in_output_list.append(np.column_stack([getattr(obj, f"_{in_output_name}") for obj in objs]))
+                new_in_output_list.append(column_stack_arrays([getattr(obj, f"_{in_output_name}") for obj in objs]))
             kwargs["in_output_list"] = new_in_output_list
         if "output_list" not in kwargs:
             new_output_list = []
             for output_name in cls.output_names:
-                new_output_list.append(np.column_stack([getattr(obj, f"_{output_name}") for obj in objs]))
+                new_output_list.append(column_stack_arrays([getattr(obj, f"_{output_name}") for obj in objs]))
             kwargs["output_list"] = new_output_list
         if "param_list" not in kwargs:
             new_param_list = []
@@ -3733,8 +3734,8 @@ Other keyword arguments are passed to `{0}.run`.
                 outputs.append(output)
             if isinstance(outputs[0], tuple):  # multiple outputs
                 outputs = list(zip(*outputs))
-                return tuple(map(column_stack, outputs))
-            return column_stack(outputs)
+                return tuple(map(column_stack_arrays, outputs))
+            return column_stack_arrays(outputs)
 
         kwargs = merge_dicts({k: Default(v) for k, v in config.pop("defaults").items()}, kwargs)
         Indicator = cls(
@@ -3922,8 +3923,8 @@ Other keyword arguments are passed to `{0}.run`.
                 outputs.append(output)
             if isinstance(outputs[0], tuple):  # multiple outputs
                 outputs = list(zip(*outputs))
-                return tuple(map(column_stack, outputs))
-            return column_stack(outputs)
+                return tuple(map(column_stack_arrays, outputs))
+            return column_stack_arrays(outputs)
 
         kwargs = merge_dicts({k: Default(v) for k, v in config.pop("defaults").items()}, kwargs)
         Indicator = cls(**merge_dicts(dict(module_name=__name__ + ".ta"), config, factory_kwargs)).with_apply_func(

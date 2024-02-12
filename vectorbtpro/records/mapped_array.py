@@ -411,7 +411,15 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils import checks
+from vectorbtpro.utils import chunking as ch
+from vectorbtpro.utils.array_ import index_repeating_rows_nb
+from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
+from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method
+from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, attach_unary_magic_methods
+from vectorbtpro.utils.mapping import to_value_mapping, apply_mapping
 from vectorbtpro.base.reshaping import to_1d_array, to_dict
+from vectorbtpro.base.merging import concat_arrays, column_stack_arrays
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb as generic_nb
@@ -420,13 +428,6 @@ from vectorbtpro.records import nb
 from vectorbtpro.records.col_mapper import ColumnMapper
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
-from vectorbtpro.utils import checks
-from vectorbtpro.utils import chunking as ch
-from vectorbtpro.utils.array_ import index_repeating_rows_nb
-from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
-from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method
-from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, attach_unary_magic_methods
-from vectorbtpro.utils.mapping import to_value_mapping, apply_mapping
 
 __all__ = [
     "MappedArray",
@@ -524,7 +525,7 @@ class MappedArray(Analyzable):
                             col_end_idxs = np.cumsum(col_lens)
                             col_start_idxs = col_end_idxs - col_lens
                             mapped_arrs.append(obj.mapped_arr[col_idxs[col_start_idxs[col] : col_end_idxs[col]]])
-            kwargs["mapped_arr"] = np.concatenate(mapped_arrs)
+            kwargs["mapped_arr"] = concat_arrays(mapped_arrs)
         if "col_arr" not in kwargs:
             kwargs["col_arr"] = kwargs["col_mapper"].col_arr
         if "idx_arr" not in kwargs:
@@ -548,7 +549,7 @@ class MappedArray(Analyzable):
                                 col_idx_arr = obj.idx_arr[col_idxs[col_start_idxs[col] : col_end_idxs[col]]]
                                 idx_arrs.append(col_idx_arr + n_rows_sum)
                         n_rows_sum += obj.wrapper.shape_2d[0]
-                kwargs["idx_arr"] = np.concatenate(idx_arrs)
+                kwargs["idx_arr"] = concat_arrays(idx_arrs)
         if "id_arr" not in kwargs:
             id_arrs = []
             for col in range(kwargs["wrapper"].shape_2d[1]):
@@ -564,7 +565,7 @@ class MappedArray(Analyzable):
                             id_arrs.append(obj.id_arr[col_idxs[col_start_idxs[col] : col_end_idxs[col]]] + from_id)
                         if len(id_arrs) > 0 and len(id_arrs[-1]) > 0:
                             from_id = id_arrs[-1].max() + 1
-            kwargs["id_arr"] = np.concatenate(id_arrs)
+            kwargs["id_arr"] = concat_arrays(id_arrs)
 
         kwargs = cls.resolve_row_stack_kwargs(*objs, **kwargs)
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
@@ -615,7 +616,7 @@ class MappedArray(Analyzable):
                 col_idxs, col_lens = obj.col_mapper.col_map
                 if len(col_idxs) > 0:
                     mapped_arrs.append(obj.mapped_arr[col_idxs])
-            kwargs["mapped_arr"] = np.concatenate(mapped_arrs)
+            kwargs["mapped_arr"] = concat_arrays(mapped_arrs)
         if "col_arr" not in kwargs:
             kwargs["col_arr"] = kwargs["col_mapper"].col_arr
         if "idx_arr" not in kwargs:
@@ -638,14 +639,14 @@ class MappedArray(Analyzable):
                         else:
                             new_idxs = old_idxs
                         idx_arrs.append(new_idxs)
-                kwargs["idx_arr"] = np.concatenate(idx_arrs)
+                kwargs["idx_arr"] = concat_arrays(idx_arrs)
         if "id_arr" not in kwargs:
             id_arrs = []
             for obj in objs:
                 col_idxs, col_lens = obj.col_mapper.col_map
                 if len(col_idxs) > 0:
                     id_arrs.append(obj.id_arr[col_idxs])
-            kwargs["id_arr"] = np.concatenate(id_arrs)
+            kwargs["id_arr"] = concat_arrays(id_arrs)
 
         kwargs = cls.resolve_column_stack_kwargs(*objs, **kwargs)
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
@@ -1107,7 +1108,7 @@ class MappedArray(Analyzable):
             else:
                 raise ValueError(f"Invalid option segment_arr='{segment_arr}'")
         if isinstance(segment_arr, tuple):
-            stacked_segment_arr = np.column_stack(segment_arr)
+            stacked_segment_arr = column_stack_arrays(segment_arr)
             segment_arr = index_repeating_rows_nb(stacked_segment_arr)
         if isinstance(reduce_func_nb, str):
             reduce_func_nb = getattr(generic_nb, reduce_func_nb + "_reduce_nb")
@@ -1595,8 +1596,8 @@ class MappedArray(Analyzable):
             if axis == 0 or axis == 1:
                 value_counts = np.vstack((value_counts, np.full((len(missing_keys), value_counts.shape[1]), 0)))
             else:
-                value_counts = np.concatenate((value_counts, np.full(len(missing_keys), 0)))
-            mapped_uniques = np.concatenate((mapped_uniques, np.array(missing_keys)))
+                value_counts = concat_arrays((value_counts, np.full(len(missing_keys), 0)))
+            mapped_uniques = concat_arrays((mapped_uniques, np.array(missing_keys)))
         nan_mask = np.isnan(mapped_uniques)
         if dropna:
             value_counts = value_counts[~nan_mask]

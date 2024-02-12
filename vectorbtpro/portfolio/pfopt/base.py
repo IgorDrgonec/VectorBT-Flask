@@ -23,6 +23,7 @@ from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.base.indexes import combine_indexes, stack_indexes, select_levels
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.reshaping import to_pd_array, to_1d_array, to_2d_array, to_dict, broadcast_array_to
+from vectorbtpro.base.merging import row_stack_arrays
 from vectorbtpro.base.indexing import point_idxr_defaults, range_idxr_defaults
 from vectorbtpro.data.base import Data
 from vectorbtpro.generic.analyzable import Analyzable
@@ -1697,7 +1698,7 @@ class PortfolioOptimizer(Analyzable):
                 *[obj.alloc_records for obj in objs],
                 wrapper=kwargs["alloc_records"].wrapper,
             )
-            kwargs["allocations"] = np.row_stack([obj._allocations for obj in objs])[record_indices]
+            kwargs["allocations"] = row_stack_arrays([obj._allocations for obj in objs])[record_indices]
 
         kwargs = cls.resolve_row_stack_kwargs(*objs, **kwargs)
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
@@ -1743,7 +1744,7 @@ class PortfolioOptimizer(Analyzable):
                 *[obj.alloc_records for obj in objs],
                 wrapper=kwargs["alloc_records"].wrapper,
             )
-            kwargs["allocations"] = np.row_stack([obj._allocations for obj in objs])[record_indices]
+            kwargs["allocations"] = row_stack_arrays([obj._allocations for obj in objs])[record_indices]
 
         kwargs = cls.resolve_column_stack_kwargs(*objs, **kwargs)
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
@@ -2321,7 +2322,7 @@ class PortfolioOptimizer(Analyzable):
             ),
             np.concatenate(alloc_points),
         )
-        allocations = np.row_stack(allocations)
+        allocations = row_stack_arrays(allocations)
         return cls(new_wrapper, alloc_points, allocations)
 
     @classmethod
@@ -3181,7 +3182,7 @@ class PortfolioOptimizer(Analyzable):
             ),
             np.concatenate(alloc_ranges),
         )
-        allocations = np.row_stack(allocations)
+        allocations = row_stack_arrays(allocations)
         return cls(new_wrapper, alloc_ranges, allocations)
 
     @classmethod

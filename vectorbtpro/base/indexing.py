@@ -596,7 +596,9 @@ def normalize_idxs(idxs: tp.MaybeIndexArray, target_len: int) -> tp.Array1d:
     if checks.is_int(idxs):
         idxs = np.array([idxs])
     if idxs.ndim == 2:
-        idxs = np.concatenate(tuple(map(lambda x: np.arange(x[0], x[1]), idxs)))
+        from vectorbtpro.base.merging import concat_arrays
+
+        idxs = concat_arrays(tuple(map(lambda x: np.arange(x[0], x[1]), idxs)))
     if (idxs < 0).any():
         idxs = np.where(idxs >= 0, idxs, target_len + idxs)
     return idxs
@@ -1354,8 +1356,11 @@ class RangeIdxr(UniIdxr):
     ) -> tp.MaybeIndexArray:
         if index is None:
             raise ValueError("Index is required")
+
+        from vectorbtpro.base.merging import column_stack_arrays
+
         start_idxs, end_idxs = get_index_ranges(index, index_freq=freq, **attr.asdict(self))
-        idxs = np.column_stack((start_idxs, end_idxs))
+        idxs = column_stack_arrays((start_idxs, end_idxs))
         self.check_idxs(idxs, check_minus_one=True)
         return idxs
 

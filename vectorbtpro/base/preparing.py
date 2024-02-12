@@ -15,8 +15,8 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.indexing import index_dict, IdxSetter, IdxSetterFactory, IdxRecords
-from vectorbtpro.base.reshaping import BCO, Default, Ref
-from vectorbtpro.base.reshaping import broadcast
+from vectorbtpro.base.reshaping import BCO, Default, Ref, broadcast
+from vectorbtpro.base.merging import concat_arrays, column_stack_arrays
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.decorators import override_arg_config, attach_arg_properties
 from vectorbtpro.base.resampling.base import Resampler
@@ -166,7 +166,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                 else:
                     target_ns = target_index.vbt.to_ns()
                 if len(target_ns) < len(wrapper.index):
-                    target_ns = np.concatenate((target_ns, np.full(len(wrapper.index) - len(target_ns), -1)))
+                    target_ns = concat_arrays((target_ns, np.full(len(wrapper.index) - len(target_ns), -1)))
                 return target_ns
 
             def _to_td(wrapper, _dt_obj=dt_obj, _last_before=last_before):
@@ -313,7 +313,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                 for col in range(td_arr.shape[1]):
                     td_arr_col = pd.to_timedelta(td_arr[:, col])
                     td_arr_cols.append(td_arr_col.values)
-                td_arr = np.column_stack(td_arr_cols)
+                td_arr = column_stack_arrays(td_arr_cols)
         return dt.to_ns(td_arr)
 
     @classmethod
@@ -331,7 +331,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                 for col in range(dt_arr.shape[1]):
                     dt_arr_col = pd.to_datetime(dt_arr[:, col]).tz_localize(None)
                     dt_arr_cols.append(dt_arr_col.values)
-                dt_arr = np.column_stack(dt_arr_cols)
+                dt_arr = column_stack_arrays(dt_arr_cols)
         return dt.to_ns(dt_arr)
 
     def prepare_post_arg(self, arg_name: str, value: tp.Optional[tp.ArrayLike] = None) -> object:

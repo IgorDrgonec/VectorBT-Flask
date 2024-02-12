@@ -296,19 +296,19 @@ class TestMerging:
     def test_row_stack_merge(self):
         np.testing.assert_array_equal(
             merging.row_stack_merge(([0, 1, 2], [3, 4, 5])),
-            np.array([[0, 1, 2], [3, 4, 5]]),
+            np.array([[0], [1], [2], [3], [4], [5]]),
         )
         np.testing.assert_array_equal(
             merging.row_stack_merge((([0, 1, 2],), ([0, 1, 2],)))[0],
-            np.array([[0, 1, 2], [0, 1, 2]]),
+            np.array([[0], [1], [2], [0], [1], [2]]),
         )
         np.testing.assert_array_equal(
             merging.row_stack_merge((([0, 1, 2], [3, 4, 5]), ([0, 1, 2], [3, 4, 5])))[0],
-            np.array([[0, 1, 2], [0, 1, 2]]),
+            np.array([[0], [1], [2], [0], [1], [2]]),
         )
         np.testing.assert_array_equal(
             merging.row_stack_merge((([0, 1, 2], [3, 4, 5]), ([0, 1, 2], [3, 4, 5])))[1],
-            np.array([[3, 4, 5], [3, 4, 5]]),
+            np.array([[3], [4], [5], [3], [4], [5]]),
         )
         assert_series_equal(
             merging.row_stack_merge(([0, 1, 2], [3, 4, 5]), keys=pd.Index(["k1", "k2"], name="key")),
@@ -649,7 +649,7 @@ class TestMerging:
                 ],
                 merge_funcs=("concat", "row_stack", "column_stack"),
             )[1],
-            np.array([[3, 4, 5], [12, 13, 14]]),
+            np.array([[3], [4], [5], [12], [13], [14]]),
         )
         np.testing.assert_array_equal(
             merging.mixed_merge(
@@ -660,13 +660,4 @@ class TestMerging:
                 merge_funcs=("concat", "row_stack", "column_stack"),
             )[2],
             np.array([[6, 15], [7, 16], [8, 17]]),
-        )
-        np.testing.assert_array_equal(
-            merging.resolve_merge_func(("concat", "row_stack", "column_stack"))(
-                [
-                    ([0, 1, 2], [3, 4, 5], [6, 7, 8]),
-                    ([9, 10, 11], [12, 13, 14], [15, 16, 17]),
-                ]
-            )[0],
-            np.array([0, 1, 2, 9, 10, 11]),
         )

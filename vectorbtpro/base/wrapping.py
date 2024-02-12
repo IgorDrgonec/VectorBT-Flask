@@ -1289,6 +1289,8 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         **kwargs,
     ) -> tp.AnyArray1d:
         """Stack reduced objects along columns and wrap the final object."""
+        from vectorbtpro.base.merging import concat_arrays
+
         _self = self.resolve(group_by=group_by)
         if len(objs) == 1:
             objs = objs[0]
@@ -1298,7 +1300,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         for obj in objs:
             new_objs.append(reshaping.to_1d_array(obj))
 
-        stacked_obj = np.concatenate(new_objs)
+        stacked_obj = concat_arrays(new_objs)
         if wrap:
             return _self.wrap_reduced(stacked_obj, **kwargs)
         return stacked_obj
@@ -1311,6 +1313,8 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         **kwargs,
     ) -> tp.AnyArray:
         """Stack objects along rows and wrap the final object."""
+        from vectorbtpro.base.merging import row_stack_arrays
+
         _self = self.resolve(group_by=group_by)
         if len(objs) == 1:
             objs = objs[0]
@@ -1325,7 +1329,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
                 obj = np.repeat(obj, _self.shape_2d[1], axis=1)
             new_objs.append(obj)
 
-        stacked_obj = np.row_stack(new_objs)
+        stacked_obj = row_stack_arrays(new_objs)
         if wrap:
             return _self.wrap(stacked_obj, **kwargs)
         return stacked_obj
@@ -1342,6 +1346,8 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
 
         `reindex_kwargs` will be passed to
         [pandas.DataFrame.reindex](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reindex.html)."""
+        from vectorbtpro.base.merging import column_stack_arrays
+
         _self = self.resolve(group_by=group_by)
         if len(objs) == 1:
             objs = objs[0]
@@ -1361,7 +1367,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
                     obj = obj.astype(None)
             new_objs.append(reshaping.to_2d_array(obj))
 
-        stacked_obj = np.column_stack(new_objs)
+        stacked_obj = column_stack_arrays(new_objs)
         if wrap:
             return _self.wrap(stacked_obj, **kwargs)
         return stacked_obj

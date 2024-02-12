@@ -5,12 +5,13 @@
 import numpy as np
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.portfolio.enums import SimulationOutput
-from vectorbtpro.records.chunking import merge_records
 from vectorbtpro.utils.chunking import ChunkMeta, ArraySlicer
 from vectorbtpro.utils.config import ReadonlyConfig
 from vectorbtpro.utils.template import Rep
+from vectorbtpro.base import chunking as base_ch
+from vectorbtpro.base.merging import column_stack_arrays
+from vectorbtpro.portfolio.enums import SimulationOutput
+from vectorbtpro.records.chunking import merge_records
 
 __all__ = []
 
@@ -49,7 +50,7 @@ def in_outputs_merge_func(
         if not isinstance(v, np.ndarray):
             raise TypeError(f"Cannot merge in-output object '{k}' of type {type(v)}")
         if v.ndim == 2:
-            in_outputs[k] = np.column_stack([getattr(r.in_outputs, k) for r in results])
+            in_outputs[k] = column_stack_arrays([getattr(r.in_outputs, k) for r in results])
         elif v.ndim == 1:
             if v.dtype.fields is None:
                 in_outputs[k] = np.concatenate([getattr(r.in_outputs, k) for r in results])
@@ -80,15 +81,15 @@ def merge_sim_outs(
 
     target_shape = ann_args["target_shape"]["value"]
     if results[0].cash_deposits.shape == target_shape:
-        cash_deposits = np.column_stack([r.cash_deposits for r in results])
+        cash_deposits = column_stack_arrays([r.cash_deposits for r in results])
     else:
         cash_deposits = results[0].cash_deposits
     if results[0].cash_earnings.shape == target_shape:
-        cash_earnings = np.column_stack([r.cash_earnings for r in results])
+        cash_earnings = column_stack_arrays([r.cash_earnings for r in results])
     else:
         cash_earnings = results[0].cash_earnings
     if results[0].call_seq is not None:
-        call_seq = np.column_stack([r.call_seq for r in results])
+        call_seq = column_stack_arrays([r.call_seq for r in results])
     else:
         call_seq = None
     if results[0].in_outputs is not None:
