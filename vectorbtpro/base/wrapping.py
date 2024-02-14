@@ -449,7 +449,6 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
     ) -> None:
         checks.assert_not_none(index, arg_name="index")
         index = dt.prepare_dt_index(index, parse_index=parse_index)
-        freq = dt.infer_index_freq(index, freq=freq)
         if columns is None:
             columns = [None]
         if not isinstance(columns, pd.Index):

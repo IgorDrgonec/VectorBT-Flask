@@ -158,7 +158,7 @@ def prepare_offset_str(offset_str: str, allow_space: bool = False) -> str:
         elif unit.lower() in ("dec", "december"):
             unit = year_prefix + "-DEC"
         new_freq_parts.append(str(multiplier) + str(unit))
-    return ",".join(new_freq_parts)
+    return " ".join(new_freq_parts)
 
 
 def to_offset(freq: tp.FrequencyLike) -> BaseOffset:
@@ -175,6 +175,8 @@ def prepare_timedelta_str(timedelta_str: str, allow_space: bool = False) -> str:
 
     To include multiple units, separate them with comma, semicolon, or space if `allow_space` is True.
     The output becomes comma-separated."""
+    from vectorbtpro.utils import datetime_nb as nb
+
     if allow_space:
         freq_parts = re.split(r"[,;\s]", timedelta_str)
     else:
@@ -194,28 +196,30 @@ def prepare_timedelta_str(timedelta_str: str, allow_space: bool = False) -> str:
             multiplier *= 7
             unit = "d"
         elif unit == "M":
-            multiplier *= 365.2425 / 12
+            multiplier *= nb.mo_ns / nb.d_ns
             unit = "d"
         elif unit == "Q":
-            multiplier *= 365.2425 / 4
+            multiplier *= nb.q_ns / nb.d_ns
             unit = "d"
         elif unit == "Y":
-            multiplier *= 365.2425
+            multiplier *= nb.y_ns / nb.d_ns
             unit = "d"
         new_freq_parts.append(str(multiplier) + str(unit))
-    return ",".join(new_freq_parts)
+    return " ".join(new_freq_parts)
 
 
 def offset_to_timedelta(offset: BaseOffset) -> pd.Timedelta:
     """Convert offset to a timedelta."""
+    from vectorbtpro.utils import datetime_nb as nb
+
     if isinstance(offset, (pd.offsets.BusinessHour, pd.offsets.CustomBusinessHour)):
-        return pd.Timedelta(hours=offset.n)
+        return pd.Timedelta(nb.h_td * offset.n)
     if isinstance(offset, (pd.offsets.BusinessDay, pd.offsets.CustomBusinessDay)):
-        return pd.Timedelta(days=offset.n)
+        return pd.Timedelta(nb.d_td * offset.n)
     if isinstance(offset, pd.offsets.Week):
-        return pd.Timedelta(days=offset.n * 7)
+        return pd.Timedelta(nb.w_td * offset.n)
     if isinstance(offset, (pd.offsets.SemiMonthBegin, pd.offsets.SemiMonthEnd)):
-        return pd.Timedelta(days=offset.n * 365.2425 / 12 * 2)
+        return pd.Timedelta(nb.semi_mo_td * offset.n)
     if isinstance(
         offset,
         (
@@ -229,7 +233,7 @@ def offset_to_timedelta(offset: BaseOffset) -> pd.Timedelta:
             pd.offsets.LastWeekOfMonth,
         ),
     ):
-        return pd.Timedelta(days=offset.n * 365.2425 / 12)
+        return pd.Timedelta(nb.mo_td * offset.n)
     if isinstance(
         offset,
         (
@@ -240,7 +244,7 @@ def offset_to_timedelta(offset: BaseOffset) -> pd.Timedelta:
             pd.offsets.FY5253Quarter,
         ),
     ):
-        return pd.Timedelta(days=offset.n * 365.2425 / 4)
+        return pd.Timedelta(nb.q_td * offset.n)
     if isinstance(
         offset,
         (
@@ -252,7 +256,7 @@ def offset_to_timedelta(offset: BaseOffset) -> pd.Timedelta:
             pd.offsets.FY5253,
         ),
     ):
-        return pd.Timedelta(days=offset.n * 365.2425)
+        return pd.Timedelta(nb.y_td * offset.n)
     return pd.Timedelta(offset)
 
 
@@ -1062,56 +1066,75 @@ def auto_detect_freq(index: pd.Index) -> tp.Optional[tp.PandasFrequency]:
     return None
 
 
+def parse_index_freq(index: pd.DatetimeIndex) -> tp.Optional[tp.PandasFrequency]:
+    """Parse frequency from a datetime index."""
+    if index.freqstr is not None:
+        return to_freq(index.freqstr)
+    if index.freq is not None:
+        return to_freq(index.freq)
+    if len(index) >= 3:
+        freq = pd.infer_freq(index)
+        if freq is not None:
+            return to_freq(freq)
+    return None
+
+
+def freq_depends_on_index(freq: tp.Optional[tp.FrequencyLike] = None) -> bool:
+    """Return whether frequency depends on index."""
+    if freq is not None:
+        if isinstance(freq, str):
+            if freq.lower() in ("auto", "index_min", "index_max", "index_mean", "index_median"):
+                return True
+    return False
+
+
 def infer_index_freq(
     index: pd.Index,
     freq: tp.Optional[tp.FrequencyLike] = None,
     allow_offset: bool = True,
     allow_numeric: bool = True,
-    detect_freq: tp.Union[None, bool, str, tp.Callable] = None,
-    detect_freq_n: tp.Optional[int] = None,
+    freq_from_n: tp.Union[None, bool, int] = None,
 ) -> tp.Union[None, int, float, tp.PandasFrequency]:
     """Infer frequency of a datetime index if `freq` is None, otherwise convert `freq`.
 
-    Argument `detect_freq` can be one of the following:
-    * False: don't detect the frequency
-    * True: detect the frequency with `auto_detect_freq`
-    * string: call a method of the difference between each pair of indices (such as "mean")
-    * callable: call a custom function that takes the index and returns a frequency
+    If `freq` is "auto", uses `auto_detect_freq`. If `freq` is "index_min", "index_max", "index_mean",
+    or "index_median", applies the function to the difference between each pair of index points.
+    If `freq_from_n` is a positive or negative number, limits the index to the first or the
+    last N index points respectively.
 
-    If `detect_freq_n` is a positive or negative number, limits the index to the first or the
-    last N index points respectively."""
+    For defaults, see `vectorbtpro._settings.datetime`."""
     from vectorbtpro._settings import settings
 
     datetime_cfg = settings["datetime"]
 
-    if detect_freq is None:
-        detect_freq = datetime_cfg["detect_freq"]
-    if detect_freq_n is None:
-        detect_freq_n = datetime_cfg["detect_freq_n"]
+    if freq_from_n is None:
+        freq_from_n = datetime_cfg["freq_from_n"]
+    if isinstance(freq_from_n, bool):
+        if freq_from_n:
+            raise ValueError("freq_from_n cannot be True")
+        freq_from_n = None
 
-    if freq is None and isinstance(index, pd.DatetimeIndex):
-        if index.freqstr is not None:
-            freq = to_freq(index.freqstr)
-        elif index.freq is not None:
-            freq = to_freq(index.freq)
-        elif len(index) >= 3:
-            freq = pd.infer_freq(index)
-            if freq is not None:
-                freq = to_freq(freq)
-        if freq is None and detect_freq is not False:
-            if detect_freq_n is None:
-                index_subset = index
-            else:
-                if detect_freq_n >= 0:
-                    index_subset = index[:detect_freq_n]
+    if isinstance(index, pd.DatetimeIndex):
+        if freq is None:
+            freq = parse_index_freq(index)
+        elif isinstance(freq, str):
+            if freq_depends_on_index(freq):
+                new_freq = parse_index_freq(index)
+                if new_freq is not None:
+                    freq = new_freq
                 else:
-                    index_subset = index[detect_freq_n:]
-            if detect_freq is True:
-                freq = auto_detect_freq(index_subset)
-            elif isinstance(detect_freq, str):
-                freq = getattr(index_subset[1:] - index_subset[:-1], detect_freq.lower())()
-            else:
-                freq = detect_freq(index_subset)
+                    if freq_from_n is None:
+                        index_subset = index
+                    else:
+                        if freq_from_n >= 0:
+                            index_subset = index[:freq_from_n]
+                        else:
+                            index_subset = index[freq_from_n:]
+                    if freq.lower() == "auto":
+                        freq = auto_detect_freq(index_subset)
+                    else:
+                        method_name = freq.lower().replace("index_", "")
+                        freq = getattr(index_subset[1:] - index_subset[:-1], method_name)()
     if freq is None:
         return None
     if checks.is_number(freq) and allow_numeric:
@@ -1136,7 +1159,10 @@ def get_dt_index_gaps(
         raise ValueError("Datetime index must be unique")
     if not index.is_monotonic_increasing:
         raise ValueError("Datetime index must be monotonically increasing")
-    freq = infer_index_freq(index, freq=freq, allow_numeric=False, detect_freq=True)
+    if freq is None:
+        freq = infer_index_freq(index, freq="auto", allow_numeric=False, freq_from_n=False)
+    else:
+        freq = infer_index_freq(index, freq=freq, allow_numeric=False)
     if skip_index is not None:
         skip_index = prepare_dt_index(skip_index, **kwargs)
         checks.assert_instance_of(skip_index, pd.DatetimeIndex)

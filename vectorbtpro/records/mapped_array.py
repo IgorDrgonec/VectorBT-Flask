@@ -810,9 +810,9 @@ class MappedArray(Analyzable):
             return pd.Series(values, name=title)
         columns = list()
         columns.append(pd.Series(self.id_arr, name="Id"))
-        columns.append(pd.Series(self.wrapper.columns[self.col_arr], name="Column"))
+        columns.append(pd.Series(self.wrapper.columns[self.col_arr], name="Column"))  # TODO: multiindex
         if self.idx_arr is not None:
-            columns.append(pd.Series(self.wrapper.index[self.idx_arr], name="Index"))
+            columns.append(pd.Series(self.wrapper.index[self.idx_arr], name="Index"))  # TODO: mapped.index
         columns.append(values)
         return pd.concat(columns, axis=1)
 

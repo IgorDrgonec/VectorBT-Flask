@@ -7,6 +7,7 @@ from datetime import datetime as _datetime, timedelta as _timedelta, time as _ti
 from functools import wraps
 from itertools import product, combinations
 
+from pandas.tseries.frequencies import to_offset
 import pytest
 from numba import njit
 from numba.core.registry import CPUDispatcher
@@ -2379,6 +2380,21 @@ class TestParams:
 
 
 class TestDatetime:
+    def test_to_offsets(self):
+        assert datetime_.to_offset("d") == to_offset("1d")
+        assert datetime_.to_offset("day") == to_offset("1d")
+        assert datetime_.to_offset("m") == to_offset("1min")
+        assert datetime_.to_offset("1m") == to_offset("1min")
+        assert datetime_.to_offset("1 m") == to_offset("1min")
+        assert datetime_.to_offset("1 minute") == to_offset("1min")
+        assert datetime_.to_offset("2 minutes") == to_offset("2min")
+        assert datetime_.to_offset("1 hour, 2 minutes") == to_offset("1h 2min")
+        assert datetime_.to_offset("1 hour; 2 minutes") == to_offset("1h 2min")
+        assert datetime_.to_offset("2 weeks") == pd.offsets.Week(weekday=0) * 2
+        assert datetime_.to_offset("2 months") == pd.offsets.MonthBegin() * 2
+        assert datetime_.to_offset("2 quarter") == pd.offsets.QuarterBegin(startingMonth=1) * 2
+        assert datetime_.to_offset("2 years") == pd.offsets.YearBegin() * 2
+
     def test_to_timedelta(self):
         assert datetime_.to_timedelta("d") == pd.to_timedelta("1d")
         assert datetime_.to_timedelta("day") == pd.to_timedelta("1d")
@@ -2389,6 +2405,10 @@ class TestDatetime:
         assert datetime_.to_timedelta("2 minutes") == pd.to_timedelta("2min")
         assert datetime_.to_timedelta("1 hour, 2 minutes") == pd.to_timedelta("1h 2min")
         assert datetime_.to_timedelta("1 hour; 2 minutes") == pd.to_timedelta("1h 2min")
+        assert datetime_.to_timedelta("2 weeks") == pd.Timedelta(days=14)
+        assert datetime_.to_timedelta("2 months") == pd.Timedelta(days=365.2425 / 12 * 2)
+        assert datetime_.to_timedelta("2 quarter") == pd.Timedelta(days=365.2425 / 4 * 2)
+        assert datetime_.to_timedelta("2 years") == pd.Timedelta(days=365.2425 * 2)
 
     def test_get_utc_tz(self):
         assert datetime_.get_utc_tz().utcoffset(_datetime.now()) == _timedelta(0)

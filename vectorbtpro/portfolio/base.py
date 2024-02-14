@@ -1259,6 +1259,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         "use_in_outputs",
         "bm_close",
         "fillna_close",
+        "year_freq",
+        "returns_acc_defaults",
         "trades_type",
         "orders_cls",
         "logs_cls",
@@ -1291,6 +1293,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         use_in_outputs: tp.Optional[bool] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
         fillna_close: tp.Optional[bool] = None,
+        year_freq: tp.Optional[tp.FrequencyLike] = None,
+        returns_acc_defaults: tp.KwargsLike = None,
         trades_type: tp.Optional[tp.Union[str, int]] = None,
         orders_cls: tp.Optional[type] = None,
         logs_cls: tp.Optional[type] = None,
@@ -1337,6 +1341,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             use_in_outputs=use_in_outputs,
             bm_close=bm_close,
             fillna_close=fillna_close,
+            year_freq=year_freq,
+            returns_acc_defaults=returns_acc_defaults,
             trades_type=trades_type,
             orders_cls=orders_cls,
             logs_cls=logs_cls,
@@ -1396,6 +1402,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         self._use_in_outputs = use_in_outputs
         self._bm_close = bm_close
         self._fillna_close = fillna_close
+        self._year_freq = year_freq
+        self._returns_acc_defaults = returns_acc_defaults
         self._trades_type = trades_type
         self._orders_cls = orders_cls
         self._logs_cls = logs_cls
@@ -2352,7 +2360,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         broadcast_kwargs: tp.KwargsLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
-        freq: tp.Optional[tp.FrequencyLike] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
         records: tp.Optional[tp.RecordsLike] = None,
         return_preparer: bool = False,
@@ -2558,7 +2565,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             broadcast_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.reshaping.broadcast`.
             jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
             chunked (any): See `vectorbtpro.utils.chunking.resolve_chunked_option`.
-            freq (any): Index frequency in case it cannot be parsed from `close`.
             bm_close (array_like): Latest benchmark price at each time step.
                 Will broadcast.
 
@@ -2892,7 +2898,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         staticized: tp.StaticizedOption = None,
-        freq: tp.Optional[tp.FrequencyLike] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
         records: tp.Optional[tp.RecordsLike] = None,
         return_preparer: bool = False,
@@ -3194,7 +3199,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 simulator to a file. If a hashable or callable, will be used as a task id of an
                 already registered jittable and chunkable simulator. Dictionary allows additional options
                 `override` and `reload` to override and reload an already existing module respectively.
-            freq (any): See `Portfolio.from_orders`.
             bm_close (array_like): See `Portfolio.from_orders`.
             records (array_like): See `Portfolio.from_orders`.
             return_preparer (bool): See `Portfolio.from_orders`.
@@ -4053,7 +4057,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         staticized: tp.StaticizedOption = None,
-        freq: tp.Optional[tp.FrequencyLike] = None,
         bm_close: tp.Optional[tp.ArrayLike] = None,
         records: tp.Optional[tp.RecordsLike] = None,
         return_preparer: bool = False,
@@ -4214,7 +4217,6 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 simulator to a file. If a hashable or callable, will be used as a task id of an
                 already registered jittable and chunkable simulator. Dictionary allows additional options
                 `override` and `reload` to override and reload an already existing module respectively.
-            freq (any): See `Portfolio.from_orders`.
             bm_close (array_like): See `Portfolio.from_orders`.
             records (array_like): See `Portfolio.from_orders`.
             return_preparer (bool): See `Portfolio.from_orders`.
@@ -4797,6 +4799,20 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     def fillna_close(self) -> bool:
         """Whether to forward-backward fill NaN values in `Portfolio.close`."""
         return self._fillna_close
+
+    @property
+    def year_freq(self) -> tp.Optional[tp.PandasFrequency]:
+        """Year frequency."""
+        return ReturnsAccessor.resolve_year_freq(
+            year_freq=self._year_freq,
+            index=self.wrapper.index,
+            freq=self.wrapper.freq,
+        )
+
+    @property
+    def returns_acc_defaults(self) -> tp.KwargsLike:
+        """Defaults for `vectorbtpro.returns.accessors.ReturnsAccessor`."""
+        return self._returns_acc_defaults
 
     @property
     def trades_type(self) -> int:
@@ -6802,15 +6818,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cls_or_self,
         group_by: tp.GroupByLike = None,
         returns: tp.Optional[tp.SeriesFrame] = None,
+        use_asset_returns: bool = False,
         bm_returns: tp.Union[None, bool, tp.ArrayLike] = None,
         log_returns: bool = False,
         daily_returns: bool = False,
         freq: tp.Optional[tp.FrequencyLike] = None,
         year_freq: tp.Optional[tp.FrequencyLike] = None,
-        use_asset_returns: bool = False,
+        defaults: tp.KwargsLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
-        defaults: tp.KwargsLike = None,
         **kwargs,
     ) -> ReturnsAccessor:
         """Get returns accessor of type `vectorbtpro.returns.accessors.ReturnsAccessor`.
@@ -6850,6 +6866,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 bm_returns = None
             if freq is None:
                 freq = cls_or_self.wrapper.freq
+            if year_freq is None:
+                year_freq = cls_or_self.year_freq
+            defaults = merge_dicts(cls_or_self.returns_acc_defaults, defaults)
         else:
             checks.assert_not_none(returns, arg_name="returns")
 
@@ -6874,15 +6893,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cls_or_self,
         group_by: tp.GroupByLike = None,
         returns: tp.Optional[tp.SeriesFrame] = None,
+        use_asset_returns: bool = False,
         bm_returns: tp.Union[None, bool, tp.ArrayLike] = None,
         log_returns: bool = False,
         daily_returns: bool = False,
         freq: tp.Optional[tp.FrequencyLike] = None,
         year_freq: tp.Optional[tp.FrequencyLike] = None,
-        use_asset_returns: bool = False,
+        defaults: tp.KwargsLike = None,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
-        defaults: tp.KwargsLike = None,
         **kwargs,
     ) -> QSAdapterT:
         """Get quantstats adapter of type `vectorbtpro.returns.qs_adapter.QSAdapter`.
@@ -6893,15 +6912,15 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         returns_acc = cls_or_self.get_returns_acc(
             group_by=group_by,
             returns=returns,
+            use_asset_returns=use_asset_returns,
             bm_returns=bm_returns,
             log_returns=log_returns,
             daily_returns=daily_returns,
             freq=freq,
             year_freq=year_freq,
-            use_asset_returns=use_asset_returns,
+            defaults=defaults,
             jitted=jitted,
             chunked=chunked,
-            defaults=defaults,
         )
         return QSAdapter(returns_acc, **kwargs)
 
@@ -7019,12 +7038,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         `stats` from `vectorbtpro._settings.portfolio`."""
         from vectorbtpro._settings import settings
 
-        returns_cfg = settings["returns"]
         portfolio_stats_cfg = settings["portfolio"]["stats"]
 
         return merge_dicts(
             Analyzable.stats_defaults.__get__(self),
-            dict(settings=dict(year_freq=returns_cfg["year_freq"], trades_type=self.trades_type)),
+            dict(settings=dict(trades_type=self.trades_type)),
             portfolio_stats_cfg,
         )
 
@@ -7192,12 +7210,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     def returns_stats(
         self,
         group_by: tp.GroupByLike = None,
+        use_asset_returns: bool = False,
         bm_returns: tp.Union[None, bool, tp.ArrayLike] = None,
         log_returns: bool = False,
         daily_returns: bool = False,
         freq: tp.Optional[tp.FrequencyLike] = None,
         year_freq: tp.Optional[tp.FrequencyLike] = None,
-        use_asset_returns: bool = False,
         defaults: tp.KwargsLike = None,
         chunked: tp.ChunkedOption = None,
         **kwargs,
@@ -7210,12 +7228,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         If `bm_returns` is not set, uses `Portfolio.get_market_returns`."""
         returns_acc = self.get_returns_acc(
             group_by=group_by,
+            use_asset_returns=use_asset_returns,
             bm_returns=bm_returns,
             log_returns=log_returns,
             daily_returns=daily_returns,
             freq=freq,
             year_freq=year_freq,
-            use_asset_returns=use_asset_returns,
             defaults=defaults,
             chunked=chunked,
         )
@@ -7675,9 +7693,9 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         self,
         column: tp.Optional[tp.Label] = None,
         group_by: tp.GroupByLike = None,
+        use_asset_returns: bool = False,
         bm_returns: tp.Union[None, bool, tp.ArrayLike] = None,
         log_returns: bool = False,
-        use_asset_returns: bool = False,
         pct_scale: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
@@ -7953,12 +7971,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         `plots` from `vectorbtpro._settings.portfolio`."""
         from vectorbtpro._settings import settings
 
-        returns_cfg = settings["returns"]
         portfolio_plots_cfg = settings["portfolio"]["plots"]
 
         return merge_dicts(
             Analyzable.plots_defaults.__get__(self),
-            dict(settings=dict(year_freq=returns_cfg["year_freq"], trades_type=self.trades_type)),
+            dict(settings=dict(trades_type=self.trades_type)),
             portfolio_plots_cfg,
         )
 

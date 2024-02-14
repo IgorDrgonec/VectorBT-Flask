@@ -246,8 +246,8 @@ def resolve_pypfopt_func_kwargs(
             else:
                 if arg_name == "frequency":
                     ann_factor = ReturnsAccessor.get_ann_factor(
-                        _get_kwarg("year_freq", None),
-                        _get_kwarg("freq", None),
+                        year_freq=_get_kwarg("year_freq", None),
+                        freq=_get_kwarg("freq", None),
                     )
                     if ann_factor is not None:
                         pass_kwargs[orig_arg_name] = ann_factor
@@ -1284,8 +1284,6 @@ def riskfolio_optimize(
     from vectorbtpro._settings import settings
 
     riskfolio_cfg = dict(settings["pfopt"]["riskfolio"])
-    wrapping_cfg = settings["wrapping"]
-    returns_cfg = settings["returns"]
 
     def _resolve_setting(k, v):
         setting = riskfolio_cfg.pop(k)
@@ -1311,11 +1309,7 @@ def riskfolio_optimize(
     solvers = _resolve_setting("solvers", solvers)
     sol_params = _resolve_setting("sol_params", sol_params)
     freq = _resolve_setting("freq", freq)
-    if freq is None:
-        freq = wrapping_cfg["freq"]
     year_freq = _resolve_setting("year_freq", year_freq)
-    if year_freq is None:
-        year_freq = returns_cfg["year_freq"]
     pre_opt = _resolve_setting("pre_opt", pre_opt)
     pre_opt_kwargs = merge_dicts(riskfolio_cfg.pop("pre_opt_kwargs"), pre_opt_kwargs)
     pre_opt_as_w = _resolve_setting("pre_opt_as_w", pre_opt_as_w)
@@ -1562,7 +1556,7 @@ def riskfolio_optimize(
                         **kwargs,
                     )
                     P, Q = warn_stdout(rp.assets_views)(**matched_kwargs)
-                    ann_factor = ReturnsAccessor.get_ann_factor(year_freq, freq)
+                    ann_factor = ReturnsAccessor.get_ann_factor(year_freq=year_freq, freq=freq)
                     if ann_factor is not None:
                         Q /= ann_factor
                     else:
@@ -1599,7 +1593,7 @@ def riskfolio_optimize(
                         **kwargs,
                     )
                     P_f, Q_f = warn_stdout(rp.factors_views)(**matched_kwargs)
-                    ann_factor = ReturnsAccessor.get_ann_factor(year_freq, freq)
+                    ann_factor = ReturnsAccessor.get_ann_factor(year_freq=year_freq, freq=freq)
                     if ann_factor is not None:
                         Q_f /= ann_factor
                     else:

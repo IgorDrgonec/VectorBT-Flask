@@ -594,7 +594,7 @@ wrapping = frozen_cfg(
     column_only_select=False,
     range_only_select=False,
     group_select=True,
-    freq=None,
+    freq="auto",
     silence_warnings=False,
     zero_to_none=True,
     min_precision=None,
@@ -638,8 +638,7 @@ datetime = frozen_cfg(
         parse_with_dateparser=False,
     ),
     dateparser_kwargs=flex_cfg(),
-    detect_freq=True,
-    detect_freq_n=20,
+    freq_from_n=20,
 )
 """_"""
 
@@ -1574,13 +1573,14 @@ portfolio = frozen_cfg(
     ),
     # Portfolio
     freq=None,
+    year_freq=None,
     use_in_outputs=True,
     fillna_close=True,
     trades_type="exittrades",
     stats=flex_cfg(
         filters=flex_cfg(
             has_year_freq=flex_cfg(
-                filter_func=lambda self, metric_settings: metric_settings.get("year_freq", None) is not None,
+                filter_func=lambda self, metric_settings: self.year_freq is not None,
                 warning_message=Sub("Metric '$metric_name' requires year frequency to be set"),
             ),
             has_bm_returns=flex_cfg(
