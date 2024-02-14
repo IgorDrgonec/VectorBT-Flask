@@ -35,6 +35,9 @@ def split_freq_str(freq_str: str) -> tp.Optional[tp.Tuple[int, str]]:
     Can be used both as offset and timedelta.
 
     The following units are returned:
+    * "ns" for nanosecond
+    * "us" for microsecond
+    * "ms" for millisecond
     * "s" for second
     * "m" for minute
     * "h" for hour
@@ -1079,12 +1082,14 @@ def parse_index_freq(index: pd.DatetimeIndex) -> tp.Optional[tp.PandasFrequency]
     return None
 
 
-def freq_depends_on_index(freq: tp.Optional[tp.FrequencyLike] = None) -> bool:
+def freq_depends_on_index(freq: tp.FrequencyLike) -> bool:
     """Return whether frequency depends on index."""
-    if freq is not None:
-        if isinstance(freq, str):
-            if freq.lower() in ("auto", "index_min", "index_max", "index_mean", "index_median"):
-                return True
+    if isinstance(freq, str):
+        freq = " ".join(freq.strip().split())
+        if freq == "auto":
+            return True
+        if freq.startswith("index_"):
+            return True
     return False
 
 
@@ -1097,8 +1102,8 @@ def infer_index_freq(
 ) -> tp.Union[None, int, float, tp.PandasFrequency]:
     """Infer frequency of a datetime index if `freq` is None, otherwise convert `freq`.
 
-    If `freq` is "auto", uses `auto_detect_freq`. If `freq` is "index_min", "index_max", "index_mean",
-    or "index_median", applies the function to the difference between each pair of index points.
+    If `freq` is "auto", uses `auto_detect_freq`. If `freq` is "index_[method_name]", applies the
+    method to the `pd.TimedeltaIndex` resulting from the difference between each pair of index points.
     If `freq_from_n` is a positive or negative number, limits the index to the first or the
     last N index points respectively.
 

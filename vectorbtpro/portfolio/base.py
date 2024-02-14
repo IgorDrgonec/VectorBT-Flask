@@ -4803,7 +4803,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
     @property
     def year_freq(self) -> tp.Optional[tp.PandasFrequency]:
         """Year frequency."""
-        return ReturnsAccessor.resolve_year_freq(
+        return ReturnsAccessor.get_year_freq(
             year_freq=self._year_freq,
             index=self.wrapper.index,
             freq=self.wrapper.freq,

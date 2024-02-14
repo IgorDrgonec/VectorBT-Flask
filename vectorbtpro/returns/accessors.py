@@ -120,6 +120,7 @@ import warnings
 
 import numpy as np
 import pandas as pd
+from pandas.tseries.offsets import BaseOffset
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.accessors import register_vbt_accessor, register_df_vbt_accessor, register_sr_vbt_accessor
@@ -356,34 +357,80 @@ class ReturnsAccessor(GenericAccessor):
         return self._log_returns
 
     @classmethod
-    def auto_detect_year_freq(
-        cls,
-        index: pd.DatetimeIndex,
-        freq: tp.PandasFrequency,
-    ) -> tp.Optional[tp.PandasFrequency]:
+    def auto_detect_ann_factor(cls, index: pd.DatetimeIndex) -> tp.Optional[float]:
         """Auto-detect annualization factor from a datetime index."""
         checks.assert_instance_of(index, pd.DatetimeIndex, arg_name="index")
         if len(index) == 1:
             return None
         offset = index[0] + pd.offsets.YearBegin() - index[0]
         first_date = index[0] + offset
-        last_date = index[-1] + freq + offset
+        last_date = index[-1] + offset
         next_year_date = last_date + pd.offsets.YearBegin()
         ratio = (last_date.value - first_date.value) / (next_year_date.value - first_date.value)
         ann_factor = len(index) / ratio
         ann_factor /= next_year_date.year - first_date.year
-        if isinstance(freq, dt.BaseOffset):
+        return ann_factor
+
+    @classmethod
+    def parse_ann_factor(cls, index: pd.DatetimeIndex, method_name: str = "max") -> tp.Optional[float]:
+        """Parse annualization factor from a datetime index."""
+        checks.assert_instance_of(index, pd.DatetimeIndex, arg_name="index")
+        if len(index) == 1:
+            return None
+        offset = index[0] + pd.offsets.YearBegin() - index[0]
+        shifted_index = index + offset
+        years = shifted_index.year
+        full_years = years[years < years.max()]
+        if len(full_years) == 0:
+            return None
+        return getattr(full_years.value_counts(), method_name.lower())()
+
+    @classmethod
+    def ann_factor_to_year_freq(
+        cls,
+        ann_factor: float,
+        freq: tp.PandasFrequency,
+        method_name: tp.Optional[str] = None,
+    ) -> tp.PandasFrequency:
+        """Convert annualization factor into year frequency."""
+        if method_name not in (None, False):
+            if method_name is True:
+                ann_factor = round(ann_factor)
+            else:
+                ann_factor = getattr(np, method_name.lower())(ann_factor)
+        if checks.is_float(ann_factor) and float.is_integer(ann_factor):
+            ann_factor = int(ann_factor)
+        if checks.is_float(ann_factor) and isinstance(freq, BaseOffset):
             freq = dt.offset_to_timedelta(freq)
         return ann_factor * freq
 
     @classmethod
-    def resolve_year_freq(
-        cls,
+    def year_freq_depends_on_index(cls, year_freq: tp.FrequencyLike) -> bool:
+        """Return whether frequency depends on index."""
+        if isinstance(year_freq, str):
+            year_freq = " ".join(year_freq.strip().split())
+            if year_freq == "auto" or year_freq.startswith("auto_"):
+                return True
+            if year_freq.startswith("index_"):
+                return True
+        return False
+
+    @class_or_instancemethod
+    def get_year_freq(
+        cls_or_self,
         year_freq: tp.Optional[tp.FrequencyLike] = None,
         index: tp.Optional[tp.Index] = None,
         freq: tp.Optional[tp.PandasFrequency] = None,
     ) -> tp.Optional[tp.PandasFrequency]:
-        """Resolve year frequency."""
+        """Resolve year frequency.
+
+        If `year_freq` is "auto", uses `ReturnsAccessor.auto_detect_ann_factor`. If `year_freq`
+        is "auto_[method_name]`, also applies the method `np.[method_name]` to the annualization factor,
+        mostly to round it. If `year_freq` is "index_[method_name]", uses `ReturnsAccessor.parse_ann_factor`
+        to determine the annualization factor by applying the method to `pd.DatetimeIndex.year`."""
+        if not isinstance(cls_or_self, type):
+            if year_freq is None:
+                year_freq = cls_or_self._year_freq
         if year_freq is None:
             from vectorbtpro._settings import settings
 
@@ -392,20 +439,44 @@ class ReturnsAccessor(GenericAccessor):
             year_freq = returns_cfg["year_freq"]
         if year_freq is None:
             return None
-        if isinstance(year_freq, str) and year_freq.lower() == "auto":
-            if index is None or not isinstance(index, pd.DatetimeIndex) or freq is None:
-                return None
-            year_freq = cls.auto_detect_year_freq(index, freq)
+
+        if isinstance(year_freq, str):
+            year_freq = " ".join(year_freq.strip().split())
+            if cls_or_self.year_freq_depends_on_index(year_freq):
+                if not isinstance(cls_or_self, type):
+                    if index is None:
+                        index = cls_or_self.wrapper.index
+                    if freq is None:
+                        freq = cls_or_self.wrapper.freq
+                if index is None or not isinstance(index, pd.DatetimeIndex) or freq is None:
+                    return None
+
+                if year_freq == "auto" or year_freq.startswith("auto_"):
+                    ann_factor = cls_or_self.auto_detect_ann_factor(index)
+                    if year_freq == "auto":
+                        method_name = None
+                    else:
+                        method_name = year_freq.replace("auto_", "")
+                    year_freq = cls_or_self.ann_factor_to_year_freq(
+                        ann_factor,
+                        dt.to_freq(freq),
+                        method_name=method_name,
+                    )
+                else:
+                    method_name = year_freq.replace("index_", "")
+                    ann_factor = cls_or_self.parse_ann_factor(index, method_name=method_name)
+                    year_freq = cls_or_self.ann_factor_to_year_freq(
+                        ann_factor,
+                        dt.to_freq(freq),
+                        method_name=None,
+                    )
+
         return dt.to_freq(year_freq)
 
     @property
     def year_freq(self) -> tp.Optional[tp.PandasFrequency]:
         """Year frequency."""
-        return self.resolve_year_freq(
-            year_freq=self._year_freq,
-            index=self.wrapper.index,
-            freq=self.wrapper.freq,
-        )
+        return self.get_year_freq()
 
     @class_or_instancemethod
     def get_ann_factor(
@@ -425,7 +496,7 @@ class ReturnsAccessor(GenericAccessor):
                 year_freq = returns_cfg["year_freq"]
             if freq is None:
                 freq = wrapping_cfg["freq"]
-            if dt.freq_depends_on_index(freq):
+            if freq is not None and dt.freq_depends_on_index(freq):
                 freq = None
         else:
             if year_freq is None:
