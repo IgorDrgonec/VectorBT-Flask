@@ -418,7 +418,7 @@ from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridCo
 from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method
 from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, attach_unary_magic_methods
 from vectorbtpro.utils.mapping import to_value_mapping, apply_mapping
-from vectorbtpro.base.reshaping import to_1d_array, to_dict
+from vectorbtpro.base.reshaping import to_1d_array, to_dict, index_to_series, index_to_frame
 from vectorbtpro.base.merging import concat_arrays, column_stack_arrays
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper
@@ -803,18 +803,33 @@ class MappedArray(Analyzable):
         """Mapped array."""
         return self.mapped_arr
 
-    def to_readable(self, title: str = "Value", only_values: bool = False, **kwargs) -> tp.SeriesFrame:
+    def to_readable(
+        self,
+        title: str = "Value",
+        only_values: bool = False,
+        expand_columns: bool = False,
+        **kwargs,
+    ) -> tp.SeriesFrame:
         """Get values in a human-readable format."""
         values = pd.Series(self.apply_mapping(**kwargs).values, name=title)
         if only_values:
             return pd.Series(values, name=title)
-        columns = list()
-        columns.append(pd.Series(self.id_arr, name="Id"))
-        columns.append(pd.Series(self.wrapper.columns[self.col_arr], name="Column"))  # TODO: multiindex
+        new_columns = list()
+        new_columns.append(pd.Series(self.id_arr, name="Id"))
+        column_index = self.wrapper.columns[self.col_arr]
+        if expand_columns and isinstance(column_index, pd.MultiIndex):
+            column_frame = index_to_frame(column_index, reset_index=True)
+            new_columns.append(column_frame.add_prefix("Column: "))
+        else:
+            column_sr = index_to_series(column_index, reset_index=True)
+            if expand_columns and self.wrapper.ndim == 2 and column_sr.name is not None:
+                new_columns.append(column_sr.rename(f"Column: {column_sr.name}"))
+            else:
+                new_columns.append(column_sr.rename("Column"))
         if self.idx_arr is not None:
-            columns.append(pd.Series(self.wrapper.index[self.idx_arr], name="Index"))  # TODO: mapped.index
-        columns.append(values)
-        return pd.concat(columns, axis=1)
+            new_columns.append(pd.Series(self.wrapper.index[self.idx_arr], name="Index"))
+        new_columns.append(values)
+        return pd.concat(new_columns, axis=1)
 
     @property
     def mapped_readable(self) -> tp.SeriesFrame:

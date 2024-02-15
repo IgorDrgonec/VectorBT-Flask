@@ -96,9 +96,18 @@ def tile_shape(shape: tp.ShapeLike, n: int, axis: int = 1) -> tp.Shape:
     return repeat_shape(shape, n, axis=axis)
 
 
-def index_to_series(arg: tp.Index) -> tp.Series:
+def index_to_series(arg: tp.Index, reset_index: bool = False) -> tp.Series:
     """Convert Index to Series."""
+    if reset_index:
+        return arg.to_series(index=pd.RangeIndex(stop=len(arg)))
     return arg.to_series()
+
+
+def index_to_frame(arg: tp.Index, reset_index: bool = False) -> tp.Frame:
+    """Convert Index to DataFrame."""
+    if not isinstance(arg, pd.MultiIndex):
+        return index_to_series(arg, reset_index=reset_index).to_frame()
+    return arg.to_frame(index=not reset_index)
 
 
 def mapping_to_series(arg: tp.MappingLike) -> tp.Series:
