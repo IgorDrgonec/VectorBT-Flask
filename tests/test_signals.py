@@ -1869,123 +1869,6 @@ class TestAccessors:
             )[2],
         )
 
-    def test_unravel(self):
-        assert_frame_equal(
-            mask.vbt.signals.unravel(),
-            pd.DataFrame(
-                [
-                    [True, False, False, False, False],
-                    [False, False, True, False, False],
-                    [False, False, False, False, True],
-                    [False, True, False, False, False],
-                    [False, False, False, True, False]
-                ],
-                index=mask.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (0, 'a'),
-                    (1, 'a'),
-                    (0, 'b'),
-                    (1, 'b'),
-                    (0, 'c')
-                ], names=['signal', None]),
-            )
-        )
-        mask2 = mask.copy()
-        mask2.iloc[:, 1] = False
-        assert_frame_equal(
-            mask2.vbt.signals.unravel(),
-            pd.DataFrame(
-                [
-                    [True, False, False, False],
-                    [False, False, False, False],
-                    [False, False, False, True],
-                    [False, True, False, False],
-                    [False, False, False, False]
-                ],
-                index=mask2.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (0, 'a'),
-                    (1, 'a'),
-                    (-1, 'b'),
-                    (0, 'c')
-                ], names=['signal', None]),
-            )
-        )
-        mask3 = mask.copy()
-        mask3.iloc[:] = False
-        assert_frame_equal(
-            mask3.vbt.signals.unravel(),
-            pd.DataFrame(
-                [
-                    [False, False, False],
-                    [False, False, False],
-                    [False, False, False],
-                    [False, False, False],
-                    [False, False, False]
-                ],
-                index=mask2.index,
-                columns=pd.Index(['a', 'b', 'c'], dtype='object'),
-            )
-        )
-        assert_frame_equal(
-            mask3.vbt.signals.unravel(force_signal_index=True),
-            pd.DataFrame(
-                [
-                    [False, False, False],
-                    [False, False, False],
-                    [False, False, False],
-                    [False, False, False],
-                    [False, False, False]
-                ],
-                index=mask2.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (-1, 'a'),
-                    (-1, 'b'),
-                    (-1, 'c'),
-                ], names=['signal', None]),
-            )
-        )
-        assert_frame_equal(
-            mask.vbt.signals.unravel(signal_index_type="positions"),
-            pd.DataFrame(
-                [
-                    [True, False, False, False, False],
-                    [False, False, True, False, False],
-                    [False, False, False, False, True],
-                    [False, True, False, False, False],
-                    [False, False, False, True, False]
-                ],
-                index=mask.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (0, 'a'),
-                    (3, 'a'),
-                    (1, 'b'),
-                    (4, 'b'),
-                    (2, 'c')
-                ], names=['signal', None]),
-            )
-        )
-        assert_frame_equal(
-            mask.vbt.signals.unravel(signal_index_type="labels"),
-            pd.DataFrame(
-                [
-                    [True, False, False, False, False],
-                    [False, False, True, False, False],
-                    [False, False, False, False, True],
-                    [False, True, False, False, False],
-                    [False, False, False, True, False]
-                ],
-                index=mask.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (mask.index[0], 'a'),
-                    (mask.index[3], 'a'),
-                    (mask.index[1], 'b'),
-                    (mask.index[4], 'b'),
-                    (mask.index[2], 'c')
-                ], names=['signal', None]),
-            )
-        )
-
     def test_between_ranges(self):
         ranges = mask.vbt.signals.between_ranges()
         assert_records_close(ranges.values, np.array([(0, 0, 0, 3, 1), (0, 1, 1, 4, 1)], dtype=range_dt))
@@ -1997,7 +1880,7 @@ class TestAccessors:
         )
         assert ranges.wrapper == mask.vbt.wrapper
 
-        mask2 = pd.DataFrame(
+        source = pd.DataFrame(
             [
                 [True, True, True],
                 [True, True, True],
@@ -2008,8 +1891,7 @@ class TestAccessors:
             index=mask.index,
             columns=mask.columns,
         )
-
-        other_mask = pd.DataFrame(
+        target = pd.DataFrame(
             [
                 [False, False, False],
                 [True, False, False],
@@ -2020,27 +1902,73 @@ class TestAccessors:
             index=mask.index,
             columns=mask.columns,
         )
-
-        ranges = mask2.vbt.signals.between_ranges(other=other_mask)
+        ranges = source.vbt.signals.between_ranges(target=target)
         assert_records_close(
             ranges.values,
             np.array(
-                [(0, 0, 1, 1, 1), (1, 0, 1, 2, 1), (0, 1, 1, 2, 1), (1, 1, 1, 3, 1), (0, 2, 1, 3, 1), (1, 2, 1, 4, 1)],
+                [
+                    (0, 0, 1, 1, 1),
+                    (1, 0, 1, 2, 1),
+                    (0, 1, 1, 2, 1),
+                    (1, 1, 1, 3, 1),
+                    (0, 2, 1, 3, 1),
+                    (1, 2, 1, 4, 1),
+                ],
                 dtype=range_dt,
             ),
         )
-        assert ranges.wrapper == mask2.vbt.wrapper
-
-        ranges = mask2.vbt.signals.between_ranges(other=other_mask, from_other=True)
+        assert ranges.wrapper == source.vbt.wrapper
+        ranges = source.vbt.signals.between_ranges(target=target, relation="manyone")
         assert_records_close(
             ranges.values,
             np.array(
-                [(0, 0, 1, 1, 1), (1, 0, 0, 1, 1), (0, 1, 1, 2, 1), (1, 1, 0, 2, 1), (0, 2, 1, 3, 1), (1, 2, 0, 3, 1)],
+                [
+                    (0, 0, 0, 1, 1),
+                    (1, 0, 1, 1, 1),
+                    (0, 1, 0, 2, 1),
+                    (1, 1, 1, 2, 1),
+                    (0, 2, 0, 3, 1),
+                    (1, 2, 1, 3, 1),
+                ],
                 dtype=range_dt,
             ),
         )
-        assert ranges.wrapper == mask2.vbt.wrapper
-
+        assert ranges.wrapper == source.vbt.wrapper
+        ranges = source.vbt.signals.between_ranges(target=target, relation="manymany")
+        assert_records_close(
+            ranges.values,
+            np.array(
+                [
+                    (0, 0, 0, 1, 1),
+                    (1, 0, 1, 1, 1),
+                    (2, 0, 1, 2, 1),
+                    (0, 1, 0, 2, 1),
+                    (1, 1, 1, 2, 1),
+                    (2, 1, 1, 3, 1),
+                    (0, 2, 0, 3, 1),
+                    (1, 2, 1, 3, 1),
+                    (2, 2, 1, 4, 1),
+                ],
+                dtype=range_dt,
+            ),
+        )
+        assert ranges.wrapper == source.vbt.wrapper
+        ranges = source.vbt.signals.between_ranges(target=target, relation="oneone")
+        assert_records_close(
+            ranges.values,
+            np.array(
+                [
+                    (0, 0, 0, 1, 1),
+                    (1, 0, 1, 2, 1),
+                    (0, 1, 0, 2, 1),
+                    (1, 1, 1, 3, 1),
+                    (0, 2, 0, 3, 1),
+                    (1, 2, 1, 4, 1),
+                ],
+                dtype=range_dt,
+            ),
+        )
+        assert ranges.wrapper == source.vbt.wrapper
         assert_records_close(
             mask.vbt.signals.between_ranges(jitted=dict(parallel=True)).values,
             mask.vbt.signals.between_ranges(jitted=dict(parallel=False)).values,
@@ -2050,12 +1978,12 @@ class TestAccessors:
             mask.vbt.signals.between_ranges(chunked=False).values,
         )
         assert_records_close(
-            mask.vbt.signals.between_ranges(other=other_mask, jitted=dict(parallel=True)).values,
-            mask.vbt.signals.between_ranges(other=other_mask, jitted=dict(parallel=False)).values,
+            mask.vbt.signals.between_ranges(target=target, jitted=dict(parallel=True)).values,
+            mask.vbt.signals.between_ranges(target=target, jitted=dict(parallel=False)).values,
         )
         assert_records_close(
-            mask.vbt.signals.between_ranges(other=other_mask, chunked=True).values,
-            mask.vbt.signals.between_ranges(other=other_mask, chunked=False).values,
+            mask.vbt.signals.between_ranges(target=target, chunked=True).values,
+            mask.vbt.signals.between_ranges(target=target, chunked=False).values,
         )
 
     def test_partition_ranges(self):
@@ -2105,6 +2033,568 @@ class TestAccessors:
         assert_records_close(
             mask.vbt.signals.between_partition_ranges(chunked=True).values,
             mask.vbt.signals.between_partition_ranges(chunked=False).values,
+        )
+
+    def test_unravel(self):
+        assert_frame_equal(
+            mask.vbt.signals.unravel(),
+            pd.DataFrame(
+                [
+                    [True, False, False, False, False],
+                    [False, False, True, False, False],
+                    [False, False, False, False, True],
+                    [False, True, False, False, False],
+                    [False, False, False, True, False],
+                ],
+                index=mask.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [(0, "a"), (1, "a"), (0, "b"), (1, "b"), (0, "c")], names=["signal", None]
+                ),
+            ),
+        )
+        mask2 = mask.copy()
+        mask2.iloc[:, 1] = False
+        assert_frame_equal(
+            mask2.vbt.signals.unravel(),
+            pd.DataFrame(
+                [
+                    [True, False, False, False],
+                    [False, False, False, False],
+                    [False, False, False, True],
+                    [False, True, False, False],
+                    [False, False, False, False],
+                ],
+                index=mask2.index,
+                columns=pd.MultiIndex.from_tuples([(0, "a"), (1, "a"), (-1, "b"), (0, "c")], names=["signal", None]),
+            ),
+        )
+        assert_frame_equal(
+            mask2.vbt.signals.unravel(incl_empty_cols=False),
+            pd.DataFrame(
+                [
+                    [True, False, False],
+                    [False, False, False],
+                    [False, False, True],
+                    [False, True, False],
+                    [False, False, False],
+                ],
+                index=mask2.index,
+                columns=pd.MultiIndex.from_tuples([(0, "a"), (1, "a"), (0, "c")], names=["signal", None]),
+            ),
+        )
+        mask3 = mask.copy()
+        mask3.iloc[:] = False
+        assert_frame_equal(
+            mask3.vbt.signals.unravel(),
+            pd.DataFrame(
+                [
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                ],
+                index=mask2.index,
+                columns=pd.Index(["a", "b", "c"], dtype="object"),
+            ),
+        )
+        assert_frame_equal(
+            mask3.vbt.signals.unravel(force_signal_index=True),
+            pd.DataFrame(
+                [
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                ],
+                index=mask2.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        (-1, "a"),
+                        (-1, "b"),
+                        (-1, "c"),
+                    ],
+                    names=["signal", None],
+                ),
+            ),
+        )
+        with pytest.raises(Exception):
+            mask3.vbt.signals.unravel(incl_empty_cols=False)
+        assert_frame_equal(
+            mask.vbt.signals.unravel(signal_index_type="positions"),
+            pd.DataFrame(
+                [
+                    [True, False, False, False, False],
+                    [False, False, True, False, False],
+                    [False, False, False, False, True],
+                    [False, True, False, False, False],
+                    [False, False, False, True, False],
+                ],
+                index=mask.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [(0, "a"), (3, "a"), (1, "b"), (4, "b"), (2, "c")], names=["signal", None]
+                ),
+            ),
+        )
+        assert_frame_equal(
+            mask.vbt.signals.unravel(signal_index_type="labels"),
+            pd.DataFrame(
+                [
+                    [True, False, False, False, False],
+                    [False, False, True, False, False],
+                    [False, False, False, False, True],
+                    [False, True, False, False, False],
+                    [False, False, False, True, False],
+                ],
+                index=mask.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        (mask.index[0], "a"),
+                        (mask.index[3], "a"),
+                        (mask.index[1], "b"),
+                        (mask.index[4], "b"),
+                        (mask.index[2], "c"),
+                    ],
+                    names=["signal", None],
+                ),
+            ),
+        )
+
+    def test_unravel_between(self):
+        assert_frame_equal(
+            mask.vbt.signals.unravel_between(incl_open_source=True),
+            pd.DataFrame(
+                [
+                    [True, False, False, False, False],
+                    [False, False, True, False, False],
+                    [False, False, False, False, True],
+                    [True, True, False, False, False],
+                    [False, False, True, True, False],
+                ],
+                index=mask.index,
+                columns=pd.MultiIndex.from_tuples([
+                    (0, "a"),
+                    (1, "a"),
+                    (0, "b"),
+                    (1, "b"),
+                    (0, "c"),
+                ], names=["signal", None]),
+            ),
+        )
+        mask2 = mask.copy()
+        mask2.iloc[:, 1] = False
+        assert_frame_equal(
+            mask2.vbt.signals.unravel_between(incl_open_source=True),
+            pd.DataFrame(
+                [
+                    [True, False, False, False],
+                    [False, False, False, False],
+                    [False, False, False, True],
+                    [True, True, False, False],
+                    [False, False, False, False],
+                ],
+                index=mask2.index,
+                columns=pd.MultiIndex.from_tuples([
+                    (0, "a"),
+                    (1, "a"),
+                    (-1, "b"),
+                    (0, "c"),
+                ], names=["signal", None]),
+            ),
+        )
+        assert_frame_equal(
+            mask2.vbt.signals.unravel_between(incl_open_source=True, incl_empty_cols=False),
+            pd.DataFrame(
+                [
+                    [True, False, False],
+                    [False, False, False],
+                    [False, False, True],
+                    [True, True, False],
+                    [False, False, False],
+                ],
+                index=mask2.index,
+                columns=pd.MultiIndex.from_tuples([
+                    (0, "a"),
+                    (1, "a"),
+                    (0, "c"),
+                ], names=["signal", None]),
+            ),
+        )
+        mask3 = mask.copy()
+        mask3.iloc[:] = False
+        assert_frame_equal(
+            mask3.vbt.signals.unravel_between(incl_open_source=True),
+            pd.DataFrame(
+                [
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                ],
+                index=mask2.index,
+                columns=pd.Index(["a", "b", "c"], dtype="object"),
+            ),
+        )
+        assert_frame_equal(
+            mask3.vbt.signals.unravel_between(force_signal_index=True),
+            pd.DataFrame(
+                [
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                ],
+                index=mask2.index,
+                columns=pd.MultiIndex.from_tuples([
+                    (-1, "a"),
+                    (-1, "b"),
+                    (-1, "c"),
+                ], names=["signal", None]),
+            ),
+        )
+        with pytest.raises(Exception):
+            mask3.vbt.signals.unravel_between(incl_empty_cols=False)
+        assert_frame_equal(
+            mask.vbt.signals.unravel_between(incl_open_source=True, signal_index_type="positions"),
+            pd.DataFrame(
+                [
+                    [True, False, False, False, False],
+                    [False, False, True, False, False],
+                    [False, False, False, False, True],
+                    [True, True, False, False, False],
+                    [False, False, True, True, False],
+                ],
+                index=mask.index,
+                columns=pd.MultiIndex.from_tuples([
+                    (0, 3, "a"),
+                    (3, -1, "a"),
+                    (1, 4, "b"),
+                    (4, -1, "b"),
+                    (2, -1, "c"),
+                ], names=["source_signal", "target_signal", None]),
+            ),
+        )
+        assert_frame_equal(
+            mask.vbt.signals.unravel_between(signal_index_type="labels", incl_empty_cols=False),
+            pd.DataFrame(
+                [
+                    [True, False],
+                    [False, True],
+                    [False, False],
+                    [True, False],
+                    [False, True],
+                ],
+                index=mask.index,
+                columns=pd.MultiIndex.from_tuples([
+                    (mask.index[0], mask.index[3], "a"),
+                    (mask.index[1], mask.index[4], "b"),
+                ], names=["source_signal", "target_signal", None]),
+            ),
+        )
+        assert_frame_equal(
+            mask.vbt.signals.unravel_between(mask.vbt.signals.fshift(), incl_open_source=True)[0],
+            pd.DataFrame(
+                [
+                    [True, False, False, False, False],
+                    [False, False, True, False, False],
+                    [False, False, False, False, True],
+                    [False, True, False, False, False],
+                    [False, False, False, True, False],
+                ],
+                index=mask.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [(0, "a"), (1, "a"), (0, "b"), (1, "b"), (0, "c")],
+                    names=["signal", None],
+                ),
+            ),
+        )
+        assert_frame_equal(
+            mask.vbt.signals.unravel_between(mask.vbt.signals.fshift(), incl_open_source=True)[1],
+            pd.DataFrame(
+                [
+                    [False, False, False, False, False],
+                    [True, False, False, False, False],
+                    [False, False, True, False, False],
+                    [False, False, False, False, True],
+                    [False, True, False, False, False],
+                ],
+                index=mask.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [(0, "a"), (1, "a"), (0, "b"), (1, "b"), (0, "c")],
+                    names=["signal", None],
+                ),
+            ),
+        )
+        mask2 = mask.copy()
+        mask2.iloc[:, 1] = False
+        assert_frame_equal(
+            mask2.vbt.signals.unravel_between(mask2.vbt.signals.fshift(), incl_open_source=True)[0],
+            pd.DataFrame(
+                [
+                    [True, False, False, False],
+                    [False, False, False, False],
+                    [False, False, False, True],
+                    [False, True, False, False],
+                    [False, False, False, False],
+                ],
+                index=mask2.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [(0, "a"), (1, "a"), (-1, "b"), (0, "c")],
+                    names=["signal", None],
+                ),
+            ),
+        )
+        assert_frame_equal(
+            mask2.vbt.signals.unravel_between(mask2.vbt.signals.fshift(), incl_open_source=True)[1],
+            pd.DataFrame(
+                [
+                    [False, False, False, False],
+                    [True, False, False, False],
+                    [False, False, False, False],
+                    [False, False, False, True],
+                    [False, True, False, False],
+                ],
+                index=mask2.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [(0, "a"), (1, "a"), (-1, "b"), (0, "c")],
+                    names=["signal", None],
+                ),
+            ),
+        )
+        assert_frame_equal(
+            mask2.vbt.signals.unravel_between(
+                mask2.vbt.signals.fshift(),
+                incl_open_source=True,
+                incl_empty_cols=False,
+            )[0],
+            pd.DataFrame(
+                [
+                    [True, False, False],
+                    [False, False, False],
+                    [False, False, True],
+                    [False, True, False],
+                    [False, False, False],
+                ],
+                index=mask2.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [(0, "a"), (1, "a"), (0, "c")], names=["signal", None]
+                ),
+            ),
+        )
+        assert_frame_equal(
+            mask2.vbt.signals.unravel_between(
+                mask2.vbt.signals.fshift(),
+                incl_open_source=True,
+                incl_empty_cols=False,
+            )[1],
+            pd.DataFrame(
+                [
+                    [False, False, False],
+                    [True, False, False],
+                    [False, False, False],
+                    [False, False, True],
+                    [False, True, False],
+                ],
+                index=mask2.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [(0, "a"), (1, "a"), (0, "c")], names=["signal", None]
+                ),
+            ),
+        )
+        mask3 = mask.copy()
+        mask3.iloc[:] = False
+        assert_frame_equal(
+            mask3.vbt.signals.unravel_between(mask3.vbt.signals.fshift(), incl_open_source=True)[0],
+            pd.DataFrame(
+                [
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                ],
+                index=mask2.index,
+                columns=pd.Index(["a", "b", "c"], dtype="object"),
+            ),
+        )
+        assert_frame_equal(
+            mask3.vbt.signals.unravel_between(mask3.vbt.signals.fshift(), incl_open_source=True)[1],
+            pd.DataFrame(
+                [
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                ],
+                index=mask2.index,
+                columns=pd.Index(["a", "b", "c"], dtype="object"),
+            ),
+        )
+        assert_frame_equal(
+            mask3.vbt.signals.unravel_between(
+                mask3.vbt.signals.fshift(),
+                incl_open_source=True,
+                force_signal_index=True,
+            )[0],
+            pd.DataFrame(
+                [
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                ],
+                index=mask2.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        (-1, "a"),
+                        (-1, "b"),
+                        (-1, "c"),
+                    ],
+                    names=["signal", None],
+                ),
+            ),
+        )
+        assert_frame_equal(
+            mask3.vbt.signals.unravel_between(
+                mask3.vbt.signals.fshift(),
+                incl_open_source=True,
+                force_signal_index=True,
+            )[1],
+            pd.DataFrame(
+                [
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                ],
+                index=mask2.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        (-1, "a"),
+                        (-1, "b"),
+                        (-1, "c"),
+                    ],
+                    names=["signal", None],
+                ),
+            ),
+        )
+        with pytest.raises(Exception):
+            mask3.vbt.signals.unravel_between(mask3.vbt.signals.fshift(), incl_empty_cols=False)
+        assert_frame_equal(
+            mask.vbt.signals.unravel_between(
+                mask.vbt.signals.fshift(),
+                incl_open_source=True,
+                signal_index_type="range",
+            )[0],
+            pd.DataFrame(
+                [
+                    [True, False, False, False, False],
+                    [False, False, True, False, False],
+                    [False, False, False, False, True],
+                    [False, True, False, False, False],
+                    [False, False, False, True, False],
+                ],
+                index=mask.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [(0, 0, "a"), (1, 1, "a"), (0, 0, "b"), (1, -1, "b"), (0, 0, "c")],
+                    names=["source_signal", "target_signal", None],
+                ),
+            ),
+        )
+        assert_frame_equal(
+            mask.vbt.signals.unravel_between(
+                mask.vbt.signals.fshift(),
+                incl_open_source=True,
+                signal_index_type="source_range",
+            )[0],
+            pd.DataFrame(
+                [
+                    [True, False, False, False, False],
+                    [False, False, True, False, False],
+                    [False, False, False, False, True],
+                    [False, True, False, False, False],
+                    [False, False, False, True, False],
+                ],
+                index=mask.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [(0, "a"), (1, "a"), (0, "b"), (1, "b"), (0, "c")],
+                    names=["signal", None],
+                ),
+            ),
+        )
+        assert_frame_equal(
+            mask.vbt.signals.unravel_between(
+                mask.vbt.signals.fshift(),
+                incl_open_source=True,
+                signal_index_type="target_range",
+            )[0],
+            pd.DataFrame(
+                [
+                    [True, False, False, False, False],
+                    [False, False, True, False, False],
+                    [False, False, False, False, True],
+                    [False, True, False, False, False],
+                    [False, False, False, True, False],
+                ],
+                index=mask.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [(0, "a"), (1, "a"), (0, "b"), (-1, "b"), (0, "c")],
+                    names=["signal", None],
+                ),
+            ),
+        )
+        assert_frame_equal(
+            mask.vbt.signals.unravel_between(
+                mask.vbt.signals.fshift(),
+                incl_open_source=True,
+                signal_index_type="positions",
+            )[0],
+            pd.DataFrame(
+                [
+                    [True, False, False, False, False],
+                    [False, False, True, False, False],
+                    [False, False, False, False, True],
+                    [False, True, False, False, False],
+                    [False, False, False, True, False],
+                ],
+                index=mask.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [(0, 1, "a"), (3, 4, "a"), (1, 2, "b"), (4, -1, "b"), (2, 3, "c")],
+                    names=["source_signal", "target_signal", None],
+                ),
+            ),
+        )
+        assert_frame_equal(
+            mask.vbt.signals.unravel_between(
+                mask.vbt.signals.fshift(),
+                signal_index_type="labels",
+                incl_empty_cols=False,
+            )[0],
+            pd.DataFrame(
+                [
+                    [True, False, False, False],
+                    [False, False, True, False],
+                    [False, False, False, True],
+                    [False, True, False, False],
+                    [False, False, False, False],
+                ],
+                index=mask.index,
+                columns=pd.MultiIndex.from_tuples(
+                    [
+                        (mask.index[0], mask.index[1], "a"),
+                        (mask.index[3], mask.index[4], "a"),
+                        (mask.index[1], mask.index[2], "b"),
+                        (mask.index[2], mask.index[3], "c"),
+                    ],
+                    names=["source_signal", "target_signal", None],
+                ),
+            ),
         )
 
     def test_rank(self):
@@ -2449,8 +2939,7 @@ class TestAccessors:
 
     def test_distance_from_last(self):
         assert_series_equal(
-            mask["a"].vbt.signals.distance_from_last(),
-            pd.Series([-1, 1, 2, 3, 1], index=mask.index, name="a")
+            mask["a"].vbt.signals.distance_from_last(), pd.Series([-1, 1, 2, 3, 1], index=mask.index, name="a")
         )
         assert_frame_equal(
             mask.vbt.signals.distance_from_last(),
@@ -2458,7 +2947,7 @@ class TestAccessors:
                 [[-1, -1, -1], [1, -1, -1], [2, 1, -1], [3, 2, 1], [1, 3, 2]],
                 index=mask.index,
                 columns=mask.columns,
-            )
+            ),
         )
         assert_frame_equal(
             mask.vbt.signals.distance_from_last(nth=0),
@@ -2466,7 +2955,7 @@ class TestAccessors:
                 [[0, -1, -1], [1, 0, -1], [2, 1, 0], [0, 2, 1], [1, 0, 2]],
                 index=mask.index,
                 columns=mask.columns,
-            )
+            ),
         )
         assert_frame_equal(
             mask.vbt.signals.distance_from_last(nth=2),
@@ -2474,7 +2963,7 @@ class TestAccessors:
                 [[-1, -1, -1], [-1, -1, -1], [-1, -1, -1], [3, -1, -1], [4, 3, -1]],
                 index=mask.index,
                 columns=mask.columns,
-            )
+            ),
         )
 
     def test_nth_index(self):
@@ -2730,7 +3219,7 @@ class TestAccessors:
             ),
         )
         assert_series_equal(
-            mask.vbt.signals.stats(column="a", settings=dict(other=mask["b"], from_other=True)),
+            mask.vbt.signals.stats(column="a", settings=dict(target=mask["b"], relation="manyone")),
             pd.Series(
                 [
                     pd.Timestamp("2020-01-01 00:00:00"),
@@ -2767,9 +3256,9 @@ class TestAccessors:
                         "First Index",
                         "Last Index",
                         "Norm Avg Index [-1, 1]",
-                        "Distance <- Other: Min",
-                        "Distance <- Other: Median",
-                        "Distance <- Other: Max",
+                        "Distance <- Target: Min",
+                        "Distance <- Target: Median",
+                        "Distance <- Target: Max",
                         "Total Partitions",
                         "Partition Rate [%]",
                         "Partition Length: Min",
@@ -3405,7 +3894,7 @@ class TestGenerators:
     def test_RPROB(self):
         rprob = vbt.RPROB.run(prob=1, input_shape=(5,), seed=seed)
         assert_series_equal(rprob.entries, pd.Series(np.array([True, True, True, True, True]), name=1))
-        rprob = vbt.RPROB.run(prob=[0., 0.5, 1.], input_shape=(5,), seed=seed)
+        rprob = vbt.RPROB.run(prob=[0.0, 0.5, 1.0], input_shape=(5,), seed=seed)
         assert_frame_equal(
             rprob.entries,
             pd.DataFrame(
@@ -3418,10 +3907,10 @@ class TestGenerators:
                         [False, False, True],
                     ]
                 ),
-                columns=pd.Index([0., 0.5, 1.], dtype="float64", name="rprob_prob"),
+                columns=pd.Index([0.0, 0.5, 1.0], dtype="float64", name="rprob_prob"),
             ),
         )
-        rprob = vbt.RPROB.run(prob=[np.array([[0., 0.25]]), np.array([[0.75, 1.]])], input_shape=(5, 2), seed=seed)
+        rprob = vbt.RPROB.run(prob=[np.array([[0.0, 0.25]]), np.array([[0.75, 1.0]])], input_shape=(5, 2), seed=seed)
         assert_frame_equal(
             rprob.entries,
             pd.DataFrame(

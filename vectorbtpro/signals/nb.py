@@ -59,7 +59,7 @@ def generate_nb(
     Args:
         target_shape (array): Target shape.
         place_func_nb (callable): Signal placement function.
-        
+
             `place_func_nb` must accept a context of type `vectorbtpro.signals.enums.GenEnContext`,
             and return the index of the last signal (-1 to break the loop).
         place_args: Arguments passed to `place_func_nb`.
@@ -802,52 +802,6 @@ def ohlc_stop_place_nb(
     return last_i
 
 
-# ############# Reshaping ############# #
-
-
-@register_jitted(cache=True)
-def unravel_nb(mask: tp.Array2d) -> tp.Tuple[tp.Array2d, tp.Array1d, tp.Array1d]:
-    """Unravel each True value to a separate column.
-
-    Returns the new mask, the row index of each True value in a ('F'-order) flattened
-    input mask, and the column index of each True value in the original input mask."""
-    true_idxs = np.flatnonzero(mask.transpose())
-
-    start_idxs = np.full(mask.shape[1], -1, dtype=np.int_)
-    end_idxs = np.full(mask.shape[1], 0, dtype=np.int_)
-    for i in range(len(true_idxs)):
-        col = true_idxs[i] // mask.shape[0]
-        if i == 0:
-            prev_col = -1
-        else:
-            prev_col = true_idxs[i - 1] // mask.shape[0]
-        if col != prev_col:
-            start_idxs[col] = i
-        end_idxs[col] = i + 1
-
-    n_cols = (end_idxs - start_idxs).sum()
-    new_mask = np.full((mask.shape[0], n_cols), False, dtype=np.bool_)
-    row_idxs = np.full(n_cols, -1, dtype=np.int_)
-    col_idxs = np.empty(n_cols, dtype=np.int_)
-    j = 0
-    for i in range(len(start_idxs)):
-        start_idx = start_idxs[i]
-        end_idx = end_idxs[i]
-        if start_idx != -1:
-            for k in range(start_idx, end_idx):
-                new_mask[true_idxs[k] % mask.shape[0], j] = True
-                row_idxs[j] = true_idxs[k]
-                col_idxs[j] = true_idxs[k] // mask.shape[0]
-                j += 1
-        else:
-            if j == 0:
-                col_idxs[j] = 0
-            else:
-                col_idxs[j] = col_idxs[j - 1] + 1
-            j += 1
-    return new_mask, row_idxs, col_idxs
-
-
 # ############# Ranking ############# #
 
 
@@ -978,6 +932,7 @@ def part_pos_rank_nb(c: RankContext) -> int:
 
 
 # ############# Distance ############# #
+
 
 @register_jitted(cache=True)
 def distance_from_last_1d_nb(mask: tp.Array1d, nth: int = 1) -> tp.Array1d:
@@ -1114,6 +1069,224 @@ def clean_enex_nb(
     return entries_out, exits_out
 
 
+# ############# Relation ############# #
+
+
+@register_jitted(cache=True)
+def relation_idxs_1d_nb(
+    source_mask: tp.Array1d,
+    target_mask: tp.Array1d,
+    relation: int = Relation.OneMany,
+) -> tp.Tuple[tp.Array1d, tp.Array1d, tp.Array1d, tp.Array1d]:
+    """Get index pairs of True values between a source and target mask.
+
+    For `relation`, see `vectorbtpro.signals.enums.Relation`.
+
+    !!! note
+        If both True values happen at the same time, source signal is assumed to come first."""
+    if relation == Relation.Chain or relation == Relation.AnyChain:
+        max_signals = source_mask.shape[0] * 2
+    else:
+        max_signals = source_mask.shape[0]
+    source_range_out = np.full(max_signals, -1, dtype=np.int_)
+    target_range_out = np.full(max_signals, -1, dtype=np.int_)
+    source_idxs_out = np.full(max_signals, -1, dtype=np.int_)
+    target_idxs_out = np.full(max_signals, -1, dtype=np.int_)
+    source_j = -1
+    target_j = -1
+    k = 0
+
+    if relation == Relation.OneOne:
+        fill_k = -1
+        for i in range(source_mask.shape[0]):
+            if source_mask[i]:
+                source_j += 1
+            if target_mask[i]:
+                target_j += 1
+            if source_mask[i]:
+                source_range_out[k] = source_j
+                source_idxs_out[k] = i
+                if fill_k == -1:
+                    fill_k = k
+                k += 1
+            if target_mask[i]:
+                if fill_k == -1:
+                    target_range_out[k] = target_j
+                    target_idxs_out[k] = i
+                    k += 1
+                else:
+                    target_range_out[fill_k] = target_j
+                    target_idxs_out[fill_k] = i
+                    fill_k += 1
+                    if fill_k == k:
+                        fill_k = -1
+    elif relation == Relation.OneMany:
+        source_idx = -1
+        source_placed = True
+        for i in range(source_mask.shape[0]):
+            if source_mask[i]:
+                source_j += 1
+            if target_mask[i]:
+                target_j += 1
+            if source_mask[i]:
+                if not source_placed:
+                    source_range_out[k] = source_j
+                    source_idxs_out[k] = source_idx
+                    k += 1
+                source_idx = i
+                source_placed = False
+            if target_mask[i]:
+                if source_idx == -1:
+                    target_range_out[k] = target_j
+                    target_idxs_out[k] = i
+                    k += 1
+                else:
+                    source_range_out[k] = source_j
+                    target_range_out[k] = target_j
+                    source_idxs_out[k] = source_idx
+                    target_idxs_out[k] = i
+                    k += 1
+                    source_placed = True
+        if not source_placed:
+            source_range_out[k] = source_j
+            source_idxs_out[k] = source_idx
+            k += 1
+    elif relation == Relation.ManyOne:
+        target_idx = -1
+        target_placed = True
+        for i in range(source_mask.shape[0] - 1, -1, -1):
+            if source_mask[i]:
+                source_j += 1
+            if target_mask[i]:
+                target_j += 1
+            if target_mask[i]:
+                if not target_placed:
+                    target_range_out[k] = target_j
+                    target_idxs_out[k] = target_idx
+                    k += 1
+                target_idx = i
+                target_placed = False
+            if source_mask[i]:
+                if target_idx == -1:
+                    source_range_out[k] = source_j
+                    source_idxs_out[k] = i
+                    k += 1
+                else:
+                    source_range_out[k] = source_j
+                    target_range_out[k] = target_j
+                    source_idxs_out[k] = i
+                    target_idxs_out[k] = target_idx
+                    k += 1
+                    target_placed = True
+        if not target_placed:
+            target_range_out[k] = target_j
+            target_idxs_out[k] = target_idx
+            k += 1
+        source_range_out[:k] = source_range_out[:k][::-1]
+        target_range_out[:k] = target_range_out[:k][::-1]
+        for _k in range(k):
+            source_range_out[_k] = source_j - source_range_out[_k]
+            target_range_out[_k] = target_j - target_range_out[_k]
+        source_idxs_out[:k] = source_idxs_out[:k][::-1]
+        target_idxs_out[:k] = target_idxs_out[:k][::-1]
+    elif relation == Relation.ManyMany:
+        source_idx = -1
+        from_k = -1
+        for i in range(source_mask.shape[0]):
+            if source_mask[i]:
+                source_j += 1
+            if target_mask[i]:
+                target_j += 1
+            if source_mask[i]:
+                source_idx = i
+                source_range_out[k] = source_j
+                source_idxs_out[k] = source_idx
+                if from_k == -1:
+                    from_k = k
+                k += 1
+            if target_mask[i]:
+                if from_k == -1:
+                    if source_idx != -1:
+                        source_range_out[k] = source_j
+                        source_idxs_out[k] = source_idx
+                    target_range_out[k] = target_j
+                    target_idxs_out[k] = i
+                    k += 1
+                else:
+                    for _k in range(from_k, k):
+                        target_range_out[_k] = target_j
+                        target_idxs_out[_k] = i
+                    from_k = -1
+    elif relation == Relation.Chain:
+        source_idx = -1
+        target_idx = -1
+        any_placed = False
+        for i in range(source_mask.shape[0]):
+            if source_mask[i]:
+                source_j += 1
+            if target_mask[i]:
+                target_j += 1
+            if source_mask[i]:
+                if source_idx == -1:
+                    source_idx = i
+                    source_range_out[k] = source_j
+                    source_idxs_out[k] = source_idx
+                    any_placed = True
+                    if target_idx != -1:
+                        target_idx = -1
+                        k += 1
+                        source_range_out[k] = source_j
+                        source_idxs_out[k] = source_idx
+            if target_mask[i]:
+                if target_idx == -1 and source_idx != -1:
+                    target_idx = i
+                    target_range_out[k] = target_j
+                    target_idxs_out[k] = target_idx
+                    source_idx = -1
+                    k += 1
+                    target_range_out[k] = target_j
+                    target_idxs_out[k] = target_idx
+                    any_placed = True
+        if any_placed:
+            k += 1
+    elif relation == Relation.AnyChain:
+        source_idx = -1
+        target_idx = -1
+        any_placed = False
+        for i in range(source_mask.shape[0]):
+            if source_mask[i]:
+                source_j += 1
+            if target_mask[i]:
+                target_j += 1
+            if source_mask[i]:
+                if source_idx == -1:
+                    source_idx = i
+                    source_range_out[k] = source_j
+                    source_idxs_out[k] = source_idx
+                    any_placed = True
+                    if target_idx != -1:
+                        target_idx = -1
+                        k += 1
+                        source_range_out[k] = source_j
+                        source_idxs_out[k] = source_idx
+            if target_mask[i]:
+                if target_idx == -1:
+                    target_idx = i
+                    target_range_out[k] = target_j
+                    target_idxs_out[k] = target_idx
+                    any_placed = True
+                    if source_idx != -1:
+                        source_idx = -1
+                        k += 1
+                        target_range_out[k] = target_j
+                        target_idxs_out[k] = target_idx
+        if any_placed:
+            k += 1
+    else:
+        raise ValueError("Invalid Relation option")
+    return source_range_out[:k], target_range_out[:k], source_idxs_out[:k], target_idxs_out[:k]
+
+
 # ############# Ranges ############# #
 
 
@@ -1131,16 +1304,14 @@ def between_ranges_nb(mask: tp.Array2d, incl_open: bool = False) -> tp.RecordArr
 
     for col in prange(mask.shape[1]):
         from_i = -1
-        to_i = -1
         for i in range(mask.shape[0]):
             if mask[i, col]:
                 if from_i > -1:
-                    to_i = i
                     r = counts[col]
                     new_records["id"][r, col] = r
                     new_records["col"][r, col] = col
                     new_records["start_idx"][r, col] = from_i
-                    new_records["end_idx"][r, col] = to_i
+                    new_records["end_idx"][r, col] = i
                     new_records["status"][r, col] = RangeStatus.Closed
                     counts[col] += 1
                 from_i = i
@@ -1157,11 +1328,11 @@ def between_ranges_nb(mask: tp.Array2d, incl_open: bool = False) -> tp.RecordArr
 
 
 @register_chunkable(
-    size=ch.ArraySizer(arg_query="mask", axis=1),
+    size=ch.ArraySizer(arg_query="source_mask", axis=1),
     arg_take_spec=dict(
-        mask=ch.ArraySlicer(axis=1),
-        other_mask=ch.ArraySlicer(axis=1),
-        from_other=None,
+        source_mask=ch.ArraySlicer(axis=1),
+        target_mask=ch.ArraySlicer(axis=1),
+        relation=None,
         incl_open=None,
     ),
     merge_func=records_ch.merge_records,
@@ -1169,69 +1340,41 @@ def between_ranges_nb(mask: tp.Array2d, incl_open: bool = False) -> tp.RecordArr
 )
 @register_jitted(cache=True, tags={"can_parallel"})
 def between_two_ranges_nb(
-    mask: tp.Array2d,
-    other_mask: tp.Array2d,
-    from_other: bool = False,
+    source_mask: tp.Array2d,
+    target_mask: tp.Array2d,
+    relation: int = Relation.OneMany,
     incl_open: bool = False,
 ) -> tp.RecordArray:
-    """Create a record of type `vectorbtpro.generic.enums.range_dt` for each range between two
-    signals in `mask` and `other_mask`.
+    """Create a record of type `vectorbtpro.generic.enums.range_dt` for each range
+    between a source and target mask.
 
-    If `from_other` is False, returns ranges from each in `mask` to the succeeding in `other_mask`.
-    Otherwise, returns ranges from each in `other_mask` to the preceding in `mask`.
+    Index pairs are resolved with `relation_idxs_1d_nb`."""
+    new_records = np.empty(source_mask.shape, dtype=range_dt)
+    counts = np.full(source_mask.shape[1], 0, dtype=np.int_)
 
-    When `mask` and `other_mask` overlap (two signals at the same time), the distance between overlapping
-    signals is still considered and `from_i` would match `to_i`."""
-    new_records = np.empty(mask.shape, dtype=range_dt)
-    counts = np.full(mask.shape[1], 0, dtype=np.int_)
-
-    for col in prange(mask.shape[1]):
-        from_i = -1
-        to_i = -1
-        if from_other:
-            for i in range(mask.shape[0] - 1, -1, -1):
-                if other_mask[i, col]:
-                    to_i = i
-                if mask[i, col]:
-                    if to_i != -1:
-                        from_i = i
-                        r = counts[col]
-                        new_records["id"][r, col] = r
-                        new_records["col"][r, col] = col
-                        new_records["start_idx"][r, col] = from_i
-                        new_records["end_idx"][r, col] = to_i
-                        new_records["status"][r, col] = RangeStatus.Closed
-                        counts[col] += 1
-                    elif incl_open:
-                        r = counts[col]
-                        new_records["id"][r, col] = r
-                        new_records["col"][r, col] = col
-                        new_records["start_idx"][r, col] = from_i
-                        new_records["end_idx"][r, col] = mask.shape[0] - 1
-                        new_records["status"][r, col] = RangeStatus.Open
-                        counts[col] += 1
-        else:
-            for i in range(mask.shape[0]):
-                if mask[i, col]:
-                    from_i = i
-                if other_mask[i, col] and from_i != -1:
-                    to_i = i
-                    r = counts[col]
-                    new_records["id"][r, col] = r
-                    new_records["col"][r, col] = col
-                    new_records["start_idx"][r, col] = from_i
-                    new_records["end_idx"][r, col] = to_i
-                    new_records["status"][r, col] = RangeStatus.Closed
-                    counts[col] += 1
-            if incl_open and to_i < from_i:
+    for col in prange(source_mask.shape[1]):
+        _, _, source_idxs, target_idsx = relation_idxs_1d_nb(
+            source_mask[:, col], 
+            target_mask[:, col], 
+            relation=relation,
+        )
+        for i in range(len(source_idxs)):
+            if source_idxs[i] != -1 and target_idsx[i] != -1:
                 r = counts[col]
                 new_records["id"][r, col] = r
                 new_records["col"][r, col] = col
-                new_records["start_idx"][r, col] = from_i
-                new_records["end_idx"][r, col] = mask.shape[0] - 1
+                new_records["start_idx"][r, col] = source_idxs[i]
+                new_records["end_idx"][r, col] = target_idsx[i]
+                new_records["status"][r, col] = RangeStatus.Closed
+                counts[col] += 1
+            elif source_idxs[i] != -1 and target_idsx[i] == -1 and incl_open:
+                r = counts[col]
+                new_records["id"][r, col] = r
+                new_records["col"][r, col] = col
+                new_records["start_idx"][r, col] = source_idxs[i]
+                new_records["end_idx"][r, col] = source_mask.shape[0] - 1
                 new_records["status"][r, col] = RangeStatus.Open
                 counts[col] += 1
-
     return generic_nb.repartition_nb(new_records, counts)
 
 
@@ -1311,6 +1454,261 @@ def between_partition_ranges_nb(mask: tp.Array2d) -> tp.RecordArray:
                 is_partition = False
 
     return generic_nb.repartition_nb(new_records, counts)
+
+
+# ############# Raveling ############# #
+
+
+@register_jitted(cache=True)
+def unravel_nb(
+    mask: tp.Array2d,
+    incl_empty_cols: bool = True,
+) -> tp.Tuple[
+    tp.Array2d,
+    tp.Array1d,
+    tp.Array1d,
+    tp.Array1d,
+]:
+    """Unravel each True value in a mask to a separate column.
+
+    Returns the new mask, the index of each True value in its column, the row index of each
+    True value in its column, and the column index of each True value in the original mask."""
+    true_idxs = np.flatnonzero(mask.transpose())
+
+    start_idxs = np.full(mask.shape[1], -1, dtype=np.int_)
+    end_idxs = np.full(mask.shape[1], 0, dtype=np.int_)
+    for i in range(len(true_idxs)):
+        col = true_idxs[i] // mask.shape[0]
+        if i == 0:
+            prev_col = -1
+        else:
+            prev_col = true_idxs[i - 1] // mask.shape[0]
+        if col != prev_col:
+            start_idxs[col] = i
+        end_idxs[col] = i + 1
+
+    n_cols = (end_idxs - start_idxs).sum()
+    new_mask = np.full((mask.shape[0], n_cols), False, dtype=np.bool_)
+    range_ = np.full(n_cols, -1, dtype=np.int_)
+    row_idxs = np.full(n_cols, -1, dtype=np.int_)
+    col_idxs = np.empty(n_cols, dtype=np.int_)
+    k = 0
+    for i in range(len(start_idxs)):
+        start_idx = start_idxs[i]
+        end_idx = end_idxs[i]
+        col_filled = False
+        if start_idx != -1:
+            for j in range(start_idx, end_idx):
+                new_mask[true_idxs[j] % mask.shape[0], k] = True
+                range_[k] = j - start_idx
+                row_idxs[k] = true_idxs[j] % mask.shape[0]
+                col_idxs[k] = true_idxs[j] // mask.shape[0]
+                k += 1
+                col_filled = True
+        if not col_filled and incl_empty_cols:
+            if k == 0:
+                col_idxs[k] = 0
+            else:
+                col_idxs[k] = col_idxs[k - 1] + 1
+            k += 1
+    return new_mask[:, :k], range_[:k], row_idxs[:k], col_idxs[:k]
+
+
+@register_jitted(cache=True)
+def unravel_between_nb(
+    mask: tp.Array2d, 
+    incl_open_source: bool = False,
+    incl_empty_cols: bool = True,
+) -> tp.Tuple[
+    tp.Array2d,
+    tp.Array1d,
+    tp.Array1d,
+    tp.Array1d,
+    tp.Array1d,
+    tp.Array1d,
+]:
+    """Unravel each pair of successive True values in a mask to a separate column.
+
+    Returns the new mask, the index of each source True value in its column, the index of
+    each target True value in its column, the row index of each source True value in the original
+    mask, the row index of each target True value in the original mask, and the column index of
+    each True value in the original mask."""
+    true_idxs = np.flatnonzero(mask.transpose())
+
+    start_idxs = np.full(mask.shape[1], -1, dtype=np.int_)
+    end_idxs = np.full(mask.shape[1], 0, dtype=np.int_)
+    for i in range(len(true_idxs)):
+        col = true_idxs[i] // mask.shape[0]
+        if i == 0:
+            prev_col = -1
+        else:
+            prev_col = true_idxs[i - 1] // mask.shape[0]
+        if col != prev_col:
+            start_idxs[col] = i
+        end_idxs[col] = i + 1
+
+    n_cols = (end_idxs - start_idxs).sum()
+    new_mask = np.full((mask.shape[0], n_cols), False, dtype=np.bool_)
+    source_range = np.full(n_cols, -1, dtype=np.int_)
+    target_range = np.full(n_cols, -1, dtype=np.int_)
+    source_idxs = np.full(n_cols, -1, dtype=np.int_)
+    target_idxs = np.full(n_cols, -1, dtype=np.int_)
+    col_idxs = np.empty(n_cols, dtype=np.int_)
+    k = 0
+    for i in range(len(start_idxs)):
+        start_idx = start_idxs[i]
+        end_idx = end_idxs[i]
+        col_filled = False
+        if start_idx != -1:
+            for j in range(start_idx, end_idx):
+                if j == end_idx - 1 and not incl_open_source:
+                    continue
+                new_mask[true_idxs[j] % mask.shape[0], k] = True
+                source_range[k] = j - start_idx
+                source_idxs[k] = true_idxs[j] % mask.shape[0]
+                if j < end_idx - 1:
+                    new_mask[true_idxs[j + 1] % mask.shape[0], k] = True
+                    target_range[k] = j + 1 - start_idx
+                    target_idxs[k] = true_idxs[j + 1] % mask.shape[0]
+                col_idxs[k] = true_idxs[j] // mask.shape[0]
+                k += 1
+                col_filled = True
+        if not col_filled and incl_empty_cols:
+            if k == 0:
+                col_idxs[k] = 0
+            else:
+                col_idxs[k] = col_idxs[k - 1] + 1
+            k += 1
+    return (
+        new_mask[:, :k],
+        source_range[:k],
+        target_range[:k],
+        source_idxs[:k],
+        target_idxs[:k],
+        col_idxs[:k],
+    )
+
+
+@register_jitted(cache=True)
+def unravel_between_two_nb(
+    source_mask: tp.Array2d,
+    target_mask: tp.Array2d,
+    relation: int = Relation.OneMany,
+    incl_open_source: bool = False,
+    incl_open_target: bool = False,
+    incl_empty_cols: bool = True,
+) -> tp.Tuple[
+    tp.Array2d,
+    tp.Array2d,
+    tp.Array1d,
+    tp.Array1d,
+    tp.Array1d,
+    tp.Array1d,
+    tp.Array1d,
+]:
+    """Unravel each pair of successive True values between a source and target mask to a separate column.
+
+    Index pairs are resolved with `relation_idxs_1d_nb`.
+
+    Returns the new source mask, the new target mask, the index of each source True value in its column,
+    the index of each target True value in its column, the row index of each True value in each
+    original mask, and the column index of each True value in both original masks."""
+    if relation == Relation.Chain or relation == Relation.AnyChain:
+        max_signals = source_mask.shape[0] * 2
+    else:
+        max_signals = source_mask.shape[0]
+    source_range_2d = np.empty((max_signals, source_mask.shape[1]), dtype=np.int_)
+    target_range_2d = np.empty((max_signals, source_mask.shape[1]), dtype=np.int_)
+    source_idxs_2d = np.empty((max_signals, source_mask.shape[1]), dtype=np.int_)
+    target_idxs_2d = np.empty((max_signals, source_mask.shape[1]), dtype=np.int_)
+    counts = np.empty(source_mask.shape[1], dtype=np.int_)
+    n_cols = 0
+
+    for col in range(source_mask.shape[1]):
+        source_range_col, target_range_col, source_idxs_col, target_idxs_col = relation_idxs_1d_nb(
+            source_mask[:, col],
+            target_mask[:, col],
+            relation=relation,
+        )
+        n_idxs = len(source_idxs_col)
+        source_range_2d[:n_idxs, col] = source_range_col
+        target_range_2d[:n_idxs, col] = target_range_col
+        source_idxs_2d[:n_idxs, col] = source_idxs_col
+        target_idxs_2d[:n_idxs, col] = target_idxs_col
+        counts[col] = n_idxs
+        if n_idxs == 0:
+            n_cols += 1
+        else:
+            n_cols += n_idxs
+
+    new_source_mask = np.full((source_mask.shape[0], n_cols), False, dtype=np.bool_)
+    new_target_mask = np.full((source_mask.shape[0], n_cols), False, dtype=np.bool_)
+    source_range = np.full(n_cols, -1, dtype=np.int_)
+    target_range = np.full(n_cols, -1, dtype=np.int_)
+    source_idxs = np.full(n_cols, -1, dtype=np.int_)
+    target_idxs = np.full(n_cols, -1, dtype=np.int_)
+    col_idxs = np.empty(n_cols, dtype=np.int_)
+    k = 0
+    for c in range(len(counts)):
+        col_filled = False
+        if counts[c] > 0:
+            for j in range(counts[c]):
+                source_idx = source_idxs_2d[j, c]
+                target_idx = target_idxs_2d[j, c]
+                if source_idx != -1 and target_idx != -1:
+                    new_source_mask[source_idx, k] = True
+                    new_target_mask[target_idx, k] = True
+                    source_range[k] = source_range_2d[j, c]
+                    target_range[k] = target_range_2d[j, c]
+                    source_idxs[k] = source_idx
+                    target_idxs[k] = target_idx
+                    col_idxs[k] = c
+                    k += 1
+                    col_filled = True
+                elif source_idx != -1 and incl_open_source:
+                    new_source_mask[source_idx, k] = True
+                    source_range[k] = source_range_2d[j, c]
+                    source_idxs[k] = source_idx
+                    col_idxs[k] = c
+                    k += 1
+                    col_filled = True
+                elif target_idx != -1 and incl_open_target:
+                    new_target_mask[target_idx, k] = True
+                    target_range[k] = target_range_2d[j, c]
+                    target_idxs[k] = target_idx
+                    col_idxs[k] = c
+                    k += 1
+                    col_filled = True
+        if not col_filled and incl_empty_cols:
+            col_idxs[k] = c
+            k += 1
+    return (
+        new_source_mask[:, :k],
+        new_target_mask[:, :k],
+        source_range[:k],
+        target_range[:k],
+        source_idxs[:k],
+        target_idxs[:k],
+        col_idxs[:k],
+    )
+
+
+@register_jitted(cache=True, tags={"can_parallel"})
+def ravel_nb(mask: tp.Array2d, group_map: tp.GroupMap) -> tp.Array2d:
+    """Ravel True values of each group into a separate column."""
+    group_idxs, group_lens = group_map
+    group_start_idxs = np.cumsum(group_lens) - group_lens
+    out = np.full((mask.shape[0], len(group_lens)), False, dtype=np.bool_)
+
+    for group in prange(len(group_lens)):
+        group_len = group_lens[group]
+        start_idx = group_start_idxs[group]
+        col_idxs = group_idxs[start_idx : start_idx + group_len]
+        for col in col_idxs:
+            for i in range(mask.shape[0]):
+                if mask[i, col]:
+                    out[i, group] = True
+    return out
 
 
 # ############# Index ############# #

@@ -20,6 +20,7 @@ from vectorbtpro.utils.config import HybridConfig
 __all__ = [
     "import_module_from_path",
     "get_refname",
+    "imlucky",
     "get_api_ref",
     "open_api_ref",
 ]
@@ -397,6 +398,16 @@ def get_refname(
     return refname
 
 
+def get_imlucky_url(query: str) -> str:
+    """Get the "I'm lucky" URL on DuckDuckGo for a query."""
+    return "https://duckduckgo.com/?q=!ducky+" + urllib.request.pathname2url(query)
+
+
+def imlucky(query: str, **kwargs) -> None:
+    """Open the "I'm lucky" URL on DuckDuckGo for a query."""
+    webbrowser.open(get_imlucky_url(query), **kwargs)
+
+
 def get_api_ref(
     obj: tp.Any,
     module: tp.Union[None, str, ModuleType] = None,
@@ -429,7 +440,7 @@ def get_api_ref(
             search_query = module.__name__ + "." + qualname
     else:
         search_query = refname
-    return "https://duckduckgo.com/?q=!ducky+" + urllib.request.pathname2url(search_query)
+    return get_imlucky_url(search_query)
 
 
 def open_api_ref(

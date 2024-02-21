@@ -1264,14 +1264,14 @@ _settings["ohlcv"] = ohlcv
 signals = frozen_cfg(
     stats=flex_cfg(
         filters=flex_cfg(
-            silent_has_other=flex_cfg(
-                filter_func=lambda self, metric_settings: metric_settings.get("other", None) is not None,
+            silent_has_target=flex_cfg(
+                filter_func=lambda self, metric_settings: metric_settings.get("target", None) is not None,
             ),
         ),
         settings=flex_cfg(
-            other=None,
-            other_name="Other",
-            from_other=False,
+            target=None,
+            target_name="Target",
+            relation="onemany",
         ),
     ),
     plots=flex_cfg(),

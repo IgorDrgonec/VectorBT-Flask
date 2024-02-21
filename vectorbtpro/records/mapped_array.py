@@ -1546,7 +1546,7 @@ class MappedArray(Analyzable):
             out.drop("count", axis=0, inplace=True)
         else:
             if isinstance(out, pd.DataFrame):
-                out.loc["count"].fillna(0.0, inplace=True)
+                out.loc["count", np.isnan(out.loc["count"])] = 0.0
             else:
                 if np.isnan(out.loc["count"]):
                     out.loc["count"] = 0.0

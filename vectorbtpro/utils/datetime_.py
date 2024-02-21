@@ -15,7 +15,7 @@ import re
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.config import merge_dicts
+from vectorbtpro.utils.config import merge_dicts, HybridConfig
 from vectorbtpro.utils.parsing import WarningsFiltered
 from vectorbtpro.utils.array_ import min_count_nb
 
@@ -23,18 +23,110 @@ __all__ = [
     "DTC",
 ]
 
+__pdoc__ = {}
+
 PandasDatetimeIndex = (pd.DatetimeIndex, pd.PeriodIndex)
 
 
 # ############# Frequency ############# #
 
 
-def split_freq_str(freq_str: str) -> tp.Optional[tp.Tuple[int, str]]:
+sharp_freq_str_config = HybridConfig(
+    dict(
+        m="m",
+        M="M",
+    )
+)
+"""_"""
+
+__pdoc__["sharp_freq_str_config"] = f"""Config for sharp frequency mapping.
+
+```python
+{sharp_freq_str_config.prettify()}
+```
+"""
+
+fuzzy_freq_str_config = HybridConfig(
+    dict(
+        ns="ns",
+        nano="ns",
+        nanos="ns",
+        nanosecond="ns",
+        nanoseconds="ns",
+        us="us",
+        micro="us",
+        micros="us",
+        microsecond="us",
+        microseconds="us",
+        ms="ms",
+        milli="ms",
+        millis="ms",
+        millisecond="ms",
+        milliseconds="ms",
+        s="s",
+        sec="s",
+        secs="s",
+        second="s",
+        seconds="s",
+        t="m",
+        min="m",
+        mins="m",
+        minute="m",
+        minutes="m",
+        h="h",
+        hour="h",
+        hours="h",
+        hourly="h",
+        d="d",
+        day="d",
+        days="d",
+        daily="d",
+        w="W",
+        wk="W",
+        wks="W",
+        week="W",
+        weeks="W",
+        weekly="W",
+        mo="M",
+        month="M",
+        months="M",
+        monthly="M",
+        q="Q",
+        quarter="Q",
+        quarters="Q",
+        quarterly="Q",
+        y="Y",
+        year="Y",
+        years="Y",
+        yearly="Y",
+        annual="Y",
+        annually="Y",
+    )
+)
+"""_"""
+
+__pdoc__["fuzzy_freq_str_config"] = f"""Config for fuzzy frequency mapping.
+
+```python
+{fuzzy_freq_str_config.prettify()}
+```
+"""
+
+
+def split_freq_str(
+    freq_str: str,
+    sharp_mapping: tp.MappingLike = None,
+    fuzzy_mapping: tp.MappingLike = None,
+) -> tp.Optional[tp.Tuple[int, str]]:
     """Split (human-readable) frequency into multiplier and unambiguous unit.
 
     Can be used both as offset and timedelta.
 
-    The following units are returned:
+    For mappings, see `sharp_freq_str_config` and `fuzzy_freq_str_config`.
+    Sharp (case-sensitive) mappings are considered first, fuzzy (case-insensitive) mappings second.
+    If a mapping returns None, will return the original unit.
+
+    The following case-sensitive units are returned:
     * "ns" for nanosecond
     * "us" for microsecond
     * "ms" for millisecond
@@ -46,6 +138,8 @@ def split_freq_str(freq_str: str) -> tp.Optional[tp.Tuple[int, str]]:
     * "M" for month
     * "Q" for quarter
     * "Y" for year
+
+    If a unit isn't recognized, will return the original unit.
     """
 
     freq_str = "".join(freq_str.strip().split())
@@ -62,28 +156,26 @@ def split_freq_str(freq_str: str) -> tp.Optional[tp.Tuple[int, str]]:
         raise ValueError("Frequency must contain unit")
     else:
         unit = match.group(2)
-    if unit.lower() in ("ns", "nanos", "nanosecond", "nanoseconds"):
-        unit = "ns"
-    elif unit.lower() in ("us", "micros", "microsecond", "microseconds"):
-        unit = "us"
-    elif unit.lower() in ("ms", "millis", "millisecond", "milliseconds"):
-        unit = "ms"
-    elif unit.lower() in ("s", "sec", "second", "seconds"):
-        unit = "s"
-    elif unit == "m" or unit.lower() in ("t", "min", "minute", "minutes"):
-        unit = "m"
-    elif unit.lower() in ("h", "hour", "hours", "hourly"):
-        unit = "h"
-    elif unit.lower() in ("d", "day", "days", "daily"):
-        unit = "d"
-    elif unit.lower() in ("w", "wk", "week", "weeks", "weekly"):
-        unit = "W"
-    elif unit == "M" or unit.lower() in ("mo", "month", "months", "monthly"):
-        unit = "M"
-    elif unit.lower() in ("q", "quarter", "quarters", "quarterly"):
-        unit = "Q"
-    elif unit.lower() in ("y", "year", "years", "yearly", "annual", "annually"):
-        unit = "Y"
+    if sharp_mapping is not None:
+        sharp_mapping = dict(sharp_mapping)
+        if unit in sharp_mapping:
+            if sharp_mapping[unit] is None:
+                return multiplier, unit
+            return multiplier, sharp_mapping[unit]
+    if unit in sharp_freq_str_config:
+        if sharp_freq_str_config[unit] is None:
+            return multiplier, unit
+        return multiplier, sharp_freq_str_config[unit]
+    if fuzzy_mapping is not None:
+        fuzzy_mapping = dict(fuzzy_mapping)
+        if unit.lower() in fuzzy_mapping:
+            if fuzzy_mapping[unit.lower()] is None:
+                return multiplier, unit
+            return multiplier, fuzzy_mapping[unit.lower()]
+    if unit.lower() in fuzzy_freq_str_config:
+        if fuzzy_freq_str_config[unit.lower()] is None:
+            return multiplier, unit
+        return multiplier, fuzzy_freq_str_config[unit.lower()]
     return multiplier, unit
 
 
@@ -108,7 +200,7 @@ def prepare_offset_str(offset_str: str, allow_space: bool = False) -> str:
         freq_part = " ".join(freq_part.strip().split())
         if freq_part == "":
             continue
-        split = split_freq_str(freq_part)
+        split = split_freq_str(freq_part, sharp_mapping=dict(MS=None))
         if split is None:
             return offset_str
         multiplier, unit = split
