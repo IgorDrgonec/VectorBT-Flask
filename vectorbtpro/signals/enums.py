@@ -9,7 +9,7 @@ from vectorbtpro.utils.formatting import prettify
 
 __pdoc__all__ = __all__ = [
     "StopType",
-    "Relation",
+    "SignalRelation",
     "FactoryMode",
     "GenEnContext",
     "GenExContext",
@@ -43,7 +43,7 @@ __pdoc__["StopType"] = f"""Stop type.
 """
 
 
-class RelationT(tp.NamedTuple):
+class SignalRelationT(tp.NamedTuple):
     OneOne: int = 0
     OneMany: int = 1
     ManyOne: int = 2
@@ -52,13 +52,13 @@ class RelationT(tp.NamedTuple):
     AnyChain: int = 5
 
 
-Relation = RelationT()
+SignalRelation = SignalRelationT()
 """_"""
 
-__pdoc__["Relation"] = f"""Relation between two masks.
+__pdoc__["SignalRelation"] = f"""SignalRelation between two masks.
 
 ```python
-{prettify(Relation)}
+{prettify(SignalRelation)}
 ```
 
 Attributes:

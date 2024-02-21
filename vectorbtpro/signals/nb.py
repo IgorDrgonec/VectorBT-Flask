@@ -1076,15 +1076,15 @@ def clean_enex_nb(
 def relation_idxs_1d_nb(
     source_mask: tp.Array1d,
     target_mask: tp.Array1d,
-    relation: int = Relation.OneMany,
+    relation: int = SignalRelation.OneMany,
 ) -> tp.Tuple[tp.Array1d, tp.Array1d, tp.Array1d, tp.Array1d]:
     """Get index pairs of True values between a source and target mask.
 
-    For `relation`, see `vectorbtpro.signals.enums.Relation`.
+    For `relation`, see `vectorbtpro.signals.enums.SignalRelation`.
 
     !!! note
         If both True values happen at the same time, source signal is assumed to come first."""
-    if relation == Relation.Chain or relation == Relation.AnyChain:
+    if relation == SignalRelation.Chain or relation == SignalRelation.AnyChain:
         max_signals = source_mask.shape[0] * 2
     else:
         max_signals = source_mask.shape[0]
@@ -1096,7 +1096,7 @@ def relation_idxs_1d_nb(
     target_j = -1
     k = 0
 
-    if relation == Relation.OneOne:
+    if relation == SignalRelation.OneOne:
         fill_k = -1
         for i in range(source_mask.shape[0]):
             if source_mask[i]:
@@ -1120,7 +1120,7 @@ def relation_idxs_1d_nb(
                     fill_k += 1
                     if fill_k == k:
                         fill_k = -1
-    elif relation == Relation.OneMany:
+    elif relation == SignalRelation.OneMany:
         source_idx = -1
         source_placed = True
         for i in range(source_mask.shape[0]):
@@ -1151,7 +1151,7 @@ def relation_idxs_1d_nb(
             source_range_out[k] = source_j
             source_idxs_out[k] = source_idx
             k += 1
-    elif relation == Relation.ManyOne:
+    elif relation == SignalRelation.ManyOne:
         target_idx = -1
         target_placed = True
         for i in range(source_mask.shape[0] - 1, -1, -1):
@@ -1189,7 +1189,7 @@ def relation_idxs_1d_nb(
             target_range_out[_k] = target_j - target_range_out[_k]
         source_idxs_out[:k] = source_idxs_out[:k][::-1]
         target_idxs_out[:k] = target_idxs_out[:k][::-1]
-    elif relation == Relation.ManyMany:
+    elif relation == SignalRelation.ManyMany:
         source_idx = -1
         from_k = -1
         for i in range(source_mask.shape[0]):
@@ -1217,7 +1217,7 @@ def relation_idxs_1d_nb(
                         target_range_out[_k] = target_j
                         target_idxs_out[_k] = i
                     from_k = -1
-    elif relation == Relation.Chain:
+    elif relation == SignalRelation.Chain:
         source_idx = -1
         target_idx = -1
         any_placed = False
@@ -1249,7 +1249,7 @@ def relation_idxs_1d_nb(
                     any_placed = True
         if any_placed:
             k += 1
-    elif relation == Relation.AnyChain:
+    elif relation == SignalRelation.AnyChain:
         source_idx = -1
         target_idx = -1
         any_placed = False
@@ -1283,7 +1283,7 @@ def relation_idxs_1d_nb(
         if any_placed:
             k += 1
     else:
-        raise ValueError("Invalid Relation option")
+        raise ValueError("Invalid SignalRelation option")
     return source_range_out[:k], target_range_out[:k], source_idxs_out[:k], target_idxs_out[:k]
 
 
@@ -1342,7 +1342,7 @@ def between_ranges_nb(mask: tp.Array2d, incl_open: bool = False) -> tp.RecordArr
 def between_two_ranges_nb(
     source_mask: tp.Array2d,
     target_mask: tp.Array2d,
-    relation: int = Relation.OneMany,
+    relation: int = SignalRelation.OneMany,
     incl_open: bool = False,
 ) -> tp.RecordArray:
     """Create a record of type `vectorbtpro.generic.enums.range_dt` for each range
@@ -1593,7 +1593,7 @@ def unravel_between_nb(
 def unravel_between_two_nb(
     source_mask: tp.Array2d,
     target_mask: tp.Array2d,
-    relation: int = Relation.OneMany,
+    relation: int = SignalRelation.OneMany,
     incl_open_source: bool = False,
     incl_open_target: bool = False,
     incl_empty_cols: bool = True,
@@ -1613,7 +1613,7 @@ def unravel_between_two_nb(
     Returns the new source mask, the new target mask, the index of each source True value in its column,
     the index of each target True value in its column, the row index of each True value in each
     original mask, and the column index of each True value in both original masks."""
-    if relation == Relation.Chain or relation == Relation.AnyChain:
+    if relation == SignalRelation.Chain or relation == SignalRelation.AnyChain:
         max_signals = source_mask.shape[0] * 2
     else:
         max_signals = source_mask.shape[0]

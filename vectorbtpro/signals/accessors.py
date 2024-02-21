@@ -1937,14 +1937,14 @@ class SignalsAccessor(GenericAccessor):
     def get_relation_str(self, relation: tp.Union[int, str]) -> str:
         """Get direction string for `relation`."""
         if isinstance(relation, str):
-            relation = map_enum_fields(relation, enums.Relation)
-        if relation == enums.Relation.OneOne:
+            relation = map_enum_fields(relation, enums.SignalRelation)
+        if relation == enums.SignalRelation.OneOne:
             return ">-<"
-        if relation == enums.Relation.OneMany:
+        if relation == enums.SignalRelation.OneMany:
             return "->"
-        if relation == enums.Relation.ManyOne:
+        if relation == enums.SignalRelation.ManyOne:
             return "<-"
-        if relation == enums.Relation.ManyMany:
+        if relation == enums.SignalRelation.ManyMany:
             return "<->"
         raise ValueError(f"Invalid relation {relation}")
 
@@ -2035,7 +2035,7 @@ class SignalsAccessor(GenericAccessor):
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         if isinstance(relation, str):
-            relation = map_enum_fields(relation, enums.Relation)
+            relation = map_enum_fields(relation, enums.SignalRelation)
 
         if target is None:
             func = jit_reg.resolve_option(nb.between_ranges_nb, jitted)
@@ -2217,7 +2217,7 @@ class SignalsAccessor(GenericAccessor):
         if wrap_kwargs is None:
             wrap_kwargs = {}
         if isinstance(relation, str):
-            relation = map_enum_fields(relation, enums.Relation)
+            relation = map_enum_fields(relation, enums.SignalRelation)
         signal_index_type = signal_index_type.lower()
         if not isinstance(cls_or_self, type):
             objs = (cls_or_self.obj, *objs)
