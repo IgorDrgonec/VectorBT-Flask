@@ -3570,6 +3570,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         on_features: tp.Optional[tp.MaybeFeatures] = None,
         on_symbols: tp.Optional[tp.MaybeSymbols] = None,
         pass_as_first: bool = False,
+        magnet_kwargs: tp.KwargsLike = None,
         ignore_args: tp.Optional[tp.Sequence[str]] = None,
         rename_args: tp.DictLike = None,
         location: tp.Optional[str] = None,
@@ -3602,6 +3603,9 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         * Any callable object
         * Iterable with any of the above. Will be stacked as columns into a DataFrame.
 
+        Use `magnet_kwargs` to provide keyword arguments that will be passed only if found
+        in the signature of the function.
+
         Use `rename_args` to rename arguments. For example, in `vectorbtpro.portfolio.base.Portfolio`,
         data can be passed instead of `close`.
 
@@ -3618,6 +3622,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         from vectorbtpro.indicators.talib_ import talib_func
         from vectorbtpro.portfolio.base import Portfolio
 
+        if magnet_kwargs is None:
+            magnet_kwargs = {}
         if data_kwargs is None:
             data_kwargs = {}
         if execute_kwargs is None:
@@ -3667,6 +3673,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     new_kwargs["unpack_to"] = "frame"
                 new_kwargs = {
                     **dict(
+                        magnet_kwargs=magnet_kwargs,
                         ignore_args=ignore_args,
                         rename_args=rename_args,
                         location=_location,
@@ -3751,6 +3758,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 return _self.run(
                     indicators,
                     *args,
+                    magnet_kwargs=magnet_kwargs,
                     ignore_args=ignore_args,
                     rename_args=rename_args,
                     location=location,
@@ -3781,7 +3789,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             func = func.run
 
         with_kwargs = {}
-        for arg_name in get_func_arg_names(func):
+        func_arg_names = get_func_arg_names(func)
+        for arg_name in func_arg_names:
             real_arg_name = arg_name
             if ignore_args is not None:
                 if arg_name in ignore_args:
@@ -3814,6 +3823,10 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     feature_idx = _self.get_feature_idx(arg_name)
                     if feature_idx != -1:
                         with_kwargs[real_arg_name] = _self.get_feature(feature_idx)
+        kwargs = dict(kwargs)
+        for k, v in magnet_kwargs.items():
+            if k in func_arg_names:
+                kwargs[k] = v
         new_args, new_kwargs = extend_args(func, args, kwargs, **with_kwargs)
         out = func(*new_args, **new_kwargs)
         if isinstance(unpack, bool):
