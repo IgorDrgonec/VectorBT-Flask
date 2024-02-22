@@ -23,6 +23,7 @@ from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.base.indexes import combine_indexes, stack_indexes, select_levels
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.reshaping import to_pd_array, to_1d_array, to_2d_array, to_dict, broadcast_array_to
+from vectorbtpro.base.merging import row_stack_arrays
 from vectorbtpro.base.indexing import point_idxr_defaults, range_idxr_defaults
 from vectorbtpro.data.base import Data
 from vectorbtpro.generic.analyzable import Analyzable
@@ -244,7 +245,10 @@ def resolve_pypfopt_func_kwargs(
                     pass_kwargs[orig_arg_name] = _get_kwarg(arg_name)
             else:
                 if arg_name == "frequency":
-                    ann_factor = ReturnsAccessor.get_ann_factor(_get_kwarg("year_freq", None), _get_kwarg("freq", None))
+                    ann_factor = ReturnsAccessor.get_ann_factor(
+                        year_freq=_get_kwarg("year_freq", None),
+                        freq=_get_kwarg("freq", None),
+                    )
                     if ann_factor is not None:
                         pass_kwargs[orig_arg_name] = ann_factor
                 elif arg_name == "prices":
@@ -574,7 +578,7 @@ def pypfopt_optimize(
         and efficient frontier:
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> data = vbt.YFData.pull(["MSFT", "AMZN", "KO", "MA"])
         ```
@@ -1175,7 +1179,7 @@ def riskfolio_optimize(
         * Classic Mean Risk Optimization:
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> data = vbt.YFData.pull(["MSFT", "AMZN", "KO", "MA"])
         >>> returns = data.close.vbt.to_returns()
@@ -1280,8 +1284,6 @@ def riskfolio_optimize(
     from vectorbtpro._settings import settings
 
     riskfolio_cfg = dict(settings["pfopt"]["riskfolio"])
-    wrapping_cfg = settings["wrapping"]
-    returns_cfg = settings["returns"]
 
     def _resolve_setting(k, v):
         setting = riskfolio_cfg.pop(k)
@@ -1307,11 +1309,7 @@ def riskfolio_optimize(
     solvers = _resolve_setting("solvers", solvers)
     sol_params = _resolve_setting("sol_params", sol_params)
     freq = _resolve_setting("freq", freq)
-    if freq is None:
-        freq = wrapping_cfg["freq"]
     year_freq = _resolve_setting("year_freq", year_freq)
-    if year_freq is None:
-        year_freq = returns_cfg["year_freq"]
     pre_opt = _resolve_setting("pre_opt", pre_opt)
     pre_opt_kwargs = merge_dicts(riskfolio_cfg.pop("pre_opt_kwargs"), pre_opt_kwargs)
     pre_opt_as_w = _resolve_setting("pre_opt_as_w", pre_opt_as_w)
@@ -1558,7 +1556,7 @@ def riskfolio_optimize(
                         **kwargs,
                     )
                     P, Q = warn_stdout(rp.assets_views)(**matched_kwargs)
-                    ann_factor = ReturnsAccessor.get_ann_factor(year_freq, freq)
+                    ann_factor = ReturnsAccessor.get_ann_factor(year_freq=year_freq, freq=freq)
                     if ann_factor is not None:
                         Q /= ann_factor
                     else:
@@ -1595,7 +1593,7 @@ def riskfolio_optimize(
                         **kwargs,
                     )
                     P_f, Q_f = warn_stdout(rp.factors_views)(**matched_kwargs)
-                    ann_factor = ReturnsAccessor.get_ann_factor(year_freq, freq)
+                    ann_factor = ReturnsAccessor.get_ann_factor(year_freq=year_freq, freq=freq)
                     if ann_factor is not None:
                         Q_f /= ann_factor
                     else:
@@ -1694,7 +1692,7 @@ class PortfolioOptimizer(Analyzable):
                 *[obj.alloc_records for obj in objs],
                 wrapper=kwargs["alloc_records"].wrapper,
             )
-            kwargs["allocations"] = np.row_stack([obj._allocations for obj in objs])[record_indices]
+            kwargs["allocations"] = row_stack_arrays([obj._allocations for obj in objs])[record_indices]
 
         kwargs = cls.resolve_row_stack_kwargs(*objs, **kwargs)
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
@@ -1740,7 +1738,7 @@ class PortfolioOptimizer(Analyzable):
                 *[obj.alloc_records for obj in objs],
                 wrapper=kwargs["alloc_records"].wrapper,
             )
-            kwargs["allocations"] = np.row_stack([obj._allocations for obj in objs])[record_indices]
+            kwargs["allocations"] = row_stack_arrays([obj._allocations for obj in objs])[record_indices]
 
         kwargs = cls.resolve_column_stack_kwargs(*objs, **kwargs)
         kwargs = cls.resolve_stack_kwargs(*objs, **kwargs)
@@ -1866,8 +1864,7 @@ class PortfolioOptimizer(Analyzable):
             * Allocate uniformly every day:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import numpy as np
+            >>> from vectorbtpro import *
 
             >>> data = vbt.YFData.pull(
             ...     ["MSFT", "AMZN", "AAPL"],
@@ -1973,8 +1970,6 @@ class PortfolioOptimizer(Analyzable):
             * Use Numba-compiled loop:
 
             ```pycon
-            >>> from numba import njit
-
             >>> @njit
             ... def random_allocate_func_nb(i, idx, n_cols):
             ...     weights = np.random.uniform(0, 1, n_cols)
@@ -2321,7 +2316,7 @@ class PortfolioOptimizer(Analyzable):
             ),
             np.concatenate(alloc_points),
         )
-        allocations = np.row_stack(allocations)
+        allocations = row_stack_arrays(allocations)
         return cls(new_wrapper, alloc_points, allocations)
 
     @classmethod
@@ -2635,7 +2630,7 @@ class PortfolioOptimizer(Analyzable):
             * Allocate once:
 
             ```pycon
-            >>> import vectorbtpro as vbt
+            >>> from vectorbtpro import *
 
             >>> data = vbt.YFData.pull(
             ...     ["MSFT", "AMZN", "AAPL"],
@@ -2764,9 +2759,6 @@ class PortfolioOptimizer(Analyzable):
             * Use Numba-compiled loop:
 
             ```pycon
-            >>> from numba import njit
-            >>> import numpy as np
-
             >>> @njit
             ... def optimize_func_nb(i, from_idx, to_idx, close):
             ...     mean = vbt.nb.nanmean_nb(close[from_idx:to_idx])
@@ -3184,7 +3176,7 @@ class PortfolioOptimizer(Analyzable):
             ),
             np.concatenate(alloc_ranges),
         )
-        allocations = np.row_stack(allocations)
+        allocations = row_stack_arrays(allocations)
         return cls(new_wrapper, alloc_ranges, allocations)
 
     @classmethod
@@ -3407,8 +3399,7 @@ class PortfolioOptimizer(Analyzable):
             * Continuing with the examples under `PortfolioOptimizer.from_optimize_func`:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
+            >>> from vectorbtpro import *
 
             >>> pfo = vbt.PortfolioOptimizer.from_random(
             ...     vbt.ArrayWrapper(

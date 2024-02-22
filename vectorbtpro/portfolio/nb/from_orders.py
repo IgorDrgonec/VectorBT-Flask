@@ -6,7 +6,6 @@ from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
 from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
-from vectorbtpro.base.flex_indexing import flex_select_nb
 from vectorbtpro.portfolio import chunking as portfolio_ch
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.registries.ch_registry import register_chunkable
@@ -118,7 +117,7 @@ def from_orders_nb(
         * Buy and hold using all cash and closing price (default):
 
         ```pycon
-        >>> import numpy as np
+        >>> from vectorbtpro import *
         >>> from vectorbtpro.records.nb import col_map_nb
         >>> from vectorbtpro.portfolio.nb import from_orders_nb, asset_flow_nb
 

@@ -1797,8 +1797,7 @@ def chunked(
         the mean in a sequential manner:
 
         ```pycon
-        >>> import vectorbtpro as vbt
-        >>> import numpy as np
+        >>> from vectorbtpro import *
 
         >>> @vbt.chunked(
         ...     n_chunks=2,

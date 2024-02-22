@@ -635,7 +635,7 @@ class Pickleable:
             ```
 
             ```pycon
-            >>> import vectorbtpro as vbt
+            >>> from vectorbtpro import *
 
             >>> vbt.pprint(vbt.pdict.load("types.ini"))
             pdict(

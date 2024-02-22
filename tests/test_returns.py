@@ -121,6 +121,12 @@ class TestAccessors:
         with pytest.raises(Exception):
             assert pd.Series([1, 2, 3]).vbt.returns(freq=None).ann_factor
 
+        returns = pd.Series(np.nan, index=pd.date_range("2021-01-01", "2024-01-01", freq="B"))
+        assert returns.vbt.returns(year_freq="yearly").ann_factor == 365.2425
+        assert returns.vbt.returns(year_freq="auto").ann_factor == 260.9047184170472
+        assert returns.vbt.returns(year_freq="auto_round").ann_factor == 261.0
+        assert returns.vbt.returns(year_freq="index_min").ann_factor == 260.0
+
     def test_from_value(self):
         assert_series_equal(pd.Series.vbt.returns.from_value(ts["a"]).obj, ts["a"].pct_change().fillna(0.0))
         assert_frame_equal(pd.DataFrame.vbt.returns.from_value(ts).obj, ts.pct_change().fillna(0.0))

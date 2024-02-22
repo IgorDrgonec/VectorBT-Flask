@@ -7,8 +7,8 @@ from glob import glob
 import re
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.data.base import key_dict
 from vectorbtpro.utils import checks
+from vectorbtpro.data.base import key_dict
 from vectorbtpro.data.custom.local import LocalData
 
 __all__ = [

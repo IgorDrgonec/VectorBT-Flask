@@ -22,8 +22,7 @@ registered setup per each cacheable function globally at a time. To avoid creati
 function over and over again, each setup can be uniquely identified by its function through hashing:
 
 ```pycon
->>> import vectorbtpro as vbt
->>> import numpy as np
+>>> from vectorbtpro import *
 
 >>> my_func = lambda: np.random.uniform(size=1000000)
 
@@ -413,9 +412,8 @@ import humanize
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils import checks
+from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.caching import Cacheable
-from vectorbtpro.utils.datetime_ import to_naive_datetime
 from vectorbtpro.utils.decorators import cacheableT, cacheable_property
 from vectorbtpro.utils.hashing import Hashable
 from vectorbtpro.utils.parsing import Regex, hash_args, UnhashableArgsError, get_func_arg_names
@@ -528,8 +526,6 @@ class CAQuery(Hashable):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
-
             >>> vbt.CAQuery.parse(lambda x: x)
             CAQuery(cacheable=<function <lambda> at 0x7fd4766c7730>, instance=None, cls=None, base_cls=None, options=None)
 
@@ -604,8 +600,6 @@ class CAQuery(Hashable):
             Let's evaluate various queries:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-
             >>> class A(vbt.Cacheable):
             ...     @vbt.cached_method(my_option=True)
             ...     def f(self):
@@ -1354,33 +1348,33 @@ class CABaseSetup(CAMetrics, Hashable):
                 total_saved = humanize.precisedelta(total_saved, minimum_unit)
             if first_run_time is not None:
                 first_run_time = humanize.naturaltime(
-                    to_naive_datetime(first_run_time),
-                    when=to_naive_datetime(datetime.now(timezone.utc)),
+                    dt.to_naive_datetime(first_run_time),
+                    when=dt.to_naive_datetime(datetime.now(timezone.utc)),
                 )
             if last_run_time is not None:
                 last_run_time = humanize.naturaltime(
-                    to_naive_datetime(last_run_time),
-                    when=to_naive_datetime(datetime.now(timezone.utc)),
+                    dt.to_naive_datetime(last_run_time),
+                    when=dt.to_naive_datetime(datetime.now(timezone.utc)),
                 )
             if first_hit_time is not None:
                 first_hit_time = humanize.naturaltime(
-                    to_naive_datetime(first_hit_time),
-                    when=to_naive_datetime(datetime.now(timezone.utc)),
+                    dt.to_naive_datetime(first_hit_time),
+                    when=dt.to_naive_datetime(datetime.now(timezone.utc)),
                 )
             if last_hit_time is not None:
                 last_hit_time = humanize.naturaltime(
-                    to_naive_datetime(last_hit_time),
-                    when=to_naive_datetime(datetime.now(timezone.utc)),
+                    dt.to_naive_datetime(last_hit_time),
+                    when=dt.to_naive_datetime(datetime.now(timezone.utc)),
                 )
             if creation_time is not None:
                 creation_time = humanize.naturaltime(
-                    to_naive_datetime(creation_time),
-                    when=to_naive_datetime(datetime.now(timezone.utc)),
+                    dt.to_naive_datetime(creation_time),
+                    when=dt.to_naive_datetime(datetime.now(timezone.utc)),
                 )
             if last_update_time is not None:
                 last_update_time = humanize.naturaltime(
-                    to_naive_datetime(last_update_time),
-                    when=to_naive_datetime(datetime.now(timezone.utc)),
+                    dt.to_naive_datetime(last_update_time),
+                    when=dt.to_naive_datetime(datetime.now(timezone.utc)),
                 )
 
         return dict(
@@ -2364,10 +2358,15 @@ class CARunSetup(CABaseSetup):
             return self.cacheable.func(self.instance_obj, *args, **kwargs)
         return self.cacheable.func(*args, **kwargs)
 
-    def get_args_hash(self, *args, **kwargs) -> int:
+    def get_args_hash(self, *args, **kwargs) -> tp.Optional[int]:
         """Get the hash of the passed arguments.
 
-        `CARunSetup.ignore_args` gets extended with `ignore_args` under `vectorbtpro._settings.caching`."""
+        `CARunSetup.ignore_args` gets extended with `ignore_args` under `vectorbtpro._settings.caching`.
+
+        If no arguments were passed, hashes None."""
+        if len(args) == 0 and len(kwargs) == 0:
+            return hash(None)
+
         from vectorbtpro._settings import settings
 
         caching_cfg = settings["caching"]

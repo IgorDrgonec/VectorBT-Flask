@@ -52,10 +52,10 @@ class TestResampler:
         assert resampler.source_freq == source_index.freq
         assert resampler.target_freq == target_index.freq
 
-    def test_from_pd_date_range(self):
-        source_index = pd.date_range("2020-01-01", "2020-02-01", freq="1h")
-        resampler = vbt.Resampler.from_pd_date_range(source_index, "2020-01-01", "2020-02-01", freq="1d")
-        target_index = pd.date_range("2020-01-01", "2020-02-01", freq="1d")
+    def test_from_date_range(self):
+        source_index = pd.date_range("2020-01-01", "2020-02-01", freq="1h", inclusive="left")
+        resampler = vbt.Resampler.from_date_range(source_index, "2020-01-01", "2020-02-01", freq="1d")
+        target_index = pd.date_range("2020-01-01", "2020-02-01", freq="1d", inclusive="left")
         assert_index_equal(resampler.source_index, source_index)
         assert_index_equal(resampler.target_index, target_index)
         assert resampler.source_freq == source_index.freq

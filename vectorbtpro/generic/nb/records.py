@@ -35,9 +35,7 @@ def get_ranges_nb(arr: tp.Array2d, gap_value: tp.Scalar) -> tp.RecordArray:
         * Find ranges in time series:
 
         ```pycon
-        >>> import numpy as np
-        >>> import pandas as pd
-        >>> from vectorbtpro.generic.nb import get_ranges_nb
+        >>> from vectorbtpro import *
 
         >>> a = np.array([
         ...     [np.nan, np.nan, np.nan, np.nan],
@@ -47,7 +45,7 @@ def get_ranges_nb(arr: tp.Array2d, gap_value: tp.Scalar) -> tp.RecordArray:
         ...     [     5, np.nan,      5,      5],
         ...     [     6,      6, np.nan,      6]
         ... ])
-        >>> records = get_ranges_nb(a, np.nan)
+        >>> records = vbt.nb.get_ranges_nb(a, np.nan)
 
         >>> pd.DataFrame.from_records(records)
            id  col  start_idx  end_idx  status
@@ -826,9 +824,7 @@ def get_drawdowns_nb(
 
     Usage:
         ```pycon
-        >>> import numpy as np
-        >>> import pandas as pd
-        >>> from vectorbtpro.generic.nb import get_drawdowns_nb
+        >>> from vectorbtpro import *
 
         >>> close = np.array([
         ...     [1, 5, 1, 3],
@@ -837,7 +833,7 @@ def get_drawdowns_nb(
         ...     [4, 2, 2, 2],
         ...     [5, 1, 1, 3]
         ... ])
-        >>> records = get_drawdowns_nb(None, None, None, close)
+        >>> records = vbt.nb.get_drawdowns_nb(None, None, None, close)
 
         >>> pd.DataFrame.from_records(records)
            id  col  start_idx  valley_idx  end_idx  start_val  valley_val  end_val  \\

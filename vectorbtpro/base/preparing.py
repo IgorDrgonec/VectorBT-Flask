@@ -15,24 +15,17 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.indexing import index_dict, IdxSetter, IdxSetterFactory, IdxRecords
-from vectorbtpro.base.reshaping import BCO, Default, Ref
-from vectorbtpro.base.reshaping import broadcast
+from vectorbtpro.base.reshaping import BCO, Default, Ref, broadcast
+from vectorbtpro.base.merging import concat_arrays, column_stack_arrays
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.decorators import override_arg_config, attach_arg_properties
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.indexes import repeat_index
-from vectorbtpro.utils import checks
+from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import Configured
 from vectorbtpro.utils.config import merge_dicts, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.cutting import suggest_module_path, cut_and_save_func
-from vectorbtpro.utils.datetime_ import (
-    freq_to_timedelta64,
-    parse_timedelta,
-    time_to_timedelta,
-    try_align_dt_to_index,
-    to_ns,
-)
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.module_ import import_module_from_path
 from vectorbtpro.utils.params import Param
@@ -143,7 +136,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             return td_obj.map_value(cls.prepare_td_obj)
 
         if isinstance(td_obj, (str, timedelta, pd.DateOffset, pd.Timedelta)):
-            td_obj = freq_to_timedelta64(td_obj)
+            td_obj = dt.to_timedelta64(td_obj)
         elif isinstance(td_obj, pd.Index):
             td_obj = td_obj.values
         return td_obj
@@ -165,7 +158,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             def _to_dt(wrapper, _dt_obj=dt_obj, _last_before=last_before):
                 if _last_before is None:
                     _last_before = False
-                _dt_obj = try_align_dt_to_index(_dt_obj, wrapper.index)
+                _dt_obj = dt.try_align_dt_to_index(_dt_obj, wrapper.index)
                 source_index = wrapper.index[wrapper.index < _dt_obj]
                 target_index = repeat_index(pd.Index([_dt_obj]), len(source_index))
                 if _last_before:
@@ -173,13 +166,13 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                 else:
                     target_ns = target_index.vbt.to_ns()
                 if len(target_ns) < len(wrapper.index):
-                    target_ns = np.concatenate((target_ns, np.full(len(wrapper.index) - len(target_ns), -1)))
+                    target_ns = concat_arrays((target_ns, np.full(len(wrapper.index) - len(target_ns), -1)))
                 return target_ns
 
             def _to_td(wrapper, _dt_obj=dt_obj, _last_before=last_before):
                 if _last_before is None:
                     _last_before = True
-                target_index = wrapper.index.vbt.to_period(parse_timedelta(_dt_obj), shift=True).to_timestamp()
+                target_index = wrapper.index.vbt.to_period(dt.to_freq(_dt_obj), shift=True).to_timestamp()
                 if _last_before:
                     return _apply_last_before(wrapper.index, target_index, wrapper.freq)
                 return target_index.vbt.to_ns()
@@ -187,7 +180,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             def _to_time(wrapper, _dt_obj=dt_obj, _last_before=last_before):
                 if _last_before is None:
                     _last_before = False
-                floor_index = wrapper.index.floor("1d") + time_to_timedelta(_dt_obj)
+                floor_index = wrapper.index.floor("1d") + dt.time_to_timedelta(_dt_obj)
                 target_index = floor_index.where(wrapper.index < floor_index, floor_index + pd.Timedelta(days=1))
                 if _last_before:
                     return _apply_last_before(wrapper.index, target_index, wrapper.freq)
@@ -202,7 +195,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                     dt_obj = dt_obj_time_template
                 except Exception as e:
                     try:
-                        parse_timedelta(dt_obj)
+                        dt.to_freq(dt_obj)
                         dt_obj = dt_obj_td_template
                     except Exception as e:
                         dt_obj = dt_obj_dt_template
@@ -320,8 +313,8 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                 for col in range(td_arr.shape[1]):
                     td_arr_col = pd.to_timedelta(td_arr[:, col])
                     td_arr_cols.append(td_arr_col.values)
-                td_arr = np.column_stack(td_arr_cols)
-        return to_ns(td_arr)
+                td_arr = column_stack_arrays(td_arr_cols)
+        return dt.to_ns(td_arr)
 
     @classmethod
     def dt_arr_to_ns(cls, dt_arr: tp.ArrayLike) -> tp.ArrayLike:
@@ -338,8 +331,8 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                 for col in range(dt_arr.shape[1]):
                     dt_arr_col = pd.to_datetime(dt_arr[:, col]).tz_localize(None)
                     dt_arr_cols.append(dt_arr_col.values)
-                dt_arr = np.column_stack(dt_arr_cols)
-        return to_ns(dt_arr)
+                dt_arr = column_stack_arrays(dt_arr_cols)
+        return dt.to_ns(dt_arr)
 
     def prepare_post_arg(self, arg_name: str, value: tp.Optional[tp.ArrayLike] = None) -> object:
         """Prepare an argument after broadcasting and/or template substitution."""

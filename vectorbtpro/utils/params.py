@@ -26,6 +26,7 @@ from vectorbtpro.utils.search import find_in_obj, replace_in_obj
 
 __all__ = [
     "generate_param_combs",
+    "pick_from_param_grid",
     "Param",
     "combine_params",
     "Parameterizer",
@@ -71,7 +72,7 @@ def generate_param_combs(op_tree: tp.Tuple, depth: int = 0) -> tp.List[tp.List]:
 
     Usage:
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> vbt.generate_param_combs(("product", ("combinations", [0, 1, 2, 3], 2), [4, 5]))
         [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2],
@@ -141,26 +142,38 @@ def params_to_list(params: tp.Params, is_tuple: bool, is_array_like: bool) -> li
     return new_params
 
 
-def get_n_combs(param_list: tp.Sequence[tp.Params]) -> int:
+def get_param_grid_len(param_grid: tp.Union[dict, tp.Sequence[tp.Params]]) -> int:
     """Get the number of parameter combinations in a parameter grid."""
+    if isinstance(param_grid, dict):
+        param_list = list(param_grid.values())
+    else:
+        param_list = param_grid
     return math.prod(list(map(len, param_list)))
 
 
-def pick_comb_from_grid(
-    param_list: tp.Sequence[tp.Params],
+def pick_from_param_grid(
+    param_grid: tp.Union[dict, tp.Sequence[tp.Params]],
     i: tp.Union[None, int, tp.Array1d] = None,
-) -> tp.Union[tp.List[tp.Param], tp.List[tp.Array1d]]:
+) -> tp.Union[dict, tp.List[tp.Param], tp.List[tp.Array1d]]:
     """Pick one or more parameter combinations from a parameter grid."""
-    n_combs = get_n_combs(param_list)
+    if isinstance(param_grid, dict):
+        param_keys = list(param_grid.keys())
+        param_list = list(param_grid.values())
+    else:
+        param_keys = None
+        param_list = param_grid
+    grid_len = get_param_grid_len(param_list)
     if i is None:
-        i = np.random.choice(n_combs)
+        i = np.random.randint(grid_len, dtype=np.int64)
     param_comb = []
     for params in param_list:
-        index = i * len(params) // n_combs
-        block_len = n_combs // len(params)
+        index = i * len(params) // grid_len
+        block_len = grid_len // len(params)
         i = i - index * block_len
-        n_combs = block_len
+        grid_len = block_len
         param_comb.append(params[index])
+    if param_keys is not None:
+        return dict(zip(param_keys, param_comb))
     return param_comb
 
 
@@ -513,13 +526,13 @@ def combine_params(
                     random_grid_indices = rng.choice(n_combs, size=random_subset, replace=random_replace)
                 if random_sort:
                     random_grid_indices = np.sort(random_grid_indices)
-                picked_level_indices = pick_comb_from_grid(level_indices, i=random_grid_indices)
+                picked_level_indices = pick_from_param_grid(level_indices, i=random_grid_indices)
             else:
                 if grid_indices is not None:
                     picked_grid_indices = grid_indices
                 else:
                     picked_grid_indices = np.arange(n_combs)
-                picked_level_indices = pick_comb_from_grid(level_indices, i=picked_grid_indices)
+                picked_level_indices = pick_from_param_grid(level_indices, i=picked_grid_indices)
 
             params_ready = True
         elif len(conditions) > 0 and grid_indices is None:
@@ -578,7 +591,7 @@ def combine_params(
         else:
             n_combs = len(grid_indices)
             level_indices = list(map(lambda x: np.arange(len(x[0])), level_param_lists))
-            picked_level_indices = pick_comb_from_grid(level_indices, i=grid_indices)
+            picked_level_indices = pick_from_param_grid(level_indices, i=grid_indices)
 
             params_ready = False
 
@@ -1702,8 +1715,7 @@ def parameterized(
         * No parameters, no parameter configs:
 
         ```pycon
-        >>> import vectorbtpro as vbt
-        >>> import pandas as pd
+        >>> from vectorbtpro import *
 
         >>> @vbt.parameterized(merge_func="column_stack")
         ... def my_ma(sr_or_df, window, wtype="simple", minp=0, adjust=False):

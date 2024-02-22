@@ -53,10 +53,7 @@ Also available as `vectorbtpro.portfolio.base.Portfolio.positions`.
 * Increasing position:
 
 ```pycon
->>> import pandas as pd
->>> import numpy as np
->>> from datetime import datetime, timedelta
->>> import vectorbtpro as vbt
+>>> from vectorbtpro import *
 
 >>> # Entry trades
 >>> pf_kwargs = dict(
@@ -1408,9 +1405,6 @@ class Trades(Ranges):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
-
             >>> index = pd.date_range("2020", periods=7)
             >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.], index=index)
             >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5], index=index)
@@ -1603,9 +1597,6 @@ class Trades(Ranges):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
-
             >>> index = pd.date_range("2020", periods=10)
             >>> price = pd.Series([1., 2., 3., 4., 5., 6., 5., 3., 2., 1.], index=index)
             >>> orders = pd.Series([1., -0.5, 0., -0.5, 2., 0., -0.5, -0.5, 0., -0.5], index=index)
@@ -1838,9 +1829,6 @@ class Trades(Ranges):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
-
             >>> index = pd.date_range("2020", periods=10)
             >>> price = pd.Series([1., 2., 3., 2., 4., 5., 6., 5., 6., 7.], index=index)
             >>> orders = pd.Series([1., 0., 0., -2., 0., 0., 2., 0., 0., -1.], index=index)
@@ -2031,9 +2019,6 @@ class Trades(Ranges):
 
         Usage:
             ```pycon
-            >>> import pandas as pd
-            >>> import vectorbtpro as vbt
-
             >>> index = pd.date_range("2020", periods=7)
             >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.], index=index)
             >>> size = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5], index=index)
@@ -2124,11 +2109,12 @@ class Trades(Ranges):
             exit_price = self_col.get_field_arr("exit_price")
             pnl = self_col.get_field_arr("pnl")
             status = self_col.get_field_arr("status")
-
             duration = to_1d_array(
-                self_col.wrapper.arr_to_timedelta(self_col.duration.values, to_pd=True, silence_warnings=True).astype(
-                    str
-                )
+                self_col.wrapper.arr_to_timedelta(
+                    self_col.duration.values,
+                    to_pd=True,
+                    silence_warnings=True,
+                ).astype(str)
             )
 
             if plot_markers:
@@ -2457,9 +2443,6 @@ class EntryTrades(Trades):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
-
             >>> index = pd.date_range("2020", periods=7)
             >>> price = pd.Series([1, 2, 3, 2, 3, 4, 3], index=index)
             >>> orders = pd.Series([1, 0, -1, 0, -1, 2, -2], index=index)
@@ -2693,9 +2676,6 @@ class ExitTrades(Trades):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
-
             >>> index = pd.date_range("2020", periods=7)
             >>> price = pd.Series([1, 2, 3, 2, 3, 4, 3], index=index)
             >>> orders = pd.Series([1, 0, -1, 0, -1, 2, -2], index=index)

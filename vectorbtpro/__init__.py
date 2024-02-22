@@ -89,6 +89,44 @@ if settings["importing"]["auto_import"]:
     from vectorbtpro.signals import nb as sig_nb, enums as sig_enums
     from vectorbtpro.utils import datetime_ as dt, datetime_nb as dt_nb
 
+
+def _import_more_stuff():
+    from functools import partial
+    from itertools import combinations, product
+    from collections import namedtuple
+    from datetime import datetime, timedelta, time
+    from time import sleep
+
+    import numpy as np
+    import pandas as pd
+    from numba import njit, prange
+
+    X = True
+    O = False
+    N = None
+    return locals()
+
+
+star_import = settings["importing"]["star_import"]
+if star_import.lower() == "all":
+    globals().update(_import_more_stuff())
+    imported_stuff = globals()
+elif star_import.lower() == "vbt":
+    imported_stuff = globals()
+elif star_import.lower() == "minimal":
+    import sys
+
+    vbt = sys.modules[__name__]
+    more_stuff = _import_more_stuff()
+    globals().update(more_stuff)
+    imported_stuff = {"vbt": vbt, "tp": tp, **more_stuff}
+    __all__ = ["vbt", "tp", *more_stuff.keys()]
+elif star_import.lower() == "none":
+    imported_stuff = dict()
+    __all__ = []
+else:
+    raise ValueError(f"Invalid option '{star_import}'")
+
 __pdoc__ = dict()
 __pdoc__["_settings"] = True
 __pdoc__["_opt_deps"] = True

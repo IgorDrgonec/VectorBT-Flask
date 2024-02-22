@@ -34,29 +34,53 @@ d_ns = h_ns * 24
 w_ns = d_ns * 7
 """Week (nanoseconds)."""
 
+y_ns = (d_ns * 438291) // 1200
+"""Year (nanoseconds)."""
+
+q_ns = y_ns // 4
+"""Quarter (nanoseconds)."""
+
+mo_ns = q_ns // 3
+"""Month (nanoseconds)."""
+
+semi_mo_ns = mo_ns // 2
+"""Semi-month (nanoseconds)."""
+
 ns_td = np.timedelta64(1, "ns")
 """Nanosecond (timedelta)."""
 
-us_td = us_ns * ns_td
+us_td = np.timedelta64(us_ns, "ns")
 """Microsecond (timedelta)."""
 
-ms_td = ms_ns * ns_td
+ms_td = np.timedelta64(ms_ns, "ns")
 """Millisecond (timedelta)."""
 
-s_td = s_ns * ns_td
+s_td = np.timedelta64(s_ns, "ns")
 """Second (timedelta)."""
 
-m_td = m_ns * ns_td
+m_td = np.timedelta64(m_ns, "ns")
 """Minute (timedelta)."""
 
-h_td = h_ns * ns_td
+h_td = np.timedelta64(h_ns, "ns")
 """Hour (timedelta)."""
 
-d_td = d_ns * ns_td
+d_td = np.timedelta64(d_ns, "ns")
 """Day (timedelta)."""
 
-w_td = w_ns * ns_td
+w_td = np.timedelta64(w_ns, "ns")
 """Week (timedelta)."""
+
+semi_mo_td = np.timedelta64(semi_mo_ns, "ns")
+"""Semi-month (timedelta)."""
+
+mo_td = np.timedelta64(mo_ns, "ns")
+"""Month (timedelta)."""
+
+q_td = np.timedelta64(q_ns, "ns")
+"""Quarter (timedelta)."""
+
+y_td = np.timedelta64(y_ns, "ns")
+"""Year (timedelta)."""
 
 unix_epoch_dt = np.datetime64(0, "ns")
 """Unix epoch (datetime)."""

@@ -20,6 +20,7 @@ from vectorbtpro.utils.config import HybridConfig
 __all__ = [
     "import_module_from_path",
     "get_refname",
+    "imlucky",
     "get_api_ref",
     "open_api_ref",
 ]
@@ -359,15 +360,16 @@ def resolve_refname(refname: str, module: tp.Union[None, str, ModuleType] = None
     refnames = []
     visited_modules = set()
     for k, v in module.__dict__.items():
-        if inspect.ismodule(v) and v.__name__.startswith(module.__name__) and v.__name__ not in visited_modules:
-            visited_modules.add(v.__name__)
-            new_refname = resolve_refname(".".join(refname_parts), module=v)
-            if new_refname is not None:
-                if isinstance(new_refname, str):
-                    new_refname = [new_refname]
-                for r in new_refname:
-                    if r not in refnames:
-                        refnames.append(r)
+        if v is not module:
+            if inspect.ismodule(v) and v.__name__.startswith(module.__name__) and v.__name__ not in visited_modules:
+                visited_modules.add(v.__name__)
+                new_refname = resolve_refname(".".join(refname_parts), module=v)
+                if new_refname is not None:
+                    if isinstance(new_refname, str):
+                        new_refname = [new_refname]
+                    for r in new_refname:
+                        if r not in refnames:
+                            refnames.append(r)
     if len(refnames) > 1:
         return refnames
     if len(refnames) == 1:
@@ -394,6 +396,16 @@ def get_refname(
     if resolve:
         return resolve_refname(refname, module=module)
     return refname
+
+
+def get_imlucky_url(query: str) -> str:
+    """Get the "I'm lucky" URL on DuckDuckGo for a query."""
+    return "https://duckduckgo.com/?q=!ducky+" + urllib.request.pathname2url(query)
+
+
+def imlucky(query: str, **kwargs) -> None:
+    """Open the "I'm lucky" URL on DuckDuckGo for a query."""
+    webbrowser.open(get_imlucky_url(query), **kwargs)
 
 
 def get_api_ref(
@@ -428,7 +440,7 @@ def get_api_ref(
             search_query = module.__name__ + "." + qualname
     else:
         search_query = refname
-    return "https://duckduckgo.com/?q=!ducky+" + urllib.request.pathname2url(search_query)
+    return get_imlucky_url(search_query)
 
 
 def open_api_ref(

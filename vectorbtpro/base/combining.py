@@ -11,11 +11,9 @@ import numpy as np
 from numba.typed import List
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.registries.jit_registry import jit_reg
-from vectorbtpro.registries.jit_registry import register_jitted
+from vectorbtpro.registries.jit_registry import jit_reg, register_jitted
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.template import RepFunc
-from vectorbtpro.base.reshaping import column_stack
 
 __all__ = []
 
@@ -135,6 +133,8 @@ def apply_and_concat_each(
     """Apply each function on its own set of positional and keyword arguments.
 
     Executes the function using `vectorbtpro.utils.execution.execute`."""
+    from vectorbtpro.base.merging import column_stack_arrays
+
     if execute_kwargs is None:
         execute_kwargs = {}
 
@@ -151,8 +151,8 @@ def apply_and_concat_each(
     if n_outputs == 1:
         if isinstance(out[0], (tuple, list, List)) and len(out[0]) == 1:
             out = list(map(lambda x: x[0], out))
-        return column_stack(out)
-    return list(map(column_stack, zip(*out)))
+        return column_stack_arrays(out)
+    return list(map(column_stack_arrays, zip(*out)))
 
 
 def apply_and_concat(

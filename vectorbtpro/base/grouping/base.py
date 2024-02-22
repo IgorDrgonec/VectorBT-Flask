@@ -167,6 +167,8 @@ class Grouper(Configured):
         """Build a `Grouper` instance from a pandas `GroupBy` object.
 
         Indices are stored under `index` and group labels under `group_by`."""
+        from vectorbtpro.base.merging import concat_arrays
+
         if not isinstance(pd_group_by, (PandasGroupBy, PandasResampler)):
             raise TypeError("pd_group_by must be an instance of GroupBy or Resampler")
         indices = list(pd_group_by.indices.values())
@@ -175,7 +177,7 @@ class Grouper(Configured):
         group_start_idxs = np.cumsum(group_lens)[1:] - group_lens[1:]
         groups[group_start_idxs] = 1
         groups = np.cumsum(groups)
-        index = pd.Index(np.concatenate(indices))
+        index = pd.Index(concat_arrays(indices))
         group_by = pd.Index(list(pd_group_by.indices.keys()), name="group")[groups]
         return cls(
             index=index,

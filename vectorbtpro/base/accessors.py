@@ -11,7 +11,6 @@ import pandas as pd
 from pandas.api.types import is_scalar
 from pandas.core.groupby import GroupBy as PandasGroupBy
 from pandas.core.resample import Resampler as PandasResampler
-from pandas.tseries.frequencies import to_offset
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import combining, reshaping, indexes
@@ -24,19 +23,12 @@ from vectorbtpro.base.indexing import (
 )
 from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.resampling.base import Resampler
-from vectorbtpro.utils import checks
+from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Configured
 from vectorbtpro.utils.decorators import class_or_instanceproperty, class_or_instancemethod
 from vectorbtpro.utils.magic_decorators import attach_binary_magic_methods, attach_unary_magic_methods
 from vectorbtpro.utils.parsing import get_context_vars
 from vectorbtpro.utils.template import substitute_templates
-from vectorbtpro.utils.datetime_ import (
-    infer_index_freq,
-    freq_to_timedelta64,
-    parse_timedelta,
-    prepare_dt_index,
-    to_ns,
-)
 from vectorbtpro.utils.eval_ import multiline_eval
 
 __all__ = ["BaseIDXAccessor", "BaseAccessor", "BaseSRAccessor", "BaseDFAccessor"]
@@ -75,7 +67,7 @@ class BaseIDXAccessor(Configured):
         """Convert index to an 64-bit integer array.
 
         Timestamps will be converted to nanoseconds."""
-        return to_ns(self.obj)
+        return dt.to_ns(self.obj)
 
     def to_period(self, freq: tp.FrequencyLike, shift: bool = False) -> pd.PeriodIndex:
         """Convert index to period."""
@@ -92,7 +84,7 @@ class BaseIDXAccessor(Configured):
         """Convert index to period and then to an 64-bit integer array.
 
         Timestamps will be converted to nanoseconds."""
-        return to_ns(self.to_period(freq, shift=shift))
+        return dt.to_ns(self.to_period(freq, shift=shift))
 
     @classmethod
     def from_values(cls, *args, **kwargs) -> tp.Index:
@@ -236,23 +228,23 @@ class BaseIDXAccessor(Configured):
         if freq is None:
             freq = wrapping_cfg["freq"]
         try:
-            return infer_index_freq(self.obj, freq=freq, **kwargs)
+            return dt.infer_index_freq(self.obj, freq=freq, **kwargs)
         except Exception as e:
             return None
 
     @property
-    def freq(self) -> tp.Optional[pd.Timedelta]:
+    def freq(self) -> tp.Optional[tp.PandasFrequency]:
         """`BaseIDXAccessor.get_freq` with date offsets and integer frequencies not allowed."""
-        return self.get_freq(allow_date_offset=False, allow_numeric=False)
+        return self.get_freq(allow_offset=True, allow_numeric=False)
 
     @property
     def ns_freq(self) -> tp.Optional[int]:
         """Convert frequency to a 64-bit integer.
 
         Timedelta will be converted to nanoseconds."""
-        freq = self.get_freq(allow_date_offset=False, allow_numeric=True)
+        freq = self.get_freq(allow_offset=False, allow_numeric=True)
         if freq is not None:
-            freq = to_ns(freq_to_timedelta64(freq))
+            freq = dt.to_ns(dt.to_timedelta64(freq))
         return freq
 
     @property
@@ -273,8 +265,11 @@ class BaseIDXAccessor(Configured):
         wrapping_cfg = settings["wrapping"]
 
         if isinstance(self.obj, pd.DatetimeIndex):
-            if self.freq is not None:
-                return (self.obj[-1] - self.obj[0]) / self.freq + 1
+            freq = self.freq
+            if freq is not None:
+                if not isinstance(freq, pd.Timedelta):
+                    freq = dt.to_timedelta(freq, approximate=True)
+                return (self.obj[-1] - self.obj[0]) / freq + 1
             if not wrapping_cfg["silence_warnings"]:
                 warnings.warn(
                     (
@@ -283,7 +278,10 @@ class BaseIDXAccessor(Configured):
                     ),
                     stacklevel=2,
                 )
-        if isinstance(self.obj[0], int) and isinstance(self.obj[-1], int):
+        if checks.is_number(self.obj[0]) and checks.is_number(self.obj[-1]):
+            freq = self.get_freq(allow_offset=False, allow_numeric=True)
+            if checks.is_number(freq):
+                return (self.obj[-1] - self.obj[0]) / freq + 1
             return self.obj[-1] - self.obj[0] + 1
         if not wrapping_cfg["silence_warnings"]:
             warnings.warn("Index is neither datetime-like nor integer", stacklevel=2)
@@ -314,7 +312,8 @@ class BaseIDXAccessor(Configured):
                     stacklevel=2,
                 )
             return a
-
+        if not isinstance(freq, pd.Timedelta):
+            freq = dt.to_timedelta(freq, approximate=True)
         if to_pd:
             out = pd.to_timedelta(a * freq)
         else:
@@ -346,13 +345,11 @@ class BaseIDXAccessor(Configured):
             pass
         if isinstance(self.obj, pd.DatetimeIndex):
             try:
-                by = to_offset(parse_timedelta(by))
-                if by.n == 1:
-                    return Grouper(index=self.obj, group_by=self.to_period(by), **kwargs)
+                return Grouper(index=self.obj, group_by=self.to_period(dt.to_freq(by)), **kwargs)
             except Exception as e:
                 pass
             try:
-                pd_group_by = pd.Series(index=self.obj, dtype=object).resample(parse_timedelta(by), **groupby_kwargs)
+                pd_group_by = pd.Series(index=self.obj, dtype=object).resample(dt.to_freq(by), **groupby_kwargs)
                 return Grouper.from_pd_group_by(pd_group_by, **kwargs)
             except Exception as e:
                 pass
@@ -368,9 +365,9 @@ class BaseIDXAccessor(Configured):
         silence_warnings: tp.Optional[bool] = None,
     ) -> tp.Union[Resampler, tp.PandasResampler]:
         """Get an index resampler of type `vectorbtpro.base.resampling.base.Resampler`."""
-        if checks.is_td_like(rule):
+        if checks.is_frequency_like(rule):
             try:
-                rule = parse_timedelta(rule)
+                rule = dt.to_freq(rule)
                 is_td = True
             except Exception as e:
                 is_td = False
@@ -389,7 +386,7 @@ class BaseIDXAccessor(Configured):
         if return_pd_resampler:
             raise TypeError("Cannot convert Resampler to Pandas Resampler")
         if checks.is_dt_like(rule) or checks.is_iterable(rule):
-            rule = prepare_dt_index(rule)
+            rule = dt.prepare_dt_index(rule)
             rule = Resampler(
                 source_index=self.obj,
                 target_index=rule,
@@ -442,9 +439,7 @@ class BaseAccessor(Wrapping):
         * Build a symmetric matrix:
 
         ```pycon
-        >>> import numpy as np
-        >>> import pandas as pd
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> # vectorbtpro.base.accessors.BaseAccessor.make_symmetric
         >>> pd.Series([1, 2, 3]).vbt.make_symmetric()
@@ -1485,7 +1480,6 @@ class BaseAccessor(Wrapping):
             1.02 s ± 927 µs per loop (mean ± std. dev. of 7 runs, 1 loop each)
             ```
         """
-        checks.assert_not_none(apply_func)
         if broadcast_named_args is None:
             broadcast_named_args = {}
         if broadcast_kwargs is None:

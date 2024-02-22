@@ -14,9 +14,7 @@ are 0 and 20 (not 19!) respectively.
     Make sure to account for this when computing custom metrics involving duration.
 
 ```pycon
->>> import numpy as np
->>> import pandas as pd
->>> import vectorbtpro as vbt
+>>> from vectorbtpro import *
 
 >>> start = '2019-01-01 UTC'  # crypto is in UTC
 >>> end = '2020-01-01 UTC'
@@ -123,27 +121,16 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.base.reshaping import to_pd_array, to_1d_array, to_2d_array, tile
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.indexes import stack_indexes, combine_indexes, tile_index
-from vectorbtpro.generic import nb
-from vectorbtpro.generic.enums import (
-    RangeStatus,
-    range_dt,
-    pattern_range_dt,
-    InterpMode,
-    RescaleMode,
-    ErrorType,
-    DistanceMeasure,
-    OverlapMode,
-)
+from vectorbtpro.generic import nb, enums
 from vectorbtpro.generic.price_records import PriceRecords
 from vectorbtpro.records.base import Records
 from vectorbtpro.records.decorators import override_field_config, attach_fields, attach_shortcut_properties
 from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
-from vectorbtpro.utils import checks
+from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
-from vectorbtpro.utils.datetime_ import freq_to_timedelta, freq_to_timedelta64, to_ns
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.params import combine_params, Param
@@ -168,13 +155,13 @@ class _DEF:
 
 ranges_field_config = ReadonlyConfig(
     dict(
-        dtype=range_dt,
+        dtype=enums.range_dt,
         settings=dict(
             id=dict(title="Range Id"),
             idx=dict(name="end_idx"),  # remap field of Records
             start_idx=dict(title="Start Index", mapping="index"),
             end_idx=dict(title="End Index", mapping="index"),
-            status=dict(title="Status", mapping=RangeStatus),
+            status=dict(title="Status", mapping=enums.RangeStatus),
         ),
     )
 )
@@ -296,7 +283,7 @@ class Ranges(PriceRecords):
         See `vectorbtpro.generic.nb.records.get_ranges_from_delta_nb`.
 
         Set `delta` to an integer to wait a certain amount of rows. Set it to anything else to
-        wait a timedelta. The conversion is done using `vectorbtpro.utils.datetime_.freq_to_timedelta64`.
+        wait a timedelta. The conversion is done using `vectorbtpro.utils.datetime_.to_timedelta64`.
         The second option requires the index to be datetime-like, or at least the frequency to be set.
 
         `**kwargs` will be passed to `Ranges.__init__`."""
@@ -318,11 +305,11 @@ class Ranges(PriceRecords):
             delta_use_index = False
             index = None
         else:
-            delta = to_ns(freq_to_timedelta64(delta))
+            delta = dt.to_ns(dt.to_timedelta64(delta))
             if isinstance(records_or_mapped.wrapper.index, pd.DatetimeIndex):
-                index = to_ns(records_or_mapped.wrapper.index)
+                index = dt.to_ns(records_or_mapped.wrapper.index)
             else:
-                freq = to_ns(freq_to_timedelta64(records_or_mapped.wrapper.freq))
+                freq = dt.to_ns(dt.to_timedelta64(records_or_mapped.wrapper.freq))
                 index = np.arange(records_or_mapped.wrapper.shape[0]) * freq
             delta_use_index = True
         if shift is None:
@@ -373,7 +360,7 @@ class Ranges(PriceRecords):
         """Filter out ranges that last less than a minimum duration."""
         if isinstance(min_duration, int):
             return self.apply_mask(self.duration.values >= min_duration, **kwargs)
-        min_duration = freq_to_timedelta64(min_duration)
+        min_duration = dt.to_timedelta64(min_duration)
         if real:
             return self.apply_mask(self.real_duration.values >= min_duration, **kwargs)
         return self.apply_mask(self.duration.values * self.wrapper.freq >= min_duration, **kwargs)
@@ -387,7 +374,7 @@ class Ranges(PriceRecords):
         """Filter out ranges that last more than a maximum duration."""
         if isinstance(max_duration, int):
             return self.apply_mask(self.duration.values <= max_duration, **kwargs)
-        max_duration = freq_to_timedelta64(max_duration)
+        max_duration = dt.to_timedelta64(max_duration)
         if real:
             return self.apply_mask(self.real_duration.values <= max_duration, **kwargs)
         return self.apply_mask(self.duration.values * self.wrapper.freq <= max_duration, **kwargs)
@@ -449,7 +436,7 @@ class Ranges(PriceRecords):
         """Get the last index in each range."""
         last_idx = self.get_field_arr("end_idx", copy=True)
         status = self.get_field_arr("status")
-        last_idx[status == RangeStatus.Closed] -= 1
+        last_idx[status == enums.RangeStatus.Closed] -= 1
         return self.map_array(last_idx, **kwargs)
 
     def get_duration(
@@ -479,10 +466,10 @@ class Ranges(PriceRecords):
         func = jit_reg.resolve_option(nb.range_duration_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         duration = func(
-            to_ns(self.get_map_field_to_index("start_idx")),
-            to_ns(self.get_map_field_to_index("end_idx")),
+            dt.to_ns(self.get_map_field_to_index("start_idx")),
+            dt.to_ns(self.get_map_field_to_index("end_idx")),
             self.get_field_arr("status"),
-            freq=to_ns(freq_to_timedelta64(self.wrapper.freq)),
+            freq=dt.to_ns(dt.to_timedelta64(self.wrapper.freq)),
         ).astype("timedelta64[ns]")
         return self.map_array(duration, **kwargs)
 
@@ -498,7 +485,7 @@ class Ranges(PriceRecords):
         """Get average range duration (as timedelta)."""
         if real:
             duration = self.real_duration
-            duration = duration.replace(mapped_arr=to_ns(duration.mapped_arr))
+            duration = duration.replace(mapped_arr=dt.to_ns(duration.mapped_arr))
             wrap_kwargs = merge_dicts(dict(name_or_index="avg_real_duration", dtype="timedelta64[ns]"), wrap_kwargs)
         else:
             duration = self.duration
@@ -517,7 +504,7 @@ class Ranges(PriceRecords):
         """Get maximum range duration (as timedelta)."""
         if real:
             duration = self.real_duration
-            duration = duration.replace(mapped_arr=to_ns(duration.mapped_arr))
+            duration = duration.replace(mapped_arr=dt.to_ns(duration.mapped_arr))
             wrap_kwargs = merge_dicts(dict(name_or_index="max_real_duration", dtype="timedelta64[ns]"), wrap_kwargs)
         else:
             duration = self.duration
@@ -576,7 +563,7 @@ class Ranges(PriceRecords):
 
         Set `proj_start` to an integer to generate a projection after a certain row
         after the start row. Set it to anything else to wait a timedelta.
-        The conversion is done using `vectorbtpro.utils.datetime_.freq_to_timedelta64`.
+        The conversion is done using `vectorbtpro.utils.datetime_.to_timedelta64`.
         The second option requires the index to be datetime-like, or at least the frequency to be set.
 
         Set `proj_period` the same way as `proj_start` to generate a projection of a certain length.
@@ -604,7 +591,7 @@ class Ranges(PriceRecords):
         """
         if close is None:
             close = self.close
-            checks.assert_not_none(close)
+            checks.assert_not_none(close, arg_name="close")
         else:
             close = self.wrapper.wrap(close, group_by=False)
         if proj_start is None:
@@ -613,23 +600,23 @@ class Ranges(PriceRecords):
             proj_start_use_index = False
             index = None
         else:
-            proj_start = to_ns(freq_to_timedelta64(proj_start))
+            proj_start = dt.to_ns(dt.to_timedelta64(proj_start))
             if isinstance(self.wrapper.index, pd.DatetimeIndex):
-                index = to_ns(self.wrapper.index)
+                index = dt.to_ns(self.wrapper.index)
             else:
-                freq = to_ns(freq_to_timedelta64(self.wrapper.freq))
+                freq = dt.to_ns(dt.to_timedelta64(self.wrapper.freq))
                 index = np.arange(self.wrapper.shape[0]) * freq
             proj_start_use_index = True
         if proj_period is not None:
             if isinstance(proj_period, int):
                 proj_period_use_index = False
             else:
-                proj_period = to_ns(freq_to_timedelta64(proj_period))
+                proj_period = dt.to_ns(dt.to_timedelta64(proj_period))
                 if index is None:
                     if isinstance(self.wrapper.index, pd.DatetimeIndex):
-                        index = to_ns(self.wrapper.index)
+                        index = dt.to_ns(self.wrapper.index)
                     else:
-                        freq = to_ns(freq_to_timedelta64(self.wrapper.freq))
+                        freq = dt.to_ns(dt.to_timedelta64(self.wrapper.freq))
                         index = np.arange(self.wrapper.shape[0]) * freq
                 proj_period_use_index = True
         else:
@@ -657,8 +644,7 @@ class Ranges(PriceRecords):
         if return_raw:
             return ridxs, projections
         projections = projections.T
-        freq = self.wrapper.get_freq(allow_numeric=False)
-        wrapper = ArrayWrapper.from_obj(projections, freq=freq)
+        wrapper = ArrayWrapper.from_obj(projections, freq=self.wrapper.freq)
         if id_level is None:
             id_level = pd.Index(self.id_arr, name="range_id")
         elif isinstance(id_level, str):
@@ -677,7 +663,7 @@ class Ranges(PriceRecords):
                 index=pd.date_range(
                     start=start_index,
                     periods=projections.shape[0],
-                    freq=freq,
+                    freq=self.wrapper.freq,
                 ),
                 columns=stack_indexes(
                     self.wrapper.columns[self.col_arr[ridxs]],
@@ -836,9 +822,6 @@ class Ranges(PriceRecords):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
-
             >>> price = pd.Series(
             ...     [11, 12, 13, 14, 11, 12, 13, 12, 11, 12],
             ...     index=pd.date_range("2020", periods=10),
@@ -992,7 +975,7 @@ class Ranges(PriceRecords):
                 if isinstance(plot_past_period, int):
                     _ohlc = ohlc.iloc[-plot_past_period:]
                 else:
-                    plot_past_period = freq_to_timedelta(plot_past_period)
+                    plot_past_period = dt.to_timedelta(plot_past_period)
                     _ohlc = ohlc[ohlc.index > ohlc.index[-1] - plot_past_period]
             else:
                 _ohlc = ohlc
@@ -1011,7 +994,7 @@ class Ranges(PriceRecords):
                 if isinstance(plot_past_period, int):
                     _close = close.iloc[-plot_past_period:]
                 else:
-                    plot_past_period = freq_to_timedelta(plot_past_period)
+                    plot_past_period = dt.to_timedelta(plot_past_period)
                     _close = close[close.index > close.index[-1] - plot_past_period]
             else:
                 _close = close
@@ -1098,9 +1081,6 @@ class Ranges(PriceRecords):
             * Plot zones colored by duration:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
-
             >>> price = pd.Series(
             ...     [1, 2, 1, 2, 3, 2, 1, 2, 3],
             ...     index=pd.date_range("2020", periods=9),
@@ -1285,9 +1265,6 @@ class Ranges(PriceRecords):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
-
             >>> price = pd.Series(
             ...     [1, 2, 1, 2, 3, 2, 1, 2, 3],
             ...     index=pd.date_range("2020", periods=9),
@@ -1422,7 +1399,7 @@ class Ranges(PriceRecords):
                 start_scatter = go.Scatter(**_start_trace_kwargs)
                 fig.add_trace(start_scatter, **add_trace_kwargs)
 
-            closed_mask = status == RangeStatus.Closed
+            closed_mask = status == enums.RangeStatus.Closed
             if closed_mask.any():
                 if plot_markers:
                     # Plot end markers
@@ -1449,7 +1426,7 @@ class Ranges(PriceRecords):
                     closed_end_scatter = go.Scatter(**_end_trace_kwargs)
                     fig.add_trace(closed_end_scatter, **add_trace_kwargs)
 
-            open_mask = status == RangeStatus.Open
+            open_mask = status == enums.RangeStatus.Open
             if open_mask.any():
                 if plot_markers:
                     # Plot end markers
@@ -1686,7 +1663,7 @@ class PSC:
 
 pattern_ranges_field_config = ReadonlyConfig(
     dict(
-        dtype=pattern_range_dt,
+        dtype=enums.pattern_range_dt,
         settings=dict(
             id=dict(title="Pattern Range Id"),
             similarity=dict(title="Similarity"),
@@ -1737,20 +1714,20 @@ class PatternRanges(Ranges):
             elif k == "max_error":
                 v = to_1d_array(v)
             elif k == "interp_mode":
-                v = map_enum_fields(v, InterpMode)
+                v = map_enum_fields(v, enums.InterpMode)
             elif k == "rescale_mode":
-                v = map_enum_fields(v, RescaleMode)
+                v = map_enum_fields(v, enums.RescaleMode)
             elif k == "error_type":
-                v = map_enum_fields(v, ErrorType)
+                v = map_enum_fields(v, enums.ErrorType)
             elif k == "distance_measure":
-                v = map_enum_fields(v, DistanceMeasure)
+                v = map_enum_fields(v, enums.DistanceMeasure)
             elif k == "max_error_interp_mode":
                 if v is None:
                     v = search_config["interp_mode"]
                 else:
-                    v = map_enum_fields(v, InterpMode)
+                    v = map_enum_fields(v, enums.InterpMode)
             elif k == "overlap_mode":
-                v = map_enum_fields(v, OverlapMode)
+                v = map_enum_fields(v, enums.OverlapMode)
             search_config[k] = v
         return PSC(**search_config)
 
@@ -2198,7 +2175,7 @@ class PatternRanges(Ranges):
                     if close is None:
                         raise ValueError("Must provide close to overlay patterns")
                     arr_sr = close.loc[_start_idx:_end_idx]
-                    if status[r] == RangeStatus.Closed:
+                    if status[r] == enums.RangeStatus.Closed:
                         arr_sr = arr_sr.iloc[:-1]
                     if fill_distance:
                         obj_trace_kwargs = dict(

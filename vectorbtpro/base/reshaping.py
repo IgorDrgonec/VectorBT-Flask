@@ -96,9 +96,18 @@ def tile_shape(shape: tp.ShapeLike, n: int, axis: int = 1) -> tp.Shape:
     return repeat_shape(shape, n, axis=axis)
 
 
-def index_to_series(arg: tp.Index) -> tp.Series:
+def index_to_series(arg: tp.Index, reset_index: bool = False) -> tp.Series:
     """Convert Index to Series."""
+    if reset_index:
+        return arg.to_series(index=pd.RangeIndex(stop=len(arg)))
     return arg.to_series()
+
+
+def index_to_frame(arg: tp.Index, reset_index: bool = False) -> tp.Frame:
+    """Convert Index to DataFrame."""
+    if not isinstance(arg, pd.MultiIndex):
+        return index_to_series(arg, reset_index=reset_index).to_frame()
+    return arg.to_frame(index=not reset_index)
 
 
 def mapping_to_series(arg: tp.MappingLike) -> tp.Series:
@@ -305,30 +314,6 @@ def tile(
         return np.tile(arg, (1, n))
     else:
         raise ValueError(f"Only axes 0 and 1 are supported, not {axis}")
-
-
-def column_stack(*arrs: tp.MaybeSequence[tp.AnyArray]) -> tp.Array2d:
-    """Stack arrays along columns."""
-    if len(arrs) == 1:
-        arrs = arrs[0]
-    arrs = list(arrs)
-
-    arrs = list(map(np.asarray, arrs))
-    common_shape = None
-    can_concatenate = True
-    for arr in arrs:
-        if common_shape is None:
-            common_shape = arr.shape
-        if arr.shape != common_shape:
-            can_concatenate = False
-            continue
-        if not (arr.ndim == 1 or (arr.ndim == 2 and arr.shape[1] == 1)):
-            can_concatenate = False
-            continue
-
-    if can_concatenate:
-        return np.concatenate(arrs).reshape((len(arrs), common_shape[0])).T
-    return np.column_stack(arrs)
 
 
 def broadcast_shapes(
@@ -911,9 +896,7 @@ def broadcast(
         * Without broadcasting index and columns:
 
         ```pycon
-        >>> import numpy as np
-        >>> import pandas as pd
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> v = 0
         >>> a = np.array([1, 2, 3])
@@ -1740,8 +1723,7 @@ def broadcast_to(
 
     Usage:
         ```pycon
-        >>> import numpy as np
-        >>> import pandas as pd
+        >>> from vectorbtpro import *
         >>> from vectorbtpro.base.reshaping import broadcast_to
 
         >>> a = np.array([1, 2, 3])
@@ -1796,7 +1778,7 @@ def broadcast_to_array_of(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> tp.Array:
 
     Usage:
         ```pycon
-        >>> import numpy as np
+        >>> from vectorbtpro import *
         >>> from vectorbtpro.base.reshaping import broadcast_to_array_of
 
         >>> broadcast_to_array_of([0.1, 0.2], np.empty((2, 2)))
@@ -1855,7 +1837,7 @@ def broadcast_combs(
 
     Usage:
         ```pycon
-        >>> import numpy as np
+        >>> from vectorbtpro import *
         >>> from vectorbtpro.base.reshaping import broadcast_combs
 
         >>> df = pd.DataFrame([[1, 2, 3], [3, 4, 5]], columns=pd.Index(['a', 'b', 'c'], name='df_param'))
@@ -1945,7 +1927,7 @@ def unstack_to_array(
 
     Usage:
         ```pycon
-        >>> import pandas as pd
+        >>> from vectorbtpro import *
         >>> from vectorbtpro.base.reshaping import unstack_to_array
 
         >>> index = pd.MultiIndex.from_arrays(
@@ -2008,7 +1990,7 @@ def make_symmetric(arg: tp.SeriesFrame, sort: bool = True) -> tp.Frame:
 
     Usage:
         ```pycon
-        >>> import pandas as pd
+        >>> from vectorbtpro import *
         >>> from vectorbtpro.base.reshaping import make_symmetric
 
         >>> df = pd.DataFrame([[1, 2], [3, 4]], index=['a', 'b'], columns=['c', 'd'])
@@ -2021,6 +2003,8 @@ def make_symmetric(arg: tp.SeriesFrame, sort: bool = True) -> tp.Frame:
         d  2.0  4.0  NaN  NaN
         ```
     """
+    from vectorbtpro.base.merging import concat_arrays
+
     checks.assert_instance_of(arg, (pd.Series, pd.DataFrame))
     df = to_2d(arg)
     if isinstance(df.index, pd.MultiIndex) or isinstance(df.columns, pd.MultiIndex):
@@ -2039,9 +2023,9 @@ def make_symmetric(arg: tp.SeriesFrame, sort: bool = True) -> tp.Frame:
         else:
             new_name = (names1, names2)
     if sort:
-        idx_vals = np.unique(np.concatenate((df.index, df.columns))).tolist()
+        idx_vals = np.unique(concat_arrays((df.index, df.columns))).tolist()
     else:
-        idx_vals = list(dict.fromkeys(np.concatenate((df.index, df.columns))))
+        idx_vals = list(dict.fromkeys(concat_arrays((df.index, df.columns))))
     df_index = df.index.copy()
     df_columns = df.columns.copy()
     if isinstance(df.index, pd.MultiIndex):
@@ -2076,7 +2060,7 @@ def unstack_to_df(
 
     Usage:
         ```pycon
-        >>> import pandas as pd
+        >>> from vectorbtpro import *
         >>> from vectorbtpro.base.reshaping import unstack_to_df
 
         >>> index = pd.MultiIndex.from_arrays(

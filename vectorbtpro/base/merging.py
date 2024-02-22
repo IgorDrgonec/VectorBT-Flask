@@ -12,10 +12,13 @@ from vectorbtpro.utils import checks
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, HybridConfig
 from vectorbtpro.utils.merging import MergeFunc
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
-from vectorbtpro.base.reshaping import column_stack, to_2d_array
+from vectorbtpro.base.reshaping import to_1d_array, to_2d_array
 from vectorbtpro.base.indexes import stack_indexes, concat_indexes
 
 __all__ = [
+    "concat_arrays",
+    "row_stack_arrays",
+    "column_stack_arrays",
     "concat_merge",
     "row_stack_merge",
     "column_stack_merge",
@@ -24,6 +27,50 @@ __all__ = [
 ]
 
 __pdoc__ = {}
+
+
+def concat_arrays(*arrs: tp.MaybeSequence[tp.AnyArray]) -> tp.Array1d:
+    """Concatenate arrays."""
+    if len(arrs) == 1:
+        arrs = arrs[0]
+    arrs = list(arrs)
+
+    arrs = list(map(to_1d_array, arrs))
+    return np.concatenate(arrs)
+
+
+def row_stack_arrays(*arrs: tp.MaybeSequence[tp.AnyArray], expand_axis: int = 1) -> tp.Array2d:
+    """Stack arrays along rows."""
+    if len(arrs) == 1:
+        arrs = arrs[0]
+    arrs = list(arrs)
+
+    arrs = list(map(partial(to_2d_array, expand_axis=expand_axis), arrs))
+    return np.concatenate(arrs, axis=0)
+
+
+def column_stack_arrays(*arrs: tp.MaybeSequence[tp.AnyArray], expand_axis: int = 1) -> tp.Array2d:
+    """Stack arrays along columns."""
+    if len(arrs) == 1:
+        arrs = arrs[0]
+    arrs = list(arrs)
+
+    arrs = list(map(partial(to_2d_array, expand_axis=expand_axis), arrs))
+    common_shape = None
+    can_concatenate = True
+    for arr in arrs:
+        if common_shape is None:
+            common_shape = arr.shape
+        if arr.shape != common_shape:
+            can_concatenate = False
+            continue
+        if not (arr.ndim == 1 or (arr.ndim == 2 and arr.shape[1] == 1)):
+            can_concatenate = False
+            continue
+
+    if can_concatenate:
+        return np.concatenate(arrs, axis=0).reshape((len(arrs), common_shape[0])).T
+    return np.concatenate(arrs, axis=1)
 
 
 def concat_merge(
@@ -41,7 +88,7 @@ def concat_merge(
 
     If `wrap` is None, it will become True if `wrapper`, `keys`, or `wrap_kwargs` are not None.
     If `wrap` is True, each array will be wrapped with Pandas Series and merged using `pd.concat`.
-    Otherwise, arrays will be kept as-is and merged using `np.concatenate`.
+    Otherwise, arrays will be kept as-is and merged using `concat_arrays`.
     `wrap_kwargs` can be a dictionary or a list of dictionaries.
 
     If `wrapper` is provided, will use `vectorbtpro.base.wrapping.ArrayWrapper.wrap_reduced`.
@@ -131,7 +178,7 @@ def concat_merge(
             objs = new_objs
 
     if not wrap:
-        return np.concatenate(objs)
+        return concat_arrays(objs)
 
     if keys is not None and isinstance(keys[0], pd.Index):
         new_obj = pd.concat(objs, axis=0, **kwargs)
@@ -175,6 +222,7 @@ def row_stack_merge(
     * 'sr', 'series': each array will be wrapped with Pandas Series
     * 'df', 'frame', 'dataframe': each array will be wrapped with Pandas DataFrame
 
+    Without wrapping, arrays will be kept as-is and merged using `row_stack_arrays`.
     Argument `wrap_kwargs` can be a dictionary or a list of dictionaries.
 
     If `wrapper` is provided, will use `vectorbtpro.base.wrapping.ArrayWrapper.wrap`.
@@ -265,7 +313,7 @@ def row_stack_merge(
             objs = new_objs
 
     if not wrap:
-        return np.row_stack(objs)
+        return row_stack_arrays(objs)
 
     if keys is not None and isinstance(keys[0], pd.Index):
         new_obj = pd.concat(objs, axis=0, **kwargs)
@@ -311,6 +359,7 @@ def column_stack_merge(
     * 'sr', 'series': each array will be wrapped with Pandas Series
     * 'df', 'frame', 'dataframe': each array will be wrapped with Pandas DataFrame
 
+    Without wrapping, arrays will be kept as-is and merged using `column_stack_arrays`.
     Argument `wrap_kwargs` can be a dictionary or a list of dictionaries.
 
     If `wrapper` is provided, will use `vectorbtpro.base.wrapping.ArrayWrapper.wrap`.
@@ -448,7 +497,7 @@ def column_stack_merge(
                     max_n_rows = new_obj.shape[0]
                 n_cols += new_obj.shape[1]
             if min_n_rows == max_n_rows:
-                return column_stack(new_objs)
+                return column_stack_arrays(new_objs)
             new_obj = np.full((max_n_rows, n_cols), fill_value)
             start_col = 0
             for obj in new_objs:
@@ -461,7 +510,7 @@ def column_stack_merge(
                     raise ValueError(f"Invalid index resetting option '{reset_index}'")
                 start_col = end_col
             return new_obj
-        return column_stack(objs)
+        return column_stack_arrays(objs)
 
     if reset_index is not None:
         max_length = max(map(len, objs))

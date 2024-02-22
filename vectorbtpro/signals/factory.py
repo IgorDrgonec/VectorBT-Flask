@@ -325,9 +325,7 @@ class SignalFactory(IndicatorFactory):
             * The simplest signal indicator that places True at the very first index:
 
             ```pycon
-            >>> from numba import njit
-            >>> import vectorbtpro as vbt
-            >>> import numpy as np
+            >>> from vectorbtpro import *
 
             >>> @njit
             ... def entry_place_func_nb(c):
@@ -363,7 +361,6 @@ class SignalFactory(IndicatorFactory):
             Test three different `n` values.
 
             ```pycon
-            >>> from numba import njit
             >>> from vectorbtpro.signals.factory import SignalFactory
 
             >>> @njit
@@ -417,9 +414,6 @@ class SignalFactory(IndicatorFactory):
             Here is an example of combining two random generators using "OR" rule (the first signal wins):
 
             ```pycon
-            >>> import numpy as np
-            >>> from numba import njit
-            >>> from collections import namedtuple
             >>> from vectorbtpro.indicators.configs import flex_elem_param_config
             >>> from vectorbtpro.signals.factory import SignalFactory
             >>> from vectorbtpro.signals.nb import rand_by_prob_place_nb
@@ -508,18 +502,18 @@ class SignalFactory(IndicatorFactory):
         default_chain_entry_func = True
         if mode == FactoryMode.Entries:
             require_input_shape = len(input_names) == 0
-            checks.assert_not_none(entry_place_func_nb)
+            checks.assert_not_none(entry_place_func_nb, arg_name="entry_place_func_nb")
             if exit_place_func_nb is not None:
                 raise ValueError("exit_place_func_nb cannot be used with FactoryMode.Entries")
         elif mode == FactoryMode.Exits:
             require_input_shape = False
             if entry_place_func_nb is not None:
                 raise ValueError("entry_place_func_nb cannot be used with FactoryMode.Exits")
-            checks.assert_not_none(exit_place_func_nb)
+            checks.assert_not_none(exit_place_func_nb, arg_name="exit_place_func_nb")
         elif mode == FactoryMode.Both:
             require_input_shape = len(input_names) == 0
-            checks.assert_not_none(entry_place_func_nb)
-            checks.assert_not_none(exit_place_func_nb)
+            checks.assert_not_none(entry_place_func_nb, arg_name="entry_place_func_nb")
+            checks.assert_not_none(exit_place_func_nb, arg_name="exit_place_func_nb")
         else:
             require_input_shape = False
             if entry_place_func_nb is None:
@@ -529,8 +523,8 @@ class SignalFactory(IndicatorFactory):
             if entry_settings is None:
                 entry_settings = {}
             entry_settings = merge_dicts(dict(pass_inputs=["entries"]), entry_settings)
-            checks.assert_not_none(entry_place_func_nb)
-            checks.assert_not_none(exit_place_func_nb)
+            checks.assert_not_none(entry_place_func_nb, arg_name="entry_place_func_nb")
+            checks.assert_not_none(exit_place_func_nb, arg_name="exit_place_func_nb")
         require_input_shape = kwargs.pop("require_input_shape", require_input_shape)
 
         if entry_settings is None:

@@ -8,10 +8,7 @@ Methods can be accessed as follows:
 * `GenericDFAccessor` -> `pd.DataFrame.vbt.*`
 
 ```pycon
->>> import vectorbtpro as vbt
->>> import numpy as np
->>> import pandas as pd
->>> from numba import njit
+>>> from vectorbtpro import *
 
 >>> # vectorbtpro.generic.accessors.GenericAccessor.rolling_mean
 >>> pd.Series([1, 2, 3, 4]).vbt.rolling_mean(2)
@@ -216,13 +213,11 @@ from vectorbtpro.generic.enums import WType, InterpMode, RescaleMode, ErrorType,
 from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
-from vectorbtpro.utils import checks
-from vectorbtpro.utils import chunking as ch
+from vectorbtpro.utils import checks, chunking as ch, datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts, resolve_dict, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.decorators import class_or_instancemethod, class_or_instanceproperty
 from vectorbtpro.utils.mapping import apply_mapping, to_value_mapping
 from vectorbtpro.utils.template import substitute_templates
-from vectorbtpro.utils.datetime_ import freq_to_timedelta, freq_to_timedelta64, prepare_dt_index, parse_timedelta
 from vectorbtpro.utils.colors import adjust_opacity, map_value_to_cmap
 from vectorbtpro.utils.enum_ import map_enum_fields
 
@@ -384,7 +379,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
             return self.fshift(n, fill_value=fill_value, **kwargs)
         if get_indexer_kwargs is None:
             get_indexer_kwargs = {}
-        n = freq_to_timedelta(n)
+        n = dt.to_timedelta(n)
         indices = self.wrapper.index.get_indexer(self.wrapper.index - n, **get_indexer_kwargs)
         new_obj = self.wrapper.fill(fill_value=fill_value)
         found_mask = indices != -1
@@ -918,7 +913,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
             args = substitute_templates(args, template_context, sub_id="args")
             func = jit_reg.resolve_option(nb.map_meta_nb, jitted)
@@ -1036,7 +1031,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper, axis=axis), template_context)
             args = substitute_templates(args, template_context, sub_id="args")
             if axis == 0:
@@ -1185,14 +1180,14 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
         else:
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
 
         if window is not None:
             if not isinstance(window, int):
-                window = freq_to_timedelta64(window)
+                window = dt.to_timedelta64(window)
         if minp is None and window is None:
             minp = 1
         if window is None:
@@ -1341,7 +1336,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
             by = substitute_templates(by, template_context, sub_id="by")
         else:
@@ -1450,7 +1445,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
             by = substitute_templates(by, template_context, sub_id="by")
         else:
@@ -1573,7 +1568,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
             rule = substitute_templates(rule, template_context, sub_id="rule")
         else:
@@ -1734,7 +1729,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
             apply_args = substitute_templates(apply_args, template_context, sub_id="apply_args")
             reduce_args = substitute_templates(reduce_args, template_context, sub_id="reduce_args")
@@ -1936,7 +1931,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(
                 broadcast_named_args,
                 dict(
@@ -2110,7 +2105,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
         else:
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
@@ -2238,7 +2233,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(
                 broadcast_named_args,
                 dict(wrapper=wrapper, group_by=group_by),
@@ -2398,7 +2393,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
         if len(resampler.target_index) == 1 and checks.is_dt_like(index):
             if isinstance(index, str):
                 try:
-                    parse_timedelta(index)
+                    dt.to_freq(index)
                     one_index = False
                 except Exception as e:
                     one_index = True
@@ -2611,7 +2606,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
             index = substitute_templates(index, template_context, sub_id="index")
         else:
@@ -2770,7 +2765,7 @@ class GenericAccessor(BaseAccessor, Analyzable):
                         **broadcast_kwargs,
                     )
             else:
-                checks.assert_not_none(wrapper)
+                checks.assert_not_none(wrapper, arg_name="wrapper")
             template_context = merge_dicts(broadcast_named_args, dict(wrapper=wrapper), template_context)
             target_lbound_index = substitute_templates(
                 target_lbound_index, template_context, sub_id="target_lbound_index"
@@ -2782,8 +2777,8 @@ class GenericAccessor(BaseAccessor, Analyzable):
             if wrapper is None:
                 wrapper = cls_or_self.wrapper
 
-        target_lbound_index = prepare_dt_index(target_lbound_index)
-        target_rbound_index = prepare_dt_index(target_rbound_index)
+        target_lbound_index = dt.prepare_dt_index(target_lbound_index)
+        target_rbound_index = dt.prepare_dt_index(target_rbound_index)
         if len(target_lbound_index) == 1 and len(target_rbound_index) > 1:
             target_lbound_index = repeat_index(target_lbound_index, len(target_rbound_index))
             if wrap_with_lbound is None:

@@ -10,16 +10,11 @@ from functools import partial
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.generic import nb as generic_nb
+from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
-from vectorbtpro.utils.datetime_ import (
-    to_tzaware_datetime,
-    datetime_to_ms,
-    split_freq_str,
-    prepare_freq,
-)
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.utils.enum_ import map_enum_fields
+from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.data.custom.remote import RemoteData
 
 try:
@@ -53,7 +48,7 @@ class BinanceData(RemoteData):
         * Set up the API key globally (optional):
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> vbt.BinanceData.set_custom_settings(
         ...     client_config=dict(
@@ -227,24 +222,22 @@ class BinanceData(RemoteData):
         get_klines_kwargs = cls.resolve_custom_setting(get_klines_kwargs, "get_klines_kwargs", merge=True)
 
         # Prepare parameters
-        freq = prepare_freq(timeframe)
-        split = split_freq_str(timeframe)
+        freq = timeframe
+        split = dt.split_freq_str(timeframe)
         if split is not None:
             multiplier, unit = split
-            if unit == "t":
-                unit = "m"
-            elif unit == "W":
+            if unit == "W":
                 unit = "w"
             timeframe = str(multiplier) + unit
         if start is not None:
-            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="utc"))
+            start_ts = dt.datetime_to_ms(dt.to_tzaware_datetime(start, naive_tz=tz, tz="utc"))
             first_valid_ts = client._get_earliest_valid_timestamp(symbol, timeframe, klines_type)
             start_ts = max(start_ts, first_valid_ts)
         else:
             start_ts = None
         prev_end_ts = None
         if end is not None:
-            end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz="utc"))
+            end_ts = dt.datetime_to_ms(dt.to_tzaware_datetime(end, naive_tz=tz, tz="utc"))
         else:
             end_ts = None
 

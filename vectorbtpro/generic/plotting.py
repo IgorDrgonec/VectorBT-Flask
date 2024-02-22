@@ -110,7 +110,7 @@ class Gauge(Configured, TraceUpdater):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
+            >>> from vectorbtpro import *
 
             >>> gauge = vbt.Gauge(
             ...     value=2,
@@ -239,7 +239,7 @@ class Bar(Configured, TraceUpdater):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
+            >>> from vectorbtpro import *
 
             >>> bar = vbt.Bar(
             ...     data=[[1, 2], [3, 4]],
@@ -353,7 +353,7 @@ class Scatter(Configured, TraceUpdater):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
+            >>> from vectorbtpro import *
 
             >>> scatter = vbt.Scatter(
             ...     data=[[1, 2], [3, 4]],
@@ -502,7 +502,7 @@ class Histogram(Configured, TraceUpdater):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
+            >>> from vectorbtpro import *
 
             >>> hist = vbt.Histogram(
             ...     data=[[1, 2], [3, 4], [2, 1]],
@@ -668,7 +668,7 @@ class Box(Configured, TraceUpdater):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
+            >>> from vectorbtpro import *
 
             >>> box = vbt.Box(
             ...     data=[[1, 2], [3, 4], [2, 1]],
@@ -840,7 +840,7 @@ class Heatmap(Configured, TraceUpdater):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
+            >>> from vectorbtpro import *
 
             >>> heatmap = vbt.Heatmap(
             ...     data=[[1, 2], [3, 4]],
@@ -974,8 +974,7 @@ class Volume(Configured, TraceUpdater):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import numpy as np
+            >>> from vectorbtpro import *
 
             >>> volume = vbt.Volume(
             ...     data=np.random.randint(1, 10, size=(3, 3, 3)),

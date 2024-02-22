@@ -1,4 +1,5 @@
 import hashlib
+from functools import partial
 
 import numpy as np
 import pandas as pd
@@ -21,16 +22,9 @@ def isclose(a, b, rel_tol=1e-06, abs_tol=0.0):
     return abs(a - b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
 
 
-def assert_index_equal(x, y, **kwargs):
-    pd.testing.assert_index_equal(x, y, rtol=1e-06, atol=0, **kwargs)
-
-
-def assert_series_equal(x, y, **kwargs):
-    pd.testing.assert_series_equal(x, y, rtol=1e-06, atol=0, **kwargs)
-
-
-def assert_frame_equal(x, y, **kwargs):
-    pd.testing.assert_frame_equal(x, y, rtol=1e-06, atol=0, **kwargs)
+assert_index_equal = partial(pd.testing.assert_index_equal, rtol=1e-06, atol=0)
+assert_series_equal = partial(pd.testing.assert_series_equal, rtol=1e-06, atol=0)
+assert_frame_equal = partial(pd.testing.assert_frame_equal, rtol=1e-06, atol=0)
 
 
 def assert_records_close(x, y):

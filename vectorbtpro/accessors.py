@@ -34,7 +34,7 @@ So, for example, the method `pd.Series.vbt.to_2d_array` is also available as
 Class methods of any accessor can be conveniently accessed using `pd_acc`, `sr_acc`, and `df_acc` shortcuts:
 
 ```pycon
->>> import vectorbtpro as vbt
+>>> from vectorbtpro import *
 
 >>> vbt.pd_acc.signals.generate
 <bound method SignalsAccessor.generate of <class 'vectorbtpro.signals.accessors.SignalsAccessor'>>

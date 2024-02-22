@@ -333,3 +333,35 @@ def cast_to_max_precision(
                     return arr
             return arr.astype(target_dtype)
     return arr
+
+
+@register_jitted(cache=True)
+def min_count_nb(arr: tp.Array1d) -> tp.Tuple[int, float, int]:
+    """Get the first position, the value, and the count of the array's minimum."""
+    mini = 0
+    minv = arr[0]
+    minc = 1
+    for i in range(1, len(arr)):
+        if arr[i] == minv:
+            minc += 1
+        elif arr[i] < minv:
+            mini = i
+            minv = arr[i]
+            minc = 1
+    return mini, minv, minc
+
+
+@register_jitted(cache=True)
+def max_count_nb(arr: tp.Array1d) -> tp.Tuple[int, float, int]:
+    """Get the first position, the value, and the count of the array's maximum."""
+    maxi = 0
+    maxv = arr[0]
+    maxc = 1
+    for i in range(1, len(arr)):
+        if arr[i] == maxv:
+            maxc += 1
+        elif arr[i] > maxv:
+            maxi = i
+            maxv = arr[i]
+            maxc = 1
+    return maxi, maxv, maxc

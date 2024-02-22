@@ -48,11 +48,7 @@ which is impossible to represent in a matrix form without duplicating index entr
 Consider the following example:
 
 ```pycon
->>> import numpy as np
->>> import pandas as pd
->>> from numba import njit
->>> from collections import namedtuple
->>> import vectorbtpro as vbt
+>>> from vectorbtpro import *
 
 >>> example_dt = np.dtype([
 ...     ('id', np.int_),
@@ -418,7 +414,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_1d_array
+from vectorbtpro.base.reshaping import to_1d_array, index_to_series, index_to_frame
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic.analyzable import Analyzable
@@ -941,32 +937,53 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
         return self._col_mapper
 
     @property
-    def records_readable(self) -> tp.Frame:
-        """Records in readable format."""
-        df = self.records.copy()
+    def field_names(self) -> tp.List[str]:
+        """Field names."""
+        return list(self.values.dtype.fields.keys())
+
+    def to_readable(self, expand_columns: bool = False) -> tp.Frame:
+        """Get records in a human-readable format."""
+        new_columns = list()
         field_settings = self.field_config.get("settings", {})
-        for col_name in df.columns:
-            if col_name in field_settings:
-                dct = field_settings[col_name]
+        for field_name in self.field_names:
+            if field_name in field_settings:
+                dct = field_settings[field_name]
                 if dct.get("ignore", False):
-                    df = df.drop(columns=col_name)
                     continue
-                field_name = dct.get("name", col_name)
+                field_name = dct.get("name", field_name)
                 if "title" in dct:
                     title = dct["title"]
-                    new_columns = dict()
-                    new_columns[field_name] = title
-                    df.rename(columns=new_columns, inplace=True)
                 else:
                     title = field_name
                 if "mapping" in dct:
                     if isinstance(dct["mapping"], str) and dct["mapping"] == "index":
-                        df[title] = self.get_map_field_to_index(col_name)
+                        new_columns.append(pd.Series(self.get_map_field_to_index(field_name), name=title))
+                    elif isinstance(dct["mapping"], str) and dct["mapping"] == "columns":
+                        column_index = self.get_map_field_to_columns(field_name)
+                        if expand_columns and isinstance(column_index, pd.MultiIndex):
+                            column_frame = index_to_frame(column_index, reset_index=True)
+                            new_columns.append(column_frame.add_prefix(f"{title}: "))
+                        else:
+                            column_sr = index_to_series(column_index, reset_index=True)
+                            if expand_columns and self.wrapper.ndim == 2 and column_sr.name is not None:
+                                new_columns.append(column_sr.rename(f"{title}: {column_sr.name}"))
+                            else:
+                                new_columns.append(column_sr.rename(title))
                     else:
-                        df[title] = self.get_apply_mapping_arr(col_name)
-        if all([isinstance(col, tuple) for col in df.columns]):
-            df.columns = pd.MultiIndex.from_tuples(df.columns)
-        return df
+                        new_columns.append(pd.Series(self.get_apply_mapping_arr(field_name), name=title))
+                else:
+                    new_columns.append(pd.Series(self.values[field_name], name=title))
+            else:
+                new_columns.append(pd.Series(self.values[field_name], name=field_name))
+        records_readable = pd.concat(new_columns, axis=1)
+        if all([isinstance(col, tuple) for col in records_readable.columns]):
+            records_readable.columns = pd.MultiIndex.from_tuples(records_readable.columns)
+        return records_readable
+
+    @property
+    def records_readable(self) -> tp.Frame:
+        """`Records.to_readable` with default arguments."""
+        return self.to_readable()
 
     def get_field_setting(self, field: str, setting: str, default: tp.Any = None) -> tp.Any:
         """Get any setting of the field. Uses `Records.field_config`."""
@@ -1170,7 +1187,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
 
         `**kwargs` are passed to `Records.map_array`."""
         if isinstance(cls_or_self, type):
-            checks.assert_not_none(col_mapper)
+            checks.assert_not_none(col_mapper, arg_name="col_mapper")
             func = jit_reg.resolve_option(nb.map_records_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             mapped_arr = func(len(col_mapper.col_arr), map_func_nb, *args)
@@ -1206,7 +1223,7 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
 
         `**kwargs` are passed to `Records.map_array`."""
         if isinstance(cls_or_self, type):
-            checks.assert_not_none(col_mapper)
+            checks.assert_not_none(col_mapper, arg_name="col_mapper")
             col_map = col_mapper.get_col_map(group_by=group_by if apply_per_group else False)
             func = jit_reg.resolve_option(nb.apply_meta_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)

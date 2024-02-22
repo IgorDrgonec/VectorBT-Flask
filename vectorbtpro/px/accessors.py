@@ -90,8 +90,7 @@ class PXAccessor(BaseAccessor):
 
     Usage:
         ```pycon
-        >>> import pandas as pd
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> pd.Series([1, 2, 3]).vbt.px.bar().show()
         ```

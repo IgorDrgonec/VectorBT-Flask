@@ -160,7 +160,7 @@ def is_sequence(arg: tp.Any) -> bool:
         len(arg)
         arg[0:0]
         return True
-    except TypeError:
+    except (TypeError, KeyError):
         return False
 
 

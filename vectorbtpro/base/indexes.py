@@ -637,7 +637,7 @@ def align_index_to(index1: tp.Index, index2: tp.Index, jitted: tp.JittedOption =
         index1 = pd.MultiIndex.from_arrays([index1])
     if not isinstance(index2, pd.MultiIndex):
         index2 = pd.MultiIndex.from_arrays([index2])
-    if pd.Index.equals(index1, index2):
+    if checks.is_index_equal(index1, index2):
         return pd.IndexSlice[:]
     if len(index1) > len(index2):
         raise ValueError("Longer index cannot be aligned to shorter index")
@@ -783,7 +783,7 @@ def cross_index_with(
         index1 = pd.MultiIndex.from_arrays([index1])
     if not isinstance(index2, pd.MultiIndex):
         index2 = pd.MultiIndex.from_arrays([index2])
-    if not index1_default and not index2_default and index1.equals(index2):
+    if not index1_default and not index2_default and checks.is_index_equal(index1, index2):
         if return_new_index:
             new_index = stack_indexes(index1, index2, drop_duplicates=True)
             return (pd.IndexSlice[:], pd.IndexSlice[:]), new_index

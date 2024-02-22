@@ -12,7 +12,6 @@ These only accept NumPy arrays and other Numba-compatible types.
 
 import numpy as np
 from numba import prange
-from numba.core.types import Type
 from numba.extending import overload
 from numba.np.numpy_support import as_dtype
 

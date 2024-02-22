@@ -8,9 +8,7 @@
 We can access the adapter from `ReturnsAccessor`:
 
 ```pycon
->>> import numpy as np
->>> import pandas as pd
->>> import vectorbtpro as vbt
+>>> from vectorbtpro import *
 >>> import quantstats as qs
 
 >>> np.random.seed(42)

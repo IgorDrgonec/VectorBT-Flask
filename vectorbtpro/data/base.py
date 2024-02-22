@@ -13,19 +13,9 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base.reshaping import to_any_array, to_pd_array, to_2d_array
-from vectorbtpro.base.wrapping import ArrayWrapper
-from vectorbtpro.base.indexes import stack_indexes
-from vectorbtpro.base.merging import is_merge_func_from_config
-from vectorbtpro.generic.analyzable import Analyzable
-from vectorbtpro.generic import nb as generic_nb
-from vectorbtpro.generic.drawdowns import Drawdowns
-from vectorbtpro.returns.accessors import ReturnsAccessor
-from vectorbtpro.data.decorators import attach_symbol_dict_methods
-from vectorbtpro.utils import checks
+from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.attr_ import get_dict_attr
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig, copy_dict
-from vectorbtpro.utils.datetime_ import to_timezone, prepare_dt_index
 from vectorbtpro.utils.parsing import get_func_arg_names, extend_args
 from vectorbtpro.utils.path_ import check_mkdir
 from vectorbtpro.utils.template import RepEval, CustomTemplate, substitute_templates
@@ -34,6 +24,15 @@ from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.decorators import cached_property, class_or_instancemethod
 from vectorbtpro.utils.selection import _NoResult, NoResult, NoResultsException
 from vectorbtpro.utils.merging import MergeFunc
+from vectorbtpro.base.reshaping import to_any_array, to_pd_array, to_2d_array
+from vectorbtpro.base.wrapping import ArrayWrapper
+from vectorbtpro.base.indexes import stack_indexes
+from vectorbtpro.base.merging import column_stack_arrays, is_merge_func_from_config
+from vectorbtpro.generic.analyzable import Analyzable
+from vectorbtpro.generic import nb as generic_nb
+from vectorbtpro.generic.drawdowns import Drawdowns
+from vectorbtpro.returns.accessors import ReturnsAccessor
+from vectorbtpro.data.decorators import attach_symbol_dict_methods
 
 try:
     if not tp.TYPE_CHECKING:
@@ -1166,7 +1165,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         return self.symbol_wrapper.index
 
     @property
-    def freq(self) -> tp.Optional[pd.Timedelta]:
+    def freq(self) -> tp.Optional[tp.PandasFrequency]:
         """Frequency.
 
         Based on the default symbol wrapper."""
@@ -1269,7 +1268,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                         col_data.append(self.data[k].values)
                     else:
                         col_data.append(self.data[k][c].values)
-                new_data[c] = key_wrapper.wrap(np.column_stack(col_data), zero_to_none=False)
+                new_data[c] = key_wrapper.wrap(column_stack_arrays(col_data), zero_to_none=False)
 
         return new_data
 
@@ -1405,13 +1404,13 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         If `force_tz_convert` is True, will convert regardless of whether the index is datetime-aware."""
         if parse_dates:
             if not isinstance(index, (pd.DatetimeIndex, pd.MultiIndex)) and index.dtype == object:
-                index = prepare_dt_index(index)
+                index = dt.prepare_dt_index(index)
         if isinstance(index, pd.DatetimeIndex):
             if index.tz is None and tz_localize is not None:
-                index = index.tz_localize(to_timezone(tz_localize))
+                index = index.tz_localize(dt.to_timezone(tz_localize))
             if tz_convert is not None:
                 if index.tz is not None or force_tz_convert:
-                    index = index.tz_convert(to_timezone(tz_convert))
+                    index = index.tz_convert(dt.to_timezone(tz_convert))
             if remove_tz and index.tz is not None:
                 index = index.tz_localize(None)
         return index
@@ -1891,7 +1890,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             missing_columns=missing_columns,
             silence_warnings=silence_warnings,
         )
-        wrapper = ArrayWrapper.from_obj(data[list(data.keys())[0]], **wrapper_kwargs)
+        first_data = data[list(data.keys())[0]]
+        wrapper = ArrayWrapper.from_obj(first_data, **wrapper_kwargs)
         attr_dicts = cls.fix_dict_types_in_kwargs(
             type(data),
             classes=classes,
@@ -3570,6 +3570,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         on_features: tp.Optional[tp.MaybeFeatures] = None,
         on_symbols: tp.Optional[tp.MaybeSymbols] = None,
         pass_as_first: bool = False,
+        magnet_kwargs: tp.KwargsLike = None,
         ignore_args: tp.Optional[tp.Sequence[str]] = None,
         rename_args: tp.DictLike = None,
         location: tp.Optional[str] = None,
@@ -3602,6 +3603,9 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         * Any callable object
         * Iterable with any of the above. Will be stacked as columns into a DataFrame.
 
+        Use `magnet_kwargs` to provide keyword arguments that will be passed only if found
+        in the signature of the function.
+
         Use `rename_args` to rename arguments. For example, in `vectorbtpro.portfolio.base.Portfolio`,
         data can be passed instead of `close`.
 
@@ -3618,6 +3622,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         from vectorbtpro.indicators.talib_ import talib_func
         from vectorbtpro.portfolio.base import Portfolio
 
+        if magnet_kwargs is None:
+            magnet_kwargs = {}
         if data_kwargs is None:
             data_kwargs = {}
         if execute_kwargs is None:
@@ -3667,6 +3673,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     new_kwargs["unpack_to"] = "frame"
                 new_kwargs = {
                     **dict(
+                        magnet_kwargs=magnet_kwargs,
                         ignore_args=ignore_args,
                         rename_args=rename_args,
                         location=_location,
@@ -3751,6 +3758,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 return _self.run(
                     indicators,
                     *args,
+                    magnet_kwargs=magnet_kwargs,
                     ignore_args=ignore_args,
                     rename_args=rename_args,
                     location=location,
@@ -3781,7 +3789,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             func = func.run
 
         with_kwargs = {}
-        for arg_name in get_func_arg_names(func):
+        func_arg_names = get_func_arg_names(func)
+        for arg_name in func_arg_names:
             real_arg_name = arg_name
             if ignore_args is not None:
                 if arg_name in ignore_args:
@@ -3814,6 +3823,10 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     feature_idx = _self.get_feature_idx(arg_name)
                     if feature_idx != -1:
                         with_kwargs[real_arg_name] = _self.get_feature(feature_idx)
+        kwargs = dict(kwargs)
+        for k, v in magnet_kwargs.items():
+            if k in func_arg_names:
+                kwargs[k] = v
         new_args, new_kwargs = extend_args(func, args, kwargs, **with_kwargs)
         out = func(*new_args, **new_kwargs)
         if isinstance(unpack, bool):
@@ -4914,7 +4927,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             * Plot the lines of one feature across all symbols:
 
             ```pycon
-            >>> import vectorbtpro as vbt
+            >>> from vectorbtpro import *
 
             >>> start = '2021-01-01 UTC'  # crypto is in UTC
             >>> end = '2021-06-01 UTC'

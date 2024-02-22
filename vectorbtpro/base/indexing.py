@@ -12,9 +12,8 @@ import pandas as pd
 from pandas.tseries.frequencies import to_offset
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils import checks
+from vectorbtpro.utils import checks, datetime_ as dt, datetime_nb as dt_nb
 from vectorbtpro.utils.template import CustomTemplate
-from vectorbtpro.utils import datetime_ as dt, datetime_nb as dt_nb
 from vectorbtpro.utils.config import hdict, merge_dicts
 from vectorbtpro.utils.pickling import pdict
 from vectorbtpro.utils.mapping import to_field_mapping
@@ -170,7 +169,7 @@ class PandasIndexer(IndexingBase):
 
     Usage:
         ```pycon
-        >>> import pandas as pd
+        >>> from vectorbtpro import *
         >>> from vectorbtpro.base.indexing import PandasIndexer
 
         >>> class C(PandasIndexer):
@@ -421,7 +420,7 @@ def build_param_indexer(
 
     Usage:
         ```pycon
-        >>> import pandas as pd
+        >>> from vectorbtpro import *
         >>> from vectorbtpro.base.indexing import build_param_indexer, indexing_on_mapper
 
         >>> MyParamIndexer = build_param_indexer(['my_param'])
@@ -597,7 +596,9 @@ def normalize_idxs(idxs: tp.MaybeIndexArray, target_len: int) -> tp.Array1d:
     if checks.is_int(idxs):
         idxs = np.array([idxs])
     if idxs.ndim == 2:
-        idxs = np.concatenate(tuple(map(lambda x: np.arange(x[0], x[1]), idxs)))
+        from vectorbtpro.base.merging import concat_arrays
+
+        idxs = concat_arrays(tuple(map(lambda x: np.arange(x[0], x[1]), idxs)))
     if (idxs < 0).any():
         idxs = np.where(idxs >= 0, idxs, target_len + idxs)
     return idxs
@@ -1054,8 +1055,7 @@ def get_index_points(
         * Provide nothing to generate at the beginning:
 
         ```pycon
-        >>> import vectorbtpro as vbt
-        >>> import pandas as pd
+        >>> from vectorbtpro import *
 
         >>> index = pd.date_range("2020-01", "2020-02", freq="1d")
 
@@ -1150,12 +1150,13 @@ def get_index_points(
                 end_date = index[end]
             else:
                 end_date = end
-            on = pd.date_range(
+            on = dt.date_range(
                 start_date,
                 end_date,
-                freq=dt.parse_timedelta(every),
+                freq=every,
                 tz=index.tz,
                 normalize=normalize_every,
+                inclusive="both",
             )
             if exact_start and on[0] > start_date:
                 on = on.insert(0, start_date)
@@ -1203,13 +1204,7 @@ def get_index_points(
             add_delta += add_time_delta
 
     if add_delta is not None:
-        if isinstance(add_delta, str):
-            add_delta = dt.prepare_freq(add_delta)
-            try:
-                add_delta = to_offset(add_delta)
-            except Exception as e:
-                add_delta = to_offset(pd.Timedelta(add_delta))
-        on += add_delta
+        on += dt.to_freq(add_delta)
 
     if kind.lower() == "labels":
         on = dt.try_align_to_dt_index(on, index)
@@ -1361,8 +1356,11 @@ class RangeIdxr(UniIdxr):
     ) -> tp.MaybeIndexArray:
         if index is None:
             raise ValueError("Index is required")
+
+        from vectorbtpro.base.merging import column_stack_arrays
+
         start_idxs, end_idxs = get_index_ranges(index, index_freq=freq, **attr.asdict(self))
-        idxs = np.column_stack((start_idxs, end_idxs))
+        idxs = column_stack_arrays((start_idxs, end_idxs))
         self.check_idxs(idxs, check_minus_one=True)
         return idxs
 
@@ -1399,9 +1397,7 @@ def get_index_ranges(
         * Provide nothing to generate one largest index range:
 
         ```pycon
-        >>> import vectorbtpro as vbt
-        >>> import pandas as pd
-        >>> import numpy as np
+        >>> from vectorbtpro import *
 
         >>> index = pd.date_range("2020-01", "2020-02", freq="1d")
 
@@ -1682,11 +1678,12 @@ def get_index_ranges(
             else:
                 end_date = end
             if lookback_period is None:
-                new_index = pd.date_range(
+                new_index = dt.date_range(
                     start_date,
                     end_date,
-                    freq=dt.parse_timedelta(every),
+                    freq=every,
                     normalize=normalize_every,
+                    inclusive="both",
                 )
                 if exact_start and new_index[0] > start_date:
                     new_index = new_index.insert(0, start_date)
@@ -1701,11 +1698,12 @@ def get_index_ranges(
             else:
                 if checks.is_int(lookback_period):
                     lookback_period *= dt.infer_index_freq(naive_index, freq=index_freq)
-                end = pd.date_range(
+                end = dt.date_range(
                     start_date + lookback_period,
                     end_date,
-                    freq=dt.parse_timedelta(every),
+                    freq=every,
                     normalize=normalize_every,
+                    inclusive="both",
                 )
                 start = end - lookback_period
             kind = "bounds"
@@ -1772,21 +1770,9 @@ def get_index_ranges(
             add_end_delta += add_end_time_delta
 
     if add_start_delta is not None:
-        if isinstance(add_start_delta, str):
-            add_start_delta = dt.prepare_freq(add_start_delta)
-            try:
-                add_start_delta = to_offset(add_start_delta)
-            except Exception as e:
-                add_start_delta = to_offset(pd.Timedelta(add_start_delta))
-        start += add_start_delta
+        start += dt.to_freq(add_start_delta)
     if add_end_delta is not None:
-        if isinstance(add_end_delta, str):
-            add_end_delta = dt.prepare_freq(add_end_delta)
-            try:
-                add_end_delta = to_offset(add_end_delta)
-            except Exception as e:
-                add_end_delta = to_offset(pd.Timedelta(add_end_delta))
-        end += add_end_delta
+        end += dt.to_freq(add_end_delta)
 
     if kind.lower() == "bounds":
         range_starts, range_ends = Resampler.map_bounds_to_source_ranges(
@@ -1992,7 +1978,7 @@ class AutoIdxr(UniIdxr):
                             kind = "dtc"
                         elif isinstance(value, str):
                             try:
-                                _ = dt.parse_timedelta(value)
+                                _ = dt.to_freq(value)
                                 kind = "frequency"
                             except Exception as e:
                                 try:

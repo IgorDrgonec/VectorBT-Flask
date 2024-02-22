@@ -44,7 +44,7 @@ class _RPROB(RPROB):
         Generate three columns with different entry probabilities:
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> rprob = vbt.RPROB.run(input_shape=(5,), prob=[0., 0.5, 1.], seed=42)
 
@@ -60,8 +60,6 @@ class _RPROB(RPROB):
         Probability can also be set per row, column, or element:
 
         ```pycon
-        >>> import numpy as np
-
         >>> rprob = vbt.RPROB.run(input_shape=(5,), prob=np.array([0., 0., 1., 1., 1.]), seed=42)
 
         >>> rprob.entries

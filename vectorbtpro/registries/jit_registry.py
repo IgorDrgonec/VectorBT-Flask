@@ -24,9 +24,7 @@ already decorated function and to avoid recompilation.
 Let's implement a task that takes a sum over an array using both NumPy and Numba:
 
 ```pycon
->>> import vectorbtpro as vbt
->>> import numpy as np
->>> import pandas as pd
+>>> from vectorbtpro import *
 
 >>> @vbt.register_jitted(task_id_or_func='sum')
 ... def sum_np(a):
@@ -204,7 +202,7 @@ Let's restart the runtime and instruct vectorbt to load the file with settings b
 >>> import os
 >>> os.environ['VBT_SETTINGS_PATH'] = "my_settings"
 
->>> import vectorbtpro as vbt
+>>> from vectorbtpro import *
 >>> vbt.jit_reg.jitable_setups['vectorbtpro.generic.nb.base.diff_nb']['nb'].jitter_kwargs
 {'cache': False}
 ```
@@ -214,13 +212,11 @@ For example, we can change the implementation in the deepest places of the core.
 Let's change the default `ddof` from 0 to 1 in `vectorbtpro.generic.nb.base.nanstd_1d_nb` and disable caching with Numba:
 
 ```pycon
->>> from vectorbtpro.generic.nb import nanstd_1d_nb, nanvar_1d_nb
-
->>> nanstd_1d_nb(np.array([1, 2, 3]))
+>>> vbt.nb.nanstd_1d_nb(np.array([1, 2, 3]))
 0.816496580927726
 
 >>> def new_nanstd_1d_nb(arr, ddof=1):
-...     return np.sqrt(nanvar_1d_nb(arr, ddof=ddof))
+...     return np.sqrt(vbt.nb.nanvar_1d_nb(arr, ddof=ddof))
 
 >>> vbt.settings.jitting.jitters['nb']['tasks']['vectorbtpro.generic.nb.base.nanstd_1d_nb'] = dict(
 ...     replace_py_func=new_nanstd_1d_nb,
@@ -238,10 +234,7 @@ After restarting the runtime:
 >>> import os
 >>> os.environ['VBT_SETTINGS_PATH'] = "my_settings"
 
->>> import numpy as np
->>> from vectorbtpro.generic.nb import nanstd_1d_nb, nanvar_1d_nb
-
->>> nanstd_1d_nb(np.array([1, 2, 3]))
+>>> vbt.nb.nanstd_1d_nb(np.array([1, 2, 3]))
 1.0
 ```
 
@@ -290,7 +283,6 @@ any argument that contains a Pandas object to a 2-dimensional NumPy array prior 
 ```pycon
 >>> from functools import wraps
 >>> from vectorbtpro.utils.jitting import NumbaJitter
->>> import pandas as pd
 
 >>> class SafeNumbaJitter(NumbaJitter):
 ...     def decorate(self, py_func, tags=None):

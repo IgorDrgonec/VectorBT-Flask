@@ -5,13 +5,8 @@
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.datetime_ import (
-    to_timestamp,
-    to_tzaware_datetime,
-    split_freq_str,
-    prepare_freq,
-)
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.data.custom.remote import RemoteData
 
@@ -40,7 +35,7 @@ class AlpacaData(RemoteData):
         * Set up the API key globally (optional for crypto):
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> vbt.AlpacaData.set_custom_settings(
         ...     client_config=dict(
@@ -245,33 +240,32 @@ class AlpacaData(RemoteData):
         feed = cls.resolve_custom_setting(feed, "feed")
         limit = cls.resolve_custom_setting(limit, "limit")
 
-        freq = prepare_freq(timeframe)
-        split = split_freq_str(timeframe)
-        if split is not None:
-            multiplier, unit = split
-            if unit == "t":
-                unit = TimeFrameUnit.Minute
-            elif unit == "h":
-                unit = TimeFrameUnit.Hour
-            elif unit == "d":
-                unit = TimeFrameUnit.Day
-            elif unit == "W":
-                unit = TimeFrameUnit.Week
-            elif unit == "M":
-                unit = TimeFrameUnit.Month
-            else:
-                raise ValueError(f"Invalid timeframe '{timeframe}'")
+        freq = timeframe
+        split = dt.split_freq_str(timeframe)
+        if split is None:
+            raise ValueError(f"Invalid timeframe '{timeframe}'")
+        multiplier, unit = split
+        if unit == "m":
+            unit = TimeFrameUnit.Minute
+        elif unit == "h":
+            unit = TimeFrameUnit.Hour
+        elif unit == "d":
+            unit = TimeFrameUnit.Day
+        elif unit == "W":
+            unit = TimeFrameUnit.Week
+        elif unit == "M":
+            unit = TimeFrameUnit.Month
         else:
             raise ValueError(f"Invalid timeframe '{timeframe}'")
         timeframe = TimeFrame(multiplier, unit)
 
         if start is not None:
-            start = to_tzaware_datetime(start, naive_tz=tz, tz="utc")
+            start = dt.to_tzaware_datetime(start, naive_tz=tz, tz="utc")
             start_str = start.replace(tzinfo=None).isoformat("T")
         else:
             start_str = None
         if end is not None:
-            end = to_tzaware_datetime(end, naive_tz=tz, tz="utc")
+            end = dt.to_tzaware_datetime(end, naive_tz=tz, tz="utc")
             end_str = end.replace(tzinfo=None).isoformat("T")
         else:
             end_str = None
@@ -333,11 +327,11 @@ class AlpacaData(RemoteData):
 
         if not df.empty:
             if start is not None:
-                start = to_timestamp(start, tz=df.index.tz)
+                start = dt.to_timestamp(start, tz=df.index.tz)
                 if df.index[0] < start:
                     df = df[df.index >= start]
             if end is not None:
-                end = to_timestamp(end, tz=df.index.tz)
+                end = dt.to_timestamp(end, tz=df.index.tz)
                 if df.index[-1] >= end:
                     df = df[df.index < end]
         return df, dict(tz_convert=tz, freq=freq)

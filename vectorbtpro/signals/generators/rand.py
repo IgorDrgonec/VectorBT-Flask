@@ -43,7 +43,7 @@ class _RAND(RAND):
         Test three different entry counts values:
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> rand = vbt.RAND.run(input_shape=(6,), n=[1, 2, 3], seed=42)
 
@@ -60,8 +60,6 @@ class _RAND(RAND):
         Entry count can also be set per column:
 
         ```pycon
-        >>> import numpy as np
-
         >>> rand = vbt.RAND.run(input_shape=(8, 2), n=[np.array([1, 2]), 3], seed=42)
 
         >>> rand.entries

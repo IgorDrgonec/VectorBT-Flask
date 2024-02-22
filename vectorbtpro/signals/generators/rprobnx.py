@@ -48,7 +48,7 @@ class _RPROBNX(RPROBNX):
         Test all probability combinations:
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> rprobnx = vbt.RPROBNX.run(
         ...     input_shape=(5,),
@@ -79,8 +79,6 @@ class _RPROBNX(RPROBNX):
         Probabilities can also be set per row, column, or element:
 
         ```pycon
-        >>> import numpy as np
-
         >>> entry_prob1 = np.array([1., 0., 1., 0., 1.])
         >>> entry_prob2 = np.array([0., 1., 0., 1., 0.])
         >>> rprobnx = vbt.RPROBNX.run(

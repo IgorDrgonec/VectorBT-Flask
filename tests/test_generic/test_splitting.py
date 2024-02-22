@@ -741,9 +741,9 @@ class TestSplitter:
             vbt.Splitter.from_ranges(index, every="W").splits_arr,
             np.array(
                 [
-                    [slice(4, 11, None)],
-                    [slice(11, 18, None)],
-                    [slice(18, 25, None)],
+                    [slice(5, 12, None)],
+                    [slice(12, 19, None)],
+                    [slice(19, 26, None)],
                 ],
                 dtype=object,
             ),
@@ -752,9 +752,9 @@ class TestSplitter:
             vbt.Splitter.from_ranges(index, every="W", split=0.5).splits_arr,
             np.array(
                 [
-                    [slice(4, 7, None), slice(7, 11, None)],
-                    [slice(11, 14, None), slice(14, 18, None)],
-                    [slice(18, 21, None), slice(21, 25, None)],
+                    [slice(5, 8, None), slice(8, 12, None)],
+                    [slice(12, 15, None), slice(15, 19, None)],
+                    [slice(19, 22, None), slice(22, 26, None)],
                 ],
                 dtype=object,
             ),
@@ -765,11 +765,11 @@ class TestSplitter:
             vbt.Splitter.from_grouper(index, by="W").splits_arr,
             np.array(
                 [
-                    [slice(0, 5, None)],
-                    [slice(5, 12, None)],
-                    [slice(12, 19, None)],
-                    [slice(19, 26, None)],
-                    [slice(26, 31, None)],
+                    [slice(0, 6, None)],
+                    [slice(6, 13, None)],
+                    [slice(13, 20, None)],
+                    [slice(20, 27, None)],
+                    [slice(27, 31, None)],
                 ],
                 dtype=object,
             ),
@@ -778,24 +778,24 @@ class TestSplitter:
             vbt.Splitter.from_grouper(index, by="W").wrapper.index,
             pd.PeriodIndex(
                 [
-                    "2019-12-30/2020-01-05",
-                    "2020-01-06/2020-01-12",
-                    "2020-01-13/2020-01-19",
-                    "2020-01-20/2020-01-26",
-                    "2020-01-27/2020-02-02",
+                    "2019-12-31/2020-01-06",
+                    "2020-01-07/2020-01-13",
+                    "2020-01-14/2020-01-20",
+                    "2020-01-21/2020-01-27",
+                    "2020-01-28/2020-02-02",
                 ],
-                dtype="period[W-SUN]",
+                dtype="period[W-MON]",
             ),
         )
         np.testing.assert_array_equal(
             vbt.Splitter.from_grouper(index, by="W", split=0.5).splits_arr,
             np.array(
                 [
-                    [slice(0, 2, None), slice(2, 5, None)],
-                    [slice(5, 8, None), slice(8, 12, None)],
-                    [slice(12, 15, None), slice(15, 19, None)],
-                    [slice(19, 22, None), slice(22, 26, None)],
-                    [slice(26, 28, None), slice(28, 31, None)],
+                    [slice(0, 3, None), slice(3, 6, None)],
+                    [slice(6, 9, None), slice(9, 13, None)],
+                    [slice(13, 16, None), slice(16, 20, None)],
+                    [slice(20, 23, None), slice(23, 27, None)],
+                    [slice(27, 29, None), slice(29, 31, None)],
                 ],
                 dtype=object,
             ),

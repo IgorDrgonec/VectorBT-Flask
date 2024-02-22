@@ -8,12 +8,7 @@ Methods can be accessed as follows:
 * `SignalsDFAccessor` -> `pd.DataFrame.vbt.signals.*`
 
 ```pycon
->>> import vectorbtpro as vbt
->>> from vectorbtpro.signals.enums import StopType
->>> import numpy as np
->>> import pandas as pd
->>> from numba import njit
->>> from datetime import datetime
+>>> from vectorbtpro import *
 
 >>> # vectorbtpro.signals.accessors.SignalsAccessor.pos_rank
 >>> pd.Series([False, True, True, True, False]).vbt.signals.pos_rank()
@@ -89,7 +84,7 @@ Name: a, dtype: object
 We can pass another signal array to compare this array with:
 
 ```pycon
->>> mask.vbt.signals.stats(column='a', settings=dict(other=mask['b']))
+>>> mask.vbt.signals.stats(column='a', settings=dict(target=mask['b']))
 
 Start                         2020-01-01 00:00:00
 End                           2020-01-05 00:00:00
@@ -101,9 +96,9 @@ Overlapping Rate [%]                    33.333333
 First Index                   2020-01-01 00:00:00
 Last Index                    2020-01-01 00:00:00
 Norm Avg Index [-1, 1]                       -1.0
-Distance -> Other: Min            0 days 00:00:00
-Distance -> Other: Median         2 days 00:00:00
-Distance -> Other: Max            4 days 00:00:00
+Distance -> Target: Min           0 days 00:00:00
+Distance -> Target: Median        2 days 00:00:00
+Distance -> Target: Max           4 days 00:00:00
 Total Partitions                                1
 Partition Rate [%]                          100.0
 Partition Length: Min             1 days 00:00:00
@@ -183,8 +178,7 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.accessors import register_vbt_accessor, register_df_vbt_accessor, register_sr_vbt_accessor
-from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.base import reshaping
+from vectorbtpro.base import chunking as base_ch, reshaping, indexes
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
@@ -192,7 +186,7 @@ from vectorbtpro.generic.ranges import Ranges
 from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
-from vectorbtpro.signals import nb
+from vectorbtpro.signals import nb, enums
 from vectorbtpro.utils import checks
 from vectorbtpro.utils import chunking as ch
 from vectorbtpro.utils.colors import adjust_lightness
@@ -200,6 +194,7 @@ from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridCo
 from vectorbtpro.utils.decorators import class_or_instancemethod, class_or_instanceproperty
 from vectorbtpro.utils.random_ import set_seed_nb
 from vectorbtpro.utils.template import RepEval, substitute_templates
+from vectorbtpro.utils.enum_ import map_enum_fields
 
 __all__ = [
     "SignalsAccessor",
@@ -581,7 +576,7 @@ class SignalsAccessor(GenericAccessor):
     @class_or_instancemethod
     def clean(
         cls_or_self,
-        *others,
+        *objs,
         force_first: bool = True,
         keep_conflicts: bool = False,
         reverse_order: bool = False,
@@ -592,16 +587,15 @@ class SignalsAccessor(GenericAccessor):
     ) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Clean signals.
 
-        If one array passed, see `SignalsAccessor.first`. If two arrays passed, entries and exits,
-        see `vectorbtpro.signals.nb.clean_enex_nb`."""
+        If one array is passed, see `SignalsAccessor.first`. If two arrays passed,
+        entries and exits, see `vectorbtpro.signals.nb.clean_enex_nb`."""
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         if wrap_kwargs is None:
             wrap_kwargs = {}
-        if isinstance(cls_or_self, type):
-            objs = others
-        else:
-            objs = (cls_or_self.obj, *others)
+        if not isinstance(cls_or_self, type):
+            objs = (cls_or_self.obj, *objs)
+
         if len(objs) == 1:
             obj = objs[0]
             if not isinstance(obj, (pd.Series, pd.DataFrame)):
@@ -627,7 +621,7 @@ class SignalsAccessor(GenericAccessor):
                 wrapper.wrap(entries_out, group_by=False, **wrap_kwargs),
                 wrapper.wrap(exits_out, group_by=False, **wrap_kwargs),
             )
-        raise ValueError("Either one or two arrays must be passed")
+        raise ValueError("This method accepts either one or two arrays")
 
     # ############# Random signals ############# #
 
@@ -1269,7 +1263,7 @@ class SignalsAccessor(GenericAccessor):
             2020-01-04   NaN  10.8  10.8
             2020-01-05   NaN   NaN   NaN
 
-            >>> out_dict['stop_type'].vbt(mapping=StopType).apply_mapping()
+            >>> out_dict['stop_type'].vbt(mapping=vbt.sig_enums.StopType).apply_mapping()
                            a     b     c
             2020-01-01  None  None  None
             2020-01-02    TP    TP  None
@@ -1315,7 +1309,7 @@ class SignalsAccessor(GenericAccessor):
             2020-01-04   NaN  10.8  10.8
             2020-01-05   NaN   NaN   NaN
 
-            >>> out_dict['stop_type'].vbt(mapping=StopType).apply_mapping()
+            >>> out_dict['stop_type'].vbt(mapping=vbt.sig_enums.StopType).apply_mapping()
                            a     b     c
             2020-01-01  None  None  None
             2020-01-02    TP    TP    TP
@@ -1938,6 +1932,22 @@ class SignalsAccessor(GenericAccessor):
             **kwargs,
         ).regroup(group_by)
 
+    # ############# Relation ############# #
+
+    def get_relation_str(self, relation: tp.Union[int, str]) -> str:
+        """Get direction string for `relation`."""
+        if isinstance(relation, str):
+            relation = map_enum_fields(relation, enums.SignalRelation)
+        if relation == enums.SignalRelation.OneOne:
+            return ">-<"
+        if relation == enums.SignalRelation.OneMany:
+            return "->"
+        if relation == enums.SignalRelation.ManyOne:
+            return "<-"
+        if relation == enums.SignalRelation.ManyMany:
+            return "<->"
+        raise ValueError(f"Invalid relation {relation}")
+
     # ############# Ranges ############# #
 
     def delta_ranges(
@@ -1952,12 +1962,12 @@ class SignalsAccessor(GenericAccessor):
 
     def between_ranges(
         self,
-        other: tp.Optional[tp.ArrayLike] = None,
-        from_other: bool = False,
+        target: tp.Optional[tp.ArrayLike] = None,
+        relation: tp.Union[int, str] = "onemany",
         incl_open: bool = False,
         broadcast_kwargs: tp.KwargsLike = None,
         group_by: tp.GroupByLike = None,
-        attach_other: bool = False,
+        attach_target: bool = False,
         jitted: tp.JittedOption = None,
         chunked: tp.ChunkedOption = None,
         **kwargs,
@@ -1965,7 +1975,7 @@ class SignalsAccessor(GenericAccessor):
         """Wrap the result of `vectorbtpro.signals.nb.between_ranges_nb`
         with `vectorbtpro.generic.ranges.Ranges`.
 
-        If `other` specified, see `vectorbtpro.signals.nb.between_two_ranges_nb`.
+        If `target` specified, see `vectorbtpro.signals.nb.between_two_ranges_nb`.
         Both will broadcast using `vectorbtpro.base.reshaping.broadcast` and `broadcast_kwargs`.
 
         Usage:
@@ -1978,10 +1988,10 @@ class SignalsAccessor(GenericAccessor):
             <vectorbtpro.generic.ranges.Ranges at 0x7ff29ea7c7b8>
 
             >>> ranges.records_readable
-               Range Id  Column  Start Timestamp  End Timestamp  Status
-            0         0       0                0              3  Closed
-            1         1       0                3              5  Closed
-            2         2       0                5              6  Closed
+               Range Id  Column  Start Index  End Index  Status
+            0         0       0            0          3  Closed
+            1         1       0            3          5  Closed
+            2         2       0            5          6  Closed
 
             >>> ranges.duration.values
             array([3, 2, 1])
@@ -1990,33 +2000,33 @@ class SignalsAccessor(GenericAccessor):
             * Two arrays, traversing the signals of the first array:
 
             ```pycon
-            >>> mask_sr = pd.Series([True, True, True, False, False])
+            >>> mask_sr1 = pd.Series([True, True, True, False, False])
             >>> mask_sr2 = pd.Series([False, False, True, False, True])
-            >>> ranges = mask_sr.vbt.signals.between_ranges(other=mask_sr2)
+            >>> ranges = mask_sr1.vbt.signals.between_ranges(target=mask_sr2)
             >>> ranges
             <vectorbtpro.generic.ranges.Ranges at 0x7ff29e3b80f0>
 
             >>> ranges.records_readable
-               Range Id  Column  Start Timestamp  End Timestamp  Status
-            0         0       0                0              2  Closed
-            1         1       0                1              2  Closed
-            2         2       0                2              2  Closed
+               Range Id  Column  Start Index  End Index  Status
+            0         0       0            2          2  Closed
+            1         1       0            2          4  Closed
 
             >>> ranges.duration.values
-            array([2, 1, 0])
+            array([0, 2])
             ```
 
             * Two arrays, traversing the signals of the second array:
 
             ```pycon
-            >>> ranges = mask_sr.vbt.signals.between_ranges(other=mask_sr2, from_other=True)
+            >>> ranges = mask_sr1.vbt.signals.between_ranges(target=mask_sr2, relation="manyone")
             >>> ranges
             <vectorbtpro.generic.ranges.Ranges at 0x7ff29eccbd68>
 
             >>> ranges.records_readable
-               Range Id  Column  Start Timestamp  End Timestamp  Status
-            0         0       0                2              2  Closed
-            1         1       0                2              4  Closed
+               Range Id  Column  Start Index  End Index  Status
+            0         0       0            0          2  Closed
+            1         1       0            1          2  Closed
+            2         2       0            2          2  Closed
 
             >>> ranges.duration.values
             array([0, 2])
@@ -2024,18 +2034,19 @@ class SignalsAccessor(GenericAccessor):
         """
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        if other is None:
-            # One input array
+        if isinstance(relation, str):
+            relation = map_enum_fields(relation, enums.SignalRelation)
+
+        if target is None:
             func = jit_reg.resolve_option(nb.between_ranges_nb, jitted)
             func = ch_reg.resolve_option(func, chunked)
             range_records = func(self.to_2d_array(), incl_open=incl_open)
             wrapper = self.wrapper
             to_attach = self.obj
         else:
-            # Two input arrays
             broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
             broadcasted_args, wrapper = reshaping.broadcast(
-                dict(obj=self.obj, other=other),
+                dict(obj=self.obj, target=target),
                 return_wrapper=True,
                 **broadcast_kwargs,
             )
@@ -2043,11 +2054,11 @@ class SignalsAccessor(GenericAccessor):
             func = ch_reg.resolve_option(func, chunked)
             range_records = func(
                 broadcasted_args["obj"],
-                broadcasted_args["other"],
-                from_other=from_other,
+                broadcasted_args["target"],
+                relation=relation,
                 incl_open=incl_open,
             )
-            to_attach = broadcasted_args["other"] if attach_other else broadcasted_args["obj"]
+            to_attach = broadcasted_args["target"] if attach_target else broadcasted_args["obj"]
         kwargs = merge_dicts(dict(close=to_attach), kwargs)
         return Ranges.from_records(wrapper, range_records, **kwargs).regroup(group_by)
 
@@ -2103,6 +2114,224 @@ class SignalsAccessor(GenericAccessor):
         range_records = func(self.to_2d_array())
         kwargs = merge_dicts(dict(close=self.obj), kwargs)
         return Ranges.from_records(self.wrapper, range_records, **kwargs).regroup(group_by)
+
+    # ############# Raveling ############# #
+
+    @classmethod
+    def index_from_unravel(
+        cls,
+        range_: tp.Array1d,
+        row_idxs: tp.Array1d,
+        index: tp.Index,
+        signal_index_type: str = "range",
+        signal_index_name: str = "signal",
+    ):
+        """Get index from an unraveling operation."""
+        if signal_index_type.lower() == "range":
+            return pd.Index(range_, name=signal_index_name)
+        if signal_index_type.lower() in ("position", "positions"):
+            return pd.Index(row_idxs, name=signal_index_name)
+        if signal_index_type.lower() in ("label", "labels"):
+            if -1 in row_idxs:
+                raise ValueError("Some columns have no signals. Use other signal index types.")
+            return pd.Index(index[row_idxs], name=signal_index_name)
+        raise ValueError(f"Invalid option signal_index_type='{signal_index_type}'")
+
+    def unravel(
+        self,
+        incl_empty_cols: bool = True,
+        force_signal_index: bool = False,
+        signal_index_type: str = "range",
+        signal_index_name: str = "signal",
+        jitted: tp.JittedOption = None,
+        index_stack_kwargs: tp.KwargsLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeTuple[tp.SeriesFrame]:
+        """Unravel signals.
+
+        See `vectorbtpro.signals.nb.unravel_nb`.
+
+        Argument `signal_index_type` takes the following values:
+        * "range": Basic signal counter in a column
+        * "position(s)": Integer position (row) of signal in a column
+        * "label(s)": Label of signal in a column
+        """
+        if index_stack_kwargs is None:
+            index_stack_kwargs = {}
+        if wrap_kwargs is None:
+            wrap_kwargs = {}
+
+        func = jit_reg.resolve_option(nb.unravel_nb, jitted)
+        new_mask, range_, row_idxs, col_idxs = func(self.to_2d_array(), incl_empty_cols=incl_empty_cols)
+        if new_mask.shape == self.wrapper.shape_2d and incl_empty_cols and not force_signal_index:
+            return self.wrapper.wrap(new_mask)
+        if not incl_empty_cols and (row_idxs == -1).all():
+            raise ValueError("No columns left")
+        signal_index = self.index_from_unravel(
+            range_,
+            row_idxs,
+            self.wrapper.index,
+            signal_index_type=signal_index_type,
+            signal_index_name=signal_index_name,
+        )
+        new_columns = indexes.stack_indexes((signal_index, self.wrapper.columns[col_idxs]), **index_stack_kwargs)
+        return self.wrapper.wrap(new_mask, columns=new_columns, group_by=False, **wrap_kwargs)
+
+    @class_or_instancemethod
+    def unravel_between(
+        cls_or_self,
+        *objs,
+        relation: tp.Union[int, str] = "onemany",
+        incl_open_source: bool = False,
+        incl_open_target: bool = False,
+        incl_empty_cols: bool = True,
+        broadcast_kwargs: tp.KwargsLike = None,
+        force_signal_index: bool = False,
+        signal_index_type: str = "pair_range",
+        signal_index_name: str = "signal",
+        jitted: tp.JittedOption = None,
+        index_stack_kwargs: tp.KwargsLike = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.MaybeTuple[tp.SeriesFrame]:
+        """Unravel signal pairs.
+
+        If one array is passed, see `vectorbtpro.signals.nb.unravel_between_nb`.
+        If two arrays are passed, see `vectorbtpro.signals.nb.unravel_between_two_nb`.
+
+        Argument `signal_index_type` takes the following values:
+        * "pair_range": Basic pair counter in a column
+        * "range": Basic signal counter in a column
+        * "source_range": Basic signal counter in a source column
+        * "target_range": Basic signal counter in a target column
+        * "position(s)": Integer position (row) of signal in a column
+        * "source_position(s)": Integer position (row) of signal in a source column
+        * "target_position(s)": Integer position (row) of signal in a target column
+        * "label(s)": Label of signal in a column
+        * "source_label(s)": Label of signal in a source column
+        * "target_label(s)": Label of signal in a target column
+        """
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
+        if index_stack_kwargs is None:
+            index_stack_kwargs = {}
+        if wrap_kwargs is None:
+            wrap_kwargs = {}
+        if isinstance(relation, str):
+            relation = map_enum_fields(relation, enums.SignalRelation)
+        signal_index_type = signal_index_type.lower()
+        if not isinstance(cls_or_self, type):
+            objs = (cls_or_self.obj, *objs)
+
+        def _build_new_columns(
+            source_range,
+            target_range,
+            source_idxs,
+            target_idxs,
+            col_idxs,
+        ):
+            indexes_to_stack = []
+            if signal_index_type == "pair_range":
+                one_points = np.concatenate((np.array([0]), col_idxs[1:] - col_idxs[:-1]))
+                basic_range = np.arange(len(col_idxs))
+                range_points = np.where(one_points == 1, basic_range, one_points)
+                signal_range = basic_range - np.maximum.accumulate(range_points)
+                signal_range[(source_range == -1) & (target_range == -1)] = -1
+                indexes_to_stack.append(pd.Index(signal_range, name=signal_index_name))
+            else:
+                if not signal_index_type.startswith("target_"):
+                    indexes_to_stack.append(cls_or_self.index_from_unravel(
+                        source_range,
+                        source_idxs,
+                        wrapper.index,
+                        signal_index_type=signal_index_type.replace("source_", ""),
+                        signal_index_name="source_" + signal_index_name,
+                    ))
+                if not signal_index_type.startswith("source_"):
+                    indexes_to_stack.append(cls_or_self.index_from_unravel(
+                        target_range,
+                        target_idxs,
+                        wrapper.index,
+                        signal_index_type=signal_index_type.replace("target_", ""),
+                        signal_index_name="target_" + signal_index_name,
+                    ))
+            if len(indexes_to_stack) == 1:
+                indexes_to_stack[0] = indexes_to_stack[0].rename(signal_index_name)
+            return indexes.stack_indexes((
+                *indexes_to_stack,
+                wrapper.columns[col_idxs]
+            ), **index_stack_kwargs)
+
+        if len(objs) == 1:
+            obj = objs[0]
+            wrapper = ArrayWrapper.from_obj(obj)
+            if not isinstance(obj, (pd.Series, pd.DataFrame)):
+                obj = wrapper.wrap(obj)
+            func = jit_reg.resolve_option(nb.unravel_between_nb, jitted)
+            new_mask, source_range, target_range, source_idxs, target_idxs, col_idxs = func(
+                reshaping.to_2d_array(obj),
+                incl_open_source=incl_open_source,
+                incl_empty_cols=incl_empty_cols,
+            )
+            if new_mask.shape == wrapper.shape_2d and incl_empty_cols and not force_signal_index:
+                return wrapper.wrap(new_mask)
+            if not incl_empty_cols and (source_idxs == -1).all():
+                raise ValueError("No columns left")
+            new_columns = _build_new_columns(
+                source_range,
+                target_range,
+                source_idxs,
+                target_idxs,
+                col_idxs,
+            )
+            return wrapper.wrap(new_mask, columns=new_columns, group_by=False, **wrap_kwargs)
+        if len(objs) == 2:
+            source = objs[0]
+            target = objs[1]
+            broadcast_kwargs = merge_dicts(dict(to_pd=False, min_ndim=2), broadcast_kwargs)
+            broadcasted_args, wrapper = reshaping.broadcast(
+                dict(source=source, target=target),
+                return_wrapper=True,
+                **broadcast_kwargs,
+            )
+            func = jit_reg.resolve_option(nb.unravel_between_two_nb, jitted)
+            new_source_mask, new_target_mask, source_range, target_range, source_idxs, target_idxs, col_idxs = func(
+                broadcasted_args["source"],
+                broadcasted_args["target"],
+                relation=relation,
+                incl_open_source=incl_open_source,
+                incl_open_target=incl_open_target,
+                incl_empty_cols=incl_empty_cols
+            )
+            if new_source_mask.shape == wrapper.shape_2d and incl_empty_cols and not force_signal_index:
+                return wrapper.wrap(new_source_mask), wrapper.wrap(new_target_mask)
+            if not incl_empty_cols and (source_idxs == -1).all() and (target_idxs == -1).all():
+                raise ValueError("No columns left")
+            new_columns = _build_new_columns(
+                source_range,
+                target_range,
+                source_idxs,
+                target_idxs,
+                col_idxs,
+            )
+            new_source_mask = wrapper.wrap(new_source_mask, columns=new_columns, group_by=False, **wrap_kwargs)
+            new_target_mask = wrapper.wrap(new_target_mask, columns=new_columns, group_by=False, **wrap_kwargs)
+            return new_source_mask, new_target_mask
+        raise ValueError("This method accepts either one or two arrays")
+
+    def ravel(
+        self,
+        group_by: tp.GroupByLike = None,
+        jitted: tp.JittedOption = None,
+        wrap_kwargs: tp.KwargsLike = None,
+    ) -> tp.SeriesFrame:
+        """See `vectorbtpro.signals.nb.ravel_nb`."""
+        if wrap_kwargs is None:
+            wrap_kwargs = {}
+
+        group_map = self.wrapper.grouper.get_group_map(group_by=group_by)
+        func = jit_reg.resolve_option(nb.ravel_nb, jitted)
+        new_mask = func(self.to_2d_array(), group_map)
+        return self.wrapper.wrap(new_mask, group_by=group_by, **wrap_kwargs)
 
     # ############# Index ############# #
 
@@ -2280,17 +2509,17 @@ class SignalsAccessor(GenericAccessor):
             ),
             total_overlapping=dict(
                 title="Total Overlapping",
-                calc_func=lambda self, other, group_by: (self & other).vbt.signals.total(group_by=group_by),
-                check_silent_has_other=True,
-                tags=["signals", "other"],
+                calc_func=lambda self, target, group_by: (self & target).vbt.signals.total(group_by=group_by),
+                check_silent_has_target=True,
+                tags=["signals", "target"],
             ),
             overlapping_rate=dict(
                 title="Overlapping Rate [%]",
-                calc_func=lambda self, other, group_by: (self & other).vbt.signals.total(group_by=group_by)
-                / (self | other).vbt.signals.total(group_by=group_by),
+                calc_func=lambda self, target, group_by: (self & target).vbt.signals.total(group_by=group_by)
+                / (self | target).vbt.signals.total(group_by=group_by),
                 post_calc_func=lambda self, out, settings: out * 100,
-                check_silent_has_other=True,
-                tags=["signals", "other"],
+                check_silent_has_target=True,
+                tags=["signals", "target"],
             ),
             first_index=dict(
                 title="First Index",
@@ -2309,7 +2538,7 @@ class SignalsAccessor(GenericAccessor):
             norm_avg_index=dict(title="Norm Avg Index [-1, 1]", calc_func="norm_avg_index", tags=["signals", "index"]),
             distance=dict(
                 title=RepEval(
-                    "f'Distance {\"<-\" if from_other else \"->\"} {other_name}' if other is not None else 'Distance'"
+                    "f'Distance {self.get_relation_str(relation)} {target_name}' if target is not None else 'Distance'"
                 ),
                 calc_func="between_ranges.duration",
                 post_calc_func=lambda self, out, settings: {
@@ -2318,7 +2547,7 @@ class SignalsAccessor(GenericAccessor):
                     "Max": out.max(),
                 },
                 apply_to_timedelta=True,
-                tags=RepEval("['signals', 'distance', 'other'] if other is not None else ['signals', 'distance']"),
+                tags=RepEval("['signals', 'distance', 'target'] if target is not None else ['signals', 'distance']"),
             ),
             total_partitions=dict(
                 title="Total Partitions",

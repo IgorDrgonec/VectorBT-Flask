@@ -18,8 +18,7 @@ By default, vectorbt searches for columns with names 'open', 'high', 'low', 'clo
 `vectorbtpro._settings.ohlcv`, or by providing `feature_map` directly to the accessor.
 
 ```pycon
->>> import pandas as pd
->>> import vectorbtpro as vbt
+>>> from vectorbtpro import *
 
 >>> df = pd.DataFrame({
 ...     'my_open1': [2, 3, 4, 3.5, 2.5],
@@ -475,8 +474,6 @@ class OHLCVDFAccessor(OHLCDataMixin, GenericDFAccessor):
 
         Usage:
             ```pycon
-            >>> import vectorbtpro as vbt
-
             >>> vbt.YFData.pull("BTC-USD").get().vbt.ohlcv.plot().show()
             ```
 

@@ -10,9 +10,8 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.data.base import key_dict
 from vectorbtpro.data.custom.db import DBData
 from vectorbtpro.data.custom.file import FileData
-from vectorbtpro.utils import checks
+from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.datetime_ import to_tzaware_datetime, to_naive_datetime
 
 try:
     if not tp.TYPE_CHECKING:
@@ -41,7 +40,7 @@ class DuckDBData(DBData):
         * Set up the connection settings globally (optional):
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> vbt.DuckDBData.set_custom_settings(connection="database.duckdb")
         ```
@@ -704,20 +703,20 @@ class DuckDBData(DBData):
                                 or (isinstance(to_utc, str) and to_utc.lower() == "index")
                                 or (checks.is_sequence(to_utc) and index_name in to_utc)
                             ):
-                                start = to_tzaware_datetime(start, naive_tz=tz, tz="utc")
-                                start = to_naive_datetime(start)
+                                start = dt.to_tzaware_datetime(start, naive_tz=tz, tz="utc")
+                                start = dt.to_naive_datetime(start)
                             else:
-                                start = to_naive_datetime(start, tz=tz)
+                                start = dt.to_naive_datetime(start, tz=tz)
                         if end is not None:
                             if (
                                 to_utc is True
                                 or (isinstance(to_utc, str) and to_utc.lower() == "index")
                                 or (checks.is_sequence(to_utc) and index_name in to_utc)
                             ):
-                                end = to_tzaware_datetime(end, naive_tz=tz, tz="utc")
-                                end = to_naive_datetime(end)
+                                end = dt.to_tzaware_datetime(end, naive_tz=tz, tz="utc")
+                                end = dt.to_naive_datetime(end)
                             else:
-                                end = to_naive_datetime(end, tz=tz)
+                                end = dt.to_naive_datetime(end, tz=tz)
                     elif index_column_type in ("TIMESTAMPTZ", "TIMESTAMP WITH TIME ZONE"):
                         if start is not None:
                             if (
@@ -725,18 +724,18 @@ class DuckDBData(DBData):
                                 or (isinstance(to_utc, str) and to_utc.lower() == "index")
                                 or (checks.is_sequence(to_utc) and index_name in to_utc)
                             ):
-                                start = to_tzaware_datetime(start, naive_tz=tz, tz="utc")
+                                start = dt.to_tzaware_datetime(start, naive_tz=tz, tz="utc")
                             else:
-                                start = to_tzaware_datetime(start, naive_tz=tz)
+                                start = dt.to_tzaware_datetime(start, naive_tz=tz)
                         if end is not None:
                             if (
                                 to_utc is True
                                 or (isinstance(to_utc, str) and to_utc.lower() == "index")
                                 or (checks.is_sequence(to_utc) and index_name in to_utc)
                             ):
-                                end = to_tzaware_datetime(end, naive_tz=tz, tz="utc")
+                                end = dt.to_tzaware_datetime(end, naive_tz=tz, tz="utc")
                             else:
-                                end = to_tzaware_datetime(end, naive_tz=tz)
+                                end = dt.to_tzaware_datetime(end, naive_tz=tz)
                 if start is not None and end is not None:
                     query += f' WHERE "{index_name}" >= $start AND "{index_name}" < $end'
                 elif start is not None:

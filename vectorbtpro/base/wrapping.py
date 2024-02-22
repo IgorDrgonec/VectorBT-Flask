@@ -14,10 +14,9 @@ from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.indexing import IndexingError, ExtPandasIndexer, index_dict, IdxSetter, IdxSetterFactory, IdxDict
 from vectorbtpro.base.indexes import stack_indexes, concat_indexes
-from vectorbtpro.utils import checks
+from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
 from vectorbtpro.utils.config import Configured, merge_dicts, resolve_dict
-from vectorbtpro.utils.datetime_ import infer_index_freq, prepare_dt_index
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method, cached_property
 from vectorbtpro.utils.array_ import is_range, cast_to_min_precision, cast_to_max_precision
@@ -51,7 +50,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         Use methods that begin with `get_` to get group-aware results."""
 
     @classmethod
-    def from_obj(cls: tp.Type[ArrayWrapperT], obj: tp.ArrayLike, *args, **kwargs) -> ArrayWrapperT:
+    def from_obj(cls: tp.Type[ArrayWrapperT], obj: tp.ArrayLike, **kwargs) -> ArrayWrapperT:
         """Derive metadata from an object."""
         from vectorbtpro.base.reshaping import to_pd_array
         from vectorbtpro.data.base import Data
@@ -70,7 +69,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         kwargs.pop("index", None)
         kwargs.pop("columns", None)
         kwargs.pop("ndim", None)
-        return cls(index, columns, ndim, *args, **kwargs)
+        return cls(index, columns, ndim, **kwargs)
 
     @classmethod
     def from_shape(
@@ -195,16 +194,14 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         kwargs["index"] = index
 
         if freq is None:
-            freq = infer_index_freq(index)
-            if freq is None:
-                new_freq = None
-                for wrapper in wrappers:
-                    if new_freq is None:
-                        new_freq = wrapper.freq
-                    else:
-                        if new_freq is not None and wrapper.freq is not None and new_freq != wrapper.freq:
-                            raise ValueError("Objects to be merged must have the same frequency")
-                freq = new_freq
+            new_freq = None
+            for wrapper in wrappers:
+                if new_freq is None:
+                    new_freq = wrapper.freq
+                else:
+                    if new_freq is not None and wrapper.freq is not None and new_freq != wrapper.freq:
+                        raise ValueError("Objects to be merged must have the same frequency")
+            freq = new_freq
         kwargs["freq"] = freq
 
         if columns is None:
@@ -331,16 +328,14 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         kwargs["index"] = index
 
         if freq is None:
-            freq = infer_index_freq(index)
-            if freq is None:
-                new_freq = None
-                for wrapper in wrappers:
-                    if new_freq is None:
-                        new_freq = wrapper.freq
-                    else:
-                        if new_freq is not None and wrapper.freq is not None and new_freq != wrapper.freq:
-                            raise ValueError("Objects to be merged must have the same frequency")
-                freq = new_freq
+            new_freq = None
+            for wrapper in wrappers:
+                if new_freq is None:
+                    new_freq = wrapper.freq
+                else:
+                    if new_freq is not None and wrapper.freq is not None and new_freq != wrapper.freq:
+                        raise ValueError("Objects to be merged must have the same frequency")
+            freq = new_freq
         kwargs["freq"] = freq
 
         if columns is None:
@@ -452,8 +447,8 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         grouper: tp.Optional[Grouper] = None,
         **kwargs,
     ) -> None:
-        checks.assert_not_none(index)
-        index = prepare_dt_index(index, parse_index=parse_index)
+        checks.assert_not_none(index, arg_name="index")
+        index = dt.prepare_dt_index(index, parse_index=parse_index)
         if columns is None:
             columns = [None]
         if not isinstance(columns, pd.Index):
@@ -853,7 +848,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         if "index" not in wrapper_kwargs:
             wrapper_kwargs["index"] = _resampler.target_index
         if "freq" not in wrapper_kwargs:
-            wrapper_kwargs["freq"] = infer_index_freq(wrapper_kwargs["index"], freq=_resampler.target_freq)
+            wrapper_kwargs["freq"] = dt.infer_index_freq(wrapper_kwargs["index"], freq=_resampler.target_freq)
         new_wrapper = self.replace(**wrapper_kwargs)
         return dict(resampler=resampler, new_wrapper=new_wrapper)
 
@@ -942,7 +937,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         return self.index_acc.get_freq(*args, **kwargs)
 
     @property
-    def freq(self) -> tp.Optional[pd.Timedelta]:
+    def freq(self) -> tp.Optional[tp.PandasFrequency]:
         """See `vectorbtpro.base.accessors.BaseIDXAccessor.freq`."""
         return self.index_acc.freq
 
@@ -1212,7 +1207,6 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         if silence_warnings is None:
             silence_warnings = wrapping_cfg["silence_warnings"]
 
-        checks.assert_not_none(self.ndim)
         _self = self.resolve(group_by=group_by)
 
         if columns is None:
@@ -1294,6 +1288,8 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         **kwargs,
     ) -> tp.AnyArray1d:
         """Stack reduced objects along columns and wrap the final object."""
+        from vectorbtpro.base.merging import concat_arrays
+
         _self = self.resolve(group_by=group_by)
         if len(objs) == 1:
             objs = objs[0]
@@ -1303,7 +1299,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         for obj in objs:
             new_objs.append(reshaping.to_1d_array(obj))
 
-        stacked_obj = np.concatenate(new_objs)
+        stacked_obj = concat_arrays(new_objs)
         if wrap:
             return _self.wrap_reduced(stacked_obj, **kwargs)
         return stacked_obj
@@ -1316,6 +1312,8 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         **kwargs,
     ) -> tp.AnyArray:
         """Stack objects along rows and wrap the final object."""
+        from vectorbtpro.base.merging import row_stack_arrays
+
         _self = self.resolve(group_by=group_by)
         if len(objs) == 1:
             objs = objs[0]
@@ -1330,7 +1328,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
                 obj = np.repeat(obj, _self.shape_2d[1], axis=1)
             new_objs.append(obj)
 
-        stacked_obj = np.row_stack(new_objs)
+        stacked_obj = row_stack_arrays(new_objs)
         if wrap:
             return _self.wrap(stacked_obj, **kwargs)
         return stacked_obj
@@ -1347,6 +1345,8 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
 
         `reindex_kwargs` will be passed to
         [pandas.DataFrame.reindex](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reindex.html)."""
+        from vectorbtpro.base.merging import column_stack_arrays
+
         _self = self.resolve(group_by=group_by)
         if len(objs) == 1:
             objs = objs[0]
@@ -1366,7 +1366,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
                     obj = obj.astype(None)
             new_objs.append(reshaping.to_2d_array(obj))
 
-        stacked_obj = np.column_stack(new_objs)
+        stacked_obj = column_stack_arrays(new_objs)
         if wrap:
             return _self.wrap(stacked_obj, **kwargs)
         return stacked_obj
@@ -1411,9 +1411,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
             * Set a single row:
 
             ```pycon
-            >>> import vectorbtpro as vbt
-            >>> import pandas as pd
-            >>> import numpy as np
+            >>> from vectorbtpro import *
 
             >>> index = pd.date_range("2020", periods=5)
             >>> columns = pd.Index(["a", "b", "c"])

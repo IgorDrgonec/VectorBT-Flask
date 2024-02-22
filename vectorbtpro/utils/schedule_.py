@@ -11,8 +11,7 @@ from datetime import datetime, timedelta, time as dt_time
 from schedule import Scheduler, Job, CancelJob
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils import checks
-from vectorbtpro.utils.datetime_ import tzaware_to_naive_time
+from vectorbtpro.utils import checks, datetime_ as dt
 
 __all__ = [
     "AsyncJob",
@@ -186,8 +185,7 @@ class ScheduleManager:
 
         Usage:
             ```pycon
-            >>> import datetime
-            >>> import vectorbtpro as vbt
+            >>> from vectorbtpro import *
 
             >>> def job_func(message="I'm working..."):
             ...     print(message)
@@ -225,7 +223,7 @@ class ScheduleManager:
             >>> my_manager.every('day', '10:30').do(job_func)
             Every 1 day at 10:30:00 do job_func() (last run: [never], next run: 2021-03-19 10:30:00)
 
-            >>> my_manager.every('day', datetime.time(9, 30, tzinfo="utc")).do(job_func)
+            >>> my_manager.every('day', time(9, 30, tzinfo="utc")).do(job_func)
             Every 1 day at 10:30:00 do job_func() (last run: [never], next run: 2021-03-19 10:30:00)
 
             >>> my_manager.every('monday').do(job_func)
@@ -300,7 +298,7 @@ class ScheduleManager:
             if isinstance(at, dt_time):
                 if job.unit == "days" or job.start_day:
                     if at.tzinfo is not None:
-                        at = tzaware_to_naive_time(at, None)
+                        at = dt.tzaware_to_naive_time(at, None)
                 at = at.isoformat()
                 if job.unit == "hours":
                     at = ":".join(at.split(":")[1:])

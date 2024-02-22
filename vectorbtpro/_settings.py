@@ -21,7 +21,7 @@ Here are the main properties of the `settings` config:
 For example, you can change default width and height of each plot:
 
 ```pycon
->>> import vectorbtpro as vbt
+>>> from vectorbtpro import *
 
 >>> vbt.settings['plotting']['layout']['width'] = 800
 >>> vbt.settings['plotting']['layout']['height'] = 400
@@ -181,8 +181,9 @@ class flex_cfg(Config):
 _settings = {}
 
 importing = frozen_cfg(
-    auto_import=True,
     clear_pycache=False,
+    auto_import=True,
+    star_import="minimal",
     plotly=True,
     telegram=True,
     quantstats=True,
@@ -593,7 +594,7 @@ wrapping = frozen_cfg(
     column_only_select=False,
     range_only_select=False,
     group_select=True,
-    freq=None,
+    freq="auto",
     silence_warnings=False,
     zero_to_none=True,
     min_precision=None,
@@ -637,6 +638,7 @@ datetime = frozen_cfg(
         parse_with_dateparser=False,
     ),
     dateparser_kwargs=flex_cfg(),
+    freq_from_n=20,
 )
 """_"""
 
@@ -663,7 +665,7 @@ data = frozen_cfg(
         synthetic=flex_cfg(
             start=None,
             end=None,
-            freq=None,
+            timeframe=None,
             tz=None,
             normalize=False,
             inclusive="left",
@@ -811,7 +813,7 @@ data = frozen_cfg(
             get_klines_kwargs=flex_cfg(),
         ),
         ccxt=flex_cfg(
-            exchange="binance",
+            exchange=None,
             exchange_config=flex_cfg(
                 enableRateLimit=True,
             ),
@@ -1262,14 +1264,14 @@ _settings["ohlcv"] = ohlcv
 signals = frozen_cfg(
     stats=flex_cfg(
         filters=flex_cfg(
-            silent_has_other=flex_cfg(
-                filter_func=lambda self, metric_settings: metric_settings.get("other", None) is not None,
+            silent_has_target=flex_cfg(
+                filter_func=lambda self, metric_settings: metric_settings.get("target", None) is not None,
             ),
         ),
         settings=flex_cfg(
-            other=None,
-            other_name="Other",
-            from_other=False,
+            target=None,
+            target_name="Target",
+            relation="onemany",
         ),
     ),
     plots=flex_cfg(),
@@ -1571,13 +1573,14 @@ portfolio = frozen_cfg(
     ),
     # Portfolio
     freq=None,
+    year_freq=None,
     use_in_outputs=True,
     fillna_close=True,
     trades_type="exittrades",
     stats=flex_cfg(
         filters=flex_cfg(
             has_year_freq=flex_cfg(
-                filter_func=lambda self, metric_settings: metric_settings.get("year_freq", None) is not None,
+                filter_func=lambda self, metric_settings: self.year_freq is not None,
                 warning_message=Sub("Metric '$metric_name' requires year frequency to be set"),
             ),
             has_bm_returns=flex_cfg(

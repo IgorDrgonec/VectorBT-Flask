@@ -1566,7 +1566,7 @@ class TestIndexing:
         np.testing.assert_array_equal(row_idxs, np.array([0, 1, 23, 24, 25, 47, 48]))
         assert col_idxs == slice(None, None, None)
 
-        dti = pd.date_range("2020-01-01", "2020-01-03", freq="15T", tz="Europe/Berlin")
+        dti = pd.date_range("2020-01-01", "2020-01-03", freq="15min", tz="Europe/Berlin")
         row_idxs, col_idxs = indexing.get_idxs(
             slice("14:30", "15:45"), dti, c, closed_start=False, closed_end=False
         )

@@ -14,8 +14,8 @@ from plotly.graph_objects import Figure as _Figure, FigureWidget as _FigureWidge
 from plotly.subplots import make_subplots as _make_subplots
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.datetime_ import get_rangebreaks
 from vectorbtpro.utils.path_ import check_mkdir
 
 __all__ = [
@@ -81,7 +81,7 @@ class FigureMixin:
                         index = index.union(d_index)
             if index is None:
                 raise ValueError("Couldn't extract x-axis values, please provide index")
-        rangebreaks = get_rangebreaks(index, **kwargs)
+        rangebreaks = dt.get_rangebreaks(index, **kwargs)
         return self.update_xaxes(rangebreaks=rangebreaks)
 
     def skip_index(self: FigureMixinT, skip_index: tp.IndexLike) -> FigureMixinT:

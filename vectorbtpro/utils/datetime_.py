@@ -9,42 +9,145 @@ from collections import namedtuple
 
 import numpy as np
 import pandas as pd
-from pandas.tseries.frequencies import to_offset
+from pandas.tseries.offsets import BaseOffset
+from pandas.tseries.frequencies import to_offset as pd_to_offset
 import re
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.config import merge_dicts
+from vectorbtpro.utils.config import merge_dicts, HybridConfig
 from vectorbtpro.utils.parsing import WarningsFiltered
+from vectorbtpro.utils.array_ import min_count_nb
 
 __all__ = [
     "DTC",
 ]
 
+__pdoc__ = {}
+
 PandasDatetimeIndex = (pd.DatetimeIndex, pd.PeriodIndex)
 
 
-def split_freq_str(freq: str) -> tp.Optional[tp.Tuple[int, str]]:
+# ############# Frequency ############# #
+
+
+sharp_freq_str_config = HybridConfig(
+    dict(
+        m="m",
+        M="M",
+    )
+)
+"""_"""
+
+__pdoc__["sharp_freq_str_config"] = f"""Config for sharp frequency mapping.
+
+```python
+{sharp_freq_str_config.prettify()}
+```
+"""
+
+fuzzy_freq_str_config = HybridConfig(
+    dict(
+        ns="ns",
+        nano="ns",
+        nanos="ns",
+        nanosecond="ns",
+        nanoseconds="ns",
+        us="us",
+        micro="us",
+        micros="us",
+        microsecond="us",
+        microseconds="us",
+        ms="ms",
+        milli="ms",
+        millis="ms",
+        millisecond="ms",
+        milliseconds="ms",
+        s="s",
+        sec="s",
+        secs="s",
+        second="s",
+        seconds="s",
+        t="m",
+        min="m",
+        mins="m",
+        minute="m",
+        minutes="m",
+        h="h",
+        hour="h",
+        hours="h",
+        hourly="h",
+        d="d",
+        day="d",
+        days="d",
+        daily="d",
+        w="W",
+        wk="W",
+        wks="W",
+        week="W",
+        weeks="W",
+        weekly="W",
+        mo="M",
+        month="M",
+        months="M",
+        monthly="M",
+        q="Q",
+        quarter="Q",
+        quarters="Q",
+        quarterly="Q",
+        y="Y",
+        year="Y",
+        years="Y",
+        yearly="Y",
+        annual="Y",
+        annually="Y",
+    )
+)
+"""_"""
+
+__pdoc__["fuzzy_freq_str_config"] = f"""Config for fuzzy frequency mapping.
+
+```python
+{fuzzy_freq_str_config.prettify()}
+```
+"""
+
+
+def split_freq_str(
+    freq_str: str,
+    sharp_mapping: tp.MappingLike = None,
+    fuzzy_mapping: tp.MappingLike = None,
+) -> tp.Optional[tp.Tuple[int, str]]:
     """Split (human-readable) frequency into multiplier and unambiguous unit.
 
     Can be used both as offset and timedelta.
 
-    The following units are returned:
+    For mappings, see `sharp_freq_str_config` and `fuzzy_freq_str_config`.
+    Sharp (case-sensitive) mappings are considered first, fuzzy (case-insensitive) mappings second.
+    If a mapping returns None, will return the original unit.
+
+    The following case-sensitive units are returned:
+    * "ns" for nanosecond
+    * "us" for microsecond
+    * "ms" for millisecond
     * "s" for second
-    * "t" for minute
+    * "m" for minute
     * "h" for hour
     * "d" for day
     * "W" for week
     * "M" for month
     * "Q" for quarter
-    * "Y" for year"""
+    * "Y" for year
 
-    freq = "".join(freq.strip().split())
-    match = re.match(r"^(\d*)\s*([a-zA-Z-]+)$", freq)
-    if match.group(1) == "" and match.group(2).isnumeric():
-        raise ValueError("Frequency must contain unit")
+    If a unit isn't recognized, will return the original unit.
+    """
+
+    freq_str = "".join(freq_str.strip().split())
+    match = re.match(r"^(\d*)\s*([a-zA-Z-]+)$", freq_str)
     if not match:
         return None
+    if match.group(1) == "" and match.group(2).isnumeric():
+        raise ValueError("Frequency must contain unit")
     if match.group(1) == "":
         multiplier = 1
     else:
@@ -53,75 +156,281 @@ def split_freq_str(freq: str) -> tp.Optional[tp.Tuple[int, str]]:
         raise ValueError("Frequency must contain unit")
     else:
         unit = match.group(2)
-    if unit in ("S", "sec", "second", "seconds"):
-        unit = "s"
-    elif unit in ("T", "m", "min", "minute", "minutes"):
-        unit = "t"
-    elif unit in ("H", "hour", "hours", "hourly"):
-        unit = "h"
-    elif unit in ("D", "day", "days", "daily"):
-        unit = "d"
-    elif unit in ("w", "wk", "week", "weeks", "weekly"):
-        unit = "W"
-    elif unit in ("mo", "month", "months", "monthly"):
-        unit = "M"
-    elif unit in ("q", "quarter", "quarters", "quarterly"):
-        unit = "Q"
-    elif unit in ("y", "year", "years", "yearly", "annual", "annually"):
-        unit = "Y"
+    if sharp_mapping is not None:
+        sharp_mapping = dict(sharp_mapping)
+        if unit in sharp_mapping:
+            if sharp_mapping[unit] is None:
+                return multiplier, unit
+            return multiplier, sharp_mapping[unit]
+    if unit in sharp_freq_str_config:
+        if sharp_freq_str_config[unit] is None:
+            return multiplier, unit
+        return multiplier, sharp_freq_str_config[unit]
+    if fuzzy_mapping is not None:
+        fuzzy_mapping = dict(fuzzy_mapping)
+        if unit.lower() in fuzzy_mapping:
+            if fuzzy_mapping[unit.lower()] is None:
+                return multiplier, unit
+            return multiplier, fuzzy_mapping[unit.lower()]
+    if unit.lower() in fuzzy_freq_str_config:
+        if fuzzy_freq_str_config[unit.lower()] is None:
+            return multiplier, unit
+        return multiplier, fuzzy_freq_str_config[unit.lower()]
     return multiplier, unit
 
 
-def prepare_freq(freq: tp.FrequencyLike) -> tp.FrequencyLike:
-    """Prepare frequency using `split_freq_str`.
+def prepare_offset_str(offset_str: str, allow_space: bool = False) -> str:
+    """Prepare offset frequency string.
 
-    To include multiple units, separate them with comma."""
-    if isinstance(freq, str):
-        if "," in freq:
-            new_freq = ""
-            for _freq in freq.split(","):
-                split = split_freq_str(_freq)
-                if split is not None:
-                    new_freq += str(split[0]) + str(split[1])
-                else:
-                    return freq
-            return new_freq
-        split = split_freq_str(freq)
-        if split is not None:
-            freq = str(split[0]) + str(split[1])
+    To include multiple units, separate them with comma, semicolon, or space if `allow_space` is True.
+    The output becomes comma-separated."""
+    from pkg_resources import parse_version
+
+    if parse_version(pd.__version__) < parse_version("2.2.0"):
+        year_prefix = "AS"
+    else:
+        year_prefix = "YS"
+
+    if allow_space:
+        freq_parts = re.split(r"[,;\s]", offset_str)
+    else:
+        freq_parts = re.split(r"[,;]", offset_str)
+    new_freq_parts = []
+    for freq_part in freq_parts:
+        freq_part = " ".join(freq_part.strip().split())
+        if freq_part == "":
+            continue
+        split = split_freq_str(freq_part, sharp_mapping=dict(MS=None))
+        if split is None:
+            return offset_str
+        multiplier, unit = split
+        if unit == "m":
+            unit = "min"
+        elif unit == "W":
+            unit = "W-MON"
+        elif unit == "M":
+            unit = "MS"
+        elif unit == "Q":
+            unit = "QS"
+        elif unit == "Y":
+            unit = "YS"
+        elif unit.lower() in ("mon", "monday"):
+            unit = "W-MON"
+        elif unit.lower() in ("tue", "tuesday"):
+            unit = "W-TUE"
+        elif unit.lower() in ("wed", "wednesday"):
+            unit = "W-WED"
+        elif unit.lower() in ("thu", "thursday"):
+            unit = "W-THU"
+        elif unit.lower() in ("fri", "friday"):
+            unit = "W-FRI"
+        elif unit.lower() in ("sat", "saturday"):
+            unit = "W-SAT"
+        elif unit.lower() in ("sun", "sunday"):
+            unit = "W-SUN"
+        elif unit.lower() in ("jan", "january"):
+            unit = year_prefix + "-JAN"
+        elif unit.lower() in ("feb", "february"):
+            unit = year_prefix + "-FEB"
+        elif unit.lower() in ("mar", "march"):
+            unit = year_prefix + "-MAR"
+        elif unit.lower() in ("apr", "april"):
+            unit = year_prefix + "-APR"
+        elif unit.lower() == "may":
+            unit = year_prefix + "-MAY"
+        elif unit.lower() in ("jun", "june"):
+            unit = year_prefix + "-JUN"
+        elif unit.lower() in ("jul", "july"):
+            unit = year_prefix + "-JUL"
+        elif unit.lower() in ("aug", "august"):
+            unit = year_prefix + "-AUG"
+        elif unit.lower() in ("sep", "september"):
+            unit = year_prefix + "-SEP"
+        elif unit.lower() in ("oct", "october"):
+            unit = year_prefix + "-OCT"
+        elif unit.lower() in ("nov", "november"):
+            unit = year_prefix + "-NOV"
+        elif unit.lower() in ("dec", "december"):
+            unit = year_prefix + "-DEC"
+        new_freq_parts.append(str(multiplier) + str(unit))
+    return " ".join(new_freq_parts)
+
+
+def to_offset(freq: tp.FrequencyLike) -> BaseOffset:
+    """Convert a frequency-like object to `pd.DateOffset`."""
+    if isinstance(freq, BaseOffset):
         return freq
-    return freq
+    if isinstance(freq, str):
+        freq = prepare_offset_str(freq)
+    return pd_to_offset(freq)
 
 
-def freq_to_timedelta(freq: tp.FrequencyLike) -> pd.Timedelta:
-    """Convert a frequency-like object to `pd.Timedelta`."""
-    if not isinstance(freq, pd.Timedelta):
-        if isinstance(freq, str) and freq.startswith("-"):
-            neg_td = True
-            freq = freq[1:]
-        else:
-            neg_td = False
-        freq = prepare_freq(freq)
-        if isinstance(freq, str) and not freq[0].isdigit():
-            # Otherwise "ValueError: unit abbreviation w/o a number"
-            freq = pd.Timedelta(1, unit=freq)
-        else:
-            freq = pd.Timedelta(freq)
-        if neg_td:
-            freq = -freq
+def prepare_timedelta_str(timedelta_str: str, allow_space: bool = False) -> str:
+    """Prepare timedelta frequency string.
+
+    To include multiple units, separate them with comma, semicolon, or space if `allow_space` is True.
+    The output becomes comma-separated."""
+    from vectorbtpro.utils import datetime_nb as nb
+
+    if allow_space:
+        freq_parts = re.split(r"[,;\s]", timedelta_str)
+    else:
+        freq_parts = re.split(r"[,;]", timedelta_str)
+    new_freq_parts = []
+    for freq_part in freq_parts:
+        freq_part = " ".join(freq_part.strip().split())
+        if freq_part == "":
+            continue
+        split = split_freq_str(freq_part)
+        if split is None:
+            return timedelta_str
+        multiplier, unit = split
+        if unit == "m":
+            unit = "min"
+        elif unit == "W":
+            multiplier *= 7
+            unit = "d"
+        elif unit == "M":
+            multiplier *= nb.mo_ns / nb.d_ns
+            unit = "d"
+        elif unit == "Q":
+            multiplier *= nb.q_ns / nb.d_ns
+            unit = "d"
+        elif unit == "Y":
+            multiplier *= nb.y_ns / nb.d_ns
+            unit = "d"
+        new_freq_parts.append(str(multiplier) + str(unit))
+    return " ".join(new_freq_parts)
+
+
+def offset_to_timedelta(offset: BaseOffset) -> pd.Timedelta:
+    """Convert offset to a timedelta."""
+    from vectorbtpro.utils import datetime_nb as nb
+
+    if isinstance(offset, (pd.offsets.BusinessHour, pd.offsets.CustomBusinessHour)):
+        return pd.Timedelta(nb.h_td * offset.n)
+    if isinstance(offset, (pd.offsets.BusinessDay, pd.offsets.CustomBusinessDay)):
+        return pd.Timedelta(nb.d_td * offset.n)
+    if isinstance(offset, pd.offsets.Week):
+        return pd.Timedelta(nb.w_td * offset.n)
+    if isinstance(offset, (pd.offsets.SemiMonthBegin, pd.offsets.SemiMonthEnd)):
+        return pd.Timedelta(nb.semi_mo_td * offset.n)
+    if isinstance(
+        offset,
+        (
+            pd.offsets.MonthBegin,
+            pd.offsets.MonthEnd,
+            pd.offsets.BusinessMonthBegin,
+            pd.offsets.BusinessMonthEnd,
+            pd.offsets.CustomBusinessMonthBegin,
+            pd.offsets.CustomBusinessMonthEnd,
+            pd.offsets.WeekOfMonth,
+            pd.offsets.LastWeekOfMonth,
+        ),
+    ):
+        return pd.Timedelta(nb.mo_td * offset.n)
+    if isinstance(
+        offset,
+        (
+            pd.offsets.QuarterBegin,
+            pd.offsets.QuarterEnd,
+            pd.offsets.BQuarterBegin,
+            pd.offsets.BQuarterEnd,
+            pd.offsets.FY5253Quarter,
+        ),
+    ):
+        return pd.Timedelta(nb.q_td * offset.n)
+    if isinstance(
+        offset,
+        (
+            pd.offsets.YearBegin,
+            pd.offsets.YearEnd,
+            pd.offsets.BYearBegin,
+            pd.offsets.BYearEnd,
+            pd.offsets.Easter,
+            pd.offsets.FY5253,
+        ),
+    ):
+        return pd.Timedelta(nb.y_td * offset.n)
+    return pd.Timedelta(offset)
+
+
+def fix_timedelta_precision(freq: pd.Timedelta) -> pd.Timedelta:
+    """Fix the precision of timedelta."""
     if hasattr(freq, "unit") and freq.unit != "ns":
         freq = freq.as_unit("ns", round_ok=False)
     return freq
 
 
-def parse_timedelta(td: tp.TimedeltaLike) -> tp.Union[pd.Timedelta, pd.DateOffset]:
-    """Parse a timedelta-like object into Pandas format."""
-    if isinstance(td, (pd.Timedelta, pd.DateOffset)):
-        return td
-    try:
-        return to_offset(prepare_freq(td))
-    except Exception as e:
-        return freq_to_timedelta(td)
+def to_timedelta(freq: tp.FrequencyLike, approximate: bool = False) -> pd.Timedelta:
+    """Convert a frequency-like object to `pd.Timedelta`."""
+    if not isinstance(freq, pd.Timedelta):
+        if isinstance(freq, str):
+            freq = " ".join(freq.strip().split())
+        if isinstance(freq, str) and freq.startswith("-"):
+            neg_td = True
+            freq = freq[1:]
+        else:
+            neg_td = False
+        if isinstance(freq, str):
+            freq = prepare_timedelta_str(freq)
+        if not isinstance(freq, BaseOffset):
+            try:
+                if isinstance(freq, str) and not freq[0].isdigit():
+                    # Otherwise "ValueError: unit abbreviation w/o a number"
+                    freq = pd.Timedelta(1, unit=freq)
+                else:
+                    freq = pd.Timedelta(freq)
+            except Exception as e1:
+                try:
+                    freq = to_offset(freq)
+                except Exception as e2:
+                    raise e1
+        if isinstance(freq, BaseOffset):
+            if approximate:
+                freq = offset_to_timedelta(freq)
+            else:
+                freq = pd.Timedelta(freq)
+        if neg_td:
+            freq = -freq
+    return fix_timedelta_precision(freq)
+
+
+def to_timedelta64(freq: tp.FrequencyLike) -> np.timedelta64:
+    """Convert a frequency-like object to `np.timedelta64`."""
+    if not isinstance(freq, np.timedelta64):
+        if not isinstance(freq, pd.Timedelta):
+            freq = to_timedelta(freq)
+        freq = freq.to_timedelta64()
+    if freq.dtype != np.dtype("timedelta64[ns]"):
+        return freq.astype("timedelta64[ns]")
+    return freq
+
+
+def to_freq(freq: tp.FrequencyLike, allow_offset: bool = True, keep_offset: bool = False) -> tp.PandasFrequency:
+    """Convert a frequency-like object to `pd.DateOffset` or `pd.Timedelta`."""
+    if isinstance(freq, pd.Timedelta):
+        return freq
+    if allow_offset and isinstance(freq, BaseOffset):
+        if not keep_offset:
+            try:
+                td_freq = to_timedelta(freq)
+                if to_offset(td_freq) == freq:
+                    freq = td_freq
+                else:
+                    warnings.warn(f"Ambiguous frequency {freq}", stacklevel=2)
+            except Exception as e:
+                pass
+        return freq
+    if allow_offset:
+        try:
+            return to_freq(to_offset(freq), allow_offset=True, keep_offset=keep_offset)
+        except Exception as e:
+            return to_timedelta(freq)
+    return to_timedelta(freq)
+
+
+# ############# Datetime ############# #
 
 
 DTCNT = namedtuple("DTCNT", ["year", "month", "day", "weekday", "hour", "minute", "second", "nanosecond"])
@@ -340,212 +649,6 @@ def time_to_timedelta(t: tp.Union[tp.TimeLike, DTC], **kwargs) -> pd.Timedelta:
     )
 
 
-def freq_to_timedelta64(freq: tp.FrequencyLike) -> np.timedelta64:
-    """Convert a frequency-like object to `np.timedelta64`."""
-    if not isinstance(freq, np.timedelta64):
-        if not isinstance(freq, (pd.DateOffset, pd.Timedelta)):
-            freq = freq_to_timedelta(freq)
-        if isinstance(freq, pd.DateOffset):
-            freq = pd.Timedelta(freq)
-        freq = freq.to_timedelta64()
-    if freq.dtype != np.dtype("timedelta64[ns]"):
-        return freq.astype("timedelta64[ns]")
-    return freq
-
-
-def prepare_dt_index(
-    index: tp.IndexLike,
-    parse_index: tp.Optional[bool] = None,
-    parse_with_dateparser: tp.Optional[bool] = None,
-    dateparser_kwargs: tp.KwargsLike = None,
-    **kwargs,
-) -> tp.Index:
-    """Try converting an index to a datetime index.
-
-    If `parse_index` is True and the object has an object data type, will parse with Pandas
-    (`parse_index` must be True) and dateparser (in addition `parse_with_dateparser` must be True).
-
-    `dateparser_kwargs` are passed to `dateparser.parse` while `**kwargs` are passed to `pd.to_datetime`.
-
-    For defaults, see `vectorbtpro._settings.datetime`."""
-    import dateparser
-    from vectorbtpro._settings import settings
-
-    datetime_cfg = settings["datetime"]
-
-    if parse_index is None:
-        parse_index = datetime_cfg["index"]["parse_index"]
-    if parse_with_dateparser is None:
-        parse_with_dateparser = datetime_cfg["index"]["parse_with_dateparser"]
-    dateparser_kwargs = merge_dicts(datetime_cfg["dateparser_kwargs"], dateparser_kwargs)
-
-    if not isinstance(index, pd.Index):
-        if isinstance(index, str):
-            if parse_index:
-                try:
-                    parsed_index = pd.to_datetime(index, **kwargs)
-                    if not isinstance(parsed_index, pd.Timestamp) and "utc" not in kwargs:
-                        parsed_index = pd.to_datetime(index, utc=True, **kwargs)
-                    index = [parsed_index]
-                except Exception as e:
-                    if parse_with_dateparser:
-                        try:
-                            parsed_index = dateparser.parse(index, **dateparser_kwargs)
-                            if parsed_index is None:
-                                raise Exception
-                            index = pd.to_datetime(parsed_index, **kwargs)
-                            index = [index]
-                        except Exception as e2:
-                            pass
-        try:
-            index = pd.Index(index)
-        except Exception as e:
-            index = pd.Index([index])
-    if isinstance(index, pd.DatetimeIndex):
-        return index
-    if index.dtype == object:
-        if parse_index:
-            try:
-                with WarningsFiltered():
-                    pd.to_datetime(index[[0]], **kwargs)
-                try:
-                    parsed_index = pd.to_datetime(index, **kwargs)
-                    if (
-                        not isinstance(parsed_index, pd.DatetimeIndex)
-                        and isinstance(parsed_index[0], datetime)
-                        and "utc" not in kwargs
-                    ):
-                        parsed_index = pd.to_datetime(index, utc=True, **kwargs)
-                    return parsed_index
-                except Exception as e:
-                    if parse_with_dateparser:
-                        try:
-
-                            def _parse(x):
-                                _parsed_index = dateparser.parse(x, **dateparser_kwargs)
-                                if _parsed_index is None:
-                                    raise Exception
-                                return _parsed_index
-
-                            return pd.to_datetime(index.map(_parse), **kwargs)
-                        except Exception as e2:
-                            pass
-            except Exception as e:
-                pass
-    return index
-
-
-def try_align_to_dt_index(source_index: tp.IndexLike, target_index: tp.Index, **kwargs) -> tp.Index:
-    """Try aligning an index to another datetime index.
-
-    Keyword arguments are passed to `prepare_dt_index`."""
-    source_index = prepare_dt_index(source_index, **kwargs)
-    if isinstance(source_index, pd.DatetimeIndex) and isinstance(target_index, pd.DatetimeIndex):
-        if source_index.tz is None and target_index.tz is not None:
-            source_index = source_index.tz_localize(target_index.tz)
-        elif source_index.tz is not None and target_index.tz is not None:
-            source_index = source_index.tz_convert(target_index.tz)
-    return source_index
-
-
-def try_align_dt_to_index(dt: tp.DatetimeLike, target_index: tp.Index, **kwargs) -> tp.DatetimeLike:
-    """Try aligning a datetime-like object to another datetime index.
-
-    Keyword arguments are passed to `to_timestamp`."""
-    if not isinstance(target_index, pd.DatetimeIndex):
-        return dt
-    dt = to_timestamp(dt, **kwargs)
-    if dt.tzinfo is None and target_index.tz is not None:
-        dt = dt.tz_localize(target_index.tz)
-    elif dt.tzinfo is not None and target_index.tz is not None:
-        dt = dt.tz_convert(target_index.tz)
-    return dt
-
-
-def infer_index_freq(
-    index: pd.Index,
-    freq: tp.Optional[tp.FrequencyLike] = None,
-    allow_date_offset: bool = True,
-    allow_numeric: bool = True,
-    detect_via_diff: bool = False,
-) -> tp.Union[None, int, float, tp.PandasFrequency]:
-    """Infer frequency of a datetime index if `freq` is None, otherwise convert `freq`."""
-    if freq is None and isinstance(index, pd.DatetimeIndex):
-        if index.freqstr is not None:
-            freq = parse_timedelta(index.freqstr)
-        elif index.freq is not None:
-            freq = parse_timedelta(index.freq)
-        elif len(index) >= 3:
-            freq = pd.infer_freq(index)
-            if freq is not None:
-                freq = parse_timedelta(freq)
-    if freq is None and detect_via_diff:
-        return (index[1:] - index[:-1]).min()
-    if freq is None:
-        return None
-    if checks.is_number(freq) and allow_numeric:
-        return freq
-    freq = parse_timedelta(freq)
-    if isinstance(freq, pd.DateOffset):
-        try:
-            td_freq = pd.Timedelta(freq)
-            if to_offset(td_freq) == freq:
-                freq = td_freq
-            else:
-                warnings.warn(f"Ambiguous frequency {freq}", stacklevel=2)
-        except Exception as e:
-            if allow_date_offset:
-                return freq
-    return freq_to_timedelta(freq)
-
-
-def get_dt_index_gaps(
-    index: tp.IndexLike,
-    freq: tp.Optional[tp.FrequencyLike] = None,
-    skip_index: tp.Optional[tp.IndexLike] = None,
-    **kwargs,
-) -> tp.Tuple[tp.Index, tp.Index]:
-    """Get gaps in a datetime index.
-
-    Returns two indexes: start indexes (inclusive) and end indexes (exclusive).
-
-    Keyword arguments are passed to `prepare_dt_index`."""
-    index = prepare_dt_index(index, **kwargs)
-    checks.assert_instance_of(index, pd.DatetimeIndex)
-    if not index.is_unique:
-        raise ValueError("Datetime index must be unique")
-    if not index.is_monotonic_increasing:
-        raise ValueError("Datetime index must be monotonically increasing")
-    freq = infer_index_freq(index, freq=freq, allow_numeric=False, detect_via_diff=True)
-    if skip_index is not None:
-        skip_index = prepare_dt_index(skip_index, **kwargs)
-        checks.assert_instance_of(skip_index, pd.DatetimeIndex)
-        skip_bound_start = skip_index.min()
-        skip_bound_end = skip_index.max()
-        index = index.difference(skip_index)
-    else:
-        skip_bound_start = None
-        skip_bound_end = None
-    start_index = index[:-1]
-    end_index = index[1:]
-    gap_mask = start_index + freq < end_index
-    bound_starts = start_index[gap_mask] + freq
-    bound_ends = end_index[gap_mask]
-    if skip_bound_start is not None and skip_bound_start < index[0]:
-        bound_starts = pd.Index([skip_bound_start]).union(bound_starts)
-        bound_ends = pd.Index([index[0]]).union(bound_ends)
-    if skip_bound_end is not None and skip_bound_end >= index[-1] + freq:
-        bound_starts = pd.Index([index[-1] + freq]).union(bound_starts)
-        bound_ends = pd.Index([skip_bound_end + freq]).union(bound_ends)
-    return bound_starts, bound_ends
-
-
-def get_rangebreaks(index: tp.IndexLike, **kwargs) -> list:
-    """Get `rangebreaks` based on `get_dt_index_gaps`."""
-    start_index, end_index = get_dt_index_gaps(index, **kwargs)
-    return [dict(bounds=x) for x in zip(start_index, end_index)]
-
-
 def get_utc_tz(**kwargs) -> tzinfo:
     """Get UTC timezone."""
     from dateutil.tz import tzutc
@@ -686,6 +789,7 @@ def to_timestamp(
     if checks.is_number(dt):
         dt = pd.Timestamp(dt, tz="utc", unit=unit, **kwargs)
     elif isinstance(dt, str):
+        dt = " ".join(dt.strip().split())
         try:
             tz = to_timezone(
                 dt.split(" ")[-1],
@@ -696,36 +800,45 @@ def to_timestamp(
             dt = " ".join(dt.split(" ")[:-1])
         except Exception as e:
             pass
-        try:
-            if dt.lower() == "now":
-                dt = pd.Timestamp.now(tz=tz)
-            else:
+        if dt.lower() == "now":
+            dt = pd.Timestamp.now(tz=tz)
+        elif dt.lower() == "today":
+            dt = pd.Timestamp.now(tz=tz).floor("1D")
+        elif dt.lower() == "yesterday":
+            dt = pd.Timestamp.now(tz=tz).floor("1D") - pd.Timedelta(days=1)
+        elif dt.lower() == "tomorrow":
+            dt = pd.Timestamp.now(tz=tz).floor("1D") + pd.Timedelta(days=1)
+        else:
+            try:
                 dt = pd.Timestamp(dt, **kwargs)
-        except Exception as e:
-            if parse_with_dateparser:
-                try:
-                    import dateparser
+            except Exception as e:
+                if parse_with_dateparser:
+                    try:
+                        import dateparser
 
-                    settings = dateparser_kwargs.get("settings", {})
-                    settings["RELATIVE_BASE"] = settings.get("RELATIVE_BASE", pd.Timestamp.now(tz=tz).to_pydatetime())
-                    dateparser_kwargs["settings"] = settings
-                    dt = dateparser.parse(dt, **dateparser_kwargs)
-                    if dt is not None:
-                        if is_tz_aware(dt):
-                            tz = to_timezone(
-                                dt.tzinfo,
-                                to_fixed_offset=True,
-                                parse_with_dateparser=parse_with_dateparser,
-                                dateparser_kwargs=dateparser_kwargs,
-                            )
-                            dt = dt.replace(tzinfo=tz)
-                        dt = pd.Timestamp(dt, **kwargs)
-                    else:
+                        settings = dateparser_kwargs.get("settings", {})
+                        settings["RELATIVE_BASE"] = settings.get(
+                            "RELATIVE_BASE",
+                            pd.Timestamp.now(tz=tz).to_pydatetime(),
+                        )
+                        dateparser_kwargs["settings"] = settings
+                        dt = dateparser.parse(dt, **dateparser_kwargs)
+                        if dt is not None:
+                            if is_tz_aware(dt):
+                                tz = to_timezone(
+                                    dt.tzinfo,
+                                    to_fixed_offset=True,
+                                    parse_with_dateparser=parse_with_dateparser,
+                                    dateparser_kwargs=dateparser_kwargs,
+                                )
+                                dt = dt.replace(tzinfo=tz)
+                            dt = pd.Timestamp(dt, **kwargs)
+                        else:
+                            raise ValueError(f"Could not parse the timestamp {dt}")
+                    except Exception as e:
                         raise ValueError(f"Could not parse the timestamp {dt}")
-                except Exception as e:
+                else:
                     raise ValueError(f"Could not parse the timestamp {dt}")
-            else:
-                raise ValueError(f"Could not parse the timestamp {dt}")
     elif not isinstance(dt, pd.Timestamp):
         dt = pd.Timestamp(dt, **kwargs)
     if tz is not None:
@@ -798,6 +911,9 @@ def to_naive_datetime(dt: tp.DatetimeLike, **kwargs) -> datetime:
     return to_naive_timestamp(dt, **kwargs).to_pydatetime()
 
 
+# ############# Nanoseconds ############# #
+
+
 def datetime_to_ms(dt: datetime) -> int:
     """Convert a datetime to milliseconds."""
     epoch = datetime.fromtimestamp(0, dt.tzinfo)
@@ -824,6 +940,8 @@ def to_ns(obj: tp.ArrayLike) -> tp.ArrayLike:
         obj = time_to_timedelta(obj)
     if isinstance(obj, pd.Timestamp):
         obj = obj.to_datetime64()
+    if isinstance(obj, BaseOffset):
+        obj = pd.Timedelta(obj)
     if isinstance(obj, pd.Timedelta):
         obj = obj.to_timedelta64()
     if isinstance(obj, (datetime, date)):
@@ -849,3 +967,323 @@ def to_ns(obj: tp.ArrayLike) -> tp.ArrayLike:
     if new_obj.ndim == 0 and (not isinstance(obj, np.ndarray) or obj.ndim != 0):
         return new_obj.item()
     return new_obj
+
+
+# ############# Index ############# #
+
+
+def date_range(
+    start: tp.Optional[tp.DatetimeLike] = None,
+    end: tp.Optional[tp.DatetimeLike] = None,
+    *,
+    periods: tp.Optional[int] = None,
+    freq: tp.Optional[tp.FrequencyLike] = None,
+    tz: tp.Optional[tp.TimezoneLike] = None,
+    inclusive: str = "left",
+    timestamp_kwargs: tp.KwargsLike = None,
+    freq_kwargs: tp.KwargsLike = None,
+    timezone_kwargs: tp.KwargsLike = None,
+    **kwargs,
+) -> pd.DatetimeIndex:
+    """Same as `pd.date_range` but preprocesses `start` and `end` with `to_timestamp`,
+    `freq` with `to_freq`, and `tz` with `to_timezone`.
+
+    If `start` and `periods` are None, will set `start` to the beginning of the Unix epoch.
+    Same if pf `periods` is not None but `start` and `end` are None.
+
+    If `end` and `periods` are None, will set `end` to the current date and time."""
+    if timestamp_kwargs is None:
+        timestamp_kwargs = {}
+    if freq_kwargs is None:
+        freq_kwargs = {}
+    if timezone_kwargs is None:
+        timezone_kwargs = {}
+    if freq is None and (start is None or end is None or periods is None):
+        freq = "1D"
+    if freq is not None:
+        freq = to_freq(freq, **freq_kwargs)
+    if tz is not None:
+        tz = to_timezone(tz, **timezone_kwargs)
+    if start is not None:
+        start = to_timestamp(start, tz=tz, **timestamp_kwargs)
+    if end is not None:
+        end = to_timestamp(end, tz=tz, **timestamp_kwargs)
+    if periods is None:
+        if start is None:
+            if tz is not None:
+                start = to_timestamp(0, tz=tz, **timestamp_kwargs)
+            elif end is not None and end.tz is not None:
+                start = to_timestamp(0, tz=end.tz, **timestamp_kwargs)
+            else:
+                start = to_naive_timestamp(0, **timestamp_kwargs)
+        if end is None:
+            if tz is not None:
+                end = to_timestamp("now", tz=tz, **timestamp_kwargs)
+            elif start is not None and start.tz is not None:
+                end = to_timestamp("now", tz=start.tz, **timestamp_kwargs)
+            else:
+                end = to_naive_timestamp("now", **timestamp_kwargs)
+    else:
+        if start is None and end is None:
+            if tz is not None:
+                start = to_timestamp(0, tz=tz, **timestamp_kwargs)
+            else:
+                start = to_naive_timestamp(0, **timestamp_kwargs)
+    return pd.date_range(
+        start=start,
+        end=end,
+        periods=periods,
+        freq=freq,
+        tz=tz,
+        inclusive=inclusive,
+        **kwargs,
+    )
+
+
+def prepare_dt_index(
+    index: tp.IndexLike,
+    parse_index: tp.Optional[bool] = None,
+    parse_with_dateparser: tp.Optional[bool] = None,
+    dateparser_kwargs: tp.KwargsLike = None,
+    **kwargs,
+) -> tp.Index:
+    """Try converting an index to a datetime index.
+
+    If `parse_index` is True and the object has an object data type, will parse with Pandas
+    (`parse_index` must be True) and dateparser (in addition `parse_with_dateparser` must be True).
+
+    `dateparser_kwargs` are passed to `dateparser.parse` while `**kwargs` are passed to `pd.to_datetime`.
+
+    For defaults, see `vectorbtpro._settings.datetime`."""
+    import dateparser
+    from vectorbtpro._settings import settings
+
+    datetime_cfg = settings["datetime"]
+
+    if parse_index is None:
+        parse_index = datetime_cfg["index"]["parse_index"]
+    if parse_with_dateparser is None:
+        parse_with_dateparser = datetime_cfg["index"]["parse_with_dateparser"]
+    dateparser_kwargs = merge_dicts(datetime_cfg["dateparser_kwargs"], dateparser_kwargs)
+
+    if not isinstance(index, pd.Index):
+        if isinstance(index, str):
+            if parse_index:
+                try:
+                    parsed_index = pd.to_datetime(index, **kwargs)
+                    if not isinstance(parsed_index, pd.Timestamp) and "utc" not in kwargs:
+                        parsed_index = pd.to_datetime(index, utc=True, **kwargs)
+                    index = [parsed_index]
+                except Exception as e:
+                    if parse_with_dateparser:
+                        try:
+                            parsed_index = dateparser.parse(index, **dateparser_kwargs)
+                            if parsed_index is None:
+                                raise Exception
+                            index = pd.to_datetime(parsed_index, **kwargs)
+                            index = [index]
+                        except Exception as e2:
+                            pass
+        try:
+            index = pd.Index(index)
+        except Exception as e:
+            index = pd.Index([index])
+    if isinstance(index, pd.DatetimeIndex):
+        return index
+    if index.dtype == object:
+        if parse_index:
+            try:
+                with WarningsFiltered():
+                    pd.to_datetime(index[[0]], **kwargs)
+                try:
+                    parsed_index = pd.to_datetime(index, **kwargs)
+                    if (
+                        not isinstance(parsed_index, pd.DatetimeIndex)
+                        and isinstance(parsed_index[0], datetime)
+                        and "utc" not in kwargs
+                    ):
+                        parsed_index = pd.to_datetime(index, utc=True, **kwargs)
+                    return parsed_index
+                except Exception as e:
+                    if parse_with_dateparser:
+                        try:
+
+                            def _parse(x):
+                                _parsed_index = dateparser.parse(x, **dateparser_kwargs)
+                                if _parsed_index is None:
+                                    raise Exception
+                                return _parsed_index
+
+                            return pd.to_datetime(index.map(_parse), **kwargs)
+                        except Exception as e2:
+                            pass
+            except Exception as e:
+                pass
+    return index
+
+
+def try_align_to_dt_index(source_index: tp.IndexLike, target_index: tp.Index, **kwargs) -> tp.Index:
+    """Try aligning an index to another datetime index.
+
+    Keyword arguments are passed to `prepare_dt_index`."""
+    source_index = prepare_dt_index(source_index, **kwargs)
+    if isinstance(source_index, pd.DatetimeIndex) and isinstance(target_index, pd.DatetimeIndex):
+        if source_index.tz is None and target_index.tz is not None:
+            source_index = source_index.tz_localize(target_index.tz)
+        elif source_index.tz is not None and target_index.tz is not None:
+            source_index = source_index.tz_convert(target_index.tz)
+    return source_index
+
+
+def try_align_dt_to_index(dt: tp.DatetimeLike, target_index: tp.Index, **kwargs) -> tp.DatetimeLike:
+    """Try aligning a datetime-like object to another datetime index.
+
+    Keyword arguments are passed to `to_timestamp`."""
+    if not isinstance(target_index, pd.DatetimeIndex):
+        return dt
+    dt = to_timestamp(dt, **kwargs)
+    if dt.tzinfo is None and target_index.tz is not None:
+        dt = dt.tz_localize(target_index.tz)
+    elif dt.tzinfo is not None and target_index.tz is not None:
+        dt = dt.tz_convert(target_index.tz)
+    return dt
+
+
+def auto_detect_freq(index: pd.Index) -> tp.Optional[tp.PandasFrequency]:
+    """Auto-detect frequency from a datetime index.
+
+    Returns the minimal frequency if it's being encountered in most of the index."""
+    diff_values = index.values[1:] - index.values[:-1]
+    if len(diff_values) > 0:
+        mini, _, minc = min_count_nb(diff_values)
+        if minc / len(index) > 0.5:
+            return index[mini + 1] - index[mini]
+    return None
+
+
+def parse_index_freq(index: pd.DatetimeIndex) -> tp.Optional[tp.PandasFrequency]:
+    """Parse frequency from a datetime index."""
+    if index.freqstr is not None:
+        return to_freq(index.freqstr)
+    if index.freq is not None:
+        return to_freq(index.freq)
+    if len(index) >= 3:
+        freq = pd.infer_freq(index)
+        if freq is not None:
+            return to_freq(freq)
+    return None
+
+
+def freq_depends_on_index(freq: tp.FrequencyLike) -> bool:
+    """Return whether frequency depends on index."""
+    if isinstance(freq, str):
+        freq = " ".join(freq.strip().split())
+        if freq == "auto":
+            return True
+        if freq.startswith("index_"):
+            return True
+    return False
+
+
+def infer_index_freq(
+    index: pd.Index,
+    freq: tp.Optional[tp.FrequencyLike] = None,
+    allow_offset: bool = True,
+    allow_numeric: bool = True,
+    freq_from_n: tp.Union[None, bool, int] = None,
+) -> tp.Union[None, int, float, tp.PandasFrequency]:
+    """Infer frequency of a datetime index if `freq` is None, otherwise convert `freq`.
+
+    If `freq` is "auto", uses `auto_detect_freq`. If `freq` is "index_[method_name]", applies the
+    method to the `pd.TimedeltaIndex` resulting from the difference between each pair of index points.
+    If `freq_from_n` is a positive or negative number, limits the index to the first or the
+    last N index points respectively.
+
+    For defaults, see `vectorbtpro._settings.datetime`."""
+    from vectorbtpro._settings import settings
+
+    datetime_cfg = settings["datetime"]
+
+    if freq_from_n is None:
+        freq_from_n = datetime_cfg["freq_from_n"]
+    if isinstance(freq_from_n, bool):
+        if freq_from_n:
+            raise ValueError("freq_from_n cannot be True")
+        freq_from_n = None
+
+    if isinstance(index, pd.DatetimeIndex):
+        if freq is None:
+            freq = parse_index_freq(index)
+        elif isinstance(freq, str):
+            if freq_depends_on_index(freq):
+                new_freq = parse_index_freq(index)
+                if new_freq is not None:
+                    freq = new_freq
+                else:
+                    if freq_from_n is None:
+                        index_subset = index
+                    else:
+                        if freq_from_n >= 0:
+                            index_subset = index[:freq_from_n]
+                        else:
+                            index_subset = index[freq_from_n:]
+                    if freq.lower() == "auto":
+                        freq = auto_detect_freq(index_subset)
+                    else:
+                        method_name = freq.lower().replace("index_", "")
+                        freq = getattr(index_subset[1:] - index_subset[:-1], method_name)()
+    if freq is None:
+        return None
+    if checks.is_number(freq) and allow_numeric:
+        return freq
+    return to_freq(freq, allow_offset=allow_offset)
+
+
+def get_dt_index_gaps(
+    index: tp.IndexLike,
+    freq: tp.Optional[tp.FrequencyLike] = None,
+    skip_index: tp.Optional[tp.IndexLike] = None,
+    **kwargs,
+) -> tp.Tuple[tp.Index, tp.Index]:
+    """Get gaps in a datetime index.
+
+    Returns two indexes: start indexes (inclusive) and end indexes (exclusive).
+
+    Keyword arguments are passed to `prepare_dt_index`."""
+    index = prepare_dt_index(index, **kwargs)
+    checks.assert_instance_of(index, pd.DatetimeIndex)
+    if not index.is_unique:
+        raise ValueError("Datetime index must be unique")
+    if not index.is_monotonic_increasing:
+        raise ValueError("Datetime index must be monotonically increasing")
+    if freq is None:
+        freq = infer_index_freq(index, freq="auto", allow_numeric=False, freq_from_n=False)
+    else:
+        freq = infer_index_freq(index, freq=freq, allow_numeric=False)
+    if skip_index is not None:
+        skip_index = prepare_dt_index(skip_index, **kwargs)
+        checks.assert_instance_of(skip_index, pd.DatetimeIndex)
+        skip_bound_start = skip_index.min()
+        skip_bound_end = skip_index.max()
+        index = index.difference(skip_index)
+    else:
+        skip_bound_start = None
+        skip_bound_end = None
+    start_index = index[:-1]
+    end_index = index[1:]
+    gap_mask = start_index + freq < end_index
+    bound_starts = start_index[gap_mask] + freq
+    bound_ends = end_index[gap_mask]
+    if skip_bound_start is not None and skip_bound_start < index[0]:
+        bound_starts = pd.Index([skip_bound_start]).union(bound_starts)
+        bound_ends = pd.Index([index[0]]).union(bound_ends)
+    if skip_bound_end is not None and skip_bound_end >= index[-1] + freq:
+        bound_starts = pd.Index([index[-1] + freq]).union(bound_starts)
+        bound_ends = pd.Index([skip_bound_end + freq]).union(bound_ends)
+    return bound_starts, bound_ends
+
+
+def get_rangebreaks(index: tp.IndexLike, **kwargs) -> list:
+    """Get `rangebreaks` based on `get_dt_index_gaps`."""
+    start_index, end_index = get_dt_index_gaps(index, **kwargs)
+    return [dict(bounds=x) for x in zip(start_index, end_index)]

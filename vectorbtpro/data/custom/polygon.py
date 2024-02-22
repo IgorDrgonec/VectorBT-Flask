@@ -11,13 +11,8 @@ import requests
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.datetime_ import (
-    to_tzaware_datetime,
-    datetime_to_ms,
-    split_freq_str,
-    prepare_freq,
-)
 from vectorbtpro.utils.pbar import get_pbar
 from vectorbtpro.data.custom.remote import RemoteData
 
@@ -46,7 +41,7 @@ class PolygonData(RemoteData):
         * Set up the API key globally:
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> vbt.PolygonData.set_custom_settings(
         ...     client_config=dict(
@@ -213,14 +208,13 @@ class PolygonData(RemoteData):
         silence_warnings = cls.resolve_custom_setting(silence_warnings, "silence_warnings")
 
         # Resolve the timeframe
-        freq = prepare_freq(timeframe)
         if not isinstance(timeframe, str):
             raise ValueError(f"Invalid timeframe '{timeframe}'")
-        split = split_freq_str(timeframe)
+        split = dt.split_freq_str(timeframe)
         if split is None:
             raise ValueError(f"Invalid timeframe '{timeframe}'")
         multiplier, unit = split
-        if unit == "t":
+        if unit == "m":
             unit = "minute"
         elif unit == "h":
             unit = "hour"
@@ -237,11 +231,11 @@ class PolygonData(RemoteData):
 
         # Establish the timestamps
         if start is not None:
-            start_ts = datetime_to_ms(to_tzaware_datetime(start, naive_tz=tz, tz="utc"))
+            start_ts = dt.datetime_to_ms(dt.to_tzaware_datetime(start, naive_tz=tz, tz="utc"))
         else:
             start_ts = None
         if end is not None:
-            end_ts = datetime_to_ms(to_tzaware_datetime(end, naive_tz=tz, tz="utc"))
+            end_ts = dt.datetime_to_ms(dt.to_tzaware_datetime(end, naive_tz=tz, tz="utc"))
         else:
             end_ts = None
         prev_end_ts = None
@@ -390,7 +384,7 @@ class PolygonData(RemoteData):
         if "VWAP" in df.columns:
             df["VWAP"] = df["VWAP"].astype(float)
 
-        return df, dict(tz_convert=tz, freq=freq)
+        return df, dict(tz_convert=tz, freq=timeframe)
 
     def update_symbol(self, symbol: str, **kwargs) -> tp.SymbolData:
         fetch_kwargs = self.select_fetch_kwargs(symbol)

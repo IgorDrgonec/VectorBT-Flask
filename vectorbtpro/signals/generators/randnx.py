@@ -40,7 +40,7 @@ class _RANDNX(RANDNX):
         Test three different entry and exit counts:
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> randnx = vbt.RANDNX.run(
         ...     input_shape=(6,),

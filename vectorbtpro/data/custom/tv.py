@@ -13,9 +13,9 @@ import time
 from websocket import WebSocket
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts, Configured
 from vectorbtpro.utils.pbar import get_pbar
-from vectorbtpro.utils.datetime_ import split_freq_str, prepare_freq
 from vectorbtpro.utils.template import CustomTemplate
 from vectorbtpro.data.custom.remote import RemoteData
 
@@ -492,7 +492,7 @@ class TVData(RemoteData):
         * Set up the credentials globally (optional):
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> vbt.TVData.set_custom_settings(
         ...     client_config=dict(
@@ -567,7 +567,7 @@ class TVData(RemoteData):
             * List all symbols (market scanner):
 
             ```pycon
-            >>> import vectorbtpro as vbt
+            >>> from vectorbtpro import *
 
             >>> vbt.TVData.list_symbols()
             ```
@@ -827,16 +827,16 @@ class TVData(RemoteData):
         pro_data = cls.resolve_custom_setting(pro_data, "pro_data")
         limit = cls.resolve_custom_setting(limit, "limit")
 
-        freq = prepare_freq(timeframe)
+        freq = timeframe
         if not isinstance(timeframe, str):
             raise ValueError(f"Invalid timeframe '{timeframe}'")
-        split = split_freq_str(timeframe)
+        split = dt.split_freq_str(timeframe)
         if split is None:
             raise ValueError(f"Invalid timeframe '{timeframe}'")
         multiplier, unit = split
         if unit == "s":
             interval = f"{str(multiplier)}S"
-        elif unit == "t":
+        elif unit == "m":
             interval = str(multiplier)
         elif unit == "h":
             interval = f"{str(multiplier)}H"

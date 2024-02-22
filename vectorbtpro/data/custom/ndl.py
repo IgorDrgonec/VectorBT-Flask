@@ -5,11 +5,8 @@
 import pandas as pd
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.datetime_ import (
-    to_timestamp,
-    to_tzaware_datetime,
-)
 from vectorbtpro.data.custom.remote import RemoteData
 
 __all__ = [
@@ -32,7 +29,7 @@ class NDLData(RemoteData):
         * Set up the API key globally (optional):
 
         ```pycon
-        >>> import vectorbtpro as vbt
+        >>> from vectorbtpro import *
 
         >>> vbt.NDLData.set_custom_settings(
         ...     api_key="YOUR_KEY"
@@ -122,14 +119,14 @@ class NDLData(RemoteData):
 
         # Establish the timestamps
         if start is not None:
-            start = to_tzaware_datetime(start, naive_tz=tz, tz="utc")
+            start = dt.to_tzaware_datetime(start, naive_tz=tz, tz="utc")
             start_date = pd.Timestamp(start).isoformat()
             if "start_date" not in params:
                 params["start_date"] = start_date
         else:
             start_date = None
         if end is not None:
-            end = to_tzaware_datetime(end, naive_tz=tz, tz="utc")
+            end = dt.to_tzaware_datetime(end, naive_tz=tz, tz="utc")
             end_date = pd.Timestamp(end).isoformat()
             if "end_date" not in params:
                 params["end_date"] = end_date
@@ -165,11 +162,11 @@ class NDLData(RemoteData):
             df = df.tz_localize("utc")
         if isinstance(df.index, pd.DatetimeIndex) and not df.empty:
             if start is not None:
-                start = to_timestamp(start, tz=df.index.tz)
+                start = dt.to_timestamp(start, tz=df.index.tz)
                 if df.index[0] < start:
                     df = df[df.index >= start]
             if end is not None:
-                end = to_timestamp(end, tz=df.index.tz)
+                end = dt.to_timestamp(end, tz=df.index.tz)
                 if df.index[-1] >= end:
                     df = df[df.index < end]
         return df, dict(tz_convert=tz)
