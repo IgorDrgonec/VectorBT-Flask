@@ -9,7 +9,7 @@ from vectorbtpro.base.flex_indexing import flex_select_1d_pc_nb, flex_select_nb
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.portfolio.enums import *
 from vectorbtpro.registries.jit_registry import register_jitted
-from vectorbtpro.utils.math_ import is_close_nb, is_close_or_less_nb, is_less_nb, add_nb
+from vectorbtpro.utils.math_ import is_close_nb, is_close_or_less_nb, is_close_or_greater_nb, is_less_nb, add_nb
 
 
 @register_jitted(cache=True)
@@ -1931,18 +1931,18 @@ def check_price_hit_nb(
         close=close,
     )
     if hit_below:
-        if can_use_ohlc and check_open and open <= price:
+        if can_use_ohlc and check_open and is_close_or_less_nb(open, price):
             if hard_price:
                 return price, True, True
             return open, True, True
-        if close <= price or (can_use_ohlc and low <= price):
+        if is_close_or_less_nb(close, price) or (can_use_ohlc and is_close_or_less_nb(low, price)):
             return price, False, True
         return price, False, False
-    if can_use_ohlc and check_open and open >= price:
+    if can_use_ohlc and check_open and is_close_or_greater_nb(open, price):
         if hard_price:
             return price, True, True
         return open, True, True
-    if close >= price or (can_use_ohlc and high >= price):
+    if is_close_or_greater_nb(close, price) or (can_use_ohlc and is_close_or_greater_nb(high, price)):
         return price, False, True
     return price, False, False
 
@@ -2147,28 +2147,28 @@ def check_limit_hit_nb(
             close=close,
         )
         if hit_below:
-            if check_open and open <= limit_price:
+            if check_open and is_close_or_less_nb(open, limit_price):
                 hit_on_open = True
                 hit = True
                 limit_price = open
             else:
-                hit = low <= limit_price
+                hit = is_close_or_less_nb(low, limit_price)
                 if hit and np.isinf(limit_price):
                     limit_price = low
         else:
-            if check_open and open >= limit_price:
+            if check_open and is_close_or_greater_nb(open, limit_price):
                 hit_on_open = True
                 hit = True
                 limit_price = open
             else:
-                hit = high >= limit_price
+                hit = is_close_or_greater_nb(high, limit_price)
                 if hit and np.isinf(limit_price):
                     limit_price = high
     else:
         if hit_below:
-            hit = close <= limit_price
+            hit = is_close_or_less_nb(close, limit_price)
         else:
-            hit = close >= limit_price
+            hit = is_close_or_greater_nb(close, limit_price)
         if hit and np.isinf(limit_price):
             limit_price = close
     return limit_price, hit_on_open, hit
@@ -2348,9 +2348,8 @@ def check_tsl_th_hit_nb(
         hit_below=hit_below,
     )
     if hit_below:
-        return peak_price <= tsl_th_price
-    else:
-        return peak_price >= tsl_th_price
+        return is_close_or_less_nb(peak_price, tsl_th_price)
+    return is_close_or_greater_nb(peak_price, tsl_th_price)
 
 
 @register_jitted(cache=True)
