@@ -1316,12 +1316,11 @@ class Configured(HasSettings, Cacheable, Comparable, Pickleable, Prettified, Cha
         all_keys = set()
         for config in configs:
             all_keys = all_keys.union(set(config.keys()))
-        init_config = configs[0]
 
         for k in all_keys:
             if k not in kwargs:
                 v = None
-                for i in range(1, len(configs)):
+                for i in range(len(configs)):
                     config = configs[i]
                     if isinstance(on_merge_conflict, dict):
                         if k in on_merge_conflict:
@@ -1333,10 +1332,12 @@ class Configured(HasSettings, Cacheable, Comparable, Pickleable, Prettified, Cha
                     else:
                         _on_merge_conflict = on_merge_conflict
                     if _on_merge_conflict.lower() == "error":
+                        if i == 0:
+                            continue
                         same_k = True
                         try:
                             if k in config:
-                                if not is_deep_equal(init_config[k], config[k]):
+                                if not is_deep_equal(configs[0][k], config[k]):
                                     same_k = False
                             else:
                                 same_k = False
