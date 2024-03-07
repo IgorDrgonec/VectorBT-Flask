@@ -903,7 +903,31 @@ def from_basic_signals_nb(
                         if main_info["type"][col] == OrderType.Limit:
                             _slippage = 0.0
                         else:
-                            _slippage = flex_select_nb(slippage_, _i, col)
+                            _slippage = float(flex_select_nb(slippage_, _i, col))
+                        _min_size = flex_select_nb(min_size_, _i, col)
+                        _max_size = flex_select_nb(max_size_, _i, col)
+                        _size_type = flex_select_nb(size_type_, _i, col)
+                        if _size_type != main_info["size_type"][col]:
+                            if not np.isnan(_min_size):
+                                _min_size, _ = resolve_size_nb(
+                                    size=_min_size,
+                                    size_type=_size_type,
+                                    position=position_now,
+                                    val_price=val_price_now,
+                                    value=value_now,
+                                    target_size_type=main_info["size_type"][col],
+                                    as_requirement=True,
+                                )
+                            if not np.isnan(_max_size):
+                                _max_size, _ = resolve_size_nb(
+                                    size=_max_size,
+                                    size_type=_size_type,
+                                    position=position_now,
+                                    val_price=val_price_now,
+                                    value=value_now,
+                                    target_size_type=main_info["size_type"][col],
+                                    as_requirement=True,
+                                )
                         order = order_nb(
                             size=main_info["size"][col],
                             price=main_info["price"][col],
@@ -912,8 +936,8 @@ def from_basic_signals_nb(
                             fees=flex_select_nb(fees_, _i, col),
                             fixed_fees=flex_select_nb(fixed_fees_, _i, col),
                             slippage=_slippage,
-                            min_size=flex_select_nb(min_size_, _i, col),
-                            max_size=flex_select_nb(max_size_, _i, col),
+                            min_size=_min_size,
+                            max_size=_max_size,
                             size_granularity=flex_select_nb(size_granularity_, _i, col),
                             leverage=flex_select_nb(leverage_, _i, col),
                             leverage_mode=flex_select_nb(leverage_mode_, _i, col),
@@ -2709,7 +2733,31 @@ def from_signals_nb(
                         if main_info["type"][col] == OrderType.Limit:
                             _slippage = 0.0
                         else:
-                            _slippage = flex_select_nb(slippage_, _i, col)
+                            _slippage = float(flex_select_nb(slippage_, _i, col))
+                        _min_size = flex_select_nb(min_size_, _i, col)
+                        _max_size = flex_select_nb(max_size_, _i, col)
+                        _size_type = flex_select_nb(size_type_, _i, col)
+                        if _size_type != main_info["size_type"][col]:
+                            if not np.isnan(_min_size):
+                                _min_size, _ = resolve_size_nb(
+                                    size=_min_size,
+                                    size_type=_size_type,
+                                    position=position_now,
+                                    val_price=val_price_now,
+                                    value=value_now,
+                                    target_size_type=main_info["size_type"][col],
+                                    as_requirement=True,
+                                )
+                            if not np.isnan(_max_size):
+                                _max_size, _ = resolve_size_nb(
+                                    size=_max_size,
+                                    size_type=_size_type,
+                                    position=position_now,
+                                    val_price=val_price_now,
+                                    value=value_now,
+                                    target_size_type=main_info["size_type"][col],
+                                    as_requirement=True,
+                                )
                         order = order_nb(
                             size=main_info["size"][col],
                             price=main_info["price"][col],
@@ -2718,8 +2766,8 @@ def from_signals_nb(
                             fees=flex_select_nb(fees_, _i, col),
                             fixed_fees=flex_select_nb(fixed_fees_, _i, col),
                             slippage=_slippage,
-                            min_size=flex_select_nb(min_size_, _i, col),
-                            max_size=flex_select_nb(max_size_, _i, col),
+                            min_size=_min_size,
+                            max_size=_max_size,
                             size_granularity=flex_select_nb(size_granularity_, _i, col),
                             leverage=flex_select_nb(leverage_, _i, col),
                             leverage_mode=flex_select_nb(leverage_mode_, _i, col),
@@ -5179,7 +5227,31 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                         if main_info["type"][col] == OrderType.Limit:
                             _slippage = 0.0
                         else:
-                            _slippage = flex_select_nb(slippage_, _i, col)
+                            _slippage = float(flex_select_nb(slippage_, _i, col))
+                        _min_size = flex_select_nb(min_size_, _i, col)
+                        _max_size = flex_select_nb(max_size_, _i, col)
+                        _size_type = flex_select_nb(size_type_, _i, col)
+                        if _size_type != main_info["size_type"][col]:
+                            if not np.isnan(_min_size):
+                                _min_size, _ = resolve_size_nb(
+                                    size=_min_size,
+                                    size_type=_size_type,
+                                    position=position_now,
+                                    val_price=val_price_now,
+                                    value=value_now,
+                                    target_size_type=main_info["size_type"][col],
+                                    as_requirement=True,
+                                )
+                            if not np.isnan(_max_size):
+                                _max_size, _ = resolve_size_nb(
+                                    size=_max_size,
+                                    size_type=_size_type,
+                                    position=position_now,
+                                    val_price=val_price_now,
+                                    value=value_now,
+                                    target_size_type=main_info["size_type"][col],
+                                    as_requirement=True,
+                                )
                         order = order_nb(
                             size=main_info["size"][col],
                             price=main_info["price"][col],
@@ -5188,8 +5260,8 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                             fees=flex_select_nb(fees_, _i, col),
                             fixed_fees=flex_select_nb(fixed_fees_, _i, col),
                             slippage=_slippage,
-                            min_size=flex_select_nb(min_size_, _i, col),
-                            max_size=flex_select_nb(max_size_, _i, col),
+                            min_size=_min_size,
+                            max_size=_max_size,
                             size_granularity=flex_select_nb(size_granularity_, _i, col),
                             leverage=flex_select_nb(leverage_, _i, col),
                             leverage_mode=flex_select_nb(leverage_mode_, _i, col),

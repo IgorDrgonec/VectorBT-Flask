@@ -947,49 +947,81 @@ def resolve_size_nb(
     position: float,
     val_price: float,
     value: float,
+    target_size_type: int = SizeType.Amount,
     as_requirement: bool = False,
 ) -> tp.Tuple[float, float]:
     """Resolve size into an absolute amount of assets and percentage of resources.
 
     Percentage is only set if the option `SizeType.Percent(100)` is used."""
+    percent = np.nan
+    if size_type == target_size_type:
+        return float(size), percent
+
     if size_type == SizeType.ValuePercent100:
+        if size_type == target_size_type:
+            return float(size), percent
+
         size /= 100
         size_type = SizeType.ValuePercent
+
     if size_type == SizeType.TargetPercent100:
+        if size_type == target_size_type:
+            return float(size), percent
+
         size /= 100
         size_type = SizeType.TargetPercent
+
     if size_type == SizeType.ValuePercent or size_type == SizeType.TargetPercent:
-        # Percentage or target percentage of the current value
+        if size_type == target_size_type:
+            return float(size), percent
+
         size *= value
         if size_type == SizeType.ValuePercent:
             size_type = SizeType.Value
         else:
             size_type = SizeType.TargetValue
+
     if size_type == SizeType.Value or size_type == SizeType.TargetValue:
-        # Value or target value
+        if size_type == target_size_type:
+            return float(size), percent
+
         size /= val_price
         if size_type == SizeType.Value:
             size_type = SizeType.Amount
         else:
             size_type = SizeType.TargetAmount
+
     if size_type == SizeType.TargetAmount:
-        # Target amount
+        if size_type == target_size_type:
+            return float(size), percent
+
         if not as_requirement:
             size -= position
         size_type = SizeType.Amount
 
-    percent = np.nan
     if size_type == SizeType.Percent100:
+        if size_type == target_size_type:
+            return float(size), percent
+
         size /= 100
         size_type = SizeType.Percent
-    if size_type == SizeType.Percent:
-        # Percentage of resources
-        percent = abs(size)
-        size = np.sign(size) * np.inf
 
+    if size_type == SizeType.Percent:
+        if size_type == target_size_type:
+            return float(size), percent
+
+        percent = abs(size)
+        if as_requirement:
+            size = np.nan
+        else:
+            size = np.sign(size) * np.inf
+        size_type = SizeType.Amount
+
+    if size_type != target_size_type:
+        raise ValueError("Cannot convert size to target size type")
     if as_requirement:
         size = abs(size)
-    return size, percent
+    return float(size), percent
 
 
 @register_jitted(cache=True)
