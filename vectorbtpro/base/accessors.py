@@ -1659,6 +1659,8 @@ class BaseAccessor(Wrapping):
         else:
             if allow_multiple and isinstance(obj, (tuple, list)):
                 objs = obj
+                if concat is None:
+                    concat = True
             else:
                 objs = (obj,)
         objs = tuple(map(lambda x: x.obj if isinstance(x, BaseAccessor) else x, objs))
@@ -1696,7 +1698,7 @@ class BaseAccessor(Wrapping):
             else:
                 top_columns = pd.Index(np.arange(len(objs) - 1), name="combine_idx")
                 new_columns = indexes.combine_indexes([top_columns, wrapper.columns])
-            return wrapper.wrap(out, **merge_dicts(dict(columns=new_columns), wrap_kwargs))
+            return wrapper.wrap(out, **merge_dicts(dict(columns=new_columns, force_2d=True), wrap_kwargs))
         else:
             # Combine arguments pairwise into one object
             out = combining.combine_multiple(inputs, combine_func, *args, **kwargs)
