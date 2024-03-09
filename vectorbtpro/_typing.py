@@ -221,8 +221,14 @@ MappedReduceMetaFunc = Callable[[GroupIdxs, int, VarArg()], Scalar]
 MappedReduceToArrayMetaFunc = Callable[[GroupIdxs, int, VarArg()], Array1d]
 
 # Indicators
-Param = Any
-Params = Sequence[Param]
+ParamValue = Any
+ParamValues = Sequence[ParamValue]
+MaybeParamValues = MaybeSequence[ParamValue]
+MaybeParams = Sequence[MaybeParamValues]
+Params = Sequence[ParamValues]
+ParamsOrDict = Union[Params, Dict[Hashable, ParamValues]]
+ParamComb = Sequence[ParamValue]
+ParamCombOrDict = Union[ParamComb, Dict[Hashable, ParamValue]]
 
 # Mappings
 MappingLike = Union[str, Mapping, NamedTuple, EnumMeta, IndexLike]

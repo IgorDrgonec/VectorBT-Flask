@@ -49,20 +49,20 @@ def to_typed_list(lst: list) -> List:
     return nb_lst
 
 
-def flatten_param_tuples(param_tuples: tp.Sequence) -> tp.List[tp.List]:
+def flatten_param_tuples(param_tuples: tp.Sequence) -> tp.Params:
     """Flattens a nested list of iterables using unzipping."""
-    param_list = []
+    params = []
     unzipped_tuples = zip(*param_tuples)
     for i, unzipped in enumerate(unzipped_tuples):
         unzipped = list(unzipped)
         if isinstance(unzipped[0], tuple):
-            param_list.extend(flatten_param_tuples(unzipped))
+            params.extend(flatten_param_tuples(unzipped))
         else:
-            param_list.append(unzipped)
-    return param_list
+            params.append(unzipped)
+    return params
 
 
-def generate_param_combs(op_tree: tp.Tuple, depth: int = 0) -> tp.List[tp.List]:
+def generate_param_combs(op_tree: tp.Tuple, depth: int = 0) -> tp.Params:
     """Generate arbitrary parameter combinations from the operation tree `op_tree`.
 
     `op_tree` is a tuple with nested instructions to generate parameters.
@@ -102,78 +102,94 @@ def generate_param_combs(op_tree: tp.Tuple, depth: int = 0) -> tp.List[tp.List]:
     return out
 
 
-def broadcast_params(param_list: tp.Sequence[tp.Params], to_n: tp.Optional[int] = None) -> tp.List[tp.List]:
-    """Broadcast parameters in `param_list`."""
+def broadcast_params(params_or_dict: tp.ParamsOrDict, to_n: tp.Optional[int] = None) -> tp.ParamsOrDict:
+    """Broadcast parameters in `params`."""
+    if isinstance(params_or_dict, dict):
+        params = list(params_or_dict.values())
+    else:
+        params = params_or_dict
     if to_n is None:
-        to_n = max(list(map(len, param_list)))
-    new_param_list = []
-    for i in range(len(param_list)):
-        params = param_list[i]
-        if len(params) in [1, to_n]:
-            if len(params) < to_n:
-                new_param_list.append([p for _ in range(to_n) for p in params])
+        to_n = max(list(map(len, params)))
+    new_params = []
+    for i in range(len(params)):
+        p_values = params[i]
+        if len(p_values) in [1, to_n]:
+            if len(p_values) < to_n:
+                new_params.append([p for _ in range(to_n) for p in p_values])
             else:
-                new_param_list.append(list(params))
+                new_params.append(list(p_values))
         else:
-            raise ValueError(f"Parameters at index {i} have length {len(params)} that cannot be broadcast to {to_n}")
-    return new_param_list
+            raise ValueError(f"Parameters at index {i} have length {len(p_values)} that cannot be broadcast to {to_n}")
+    if isinstance(params_or_dict, dict):
+        return dict(zip(params_or_dict.keys(), new_params))
+    return new_params
 
 
-def create_param_product(param_list: tp.Sequence[tp.Params]) -> tp.List[tp.List]:
-    """Make Cartesian product out of all params in `param_list`."""
+def create_param_product(params_or_dict: tp.ParamsOrDict) -> tp.ParamsOrDict:
+    """Make Cartesian product out of all params in `params`."""
     import itertools
 
-    return list(map(list, zip(*itertools.product(*param_list))))
+    if isinstance(params_or_dict, dict):
+        params = list(params_or_dict.values())
+    else:
+        params = params_or_dict
+    new_params = list(map(list, zip(*itertools.product(*params))))
+    if isinstance(params_or_dict, dict):
+        return dict(zip(params_or_dict.keys(), new_params))
+    return new_params
 
 
-def params_to_list(params: tp.Params, is_tuple: bool, is_array_like: bool) -> list:
-    """Cast parameters to a list."""
+def is_single_param_value(p_values: tp.MaybeParamValues, is_tuple: bool, is_array_like: bool) -> bool:
+    """Check whether `p_values` is a single value."""
     check_against = [list, List]
     if not is_tuple:
         check_against.append(tuple)
     if not is_array_like:
         check_against.append(np.ndarray)
-    if isinstance(params, tuple(check_against)):
-        new_params = list(params)
-    elif isinstance(params, range):
-        new_params = list(params)
-    else:
-        new_params = [params]
-    return new_params
+    if isinstance(p_values, tuple(check_against)):
+        return False
+    if isinstance(p_values, range):
+        return False
+    return True
 
 
-def get_param_grid_len(param_grid: tp.Union[dict, tp.Sequence[tp.Params]]) -> int:
+def params_to_list(p_values: tp.MaybeParamValues, is_tuple: bool, is_array_like: bool) -> list:
+    """Cast parameters to a list."""
+    if is_single_param_value(p_values, is_tuple, is_array_like):
+        return [p_values]
+    return list(p_values)
+
+
+def get_param_grid_len(params_or_dict: tp.ParamsOrDict) -> int:
     """Get the number of parameter combinations in a parameter grid."""
-    if isinstance(param_grid, dict):
-        param_list = list(param_grid.values())
+    if isinstance(params_or_dict, dict):
+        params = list(params_or_dict.values())
     else:
-        param_list = param_grid
-    return math.prod(list(map(len, param_list)))
+        params = params_or_dict
+    return math.prod(list(map(len, params)))
 
 
 def pick_from_param_grid(
-    param_grid: tp.Union[dict, tp.Sequence[tp.Params]],
+    params_or_dict: tp.ParamsOrDict,
     i: tp.Union[None, int, tp.Array1d] = None,
-) -> tp.Union[dict, tp.List[tp.Param], tp.List[tp.Array1d]]:
+) -> tp.Union[tp.ParamCombOrDict, tp.List[tp.Array1d]]:
     """Pick one or more parameter combinations from a parameter grid."""
-    if isinstance(param_grid, dict):
-        param_keys = list(param_grid.keys())
-        param_list = list(param_grid.values())
+    if isinstance(params_or_dict, dict):
+        params = list(params_or_dict.values())
     else:
-        param_keys = None
-        param_list = param_grid
-    grid_len = get_param_grid_len(param_list)
+        params = params_or_dict
+    grid_len = get_param_grid_len(params)
     if i is None:
         i = np.random.randint(grid_len, dtype=np.int64)
     param_comb = []
-    for params in param_list:
-        index = i * len(params) // grid_len
-        block_len = grid_len // len(params)
+    for p_values in params:
+        index = i * len(p_values) // grid_len
+        block_len = grid_len // len(p_values)
         i = i - index * block_len
         grid_len = block_len
-        param_comb.append(params[index])
-    if param_keys is not None:
-        return dict(zip(param_keys, param_comb))
+        param_comb.append(p_values[index])
+    if isinstance(params_or_dict, dict):
+        return dict(zip(params_or_dict.keys(), param_comb))
     return param_comb
 
 
@@ -184,11 +200,7 @@ ParamT = tp.TypeVar("ParamT", bound="Param")
 class Param(Annotatable):
     """Class that represents a parameter."""
 
-    value: tp.Union[
-        tp.Param,
-        tp.Dict[tp.Hashable, tp.Param],
-        tp.Sequence[tp.Param],
-    ] = attr.ib(default=_DEF)
+    value: tp.Union[tp.MaybeParamValues, tp.Dict[tp.Hashable, tp.ParamValue]] = attr.ib(default=_DEF)
     """One or more parameter values."""
 
     is_tuple: bool = attr.ib(default=False)
@@ -438,7 +450,7 @@ def combine_params(
         names[k] = keys_name
         curr_idx += 1
 
-    level_param_lists = []
+    level_params = []
     param_keys = []
     level_indexes = []
     shown_levels = []
@@ -450,14 +462,14 @@ def combine_params(
         for k in level_map[level].keys():
             param_keys.append(k)
 
-        param_list = tuple(level_map[level].values())
-        if len(param_list) > 1:
-            param_list = broadcast_params(param_list)
-        level_param_lists.append(param_list)
+        params = tuple(level_map[level].values())
+        if len(params) > 1:
+            params = broadcast_params(params)
+        level_params.append(params)
         if n_combs is None:
-            n_combs = len(param_list[0])
+            n_combs = len(params[0])
         else:
-            n_combs *= len(param_list[0])
+            n_combs *= len(params[0])
 
         if build_index:
             levels = []
@@ -471,7 +483,7 @@ def combine_params(
                 _param_index = levels[0]
                 shown_levels.append(level)
             else:
-                _param_index = range(len(param_list[0]))
+                _param_index = range(len(params[0]))
                 hidden_levels.append(level)
             level_indexes.append(_param_index)
 
@@ -516,7 +528,7 @@ def combine_params(
         if len(conditions) == 0:
             if grid_indices is not None:
                 n_combs = len(grid_indices)
-            level_indices = list(map(lambda x: np.arange(len(x[0])), level_param_lists))
+            level_indices = list(map(lambda x: np.arange(len(x[0])), level_params))
             if random_subset is not None:
                 if checks.is_float(random_subset):
                     random_subset = int(random_subset * n_combs)
@@ -554,10 +566,10 @@ def combine_params(
                 picked_indices = []
                 k = 0
                 param_values = {}
-                for level, param_list in enumerate(level_param_lists):
-                    picked_index = rng.choice(len(param_list[0]), replace=True)
-                    for j in range(len(param_list)):
-                        picked_value = param_list[j][picked_index]
+                for level, params in enumerate(level_params):
+                    picked_index = rng.choice(len(params[0]), replace=True)
+                    for j in range(len(params)):
+                        picked_value = params[j][picked_index]
                         param_values[param_keys[k]] = picked_value
                         param_values[names[param_keys[k]]] = picked_value
                         k += 1
@@ -590,7 +602,7 @@ def combine_params(
             params_ready = True
         else:
             n_combs = len(grid_indices)
-            level_indices = list(map(lambda x: np.arange(len(x[0])), level_param_lists))
+            level_indices = list(map(lambda x: np.arange(len(x[0])), level_params))
             picked_level_indices = pick_from_param_grid(level_indices, i=grid_indices)
 
             params_ready = False
@@ -601,11 +613,11 @@ def combine_params(
             param_product = dict()
             k = 0
             for level in range(len(picked_level_indices)):
-                for j in range(len(level_param_lists[level])):
+                for j in range(len(level_params[level])):
                     param_key = param_keys[k]
                     if param_key not in param_product:
                         param_product[param_key] = []
-                    param_values = level_param_lists[level][j]
+                    param_values = level_params[level][j]
                     picked_param_values = [param_values[i] for i in picked_level_indices[level]]
                     param_product[param_key] = picked_param_values
                     k += 1
@@ -626,11 +638,11 @@ def combine_params(
             param_index = None
     else:
         op_tree_operands = []
-        for param_list in level_param_lists:
-            if len(param_list) > 1:
-                op_tree_operands.append((zip, *broadcast_params(param_list)))
+        for params in level_params:
+            if len(params) > 1:
+                op_tree_operands.append((zip, *broadcast_params(params)))
             else:
-                op_tree_operands.append(param_list[0])
+                op_tree_operands.append(params[0])
         if len(op_tree_operands) > 1:
             param_product = dict(zip(param_keys, generate_param_combs(("product", *op_tree_operands))))
         elif isinstance(op_tree_operands[0], tuple):

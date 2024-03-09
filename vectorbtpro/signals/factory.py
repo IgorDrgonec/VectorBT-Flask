@@ -679,7 +679,7 @@ class SignalFactory(IndicatorFactory):
         def custom_func(
             input_list: tp.List[tp.AnyArray],
             in_output_list: tp.List[tp.List[tp.AnyArray]],
-            param_list: tp.List[tp.List[tp.Param]],
+            param_list: tp.List[tp.List[tp.ParamValue]],
             *args,
             input_shape: tp.Optional[tp.Shape] = None,
             place_args: tp.ArgsLike = None,

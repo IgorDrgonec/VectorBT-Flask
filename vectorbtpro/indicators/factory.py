@@ -59,7 +59,13 @@ from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.mapping import to_value_mapping, apply_mapping
-from vectorbtpro.utils.params import to_typed_list, broadcast_params, create_param_product, params_to_list
+from vectorbtpro.utils.params import (
+    to_typed_list,
+    broadcast_params,
+    create_param_product,
+    is_single_param_value,
+    params_to_list,
+)
 from vectorbtpro.utils.parsing import (
     get_expr_var_names,
     get_func_arg_names,
@@ -102,26 +108,29 @@ except ImportError:
 
 
 def prepare_params(
-    param_list: tp.Sequence[tp.Params],
+    params: tp.MaybeParams,
     param_names: tp.Sequence[str],
     param_settings: tp.Sequence[tp.KwargsLike],
     input_shape: tp.Optional[tp.Shape] = None,
     to_2d: bool = False,
     context: tp.KwargsLike = None,
-) -> tp.List[tp.Params]:
+) -> tp.Tuple[tp.Params, bool]:
     """Prepare parameters.
 
-    Resolves references and performs broadcasting to the input shape."""
+    Resolves references and performs broadcasting to the input shape.
+
+    Returns prepared parameters as well as whether the user provided multiple parameters."""
     # Resolve references
     if context is None:
         context = {}
-    pool = dict(zip(param_names, param_list))
+    pool = dict(zip(param_names, params))
     for k in pool:
         pool[k] = resolve_ref(pool, k)
-    param_list = [pool[k] for k in param_names]
+    params = [pool[k] for k in param_names]
 
-    new_param_list = []
-    for i, p_values in enumerate(param_list):
+    new_params = []
+    params_are_multiple = False
+    for i, p_values in enumerate(params):
         # Resolve settings
         _param_settings = resolve_dict(param_settings[i])
         is_tuple = _param_settings.get("is_tuple", False)
@@ -143,6 +152,8 @@ def prepare_params(
         )
         template = _param_settings.get("template", None)
 
+        if not is_single_param_value(p_values, is_tuple, is_array_like):
+            params_are_multiple = True
         new_p_values = params_to_list(p_values, is_tuple, is_array_like)
         if template is not None:
             new_p_values = [
@@ -186,12 +197,12 @@ def prepare_params(
                 new_p_values = __new_p_values
             else:
                 new_p_values = _new_p_values
-        new_param_list.append(new_p_values)
-    return new_param_list
+        new_params.append(new_p_values)
+    return new_params, params_are_multiple
 
 
 def build_columns(
-    param_list: tp.Sequence[tp.Params],
+    params: tp.Params,
     input_columns: tp.IndexLike,
     level_names: tp.Optional[tp.Sequence[str]] = None,
     hide_levels: tp.Optional[tp.Sequence[tp.Union[str, int]]] = None,
@@ -201,20 +212,20 @@ def build_columns(
     ignore_ranges: bool = False,
     **kwargs,
 ) -> tp.Tuple[tp.List[tp.Index], tp.Index]:
-    """For each parameter in `param_list`, create a new column level with parameter values
+    """For each parameter in `params`, create a new column level with parameter values
     and stack it on top of `input_columns`.
 
     Returns a list of parameter indexes and new columns."""
     if level_names is not None:
-        checks.assert_len_equal(param_list, level_names)
+        checks.assert_len_equal(params, level_names)
     if hide_levels is None:
         hide_levels = []
     input_columns = indexes.to_any_index(input_columns)
 
     param_indexes = []
     shown_param_indexes = []
-    for i in range(len(param_list)):
-        p_values = param_list[i]
+    for i in range(len(params)):
+        p_values = params[i]
         level_name = None
         if level_names is not None:
             level_name = level_names[i]
@@ -255,7 +266,7 @@ def build_columns(
         if i not in hide_levels and (level_names is None or level_names[i] not in hide_levels):
             shown_param_indexes.append(param_index)
     if not per_column:
-        n_param_values = len(param_list[0]) if len(param_list) > 0 else 1
+        n_param_values = len(params[0]) if len(params) > 0 else 1
         input_columns = indexes.tile_index(input_columns, n_param_values, ignore_ranges=ignore_ranges)
     if len(shown_param_indexes) > 0:
         stacked_columns = indexes.stack_indexes([*shown_param_indexes, input_columns], **kwargs)
@@ -291,7 +302,7 @@ IndicatorBaseT = tp.TypeVar("IndicatorBaseT", bound="IndicatorBase")
 CacheOutputT = tp.Any
 RawOutputT = tp.Tuple[
     tp.List[tp.Array2d],
-    tp.List[tp.Tuple[tp.Param, ...]],
+    tp.List[tp.Tuple[tp.ParamValue, ...]],
     int,
     tp.List[tp.Any],
 ]
@@ -299,7 +310,7 @@ InputListT = tp.List[tp.Array2d]
 InputMapperT = tp.Optional[tp.Array1d]
 InOutputListT = tp.List[tp.Array2d]
 OutputListT = tp.List[tp.Array2d]
-ParamListT = tp.List[tp.List[tp.Param]]
+ParamListT = tp.List[tp.List[tp.ParamValue]]
 MapperListT = tp.List[tp.Index]
 OtherListT = tp.List[tp.Any]
 PipelineOutputT = tp.Tuple[
@@ -346,7 +357,7 @@ class IndicatorBase(Analyzable):
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
-        params: tp.Optional[tp.MappingSequence[tp.Params]] = None,
+        params: tp.Optional[tp.MaybeParams] = None,
         param_product: bool = False,
         random_subset: tp.Optional[int] = None,
         param_settings: tp.Optional[tp.MappingSequence[tp.KwargsLike]] = None,
@@ -467,7 +478,7 @@ class IndicatorBase(Analyzable):
             pass_wrapper (bool): Whether to pass the input wrapper to `custom_func` as keyword argument.
             level_names (list of str): A list of column level names corresponding to each parameter.
 
-                Must have the same length as `param_list`.
+                Must have the same length as `params`.
             hide_levels (list of int or str): A list of level names or indices of parameter levels to hide.
             build_col_kwargs (dict): Keyword arguments passed to `build_columns`.
             return_raw (bool or str): Whether to return raw outputs and hashed parameter tuples without
@@ -636,7 +647,7 @@ class IndicatorBase(Analyzable):
             ),
             template_context,
         )
-        param_list = prepare_params(
+        param_list, params_are_multiple = prepare_params(
             param_list,
             param_names,
             param_settings,
@@ -921,6 +932,8 @@ class IndicatorBase(Analyzable):
 
         # Return artifacts: no pandas objects, just a wrapper and NumPy arrays
         new_ndim = len(input_shape) if output_list[0].shape[1] == 1 else output_list[0].ndim
+        if new_ndim == 1 and params_are_multiple:
+            new_ndim = 2
         wrapper = ArrayWrapper(input_index, new_columns, new_ndim, **wrapper_kwargs)
 
         return (
@@ -1486,7 +1499,7 @@ class IndicatorFactory(Configured):
 
         for param_name in param_names:
 
-            def param_list_prop(self, _param_name=param_name) -> tp.List[tp.Param]:
+            def param_list_prop(self, _param_name=param_name) -> tp.List[tp.ParamValue]:
                 return getattr(self, f"_{_param_name}_list")
 
             param_list_prop.__doc__ = f"List of `{param_name}` values."
@@ -2036,7 +2049,7 @@ class IndicatorFactory(Configured):
 
         def _split_args(
             args: tp.Sequence,
-        ) -> tp.Tuple[tp.Dict[str, tp.ArrayLike], tp.Dict[str, tp.ArrayLike], tp.Dict[str, tp.Params], tp.Args]:
+        ) -> tp.Tuple[tp.Dict[str, tp.ArrayLike], tp.Dict[str, tp.ArrayLike], tp.Dict[str, tp.ParamValues], tp.Args]:
             inputs = dict(zip(input_names, args[: len(input_names)]))
             checks.assert_len_equal(inputs, input_names)
             args = args[len(input_names) :]
@@ -2614,7 +2627,7 @@ Other keyword arguments are passed to `{0}.run`.
         def custom_func(
             input_tuple: tp.Tuple[tp.AnyArray, ...],
             in_output_tuple: tp.Tuple[tp.List[tp.AnyArray], ...],
-            param_tuple: tp.Tuple[tp.List[tp.Param], ...],
+            param_tuple: tp.Tuple[tp.List[tp.ParamValue], ...],
             *_args,
             input_shape: tp.Optional[tp.Shape] = None,
             per_column: bool = False,
@@ -3415,7 +3428,7 @@ Other keyword arguments are passed to `{0}.run`.
         def apply_func(
             input_tuple: tp.Tuple[tp.Array2d, ...],
             in_output_tuple: tp.Tuple[tp.Array2d, ...],
-            param_tuple: tp.Tuple[tp.Param, ...],
+            param_tuple: tp.Tuple[tp.ParamValue, ...],
             timeframe: tp.Optional[tp.FrequencyLike] = None,
             **_kwargs,
         ) -> tp.MaybeTuple[tp.Array2d]:
@@ -3703,7 +3716,7 @@ Other keyword arguments are passed to `{0}.run`.
         def apply_func(
             input_tuple: tp.Tuple[tp.AnyArray, ...],
             in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
-            param_tuple: tp.Tuple[tp.Param, ...],
+            param_tuple: tp.Tuple[tp.ParamValue, ...],
             **_kwargs,
         ) -> tp.MaybeTuple[tp.Array2d]:
             is_series = isinstance(input_tuple[0], pd.Series)
@@ -3898,7 +3911,7 @@ Other keyword arguments are passed to `{0}.run`.
         def apply_func(
             input_tuple: tp.Tuple[tp.AnyArray, ...],
             in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
-            param_tuple: tp.Tuple[tp.Param, ...],
+            param_tuple: tp.Tuple[tp.ParamValue, ...],
             **_kwargs,
         ) -> tp.MaybeTuple[tp.Array2d]:
             is_series = isinstance(input_tuple[0], pd.Series)
@@ -4133,7 +4146,7 @@ Other keyword arguments are passed to `{0}.run`.
         def apply_func(
             input_tuple: tp.Tuple[tp.Series, ...],
             in_output_tuple: tp.Tuple[tp.Series, ...],
-            param_tuple: tp.Tuple[tp.Param, ...],
+            param_tuple: tp.Tuple[tp.ParamValue, ...],
             *_args,
             **_kwargs,
         ) -> tp.MaybeTuple[tp.Array1d]:
@@ -4842,7 +4855,7 @@ Other keyword arguments are passed to `{0}.run`.
         def apply_func(
             input_tuple: tp.Tuple[tp.AnyArray, ...],
             in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
-            param_tuple: tp.Tuple[tp.Param, ...],
+            param_tuple: tp.Tuple[tp.ParamValue, ...],
             **_kwargs,
         ) -> tp.MaybeTuple[tp.Array2d]:
             import vectorbtpro as vbt
