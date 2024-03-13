@@ -342,15 +342,35 @@ class IndicatorBase(Analyzable):
     _level_names: tp.Tuple[str, ...]
 
     def __getattr__(self, k: str) -> tp.Any:
-        """Redirect queries targeted at a generic output name by the short name of the indicator."""
+        """Redirect queries targeted at a generic output name by "output" or the short name of the indicator."""
         short_name = object.__getattribute__(self, "short_name")
         output_names = object.__getattribute__(self, "output_names")
         if len(output_names) == 1:
-            if short_name not in output_names:
-                if k.startswith(short_name):
-                    k = k[len(short_name):]
-                    if len(k) == 0 or not k[0].isalpha():
-                        return object.__getattribute__(self, output_names[0] + k)
+            if k.startswith("output") and "output" not in output_names:
+                new_k = k[len("output"):]
+                if len(new_k) == 0 or not new_k[0].isalnum():
+                    try:
+                        return object.__getattribute__(self, output_names[0] + new_k)
+                    except AttributeError:
+                        pass
+            if k.startswith(short_name) and short_name not in output_names:
+                new_k = k[len(short_name):]
+                if len(new_k) == 0 or not new_k[0].isalnum():
+                    try:
+                        return object.__getattribute__(self, output_names[0] + new_k)
+                    except AttributeError:
+                        pass
+            if k.lower().startswith(short_name.lower()) and short_name.lower() not in output_names:
+                new_k = k[len(short_name):].lower()
+                if len(new_k) == 0 or not new_k[0].isalnum():
+                    try:
+                        return object.__getattribute__(self, output_names[0] + new_k)
+                    except AttributeError:
+                        pass
+            try:
+                return object.__getattribute__(self, output_names[0] + "_" + k)
+            except AttributeError:
+                pass
         return object.__getattribute__(self, k)
 
     @classmethod
