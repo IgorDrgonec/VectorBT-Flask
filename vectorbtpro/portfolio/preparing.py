@@ -11,17 +11,19 @@ import numpy as np
 from vectorbtpro import _typing as tp
 from vectorbtpro.base.preparing import BasePreparer
 from vectorbtpro.base.decorators import override_arg_config, attach_arg_properties
-from vectorbtpro.base.reshaping import broadcast_array_to, broadcast
+from vectorbtpro.base.reshaping import to_2d_array, broadcast_array_to, broadcast_arrays, broadcast
 from vectorbtpro.base.wrapping import ArrayWrapper
+from vectorbtpro.base.indexing import AutoIdxr
 from vectorbtpro.base import chunking as base_ch
+from vectorbtpro.generic import nb as generic_nb
+from vectorbtpro.signals import nb as signals_nb
 from vectorbtpro.portfolio import nb, enums
 from vectorbtpro.portfolio.call_seq import require_call_seq, build_call_seq
 from vectorbtpro.portfolio.orders import FSOrders
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks, chunking as ch
-from vectorbtpro.utils.config import Configured
-from vectorbtpro.utils.config import merge_dicts, ReadonlyConfig
+from vectorbtpro.utils.config import Configured, merge_dicts, ReadonlyConfig
 from vectorbtpro.utils.mapping import to_field_mapping
 from vectorbtpro.utils.template import CustomTemplate, substitute_templates, RepFunc
 from vectorbtpro.data.base import OHLCDataMixin, Data
@@ -108,6 +110,8 @@ base_arg_config = ReadonlyConfig(
         group_by=dict(),
         cash_sharing=dict(),
         freq=dict(),
+        sim_start=dict(),
+        sim_end=dict(),
         call_seq=dict(map_enum_kwargs=dict(enum=enums.CallSeqType, look_for_type=str)),
         attach_call_seq=dict(),
         keep_inout_flex=dict(),
@@ -288,29 +292,79 @@ class BasePFPreparer(BasePreparer):
         return self.wrapper.grouper.get_group_lens(group_by=self.group_by)
 
     @cachedproperty
-    def init_cash(self) -> tp.ArrayLike:
-        """Argument `init_cash`."""
-        init_cash = broadcast_array_to(self._pre_init_cash, len(self.cs_group_lens))
-        checks.assert_subdtype(init_cash, np.number, arg_name="init_cash")
-        init_cash = np.require(init_cash, dtype=np.float_)
-        return init_cash
+    def sim_group_lens(self) -> tp.GroupLens:
+        """Simulation group lengths."""
+        return self.group_lens
+
+    def align_pc_arr(
+        self,
+        arr: tp.ArrayLike,
+        group_lens: tp.Optional[tp.GroupLens] = None,
+        check_dtype: tp.Optional[tp.DTypeLike] = None,
+        cast_to_dtype: tp.Optional[tp.DTypeLike] = None,
+        reduce_func: tp.Union[None, str, tp.Callable] = None,
+        arg_name: tp.Optional[str] = None,
+    ) -> tp.Array1d:
+        """Align a per-column array."""
+        arr = np.asarray(arr)
+        if check_dtype is not None:
+            checks.assert_subdtype(arr, check_dtype, arg_name=arg_name)
+        if cast_to_dtype is not None:
+            arr = np.require(arr, dtype=cast_to_dtype)
+        if arr.size > 1 and group_lens is not None and reduce_func is not None:
+            if len(self.group_lens) == len(arr) != len(group_lens) == len(self.wrapper.columns):
+                new_arr = np.empty(len(self.wrapper.columns), dtype=np.int_)
+                col_generator = self.wrapper.grouper.yield_group_idxs()
+                for i, cols in enumerate(col_generator):
+                    new_arr[cols] = arr[i]
+                arr = new_arr
+            if len(self.wrapper.columns) == len(arr) != len(group_lens):
+                new_arr = np.empty(len(group_lens), dtype=np.int_)
+                col_generator = self.wrapper.grouper.yield_group_lens_idxs(group_lens)
+                for i, cols in enumerate(col_generator):
+                    if isinstance(reduce_func, str):
+                        new_arr[i] = getattr(arr[cols], reduce_func)()
+                    else:
+                        new_arr[i] = reduce_func(arr[cols])
+                arr = new_arr
+        if group_lens is not None:
+            return broadcast_array_to(arr, len(group_lens))
+        return broadcast_array_to(arr, len(self.wrapper.columns))
 
     @cachedproperty
-    def init_position(self) -> tp.ArrayLike:
+    def init_cash(self) -> tp.Array1d:
+        """Argument `init_cash`."""
+        return self.align_pc_arr(
+            self._pre_init_cash,
+            group_lens=self.cs_group_lens,
+            check_dtype=np.number,
+            cast_to_dtype=np.float_,
+            reduce_func="sum",
+            arg_name="init_cash",
+        )
+
+    @cachedproperty
+    def init_position(self) -> tp.Array1d:
         """Argument `init_position`."""
-        init_position = broadcast_array_to(self._pre_init_position, self.target_shape[1])
-        checks.assert_subdtype(init_position, np.number, arg_name="init_position")
-        init_position = np.require(init_position, dtype=np.float_)
+        init_position = self.align_pc_arr(
+            self._pre_init_position,
+            check_dtype=np.number,
+            cast_to_dtype=np.float_,
+            arg_name="init_position",
+        )
         if (((init_position > 0) | (init_position < 0)) & np.isnan(self.init_price)).any():
             warnings.warn(f"Initial position has undefined price. Set init_price.", stacklevel=2)
         return init_position
 
     @cachedproperty
-    def init_price(self) -> tp.ArrayLike:
+    def init_price(self) -> tp.Array1d:
         """Argument `init_price`."""
-        init_price = broadcast_array_to(self._pre_init_price, self.target_shape[1])
-        checks.assert_subdtype(init_price, np.number, arg_name="init_price")
-        return np.require(init_price, dtype=np.float_)
+        return self.align_pc_arr(
+            self._pre_init_price,
+            check_dtype=np.number,
+            cast_to_dtype=np.float_,
+            arg_name="init_price",
+        )
 
     @cachedproperty
     def cash_deposits(self) -> tp.ArrayLike:
@@ -324,6 +378,86 @@ class BasePFPreparer(BasePreparer):
             keep_flex=self.keep_inout_flex,
             reindex_kwargs=dict(fill_value=0.0),
             require_kwargs=self.broadcast_kwargs.get("require_kwargs", {}),
+        )
+
+    def prepare_sim_start_value(self, value: tp.Scalar) -> int:
+        """Prepare a single value of `sim_start`."""
+        auto_idxr = AutoIdxr(value, indexer_method="bfill", below_to_zero=True)
+        return auto_idxr.get(self.wrapper.index, freq=self.wrapper.freq)
+
+    def prepare_sim_end_value(self, value: tp.Scalar) -> int:
+        """Prepare a single value of `sim_end`."""
+        auto_idxr = AutoIdxr(value, indexer_method="bfill", above_to_len=True)
+        return auto_idxr.get(self.wrapper.index, freq=self.wrapper.freq)
+
+    @cachedproperty
+    def auto_sim_start(self) -> tp.Optional[tp.ArrayLike]:
+        """Get automatic `sim_start`"""
+        return None
+
+    @cachedproperty
+    def auto_sim_end(self) -> tp.Optional[tp.ArrayLike]:
+        """Get automatic `sim_end`"""
+        return None
+
+    @cachedproperty
+    def sim_start(self) -> tp.Optional[tp.ArrayLike]:
+        """Argument `sim_start`."""
+        sim_start = self["sim_start"]
+        if sim_start is None:
+            return None
+        if isinstance(sim_start, str) and sim_start.lower() == "auto":
+            sim_start = self.auto_sim_start
+            if sim_start is None:
+                return None
+        sim_start_arr = np.asarray(sim_start)
+        if np.issubdtype(sim_start_arr.dtype, np.integer):
+            if sim_start_arr.ndim == 0:
+                return sim_start
+            new_sim_start = sim_start_arr
+        else:
+            if sim_start_arr.ndim == 0:
+                return self.prepare_sim_start_value(sim_start)
+            new_sim_start = np.empty(len(sim_start), dtype=np.int_)
+            for i in range(len(sim_start)):
+                new_sim_start[i] = self.prepare_sim_start_value(sim_start[i])
+        return self.align_pc_arr(
+            new_sim_start,
+            group_lens=self.sim_group_lens,
+            check_dtype=np.integer,
+            cast_to_dtype=np.int_,
+            reduce_func="min",
+            arg_name="sim_start",
+        )
+
+    @cachedproperty
+    def sim_end(self) -> tp.Optional[tp.ArrayLike]:
+        """Argument `sim_end`."""
+        sim_end = self["sim_end"]
+        if sim_end is None:
+            return None
+        if isinstance(sim_end, str) and sim_end.lower() == "auto":
+            sim_end = self.auto_sim_end
+            if sim_end is None:
+                return None
+        sim_end_arr = np.asarray(sim_end)
+        if np.issubdtype(sim_end_arr.dtype, np.integer):
+            if sim_end_arr.ndim == 0:
+                return sim_end
+            new_sim_end = sim_end_arr
+        else:
+            if sim_end_arr.ndim == 0:
+                return self.prepare_sim_end_value(sim_end)
+            new_sim_end = np.empty(len(sim_end), dtype=np.int_)
+            for i in range(len(sim_end)):
+                new_sim_end[i] = self.prepare_sim_end_value(sim_end[i])
+        return self.align_pc_arr(
+            new_sim_end,
+            group_lens=self.sim_group_lens,
+            check_dtype=np.integer,
+            cast_to_dtype=np.int_,
+            reduce_func="max",
+            arg_name="sim_end",
         )
 
     @cachedproperty
@@ -354,6 +488,8 @@ class BasePFPreparer(BasePreparer):
                 init_position=self.init_position,
                 init_price=self.init_price,
                 cash_deposits=self.cash_deposits,
+                sim_start=self.sim_start,
+                sim_end=self.sim_end,
                 call_seq=self.call_seq,
                 auto_call_seq=self.auto_call_seq,
                 attach_call_seq=self.attach_call_seq,
@@ -579,6 +715,28 @@ class FOPreparer(BasePFPreparer):
         return self["max_log_records"]
 
     # ############# After broadcasting ############# #
+
+    @cachedproperty
+    def sim_group_lens(self) -> tp.GroupLens:
+        return self.cs_group_lens
+
+    @cachedproperty
+    def auto_sim_start(self) -> tp.Optional[tp.ArrayLike]:
+        size = to_2d_array(self.size)
+        if size.shape[0] == 1:
+            return None
+        first_valid_idx = generic_nb.first_valid_index_nb(size, check_inf=False)
+        first_valid_idx = np.where(first_valid_idx == -1, 0, first_valid_idx)
+        return first_valid_idx
+
+    @cachedproperty
+    def auto_sim_end(self) -> tp.Optional[tp.ArrayLike]:
+        size = to_2d_array(self.size)
+        if size.shape[0] == 1:
+            return None
+        last_valid_idx = generic_nb.last_valid_index_nb(size, check_inf=False)
+        last_valid_idx = np.where(last_valid_idx == -1, len(self.wrapper.index), last_valid_idx + 1)
+        return last_valid_idx
 
     @cachedproperty
     def price_and_from_ago(self) -> tp.Tuple[tp.ArrayLike, tp.ArrayLike]:
@@ -1225,6 +1383,12 @@ class FSPreparer(BasePFPreparer):
     # ############# After broadcasting ############# #
 
     @cachedproperty
+    def sim_group_lens(self) -> tp.GroupLens:
+        if not self.dynamic_mode:
+            return self.cs_group_lens
+        return self.group_lens
+
+    @cachedproperty
     def signals(self) -> tp.Tuple[tp.ArrayLike, tp.ArrayLike, tp.ArrayLike, tp.ArrayLike]:
         """Arguments `entries`, `exits`, `short_entries`, and `short_exits` after broadcasting."""
         if not self.dynamic_mode and not self.ls_mode:
@@ -1292,6 +1456,29 @@ class FSPreparer(BasePFPreparer):
     def short_exits(self) -> tp.ArrayLike:
         """Argument `short_exits`."""
         return self.signals[3]
+
+    @cachedproperty
+    def combined_mask(self) -> tp.Array2d:
+        """Signals combined using the OR rule into a mask."""
+        long_entries = to_2d_array(self.long_entries)
+        long_exits = to_2d_array(self.long_exits)
+        short_entries = to_2d_array(self.short_entries)
+        short_exits = to_2d_array(self.short_exits)
+        return long_entries | long_exits | short_entries | short_exits
+
+    @cachedproperty
+    def auto_sim_start(self) -> tp.Optional[tp.ArrayLike]:
+        if self.combined_mask.shape[0] == 1:
+            return None
+        first_signal_idx = signals_nb.nth_index_nb(self.combined_mask, 0)
+        return np.where(first_signal_idx == -1, 0, first_signal_idx)
+
+    @cachedproperty
+    def auto_sim_end(self) -> tp.Optional[tp.ArrayLike]:
+        if self.combined_mask.shape[0] == 1:
+            return None
+        last_signal_idx = signals_nb.nth_index_nb(self.combined_mask, -1)
+        return np.where(last_signal_idx == -1, len(self.wrapper.index), last_signal_idx + 1)
 
     @cachedproperty
     def price_and_from_ago(self) -> tp.Tuple[tp.ArrayLike, tp.ArrayLike]:
@@ -1774,6 +1961,28 @@ class FOFPreparer(BasePFPreparer):
     # ############# After broadcasting ############# #
 
     @cachedproperty
+    def sim_start(self) -> tp.Optional[tp.ArrayLike]:
+        sim_start = self["sim_start"]
+        if sim_start is None:
+            return None
+        if self.row_wise:
+            if checks.is_complex_sequence(sim_start):
+                raise ValueError("Simulation start must be a scalar in a row-wise simulation mode")
+            return self.prepare_sim_start_value(sim_start)
+        return BasePFPreparer.sim_start.func(self)
+
+    @cachedproperty
+    def sim_end(self) -> tp.Optional[tp.ArrayLike]:
+        sim_end = self["sim_end"]
+        if sim_end is None:
+            return None
+        if self.row_wise:
+            if checks.is_complex_sequence(sim_end):
+                raise ValueError("Simulation end must be a scalar in a row-wise simulation mode")
+            return self.prepare_sim_end_value(sim_end)
+        return BasePFPreparer.sim_end.func(self)
+
+    @cachedproperty
     def segment_mask(self) -> tp.ArrayLike:
         """Argument `segment_mask`."""
         segment_mask = self._pre_segment_mask
@@ -1959,6 +2168,16 @@ class FDOFPreparer(FOFPreparer):
     @cachedproperty
     def _pre_call_seq(self) -> tp.Optional[tp.ArrayLike]:
         return BasePFPreparer._pre_call_seq.func(self)
+
+    # ############# After broadcasting ############# #
+
+    @cachedproperty
+    def auto_sim_start(self) -> tp.Optional[tp.ArrayLike]:
+        return FOPreparer.auto_sim_start.func(self)
+
+    @cachedproperty
+    def auto_sim_end(self) -> tp.Optional[tp.ArrayLike]:
+        return FOPreparer.auto_sim_end.func(self)
 
     # ############# Template substitution ############# #
 

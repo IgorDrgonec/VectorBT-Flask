@@ -35,40 +35,40 @@ grouped_index = pd.MultiIndex.from_arrays(
 
 class TestGrouper:
     def test_group_by_to_index(self):
-        assert not grouping.base.group_by_to_index(grouped_index, group_by=False)
-        assert grouping.base.group_by_to_index(grouped_index, group_by=None) is None
+        assert not vbt.Grouper.group_by_to_index(grouped_index, group_by=False)
+        assert vbt.Grouper.group_by_to_index(grouped_index, group_by=None) is None
         assert_index_equal(
-            grouping.base.group_by_to_index(grouped_index, group_by=True),
+            vbt.Grouper.group_by_to_index(grouped_index, group_by=True),
             pd.Index(["group"] * len(grouped_index), name="group"),
         )
         assert_index_equal(
-            grouping.base.group_by_to_index(grouped_index, group_by=0),
+            vbt.Grouper.group_by_to_index(grouped_index, group_by=0),
             pd.Index([1, 1, 1, 1, 0, 0, 0, 0], dtype="int64", name="first"),
         )
         assert_index_equal(
-            grouping.base.group_by_to_index(grouped_index, group_by="first"),
+            vbt.Grouper.group_by_to_index(grouped_index, group_by="first"),
             pd.Index([1, 1, 1, 1, 0, 0, 0, 0], dtype="int64", name="first"),
         )
         assert_index_equal(
-            grouping.base.group_by_to_index(grouped_index, group_by=[0, 1]),
+            vbt.Grouper.group_by_to_index(grouped_index, group_by=[0, 1]),
             pd.MultiIndex.from_tuples(
                 [(1, 3), (1, 3), (1, 2), (1, 2), (0, 1), (0, 1), (0, 0), (0, 0)],
                 names=["first", "second"],
             ),
         )
         assert_index_equal(
-            grouping.base.group_by_to_index(grouped_index, group_by=["first", "second"]),
+            vbt.Grouper.group_by_to_index(grouped_index, group_by=["first", "second"]),
             pd.MultiIndex.from_tuples(
                 [(1, 3), (1, 3), (1, 2), (1, 2), (0, 1), (0, 1), (0, 0), (0, 0)],
                 names=["first", "second"],
             ),
         )
         assert_index_equal(
-            grouping.base.group_by_to_index(grouped_index, group_by=np.array([3, 2, 1, 1, 1, 0, 0, 0])),
+            vbt.Grouper.group_by_to_index(grouped_index, group_by=np.array([3, 2, 1, 1, 1, 0, 0, 0])),
             pd.Index([3, 2, 1, 1, 1, 0, 0, 0], dtype="int64", name="group"),
         )
         assert_index_equal(
-            grouping.base.group_by_to_index(
+            vbt.Grouper.group_by_to_index(
                 grouped_index,
                 group_by=pd.Index([3, 2, 1, 1, 1, 0, 0, 0], name="fourth"),
             ),
@@ -76,13 +76,13 @@ class TestGrouper:
         )
 
     def test_get_groups_and_index(self):
-        a, b = grouping.base.get_groups_and_index(grouped_index, group_by=None)
+        a, b = vbt.Grouper.group_by_to_groups_and_index(grouped_index, group_by=None)
         np.testing.assert_array_equal(a, np.array([0, 1, 2, 3, 4, 5, 6, 7]))
         assert_index_equal(b, grouped_index)
-        a, b = grouping.base.get_groups_and_index(grouped_index, group_by=0)
+        a, b = vbt.Grouper.group_by_to_groups_and_index(grouped_index, group_by=0)
         np.testing.assert_array_equal(a, np.array([0, 0, 0, 0, 1, 1, 1, 1]))
         assert_index_equal(b, pd.Index([1, 0], dtype="int64", name="first"))
-        a, b = grouping.base.get_groups_and_index(grouped_index, group_by=[0, 1])
+        a, b = vbt.Grouper.group_by_to_groups_and_index(grouped_index, group_by=[0, 1])
         np.testing.assert_array_equal(a, np.array([0, 0, 1, 1, 2, 2, 3, 3]))
         assert_index_equal(
             b,

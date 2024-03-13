@@ -299,7 +299,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         raise TypeError(f"'{type(self).__name__}' object is not iterable")
 
     @classmethod
-    def td_arr_to_ns(cls, td_arr: tp.ArrayLike) -> tp.ArrayLike:
+    def prepare_td_arr(cls, td_arr: tp.ArrayLike) -> tp.ArrayLike:
         """Prepare a timedelta array."""
         if td_arr.dtype == object:
             if td_arr.ndim in (0, 1):
@@ -314,10 +314,10 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                     td_arr_col = pd.to_timedelta(td_arr[:, col])
                     td_arr_cols.append(td_arr_col.values)
                 td_arr = column_stack_arrays(td_arr_cols)
-        return dt.to_ns(td_arr)
+        return td_arr
 
     @classmethod
-    def dt_arr_to_ns(cls, dt_arr: tp.ArrayLike) -> tp.ArrayLike:
+    def prepare_dt_arr(cls, dt_arr: tp.ArrayLike) -> tp.ArrayLike:
         """Prepare a datetime array."""
         if dt_arr.dtype == object:
             if dt_arr.ndim in (0, 1):
@@ -332,7 +332,17 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                     dt_arr_col = pd.to_datetime(dt_arr[:, col]).tz_localize(None)
                     dt_arr_cols.append(dt_arr_col.values)
                 dt_arr = column_stack_arrays(dt_arr_cols)
-        return dt.to_ns(dt_arr)
+        return dt_arr
+
+    @classmethod
+    def td_arr_to_ns(cls, td_arr: tp.ArrayLike) -> tp.ArrayLike:
+        """Prepare a timedelta array and convert it to nanoseconds."""
+        return dt.to_ns(cls.prepare_td_arr(td_arr))
+
+    @classmethod
+    def dt_arr_to_ns(cls, dt_arr: tp.ArrayLike) -> tp.ArrayLike:
+        """Prepare a datetime array and convert it to nanoseconds."""
+        return dt.to_ns(cls.prepare_dt_arr(dt_arr))
 
     def prepare_post_arg(self, arg_name: str, value: tp.Optional[tp.ArrayLike] = None) -> object:
         """Prepare an argument after broadcasting and/or template substitution."""
@@ -587,7 +597,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             target_args = {}
             for k in func_arg_names:
                 arg_attr = target_arg_map.get(k, k)
-                if arg_attr is not None:
+                if arg_attr is not None and hasattr(self, arg_attr):
                     target_args[k] = getattr(self, arg_attr)
             return target_args
         return None

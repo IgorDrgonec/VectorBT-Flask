@@ -6584,6 +6584,152 @@ class TestFromHolding:
             ).order_records,
         )
 
+    @pytest.mark.parametrize("test_ls", [False, True])
+    @pytest.mark.parametrize("test_flexible", [False, True])
+    def test_sim_range(self, test_ls, test_flexible):
+        if test_ls:
+            if test_flexible:
+                _from_signals_both = partial(from_ls_signals_both, adjust_func_nb=adjust_func_nb)
+            else:
+                _from_signals_both = from_ls_signals_both
+        else:
+            if test_flexible:
+                _from_signals_both = partial(from_signals_both, adjust_func_nb=adjust_func_nb)
+            else:
+                _from_signals_both = from_signals_both
+        _entries_wide = entries_wide.copy()
+        _exits_wide = exits_wide.copy()
+        _entries_wide.iloc[:1] = False
+        _exits_wide.iloc[:1] = False
+        assert_records_close(
+            _from_signals_both(entries=entries_wide, exits=exits_wide, sim_start=1).order_records,
+            _from_signals_both(entries=_entries_wide, exits=_exits_wide).order_records,
+        )
+        assert_records_close(
+            _from_signals_both(entries=entries_wide, exits=exits_wide, sim_start=1).order_records,
+            _from_signals_both(entries=_entries_wide, exits=_exits_wide, sim_start="auto").order_records,
+        )
+        _entries_wide = entries_wide.copy()
+        _exits_wide = exits_wide.copy()
+        _entries_wide.iloc[2:] = False
+        _exits_wide.iloc[2:] = False
+        assert_records_close(
+            _from_signals_both(entries=entries_wide, exits=exits_wide, sim_end=2).order_records,
+            _from_signals_both(entries=_entries_wide, exits=_exits_wide).order_records,
+        )
+        assert_records_close(
+            _from_signals_both(entries=entries_wide, exits=exits_wide, sim_end=2).order_records,
+            _from_signals_both(entries=_entries_wide, exits=_exits_wide, sim_end="auto").order_records,
+        )
+        _entries_wide = entries_wide.copy()
+        _exits_wide = exits_wide.copy()
+        _entries_wide.iloc[:1, 0] = False
+        _entries_wide.iloc[:2, 1] = False
+        _entries_wide.iloc[:3, 2] = False
+        _exits_wide.iloc[:1, 0] = False
+        _exits_wide.iloc[:2, 1] = False
+        _exits_wide.iloc[:3, 2] = False
+        assert_records_close(
+            _from_signals_both(
+                entries=entries_wide,
+                exits=exits_wide,
+                sim_start=[1, 2, 3],
+            ).order_records,
+            _from_signals_both(
+                entries=_entries_wide,
+                exits=_exits_wide,
+            ).order_records,
+        )
+        assert_records_close(
+            _from_signals_both(
+                entries=entries_wide,
+                exits=exits_wide,
+                sim_start=[1, 2, 3],
+            ).order_records,
+            _from_signals_both(
+                entries=_entries_wide,
+                exits=_exits_wide,
+                sim_start="auto",
+            ).order_records,
+        )
+        with pytest.raises(Exception):
+            _from_signals_both(
+                entries=entries_wide,
+                exits=exits_wide,
+                sim_start=[1, 2],
+            )
+        if not test_flexible:
+            assert_records_close(
+                _from_signals_both(
+                    close=price_wide,
+                    entries=entries_wide,
+                    exits=exits_wide,
+                    group_by=[0, 0, 1],
+                    sim_start=[1, 2, 3],
+                ).order_records,
+                _from_signals_both(
+                    close=price_wide,
+                    entries=_entries_wide,
+                    exits=_exits_wide,
+                    group_by=[0, 0, 1],
+                ).order_records,
+            )
+            assert_records_close(
+                _from_signals_both(
+                    close=price_wide,
+                    entries=entries_wide,
+                    exits=exits_wide,
+                    group_by=[0, 0, 1],
+                    sim_start=[1, 2, 3],
+                ).order_records,
+                _from_signals_both(
+                    close=price_wide,
+                    entries=_entries_wide,
+                    exits=_exits_wide,
+                    group_by=[0, 0, 1],
+                    sim_start="auto",
+                ).order_records,
+            )
+        _entries_wide = entries_wide.copy()
+        _exits_wide = exits_wide.copy()
+        _entries_wide.iloc[:1, 0] = False
+        _entries_wide.iloc[:2, 1] = False
+        _entries_wide.iloc[:2, 2] = False
+        _exits_wide.iloc[:1, 0] = False
+        _exits_wide.iloc[:2, 1] = False
+        _exits_wide.iloc[:2, 2] = False
+        assert_records_close(
+            _from_signals_both(
+                entries=entries_wide,
+                exits=exits_wide,
+                group_by=[0, 0, 1],
+                cash_sharing=True,
+                sim_start=[1, 2],
+            ).order_records,
+            _from_signals_both(
+                entries=_entries_wide,
+                exits=_exits_wide,
+                group_by=[0, 0, 1],
+                cash_sharing=True,
+            ).order_records,
+        )
+        assert_records_close(
+            _from_signals_both(
+                entries=entries_wide,
+                exits=exits_wide,
+                group_by=[0, 0, 1],
+                cash_sharing=True,
+                sim_start=[1, 2],
+            ).order_records,
+            _from_signals_both(
+                entries=_entries_wide,
+                exits=_exits_wide,
+                group_by=[0, 0, 1],
+                cash_sharing=True,
+                sim_start="auto",
+            ).order_records,
+        )
+
 
 # ############# from_random_signals ############# #
 

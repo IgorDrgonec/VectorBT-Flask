@@ -1551,7 +1551,7 @@ class BaseAccessor(Wrapping):
 
                 If True, see `vectorbtpro.base.combining.combine_and_concat`.
                 If False, see `vectorbtpro.base.combining.combine_multiple`.
-                If None, becomes True if there are more than two arguments to combine.
+                If None, becomes True if there are multiple objects to combine.
 
                 Can only concatenate using the instance method.
             keys (index_like): Outermost column level.

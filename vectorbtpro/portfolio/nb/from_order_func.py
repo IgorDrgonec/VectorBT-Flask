@@ -425,6 +425,8 @@ PostOrderFuncT = tp.Callable[[PostOrderContext, tp.VarArg()], None]
         low=base_ch.flex_array_gl_slicer,
         close=base_ch.flex_array_gl_slicer,
         bm_close=base_ch.flex_array_gl_slicer,
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
         ffill_val_price=None,
         update_value=None,
         fill_pos_info=None,
@@ -477,6 +479,8 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
     low: tp.FlexArray2dLike = np.nan,
     close: tp.FlexArray2dLike = np.nan,
     bm_close: tp.FlexArray2dLike = np.nan,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
     ffill_val_price: bool = True,
     update_value: bool = False,
     fill_pos_info: bool = True,
@@ -839,6 +843,15 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
     close_ = to_2d_array_nb(np.asarray(close))
     bm_close_ = to_2d_array_nb(np.asarray(bm_close))
 
+    if sim_start is None:
+        sim_start_ = to_1d_array_nb(np.asarray(0).astype(np.int_))
+    else:
+        sim_start_ = to_1d_array_nb(np.asarray(sim_start).astype(np.int_))
+    if sim_end is None:
+        sim_end_ = to_1d_array_nb(np.asarray(target_shape[0]).astype(np.int_))
+    else:
+        sim_end_ = to_1d_array_nb(np.asarray(sim_end).astype(np.int_))
+
     order_records, log_records = prepare_records_nb(target_shape, max_order_records, max_log_records)
     last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)
     last_position = prepare_last_position_nb(target_shape, init_position_)
@@ -965,7 +978,14 @@ def from_order_func_nb(  # %? line.replace("from_order_func_nb", new_func_name)
         )
         pre_group_out = pre_group_func_nb(pre_group_ctx, *pre_sim_out, *pre_group_args)
 
-        for i in range(target_shape[0]):
+        _sim_start = flex_select_1d_pc_nb(sim_start_, group)
+        if _sim_start < 0:
+            _sim_start = target_shape[0] + _sim_start
+        _sim_end = flex_select_1d_pc_nb(sim_end_, group)
+        if _sim_end < 0:
+            _sim_end = target_shape[0] + _sim_end
+
+        for i in range(_sim_start, _sim_end):
             if call_seq is None:
                 for c in range(group_len):
                     temp_call_seq[c] = c
@@ -1646,6 +1666,8 @@ PostRowFuncT = tp.Callable[[RowContext, tp.VarArg()], None]
         low=base_ch.flex_array_gl_slicer,
         close=base_ch.flex_array_gl_slicer,
         bm_close=base_ch.flex_array_gl_slicer,
+        sim_start=None,
+        sim_end=None,
         ffill_val_price=None,
         update_value=None,
         fill_pos_info=None,
@@ -1698,6 +1720,8 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
     low: tp.FlexArray2dLike = np.nan,
     close: tp.FlexArray2dLike = np.nan,
     bm_close: tp.FlexArray2dLike = np.nan,
+    sim_start: tp.Optional[int] = None,
+    sim_end: tp.Optional[int] = None,
     ffill_val_price: bool = True,
     update_value: bool = False,
     fill_pos_info: bool = True,
@@ -1900,7 +1924,20 @@ def from_order_func_rw_nb(  # %? line.replace("from_order_func_rw_nb", new_func_
     )
     pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
 
-    for i in range(target_shape[0]):
+    if sim_start is None:
+        _sim_start = 0
+    else:
+        _sim_start = int(sim_start)
+        if _sim_start < 0:
+            _sim_start = target_shape[0] + _sim_start
+    if sim_end is None:
+        _sim_end = target_shape[0]
+    else:
+        _sim_end = int(sim_end)
+        if _sim_end < 0:
+            _sim_end = target_shape[0] + _sim_end
+
+    for i in range(_sim_start, _sim_end):
 
         # Call function before the row
         pre_row_ctx = RowContext(
@@ -2616,6 +2653,8 @@ FlexOrderFuncT = tp.Callable[[FlexOrderContext, tp.VarArg()], tp.Tuple[int, Orde
         low=base_ch.flex_array_gl_slicer,
         close=base_ch.flex_array_gl_slicer,
         bm_close=base_ch.flex_array_gl_slicer,
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
         ffill_val_price=None,
         update_value=None,
         fill_pos_info=None,
@@ -2667,6 +2706,8 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
     low: tp.FlexArray2dLike = np.nan,
     close: tp.FlexArray2dLike = np.nan,
     bm_close: tp.FlexArray2dLike = np.nan,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
     ffill_val_price: bool = True,
     update_value: bool = False,
     fill_pos_info: bool = True,
@@ -2866,6 +2907,15 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
     close_ = to_2d_array_nb(np.asarray(close))
     bm_close_ = to_2d_array_nb(np.asarray(bm_close))
 
+    if sim_start is None:
+        sim_start_ = to_1d_array_nb(np.asarray(0).astype(np.int_))
+    else:
+        sim_start_ = to_1d_array_nb(np.asarray(sim_start).astype(np.int_))
+    if sim_end is None:
+        sim_end_ = to_1d_array_nb(np.asarray(target_shape[0]).astype(np.int_))
+    else:
+        sim_end_ = to_1d_array_nb(np.asarray(sim_end).astype(np.int_))
+
     order_records, log_records = prepare_records_nb(target_shape, max_order_records, max_log_records)
     last_cash = prepare_last_cash_nb(target_shape, group_lens, cash_sharing, init_cash_)
     last_position = prepare_last_position_nb(target_shape, init_position_)
@@ -2990,7 +3040,14 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
         )
         pre_group_out = pre_group_func_nb(pre_group_ctx, *pre_sim_out, *pre_group_args)
 
-        for i in range(target_shape[0]):
+        _sim_start = flex_select_1d_pc_nb(sim_start_, group)
+        if _sim_start < 0:
+            _sim_start = target_shape[0] + _sim_start
+        _sim_end = flex_select_1d_pc_nb(sim_end_, group)
+        if _sim_end < 0:
+            _sim_end = target_shape[0] + _sim_end
+
+        for i in range(_sim_start, _sim_end):
 
             if track_value:
                 # Update valuation price using current open
@@ -3626,6 +3683,8 @@ def from_flex_order_func_nb(  # %? line.replace("from_flex_order_func_nb", new_f
         low=base_ch.flex_array_gl_slicer,
         close=base_ch.flex_array_gl_slicer,
         bm_close=base_ch.flex_array_gl_slicer,
+        sim_start=None,
+        sim_end=None,
         ffill_val_price=None,
         update_value=None,
         fill_pos_info=None,
@@ -3677,6 +3736,8 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
     low: tp.FlexArray2dLike = np.nan,
     close: tp.FlexArray2dLike = np.nan,
     bm_close: tp.FlexArray2dLike = np.nan,
+    sim_start: tp.Optional[int] = None,
+    sim_end: tp.Optional[int] = None,
     ffill_val_price: bool = True,
     update_value: bool = False,
     fill_pos_info: bool = True,
@@ -3824,7 +3885,20 @@ def from_flex_order_func_rw_nb(  # %? line.replace("from_flex_order_func_rw_nb",
     )
     pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
 
-    for i in range(target_shape[0]):
+    if sim_start is None:
+        _sim_start = 0
+    else:
+        _sim_start = int(sim_start)
+        if _sim_start < 0:
+            _sim_start = target_shape[0] + _sim_start
+    if sim_end is None:
+        _sim_end = target_shape[0]
+    else:
+        _sim_end = int(sim_end)
+        if _sim_end < 0:
+            _sim_end = target_shape[0] + _sim_end
+
+    for i in range(_sim_start, _sim_end):
 
         # Call function before the row
         pre_row_ctx = RowContext(

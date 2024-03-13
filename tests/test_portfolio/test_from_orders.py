@@ -2388,3 +2388,96 @@ class TestFromOrders:
             ).order_records,
             np.array([(0, 0, 0, 50.0, 1.0, 0.0, 0), (1, 0, 4, 50.0, 5.0, 0.0, 1)], dtype=order_dt),
         )
+
+    def test_sim_range(self):
+        _order_size_wide = order_size_wide.copy()
+        _order_size_wide.iloc[:1] = np.nan
+        assert_records_close(
+            from_orders_both(size=order_size_wide, sim_start=1).order_records,
+            from_orders_both(size=_order_size_wide).order_records,
+        )
+        assert_records_close(
+            from_orders_both(size=order_size_wide, sim_start=1).order_records,
+            from_orders_both(size=_order_size_wide, sim_start="auto").order_records,
+        )
+        _order_size_wide = order_size_wide.copy()
+        _order_size_wide.iloc[2:] = np.nan
+        assert_records_close(
+            from_orders_both(size=order_size_wide, sim_end=2).order_records,
+            from_orders_both(size=_order_size_wide).order_records,
+        )
+        assert_records_close(
+            from_orders_both(size=order_size_wide, sim_end=2).order_records,
+            from_orders_both(size=_order_size_wide, sim_end="auto").order_records,
+        )
+        _order_size_wide = order_size_wide.copy()
+        _order_size_wide.iloc[:1, 0] = np.nan
+        _order_size_wide.iloc[:2, 1] = np.nan
+        _order_size_wide.iloc[:3, 2] = np.nan
+        assert_records_close(
+            from_orders_both(size=order_size_wide, sim_start=[1, 2, 3]).order_records,
+            from_orders_both(size=_order_size_wide).order_records,
+        )
+        assert_records_close(
+            from_orders_both(size=order_size_wide, sim_start=[1, 2, 3]).order_records,
+            from_orders_both(size=_order_size_wide, sim_start="auto").order_records,
+        )
+        with pytest.raises(Exception):
+            from_orders_both(size=order_size_wide, sim_start=[1, 2])
+        assert_records_close(
+            from_orders_both(size=order_size_wide, group_by=[0, 0, 1], sim_start=[1, 2, 3]).order_records,
+            from_orders_both(size=_order_size_wide, group_by=[0, 0, 1]).order_records,
+        )
+        assert_records_close(
+            from_orders_both(size=order_size_wide, group_by=[0, 0, 1], sim_start=[1, 2, 3]).order_records,
+            from_orders_both(size=_order_size_wide, group_by=[0, 0, 1], sim_start="auto").order_records,
+        )
+        assert_records_close(
+            from_orders_both(size=order_size_wide, group_by=[0, 0, 1], sim_start=[1, 1, 2]).order_records,
+            from_orders_both(size=order_size_wide, group_by=[0, 0, 1], sim_start=[1, 2]).order_records,
+        )
+        _order_size_wide = order_size_wide.copy()
+        _order_size_wide.iloc[:1, 0] = np.nan
+        _order_size_wide.iloc[:2, 1] = np.nan
+        _order_size_wide.iloc[:2, 2] = np.nan
+        assert_records_close(
+            from_orders_both(
+                size=order_size_wide,
+                group_by=[0, 0, 1],
+                cash_sharing=True,
+                sim_start=[1, 2],
+            ).order_records,
+            from_orders_both(
+                size=_order_size_wide,
+                group_by=[0, 0, 1],
+                cash_sharing=True,
+            ).order_records,
+        )
+        assert_records_close(
+            from_orders_both(
+                size=order_size_wide,
+                group_by=[0, 0, 1],
+                cash_sharing=True,
+                sim_start=[1, 2],
+            ).order_records,
+            from_orders_both(
+                size=_order_size_wide,
+                group_by=[0, 0, 1],
+                cash_sharing=True,
+                sim_start="auto",
+            ).order_records,
+        )
+        assert_records_close(
+            from_orders_both(
+                size=order_size_wide,
+                group_by=[0, 0, 1],
+                sim_start=[1, 1, 2],
+                cash_sharing=True,
+            ).order_records,
+            from_orders_both(
+                size=order_size_wide,
+                group_by=[0, 0, 1],
+                sim_start=[1, 2],
+                cash_sharing=True,
+            ).order_records,
+        )

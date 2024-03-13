@@ -28,65 +28,6 @@ __all__ = [
 
 GroupByT = tp.Union[None, bool, tp.Index]
 
-
-def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike, def_lvl_name: tp.Hashable = "group") -> GroupByT:
-    """Convert mapper `group_by` to `pd.Index`.
-
-    !!! note
-        Index and mapper must have the same length."""
-    if group_by is None or group_by is False:
-        return group_by
-    if isinstance(group_by, CustomTemplate):
-        group_by = group_by.substitute(context=dict(index=index), strict=True, sub_id="group_by")
-    if group_by is True:
-        group_by = pd.Index(["group"] * len(index), name=def_lvl_name)
-    elif isinstance(index, pd.MultiIndex) or isinstance(group_by, (ExceptLevel, int, str)):
-        if isinstance(group_by, ExceptLevel):
-            except_levels = group_by.value
-            if isinstance(except_levels, (int, str)):
-                except_levels = [except_levels]
-            new_group_by = []
-            for i, name in enumerate(index.names):
-                if i not in except_levels and name not in except_levels:
-                    new_group_by.append(name)
-            if len(new_group_by) == 0:
-                group_by = pd.Index(["group"] * len(index), name=def_lvl_name)
-            else:
-                if len(new_group_by) == 1:
-                    new_group_by = new_group_by[0]
-                group_by = indexes.select_levels(index, new_group_by)
-        elif isinstance(group_by, (int, str)):
-            group_by = indexes.select_levels(index, group_by)
-        elif isinstance(group_by, (tuple, list)) and len(group_by) <= len(index.names):
-            try:
-                group_by = indexes.select_levels(index, group_by)
-            except (IndexError, KeyError):
-                pass
-    if not isinstance(group_by, pd.Index):
-        group_by = pd.Index(group_by, name=def_lvl_name)
-    if len(group_by) != len(index):
-        raise ValueError("group_by and index must have the same length")
-    return group_by
-
-
-def get_groups_and_index(index: tp.Index, group_by: tp.GroupByLike, def_lvl_name: tp.Hashable = "group",) -> tp.Tuple[tp.Array1d, tp.Index]:
-    """Return array of group indices pointing to the original index, and grouped index."""
-    if group_by is None or group_by is False:
-        return np.arange(len(index)), index
-
-    group_by = group_by_to_index(index, group_by, def_lvl_name)
-    codes, uniques = pd.factorize(group_by)
-    if not isinstance(uniques, pd.Index):
-        new_index = pd.Index(uniques)
-    else:
-        new_index = uniques
-    if isinstance(group_by, pd.MultiIndex):
-        new_index.names = group_by.names
-    elif isinstance(group_by, (pd.Index, pd.Series)):
-        new_index.name = group_by.name
-    return codes, new_index
-
-
 GrouperT = tp.TypeVar("GrouperT", bound="Grouper")
 
 
@@ -105,58 +46,97 @@ class Grouper(Configured):
     Set `allow_disable` to False to prohibit disabling of grouping if `Grouper.group_by` is not None.
     Set `allow_modify` to False to prohibit modifying groups (you can still change their labels).
 
-    All properties are read-only to enable caching.
+    All properties are read-only to enable caching."""
 
-    !!! note
-        Columns must form monolithic groups for using `get_group_lens_nb`.
-
-    !!! note
-        This class is meant to be immutable. To change any attribute, use `Grouper.replace`."""
-
-    _expected_keys: tp.ExpectedKeys = (Configured._expected_keys or set()) | {
-        "index",
-        "group_by",
-        "def_lvl_name",
-        "allow_enable",
-        "allow_disable",
-        "allow_modify",
-    }
-
-    def __init__(
-        self,
+    @classmethod
+    def group_by_to_index(
+        cls,
         index: tp.Index,
-        group_by: tp.GroupByLike = None,
+        group_by: tp.GroupByLike,
         def_lvl_name: tp.Hashable = "group",
-        allow_enable: bool = True,
-        allow_disable: bool = True,
-        allow_modify: bool = True,
-        **kwargs,
-    ) -> None:
+    ) -> GroupByT:
+        """Convert mapper `group_by` to `pd.Index`.
 
-        if not isinstance(index, pd.Index):
-            index = pd.Index(index)
+        !!! note
+            Index and mapper must have the same length."""
         if group_by is None or group_by is False:
-            group_by = None
+            return group_by
+        if isinstance(group_by, CustomTemplate):
+            group_by = group_by.substitute(context=dict(index=index), strict=True, sub_id="group_by")
+        if group_by is True:
+            group_by = pd.Index(["group"] * len(index), name=def_lvl_name)
+        elif isinstance(index, pd.MultiIndex) or isinstance(group_by, (ExceptLevel, int, str)):
+            if isinstance(group_by, ExceptLevel):
+                except_levels = group_by.value
+                if isinstance(except_levels, (int, str)):
+                    except_levels = [except_levels]
+                new_group_by = []
+                for i, name in enumerate(index.names):
+                    if i not in except_levels and name not in except_levels:
+                        new_group_by.append(name)
+                if len(new_group_by) == 0:
+                    group_by = pd.Index(["group"] * len(index), name=def_lvl_name)
+                else:
+                    if len(new_group_by) == 1:
+                        new_group_by = new_group_by[0]
+                    group_by = indexes.select_levels(index, new_group_by)
+            elif isinstance(group_by, (int, str)):
+                group_by = indexes.select_levels(index, group_by)
+            elif isinstance(group_by, (tuple, list)) and len(group_by) <= len(index.names):
+                try:
+                    group_by = indexes.select_levels(index, group_by)
+                except (IndexError, KeyError):
+                    pass
+        if not isinstance(group_by, pd.Index):
+            group_by = pd.Index(group_by, name=def_lvl_name)
+        if len(group_by) != len(index):
+            raise ValueError("group_by and index must have the same length")
+        return group_by
+
+    @classmethod
+    def group_by_to_groups_and_index(
+        cls,
+        index: tp.Index,
+        group_by: tp.GroupByLike,
+        def_lvl_name: tp.Hashable = "group",
+    ) -> tp.Tuple[tp.Array1d, tp.Index]:
+        """Return array of group indices pointing to the original index, and grouped index."""
+        if group_by is None or group_by is False:
+            return np.arange(len(index)), index
+
+        group_by = cls.group_by_to_index(index, group_by, def_lvl_name)
+        codes, uniques = pd.factorize(group_by)
+        if not isinstance(uniques, pd.Index):
+            new_index = pd.Index(uniques)
         else:
-            group_by = group_by_to_index(index, group_by, def_lvl_name=def_lvl_name)
+            new_index = uniques
+        if isinstance(group_by, pd.MultiIndex):
+            new_index.names = group_by.names
+        elif isinstance(group_by, (pd.Index, pd.Series)):
+            new_index.name = group_by.name
+        return codes, new_index
 
-        self._index = index
-        self._group_by = group_by
-        self._def_lvl_name = def_lvl_name
-        self._allow_enable = allow_enable
-        self._allow_disable = allow_disable
-        self._allow_modify = allow_modify
+    @classmethod
+    def yield_group_lens_idxs(cls, group_lens: tp.GroupLens) -> tp.Generator[tp.GroupIdxs, None, None]:
+        """Yield indices of each group in group lengths."""
+        group_end_idxs = np.cumsum(group_lens)
+        group_start_idxs = group_end_idxs - group_lens
+        for group in range(len(group_lens)):
+            from_col = group_start_idxs[group]
+            to_col = group_end_idxs[group]
+            yield np.arange(from_col, to_col)
 
-        Configured.__init__(
-            self,
-            index=index,
-            group_by=group_by,
-            def_lvl_name=def_lvl_name,
-            allow_enable=allow_enable,
-            allow_disable=allow_disable,
-            allow_modify=allow_modify,
-            **kwargs,
-        )
+    @classmethod
+    def yield_group_map_idxs(cls, group_map: tp.GroupMap) -> tp.Generator[tp.GroupIdxs, None, None]:
+        """Yield indices of each group in a group map."""
+        group_idxs, group_lens = group_map
+        group_start = 0
+        group_end = 0
+        for g in range(len(group_lens)):
+            group_len = group_lens[g]
+            group_end += group_len
+            yield group_idxs[group_start:group_end]
+            group_start += group_len
 
     @classmethod
     def from_pd_group_by(
@@ -182,6 +162,50 @@ class Grouper(Configured):
         return cls(
             index=index,
             group_by=group_by,
+            **kwargs,
+        )
+
+    _expected_keys: tp.ExpectedKeys = (Configured._expected_keys or set()) | {
+        "index",
+        "group_by",
+        "def_lvl_name",
+        "allow_enable",
+        "allow_disable",
+        "allow_modify",
+    }
+
+    def __init__(
+        self,
+        index: tp.Index,
+        group_by: tp.GroupByLike = None,
+        def_lvl_name: tp.Hashable = "group",
+        allow_enable: bool = True,
+        allow_disable: bool = True,
+        allow_modify: bool = True,
+        **kwargs,
+    ) -> None:
+        if not isinstance(index, pd.Index):
+            index = pd.Index(index)
+        if group_by is None or group_by is False:
+            group_by = None
+        else:
+            group_by = self.group_by_to_index(index, group_by, def_lvl_name=def_lvl_name)
+
+        self._index = index
+        self._group_by = group_by
+        self._def_lvl_name = def_lvl_name
+        self._allow_enable = allow_enable
+        self._allow_disable = allow_disable
+        self._allow_modify = allow_modify
+
+        Configured.__init__(
+            self,
+            index=index,
+            group_by=group_by,
+            def_lvl_name=def_lvl_name,
+            allow_enable=allow_enable,
+            allow_disable=allow_disable,
+            allow_modify=allow_modify,
             **kwargs,
         )
 
@@ -238,11 +262,19 @@ class Grouper(Configured):
         Doesn't care if grouping labels have been changed."""
         if group_by is None or (group_by is False and self.group_by is None):
             return False
-        group_by = group_by_to_index(self.index, group_by, def_lvl_name=self.def_lvl_name)
+        group_by = self.group_by_to_index(self.index, group_by, def_lvl_name=self.def_lvl_name)
         if isinstance(group_by, pd.Index) and isinstance(self.group_by, pd.Index):
             if not pd.Index.equals(group_by, self.group_by):
-                groups1 = get_groups_and_index(self.index, group_by, def_lvl_name=self.def_lvl_name)[0]
-                groups2 = get_groups_and_index(self.index, self.group_by, def_lvl_name=self.def_lvl_name)[0]
+                groups1 = self.group_by_to_groups_and_index(
+                    self.index,
+                    group_by,
+                    def_lvl_name=self.def_lvl_name,
+                )[0]
+                groups2 = self.group_by_to_groups_and_index(
+                    self.index,
+                    self.group_by,
+                    def_lvl_name=self.def_lvl_name,
+                )[0]
                 if not np.array_equal(groups1, groups2):
                     return True
             return False
@@ -298,13 +330,13 @@ class Grouper(Configured):
         if group_by is False and self.group_by is None:
             group_by = None
         self.check_group_by(group_by=group_by, **kwargs)
-        return group_by_to_index(self.index, group_by, def_lvl_name=self.def_lvl_name)
+        return self.group_by_to_index(self.index, group_by, def_lvl_name=self.def_lvl_name)
 
     @cached_method(whitelist=True)
     def get_groups_and_index(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.Tuple[tp.Array1d, tp.Index]:
-        """See `get_groups_and_index`."""
+        """See `Grouper.group_by_to_groups_and_index`."""
         group_by = self.resolve_group_by(group_by=group_by, **kwargs)
-        return get_groups_and_index(self.index, group_by, def_lvl_name=self.def_lvl_name)
+        return self.group_by_to_groups_and_index(self.index, group_by, def_lvl_name=self.def_lvl_name)
 
     def get_groups(self, **kwargs) -> tp.Array1d:
         """Return groups array."""
@@ -339,7 +371,7 @@ class Grouper(Configured):
 
     @cached_method(whitelist=True)
     def get_group_lens(self, group_by: tp.GroupByLike = None, jitted: tp.JittedOption = None, **kwargs) -> tp.GroupLens:
-        """See get_group_lens_nb."""
+        """See `vectorbtpro.base.grouping.nb.get_group_lens_nb`."""
         group_by = self.resolve_group_by(group_by=group_by, **kwargs)
         if group_by is None or group_by is False:  # no grouping
             return np.full(len(self.index), 1)
@@ -371,14 +403,8 @@ class Grouper(Configured):
 
     def yield_group_idxs(self, **kwargs) -> tp.Generator[tp.GroupIdxs, None, None]:
         """Yield indices of each group."""
-        group_idxs, group_lens = self.get_group_map(**kwargs)
-        group_start = 0
-        group_end = 0
-        for g in range(len(group_lens)):
-            group_len = group_lens[g]
-            group_end += group_len
-            yield group_idxs[group_start:group_end]
-            group_start += group_len
+        group_map = self.get_group_map(**kwargs)
+        return self.yield_group_map_idxs(group_map)
 
     def __iter__(self) -> tp.Generator[tp.Tuple[tp.Label, tp.GroupIdxs], None, None]:
         index = self.get_index()

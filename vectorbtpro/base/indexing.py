@@ -537,19 +537,31 @@ class IdxrBase:
         """Get indices."""
         raise NotImplementedError
 
-    def slice_indexer(self, index: tp.Index, slice_: tp.Slice, closed_end: bool = False) -> slice:
+    @classmethod
+    def slice_indexer(
+        cls,
+        index: tp.Index,
+        slice_: tp.Slice,
+        closed_start: bool = True,
+        closed_end: bool = False,
+    ) -> slice:
         """Compute the slice indexer for input labels and step."""
         start = slice_.start
         end = slice_.stop
-        if closed_end:
-            return index.slice_indexer(start, end, slice_.step)
         if start is not None:
-            start = index.get_slice_bound(start, side="left")
+            left_start = index.get_slice_bound(start, side="left")
+            right_start = index.get_slice_bound(start, side="right")
+            if left_start == right_start or not closed_start:
+                start = right_start
+            else:
+                start = left_start
         if end is not None:
-            new_end = index.get_slice_bound(end, side="right")
-            if new_end != index.get_slice_bound(end, side="left"):
-                new_end = new_end - 1
-            end = new_end
+            left_end = index.get_slice_bound(end, side="left")
+            right_end = index.get_slice_bound(end, side="right")
+            if left_end == right_end or closed_end:
+                end = right_end
+            else:
+                end = left_end
         return slice(start, end, slice_.step)
 
     def check_idxs(self, idxs: tp.MaybeIndexArray, check_minus_one: bool = False) -> None:
@@ -784,6 +796,9 @@ class LabelIdxr(UniIdxr):
     value: tp.Union[None, tp.MaybeSequence[tp.Label], tp.Slice] = attr.ib()
     """One or more labels."""
 
+    closed_start: bool = attr.ib(default=True)
+    """Whether slice start should be inclusive."""
+
     closed_end: bool = attr.ib(default=True)
     """Whether slice end should be inclusive."""
 
@@ -805,7 +820,12 @@ class LabelIdxr(UniIdxr):
             index = select_levels(index, self.level)
 
         if isinstance(self.value, (slice, hslice)):
-            idxs = self.slice_indexer(index, self.value, closed_end=self.closed_end)
+            idxs = self.slice_indexer(
+                index,
+                self.value,
+                closed_start=self.closed_start,
+                closed_end=self.closed_end,
+            )
         elif (checks.is_sequence(self.value) and not np.isscalar(self.value)) and (
             not isinstance(index, pd.MultiIndex)
             or (isinstance(index, pd.MultiIndex) and isinstance(self.value[0], tuple))
@@ -826,11 +846,22 @@ class DatetimeIdxr(UniIdxr):
     value: tp.Union[None, tp.MaybeSequence[tp.DatetimeLike], tp.Slice] = attr.ib()
     """One or more datetime-like objects."""
 
+    closed_start: bool = attr.ib(default=True)
+    """Whether slice start should be inclusive."""
+
     closed_end: bool = attr.ib(default=False)
     """Whether slice end should be inclusive."""
 
     indexer_method: tp.Optional[str] = attr.ib(default="bfill")
-    """Method for `pd.Index.get_indexer`."""
+    """Method for `pd.Index.get_indexer`.
+    
+    Allows two additional values: "before" and "after"."""
+
+    below_to_zero: bool = attr.ib(default=False)
+    """Whether to place 0 instead of -1 if `DatetimeIdxr.value` is below the first index."""
+
+    above_to_len: bool = attr.ib(default=False)
+    """Whether to place `len(index)` instead of -1 if `DatetimeIdxr.value` is above the last index."""
 
     def get(
         self,
@@ -852,18 +883,36 @@ class DatetimeIdxr(UniIdxr):
             start = dt.try_align_dt_to_index(self.value.start, index)
             stop = dt.try_align_dt_to_index(self.value.stop, index)
             new_value = slice(start, stop, self.value.step)
-            idxs = self.slice_indexer(index, new_value, closed_end=self.closed_end)
+            idxs = self.slice_indexer(index, new_value, closed_start=self.closed_start, closed_end=self.closed_end)
         elif checks.is_sequence(self.value) and not np.isscalar(self.value):
             new_value = dt.try_align_to_dt_index(self.value, index)
             idxs = index.get_indexer(new_value, method=self.indexer_method)
+            if self.below_to_zero:
+                idxs = np.where(new_value < index[0], 0, idxs)
+            if self.above_to_len:
+                idxs = np.where(new_value > index[-1], len(index), idxs)
         else:
             new_value = dt.try_align_dt_to_index(self.value, index)
-            if self.indexer_method is None or new_value in index:
-                idxs = index.get_loc(new_value)
-                if isinstance(idxs, np.ndarray) and np.issubdtype(idxs.dtype, np.bool_):
-                    idxs = np.flatnonzero(idxs)
+            if new_value < index[0] and self.below_to_zero:
+                idxs = 0
+            elif new_value > index[-1] and self.above_to_len:
+                idxs = len(index)
             else:
-                idxs = index.get_indexer([new_value], method=self.indexer_method)[0]
+                if self.indexer_method is None or new_value in index:
+                    idxs = index.get_loc(new_value)
+                    if isinstance(idxs, np.ndarray) and np.issubdtype(idxs.dtype, np.bool_):
+                        idxs = np.flatnonzero(idxs)
+                else:
+                    indexer_method = self.indexer_method
+                    if indexer_method is not None:
+                        indexer_method = indexer_method.lower()
+                        if indexer_method == "before":
+                            new_value = new_value - pd.Timedelta(1, "ns")
+                            indexer_method = "ffill"
+                        elif indexer_method == "after":
+                            new_value = new_value + pd.Timedelta(1, "ns")
+                            indexer_method = "bfill"
+                    idxs = index.get_indexer([new_value], method=indexer_method)[0]
         self.check_idxs(idxs, check_minus_one=True)
         return idxs
 
@@ -1006,7 +1055,7 @@ class PointIdxr(UniIdxr):
     indexer_method: str = attr.ib(default="bfill")
     """Method for `pd.Index.get_indexer`.
     
-    Allows two additional values "before" and "after"."""
+    Allows two additional values: "before" and "after"."""
 
     indexer_tolerance: tp.Optional[tp.Union[int, tp.TimedeltaLike, tp.IndexLike]] = attr.ib(default=None)
     """Tolerance for `pd.Index.get_indexer`.
@@ -1194,6 +1243,7 @@ def get_index_points(
         on = on.floor("D")
         add_time_delta = dt.time_to_timedelta(at_time)
         if indexer_tolerance is None:
+            indexer_method = indexer_method.lower()
             if indexer_method in ("pad", "ffill"):
                 indexer_tolerance = add_time_delta
             elif indexer_method in ("backfill", "bfill"):
@@ -1208,6 +1258,7 @@ def get_index_points(
 
     if kind.lower() == "labels":
         on = dt.try_align_to_dt_index(on, index)
+        indexer_method = indexer_method.lower()
         if indexer_method == "before":
             on = on - pd.Timedelta(1, "ns")
             indexer_method = "ffill"
@@ -1848,6 +1899,12 @@ class AutoIdxr(UniIdxr):
     indexer_method: tp.Optional[str] = attr.ib(default=_DEF)
     """Method for `pd.Index.get_indexer`."""
 
+    below_to_zero: bool = attr.ib(default=_DEF)
+    """Whether to place 0 instead of -1 if `AutoIdxr.value` is below the first index."""
+
+    above_to_len: bool = attr.ib(default=_DEF)
+    """Whether to place `len(index)` instead of -1 if `AutoIdxr.value` is above the last index."""
+
     level: tp.MaybeLevelSequence = attr.ib(default=None)
     """One or more levels.
 
@@ -1905,12 +1962,14 @@ class AutoIdxr(UniIdxr):
             idxr_kwargs = None
         if idxr_kwargs is None:
             idxr_kwargs = {}
-        if self.closed_start is not _DEF:
-            idxr_kwargs["closed_start"] = self.closed_start
-        if self.closed_end is not _DEF:
-            idxr_kwargs["closed_end"] = self.closed_end
-        if self.indexer_method is not _DEF:
-            idxr_kwargs["indexer_method"] = self.indexer_method
+
+        def _dtc_check_func(dtc):
+            return (
+                not dtc.has_full_datetime()
+                and self.indexer_method in (_DEF, None)
+                and self.below_to_zero is _DEF
+                and self.above_to_len is _DEF
+            )
 
         if kind is None:
             if isinstance(value, PosSel):
@@ -1928,9 +1987,9 @@ class AutoIdxr(UniIdxr):
                     if index is None:
                         raise ValueError("Index is required")
                     if isinstance(index, pd.DatetimeIndex):
-                        if dt.DTC.is_parsable(
-                            value.start, check_func=lambda dtc: not dtc.has_full_datetime()
-                        ) or dt.DTC.is_parsable(value.stop, check_func=lambda dtc: not dtc.has_full_datetime()):
+                        if dt.DTC.is_parsable(value.start, check_func=_dtc_check_func) or dt.DTC.is_parsable(
+                            value.stop, check_func=_dtc_check_func
+                        ):
                             kind = "dtc"
                         else:
                             kind = "datetime"
@@ -1959,7 +2018,7 @@ class AutoIdxr(UniIdxr):
                     if index is None:
                         raise ValueError("Index is required")
                     elif isinstance(index, pd.DatetimeIndex):
-                        if dt.DTC.is_parsable(value[0], check_func=lambda dtc: not dtc.has_full_datetime()):
+                        if dt.DTC.is_parsable(value[0], check_func=_dtc_check_func):
                             kind = "dtc"
                         else:
                             kind = "datetime"
@@ -1974,10 +2033,12 @@ class AutoIdxr(UniIdxr):
                     if index is None:
                         raise ValueError("Index is required")
                     if isinstance(index, pd.DatetimeIndex):
-                        if dt.DTC.is_parsable(value, check_func=lambda dtc: not dtc.has_full_datetime()):
+                        if dt.DTC.is_parsable(value, check_func=_dtc_check_func):
                             kind = "dtc"
                         elif isinstance(value, str):
                             try:
+                                if not value.isupper() and not value.islower():
+                                    raise Exception  # "2020" shouldn't be a frequency
                                 _ = dt.to_freq(value)
                                 kind = "frequency"
                             except Exception as e:
@@ -1993,18 +2054,28 @@ class AutoIdxr(UniIdxr):
                     else:
                         kind = "labels"
 
+        def _expand_target_kwargs(target_cls, **target_kwargs):
+            source_arg_names = {a.name for a in self.__attrs_attrs__ if a.default is _DEF}
+            target_arg_names = {a.name for a in target_cls.__attrs_attrs__}
+            for arg_name in source_arg_names:
+                if arg_name in target_arg_names:
+                    arg_value = getattr(self, arg_name)
+                    if arg_value is not _DEF:
+                        target_kwargs[arg_name] = arg_value
+            return target_kwargs
+
         if kind.lower() in ("position", "positions"):
-            idx = PosIdxr(value, **idxr_kwargs)
+            idx = PosIdxr(value, **_expand_target_kwargs(PosIdxr, **idxr_kwargs))
         elif kind.lower() == "mask":
-            idx = MaskIdxr(value, **idxr_kwargs)
+            idx = MaskIdxr(value, **_expand_target_kwargs(MaskIdxr, **idxr_kwargs))
         elif kind.lower() in ("label", "labels"):
-            idx = LabelIdxr(value, **idxr_kwargs)
+            idx = LabelIdxr(value, **_expand_target_kwargs(LabelIdxr, **idxr_kwargs))
         elif kind.lower() == "datetime":
-            idx = DatetimeIdxr(value, **idxr_kwargs)
+            idx = DatetimeIdxr(value, **_expand_target_kwargs(DatetimeIdxr, **idxr_kwargs))
         elif kind.lower() == "dtc":
-            idx = DTCIdxr(value, **idxr_kwargs)
+            idx = DTCIdxr(value, **_expand_target_kwargs(DTCIdxr, **idxr_kwargs))
         elif kind.lower() == "frequency":
-            idx = PointIdxr(every=value, **idxr_kwargs)
+            idx = PointIdxr(every=value, **_expand_target_kwargs(PointIdxr, **idxr_kwargs))
         else:
             raise ValueError(f"Invalid option kind='{kind}'")
         return idx.get(index=index, freq=freq)

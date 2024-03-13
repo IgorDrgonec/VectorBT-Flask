@@ -402,6 +402,8 @@ def signal_to_size_nb(
         upon_dir_conflict=base_ch.flex_array_gl_slicer,
         upon_opposite_entry=base_ch.flex_array_gl_slicer,
         from_ago=base_ch.flex_array_gl_slicer,
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
         call_seq=base_ch.array_gl_slicer,
         auto_call_seq=None,
         ffill_val_price=None,
@@ -455,6 +457,8 @@ def from_basic_signals_nb(
     upon_dir_conflict: tp.FlexArray2dLike = DirectionConflictMode.Ignore,
     upon_opposite_entry: tp.FlexArray2dLike = OppositeEntryMode.ReverseReduce,
     from_ago: tp.FlexArray2dLike = 0,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
     call_seq: tp.Optional[tp.Array2d] = None,
     auto_call_seq: bool = False,
     ffill_val_price: bool = True,
@@ -512,6 +516,15 @@ def from_basic_signals_nb(
     upon_dir_conflict_ = to_2d_array_nb(np.asarray(upon_dir_conflict))
     upon_opposite_entry_ = to_2d_array_nb(np.asarray(upon_opposite_entry))
     from_ago_ = to_2d_array_nb(np.asarray(from_ago))
+
+    if sim_start is None:
+        sim_start_ = to_1d_array_nb(np.asarray(0).astype(np.int_))
+    else:
+        sim_start_ = to_1d_array_nb(np.asarray(sim_start).astype(np.int_))
+    if sim_end is None:
+        sim_end_ = to_1d_array_nb(np.asarray(target_shape[0]).astype(np.int_))
+    else:
+        sim_end_ = to_1d_array_nb(np.asarray(sim_end).astype(np.int_))
 
     if max_order_records is None:
         order_records = np.empty((target_shape[0], target_shape[1]), dtype=fs_order_dt)
@@ -603,7 +616,14 @@ def from_basic_signals_nb(
         to_col = group_end_idxs[group]
         group_len = to_col - from_col
 
-        for i in range(target_shape[0]):
+        _sim_start = flex_select_1d_pc_nb(sim_start_, group)
+        if _sim_start < 0:
+            _sim_start = target_shape[0] + _sim_start
+        _sim_end = flex_select_1d_pc_nb(sim_end_, group)
+        if _sim_end < 0:
+            _sim_end = target_shape[0] + _sim_end
+
+        for i in range(_sim_start, _sim_end):
             # Add cash
             _cash_deposits = flex_select_nb(cash_deposits_, i, group)
             if _cash_deposits < 0:
@@ -1122,6 +1142,8 @@ def from_basic_signals_nb(
         delta_format=base_ch.flex_array_gl_slicer,
         time_delta_format=base_ch.flex_array_gl_slicer,
         from_ago=base_ch.flex_array_gl_slicer,
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
         call_seq=base_ch.array_gl_slicer,
         auto_call_seq=None,
         ffill_val_price=None,
@@ -1202,6 +1224,8 @@ def from_signals_nb(
     delta_format: tp.FlexArray2dLike = DeltaFormat.Percent,
     time_delta_format: tp.FlexArray2dLike = TimeDeltaFormat.Index,
     from_ago: tp.FlexArray2dLike = 0,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
     call_seq: tp.Optional[tp.Array2d] = None,
     auto_call_seq: bool = False,
     ffill_val_price: bool = True,
@@ -1282,6 +1306,15 @@ def from_signals_nb(
     delta_format_ = to_2d_array_nb(np.asarray(delta_format))
     time_delta_format_ = to_2d_array_nb(np.asarray(time_delta_format))
     from_ago_ = to_2d_array_nb(np.asarray(from_ago))
+
+    if sim_start is None:
+        sim_start_ = to_1d_array_nb(np.asarray(0).astype(np.int_))
+    else:
+        sim_start_ = to_1d_array_nb(np.asarray(sim_start).astype(np.int_))
+    if sim_end is None:
+        sim_end_ = to_1d_array_nb(np.asarray(target_shape[0]).astype(np.int_))
+    else:
+        sim_end_ = to_1d_array_nb(np.asarray(sim_end).astype(np.int_))
 
     n_sl_steps = sl_stop_.shape[0]
     n_tsl_steps = tsl_stop_.shape[0]
@@ -1485,7 +1518,14 @@ def from_signals_nb(
         to_col = group_end_idxs[group]
         group_len = to_col - from_col
 
-        for i in range(target_shape[0]):
+        _sim_start = flex_select_1d_pc_nb(sim_start_, group)
+        if _sim_start < 0:
+            _sim_start = target_shape[0] + _sim_start
+        _sim_end = flex_select_1d_pc_nb(sim_end_, group)
+        if _sim_end < 0:
+            _sim_end = target_shape[0] + _sim_end
+
+        for i in range(_sim_start, _sim_end):
             # Add cash
             _cash_deposits = flex_select_nb(cash_deposits_, i, group)
             if _cash_deposits < 0:
@@ -3519,6 +3559,8 @@ PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
         delta_format=base_ch.flex_array_gl_slicer,
         time_delta_format=base_ch.flex_array_gl_slicer,
         from_ago=base_ch.flex_array_gl_slicer,
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
         call_seq=base_ch.array_gl_slicer,
         auto_call_seq=None,
         ffill_val_price=None,
@@ -3606,6 +3648,8 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     delta_format: tp.FlexArray2dLike = DeltaFormat.Percent,
     time_delta_format: tp.FlexArray2dLike = TimeDeltaFormat.Index,
     from_ago: tp.FlexArray2dLike = 0,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
     call_seq: tp.Optional[tp.Array2d] = None,
     auto_call_seq: bool = False,
     ffill_val_price: bool = True,
@@ -3688,6 +3732,15 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     delta_format_ = to_2d_array_nb(np.asarray(delta_format))
     time_delta_format_ = to_2d_array_nb(np.asarray(time_delta_format))
     from_ago_ = to_2d_array_nb(np.asarray(from_ago))
+
+    if sim_start is None:
+        sim_start_ = to_1d_array_nb(np.asarray(0).astype(np.int_))
+    else:
+        sim_start_ = to_1d_array_nb(np.asarray(sim_start).astype(np.int_))
+    if sim_end is None:
+        sim_end_ = to_1d_array_nb(np.asarray(target_shape[0]).astype(np.int_))
+    else:
+        sim_end_ = to_1d_array_nb(np.asarray(sim_end).astype(np.int_))
 
     n_sl_steps = sl_stop_.shape[0]
     n_tsl_steps = tsl_stop_.shape[0]
@@ -3868,7 +3921,14 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
         to_col = group_end_idxs[group]
         group_len = to_col - from_col
 
-        for i in range(target_shape[0]):
+        _sim_start = flex_select_1d_pc_nb(sim_start_, group)
+        if _sim_start < 0:
+            _sim_start = target_shape[0] + _sim_start
+        _sim_end = flex_select_1d_pc_nb(sim_end_, group)
+        if _sim_end < 0:
+            _sim_end = target_shape[0] + _sim_end
+
+        for i in range(_sim_start, _sim_end):
             # Add cash
             if cash_sharing:
                 _cash_deposits = flex_select_nb(cash_deposits_, i, group)
