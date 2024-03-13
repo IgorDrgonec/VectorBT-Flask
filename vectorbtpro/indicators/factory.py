@@ -341,6 +341,18 @@ class IndicatorBase(Analyzable):
     _output_flags: tp.ClassVar[tp.Kwargs]
     _level_names: tp.Tuple[str, ...]
 
+    def __getattr__(self, k: str) -> tp.Any:
+        """Redirect queries targeted at a generic output name by the short name of the indicator."""
+        short_name = object.__getattribute__(self, "short_name")
+        output_names = object.__getattribute__(self, "output_names")
+        if len(output_names) == 1:
+            if short_name not in output_names:
+                if k.startswith(short_name):
+                    k = k[len(short_name):]
+                    if len(k) == 0 or not k[0].isalpha():
+                        return object.__getattribute__(self, output_names[0] + k)
+        return object.__getattribute__(self, k)
+
     @classmethod
     def run_pipeline(
         cls,
