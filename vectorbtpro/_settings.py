@@ -1848,7 +1848,7 @@ class SettingsConfig(Config):
                 __pdoc__[k] = substitute_templates(
                     v,
                     context=dict(config_doc=config_doc),
-                    sub_id="__pdoc__",
+                    eval_id="__pdoc__",
                 )
 
 

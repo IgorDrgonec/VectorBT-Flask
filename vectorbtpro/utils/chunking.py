@@ -1385,9 +1385,9 @@ class Chunker(Configured):
             _template_context = dict(template_context)
             _template_context["ann_args"] = ann_args
             _template_context["chunk_meta"] = _chunk_meta
-            chunk_ann_args = substitute_templates(ann_args, _template_context, sub_id="chunk_ann_args")
+            chunk_ann_args = substitute_templates(ann_args, _template_context, eval_id="chunk_ann_args")
             _template_context["chunk_ann_args"] = chunk_ann_args
-            chunk_arg_take_spec = substitute_templates(arg_take_spec, _template_context, sub_id="chunk_arg_take_spec")
+            chunk_arg_take_spec = substitute_templates(arg_take_spec, _template_context, eval_id="chunk_arg_take_spec")
             _template_context["chunk_arg_take_spec"] = chunk_arg_take_spec
 
             if callable(chunk_arg_take_spec):
@@ -1739,7 +1739,7 @@ class Chunker(Configured):
         )
         if return_raw_chunks:
             return chunk_meta, funcs_args
-        execute_kwargs = substitute_templates(execute_kwargs, template_context, sub_id="execute_kwargs")
+        execute_kwargs = substitute_templates(execute_kwargs, template_context, eval_id="execute_kwargs")
         results = execute(funcs_args, n_calls=len(chunk_meta), **execute_kwargs)
         if merge_func is not None:
             template_context["funcs_args"] = funcs_args

@@ -62,7 +62,7 @@ class Grouper(Configured):
         if group_by is None or group_by is False:
             return group_by
         if isinstance(group_by, CustomTemplate):
-            group_by = group_by.substitute(context=dict(index=index), strict=True, sub_id="group_by")
+            group_by = group_by.substitute(context=dict(index=index), strict=True, eval_id="group_by")
         if group_by is True:
             group_by = pd.Index(["group"] * len(index), name=def_lvl_name)
         elif isinstance(index, pd.MultiIndex) or isinstance(group_by, (ExceptLevel, int, str)):

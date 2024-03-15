@@ -712,7 +712,7 @@ class TVData(RemoteData):
                     else:
                         raise ValueError("Must provide fields for filter_by")
                     if isinstance(filter_by, CustomTemplate):
-                        if not filter_by.substitute(context, sub_id="filter_by"):
+                        if not filter_by.substitute(context, eval_id="filter_by"):
                             continue
                     elif callable(filter_by):
                         if not filter_by(context):

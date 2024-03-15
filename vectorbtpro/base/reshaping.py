@@ -1547,7 +1547,7 @@ def broadcast(
                         ),
                         _context,
                     )
-                    o = o.substitute(context, sub_id="broadcast")
+                    o = o.substitute(context, eval_id="broadcast")
                 o = to_2d_array(o)
                 if not _keep_flex:
                     needs_broadcasting = True
@@ -1638,7 +1638,7 @@ def broadcast(
                     ),
                     bco.context,
                 )
-                new_obj = bco.value.substitute(context, sub_id="broadcast")
+                new_obj = bco.value.substitute(context, eval_id="broadcast")
             else:
                 raise TypeError(f"Special type {type(bco.value)} is not supported")
         else:

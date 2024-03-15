@@ -324,6 +324,20 @@ class Takeable(Annotatable):
     point_wise: bool = attr.ib(default=_DEF)
     """Whether to select one range point at a time and return a tuple."""
 
+    eval_id: tp.Optional[tp.MaybeSequence[tp.Hashable]] = attr.ib(default=None)
+    """One or more identifiers at which to evaluate this instance."""
+
+    def meets_eval_id(self, eval_id: tp.Optional[tp.Hashable]) -> bool:
+        """Return whether the evaluation id of the instance meets the global evaluation id."""
+        if self.eval_id is not None and eval_id is not None:
+            if checks.is_complex_sequence(self.eval_id):
+                if eval_id not in self.eval_id:
+                    return False
+            else:
+                if eval_id != self.eval_id:
+                    return False
+        return True
+
     def check_obj(self) -> None:
         """Check whether value is missing."""
         if self.obj is _DEF:
@@ -417,7 +431,7 @@ class Splitter(Analyzable):
                     _new_split.append(range_)
             if split_check_template is not None:
                 _template_context = merge_dicts(dict(index=index, i=i, split=_new_split), template_context)
-                split_ok = substitute_templates(split_check_template, _template_context, sub_id="split_check_template")
+                split_ok = substitute_templates(split_check_template, _template_context, eval_id="split_check_template")
                 if not split_ok:
                     removed_indices.append(i)
                     continue
@@ -433,7 +447,7 @@ class Splitter(Analyzable):
         else:
             if isinstance(split_labels, CustomTemplate):
                 _template_context = merge_dicts(dict(index=index, splits_arr=new_splits_arr), template_context)
-                split_labels = substitute_templates(split_labels, _template_context, sub_id=split_labels)
+                split_labels = substitute_templates(split_labels, _template_context, eval_id=split_labels)
                 if not isinstance(split_labels, pd.Index):
                     split_labels = pd.Index(split_labels, name="split")
             else:
@@ -446,7 +460,7 @@ class Splitter(Analyzable):
         else:
             if isinstance(split_labels, CustomTemplate):
                 _template_context = merge_dicts(dict(index=index, splits_arr=new_splits_arr), template_context)
-                set_labels = substitute_templates(set_labels, _template_context, sub_id=set_labels)
+                set_labels = substitute_templates(set_labels, _template_context, eval_id=set_labels)
             if not isinstance(set_labels, pd.Index):
                 set_labels = pd.Index(set_labels, name="set")
         if wrapper_kwargs is None:
@@ -1151,7 +1165,7 @@ class Splitter(Analyzable):
 
         if isinstance(by, CustomTemplate):
             _template_context = merge_dicts(dict(index=index), template_context)
-            by = substitute_templates(by, _template_context, sub_id="by")
+            by = substitute_templates(by, _template_context, eval_id="by")
         grouper = BaseIDXAccessor(index).get_grouper(by, groupby_kwargs=groupby_kwargs, **grouper_kwargs)
         splits = []
         indices = []
@@ -1533,9 +1547,9 @@ class Splitter(Analyzable):
                 ),
                 template_context,
             )
-            _split_func = substitute_templates(split_func, _template_context, sub_id="split_func")
-            _split_args = substitute_templates(split_args, _template_context, sub_id="split_args")
-            _split_kwargs = substitute_templates(split_kwargs, _template_context, sub_id="split_kwargs")
+            _split_func = substitute_templates(split_func, _template_context, eval_id="split_func")
+            _split_args = substitute_templates(split_args, _template_context, eval_id="split_args")
+            _split_kwargs = substitute_templates(split_kwargs, _template_context, eval_id="split_kwargs")
             new_split = _split_func(*_split_args, **_split_kwargs)
             if new_split is None:
                 break
@@ -1967,7 +1981,7 @@ class Splitter(Analyzable):
                 template_context = {}
             if "index" not in template_context:
                 template_context["index"] = index
-            range_ = range_.substitute(context=template_context, sub_id="range")
+            range_ = range_.substitute(context=template_context, eval_id="range")
         if callable(range_):
             meta["was_callable"] = True
             range_ = range_(index)
@@ -2193,7 +2207,7 @@ class Splitter(Analyzable):
         # Substitute template
         if isinstance(new_split, CustomTemplate):
             _template_context = merge_dicts(dict(index=index[range_]), template_context)
-            new_split = substitute_templates(new_split, _template_context, sub_id="new_split")
+            new_split = substitute_templates(new_split, _template_context, eval_id="new_split")
 
         # Split by gap
         if isinstance(new_split, str) and new_split.lower() == "by_gap":
@@ -2897,7 +2911,7 @@ class Splitter(Analyzable):
                     ),
                     template_context,
                 )
-                obj_slice = substitute_templates(obj, _template_context, sub_id="take_range")
+                obj_slice = substitute_templates(obj, _template_context, eval_id="take_range")
             else:
                 obj_slice = self.take_range(obj, obj_range_meta["range_"], point_wise=point_wise)
             bounds = _get_bounds(range_meta, obj_meta, obj_range_meta)
@@ -3062,7 +3076,11 @@ class Splitter(Analyzable):
     # ############# Applying ############# #
 
     @classmethod
-    def parse_and_inject_takeables(cls, flat_ann_args: tp.FlatAnnArgs) -> tp.FlatAnnArgs:
+    def parse_and_inject_takeables(
+        cls,
+        flat_ann_args: tp.FlatAnnArgs,
+        eval_id: tp.Optional[tp.Hashable] = None,
+    ) -> tp.FlatAnnArgs:
         """Parse `Takeable` instances from function annotations and inject them into flattened annotated arguments."""
         new_flat_ann_args = dict()
         for k, v in flat_ann_args.items():
@@ -3070,7 +3088,7 @@ class Splitter(Analyzable):
             if "annotation" in v:
                 if isinstance(v["annotation"], type) and issubclass(v["annotation"], Takeable):
                     v["annotation"] = v["annotation"]()
-                if isinstance(v["annotation"], Takeable):
+                if isinstance(v["annotation"], Takeable) and v["annotation"].meets_eval_id(eval_id):
                     if "value" in v:
                         if not isinstance(v["value"], Takeable):
                             v["value"] = attr.evolve(v["annotation"], obj=v["value"])
@@ -3111,6 +3129,7 @@ class Splitter(Analyzable):
         merge_kwargs: tp.KwargsLike = None,
         merge_all: bool = True,
         wrap_results: bool = True,
+        eval_id: tp.Optional[tp.Hashable] = None,
         **apply_kwargs,
     ) -> tp.Any:
         """Apply a function on each range.
@@ -3302,7 +3321,7 @@ class Splitter(Analyzable):
                 attach_annotations=True,
             )
             flat_ann_args = flatten_ann_args(ann_args)
-            flat_ann_args = self.parse_and_inject_takeables(flat_ann_args)
+            flat_ann_args = self.parse_and_inject_takeables(flat_ann_args, eval_id=eval_id)
             ann_args = unflatten_ann_args(flat_ann_args)
             apply_args, apply_kwargs = ann_args_to_args(ann_args)
 
@@ -3348,7 +3367,7 @@ class Splitter(Analyzable):
                     ),
                     _template_context,
                 )
-                obj_slice = substitute_templates(takeable.obj, _template_context, sub_id="take_range")
+                obj_slice = substitute_templates(takeable.obj, _template_context, eval_id="take_range")
             else:
                 obj_slice = self.take_range(
                     takeable.obj,
@@ -3362,14 +3381,14 @@ class Splitter(Analyzable):
             obj_range_meta = {}
             new_args = ()
             if args is not None:
-                for i, arg in enumerate(args):
-                    if isinstance(arg, Takeable):
-                        _obj_meta, _obj_range_meta, obj_slice = _take_range(arg, range_, _template_context)
+                for i, v in enumerate(args):
+                    if isinstance(v, Takeable) and v.meets_eval_id(eval_id):
+                        _obj_meta, _obj_range_meta, obj_slice = _take_range(v, range_, _template_context)
                         new_args += (obj_slice,)
                         obj_meta[i] = _obj_meta
                         obj_range_meta[i] = _obj_range_meta
                     else:
-                        new_args += (arg,)
+                        new_args += (v,)
             return obj_meta, obj_range_meta, new_args
 
         def _take_kwargs(kwargs, range_, _template_context):
@@ -3378,7 +3397,7 @@ class Splitter(Analyzable):
             new_kwargs = {}
             if kwargs is not None:
                 for k, v in kwargs.items():
-                    if isinstance(v, Takeable):
+                    if isinstance(v, Takeable) and v.meets_eval_id(eval_id):
                         _obj_meta, _obj_range_meta, obj_slice = _take_range(v, range_, _template_context)
                         new_kwargs[k] = obj_slice
                         obj_meta[k] = _obj_meta
@@ -3475,9 +3494,9 @@ class Splitter(Analyzable):
                 ),
                 _template_context,
             )
-            _apply_func = substitute_templates(apply_func, _template_context, sub_id="apply_func")
-            _apply_args = substitute_templates(_apply_args, _template_context, sub_id="apply_args")
-            _apply_kwargs = substitute_templates(_apply_kwargs, _template_context, sub_id="apply_kwargs")
+            _apply_func = substitute_templates(apply_func, _template_context, eval_id="apply_func")
+            _apply_args = substitute_templates(_apply_args, _template_context, eval_id="apply_args")
+            _apply_kwargs = substitute_templates(_apply_kwargs, _template_context, eval_id="apply_kwargs")
             return _apply_func, _apply_args, _apply_kwargs
 
         def _attach_bounds(keys, range_bounds):

@@ -79,8 +79,8 @@ class MergeFunc(Annotatable):
         merge_kwargs = self.merge_kwargs
         if merge_kwargs is None:
             merge_kwargs = {}
-        merge_func = substitute_templates(merge_func, self.context, sub_id=self.sub_id_prefix + "merge_func")
-        merge_kwargs = substitute_templates(merge_kwargs, self.context, sub_id=self.sub_id_prefix + "merge_kwargs")
+        merge_func = substitute_templates(merge_func, self.context, eval_id=self.sub_id_prefix + "merge_func")
+        merge_kwargs = substitute_templates(merge_kwargs, self.context, eval_id=self.sub_id_prefix + "merge_kwargs")
         return partial(merge_func, **merge_kwargs)
 
     def __call__(self, *objs, **kwargs) -> tp.Any:

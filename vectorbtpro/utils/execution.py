@@ -902,12 +902,12 @@ def execute(
             _pre_execute_func = substitute_templates(
                 pre_execute_func,
                 template_context,
-                sub_id="pre_execute_func",
+                eval_id="pre_execute_func",
             )
             _pre_execute_kwargs = substitute_templates(
                 pre_execute_kwargs,
                 template_context,
-                sub_id="pre_execute_kwargs",
+                eval_id="pre_execute_kwargs",
             )
             _pre_execute_func(**_pre_execute_kwargs)
 
@@ -931,12 +931,12 @@ def execute(
             _post_execute_func = substitute_templates(
                 post_execute_func,
                 _template_context,
-                sub_id="post_execute_func",
+                eval_id="post_execute_func",
             )
             _post_execute_kwargs = substitute_templates(
                 post_execute_kwargs,
                 _template_context,
-                sub_id="post_execute_kwargs",
+                eval_id="post_execute_kwargs",
             )
             new_outputs = _post_execute_func(**_post_execute_kwargs)
             if new_outputs is not None:
@@ -975,7 +975,7 @@ def execute(
 
     # Substitute templates
     if isinstance(funcs_args, CustomTemplate):
-        funcs_args = substitute_templates(funcs_args, template_context, sub_id="funcs_args")
+        funcs_args = substitute_templates(funcs_args, template_context, eval_id="funcs_args")
         if hasattr(funcs_args, "__len__"):
             n_calls = len(funcs_args)
         else:
@@ -1020,12 +1020,12 @@ def execute(
                 _pre_chunk_func = substitute_templates(
                     pre_chunk_func,
                     _template_context,
-                    sub_id="pre_chunk_func",
+                    eval_id="pre_chunk_func",
                 )
                 _pre_chunk_kwargs = substitute_templates(
                     pre_chunk_kwargs,
                     _template_context,
-                    sub_id="pre_chunk_kwargs",
+                    eval_id="pre_chunk_kwargs",
                 )
                 return _pre_chunk_func(**_pre_chunk_kwargs)
             return None
@@ -1044,12 +1044,12 @@ def execute(
                 _post_chunk_func = substitute_templates(
                     post_chunk_func,
                     _template_context,
-                    sub_id="post_chunk_func",
+                    eval_id="post_chunk_func",
                 )
                 _post_chunk_kwargs = substitute_templates(
                     post_chunk_kwargs,
                     _template_context,
-                    sub_id="post_chunk_kwargs",
+                    eval_id="post_chunk_kwargs",
                 )
                 new_call_outputs = _post_chunk_func(**_post_chunk_kwargs)
                 if new_call_outputs is not None:

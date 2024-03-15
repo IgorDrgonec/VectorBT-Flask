@@ -1194,7 +1194,7 @@ class Ranges(PriceRecords):
                         close=close,
                         ohlc=ohlc,
                     ),
-                    sub_id="shape_kwargs",
+                    eval_id="shape_kwargs",
                 )
                 _shape_kwargs = merge_dicts(
                     dict(

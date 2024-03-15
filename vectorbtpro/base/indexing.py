@@ -2105,7 +2105,7 @@ class RowIdxr(IdxrBase):
         idxr = self.idxr
         if isinstance(idxr, CustomTemplate):
             _template_context = merge_dicts(dict(index=index, freq=freq), template_context)
-            idxr = idxr.substitute(_template_context, sub_id="idxr")
+            idxr = idxr.substitute(_template_context, eval_id="idxr")
         if not isinstance(idxr, UniIdxr):
             if isinstance(idxr, IdxrBase):
                 raise TypeError(f"Indexer of {type(self)} must be an instance of UniIdxr")
@@ -2136,7 +2136,7 @@ class ColIdxr(IdxrBase):
         idxr = self.idxr
         if isinstance(idxr, CustomTemplate):
             _template_context = merge_dicts(dict(columns=columns), template_context)
-            idxr = idxr.substitute(_template_context, sub_id="idxr")
+            idxr = idxr.substitute(_template_context, eval_id="idxr")
         if not isinstance(idxr, UniIdxr):
             if isinstance(idxr, IdxrBase):
                 raise TypeError(f"Indexer of {type(self)} must be an instance of UniIdxr")
@@ -2176,7 +2176,7 @@ class Idxr(IdxrBase):
             idxr = self.idxrs[0]
             if isinstance(idxr, CustomTemplate):
                 _template_context = merge_dicts(dict(index=index, columns=columns, freq=freq), template_context)
-                idxr = idxr.substitute(_template_context, sub_id="idxr")
+                idxr = idxr.substitute(_template_context, eval_id="idxr")
                 if isinstance(idxr, tuple):
                     return type(self)(*idxr).get(
                         index=index,
@@ -2408,7 +2408,7 @@ class IdxSetter:
                     ),
                     template_context,
                 )
-                v = v.substitute(_template_context, sub_id="set")
+                v = v.substitute(_template_context, eval_id="set")
             if not isinstance(v, np.ndarray):
                 v = np.asarray(v)
 

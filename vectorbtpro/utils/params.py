@@ -267,6 +267,20 @@ class Param(Annotatable):
     mono_merge_kwargs: tp.KwargsLike = attr.ib(default=None)
     """Keyword arguments passed to `Param.mono_merge_func`."""
 
+    eval_id: tp.Optional[tp.MaybeSequence[tp.Hashable]] = attr.ib(default=None)
+    """One or more identifiers at which to evaluate this instance."""
+
+    def meets_eval_id(self, eval_id: tp.Optional[tp.Hashable]) -> bool:
+        """Return whether the evaluation id of the instance meets the global evaluation id."""
+        if self.eval_id is not None and eval_id is not None:
+            if checks.is_complex_sequence(self.eval_id):
+                if eval_id not in self.eval_id:
+                    return False
+            else:
+                if eval_id != self.eval_id:
+                    return False
+        return True
+
     def check_value(self) -> None:
         """Check whether value is missing."""
         if self.value is _DEF:
@@ -441,7 +455,7 @@ def combine_params(
                 ),
                 p.context,
             )
-            values = p.map_template.substitute(param_context, sub_id="map_template")
+            values = p.map_template.substitute(param_context, eval_id="map_template")
 
         if level not in level_map:
             level_map[level] = OrderedDict()
@@ -1063,11 +1077,11 @@ class Parameterizer(Configured):
         return self._execute_kwargs
 
     @classmethod
-    def find_params_in_obj(cls, obj: tp.Any, **kwargs) -> dict:
+    def find_params_in_obj(cls, obj: tp.Any, eval_id: tp.Optional[tp.Hashable] = None, **kwargs) -> dict:
         """Find values wrapped with `Param` in a recursive manner.
 
         Uses `vectorbtpro.utils.search.find_in_obj`."""
-        return find_in_obj(obj, lambda k, v: isinstance(v, Param), **kwargs)
+        return find_in_obj(obj, lambda k, v: isinstance(v, Param) and v.meets_eval_id(eval_id), **kwargs)
 
     @classmethod
     def param_product_to_objs(cls, obj: tp.Any, param_product: dict) -> tp.List[dict]:
@@ -1085,7 +1099,11 @@ class Parameterizer(Configured):
         return new_objs
 
     @classmethod
-    def parse_and_inject_params(cls, flat_ann_args: tp.FlatAnnArgs) -> tp.FlatAnnArgs:
+    def parse_and_inject_params(
+        cls,
+        flat_ann_args: tp.FlatAnnArgs,
+        eval_id: tp.Optional[tp.Hashable] = None,
+    ) -> tp.FlatAnnArgs:
         """Parse `Param` instances from function annotations and inject them into flattened annotated arguments."""
         new_flat_ann_args = dict()
         for k, v in flat_ann_args.items():
@@ -1093,7 +1111,7 @@ class Parameterizer(Configured):
             if "annotation" in v:
                 if isinstance(v["annotation"], type) and issubclass(v["annotation"], Param):
                     v["annotation"] = v["annotation"]()
-                if isinstance(v["annotation"], Param):
+                if isinstance(v["annotation"], Param) and v["annotation"].meets_eval_id(eval_id):
                     if "value" in v:
                         if not isinstance(v["value"], Param):
                             v["value"] = attr.evolve(v["annotation"], value=v["value"])
@@ -1163,7 +1181,7 @@ class Parameterizer(Configured):
         template_context: tp.KwargsLike = None,
     ) -> tp.Tuple[tp.List[tp.Kwargs], tp.Optional[tp.Index], bool]:
         """Select a parameter combination from parameter configs and index."""
-        selection = substitute_templates(selection, template_context, sub_id="selection")
+        selection = substitute_templates(selection, template_context, eval_id="selection")
         if isinstance(selection, _NoResult):
             raise NoResultsException
         found_param = False
@@ -1236,8 +1254,8 @@ class Parameterizer(Configured):
                 v["value"] = param_config[k]
                 _ann_args[k] = v
             _args, _kwargs = ann_args_to_args(_ann_args)
-            _args = substitute_templates(_args, _template_context, sub_id="args")
-            _kwargs = substitute_templates(_kwargs, _template_context, sub_id="kwargs")
+            _args = substitute_templates(_args, _template_context, eval_id="args")
+            _kwargs = substitute_templates(_kwargs, _template_context, eval_id="kwargs")
             yield func, _args, _kwargs
 
     @classmethod
@@ -1367,7 +1385,13 @@ class Parameterizer(Configured):
 
         return self.roll_param_config(new_param_config, ann_args)
 
-    def run(self, *args, param_configs: tp.Optional[tp.MaybeSequence[tp.Kwargs]] = None, **kwargs) -> tp.Any:
+    def run(
+        self,
+        *args,
+        param_configs: tp.Optional[tp.MaybeSequence[tp.Kwargs]] = None,
+        eval_id: tp.Optional[tp.Hashable] = None,
+        **kwargs,
+    ) -> tp.Any:
         """Parameterize arguments and run the function.
 
         Does the following:
@@ -1469,7 +1493,10 @@ class Parameterizer(Configured):
         )
         template_context["flat_ann_args"] = flatten_ann_args(template_context["ann_args"])
         if has_annotatables(self.func):
-            template_context["flat_ann_args"] = self.parse_and_inject_params(template_context["flat_ann_args"])
+            template_context["flat_ann_args"] = self.parse_and_inject_params(
+                template_context["flat_ann_args"],
+                eval_id=eval_id,
+            )
             template_context["ann_args"] = unflatten_ann_args(
                 template_context["flat_ann_args"],
                 partial_ann_args=template_context["ann_args"],
@@ -1501,7 +1528,7 @@ class Parameterizer(Configured):
         for k, v in template_context["flat_ann_args"].items():
             if "value" in v:
                 paramable_kwargs[k] = v["value"]
-        param_dct = self.find_params_in_obj(paramable_kwargs, **param_search_kwargs)
+        param_dct = self.find_params_in_obj(paramable_kwargs, eval_id=eval_id, **param_search_kwargs)
         param_index = None
         if len(param_dct) > 0:
             param_product, param_index = combine_params(
@@ -1712,6 +1739,7 @@ def parameterized(
     return_meta: tp.Optional[bool] = None,
     return_param_index: tp.Optional[bool] = None,
     execute_kwargs: tp.KwargsLike = None,
+    eval_id: tp.Optional[tp.Hashable] = None,
     **kwargs,
 ) -> tp.Callable:
     """Decorator that parameterizes the inputs of a function using `Parameterizer`.
@@ -1879,7 +1907,7 @@ def parameterized(
                     if merge:
                         return merge_dicts(wrapper.options[key], kwargs.pop("_" + key))
                     return kwargs.pop("_" + key)
-                return wrapper.options[key]
+                return wrapper.options.get(key)
 
             parameterizer_cls = wrapper.options["parameterizer_cls"]
             if parameterizer_cls is None:
@@ -1915,7 +1943,7 @@ def parameterized(
                 return_meta=_resolve_key("return_meta"),
                 return_param_index=_resolve_key("return_param_index"),
                 execute_kwargs=_resolve_key("execute_kwargs", merge=True),
-            ).run(*args, **kwargs)
+            ).run(*args, eval_id=eval_id, **kwargs)
 
         wrapper.func = func
         wrapper.name = func.__name__
@@ -1950,6 +1978,7 @@ def parameterized(
                 return_meta=return_meta,
                 return_param_index=return_param_index,
                 execute_kwargs=merge_dicts(kwargs, execute_kwargs),
+                eval_id=eval_id,
             ),
             options_=dict(
                 frozen_keys=True,

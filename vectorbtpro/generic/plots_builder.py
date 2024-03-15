@@ -198,18 +198,18 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
             sub_settings = substitute_templates(
                 settings,
                 context=template_context,
-                sub_id="sub_settings",
+                eval_id="sub_settings",
                 strict=False,
             )
             sub_make_subplots_kwargs = substitute_templates(
                 make_subplots_kwargs,
                 context=template_context,
-                sub_id="sub_make_subplots_kwargs",
+                eval_id="sub_make_subplots_kwargs",
             )
             sub_layout_kwargs = substitute_templates(
                 layout_kwargs,
                 context=template_context,
-                sub_id="sub_layout_kwargs",
+                eval_id="sub_layout_kwargs",
             )
         else:
             sub_settings = settings
@@ -269,12 +269,12 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                 subplot_context = substitute_templates(
                     subplot_context,
                     context=subplot_context,
-                    sub_id="subplot_context",
+                    eval_id="subplot_context",
                 )
                 _subplot_settings = _subplot_settings.substitute(
                     context=subplot_context,
                     strict=True,
-                    sub_id="subplot",
+                    eval_id="subplot",
                 )
             if isinstance(_subplot_settings, list):
                 for __subplot_settings in _subplot_settings:
@@ -325,14 +325,14 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
             template_context_merged = substitute_templates(
                 template_context_merged,
                 context=merged_settings,
-                sub_id="template_context_merged",
+                eval_id="template_context_merged",
             )
             context = merge_dicts(template_context_merged, merged_settings)
             # safe because we will use substitute_templates again once layout params are known
             merged_settings = substitute_templates(
                 merged_settings,
                 context=context,
-                sub_id="merged_settings",
+                eval_id="merged_settings",
             )
 
             # Filter by tag
@@ -382,7 +382,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                 _filter_settings = substitute_templates(
                     filter_settings,
                     context=context,
-                    sub_id="filter_settings",
+                    eval_id="filter_settings",
                 )
                 filter_func = _filter_settings["filter_func"]
                 warning_message = _filter_settings.get("warning_message", None)
@@ -558,7 +558,7 @@ class PlotsBuilderMixin(metaclass=MetaPlotsBuilderMixin):
                         custom_arg_names.add(k)
                 final_kwargs = merge_dicts(subplot_layout_kwargs, final_kwargs)
                 context = merge_dicts(subplot_layout_kwargs, context)
-                final_kwargs = substitute_templates(final_kwargs, context=context, sub_id="final_kwargs")
+                final_kwargs = substitute_templates(final_kwargs, context=context, eval_id="final_kwargs")
 
                 # Clean up keys
                 for k, v in list(final_kwargs.items()):

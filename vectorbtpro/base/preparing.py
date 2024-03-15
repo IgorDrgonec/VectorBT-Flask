@@ -356,7 +356,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         if arg is not None:
             arg_config = self.arg_config[arg_name]
             if arg_config.get("substitute_templates", False):
-                arg = substitute_templates(arg, self.template_context, sub_id=arg_name)
+                arg = substitute_templates(arg, self.template_context, eval_id=arg_name)
             if "map_enum_kwargs" in arg_config:
                 arg = map_enum_fields(arg, **arg_config["map_enum_kwargs"])
             if arg_config.get("is_td", False):

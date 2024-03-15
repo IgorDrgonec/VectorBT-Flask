@@ -322,7 +322,7 @@ class SignalsAccessor(GenericAccessor):
             dict(shape=shape, shape_2d=shape_2d, wait=wait),
             template_context,
         )
-        place_args = substitute_templates(place_args, template_context, sub_id="place_args")
+        place_args = substitute_templates(place_args, template_context, eval_id="place_args")
         func = jit_reg.resolve_option(nb.generate_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         result = func(
@@ -475,8 +475,8 @@ class SignalsAccessor(GenericAccessor):
             ),
             template_context,
         )
-        entry_place_args = substitute_templates(entry_place_args, template_context, sub_id="entry_place_args")
-        exit_place_args = substitute_templates(exit_place_args, template_context, sub_id="exit_place_args")
+        entry_place_args = substitute_templates(entry_place_args, template_context, eval_id="entry_place_args")
+        exit_place_args = substitute_templates(exit_place_args, template_context, eval_id="exit_place_args")
         func = jit_reg.resolve_option(nb.generate_enex_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         result1, result2 = func(
@@ -558,7 +558,7 @@ class SignalsAccessor(GenericAccessor):
             dict(wait=wait, until_next=until_next, skip_until_exit=skip_until_exit),
             template_context,
         )
-        exit_place_args = substitute_templates(exit_place_args, template_context, sub_id="exit_place_args")
+        exit_place_args = substitute_templates(exit_place_args, template_context, eval_id="exit_place_args")
         func = jit_reg.resolve_option(nb.generate_ex_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         exits = func(
@@ -1614,7 +1614,7 @@ class SignalsAccessor(GenericAccessor):
             ),
             template_context,
         )
-        rank_args = substitute_templates(rank_args, template_context, sub_id="rank_args")
+        rank_args = substitute_templates(rank_args, template_context, eval_id="rank_args")
         func = jit_reg.resolve_option(nb.rank_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         rank = func(

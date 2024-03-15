@@ -2216,7 +2216,7 @@ class PortfolioOptimizer(Analyzable):
                             skip_not_found=_skip_not_found,
                         ),
                         _template_context,
-                        sub_id="get_index_points_defaults",
+                        eval_id="get_index_points_defaults",
                         strict=True,
                     )
                     _index_points = wrapper.get_index_points(**get_index_points_kwargs)
@@ -2229,7 +2229,7 @@ class PortfolioOptimizer(Analyzable):
                     _index_points = substitute_templates(
                         _index_points,
                         _template_context,
-                        sub_id="index_points",
+                        eval_id="index_points",
                         strict=True,
                     )
                     _index_points = to_1d_array(_index_points)
@@ -2239,11 +2239,11 @@ class PortfolioOptimizer(Analyzable):
                     _allocate_func = substitute_templates(
                         _allocate_func,
                         _template_context,
-                        sub_id="allocate_func",
+                        eval_id="allocate_func",
                         strict=True,
                     )
-                    _args = substitute_templates(_args, _template_context, sub_id="args")
-                    _kwargs = substitute_templates(_kwargs, _template_context, sub_id="kwargs")
+                    _args = substitute_templates(_args, _template_context, eval_id="args")
+                    _kwargs = substitute_templates(_kwargs, _template_context, eval_id="kwargs")
                     func = jit_reg.resolve_option(nb.allocate_meta_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
                     _allocations = func(len(wrapper.columns), _index_points, _allocate_func, *_args, **_kwargs)
@@ -2254,11 +2254,11 @@ class PortfolioOptimizer(Analyzable):
                         __allocate_func = substitute_templates(
                             _allocate_func,
                             __template_context,
-                            sub_id="allocate_func",
+                            eval_id="allocate_func",
                             strict=True,
                         )
-                        __args = substitute_templates(_args, __template_context, sub_id="args")
-                        __kwargs = substitute_templates(_kwargs, __template_context, sub_id="kwargs")
+                        __args = substitute_templates(_args, __template_context, eval_id="args")
+                        __kwargs = substitute_templates(_kwargs, __template_context, eval_id="kwargs")
                         funcs_args.append((__allocate_func, __args, __kwargs))
 
                     _execute_kwargs = merge_dicts(
@@ -3033,7 +3033,7 @@ class PortfolioOptimizer(Analyzable):
                             jitted=_jitted,
                         ),
                         _template_context,
-                        sub_id="get_index_ranges_defaults",
+                        eval_id="get_index_ranges_defaults",
                         strict=True,
                     )
                     _index_ranges = wrapper.get_index_ranges(**get_index_ranges_defaults)
@@ -3046,7 +3046,7 @@ class PortfolioOptimizer(Analyzable):
                     _index_ranges = substitute_templates(
                         _index_ranges,
                         _template_context,
-                        sub_id="index_ranges",
+                        eval_id="index_ranges",
                         strict=True,
                     )
                     if isinstance(_index_ranges, np.ndarray):
@@ -3059,7 +3059,7 @@ class PortfolioOptimizer(Analyzable):
                     _index_loc = substitute_templates(
                         _index_loc,
                         _template_context,
-                        sub_id="index_loc",
+                        eval_id="index_loc",
                         strict=True,
                     )
                     _index_loc = to_1d_array(_index_loc)
@@ -3069,11 +3069,11 @@ class PortfolioOptimizer(Analyzable):
                     _optimize_func = substitute_templates(
                         _optimize_func,
                         _template_context,
-                        sub_id="optimize_func",
+                        eval_id="optimize_func",
                         strict=True,
                     )
-                    _args = substitute_templates(_args, _template_context, sub_id="args")
-                    _kwargs = substitute_templates(_kwargs, _template_context, sub_id="kwargs")
+                    _args = substitute_templates(_args, _template_context, eval_id="args")
+                    _kwargs = substitute_templates(_kwargs, _template_context, eval_id="kwargs")
                     func = jit_reg.resolve_option(nb.optimize_meta_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
                     _allocations = func(
@@ -3092,11 +3092,11 @@ class PortfolioOptimizer(Analyzable):
                         __optimize_func = substitute_templates(
                             _optimize_func,
                             __template_context,
-                            sub_id="optimize_func",
+                            eval_id="optimize_func",
                             strict=True,
                         )
-                        __args = substitute_templates(_args, __template_context, sub_id="args")
-                        __kwargs = substitute_templates(_kwargs, __template_context, sub_id="kwargs")
+                        __args = substitute_templates(_args, __template_context, eval_id="args")
+                        __kwargs = substitute_templates(_kwargs, __template_context, eval_id="kwargs")
                         funcs_args.append((__optimize_func, __args, __kwargs))
 
                     _execute_kwargs = merge_dicts(
@@ -3119,7 +3119,7 @@ class PortfolioOptimizer(Analyzable):
                     _alloc_wait = substitute_templates(
                         _alloc_wait,
                         _template_context,
-                        sub_id="alloc_wait",
+                        eval_id="alloc_wait",
                         strict=True,
                     )
                     alloc_idx = _index_ranges[1] - 1 + _alloc_wait

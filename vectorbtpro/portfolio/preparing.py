@@ -501,7 +501,7 @@ class BasePFPreparer(BasePreparer):
     @cachedproperty
     def in_outputs(self) -> tp.Optional[tp.NamedTuple]:
         """Argument `in_outputs`."""
-        return substitute_templates(self._pre_in_outputs, self.template_context, sub_id="in_outputs")
+        return substitute_templates(self._pre_in_outputs, self.template_context, eval_id="in_outputs")
 
     # ############# Result ############# #
 

@@ -817,8 +817,8 @@ class IndicatorBase(Analyzable):
                     ),
                     template_context,
                 )
-                func_args = substitute_templates(func_args, template_context, sub_id="custom_func_args")
-                func_kwargs = substitute_templates(func_kwargs, template_context, sub_id="custom_func_kwargs")
+                func_args = substitute_templates(func_args, template_context, eval_id="custom_func_args")
+                func_kwargs = substitute_templates(func_kwargs, template_context, eval_id="custom_func_kwargs")
 
             # Run the custom function
             if checks.is_numba_func(custom_func):

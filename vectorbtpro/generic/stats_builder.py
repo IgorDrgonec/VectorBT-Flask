@@ -273,7 +273,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
             sub_settings = substitute_templates(
                 settings,
                 context=template_context,
-                sub_id="sub_settings",
+                eval_id="sub_settings",
                 strict=False,
             )
         else:
@@ -334,12 +334,12 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 metric_context = substitute_templates(
                     metric_context,
                     context=metric_context,
-                    sub_id="metric_context",
+                    eval_id="metric_context",
                 )
                 _metric_settings = _metric_settings.substitute(
                     context=metric_context,
                     strict=True,
-                    sub_id="metric",
+                    eval_id="metric",
                 )
             if isinstance(_metric_settings, list):
                 for __metric_settings in _metric_settings:
@@ -391,13 +391,13 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
             template_context_merged = substitute_templates(
                 template_context_merged,
                 context=merged_settings,
-                sub_id="template_context_merged",
+                eval_id="template_context_merged",
             )
             context = merge_dicts(template_context_merged, merged_settings)
             merged_settings = substitute_templates(
                 merged_settings,
                 context=context,
-                sub_id="merged_settings",
+                eval_id="merged_settings",
             )
 
             # Filter by tag
@@ -447,7 +447,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 _filter_settings = substitute_templates(
                     filter_settings,
                     context=context,
-                    sub_id="filter_settings",
+                    eval_id="filter_settings",
                 )
                 filter_func = _filter_settings["filter_func"]
                 warning_message = _filter_settings.get("warning_message", None)

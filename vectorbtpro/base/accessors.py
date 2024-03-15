@@ -932,8 +932,8 @@ class BaseAccessor(Wrapping):
                     ),
                     template_context,
                 )
-                _func_args = substitute_templates(args, _template_context, sub_id="func_args")
-                _func_kwargs = substitute_templates(func_kwargs, _template_context, sub_id="func_kwargs")
+                _func_args = substitute_templates(args, _template_context, eval_id="func_args")
+                _func_kwargs = substitute_templates(func_kwargs, _template_context, eval_id="func_kwargs")
                 v = value_or_func(*_func_args, **_func_kwargs)
                 if self.is_series() or columns is None:
                     obj.iloc[index_points[i]] = v
@@ -1003,8 +1003,8 @@ class BaseAccessor(Wrapping):
                     ),
                     template_context,
                 )
-                _func_args = substitute_templates(args, _template_context, sub_id="func_args")
-                _func_kwargs = substitute_templates(func_kwargs, _template_context, sub_id="func_kwargs")
+                _func_args = substitute_templates(args, _template_context, eval_id="func_args")
+                _func_kwargs = substitute_templates(func_kwargs, _template_context, eval_id="func_kwargs")
                 v = value_or_func(*_func_args, **_func_kwargs)
             elif checks.is_sequence(value_or_func) and not isinstance(value_or_func, str):
                 v = value_or_func[i]
@@ -1362,8 +1362,8 @@ class BaseAccessor(Wrapping):
         elif not keep_pd:
             broadcast_named_args = {k: np.asarray(v) for k, v in broadcast_named_args.items()}
         template_context = merge_dicts(broadcast_named_args, template_context)
-        args = substitute_templates(args, template_context, sub_id="args")
-        kwargs = substitute_templates(kwargs, template_context, sub_id="kwargs")
+        args = substitute_templates(args, template_context, eval_id="args")
+        kwargs = substitute_templates(kwargs, template_context, eval_id="kwargs")
         out = apply_func(broadcast_named_args["obj"], *args, **kwargs)
         return wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
@@ -1501,8 +1501,8 @@ class BaseAccessor(Wrapping):
         elif not keep_pd:
             broadcast_named_args = {k: np.asarray(v) for k, v in broadcast_named_args.items()}
         template_context = merge_dicts(broadcast_named_args, dict(ntimes=ntimes), template_context)
-        args = substitute_templates(args, template_context, sub_id="args")
-        kwargs = substitute_templates(kwargs, template_context, sub_id="kwargs")
+        args = substitute_templates(args, template_context, eval_id="args")
+        kwargs = substitute_templates(kwargs, template_context, eval_id="kwargs")
         out = combining.apply_and_concat(ntimes, apply_func, broadcast_named_args["obj"], *args, **kwargs)
         if keys is not None:
             new_columns = indexes.combine_indexes([keys, wrapper.columns])
@@ -1682,8 +1682,8 @@ class BaseAccessor(Wrapping):
         elif not keep_pd:
             broadcast_named_args = {k: np.asarray(v) for k, v in broadcast_named_args.items()}
         template_context = merge_dicts(broadcast_named_args, template_context)
-        args = substitute_templates(args, template_context, sub_id="args")
-        kwargs = substitute_templates(kwargs, template_context, sub_id="kwargs")
+        args = substitute_templates(args, template_context, eval_id="args")
+        kwargs = substitute_templates(kwargs, template_context, eval_id="kwargs")
         inputs = [broadcast_named_args["obj_" + str(i)] for i in range(len(objs))]
 
         if concat is None:

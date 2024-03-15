@@ -408,7 +408,7 @@ def cv_split(
                     _parameterized_kwargs = substitute_templates(
                         parameterized_kwargs,
                         __template_context,
-                        sub_id="parameterized_kwargs",
+                        eval_id="parameterized_kwargs",
                     )
                     parameterized_func = parameterized(
                         func,
@@ -460,7 +460,7 @@ def cv_split(
                 new_parameters = tuple(signature.parameters.values()) + (var_kwargs_param,)
                 apply_wrapper.__signature__ = signature.replace(parameters=new_parameters)
             split_func = split(apply_wrapper, template_context=template_context, **split_kwargs)
-            return split_func(*args, __template_context=Rep("context", sub_id="apply_kwargs"), **kwargs)
+            return split_func(*args, __template_context=Rep("context", eval_id="apply_kwargs"), **kwargs)
 
         wrapper.func = func
         wrapper.name = func.__name__

@@ -2158,7 +2158,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             data = self.run(feature, **run_kwargs, unpack=True)
             data = self.symbol_wrapper.wrap(data, **wrap_kwargs)
         if isinstance(data, CustomTemplate):
-            data = data.substitute(dict(data=self), sub_id="data")
+            data = data.substitute(dict(data=self), eval_id="data")
         if isinstance(data, pd.Series) and self.symbol_wrapper.ndim == 1:
             data = data.copy(deep=False)
             data.name = self.symbols[0]
@@ -2191,7 +2191,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         if data is None:
             data = type(self).pull(symbol, **pull_kwargs).get(**get_kwargs)
         if isinstance(data, CustomTemplate):
-            data = data.substitute(dict(data=self), sub_id="data")
+            data = data.substitute(dict(data=self), eval_id="data")
         if isinstance(data, pd.Series) and self.feature_wrapper.ndim == 1:
             data = data.copy(deep=False)
             data.name = self.features[0]
@@ -2240,7 +2240,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         Will try to determine the orientation automatically."""
         if data is not None:
             if isinstance(data, CustomTemplate):
-                data = data.substitute(dict(data=self), sub_id="data")
+                data = data.substitute(dict(data=self), eval_id="data")
             if isinstance(data, pd.Series):
                 columns = [data.name]
             else:
@@ -3242,9 +3242,9 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             template_context = {}
 
         def _transform(data, _template_context=None):
-            _transform_func = substitute_templates(transform_func, _template_context, sub_id="transform_func")
-            _args = substitute_templates(args, _template_context, sub_id="args")
-            _kwargs = substitute_templates(kwargs, _template_context, sub_id="kwargs")
+            _transform_func = substitute_templates(transform_func, _template_context, eval_id="transform_func")
+            _args = substitute_templates(args, _template_context, eval_id="args")
+            _kwargs = substitute_templates(kwargs, _template_context, eval_id="kwargs")
             return _transform_func(data, *_args, **_kwargs)
 
         if (self.feature_oriented and (per_feature and not per_symbol)) or (
@@ -3883,9 +3883,9 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             else:
                 _arg = arg
         if isinstance(_arg, CustomTemplate):
-            _arg = _arg.substitute(template_context, sub_id=arg_name)
+            _arg = _arg.substitute(template_context, eval_id=arg_name)
         elif is_kwargs:
-            _arg = substitute_templates(_arg, template_context, sub_id=arg_name)
+            _arg = substitute_templates(_arg, template_context, eval_id=arg_name)
         return _arg
 
     def to_csv(

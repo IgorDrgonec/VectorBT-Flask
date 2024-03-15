@@ -68,7 +68,7 @@ class GBMOHLCData(SyntheticData):
         """
         n_ticks = cls.resolve_custom_setting(n_ticks, "n_ticks")
         template_context = merge_dicts(dict(symbol=symbol, index=index), template_context)
-        n_ticks = substitute_templates(n_ticks, template_context, sub_id="n_ticks")
+        n_ticks = substitute_templates(n_ticks, template_context, eval_id="n_ticks")
         n_ticks = broadcast_array_to(n_ticks, len(index))
         start_value = cls.resolve_custom_setting(start_value, "start_value")
         mean = cls.resolve_custom_setting(mean, "mean")
