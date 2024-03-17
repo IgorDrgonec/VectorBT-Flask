@@ -111,7 +111,6 @@ Name: group, dtype: object
 ![](/assets/images/api/ranges_plots.dark.svg#only-dark){: .iimg loading=lazy }
 """
 
-import attr
 import warnings
 
 import numpy as np
@@ -129,6 +128,7 @@ from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks, datetime_ as dt
+from vectorbtpro.utils.attr_ import define, fld, MISSING, AttrsMixin
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.enum_ import map_enum_fields
@@ -145,10 +145,6 @@ __all__ = [
 ]
 
 __pdoc__ = {}
-
-
-class _DEF:
-    pass
 
 
 # ############# Ranges ############# #
@@ -1520,56 +1516,56 @@ Ranges.override_subplots_doc(__pdoc__)
 PatternRangesT = tp.TypeVar("PatternRangesT", bound="PatternRanges")
 
 
-@attr.s(frozen=True, eq=False)
-class PSC:
+@define
+class PSC(AttrsMixin):
     """Class that represents a pattern search config.
 
     Every field will be resolved into the format suitable for Numba."""
 
-    pattern: tp.Union[tp.ArrayLike] = attr.ib(default=_DEF)
+    pattern: tp.Union[tp.ArrayLike] = fld(default=MISSING)
     """Flexible pattern array.
     
     Can be smaller or bigger than the source array; in such a case, the values of the smaller array
     will be "stretched" by interpolation of the type in `PSC.interp_mode`."""
 
-    window: tp.Optional[int] = attr.ib(default=_DEF)
+    window: tp.Optional[int] = fld(default=MISSING)
     """Minimum window.
     
     Defaults to the length of `PSC.pattern`."""
 
-    max_window: tp.Optional[int] = attr.ib(default=_DEF)
+    max_window: tp.Optional[int] = fld(default=MISSING)
     """Maximum window (including)."""
 
-    row_select_prob: tp.Union[float] = attr.ib(default=_DEF)
+    row_select_prob: tp.Union[float] = fld(default=MISSING)
     """Row selection probability."""
 
-    window_select_prob: tp.Union[float] = attr.ib(default=_DEF)
+    window_select_prob: tp.Union[float] = fld(default=MISSING)
     """Window selection probability."""
 
-    roll_forward: tp.Union[bool] = attr.ib(default=_DEF)
+    roll_forward: tp.Union[bool] = fld(default=MISSING)
     """Whether to roll windows to the left of the current row, otherwise to the right."""
 
-    interp_mode: tp.Union[int, str] = attr.ib(default=_DEF)
+    interp_mode: tp.Union[int, str] = fld(default=MISSING)
     """Interpolation mode. See `vectorbtpro.generic.enums.InterpMode`."""
 
-    rescale_mode: tp.Union[int, str] = attr.ib(default=_DEF)
+    rescale_mode: tp.Union[int, str] = fld(default=MISSING)
     """Rescaling mode. See `vectorbtpro.generic.enums.RescaleMode`."""
 
-    vmin: tp.Union[float] = attr.ib(default=_DEF)
+    vmin: tp.Union[float] = fld(default=MISSING)
     """Minimum value of any window. Should only be used when the array has fixed bounds.
     
     Used in rescaling using `RescaleMode.MinMax` and checking against `PSC.min_pct_change` and `PSC.max_pct_change`.
     
     If `np.nan`, gets calculated dynamically."""
 
-    vmax: tp.Union[float] = attr.ib(default=_DEF)
+    vmax: tp.Union[float] = fld(default=MISSING)
     """Maximum value of any window. Should only be used when the array has fixed bounds.
     
     Used in rescaling using `RescaleMode.MinMax` and checking against `PSC.min_pct_change` and `PSC.max_pct_change`.
     
     If `np.nan`, gets calculated dynamically."""
 
-    pmin: tp.Union[float] = attr.ib(default=_DEF)
+    pmin: tp.Union[float] = fld(default=MISSING)
     """Value to be considered as the minimum of `PSC.pattern`.
     
     Used in rescaling using `RescaleMode.MinMax` and calculating the maximum distance at each point 
@@ -1577,7 +1573,7 @@ class PSC:
     
     If `np.nan`, gets calculated dynamically."""
 
-    pmax: tp.Union[float] = attr.ib(default=_DEF)
+    pmax: tp.Union[float] = fld(default=MISSING)
     """Value to be considered as the maximum of `PSC.pattern`.
     
     Used in rescaling using `RescaleMode.MinMax` and calculating the maximum distance at each point 
@@ -1585,27 +1581,27 @@ class PSC:
     
     If `np.nan`, gets calculated dynamically."""
 
-    invert: tp.Union[bool] = attr.ib(default=_DEF)
+    invert: tp.Union[bool] = fld(default=MISSING)
     """Whether to invert the pattern vertically."""
 
-    error_type: tp.Union[int, str] = attr.ib(default=_DEF)
+    error_type: tp.Union[int, str] = fld(default=MISSING)
     """Error type. See `vectorbtpro.generic.enums.ErrorType`."""
 
-    distance_measure: tp.Union[int, str] = attr.ib(default=_DEF)
+    distance_measure: tp.Union[int, str] = fld(default=MISSING)
     """Distance measure. See `vectorbtpro.generic.enums.DistanceMeasure`."""
 
-    max_error: tp.Union[tp.ArrayLike] = attr.ib(default=_DEF)
+    max_error: tp.Union[tp.ArrayLike] = fld(default=MISSING)
     """Maximum error at each point. Can be provided as a flexible array.
     
     If `max_error` is an array, it must be of the same size as the pattern array.
     It also should be provided within the same scale as the pattern."""
 
-    max_error_interp_mode: tp.Union[None, int, str] = attr.ib(default=_DEF)
+    max_error_interp_mode: tp.Union[None, int, str] = fld(default=MISSING)
     """Interpolation mode for `PSC.max_error`. See `vectorbtpro.generic.enums.InterpMode`.
     
     If None, defaults to `PSC.interp_mode`."""
 
-    max_error_as_maxdist: tp.Union[bool] = attr.ib(default=_DEF)
+    max_error_as_maxdist: tp.Union[bool] = fld(default=MISSING)
     """Whether `PSC.max_error` should be used as the maximum distance at each point.
     
     If False, crossing `PSC.max_error` will set the distance to the maximum distance
@@ -1613,43 +1609,43 @@ class PSC:
     
     If True and any of the points in a window is `np.nan`, the point will be skipped."""
 
-    max_error_strict: tp.Union[bool] = attr.ib(default=_DEF)
+    max_error_strict: tp.Union[bool] = fld(default=MISSING)
     """Whether crossing `PSC.max_error` even once should yield the similarity of `np.nan`."""
 
-    min_pct_change: tp.Union[float] = attr.ib(default=_DEF)
+    min_pct_change: tp.Union[float] = fld(default=MISSING)
     """Minimum percentage change of the window to stay a candidate for search.
 
     If any window doesn't cross this mark, its similarity becomes `np.nan`."""
 
-    max_pct_change: tp.Union[float] = attr.ib(default=_DEF)
+    max_pct_change: tp.Union[float] = fld(default=MISSING)
     """Maximum percentage change of the window to stay a candidate for search.
 
     If any window crosses this mark, its similarity becomes `np.nan`."""
 
-    min_similarity: tp.Union[float] = attr.ib(default=_DEF)
+    min_similarity: tp.Union[float] = fld(default=MISSING)
     """Minimum similarity.
     
     If any window doesn't cross this mark, its similarity becomes `np.nan`."""
 
-    minp: tp.Optional[int] = attr.ib(default=_DEF)
+    minp: tp.Optional[int] = fld(default=MISSING)
     """Minimum number of observations in price window required to have a value."""
 
-    overlap_mode: tp.Union[int, str] = attr.ib(default=_DEF)
+    overlap_mode: tp.Union[int, str] = fld(default=MISSING)
     """Overlapping mode. See `vectorbtpro.generic.enums.OverlapMode`."""
 
-    max_records: tp.Optional[int] = attr.ib(default=_DEF)
+    max_records: tp.Optional[int] = fld(default=MISSING)
     """Maximum number of records expected to be filled.
     
     Set to avoid creating empty arrays larger than needed."""
 
-    name: tp.Optional[str] = attr.ib(default=None)
+    name: tp.Optional[str] = fld(default=None)
     """Name of the config."""
 
     def __eq__(self, other):
         return checks.is_deep_equal(self, other)
 
     def __hash__(self):
-        dct = attr.asdict(self)
+        dct = self.asdict()
         if isinstance(dct["pattern"], np.ndarray):
             dct["pattern"] = tuple(dct["pattern"])
         else:
@@ -1698,14 +1694,14 @@ class PatternRanges(Ranges):
             search_config = dict()
         if isinstance(search_config, dict):
             search_config = PSC(**search_config)
-        search_config = attr.asdict(search_config)
+        search_config = search_config.asdict()
         defaults = {}
         for k, v in get_func_kwargs(cls.from_pattern_search).items():
             if k in search_config:
                 defaults[k] = v
         defaults = merge_dicts(defaults, kwargs)
         for k, v in search_config.items():
-            if v is _DEF:
+            if v is MISSING:
                 v = defaults[k]
             if k == "pattern":
                 if v is None:
@@ -1799,7 +1795,7 @@ class PatternRanges(Ranges):
         arr = to_pd_array(arr)
         arr_2d = to_2d_array(arr)
         arr_wrapper = ArrayWrapper.from_obj(arr)
-        psc_keys = [a.name for a in PSC.__attrs_attrs__ if a.name != "name"]
+        psc_keys = [a.name for a in PSC.fields if a.name != "name"]
         method_locals = {k: v for k, v in locals().items() if k in psc_keys}
 
         # Flatten search configs
@@ -1859,8 +1855,8 @@ class PatternRanges(Ranges):
                 for i in range(len(param_columns)):
                     for search_config in flat_search_configs:
                         new_search_config = dict()
-                        for k, v in attr.asdict(search_config).items():
-                            if v is not _DEF:
+                        for k, v in search_config.asdict().items():
+                            if v is not MISSING:
                                 if k in param_product:
                                     raise ValueError(f"Parameter '{k}' is re-defined in a search configuration")
                                 new_search_config[k] = v
@@ -1885,7 +1881,7 @@ class PatternRanges(Ranges):
                 "arr": arr_2d[:, c % arr_2d.shape[1]],
             }
             new_search_config = cls.resolve_search_config(flat_search_configs[c], **method_locals)
-            for k, v in attr.asdict(new_search_config).items():
+            for k, v in new_search_config.asdict().items():
                 if k == "name":
                     continue
                 if isinstance(v, Param):

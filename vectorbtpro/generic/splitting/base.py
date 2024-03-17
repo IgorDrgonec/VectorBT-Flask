@@ -2,7 +2,6 @@
 
 """Base class for splitting."""
 
-import attr
 import warnings
 
 import numpy as np
@@ -12,6 +11,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro._settings import settings
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks, datetime_ as dt
+from vectorbtpro.utils.attr_ import define, fld, MISSING, AttrsMixin
 from vectorbtpro.utils.array_ import is_range
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.colors import adjust_opacity
@@ -55,33 +55,29 @@ __all__ = [
 __pdoc__ = {}
 
 
-class _DEF:
-    pass
-
-
 SplitterT = tp.TypeVar("SplitterT", bound="Splitter")
 
 
-@attr.s(frozen=True)
-class FixRange:
+@define
+class FixRange(AttrsMixin):
     """Class that represents a fixed range."""
 
-    range_: tp.FixRangeLike = attr.ib()
+    range_: tp.FixRangeLike = fld()
     """Range."""
 
 
-@attr.s(frozen=True)
-class RelRange:
+@define
+class RelRange(AttrsMixin):
     """Class that represents a relative range."""
 
-    offset: tp.Union[int, float, tp.TimedeltaLike] = attr.ib(default=0)
+    offset: tp.Union[int, float, tp.TimedeltaLike] = fld(default=0)
     """Offset.
     
     Floating values between 0 and 1 are considered relative.
     
     Can be negative."""
 
-    offset_anchor: str = attr.ib(default="prev_end")
+    offset_anchor: str = fld(default="prev_end")
     """Offset anchor.
     
     Supported are
@@ -92,7 +88,7 @@ class RelRange:
     * 'prev_end': End of the previous range
     """
 
-    offset_space: str = attr.ib(default="free")
+    offset_space: str = fld(default="free")
     """Offset space.
 
     Supported are
@@ -103,14 +99,14 @@ class RelRange:
     
     Applied only when `RelRange.offset` is a relative number."""
 
-    length: tp.Union[int, float, tp.TimedeltaLike] = attr.ib(default=1.0)
+    length: tp.Union[int, float, tp.TimedeltaLike] = fld(default=1.0)
     """Length.
     
     Floating values between 0 and 1 are considered relative.
     
     Can be negative."""
 
-    length_space: str = attr.ib(default="free")
+    length_space: str = fld(default="free")
     """Length space.
     
     Supported are
@@ -122,7 +118,7 @@ class RelRange:
     
     Applied only when `RelRange.length` is a relative number."""
 
-    out_of_bounds: str = attr.ib(default="warn")
+    out_of_bounds: str = fld(default="warn")
     """Check if start and stop are within bounds.
     
     Supported are
@@ -133,7 +129,7 @@ class RelRange:
     * 'raise": Raise an error if out-of-bounds
     """
 
-    is_gap: bool = attr.ib(default=False)
+    is_gap: bool = fld(default=False)
     """Whether the range acts as a gap."""
 
     def __attrs_post_init__(self):
@@ -301,30 +297,30 @@ class RelRange:
         return slice(start, stop)
 
 
-@attr.s(frozen=True)
-class Takeable(Annotatable):
+@define
+class Takeable(Annotatable, AttrsMixin):
     """Class that represents an object from which a range can be taken."""
 
-    obj: tp.Any = attr.ib(default=_DEF)
+    obj: tp.Any = fld(default=MISSING)
     """Takeable object."""
 
-    remap_to_obj: bool = attr.ib(default=_DEF)
+    remap_to_obj: bool = fld(default=MISSING)
     """Whether to remap `Splitter.index` to the index of `Takeable.obj`.
     
     Otherwise, will assume that the object has the same index."""
 
-    index: tp.Optional[tp.IndexLike] = attr.ib(default=_DEF)
+    index: tp.Optional[tp.IndexLike] = fld(default=MISSING)
     """Index of the object.
     
     If not present, will be accessed using `Splitter.get_obj_index`."""
 
-    freq: tp.Optional[tp.FrequencyLike] = attr.ib(default=_DEF)
+    freq: tp.Optional[tp.FrequencyLike] = fld(default=MISSING)
     """Frequency of `Takeable.index`."""
 
-    point_wise: bool = attr.ib(default=_DEF)
+    point_wise: bool = fld(default=MISSING)
     """Whether to select one range point at a time and return a tuple."""
 
-    eval_id: tp.Optional[tp.MaybeSequence[tp.Hashable]] = attr.ib(default=None)
+    eval_id: tp.Optional[tp.MaybeSequence[tp.Hashable]] = fld(default=None)
     """One or more identifiers at which to evaluate this instance."""
 
     def meets_eval_id(self, eval_id: tp.Optional[tp.Hashable]) -> bool:
@@ -340,7 +336,7 @@ class Takeable(Annotatable):
 
     def check_obj(self) -> None:
         """Check whether value is missing."""
-        if self.obj is _DEF:
+        if self.obj is MISSING:
             raise ValueError("Takeable object is missing")
 
 
@@ -3091,15 +3087,9 @@ class Splitter(Analyzable):
                 if isinstance(v["annotation"], Takeable) and v["annotation"].meets_eval_id(eval_id):
                     if "value" in v:
                         if not isinstance(v["value"], Takeable):
-                            v["value"] = attr.evolve(v["annotation"], obj=v["value"])
+                            v["value"] = v["annotation"].replace(obj=v["value"])
                         else:
-                            v["value"] = attr.evolve(
-                                v["value"],
-                                **merge_dicts(
-                                    attr.asdict(v["annotation"]),
-                                    attr.asdict(v["value"]),
-                                ),
-                            )
+                            v["value"] = v["value"].merge_over(v["annotation"])
         return new_flat_ann_args
 
     def apply(
@@ -3348,9 +3338,9 @@ class Splitter(Analyzable):
             obj_meta, obj_range_meta = self.get_ready_obj_range(
                 takeable.obj,
                 range_,
-                remap_to_obj=takeable.remap_to_obj if takeable.remap_to_obj is not _DEF else remap_to_obj,
-                obj_index=takeable.index if takeable.index is not _DEF else obj_index,
-                obj_freq=takeable.freq if takeable.freq is not _DEF else obj_freq,
+                remap_to_obj=takeable.remap_to_obj if takeable.remap_to_obj is not MISSING else remap_to_obj,
+                obj_index=takeable.index if takeable.index is not MISSING else obj_index,
+                obj_freq=takeable.freq if takeable.freq is not MISSING else obj_freq,
                 range_format=range_format,
                 template_context=_template_context,
                 silence_warnings=silence_warnings,
@@ -3363,7 +3353,7 @@ class Splitter(Analyzable):
                     dict(
                         range_=obj_range_meta["range_"],
                         range_meta=obj_range_meta,
-                        point_wise=takeable.point_wise if takeable.point_wise is not _DEF else point_wise,
+                        point_wise=takeable.point_wise if takeable.point_wise is not MISSING else point_wise,
                     ),
                     _template_context,
                 )
@@ -3372,7 +3362,7 @@ class Splitter(Analyzable):
                 obj_slice = self.take_range(
                     takeable.obj,
                     obj_range_meta["range_"],
-                    point_wise=takeable.point_wise if takeable.point_wise is not _DEF else point_wise,
+                    point_wise=takeable.point_wise if takeable.point_wise is not MISSING else point_wise,
                 )
             return obj_meta, obj_range_meta, obj_slice
 
@@ -3636,8 +3626,7 @@ class Splitter(Analyzable):
                 if is_merge_func_from_config(merge_func):
                     merge_kwargs = merge_dicts(dict(keys=keys), merge_kwargs)
                 if isinstance(merge_func, MergeFunc):
-                    merge_func = attr.evolve(
-                        merge_func,
+                    merge_func = merge_func.replace(
                         merge_kwargs=merge_kwargs,
                         context=template_context,
                     )
@@ -3719,8 +3708,7 @@ class Splitter(Analyzable):
                         else:
                             _merge_kwargs = merge_kwargs
                         if isinstance(merge_func, MergeFunc):
-                            _merge_func = attr.evolve(
-                                merge_func,
+                            _merge_func = merge_func.replace(
                                 merge_kwargs=_merge_kwargs,
                                 context=_template_context,
                             )

@@ -2,13 +2,11 @@
 
 """Global registry for chunkables."""
 
-import attr
-
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
 from vectorbtpro.utils.chunking import chunked, resolve_chunked, resolve_chunked_option
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.hashing import Hashable
 from vectorbtpro.utils.template import RepEval
 
 __all__ = [
@@ -17,23 +15,23 @@ __all__ = [
 ]
 
 
-@attr.s(frozen=True, eq=False)
-class ChunkedSetup(Hashable):
+@define
+class ChunkedSetup(AttrsMixin):
     """Class that represents a chunkable setup.
 
     !!! note
         Hashed solely by `setup_id`."""
 
-    setup_id: tp.Hashable = attr.ib()
+    setup_id: tp.Hashable = fld()
     """Setup id."""
 
-    func: tp.Callable = attr.ib()
+    func: tp.Callable = fld()
     """Chunkable function."""
 
-    options: tp.DictLike = attr.ib(default=None)
+    options: tp.DictLike = fld(default=None)
     """Options dictionary."""
 
-    tags: tp.SetLike = attr.ib(default=None)
+    tags: tp.SetLike = fld(default=None)
     """Set of tags."""
 
     @staticmethod
@@ -76,7 +74,7 @@ class ChunkableRegistry:
             if expression is None:
                 result = True
             else:
-                result = RepEval(expression).substitute(context=merge_dicts(attr.asdict(setup), context))
+                result = RepEval(expression).substitute(context=merge_dicts(setup.asdict(), context))
                 checks.assert_instance_of(result, bool)
 
             if result:

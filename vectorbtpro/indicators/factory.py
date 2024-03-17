@@ -130,7 +130,7 @@ def prepare_params(
 
     new_params = []
     params_are_multiple = False
-    for i, p_values in enumerate(params):
+    for i, param_values in enumerate(params):
         # Resolve settings
         _param_settings = resolve_dict(param_settings[i])
         is_tuple = _param_settings.get("is_tuple", False)
@@ -140,9 +140,9 @@ def prepare_params(
             if dtype_kwargs is None:
                 dtype_kwargs = {}
             if checks.is_namedtuple(dtype):
-                p_values = map_enum_fields(p_values, dtype, **dtype_kwargs)
+                param_values = map_enum_fields(param_values, dtype, **dtype_kwargs)
             else:
-                p_values = apply_mapping(p_values, dtype, **dtype_kwargs)
+                param_values = apply_mapping(param_values, dtype, **dtype_kwargs)
         is_array_like = _param_settings.get("is_array_like", False)
         min_one_dim = _param_settings.get("min_one_dim", False)
         bc_to_input = _param_settings.get("bc_to_input", False)
@@ -152,20 +152,20 @@ def prepare_params(
         )
         template = _param_settings.get("template", None)
 
-        if not is_single_param_value(p_values, is_tuple, is_array_like):
+        if not is_single_param_value(param_values, is_tuple, is_array_like):
             params_are_multiple = True
-        new_p_values = params_to_list(p_values, is_tuple, is_array_like)
+        new_param_values = params_to_list(param_values, is_tuple, is_array_like)
         if template is not None:
-            new_p_values = [
-                template.substitute(context={param_names[i]: new_p_values[j], **context})
-                for j in range(len(new_p_values))
+            new_param_values = [
+                template.substitute(context={param_names[i]: new_param_values[j], **context})
+                for j in range(len(new_param_values))
             ]
         if not bc_to_input:
             if is_array_like:
                 if min_one_dim:
-                    new_p_values = list(map(reshaping.to_1d_array, new_p_values))
+                    new_param_values = list(map(reshaping.to_1d_array, new_param_values))
                 else:
-                    new_p_values = list(map(np.asarray, new_p_values))
+                    new_param_values = list(map(np.asarray, new_param_values))
         else:
             # Broadcast to input or its axis
             if is_tuple:
@@ -181,23 +181,23 @@ def prepare_params(
                     to_shape = (input_shape[0],)
                 else:
                     to_shape = (input_shape[1],) if len(input_shape) > 1 else (1,)
-            _new_p_values = reshaping.broadcast(*new_p_values, to_shape=to_shape, **broadcast_kwargs)
-            if len(new_p_values) == 1:
-                _new_p_values = [_new_p_values]
+            _new_param_values = reshaping.broadcast(*new_param_values, to_shape=to_shape, **broadcast_kwargs)
+            if len(new_param_values) == 1:
+                _new_param_values = [_new_param_values]
             else:
-                _new_p_values = list(_new_p_values)
+                _new_param_values = list(_new_param_values)
             if to_2d and bc_to_input is True:
                 # If inputs are meant to reshape to 2D, do the same to parameters
                 # But only to those that fully resemble inputs (= not raw)
-                __new_p_values = _new_p_values.copy()
-                for j, param in enumerate(__new_p_values):
+                __new_param_values = _new_param_values.copy()
+                for j, param in enumerate(__new_param_values):
                     keep_flex = broadcast_kwargs.get("keep_flex", False)
                     if keep_flex is False or (isinstance(keep_flex, (tuple, list)) and not keep_flex[j]):
-                        __new_p_values[j] = reshaping.to_2d(param)
-                new_p_values = __new_p_values
+                        __new_param_values[j] = reshaping.to_2d(param)
+                new_param_values = __new_param_values
             else:
-                new_p_values = _new_p_values
-        new_params.append(new_p_values)
+                new_param_values = _new_param_values
+        new_params.append(new_param_values)
     return new_params, params_are_multiple
 
 
@@ -225,7 +225,7 @@ def build_columns(
     param_indexes = []
     shown_param_indexes = []
     for i in range(len(params)):
-        p_values = params[i]
+        param_values = params[i]
         level_name = None
         if level_names is not None:
             level_name = level_names[i]
@@ -239,15 +239,15 @@ def build_columns(
                 dtype = to_value_mapping(dtype, reverse=False)
             else:
                 dtype = to_value_mapping(dtype, reverse=True)
-            p_values = apply_mapping(p_values, dtype)
+            param_values = apply_mapping(param_values, dtype)
         _per_column = _param_settings.get("per_column", False)
         _post_index_func = _param_settings.get("post_index_func", None)
         if per_column:
-            param_index = indexes.index_from_values(p_values, single_value=_single_value, name=level_name)
+            param_index = indexes.index_from_values(param_values, single_value=_single_value, name=level_name)
         else:
             if _per_column:
                 param_index = None
-                for p in p_values:
+                for p in param_values:
                     bc_param = broadcast_array_to(p, len(input_columns))
                     _param_index = indexes.index_from_values(bc_param, single_value=False, name=level_name)
                     if param_index is None:
@@ -258,7 +258,7 @@ def build_columns(
                     # When using flexible column-wise parameters
                     param_index = indexes.repeat_index(param_index, len(input_columns), ignore_ranges=ignore_ranges)
             else:
-                param_index = indexes.index_from_values(p_values, single_value=_single_value, name=level_name)
+                param_index = indexes.index_from_values(param_values, single_value=_single_value, name=level_name)
                 param_index = indexes.repeat_index(param_index, len(input_columns), ignore_ranges=ignore_ranges)
         if _post_index_func is not None:
             param_index = _post_index_func(param_index)

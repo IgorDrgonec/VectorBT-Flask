@@ -2,9 +2,8 @@
 
 """Utilities for selecting."""
 
-import attr
-
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
 
 __all__ = [
     "PosSel",
@@ -14,19 +13,19 @@ __all__ = [
 ]
 
 
-@attr.s(frozen=True)
-class PosSel:
+@define
+class PosSel(AttrsMixin):
     """Class that represents a selection by position."""
 
-    value: tp.MaybeIterable[tp.Hashable] = attr.ib()
+    value: tp.MaybeIterable[tp.Hashable] = fld()
     """Selection of one or more positions."""
 
 
-@attr.s(frozen=True)
-class LabelSel:
+@define
+class LabelSel(AttrsMixin):
     """Class that represents a selection by label."""
 
-    value: tp.MaybeIterable[tp.Hashable] = attr.ib()
+    value: tp.MaybeIterable[tp.Hashable] = fld()
     """Selection of one or more labels."""
 
 

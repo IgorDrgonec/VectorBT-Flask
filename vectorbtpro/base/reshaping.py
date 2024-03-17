@@ -4,7 +4,6 @@
 
 Reshape functions transform a Pandas object/NumPy array in some way."""
 
-import attr
 import functools
 import itertools
 
@@ -15,6 +14,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.base import indexes, wrapping, indexing
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
 from vectorbtpro.utils.config import resolve_dict, merge_dicts
 from vectorbtpro.utils.params import combine_params, Param
 from vectorbtpro.utils.parsing import get_func_arg_names
@@ -694,65 +694,65 @@ def align_pd_arrays(
     return tuple(args)
 
 
-@attr.s(frozen=True)
-class BCO:
+@define
+class BCO(AttrsMixin):
     """Class that represents an object passed to `broadcast`.
 
     If any value is None, mostly defaults to the global value passed to `broadcast`."""
 
-    value: tp.Any = attr.ib()
+    value: tp.Any = fld()
     """Value of the object."""
 
-    axis: tp.Optional[int] = attr.ib(default=None)
+    axis: tp.Optional[int] = fld(default=None)
     """Axis to broadcast.
     
     Set to None to broadcast all axes."""
 
-    to_pd: tp.Optional[bool] = attr.ib(default=None)
+    to_pd: tp.Optional[bool] = fld(default=None)
     """Whether to convert the output array to a Pandas object."""
 
-    keep_flex: tp.Optional[bool] = attr.ib(default=None)
+    keep_flex: tp.Optional[bool] = fld(default=None)
     """Whether to keep the raw version of the output for flexible indexing.
     
     Only makes sure that the array can broadcast to the target shape."""
 
-    min_ndim: tp.Optional[int] = attr.ib(default=None)
+    min_ndim: tp.Optional[int] = fld(default=None)
     """Minimum number of dimensions."""
 
-    expand_axis: tp.Optional[int] = attr.ib(default=None)
+    expand_axis: tp.Optional[int] = fld(default=None)
     """Axis to expand if the array is 1-dim but the target shape is 2-dim."""
 
-    post_func: tp.Optional[tp.Callable] = attr.ib(default=None)
+    post_func: tp.Optional[tp.Callable] = fld(default=None)
     """Function to post-process the output array."""
 
-    require_kwargs: tp.Optional[tp.Kwargs] = attr.ib(default=None)
+    require_kwargs: tp.Optional[tp.Kwargs] = fld(default=None)
     """Keyword arguments passed to `np.require`."""
 
-    reindex_kwargs: tp.Optional[tp.Kwargs] = attr.ib(default=None)
+    reindex_kwargs: tp.Optional[tp.Kwargs] = fld(default=None)
     """Keyword arguments passed to `pd.DataFrame.reindex`."""
 
-    merge_kwargs: tp.Optional[tp.Kwargs] = attr.ib(default=None)
+    merge_kwargs: tp.Optional[tp.Kwargs] = fld(default=None)
     """Keyword arguments passed to `vectorbtpro.base.merging.column_stack_merge`."""
 
-    context: tp.KwargsLike = attr.ib(default=None)
+    context: tp.KwargsLike = fld(default=None)
     """Context used in evaluation of templates.
     
     Will be merged over `template_context`."""
 
 
-@attr.s(frozen=True)
-class Default:
+@define
+class Default(AttrsMixin):
     """Class for wrapping default values."""
 
-    value: tp.Any = attr.ib()
+    value: tp.Any = fld()
     """Default value."""
 
 
-@attr.s(frozen=True)
-class Ref:
+@define
+class Ref(AttrsMixin):
     """Class for wrapping references to other values."""
 
-    key: tp.Hashable = attr.ib()
+    key: tp.Hashable = fld()
     """Reference to another key."""
 
 
@@ -889,7 +889,7 @@ def broadcast(
     * a sequence with value per object, and
     * a mapping with value per object name and the special key `_def` denoting the default value.
 
-    Additionally, any object can be passed wrapped with `BCO`, which attributes will override
+    Additionally, any object can be passed wrapped with `BCO`, which ibutes will override
     any of the above arguments if not None.
 
     Usage:

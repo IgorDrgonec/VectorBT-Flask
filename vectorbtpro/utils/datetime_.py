@@ -2,7 +2,6 @@
 
 """Utilities for working with dates and time."""
 
-import attr
 import warnings
 from datetime import datetime, timezone, timedelta, tzinfo, date, time
 from collections import namedtuple
@@ -15,6 +14,7 @@ import re
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
 from vectorbtpro.utils.config import merge_dicts, HybridConfig
 from vectorbtpro.utils.parsing import WarningsFiltered
 from vectorbtpro.utils.array_ import min_count_nb
@@ -440,32 +440,32 @@ DTCNT = namedtuple("DTCNT", ["year", "month", "day", "weekday", "hour", "minute"
 DTCT = tp.TypeVar("DTCT", bound="DTC")
 
 
-@attr.s(frozen=True)
-class DTC:
+@define
+class DTC(AttrsMixin):
     """Class representing one or more datetime components."""
 
-    year: tp.Optional[int] = attr.ib(default=None)
+    year: tp.Optional[int] = fld(default=None)
     """Year."""
 
-    month: tp.Optional[int] = attr.ib(default=None)
+    month: tp.Optional[int] = fld(default=None)
     """Month."""
 
-    day: tp.Optional[int] = attr.ib(default=None)
+    day: tp.Optional[int] = fld(default=None)
     """Day of month."""
 
-    weekday: tp.Optional[int] = attr.ib(default=None)
+    weekday: tp.Optional[int] = fld(default=None)
     """Day of week."""
 
-    hour: tp.Optional[int] = attr.ib(default=None)
+    hour: tp.Optional[int] = fld(default=None)
     """Hour."""
 
-    minute: tp.Optional[int] = attr.ib(default=None)
+    minute: tp.Optional[int] = fld(default=None)
     """Minute."""
 
-    second: tp.Optional[int] = attr.ib(default=None)
+    second: tp.Optional[int] = fld(default=None)
     """Second."""
 
-    nanosecond: tp.Optional[int] = attr.ib(default=None)
+    nanosecond: tp.Optional[int] = fld(default=None)
     """Nanosecond."""
 
     @classmethod
@@ -624,7 +624,7 @@ class DTC:
 
     def to_namedtuple(self) -> namedtuple:
         """Convert to a named tuple."""
-        return DTCNT(*attr.asdict(self).values())
+        return DTCNT(*self.asdict().values())
 
 
 def time_to_timedelta(t: tp.Union[tp.TimeLike, DTC], **kwargs) -> pd.Timedelta:

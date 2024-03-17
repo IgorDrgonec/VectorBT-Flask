@@ -2,10 +2,10 @@
 
 """Utilities for annotations."""
 
-import attr
 from collections import defaultdict
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
 
 __all__ = [
     "Annotatable",
@@ -173,40 +173,40 @@ def has_annotatables(func: tp.Callable, target_cls: tp.Type[Annotatable] = Annot
     return False
 
 
-@attr.s(frozen=True, init=False)
-class VarArgs(Annotatable):
+@define
+class VarArgs(Annotatable, AttrsMixin):
     """Class representing annotations for variable positional arguments."""
 
-    args: tp.Tuple[tp.Annotation, ...] = attr.ib()
+    args: tp.Tuple[tp.Annotation, ...] = fld()
     """Tuple with annotations."""
 
     def __init__(self, *args) -> None:
-        self.__attrs_init__(args=args)
+        AttrsMixin.__init__(self, args=args)
 
 
-@attr.s(frozen=True, init=False)
-class VarKwargs(Annotatable):
+@define
+class VarKwargs(Annotatable, AttrsMixin):
     """Class representing annotations for variable keyword arguments."""
 
-    kwargs: tp.Dict[str, tp.Annotation] = attr.ib()
+    kwargs: tp.Dict[str, tp.Annotation] = fld()
     """Dict with annotations."""
 
     def __init__(self, **kwargs) -> None:
-        self.__attrs_init__(kwargs=kwargs)
+        AttrsMixin.__init__(self, kwargs=kwargs)
 
 
-@attr.s(frozen=True, init=False)
-class Union(Annotatable):
+@define
+class Union(Annotatable, AttrsMixin):
     """Class representing a union of one to multiple annotations."""
 
-    annotations: tp.Tuple[tp.Annotation, ...] = attr.ib()
+    annotations: tp.Tuple[tp.Annotation, ...] = fld()
     """Annotations."""
 
-    resolved: bool = attr.ib(default=False)
+    resolved: bool = fld(default=False)
     """Whether the instance is resolved."""
 
     def __init__(self, *annotations, resolved: bool = False) -> None:
-        self.__attrs_init__(annotations=annotations, resolved=resolved)
+        AttrsMixin.__init__(self, annotations=annotations, resolved=resolved)
 
     def resolve(self) -> tp.Annotation:
         """Resolve the union."""

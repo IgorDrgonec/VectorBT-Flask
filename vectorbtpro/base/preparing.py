@@ -9,7 +9,6 @@ from datetime import timedelta, time
 from functools import partial, cached_property as cachedproperty
 from pathlib import Path
 
-import attr
 import numpy as np
 import pandas as pd
 
@@ -113,7 +112,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         if isinstance(value, (CustomTemplate, Ref)):
             return value
         if isinstance(value, (Param, BCO, Default)):
-            attr_dct = attr.asdict(value)
+            attr_dct = value.asdict()
             if isinstance(value, Param) and attr_dct["map_template"] is None:
                 attr_dct["map_template"] = RepFunc(lambda values: cls.map_enum_value(values, **kwargs))
             elif not isinstance(value, Param):

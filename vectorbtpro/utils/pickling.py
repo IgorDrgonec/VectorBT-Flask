@@ -2,7 +2,6 @@
 
 """Utilities for pickling."""
 
-import attr
 import humanize
 import ast
 from pathlib import Path
@@ -12,6 +11,7 @@ import pandas as pd
 
 import vectorbtpro as vbt
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
 from vectorbtpro.utils.path_ import check_mkdir
 from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.checks import Comparable, is_hashable, is_deep_equal
@@ -260,31 +260,31 @@ def load(path: tp.PathLike, compression: tp.Union[None, bool, str] = None, **kwa
     return loads(bytes_, compression=compression, **kwargs)
 
 
-@attr.s(frozen=True)
-class RecState:
+@define
+class RecState(AttrsMixin):
     """Class that represents a state used to reconstruct an instance."""
 
-    init_args: tp.Args = attr.ib(default=attr.Factory(tuple))
+    init_args: tp.Args = fld(factory=tuple)
     """Positional arguments used in initialization."""
 
-    init_kwargs: tp.Kwargs = attr.ib(default=attr.Factory(dict))
+    init_kwargs: tp.Kwargs = fld(factory=dict)
     """Keyword arguments used in initialization."""
 
-    attr_dct: tp.Kwargs = attr.ib(default=attr.Factory(dict))
+    attr_dct: tp.Kwargs = fld(factory=dict)
     """Dictionary with names and values of writeable attributes."""
 
 
-@attr.s(frozen=True)
-class RecInfo:
+@define
+class RecInfo(AttrsMixin):
     """Class that represents information needed to reconstruct an instance."""
 
-    id_: str = attr.ib()
+    id_: str = fld()
     """Identifier."""
 
-    cls: tp.Type = attr.ib()
+    cls: tp.Type = fld()
     """Class."""
 
-    modify_state: tp.Optional[tp.Callable[[RecState], RecState]] = attr.ib(default=None)
+    modify_state: tp.Optional[tp.Callable[[RecState], RecState]] = fld(default=None)
     """Callback to modify the reconstruction state."""
 
     def register(self) -> None:

@@ -3,7 +3,6 @@
 """Utilities for working with parameters."""
 
 import math
-import attr
 import inspect
 from collections import OrderedDict
 from collections.abc import Callable
@@ -15,6 +14,7 @@ from numba.typed import List
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.attr_ import define, fld, MISSING, AttrsMixin
 from vectorbtpro.utils.config import Config, Configured, merge_dicts
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.template import CustomTemplate, substitute_templates
@@ -32,10 +32,6 @@ __all__ = [
     "Parameterizer",
     "parameterized",
 ]
-
-
-class _DEF:
-    pass
 
 
 def to_typed_list(lst: list) -> List:
@@ -112,14 +108,16 @@ def broadcast_params(params_or_dict: tp.ParamsOrDict, to_n: tp.Optional[int] = N
         to_n = max(list(map(len, params)))
     new_params = []
     for i in range(len(params)):
-        p_values = params[i]
-        if len(p_values) in [1, to_n]:
-            if len(p_values) < to_n:
-                new_params.append([p for _ in range(to_n) for p in p_values])
+        param_values = params[i]
+        if len(param_values) in [1, to_n]:
+            if len(param_values) < to_n:
+                new_params.append([p for _ in range(to_n) for p in param_values])
             else:
-                new_params.append(list(p_values))
+                new_params.append(list(param_values))
         else:
-            raise ValueError(f"Parameters at index {i} have length {len(p_values)} that cannot be broadcast to {to_n}")
+            raise ValueError(
+                f"Parameters at index {i} have length {len(param_values)} that cannot be broadcast to {to_n}"
+            )
     if isinstance(params_or_dict, dict):
         return dict(zip(params_or_dict.keys(), new_params))
     return new_params
@@ -139,25 +137,33 @@ def create_param_product(params_or_dict: tp.ParamsOrDict) -> tp.ParamsOrDict:
     return new_params
 
 
-def is_single_param_value(p_values: tp.MaybeParamValues, is_tuple: bool, is_array_like: bool) -> bool:
-    """Check whether `p_values` is a single value."""
+def is_single_param_value(
+    param_values: tp.MaybeParamValues,
+    is_tuple: bool = False,
+    is_array_like: bool = False,
+) -> bool:
+    """Check whether `param_values` is a single value."""
     check_against = [list, List]
     if not is_tuple:
         check_against.append(tuple)
     if not is_array_like:
         check_against.append(np.ndarray)
-    if isinstance(p_values, tuple(check_against)):
+    if isinstance(param_values, tuple(check_against)):
         return False
-    if isinstance(p_values, range):
+    if isinstance(param_values, range):
         return False
     return True
 
 
-def params_to_list(p_values: tp.MaybeParamValues, is_tuple: bool, is_array_like: bool) -> list:
+def params_to_list(
+    param_values: tp.MaybeParamValues,
+    is_tuple: bool = False,
+    is_array_like: bool = False,
+) -> list:
     """Cast parameters to a list."""
-    if is_single_param_value(p_values, is_tuple, is_array_like):
-        return [p_values]
-    return list(p_values)
+    if is_single_param_value(param_values, is_tuple, is_array_like):
+        return [param_values]
+    return list(param_values)
 
 
 def get_param_grid_len(params_or_dict: tp.ParamsOrDict) -> int:
@@ -182,12 +188,12 @@ def pick_from_param_grid(
     if i is None:
         i = np.random.randint(grid_len, dtype=np.int64)
     param_comb = []
-    for p_values in params:
-        index = i * len(p_values) // grid_len
-        block_len = grid_len // len(p_values)
+    for param_values in params:
+        index = i * len(param_values) // grid_len
+        block_len = grid_len // len(param_values)
         i = i - index * block_len
         grid_len = block_len
-        param_comb.append(p_values[index])
+        param_comb.append(param_values[index])
     if isinstance(params_or_dict, dict):
         return dict(zip(params_or_dict.keys(), param_comb))
     return param_comb
@@ -196,30 +202,30 @@ def pick_from_param_grid(
 ParamT = tp.TypeVar("ParamT", bound="Param")
 
 
-@attr.s(frozen=True)
-class Param(Annotatable):
+@define
+class Param(Annotatable, AttrsMixin):
     """Class that represents a parameter."""
 
-    value: tp.Union[tp.MaybeParamValues, tp.Dict[tp.Hashable, tp.ParamValue]] = attr.ib(default=_DEF)
+    value: tp.Union[tp.MaybeParamValues, tp.Dict[tp.Hashable, tp.ParamValue]] = fld(default=MISSING)
     """One or more parameter values."""
 
-    is_tuple: bool = attr.ib(default=False)
+    is_tuple: bool = fld(default=False)
     """Whether `Param.value` is a tuple.
     
     If so, providing a tuple will be considered as a single value."""
 
-    is_array_like: bool = attr.ib(default=False)
+    is_array_like: bool = fld(default=False)
     """Whether `Param.value` is array-like.
     
     If so, providing a NumPy array will be considered as a single value."""
 
-    map_template: tp.Optional[CustomTemplate] = attr.ib(default=None)
+    map_template: tp.Optional[CustomTemplate] = fld(default=None)
     """Template to map `Param.value` before building parameter combinations."""
 
-    random_subset: tp.Union[None, int, float] = attr.ib(default=None)
+    random_subset: tp.Union[None, int, float] = fld(default=None)
     """Random subset of values to select."""
 
-    level: tp.Optional[int] = attr.ib(default=None)
+    level: tp.Optional[int] = fld(default=None)
     """Level of the product the parameter takes part in.
 
     Parameters with the same level are stacked together, while parameters with different levels
@@ -232,42 +238,42 @@ class Param(Annotatable):
     Levels must come in a strict order starting with 0 and without gaps. If any of the parameters
     have a level specified, all parameters must specify their level."""
 
-    condition: tp.Optional[str] = attr.ib(default=None)
+    condition: tp.Optional[str] = fld(default=None)
     """Keep a parameter combination only if the condition is met.
     
     Condition should be an expression where `x` denotes this parameter and any other variable
     denotes the name of other parameter(s)."""
 
-    context: tp.KwargsLike = attr.ib(default=None)
+    context: tp.KwargsLike = fld(default=None)
     """Context used in evaluation of `Param.condition` and `Param.map_template`."""
 
-    keys: tp.Optional[tp.IndexLike] = attr.ib(default=None)
+    keys: tp.Optional[tp.IndexLike] = fld(default=None)
     """Keys acting as an index level.
 
     If None, converts `Param.value` to an index using 
     `vectorbtpro.base.indexes.index_from_values`."""
 
-    hide: bool = attr.ib(default=False)
+    hide: bool = fld(default=False)
     """Whether to hide the parameter from the parameter index."""
 
-    name: tp.Optional[tp.Hashable] = attr.ib(default=None)
+    name: tp.Optional[tp.Hashable] = fld(default=None)
     """Name of the parameter.
     
     If None, defaults to the name of the index in `Param.keys`, or to the key in 
     `param_dct` passed to `combine_params`."""
 
-    mono_reduce: bool = attr.ib(default=False)
+    mono_reduce: bool = fld(default=False)
     """Whether to reduce a mono-chunk of the same values into one value."""
 
-    mono_merge_func: tp.MergeFuncLike = attr.ib(default=None)
+    mono_merge_func: tp.MergeFuncLike = fld(default=None)
     """Merge function to apply when building a mono-chunk.
     
     Resolved using `vectorbtpro.base.merging.resolve_merge_func`."""
 
-    mono_merge_kwargs: tp.KwargsLike = attr.ib(default=None)
+    mono_merge_kwargs: tp.KwargsLike = fld(default=None)
     """Keyword arguments passed to `Param.mono_merge_func`."""
 
-    eval_id: tp.Optional[tp.MaybeSequence[tp.Hashable]] = attr.ib(default=None)
+    eval_id: tp.Optional[tp.MaybeSequence[tp.Hashable]] = fld(default=None)
     """One or more identifiers at which to evaluate this instance."""
 
     def meets_eval_id(self, eval_id: tp.Optional[tp.Hashable]) -> bool:
@@ -283,13 +289,13 @@ class Param(Annotatable):
 
     def check_value(self) -> None:
         """Check whether value is missing."""
-        if self.value is _DEF:
+        if self.value is MISSING:
             raise ValueError("Parameter value is missing")
 
     def map_value(self: ParamT, func: tp.Callable) -> ParamT:
         """Execute a function on each value in `Param.value` and create a new `Param` instance."""
         self.check_value()
-        attr_dct = attr.asdict(self)
+        attr_dct = self.asdict()
         if isinstance(attr_dct["value"], dict):
             attr_dct["value"] = {k: v for k, v in attr_dct["value"].items()}
         elif isinstance(attr_dct["value"], pd.Index):
@@ -299,6 +305,14 @@ class Param(Annotatable):
         else:
             attr_dct["value"] = list(map(func, attr_dct["value"]))
         return type(self)(**attr_dct)
+
+
+class Paramable:
+    """Class representing an object that can be returned as a parameter."""
+
+    def as_param(self) -> Param:
+        """Return this instance as a parameter."""
+        raise NotImplementedError
 
 
 def combine_params(
@@ -363,8 +377,13 @@ def combine_params(
     contexts = {}
     names = {}
     for k, p in param_dct.items():
+        if isinstance(p, Paramable):
+            p = p.to_param()
         if not isinstance(p, Param):
             p = Param(p)
+        if isinstance(p.value, Paramable):
+            p2 = p.value.to_param()
+            p = p.merge_over(p2, value=p2.value)
         if p.condition is not None:
             conditions[k] = p.condition
             if p.context is not None:
@@ -1114,15 +1133,9 @@ class Parameterizer(Configured):
                 if isinstance(v["annotation"], Param) and v["annotation"].meets_eval_id(eval_id):
                     if "value" in v:
                         if not isinstance(v["value"], Param):
-                            v["value"] = attr.evolve(v["annotation"], value=v["value"])
+                            v["value"] = v["annotation"].replace(value=v["value"])
                         else:
-                            v["value"] = attr.evolve(
-                                v["value"],
-                                **merge_dicts(
-                                    attr.asdict(v["annotation"]),
-                                    attr.asdict(v["value"]),
-                                ),
-                            )
+                            v["value"] = v["value"].merge_over(v["annotation"])
         return new_flat_ann_args
 
     @classmethod
@@ -1368,8 +1381,7 @@ class Parameterizer(Configured):
                 new_param_config[k] = new_param_config[k][0]
             elif k_merge_func is not None:
                 if isinstance(k_merge_func, MergeFunc):
-                    k_merge_func = attr.evolve(
-                        k_merge_func,
+                    k_merge_func = k_merge_func.replace(
                         merge_kwargs=k_merge_kwargs,
                         context=template_context,
                         sub_id_prefix="mono_",
@@ -1698,7 +1710,7 @@ class Parameterizer(Configured):
             if is_merge_func_from_config(merge_func):
                 merge_kwargs = merge_dicts(dict(keys=template_context["param_index"]), merge_kwargs)
             if isinstance(merge_func, MergeFunc):
-                merge_func = attr.evolve(merge_func, merge_kwargs=merge_kwargs, context=template_context)
+                merge_func = merge_func.replace(merge_kwargs=merge_kwargs, context=template_context)
             else:
                 merge_func = MergeFunc(merge_func, merge_kwargs=merge_kwargs, context=template_context)
             if return_param_index:

@@ -4,11 +4,11 @@
 
 import uuid
 
-import attr
 import numpy as np
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.attr_ import define
 from vectorbtpro.utils.chunking import (
     ArgGetter,
     ArgSizer,
@@ -92,7 +92,7 @@ def get_group_lens_slice(group_lens: tp.Array1d, chunk_meta: ChunkMeta) -> slice
     return slice(start, end)
 
 
-@attr.s(frozen=True)
+@define
 class GroupLensMapper(ChunkMapper, ArgGetter):
     """Class for mapping chunk metadata to per-group column lengths.
 
@@ -139,7 +139,7 @@ class ChunkedGroupMap(Chunked):
         return self.take_spec
 
 
-@attr.s(frozen=True)
+@define
 class GroupIdxsMapper(ChunkMapper, ArgGetter):
     """Class for mapping chunk metadata to per-group column indices.
 
@@ -190,7 +190,7 @@ class FlexArraySizer(ArraySizer):
         raise ValueError(f"FlexArraySizer supports max 2 dimensions, not {len(obj.shape)}")
 
 
-@attr.s(frozen=True)
+@define
 class FlexArraySelector(ArraySelector):
     """Class for selecting one element from a NumPy array's axis flexibly based on the chunk index.
 
@@ -242,7 +242,7 @@ class FlexArraySelector(ArraySelector):
         raise ValueError(f"FlexArraySelector supports max 2 dimensions, not {len(obj.shape)}")
 
 
-@attr.s(frozen=True)
+@define
 class FlexArraySlicer(ArraySlicer):
     """Class for selecting one element from a NumPy array's axis flexibly based on the chunk index.
 

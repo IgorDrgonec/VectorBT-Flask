@@ -2,7 +2,6 @@
 
 """Base class for working with data sources."""
 
-import attr
 import warnings
 from pathlib import Path
 import traceback
@@ -24,6 +23,7 @@ from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.decorators import cached_property, class_or_instancemethod
 from vectorbtpro.utils.selection import _NoResult, NoResult, NoResultsException
 from vectorbtpro.utils.merging import MergeFunc
+from vectorbtpro.utils.params import Param
 from vectorbtpro.base.reshaping import to_any_array, to_pd_array, to_2d_array
 from vectorbtpro.base.wrapping import ArrayWrapper
 from vectorbtpro.base.indexes import stack_indexes
@@ -3721,7 +3721,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 if is_merge_func_from_config(merge_func):
                     merge_kwargs = merge_dicts(dict(keys=keys), merge_kwargs)
                 if isinstance(merge_func, MergeFunc):
-                    merge_func = attr.evolve(merge_func, merge_kwargs=merge_kwargs, context=template_context)
+                    merge_func = merge_func.replace(merge_kwargs=merge_kwargs, context=template_context)
                 else:
                     merge_func = MergeFunc(merge_func, merge_kwargs=merge_kwargs, context=template_context)
                 if return_keys:

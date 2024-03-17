@@ -7,7 +7,6 @@ They perform operations on index objects, such as stacking, combining, and clean
 !!! note
     "Index" in pandas context is referred to both index and columns."""
 
-import attr
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -16,6 +15,7 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import jit_reg, register_jitted
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
 
 __all__ = [
     "ExceptLevel",
@@ -26,11 +26,11 @@ __all__ = [
 ]
 
 
-@attr.s(frozen=True)
-class ExceptLevel:
+@define
+class ExceptLevel(AttrsMixin):
     """Class for grouping except one or more levels."""
 
-    value: tp.MaybeLevelSequence = attr.ib()
+    value: tp.MaybeLevelSequence = fld()
     """One or more level positions or names."""
 
 

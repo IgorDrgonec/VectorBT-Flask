@@ -8,10 +8,10 @@ import re
 import io
 import contextlib
 import warnings
-import attr
 import sys
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
 from vectorbtpro.utils.annotations import get_annotations, VarArgs, VarKwargs
 
 __all__ = [
@@ -21,14 +21,14 @@ __all__ = [
 ]
 
 
-@attr.s(frozen=True)
-class Regex:
+@define
+class Regex(AttrsMixin):
     """Class for matching a regular expression."""
 
-    pattern: str = attr.ib()
+    pattern: str = fld()
     """Pattern."""
 
-    flags: int = attr.ib(default=0)
+    flags: int = fld(default=0)
     """Flags."""
 
     def matches(self, string: str) -> bool:

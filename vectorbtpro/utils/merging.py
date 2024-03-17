@@ -2,11 +2,11 @@
 
 """Utilities for merging."""
 
-import attr
 from functools import partial
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
 from vectorbtpro.utils.annotations import get_annotations, Annotatable, Union
 from vectorbtpro.utils.template import substitute_templates
 from vectorbtpro.utils.config import merge_dicts
@@ -21,27 +21,27 @@ __pdoc__ = {}
 MergeFuncT = tp.TypeVar("MergeFuncT", bound="MergeFunc")
 
 
-@attr.s(frozen=True, init=False)
-class MergeFunc(Annotatable):
+@define
+class MergeFunc(Annotatable, AttrsMixin):
     """Class representing a merging function and its keyword arguments.
 
     Can be directly called to call the underlying (already resolved and with keyword
     arguments attached) merging function."""
 
-    merge_func: tp.MergeFuncLike = attr.ib()
+    merge_func: tp.MergeFuncLike = fld()
     """Merging function."""
 
-    merge_kwargs: tp.KwargsLike = attr.ib(default=None)
+    merge_kwargs: tp.KwargsLike = fld(default=None)
     """Keyword arguments passed to the merging function."""
 
-    context: tp.KwargsLike = attr.ib(default=None)
+    context: tp.KwargsLike = fld(default=None)
     """Context for substituting templates in `MergeFunc.merge_func` and `MergeFunc.merge_kwargs`."""
 
-    sub_id_prefix: str = attr.ib(default="")
+    sub_id_prefix: str = fld(default="")
     """Prefix for the substitution id."""
 
     def __init__(self, *args, **kwargs) -> None:
-        attr_names = [a.name for a in self.__attrs_attrs__]
+        attr_names = [a.name for a in self.fields]
         if attr_names.index("merge_kwargs") < len(args):
             new_args = list(args)
             merge_kwargs = new_args[attr_names.index("merge_kwargs")]
@@ -61,13 +61,7 @@ class MergeFunc(Annotatable):
             merge_kwargs.update({k: kwargs.pop(k) for k in list(kwargs.keys()) if k not in attr_names})
             kwargs["merge_kwargs"] = merge_kwargs
 
-        self.__attrs_init__(*args, **kwargs)
-
-    def evolve(self: MergeFuncT, merge_kwargs: tp.KwargsLike = None, context: tp.KwargsLike = None) -> MergeFuncT:
-        """Evolve the instance with new keyword arguments and context."""
-        merge_kwargs = merge_dicts(self.merge_kwargs, merge_kwargs)
-        context = merge_dicts(self.context, context)
-        return attr.evolve(self, merge_kwargs=merge_kwargs, context=context)
+        AttrsMixin.__init__(self, *args, **kwargs)
 
     def resolve_merge_func(self) -> tp.Optional[tp.Callable]:
         """Get the merging function where keyword arguments are hard-coded."""

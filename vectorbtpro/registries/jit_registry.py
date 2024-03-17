@@ -344,12 +344,10 @@ non-precise type pyobject
     from other Numba functions since the convertion operation is done using Python.
 """
 
-import attr
-
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
 from vectorbtpro.utils.config import merge_dicts, atomic_dict
-from vectorbtpro.utils.hashing import Hashable
 from vectorbtpro.utils.jitting import (
     Jitter,
     resolve_jitted_kwargs,
@@ -371,26 +369,26 @@ def get_func_full_name(func: tp.Callable) -> str:
     return func.__module__ + "." + func.__name__
 
 
-@attr.s(frozen=True, eq=False)
-class JitableSetup(Hashable):
+@define
+class JitableSetup(AttrsMixin):
     """Class that represents a jitable setup.
 
     !!! note
         Hashed solely by `task_id` and `jitter_id`."""
 
-    task_id: tp.Hashable = attr.ib()
+    task_id: tp.Hashable = fld()
     """Task id."""
 
-    jitter_id: tp.Hashable = attr.ib()
+    jitter_id: tp.Hashable = fld()
     """Jitter id."""
 
-    py_func: tp.Callable = attr.ib()
+    py_func: tp.Callable = fld()
     """Python function to be jitted."""
 
-    jitter_kwargs: tp.KwargsLike = attr.ib(default=None)
+    jitter_kwargs: tp.KwargsLike = fld(default=None)
     """Keyword arguments passed to `vectorbtpro.utils.jitting.resolve_jitter`."""
 
-    tags: tp.SetLike = attr.ib(default=None)
+    tags: tp.SetLike = fld(default=None)
     """Set of tags."""
 
     @staticmethod
@@ -402,18 +400,18 @@ class JitableSetup(Hashable):
         return (self.task_id, self.jitter_id)
 
 
-@attr.s(frozen=True, eq=False)
-class JittedSetup(Hashable):
+@define
+class JittedSetup(AttrsMixin):
     """Class that represents a jitted setup.
 
     !!! note
         Hashed solely by sorted config of `jitter`. That is, two jitters with the same config
         will yield the same hash and the function won't be re-decorated."""
 
-    jitter: Jitter = attr.ib()
+    jitter: Jitter = fld()
     """Jitter that decorated the function."""
 
-    jitted_func: tp.Callable = attr.ib()
+    jitted_func: tp.Callable = fld()
     """Decorated function."""
 
     @staticmethod
@@ -512,7 +510,7 @@ class JITRegistry:
                 if expression is None:
                     result = True
                 else:
-                    result = RepEval(expression).substitute(context=merge_dicts(attr.asdict(setup), context))
+                    result = RepEval(expression).substitute(context=merge_dicts(setup.asdict(), context))
                     checks.assert_instance_of(result, bool)
 
                 if result:
@@ -531,7 +529,7 @@ class JITRegistry:
             if expression is None:
                 result = True
             else:
-                result = RepEval(expression).substitute(context=merge_dicts(attr.asdict(setup), context))
+                result = RepEval(expression).substitute(context=merge_dicts(setup.asdict(), context))
                 checks.assert_instance_of(result, bool)
 
             if result:

@@ -2,6 +2,8 @@
 
 """Utilities for working with class/instance attributes."""
 
+import enum
+import attr
 import re
 import inspect
 from collections.abc import Iterable
@@ -11,12 +13,127 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.parsing import get_func_arg_names
+from vectorbtpro.utils.hashing import Hashable
+from vectorbtpro.utils.decorators import class_or_instanceproperty
 
 __all__ = [
+    "MISSING",
+    "AttrsMixin",
+    "define",
+    "fld",
     "deep_getattr",
 ]
+
+
+class _Missing(enum.Enum):
+    """Sentinel that represents a missing value."""
+
+    MISSING = enum.auto()
+
+    def __repr__(self):
+        return "MISSING"
+
+    def __bool__(self):
+        return False
+
+
+MISSING = _Missing.MISSING
+"""Sentinel that represents a missing value."""
+
+
+AttrsMixinT = tp.TypeVar("AttrsMixinT", bound="AttrsMixin")
+
+
+class AttrsMixin(Hashable):
+    """Mixin class for attributes."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        self.__attrs_init__(*args, **kwargs)
+
+    @class_or_instanceproperty
+    def fields(cls_or_self) -> tp.Tuple[attr.Attribute]:
+        """Get a tuple of fields."""
+        if isinstance(cls_or_self, type):
+            return attr.fields(cls_or_self)
+        return attr.fields(type(cls_or_self))
+
+    @class_or_instanceproperty
+    def fields_dict(cls_or_self) -> tp.Dict[str, attr.Attribute]:
+        """Get a dict of fields."""
+        if isinstance(cls_or_self, type):
+            return attr.fields_dict(cls_or_self)
+        return attr.fields_dict(type(cls_or_self))
+
+    def asdict(self, full: bool = True) -> dict:
+        """Convert this instance to a dictionary.
+
+        If `full` is False, won't include fields with `MISSING` as value."""
+        dct = dict()
+        for a in self.fields:
+            k = a.name
+            v = getattr(self, k)
+            if full or v is not MISSING:
+                dct[k] = v
+        return dct
+
+    def replace(self: AttrsMixinT, **changes) -> AttrsMixinT:
+        """Create a new instance by making changes to the attribute values."""
+        return attr.evolve(self, **changes)
+
+    def merge_with(self: AttrsMixinT, other: AttrsMixinT, **changes) -> AttrsMixinT:
+        """Merge this instance with another instance."""
+        from vectorbtpro.utils.config import merge_dicts
+
+        return self.replace(
+            **merge_dicts(
+                self.asdict(full=False),
+                other.asdict(full=False),
+                changes,
+            )
+        )
+
+    def merge_over(self: AttrsMixinT, other: AttrsMixinT, **changes) -> AttrsMixinT:
+        """Merge this instance over another instance."""
+        from vectorbtpro.utils.config import merge_dicts
+
+        return self.replace(
+            **merge_dicts(
+                other.asdict(full=False),
+                self.asdict(full=False),
+                changes,
+            )
+        )
+
+    def __repr__(self):
+        dct = self.asdict(full=False)
+        new_cls = attr.make_class(type(self).__name__, list(dct.keys()), cmp=False)
+        new_obj = new_cls(**dct)
+        return new_obj.__repr__()
+
+    @property
+    def hash_key(self) -> tuple:
+        return tuple(self.asdict().items())
+
+
+def define(*args, **kwargs) -> tp.FlexClassWrapper:
+    """Prepare a class with attributes.
+
+    Attaches `AttrsMixin` as a base class (if not present) and applies `attr.define`."""
+
+    def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
+        if not issubclass(cls, AttrsMixin):
+            cls = type(cls.__name__, (AttrsMixin,) + cls.__bases__, dict(cls.__dict__))
+        return attr.define(frozen=True, slots=False, init=False, eq=False, repr=False, **kwargs)(cls)
+
+    if len(args) == 0:
+        return wrapper
+    elif len(args) == 1:
+        return wrapper(args[0])
+    raise ValueError("Either class or keyword arguments must be passed")
+
+
+fld = attr.field
+"""Alias for `attr.field`"""
 
 
 def get_dict_attr(obj: tp.Union[object, type], attr: str) -> tp.Any:
@@ -193,6 +310,9 @@ class AttrResolverMixin:
         Won't cache if `use_caching` is False or any passed argument is in `custom_arg_names`.
 
         Use `passed_kwargs_out` to get keyword arguments that were passed."""
+        from vectorbtpro.utils.config import merge_dicts
+        from vectorbtpro.utils.parsing import get_func_arg_names
+
         # Resolve defaults
         if custom_arg_names is None:
             custom_arg_names = list()
