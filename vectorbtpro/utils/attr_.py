@@ -2,8 +2,9 @@
 
 """Utilities for working with class/instance attributes."""
 
-import enum
 import attr
+from attr.exceptions import NotAnAttrsClassError
+import enum
 import re
 import inspect
 from collections.abc import Iterable
@@ -48,21 +49,33 @@ class AttrsMixin(Hashable):
     """Mixin class for attributes."""
 
     def __init__(self, *args, **kwargs) -> None:
+        if not attr.has(type(self)):
+            msg = f"{type(self)!r} is not an attrs-decorated class."
+            raise NotAnAttrsClassError(msg)
+
         self.__attrs_init__(*args, **kwargs)
 
     @class_or_instanceproperty
-    def fields(cls_or_self) -> tp.Tuple[attr.Attribute]:
+    def fields(cls_or_self) -> tp.Optional[tp.Tuple[attr.Attribute]]:
         """Get a tuple of fields."""
         if isinstance(cls_or_self, type):
-            return attr.fields(cls_or_self)
-        return attr.fields(type(cls_or_self))
+            cls = cls_or_self
+            if not attr.has(cls):
+                return None
+        else:
+            cls = type(cls_or_self)
+        return attr.fields(cls)
 
     @class_or_instanceproperty
-    def fields_dict(cls_or_self) -> tp.Dict[str, attr.Attribute]:
+    def fields_dict(cls_or_self) -> tp.Optional[tp.Dict[str, attr.Attribute]]:
         """Get a dict of fields."""
         if isinstance(cls_or_self, type):
-            return attr.fields_dict(cls_or_self)
-        return attr.fields_dict(type(cls_or_self))
+            cls = cls_or_self
+            if not attr.has(cls):
+                return None
+        else:
+            cls = type(cls_or_self)
+        return attr.fields_dict(cls)
 
     def asdict(self, full: bool = True) -> dict:
         """Convert this instance to a dictionary.
