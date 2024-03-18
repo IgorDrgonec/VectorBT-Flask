@@ -1148,7 +1148,9 @@ def win_rate_reduce_nb(pnl_arr: tp.Array1d) -> float:
             count += 1
             if pnl_arr[i] > 0:
                 win_count += 1
-    return win_count / pnl_arr.shape[0]
+    if count == 0:
+        return np.nan
+    return win_count / count
 
 
 @register_jitted(cache=True)
@@ -1190,12 +1192,14 @@ def expectancy_reduce_nb(pnl_arr: tp.Array1d) -> float:
             elif pnl_arr[i] < 0:
                 loss_count += 1
                 loss_sum += abs(pnl_arr[i])
-    win_rate = win_count / pnl_arr.shape[0]
+    if count == 0:
+        return np.nan
+    win_rate = win_count / count
     if win_count == 0:
         win_mean = 0.0
     else:
         win_mean = win_sum / win_count
-    loss_rate = loss_count / pnl_arr.shape[0]
+    loss_rate = loss_count / count
     if loss_count == 0:
         loss_mean = 0.0
     else:
@@ -1209,6 +1213,8 @@ def sqn_reduce_nb(pnl_arr: tp.Array1d, ddof: int = 0) -> float:
     count = generic_nb.nancnt_1d_nb(pnl_arr)
     mean = np.nanmean(pnl_arr)
     std = generic_nb.nanstd_1d_nb(pnl_arr, ddof=ddof)
+    if std == 0:
+        return np.nan
     return np.sqrt(count) * mean / std
 
 
