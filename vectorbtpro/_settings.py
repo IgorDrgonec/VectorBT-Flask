@@ -639,6 +639,7 @@ datetime = frozen_cfg(
     ),
     dateparser_kwargs=flex_cfg(),
     freq_from_n=20,
+    tz_naive_ns=True,
 )
 """_"""
 

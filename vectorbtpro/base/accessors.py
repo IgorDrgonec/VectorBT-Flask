@@ -80,11 +80,18 @@ class BaseIDXAccessor(Configured):
             raise TypeError(f"Cannot convert index of type {type(index)} to period")
         return index
 
-    def to_period_ns(self, freq: tp.FrequencyLike, shift: bool = True) -> tp.Array1d:
+    def to_period_ts(self, *args, **kwargs) -> pd.DatetimeIndex:
+        """Convert index to period and then to timestamp."""
+        new_index = self.to_period(*args, **kwargs).to_timestamp()
+        if self.obj.tz is not None:
+            new_index = new_index.tz_localize(self.obj.tz)
+        return new_index
+
+    def to_period_ns(self, *args, **kwargs) -> tp.Array1d:
         """Convert index to period and then to an 64-bit integer array.
 
         Timestamps will be converted to nanoseconds."""
-        return dt.to_ns(self.to_period(freq, shift=shift))
+        return dt.to_ns(self.to_period_ts(*args, **kwargs))
 
     @classmethod
     def from_values(cls, *args, **kwargs) -> tp.Index:

@@ -171,7 +171,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             def _to_td(wrapper, _dt_obj=dt_obj, _last_before=last_before):
                 if _last_before is None:
                     _last_before = True
-                target_index = wrapper.index.vbt.to_period(dt.to_freq(_dt_obj), shift=True).to_timestamp()
+                target_index = wrapper.index.vbt.to_period_ts(dt.to_freq(_dt_obj), shift=True)
                 if _last_before:
                     return _apply_last_before(wrapper.index, target_index, wrapper.freq)
                 return target_index.vbt.to_ns()
