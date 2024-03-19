@@ -4,7 +4,7 @@
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import define
+from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.chunking import chunked, resolve_chunked, resolve_chunked_option
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.template import RepEval
@@ -16,7 +16,7 @@ __all__ = [
 
 
 @define
-class ChunkedSetup(define.mixin):
+class ChunkedSetup(DefineMixin):
     """Class that represents a chunkable setup.
 
     !!! note

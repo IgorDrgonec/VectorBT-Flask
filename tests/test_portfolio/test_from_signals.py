@@ -6730,6 +6730,75 @@ class TestFromHolding:
             ).order_records,
         )
 
+    def test_ctx_helpers(self):
+        @njit
+        def post_signal_func_nb(c):
+            _ = vbt.pf_nb.get_position_nb(c)
+            _ = vbt.pf_nb.get_position_nb(c, col=1)
+            _ = vbt.pf_nb.in_position_nb(c)
+            _ = vbt.pf_nb.in_position_nb(c, col=1)
+            _ = vbt.pf_nb.in_long_position_nb(c)
+            _ = vbt.pf_nb.in_long_position_nb(c, col=1)
+            _ = vbt.pf_nb.in_short_position_nb(c)
+            _ = vbt.pf_nb.in_short_position_nb(c, col=1)
+            _ = vbt.pf_nb.get_n_active_positions_nb(c)
+            _ = vbt.pf_nb.get_n_active_positions_nb(c, all_groups=True)
+            _ = vbt.pf_nb.get_cash_nb(c)
+            _ = vbt.pf_nb.get_cash_nb(c, col_or_group=1)
+            _ = vbt.pf_nb.get_locked_cash_nb(c)
+            _ = vbt.pf_nb.get_locked_cash_nb(c, col=1)
+            _ = vbt.pf_nb.get_free_cash_nb(c)
+            _ = vbt.pf_nb.get_free_cash_nb(c, col_or_group=1)
+            _ = vbt.pf_nb.has_free_cash_nb(c)
+            _ = vbt.pf_nb.has_free_cash_nb(c, col_or_group=1)
+            _ = vbt.pf_nb.get_val_price_nb(c)
+            _ = vbt.pf_nb.get_val_price_nb(c, col=1)
+            _ = vbt.pf_nb.get_value_nb(c)
+            _ = vbt.pf_nb.get_value_nb(c, col_or_group=1)
+            _ = vbt.pf_nb.get_leverage_nb(c)
+            _ = vbt.pf_nb.get_leverage_nb(c, col=1)
+            _ = vbt.pf_nb.get_position_value_nb(c)
+            _ = vbt.pf_nb.get_position_value_nb(c, col=1)
+            _ = vbt.pf_nb.get_allocation_nb(c)
+            _ = vbt.pf_nb.get_allocation_nb(c, col=1)
+            _ = vbt.pf_nb.get_order_count_nb(c)
+            _ = vbt.pf_nb.get_order_count_nb(c, col=1)
+            _ = vbt.pf_nb.get_order_records_nb(c)
+            _ = vbt.pf_nb.get_order_records_nb(c, col=1)
+            _ = vbt.pf_nb.any_order_nb(c)
+            _ = vbt.pf_nb.any_order_nb(c, col=1)
+            _ = vbt.pf_nb.order_filled_nb(c)
+            _ = vbt.pf_nb.order_opened_position_nb(c)
+            _ = vbt.pf_nb.order_increased_position_nb(c)
+            _ = vbt.pf_nb.order_decreased_position_nb(c)
+            _ = vbt.pf_nb.order_closed_position_nb(c)
+            _ = vbt.pf_nb.order_reversed_position_nb(c)
+            _ = vbt.pf_nb.get_limit_target_price_nb(c)
+            _ = vbt.pf_nb.get_limit_target_price_nb(c, col=1)
+            _ = vbt.pf_nb.get_sl_target_price_nb(c)
+            _ = vbt.pf_nb.get_sl_target_price_nb(c, col=1)
+            _ = vbt.pf_nb.get_tsl_target_price_nb(c)
+            _ = vbt.pf_nb.get_tsl_target_price_nb(c, col=1)
+            _ = vbt.pf_nb.get_tp_target_price_nb(c)
+            _ = vbt.pf_nb.get_tp_target_price_nb(c, col=1)
+            _ = vbt.pf_nb.get_entry_trade_records_nb(c)
+            _ = vbt.pf_nb.get_entry_trade_records_nb(c, col=1)
+            _ = vbt.pf_nb.get_exit_trade_records_nb(c)
+            _ = vbt.pf_nb.get_exit_trade_records_nb(c, col=1)
+            _ = vbt.pf_nb.get_position_records_nb(c)
+            _ = vbt.pf_nb.get_position_records_nb(c, col=1)
+
+        _ = vbt.PF.from_signals(
+            [1],
+            long_entries=[[True, False]],
+            short_entries=[[False, True]],
+            init_cash=[100, 200],
+            post_signal_func_nb=post_signal_func_nb,
+            sl_stop=0.1,
+            tsl_stop=0.2,
+            tp_stop=0.3,
+        )
+
 
 # ############# from_random_signals ############# #
 

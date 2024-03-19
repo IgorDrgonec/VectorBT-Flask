@@ -14,7 +14,7 @@ from numba.typed import List
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import define
+from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.config import Config, Configured, merge_dicts
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.template import CustomTemplate, substitute_templates
@@ -203,7 +203,7 @@ ParamT = tp.TypeVar("ParamT", bound="Param")
 
 
 @define
-class Param(Annotatable, define.mixin):
+class Param(Annotatable, DefineMixin):
     """Class that represents a parameter."""
 
     value: tp.Union[tp.MaybeParamValues, tp.Dict[tp.Hashable, tp.ParamValue]] = define.required_field()

@@ -8,7 +8,7 @@ import numpy as np
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import define
+from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.chunking import (
     ArgGetter,
     ArgSizer,
@@ -93,7 +93,7 @@ def get_group_lens_slice(group_lens: tp.Array1d, chunk_meta: ChunkMeta) -> slice
 
 
 @define
-class GroupLensMapper(ChunkMapper, ArgGetter, define.mixin):
+class GroupLensMapper(ChunkMapper, ArgGetter, DefineMixin):
     """Class for mapping chunk metadata to per-group column lengths.
 
     Argument can be either a group map tuple or a group lengths array."""
@@ -140,7 +140,7 @@ class ChunkedGroupMap(Chunked):
 
 
 @define
-class GroupIdxsMapper(ChunkMapper, ArgGetter, define.mixin):
+class GroupIdxsMapper(ChunkMapper, ArgGetter, DefineMixin):
     """Class for mapping chunk metadata to per-group column indices.
 
     Argument must be a group map tuple."""
@@ -191,7 +191,7 @@ class FlexArraySizer(ArraySizer):
 
 
 @define
-class FlexArraySelector(ArraySelector, define.mixin):
+class FlexArraySelector(ArraySelector, DefineMixin):
     """Class for selecting one element from a NumPy array's axis flexibly based on the chunk index.
 
     The result is intended to be used together with `vectorbtpro.base.flex_indexing.flex_select_1d_nb`
@@ -243,7 +243,7 @@ class FlexArraySelector(ArraySelector, define.mixin):
 
 
 @define
-class FlexArraySlicer(ArraySlicer, define.mixin):
+class FlexArraySlicer(ArraySlicer, DefineMixin):
     """Class for selecting one element from a NumPy array's axis flexibly based on the chunk index.
 
     The result is intended to be used together with `vectorbtpro.base.flex_indexing.flex_select_1d_nb`

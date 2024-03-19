@@ -11,7 +11,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro._settings import settings
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks, datetime_ as dt
-from vectorbtpro.utils.attr_ import define, MISSING
+from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
 from vectorbtpro.utils.array_ import is_range
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.colors import adjust_opacity
@@ -59,7 +59,7 @@ SplitterT = tp.TypeVar("SplitterT", bound="Splitter")
 
 
 @define
-class FixRange(define.mixin):
+class FixRange(DefineMixin):
     """Class that represents a fixed range."""
 
     range_: tp.FixRangeLike = define.field()
@@ -67,7 +67,7 @@ class FixRange(define.mixin):
 
 
 @define
-class RelRange(define.mixin):
+class RelRange(DefineMixin):
     """Class that represents a relative range."""
 
     offset: tp.Union[int, float, tp.TimedeltaLike] = define.field(default=0)
@@ -298,7 +298,7 @@ class RelRange(define.mixin):
 
 
 @define
-class Takeable(Annotatable, define.mixin):
+class Takeable(Annotatable, DefineMixin):
     """Class that represents an object from which a range can be taken."""
 
     obj: tp.Any = define.required_field()

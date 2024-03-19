@@ -19,6 +19,7 @@ from vectorbtpro.utils.decorators import class_or_instanceproperty, class_or_ins
 
 __all__ = [
     "MISSING",
+    "DefineMixin",
     "define",
     "deep_getattr",
 ]
@@ -186,11 +187,6 @@ class define:
 
     Attaches `DefineMixin` as a base class (if not present) and applies `attr.define`."""
 
-    @class_or_instanceproperty
-    def mixin(cls_or_self) -> tp.Type[DefineMixin]:
-        """Alias for `DefineMixin`."""
-        return DefineMixin
-
     @classmethod
     def field(cls, **kwargs) -> tp.Any:
         """Alias for `attr.field`."""
@@ -224,7 +220,7 @@ class define:
     def __new__(cls, *args, **kwargs) -> tp.FlexClassWrapper:
         def wrapper(wrapped_cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
             if DefineMixin not in wrapped_cls.__bases__:
-                raise TypeError("define.mixin missing among base classes")
+                raise TypeError("DefineMixin missing among base classes")
             return attr.define(frozen=True, slots=False, init=False, eq=False, repr=False, **kwargs)(wrapped_cls)
 
         if len(args) == 0:

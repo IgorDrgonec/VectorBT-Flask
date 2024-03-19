@@ -346,7 +346,7 @@ non-precise type pyobject
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import define
+from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.config import merge_dicts, atomic_dict
 from vectorbtpro.utils.jitting import (
     Jitter,
@@ -370,7 +370,7 @@ def get_func_full_name(func: tp.Callable) -> str:
 
 
 @define
-class JitableSetup(define.mixin):
+class JitableSetup(DefineMixin):
     """Class that represents a jitable setup.
 
     !!! note
@@ -401,7 +401,7 @@ class JitableSetup(define.mixin):
 
 
 @define
-class JittedSetup(define.mixin):
+class JittedSetup(DefineMixin):
     """Class that represents a jitted setup.
 
     !!! note

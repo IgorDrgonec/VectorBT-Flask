@@ -14,7 +14,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.base import indexes, wrapping, indexing
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import define
+from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.config import resolve_dict, merge_dicts
 from vectorbtpro.utils.params import combine_params, Param
 from vectorbtpro.utils.parsing import get_func_arg_names
@@ -695,7 +695,7 @@ def align_pd_arrays(
 
 
 @define
-class BCO(define.mixin):
+class BCO(DefineMixin):
     """Class that represents an object passed to `broadcast`.
 
     If any value is None, mostly defaults to the global value passed to `broadcast`."""
@@ -741,7 +741,7 @@ class BCO(define.mixin):
 
 
 @define
-class Default(define.mixin):
+class Default(DefineMixin):
     """Class for wrapping default values."""
 
     value: tp.Any = define.field()
@@ -749,7 +749,7 @@ class Default(define.mixin):
 
 
 @define
-class Ref(define.mixin):
+class Ref(DefineMixin):
     """Class for wrapping references to other values."""
 
     key: tp.Hashable = define.field()

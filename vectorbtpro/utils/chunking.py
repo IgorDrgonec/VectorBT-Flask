@@ -13,7 +13,7 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import define, MISSING
+from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
 from vectorbtpro.utils.config import merge_dicts, Config, Configured
 from vectorbtpro.utils.parsing import annotate_args, ann_args_to_args, match_ann_arg, get_func_arg_names, Regex
 from vectorbtpro.utils.template import substitute_templates, Rep
@@ -63,7 +63,7 @@ __pdoc__ = {}
 
 
 @define
-class ArgGetter(define.mixin):
+class ArgGetter(DefineMixin):
     """Class for getting an argument from annotated arguments."""
 
     arg_query: tp.Optional[tp.AnnArgQuery] = define.field(default=None)
@@ -77,7 +77,7 @@ class ArgGetter(define.mixin):
 
 
 @define
-class AxisSpecifier(define.mixin):
+class AxisSpecifier(DefineMixin):
     """Class with an attribute for specifying an axis."""
 
     axis: tp.Optional[int] = define.field(default=None)
@@ -85,7 +85,7 @@ class AxisSpecifier(define.mixin):
 
 
 @define
-class DimRetainer(define.mixin):
+class DimRetainer(DefineMixin):
     """Class with an attribute for retaining dimensions."""
 
     keep_dims: bool = define.field(default=False)
@@ -111,7 +111,7 @@ class Sizer(Annotatable):
 
 
 @define
-class ArgSizer(Sizer, ArgGetter, define.mixin):
+class ArgSizer(Sizer, ArgGetter, DefineMixin):
     """Class for getting the size from an argument."""
 
     single_type: tp.Optional[tp.TypeLike] = define.field(default=None)
@@ -159,7 +159,7 @@ class LenSizer(ArgSizer):
 
 
 @define
-class ShapeSizer(ArgSizer, AxisSpecifier, define.mixin):
+class ShapeSizer(ArgSizer, AxisSpecifier, DefineMixin):
     """Class for getting the size from the length of an axis in a shape."""
 
     @classmethod
@@ -211,7 +211,7 @@ class ArraySizer(ShapeSizer):
 
 
 @define
-class ChunkMeta(define.mixin):
+class ChunkMeta(DefineMixin):
     """Class that represents a chunk metadata."""
 
     uuid: str = define.field()
@@ -328,7 +328,7 @@ def yield_chunk_meta(
 
 
 @define
-class ChunkMapper(define.mixin):
+class ChunkMapper(DefineMixin):
     """Abstract class for mapping chunk metadata.
 
     Implements the abstract `ChunkMapper.map` method.
@@ -365,12 +365,12 @@ class ChunkMapper(define.mixin):
 
 
 @define
-class NotChunked(Annotatable, define.mixin):
+class NotChunked(Annotatable, DefineMixin):
     """Class that represents an argument that shouldn't be chunked."""
 
 
 @define
-class ChunkTaker(Annotatable, define.mixin):
+class ChunkTaker(Annotatable, DefineMixin):
     """Abstract class for taking one or more elements based on the chunk index or range.
 
     !!! note
@@ -422,7 +422,7 @@ class ChunkTaker(Annotatable, define.mixin):
 
 
 @define
-class ChunkSelector(ChunkTaker, DimRetainer, define.mixin):
+class ChunkSelector(ChunkTaker, DimRetainer, DefineMixin):
     """Class for selecting one element based on the chunk index."""
 
     def get_size(self, obj: tp.Sequence, **kwargs) -> int:
@@ -468,7 +468,7 @@ class CountAdapter(ChunkSlicer):
 
 
 @define
-class ShapeSelector(ChunkSelector, AxisSpecifier, define.mixin):
+class ShapeSelector(ChunkSelector, AxisSpecifier, DefineMixin):
     """Class for selecting one element from a shape's axis based on the chunk index."""
 
     def get_size(self, obj: tp.ShapeLike, **kwargs) -> int:
@@ -498,7 +498,7 @@ class ShapeSelector(ChunkSelector, AxisSpecifier, define.mixin):
 
 
 @define
-class ShapeSlicer(ChunkSlicer, AxisSpecifier, define.mixin):
+class ShapeSlicer(ChunkSlicer, AxisSpecifier, DefineMixin):
     """Class for slicing multiple elements from a shape's axis based on the chunk range."""
 
     def get_size(self, obj: tp.ShapeLike, **kwargs) -> int:
@@ -586,7 +586,7 @@ class ArraySlicer(ShapeSlicer):
 
 
 @define
-class ContainerTaker(ChunkTaker, define.mixin):
+class ContainerTaker(ChunkTaker, DefineMixin):
     """Class for taking from a container with other chunk takers.
 
     Accepts the specification of the container."""
@@ -852,7 +852,7 @@ class Chunkable:
 
 
 @define
-class Chunked(Chunkable, Annotatable, define.mixin):
+class Chunked(Chunkable, Annotatable, DefineMixin):
     """Class representing a chunkable value.
 
     Can take a variable number of keyword arguments, which will be used as `Chunked.take_spec_kwargs`."""
@@ -892,7 +892,7 @@ class Chunked(Chunkable, Annotatable, define.mixin):
             take_spec_kwargs.update({k: kwargs.pop(k) for k in list(kwargs.keys()) if k not in attr_names})
             kwargs["take_spec_kwargs"] = take_spec_kwargs
 
-        define.mixin.__init__(self, *args, **kwargs)
+        DefineMixin.__init__(self, *args, **kwargs)
 
     def get_value(self) -> tp.Any:
         self.assert_field_not_missing("value")
@@ -944,7 +944,7 @@ class ChunkedShape(Chunked):
 
 
 @define
-class ChunkedArray(Chunked, define.mixin):
+class ChunkedArray(Chunked, DefineMixin):
     """Class representing a chunkable array."""
 
     flex: bool = define.field(default=False)

@@ -15,7 +15,7 @@ from vectorbtpro.registries.jit_registry import register_jitted
 
 @register_jitted
 def select_nb(
-    ctx: tp.NamedTuple,
+    c: tp.NamedTuple,
     arr: tp.FlexArray2d,
     i: tp.Optional[int] = None,
     col: tp.Optional[int] = None,
@@ -24,11 +24,11 @@ def select_nb(
 
     If any of the arguments are None, will use the respective value from the context."""
     if i is None:
-        _i = ctx.i
+        _i = c.i
     else:
         _i = i
     if col is None:
-        _col = ctx.col
+        _col = c.col
     else:
         _col = col
     return flex_select_nb(arr, _i, _col)
@@ -36,7 +36,7 @@ def select_nb(
 
 @register_jitted
 def select_from_col_nb(
-    ctx: tp.NamedTuple,
+    c: tp.NamedTuple,
     col: int,
     arr: tp.FlexArray2d,
     i: tp.Optional[int] = None,
@@ -45,7 +45,7 @@ def select_from_col_nb(
 
     If any of the arguments are None, will use the respective value from the context."""
     if i is None:
-        _i = ctx.i
+        _i = c.i
     else:
         _i = i
     return flex_select_nb(arr, _i, col)
@@ -53,7 +53,7 @@ def select_from_col_nb(
 
 @register_jitted
 def iter_above_nb(
-    ctx: tp.NamedTuple,
+    c: tp.NamedTuple,
     arr1: tp.FlexArray2d,
     arr2: tp.FlexArray2d,
     i: tp.Optional[int] = None,
@@ -63,11 +63,11 @@ def iter_above_nb(
 
     If any of the arguments are None, will use the respective value from the context."""
     if i is None:
-        _i = ctx.i
+        _i = c.i
     else:
         _i = i
     if col is None:
-        _col = ctx.col
+        _col = c.col
     else:
         _col = col
     return _iter_above_nb(arr1, arr2, _i, _col)
@@ -75,7 +75,7 @@ def iter_above_nb(
 
 @register_jitted
 def iter_below_nb(
-    ctx: tp.NamedTuple,
+    c: tp.NamedTuple,
     arr1: tp.FlexArray2d,
     arr2: tp.FlexArray2d,
     i: tp.Optional[int] = None,
@@ -85,11 +85,11 @@ def iter_below_nb(
 
     If any of the arguments are None, will use the respective value from the context."""
     if i is None:
-        _i = ctx.i
+        _i = c.i
     else:
         _i = i
     if col is None:
-        _col = ctx.col
+        _col = c.col
     else:
         _col = col
     return _iter_below_nb(arr1, arr2, _i, _col)
@@ -97,7 +97,7 @@ def iter_below_nb(
 
 @register_jitted
 def iter_crossed_above_nb(
-    ctx: tp.NamedTuple,
+    c: tp.NamedTuple,
     arr1: tp.FlexArray2d,
     arr2: tp.FlexArray2d,
     i: tp.Optional[int] = None,
@@ -107,11 +107,11 @@ def iter_crossed_above_nb(
 
     If any of the arguments are None, will use the respective value from the context."""
     if i is None:
-        _i = ctx.i
+        _i = c.i
     else:
         _i = i
     if col is None:
-        _col = ctx.col
+        _col = c.col
     else:
         _col = col
     return _iter_crossed_above_nb(arr1, arr2, _i, _col)
@@ -119,7 +119,7 @@ def iter_crossed_above_nb(
 
 @register_jitted
 def iter_crossed_below_nb(
-    ctx: tp.NamedTuple,
+    c: tp.NamedTuple,
     arr1: tp.FlexArray2d,
     arr2: tp.FlexArray2d,
     i: tp.Optional[int] = None,
@@ -129,11 +129,11 @@ def iter_crossed_below_nb(
 
     If any of the arguments are None, will use the respective value from the context."""
     if i is None:
-        _i = ctx.i
+        _i = c.i
     else:
         _i = i
     if col is None:
-        _col = ctx.col
+        _col = c.col
     else:
         _col = col
     return _iter_crossed_below_nb(arr1, arr2, _i, _col)

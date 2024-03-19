@@ -9,7 +9,7 @@ import importlib
 import vectorbtpro as vbt
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import define
+from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.parsing import get_func_arg_names
@@ -27,7 +27,7 @@ __all__ = [
 
 
 @define
-class CustomTemplate(define.mixin):
+class CustomTemplate(DefineMixin):
     """Class for substituting templates."""
 
     template: tp.Any = define.field()

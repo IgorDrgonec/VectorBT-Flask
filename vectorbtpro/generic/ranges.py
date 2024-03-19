@@ -128,7 +128,7 @@ from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks, datetime_ as dt
-from vectorbtpro.utils.attr_ import define, MISSING
+from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.enum_ import map_enum_fields
@@ -1517,7 +1517,7 @@ PatternRangesT = tp.TypeVar("PatternRangesT", bound="PatternRanges")
 
 
 @define
-class PSC(define.mixin):
+class PSC(DefineMixin):
     """Class that represents a pattern search config.
 
     Every field will be resolved into the format suitable for Numba."""

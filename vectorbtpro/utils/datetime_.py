@@ -14,7 +14,7 @@ import re
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import define
+from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.config import merge_dicts, HybridConfig
 from vectorbtpro.utils.parsing import WarningsFiltered
 from vectorbtpro.utils.array_ import min_count_nb
@@ -441,7 +441,7 @@ DTCT = tp.TypeVar("DTCT", bound="DTC")
 
 
 @define
-class DTC(define.mixin):
+class DTC(DefineMixin):
     """Class representing one or more datetime components."""
 
     year: tp.Optional[int] = define.field(default=None)

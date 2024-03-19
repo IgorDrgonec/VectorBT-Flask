@@ -11,7 +11,7 @@ import warnings
 import sys
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.attr_ import define
+from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.annotations import get_annotations, VarArgs, VarKwargs
 
 __all__ = [
@@ -22,7 +22,7 @@ __all__ = [
 
 
 @define
-class Regex(define.mixin):
+class Regex(DefineMixin):
     """Class for matching a regular expression."""
 
     pattern: str = define.field()

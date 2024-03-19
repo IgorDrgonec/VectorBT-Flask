@@ -3,7 +3,7 @@
 """Utilities for selecting."""
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.attr_ import define
+from vectorbtpro.utils.attr_ import DefineMixin, define
 
 __all__ = [
     "PosSel",
@@ -14,7 +14,7 @@ __all__ = [
 
 
 @define
-class PosSel(define.mixin):
+class PosSel(DefineMixin):
     """Class that represents a selection by position."""
 
     value: tp.MaybeIterable[tp.Hashable] = define.field()
@@ -22,7 +22,7 @@ class PosSel(define.mixin):
 
 
 @define
-class LabelSel(define.mixin):
+class LabelSel(DefineMixin):
     """Class that represents a selection by label."""
 
     value: tp.MaybeIterable[tp.Hashable] = define.field()

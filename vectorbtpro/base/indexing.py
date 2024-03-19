@@ -12,7 +12,7 @@ from pandas.tseries.frequencies import to_offset
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks, datetime_ as dt, datetime_nb as dt_nb
-from vectorbtpro.utils.attr_ import define, MISSING
+from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
 from vectorbtpro.utils.template import CustomTemplate
 from vectorbtpro.utils.config import hdict, merge_dicts
 from vectorbtpro.utils.pickling import pdict
@@ -491,7 +491,7 @@ hsliceT = tp.TypeVar("hsliceT", bound="hslice")
 
 
 @define
-class hslice(define.mixin):
+class hslice(DefineMixin):
     """Hashable slice."""
 
     start: object = define.field()
@@ -514,7 +514,7 @@ class hslice(define.mixin):
                 stop = None
             if step is MISSING:
                 step = None
-        define.mixin.__init__(self, start=start, stop=stop, step=step)
+        DefineMixin.__init__(self, start=start, stop=stop, step=step)
 
     @classmethod
     def from_slice(cls: tp.Type[hsliceT], slice_: slice) -> hsliceT:
@@ -711,7 +711,7 @@ class UniIdxr(IdxrBase):
 
 
 @define
-class UniIdxrOp(UniIdxr, define.mixin):
+class UniIdxrOp(UniIdxr, DefineMixin):
     """Class for applying an operation to one or more indexers.
 
     Produces a single set of indices."""
@@ -726,7 +726,7 @@ class UniIdxrOp(UniIdxr, define.mixin):
     def __init__(self, op_func: tp.Callable, *idxrs) -> None:
         if len(idxrs) == 1 and checks.is_iterable(idxrs[0]):
             idxrs = idxrs[0]
-        define.mixin.__init__(self, op_func=op_func, idxrs=idxrs)
+        DefineMixin.__init__(self, op_func=op_func, idxrs=idxrs)
 
     def get(
         self,
@@ -744,7 +744,7 @@ class UniIdxrOp(UniIdxr, define.mixin):
 
 
 @define
-class PosIdxr(UniIdxr, define.mixin):
+class PosIdxr(UniIdxr, DefineMixin):
     """Class for resolving indices provided as integer positions."""
 
     value: tp.Union[None, tp.MaybeSequence[tp.MaybeSequence[int]], tp.Slice] = define.field()
@@ -767,7 +767,7 @@ class PosIdxr(UniIdxr, define.mixin):
 
 
 @define
-class MaskIdxr(UniIdxr, define.mixin):
+class MaskIdxr(UniIdxr, DefineMixin):
     """Class for resolving indices provided as a mask."""
 
     value: tp.Union[None, tp.Sequence[bool]] = define.field()
@@ -786,7 +786,7 @@ class MaskIdxr(UniIdxr, define.mixin):
 
 
 @define
-class LabelIdxr(UniIdxr, define.mixin):
+class LabelIdxr(UniIdxr, DefineMixin):
     """Class for resolving indices provided as labels."""
 
     value: tp.Union[None, tp.MaybeSequence[tp.Label], tp.Slice] = define.field()
@@ -836,7 +836,7 @@ class LabelIdxr(UniIdxr, define.mixin):
 
 
 @define
-class DatetimeIdxr(UniIdxr, define.mixin):
+class DatetimeIdxr(UniIdxr, DefineMixin):
     """Class for resolving indices provided as datetime-like objects."""
 
     value: tp.Union[None, tp.MaybeSequence[tp.DatetimeLike], tp.Slice] = define.field()
@@ -914,7 +914,7 @@ class DatetimeIdxr(UniIdxr, define.mixin):
 
 
 @define
-class DTCIdxr(UniIdxr, define.mixin):
+class DTCIdxr(UniIdxr, DefineMixin):
     """Class for resolving indices provided as datetime-like components."""
 
     value: tp.Union[None, tp.MaybeSequence[tp.DTCLike], tp.Slice] = define.field()
@@ -986,7 +986,7 @@ class DTCIdxr(UniIdxr, define.mixin):
 
 
 @define
-class PointIdxr(UniIdxr, define.mixin):
+class PointIdxr(UniIdxr, DefineMixin):
     """Class for resolving index points."""
 
     every: tp.Optional[tp.FrequencyLike] = define.field(default=None)
@@ -1283,7 +1283,7 @@ def get_index_points(
 
 
 @define
-class RangeIdxr(UniIdxr, define.mixin):
+class RangeIdxr(UniIdxr, DefineMixin):
     """Class for resolving index ranges."""
 
     every: tp.Optional[tp.FrequencyLike] = define.field(default=None)
@@ -1867,7 +1867,7 @@ def get_index_ranges(
 
 
 @define
-class AutoIdxr(UniIdxr, define.mixin):
+class AutoIdxr(UniIdxr, DefineMixin):
     """Class for resolving indices, datetime-like objects, frequency-like objects, and labels for one axis."""
 
     value: tp.Union[
@@ -1933,7 +1933,7 @@ class AutoIdxr(UniIdxr, define.mixin):
         for k in list(kwargs.keys()):
             if k not in builtin_keys:
                 idxr_kwargs[k] = kwargs.pop(k)
-        define.mixin.__init__(self, *args, idxr_kwargs=idxr_kwargs, **kwargs)
+        DefineMixin.__init__(self, *args, idxr_kwargs=idxr_kwargs, **kwargs)
 
     def get(
         self,
@@ -2078,7 +2078,7 @@ class AutoIdxr(UniIdxr, define.mixin):
 
 
 @define
-class RowIdxr(IdxrBase, define.mixin):
+class RowIdxr(IdxrBase, DefineMixin):
     """Class for resolving row indices."""
 
     idxr: object = define.field()
@@ -2090,7 +2090,7 @@ class RowIdxr(IdxrBase, define.mixin):
     """Keyword arguments passed to `AutoIdxr`."""
 
     def __init__(self, idxr: object, **idxr_kwargs) -> None:
-        define.mixin.__init__(self, idxr=idxr, idxr_kwargs=hdict(idxr_kwargs))
+        DefineMixin.__init__(self, idxr=idxr, idxr_kwargs=hdict(idxr_kwargs))
 
     def get(
         self,
@@ -2110,7 +2110,7 @@ class RowIdxr(IdxrBase, define.mixin):
 
 
 @define
-class ColIdxr(IdxrBase, define.mixin):
+class ColIdxr(IdxrBase, DefineMixin):
     """Class for resolving column indices."""
 
     idxr: object = define.field()
@@ -2122,7 +2122,7 @@ class ColIdxr(IdxrBase, define.mixin):
     """Keyword arguments passed to `AutoIdxr`."""
 
     def __init__(self, idxr: object, **idxr_kwargs) -> None:
-        define.mixin.__init__(self, idxr=idxr, idxr_kwargs=hdict(idxr_kwargs))
+        DefineMixin.__init__(self, idxr=idxr, idxr_kwargs=hdict(idxr_kwargs))
 
     def get(
         self,
@@ -2141,7 +2141,7 @@ class ColIdxr(IdxrBase, define.mixin):
 
 
 @define
-class Idxr(IdxrBase, define.mixin):
+class Idxr(IdxrBase, DefineMixin):
     """Class for resolving indices."""
 
     idxrs: tp.Tuple[object, ...] = define.field()
@@ -2157,7 +2157,7 @@ class Idxr(IdxrBase, define.mixin):
     """Keyword arguments passed to `RowIdxr` and `ColIdxr`."""
 
     def __init__(self, *idxrs: object, **idxr_kwargs) -> None:
-        define.mixin.__init__(self, idxrs=idxrs, idxr_kwargs=hdict(idxr_kwargs))
+        DefineMixin.__init__(self, idxrs=idxrs, idxr_kwargs=hdict(idxr_kwargs))
 
     def get(
         self,
@@ -2243,7 +2243,7 @@ IdxSetterT = tp.TypeVar("IdxSetterT", bound="IdxSetter")
 
 
 @define
-class IdxSetter(define.mixin):
+class IdxSetter(DefineMixin):
     """Class for setting values based on indexing."""
 
     idx_items: tp.List[tp.Tuple[object, tp.ArrayLike]] = define.field()
@@ -2513,7 +2513,7 @@ class IdxSetterFactory:
 
 
 @define
-class IdxDict(IdxSetterFactory, define.mixin):
+class IdxDict(IdxSetterFactory, DefineMixin):
     """Class for building an index setter from a dict."""
 
     index_dct: dict = define.field()
@@ -2524,7 +2524,7 @@ class IdxDict(IdxSetterFactory, define.mixin):
 
 
 @define
-class IdxSeries(IdxSetterFactory, define.mixin):
+class IdxSeries(IdxSetterFactory, DefineMixin):
     """Class for building an index setter from a Series."""
 
     sr: tp.AnyArray1d = define.field()
@@ -2563,7 +2563,7 @@ class IdxSeries(IdxSetterFactory, define.mixin):
 
 
 @define
-class IdxFrame(IdxSetterFactory, define.mixin):
+class IdxFrame(IdxSetterFactory, DefineMixin):
     """Class for building an index setter from a DataFrame."""
 
     df: tp.AnyArray2d = define.field()
@@ -2635,7 +2635,7 @@ class IdxFrame(IdxSetterFactory, define.mixin):
 
 
 @define
-class IdxRecords(IdxSetterFactory, define.mixin):
+class IdxRecords(IdxSetterFactory, DefineMixin):
     """Class for building index setters from records - one per field."""
 
     records: tp.RecordsLike = define.field()

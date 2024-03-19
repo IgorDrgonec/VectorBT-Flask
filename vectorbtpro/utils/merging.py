@@ -6,7 +6,7 @@ from functools import partial
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import define
+from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.annotations import get_annotations, Annotatable, Union
 from vectorbtpro.utils.template import substitute_templates
 from vectorbtpro.utils.config import merge_dicts
@@ -22,7 +22,7 @@ MergeFuncT = tp.TypeVar("MergeFuncT", bound="MergeFunc")
 
 
 @define
-class MergeFunc(Annotatable, define.mixin):
+class MergeFunc(Annotatable, DefineMixin):
     """Class representing a merging function and its keyword arguments.
 
     Can be directly called to call the underlying (already resolved and with keyword
@@ -61,7 +61,7 @@ class MergeFunc(Annotatable, define.mixin):
             merge_kwargs.update({k: kwargs.pop(k) for k in list(kwargs.keys()) if k not in attr_names})
             kwargs["merge_kwargs"] = merge_kwargs
 
-        define.mixin.__init__(self, *args, **kwargs)
+        DefineMixin.__init__(self, *args, **kwargs)
 
     def resolve_merge_func(self) -> tp.Optional[tp.Callable]:
         """Get the merging function where keyword arguments are hard-coded."""

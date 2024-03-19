@@ -2094,7 +2094,7 @@ def check_limit_expired_nb(
 
 @register_jitted(cache=True)
 def resolve_limit_price_nb(
-    price: float,
+    init_price: float,
     limit_delta: float = np.nan,
     delta_format: int = DeltaFormat.Percent,
     hit_below: bool = True,
@@ -2112,9 +2112,9 @@ def resolve_limit_price_nb(
                     limit_price = np.inf
             else:
                 if delta_format == DeltaFormat.Absolute:
-                    limit_price = price - limit_delta
+                    limit_price = init_price - limit_delta
                 elif delta_format == DeltaFormat.Percent:
-                    limit_price = price * (1 - limit_delta)
+                    limit_price = init_price * (1 - limit_delta)
                 elif delta_format == DeltaFormat.Target:
                     limit_price = limit_delta
                 else:
@@ -2127,15 +2127,15 @@ def resolve_limit_price_nb(
                     limit_price = np.inf
             else:
                 if delta_format == DeltaFormat.Absolute:
-                    limit_price = price + limit_delta
+                    limit_price = init_price + limit_delta
                 elif delta_format == DeltaFormat.Percent:
-                    limit_price = price * (1 + limit_delta)
+                    limit_price = init_price * (1 + limit_delta)
                 elif delta_format == DeltaFormat.Target:
                     limit_price = limit_delta
                 else:
                     raise ValueError("Invalid DeltaFormat option")
     else:
-        limit_price = price
+        limit_price = init_price
     return limit_price
 
 
@@ -2164,7 +2164,7 @@ def check_limit_hit_nb(
     _size = get_diraware_size_nb(size, direction)
     hit_below = (_size > 0 and not limit_reverse) or (_size < 0 and limit_reverse)
     limit_price = resolve_limit_price_nb(
-        price=price,
+        init_price=price,
         limit_delta=limit_delta,
         delta_format=delta_format,
         hit_below=hit_below,

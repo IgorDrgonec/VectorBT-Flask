@@ -413,7 +413,7 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks, datetime_ as dt
-from vectorbtpro.utils.attr_ import define
+from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.caching import Cacheable
 from vectorbtpro.utils.decorators import cacheableT, cacheable_property
 from vectorbtpro.utils.parsing import Regex, hash_args, UnhashableArgsError, get_func_arg_names
@@ -498,7 +498,7 @@ def _instance_converter(instance: InstanceT) -> InstanceT:
 
 
 @define
-class CAQuery(define.mixin):
+class CAQuery(DefineMixin):
     """Data class that represents a query for matching and ranking setups."""
 
     cacheable: tp.Optional[tp.Union[tp.Callable, cacheableT, str, Regex]] = define.field(default=None)
@@ -739,7 +739,7 @@ class CAQuery(define.mixin):
 
 
 @define
-class CARule(define.mixin):
+class CARule(DefineMixin):
     """Data class that represents a rule that should be enforced on setups that match a query."""
 
     query: CAQuery = define.field()
@@ -1135,7 +1135,7 @@ class CAMetrics:
 
 
 @define
-class CABaseSetup(CAMetrics, define.mixin):
+class CABaseSetup(CAMetrics, DefineMixin):
     """Base class that exposes properties and methods for cache management."""
 
     registry: CacheableRegistry = define.field(default=ca_reg)
@@ -1632,7 +1632,7 @@ CAClassSetupT = tp.TypeVar("CAClassSetupT", bound="CAClassSetup")
 
 
 @define
-class CAClassSetup(CABaseDelegatorSetup, define.mixin):
+class CAClassSetup(CABaseDelegatorSetup, DefineMixin):
     """Class that represents a setup of a cacheable class.
 
     The provided class must subclass `vectorbtpro.utils.caching.Cacheable`.
@@ -1825,7 +1825,7 @@ CAInstanceSetupT = tp.TypeVar("CAInstanceSetupT", bound="CAInstanceSetup")
 
 
 @define
-class CAInstanceSetup(CABaseDelegatorSetup, define.mixin):
+class CAInstanceSetup(CABaseDelegatorSetup, DefineMixin):
     """Class that represents a setup of an instance that has cacheables bound to it.
 
     The provided instance must be of `vectorbtpro.utils.caching.Cacheable`.
@@ -1956,7 +1956,7 @@ CAUnboundSetupT = tp.TypeVar("CAUnboundSetupT", bound="CAUnboundSetup")
 
 
 @define
-class CAUnboundSetup(CABaseDelegatorSetup, define.mixin):
+class CAUnboundSetup(CABaseDelegatorSetup, DefineMixin):
     """Class that represents a setup of an unbound cacheable property or method.
 
     An unbound callable is a callable that was declared in a class but is not bound
@@ -2058,7 +2058,7 @@ CARunSetupT = tp.TypeVar("CARunSetupT", bound="CARunSetup")
 
 
 @define
-class CARunResult(define.mixin):
+class CARunResult(DefineMixin):
     """Class that represents a cached result of a run.
 
     !!! note
@@ -2122,7 +2122,7 @@ class CARunResult(define.mixin):
 
 
 @define
-class CARunSetup(CABaseSetup, define.mixin):
+class CARunSetup(CABaseSetup, DefineMixin):
     """Class that represents a runnable cacheable setup.
 
     Takes care of running functions and caching the results using `CARunSetup.run`.

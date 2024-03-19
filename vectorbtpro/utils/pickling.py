@@ -11,7 +11,7 @@ import pandas as pd
 
 import vectorbtpro as vbt
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.attr_ import define
+from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.path_ import check_mkdir
 from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.checks import Comparable, is_hashable, is_deep_equal
@@ -261,7 +261,7 @@ def load(path: tp.PathLike, compression: tp.Union[None, bool, str] = None, **kwa
 
 
 @define
-class RecState(define.mixin):
+class RecState(DefineMixin):
     """Class that represents a state used to reconstruct an instance."""
 
     init_args: tp.Args = define.field(factory=tuple)
@@ -275,7 +275,7 @@ class RecState(define.mixin):
 
 
 @define
-class RecInfo(define.mixin):
+class RecInfo(DefineMixin):
     """Class that represents information needed to reconstruct an instance."""
 
     id_: str = define.field()

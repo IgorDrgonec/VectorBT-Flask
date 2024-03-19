@@ -5,7 +5,7 @@
 from numba import prange
 
 from vectorbtpro.base import chunking as base_ch
-from vectorbtpro.base.reshaping import to_1d_array_nb
+from vectorbtpro.base.reshaping import to_1d_array_nb, to_2d_array_nb
 from vectorbtpro.portfolio.nb.core import *
 from vectorbtpro.records import chunking as records_ch
 from vectorbtpro.registries.ch_registry import register_chunkable
@@ -174,7 +174,7 @@ def fill_entry_trades_in_position_nb(
     size=base_ch.GroupLensSizer(arg_query="col_map"),
     arg_take_spec=dict(
         order_records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
-        close=ch.ArraySlicer(axis=1),
+        close=base_ch.FlexArraySlicer(axis=1),
         col_map=base_ch.GroupMapSlicer(),
         init_position=base_ch.FlexArraySlicer(),
         init_price=base_ch.FlexArraySlicer(),
@@ -185,7 +185,7 @@ def fill_entry_trades_in_position_nb(
 @register_jitted(cache=True, tags={"can_parallel"})
 def get_entry_trades_nb(
     order_records: tp.RecordArray,
-    close: tp.Array2d,
+    close: tp.FlexArray2dLike,
     col_map: tp.GroupMap,
     init_position: tp.FlexArray1dLike = 0.0,
     init_price: tp.FlexArray1dLike = np.nan,
@@ -262,6 +262,7 @@ def get_entry_trades_nb(
         7          0       0          2
         ```
     """
+    close_ = to_2d_array_nb(np.asarray(close))
     init_position_ = to_1d_array_nb(np.asarray(init_position))
     init_price_ = to_1d_array_nb(np.asarray(init_price))
 
@@ -430,11 +431,12 @@ def get_entry_trades_nb(
             last_c = col_len - 1
             remaining_size = add_nb(entry_size_sum, -exit_size_sum)
             exit_size_sum = entry_size_sum
-            last_close = close[close.shape[0] - 1, col]
+            last_close = flex_select_nb(close_, close.shape[0] - 1, col)
             if np.isnan(last_close):
                 for ri in range(close.shape[0] - 1, -1, -1):
-                    if not np.isnan(close[ri, col]):
-                        last_close = close[ri, col]
+                    _close = flex_select_nb(close_, ri, col)
+                    if not np.isnan(_close):
+                        last_close = _close
                         break
             exit_gross_sum += remaining_size * last_close
 
@@ -466,7 +468,7 @@ def get_entry_trades_nb(
     size=base_ch.GroupLensSizer(arg_query="col_map"),
     arg_take_spec=dict(
         order_records=ch.ArraySlicer(axis=0, mapper=records_ch.col_idxs_mapper),
-        close=ch.ArraySlicer(axis=1),
+        close=base_ch.FlexArraySlicer(axis=1),
         col_map=base_ch.GroupMapSlicer(),
         init_position=base_ch.FlexArraySlicer(),
         init_price=base_ch.FlexArraySlicer(),
@@ -477,7 +479,7 @@ def get_entry_trades_nb(
 @register_jitted(cache=True, tags={"can_parallel"})
 def get_exit_trades_nb(
     order_records: tp.RecordArray,
-    close: tp.Array2d,
+    close: tp.FlexArray2dLike,
     col_map: tp.GroupMap,
     init_position: tp.FlexArray1dLike = 0.0,
     init_price: tp.FlexArray1dLike = np.nan,
@@ -523,6 +525,7 @@ def get_exit_trades_nb(
         7          0       0          2
         ```
     """
+    close_ = to_2d_array_nb(np.asarray(close))
     init_position_ = to_1d_array_nb(np.asarray(init_position))
     init_price_ = to_1d_array_nb(np.asarray(init_price))
 
@@ -700,11 +703,12 @@ def get_exit_trades_nb(
         if in_position and is_less_nb(-entry_size_sum, 0):
             # Trade hasn't been closed
             exit_size = entry_size_sum
-            last_close = close[close.shape[0] - 1, col]
+            last_close = flex_select_nb(close_, close.shape[0] - 1, col)
             if np.isnan(last_close):
                 for ri in range(close.shape[0] - 1, -1, -1):
-                    if not np.isnan(close[ri, col]):
-                        last_close = close[ri, col]
+                    _close = flex_select_nb(close_, ri, col)
+                    if not np.isnan(_close):
+                        last_close = _close
                         break
             exit_price = last_close
             exit_fees = 0.0
