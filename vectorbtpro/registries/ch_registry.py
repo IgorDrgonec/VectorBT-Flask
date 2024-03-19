@@ -4,7 +4,7 @@
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
+from vectorbtpro.utils.attr_ import define
 from vectorbtpro.utils.chunking import chunked, resolve_chunked, resolve_chunked_option
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.template import RepEval
@@ -16,22 +16,22 @@ __all__ = [
 
 
 @define
-class ChunkedSetup(AttrsMixin):
+class ChunkedSetup(define.mixin):
     """Class that represents a chunkable setup.
 
     !!! note
         Hashed solely by `setup_id`."""
 
-    setup_id: tp.Hashable = fld()
+    setup_id: tp.Hashable = define.field()
     """Setup id."""
 
-    func: tp.Callable = fld()
+    func: tp.Callable = define.field()
     """Chunkable function."""
 
-    options: tp.DictLike = fld(default=None)
+    options: tp.DictLike = define.field(default=None)
     """Options dictionary."""
 
-    tags: tp.SetLike = fld(default=None)
+    tags: tp.SetLike = define.field(default=None)
     """Set of tags."""
 
     @staticmethod

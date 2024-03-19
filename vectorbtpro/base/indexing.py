@@ -12,7 +12,7 @@ from pandas.tseries.frequencies import to_offset
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks, datetime_ as dt, datetime_nb as dt_nb
-from vectorbtpro.utils.attr_ import define, fld, MISSING, AttrsMixin
+from vectorbtpro.utils.attr_ import define, MISSING
 from vectorbtpro.utils.template import CustomTemplate
 from vectorbtpro.utils.config import hdict, merge_dicts
 from vectorbtpro.utils.pickling import pdict
@@ -491,16 +491,16 @@ hsliceT = tp.TypeVar("hsliceT", bound="hslice")
 
 
 @define
-class hslice(AttrsMixin):
+class hslice(define.mixin):
     """Hashable slice."""
 
-    start: object = fld()
+    start: object = define.field()
     """Start."""
 
-    stop: object = fld()
+    stop: object = define.field()
     """Stop."""
 
-    step: object = fld()
+    step: object = define.field()
     """Step."""
 
     def __init__(self, start: object = MISSING, stop: object = MISSING, step: object = MISSING) -> None:
@@ -514,7 +514,7 @@ class hslice(AttrsMixin):
                 stop = None
             if step is MISSING:
                 step = None
-        AttrsMixin.__init__(self, start=start, stop=stop, step=step)
+        define.mixin.__init__(self, start=start, stop=stop, step=step)
 
     @classmethod
     def from_slice(cls: tp.Type[hsliceT], slice_: slice) -> hsliceT:
@@ -711,22 +711,22 @@ class UniIdxr(IdxrBase):
 
 
 @define
-class UniIdxrOp(UniIdxr, AttrsMixin):
+class UniIdxrOp(UniIdxr, define.mixin):
     """Class for applying an operation to one or more indexers.
 
     Produces a single set of indices."""
 
-    op_func: tp.Callable = fld()
+    op_func: tp.Callable = define.field()
     """Operation function that takes the indices of each indexer (as `*args`), `index` (keyword argument), 
     and `freq` (keyword argument), and returns new indices."""
 
-    idxrs: tp.Tuple[object, ...] = fld()
+    idxrs: tp.Tuple[object, ...] = define.field()
     """A tuple of one or more indexers."""
 
     def __init__(self, op_func: tp.Callable, *idxrs) -> None:
         if len(idxrs) == 1 and checks.is_iterable(idxrs[0]):
             idxrs = idxrs[0]
-        AttrsMixin.__init__(self, op_func=op_func, idxrs=idxrs)
+        define.mixin.__init__(self, op_func=op_func, idxrs=idxrs)
 
     def get(
         self,
@@ -744,10 +744,10 @@ class UniIdxrOp(UniIdxr, AttrsMixin):
 
 
 @define
-class PosIdxr(UniIdxr, AttrsMixin):
+class PosIdxr(UniIdxr, define.mixin):
     """Class for resolving indices provided as integer positions."""
 
-    value: tp.Union[None, tp.MaybeSequence[tp.MaybeSequence[int]], tp.Slice] = fld()
+    value: tp.Union[None, tp.MaybeSequence[tp.MaybeSequence[int]], tp.Slice] = define.field()
     """One or more integer positions."""
 
     def get(
@@ -767,10 +767,10 @@ class PosIdxr(UniIdxr, AttrsMixin):
 
 
 @define
-class MaskIdxr(UniIdxr, AttrsMixin):
+class MaskIdxr(UniIdxr, define.mixin):
     """Class for resolving indices provided as a mask."""
 
-    value: tp.Union[None, tp.Sequence[bool]] = fld()
+    value: tp.Union[None, tp.Sequence[bool]] = define.field()
     """Mask."""
 
     def get(
@@ -786,19 +786,19 @@ class MaskIdxr(UniIdxr, AttrsMixin):
 
 
 @define
-class LabelIdxr(UniIdxr, AttrsMixin):
+class LabelIdxr(UniIdxr, define.mixin):
     """Class for resolving indices provided as labels."""
 
-    value: tp.Union[None, tp.MaybeSequence[tp.Label], tp.Slice] = fld()
+    value: tp.Union[None, tp.MaybeSequence[tp.Label], tp.Slice] = define.field()
     """One or more labels."""
 
-    closed_start: bool = fld(default=True)
+    closed_start: bool = define.field(default=True)
     """Whether slice start should be inclusive."""
 
-    closed_end: bool = fld(default=True)
+    closed_end: bool = define.field(default=True)
     """Whether slice end should be inclusive."""
 
-    level: tp.MaybeLevelSequence = fld(default=None)
+    level: tp.MaybeLevelSequence = define.field(default=None)
     """One or more levels."""
 
     def get(
@@ -836,27 +836,27 @@ class LabelIdxr(UniIdxr, AttrsMixin):
 
 
 @define
-class DatetimeIdxr(UniIdxr, AttrsMixin):
+class DatetimeIdxr(UniIdxr, define.mixin):
     """Class for resolving indices provided as datetime-like objects."""
 
-    value: tp.Union[None, tp.MaybeSequence[tp.DatetimeLike], tp.Slice] = fld()
+    value: tp.Union[None, tp.MaybeSequence[tp.DatetimeLike], tp.Slice] = define.field()
     """One or more datetime-like objects."""
 
-    closed_start: bool = fld(default=True)
+    closed_start: bool = define.field(default=True)
     """Whether slice start should be inclusive."""
 
-    closed_end: bool = fld(default=False)
+    closed_end: bool = define.field(default=False)
     """Whether slice end should be inclusive."""
 
-    indexer_method: tp.Optional[str] = fld(default="bfill")
+    indexer_method: tp.Optional[str] = define.field(default="bfill")
     """Method for `pd.Index.get_indexer`.
     
     Allows two additional values: "before" and "after"."""
 
-    below_to_zero: bool = fld(default=False)
+    below_to_zero: bool = define.field(default=False)
     """Whether to place 0 instead of -1 if `DatetimeIdxr.value` is below the first index."""
 
-    above_to_len: bool = fld(default=False)
+    above_to_len: bool = define.field(default=False)
     """Whether to place `len(index)` instead of -1 if `DatetimeIdxr.value` is above the last index."""
 
     def get(
@@ -914,22 +914,22 @@ class DatetimeIdxr(UniIdxr, AttrsMixin):
 
 
 @define
-class DTCIdxr(UniIdxr, AttrsMixin):
+class DTCIdxr(UniIdxr, define.mixin):
     """Class for resolving indices provided as datetime-like components."""
 
-    value: tp.Union[None, tp.MaybeSequence[tp.DTCLike], tp.Slice] = fld()
+    value: tp.Union[None, tp.MaybeSequence[tp.DTCLike], tp.Slice] = define.field()
     """One or more datetime-like components."""
 
-    parse_kwargs: tp.KwargsLike = fld(default=None)
+    parse_kwargs: tp.KwargsLike = define.field(default=None)
     """Keyword arguments passed to `vectorbtpro.utils.datetime_.DTC.parse`."""
 
-    closed_start: bool = fld(default=True)
+    closed_start: bool = define.field(default=True)
     """Whether slice start should be inclusive."""
 
-    closed_end: bool = fld(default=False)
+    closed_end: bool = define.field(default=False)
     """Whether slice end should be inclusive."""
 
-    jitted: tp.JittedOption = fld(default=None)
+    jitted: tp.JittedOption = define.field(default=None)
     """Jitting option passed to `vectorbtpro.utils.datetime_nb.index_matches_dtc_nb`
     and `vectorbtpro.utils.datetime_nb.index_within_dtc_range_nb`."""
 
@@ -986,10 +986,10 @@ class DTCIdxr(UniIdxr, AttrsMixin):
 
 
 @define
-class PointIdxr(UniIdxr, AttrsMixin):
+class PointIdxr(UniIdxr, define.mixin):
     """Class for resolving index points."""
 
-    every: tp.Optional[tp.FrequencyLike] = fld(default=None)
+    every: tp.Optional[tp.FrequencyLike] = define.field(default=None)
     """Frequency either as an integer or timedelta.
     
     Gets translated into `on` array by creating a range. If integer, an index sequence from `start` to `end` 
@@ -998,48 +998,48 @@ class PointIdxr(UniIdxr, AttrsMixin):
     
     If `at_time` is not None and `every` and `on` are None, `every` defaults to one day."""
 
-    normalize_every: bool = fld(default=False)
+    normalize_every: bool = define.field(default=False)
     """Normalize start/end dates to midnight before generating date range."""
 
-    at_time: tp.Optional[tp.TimeLike] = fld(default=None)
+    at_time: tp.Optional[tp.TimeLike] = define.field(default=None)
     """Time of the day either as a (human-readable) string or `datetime.time`. 
     
     Every datetime in `on` gets floored to the daily frequency, while `at_time` gets converted into 
     a timedelta using `vectorbtpro.utils.datetime_.time_to_timedelta` and added to `add_delta`. 
     Index must be datetime-like."""
 
-    start: tp.Optional[tp.Union[int, tp.DatetimeLike]] = fld(default=None)
+    start: tp.Optional[tp.Union[int, tp.DatetimeLike]] = define.field(default=None)
     """Start index/date.
     
     If (human-readable) string, gets converted into a datetime.
     
     If `every` is None, gets used to filter the final index array."""
 
-    end: tp.Optional[tp.Union[int, tp.DatetimeLike]] = fld(default=None)
+    end: tp.Optional[tp.Union[int, tp.DatetimeLike]] = define.field(default=None)
     """End index/date.
     
     If (human-readable) string, gets converted into a datetime.
     
     If `every` is None, gets used to filter the final index array."""
 
-    exact_start: bool = fld(default=False)
+    exact_start: bool = define.field(default=False)
     """Whether the first index should be exactly `start`.
     
     Depending on `every`, the first index picked by `pd.date_range` may happen after `start`.
     In such a case, `start` gets injected before the first index generated by `pd.date_range`."""
 
-    on: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = fld(default=None)
+    on: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = define.field(default=None)
     """Index/label or a sequence of such.
     
     Gets converted into datetime format whenever possible."""
 
-    add_delta: tp.Optional[tp.FrequencyLike] = fld(default=None)
+    add_delta: tp.Optional[tp.FrequencyLike] = define.field(default=None)
     """Offset to be added to each in `on`.
     
     If string, gets converted into an offset using 
     [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html)."""
 
-    kind: tp.Optional[str] = fld(default=None)
+    kind: tp.Optional[str] = define.field(default=None)
     """Kind of data in `on`: indices or labels.
     
     If None, gets assigned to `indices` if `on` contains integer data, otherwise to `labels`.
@@ -1048,18 +1048,18 @@ class PointIdxr(UniIdxr, AttrsMixin):
     Prior to this, gets its timezone aligned to the timezone of the index. If `kind` is 'indices', 
     `on` gets wrapped with NumPy."""
 
-    indexer_method: str = fld(default="bfill")
+    indexer_method: str = define.field(default="bfill")
     """Method for `pd.Index.get_indexer`.
     
     Allows two additional values: "before" and "after"."""
 
-    indexer_tolerance: tp.Optional[tp.Union[int, tp.TimedeltaLike, tp.IndexLike]] = fld(default=None)
+    indexer_tolerance: tp.Optional[tp.Union[int, tp.TimedeltaLike, tp.IndexLike]] = define.field(default=None)
     """Tolerance for `pd.Index.get_indexer`.
     
     If `at_time` is set and `indexer_method` is neither exact nor nearest, `indexer_tolerance` 
     becomes such that the next element must be within the current day."""
 
-    skip_not_found: bool = fld(default=True)
+    skip_not_found: bool = define.field(default=True)
     """Whether to drop indices that are -1 (not found)."""
 
     def get(
@@ -1283,10 +1283,10 @@ def get_index_points(
 
 
 @define
-class RangeIdxr(UniIdxr, AttrsMixin):
+class RangeIdxr(UniIdxr, define.mixin):
     """Class for resolving index ranges."""
 
-    every: tp.Optional[tp.FrequencyLike] = fld(default=None)
+    every: tp.Optional[tp.FrequencyLike] = define.field(default=None)
     """Frequency either as an integer or timedelta.
 
     Gets translated into `start` and `end` arrays by creating a range. If integer, an index sequence from `start` 
@@ -1296,10 +1296,10 @@ class RangeIdxr(UniIdxr, AttrsMixin):
     If `start_time` and `end_time` are not None and `every`, `start`, and `end` are None, 
     `every` defaults to one day."""
 
-    normalize_every: bool = fld(default=False)
+    normalize_every: bool = define.field(default=False)
     """Normalize start/end dates to midnight before generating date range."""
 
-    split_every: bool = fld(default=True)
+    split_every: bool = define.field(default=True)
     """Whether to split the sequence generated using `every` into `start` and `end` arrays.
 
     After creation, and if `split_every` is True, an index range is created from each pair of elements in 
@@ -1308,21 +1308,21 @@ class RangeIdxr(UniIdxr, AttrsMixin):
 
     Forced to False if `every`, `start_time`, and `end_time` are not None and `fixed_start` is False."""
 
-    start_time: tp.Optional[tp.TimeLike] = fld(default=None)
+    start_time: tp.Optional[tp.TimeLike] = define.field(default=None)
     """Start time of the day either as a (human-readable) string or `datetime.time`. 
 
     Every datetime in `start` gets floored to the daily frequency, while `start_time` gets converted into 
     a timedelta using `vectorbtpro.utils.datetime_.time_to_timedelta` and added to `add_start_delta`. 
     Index must be datetime-like."""
 
-    end_time: tp.Optional[tp.TimeLike] = fld(default=None)
+    end_time: tp.Optional[tp.TimeLike] = define.field(default=None)
     """End time of the day either as a (human-readable) string or `datetime.time`. 
 
     Every datetime in `end` gets floored to the daily frequency, while `end_time` gets converted into 
     a timedelta using `vectorbtpro.utils.datetime_.time_to_timedelta` and added to `add_end_delta`. 
     Index must be datetime-like."""
 
-    lookback_period: tp.Optional[tp.FrequencyLike] = fld(default=None)
+    lookback_period: tp.Optional[tp.FrequencyLike] = define.field(default=None)
     """Lookback period either as an integer or offset.
 
     If `lookback_period` is set, `start` becomes `end-lookback_period`. If `every` is not None, 
@@ -1332,21 +1332,21 @@ class RangeIdxr(UniIdxr, AttrsMixin):
     [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html).
     If integer, gets multiplied by the frequency of the index if the index is not integer."""
 
-    start: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = fld(default=None)
+    start: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = define.field(default=None)
     """Start index/label or a sequence of such.
 
     Gets converted into datetime format whenever possible.
 
     Gets broadcasted together with `end`."""
 
-    end: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = fld(default=None)
+    end: tp.Optional[tp.Union[int, tp.DatetimeLike, tp.IndexLike]] = define.field(default=None)
     """End index/label or a sequence of such.
 
     Gets converted into datetime format whenever possible.
 
     Gets broadcasted together with `start`."""
 
-    exact_start: bool = fld(default=False)
+    exact_start: bool = define.field(default=False)
     """Whether the first index in the `start` array should be exactly `start`.
 
     Depending on `every`, the first index picked by `pd.date_range` may happen after `start`.
@@ -1354,32 +1354,32 @@ class RangeIdxr(UniIdxr, AttrsMixin):
 
     Cannot be used together with `lookback_period`."""
 
-    fixed_start: bool = fld(default=False)
+    fixed_start: bool = define.field(default=False)
     """Whether all indices in the `start` array should be exactly `start`.
 
     Works only together with `every`.
 
     Cannot be used together with `lookback_period`."""
 
-    closed_start: bool = fld(default=True)
+    closed_start: bool = define.field(default=True)
     """Whether `start` should be inclusive."""
 
-    closed_end: bool = fld(default=False)
+    closed_end: bool = define.field(default=False)
     """Whether `end` should be inclusive."""
 
-    add_start_delta: tp.Optional[tp.FrequencyLike] = fld(default=None)
+    add_start_delta: tp.Optional[tp.FrequencyLike] = define.field(default=None)
     """Offset to be added to each in `start`.
 
     If string, gets converted into an offset using 
     [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html)."""
 
-    add_end_delta: tp.Optional[tp.FrequencyLike] = fld(default=None)
+    add_end_delta: tp.Optional[tp.FrequencyLike] = define.field(default=None)
     """Offset to be added to each in `end`.
 
     If string, gets converted into an offset using 
     [to_offset](https://pandas.pydata.org/docs/reference/api/pandas.tseries.frequencies.to_offset.html)."""
 
-    kind: tp.Optional[str] = fld(default=None)
+    kind: tp.Optional[str] = define.field(default=None)
     """Kind of data in `on`: indices, labels or bounds.
 
     If None, gets assigned to `indices` if `start` and `end` contain integer data, to `bounds`
@@ -1390,10 +1390,10 @@ class RangeIdxr(UniIdxr, AttrsMixin):
     `start` and `end` get wrapped with NumPy. If kind` is 'bounds', 
     `vectorbtpro.base.resampling.base.Resampler.map_bounds_to_source_ranges` is used."""
 
-    skip_not_found: bool = fld(default=True)
+    skip_not_found: bool = define.field(default=True)
     """Whether to drop indices that are -1 (not found)."""
 
-    jitted: tp.JittedOption = fld(default=None)
+    jitted: tp.JittedOption = define.field(default=None)
     """Jitting option passed to `vectorbtpro.base.resampling.base.Resampler.map_bounds_to_source_ranges`."""
 
     def get(
@@ -1867,7 +1867,7 @@ def get_index_ranges(
 
 
 @define
-class AutoIdxr(UniIdxr, AttrsMixin):
+class AutoIdxr(UniIdxr, define.mixin):
     """Class for resolving indices, datetime-like objects, frequency-like objects, and labels for one axis."""
 
     value: tp.Union[
@@ -1880,33 +1880,33 @@ class AutoIdxr(UniIdxr, AttrsMixin):
         tp.MaybeSequence[tp.DTCLike],
         tp.FrequencyLike,
         tp.Slice,
-    ] = fld()
+    ] = define.field()
     """One or more integer indices, datetime-like objects, frequency-like objects, or labels.
     
     Can also be an instance of `vectorbtpro.utils.selection.PosSel` holding position(s)
     and `vectorbtpro.utils.selection.LabelSel` holding label(s)."""
 
-    closed_start: bool = fld(default=MISSING)
+    closed_start: bool = define.optional_field()
     """Whether slice start should be inclusive."""
 
-    closed_end: bool = fld(default=MISSING)
+    closed_end: bool = define.optional_field()
     """Whether slice end should be inclusive."""
 
-    indexer_method: tp.Optional[str] = fld(default=MISSING)
+    indexer_method: tp.Optional[str] = define.optional_field()
     """Method for `pd.Index.get_indexer`."""
 
-    below_to_zero: bool = fld(default=MISSING)
+    below_to_zero: bool = define.optional_field()
     """Whether to place 0 instead of -1 if `AutoIdxr.value` is below the first index."""
 
-    above_to_len: bool = fld(default=MISSING)
+    above_to_len: bool = define.optional_field()
     """Whether to place `len(index)` instead of -1 if `AutoIdxr.value` is above the last index."""
 
-    level: tp.MaybeLevelSequence = fld(default=None)
+    level: tp.MaybeLevelSequence = define.field(default=None)
     """One or more levels.
 
     If `level` is not None and `kind` is None, `kind` becomes "labels"."""
 
-    kind: tp.Optional[str] = fld(default=None)
+    kind: tp.Optional[str] = define.field(default=None)
     """Kind of value.
 
     Allowed are
@@ -1920,7 +1920,7 @@ class AutoIdxr(UniIdxr, AttrsMixin):
 
     If None, will (try to) determine automatically based on the type of indices."""
 
-    idxr_kwargs: tp.KwargsLike = fld(default=None)
+    idxr_kwargs: tp.KwargsLike = define.field(default=None)
     """Keyword arguments passed to the selected indexer."""
 
     def __init__(self, *args, **kwargs) -> None:
@@ -1933,7 +1933,7 @@ class AutoIdxr(UniIdxr, AttrsMixin):
         for k in list(kwargs.keys()):
             if k not in builtin_keys:
                 idxr_kwargs[k] = kwargs.pop(k)
-        AttrsMixin.__init__(self, *args, idxr_kwargs=idxr_kwargs, **kwargs)
+        define.mixin.__init__(self, *args, idxr_kwargs=idxr_kwargs, **kwargs)
 
     def get(
         self,
@@ -2078,19 +2078,19 @@ class AutoIdxr(UniIdxr, AttrsMixin):
 
 
 @define
-class RowIdxr(IdxrBase, AttrsMixin):
+class RowIdxr(IdxrBase, define.mixin):
     """Class for resolving row indices."""
 
-    idxr: object = fld()
+    idxr: object = define.field()
     """Indexer.
     
     Can be an instance of `UniIdxr`, a custom template, or a value to be wrapped with `AutoIdxr`."""
 
-    idxr_kwargs: tp.KwargsLike = fld()
+    idxr_kwargs: tp.KwargsLike = define.field()
     """Keyword arguments passed to `AutoIdxr`."""
 
     def __init__(self, idxr: object, **idxr_kwargs) -> None:
-        AttrsMixin.__init__(self, idxr=idxr, idxr_kwargs=hdict(idxr_kwargs))
+        define.mixin.__init__(self, idxr=idxr, idxr_kwargs=hdict(idxr_kwargs))
 
     def get(
         self,
@@ -2110,19 +2110,19 @@ class RowIdxr(IdxrBase, AttrsMixin):
 
 
 @define
-class ColIdxr(IdxrBase, AttrsMixin):
+class ColIdxr(IdxrBase, define.mixin):
     """Class for resolving column indices."""
 
-    idxr: object = fld()
+    idxr: object = define.field()
     """Indexer.
         
     Can be an instance of `UniIdxr`, a custom template, or a value to be wrapped with `AutoIdxr`."""
 
-    idxr_kwargs: tp.KwargsLike = fld()
+    idxr_kwargs: tp.KwargsLike = define.field()
     """Keyword arguments passed to `AutoIdxr`."""
 
     def __init__(self, idxr: object, **idxr_kwargs) -> None:
-        AttrsMixin.__init__(self, idxr=idxr, idxr_kwargs=hdict(idxr_kwargs))
+        define.mixin.__init__(self, idxr=idxr, idxr_kwargs=hdict(idxr_kwargs))
 
     def get(
         self,
@@ -2141,10 +2141,10 @@ class ColIdxr(IdxrBase, AttrsMixin):
 
 
 @define
-class Idxr(IdxrBase, AttrsMixin):
+class Idxr(IdxrBase, define.mixin):
     """Class for resolving indices."""
 
-    idxrs: tp.Tuple[object, ...] = fld()
+    idxrs: tp.Tuple[object, ...] = define.field()
     """A tuple of one or more indexers.
     
     If one indexer is provided, can be an instance of `RowIdxr` or `ColIdxr`, 
@@ -2153,11 +2153,11 @@ class Idxr(IdxrBase, AttrsMixin):
     If two indexers are provided, can be an instance of `RowIdxr` and `ColIdxr` respectively,
     or a value to wrapped with `RowIdxr` and `ColIdxr` respectively."""
 
-    idxr_kwargs: tp.KwargsLike = fld()
+    idxr_kwargs: tp.KwargsLike = define.field()
     """Keyword arguments passed to `RowIdxr` and `ColIdxr`."""
 
     def __init__(self, *idxrs: object, **idxr_kwargs) -> None:
-        AttrsMixin.__init__(self, idxrs=idxrs, idxr_kwargs=hdict(idxr_kwargs))
+        define.mixin.__init__(self, idxrs=idxrs, idxr_kwargs=hdict(idxr_kwargs))
 
     def get(
         self,
@@ -2243,10 +2243,10 @@ IdxSetterT = tp.TypeVar("IdxSetterT", bound="IdxSetter")
 
 
 @define
-class IdxSetter(AttrsMixin):
+class IdxSetter(define.mixin):
     """Class for setting values based on indexing."""
 
-    idx_items: tp.List[tp.Tuple[object, tp.ArrayLike]] = fld()
+    idx_items: tp.List[tp.Tuple[object, tp.ArrayLike]] = define.field()
     """Items where the first element is an indexer and the second element is a value to be set."""
 
     @classmethod
@@ -2513,10 +2513,10 @@ class IdxSetterFactory:
 
 
 @define
-class IdxDict(IdxSetterFactory, AttrsMixin):
+class IdxDict(IdxSetterFactory, define.mixin):
     """Class for building an index setter from a dict."""
 
-    index_dct: dict = fld()
+    index_dct: dict = define.field()
     """Dict that contains indexer objects as keys and values to be set as values."""
 
     def get(self) -> tp.Union[IdxSetter, tp.Dict[tp.Label, IdxSetter]]:
@@ -2524,19 +2524,19 @@ class IdxDict(IdxSetterFactory, AttrsMixin):
 
 
 @define
-class IdxSeries(IdxSetterFactory, AttrsMixin):
+class IdxSeries(IdxSetterFactory, define.mixin):
     """Class for building an index setter from a Series."""
 
-    sr: tp.AnyArray1d = fld()
+    sr: tp.AnyArray1d = define.field()
     """Series or any array-like object to create the Series from."""
 
-    split: bool = fld(default=False)
+    split: bool = define.field(default=False)
     """Whether to split the setting operation.
         
     If False, will set all values using a single operation.
     Otherwise, will do one operation per element."""
 
-    idx_kwargs: tp.KwargsLike = fld(default=None)
+    idx_kwargs: tp.KwargsLike = define.field(default=None)
     """Keyword arguments passed to `idx` if the indexer isn't an instance of `Idxr`."""
 
     def get(self) -> tp.Union[IdxSetter, tp.Dict[tp.Label, IdxSetter]]:
@@ -2563,13 +2563,13 @@ class IdxSeries(IdxSetterFactory, AttrsMixin):
 
 
 @define
-class IdxFrame(IdxSetterFactory, AttrsMixin):
+class IdxFrame(IdxSetterFactory, define.mixin):
     """Class for building an index setter from a DataFrame."""
 
-    df: tp.AnyArray2d = fld()
+    df: tp.AnyArray2d = define.field()
     """DataFrame or any array-like object to create the DataFrame from."""
 
-    split: tp.Union[bool, str] = fld(default=False)
+    split: tp.Union[bool, str] = define.field(default=False)
     """Whether to split the setting operation.
     
     If False, will set all values using a single operation.
@@ -2579,10 +2579,10 @@ class IdxFrame(IdxSetterFactory, AttrsMixin):
     * 'rows': one operation per row
     * True or 'elements': one operation per element"""
 
-    rowidx_kwargs: tp.KwargsLike = fld(default=None)
+    rowidx_kwargs: tp.KwargsLike = define.field(default=None)
     """Keyword arguments passed to `rowidx` if the indexer isn't an instance of `RowIdxr`."""
 
-    colidx_kwargs: tp.KwargsLike = fld(default=None)
+    colidx_kwargs: tp.KwargsLike = define.field(default=None)
     """Keyword arguments passed to `colidx` if the indexer isn't an instance of `ColIdxr`."""
 
     def get(self) -> tp.Union[IdxSetter, tp.Dict[tp.Label, IdxSetter]]:
@@ -2635,16 +2635,16 @@ class IdxFrame(IdxSetterFactory, AttrsMixin):
 
 
 @define
-class IdxRecords(IdxSetterFactory, AttrsMixin):
+class IdxRecords(IdxSetterFactory, define.mixin):
     """Class for building index setters from records - one per field."""
 
-    records: tp.RecordsLike = fld()
+    records: tp.RecordsLike = define.field()
     """Series, DataFrame, or any sequence of mapping-like objects.
     
     If a Series or DataFrame and the index is not a default range, the index will become a row field.
     If a custom row field is provided, the index will be ignored."""
 
-    row_field: tp.Union[None, bool, tp.Label] = fld(default=None)
+    row_field: tp.Union[None, bool, tp.Label] = define.field(default=None)
     """Row field.
     
     If None or True, will search for "row", "index", "open time", and "date" (case-insensitive).
@@ -2654,7 +2654,7 @@ class IdxRecords(IdxSetterFactory, AttrsMixin):
     If a record doesn't have a row field, all rows will be set.
     If there's no row and column field, the field value will become the default of the entire array."""
 
-    col_field: tp.Union[None, bool, tp.Label] = fld(default=None)
+    col_field: tp.Union[None, bool, tp.Label] = define.field(default=None)
     """Column field.
 
     If None or True, will search for "col", "column", and "symbol" (case-insensitive).
@@ -2662,10 +2662,10 @@ class IdxRecords(IdxSetterFactory, AttrsMixin):
     If a record doesn't have a column field, all columns will be set.
     If there's no row and column field, the field value will become the default of the entire array."""
 
-    rowidx_kwargs: tp.KwargsLike = fld(default=None)
+    rowidx_kwargs: tp.KwargsLike = define.field(default=None)
     """Keyword arguments passed to `rowidx` if the indexer isn't an instance of `RowIdxr`."""
 
-    colidx_kwargs: tp.KwargsLike = fld(default=None)
+    colidx_kwargs: tp.KwargsLike = define.field(default=None)
     """Keyword arguments passed to `colidx` if the indexer isn't an instance of `ColIdxr`."""
 
     def get(self) -> tp.Union[IdxSetter, tp.Dict[tp.Label, IdxSetter]]:

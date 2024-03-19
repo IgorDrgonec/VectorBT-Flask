@@ -14,7 +14,7 @@ import re
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
+from vectorbtpro.utils.attr_ import define
 from vectorbtpro.utils.config import merge_dicts, HybridConfig
 from vectorbtpro.utils.parsing import WarningsFiltered
 from vectorbtpro.utils.array_ import min_count_nb
@@ -441,31 +441,31 @@ DTCT = tp.TypeVar("DTCT", bound="DTC")
 
 
 @define
-class DTC(AttrsMixin):
+class DTC(define.mixin):
     """Class representing one or more datetime components."""
 
-    year: tp.Optional[int] = fld(default=None)
+    year: tp.Optional[int] = define.field(default=None)
     """Year."""
 
-    month: tp.Optional[int] = fld(default=None)
+    month: tp.Optional[int] = define.field(default=None)
     """Month."""
 
-    day: tp.Optional[int] = fld(default=None)
+    day: tp.Optional[int] = define.field(default=None)
     """Day of month."""
 
-    weekday: tp.Optional[int] = fld(default=None)
+    weekday: tp.Optional[int] = define.field(default=None)
     """Day of week."""
 
-    hour: tp.Optional[int] = fld(default=None)
+    hour: tp.Optional[int] = define.field(default=None)
     """Hour."""
 
-    minute: tp.Optional[int] = fld(default=None)
+    minute: tp.Optional[int] = define.field(default=None)
     """Minute."""
 
-    second: tp.Optional[int] = fld(default=None)
+    second: tp.Optional[int] = define.field(default=None)
     """Second."""
 
-    nanosecond: tp.Optional[int] = fld(default=None)
+    nanosecond: tp.Optional[int] = define.field(default=None)
     """Nanosecond."""
 
     @classmethod
@@ -934,11 +934,20 @@ def interval_to_ms(interval: str) -> tp.Optional[int]:
         return None
 
 
-def to_ns(obj: tp.ArrayLike) -> tp.ArrayLike:
+def to_ns(obj: tp.ArrayLike, tz_naive_ns: tp.Optional[bool] = None) -> tp.ArrayLike:
     """Convert a datetime, timedelta, integer, or any array-like object to nanoseconds since Unix Epoch."""
+    from vectorbtpro._settings import settings
+
+    datetime_cfg = settings["datetime"]
+
+    if tz_naive_ns is None:
+        tz_naive_ns = datetime_cfg["tz_naive_ns"]
+
     if isinstance(obj, time):
         obj = time_to_timedelta(obj)
     if isinstance(obj, pd.Timestamp):
+        if tz_naive_ns:
+            obj = obj.tz_localize(None).tz_localize("utc")
         obj = obj.to_datetime64()
     if isinstance(obj, BaseOffset):
         obj = pd.Timedelta(obj)
@@ -952,6 +961,9 @@ def to_ns(obj: tp.ArrayLike) -> tp.ArrayLike:
         obj = obj.tz_localize(None).tz_localize("utc")
     if isinstance(obj, pd.PeriodIndex):
         obj = obj.to_timestamp()
+    if isinstance(obj, pd.DatetimeIndex):
+        if tz_naive_ns:
+            obj = obj.tz_localize(None).tz_localize("utc")
     if isinstance(obj, pd.Index):
         obj = obj.values
 

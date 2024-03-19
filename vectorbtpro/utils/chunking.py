@@ -13,7 +13,7 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import define, fld, MISSING, AttrsMixin
+from vectorbtpro.utils.attr_ import define, MISSING
 from vectorbtpro.utils.config import merge_dicts, Config, Configured
 from vectorbtpro.utils.parsing import annotate_args, ann_args_to_args, match_ann_arg, get_func_arg_names, Regex
 from vectorbtpro.utils.template import substitute_templates, Rep
@@ -63,10 +63,10 @@ __pdoc__ = {}
 
 
 @define
-class ArgGetter(AttrsMixin):
+class ArgGetter(define.mixin):
     """Class for getting an argument from annotated arguments."""
 
-    arg_query: tp.Optional[tp.AnnArgQuery] = fld(default=None)
+    arg_query: tp.Optional[tp.AnnArgQuery] = define.field(default=None)
     """Query for annotated argument to derive the size from."""
 
     def get_arg(self, ann_args: tp.AnnArgs) -> tp.Any:
@@ -77,18 +77,18 @@ class ArgGetter(AttrsMixin):
 
 
 @define
-class AxisSpecifier(AttrsMixin):
+class AxisSpecifier(define.mixin):
     """Class with an attribute for specifying an axis."""
 
-    axis: tp.Optional[int] = fld(default=None)
+    axis: tp.Optional[int] = define.field(default=None)
     """Axis of the argument to take from."""
 
 
 @define
-class DimRetainer:
+class DimRetainer(define.mixin):
     """Class with an attribute for retaining dimensions."""
 
-    keep_dims: bool = fld(default=False)
+    keep_dims: bool = define.field(default=False)
     """Whether to retain dimensions."""
 
 
@@ -111,10 +111,10 @@ class Sizer(Annotatable):
 
 
 @define
-class ArgSizer(Sizer, ArgGetter):
+class ArgSizer(Sizer, ArgGetter, define.mixin):
     """Class for getting the size from an argument."""
 
-    single_type: tp.Optional[tp.TypeLike] = fld(default=None)
+    single_type: tp.Optional[tp.TypeLike] = define.field(default=None)
     """One or multiple types to consider as a single value."""
 
     def get_size(self, ann_args: tp.AnnArgs, **kwargs) -> int:
@@ -159,7 +159,7 @@ class LenSizer(ArgSizer):
 
 
 @define
-class ShapeSizer(ArgSizer, AxisSpecifier):
+class ShapeSizer(ArgSizer, AxisSpecifier, define.mixin):
     """Class for getting the size from the length of an axis in a shape."""
 
     @classmethod
@@ -211,24 +211,24 @@ class ArraySizer(ShapeSizer):
 
 
 @define
-class ChunkMeta(AttrsMixin):
+class ChunkMeta(define.mixin):
     """Class that represents a chunk metadata."""
 
-    uuid: str = fld()
+    uuid: str = define.field()
     """Unique identifier of the chunk.
 
     Used for caching."""
 
-    idx: int = fld()
+    idx: int = define.field()
     """Chunk index."""
 
-    start: tp.Optional[int] = fld()
+    start: tp.Optional[int] = define.field()
     """Start of the chunk range (including). Can be None."""
 
-    end: tp.Optional[int] = fld()
+    end: tp.Optional[int] = define.field()
     """End of the chunk range (excluding). Can be None."""
 
-    indices: tp.Optional[tp.Sequence[int]] = fld()
+    indices: tp.Optional[tp.Sequence[int]] = define.field()
     """Indices included in the chunk range. Can be None.
 
     Has priority over `ChunkMeta.start` and `ChunkMeta.end`."""
@@ -328,7 +328,7 @@ def yield_chunk_meta(
 
 
 @define
-class ChunkMapper(AttrsMixin):
+class ChunkMapper(define.mixin):
     """Abstract class for mapping chunk metadata.
 
     Implements the abstract `ChunkMapper.map` method.
@@ -338,10 +338,10 @@ class ChunkMapper(AttrsMixin):
     !!! note
         Use `ChunkMapper.apply` instead of `ChunkMapper.map`."""
 
-    should_cache: bool = fld(default=True)
+    should_cache: bool = define.field(default=True)
     """Whether should cache."""
 
-    chunk_meta_cache: tp.Dict[str, ChunkMeta] = fld(factory=dict)
+    chunk_meta_cache: tp.Dict[str, ChunkMeta] = define.field(factory=dict)
     """Cache for outgoing `ChunkMeta` instances keyed by UUID of the incoming ones."""
 
     def apply(self, chunk_meta: ChunkMeta, **kwargs) -> ChunkMeta:
@@ -365,24 +365,24 @@ class ChunkMapper(AttrsMixin):
 
 
 @define
-class NotChunked(Annotatable, AttrsMixin):
+class NotChunked(Annotatable, define.mixin):
     """Class that represents an argument that shouldn't be chunked."""
 
 
 @define
-class ChunkTaker(Annotatable, AttrsMixin):
+class ChunkTaker(Annotatable, define.mixin):
     """Abstract class for taking one or more elements based on the chunk index or range.
 
     !!! note
         Use `ChunkTaker.apply` instead of `ChunkTaker.take`."""
 
-    single_type: tp.Optional[tp.TypeLike] = fld(default=None)
+    single_type: tp.Optional[tp.TypeLike] = define.field(default=None)
     """One or multiple types to consider as a single value."""
 
-    ignore_none: bool = fld(default=True)
+    ignore_none: bool = define.field(default=True)
     """Whether to ignore None."""
 
-    mapper: tp.Optional[ChunkMapper] = fld(default=None)
+    mapper: tp.Optional[ChunkMapper] = define.field(default=None)
     """Chunk mapper of type `ChunkMapper`."""
 
     def get_size(self, obj: tp.Any, **kwargs) -> int:
@@ -422,7 +422,7 @@ class ChunkTaker(Annotatable, AttrsMixin):
 
 
 @define
-class ChunkSelector(ChunkTaker, DimRetainer):
+class ChunkSelector(ChunkTaker, DimRetainer, define.mixin):
     """Class for selecting one element based on the chunk index."""
 
     def get_size(self, obj: tp.Sequence, **kwargs) -> int:
@@ -468,7 +468,7 @@ class CountAdapter(ChunkSlicer):
 
 
 @define
-class ShapeSelector(ChunkSelector, AxisSpecifier):
+class ShapeSelector(ChunkSelector, AxisSpecifier, define.mixin):
     """Class for selecting one element from a shape's axis based on the chunk index."""
 
     def get_size(self, obj: tp.ShapeLike, **kwargs) -> int:
@@ -498,7 +498,7 @@ class ShapeSelector(ChunkSelector, AxisSpecifier):
 
 
 @define
-class ShapeSlicer(ChunkSlicer, AxisSpecifier):
+class ShapeSlicer(ChunkSlicer, AxisSpecifier, define.mixin):
     """Class for slicing multiple elements from a shape's axis based on the chunk range."""
 
     def get_size(self, obj: tp.ShapeLike, **kwargs) -> int:
@@ -586,12 +586,12 @@ class ArraySlicer(ShapeSlicer):
 
 
 @define
-class ContainerTaker(ChunkTaker):
+class ContainerTaker(ChunkTaker, define.mixin):
     """Class for taking from a container with other chunk takers.
 
     Accepts the specification of the container."""
 
-    cont_take_spec: tp.Optional[tp.ContainerTakeSpec] = fld(default=None)
+    cont_take_spec: tp.Optional[tp.ContainerTakeSpec] = define.field(default=None)
     """Specification of the container."""
 
     def __init__(
@@ -852,23 +852,23 @@ class Chunkable:
 
 
 @define
-class Chunked(Chunkable, Annotatable, AttrsMixin):
+class Chunked(Chunkable, Annotatable, define.mixin):
     """Class representing a chunkable value.
 
     Can take a variable number of keyword arguments, which will be used as `Chunked.take_spec_kwargs`."""
 
-    value: tp.Any = fld(default=MISSING)
+    value: tp.Any = define.required_field()
     """Value."""
 
-    take_spec: tp.TakeSpec = fld(default=MISSING)
+    take_spec: tp.TakeSpec = define.optional_field()
     """Chunk taking specification."""
 
-    take_spec_kwargs: tp.KwargsLike = fld(default=None)
+    take_spec_kwargs: tp.KwargsLike = define.field(default=None)
     """Keyword arguments passed to the respective `ChunkTaker` subclass.
 
     If `Chunked.take_spec` is an instance rather than a class, will "evolve" it."""
 
-    select: bool = fld(default=False)
+    select: bool = define.field(default=False)
     """Whether to chunk by selection."""
 
     def __init__(self, *args, **kwargs) -> None:
@@ -892,26 +892,16 @@ class Chunked(Chunkable, Annotatable, AttrsMixin):
             take_spec_kwargs.update({k: kwargs.pop(k) for k in list(kwargs.keys()) if k not in attr_names})
             kwargs["take_spec_kwargs"] = take_spec_kwargs
 
-        AttrsMixin.__init__(self, *args, **kwargs)
+        define.mixin.__init__(self, *args, **kwargs)
 
-    @property
-    def value_missing(self) -> bool:
-        """Check whether `Chunked.value` is missing."""
-        return self.value is MISSING
+    def get_value(self) -> tp.Any:
+        self.assert_field_not_missing("value")
+        return self.value
 
     @property
     def take_spec_missing(self) -> bool:
         """Check whether `Chunked.take_spec` is missing."""
         return self.take_spec is MISSING
-
-    def check_value(self) -> None:
-        """Check whether value is missing."""
-        if self.value_missing:
-            raise ValueError("Parameter value is missing")
-
-    def get_value(self) -> tp.Any:
-        self.check_value()
-        return self.value
 
     def resolve_take_spec(self) -> tp.TakeSpec:
         """Resolve `take_spec`."""
@@ -954,10 +944,10 @@ class ChunkedShape(Chunked):
 
 
 @define
-class ChunkedArray(Chunked):
+class ChunkedArray(Chunked, define.mixin):
     """Class representing a chunkable array."""
 
-    flex: bool = fld(default=False)
+    flex: bool = define.field(default=False)
     """Whether the array is flexible."""
 
     def resolve_take_spec(self) -> tp.TakeSpec:

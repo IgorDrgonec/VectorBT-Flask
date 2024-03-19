@@ -14,7 +14,7 @@ from numba.typed import List
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import define, fld, MISSING, AttrsMixin
+from vectorbtpro.utils.attr_ import define
 from vectorbtpro.utils.config import Config, Configured, merge_dicts
 from vectorbtpro.utils.execution import execute
 from vectorbtpro.utils.template import CustomTemplate, substitute_templates
@@ -203,29 +203,29 @@ ParamT = tp.TypeVar("ParamT", bound="Param")
 
 
 @define
-class Param(Annotatable, AttrsMixin):
+class Param(Annotatable, define.mixin):
     """Class that represents a parameter."""
 
-    value: tp.Union[tp.MaybeParamValues, tp.Dict[tp.Hashable, tp.ParamValue]] = fld(default=MISSING)
+    value: tp.Union[tp.MaybeParamValues, tp.Dict[tp.Hashable, tp.ParamValue]] = define.required_field()
     """One or more parameter values."""
 
-    is_tuple: bool = fld(default=False)
+    is_tuple: bool = define.optional_field(default=False)
     """Whether `Param.value` is a tuple.
     
     If so, providing a tuple will be considered as a single value."""
 
-    is_array_like: bool = fld(default=False)
+    is_array_like: bool = define.optional_field(default=False)
     """Whether `Param.value` is array-like.
     
     If so, providing a NumPy array will be considered as a single value."""
 
-    map_template: tp.Optional[CustomTemplate] = fld(default=None)
+    map_template: tp.Optional[CustomTemplate] = define.optional_field(default=None)
     """Template to map `Param.value` before building parameter combinations."""
 
-    random_subset: tp.Union[None, int, float] = fld(default=None)
+    random_subset: tp.Union[None, int, float] = define.optional_field(default=None)
     """Random subset of values to select."""
 
-    level: tp.Optional[int] = fld(default=None)
+    level: tp.Optional[int] = define.optional_field(default=None)
     """Level of the product the parameter takes part in.
 
     Parameters with the same level are stacked together, while parameters with different levels
@@ -238,42 +238,42 @@ class Param(Annotatable, AttrsMixin):
     Levels must come in a strict order starting with 0 and without gaps. If any of the parameters
     have a level specified, all parameters must specify their level."""
 
-    condition: tp.Optional[str] = fld(default=None)
+    condition: tp.Optional[str] = define.optional_field(default=None)
     """Keep a parameter combination only if the condition is met.
     
     Condition should be an expression where `x` denotes this parameter and any other variable
     denotes the name of other parameter(s)."""
 
-    context: tp.KwargsLike = fld(default=None)
+    context: tp.KwargsLike = define.optional_field(default=None)
     """Context used in evaluation of `Param.condition` and `Param.map_template`."""
 
-    keys: tp.Optional[tp.IndexLike] = fld(default=None)
+    keys: tp.Optional[tp.IndexLike] = define.optional_field(default=None)
     """Keys acting as an index level.
 
     If None, converts `Param.value` to an index using 
     `vectorbtpro.base.indexes.index_from_values`."""
 
-    hide: bool = fld(default=False)
+    hide: bool = define.optional_field(default=False)
     """Whether to hide the parameter from the parameter index."""
 
-    name: tp.Optional[tp.Hashable] = fld(default=None)
+    name: tp.Optional[tp.Hashable] = define.optional_field(default=None)
     """Name of the parameter.
     
     If None, defaults to the name of the index in `Param.keys`, or to the key in 
     `param_dct` passed to `combine_params`."""
 
-    mono_reduce: bool = fld(default=False)
+    mono_reduce: bool = define.optional_field(default=False)
     """Whether to reduce a mono-chunk of the same values into one value."""
 
-    mono_merge_func: tp.MergeFuncLike = fld(default=None)
+    mono_merge_func: tp.MergeFuncLike = define.optional_field(default=None)
     """Merge function to apply when building a mono-chunk.
     
     Resolved using `vectorbtpro.base.merging.resolve_merge_func`."""
 
-    mono_merge_kwargs: tp.KwargsLike = fld(default=None)
+    mono_merge_kwargs: tp.KwargsLike = define.optional_field(default=None)
     """Keyword arguments passed to `Param.mono_merge_func`."""
 
-    eval_id: tp.Optional[tp.MaybeSequence[tp.Hashable]] = fld(default=None)
+    eval_id: tp.Optional[tp.MaybeSequence[tp.Hashable]] = define.optional_field(default=None)
     """One or more identifiers at which to evaluate this instance."""
 
     def meets_eval_id(self, eval_id: tp.Optional[tp.Hashable]) -> bool:
@@ -287,14 +287,9 @@ class Param(Annotatable, AttrsMixin):
                     return False
         return True
 
-    def check_value(self) -> None:
-        """Check whether value is missing."""
-        if self.value is MISSING:
-            raise ValueError("Parameter value is missing")
-
     def map_value(self: ParamT, func: tp.Callable) -> ParamT:
         """Execute a function on each value in `Param.value` and create a new `Param` instance."""
-        self.check_value()
+        self.assert_field_not_missing("value")
         attr_dct = self.asdict()
         if isinstance(attr_dct["value"], dict):
             attr_dct["value"] = {k: v for k, v in attr_dct["value"].items()}
@@ -378,12 +373,14 @@ def combine_params(
     names = {}
     for k, p in param_dct.items():
         if isinstance(p, Paramable):
-            p = p.to_param()
+            p = p.as_param()
         if not isinstance(p, Param):
             p = Param(p)
         if isinstance(p.value, Paramable):
-            p2 = p.value.to_param()
+            p2 = p.value.as_param()
             p = p.merge_over(p2, value=p2.value)
+        p = p.resolve()
+
         if p.condition is not None:
             conditions[k] = p.condition
             if p.context is not None:
@@ -416,7 +413,7 @@ def combine_params(
         else:
             keys = None
 
-        p.check_value()
+        p.assert_field_not_missing("value")
         value = p.value
         if isinstance(value, dict):
             if not p.hide and keys is None:
@@ -1367,12 +1364,18 @@ class Parameterizer(Configured):
             if k in flat_ann_args:
                 ann_arg = flat_ann_args[k]
                 if "value" in ann_arg and isinstance(ann_arg["value"], Param):
-                    if k_reduce is None and ann_arg["value"].mono_reduce is not None:
-                        k_reduce = ann_arg["value"].mono_reduce
-                    if k_merge_func is None and ann_arg["value"].mono_merge_func is not None:
-                        k_merge_func = ann_arg["value"].mono_merge_func
-                    if k_merge_kwargs is None and ann_arg["value"].mono_merge_kwargs is not None:
-                        k_merge_kwargs = ann_arg["value"].mono_merge_kwargs
+                    if k_reduce is None:
+                        param_k_reduce = ann_arg["value"].resolve_field("mono_reduce")
+                        if param_k_reduce is not None:
+                            k_reduce = param_k_reduce
+                    if k_merge_func is None:
+                        param_k_merge_func = ann_arg["value"].resolve_field("mono_merge_func")
+                        if param_k_merge_func is not None:
+                            k_merge_func = param_k_merge_func
+                    if k_merge_kwargs is None:
+                        param_k_merge_kwargs = ann_arg["value"].resolve_field("mono_merge_kwargs")
+                        if param_k_merge_kwargs is not None:
+                            k_merge_kwargs = param_k_merge_kwargs
             if k_reduce is None:
                 k_reduce = all_same[k]
             elif k_reduce and not all_same[k]:

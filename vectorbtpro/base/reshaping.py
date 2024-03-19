@@ -14,7 +14,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.base import indexes, wrapping, indexing
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
+from vectorbtpro.utils.attr_ import define
 from vectorbtpro.utils.config import resolve_dict, merge_dicts
 from vectorbtpro.utils.params import combine_params, Param
 from vectorbtpro.utils.parsing import get_func_arg_names
@@ -695,64 +695,64 @@ def align_pd_arrays(
 
 
 @define
-class BCO(AttrsMixin):
+class BCO(define.mixin):
     """Class that represents an object passed to `broadcast`.
 
     If any value is None, mostly defaults to the global value passed to `broadcast`."""
 
-    value: tp.Any = fld()
+    value: tp.Any = define.field()
     """Value of the object."""
 
-    axis: tp.Optional[int] = fld(default=None)
+    axis: tp.Optional[int] = define.field(default=None)
     """Axis to broadcast.
     
     Set to None to broadcast all axes."""
 
-    to_pd: tp.Optional[bool] = fld(default=None)
+    to_pd: tp.Optional[bool] = define.field(default=None)
     """Whether to convert the output array to a Pandas object."""
 
-    keep_flex: tp.Optional[bool] = fld(default=None)
+    keep_flex: tp.Optional[bool] = define.field(default=None)
     """Whether to keep the raw version of the output for flexible indexing.
     
     Only makes sure that the array can broadcast to the target shape."""
 
-    min_ndim: tp.Optional[int] = fld(default=None)
+    min_ndim: tp.Optional[int] = define.field(default=None)
     """Minimum number of dimensions."""
 
-    expand_axis: tp.Optional[int] = fld(default=None)
+    expand_axis: tp.Optional[int] = define.field(default=None)
     """Axis to expand if the array is 1-dim but the target shape is 2-dim."""
 
-    post_func: tp.Optional[tp.Callable] = fld(default=None)
+    post_func: tp.Optional[tp.Callable] = define.field(default=None)
     """Function to post-process the output array."""
 
-    require_kwargs: tp.Optional[tp.Kwargs] = fld(default=None)
+    require_kwargs: tp.Optional[tp.Kwargs] = define.field(default=None)
     """Keyword arguments passed to `np.require`."""
 
-    reindex_kwargs: tp.Optional[tp.Kwargs] = fld(default=None)
+    reindex_kwargs: tp.Optional[tp.Kwargs] = define.field(default=None)
     """Keyword arguments passed to `pd.DataFrame.reindex`."""
 
-    merge_kwargs: tp.Optional[tp.Kwargs] = fld(default=None)
+    merge_kwargs: tp.Optional[tp.Kwargs] = define.field(default=None)
     """Keyword arguments passed to `vectorbtpro.base.merging.column_stack_merge`."""
 
-    context: tp.KwargsLike = fld(default=None)
+    context: tp.KwargsLike = define.field(default=None)
     """Context used in evaluation of templates.
     
     Will be merged over `template_context`."""
 
 
 @define
-class Default(AttrsMixin):
+class Default(define.mixin):
     """Class for wrapping default values."""
 
-    value: tp.Any = fld()
+    value: tp.Any = define.field()
     """Default value."""
 
 
 @define
-class Ref(AttrsMixin):
+class Ref(define.mixin):
     """Class for wrapping references to other values."""
 
-    key: tp.Hashable = fld()
+    key: tp.Hashable = define.field()
     """Reference to another key."""
 
 

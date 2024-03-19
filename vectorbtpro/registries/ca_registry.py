@@ -413,7 +413,7 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks, datetime_ as dt
-from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
+from vectorbtpro.utils.attr_ import define
 from vectorbtpro.utils.caching import Cacheable
 from vectorbtpro.utils.decorators import cacheableT, cacheable_property
 from vectorbtpro.utils.parsing import Regex, hash_args, UnhashableArgsError, get_func_arg_names
@@ -498,22 +498,22 @@ def _instance_converter(instance: InstanceT) -> InstanceT:
 
 
 @define
-class CAQuery(AttrsMixin):
+class CAQuery(define.mixin):
     """Data class that represents a query for matching and ranking setups."""
 
-    cacheable: tp.Optional[tp.Union[tp.Callable, cacheableT, str, Regex]] = fld(default=None)
+    cacheable: tp.Optional[tp.Union[tp.Callable, cacheableT, str, Regex]] = define.field(default=None)
     """Cacheable object or its name (case-sensitive)."""
 
-    instance: InstanceT = fld(default=None, converter=_instance_converter)
+    instance: InstanceT = define.field(default=None, converter=_instance_converter)
     """Weak reference to the instance `CAQuery.cacheable` is bound to."""
 
-    cls: tp.Optional[tp.TypeLike] = fld(default=None)
+    cls: tp.Optional[tp.TypeLike] = define.field(default=None)
     """Class of the instance or its name (case-sensitive) `CAQuery.cacheable` is bound to."""
 
-    base_cls: tp.Optional[tp.TypeLike] = fld(default=None)
+    base_cls: tp.Optional[tp.TypeLike] = define.field(default=None)
     """Base class of the instance or its name (case-sensitive) `CAQuery.cacheable` is bound to."""
 
-    options: tp.Optional[dict] = fld(default=None)
+    options: tp.Optional[dict] = define.field(default=None)
     """Options to match."""
 
     @classmethod
@@ -739,22 +739,22 @@ class CAQuery(AttrsMixin):
 
 
 @define
-class CARule(AttrsMixin):
+class CARule(define.mixin):
     """Data class that represents a rule that should be enforced on setups that match a query."""
 
-    query: CAQuery = fld()
+    query: CAQuery = define.field()
     """`CAQuery` used in matching."""
 
-    enforce_func: tp.Optional[tp.Callable] = fld()
+    enforce_func: tp.Optional[tp.Callable] = define.field()
     """Function to run on the setup if it has been matched."""
 
-    kind: tp.Optional[tp.MaybeIterable[str]] = fld(default=None)
+    kind: tp.Optional[tp.MaybeIterable[str]] = define.field(default=None)
     """Kind of a setup to match."""
 
-    exclude: tp.Optional[tp.MaybeIterable["CABaseSetup"]] = fld(default=None)
+    exclude: tp.Optional[tp.MaybeIterable["CABaseSetup"]] = define.field(default=None)
     """One or multiple setups to exclude."""
 
-    filter_func: tp.Optional[tp.Callable] = fld(default=None)
+    filter_func: tp.Optional[tp.Callable] = define.field(default=None)
     """Function to filter out a setup."""
 
     def matches_setup(self, setup: "CABaseSetup") -> bool:
@@ -1135,19 +1135,19 @@ class CAMetrics:
 
 
 @define
-class CABaseSetup(CAMetrics, AttrsMixin):
+class CABaseSetup(CAMetrics, define.mixin):
     """Base class that exposes properties and methods for cache management."""
 
-    registry: CacheableRegistry = fld(default=ca_reg)
+    registry: CacheableRegistry = define.field(default=ca_reg)
     """Registry of type `CacheableRegistry`."""
 
-    use_cache: tp.Optional[bool] = fld(default=None)
+    use_cache: tp.Optional[bool] = define.field(default=None)
     """Whether caching is enabled."""
 
-    whitelist: tp.Optional[bool] = fld(default=None)
+    whitelist: tp.Optional[bool] = define.field(default=None)
     """Whether to cache even if caching was disabled globally."""
 
-    active: bool = fld(default=True)
+    active: bool = define.field(default=True)
     """Whether to register and/or return setup when requested."""
 
     def __attrs_post_init__(self) -> None:
@@ -1632,7 +1632,7 @@ CAClassSetupT = tp.TypeVar("CAClassSetupT", bound="CAClassSetup")
 
 
 @define
-class CAClassSetup(CABaseDelegatorSetup):
+class CAClassSetup(CABaseDelegatorSetup, define.mixin):
     """Class that represents a setup of a cacheable class.
 
     The provided class must subclass `vectorbtpro.utils.caching.Cacheable`.
@@ -1646,7 +1646,7 @@ class CAClassSetup(CABaseDelegatorSetup):
     !!! note
         Unbound setups are not children of class setups. See notes on `CAUnboundSetup`."""
 
-    cls: tp.Type[Cacheable] = fld(default=None, validator=_assert_value_not_none)
+    cls: tp.Type[Cacheable] = define.field(default=None, validator=_assert_value_not_none)
     """Cacheable class."""
 
     @staticmethod
@@ -1825,7 +1825,7 @@ CAInstanceSetupT = tp.TypeVar("CAInstanceSetupT", bound="CAInstanceSetup")
 
 
 @define
-class CAInstanceSetup(CABaseDelegatorSetup):
+class CAInstanceSetup(CABaseDelegatorSetup, define.mixin):
     """Class that represents a setup of an instance that has cacheables bound to it.
 
     The provided instance must be of `vectorbtpro.utils.caching.Cacheable`.
@@ -1834,7 +1834,7 @@ class CAInstanceSetup(CABaseDelegatorSetup):
 
     If `use_cash` or `whitelist` are None, inherits a non-empty value from its parent class setup."""
 
-    instance: tp.Union[Cacheable, ReferenceType] = fld(default=None, validator=_assert_value_not_none)
+    instance: tp.Union[Cacheable, ReferenceType] = define.field(default=None, validator=_assert_value_not_none)
     """Cacheable instance."""
 
     @staticmethod
@@ -1956,7 +1956,7 @@ CAUnboundSetupT = tp.TypeVar("CAUnboundSetupT", bound="CAUnboundSetup")
 
 
 @define
-class CAUnboundSetup(CABaseDelegatorSetup):
+class CAUnboundSetup(CABaseDelegatorSetup, define.mixin):
     """Class that represents a setup of an unbound cacheable property or method.
 
     An unbound callable is a callable that was declared in a class but is not bound
@@ -1975,7 +1975,7 @@ class CAUnboundSetup(CABaseDelegatorSetup):
     !!! hint
         Use class attributes instead of instance attributes to access unbound callables."""
 
-    cacheable: cacheableT = fld(default=None, validator=_assert_value_not_none)
+    cacheable: cacheableT = define.field(default=None, validator=_assert_value_not_none)
     """Cacheable object."""
 
     @staticmethod
@@ -2058,19 +2058,19 @@ CARunSetupT = tp.TypeVar("CARunSetupT", bound="CARunSetup")
 
 
 @define
-class CARunResult(AttrsMixin):
+class CARunResult(define.mixin):
     """Class that represents a cached result of a run.
 
     !!! note
         Hashed solely by the hash of the arguments `args_hash`."""
 
-    args_hash: int = fld()
+    args_hash: int = define.field()
     """Hash of the arguments."""
 
-    result: tp.Any = fld()
+    result: tp.Any = define.field()
     """Result of the run."""
 
-    timer: Timer = fld()
+    timer: Timer = define.field()
     """Timer used to measure the execution time."""
 
     def __attrs_post_init__(self) -> None:
@@ -2122,7 +2122,7 @@ class CARunResult(AttrsMixin):
 
 
 @define
-class CARunSetup(CABaseSetup):
+class CARunSetup(CABaseSetup, define.mixin):
     """Class that represents a runnable cacheable setup.
 
     Takes care of running functions and caching the results using `CARunSetup.run`.
@@ -2148,19 +2148,19 @@ class CARunSetup(CABaseSetup):
         Otherwise, creates and registers a new one. Using `CARunSetup.__init__` will throw an error if there
         is a setup with the same hash."""
 
-    cacheable: cacheableT = fld(default=None, validator=_assert_value_not_none)
+    cacheable: cacheableT = define.field(default=None, validator=_assert_value_not_none)
     """Cacheable object."""
 
-    instance: tp.Union[Cacheable, ReferenceType] = fld(default=None)
+    instance: tp.Union[Cacheable, ReferenceType] = define.field(default=None)
     """Cacheable instance."""
 
-    max_size: tp.Optional[int] = fld(default=None)
+    max_size: tp.Optional[int] = define.field(default=None)
     """Maximum number of entries in `CARunSetup.cache`."""
 
-    ignore_args: tp.Optional[tp.Iterable[tp.AnnArgQuery]] = fld(default=None)
+    ignore_args: tp.Optional[tp.Iterable[tp.AnnArgQuery]] = define.field(default=None)
     """Arguments to ignore when hashing."""
 
-    cache: tp.Dict[int, CARunResult] = fld(factory=dict)
+    cache: tp.Dict[int, CARunResult] = define.field(factory=dict)
     """Dict of cached `CARunResult` instances by their hash."""
 
     @staticmethod

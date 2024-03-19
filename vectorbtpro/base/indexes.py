@@ -15,7 +15,7 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import jit_reg, register_jitted
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
+from vectorbtpro.utils.attr_ import define
 
 __all__ = [
     "ExceptLevel",
@@ -27,10 +27,10 @@ __all__ = [
 
 
 @define
-class ExceptLevel(AttrsMixin):
+class ExceptLevel(define.mixin):
     """Class for grouping except one or more levels."""
 
-    value: tp.MaybeLevelSequence = fld()
+    value: tp.MaybeLevelSequence = define.field()
     """One or more level positions or names."""
 
 

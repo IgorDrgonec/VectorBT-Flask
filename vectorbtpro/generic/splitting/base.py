@@ -11,7 +11,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro._settings import settings
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks, datetime_ as dt
-from vectorbtpro.utils.attr_ import define, fld, MISSING, AttrsMixin
+from vectorbtpro.utils.attr_ import define, MISSING
 from vectorbtpro.utils.array_ import is_range
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.colors import adjust_opacity
@@ -59,25 +59,25 @@ SplitterT = tp.TypeVar("SplitterT", bound="Splitter")
 
 
 @define
-class FixRange(AttrsMixin):
+class FixRange(define.mixin):
     """Class that represents a fixed range."""
 
-    range_: tp.FixRangeLike = fld()
+    range_: tp.FixRangeLike = define.field()
     """Range."""
 
 
 @define
-class RelRange(AttrsMixin):
+class RelRange(define.mixin):
     """Class that represents a relative range."""
 
-    offset: tp.Union[int, float, tp.TimedeltaLike] = fld(default=0)
+    offset: tp.Union[int, float, tp.TimedeltaLike] = define.field(default=0)
     """Offset.
     
     Floating values between 0 and 1 are considered relative.
     
     Can be negative."""
 
-    offset_anchor: str = fld(default="prev_end")
+    offset_anchor: str = define.field(default="prev_end")
     """Offset anchor.
     
     Supported are
@@ -88,7 +88,7 @@ class RelRange(AttrsMixin):
     * 'prev_end': End of the previous range
     """
 
-    offset_space: str = fld(default="free")
+    offset_space: str = define.field(default="free")
     """Offset space.
 
     Supported are
@@ -99,14 +99,14 @@ class RelRange(AttrsMixin):
     
     Applied only when `RelRange.offset` is a relative number."""
 
-    length: tp.Union[int, float, tp.TimedeltaLike] = fld(default=1.0)
+    length: tp.Union[int, float, tp.TimedeltaLike] = define.field(default=1.0)
     """Length.
     
     Floating values between 0 and 1 are considered relative.
     
     Can be negative."""
 
-    length_space: str = fld(default="free")
+    length_space: str = define.field(default="free")
     """Length space.
     
     Supported are
@@ -118,7 +118,7 @@ class RelRange(AttrsMixin):
     
     Applied only when `RelRange.length` is a relative number."""
 
-    out_of_bounds: str = fld(default="warn")
+    out_of_bounds: str = define.field(default="warn")
     """Check if start and stop are within bounds.
     
     Supported are
@@ -129,7 +129,7 @@ class RelRange(AttrsMixin):
     * 'raise": Raise an error if out-of-bounds
     """
 
-    is_gap: bool = fld(default=False)
+    is_gap: bool = define.field(default=False)
     """Whether the range acts as a gap."""
 
     def __attrs_post_init__(self):
@@ -298,29 +298,29 @@ class RelRange(AttrsMixin):
 
 
 @define
-class Takeable(Annotatable, AttrsMixin):
+class Takeable(Annotatable, define.mixin):
     """Class that represents an object from which a range can be taken."""
 
-    obj: tp.Any = fld(default=MISSING)
+    obj: tp.Any = define.required_field()
     """Takeable object."""
 
-    remap_to_obj: bool = fld(default=MISSING)
+    remap_to_obj: bool = define.optional_field()
     """Whether to remap `Splitter.index` to the index of `Takeable.obj`.
     
     Otherwise, will assume that the object has the same index."""
 
-    index: tp.Optional[tp.IndexLike] = fld(default=MISSING)
+    index: tp.Optional[tp.IndexLike] = define.optional_field()
     """Index of the object.
     
     If not present, will be accessed using `Splitter.get_obj_index`."""
 
-    freq: tp.Optional[tp.FrequencyLike] = fld(default=MISSING)
+    freq: tp.Optional[tp.FrequencyLike] = define.optional_field()
     """Frequency of `Takeable.index`."""
 
-    point_wise: bool = fld(default=MISSING)
+    point_wise: bool = define.optional_field()
     """Whether to select one range point at a time and return a tuple."""
 
-    eval_id: tp.Optional[tp.MaybeSequence[tp.Hashable]] = fld(default=None)
+    eval_id: tp.Optional[tp.MaybeSequence[tp.Hashable]] = define.field(default=None)
     """One or more identifiers at which to evaluate this instance."""
 
     def meets_eval_id(self, eval_id: tp.Optional[tp.Hashable]) -> bool:
@@ -333,11 +333,6 @@ class Takeable(Annotatable, AttrsMixin):
                 if eval_id != self.eval_id:
                     return False
         return True
-
-    def check_obj(self) -> None:
-        """Check whether value is missing."""
-        if self.obj is MISSING:
-            raise ValueError("Takeable object is missing")
 
 
 class Splitter(Analyzable):
@@ -3334,7 +3329,7 @@ class Splitter(Analyzable):
             return range_meta
 
         def _take_range(takeable, range_, _template_context):
-            takeable.check_obj()
+            takeable.assert_field_not_missing("obj")
             obj_meta, obj_range_meta = self.get_ready_obj_range(
                 takeable.obj,
                 range_,

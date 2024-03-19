@@ -128,7 +128,7 @@ from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks, datetime_ as dt
-from vectorbtpro.utils.attr_ import define, fld, MISSING, AttrsMixin
+from vectorbtpro.utils.attr_ import define, MISSING
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.enum_ import map_enum_fields
@@ -1517,55 +1517,55 @@ PatternRangesT = tp.TypeVar("PatternRangesT", bound="PatternRanges")
 
 
 @define
-class PSC(AttrsMixin):
+class PSC(define.mixin):
     """Class that represents a pattern search config.
 
     Every field will be resolved into the format suitable for Numba."""
 
-    pattern: tp.Union[tp.ArrayLike] = fld(default=MISSING)
+    pattern: tp.Union[tp.ArrayLike] = define.required_field()
     """Flexible pattern array.
     
     Can be smaller or bigger than the source array; in such a case, the values of the smaller array
     will be "stretched" by interpolation of the type in `PSC.interp_mode`."""
 
-    window: tp.Optional[int] = fld(default=MISSING)
+    window: tp.Optional[int] = define.optional_field()
     """Minimum window.
     
     Defaults to the length of `PSC.pattern`."""
 
-    max_window: tp.Optional[int] = fld(default=MISSING)
+    max_window: tp.Optional[int] = define.optional_field()
     """Maximum window (including)."""
 
-    row_select_prob: tp.Union[float] = fld(default=MISSING)
+    row_select_prob: tp.Union[float] = define.optional_field()
     """Row selection probability."""
 
-    window_select_prob: tp.Union[float] = fld(default=MISSING)
+    window_select_prob: tp.Union[float] = define.optional_field()
     """Window selection probability."""
 
-    roll_forward: tp.Union[bool] = fld(default=MISSING)
+    roll_forward: tp.Union[bool] = define.optional_field()
     """Whether to roll windows to the left of the current row, otherwise to the right."""
 
-    interp_mode: tp.Union[int, str] = fld(default=MISSING)
+    interp_mode: tp.Union[int, str] = define.optional_field()
     """Interpolation mode. See `vectorbtpro.generic.enums.InterpMode`."""
 
-    rescale_mode: tp.Union[int, str] = fld(default=MISSING)
+    rescale_mode: tp.Union[int, str] = define.optional_field()
     """Rescaling mode. See `vectorbtpro.generic.enums.RescaleMode`."""
 
-    vmin: tp.Union[float] = fld(default=MISSING)
+    vmin: tp.Union[float] = define.optional_field()
     """Minimum value of any window. Should only be used when the array has fixed bounds.
     
     Used in rescaling using `RescaleMode.MinMax` and checking against `PSC.min_pct_change` and `PSC.max_pct_change`.
     
     If `np.nan`, gets calculated dynamically."""
 
-    vmax: tp.Union[float] = fld(default=MISSING)
+    vmax: tp.Union[float] = define.optional_field()
     """Maximum value of any window. Should only be used when the array has fixed bounds.
     
     Used in rescaling using `RescaleMode.MinMax` and checking against `PSC.min_pct_change` and `PSC.max_pct_change`.
     
     If `np.nan`, gets calculated dynamically."""
 
-    pmin: tp.Union[float] = fld(default=MISSING)
+    pmin: tp.Union[float] = define.optional_field()
     """Value to be considered as the minimum of `PSC.pattern`.
     
     Used in rescaling using `RescaleMode.MinMax` and calculating the maximum distance at each point 
@@ -1573,7 +1573,7 @@ class PSC(AttrsMixin):
     
     If `np.nan`, gets calculated dynamically."""
 
-    pmax: tp.Union[float] = fld(default=MISSING)
+    pmax: tp.Union[float] = define.optional_field()
     """Value to be considered as the maximum of `PSC.pattern`.
     
     Used in rescaling using `RescaleMode.MinMax` and calculating the maximum distance at each point 
@@ -1581,27 +1581,27 @@ class PSC(AttrsMixin):
     
     If `np.nan`, gets calculated dynamically."""
 
-    invert: tp.Union[bool] = fld(default=MISSING)
+    invert: tp.Union[bool] = define.optional_field()
     """Whether to invert the pattern vertically."""
 
-    error_type: tp.Union[int, str] = fld(default=MISSING)
+    error_type: tp.Union[int, str] = define.optional_field()
     """Error type. See `vectorbtpro.generic.enums.ErrorType`."""
 
-    distance_measure: tp.Union[int, str] = fld(default=MISSING)
+    distance_measure: tp.Union[int, str] = define.optional_field()
     """Distance measure. See `vectorbtpro.generic.enums.DistanceMeasure`."""
 
-    max_error: tp.Union[tp.ArrayLike] = fld(default=MISSING)
+    max_error: tp.Union[tp.ArrayLike] = define.optional_field()
     """Maximum error at each point. Can be provided as a flexible array.
     
     If `max_error` is an array, it must be of the same size as the pattern array.
     It also should be provided within the same scale as the pattern."""
 
-    max_error_interp_mode: tp.Union[None, int, str] = fld(default=MISSING)
+    max_error_interp_mode: tp.Union[None, int, str] = define.optional_field()
     """Interpolation mode for `PSC.max_error`. See `vectorbtpro.generic.enums.InterpMode`.
     
     If None, defaults to `PSC.interp_mode`."""
 
-    max_error_as_maxdist: tp.Union[bool] = fld(default=MISSING)
+    max_error_as_maxdist: tp.Union[bool] = define.optional_field()
     """Whether `PSC.max_error` should be used as the maximum distance at each point.
     
     If False, crossing `PSC.max_error` will set the distance to the maximum distance
@@ -1609,36 +1609,36 @@ class PSC(AttrsMixin):
     
     If True and any of the points in a window is `np.nan`, the point will be skipped."""
 
-    max_error_strict: tp.Union[bool] = fld(default=MISSING)
+    max_error_strict: tp.Union[bool] = define.optional_field()
     """Whether crossing `PSC.max_error` even once should yield the similarity of `np.nan`."""
 
-    min_pct_change: tp.Union[float] = fld(default=MISSING)
+    min_pct_change: tp.Union[float] = define.optional_field()
     """Minimum percentage change of the window to stay a candidate for search.
 
     If any window doesn't cross this mark, its similarity becomes `np.nan`."""
 
-    max_pct_change: tp.Union[float] = fld(default=MISSING)
+    max_pct_change: tp.Union[float] = define.optional_field()
     """Maximum percentage change of the window to stay a candidate for search.
 
     If any window crosses this mark, its similarity becomes `np.nan`."""
 
-    min_similarity: tp.Union[float] = fld(default=MISSING)
+    min_similarity: tp.Union[float] = define.optional_field()
     """Minimum similarity.
     
     If any window doesn't cross this mark, its similarity becomes `np.nan`."""
 
-    minp: tp.Optional[int] = fld(default=MISSING)
+    minp: tp.Optional[int] = define.optional_field()
     """Minimum number of observations in price window required to have a value."""
 
-    overlap_mode: tp.Union[int, str] = fld(default=MISSING)
+    overlap_mode: tp.Union[int, str] = define.optional_field()
     """Overlapping mode. See `vectorbtpro.generic.enums.OverlapMode`."""
 
-    max_records: tp.Optional[int] = fld(default=MISSING)
+    max_records: tp.Optional[int] = define.optional_field()
     """Maximum number of records expected to be filled.
     
     Set to avoid creating empty arrays larger than needed."""
 
-    name: tp.Optional[str] = fld(default=None)
+    name: tp.Optional[str] = define.field(default=None)
     """Name of the config."""
 
     def __eq__(self, other):

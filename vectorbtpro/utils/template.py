@@ -9,7 +9,7 @@ import importlib
 import vectorbtpro as vbt
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
+from vectorbtpro.utils.attr_ import define
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.parsing import get_func_arg_names
@@ -27,24 +27,24 @@ __all__ = [
 
 
 @define
-class CustomTemplate(AttrsMixin):
+class CustomTemplate(define.mixin):
     """Class for substituting templates."""
 
-    template: tp.Any = fld()
+    template: tp.Any = define.field()
     """Template to be processed."""
 
-    context: tp.KwargsLike = fld(default=None)
+    context: tp.KwargsLike = define.field(default=None)
     """Context mapping."""
 
-    strict: tp.Optional[bool] = fld(default=None)
+    strict: tp.Optional[bool] = define.field(default=None)
     """Whether to raise an error if processing template fails.
 
     If not None, overrides `strict` passed by `substitute_templates`."""
 
-    context_merge_kwargs: tp.KwargsLike = fld(default=None)
+    context_merge_kwargs: tp.KwargsLike = define.field(default=None)
     """Keyword arguments passed to `vectorbtpro.utils.config.merge_dicts`."""
 
-    eval_id: tp.Optional[tp.MaybeSequence[tp.Hashable]] = fld(default=None)
+    eval_id: tp.Optional[tp.MaybeSequence[tp.Hashable]] = define.field(default=None)
     """One or more identifiers at which to evaluate this instance."""
 
     def meets_eval_id(self, eval_id: tp.Optional[tp.Hashable]) -> bool:

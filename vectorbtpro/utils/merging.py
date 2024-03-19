@@ -6,7 +6,7 @@ from functools import partial
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
+from vectorbtpro.utils.attr_ import define
 from vectorbtpro.utils.annotations import get_annotations, Annotatable, Union
 from vectorbtpro.utils.template import substitute_templates
 from vectorbtpro.utils.config import merge_dicts
@@ -22,22 +22,22 @@ MergeFuncT = tp.TypeVar("MergeFuncT", bound="MergeFunc")
 
 
 @define
-class MergeFunc(Annotatable, AttrsMixin):
+class MergeFunc(Annotatable, define.mixin):
     """Class representing a merging function and its keyword arguments.
 
     Can be directly called to call the underlying (already resolved and with keyword
     arguments attached) merging function."""
 
-    merge_func: tp.MergeFuncLike = fld()
+    merge_func: tp.MergeFuncLike = define.field()
     """Merging function."""
 
-    merge_kwargs: tp.KwargsLike = fld(default=None)
+    merge_kwargs: tp.KwargsLike = define.field(default=None)
     """Keyword arguments passed to the merging function."""
 
-    context: tp.KwargsLike = fld(default=None)
+    context: tp.KwargsLike = define.field(default=None)
     """Context for substituting templates in `MergeFunc.merge_func` and `MergeFunc.merge_kwargs`."""
 
-    sub_id_prefix: str = fld(default="")
+    sub_id_prefix: str = define.field(default="")
     """Prefix for the substitution id."""
 
     def __init__(self, *args, **kwargs) -> None:
@@ -61,7 +61,7 @@ class MergeFunc(Annotatable, AttrsMixin):
             merge_kwargs.update({k: kwargs.pop(k) for k in list(kwargs.keys()) if k not in attr_names})
             kwargs["merge_kwargs"] = merge_kwargs
 
-        AttrsMixin.__init__(self, *args, **kwargs)
+        define.mixin.__init__(self, *args, **kwargs)
 
     def resolve_merge_func(self) -> tp.Optional[tp.Callable]:
         """Get the merging function where keyword arguments are hard-coded."""

@@ -5,7 +5,7 @@
 from collections import defaultdict
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
+from vectorbtpro.utils.attr_ import define
 
 __all__ = [
     "Annotatable",
@@ -174,39 +174,39 @@ def has_annotatables(func: tp.Callable, target_cls: tp.Type[Annotatable] = Annot
 
 
 @define
-class VarArgs(Annotatable, AttrsMixin):
+class VarArgs(Annotatable, define.mixin):
     """Class representing annotations for variable positional arguments."""
 
-    args: tp.Tuple[tp.Annotation, ...] = fld()
+    args: tp.Tuple[tp.Annotation, ...] = define.field()
     """Tuple with annotations."""
 
     def __init__(self, *args) -> None:
-        AttrsMixin.__init__(self, args=args)
+        define.mixin.__init__(self, args=args)
 
 
 @define
-class VarKwargs(Annotatable, AttrsMixin):
+class VarKwargs(Annotatable, define.mixin):
     """Class representing annotations for variable keyword arguments."""
 
-    kwargs: tp.Dict[str, tp.Annotation] = fld()
+    kwargs: tp.Dict[str, tp.Annotation] = define.field()
     """Dict with annotations."""
 
     def __init__(self, **kwargs) -> None:
-        AttrsMixin.__init__(self, kwargs=kwargs)
+        define.mixin.__init__(self, kwargs=kwargs)
 
 
 @define
-class Union(Annotatable, AttrsMixin):
+class Union(Annotatable, define.mixin):
     """Class representing a union of one to multiple annotations."""
 
-    annotations: tp.Tuple[tp.Annotation, ...] = fld()
+    annotations: tp.Tuple[tp.Annotation, ...] = define.field()
     """Annotations."""
 
-    resolved: bool = fld(default=False)
+    resolved: bool = define.field(default=False)
     """Whether the instance is resolved."""
 
     def __init__(self, *annotations, resolved: bool = False) -> None:
-        AttrsMixin.__init__(self, annotations=annotations, resolved=resolved)
+        define.mixin.__init__(self, annotations=annotations, resolved=resolved)
 
     def resolve(self) -> tp.Annotation:
         """Resolve the union."""

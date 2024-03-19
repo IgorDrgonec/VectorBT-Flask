@@ -11,7 +11,7 @@ import pandas as pd
 
 import vectorbtpro as vbt
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
+from vectorbtpro.utils.attr_ import define
 from vectorbtpro.utils.path_ import check_mkdir
 from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.checks import Comparable, is_hashable, is_deep_equal
@@ -261,30 +261,30 @@ def load(path: tp.PathLike, compression: tp.Union[None, bool, str] = None, **kwa
 
 
 @define
-class RecState(AttrsMixin):
+class RecState(define.mixin):
     """Class that represents a state used to reconstruct an instance."""
 
-    init_args: tp.Args = fld(factory=tuple)
+    init_args: tp.Args = define.field(factory=tuple)
     """Positional arguments used in initialization."""
 
-    init_kwargs: tp.Kwargs = fld(factory=dict)
+    init_kwargs: tp.Kwargs = define.field(factory=dict)
     """Keyword arguments used in initialization."""
 
-    attr_dct: tp.Kwargs = fld(factory=dict)
+    attr_dct: tp.Kwargs = define.field(factory=dict)
     """Dictionary with names and values of writeable attributes."""
 
 
 @define
-class RecInfo(AttrsMixin):
+class RecInfo(define.mixin):
     """Class that represents information needed to reconstruct an instance."""
 
-    id_: str = fld()
+    id_: str = define.field()
     """Identifier."""
 
-    cls: tp.Type = fld()
+    cls: tp.Type = define.field()
     """Class."""
 
-    modify_state: tp.Optional[tp.Callable[[RecState], RecState]] = fld(default=None)
+    modify_state: tp.Optional[tp.Callable[[RecState], RecState]] = define.field(default=None)
     """Callback to modify the reconstruction state."""
 
     def register(self) -> None:

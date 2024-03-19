@@ -346,7 +346,7 @@ non-precise type pyobject
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.attr_ import define, fld, AttrsMixin
+from vectorbtpro.utils.attr_ import define
 from vectorbtpro.utils.config import merge_dicts, atomic_dict
 from vectorbtpro.utils.jitting import (
     Jitter,
@@ -370,25 +370,25 @@ def get_func_full_name(func: tp.Callable) -> str:
 
 
 @define
-class JitableSetup(AttrsMixin):
+class JitableSetup(define.mixin):
     """Class that represents a jitable setup.
 
     !!! note
         Hashed solely by `task_id` and `jitter_id`."""
 
-    task_id: tp.Hashable = fld()
+    task_id: tp.Hashable = define.field()
     """Task id."""
 
-    jitter_id: tp.Hashable = fld()
+    jitter_id: tp.Hashable = define.field()
     """Jitter id."""
 
-    py_func: tp.Callable = fld()
+    py_func: tp.Callable = define.field()
     """Python function to be jitted."""
 
-    jitter_kwargs: tp.KwargsLike = fld(default=None)
+    jitter_kwargs: tp.KwargsLike = define.field(default=None)
     """Keyword arguments passed to `vectorbtpro.utils.jitting.resolve_jitter`."""
 
-    tags: tp.SetLike = fld(default=None)
+    tags: tp.SetLike = define.field(default=None)
     """Set of tags."""
 
     @staticmethod
@@ -401,17 +401,17 @@ class JitableSetup(AttrsMixin):
 
 
 @define
-class JittedSetup(AttrsMixin):
+class JittedSetup(define.mixin):
     """Class that represents a jitted setup.
 
     !!! note
         Hashed solely by sorted config of `jitter`. That is, two jitters with the same config
         will yield the same hash and the function won't be re-decorated."""
 
-    jitter: Jitter = fld()
+    jitter: Jitter = define.field()
     """Jitter that decorated the function."""
 
-    jitted_func: tp.Callable = fld()
+    jitted_func: tp.Callable = define.field()
     """Decorated function."""
 
     @staticmethod
