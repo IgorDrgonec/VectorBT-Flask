@@ -3,6 +3,7 @@
 """Base class for splitting."""
 
 import warnings
+import math
 
 import numpy as np
 import pandas as pd
@@ -748,21 +749,18 @@ class Splitter(Analyzable):
                 ratio = split
 
             def empty_len_objective(length):
+                length = math.ceil(length)
+                first_len = int(ratio * length)
+                second_len = length - first_len
                 if split is None or optimize_anchor_set == 0:
-                    length = int(length)
-                    first_len = int(ratio * length)
-                    second_len = length - first_len
                     empty_len = len(index) - (n * first_len + second_len)
                 else:
-                    length = int(length)
-                    first_len = int(ratio * length)
-                    second_len = length - first_len
                     empty_len = len(index) - (n * second_len + first_len)
                 if empty_len >= 0:
                     return empty_len
                 return len(index)
 
-            length = int(minimize_scalar(empty_len_objective).x)
+            length = math.ceil(minimize_scalar(empty_len_objective).x)
             if split is None or optimize_anchor_set == 0:
                 offset = int(ratio * length)
             else:
