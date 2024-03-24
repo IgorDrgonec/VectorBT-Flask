@@ -1974,6 +1974,56 @@ class TestParams:
         assert param_product["c"] == [92, 226, 67, 402, 128, 443, 276, 76, 366, 325]
         param_product = vbt.combine_params(
             param_dct={
+                "a": vbt.Param(np.arange(1000), condition=vbt.RepFunc(lambda a, b: a > b)),
+                "b": vbt.Param(np.arange(1000), condition=vbt.RepFunc(lambda b, c: b > c)),
+                "c": vbt.Param(np.arange(1000)),
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+        )[0]
+        assert param_product["a"] == [450, 475, 700, 781, 786, 822, 858, 905, 922, 967]
+        assert param_product["b"] == [227, 330, 354, 643, 513, 545, 827, 370, 744, 410]
+        assert param_product["c"] == [92, 226, 67, 402, 128, 443, 276, 76, 366, 325]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(1000), condition="__a__ > __b__"),
+                "b": vbt.Param(np.arange(1000), condition="__b__ > __c__"),
+                "c": vbt.Param(np.arange(1000)),
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+        )[0]
+        assert param_product["a"] == [450, 475, 700, 781, 786, 822, 858, 905, 922, 967]
+        assert param_product["b"] == [227, 330, 354, 643, 513, 545, 827, 370, 744, 410]
+        assert param_product["c"] == [92, 226, 67, 402, 128, 443, 276, 76, 366, 325]
+        with pytest.raises(Exception):
+            vbt.combine_params(
+                param_dct={
+                    "a": vbt.Param(np.arange(1000), hide=True, condition="__a__ > __b__"),
+                    "b": vbt.Param(np.arange(1000), hide=True, condition="__b__ > __c__"),
+                    "c": vbt.Param(np.arange(1000)),
+                },
+                build_grid=False,
+                seed=seed,
+                random_subset=10,
+            )
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(1000), hide=True, keys=np.arange(1000), condition="__a__ > __b__"),
+                "b": vbt.Param(np.arange(1000), hide=True, keys=np.arange(1000), condition="__b__ > __c__"),
+                "c": vbt.Param(np.arange(1000)),
+            },
+            build_grid=False,
+            seed=seed,
+            random_subset=10,
+        )[0]
+        assert param_product["a"] == [450, 475, 700, 781, 786, 822, 858, 905, 922, 967]
+        assert param_product["b"] == [227, 330, 354, 643, 513, 545, 827, 370, 744, 410]
+        assert param_product["c"] == [92, 226, 67, 402, 128, 443, 276, 76, 366, 325]
+        param_product = vbt.combine_params(
+            param_dct={
                 "a": vbt.Param(np.arange(1000), condition="a > b"),
                 "b": vbt.Param(np.arange(1000), condition="b > c"),
                 "c": vbt.Param(np.arange(1000)),
@@ -2078,6 +2128,60 @@ class TestParams:
             param_dct={
                 "a": vbt.Param(np.arange(5), condition="a > b"),
                 "b": vbt.Param(np.arange(5), condition="b > c"),
+                "c": vbt.Param(np.arange(5)),
+            },
+            build_grid=True,
+            seed=seed,
+            random_subset=10,
+            random_replace=False,
+        )[0]
+        assert param_product["a"] == [2, 3, 3, 3, 4, 4, 4, 4, 4, 4]
+        assert param_product["b"] == [1, 1, 2, 2, 1, 2, 2, 3, 3, 3]
+        assert param_product["c"] == [0, 0, 0, 1, 0, 0, 1, 0, 1, 2]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(5), condition=vbt.RepFunc(lambda a, b: a > b)),
+                "b": vbt.Param(np.arange(5), condition=vbt.RepFunc(lambda b, c: b > c)),
+                "c": vbt.Param(np.arange(5)),
+            },
+            build_grid=True,
+            seed=seed,
+            random_subset=10,
+            random_replace=False,
+        )[0]
+        assert param_product["a"] == [2, 3, 3, 3, 4, 4, 4, 4, 4, 4]
+        assert param_product["b"] == [1, 1, 2, 2, 1, 2, 2, 3, 3, 3]
+        assert param_product["c"] == [0, 0, 0, 1, 0, 0, 1, 0, 1, 2]
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(5), condition="__a__ > __b__"),
+                "b": vbt.Param(np.arange(5), condition="__b__ > __c__"),
+                "c": vbt.Param(np.arange(5)),
+            },
+            build_grid=True,
+            seed=seed,
+            random_subset=10,
+            random_replace=False,
+        )[0]
+        assert param_product["a"] == [2, 3, 3, 3, 4, 4, 4, 4, 4, 4]
+        assert param_product["b"] == [1, 1, 2, 2, 1, 2, 2, 3, 3, 3]
+        assert param_product["c"] == [0, 0, 0, 1, 0, 0, 1, 0, 1, 2]
+        with pytest.raises(Exception):
+            vbt.combine_params(
+                param_dct={
+                    "a": vbt.Param(np.arange(5), hide=True, condition="__a__ > __b__"),
+                    "b": vbt.Param(np.arange(5), hide=True, condition="__b__ > __c__"),
+                    "c": vbt.Param(np.arange(5)),
+                },
+                build_grid=True,
+                seed=seed,
+                random_subset=10,
+                random_replace=False,
+            )
+        param_product = vbt.combine_params(
+            param_dct={
+                "a": vbt.Param(np.arange(5), hide=True, keys=np.arange(5), condition="__a__ > __b__"),
+                "b": vbt.Param(np.arange(5), hide=True, keys=np.arange(5), condition="__b__ > __c__"),
                 "c": vbt.Param(np.arange(5)),
             },
             build_grid=True,

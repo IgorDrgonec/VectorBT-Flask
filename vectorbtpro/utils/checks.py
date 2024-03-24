@@ -534,9 +534,9 @@ def assert_instance_of(arg: tp.Any, types: tp.TypeLike, arg_name: tp.Optional[st
         x = f"Argument '{arg_name}'"
     if not is_instance_of(arg, types):
         if isinstance(types, tuple):
-            raise AssertionError(f"{x} must be of one of the types {types}, not {type(arg)}")
+            raise AssertionError(f"{x} must be of one of types {types}, not {type(arg)}")
         else:
-            raise AssertionError(f"{x} must be of the type {types}, not {type(arg)}")
+            raise AssertionError(f"{x} must be of type {types}, not {type(arg)}")
 
 
 def assert_not_instance_of(arg: tp.Any, types: tp.TypeLike, arg_name: tp.Optional[str] = None) -> None:
@@ -547,9 +547,9 @@ def assert_not_instance_of(arg: tp.Any, types: tp.TypeLike, arg_name: tp.Optiona
         x = f"Argument '{arg_name}'"
     if is_instance_of(arg, types):
         if isinstance(types, tuple):
-            raise AssertionError(f"{x} cannot be of one of the types {types}")
+            raise AssertionError(f"{x} cannot be of one of types {types}")
         else:
-            raise AssertionError(f"{x} cannot be of the type {types}")
+            raise AssertionError(f"{x} cannot be of type {types}")
 
 
 def assert_subclass_of(arg: tp.Type, classes: tp.TypeLike, arg_name: tp.Optional[str] = None) -> None:
@@ -560,9 +560,9 @@ def assert_subclass_of(arg: tp.Type, classes: tp.TypeLike, arg_name: tp.Optional
         x = f"Argument '{arg_name}'"
     if not is_subclass_of(arg, classes):
         if isinstance(classes, tuple):
-            raise AssertionError(f"{x} must be a subclass of one of the types {classes}")
+            raise AssertionError(f"{x} must be a subclass of one of types {classes}")
         else:
-            raise AssertionError(f"{x} must be a subclass of the type {classes}")
+            raise AssertionError(f"{x} must be a subclass of type {classes}")
 
 
 def assert_not_subclass_of(arg: tp.Type, classes: tp.TypeLike, arg_name: tp.Optional[str] = None) -> None:
@@ -573,9 +573,9 @@ def assert_not_subclass_of(arg: tp.Type, classes: tp.TypeLike, arg_name: tp.Opti
         x = f"Argument '{arg_name}'"
     if is_subclass_of(arg, classes):
         if isinstance(classes, tuple):
-            raise AssertionError(f"{x} cannot be a subclass of one of the types {classes}")
+            raise AssertionError(f"{x} cannot be a subclass of one of types {classes}")
         else:
-            raise AssertionError(f"{x} cannot be a subclass of the type {classes}")
+            raise AssertionError(f"{x} cannot be a subclass of type {classes}")
 
 
 def assert_type_equal(arg1: tp.Any, arg2: tp.Any) -> None:

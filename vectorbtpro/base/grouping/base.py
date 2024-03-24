@@ -82,13 +82,20 @@ class Grouper(Configured):
                     group_by = indexes.select_levels(index, new_group_by)
             elif isinstance(group_by, (int, str)):
                 group_by = indexes.select_levels(index, group_by)
-            elif isinstance(group_by, (tuple, list)) and len(group_by) <= len(index.names):
+            elif (
+                isinstance(group_by, (tuple, list))
+                and not isinstance(group_by[0], pd.Index)
+                and len(group_by) <= len(index.names)
+            ):
                 try:
                     group_by = indexes.select_levels(index, group_by)
                 except (IndexError, KeyError):
                     pass
         if not isinstance(group_by, pd.Index):
-            group_by = pd.Index(group_by, name=def_lvl_name)
+            if isinstance(group_by[0], pd.Index):
+                group_by = pd.MultiIndex.from_arrays(group_by)
+            else:
+                group_by = pd.Index(group_by, name=def_lvl_name)
         if len(group_by) != len(index):
             raise ValueError("group_by and index must have the same length")
         return group_by
@@ -117,8 +124,8 @@ class Grouper(Configured):
         return codes, new_index
 
     @classmethod
-    def yield_group_lens_idxs(cls, group_lens: tp.GroupLens) -> tp.Generator[tp.GroupIdxs, None, None]:
-        """Yield indices of each group in group lengths."""
+    def iter_group_lens(cls, group_lens: tp.GroupLens) -> tp.Generator[tp.GroupIdxs, None, None]:
+        """Iterate over indices of each group in group lengths."""
         group_end_idxs = np.cumsum(group_lens)
         group_start_idxs = group_end_idxs - group_lens
         for group in range(len(group_lens)):
@@ -127,13 +134,13 @@ class Grouper(Configured):
             yield np.arange(from_col, to_col)
 
     @classmethod
-    def yield_group_map_idxs(cls, group_map: tp.GroupMap) -> tp.Generator[tp.GroupIdxs, None, None]:
-        """Yield indices of each group in a group map."""
+    def iter_group_map(cls, group_map: tp.GroupMap) -> tp.Generator[tp.GroupIdxs, None, None]:
+        """Iterate over indices of each group in a group map."""
         group_idxs, group_lens = group_map
         group_start = 0
         group_end = 0
-        for g in range(len(group_lens)):
-            group_len = group_lens[g]
+        for group in range(len(group_lens)):
+            group_len = group_lens[group]
             group_end += group_len
             yield group_idxs[group_start:group_end]
             group_start += group_len
@@ -282,7 +289,7 @@ class Grouper(Configured):
 
     @cached_method(whitelist=True)
     def is_grouping_changed(self, group_by: tp.GroupByLike = None) -> bool:
-        """Check whether grouping has changed in any way."""
+        """Check whether grouping has been changed in any way."""
         if group_by is None or (group_by is False and self.group_by is None):
             return False
         if isinstance(group_by, pd.Index) and isinstance(self.group_by, pd.Index):
@@ -401,15 +408,23 @@ class Grouper(Configured):
         func = jit_reg.resolve_option(nb.get_group_map_nb, jitted)
         return func(groups, len(new_index))
 
-    def yield_group_idxs(self, **kwargs) -> tp.Generator[tp.GroupIdxs, None, None]:
-        """Yield indices of each group."""
+    def iter_group_idxs(self, **kwargs) -> tp.Generator[tp.GroupIdxs, None, None]:
+        """Iterate over indices of each group."""
         group_map = self.get_group_map(**kwargs)
-        return self.yield_group_map_idxs(group_map)
+        return self.iter_group_map(group_map)
 
-    def __iter__(self) -> tp.Generator[tp.Tuple[tp.Label, tp.GroupIdxs], None, None]:
-        index = self.get_index()
-        for g, group_idxs in enumerate(self.yield_group_idxs()):
-            yield index[g], group_idxs
+    def iter_groups(
+        self,
+        key_as_index: bool = False,
+        **kwargs,
+    ) -> tp.Generator[tp.Tuple[tp.Union[tp.Hashable, pd.Index], tp.GroupIdxs], None, None]:
+        """Iterate over groups and their indices."""
+        index = self.get_index(**kwargs)
+        for group, group_idxs in enumerate(self.iter_group_idxs(**kwargs)):
+            if key_as_index:
+                yield index[[group]], group_idxs
+            else:
+                yield index[group], group_idxs
 
     def select_groups(self, group_idxs: tp.Array1d, jitted: tp.JittedOption = None) -> tp.Tuple[tp.Array1d, tp.Array1d]:
         """Select groups.

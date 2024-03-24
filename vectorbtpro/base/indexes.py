@@ -156,23 +156,19 @@ def tile_index(index: tp.IndexLike, n: int, ignore_ranges: tp.Optional[bool] = N
     return pd.Index(np.tile(index, n), name=index.name)
 
 
-def stack_indexes(
-    *indexes: tp.MaybeTuple[tp.IndexLike],
+def clean_index(
+    index: tp.IndexLike,
     drop_duplicates: tp.Optional[bool] = None,
     keep: tp.Optional[str] = None,
     drop_redundant: tp.Optional[bool] = None,
 ) -> tp.Index:
-    """Stack each index in `indexes` on top of each other, from top to bottom.
+    """Clean index.
 
     Set `drop_duplicates` to True to remove duplicate levels.
 
     For details on `keep`, see `drop_duplicate_levels`.
 
     Set `drop_redundant` to True to use `drop_redundant_levels`."""
-    if len(indexes) == 1:
-        indexes = indexes[0]
-    indexes = list(indexes)
-
     from vectorbtpro._settings import settings
 
     broadcasting_cfg = settings["broadcasting"]
@@ -183,6 +179,20 @@ def stack_indexes(
         keep = broadcasting_cfg["keep"]
     if drop_redundant is None:
         drop_redundant = broadcasting_cfg["drop_redundant"]
+
+    index = to_any_index(index)
+    if drop_duplicates:
+        index = drop_duplicate_levels(index, keep=keep)
+    if drop_redundant:
+        index = drop_redundant_levels(index)
+    return index
+
+
+def stack_indexes(*indexes: tp.MaybeTuple[tp.IndexLike], **clean_index_kwargs) -> tp.Index:
+    """Stack each index in `indexes` on top of each other, from top to bottom."""
+    if len(indexes) == 1:
+        indexes = indexes[0]
+    indexes = list(indexes)
 
     levels = []
     for i in range(len(indexes)):
@@ -200,11 +210,7 @@ def stack_indexes(
                 raise ValueError(f"Index at level {i} could not be broadcast to shape ({max_len},) ")
             levels[i] = repeat_index(levels[i], max_len, ignore_ranges=False)
     new_index = pd.MultiIndex.from_arrays(levels)
-    if drop_duplicates:
-        new_index = drop_duplicate_levels(new_index, keep=keep)
-    if drop_redundant:
-        new_index = drop_redundant_levels(new_index)
-    return new_index
+    return clean_index(new_index, **clean_index_kwargs)
 
 
 def combine_indexes(*indexes: tp.MaybeTuple[tp.IndexLike], **kwargs) -> tp.Index:
@@ -252,7 +258,7 @@ def concat_indexes(
     *indexes: tp.MaybeTuple[tp.IndexLike],
     index_concat_method: tp.MaybeTuple[tp.Union[str, tp.Callable]] = "append",
     keys: tp.Optional[tp.IndexLike] = None,
-    index_stack_kwargs: tp.KwargsLike = None,
+    clean_index_kwargs: tp.KwargsLike = None,
     verify_integrity: bool = True,
     axis: int = 1,
 ) -> tp.Index:
@@ -278,8 +284,8 @@ def concat_indexes(
     if len(indexes) == 1:
         indexes = indexes[0]
     indexes = list(indexes)
-    if index_stack_kwargs is None:
-        index_stack_kwargs = {}
+    if clean_index_kwargs is None:
+        clean_index_kwargs = {}
     if axis == 0:
         factorized_name = "row_idx"
     elif axis == 1:
@@ -301,7 +307,7 @@ def concat_indexes(
                 *indexes,
                 index_concat_method=index_concat_method[0],
                 keys=keys,
-                index_stack_kwargs=index_stack_kwargs,
+                clean_index_kwargs=clean_index_kwargs,
                 verify_integrity=verify_integrity,
                 axis=axis,
             )
@@ -310,7 +316,7 @@ def concat_indexes(
                 *indexes,
                 index_concat_method=index_concat_method[1],
                 keys=keys,
-                index_stack_kwargs=index_stack_kwargs,
+                clean_index_kwargs=clean_index_kwargs,
                 verify_integrity=verify_integrity,
                 axis=axis,
             )
@@ -357,7 +363,7 @@ def concat_indexes(
         new_index = concat_indexes(
             *indexes,
             index_concat_method="append",
-            index_stack_kwargs=index_stack_kwargs,
+            clean_index_kwargs=clean_index_kwargs,
             verify_integrity=False,
             axis=axis,
         )
@@ -386,11 +392,11 @@ def concat_indexes(
             keys = concat_indexes(
                 *keys,
                 index_concat_method="append",
-                index_stack_kwargs=index_stack_kwargs,
+                clean_index_kwargs=clean_index_kwargs,
                 verify_integrity=False,
                 axis=axis,
             )
-            new_index = stack_indexes((keys, new_index), **index_stack_kwargs)
+            new_index = stack_indexes((keys, new_index), **clean_index_kwargs)
             keys = None
         elif not isinstance(keys, pd.Index):
             keys = pd.Index(keys)
@@ -402,7 +408,7 @@ def concat_indexes(
                 top_index = repeated_index
             else:
                 top_index = top_index.append(repeated_index)
-        new_index = stack_indexes((top_index, new_index), **index_stack_kwargs)
+        new_index = stack_indexes((top_index, new_index), **clean_index_kwargs)
     if verify_integrity:
         if keys is None:
             if axis == 0:
@@ -481,14 +487,25 @@ def drop_levels(
     return index.droplevel(list(levels_to_drop))
 
 
-def rename_levels(index: tp.Index, name_dict: tp.Dict[tp.Level, tp.Any], strict: bool = True) -> tp.Index:
-    """Rename levels in `index` by `name_dict`."""
+def rename_levels(index: tp.Index, mapper: tp.MaybeMappingSequence[tp.Level], strict: bool = True) -> tp.Index:
+    """Rename levels in `index` by `mapper`.
+
+    Mapper can be a single or multiple levels to rename to, or a dictionary that maps
+    old level names to new level names."""
     if isinstance(index, pd.MultiIndex):
         nlevels = index.nlevels
+        if isinstance(mapper, (int, str)):
+            mapper = dict(zip(index.names, [mapper]))
+        elif checks.is_complex_sequence(mapper):
+            mapper = dict(zip(index.names, mapper))
     else:
         nlevels = 1
+        if isinstance(mapper, (int, str)):
+            mapper = dict(zip([index.name], [mapper]))
+        elif checks.is_complex_sequence(mapper):
+            mapper = dict(zip([index.name], mapper))
 
-    for k, v in name_dict.items():
+    for k, v in mapper.items():
         if k in index.names:
             if isinstance(index, pd.MultiIndex):
                 index = index.rename(v, level=k)
@@ -955,3 +972,128 @@ def find_first_occurrence(index_value: tp.Any, index: tp.Index) -> int:
     elif isinstance(loc, np.ndarray):
         return np.flatnonzero(loc)[0]
     return loc
+
+
+IndexApplierT = tp.TypeVar("IndexApplierT", bound="IndexApplier")
+
+
+class IndexApplier:
+    """Abstract class that can apply a function on an index."""
+
+    def apply_to_index(
+        self: IndexApplierT,
+        apply_func: tp.Callable,
+        *args,
+        axis: tp.Optional[int] = None,
+        **kwargs,
+    ) -> IndexApplierT:
+        """Apply function `apply_func` on the index of the instance and return a new instance.
+
+        Set `axis` to 1 for columns, 0 for index, and None to determine automatically.
+        Set `copy_data` to True to make a deep copy of the data."""
+        raise NotImplementedError
+
+    def add_levels(
+        self: IndexApplierT,
+        *indexes: tp.Index,
+        on_top: bool = True,
+        drop_duplicates: tp.Optional[bool] = None,
+        keep: tp.Optional[str] = None,
+        drop_redundant: tp.Optional[bool] = None,
+        **kwargs,
+    ) -> IndexApplierT:
+        """Append or prepend levels using `stack_indexes`.
+
+        Set `on_top` to False to stack at bottom.
+
+        See `IndexApplier.apply_to_index` for other keyword arguments."""
+
+        def _apply_func(index):
+            if on_top:
+                return stack_indexes(
+                    [*indexes, index],
+                    drop_duplicates=drop_duplicates,
+                    keep=keep,
+                    drop_redundant=drop_redundant,
+                )
+            return stack_indexes(
+                [index, *indexes],
+                drop_duplicates=drop_duplicates,
+                keep=keep,
+                drop_redundant=drop_redundant,
+            )
+
+        return self.apply_to_index(_apply_func, **kwargs)
+
+    def drop_levels(
+        self: IndexApplierT,
+        levels: tp.Union[ExceptLevel, tp.MaybeLevelSequence],
+        strict: bool = True,
+        **kwargs,
+    ) -> IndexApplierT:
+        """Drop levels using `drop_levels`.
+
+        See `IndexApplier.apply_to_index` for other keyword arguments."""
+
+        def _apply_func(index):
+            return drop_levels(index, levels, strict=strict)
+
+        return self.apply_to_index(_apply_func, **kwargs)
+
+    def rename_levels(
+        self: IndexApplierT,
+        mapper: tp.MaybeMappingSequence[tp.Level],
+        strict: bool = True,
+        **kwargs,
+    ) -> IndexApplierT:
+        """Rename levels using `rename_levels`.
+
+        See `IndexApplier.apply_to_index` for other keyword arguments."""
+
+        def _apply_func(index):
+            return rename_levels(index, mapper, strict=strict)
+
+        return self.apply_to_index(_apply_func, **kwargs)
+
+    def select_levels(
+        self: IndexApplierT,
+        level_names: tp.Union[ExceptLevel, tp.MaybeLevelSequence],
+        strict: bool = True,
+        **kwargs,
+    ) -> IndexApplierT:
+        """Select levels using `select_levels`.
+
+        See `IndexApplier.apply_to_index` for other keyword arguments."""
+
+        def _apply_func(index):
+            return select_levels(index, level_names, strict=strict)
+
+        return self.apply_to_index(_apply_func, **kwargs)
+
+    def drop_redundant_levels(
+        self: IndexApplierT,
+        axis: tp.Optional[int] = None,
+        **kwargs,
+    ) -> IndexApplierT:
+        """Drop any redundant levels using `drop_redundant_levels`.
+
+        See `IndexApplier.apply_to_index` for other keyword arguments."""
+
+        def _apply_func(index):
+            return drop_redundant_levels(index)
+
+        return self.apply_to_index(_apply_func, axis=axis)
+
+    def drop_duplicate_levels(
+        self: IndexApplierT,
+        keep: tp.Optional[str] = None,
+        **kwargs,
+    ) -> IndexApplierT:
+        """Drop any duplicate levels using `drop_duplicate_levels`.
+
+        See `IndexApplier.apply_to_index` for other keyword arguments."""
+
+        def _apply_func(index):
+            return drop_duplicate_levels(index, keep=keep)
+
+        return self.apply_to_index(_apply_func, **kwargs)

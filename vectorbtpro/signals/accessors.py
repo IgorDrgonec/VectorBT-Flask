@@ -2144,7 +2144,7 @@ class SignalsAccessor(GenericAccessor):
         signal_index_type: str = "range",
         signal_index_name: str = "signal",
         jitted: tp.JittedOption = None,
-        index_stack_kwargs: tp.KwargsLike = None,
+        clean_index_kwargs: tp.KwargsLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Unravel signals.
@@ -2156,8 +2156,8 @@ class SignalsAccessor(GenericAccessor):
         * "position(s)": Integer position (row) of signal in a column
         * "label(s)": Label of signal in a column
         """
-        if index_stack_kwargs is None:
-            index_stack_kwargs = {}
+        if clean_index_kwargs is None:
+            clean_index_kwargs = {}
         if wrap_kwargs is None:
             wrap_kwargs = {}
 
@@ -2174,7 +2174,7 @@ class SignalsAccessor(GenericAccessor):
             signal_index_type=signal_index_type,
             signal_index_name=signal_index_name,
         )
-        new_columns = indexes.stack_indexes((signal_index, self.wrapper.columns[col_idxs]), **index_stack_kwargs)
+        new_columns = indexes.stack_indexes((signal_index, self.wrapper.columns[col_idxs]), **clean_index_kwargs)
         return self.wrapper.wrap(new_mask, columns=new_columns, group_by=False, **wrap_kwargs)
 
     @class_or_instancemethod
@@ -2190,7 +2190,7 @@ class SignalsAccessor(GenericAccessor):
         signal_index_type: str = "pair_range",
         signal_index_name: str = "signal",
         jitted: tp.JittedOption = None,
-        index_stack_kwargs: tp.KwargsLike = None,
+        clean_index_kwargs: tp.KwargsLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Unravel signal pairs.
@@ -2212,8 +2212,8 @@ class SignalsAccessor(GenericAccessor):
         """
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        if index_stack_kwargs is None:
-            index_stack_kwargs = {}
+        if clean_index_kwargs is None:
+            clean_index_kwargs = {}
         if wrap_kwargs is None:
             wrap_kwargs = {}
         if isinstance(relation, str):
@@ -2259,7 +2259,7 @@ class SignalsAccessor(GenericAccessor):
             return indexes.stack_indexes((
                 *indexes_to_stack,
                 wrapper.columns[col_idxs]
-            ), **index_stack_kwargs)
+            ), **clean_index_kwargs)
 
         if len(objs) == 1:
             obj = objs[0]

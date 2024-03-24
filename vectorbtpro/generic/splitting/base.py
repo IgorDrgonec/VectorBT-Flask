@@ -1158,7 +1158,7 @@ class Splitter(Analyzable):
         grouper = BaseIDXAccessor(index).get_grouper(by, groupby_kwargs=groupby_kwargs, **grouper_kwargs)
         splits = []
         indices = []
-        for i, new_split in enumerate(grouper.yield_group_idxs()):
+        for i, new_split in enumerate(grouper.iter_group_idxs()):
             if split is not None:
                 new_split = cls.split_range(
                     new_split,
@@ -2917,9 +2917,9 @@ class Splitter(Analyzable):
             range_bounds = pd.MultiIndex.from_tuples(range_bounds, names=["start", "end"])
             if keys is None:
                 return range_bounds
-            index_stack_kwargs = dict(index_combine_kwargs)
-            index_stack_kwargs.pop("ignore_ranges", None)
-            return stack_indexes((keys, range_bounds), **index_stack_kwargs)
+            clean_index_kwargs = dict(index_combine_kwargs)
+            clean_index_kwargs.pop("ignore_ranges", None)
+            return stack_indexes((keys, range_bounds), **clean_index_kwargs)
 
         if into is None:
             range_objs = []
@@ -3486,9 +3486,9 @@ class Splitter(Analyzable):
             range_bounds = pd.MultiIndex.from_tuples(range_bounds, names=["start", "end"])
             if keys is None:
                 return range_bounds
-            index_stack_kwargs = dict(index_combine_kwargs)
-            index_stack_kwargs.pop("ignore_ranges", None)
-            return stack_indexes((keys, range_bounds), **index_stack_kwargs)
+            clean_index_kwargs = dict(index_combine_kwargs)
+            clean_index_kwargs.pop("ignore_ranges", None)
+            return stack_indexes((keys, range_bounds), **clean_index_kwargs)
 
         if iteration.lower() == "split_major":
 

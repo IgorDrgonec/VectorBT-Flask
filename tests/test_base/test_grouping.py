@@ -278,13 +278,13 @@ class TestGrouper:
             np.array([4, 8]),
         )
 
-    def test_yield_group_idxs(self):
+    def test_iter_group_idxs(self):
         np.testing.assert_array_equal(
-            np.concatenate(tuple(vbt.Grouper(grouped_index).yield_group_idxs())),
+            np.concatenate(tuple(vbt.Grouper(grouped_index).iter_group_idxs())),
             np.array([0, 1, 2, 3, 4, 5, 6, 7]),
         )
         np.testing.assert_array_equal(
-            np.concatenate(tuple(vbt.Grouper(grouped_index).yield_group_idxs(group_by=0))),
+            np.concatenate(tuple(vbt.Grouper(grouped_index).iter_group_idxs(group_by=0))),
             np.array([0, 1, 2, 3, 4, 5, 6, 7]),
         )
 

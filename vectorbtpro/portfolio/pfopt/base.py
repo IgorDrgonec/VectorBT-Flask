@@ -1841,7 +1841,7 @@ class PortfolioOptimizer(Analyzable):
         template_context: tp.KwargsLike = None,
         execute_kwargs: tp.KwargsLike = None,
         random_subset: tp.Optional[int] = None,
-        index_stack_kwargs: tp.KwargsLike = None,
+        clean_index_kwargs: tp.KwargsLike = None,
         wrapper_kwargs: tp.KwargsLike = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
@@ -2004,8 +2004,8 @@ class PortfolioOptimizer(Analyzable):
         if parameterizer_cls is None:
             parameterizer_cls = Parameterizer
         param_search_kwargs = merge_dicts(params_cfg["param_search_kwargs"], param_search_kwargs)
-        if index_stack_kwargs is None:
-            index_stack_kwargs = {}
+        if clean_index_kwargs is None:
+            clean_index_kwargs = {}
         if pbar_kwargs is None:
             pbar_kwargs = {}
 
@@ -2066,7 +2066,7 @@ class PortfolioOptimizer(Analyzable):
             param_product, param_columns = combine_params(
                 param_dct,
                 random_subset=random_subset,
-                index_stack_kwargs=index_stack_kwargs,
+                clean_index_kwargs=clean_index_kwargs,
                 name_tuple_to_str=name_tuple_to_str,
             )
             if param_columns is None:
@@ -2094,7 +2094,7 @@ class PortfolioOptimizer(Analyzable):
                         param_columns,
                         pd.Index(gc_names, name="group_config"),
                     ),
-                    **index_stack_kwargs,
+                    **clean_index_kwargs,
                 )
         else:
             if n_config_params == 0 or (n_config_params == 1 and gc_names_none):
@@ -2284,7 +2284,7 @@ class PortfolioOptimizer(Analyzable):
                 pbar.update(1)
 
         # Build column hierarchy
-        new_columns = combine_indexes((group_index, wrapper.columns), **index_stack_kwargs)
+        new_columns = combine_indexes((group_index, wrapper.columns), **clean_index_kwargs)
 
         # Create instance
         wrapper_kwargs = merge_dicts(
@@ -2582,7 +2582,7 @@ class PortfolioOptimizer(Analyzable):
         template_context: tp.KwargsLike = None,
         execute_kwargs: tp.KwargsLike = None,
         random_subset: tp.Optional[int] = None,
-        index_stack_kwargs: tp.KwargsLike = None,
+        clean_index_kwargs: tp.KwargsLike = None,
         wrapper_kwargs: tp.KwargsLike = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
@@ -2799,8 +2799,8 @@ class PortfolioOptimizer(Analyzable):
         if parameterizer_cls is None:
             parameterizer_cls = Parameterizer
         param_search_kwargs = merge_dicts(params_cfg["param_search_kwargs"], param_search_kwargs)
-        if index_stack_kwargs is None:
-            index_stack_kwargs = {}
+        if clean_index_kwargs is None:
+            clean_index_kwargs = {}
         if pbar_kwargs is None:
             pbar_kwargs = {}
 
@@ -2867,7 +2867,7 @@ class PortfolioOptimizer(Analyzable):
             param_product, param_columns = combine_params(
                 param_dct,
                 random_subset=random_subset,
-                index_stack_kwargs=index_stack_kwargs,
+                clean_index_kwargs=clean_index_kwargs,
                 name_tuple_to_str=name_tuple_to_str,
             )
             if param_columns is None:
@@ -2895,7 +2895,7 @@ class PortfolioOptimizer(Analyzable):
                         param_columns,
                         pd.Index(gc_names, name="group_config"),
                     ),
-                    **index_stack_kwargs,
+                    **clean_index_kwargs,
                 )
         else:
             if n_config_params == 0 or (n_config_params == 1 and gc_names_none):
@@ -3144,7 +3144,7 @@ class PortfolioOptimizer(Analyzable):
                 pbar.update(1)
 
         # Build column hierarchy
-        new_columns = combine_indexes((group_index, wrapper.columns), **index_stack_kwargs)
+        new_columns = combine_indexes((group_index, wrapper.columns), **clean_index_kwargs)
 
         # Create instance
         wrapper_kwargs = merge_dicts(

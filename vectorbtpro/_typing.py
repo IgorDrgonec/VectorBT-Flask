@@ -91,6 +91,7 @@ MaybeSequence = Union[T, Sequence[T]]
 MappingSequence = Union[Mapping[Hashable, T], Sequence[T]]
 MaybeMappingSequence = Union[T, Mapping[Hashable, T], Sequence[T]]
 SetLike = Union[None, Set[T]]
+ItemGenerator = Generator[Tuple[Hashable, Any], None, None]
 
 
 # Arrays
@@ -225,7 +226,9 @@ ParamValues = Sequence[ParamValue]
 MaybeParamValues = MaybeSequence[ParamValue]
 MaybeParams = Sequence[MaybeParamValues]
 Params = Sequence[ParamValues]
+ParamsOrLens = Sequence[Union[ParamValues, int]]
 ParamsOrDict = Union[Params, Dict[Hashable, ParamValues]]
+ParamGrid = Union[ParamsOrLens, Dict[Hashable, ParamsOrLens]]
 ParamComb = Sequence[ParamValue]
 ParamCombOrDict = Union[ParamComb, Dict[Hashable, ParamValue]]
 

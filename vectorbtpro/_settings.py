@@ -29,17 +29,25 @@ For example, you can change default width and height of each plot:
 
 The main sub-configs such as for plotting can be also accessed/modified using the dot notation:
 
-```
+```pycon
 >>> vbt.settings.plotting['layout']['width'] = 800
 ```
 
-Some sub-configs allow the dot notation too but this depends whether they inherit the rules of the root config.
+Some sub-configs allow the dot notation too but this depends on whether they are an instance of `frozen_cfg`:
 
-```plaintext
->>> vbt.settings.data - ok
->>> vbt.settings.data.binance - ok
->>> vbt.settings.data.binance.api_key - error
->>> vbt.settings.data.binance['api_key'] - ok
+```pycon
+>>> type(vbt.settings)
+vectorbtpro._settings.frozen_cfg
+>>> vbt.settings.data  # ok
+
+>>> type(vbt.settings.data)
+vectorbtpro._settings.frozen_cfg
+>>> vbt.settings.data.silence_warnings  # ok
+
+>>> type(vbt.settings.data.custom)
+vectorbtpro._settings.flex_cfg
+>>> vbt.settings.data.custom.binance  # error
+>>> vbt.settings.data.custom["binance"]  # ok
 ```
 
 Since this is only visible when looking at the source code, the advice is to always use the bracket notation.
@@ -442,7 +450,7 @@ params = frozen_cfg(
     max_guesses=None,
     max_misses=None,
     seed=None,
-    index_stack_kwargs=flex_cfg(),
+    clean_index_kwargs=flex_cfg(),
     name_tuple_to_str=True,
     merge_func=None,
     merge_kwargs=flex_cfg(),

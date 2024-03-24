@@ -451,7 +451,7 @@ def broadcast_index(
     ignore_sr_names: tp.Optional[bool] = None,
     ignore_ranges: tp.Optional[bool] = None,
     check_index_names: tp.Optional[bool] = None,
-    **index_stack_kwargs,
+    **clean_index_kwargs,
 ) -> tp.Optional[tp.Index]:
     """Produce a broadcast index/columns.
 
@@ -474,7 +474,7 @@ def broadcast_index(
             Conflicting Series names are those that are different but not None.
         ignore_ranges (bool): Whether to ignore indexes of type `pd.RangeIndex`.
         check_index_names (bool): See `vectorbtpro.utils.checks.is_index_equal`.
-        **index_stack_kwargs: Keyword arguments passed to `vectorbtpro.base.indexes.stack_indexes`.
+        **clean_index_kwargs: Keyword arguments passed to `vectorbtpro.base.indexes.clean_index`.
 
     For defaults, see `vectorbtpro._settings.broadcasting`.
 
@@ -546,7 +546,7 @@ def broadcast_index(
                                     new_index = indexes.repeat_index(new_index, len(index), ignore_ranges=ignore_ranges)
                                 elif len(index) < len(new_index):
                                     index = indexes.repeat_index(index, len(new_index), ignore_ranges=ignore_ranges)
-                            new_index = indexes.stack_indexes([new_index, index], **index_stack_kwargs)
+                            new_index = indexes.stack_indexes([new_index, index], **clean_index_kwargs)
         else:
             raise ValueError(f"Invalid value '{index_from}' for {'columns' if axis == 1 else 'index'}_from")
     else:
@@ -808,7 +808,7 @@ def broadcast(
     ignore_sr_names: tp.Optional[bool] = None,
     ignore_ranges: tp.Optional[bool] = None,
     check_index_names: tp.Optional[bool] = None,
-    index_stack_kwargs: tp.KwargsLike = None,
+    clean_index_kwargs: tp.KwargsLike = None,
     template_context: tp.KwargsLike = None,
 ) -> tp.Any:
     """Bring any array-like object in `args` to the same shape by using NumPy-like broadcasting.
@@ -878,7 +878,7 @@ def broadcast(
         ignore_sr_names (bool): See `broadcast_index`.
         ignore_ranges (bool): See `broadcast_index`.
         check_index_names (bool): See `broadcast_index`.
-        index_stack_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.indexes.stack_indexes`.
+        clean_index_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.indexes.clean_index`.
         template_context (dict): Template context.
 
     For defaults, see `vectorbtpro._settings.broadcasting`.
@@ -1185,8 +1185,8 @@ def broadcast(
         merge_arg_names = get_func_arg_names(pd.DataFrame.merge)
         if set(merge_kwargs) <= set(merge_arg_names):
             merge_kwargs_per_obj = False
-    if index_stack_kwargs is None:
-        index_stack_kwargs = {}
+    if clean_index_kwargs is None:
+        clean_index_kwargs = {}
     if checks.is_mapping(args[0]) and not isinstance(args[0], indexing.index_dict):
         if len(args) > 1:
             raise ValueError("Only one argument is allowed when passing a mapping")
@@ -1421,7 +1421,7 @@ def broadcast(
             ignore_sr_names=ignore_sr_names,
             ignore_ranges=ignore_ranges,
             check_index_names=check_index_names,
-            **index_stack_kwargs,
+            **clean_index_kwargs,
         )
         new_columns = broadcast_index(
             [v for k, v in aligned_objs.items() if obj_axis[k] in (None, 1)],
@@ -1431,7 +1431,7 @@ def broadcast(
             ignore_sr_names=ignore_sr_names,
             ignore_ranges=ignore_ranges,
             check_index_names=check_index_names,
-            **index_stack_kwargs,
+            **clean_index_kwargs,
         )
     else:
         new_index = pd.RangeIndex(stop=to_shape_2d[0])
@@ -1452,13 +1452,13 @@ def broadcast(
             param_dct,
             random_subset=random_subset,
             seed=seed,
-            index_stack_kwargs=index_stack_kwargs,
+            clean_index_kwargs=clean_index_kwargs,
         )
         n_params = len(param_columns)
 
         # Combine parameter columns with new columns
         if param_columns is not None and new_columns is not None:
-            new_columns = indexes.combine_indexes([param_columns, new_columns], **index_stack_kwargs)
+            new_columns = indexes.combine_indexes([param_columns, new_columns], **clean_index_kwargs)
 
     # Tile
     if tile is not None:
@@ -1467,7 +1467,7 @@ def broadcast(
                 new_columns = indexes.tile_index(new_columns, tile)
         else:
             if new_columns is not None:
-                new_columns = indexes.combine_indexes([tile, new_columns], **index_stack_kwargs)
+                new_columns = indexes.combine_indexes([tile, new_columns], **clean_index_kwargs)
             tile = len(tile)
         n_params = max(n_params, 1) * tile
 

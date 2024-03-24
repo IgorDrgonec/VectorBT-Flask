@@ -1178,9 +1178,33 @@ class IndicatorBase(Analyzable):
         for i, param_name in enumerate(self.param_names):
             setattr(self, f"_{param_name}_list", param_list[i])
             setattr(self, f"_{param_name}_mapper", mapper_list[i])
-        if len(self.param_names) > 1:
-            tuple_mapper = list(zip(*list(mapper_list)))
-            setattr(self, "_tuple_mapper", tuple_mapper)
+
+        # Initialize indexers
+        mapper_sr_list = []
+        for i, m in enumerate(mapper_list):
+            mapper_sr_list.append(pd.Series(m, index=wrapper.columns))
+        tuple_mapper = self._tuple_mapper
+        if tuple_mapper is not None:
+            mapper_sr_list.append(pd.Series(tuple_mapper.tolist(), index=wrapper.columns))
+        for base_cls in type(self).__bases__:
+            if base_cls.__name__ == "ParamIndexer":
+                base_cls.__init__(self, mapper_sr_list, level_names=[*level_names, level_names])
+
+    @property
+    def _tuple_mapper(self) -> tp.Optional[pd.MultiIndex]:
+        """Tuple mapper."""
+        if len(self.param_names) <= 1:
+            return None
+        return pd.MultiIndex.from_arrays([getattr(self, f"_{name}_mapper") for name in self.param_names])
+
+    @property
+    def _param_mapper(self) -> tp.Optional[pd.Index]:
+        """Parameter mapper."""
+        if len(self.param_names) == 0:
+            return None
+        if len(self.param_names) == 1:
+            return getattr(self, f"_{self.param_names[0]}_mapper")
+        return self._tuple_mapper
 
     def indexing_func(self: IndicatorBaseT, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> IndicatorBaseT:
         """Perform indexing on `IndicatorBase`."""
@@ -1326,6 +1350,42 @@ class IndicatorBase(Analyzable):
         if new_df.index.equals(df.index):
             return self
         return self.loc[new_df.index]
+
+    # ############# Iteration ############# #
+
+    def items(
+        self,
+        group_by: tp.GroupByLike = "params",
+        apply_group_by: bool = False,
+        keep_2d: bool = False,
+        key_as_index: bool = False,
+    ) -> tp.ItemGenerator:
+        """Iterate over columns (or groups if grouped and `Wrapping.group_select` is True).
+
+        Allows the following additional options for `group_by`: "params" and parameter names."""
+        if isinstance(group_by, (tuple, list)):
+            new_group_by = []
+            for g in group_by:
+                if isinstance(g, str):
+                    if g not in self.wrapper.columns.names:
+                        if g in self.param_names:
+                            g = getattr(self, f"_{g}_mapper")
+                new_group_by.append(g)
+            group_by = type(group_by)(new_group_by)
+        elif isinstance(group_by, str):
+            if group_by not in self.wrapper.columns.names:
+                if group_by.lower() == "params":
+                    group_by = self._param_mapper
+                elif group_by in self.param_names:
+                    group_by = getattr(self, f"_{group_by}_mapper")
+        for k, v in Analyzable.items(
+            self,
+            group_by=group_by,
+            apply_group_by=apply_group_by,
+            keep_2d=keep_2d,
+            key_as_index=key_as_index,
+        ):
+            yield k, v
 
 
 class IndicatorFactory(Configured):
@@ -1576,46 +1636,6 @@ class IndicatorFactory(Configured):
                     _output_flags = ", ".join(_output_flags)
                 output_prop.__doc__ += "\n\n" + _output_flags
             setattr(Indicator, output_name, property(output_prop))
-
-        # Add __init__ method
-        def __init__(
-            self,
-            wrapper: ArrayWrapper,
-            input_list: InputListT,
-            input_mapper: InputMapperT,
-            in_output_list: InOutputListT,
-            output_list: OutputListT,
-            param_list: ParamListT,
-            mapper_list: MapperListT,
-            short_name: str,
-            level_names: tp.Tuple[str, ...],
-        ) -> None:
-            IndicatorBase.__init__(
-                self,
-                wrapper,
-                input_list,
-                input_mapper,
-                in_output_list,
-                output_list,
-                param_list,
-                mapper_list,
-                short_name,
-                level_names,
-            )
-            if len(param_names) > 1:
-                tuple_mapper = list(zip(*list(mapper_list)))
-            else:
-                tuple_mapper = None
-
-            # Initialize indexers
-            mapper_sr_list = []
-            for i, m in enumerate(mapper_list):
-                mapper_sr_list.append(pd.Series(m, index=wrapper.columns))
-            if tuple_mapper is not None:
-                mapper_sr_list.append(pd.Series(tuple_mapper, index=wrapper.columns))
-            ParamIndexer.__init__(self, mapper_sr_list, level_names=[*level_names, level_names])
-
-        setattr(Indicator, "__init__", __init__)
 
         # Add user-defined outputs
         for prop_name, prop in lazy_outputs.items():

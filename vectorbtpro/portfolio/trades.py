@@ -892,7 +892,7 @@ class Trades(Ranges):
         exit_price_close: bool = False,
         max_duration: tp.Optional[int] = None,
         jitted: tp.JittedOption = None,
-        index_stack_kwargs: tp.KwargsLike = None,
+        clean_index_kwargs: tp.KwargsLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Get expanding best price.
@@ -909,12 +909,12 @@ class Trades(Ranges):
             exit_price_close=exit_price_close,
             max_duration=max_duration,
         )
-        if index_stack_kwargs is None:
-            index_stack_kwargs = {}
+        if clean_index_kwargs is None:
+            clean_index_kwargs = {}
         new_columns = stack_indexes((
             self.wrapper.columns[self.get_field_arr("col")],
             pd.Index(self.get_field_arr("id"), name="id"),
-        ), **index_stack_kwargs)
+        ), **clean_index_kwargs)
         if wrap_kwargs is None:
             wrap_kwargs = {}
         return self.wrapper.wrap(
@@ -931,7 +931,7 @@ class Trades(Ranges):
         exit_price_close: bool = False,
         max_duration: tp.Optional[int] = None,
         jitted: tp.JittedOption = None,
-        index_stack_kwargs: tp.KwargsLike = None,
+        clean_index_kwargs: tp.KwargsLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.SeriesFrame:
         """Get expanding worst price.
@@ -948,12 +948,12 @@ class Trades(Ranges):
             exit_price_close=exit_price_close,
             max_duration=max_duration,
         )
-        if index_stack_kwargs is None:
-            index_stack_kwargs = {}
+        if clean_index_kwargs is None:
+            clean_index_kwargs = {}
         new_columns = stack_indexes((
             self.wrapper.columns[self.get_field_arr("col")],
             pd.Index(self.get_field_arr("id"), name="id"),
-        ), **index_stack_kwargs)
+        ), **clean_index_kwargs)
         if wrap_kwargs is None:
             wrap_kwargs = {}
         return self.wrapper.wrap(

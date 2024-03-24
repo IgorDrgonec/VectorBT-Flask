@@ -13,13 +13,14 @@ from vectorbtpro.base import indexes, reshaping
 from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.resampling.base import Resampler
 from vectorbtpro.base.indexing import IndexingError, ExtPandasIndexer, index_dict, IdxSetter, IdxSetterFactory, IdxDict
-from vectorbtpro.base.indexes import stack_indexes, concat_indexes
+from vectorbtpro.base.indexes import stack_indexes, concat_indexes, IndexApplier
 from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.attr_ import AttrResolverMixin, AttrResolverMixinT
 from vectorbtpro.utils.config import Configured, merge_dicts, resolve_dict
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.decorators import class_or_instancemethod, cached_method, cached_property
 from vectorbtpro.utils.array_ import is_range, cast_to_min_precision, cast_to_max_precision
+from vectorbtpro.utils.params import Param, Itemable, Paramable
 
 if tp.TYPE_CHECKING:
     from vectorbtpro.base.accessors import BaseIDXAccessor as BaseIDXAccessorT
@@ -33,10 +34,11 @@ __all__ = [
     "Wrapping",
 ]
 
+
 ArrayWrapperT = tp.TypeVar("ArrayWrapperT", bound="ArrayWrapper")
 
 
-class ArrayWrapper(Configured, ExtPandasIndexer):
+class ArrayWrapper(Configured, IndexApplier, ExtPandasIndexer, Itemable, Paramable):
     """Class that stores index, columns, and shape metadata for wrapping NumPy arrays.
     Tightly integrated with `vectorbtpro.base.grouping.base.Grouper` for grouping columns.
 
@@ -155,7 +157,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         stack_columns: bool = True,
         index_concat_method: tp.MaybeTuple[tp.Union[str, tp.Callable]] = "append",
         keys: tp.Optional[tp.IndexLike] = None,
-        index_stack_kwargs: tp.KwargsLike = None,
+        clean_index_kwargs: tp.KwargsLike = None,
         verify_integrity: bool = True,
         **kwargs,
     ) -> ArrayWrapperT:
@@ -185,7 +187,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
                 [wrapper.index for wrapper in wrappers],
                 index_concat_method=index_concat_method,
                 keys=keys,
-                index_stack_kwargs=index_stack_kwargs,
+                clean_index_kwargs=clean_index_kwargs,
                 verify_integrity=verify_integrity,
                 axis=0,
             )
@@ -215,7 +217,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
                             raise ValueError("Objects to be merged must have the same columns")
                         new_columns = stack_indexes(
                             (new_columns, wrapper.columns),
-                            **resolve_dict(index_stack_kwargs),
+                            **resolve_dict(clean_index_kwargs),
                         )
             columns = new_columns
         elif not isinstance(columns, pd.Index):
@@ -273,7 +275,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         col_concat_method: tp.MaybeTuple[tp.Union[str, tp.Callable]] = "append",
         group_concat_method: tp.MaybeTuple[tp.Union[str, tp.Callable]] = ("append", "factorize_each"),
         keys: tp.Optional[tp.IndexLike] = None,
-        index_stack_kwargs: tp.KwargsLike = None,
+        clean_index_kwargs: tp.KwargsLike = None,
         verify_integrity: bool = True,
         **kwargs,
     ) -> ArrayWrapperT:
@@ -343,7 +345,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
                 [wrapper.columns for wrapper in wrappers],
                 index_concat_method=col_concat_method,
                 keys=keys,
-                index_stack_kwargs=index_stack_kwargs,
+                clean_index_kwargs=clean_index_kwargs,
                 verify_integrity=verify_integrity,
                 axis=1,
             )
@@ -368,7 +370,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
                         [wrapper.grouper.get_stretched_index() for wrapper in wrappers],
                         index_concat_method=group_concat_method,
                         keys=keys,
-                        index_stack_kwargs=index_stack_kwargs,
+                        clean_index_kwargs=clean_index_kwargs,
                         verify_integrity=verify_integrity,
                         axis=2,
                     )
@@ -973,7 +975,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         return self._parse_index
 
     @property
-    def column_only_select(self) -> tp.Optional[bool]:
+    def column_only_select(self) -> bool:
         """Whether to perform indexing on columns only."""
         from vectorbtpro._settings import settings
 
@@ -985,7 +987,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         return column_only_select
 
     @property
-    def range_only_select(self) -> tp.Optional[bool]:
+    def range_only_select(self) -> bool:
         """Whether to perform indexing on rows using slices only."""
         from vectorbtpro._settings import settings
 
@@ -997,7 +999,7 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         return range_only_select
 
     @property
-    def group_select(self) -> tp.Optional[bool]:
+    def group_select(self) -> bool:
         """Whether to allow indexing on groups."""
         from vectorbtpro._settings import settings
 
@@ -1386,6 +1388,23 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
         _self = self.resolve(group_by=group_by)
         return _self.wrap_reduced(np.full(_self.shape_2d[1], fill_value), **kwargs)
 
+    def apply_to_index(
+        self: ArrayWrapperT,
+        apply_func: tp.Callable,
+        *args,
+        axis: tp.Optional[int] = None,
+        **kwargs,
+    ) -> ArrayWrapperT:
+        if axis is None:
+            axis = 0 if self.ndim == 1 else 1
+        if self.ndim == 1 and axis == 1:
+            raise TypeError("Axis 1 is not supported for one dimension")
+        checks.assert_in(axis, (0, 1))
+
+        if axis == 1:
+            return self.replace(columns=apply_func(self.columns, *args, **kwargs))
+        return self.replace(index=apply_func(self.index, *args, **kwargs))
+
     def get_index_points(self, *args, **kwargs) -> tp.Array1d:
         """See `vectorbtpro.base.accessors.BaseIDXAccessor.get_points`."""
         return self.index_acc.get_points(*args, **kwargs)
@@ -1725,11 +1744,93 @@ class ArrayWrapper(Configured, ExtPandasIndexer):
             splitter = splitter(self.index, template_context=template_context, **splitter_kwargs)
         return splitter.take(self, template_context=template_context, **take_kwargs)
 
+    # ############# Iteration ############# #
+
+    def items(
+        self,
+        group_by: tp.GroupByLike = None,
+        apply_group_by: bool = False,
+        keep_2d: bool = False,
+        key_as_index: bool = False,
+    ) -> tp.ItemGenerator:
+        """Iterate over columns or groups (if grouped and `Wrapping.group_select` is True).
+
+        If `apply_group_by` is False, `group_by` becomes a grouping instruction for the iteration,
+        not for the final object. In this case, will raise an error if the instance is grouped
+        and that grouping must be changed."""
+        if group_by is None or apply_group_by:
+            _self = self.regroup(group_by=group_by)
+            if _self.group_select and _self.grouper.is_grouped():
+                columns = _self.get_columns()
+                ndim = _self.get_ndim()
+            else:
+                columns = _self.columns
+                ndim = _self.ndim
+
+            if ndim == 1:
+                if key_as_index:
+                    yield columns, _self
+                else:
+                    yield columns[0], _self
+            else:
+                for i in range(len(columns)):
+                    if key_as_index:
+                        key = columns[[i]]
+                    else:
+                        key = columns[i]
+                    if _self.column_only_select:
+                        if keep_2d:
+                            yield key, _self.iloc[i : i + 1]
+                        else:
+                            yield key, _self.iloc[i]
+                    else:
+                        if keep_2d:
+                            yield key, _self.iloc[:, i : i + 1]
+                        else:
+                            yield key, _self.iloc[:, i]
+        else:
+            if self.group_select and self.grouper.is_grouped():
+                raise ValueError("Cannot change grouping")
+            wrapper = self.regroup(group_by=group_by)
+            if wrapper.get_ndim() == 1:
+                if key_as_index:
+                    yield wrapper.get_columns(), self
+                else:
+                    yield wrapper.get_columns()[0], self
+            else:
+                for group, group_idxs in wrapper.grouper.iter_groups(key_as_index=key_as_index):
+                    if self.column_only_select:
+                        if keep_2d or len(group_idxs) > 1:
+                            yield group, self.iloc[group_idxs]
+                        else:
+                            yield group, self.iloc[group_idxs[0]]
+                    else:
+                        if keep_2d or len(group_idxs) > 1:
+                            yield group, self.iloc[:, group_idxs]
+                        else:
+                            yield group, self.iloc[:, group_idxs[0]]
+
+    def as_param(self, **kwargs) -> Param:
+        param_values = []
+        index_values = []
+        first_index = None
+        keys = None
+        for k, v in self.items(key_as_index=True, **kwargs):
+            param_values.append(v)
+            index_values.append(k[0])
+            if first_index is None:
+                first_index = k
+        if isinstance(first_index, pd.MultiIndex):
+            keys = pd.MultiIndex.from_tuples(index_values, names=first_index.names)
+        elif isinstance(first_index, pd.Index):
+            keys = pd.Index(index_values, name=first_index.name)
+        return Param(param_values, keys=keys)
+
 
 WrappingT = tp.TypeVar("WrappingT", bound="Wrapping")
 
 
-class Wrapping(Configured, ExtPandasIndexer, AttrResolverMixin):
+class Wrapping(Configured, IndexApplier, ExtPandasIndexer, AttrResolverMixin, Itemable, Paramable):
     """Class that uses `ArrayWrapper` globally."""
 
     @classmethod
@@ -1808,8 +1909,27 @@ class Wrapping(Configured, ExtPandasIndexer, AttrResolverMixin):
         """Array wrapper of the type `ArrayWrapper`."""
         return self._wrapper
 
+    def apply_to_index(
+        self: ArrayWrapperT,
+        apply_func: tp.Callable,
+        *args,
+        axis: tp.Optional[int] = None,
+        **kwargs,
+    ) -> ArrayWrapperT:
+        if axis is None:
+            axis = 0 if self.wrapper.ndim == 1 else 1
+        if self.wrapper.ndim == 1 and axis == 1:
+            raise TypeError("Axis 1 is not supported for one dimension")
+        checks.assert_in(axis, (0, 1))
+
+        if axis == 1:
+            new_wrapper = self.wrapper.replace(columns=apply_func(self.wrapper.columns, *args, **kwargs))
+        else:
+            new_wrapper = self.wrapper.replace(index=apply_func(self.wrapper.index, *args, **kwargs))
+        return self.replace(wrapper=new_wrapper)
+
     @property
-    def column_only_select(self) -> tp.Optional[bool]:
+    def column_only_select(self) -> bool:
         """Overrides `ArrayWrapper.column_only_select`."""
         column_only_select = getattr(self, "_column_only_select", None)
         if column_only_select is None:
@@ -1817,7 +1937,7 @@ class Wrapping(Configured, ExtPandasIndexer, AttrResolverMixin):
         return column_only_select
 
     @property
-    def range_only_select(self) -> tp.Optional[bool]:
+    def range_only_select(self) -> bool:
         """Overrides `ArrayWrapper.range_only_select`."""
         range_only_select = getattr(self, "_range_only_select", None)
         if range_only_select is None:
@@ -1825,7 +1945,7 @@ class Wrapping(Configured, ExtPandasIndexer, AttrResolverMixin):
         return range_only_select
 
     @property
-    def group_select(self) -> tp.Optional[bool]:
+    def group_select(self) -> bool:
         """Overrides `ArrayWrapper.group_select`."""
         group_select = getattr(self, "_group_select", None)
         if group_select is None:
@@ -1870,8 +1990,10 @@ class Wrapping(Configured, ExtPandasIndexer, AttrResolverMixin):
             if wrapper_copy.freq != self.wrapper.freq:
                 if not silence_warnings:
                     warnings.warn(
-                        f"Changing the frequency will create a copy of this object. "
-                        f"Consider setting it upon object creation to re-use existing cache.",
+                        (
+                            f"Changing the frequency will create a copy of this object. "
+                            f"Consider setting it upon object creation to re-use existing cache."
+                        ),
                         stacklevel=2,
                     )
                 self_copy = self.replace(wrapper=wrapper_copy)
@@ -2027,3 +2149,85 @@ class Wrapping(Configured, ExtPandasIndexer, AttrResolverMixin):
                 splitter = getattr(splitter_cls, splitter)
             splitter = splitter(self.wrapper.index, template_context=template_context, **splitter_kwargs)
         return splitter.take(self, template_context=template_context, **take_kwargs)
+
+    # ############# Iteration ############# #
+
+    def items(
+        self,
+        group_by: tp.GroupByLike = None,
+        apply_group_by: bool = False,
+        keep_2d: bool = False,
+        key_as_index: bool = False,
+    ) -> tp.ItemGenerator:
+        """Iterate over columns or groups (if grouped and `Wrapping.group_select` is True).
+
+        If `apply_group_by` is False, `group_by` becomes a grouping instruction for the iteration,
+        not for the final object. In this case, will raise an error if the instance is grouped
+        and that grouping must be changed."""
+        if group_by is None or apply_group_by:
+            _self = self.regroup(group_by=group_by)
+            if _self.group_select and _self.wrapper.grouper.is_grouped():
+                columns = _self.wrapper.get_columns()
+                ndim = _self.wrapper.get_ndim()
+            else:
+                columns = _self.wrapper.columns
+                ndim = _self.wrapper.ndim
+
+            if ndim == 1:
+                if key_as_index:
+                    yield columns, _self
+                else:
+                    yield columns[0], _self
+            else:
+                for i in range(len(columns)):
+                    if key_as_index:
+                        key = columns[[i]]
+                    else:
+                        key = columns[i]
+                    if _self.column_only_select:
+                        if keep_2d:
+                            yield key, _self.iloc[i : i + 1]
+                        else:
+                            yield key, _self.iloc[i]
+                    else:
+                        if keep_2d:
+                            yield key, _self.iloc[:, i : i + 1]
+                        else:
+                            yield key, _self.iloc[:, i]
+        else:
+            if self.group_select and self.wrapper.grouper.is_grouped():
+                raise ValueError("Cannot change grouping")
+            wrapper = self.wrapper.regroup(group_by=group_by)
+            if wrapper.get_ndim() == 1:
+                if key_as_index:
+                    yield wrapper.get_columns(), self
+                else:
+                    yield wrapper.get_columns()[0], self
+            else:
+                for group, group_idxs in wrapper.grouper.iter_groups(key_as_index=key_as_index):
+                    if self.column_only_select:
+                        if keep_2d or len(group_idxs) > 1:
+                            yield group, self.iloc[group_idxs]
+                        else:
+                            yield group, self.iloc[group_idxs[0]]
+                    else:
+                        if keep_2d or len(group_idxs) > 1:
+                            yield group, self.iloc[:, group_idxs]
+                        else:
+                            yield group, self.iloc[:, group_idxs[0]]
+
+    def as_param(self, **kwargs) -> Param:
+        param_values = []
+        index_values = []
+        first_index = None
+        keys = None
+        for k, v in self.items(key_as_index=True, **kwargs):
+            param_values.append(v)
+            index_values.append(k[0])
+            if first_index is None:
+                first_index = k
+        if isinstance(first_index, pd.MultiIndex):
+            keys = pd.MultiIndex.from_tuples(index_values, names=first_index.names)
+        elif isinstance(first_index, pd.Index):
+            keys = pd.Index(index_values, name=first_index.name)
+        return Param(param_values, keys=keys)

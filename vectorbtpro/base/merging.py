@@ -79,7 +79,7 @@ def concat_merge(
     wrap: tp.Optional[bool] = None,
     wrapper: tp.Optional[ArrayWrapper] = None,
     wrap_kwargs: tp.KwargsLikeSequence = None,
-    index_stack_kwargs: tp.KwargsLike = None,
+    clean_index_kwargs: tp.KwargsLike = None,
     **kwargs,
 ) -> tp.MaybeTuple[tp.AnyArray]:
     """Merge multiple array-like objects through concatenation.
@@ -149,7 +149,7 @@ def concat_merge(
                     keys = concat_indexes(
                         *keys,
                         index_concat_method="append",
-                        index_stack_kwargs=index_stack_kwargs,
+                        clean_index_kwargs=clean_index_kwargs,
                         verify_integrity=False,
                         axis=0,
                     )
@@ -182,22 +182,22 @@ def concat_merge(
 
     if keys is not None and isinstance(keys[0], pd.Index):
         new_obj = pd.concat(objs, axis=0, **kwargs)
-        if index_stack_kwargs is None:
-            index_stack_kwargs = {}
+        if clean_index_kwargs is None:
+            clean_index_kwargs = {}
         if len(keys) == 1:
             keys = keys[0]
         else:
             keys = concat_indexes(
                 *keys,
                 index_concat_method="append",
-                index_stack_kwargs=index_stack_kwargs,
+                clean_index_kwargs=clean_index_kwargs,
                 verify_integrity=False,
                 axis=0,
             )
         if default_index:
             new_obj.index = keys
         else:
-            new_obj.index = stack_indexes((keys, new_obj.index), **index_stack_kwargs)
+            new_obj.index = stack_indexes((keys, new_obj.index), **clean_index_kwargs)
         return new_obj
     return pd.concat(objs, axis=0, keys=keys, **kwargs)
 
@@ -208,7 +208,7 @@ def row_stack_merge(
     wrap: tp.Union[None, str, bool] = None,
     wrapper: tp.Optional[ArrayWrapper] = None,
     wrap_kwargs: tp.KwargsLikeSequence = None,
-    index_stack_kwargs: tp.KwargsLikeSequence = None,
+    clean_index_kwargs: tp.KwargsLikeSequence = None,
     **kwargs,
 ) -> tp.MaybeTuple[tp.AnyArray]:
     """Merge multiple array-like or `vectorbtpro.base.wrapping.Wrapping` objects through row stacking.
@@ -317,22 +317,22 @@ def row_stack_merge(
 
     if keys is not None and isinstance(keys[0], pd.Index):
         new_obj = pd.concat(objs, axis=0, **kwargs)
-        if index_stack_kwargs is None:
-            index_stack_kwargs = {}
+        if clean_index_kwargs is None:
+            clean_index_kwargs = {}
         if len(keys) == 1:
             keys = keys[0]
         else:
             keys = concat_indexes(
                 *keys,
                 index_concat_method="append",
-                index_stack_kwargs=index_stack_kwargs,
+                clean_index_kwargs=clean_index_kwargs,
                 verify_integrity=False,
                 axis=0,
             )
         if default_index:
             new_obj.index = keys
         else:
-            new_obj.index = stack_indexes((keys, new_obj.index), **index_stack_kwargs)
+            new_obj.index = stack_indexes((keys, new_obj.index), **clean_index_kwargs)
         return new_obj
     return pd.concat(objs, axis=0, keys=keys, **kwargs)
 
@@ -345,7 +345,7 @@ def column_stack_merge(
     wrap: tp.Union[None, str, bool] = None,
     wrapper: tp.Optional[ArrayWrapper] = None,
     wrap_kwargs: tp.KwargsLikeSequence = None,
-    index_stack_kwargs: tp.KwargsLikeSequence = None,
+    clean_index_kwargs: tp.KwargsLikeSequence = None,
     **kwargs,
 ) -> tp.MaybeTuple[tp.AnyArray]:
     """Merge multiple array-like or `vectorbtpro.base.wrapping.Wrapping` objects through column stacking.
@@ -529,22 +529,22 @@ def column_stack_merge(
 
     if keys is not None and isinstance(keys[0], pd.Index):
         new_obj = pd.concat(objs, axis=1, **kwargs)
-        if index_stack_kwargs is None:
-            index_stack_kwargs = {}
+        if clean_index_kwargs is None:
+            clean_index_kwargs = {}
         if len(keys) == 1:
             keys = keys[0]
         else:
             keys = concat_indexes(
                 *keys,
                 index_concat_method="append",
-                index_stack_kwargs=index_stack_kwargs,
+                clean_index_kwargs=clean_index_kwargs,
                 verify_integrity=False,
                 axis=1,
             )
         if default_columns:
             new_obj.columns = keys
         else:
-            new_obj.columns = stack_indexes((keys, new_obj.columns), **index_stack_kwargs)
+            new_obj.columns = stack_indexes((keys, new_obj.columns), **clean_index_kwargs)
         return new_obj
     return pd.concat(objs, axis=1, keys=keys, **kwargs)
 

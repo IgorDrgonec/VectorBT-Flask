@@ -3228,6 +3228,105 @@ class TestData:
         assert_index_equal(stats_df.index, data.wrapper.columns)
         assert_index_equal(stats_df.columns, stats_index)
 
+    @pytest.mark.parametrize("test_to_feature_oriented", [False, True])
+    def test_items(self, test_to_feature_oriented):
+        data = MyData.pull(["S1", "S2", "S3"], shape=(5, 3), columns=["F1", "F2", "F3"])
+        if test_to_feature_oriented:
+            data = data.to_feature_oriented(
+                classes=vbt.feature_dict({"F1": dict(k="K1"), "F2": dict(k="K1"), "F3": dict(k="K2")})
+            )
+        else:
+            data = data.to_symbol_oriented(
+                classes=vbt.symbol_dict({"S1": dict(k="K1"), "S2": dict(k="K1"), "S3": dict(k="K2")})
+            )
+        items = list(data.items())
+        assert len(items) == 3
+        assert items[0][0] == "S1"
+        assert items[0][1] == data.select_symbol_idxs(0)
+        assert items[1][0] == "S2"
+        assert items[1][1] == data.select_symbol_idxs(1)
+        assert items[2][0] == "S3"
+        assert items[2][1] == data.select_symbol_idxs(2)
+        items = list(data.items(keep_2d=True))
+        assert len(items) == 3
+        assert items[0][0] == "S1"
+        assert items[0][1] == data.select_symbol_idxs([0])
+        assert items[1][0] == "S2"
+        assert items[1][1] == data.select_symbol_idxs([1])
+        assert items[2][0] == "S3"
+        assert items[2][1] == data.select_symbol_idxs([2])
+        items = list(data.items(group_by=["G1", "G1", "G2"]))
+        assert len(items) == 2
+        assert items[0][0] == "G1"
+        assert items[0][1] == data.select_symbol_idxs([0, 1])
+        assert items[1][0] == "G2"
+        assert items[1][1] == data.select_symbol_idxs(2)
+        items = list(data.items(group_by=["G1", "G1", "G2"], keep_2d=True))
+        assert len(items) == 2
+        assert items[0][0] == "G1"
+        assert items[0][1] == data.select_symbol_idxs([0, 1])
+        assert items[1][0] == "G2"
+        assert items[1][1] == data.select_symbol_idxs([2])
+        items = list(data.items(group_by=True))
+        assert len(items) == 1
+        assert items[0][0] == "group"
+        assert items[0][1] == data
+        items = list(data.items(over="features"))
+        assert len(items) == 3
+        assert items[0][0] == "F1"
+        assert items[0][1] == data.select_feature_idxs(0)
+        assert items[1][0] == "F2"
+        assert items[1][1] == data.select_feature_idxs(1)
+        assert items[2][0] == "F3"
+        assert items[2][1] == data.select_feature_idxs(2)
+        items = list(data.items(over="features", keep_2d=True))
+        assert len(items) == 3
+        assert items[0][0] == "F1"
+        assert items[0][1] == data.select_feature_idxs([0])
+        assert items[1][0] == "F2"
+        assert items[1][1] == data.select_feature_idxs([1])
+        assert items[2][0] == "F3"
+        assert items[2][1] == data.select_feature_idxs([2])
+        items = list(data.items(over="features", group_by=["G1", "G1", "G2"]))
+        assert len(items) == 2
+        assert items[0][0] == "G1"
+        assert items[0][1] == data.select_feature_idxs([0, 1])
+        assert items[1][0] == "G2"
+        assert items[1][1] == data.select_feature_idxs(2)
+        items = list(data.items(over="features", group_by=["G1", "G1", "G2"], keep_2d=True))
+        assert len(items) == 2
+        assert items[0][0] == "G1"
+        assert items[0][1] == data.select_feature_idxs([0, 1])
+        assert items[1][0] == "G2"
+        assert items[1][1] == data.select_feature_idxs([2])
+        items = list(data.items(over="features", group_by=True))
+        assert len(items) == 1
+        assert items[0][0] == "group"
+        assert items[0][1] == data
+        items = list(data.items(over="keys", group_by="k"))
+        assert len(items) == 2
+        assert items[0][0] == "K1"
+        assert items[0][1] == data.select_keys([data.keys[0], data.keys[1]])
+        assert items[1][0] == "K2"
+        assert items[1][1] == data.select_keys(data.keys[2])
+        with pytest.raises(Exception):
+            list(data.items(over="keys", group_by=True, apply_group_by=True))
+        items = list(data.items(over="columns", group_by=True, apply_group_by=True))
+        assert len(items) == 1
+        assert items[0][0] == "group"
+        assert items[0][1] == data.regroup(True)
+
+    def test_as_params(self):
+        data = MyData.pull(["S1", "S2", "S3"], shape=(5, 3), columns=["F1", "F2", "F3"])
+        param = data.as_param()
+        assert_index_equal(param.keys, data.symbol_wrapper.columns)
+        param = data.as_param(group_by=True)
+        assert_index_equal(param.keys, data.symbol_wrapper.get_columns(True))
+        param = data.as_param(over="columns")
+        assert_index_equal(param.keys, data.wrapper.columns)
+        param = data.as_param(over="columns", group_by=True)
+        assert_index_equal(param.keys, data.wrapper.get_columns(True))
+
 
 # ############# custom ############# #
 

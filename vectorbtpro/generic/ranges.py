@@ -551,7 +551,7 @@ class Ranges(PriceRecords):
         id_level: tp.Union[None, str, tp.IndexLike] = None,
         jitted: tp.JittedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
-        index_stack_kwargs: tp.KwargsLike = None,
+        clean_index_kwargs: tp.KwargsLike = None,
     ) -> tp.Union[tp.Tuple[tp.Array1d, tp.Array2d], tp.Frame]:
         """Generate a projection for each range record.
 
@@ -664,7 +664,7 @@ class Ranges(PriceRecords):
                 columns=stack_indexes(
                     self.wrapper.columns[self.col_arr[ridxs]],
                     id_level[ridxs],
-                    **resolve_dict(index_stack_kwargs),
+                    **resolve_dict(clean_index_kwargs),
                 ),
             ),
             wrap_kwargs,
@@ -1762,7 +1762,7 @@ class PatternRanges(Ranges):
         jitted: tp.JittedOption = None,
         execute_kwargs: tp.KwargsLike = None,
         attach_as_close: bool = True,
-        index_stack_kwargs: tp.KwargsLike = None,
+        clean_index_kwargs: tp.KwargsLike = None,
         wrapper_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> PatternRangesT:
@@ -1790,8 +1790,8 @@ class PatternRanges(Ranges):
         `**kwargs` will be passed to `PatternRanges.__init__`."""
         if seed is not None:
             set_seed(seed)
-        if index_stack_kwargs is None:
-            index_stack_kwargs = {}
+        if clean_index_kwargs is None:
+            clean_index_kwargs = {}
         arr = to_pd_array(arr)
         arr_2d = to_2d_array(arr)
         arr_wrapper = ArrayWrapper.from_obj(arr)
@@ -1840,7 +1840,7 @@ class PatternRanges(Ranges):
             param_product, param_columns = combine_params(
                 param_dct,
                 random_subset=random_subset,
-                index_stack_kwargs=index_stack_kwargs,
+                clean_index_kwargs=clean_index_kwargs,
             )
             if len(flat_search_configs) == 0:
                 flat_search_configs = []
@@ -1906,13 +1906,13 @@ class PatternRanges(Ranges):
         n_config_params = len(psc_names) // arr_2d.shape[1]
         if param_columns is not None:
             if n_config_params == 0 or (n_config_params == 1 and psc_names_none):
-                new_columns = combine_indexes((param_columns, arr_wrapper.columns), **index_stack_kwargs)
+                new_columns = combine_indexes((param_columns, arr_wrapper.columns), **clean_index_kwargs)
             else:
                 search_config_index = pd.Index(psc_names, name="search_config")
                 base_columns = stack_indexes(
-                    (search_config_index, tile_index(arr_wrapper.columns, n_config_params)), **index_stack_kwargs
+                    (search_config_index, tile_index(arr_wrapper.columns, n_config_params)), **clean_index_kwargs
                 )
-                new_columns = combine_indexes((param_columns, base_columns), **index_stack_kwargs)
+                new_columns = combine_indexes((param_columns, base_columns), **clean_index_kwargs)
         else:
             if n_config_params == 0 or (n_config_params == 1 and psc_names_none):
                 new_columns = arr_wrapper.columns
@@ -1920,7 +1920,7 @@ class PatternRanges(Ranges):
                 search_config_index = pd.Index(psc_names, name="search_config")
                 new_columns = stack_indexes(
                     (search_config_index, tile_index(arr_wrapper.columns, n_config_params)),
-                    **index_stack_kwargs,
+                    **clean_index_kwargs,
                 )
 
         # Wrap with class

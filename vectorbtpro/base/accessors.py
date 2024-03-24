@@ -15,6 +15,7 @@ from pandas.core.resample import Resampler as PandasResampler
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import combining, reshaping, indexes
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
+from vectorbtpro.base.indexes import IndexApplier
 from vectorbtpro.base.indexing import (
     point_idxr_defaults,
     range_idxr_defaults,
@@ -34,7 +35,10 @@ from vectorbtpro.utils.eval_ import multiline_eval
 __all__ = ["BaseIDXAccessor", "BaseAccessor", "BaseSRAccessor", "BaseDFAccessor"]
 
 
-class BaseIDXAccessor(Configured):
+BaseIDXAccessorT = tp.TypeVar("BaseIDXAccessorT", bound="BaseIDXAccessor")
+
+
+class BaseIDXAccessor(Configured, IndexApplier):
     """Accessor on top of Index.
 
     Accessible via `pd.Index.vbt` and all child accessors."""
@@ -156,25 +160,13 @@ class BaseIDXAccessor(Configured):
             objs = (cls_or_self.obj, *others)
         return indexes.concat_indexes(*objs, **kwargs)
 
-    def drop_levels(self, *args, **kwargs) -> tp.Index:
-        """See `vectorbtpro.base.indexes.drop_levels`."""
-        return indexes.drop_levels(self.obj, *args, **kwargs)
-
-    def rename_levels(self, *args, **kwargs) -> tp.Index:
-        """See `vectorbtpro.base.indexes.rename_levels`."""
-        return indexes.rename_levels(self.obj, *args, **kwargs)
-
-    def select_levels(self, *args, **kwargs) -> tp.Index:
-        """See `vectorbtpro.base.indexes.select_levels`."""
-        return indexes.select_levels(self.obj, *args, **kwargs)
-
-    def drop_redundant_levels(self, *args, **kwargs) -> tp.Index:
-        """See `vectorbtpro.base.indexes.drop_redundant_levels`."""
-        return indexes.drop_redundant_levels(self.obj, *args, **kwargs)
-
-    def drop_duplicate_levels(self, *args, **kwargs) -> tp.Index:
-        """See `vectorbtpro.base.indexes.drop_duplicate_levels`."""
-        return indexes.drop_duplicate_levels(self.obj, *args, **kwargs)
+    def apply_to_index(
+        self: BaseIDXAccessorT,
+        apply_func: tp.Callable,
+        *args,
+        **kwargs,
+    ) -> pd.Index:
+        return self.replace(obj=apply_func(self.obj, *args, **kwargs)).obj
 
     def align_to(self, *args, **kwargs) -> tp.IndexSlice:
         """See `vectorbtpro.base.indexes.align_index_to`."""
@@ -768,18 +760,14 @@ class BaseAccessor(Wrapping):
 
     # ############# Indexes ############# #
 
-    def apply_on_index(
-        self,
+    def apply_to_index(
+        self: BaseAccessorT,
         apply_func: tp.Callable,
         *args,
         axis: tp.Optional[int] = None,
         copy_data: bool = False,
         **kwargs,
     ) -> tp.Optional[tp.SeriesFrame]:
-        """Apply function `apply_func` on index of the pandas object.
-
-        Set `axis` to 1 for columns, 0 for index, and None to determine automatically.
-        Set `copy_data` to True to make a deep copy of the data."""
         if axis is None:
             axis = 0 if self.is_series() else 1
         if self.is_series() and axis == 1:
@@ -797,104 +785,6 @@ class BaseAccessor(Wrapping):
         if axis == 1:
             return self.wrapper.wrap(obj, group_by=False, columns=obj_index)
         return self.wrapper.wrap(obj, group_by=False, index=obj_index)
-
-    def stack_index(
-        self,
-        index: tp.Index,
-        axis: tp.Optional[int] = None,
-        copy_data: bool = False,
-        on_top: bool = True,
-        **kwargs,
-    ) -> tp.Optional[tp.SeriesFrame]:
-        """See `vectorbtpro.base.indexes.stack_indexes`.
-
-        Set `on_top` to False to stack at bottom.
-
-        See `BaseAccessor.apply_on_index` for other keyword arguments."""
-
-        def apply_func(obj_index: tp.Index) -> tp.Index:
-            if on_top:
-                return indexes.stack_indexes([index, obj_index], **kwargs)
-            return indexes.stack_indexes([obj_index, index], **kwargs)
-
-        return self.apply_on_index(apply_func, axis=axis, copy_data=copy_data)
-
-    def drop_levels(
-        self,
-        levels: tp.Union[indexes.ExceptLevel, tp.MaybeLevelSequence],
-        axis: tp.Optional[int] = None,
-        copy_data: bool = False,
-        strict: bool = True,
-    ) -> tp.Optional[tp.SeriesFrame]:
-        """See `vectorbtpro.base.indexes.drop_levels`.
-
-        See `BaseAccessor.apply_on_index` for other keyword arguments."""
-
-        def apply_func(obj_index: tp.Index) -> tp.Index:
-            return indexes.drop_levels(obj_index, levels, strict=strict)
-
-        return self.apply_on_index(apply_func, axis=axis, copy_data=copy_data)
-
-    def rename_levels(
-        self,
-        name_dict: tp.Dict[str, tp.Any],
-        axis: tp.Optional[int] = None,
-        copy_data: bool = False,
-        strict: bool = True,
-    ) -> tp.Optional[tp.SeriesFrame]:
-        """See `vectorbtpro.base.indexes.rename_levels`.
-
-        See `BaseAccessor.apply_on_index` for other keyword arguments."""
-
-        def apply_func(obj_index: tp.Index) -> tp.Index:
-            return indexes.rename_levels(obj_index, name_dict, strict=strict)
-
-        return self.apply_on_index(apply_func, axis=axis, copy_data=copy_data)
-
-    def select_levels(
-        self,
-        level_names: tp.Union[indexes.ExceptLevel, tp.MaybeLevelSequence],
-        axis: tp.Optional[int] = None,
-        copy_data: bool = False,
-        strict: bool = True,
-    ) -> tp.Optional[tp.SeriesFrame]:
-        """See `vectorbtpro.base.indexes.select_levels`.
-
-        See `BaseAccessor.apply_on_index` for other keyword arguments."""
-
-        def apply_func(obj_index: tp.Index) -> tp.Index:
-            return indexes.select_levels(obj_index, level_names, strict=strict)
-
-        return self.apply_on_index(apply_func, axis=axis, copy_data=copy_data)
-
-    def drop_redundant_levels(
-        self,
-        axis: tp.Optional[int] = None,
-        copy_data: bool = False,
-    ) -> tp.Optional[tp.SeriesFrame]:
-        """See `vectorbtpro.base.indexes.drop_redundant_levels`.
-
-        See `BaseAccessor.apply_on_index` for other keyword arguments."""
-
-        def apply_func(obj_index: tp.Index) -> tp.Index:
-            return indexes.drop_redundant_levels(obj_index)
-
-        return self.apply_on_index(apply_func, axis=axis, copy_data=copy_data)
-
-    def drop_duplicate_levels(
-        self,
-        keep: tp.Optional[str] = None,
-        axis: tp.Optional[int] = None,
-        copy_data: bool = False,
-    ) -> tp.Optional[tp.SeriesFrame]:
-        """See `vectorbtpro.base.indexes.drop_duplicate_levels`.
-
-        See `BaseAccessor.apply_on_index` for other keyword arguments."""
-
-        def apply_func(obj_index: tp.Index) -> tp.Index:
-            return indexes.drop_duplicate_levels(obj_index, keep=keep)
-
-        return self.apply_on_index(apply_func, axis=axis, copy_data=copy_data)
 
     # ############# Setting ############# #
 

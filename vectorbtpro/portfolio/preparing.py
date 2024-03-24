@@ -314,13 +314,13 @@ class BasePFPreparer(BasePreparer):
         if arr.size > 1 and group_lens is not None and reduce_func is not None:
             if len(self.group_lens) == len(arr) != len(group_lens) == len(self.wrapper.columns):
                 new_arr = np.empty(len(self.wrapper.columns), dtype=np.int_)
-                col_generator = self.wrapper.grouper.yield_group_idxs()
+                col_generator = self.wrapper.grouper.iter_group_idxs()
                 for i, cols in enumerate(col_generator):
                     new_arr[cols] = arr[i]
                 arr = new_arr
             if len(self.wrapper.columns) == len(arr) != len(group_lens):
                 new_arr = np.empty(len(group_lens), dtype=np.int_)
-                col_generator = self.wrapper.grouper.yield_group_lens_idxs(group_lens)
+                col_generator = self.wrapper.grouper.iter_group_lens(group_lens)
                 for i, cols in enumerate(col_generator):
                     if isinstance(reduce_func, str):
                         new_arr[i] = getattr(arr[cols], reduce_func)()

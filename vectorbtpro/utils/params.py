@@ -28,6 +28,8 @@ __all__ = [
     "generate_param_combs",
     "pick_from_param_grid",
     "Param",
+    "Itemable",
+    "Paramable",
     "combine_params",
     "Parameterizer",
     "parameterized",
@@ -166,36 +168,53 @@ def params_to_list(
     return list(param_values)
 
 
-def get_param_grid_len(params_or_dict: tp.ParamsOrDict) -> int:
-    """Get the number of parameter combinations in a parameter grid."""
-    if isinstance(params_or_dict, dict):
-        params = list(params_or_dict.values())
+def get_param_grid_len(param_grid: tp.ParamGrid) -> int:
+    """Get the number of parameter combinations in a parameter grid.
+
+    Parameter values can also be an integer to represent the number of values."""
+    if isinstance(param_grid, dict):
+        params_or_lens = list(param_grid.values())
     else:
-        params = params_or_dict
-    return math.prod(list(map(len, params)))
+        params_or_lens = param_grid
+    grid_len = 1
+    for param_values_or_len in params_or_lens:
+        if checks.is_int(param_values_or_len):
+            grid_len *= param_values_or_len
+        else:
+            grid_len *= len(param_values_or_len)
+    return grid_len
 
 
 def pick_from_param_grid(
-    params_or_dict: tp.ParamsOrDict,
+    param_grid: tp.ParamGrid,
     i: tp.Union[None, int, tp.Array1d] = None,
 ) -> tp.Union[tp.ParamCombOrDict, tp.List[tp.Array1d]]:
-    """Pick one or more parameter combinations from a parameter grid."""
-    if isinstance(params_or_dict, dict):
-        params = list(params_or_dict.values())
+    """Pick one or more parameter combinations from a parameter grid.
+
+    Parameter values can also be an integer to represent the number of values."""
+    if isinstance(param_grid, dict):
+        params_or_lens = list(param_grid.values())
     else:
-        params = params_or_dict
-    grid_len = get_param_grid_len(params)
+        params_or_lens = param_grid
+    grid_len = get_param_grid_len(params_or_lens)
     if i is None:
         i = np.random.randint(grid_len, dtype=np.int64)
     param_comb = []
-    for param_values in params:
-        index = i * len(param_values) // grid_len
-        block_len = grid_len // len(param_values)
+    for param_values_or_len in params_or_lens:
+        if checks.is_int(param_values_or_len):
+            param_len = param_values_or_len
+        else:
+            param_len = len(param_values_or_len)
+        index = i * param_len // grid_len
+        block_len = grid_len // param_len
         i = i - index * block_len
         grid_len = block_len
-        param_comb.append(param_values[index])
-    if isinstance(params_or_dict, dict):
-        return dict(zip(params_or_dict.keys(), param_comb))
+        if checks.is_int(param_values_or_len):
+            param_comb.append(index)
+        else:
+            param_comb.append(param_values_or_len[index])
+    if isinstance(param_grid, dict):
+        return dict(zip(param_grid.keys(), param_comb))
     return param_comb
 
 
@@ -238,11 +257,15 @@ class Param(Annotatable, DefineMixin):
     Levels must come in a strict order starting with 0 and without gaps. If any of the parameters
     have a level specified, all parameters must specify their level."""
 
-    condition: tp.Optional[str] = define.optional_field(default=None)
+    condition: tp.Union[None, str, CustomTemplate] = define.optional_field(default=None)
     """Keep a parameter combination only if the condition is met.
     
-    Condition should be an expression where `x` denotes this parameter and any other variable
-    denotes the name of other parameter(s)."""
+    Condition can be a template or an expression where `x` (or parameter name) denotes this 
+    parameter and any other variable denotes the name of other parameter(s). If passed as an expression,
+    it will be pre-compiled so its execution may be faster than if passed as a template.
+    
+    To access a parameter index value, prepend and append `__` to the level name. For example, 
+    use `__fast_sma_timeperiod__` if the parameter index contains a level `fast_sma_timeperiod`."""
 
     context: tp.KwargsLike = define.optional_field(default=None)
     """Context used in evaluation of `Param.condition` and `Param.map_template`."""
@@ -302,10 +325,18 @@ class Param(Annotatable, DefineMixin):
         return type(self)(**attr_dct)
 
 
+class Itemable:
+    """Class representing an object that can be returned as items."""
+
+    def items(self, **kwargs) -> tp.ItemGenerator:
+        """Return this instance as items."""
+        raise NotImplementedError
+
+
 class Paramable:
     """Class representing an object that can be returned as a parameter."""
 
-    def as_param(self) -> Param:
+    def as_param(self, **kwargs) -> Param:
         """Return this instance as a parameter."""
         raise NotImplementedError
 
@@ -320,7 +351,7 @@ def combine_params(
     max_guesses: tp.Union[None, int, float] = None,
     max_misses: tp.Union[None, int, float] = None,
     seed: tp.Optional[int] = None,
-    index_stack_kwargs: tp.KwargsLike = None,
+    clean_index_kwargs: tp.KwargsLike = None,
     name_tuple_to_str: tp.Union[None, bool, tp.Callable] = None,
     build_index: bool = True,
     raise_empty_error: bool = False,
@@ -334,7 +365,7 @@ def combine_params(
     doesn't build the entire grid, but selects and combines combinations on the fly.
     Materializing the grid is recommended only when the number of combinations is relatively low
     (less than one million) and parameters have conditions.
-    
+
     Argument `grid_indices` can be a slice (for example, `slice(None, None, 2)` for `::2`) or an array
     with indices that map to the length of the grid. It can be used to skip a some combinations
     before a random subset is drawn.
@@ -356,15 +387,17 @@ def combine_params(
     If a name of any parameter is a tuple, can convert this tuple into a string by setting
     `name_tuple_to_str` either to True or providing a callable that does this.
 
-    Keyword arguments `index_stack_kwargs` are passed to `vectorbtpro.base.indexes.stack_indexes`."""
+    Keyword arguments `clean_index_kwargs` are passed to `vectorbtpro.base.indexes.clean_index`."""
     from vectorbtpro.base import indexes
 
-    if index_stack_kwargs is None:
-        index_stack_kwargs = {}
+    if clean_index_kwargs is None:
+        clean_index_kwargs = {}
     rng = np.random.default_rng(seed=seed)
 
     level_map = OrderedDict()
-    product_indexes = OrderedDict()
+    param_level = {}
+    param_keys = {}
+    param_visible_keys = {}
     level_seen = False
     curr_idx = 0
     max_idx = 0
@@ -404,49 +437,54 @@ def combine_params(
         sr_name = None
         index_name = None
 
-        if not p.hide:
-            keys = p.keys
-            if keys is not None:
-                if not isinstance(keys, pd.Index):
-                    keys = pd.Index(keys)
+        keys = p.keys
+        if keys is not None:
+            if not isinstance(keys, pd.Index):
+                keys = pd.Index(keys)
+            if isinstance(keys, pd.MultiIndex):
+                keys_name = keys.names
+            else:
                 keys_name = keys.name
-        else:
-            keys = None
 
         p.assert_field_not_missing("value")
         value = p.value
         if isinstance(value, dict):
-            if not p.hide and keys is None:
+            if keys is None:
                 keys = pd.Index(value.keys())
             value = list(value.values())
         elif isinstance(value, pd.Index):
-            if not p.hide and keys is None:
+            if keys is None:
                 keys = value
-            index_name = value.name
+            if isinstance(value, pd.MultiIndex):
+                index_name = value.names
+            else:
+                index_name = value.name
             value = value.tolist()
         elif isinstance(value, pd.Series):
             if not checks.is_default_index(value.index):
-                if not p.hide and keys is None:
+                if keys is None:
                     keys = value.index
-                index_name = value.index.name
+                if isinstance(value.index, pd.MultiIndex):
+                    index_name = value.index.names
+                else:
+                    index_name = value.index.name
             sr_name = value.name
             value = value.values.tolist()
         values = params_to_list(value, is_tuple=p.is_tuple, is_array_like=p.is_array_like)
 
-        if not p.hide:
-            if keys_name is None:
-                if p_name is not None:
-                    keys_name = p_name
-                elif sr_name is not None:
-                    keys_name = sr_name
-                elif index_name is not None:
-                    keys_name = index_name
-                else:
-                    keys_name = k
-            if keys is None:
-                keys = indexes.index_from_values(values, name=keys_name)
+        if keys_name is None:
+            if p_name is not None:
+                keys_name = p_name
+            elif sr_name is not None:
+                keys_name = sr_name
+            elif index_name is not None:
+                keys_name = index_name
             else:
-                keys = keys.rename(keys_name)
+                keys_name = k
+        if keys is None and not p.hide:
+            keys = indexes.index_from_values(values, name=keys_name)
+        elif keys is not None:
+            keys = keys.rename(keys_name)
 
         if p.random_subset is not None:
             if checks.is_float(p.random_subset):
@@ -476,12 +514,17 @@ def combine_params(
         if level not in level_map:
             level_map[level] = OrderedDict()
         level_map[level][k] = values
-        product_indexes[k] = keys
-        names[k] = keys_name
+        param_level[k] = level
+        param_keys[k] = keys
+        if not p.hide:
+            param_visible_keys[k] = keys
+        if not isinstance(keys, pd.MultiIndex):
+            names[k] = keys_name
         curr_idx += 1
 
     level_params = []
-    param_keys = []
+    level_lens = []
+    param_dct_keys = []
     level_indexes = []
     shown_levels = []
     hidden_levels = []
@@ -490,12 +533,13 @@ def combine_params(
         if level not in level_map:
             raise ValueError("Levels must come in a strict order starting with 0 and without gaps")
         for k in level_map[level].keys():
-            param_keys.append(k)
+            param_dct_keys.append(k)
 
         params = tuple(level_map[level].values())
         if len(params) > 1:
             params = broadcast_params(params)
         level_params.append(params)
+        level_lens.append(len(params[0]))
         if n_combs is None:
             n_combs = len(params[0])
         else:
@@ -504,10 +548,10 @@ def combine_params(
         if build_index:
             levels = []
             for k in level_map[level].keys():
-                if product_indexes[k] is not None:
-                    levels.append(product_indexes[k])
+                if k in param_visible_keys:
+                    levels.append(param_visible_keys[k])
             if len(levels) > 1:
-                _param_index = indexes.stack_indexes(levels, **index_stack_kwargs)
+                _param_index = indexes.stack_indexes(levels, **clean_index_kwargs)
                 shown_levels.append(level)
             elif len(levels) == 1:
                 _param_index = levels[0]
@@ -520,8 +564,25 @@ def combine_params(
     if len(conditions) > 0:
         condition_funcs = {}
         for k, expr in conditions.items():
-            arg_names = {"x"} | set(names.keys()) | set(names.values()) | set(contexts[k].keys())
-            condition_funcs[k] = eval(f"lambda {', '.join(arg_names)}: {expr}")
+            if isinstance(expr, str):
+                arg_names = (
+                    {"x"}
+                    | set(map(lambda x: f"__{x}__", param_dct_keys))
+                    | set(map(lambda x: f"__{x}__", names.values()))
+                    | set(param_dct_keys)
+                    | set(names.values())
+                    | set(contexts[k].keys())
+                )
+                for level_index in level_indexes:
+                    if level_index is not None:
+                        if isinstance(level_index, pd.MultiIndex):
+                            for level_name in level_index.names:
+                                arg_names.add(f"__{level_name}__")
+                        elif isinstance(level_index, pd.Index):
+                            arg_names.add(f"__{level_index.name}__")
+                condition_funcs[k] = eval(f"lambda {'=None, '.join(arg_names)}=None: {expr}")
+            else:
+                condition_funcs[k] = expr
     else:
         condition_funcs = None
 
@@ -558,7 +619,6 @@ def combine_params(
         if len(conditions) == 0:
             if grid_indices is not None:
                 n_combs = len(grid_indices)
-            level_indices = list(map(lambda x: np.arange(len(x[0])), level_params))
             if random_subset is not None:
                 if checks.is_float(random_subset):
                     random_subset = int(random_subset * n_combs)
@@ -568,13 +628,13 @@ def combine_params(
                     random_grid_indices = rng.choice(n_combs, size=random_subset, replace=random_replace)
                 if random_sort:
                     random_grid_indices = np.sort(random_grid_indices)
-                picked_level_indices = pick_from_param_grid(level_indices, i=random_grid_indices)
+                picked_level_indices = pick_from_param_grid(level_lens, i=random_grid_indices)
             else:
                 if grid_indices is not None:
                     picked_grid_indices = grid_indices
                 else:
                     picked_grid_indices = np.arange(n_combs)
-                picked_level_indices = pick_from_param_grid(level_indices, i=picked_grid_indices)
+                picked_level_indices = pick_from_param_grid(level_lens, i=picked_grid_indices)
 
             params_ready = True
         elif len(conditions) > 0 and grid_indices is None:
@@ -595,22 +655,40 @@ def combine_params(
                 n_guesses += 1
                 picked_indices = []
                 k = 0
-                param_values = {}
+                param_comb_keys = {}
+                param_comb = {}
                 for level, params in enumerate(level_params):
-                    picked_index = rng.choice(len(params[0]), replace=True)
+                    i = rng.choice(len(params[0]), replace=True)
                     for j in range(len(params)):
-                        picked_value = params[j][picked_index]
-                        param_values[param_keys[k]] = picked_value
-                        param_values[names[param_keys[k]]] = picked_value
+                        p_keys = param_keys[param_dct_keys[k]]
+                        if p_keys is not None:
+                            param_comb_keys[f"__{param_dct_keys[k]}__"] = p_keys[i]
+                            if param_dct_keys[k] in names:
+                                param_comb_keys[f"__{names[param_dct_keys[k]]}__"] = p_keys[i]
+                            if isinstance(p_keys, pd.MultiIndex):
+                                for l, level_name in enumerate(p_keys.names):
+                                    if level_name is not None:
+                                        param_comb_keys[f"__{level_name}__"] = p_keys[i][l]
+                            elif isinstance(p_keys, pd.Index):
+                                if p_keys.name is not None:
+                                    param_comb_keys[f"__{p_keys.name}__"] = p_keys[i]
+                        picked_value = params[j][i]
+                        param_comb[param_dct_keys[k]] = picked_value
+                        if param_dct_keys[k] in names:
+                            param_comb[names[param_dct_keys[k]]] = picked_value
                         k += 1
-                    picked_indices.append(picked_index)
+                    picked_indices.append(i)
                 visited_indices_set.add(tuple(picked_indices))
                 if not random_replace and tuple(picked_indices) in picked_indices_set:
                     continue
                 conditions_met = True
                 for k, condition_func in condition_funcs.items():
-                    param_context = {"x": param_values[k], **param_values, **contexts[k]}
-                    if not condition_func(**param_context):
+                    param_context = {"x": param_comb[k], **param_comb_keys, **param_comb, **contexts[k]}
+                    if isinstance(condition_func, CustomTemplate):
+                        condition_met = condition_func.substitute(param_context)
+                    else:
+                        condition_met = condition_func(**param_context)
+                    if not condition_met:
                         conditions_met = False
                         break
                 if conditions_met:
@@ -632,19 +710,18 @@ def combine_params(
             params_ready = True
         else:
             n_combs = len(grid_indices)
-            level_indices = list(map(lambda x: np.arange(len(x[0])), level_params))
-            picked_level_indices = pick_from_param_grid(level_indices, i=grid_indices)
+            picked_level_indices = pick_from_param_grid(level_lens, i=grid_indices)
 
             params_ready = False
 
         if len(picked_level_indices) == 0 or len(picked_level_indices[0]) == 0:
-            param_product = {k: [] for k in param_keys}
+            param_product = {k: [] for k in param_dct_keys}
         else:
             param_product = dict()
             k = 0
             for level in range(len(picked_level_indices)):
                 for j in range(len(level_params[level])):
-                    param_key = param_keys[k]
+                    param_key = param_dct_keys[k]
                     if param_key not in param_product:
                         param_product[param_key] = []
                     param_values = level_params[level][j]
@@ -661,7 +738,7 @@ def combine_params(
                     else:
                         shown_indexes.append(index[picked_level_indices[level]])
             if len(shown_indexes) > 1:
-                param_index = indexes.stack_indexes(shown_indexes, **index_stack_kwargs)
+                param_index = indexes.stack_indexes(shown_indexes, **clean_index_kwargs)
             else:
                 param_index = shown_indexes[0]
         else:
@@ -674,15 +751,15 @@ def combine_params(
             else:
                 op_tree_operands.append(params[0])
         if len(op_tree_operands) > 1:
-            param_product = dict(zip(param_keys, generate_param_combs(("product", *op_tree_operands))))
+            param_product = dict(zip(param_dct_keys, generate_param_combs(("product", *op_tree_operands))))
         elif isinstance(op_tree_operands[0], tuple):
-            param_product = dict(zip(param_keys, generate_param_combs(op_tree_operands[0])))
+            param_product = dict(zip(param_dct_keys, generate_param_combs(op_tree_operands[0])))
         else:
-            param_product = dict(zip(param_keys, op_tree_operands))
+            param_product = dict(zip(param_dct_keys, op_tree_operands))
 
         if build_index and len(shown_levels) > 0:
             if len(level_indexes) > 1:
-                param_index = indexes.combine_indexes(level_indexes, **index_stack_kwargs)
+                param_index = indexes.combine_indexes(level_indexes, **clean_index_kwargs)
                 if len(hidden_levels) > 0:
                     if len(shown_levels) > 1:
                         param_index = indexes.select_levels(param_index, shown_levels)
@@ -713,14 +790,36 @@ def combine_params(
             keep_indices = []
             any_discarded = False
             for i in indices:
-                param_values = {}
+                param_comb_keys = {}
+                level_indices = pick_from_param_grid(level_lens, i=i)
                 for k in param_product:
-                    param_values[k] = param_product[k][i]
-                    param_values[names[k]] = param_product[k][i]
+                    p_keys = param_keys[k]
+                    if p_keys is not None:
+                        p_keys_value = p_keys[level_indices[param_level[k]]]
+                        param_comb_keys[f"__{k}__"] = p_keys_value
+                        if k in names:
+                            param_comb_keys[f"__{names[k]}__"] = p_keys_value
+                if param_index is not None:
+                    if isinstance(param_index, pd.MultiIndex):
+                        for l, level_name in enumerate(param_index.names):
+                            if level_name is not None:
+                                param_comb_keys[f"__{level_name}__"] = param_index[i][l]
+                    elif isinstance(param_index, pd.Index):
+                        if param_index.name is not None:
+                            param_comb_keys[f"__{param_index.name}__"] = param_index[i]
+                param_comb = {}
+                for k in param_product:
+                    param_comb[k] = param_product[k][i]
+                    if k in names:
+                        param_comb[names[k]] = param_product[k][i]
                 conditions_met = True
                 for k, condition_func in condition_funcs.items():
-                    param_context = {"x": param_values[k], **param_values, **contexts[k]}
-                    if not condition_func(**param_context):
+                    param_context = {"x": param_comb[k], **param_comb_keys, **param_comb, **contexts[k]}
+                    if isinstance(condition_func, CustomTemplate):
+                        condition_met = condition_func.substitute(param_context)
+                    else:
+                        condition_met = condition_func(**param_context)
+                    if not condition_met:
                         conditions_met = False
                         break
                 if conditions_met:
@@ -779,6 +878,7 @@ def combine_params(
                     param_index.rename(new_names, inplace=True)
                 else:
                     param_index.rename(new_names[0], inplace=True)
+        param_index = indexes.clean_index(param_index, **clean_index_kwargs)
 
     if raise_empty_error:
         if len(param_product[list(param_product.keys())[0]]) == 0:
@@ -806,7 +906,7 @@ class Parameterizer(Configured):
         "max_guesses",
         "max_misses",
         "seed",
-        "index_stack_kwargs",
+        "clean_index_kwargs",
         "name_tuple_to_str",
         "merge_func",
         "merge_kwargs",
@@ -838,7 +938,7 @@ class Parameterizer(Configured):
         max_guesses: tp.Union[None, int, float] = None,
         max_misses: tp.Union[None, int, float] = None,
         seed: tp.Optional[int] = None,
-        index_stack_kwargs: tp.KwargsLike = None,
+        clean_index_kwargs: tp.KwargsLike = None,
         name_tuple_to_str: tp.Union[None, bool, tp.Callable] = None,
         merge_func: tp.Optional[tp.MergeFuncLike] = None,
         merge_kwargs: tp.KwargsLike = None,
@@ -870,7 +970,7 @@ class Parameterizer(Configured):
             max_guesses=max_guesses,
             max_misses=max_misses,
             seed=seed,
-            index_stack_kwargs=index_stack_kwargs,
+            clean_index_kwargs=clean_index_kwargs,
             name_tuple_to_str=name_tuple_to_str,
             merge_func=merge_func,
             merge_kwargs=merge_kwargs,
@@ -901,7 +1001,7 @@ class Parameterizer(Configured):
         self._max_guesses = max_guesses
         self._max_misses = max_misses
         self._seed = seed
-        self._index_stack_kwargs = index_stack_kwargs
+        self._clean_index_kwargs = clean_index_kwargs
         self._name_tuple_to_str = name_tuple_to_str
         self._merge_func = merge_func
         self._merge_kwargs = merge_kwargs
@@ -984,9 +1084,9 @@ class Parameterizer(Configured):
         return self._seed
 
     @property
-    def index_stack_kwargs(self) -> tp.KwargsLike:
+    def clean_index_kwargs(self) -> tp.KwargsLike:
         """See `combine_params`."""
-        return self._index_stack_kwargs
+        return self._clean_index_kwargs
 
     @property
     def name_tuple_to_str(self) -> tp.Union[None, bool, tp.Callable]:
@@ -1459,7 +1559,7 @@ class Parameterizer(Configured):
         max_guesses = self.resolve_setting(self.max_guesses, "max_guesses")
         max_misses = self.resolve_setting(self.max_misses, "max_misses")
         seed = self.resolve_setting(self.seed, "seed")
-        index_stack_kwargs = self.resolve_setting(self.index_stack_kwargs, "index_stack_kwargs", merge=True)
+        clean_index_kwargs = self.resolve_setting(self.clean_index_kwargs, "clean_index_kwargs", merge=True)
         name_tuple_to_str = self.resolve_setting(self.name_tuple_to_str, "name_tuple_to_str")
         merge_func = self.resolve_setting(self.merge_func, "merge_func")
         merge_kwargs = self.resolve_setting(self.merge_kwargs, "merge_kwargs", merge=True)
@@ -1556,7 +1656,7 @@ class Parameterizer(Configured):
                 max_guesses=max_guesses,
                 max_misses=max_misses,
                 seed=seed,
-                index_stack_kwargs=index_stack_kwargs,
+                clean_index_kwargs=clean_index_kwargs,
                 name_tuple_to_str=name_tuple_to_str,
                 raise_empty_error=True,
             )
@@ -1583,7 +1683,7 @@ class Parameterizer(Configured):
                         param_index,
                         pd.Index(pc_names, name="param_config"),
                     ),
-                    **index_stack_kwargs,
+                    **clean_index_kwargs,
                 )
         else:
             if n_config_params == 0 or (n_config_params == 1 and pc_names_none):
@@ -1738,7 +1838,7 @@ def parameterized(
     max_guesses: tp.Union[None, int, float] = None,
     max_misses: tp.Union[None, int, float] = None,
     seed: tp.Optional[int] = None,
-    index_stack_kwargs: tp.KwargsLike = None,
+    clean_index_kwargs: tp.KwargsLike = None,
     name_tuple_to_str: tp.Union[None, bool, tp.Callable] = None,
     merge_func: tp.Optional[tp.MergeFuncLike] = None,
     merge_kwargs: tp.KwargsLike = None,
@@ -1942,7 +2042,7 @@ def parameterized(
                 max_guesses=_resolve_key("max_guesses"),
                 max_misses=_resolve_key("max_misses"),
                 seed=_resolve_key("seed"),
-                index_stack_kwargs=_resolve_key("index_stack_kwargs", merge=True),
+                clean_index_kwargs=_resolve_key("clean_index_kwargs", merge=True),
                 name_tuple_to_str=_resolve_key("name_tuple_to_str"),
                 merge_func=_resolve_key("merge_func"),
                 merge_kwargs=_resolve_key("merge_kwargs", merge=True),
@@ -1977,7 +2077,7 @@ def parameterized(
                 max_guesses=max_guesses,
                 max_misses=max_misses,
                 seed=seed,
-                index_stack_kwargs=index_stack_kwargs,
+                clean_index_kwargs=clean_index_kwargs,
                 name_tuple_to_str=name_tuple_to_str,
                 merge_func=merge_func,
                 merge_kwargs=merge_kwargs,
