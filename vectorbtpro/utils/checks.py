@@ -698,13 +698,13 @@ def assert_shape_equal(
                 raise AssertionError(f"Axis {axis} of {arg1.shape} and {arg2.shape} do not match")
 
 
-def assert_index_equal(arg1: pd.Index, arg2: pd.Index, check_names: bool = True) -> None:
+def assert_index_equal(arg1: tp.Index, arg2: tp.Index, check_names: bool = True) -> None:
     """Raise exception if the first argument and the second argument have different index."""
     if not is_index_equal(arg1, arg2, check_names=check_names):
         raise AssertionError(f"Indexes {arg1} and {arg2} do not match")
 
 
-def assert_columns_equal(arg1: pd.Index, arg2: pd.Index, check_names: bool = True) -> None:
+def assert_columns_equal(arg1: tp.Index, arg2: tp.Index, check_names: bool = True) -> None:
     """Raise exception if the first argument and the second argument have different columns."""
     if not is_index_equal(arg1, arg2, check_names=check_names):
         raise AssertionError(f"Columns {arg1} and {arg2} do not match")
@@ -743,7 +743,7 @@ def assert_array_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> None:
     raise AssertionError(f"Arrays {arg1} and {arg2} do not match")
 
 
-def assert_level_not_exists(arg: pd.Index, level_name: str) -> None:
+def assert_level_not_exists(arg: tp.Index, level_name: str) -> None:
     """Raise exception if index the argument has level `level_name`."""
     if isinstance(arg, pd.MultiIndex):
         names = arg.names

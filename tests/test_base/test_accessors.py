@@ -259,12 +259,6 @@ class TestAccessors:
                 columns=pd.Index(["a3_yo"], dtype="object", name="c3"),
             ),
         )
-        df1_copy = df1.vbt.apply_to_index(lambda idx: idx + "_yo", axis=0, copy_data=True)
-        df1_copy.iloc[0, 0] = -1
-        assert df1.iloc[0, 0] == 1
-        df1_copy2 = df1.vbt.apply_to_index(lambda idx: idx + "_yo", axis=1, copy_data=True)
-        df1_copy2.iloc[0, 0] = -1
-        assert df1.iloc[0, 0] == 1
 
     def test_add_levels(self):
         assert_frame_equal(

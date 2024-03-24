@@ -980,17 +980,8 @@ IndexApplierT = tp.TypeVar("IndexApplierT", bound="IndexApplier")
 class IndexApplier:
     """Abstract class that can apply a function on an index."""
 
-    def apply_to_index(
-        self: IndexApplierT,
-        apply_func: tp.Callable,
-        *args,
-        axis: tp.Optional[int] = None,
-        **kwargs,
-    ) -> IndexApplierT:
-        """Apply function `apply_func` on the index of the instance and return a new instance.
-
-        Set `axis` to 1 for columns, 0 for index, and None to determine automatically.
-        Set `copy_data` to True to make a deep copy of the data."""
+    def apply_to_index(self: IndexApplierT, apply_func: tp.Callable, *args, **kwargs) -> IndexApplierT:
+        """Apply function `apply_func` on the index of the instance and return a new instance."""
         raise NotImplementedError
 
     def add_levels(
@@ -1070,11 +1061,7 @@ class IndexApplier:
 
         return self.apply_to_index(_apply_func, **kwargs)
 
-    def drop_redundant_levels(
-        self: IndexApplierT,
-        axis: tp.Optional[int] = None,
-        **kwargs,
-    ) -> IndexApplierT:
+    def drop_redundant_levels(self: IndexApplierT, **kwargs) -> IndexApplierT:
         """Drop any redundant levels using `drop_redundant_levels`.
 
         See `IndexApplier.apply_to_index` for other keyword arguments."""
@@ -1082,13 +1069,9 @@ class IndexApplier:
         def _apply_func(index):
             return drop_redundant_levels(index)
 
-        return self.apply_to_index(_apply_func, axis=axis)
+        return self.apply_to_index(_apply_func, **kwargs)
 
-    def drop_duplicate_levels(
-        self: IndexApplierT,
-        keep: tp.Optional[str] = None,
-        **kwargs,
-    ) -> IndexApplierT:
+    def drop_duplicate_levels(self: IndexApplierT, keep: tp.Optional[str] = None, **kwargs) -> IndexApplierT:
         """Drop any duplicate levels using `drop_duplicate_levels`.
 
         See `IndexApplier.apply_to_index` for other keyword arguments."""

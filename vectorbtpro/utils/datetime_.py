@@ -1161,7 +1161,7 @@ def try_align_dt_to_index(dt: tp.DatetimeLike, target_index: tp.Index, **kwargs)
     return dt
 
 
-def auto_detect_freq(index: pd.Index) -> tp.Optional[tp.PandasFrequency]:
+def auto_detect_freq(index: tp.Index) -> tp.Optional[tp.PandasFrequency]:
     """Auto-detect frequency from a datetime index.
 
     Returns the minimal frequency if it's being encountered in most of the index."""
@@ -1198,7 +1198,7 @@ def freq_depends_on_index(freq: tp.FrequencyLike) -> bool:
 
 
 def infer_index_freq(
-    index: pd.Index,
+    index: tp.Index,
     freq: tp.Optional[tp.FrequencyLike] = None,
     allow_offset: bool = True,
     allow_numeric: bool = True,

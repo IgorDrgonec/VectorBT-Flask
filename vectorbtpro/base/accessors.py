@@ -165,7 +165,7 @@ class BaseIDXAccessor(Configured, IndexApplier):
         apply_func: tp.Callable,
         *args,
         **kwargs,
-    ) -> pd.Index:
+    ) -> tp.Index:
         return self.replace(obj=apply_func(self.obj, *args, **kwargs)).obj
 
     def align_to(self, *args, **kwargs) -> tp.IndexSlice:
@@ -760,31 +760,8 @@ class BaseAccessor(Wrapping):
 
     # ############# Indexes ############# #
 
-    def apply_to_index(
-        self: BaseAccessorT,
-        apply_func: tp.Callable,
-        *args,
-        axis: tp.Optional[int] = None,
-        copy_data: bool = False,
-        **kwargs,
-    ) -> tp.Optional[tp.SeriesFrame]:
-        if axis is None:
-            axis = 0 if self.is_series() else 1
-        if self.is_series() and axis == 1:
-            raise TypeError("Axis 1 is not supported in Series")
-        checks.assert_in(axis, (0, 1))
-
-        if axis == 1:
-            obj_index = self.wrapper.columns
-        else:
-            obj_index = self.wrapper.index
-        obj_index = apply_func(obj_index, *args, **kwargs)
-        obj = self.obj.values
-        if copy_data:
-            obj = obj.copy()
-        if axis == 1:
-            return self.wrapper.wrap(obj, group_by=False, columns=obj_index)
-        return self.wrapper.wrap(obj, group_by=False, index=obj_index)
+    def apply_to_index(self: BaseAccessorT, *args, **kwargs) -> tp.SeriesFrame:
+        return Wrapping.apply_to_index(self, *args, **kwargs).obj
 
     # ############# Setting ############# #
 

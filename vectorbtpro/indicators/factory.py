@@ -223,7 +223,7 @@ def build_columns(
     input_columns = indexes.to_any_index(input_columns)
 
     param_indexes = []
-    shown_param_indexes = []
+    visible_param_indexes = []
     for i in range(len(params)):
         param_values = params[i]
         level_name = None
@@ -264,12 +264,12 @@ def build_columns(
             param_index = _post_index_func(param_index)
         param_indexes.append(param_index)
         if i not in hide_levels and (level_names is None or level_names[i] not in hide_levels):
-            shown_param_indexes.append(param_index)
+            visible_param_indexes.append(param_index)
     if not per_column:
         n_param_values = len(params[0]) if len(params) > 0 else 1
         input_columns = indexes.tile_index(input_columns, n_param_values, ignore_ranges=ignore_ranges)
-    if len(shown_param_indexes) > 0:
-        stacked_columns = indexes.stack_indexes([*shown_param_indexes, input_columns], **kwargs)
+    if len(visible_param_indexes) > 0:
+        stacked_columns = indexes.stack_indexes([*visible_param_indexes, input_columns], **kwargs)
     else:
         stacked_columns = input_columns
     return param_indexes, stacked_columns
@@ -339,7 +339,6 @@ class IndicatorBase(Analyzable):
     _output_names: tp.ClassVar[tp.Tuple[str, ...]]
     _lazy_output_names: tp.ClassVar[tp.Tuple[str, ...]]
     _output_flags: tp.ClassVar[tp.Kwargs]
-    _level_names: tp.Tuple[str, ...]
 
     def __getattr__(self, k: str) -> tp.Any:
         """Redirect queries targeted at a generic output name by "output" or the short name of the indicator."""
@@ -1122,7 +1121,6 @@ class IndicatorBase(Analyzable):
         "param_list",
         "mapper_list",
         "short_name",
-        "level_names",
     }
 
     def __init__(
@@ -1135,7 +1133,6 @@ class IndicatorBase(Analyzable):
         param_list: ParamListT,
         mapper_list: MapperListT,
         short_name: str,
-        level_names: tp.Tuple[str, ...],
         **kwargs,
     ) -> None:
         if input_mapper is not None:
@@ -1149,7 +1146,8 @@ class IndicatorBase(Analyzable):
         for mapper in mapper_list:
             checks.assert_equal(len(mapper), wrapper.shape_2d[1])
         checks.assert_instance_of(short_name, str)
-        checks.assert_len_equal(level_names, param_list)
+        if "level_names" in kwargs:
+            del kwargs["level_names"]  # deprecated
 
         Analyzable.__init__(
             self,
@@ -1161,13 +1159,10 @@ class IndicatorBase(Analyzable):
             param_list=param_list,
             mapper_list=mapper_list,
             short_name=short_name,
-            level_names=level_names,
             **kwargs,
         )
 
         setattr(self, "_short_name", short_name)
-        setattr(self, "_level_names", level_names)
-
         for i, ts_name in enumerate(self.input_names):
             setattr(self, f"_{ts_name}", input_list[i])
         setattr(self, "_input_mapper", input_mapper)
@@ -1185,26 +1180,53 @@ class IndicatorBase(Analyzable):
             mapper_sr_list.append(pd.Series(m, index=wrapper.columns))
         tuple_mapper = self._tuple_mapper
         if tuple_mapper is not None:
+            level_names = tuple(tuple_mapper.names)
             mapper_sr_list.append(pd.Series(tuple_mapper.tolist(), index=wrapper.columns))
+        else:
+            level_names = ()
+        self._level_names = level_names
         for base_cls in type(self).__bases__:
             if base_cls.__name__ == "ParamIndexer":
                 base_cls.__init__(self, mapper_sr_list, level_names=[*level_names, level_names])
 
     @property
     def _tuple_mapper(self) -> tp.Optional[pd.MultiIndex]:
-        """Tuple mapper."""
+        """Mapper of multiple parameters."""
         if len(self.param_names) <= 1:
             return None
         return pd.MultiIndex.from_arrays([getattr(self, f"_{name}_mapper") for name in self.param_names])
 
     @property
     def _param_mapper(self) -> tp.Optional[pd.Index]:
-        """Parameter mapper."""
+        """Mapper of all parameters."""
         if len(self.param_names) == 0:
             return None
         if len(self.param_names) == 1:
             return getattr(self, f"_{self.param_names[0]}_mapper")
         return self._tuple_mapper
+
+    @property
+    def _visible_param_mapper(self) -> tp.Optional[pd.Index]:
+        """Mapper of visible parameters."""
+        if len(self.param_names) == 0:
+            return None
+        if len(self.param_names) == 1:
+            mapper = getattr(self, f"_{self.param_names[0]}_mapper")
+            if mapper.name is None:
+                return None
+            if mapper.name not in self.wrapper.columns.names:
+                return None
+            return mapper
+        mapper = self._tuple_mapper
+        visible_indexes = []
+        for i, name in enumerate(mapper.names):
+            if name is not None and name in self.wrapper.columns.names:
+                visible_indexes.append(mapper.get_level_values(i))
+        if len(visible_indexes) == 0:
+            return None
+        if len(visible_indexes) == 1:
+            return visible_indexes[0]
+        return pd.MultiIndex.from_arrays(visible_indexes)
 
     def indexing_func(self: IndicatorBaseT, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> IndicatorBaseT:
         """Perform indexing on `IndicatorBase`."""
@@ -1304,7 +1326,7 @@ class IndicatorBase(Analyzable):
         return cls_or_self._output_flags
 
     @property
-    def level_names(self) -> tp.Tuple[str, ...]:
+    def level_names(self) -> tp.Tuple[str]:
         """Column level names corresponding to each parameter."""
         return self._level_names
 
@@ -1351,6 +1373,43 @@ class IndicatorBase(Analyzable):
             return self
         return self.loc[new_df.index]
 
+    def rename(self: IndicatorBaseT, short_name: str) -> IndicatorBaseT:
+        """Replace the short name of the indicator."""
+        new_level_names = ()
+        for level_name in self.level_names:
+            if level_name.startswith(self.short_name + "_"):
+                level_name = level_name.replace(self.short_name, short_name, 1)
+            new_level_names += (level_name,)
+        new_mapper_list = []
+        for i, param_name in enumerate(self.param_names):
+            mapper = getattr(self, f"_{param_name}_mapper")
+            new_mapper_list.append(mapper.rename(new_level_names[i]))
+        new_columns = self.wrapper.columns
+        for i, name in enumerate(self.wrapper.columns.names):
+            if name in self.level_names:
+                new_columns = new_columns.rename({name: new_level_names[self.level_names.index(name)]})
+        new_wrapper = self.wrapper.replace(columns=new_columns)
+        return self.replace(wrapper=new_wrapper, mapper_list=new_mapper_list, short_name=short_name)
+
+    def rename_levels(
+        self: IndicatorBaseT,
+        mapper: tp.MaybeMappingSequence[tp.Level],
+        **kwargs,
+    ) -> IndicatorBaseT:
+        new_self = Analyzable.rename_levels(self, mapper, **kwargs)
+        old_column_names = self.wrapper.columns.names
+        new_column_names = new_self.wrapper.columns.names
+        new_level_names = ()
+        for level_name in new_self.level_names:
+            if level_name in old_column_names:
+                level_name = new_column_names[old_column_names.index(level_name)]
+            new_level_names += (level_name,)
+        new_mapper_list = []
+        for i, param_name in enumerate(new_self.param_names):
+            mapper = getattr(new_self, f"_{param_name}_mapper")
+            new_mapper_list.append(mapper.rename(new_level_names[i]))
+        return new_self.replace(mapper_list=new_mapper_list, level_names=new_level_names)
+
     # ############# Iteration ############# #
 
     def items(
@@ -1362,8 +1421,17 @@ class IndicatorBase(Analyzable):
     ) -> tp.ItemGenerator:
         """Iterate over columns (or groups if grouped and `Wrapping.group_select` is True).
 
-        Allows the following additional options for `group_by`: "params" and parameter names."""
-        if isinstance(group_by, (tuple, list)):
+        Allows the following additional options for `group_by`: "all_params", "params"
+        (only those that aren't hidden), and parameter names."""
+        if isinstance(group_by, str):
+            if group_by not in self.wrapper.columns.names:
+                if group_by.lower() == "all_params":
+                    group_by = self._param_mapper
+                elif group_by.lower() == "params":
+                    group_by = self._visible_param_mapper
+                elif group_by in self.param_names:
+                    group_by = getattr(self, f"_{group_by}_mapper")
+        elif isinstance(group_by, (tuple, list)):
             new_group_by = []
             for g in group_by:
                 if isinstance(g, str):
@@ -1372,12 +1440,6 @@ class IndicatorBase(Analyzable):
                             g = getattr(self, f"_{g}_mapper")
                 new_group_by.append(g)
             group_by = type(group_by)(new_group_by)
-        elif isinstance(group_by, str):
-            if group_by not in self.wrapper.columns.names:
-                if group_by.lower() == "params":
-                    group_by = self._param_mapper
-                elif group_by in self.param_names:
-                    group_by = getattr(self, f"_{group_by}_mapper")
         for k, v in Analyzable.items(
             self,
             group_by=group_by,
@@ -2216,7 +2278,6 @@ class IndicatorFactory(Configured):
                 new_param_list,
                 mapper_list,
                 short_name,
-                tuple(level_names),
             )
             if len(other_list) > 0:
                 return (obj, *tuple(other_list))

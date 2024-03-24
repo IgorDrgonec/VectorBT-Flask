@@ -217,7 +217,7 @@ class Resampler(Configured):
         return target_freq
 
     @classmethod
-    def get_lbound_index(cls, index: pd.Index, freq: tp.AnyPandasFrequency = None) -> tp.Index:
+    def get_lbound_index(cls, index: tp.Index, freq: tp.AnyPandasFrequency = None) -> tp.Index:
         """Get the left bound of a datetime index.
 
         If `freq` is None, calculates the leftmost bound."""
@@ -229,7 +229,7 @@ class Resampler(Configured):
         return (index[:-1] + pd.Timedelta(1, "ns")).append(min_ts)
 
     @classmethod
-    def get_rbound_index(cls, index: pd.Index, freq: tp.AnyPandasFrequency = None) -> tp.Index:
+    def get_rbound_index(cls, index: tp.Index, freq: tp.AnyPandasFrequency = None) -> tp.Index:
         """Get the right bound of a datetime index.
 
         If `freq` is None, calculates the rightmost bound."""

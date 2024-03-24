@@ -13,7 +13,7 @@ from vectorbtpro.utils.config import resolve_dict, merge_dicts, HybridConfig
 from vectorbtpro.utils.merging import MergeFunc
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
 from vectorbtpro.base.reshaping import to_1d_array, to_2d_array
-from vectorbtpro.base.indexes import stack_indexes, concat_indexes
+from vectorbtpro.base.indexes import stack_indexes, concat_indexes, clean_index
 
 __all__ = [
     "concat_arrays",
@@ -182,24 +182,25 @@ def concat_merge(
 
     if keys is not None and isinstance(keys[0], pd.Index):
         new_obj = pd.concat(objs, axis=0, **kwargs)
-        if clean_index_kwargs is None:
-            clean_index_kwargs = {}
         if len(keys) == 1:
             keys = keys[0]
         else:
             keys = concat_indexes(
                 *keys,
                 index_concat_method="append",
-                clean_index_kwargs=clean_index_kwargs,
                 verify_integrity=False,
                 axis=0,
             )
         if default_index:
             new_obj.index = keys
         else:
-            new_obj.index = stack_indexes((keys, new_obj.index), **clean_index_kwargs)
-        return new_obj
-    return pd.concat(objs, axis=0, keys=keys, **kwargs)
+            new_obj.index = stack_indexes((keys, new_obj.index))
+    else:
+        new_obj = pd.concat(objs, axis=0, keys=keys, **kwargs)
+    if clean_index_kwargs is None:
+        clean_index_kwargs = {}
+    new_obj.index = clean_index(new_obj.index, **clean_index_kwargs)
+    return new_obj
 
 
 def row_stack_merge(
@@ -317,24 +318,25 @@ def row_stack_merge(
 
     if keys is not None and isinstance(keys[0], pd.Index):
         new_obj = pd.concat(objs, axis=0, **kwargs)
-        if clean_index_kwargs is None:
-            clean_index_kwargs = {}
         if len(keys) == 1:
             keys = keys[0]
         else:
             keys = concat_indexes(
                 *keys,
                 index_concat_method="append",
-                clean_index_kwargs=clean_index_kwargs,
                 verify_integrity=False,
                 axis=0,
             )
         if default_index:
             new_obj.index = keys
         else:
-            new_obj.index = stack_indexes((keys, new_obj.index), **clean_index_kwargs)
-        return new_obj
-    return pd.concat(objs, axis=0, keys=keys, **kwargs)
+            new_obj.index = stack_indexes((keys, new_obj.index))
+    else:
+        new_obj = pd.concat(objs, axis=0, keys=keys, **kwargs)
+    if clean_index_kwargs is None:
+        clean_index_kwargs = {}
+    new_obj.index = clean_index(new_obj.index, **clean_index_kwargs)
+    return new_obj
 
 
 def column_stack_merge(
@@ -529,24 +531,25 @@ def column_stack_merge(
 
     if keys is not None and isinstance(keys[0], pd.Index):
         new_obj = pd.concat(objs, axis=1, **kwargs)
-        if clean_index_kwargs is None:
-            clean_index_kwargs = {}
         if len(keys) == 1:
             keys = keys[0]
         else:
             keys = concat_indexes(
                 *keys,
                 index_concat_method="append",
-                clean_index_kwargs=clean_index_kwargs,
                 verify_integrity=False,
                 axis=1,
             )
         if default_columns:
             new_obj.columns = keys
         else:
-            new_obj.columns = stack_indexes((keys, new_obj.columns), **clean_index_kwargs)
-        return new_obj
-    return pd.concat(objs, axis=1, keys=keys, **kwargs)
+            new_obj.columns = stack_indexes((keys, new_obj.columns))
+    else:
+        new_obj = pd.concat(objs, axis=1, keys=keys, **kwargs)
+    if clean_index_kwargs is None:
+        clean_index_kwargs = {}
+    new_obj.columns = clean_index(new_obj.columns, **clean_index_kwargs)
+    return new_obj
 
 
 def imageio_merge(
