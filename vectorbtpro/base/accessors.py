@@ -32,6 +32,11 @@ from vectorbtpro.utils.parsing import get_context_vars
 from vectorbtpro.utils.template import substitute_templates
 from vectorbtpro.utils.eval_ import multiline_eval
 
+if tp.TYPE_CHECKING:
+    from vectorbtpro.generic.splitting.base import Splitter as SplitterT
+else:
+    SplitterT = tp.Any
+
 __all__ = ["BaseIDXAccessor", "BaseAccessor", "BaseSRAccessor", "BaseDFAccessor"]
 
 
@@ -408,6 +413,16 @@ class BaseIDXAccessor(Configured, IndexApplier):
     def get_ranges(self, *args, **kwargs) -> tp.Tuple[tp.Array1d, tp.Array1d]:
         """See `vectorbtpro.base.indexing.get_index_ranges`."""
         return get_index_ranges(self.obj, self.any_freq, *args, **kwargs)
+
+    # ############# Splitting ############# #
+
+    def split(self, *args, splitter_cls: tp.Optional[tp.Type[SplitterT]] = None, **kwargs) -> tp.Any:
+        """Split using `vectorbtpro.generic.splitting.base.Splitter.split_and_take`."""
+        from vectorbtpro.generic.splitting.base import Splitter
+
+        if splitter_cls is None:
+            splitter_cls = Splitter
+        return splitter_cls.split_and_take(self.obj, self.obj, *args, **kwargs)
 
 
 BaseAccessorT = tp.TypeVar("BaseAccessorT", bound="BaseAccessor")
@@ -1646,6 +1661,36 @@ class BaseAccessor(Wrapping):
         else:
             out = multiline_eval(expr, context=objs)
         return wrapper.wrap(out, **wrap_kwargs)
+
+    def split(self, *args, splitter_cls: tp.Optional[tp.Type[SplitterT]] = None, **kwargs) -> tp.Any:
+        """Split using `vectorbtpro.generic.splitting.base.Splitter.split_and_take`.
+
+        Uses the option `into="reset_stacked"` by default.
+
+        !!! note
+            Splits Pandas object, not accessor!
+        """
+        from vectorbtpro.generic.splitting.base import Splitter
+
+        if splitter_cls is None:
+            splitter_cls = Splitter
+        return splitter_cls.split_and_take(
+            self.wrapper.index,
+            self.obj,
+            *args,
+            _take_kwargs=dict(into="reset_stacked"),
+            **kwargs,
+        )
+
+    # ############# Iteration ############# #
+
+    def items(self, *args, **kwargs) -> tp.ItemGenerator:
+        """See `vectorbtpro.base.wrapping.Wrapping.items`.
+
+        !!! note
+            Splits Pandas object, not accessor!"""
+        for k, v in Wrapping.items(self, *args, **kwargs):
+            yield k, v.obj
 
 
 class BaseSRAccessor(BaseAccessor):

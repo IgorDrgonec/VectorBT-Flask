@@ -42,14 +42,30 @@ def get_func_kwargs(func: tp.Callable) -> dict:
     return {k: v.default for k, v in signature.parameters.items() if v.default is not inspect.Parameter.empty}
 
 
-def get_func_arg_names(func: tp.Callable, arg_kind: tp.Optional[tp.MaybeTuple[int]] = None) -> tp.List[str]:
+def get_func_arg_names(
+    func: tp.Callable,
+    arg_kind: tp.Optional[tp.MaybeTuple[int]] = None,
+    req_only: bool = False,
+    opt_only: bool = False,
+) -> tp.List[str]:
     """Get argument names of a function."""
     signature = inspect.signature(func)
     if arg_kind is not None and isinstance(arg_kind, int):
         arg_kind = (arg_kind,)
-    if arg_kind is None:
-        return [p.name for p in signature.parameters.values() if p.kind != p.VAR_POSITIONAL and p.kind != p.VAR_KEYWORD]
-    return [p.name for p in signature.parameters.values() if p.kind in arg_kind]
+    arg_names = []
+    for p in signature.parameters.values():
+        if arg_kind is None:
+            if p.kind == p.VAR_POSITIONAL or p.kind == p.VAR_KEYWORD:
+                continue
+        else:
+            if p.kind not in arg_kind:
+                continue
+        if req_only and p.default is not inspect.Parameter.empty:
+            continue
+        if opt_only and p.default is inspect.Parameter.empty:
+            continue
+        arg_names.append(p.name)
+    return arg_names
 
 
 def extend_args(func: tp.Callable, args: tp.Args, kwargs: tp.Kwargs, **with_kwargs) -> tp.Tuple[tp.Args, tp.Kwargs]:

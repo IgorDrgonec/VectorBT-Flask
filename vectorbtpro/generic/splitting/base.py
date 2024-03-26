@@ -4,6 +4,7 @@
 
 import warnings
 import math
+import inspect
 
 import numpy as np
 import pandas as pd
@@ -1026,7 +1027,6 @@ class Splitter(Analyzable):
     def from_ranges(
         cls: tp.Type[SplitterT],
         index: tp.IndexLike,
-        *args,
         split: tp.Optional[tp.SplitLike] = None,
         split_range_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
@@ -1035,6 +1035,8 @@ class Splitter(Analyzable):
         """Create a new `Splitter` instance from ranges.
 
         Uses `vectorbtpro.base.indexing.get_index_ranges` to generate start and end indices.
+        Passes only related keyword arguments found in `kwargs`.
+
         Other keyword arguments will be passed to `Splitter.from_splits`. For details on
         `split` and `split_range_kwargs`, see `Splitter.from_rolling`.
 
@@ -1077,7 +1079,7 @@ class Splitter(Analyzable):
             if k in func_arg_names:
                 ranges_kwargs[k] = kwargs.pop(k)
 
-        start_idxs, stop_idxs = get_index_ranges(index, *args, skip_not_found=True, **ranges_kwargs)
+        start_idxs, stop_idxs = get_index_ranges(index, skip_not_found=True, **ranges_kwargs)
         splits = []
         for start, stop in zip(start_idxs, stop_idxs):
             new_split = slice(start, stop)
@@ -1402,7 +1404,7 @@ class Splitter(Analyzable):
     def from_sklearn(
         cls: tp.Type[SplitterT],
         index: tp.IndexLike,
-        splitter: BaseCrossValidatorT,
+        skl_splitter: BaseCrossValidatorT,
         groups: tp.Optional[tp.ArrayLike] = None,
         split_labels: tp.Optional[tp.IndexLike] = None,
         set_labels: tp.Optional[tp.IndexLike] = None,
@@ -1416,11 +1418,11 @@ class Splitter(Analyzable):
         from sklearn.model_selection import BaseCrossValidator
 
         index = dt.prepare_dt_index(index)
-        checks.assert_instance_of(splitter, BaseCrossValidator)
+        checks.assert_instance_of(skl_splitter, BaseCrossValidator)
         if set_labels is None:
             set_labels = ["train", "test"]
 
-        indices_generator = splitter.split(np.arange(len(index))[:, None], groups=groups)
+        indices_generator = skl_splitter.split(np.arange(len(index))[:, None], groups=groups)
         return cls.from_splits(
             index,
             list(indices_generator),
@@ -1590,6 +1592,108 @@ class Splitter(Analyzable):
             template_context=template_context,
             **kwargs,
         )
+
+    @classmethod
+    def guess_method(cls, **kwargs) -> tp.Optional[str]:
+        """Guess the factory method based on keyword arguments.
+
+        Returns None if cannot guess."""
+        if len(kwargs) == 0:
+            return None
+        keys = {"index"} | set(kwargs.keys())
+        from_splits_arg_names = set(get_func_arg_names(cls.from_splits))
+        from_splits_arg_names.remove("splits")
+        matched_methods = []
+        n_args = []
+        for k in cls.__dict__:
+            if k.startswith("from_") and inspect.ismethod(getattr(cls, k)):
+                req_func_arg_names = set(get_func_arg_names(getattr(cls, k), req_only=True))
+                if len(req_func_arg_names) > 0:
+                    if not (req_func_arg_names <= keys):
+                        continue
+                opt_func_arg_names = set(get_func_arg_names(getattr(cls, k), opt_only=True))
+                func_arg_names = from_splits_arg_names | req_func_arg_names | opt_func_arg_names
+                if k == "from_ranges":
+                    func_arg_names |= set(get_func_arg_names(get_index_ranges))
+                if len(func_arg_names) > 0:
+                    if not (keys <= func_arg_names):
+                        continue
+                matched_methods.append(k)
+                n_args.append(len(req_func_arg_names) + len(opt_func_arg_names))
+        if len(matched_methods) > 1:
+            if "from_n_rolling" in matched_methods:
+                return "from_n_rolling"
+            return sorted(zip(matched_methods, n_args), key=lambda x: x[1])[0][0]
+        if len(matched_methods) == 1:
+            return matched_methods[0]
+        return None
+
+    @classmethod
+    def split_and_take(
+        cls,
+        index: tp.IndexLike,
+        obj: tp.Any,
+        splitter: tp.Union[None, str, SplitterT, tp.Callable] = None,
+        splitter_kwargs: tp.KwargsLike = None,
+        take_kwargs: tp.KwargsLike = None,
+        template_context: tp.KwargsLike = None,
+        _splitter_kwargs: tp.KwargsLike = None,
+        _take_kwargs: tp.KwargsLike = None,
+        **kwargs,
+    ) -> tp.Any:
+        """Split index and take from an object.
+
+        Argument `splitter` can be an actual `Splitter` instance, the name of a factory method
+        (such as "from_n_rolling"), or the factory method itself. If `splitter` is None,
+        the right method will be guessed based on the supplied arguments using `Splitter.guess_method`.
+
+        Keyword arguments `splitter_kwargs` are passed to the factory method.
+
+        Keyword arguments `take_kwargs` are passed to `Splitter.take`.
+
+        If `kwargs` is provided, it will be used as `splitter_kwargs` if `take_kwargs` is already set,
+        and vice versa. If `splitter_kwargs` and `take_kwargs` aren't set, it will be used as
+        `splitter_kwargs` if a splitter instance hasn't been built yet, otherwise as `take_kwargs`.
+        If both arguments are set, will raise an error."""
+        if splitter_kwargs is None:
+            splitter_kwargs = {}
+        else:
+            splitter_kwargs = dict(splitter_kwargs)
+        if take_kwargs is None:
+            take_kwargs = {}
+        else:
+            take_kwargs = dict(take_kwargs)
+        if _splitter_kwargs is None:
+            _splitter_kwargs = {}
+        if _take_kwargs is None:
+            _take_kwargs = {}
+        if len(kwargs) > 0:
+            if len(splitter_kwargs) == 0 and len(take_kwargs) > 0:
+                splitter_kwargs = kwargs
+            elif len(splitter_kwargs) > 0 and len(take_kwargs) == 0:
+                take_kwargs = kwargs
+            elif len(splitter_kwargs) == 0 and len(take_kwargs) == 0:
+                if splitter is None or not isinstance(splitter, cls):
+                    splitter_kwargs = kwargs
+                else:
+                    take_kwargs = kwargs
+            else:
+                raise ValueError("Pass kwargs as splitter_kwargs or take_kwargs")
+        if splitter is None:
+            splitter = cls.guess_method(**splitter_kwargs)
+        if splitter is None:
+            raise ValueError("Must provide splitter")
+        if not isinstance(splitter, cls):
+            if isinstance(splitter, str):
+                splitter = getattr(cls, splitter)
+            for k, v in _splitter_kwargs.items():
+                if k not in splitter_kwargs:
+                    splitter_kwargs[k] = v
+            splitter = splitter(index, template_context=template_context, **splitter_kwargs)
+        for k, v in _take_kwargs.items():
+            if k not in take_kwargs:
+                take_kwargs[k] = v
+        return splitter.take(obj, template_context=template_context, **take_kwargs)
 
     @classmethod
     def resolve_row_stack_kwargs(

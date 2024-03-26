@@ -310,18 +310,34 @@ class Param(Annotatable, DefineMixin):
                     return False
         return True
 
-    def map_value(self: ParamT, func: tp.Callable) -> ParamT:
-        """Execute a function on each value in `Param.value` and create a new `Param` instance."""
+    def map_value(self: ParamT, func: tp.Callable, old_as_keys: bool = False) -> ParamT:
+        """Execute a function on each value in `Param.value` and create a new `Param` instance.
+
+        If `old_as_keys` is True, will use old values as keys, unless keys are already provided."""
         self.assert_field_not_missing("value")
         attr_dct = self.asdict()
+        is_tuple = self.resolve_field("is_tuple")
+        is_array_like = self.resolve_field("is_array_like")
+        keys = self.resolve_field("keys")
+
         if isinstance(attr_dct["value"], dict):
             attr_dct["value"] = {k: v for k, v in attr_dct["value"].items()}
         elif isinstance(attr_dct["value"], pd.Index):
             attr_dct["value"] = pd.Index(map(func, attr_dct["value"]))
         elif isinstance(attr_dct["value"], pd.Series):
             attr_dct["value"] = pd.Series(map(func, attr_dct["value"].values), index=attr_dct["value"].index)
-        else:
+        elif not is_single_param_value(attr_dct["value"], is_tuple, is_array_like):
+            if old_as_keys and keys is None:
+                from vectorbtpro.base import indexes
+
+                attr_dct["keys"] = indexes.index_from_values(attr_dct["value"])
             attr_dct["value"] = list(map(func, attr_dct["value"]))
+        else:
+            if old_as_keys and keys is None and not isinstance(attr_dct["value"], Paramable):
+                from vectorbtpro.base import indexes
+
+                attr_dct["keys"] = indexes.index_from_values([attr_dct["value"]])
+            attr_dct["value"] = func(attr_dct["value"])
         return type(self)(**attr_dct)
 
 
