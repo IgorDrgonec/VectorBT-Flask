@@ -4641,6 +4641,67 @@ class TestDecorators:
         split_f = vbt.split(f, splitter=splitter, takeable_args=["index", "a", "my_args_0", "b", "c"])
         assert split_f(index, sr, sr, b=sr, c=sr) == 25
 
+        split_f1 = vbt.split(
+            f,
+            splitter="from_single",
+            splitter_kwargs=dict(split=vbt.RelRange(length=5)),
+            takeable_args=["index"],
+        )
+        split_f2 = vbt.split(
+            f,
+            splitter_kwargs=dict(split=vbt.RelRange(length=5)),
+            takeable_args=["index"],
+        )
+        split_f3 = vbt.split(
+            f,
+            split=vbt.RelRange(length=5),
+            takeable_args=["index"],
+        )
+        assert split_f1(index, sr, sr, b=sr, c=sr) == split_f2(index, sr, sr, b=sr, c=sr)
+        assert split_f1(index, sr, sr, b=sr, c=sr) == split_f3(index, sr, sr, b=sr, c=sr)
+        split_f1 = vbt.split(
+            f,
+            splitter="from_n_rolling",
+            splitter_kwargs=dict(n=2, split=vbt.RelRange(length=5)),
+            takeable_args=["index"],
+        )
+        split_f2 = vbt.split(
+            f,
+            splitter_kwargs=dict(n=2, split=vbt.RelRange(length=5)),
+            takeable_args=["index"],
+        )
+        split_f3 = vbt.split(
+            f,
+            n=2,
+            split=vbt.RelRange(length=5),
+            takeable_args=["index"],
+        )
+        assert_series_equal(split_f1(index, sr, sr, b=sr, c=sr), split_f2(index, sr, sr, b=sr, c=sr))
+        assert_series_equal(split_f1(index, sr, sr, b=sr, c=sr), split_f3(index, sr, sr, b=sr, c=sr))
+        split_f1 = vbt.split(
+            f,
+            splitter="from_n_rolling",
+            splitter_kwargs=dict(n=2, split=vbt.RelRange(length=5)),
+            apply_kwargs=dict(split_group_by=True, set_group_by=True),
+            takeable_args=["index"],
+        )
+        split_f2 = vbt.split(
+            f,
+            splitter_kwargs=dict(n=2, split=vbt.RelRange(length=5)),
+            apply_kwargs=dict(split_group_by=True, set_group_by=True),
+            takeable_args=["index"],
+        )
+        split_f3 = vbt.split(
+            f,
+            n=2,
+            split=vbt.RelRange(length=5),
+            split_group_by=True,
+            set_group_by=True,
+            takeable_args=["index"],
+        )
+        assert split_f1(index, sr, sr, b=sr, c=sr) == split_f2(index, sr, sr, b=sr, c=sr)
+        assert split_f1(index, sr, sr, b=sr, c=sr) == split_f3(index, sr, sr, b=sr, c=sr)
+
     def test_cv_split(self):
         def f(sr, i):
             return sr[i]

@@ -14,6 +14,7 @@ from vectorbtpro.utils.parsing import (
     unflatten_ann_args,
     ann_args_to_args,
     match_ann_arg,
+    get_func_arg_names,
 )
 from vectorbtpro.utils.params import parameterized
 from vectorbtpro.utils.selection import _NoResult, NoResult, NoResultsException
@@ -29,7 +30,7 @@ __all__ = [
 def split(
     *args,
     splitter: tp.Union[None, str, Splitter, tp.Callable] = None,
-    splitter_cls: tp.Type[Splitter] = Splitter,
+    splitter_cls: tp.Optional[tp.Type[Splitter]] = None,
     splitter_kwargs: tp.KwargsLike = None,
     index: tp.Optional[tp.IndexLike] = None,
     index_from: tp.Optional[tp.AnnArgQuery] = None,
@@ -37,22 +38,32 @@ def split(
     template_context: tp.KwargsLike = None,
     forward_kwargs_as: tp.KwargsLike = None,
     return_splitter: bool = False,
-    **apply_kwargs,
+    apply_kwargs: tp.KwargsLike = None,
+    **var_kwargs,
 ) -> tp.Callable:
     """Decorator that splits the inputs of a function.
 
     Does the following:
 
     1. Resolves the splitter of the type `vectorbtpro.generic.splitting.base.Splitter` using
-    the argument `splitter`. It can be either an already provided splitter instance, the name of
-    splitter class method, or an arbitrary callable. If any of the latter, it will pass `index` and
-    `**splitter_kwargs`. Index is getting resolved either using an already provided `index`,
-    by parsing the argument under a name/position provided in `index_from`, or by parsing the
-    first argument from `takeable_args` (in this order).
+    the argument `splitter`. It can be either an already provided splitter instance, the
+    name of a factory method (such as "from_n_rolling"), or the factory method itself.
+    If `splitter` is None, the right method will be guessed based on the supplied arguments
+    using `vectorbtpro.generic.splitting.base.Splitter.guess_method`. To construct a splitter,
+    it will pass `index` and `**splitter_kwargs`. Index is getting resolved either using an already
+    provided `index`, by parsing the argument under a name/position provided in `index_from`,
+    or by parsing the first argument from `takeable_args` (in this order).
     2. Wraps arguments in `takeable_args` with `vectorbtpro.generic.splitting.base.Takeable`
     3. Runs `vectorbtpro.generic.splitting.base.Splitter.apply` with arguments passed
-    to the function as `args` and `kwargs`, but also `**apply_kwargs` (the ones passed to
+    to the function as `args` and `kwargs`, but also `apply_kwargs` (the ones passed to
     the decorator)
+
+    Keyword arguments `splitter_kwargs` are passed to the factory method. Keyword arguments
+    `apply_kwargs` are passed to `vectorbtpro.generic.splitting.base.Splitter.apply`. If variable
+    keyword arguments are provided, they will be used as `splitter_kwargs` if `apply_kwargs` is already set,
+    and vice versa. If `splitter_kwargs` and `apply_kwargs` aren't set, they will be used as `splitter_kwargs`
+    if a splitter instance hasn't been built yet, otherwise as `apply_kwargs`. If both arguments are set,
+    will raise an error.
 
     Usage:
         * Split a Series and return its sum:
@@ -138,13 +149,8 @@ def split(
         @wraps(func)
         def wrapper(*args, **kwargs) -> tp.Any:
             splitter = kwargs.pop("_splitter", wrapper.options["splitter"])
-            if splitter is None:
-                raise ValueError("Must provide splitter")
             splitter_cls = kwargs.pop("_splitter_cls", wrapper.options["splitter_cls"])
-            splitter_kwargs = merge_dicts(
-                wrapper.options["splitter_kwargs"],
-                kwargs.pop("_splitter_kwargs", {}),
-            )
+            splitter_kwargs = merge_dicts(wrapper.options["splitter_kwargs"], kwargs.pop("_splitter_kwargs", {}))
             index = kwargs.pop("_index", wrapper.options["index"])
             index_from = kwargs.pop("_index_from", wrapper.options["index_from"])
             takeable_args = kwargs.pop("_takeable_args", wrapper.options["takeable_args"])
@@ -154,19 +160,10 @@ def split(
                 takeable_args = set(takeable_args)
             else:
                 takeable_args = {takeable_args}
-            template_context = merge_dicts(
-                wrapper.options["template_context"],
-                kwargs.pop("_template_context", {}),
-            )
-            apply_kwargs = merge_dicts(
-                wrapper.options["apply_kwargs"],
-                kwargs.pop("_apply_kwargs", {}),
-            )
+            template_context = merge_dicts(wrapper.options["template_context"], kwargs.pop("_template_context", {}))
+            apply_kwargs = merge_dicts(wrapper.options["apply_kwargs"], kwargs.pop("_apply_kwargs", {}))
             return_splitter = kwargs.pop("_return_splitter", wrapper.options["return_splitter"])
-            forward_kwargs_as = merge_dicts(
-                wrapper.options["forward_kwargs_as"],
-                kwargs.pop("_forward_kwargs_as", {}),
-            )
+            forward_kwargs_as = merge_dicts(wrapper.options["forward_kwargs_as"], kwargs.pop("_forward_kwargs_as", {}))
             if len(forward_kwargs_as) > 0:
                 new_kwargs = dict()
                 for k, v in kwargs.items():
@@ -179,6 +176,46 @@ def split(
                 for k, v in forward_kwargs_as.items():
                     kwargs[v] = locals()[k]
 
+            if splitter_cls is None:
+                splitter_cls = Splitter
+            if len(var_kwargs) > 0:
+                if len(splitter_kwargs) == 0 and len(apply_kwargs) > 0:
+                    splitter_kwargs = var_kwargs
+                elif len(splitter_kwargs) > 0 and len(apply_kwargs) == 0:
+                    apply_kwargs = var_kwargs
+                elif len(splitter_kwargs) == 0 and len(apply_kwargs) == 0:
+                    if splitter is None or not isinstance(splitter, splitter_cls):
+                        apply_arg_names = get_func_arg_names(splitter_cls.apply)
+                        if splitter is not None:
+                            if isinstance(splitter, str):
+                                splitter_arg_names = get_func_arg_names(getattr(splitter_cls, splitter))
+                            else:
+                                splitter_arg_names = get_func_arg_names(splitter)
+                            for k, v in var_kwargs.items():
+                                assigned = False
+                                if k in splitter_arg_names:
+                                    splitter_kwargs[k] = v
+                                    assigned = True
+                                if k != "split" and k in apply_arg_names:
+                                    apply_kwargs[k] = v
+                                    assigned = True
+                                if not assigned:
+                                    raise ValueError(f"Argument '{k}' couldn't be assigned")
+                        else:
+                            for k, v in var_kwargs.items():
+                                if k == "freq":
+                                    splitter_kwargs[k] = v
+                                    apply_kwargs[k] = v
+                                elif k == "split" or k not in apply_arg_names:
+                                    splitter_kwargs[k] = v
+                                else:
+                                    apply_kwargs[k] = v
+                    else:
+                        apply_kwargs = var_kwargs
+                else:
+                    raise ValueError("Pass keyword arguments as splitter_kwargs or apply_kwargs")
+            if splitter is None:
+                splitter = splitter_cls.guess_method(**splitter_kwargs)
             if not isinstance(splitter, splitter_cls) and index is not None:
                 if isinstance(splitter, str):
                     splitter = getattr(splitter_cls, splitter)
@@ -240,6 +277,7 @@ def split(
                 forward_kwargs_as=forward_kwargs_as,
                 return_splitter=return_splitter,
                 apply_kwargs=apply_kwargs,
+                var_kwargs=var_kwargs,
             ),
             options_=dict(
                 frozen_keys=True,

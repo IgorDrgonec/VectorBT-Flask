@@ -1639,22 +1639,20 @@ class Splitter(Analyzable):
         template_context: tp.KwargsLike = None,
         _splitter_kwargs: tp.KwargsLike = None,
         _take_kwargs: tp.KwargsLike = None,
-        **kwargs,
+        **var_kwargs,
     ) -> tp.Any:
-        """Split index and take from an object.
+        """Split an index and take from an object.
 
         Argument `splitter` can be an actual `Splitter` instance, the name of a factory method
         (such as "from_n_rolling"), or the factory method itself. If `splitter` is None,
         the right method will be guessed based on the supplied arguments using `Splitter.guess_method`.
 
-        Keyword arguments `splitter_kwargs` are passed to the factory method.
-
-        Keyword arguments `take_kwargs` are passed to `Splitter.take`.
-
-        If `kwargs` is provided, it will be used as `splitter_kwargs` if `take_kwargs` is already set,
-        and vice versa. If `splitter_kwargs` and `take_kwargs` aren't set, it will be used as
-        `splitter_kwargs` if a splitter instance hasn't been built yet, otherwise as `take_kwargs`.
-        If both arguments are set, will raise an error."""
+        Keyword arguments `splitter_kwargs` are passed to the factory method. Keyword arguments
+        `take_kwargs` are passed to `Splitter.take`. If variable keyword arguments are provided, they
+        will be used as `splitter_kwargs` if `take_kwargs` is already set, and vice versa. If
+        `splitter_kwargs` and `take_kwargs` aren't set, they will be used as `take_kwargs` if a splitter
+        instance has been built, otherwise arguments will be distributed based on the signatures of the
+        factory method and `Splitter.take`. If both arguments are set, will raise an error."""
         if splitter_kwargs is None:
             splitter_kwargs = {}
         else:
@@ -1667,18 +1665,42 @@ class Splitter(Analyzable):
             _splitter_kwargs = {}
         if _take_kwargs is None:
             _take_kwargs = {}
-        if len(kwargs) > 0:
+        if len(var_kwargs) > 0:
             if len(splitter_kwargs) == 0 and len(take_kwargs) > 0:
-                splitter_kwargs = kwargs
+                splitter_kwargs = var_kwargs
             elif len(splitter_kwargs) > 0 and len(take_kwargs) == 0:
-                take_kwargs = kwargs
+                take_kwargs = var_kwargs
             elif len(splitter_kwargs) == 0 and len(take_kwargs) == 0:
                 if splitter is None or not isinstance(splitter, cls):
-                    splitter_kwargs = kwargs
+                    take_arg_names = get_func_arg_names(cls.take)
+                    if splitter is not None:
+                        if isinstance(splitter, str):
+                            splitter_arg_names = get_func_arg_names(getattr(cls, splitter))
+                        else:
+                            splitter_arg_names = get_func_arg_names(splitter)
+                        for k, v in var_kwargs.items():
+                            assigned = False
+                            if k in splitter_arg_names:
+                                splitter_kwargs[k] = v
+                                assigned = True
+                            if k != "split" and k in take_arg_names:
+                                take_kwargs[k] = v
+                                assigned = True
+                            if not assigned:
+                                raise ValueError(f"Argument '{k}' couldn't be assigned")
+                    else:
+                        for k, v in var_kwargs.items():
+                            if k == "freq":
+                                splitter_kwargs[k] = v
+                                take_kwargs[k] = v
+                            elif k == "split" or k not in take_arg_names:
+                                splitter_kwargs[k] = v
+                            else:
+                                take_kwargs[k] = v
                 else:
-                    take_kwargs = kwargs
+                    take_kwargs = var_kwargs
             else:
-                raise ValueError("Pass kwargs as splitter_kwargs or take_kwargs")
+                raise ValueError("Pass keyword arguments as splitter_kwargs or take_kwargs")
         if splitter is None:
             splitter = cls.guess_method(**splitter_kwargs)
         if splitter is None:
