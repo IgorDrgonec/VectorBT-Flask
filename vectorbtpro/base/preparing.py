@@ -129,10 +129,10 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         return map_enum_fields(value, **kwargs)
 
     @classmethod
-    def prepare_td_obj(cls, td_obj: object) -> object:
+    def prepare_td_obj(cls, td_obj: object, old_as_keys: bool = True) -> object:
         """Prepare a timedelta object for broadcasting."""
         if isinstance(td_obj, Param):
-            return td_obj.map_value(cls.prepare_td_obj)
+            return td_obj.map_value(cls.prepare_td_obj, old_as_keys=old_as_keys)
 
         if isinstance(td_obj, (str, timedelta, pd.DateOffset, pd.Timedelta)):
             td_obj = dt.to_timedelta64(td_obj)
@@ -141,10 +141,15 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         return td_obj
 
     @classmethod
-    def prepare_dt_obj(cls, dt_obj: object, last_before: tp.Optional[bool] = None) -> object:
+    def prepare_dt_obj(
+        cls,
+        dt_obj: object,
+        old_as_keys: bool = True,
+        last_before: tp.Optional[bool] = None,
+    ) -> object:
         """Prepare a datetime object for broadcasting."""
         if isinstance(dt_obj, Param):
-            return dt_obj.map_value(partial(cls.prepare_dt_obj))
+            return dt_obj.map_value(cls.prepare_dt_obj, old_as_keys=old_as_keys)
 
         if isinstance(dt_obj, (str, time, timedelta, pd.DateOffset, pd.Timedelta)):
 
@@ -266,9 +271,16 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             if len(arg_config.get("map_enum_kwargs", {})) > 0:
                 arg = self.map_enum_value(arg, **arg_config["map_enum_kwargs"])
             if arg_config.get("is_td", False):
-                arg = self.prepare_td_obj(arg)
+                arg = self.prepare_td_obj(
+                    arg,
+                    old_as_keys=arg_config.get("old_as_keys", True),
+                )
             if arg_config.get("is_dt", False):
-                arg = self.prepare_dt_obj(arg, last_before=arg_config.get("last_before", None))
+                arg = self.prepare_dt_obj(
+                    arg,
+                    old_as_keys=arg_config.get("old_as_keys", True),
+                    last_before=arg_config.get("last_before", None),
+                )
         return arg
 
     def get_arg(self, arg_name: str, use_idx_setter: bool = True, use_default: bool = True) -> tp.Any:
