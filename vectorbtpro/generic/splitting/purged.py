@@ -50,16 +50,22 @@ class BasePurgedCV:
     `pred_times` and `eval_times` must all be pandas DataFrames/Series having the same index. It is also
     assumed that the samples are time-ordered with respect to the prediction time."""
 
-    def __init__(self, n_folds: int = 10) -> None:
+    def __init__(self, n_folds: int = 10, purge_td: tp.TimedeltaLike = 0) -> None:
         self._n_folds = n_folds
         self._pred_times = None
         self._eval_times = None
         self._indices = None
+        self._purge_td = dt.to_timedelta(purge_td)
 
     @property
     def n_folds(self) -> int:
         """Number of folds."""
         return self._n_folds
+
+    @property
+    def purge_td(self) -> pd.Timedelta:
+        """Purge period."""
+        return self._purge_td
 
     @property
     def pred_times(self) -> tp.Optional[pd.Series]:
@@ -88,7 +94,8 @@ class BasePurgedCV:
         `test_fold_end`, this method removes from the train set all the samples whose evaluation time
         is posterior to the prediction time of the first test sample after the boundary."""
         time_test_fold_start = self.pred_times.iloc[test_fold_start]
-        train_indices_1 = np.intersect1d(train_indices, self.indices[self.eval_times < time_test_fold_start])
+        eval_times = self.eval_times + self.purge_td
+        train_indices_1 = np.intersect1d(train_indices, self.indices[eval_times < time_test_fold_start])
         train_indices_2 = np.intersect1d(train_indices, self.indices[test_fold_end:])
         return np.concatenate((train_indices_1, train_indices_2))
 
@@ -146,8 +153,9 @@ class PurgedWalkForwardCV(BasePurgedCV):
         min_train_folds: int = 2,
         max_train_folds: tp.Optional[int] = None,
         split_by_time: bool = False,
+        purge_td: tp.TimedeltaLike = 0,
     ) -> None:
-        BasePurgedCV.__init__(self, n_folds=n_folds)
+        BasePurgedCV.__init__(self, n_folds=n_folds, purge_td=purge_td)
 
         if n_test_folds >= self.n_folds - 1:
             raise ValueError("n_test_folds must be between 1 and n_folds - 1")
@@ -260,9 +268,10 @@ class PurgedKFoldCV(BasePurgedCV):
         self,
         n_folds: int = 10,
         n_test_folds: int = 2,
+        purge_td: tp.TimedeltaLike = 0,
         embargo_td: tp.TimedeltaLike = 0,
     ) -> None:
-        BasePurgedCV.__init__(self, n_folds=n_folds)
+        BasePurgedCV.__init__(self, n_folds=n_folds, purge_td=purge_td)
 
         if n_test_folds > self.n_folds - 1:
             raise ValueError("n_test_folds must be between 1 and n_folds - 1")
@@ -288,7 +297,7 @@ class PurgedKFoldCV(BasePurgedCV):
         """Apply the embargo procedure to part of the train set.
 
         This amounts to dropping the train set samples whose prediction time occurs within
-        `PurgedKFoldCV.embargo_dt` of the test set sample evaluation times. This method applies
+        `PurgedKFoldCV.embargo_td` of the test set sample evaluation times. This method applies
         the embargo only to the part of the training set immediately following the end of the test
         set determined by `test_fold_end`."""
         last_test_eval_time = self.eval_times.iloc[test_indices[test_indices <= test_fold_end]].max()

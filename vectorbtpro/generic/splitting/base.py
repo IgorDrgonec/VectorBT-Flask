@@ -1473,6 +1473,7 @@ class Splitter(Analyzable):
         min_train_folds: int = 2,
         max_train_folds: tp.Optional[int] = None,
         split_by_time: bool = False,
+        purge_td: tp.TimedeltaLike = 0,
         pred_times: tp.Union[None, tp.Index, tp.Series] = None,
         eval_times: tp.Union[None, tp.Index, tp.Series] = None,
         **kwargs,
@@ -1487,6 +1488,7 @@ class Splitter(Analyzable):
             min_train_folds=min_train_folds,
             max_train_folds=max_train_folds,
             split_by_time=split_by_time,
+            purge_td=purge_td,
         )
         return cls.from_purged(
             index,
@@ -1502,6 +1504,7 @@ class Splitter(Analyzable):
         index: tp.IndexLike,
         n_folds: int = 10,
         n_test_folds: int = 2,
+        purge_td: tp.TimedeltaLike = 0,
         embargo_td: tp.TimedeltaLike = 0,
         pred_times: tp.Union[None, tp.Index, tp.Series] = None,
         eval_times: tp.Union[None, tp.Index, tp.Series] = None,
@@ -1514,6 +1517,7 @@ class Splitter(Analyzable):
         purged_splitter = PurgedKFoldCV(
             n_folds=n_folds,
             n_test_folds=n_test_folds,
+            purge_td=purge_td,
             embargo_td=embargo_td,
         )
         return cls.from_purged(
