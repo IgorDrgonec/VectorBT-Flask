@@ -21,6 +21,7 @@ from vectorbtpro.utils.array_ import min_count_nb
 
 __all__ = [
     "DTC",
+    "date_range",
 ]
 
 __pdoc__ = {}

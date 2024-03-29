@@ -140,4 +140,4 @@ dmypy.json
 /venvs/
 /work/
 /*.ipynb
-/members/
+members

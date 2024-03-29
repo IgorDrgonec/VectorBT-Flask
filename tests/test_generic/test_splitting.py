@@ -818,6 +818,137 @@ class TestSplitter:
             ),
         )
 
+    def test_from_purged_walkforward(self):
+        np.testing.assert_array_equal(
+            vbt.Splitter.from_purged_walkforward(index, n_folds=5).splits_arr,
+            np.array(
+                [
+                    [slice(0, 13, None), slice(13, 19, None)],
+                    [slice(0, 19, None), slice(19, 25, None)],
+                    [slice(0, 25, None), slice(25, 31, None)],
+                ],
+                dtype=object,
+            ),
+        )
+        np.testing.assert_array_equal(
+            vbt.Splitter.from_purged_walkforward(
+                index,
+                n_folds=5,
+                pred_times=index,
+                eval_times=index + pd.Timedelta(days=3),
+            ).splits_arr,
+            np.array(
+                [
+                    [slice(0, 10, None), slice(13, 19, None)],
+                    [slice(0, 16, None), slice(19, 25, None)],
+                    [slice(0, 22, None), slice(25, 31, None)],
+                ],
+                dtype=object,
+            ),
+        )
+
+    def test_from_purged_kfold(self):
+        splits_arr = vbt.Splitter.from_purged_kfold(index, n_folds=4).splits_arr
+        assert splits_arr[0][0] == slice(0, 16, None)
+        assert splits_arr[0][1] == slice(16, 31, None)
+        np.testing.assert_array_equal(
+            splits_arr[1][0].range_,
+            np.array([0, 1, 2, 3, 4, 5, 6, 7, 16, 17, 18, 19, 20, 21, 22, 23]),
+        )
+        np.testing.assert_array_equal(
+            splits_arr[1][1].range_,
+            np.array([8, 9, 10, 11, 12, 13, 14, 15, 24, 25, 26, 27, 28, 29, 30]),
+        )
+        np.testing.assert_array_equal(
+            splits_arr[2][0].range_,
+            np.array([0, 1, 2, 3, 4, 5, 6, 7, 24, 25, 26, 27, 28, 29, 30]),
+        )
+        assert splits_arr[2][1] == slice(8, 24, None)
+        assert splits_arr[3][0] == slice(8, 24, None)
+        np.testing.assert_array_equal(
+            splits_arr[3][1].range_,
+            np.array([0, 1, 2, 3, 4, 5, 6, 7, 24, 25, 26, 27, 28, 29, 30]),
+        )
+        np.testing.assert_array_equal(
+            splits_arr[4][0].range_,
+            np.array([8, 9, 10, 11, 12, 13, 14, 15, 24, 25, 26, 27, 28, 29, 30]),
+        )
+        np.testing.assert_array_equal(
+            splits_arr[4][1].range_,
+            np.array([0, 1, 2, 3, 4, 5, 6, 7, 16, 17, 18, 19, 20, 21, 22, 23]),
+        )
+        assert splits_arr[5][0] == slice(16, 31, None)
+        assert splits_arr[5][1] == slice(0, 16, None)
+
+        splits_arr = vbt.Splitter.from_purged_kfold(
+            index,
+            n_folds=4,
+            pred_times=index,
+            eval_times=index + pd.Timedelta(days=3),
+        ).splits_arr
+        assert splits_arr[0][0] == slice(0, 13, None)
+        assert splits_arr[0][1] == slice(16, 31, None)
+        np.testing.assert_array_equal(
+            splits_arr[1][0].range_,
+            np.array([0, 1, 2, 3, 4, 19, 20]),
+        )
+        np.testing.assert_array_equal(
+            splits_arr[1][1].range_,
+            np.array([8, 9, 10, 11, 12, 13, 14, 15, 24, 25, 26, 27, 28, 29, 30]),
+        )
+        np.testing.assert_array_equal(
+            splits_arr[2][0].range_,
+            np.array([0, 1, 2, 3, 4, 27, 28, 29, 30]),
+        )
+        assert splits_arr[2][1] == slice(8, 24, None)
+        assert splits_arr[3][0] == slice(11, 21, None)
+        np.testing.assert_array_equal(
+            splits_arr[3][1].range_,
+            np.array([0, 1, 2, 3, 4, 5, 6, 7, 24, 25, 26, 27, 28, 29, 30]),
+        )
+        np.testing.assert_array_equal(
+            splits_arr[4][0].range_,
+            np.array([11, 12, 27, 28, 29, 30]),
+        )
+        np.testing.assert_array_equal(
+            splits_arr[4][1].range_,
+            np.array([0, 1, 2, 3, 4, 5, 6, 7, 16, 17, 18, 19, 20, 21, 22, 23]),
+        )
+        assert splits_arr[5][0] == slice(19, 31, None)
+        assert splits_arr[5][1] == slice(0, 16, None)
+
+        splits_arr = vbt.Splitter.from_purged_kfold(
+            index,
+            n_folds=4,
+            embargo_td="2 days",
+            pred_times=index,
+            eval_times=index + pd.Timedelta(days=3),
+        ).splits_arr
+        assert splits_arr[0][0] == slice(0, 13, None)
+        assert splits_arr[0][1] == slice(16, 31, None)
+        assert splits_arr[1][0] == slice(0, 5, None)
+        np.testing.assert_array_equal(
+            splits_arr[1][1].range_,
+            np.array([8, 9, 10, 11, 12, 13, 14, 15, 24, 25, 26, 27, 28, 29, 30]),
+        )
+        np.testing.assert_array_equal(
+            splits_arr[2][0].range_,
+            np.array([0,  1,  2,  3,  4, 29, 30]),
+        )
+        assert splits_arr[2][1] == slice(8, 24, None)
+        assert splits_arr[3][0] == slice(13, 21, None)
+        np.testing.assert_array_equal(
+            splits_arr[3][1].range_,
+            np.array([0,  1,  2,  3,  4,  5,  6,  7, 24, 25, 26, 27, 28, 29, 30]),
+        )
+        assert splits_arr[4][0] == slice(29, 31, None)
+        np.testing.assert_array_equal(
+            splits_arr[4][1].range_,
+            np.array([0,  1,  2,  3,  4,  5,  6,  7, 16, 17, 18, 19, 20, 21, 22, 23]),
+        )
+        assert splits_arr[5][0] == slice(21, 31, None)
+        assert splits_arr[5][1] == slice(0, 16, None)
+
     def test_row_stack(self):
         splitter1 = vbt.Splitter.from_splits(
             index, [slice(0, 10), slice(10, 20), slice(20, 30)], split_labels=["a", "b", "c"]
@@ -4576,11 +4707,10 @@ class TestSplitter:
         splitter.plots(settings=dict(split_group_by=[0, 1, 0, 2], set_group_by=[0, 0])),
 
 
-class TestSKLSplitter:
+class TestSplitterCV:
     def test_class(self):
-        skl_splitter = vbt.SKLSplitter(
-            "from_splits",
-            [
+        skl_splitter = vbt.SplitterCV(
+            splits=[
                 [slice(5, 5), slice(5, 6)],
                 [slice(6, 8), slice(8, 11)],
                 [slice(11, 15), slice(15, 20)],

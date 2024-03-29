@@ -10,7 +10,6 @@ import numpy as np
 import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro._settings import settings
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
@@ -40,6 +39,7 @@ from vectorbtpro.base.grouping.base import Grouper
 from vectorbtpro.base.merging import row_stack_merge, column_stack_merge, is_merge_func_from_config
 from vectorbtpro.generic.analyzable import Analyzable
 from vectorbtpro.generic.splitting import nb
+from vectorbtpro.generic.splitting.purged import BasePurgedCV, PurgedWalkForwardCV, PurgedKFoldCV
 
 if tp.TYPE_CHECKING:
     from sklearn.model_selection import BaseCrossValidator as BaseCrossValidatorT
@@ -51,7 +51,6 @@ __all__ = [
     "RelRange",
     "Takeable",
     "Splitter",
-    "SKLSplitter",
 ]
 
 __pdoc__ = {}
@@ -356,7 +355,7 @@ class Splitter(Analyzable):
         wrapper_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> SplitterT:
-        """Create a new `Splitter` instance from an iterable of splits.
+        """Create a `Splitter` instance from an iterable of splits.
 
         Argument `splits` supports both absolute and relative ranges.
         To transform relative ranges into the absolute format, enable `fix_ranges`.
@@ -470,7 +469,7 @@ class Splitter(Analyzable):
         template_context: tp.KwargsLike = None,
         **kwargs,
     ) -> SplitterT:
-        """Create a new `Splitter` instance from a single split."""
+        """Create a `Splitter` instance from a single split."""
         if split_range_kwargs is None:
             split_range_kwargs = {}
         new_split = cls.split_range(
@@ -507,7 +506,7 @@ class Splitter(Analyzable):
         freq: tp.Optional[tp.FrequencyLike] = None,
         **kwargs,
     ) -> SplitterT:
-        """Create a new `Splitter` instance from a rolling range of a fixed length.
+        """Create a `Splitter` instance from a rolling range of a fixed length.
 
         Uses `Splitter.from_splits` to prepare the splits array and labels, and to build the instance.
 
@@ -686,7 +685,7 @@ class Splitter(Analyzable):
         freq: tp.Optional[tp.FrequencyLike] = None,
         **kwargs,
     ) -> SplitterT:
-        """Create a new `Splitter` instance from a number of rolling ranges of the same length.
+        """Create a `Splitter` instance from a number of rolling ranges of the same length.
 
         If `length` is None, splits the index evenly into `n` non-overlapping ranges
         using `Splitter.from_rolling`. Otherwise, picks `n` evenly-spaced, potentially overlapping
@@ -837,7 +836,7 @@ class Splitter(Analyzable):
         freq: tp.Optional[tp.FrequencyLike] = None,
         **kwargs,
     ) -> SplitterT:
-        """Create a new `Splitter` instance from an expanding range.
+        """Create a `Splitter` instance from an expanding range.
 
         Argument `min_length` is the minimum length of the expanding range. Provide it as
         a float between 0 and 1 to make it relative to the length of the index. Argument `offset` is
@@ -943,7 +942,7 @@ class Splitter(Analyzable):
         freq: tp.Optional[tp.FrequencyLike] = None,
         **kwargs,
     ) -> SplitterT:
-        """Create a new `Splitter` instance from a number of expanding ranges.
+        """Create a `Splitter` instance from a number of expanding ranges.
 
         Picks `n` evenly-spaced, expanding ranges. Argument `min_length` defines the minimum
         length for each range. For other arguments, see `Splitter.from_rolling`.
@@ -1032,7 +1031,7 @@ class Splitter(Analyzable):
         template_context: tp.KwargsLike = None,
         **kwargs,
     ) -> SplitterT:
-        """Create a new `Splitter` instance from ranges.
+        """Create a `Splitter` instance from ranges.
 
         Uses `vectorbtpro.base.indexing.get_index_ranges` to generate start and end indices.
         Passes only related keyword arguments found in `kwargs`.
@@ -1115,7 +1114,7 @@ class Splitter(Analyzable):
         freq: tp.Optional[tp.FrequencyLike] = None,
         **kwargs,
     ) -> SplitterT:
-        """Create a new `Splitter` instance from a grouper.
+        """Create a `Splitter` instance from a grouper.
 
         See `vectorbtpro.base.accessors.BaseIDXAccessor.get_grouper`.
 
@@ -1205,7 +1204,7 @@ class Splitter(Analyzable):
         freq: tp.Optional[tp.FrequencyLike] = None,
         **kwargs,
     ) -> SplitterT:
-        """Create a new `Splitter` instance from a number of random ranges.
+        """Create a `Splitter` instance from a number of random ranges.
 
         Randomly picks the length of a range between `min_length` and `max_length` (including) using
         `length_choice_func`, which receives an array of possible values and selects one. It defaults to
@@ -1410,7 +1409,7 @@ class Splitter(Analyzable):
         set_labels: tp.Optional[tp.IndexLike] = None,
         **kwargs,
     ) -> SplitterT:
-        """Create a new `Splitter` instance from a scikit-learn's splitter.
+        """Create a `Splitter` instance from a scikit-learn's splitter.
 
         The splitter must be an instance of `sklearn.model_selection.BaseCrossValidator`.
 
@@ -1432,6 +1431,100 @@ class Splitter(Analyzable):
         )
 
     @classmethod
+    def from_purged(
+        cls: tp.Type[SplitterT],
+        index: tp.IndexLike,
+        purged_splitter: BasePurgedCV,
+        pred_times: tp.Union[None, tp.Index, tp.Series] = None,
+        eval_times: tp.Union[None, tp.Index, tp.Series] = None,
+        split_labels: tp.Optional[tp.IndexLike] = None,
+        set_labels: tp.Optional[tp.IndexLike] = None,
+        **kwargs,
+    ) -> SplitterT:
+        """Create a `Splitter` instance from a purged splitter.
+
+        The splitter must be an instance of `vectorbtpro.generic.splitting.purged.BasePurgedCV`.
+
+        Uses `Splitter.from_splits` to prepare the splits array and labels, and to build the instance."""
+        index = dt.prepare_dt_index(index)
+        checks.assert_instance_of(purged_splitter, BasePurgedCV)
+        if set_labels is None:
+            set_labels = ["train", "test"]
+
+        indices_generator = purged_splitter.split(
+            pd.Series(np.arange(len(index)), index=index),
+            pred_times=pred_times,
+            eval_times=eval_times,
+        )
+        return cls.from_splits(
+            index,
+            list(indices_generator),
+            split_labels=split_labels,
+            set_labels=set_labels,
+            **kwargs,
+        )
+
+    @classmethod
+    def from_purged_walkforward(
+        cls: tp.Type[SplitterT],
+        index: tp.IndexLike,
+        n_folds: int = 10,
+        n_test_folds: int = 1,
+        min_train_folds: int = 2,
+        max_train_folds: tp.Optional[int] = None,
+        split_by_time: bool = False,
+        pred_times: tp.Union[None, tp.Index, tp.Series] = None,
+        eval_times: tp.Union[None, tp.Index, tp.Series] = None,
+        **kwargs,
+    ) -> SplitterT:
+        """Create a `Splitter` instance from `vectorbtpro.generic.splitting.purged.PurgedWalkForwardCV`.
+
+        Keyword arguments are passed to `Splitter.from_purged`."""
+        index = dt.prepare_dt_index(index)
+        purged_splitter = PurgedWalkForwardCV(
+            n_folds=n_folds,
+            n_test_folds=n_test_folds,
+            min_train_folds=min_train_folds,
+            max_train_folds=max_train_folds,
+            split_by_time=split_by_time,
+        )
+        return cls.from_purged(
+            index,
+            purged_splitter,
+            pred_times=pred_times,
+            eval_times=eval_times,
+            **kwargs,
+        )
+
+    @classmethod
+    def from_purged_kfold(
+        cls: tp.Type[SplitterT],
+        index: tp.IndexLike,
+        n_folds: int = 10,
+        n_test_folds: int = 2,
+        embargo_td: tp.TimedeltaLike = 0,
+        pred_times: tp.Union[None, tp.Index, tp.Series] = None,
+        eval_times: tp.Union[None, tp.Index, tp.Series] = None,
+        **kwargs,
+    ) -> SplitterT:
+        """Create a `Splitter` instance from `vectorbtpro.generic.splitting.purged.PurgedKFoldCV`.
+
+        Keyword arguments are passed to `Splitter.from_purged`."""
+        index = dt.prepare_dt_index(index)
+        purged_splitter = PurgedKFoldCV(
+            n_folds=n_folds,
+            n_test_folds=n_test_folds,
+            embargo_td=embargo_td,
+        )
+        return cls.from_purged(
+            index,
+            purged_splitter,
+            pred_times=pred_times,
+            eval_times=eval_times,
+            **kwargs,
+        )
+
+    @classmethod
     def from_split_func(
         cls: tp.Type[SplitterT],
         index: tp.IndexLike,
@@ -1446,7 +1539,7 @@ class Splitter(Analyzable):
         freq: tp.Optional[tp.FrequencyLike] = None,
         **kwargs,
     ) -> SplitterT:
-        """Create a new `Splitter` instance from a custom split function.
+        """Create a `Splitter` instance from a custom split function.
 
         In a while-loop, substitutes templates in `split_args` and `split_kwargs` and passes
         them to `split_func`, which should return either a split (see `new_split` in `Splitter.split_range`,
@@ -5186,189 +5279,3 @@ class Splitter(Analyzable):
 
 Splitter.override_metrics_doc(__pdoc__)
 Splitter.override_subplots_doc(__pdoc__)
-
-if settings["importing"]["sklearn"]:
-    from sklearn.model_selection import BaseCrossValidator
-    from sklearn.utils.validation import indexable
-
-    class SKLSplitter(BaseCrossValidator):
-        """Split iterator based on `Splitter`.
-
-        Args:
-            method (str or callable): Method that returns an instance of `Splitter`.
-            *method_args: Positional arguments passed to `method`.
-            splitter_cls (type): Splitter class.
-            split_group_by (any): Split groups. See `vectorbtpro.base.accessors.BaseIDXAccessor.get_grouper`.
-
-                Not passed to `method`.
-            set_group_by (any): Set groups. See `vectorbtpro.base.accessors.BaseIDXAccessor.get_grouper`.
-
-                Not passed to `method`.
-            template_context (dict): Mapping used to substitute templates in ranges.
-
-                Passed to `method`.
-            **method_kwargs: Keyword arguments passed to `method`.
-
-        Usage:
-            * Replicate `TimeSeriesSplit` from scikit-learn:
-
-            ```pycon
-            >>> from vectorbtpro import *
-
-            >>> X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]])
-            >>> y = np.array([1, 2, 3, 4])
-
-            >>> tscv = vbt.SKLSplitter(
-            ...     "from_expanding",
-            ...     min_length=2,
-            ...     offset=1,
-            ...     split=-1
-            ... )
-            >>> for i, (train_indices, test_indices) in enumerate(tscv.split(X)):
-            ...     print("Split %d:" % i)
-            ...     X_train, X_test = X[train_indices], X[test_indices]
-            ...     print("  X:", X_train.tolist(), X_test.tolist())
-            ...     y_train, y_test = y[train_indices], y[test_indices]
-            ...     print("  y:", y_train.tolist(), y_test.tolist())
-            Split 0:
-              X: [[1, 2]] [[3, 4]]
-              y: [1] [2]
-            Split 1:
-              X: [[1, 2], [3, 4]] [[5, 6]]
-              y: [1, 2] [3]
-            Split 2:
-              X: [[1, 2], [3, 4], [5, 6]] [[7, 8]]
-              y: [1, 2, 3] [4]
-            ```
-        """
-
-        def __init__(
-            self,
-            method: tp.Union[str, tp.Callable],
-            *method_args,
-            splitter_cls: tp.Type[Splitter] = Splitter,
-            split_group_by: tp.AnyGroupByLike = None,
-            set_group_by: tp.AnyGroupByLike = None,
-            template_context: tp.KwargsLike = None,
-            **method_kwargs,
-        ) -> None:
-            self.method = method
-            self.method_args = method_args
-            self.method_kwargs = method_kwargs
-            self.splitter_cls = splitter_cls
-            self.split_group_by = split_group_by
-            self.set_group_by = set_group_by
-            self.template_context = template_context
-
-        def get_splitter(
-            self,
-            X: tp.Any = None,
-            y: tp.Any = None,
-            groups: tp.Any = None,
-        ) -> Splitter:
-            """Get splitter of type `Splitter`."""
-            X, y, groups = indexable(X, y, groups)
-            try:
-                index = self.splitter_cls.get_obj_index(X)
-            except ValueError as e:
-                index = pd.RangeIndex(stop=len(X))
-            if isinstance(self.method, str):
-                method = getattr(self.splitter_cls, self.method)
-            else:
-                method = self.method
-            splitter = method(
-                index,
-                *self.method_args,
-                template_context=self.template_context,
-                **self.method_kwargs,
-            )
-            if splitter.get_n_sets(set_group_by=self.set_group_by) != 2:
-                raise ValueError("Number of sets in the splitter must be 2: train and test")
-            return splitter
-
-        def _iter_masks(
-            self,
-            X: tp.Any = None,
-            y: tp.Any = None,
-            groups: tp.Any = None,
-        ) -> tp.Generator[tp.Tuple[tp.Array1d, tp.Array1d], None, None]:
-            """Generates boolean masks corresponding to train and test sets."""
-            splitter = self.get_splitter(X=X, y=y, groups=groups)
-            for mask_arr in splitter.get_iter_split_mask_arrs(
-                split_group_by=self.split_group_by,
-                set_group_by=self.set_group_by,
-                template_context=self.template_context,
-            ):
-                yield mask_arr[0], mask_arr[1]
-
-        def _iter_train_masks(
-            self,
-            X: tp.Any = None,
-            y: tp.Any = None,
-            groups: tp.Any = None,
-        ) -> tp.Generator[tp.Array1d, None, None]:
-            """Generates boolean masks corresponding to train sets."""
-            for train_mask_arr, _ in self._iter_masks(X=X, y=y, groups=groups):
-                yield train_mask_arr
-
-        def _iter_test_masks(
-            self,
-            X: tp.Any = None,
-            y: tp.Any = None,
-            groups: tp.Any = None,
-        ) -> tp.Generator[tp.Array1d, None, None]:
-            """Generates boolean masks corresponding to test sets."""
-            for _, test_mask_arr in self._iter_masks(X=X, y=y, groups=groups):
-                yield test_mask_arr
-
-        def _iter_indices(
-            self,
-            X: tp.Any = None,
-            y: tp.Any = None,
-            groups: tp.Any = None,
-        ) -> tp.Generator[tp.Tuple[tp.Array1d, tp.Array1d], None, None]:
-            """Generates integer indices corresponding to train and test sets."""
-            for train_mask_arr, test_mask_arr in self._iter_masks(X=X, y=y, groups=groups):
-                yield np.flatnonzero(train_mask_arr), np.flatnonzero(test_mask_arr)
-
-        def _iter_train_indices(
-            self,
-            X: tp.Any = None,
-            y: tp.Any = None,
-            groups: tp.Any = None,
-        ) -> tp.Generator[tp.Array1d, None, None]:
-            """Generates integer indices corresponding to train sets."""
-            for train_indices, _ in self._iter_indices(X=X, y=y, groups=groups):
-                yield train_indices
-
-        def _iter_test_indices(
-            self,
-            X: tp.Any = None,
-            y: tp.Any = None,
-            groups: tp.Any = None,
-        ) -> tp.Generator[tp.Array1d, None, None]:
-            """Generates integer indices corresponding to test sets."""
-            for _, test_indices in self._iter_indices(X=X, y=y, groups=groups):
-                yield test_indices
-
-        def get_n_splits(
-            self,
-            X: tp.Any = None,
-            y: tp.Any = None,
-            groups: tp.Any = None,
-        ) -> int:
-            """Returns the number of splitting iterations in the cross-validator."""
-            splitter = self.get_splitter(X=X, y=y, groups=groups)
-            return splitter.get_n_splits(split_group_by=self.split_group_by)
-
-        def split(
-            self,
-            X: tp.Any = None,
-            y: tp.Any = None,
-            groups: tp.Any = None,
-        ) -> tp.Generator[tp.Tuple[tp.Array1d, tp.Array1d], None, None]:
-            """Generate indices to split data into training and test set."""
-            return self._iter_indices(X=X, y=y, groups=groups)
-
-else:
-    SKLSplitter = None
