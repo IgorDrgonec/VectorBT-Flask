@@ -951,6 +951,12 @@ fs_arg_config = ReadonlyConfig(
             subdtype=np.bool_,
             broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=False)),
         ),
+        limit_order_price=dict(
+            broadcast=True,
+            map_enum_kwargs=dict(enum=enums.LimitOrderPrice, ignore_type=(int, float)),
+            subdtype=np.number,
+            broadcast_kwargs=dict(reindex_kwargs=dict(fill_value=enums.LimitOrderPrice.Limit)),
+        ),
         upon_adj_limit_conflict=dict(
             broadcast=True,
             map_enum_kwargs=dict(enum=enums.PendingConflictMode),

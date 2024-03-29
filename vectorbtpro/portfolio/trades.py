@@ -62,7 +62,7 @@ Also available as `vectorbtpro.portfolio.base.Portfolio.positions`.
 ...     fixed_fees=1.
 ... )
 >>> entry_trades = vbt.Portfolio.from_orders(**pf_kwargs).entry_trades
->>> entry_trades.records_readable
+>>> entry_trades.readable
    Entry Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
 0               0       0   1.0               0            0              1.0
 1               1       0   1.0               1            1              2.0
@@ -83,7 +83,7 @@ Also available as `vectorbtpro.portfolio.base.Portfolio.positions`.
 
 >>> # Exit trades
 >>> exit_trades = vbt.Portfolio.from_orders(**pf_kwargs).exit_trades
->>> exit_trades.records_readable
+>>> exit_trades.readable
    Exit Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
 0              0       0   4.0               0            0              2.5
 
@@ -95,7 +95,7 @@ Also available as `vectorbtpro.portfolio.base.Portfolio.positions`.
 
 >>> # Positions
 >>> positions = vbt.Portfolio.from_orders(**pf_kwargs).positions
->>> positions.records_readable
+>>> positions.readable
    Position Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
 0            0       0   4.0               0            0              2.5
 
@@ -119,7 +119,7 @@ True
 ...     fixed_fees=1.
 ... )
 >>> entry_trades = vbt.Portfolio.from_orders(**pf_kwargs).entry_trades
->>> entry_trades.records_readable
+>>> entry_trades.readable
    Entry Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
 0               0       0   4.0               0            0              1.0
 
@@ -131,7 +131,7 @@ True
 
 >>> # Exit trades
 >>> exit_trades = vbt.Portfolio.from_orders(**pf_kwargs).exit_trades
->>> exit_trades.records_readable
+>>> exit_trades.readable
    Exit Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
 0              0       0   1.0               0            0              1.0
 1              1       0   1.0               0            0              1.0
@@ -152,7 +152,7 @@ True
 
 >>> # Positions
 >>> positions = vbt.Portfolio.from_orders(**pf_kwargs).positions
->>> positions.records_readable
+>>> positions.readable
    Position Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
 0            0       0   4.0               0            0              1.0
 
@@ -176,7 +176,7 @@ True
 ...     fixed_fees=1.
 ... )
 >>> entry_trades = vbt.Portfolio.from_orders(**pf_kwargs).entry_trades
->>> entry_trades.records_readable
+>>> entry_trades.readable
    Entry Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
 0               0       0   1.0               0            0              1.0
 1               1       0   1.0               1            1              2.0
@@ -197,7 +197,7 @@ True
 
 >>> # Exit trades
 >>> exit_trades = vbt.Portfolio.from_orders(**pf_kwargs).exit_trades
->>> exit_trades.records_readable
+>>> exit_trades.readable
    Exit Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
 0              0       0   1.0               0            0              1.0
 1              1       0   1.0               1            1              2.0
@@ -218,7 +218,7 @@ True
 
 >>> # Positions
 >>> positions = vbt.Portfolio.from_orders(**pf_kwargs).positions
->>> positions.records_readable
+>>> positions.readable
    Position Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
 0            0       0   1.0               0            0              1.0
 1            1       0   1.0               1            1              2.0
@@ -251,7 +251,7 @@ True
 ...     fixed_fees=1.
 ... )
 >>> entry_trades = vbt.Portfolio.from_orders(**pf_kwargs).entry_trades
->>> entry_trades.records_readable
+>>> entry_trades.readable
    Entry Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
 0               0       0   1.0               0            0              1.0
 
@@ -263,7 +263,7 @@ True
 
 >>> # Exit trades
 >>> exit_trades = vbt.Portfolio.from_orders(**pf_kwargs).exit_trades
->>> exit_trades.records_readable
+>>> exit_trades.readable
    Exit Trade Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
 0              0       0   1.0               0            0              1.0
 
@@ -275,7 +275,7 @@ True
 
 >>> # Positions
 >>> positions = vbt.Portfolio.from_orders(**pf_kwargs).positions
->>> positions.records_readable
+>>> positions.readable
    Position Id  Column  Size  Entry Order Id  Entry Index  Avg Entry Price  \\
 0            0       0   1.0               0            0              1.0
 

@@ -1953,7 +1953,8 @@ def check_price_hit_nb(
 ) -> tp.Tuple[float, bool, bool]:
     """Check whether a target price was hit.
 
-    If `can_use_ohlc`, `check_open`, and `hard_price` are True and the target price is hit by open, returns open.
+    If `hard_price` is False, and `can_use_ohlc` and `check_open` are True and the target price
+    is hit by open, returns open. Otherwise, returns the actual target price.
 
     Returns the stop price, whether it was hit by open, and whether it was hit during this bar."""
     high, low = resolve_hl_nb(
@@ -2153,6 +2154,7 @@ def check_limit_hit_nb(
     limit_reverse: bool = False,
     can_use_ohlc: bool = True,
     check_open: bool = True,
+    hard_limit: bool = False,
 ) -> tp.Tuple[float, bool, bool]:
     """Resolve the limit price using `resolve_limit_price_nb` and check whether it was hit.
 
@@ -2182,7 +2184,8 @@ def check_limit_hit_nb(
             if check_open and is_close_or_less_nb(open, limit_price):
                 hit_on_open = True
                 hit = True
-                limit_price = open
+                if not hard_limit:
+                    limit_price = open
             else:
                 hit = is_close_or_less_nb(low, limit_price)
                 if hit and np.isinf(limit_price):
@@ -2191,7 +2194,8 @@ def check_limit_hit_nb(
             if check_open and is_close_or_greater_nb(open, limit_price):
                 hit_on_open = True
                 hit = True
-                limit_price = open
+                if not hard_limit:
+                    limit_price = open
             else:
                 hit = is_close_or_greater_nb(high, limit_price)
                 if hit and np.isinf(limit_price):
@@ -2204,6 +2208,22 @@ def check_limit_hit_nb(
         if hit and np.isinf(limit_price):
             limit_price = close
     return limit_price, hit_on_open, hit
+
+
+@register_jitted(cache=True)
+def resolve_limit_order_price_nb(
+    limit_price: float,
+    close: float,
+    limit_order_price: float,
+) -> float:
+    """Resolve the limit order price of a limit order."""
+    if limit_order_price == LimitOrderPrice.Limit or limit_order_price == LimitOrderPrice.HardLimit:
+        return float(limit_price)
+    elif limit_order_price == LimitOrderPrice.Close:
+        return float(close)
+    elif limit_order_price < 0:
+        raise ValueError("Invalid LimitOrderPrice option")
+    return float(limit_order_price)
 
 
 @register_jitted(cache=True)
@@ -2287,9 +2307,7 @@ def check_td_stop_hit_nb(
 ) -> tp.Tuple[bool, bool]:
     """Check whether TD stop was hit by comparing the current index with the initial index.
 
-    Returns whether the stop was hit already on open, and whether the stop was hit during this bar.
-
-    Identical mechanics to `check_limit_hit_nb`."""
+    Returns whether the stop was hit already on open, and whether the stop was hit during this bar."""
     if stop == -1:
         return False, False
     if time_delta_format == TimeDeltaFormat.Rows:
@@ -2330,9 +2348,7 @@ def check_dt_stop_hit_nb(
 ) -> tp.Tuple[bool, bool]:
     """Check whether DT stop was hit by comparing the current index with the initial index.
 
-    Returns whether the stop was hit already on open, and whether the stop was hit during this bar.
-
-    Identical mechanics to `check_limit_hit_nb`."""
+    Returns whether the stop was hit already on open, and whether the stop was hit during this bar."""
     if stop == -1:
         return False, False
     if time_delta_format == TimeDeltaFormat.Rows:
@@ -2582,6 +2598,7 @@ def set_limit_info_nb(
     expiry: int = -1,
     time_delta_format: int = TimeDeltaFormat.Index,
     reverse: bool = False,
+    order_price: int = LimitOrderPrice.Limit,
 ) -> None:
     """Set limit order information.
 
@@ -2600,6 +2617,7 @@ def set_limit_info_nb(
     limit_info["expiry"] = expiry
     limit_info["time_delta_format"] = time_delta_format
     limit_info["reverse"] = reverse
+    limit_info["order_price"] = order_price
 
 
 @register_jitted(cache=True)
@@ -2619,6 +2637,7 @@ def clear_limit_info_nb(limit_info: tp.Record) -> None:
     limit_info["expiry"] = -1
     limit_info["time_delta_format"] = -1
     limit_info["reverse"] = False
+    limit_info["order_price"] = np.nan
 
 
 @register_jitted(cache=True)

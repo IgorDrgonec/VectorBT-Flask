@@ -28,7 +28,7 @@ Using `Drawdowns.from_price`, you can generate drawdown records for any time ser
 
 >>> drawdowns = vbt.Drawdowns.from_price(price, wrapper_kwargs=dict(freq='d'))
 
->>> drawdowns.records_readable
+>>> drawdowns.readable
    Drawdown Id  Column               Start Index              Valley Index  \\
 0            0       0 2019-10-02 00:00:00+00:00 2019-10-06 00:00:00+00:00
 1            1       0 2019-10-09 00:00:00+00:00 2019-10-24 00:00:00+00:00

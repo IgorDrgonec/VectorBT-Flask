@@ -1987,7 +1987,7 @@ class SignalsAccessor(GenericAccessor):
             >>> ranges
             <vectorbtpro.generic.ranges.Ranges at 0x7ff29ea7c7b8>
 
-            >>> ranges.records_readable
+            >>> ranges.readable
                Range Id  Column  Start Index  End Index  Status
             0         0       0            0          3  Closed
             1         1       0            3          5  Closed
@@ -2006,7 +2006,7 @@ class SignalsAccessor(GenericAccessor):
             >>> ranges
             <vectorbtpro.generic.ranges.Ranges at 0x7ff29e3b80f0>
 
-            >>> ranges.records_readable
+            >>> ranges.readable
                Range Id  Column  Start Index  End Index  Status
             0         0       0            2          2  Closed
             1         1       0            2          4  Closed
@@ -2022,7 +2022,7 @@ class SignalsAccessor(GenericAccessor):
             >>> ranges
             <vectorbtpro.generic.ranges.Ranges at 0x7ff29eccbd68>
 
-            >>> ranges.records_readable
+            >>> ranges.readable
                Range Id  Column  Start Index  End Index  Status
             0         0       0            0          2  Closed
             1         1       0            1          2  Closed
@@ -2078,7 +2078,7 @@ class SignalsAccessor(GenericAccessor):
         Usage:
             ```pycon
             >>> mask_sr = pd.Series([True, True, True, False, True, True])
-            >>> mask_sr.vbt.signals.partition_ranges().records_readable
+            >>> mask_sr.vbt.signals.partition_ranges().readable
                Range Id  Column  Start Timestamp  End Timestamp  Status
             0         0       0                0              3  Closed
             1         1       0                4              5    Open
@@ -2103,7 +2103,7 @@ class SignalsAccessor(GenericAccessor):
         Usage:
             ```pycon
             >>> mask_sr = pd.Series([True, False, False, True, False, True, True])
-            >>> mask_sr.vbt.signals.between_partition_ranges().records_readable
+            >>> mask_sr.vbt.signals.between_partition_ranges().readable
                Range Id  Column  Start Timestamp  End Timestamp  Status
             0         0       0                0              3  Closed
             1         1       0                3              5  Closed

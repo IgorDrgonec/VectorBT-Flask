@@ -2856,6 +2856,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         limit_tif: tp.Optional[tp.ArrayLike] = None,
         limit_expiry: tp.Optional[tp.ArrayLike] = None,
         limit_reverse: tp.Optional[tp.ArrayLike] = None,
+        limit_order_price: tp.Optional[tp.ArrayLike] = None,
         upon_adj_limit_conflict: tp.Optional[tp.ArrayLike] = None,
         upon_opp_limit_conflict: tp.Optional[tp.ArrayLike] = None,
         use_stops: tp.Optional[bool] = None,
@@ -3071,6 +3072,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
                 If True, a buy/sell limit price will be checked against high/low (not low/high).
                 Also, the limit delta will be applied above/below (not below/above) the initial price.
+            limit_order_price (LimitOrderPrice or array_like): See `vectorbtpro.portfolio.enums.LimitOrderPrice`.
+                Will broadcast.
+
+                If provided on per-element basis, gets applied upon order creation. If a positive value is provided,
+                used directly as a price, otherwise used as an enumerated value.
             upon_adj_limit_conflict (PendingConflictMode or array_like): Conflict mode for limit and user-defined
                 signals of adjacent sign. See `vectorbtpro.portfolio.enums.PendingConflictMode`. Will broadcast.
             upon_opp_limit_conflict (PendingConflictMode or array_like): Conflict mode for limit and user-defined
@@ -4583,7 +4589,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ...     max_order_records=close.shape[0] * 2
             ... )
 
-            >>> pf.orders.records_readable
+            >>> pf.orders.readable
                 Order Id Column  Timestamp  Size  Price  Fees  Side
             0          0      a          0   1.0    1.0   0.0   Buy
             1          1      a          0   1.0    2.0   0.0  Sell

@@ -30,7 +30,7 @@ are 0 and 20 (not 19!) respectively.
 
 >>> ranges = vbt.Ranges.from_array(fast_below_slow, wrapper_kwargs=dict(freq='d'))
 
->>> ranges.records_readable
+>>> ranges.readable
    Range Id  Column           Start Timestamp             End Timestamp  \\
 0         0       0 2019-02-19 00:00:00+00:00 2019-07-25 00:00:00+00:00
 1         1       0 2019-08-08 00:00:00+00:00 2019-08-19 00:00:00+00:00

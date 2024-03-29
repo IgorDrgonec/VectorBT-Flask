@@ -836,6 +836,8 @@ class MappedArray(Analyzable):
         """`MappedArray.to_readable` with default arguments."""
         return self.to_readable()
 
+    readable = mapped_readable
+
     def __len__(self) -> int:
         return len(self.values)
 
