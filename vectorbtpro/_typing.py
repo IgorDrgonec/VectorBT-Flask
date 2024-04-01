@@ -88,10 +88,10 @@ TupleList = Union[List[T], Tuple[T, ...]]
 MaybeTupleList = Union[T, List[T], Tuple[T, ...]]
 MaybeIterable = Union[T, Iterable[T]]
 MaybeSequence = Union[T, Sequence[T]]
-MaybeCollection = Union[T, Collection[T]]
 MappingSequence = Union[Mapping[Hashable, T], Sequence[T]]
 MaybeMappingSequence = Union[T, Mapping[Hashable, T], Sequence[T]]
 SetLike = Union[None, Set[T]]
+ItemGenerator = Generator[Tuple[Hashable, Any], None, None]
 
 
 # Arrays
@@ -221,8 +221,16 @@ MappedReduceMetaFunc = Callable[[GroupIdxs, int, VarArg()], Scalar]
 MappedReduceToArrayMetaFunc = Callable[[GroupIdxs, int, VarArg()], Array1d]
 
 # Indicators
-Param = Any
-Params = Sequence[Param]
+ParamValue = Any
+ParamValues = Sequence[ParamValue]
+MaybeParamValues = MaybeSequence[ParamValue]
+MaybeParams = Sequence[MaybeParamValues]
+Params = Sequence[ParamValues]
+ParamsOrLens = Sequence[Union[ParamValues, int]]
+ParamsOrDict = Union[Params, Dict[Hashable, ParamValues]]
+ParamGrid = Union[ParamsOrLens, Dict[Hashable, ParamsOrLens]]
+ParamComb = Sequence[ParamValue]
+ParamCombOrDict = Union[ParamComb, Dict[Hashable, ParamValue]]
 
 # Mappings
 MappingLike = Union[str, Mapping, NamedTuple, EnumMeta, IndexLike]

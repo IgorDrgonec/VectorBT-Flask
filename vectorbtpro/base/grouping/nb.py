@@ -3,63 +3,13 @@
 """Numba-compiled functions for grouping."""
 
 import numpy as np
-import pandas as pd
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.base import indexes
 from vectorbtpro.registries.jit_registry import register_jitted
-from vectorbtpro.utils import checks
 
 __all__ = []
 
 GroupByT = tp.Union[None, bool, tp.Index]
-
-
-def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike) -> GroupByT:
-    """Convert mapper `group_by` to `pd.Index`.
-
-    !!! note
-        Index and mapper must have the same length."""
-    if group_by is None or group_by is False:
-        return group_by
-    if group_by is True:
-        group_by = pd.Index(["group"] * len(index))  # one group
-    elif isinstance(group_by, (int, str)):
-        group_by = indexes.select_levels(index, group_by)
-    elif checks.is_sequence(group_by):
-        if (
-            len(group_by) != len(index)
-            and isinstance(group_by[0], (int, str))
-            and isinstance(index, pd.MultiIndex)
-            and len(group_by) <= len(index.names)
-        ):
-            try:
-                group_by = indexes.select_levels(index, group_by)
-            except (IndexError, KeyError):
-                pass
-    if not isinstance(group_by, pd.Index):
-        group_by = pd.Index(group_by)
-    if len(group_by) != len(index):
-        raise ValueError("group_by and index must have the same length")
-    return group_by
-
-
-def get_groups_and_index(index: tp.Index, group_by: tp.GroupByLike) -> tp.Tuple[tp.Array1d, tp.Index]:
-    """Return array of group indices pointing to the original index, and grouped index."""
-    if group_by is None or group_by is False:
-        return np.arange(len(index)), index
-
-    group_by = group_by_to_index(index, group_by)
-    codes, uniques = pd.factorize(group_by)
-    if not isinstance(uniques, pd.Index):
-        new_index = pd.Index(uniques)
-    else:
-        new_index = uniques
-    if isinstance(group_by, pd.MultiIndex):
-        new_index.names = group_by.names
-    elif isinstance(group_by, (pd.Index, pd.Series)):
-        new_index.name = group_by.name
-    return codes, new_index
 
 
 @register_jitted(cache=True)

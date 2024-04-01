@@ -2,7 +2,6 @@
 
 """Utilities for working with dates and time."""
 
-import attr
 import warnings
 from datetime import datetime, timezone, timedelta, tzinfo, date, time
 from collections import namedtuple
@@ -15,12 +14,14 @@ import re
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.config import merge_dicts, HybridConfig
 from vectorbtpro.utils.parsing import WarningsFiltered
 from vectorbtpro.utils.array_ import min_count_nb
 
 __all__ = [
     "DTC",
+    "date_range",
 ]
 
 __pdoc__ = {}
@@ -440,32 +441,32 @@ DTCNT = namedtuple("DTCNT", ["year", "month", "day", "weekday", "hour", "minute"
 DTCT = tp.TypeVar("DTCT", bound="DTC")
 
 
-@attr.s(frozen=True)
-class DTC:
+@define
+class DTC(DefineMixin):
     """Class representing one or more datetime components."""
 
-    year: tp.Optional[int] = attr.ib(default=None)
+    year: tp.Optional[int] = define.field(default=None)
     """Year."""
 
-    month: tp.Optional[int] = attr.ib(default=None)
+    month: tp.Optional[int] = define.field(default=None)
     """Month."""
 
-    day: tp.Optional[int] = attr.ib(default=None)
+    day: tp.Optional[int] = define.field(default=None)
     """Day of month."""
 
-    weekday: tp.Optional[int] = attr.ib(default=None)
+    weekday: tp.Optional[int] = define.field(default=None)
     """Day of week."""
 
-    hour: tp.Optional[int] = attr.ib(default=None)
+    hour: tp.Optional[int] = define.field(default=None)
     """Hour."""
 
-    minute: tp.Optional[int] = attr.ib(default=None)
+    minute: tp.Optional[int] = define.field(default=None)
     """Minute."""
 
-    second: tp.Optional[int] = attr.ib(default=None)
+    second: tp.Optional[int] = define.field(default=None)
     """Second."""
 
-    nanosecond: tp.Optional[int] = attr.ib(default=None)
+    nanosecond: tp.Optional[int] = define.field(default=None)
     """Nanosecond."""
 
     @classmethod
@@ -624,7 +625,7 @@ class DTC:
 
     def to_namedtuple(self) -> namedtuple:
         """Convert to a named tuple."""
-        return DTCNT(*attr.asdict(self).values())
+        return DTCNT(*self.asdict().values())
 
 
 def time_to_timedelta(t: tp.Union[tp.TimeLike, DTC], **kwargs) -> pd.Timedelta:
@@ -934,11 +935,20 @@ def interval_to_ms(interval: str) -> tp.Optional[int]:
         return None
 
 
-def to_ns(obj: tp.ArrayLike) -> tp.ArrayLike:
+def to_ns(obj: tp.ArrayLike, tz_naive_ns: tp.Optional[bool] = None) -> tp.ArrayLike:
     """Convert a datetime, timedelta, integer, or any array-like object to nanoseconds since Unix Epoch."""
+    from vectorbtpro._settings import settings
+
+    datetime_cfg = settings["datetime"]
+
+    if tz_naive_ns is None:
+        tz_naive_ns = datetime_cfg["tz_naive_ns"]
+
     if isinstance(obj, time):
         obj = time_to_timedelta(obj)
     if isinstance(obj, pd.Timestamp):
+        if tz_naive_ns:
+            obj = obj.tz_localize(None).tz_localize("utc")
         obj = obj.to_datetime64()
     if isinstance(obj, BaseOffset):
         obj = pd.Timedelta(obj)
@@ -952,6 +962,9 @@ def to_ns(obj: tp.ArrayLike) -> tp.ArrayLike:
         obj = obj.tz_localize(None).tz_localize("utc")
     if isinstance(obj, pd.PeriodIndex):
         obj = obj.to_timestamp()
+    if isinstance(obj, pd.DatetimeIndex):
+        if tz_naive_ns:
+            obj = obj.tz_localize(None).tz_localize("utc")
     if isinstance(obj, pd.Index):
         obj = obj.values
 
@@ -1149,7 +1162,7 @@ def try_align_dt_to_index(dt: tp.DatetimeLike, target_index: tp.Index, **kwargs)
     return dt
 
 
-def auto_detect_freq(index: pd.Index) -> tp.Optional[tp.PandasFrequency]:
+def auto_detect_freq(index: tp.Index) -> tp.Optional[tp.PandasFrequency]:
     """Auto-detect frequency from a datetime index.
 
     Returns the minimal frequency if it's being encountered in most of the index."""
@@ -1186,7 +1199,7 @@ def freq_depends_on_index(freq: tp.FrequencyLike) -> bool:
 
 
 def infer_index_freq(
-    index: pd.Index,
+    index: tp.Index,
     freq: tp.Optional[tp.FrequencyLike] = None,
     allow_offset: bool = True,
     allow_numeric: bool = True,

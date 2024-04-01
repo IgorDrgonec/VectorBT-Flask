@@ -36,6 +36,7 @@ __pdoc__all__ = __all__ = [
     "status_info_desc",
     "OrderSide",
     "OrderType",
+    "LimitOrderPrice",
     "TradeDirection",
     "TradeStatus",
     "TradesType",
@@ -829,6 +830,39 @@ __pdoc__[
 ```python
 {prettify(OrderType)}
 ```
+"""
+
+
+class LimitOrderPriceT(tp.NamedTuple):
+    Limit: int = -1
+    HardLimit: int = -2
+    Close: int = -3
+
+
+LimitOrderPrice = LimitOrderPriceT()
+"""_"""
+
+__pdoc__[
+    "LimitOrderPrice"
+] = f"""Limit order price.
+
+```python
+{prettify(LimitOrderPrice)}
+```
+
+Which price to use when executing a limit order?
+
+Attributes:
+    Limit: Limit price. 
+
+        If the target price is first hit by the opening price, the opening price is used.
+    HardLimit: Hard limit price.
+
+        The stop price is used regardless of whether the target price is first hit by the opening price.
+    Close: Closing price.
+
+!!! note
+    Each flag is negative, thus if a positive value is provided, it's used directly as price.
 """
 
 
@@ -2804,6 +2838,7 @@ limit_info_fields = [
     ("expiry", np.int64),
     ("time_delta_format", np.int_),
     ("reverse", np.float_),
+    ("order_price", np.float_),
 ]
 """Fields for `limit_info_dt`."""
 
@@ -2833,6 +2868,7 @@ Attributes:
     expiry: Expiry time in integer format. Set to `-1` to disable.
     time_delta_format: See `TimeDeltaFormat`.
     reverse: Whether to reverse the price hit detection.
+    order_price: See `LimitOrderPrice`.
 """
 
 sl_info_fields = [

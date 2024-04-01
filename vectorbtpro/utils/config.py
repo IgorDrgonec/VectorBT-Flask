@@ -8,6 +8,7 @@ from copy import copy, deepcopy
 from pathlib import Path
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils.attr_ import MISSING
 from vectorbtpro.utils.checks import Comparable, is_deep_equal, assert_in, assert_instance_of
 from vectorbtpro.utils.caching import Cacheable
 from vectorbtpro.utils.decorators import class_or_instancemethod
@@ -28,10 +29,6 @@ __all__ = [
     "Configured",
     "AtomicConfig",
 ]
-
-
-class _DEF:
-    pass
 
 
 class hdict(dict):
@@ -589,13 +586,13 @@ class Config(pdict):
             raise KeyError(f"Config keys are frozen")
         dict.__delitem__(self, k)
 
-    def pop(self, k: str, v: tp.Any = _DEF, force: bool = False) -> tp.Any:
+    def pop(self, k: str, v: tp.Any = MISSING, force: bool = False) -> tp.Any:
         """Remove and return the pair by the key."""
         if not force and self.get_option("readonly"):
             raise TypeError("Config is read-only")
         if not force and self.get_option("frozen_keys"):
             raise KeyError(f"Config keys are frozen")
-        if v is _DEF:
+        if v is MISSING:
             result = dict.pop(self, k)
         else:
             result = dict.pop(self, k, v)
@@ -1019,7 +1016,7 @@ class HasSettings:
         cls,
         path: tp.PathLikeKey,
         key: str,
-        default: tp.Any = _DEF,
+        default: tp.Any = MISSING,
         sub_path: tp.Optional[tp.PathLikeKey] = None,
         sub_path_only: bool = False,
     ) -> tp.Any:
@@ -1045,7 +1042,7 @@ class HasSettings:
         try:
             return path_settings[key]
         except KeyError as e:
-            if default is _DEF:
+            if default is MISSING:
                 if sub_path is not None:
                     raise SettingNotFoundError(
                         f"Found no key '{key}' in the settings under the paths '{path}' and '{sub_path}'"
@@ -1058,7 +1055,7 @@ class HasSettings:
     def get_setting(
         cls,
         key: str,
-        default: tp.Any = _DEF,
+        default: tp.Any = MISSING,
         path_id: tp.Optional[tp.Hashable] = None,
         inherit: bool = True,
         sub_path: tp.Optional[tp.PathLikeKey] = None,
@@ -1077,7 +1074,7 @@ class HasSettings:
                 return cls_.get_path_setting(path, key, sub_path=sub_path, sub_path_only=sub_path_only)
             except (SettingsNotFoundError, SettingNotFoundError) as e:
                 continue
-        if default is _DEF:
+        if default is MISSING:
             if path_id is not None:
                 if sub_path is not None:
                     raise SettingNotFoundError(
@@ -1138,7 +1135,7 @@ class HasSettings:
         value: tp.Optional[tp.Any],
         key: str,
         merge: bool = False,
-        default: tp.Any = _DEF,
+        default: tp.Any = MISSING,
         path_id: tp.Optional[tp.Hashable] = None,
         inherit: bool = True,
         sub_path: tp.Optional[tp.PathLikeKey] = None,
@@ -1316,12 +1313,11 @@ class Configured(HasSettings, Cacheable, Comparable, Pickleable, Prettified, Cha
         all_keys = set()
         for config in configs:
             all_keys = all_keys.union(set(config.keys()))
-        init_config = configs[0]
 
         for k in all_keys:
             if k not in kwargs:
                 v = None
-                for i in range(1, len(configs)):
+                for i in range(len(configs)):
                     config = configs[i]
                     if isinstance(on_merge_conflict, dict):
                         if k in on_merge_conflict:
@@ -1333,10 +1329,12 @@ class Configured(HasSettings, Cacheable, Comparable, Pickleable, Prettified, Cha
                     else:
                         _on_merge_conflict = on_merge_conflict
                     if _on_merge_conflict.lower() == "error":
+                        if i == 0:
+                            continue
                         same_k = True
                         try:
                             if k in config:
-                                if not is_deep_equal(init_config[k], config[k]):
+                                if not is_deep_equal(configs[0][k], config[k]):
                                     same_k = False
                             else:
                                 same_k = False

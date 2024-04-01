@@ -9,7 +9,7 @@ from vectorbtpro.base.flex_indexing import flex_select_1d_pc_nb, flex_select_nb
 from vectorbtpro.generic import nb as generic_nb
 from vectorbtpro.portfolio.enums import *
 from vectorbtpro.registries.jit_registry import register_jitted
-from vectorbtpro.utils.math_ import is_close_nb, is_close_or_less_nb, is_less_nb, add_nb
+from vectorbtpro.utils.math_ import is_close_nb, is_close_or_less_nb, is_close_or_greater_nb, is_less_nb, add_nb
 
 
 @register_jitted(cache=True)
@@ -947,49 +947,81 @@ def resolve_size_nb(
     position: float,
     val_price: float,
     value: float,
+    target_size_type: int = SizeType.Amount,
     as_requirement: bool = False,
 ) -> tp.Tuple[float, float]:
     """Resolve size into an absolute amount of assets and percentage of resources.
 
     Percentage is only set if the option `SizeType.Percent(100)` is used."""
+    percent = np.nan
+    if size_type == target_size_type:
+        return float(size), percent
+
     if size_type == SizeType.ValuePercent100:
+        if size_type == target_size_type:
+            return float(size), percent
+
         size /= 100
         size_type = SizeType.ValuePercent
+
     if size_type == SizeType.TargetPercent100:
+        if size_type == target_size_type:
+            return float(size), percent
+
         size /= 100
         size_type = SizeType.TargetPercent
+
     if size_type == SizeType.ValuePercent or size_type == SizeType.TargetPercent:
-        # Percentage or target percentage of the current value
+        if size_type == target_size_type:
+            return float(size), percent
+
         size *= value
         if size_type == SizeType.ValuePercent:
             size_type = SizeType.Value
         else:
             size_type = SizeType.TargetValue
+
     if size_type == SizeType.Value or size_type == SizeType.TargetValue:
-        # Value or target value
+        if size_type == target_size_type:
+            return float(size), percent
+
         size /= val_price
         if size_type == SizeType.Value:
             size_type = SizeType.Amount
         else:
             size_type = SizeType.TargetAmount
+
     if size_type == SizeType.TargetAmount:
-        # Target amount
+        if size_type == target_size_type:
+            return float(size), percent
+
         if not as_requirement:
             size -= position
         size_type = SizeType.Amount
 
-    percent = np.nan
     if size_type == SizeType.Percent100:
+        if size_type == target_size_type:
+            return float(size), percent
+
         size /= 100
         size_type = SizeType.Percent
-    if size_type == SizeType.Percent:
-        # Percentage of resources
-        percent = abs(size)
-        size = np.sign(size) * np.inf
 
+    if size_type == SizeType.Percent:
+        if size_type == target_size_type:
+            return float(size), percent
+
+        percent = abs(size)
+        if as_requirement:
+            size = np.nan
+        else:
+            size = np.sign(size) * np.inf
+        size_type = SizeType.Amount
+
+    if size_type != target_size_type:
+        raise ValueError("Cannot convert size to target size type")
     if as_requirement:
         size = abs(size)
-    return size, percent
+    return float(size), percent
 
 
 @register_jitted(cache=True)
@@ -1921,7 +1953,8 @@ def check_price_hit_nb(
 ) -> tp.Tuple[float, bool, bool]:
     """Check whether a target price was hit.
 
-    If `can_use_ohlc`, `check_open`, and `hard_price` are True and the target price is hit by open, returns open.
+    If `hard_price` is False, and `can_use_ohlc` and `check_open` are True and the target price
+    is hit by open, returns open. Otherwise, returns the actual target price.
 
     Returns the stop price, whether it was hit by open, and whether it was hit during this bar."""
     high, low = resolve_hl_nb(
@@ -1931,18 +1964,18 @@ def check_price_hit_nb(
         close=close,
     )
     if hit_below:
-        if can_use_ohlc and check_open and open <= price:
+        if can_use_ohlc and check_open and is_close_or_less_nb(open, price):
             if hard_price:
                 return price, True, True
             return open, True, True
-        if close <= price or (can_use_ohlc and low <= price):
+        if is_close_or_less_nb(close, price) or (can_use_ohlc and is_close_or_less_nb(low, price)):
             return price, False, True
         return price, False, False
-    if can_use_ohlc and check_open and open >= price:
+    if can_use_ohlc and check_open and is_close_or_greater_nb(open, price):
         if hard_price:
             return price, True, True
         return open, True, True
-    if close >= price or (can_use_ohlc and high >= price):
+    if is_close_or_greater_nb(close, price) or (can_use_ohlc and is_close_or_greater_nb(high, price)):
         return price, False, True
     return price, False, False
 
@@ -2062,7 +2095,7 @@ def check_limit_expired_nb(
 
 @register_jitted(cache=True)
 def resolve_limit_price_nb(
-    price: float,
+    init_price: float,
     limit_delta: float = np.nan,
     delta_format: int = DeltaFormat.Percent,
     hit_below: bool = True,
@@ -2080,9 +2113,9 @@ def resolve_limit_price_nb(
                     limit_price = np.inf
             else:
                 if delta_format == DeltaFormat.Absolute:
-                    limit_price = price - limit_delta
+                    limit_price = init_price - limit_delta
                 elif delta_format == DeltaFormat.Percent:
-                    limit_price = price * (1 - limit_delta)
+                    limit_price = init_price * (1 - limit_delta)
                 elif delta_format == DeltaFormat.Target:
                     limit_price = limit_delta
                 else:
@@ -2095,15 +2128,15 @@ def resolve_limit_price_nb(
                     limit_price = np.inf
             else:
                 if delta_format == DeltaFormat.Absolute:
-                    limit_price = price + limit_delta
+                    limit_price = init_price + limit_delta
                 elif delta_format == DeltaFormat.Percent:
-                    limit_price = price * (1 + limit_delta)
+                    limit_price = init_price * (1 + limit_delta)
                 elif delta_format == DeltaFormat.Target:
                     limit_price = limit_delta
                 else:
                     raise ValueError("Invalid DeltaFormat option")
     else:
-        limit_price = price
+        limit_price = init_price
     return limit_price
 
 
@@ -2121,6 +2154,7 @@ def check_limit_hit_nb(
     limit_reverse: bool = False,
     can_use_ohlc: bool = True,
     check_open: bool = True,
+    hard_limit: bool = False,
 ) -> tp.Tuple[float, bool, bool]:
     """Resolve the limit price using `resolve_limit_price_nb` and check whether it was hit.
 
@@ -2132,7 +2166,7 @@ def check_limit_hit_nb(
     _size = get_diraware_size_nb(size, direction)
     hit_below = (_size > 0 and not limit_reverse) or (_size < 0 and limit_reverse)
     limit_price = resolve_limit_price_nb(
-        price=price,
+        init_price=price,
         limit_delta=limit_delta,
         delta_format=delta_format,
         hit_below=hit_below,
@@ -2147,31 +2181,49 @@ def check_limit_hit_nb(
             close=close,
         )
         if hit_below:
-            if check_open and open <= limit_price:
+            if check_open and is_close_or_less_nb(open, limit_price):
                 hit_on_open = True
                 hit = True
-                limit_price = open
+                if not hard_limit:
+                    limit_price = open
             else:
-                hit = low <= limit_price
+                hit = is_close_or_less_nb(low, limit_price)
                 if hit and np.isinf(limit_price):
                     limit_price = low
         else:
-            if check_open and open >= limit_price:
+            if check_open and is_close_or_greater_nb(open, limit_price):
                 hit_on_open = True
                 hit = True
-                limit_price = open
+                if not hard_limit:
+                    limit_price = open
             else:
-                hit = high >= limit_price
+                hit = is_close_or_greater_nb(high, limit_price)
                 if hit and np.isinf(limit_price):
                     limit_price = high
     else:
         if hit_below:
-            hit = close <= limit_price
+            hit = is_close_or_less_nb(close, limit_price)
         else:
-            hit = close >= limit_price
+            hit = is_close_or_greater_nb(close, limit_price)
         if hit and np.isinf(limit_price):
             limit_price = close
     return limit_price, hit_on_open, hit
+
+
+@register_jitted(cache=True)
+def resolve_limit_order_price_nb(
+    limit_price: float,
+    close: float,
+    limit_order_price: float,
+) -> float:
+    """Resolve the limit order price of a limit order."""
+    if limit_order_price == LimitOrderPrice.Limit or limit_order_price == LimitOrderPrice.HardLimit:
+        return float(limit_price)
+    elif limit_order_price == LimitOrderPrice.Close:
+        return float(close)
+    elif limit_order_price < 0:
+        raise ValueError("Invalid LimitOrderPrice option")
+    return float(limit_order_price)
 
 
 @register_jitted(cache=True)
@@ -2255,9 +2307,7 @@ def check_td_stop_hit_nb(
 ) -> tp.Tuple[bool, bool]:
     """Check whether TD stop was hit by comparing the current index with the initial index.
 
-    Returns whether the stop was hit already on open, and whether the stop was hit during this bar.
-
-    Identical mechanics to `check_limit_hit_nb`."""
+    Returns whether the stop was hit already on open, and whether the stop was hit during this bar."""
     if stop == -1:
         return False, False
     if time_delta_format == TimeDeltaFormat.Rows:
@@ -2298,9 +2348,7 @@ def check_dt_stop_hit_nb(
 ) -> tp.Tuple[bool, bool]:
     """Check whether DT stop was hit by comparing the current index with the initial index.
 
-    Returns whether the stop was hit already on open, and whether the stop was hit during this bar.
-
-    Identical mechanics to `check_limit_hit_nb`."""
+    Returns whether the stop was hit already on open, and whether the stop was hit during this bar."""
     if stop == -1:
         return False, False
     if time_delta_format == TimeDeltaFormat.Rows:
@@ -2348,9 +2396,8 @@ def check_tsl_th_hit_nb(
         hit_below=hit_below,
     )
     if hit_below:
-        return peak_price <= tsl_th_price
-    else:
-        return peak_price >= tsl_th_price
+        return is_close_or_less_nb(peak_price, tsl_th_price)
+    return is_close_or_greater_nb(peak_price, tsl_th_price)
 
 
 @register_jitted(cache=True)
@@ -2551,6 +2598,7 @@ def set_limit_info_nb(
     expiry: int = -1,
     time_delta_format: int = TimeDeltaFormat.Index,
     reverse: bool = False,
+    order_price: int = LimitOrderPrice.Limit,
 ) -> None:
     """Set limit order information.
 
@@ -2569,6 +2617,7 @@ def set_limit_info_nb(
     limit_info["expiry"] = expiry
     limit_info["time_delta_format"] = time_delta_format
     limit_info["reverse"] = reverse
+    limit_info["order_price"] = order_price
 
 
 @register_jitted(cache=True)
@@ -2588,6 +2637,7 @@ def clear_limit_info_nb(limit_info: tp.Record) -> None:
     limit_info["expiry"] = -1
     limit_info["time_delta_format"] = -1
     limit_info["reverse"] = False
+    limit_info["order_price"] = np.nan
 
 
 @register_jitted(cache=True)

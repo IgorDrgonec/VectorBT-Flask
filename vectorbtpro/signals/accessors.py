@@ -316,7 +316,7 @@ class SignalsAccessor(GenericAccessor):
             dict(shape=shape, shape_2d=shape_2d, wait=wait),
             template_context,
         )
-        place_args = substitute_templates(place_args, template_context, sub_id="place_args")
+        place_args = substitute_templates(place_args, template_context, eval_id="place_args")
         func = jit_reg.resolve_option(nb.generate_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         result = func(
@@ -469,8 +469,8 @@ class SignalsAccessor(GenericAccessor):
             ),
             template_context,
         )
-        entry_place_args = substitute_templates(entry_place_args, template_context, sub_id="entry_place_args")
-        exit_place_args = substitute_templates(exit_place_args, template_context, sub_id="exit_place_args")
+        entry_place_args = substitute_templates(entry_place_args, template_context, eval_id="entry_place_args")
+        exit_place_args = substitute_templates(exit_place_args, template_context, eval_id="exit_place_args")
         func = jit_reg.resolve_option(nb.generate_enex_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         result1, result2 = func(
@@ -552,7 +552,7 @@ class SignalsAccessor(GenericAccessor):
             dict(wait=wait, until_next=until_next, skip_until_exit=skip_until_exit),
             template_context,
         )
-        exit_place_args = substitute_templates(exit_place_args, template_context, sub_id="exit_place_args")
+        exit_place_args = substitute_templates(exit_place_args, template_context, eval_id="exit_place_args")
         func = jit_reg.resolve_option(nb.generate_ex_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         exits = func(
@@ -1608,7 +1608,7 @@ class SignalsAccessor(GenericAccessor):
             ),
             template_context,
         )
-        rank_args = substitute_templates(rank_args, template_context, sub_id="rank_args")
+        rank_args = substitute_templates(rank_args, template_context, eval_id="rank_args")
         func = jit_reg.resolve_option(nb.rank_nb, jitted)
         func = ch_reg.resolve_option(func, chunked)
         rank = func(
@@ -1981,7 +1981,7 @@ class SignalsAccessor(GenericAccessor):
             >>> ranges
             <vectorbtpro.generic.ranges.Ranges at 0x7ff29ea7c7b8>
 
-            >>> ranges.records_readable
+            >>> ranges.readable
                Range Id  Column  Start Index  End Index  Status
             0         0       0            0          3  Closed
             1         1       0            3          5  Closed
@@ -2000,7 +2000,7 @@ class SignalsAccessor(GenericAccessor):
             >>> ranges
             <vectorbtpro.generic.ranges.Ranges at 0x7ff29e3b80f0>
 
-            >>> ranges.records_readable
+            >>> ranges.readable
                Range Id  Column  Start Index  End Index  Status
             0         0       0            2          2  Closed
             1         1       0            2          4  Closed
@@ -2016,7 +2016,7 @@ class SignalsAccessor(GenericAccessor):
             >>> ranges
             <vectorbtpro.generic.ranges.Ranges at 0x7ff29eccbd68>
 
-            >>> ranges.records_readable
+            >>> ranges.readable
                Range Id  Column  Start Index  End Index  Status
             0         0       0            0          2  Closed
             1         1       0            1          2  Closed
@@ -2072,7 +2072,7 @@ class SignalsAccessor(GenericAccessor):
         Usage:
             ```pycon
             >>> mask_sr = pd.Series([True, True, True, False, True, True])
-            >>> mask_sr.vbt.signals.partition_ranges().records_readable
+            >>> mask_sr.vbt.signals.partition_ranges().readable
                Range Id  Column  Start Timestamp  End Timestamp  Status
             0         0       0                0              3  Closed
             1         1       0                4              5    Open
@@ -2097,7 +2097,7 @@ class SignalsAccessor(GenericAccessor):
         Usage:
             ```pycon
             >>> mask_sr = pd.Series([True, False, False, True, False, True, True])
-            >>> mask_sr.vbt.signals.between_partition_ranges().records_readable
+            >>> mask_sr.vbt.signals.between_partition_ranges().readable
                Range Id  Column  Start Timestamp  End Timestamp  Status
             0         0       0                0              3  Closed
             1         1       0                3              5  Closed
@@ -2138,7 +2138,7 @@ class SignalsAccessor(GenericAccessor):
         signal_index_type: str = "range",
         signal_index_name: str = "signal",
         jitted: tp.JittedOption = None,
-        index_stack_kwargs: tp.KwargsLike = None,
+        clean_index_kwargs: tp.KwargsLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Unravel signals.
@@ -2163,8 +2163,8 @@ class SignalsAccessor(GenericAccessor):
             2020-01-05  False  False  False   True  False  False  False
             ```
         """
-        if index_stack_kwargs is None:
-            index_stack_kwargs = {}
+        if clean_index_kwargs is None:
+            clean_index_kwargs = {}
         if wrap_kwargs is None:
             wrap_kwargs = {}
 
@@ -2181,7 +2181,7 @@ class SignalsAccessor(GenericAccessor):
             signal_index_type=signal_index_type,
             signal_index_name=signal_index_name,
         )
-        new_columns = indexes.stack_indexes((signal_index, self.wrapper.columns[col_idxs]), **index_stack_kwargs)
+        new_columns = indexes.stack_indexes((signal_index, self.wrapper.columns[col_idxs]), **clean_index_kwargs)
         return self.wrapper.wrap(new_mask, columns=new_columns, group_by=False, **wrap_kwargs)
 
     @class_or_instancemethod
@@ -2197,7 +2197,7 @@ class SignalsAccessor(GenericAccessor):
         signal_index_type: str = "pair_range",
         signal_index_name: str = "signal",
         jitted: tp.JittedOption = None,
-        index_stack_kwargs: tp.KwargsLike = None,
+        clean_index_kwargs: tp.KwargsLike = None,
         wrap_kwargs: tp.KwargsLike = None,
     ) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Unravel signal pairs.
@@ -2293,8 +2293,8 @@ class SignalsAccessor(GenericAccessor):
         """
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        if index_stack_kwargs is None:
-            index_stack_kwargs = {}
+        if clean_index_kwargs is None:
+            clean_index_kwargs = {}
         if wrap_kwargs is None:
             wrap_kwargs = {}
         if isinstance(relation, str):
@@ -2340,7 +2340,7 @@ class SignalsAccessor(GenericAccessor):
             return indexes.stack_indexes((
                 *indexes_to_stack,
                 wrapper.columns[col_idxs]
-            ), **index_stack_kwargs)
+            ), **clean_index_kwargs)
 
         if len(objs) == 1:
             obj = objs[0]

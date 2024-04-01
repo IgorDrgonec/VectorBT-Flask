@@ -95,7 +95,7 @@ There are two ways to print records:
 * Readable dataframe that takes into consideration `Records.field_config`:
 
 ```pycon
->>> records.records_readable
+>>> records.readable
    Id Column Timestamp  some_field
 0   0      a         x        10.0
 1   1      a         y        11.0
@@ -984,6 +984,8 @@ class Records(Analyzable, RecordsWithFields, metaclass=MetaRecords):
     def records_readable(self) -> tp.Frame:
         """`Records.to_readable` with default arguments."""
         return self.to_readable()
+
+    readable = records_readable
 
     def get_field_setting(self, field: str, setting: str, default: tp.Any = None) -> tp.Any:
         """Get any setting of the field. Uses `Records.field_config`."""

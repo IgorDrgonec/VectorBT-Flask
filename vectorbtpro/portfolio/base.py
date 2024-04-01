@@ -2346,6 +2346,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cash_earnings: tp.Optional[tp.ArrayLike] = None,
         cash_dividends: tp.Optional[tp.ArrayLike] = None,
         cash_sharing: tp.Optional[bool] = None,
+        sim_start: tp.Optional[tp.ArrayLike] = None,
+        sim_end: tp.Optional[tp.ArrayLike] = None,
         call_seq: tp.Optional[tp.ArrayLike] = None,
         attach_call_seq: tp.Optional[bool] = None,
         ffill_val_price: tp.Optional[bool] = None,
@@ -2505,6 +2507,12 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
                 Negative numbers will be cast to positive to avoid the look-ahead bias. Defaults to 0.
                 Remember to account of it if you're using a custom signal function!
+            sim_start (int, datetime_like, or array_like): Simulation start row or index (inclusive).
+
+                Can be "auto", which will be substituted by the index of the first non-NA size value.
+            sim_end (int, datetime_like, or array_like): Simulation end row or index (exclusive).
+
+                Can be "auto", which will be substituted by the index of the first non-NA size value.
             call_seq (CallSeqType or array_like): Default sequence of calls per row and group.
 
                 Each value in this sequence must indicate the position of column in the group to
@@ -2848,6 +2856,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         limit_tif: tp.Optional[tp.ArrayLike] = None,
         limit_expiry: tp.Optional[tp.ArrayLike] = None,
         limit_reverse: tp.Optional[tp.ArrayLike] = None,
+        limit_order_price: tp.Optional[tp.ArrayLike] = None,
         upon_adj_limit_conflict: tp.Optional[tp.ArrayLike] = None,
         upon_opp_limit_conflict: tp.Optional[tp.ArrayLike] = None,
         use_stops: tp.Optional[bool] = None,
@@ -2879,6 +2888,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cash_dividends: tp.Optional[tp.ArrayLike] = None,
         cash_sharing: tp.Optional[bool] = None,
         from_ago: tp.Optional[tp.ArrayLike] = None,
+        sim_start: tp.Optional[tp.ArrayLike] = None,
+        sim_end: tp.Optional[tp.ArrayLike] = None,
         call_seq: tp.Optional[tp.ArrayLike] = None,
         attach_call_seq: tp.Optional[bool] = None,
         ffill_val_price: tp.Optional[bool] = None,
@@ -3061,6 +3072,11 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
 
                 If True, a buy/sell limit price will be checked against high/low (not low/high).
                 Also, the limit delta will be applied above/below (not below/above) the initial price.
+            limit_order_price (LimitOrderPrice or array_like): See `vectorbtpro.portfolio.enums.LimitOrderPrice`.
+                Will broadcast.
+
+                If provided on per-element basis, gets applied upon order creation. If a positive value is provided,
+                used directly as a price, otherwise used as an enumerated value.
             upon_adj_limit_conflict (PendingConflictMode or array_like): Conflict mode for limit and user-defined
                 signals of adjacent sign. See `vectorbtpro.portfolio.enums.PendingConflictMode`. Will broadcast.
             upon_opp_limit_conflict (PendingConflictMode or array_like): Conflict mode for limit and user-defined
@@ -3156,6 +3172,14 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             from_ago (int or array_like): See `Portfolio.from_orders`.
 
                 Take effect only for user-defined signals, not for stop signals.
+            sim_start (int, datetime_like, or array_like): Simulation start row or index (inclusive).
+
+                Can be "auto", which will be substituted by the index of the first signal across
+                long and short entries and long and short exits.
+            sim_end (int, datetime_like, or array_like): Simulation end row or index (exclusive).
+
+                Can be "auto", which will be substituted by the index of the last signal across
+                long and short entries and long and short exits.
             call_seq (CallSeqType or array_like): See `Portfolio.from_orders`.
             attach_call_seq (bool): See `Portfolio.from_orders`.
             ffill_val_price (bool): See `Portfolio.from_orders`.
@@ -4010,6 +4034,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         cash_deposits: tp.Optional[tp.ArrayLike] = None,
         cash_earnings: tp.Optional[tp.ArrayLike] = None,
         cash_sharing: tp.Optional[bool] = None,
+        sim_start: tp.Optional[tp.ArrayLike] = None,
+        sim_end: tp.Optional[tp.ArrayLike] = None,
         call_seq: tp.Optional[tp.ArrayLike] = None,
         attach_call_seq: tp.Optional[bool] = None,
         segment_mask: tp.Optional[tp.ArrayLike] = None,
@@ -4094,6 +4120,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             cash_sharing (bool): Whether to share cash within the same group.
 
                 If `group_by` is None, `group_by` becomes True to form a single group with cash sharing.
+            sim_start (int, datetime_like, or array_like): Simulation start row or index (inclusive).
+            sim_end (int, datetime_like, or array_like): Simulation end row or index (exclusive).
             call_seq (CallSeqType or array_like): Default sequence of calls per row and group.
 
                 * Use `vectorbtpro.portfolio.enums.CallSeqType` to select a sequence type.
@@ -4561,7 +4589,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
             ...     max_order_records=close.shape[0] * 2
             ... )
 
-            >>> pf.orders.records_readable
+            >>> pf.orders.readable
                 Order Id Column  Timestamp  Size  Price  Fees  Side
             0          0      a          0   1.0    1.0   0.0   Buy
             1          1      a          0   1.0    2.0   0.0  Sell
@@ -4639,6 +4667,8 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
         order_func_nb: tp.Optional[nb.OrderFuncT] = None,
         flex_order_func_nb: tp.Optional[nb.FlexOrderFuncT] = None,
         val_price: tp.Optional[tp.ArrayLike] = None,
+        sim_start: tp.Optional[tp.ArrayLike] = None,
+        sim_end: tp.Optional[tp.ArrayLike] = None,
         call_seq: tp.Optional[tp.ArrayLike] = None,
         flexible: bool = False,
         broadcast_named_args: tp.KwargsLike = None,

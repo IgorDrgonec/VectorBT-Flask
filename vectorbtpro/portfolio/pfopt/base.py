@@ -1841,7 +1841,7 @@ class PortfolioOptimizer(Analyzable):
         template_context: tp.KwargsLike = None,
         execute_kwargs: tp.KwargsLike = None,
         random_subset: tp.Optional[int] = None,
-        index_stack_kwargs: tp.KwargsLike = None,
+        clean_index_kwargs: tp.KwargsLike = None,
         wrapper_kwargs: tp.KwargsLike = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
@@ -2004,8 +2004,8 @@ class PortfolioOptimizer(Analyzable):
         if parameterizer_cls is None:
             parameterizer_cls = Parameterizer
         param_search_kwargs = merge_dicts(params_cfg["param_search_kwargs"], param_search_kwargs)
-        if index_stack_kwargs is None:
-            index_stack_kwargs = {}
+        if clean_index_kwargs is None:
+            clean_index_kwargs = {}
         if pbar_kwargs is None:
             pbar_kwargs = {}
 
@@ -2066,7 +2066,7 @@ class PortfolioOptimizer(Analyzable):
             param_product, param_columns = combine_params(
                 param_dct,
                 random_subset=random_subset,
-                index_stack_kwargs=index_stack_kwargs,
+                clean_index_kwargs=clean_index_kwargs,
                 name_tuple_to_str=name_tuple_to_str,
             )
             if param_columns is None:
@@ -2094,7 +2094,7 @@ class PortfolioOptimizer(Analyzable):
                         param_columns,
                         pd.Index(gc_names, name="group_config"),
                     ),
-                    **index_stack_kwargs,
+                    **clean_index_kwargs,
                 )
         else:
             if n_config_params == 0 or (n_config_params == 1 and gc_names_none):
@@ -2216,7 +2216,7 @@ class PortfolioOptimizer(Analyzable):
                             skip_not_found=_skip_not_found,
                         ),
                         _template_context,
-                        sub_id="get_index_points_defaults",
+                        eval_id="get_index_points_defaults",
                         strict=True,
                     )
                     _index_points = wrapper.get_index_points(**get_index_points_kwargs)
@@ -2229,7 +2229,7 @@ class PortfolioOptimizer(Analyzable):
                     _index_points = substitute_templates(
                         _index_points,
                         _template_context,
-                        sub_id="index_points",
+                        eval_id="index_points",
                         strict=True,
                     )
                     _index_points = to_1d_array(_index_points)
@@ -2239,11 +2239,11 @@ class PortfolioOptimizer(Analyzable):
                     _allocate_func = substitute_templates(
                         _allocate_func,
                         _template_context,
-                        sub_id="allocate_func",
+                        eval_id="allocate_func",
                         strict=True,
                     )
-                    _args = substitute_templates(_args, _template_context, sub_id="args")
-                    _kwargs = substitute_templates(_kwargs, _template_context, sub_id="kwargs")
+                    _args = substitute_templates(_args, _template_context, eval_id="args")
+                    _kwargs = substitute_templates(_kwargs, _template_context, eval_id="kwargs")
                     func = jit_reg.resolve_option(nb.allocate_meta_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
                     _allocations = func(len(wrapper.columns), _index_points, _allocate_func, *_args, **_kwargs)
@@ -2254,11 +2254,11 @@ class PortfolioOptimizer(Analyzable):
                         __allocate_func = substitute_templates(
                             _allocate_func,
                             __template_context,
-                            sub_id="allocate_func",
+                            eval_id="allocate_func",
                             strict=True,
                         )
-                        __args = substitute_templates(_args, __template_context, sub_id="args")
-                        __kwargs = substitute_templates(_kwargs, __template_context, sub_id="kwargs")
+                        __args = substitute_templates(_args, __template_context, eval_id="args")
+                        __kwargs = substitute_templates(_kwargs, __template_context, eval_id="kwargs")
                         funcs_args.append((__allocate_func, __args, __kwargs))
 
                     _execute_kwargs = merge_dicts(
@@ -2284,7 +2284,7 @@ class PortfolioOptimizer(Analyzable):
                 pbar.update(1)
 
         # Build column hierarchy
-        new_columns = combine_indexes((group_index, wrapper.columns), **index_stack_kwargs)
+        new_columns = combine_indexes((group_index, wrapper.columns), **clean_index_kwargs)
 
         # Create instance
         wrapper_kwargs = merge_dicts(
@@ -2582,7 +2582,7 @@ class PortfolioOptimizer(Analyzable):
         template_context: tp.KwargsLike = None,
         execute_kwargs: tp.KwargsLike = None,
         random_subset: tp.Optional[int] = None,
-        index_stack_kwargs: tp.KwargsLike = None,
+        clean_index_kwargs: tp.KwargsLike = None,
         wrapper_kwargs: tp.KwargsLike = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
@@ -2799,8 +2799,8 @@ class PortfolioOptimizer(Analyzable):
         if parameterizer_cls is None:
             parameterizer_cls = Parameterizer
         param_search_kwargs = merge_dicts(params_cfg["param_search_kwargs"], param_search_kwargs)
-        if index_stack_kwargs is None:
-            index_stack_kwargs = {}
+        if clean_index_kwargs is None:
+            clean_index_kwargs = {}
         if pbar_kwargs is None:
             pbar_kwargs = {}
 
@@ -2867,7 +2867,7 @@ class PortfolioOptimizer(Analyzable):
             param_product, param_columns = combine_params(
                 param_dct,
                 random_subset=random_subset,
-                index_stack_kwargs=index_stack_kwargs,
+                clean_index_kwargs=clean_index_kwargs,
                 name_tuple_to_str=name_tuple_to_str,
             )
             if param_columns is None:
@@ -2895,7 +2895,7 @@ class PortfolioOptimizer(Analyzable):
                         param_columns,
                         pd.Index(gc_names, name="group_config"),
                     ),
-                    **index_stack_kwargs,
+                    **clean_index_kwargs,
                 )
         else:
             if n_config_params == 0 or (n_config_params == 1 and gc_names_none):
@@ -3033,7 +3033,7 @@ class PortfolioOptimizer(Analyzable):
                             jitted=_jitted,
                         ),
                         _template_context,
-                        sub_id="get_index_ranges_defaults",
+                        eval_id="get_index_ranges_defaults",
                         strict=True,
                     )
                     _index_ranges = wrapper.get_index_ranges(**get_index_ranges_defaults)
@@ -3046,7 +3046,7 @@ class PortfolioOptimizer(Analyzable):
                     _index_ranges = substitute_templates(
                         _index_ranges,
                         _template_context,
-                        sub_id="index_ranges",
+                        eval_id="index_ranges",
                         strict=True,
                     )
                     if isinstance(_index_ranges, np.ndarray):
@@ -3059,7 +3059,7 @@ class PortfolioOptimizer(Analyzable):
                     _index_loc = substitute_templates(
                         _index_loc,
                         _template_context,
-                        sub_id="index_loc",
+                        eval_id="index_loc",
                         strict=True,
                     )
                     _index_loc = to_1d_array(_index_loc)
@@ -3069,11 +3069,11 @@ class PortfolioOptimizer(Analyzable):
                     _optimize_func = substitute_templates(
                         _optimize_func,
                         _template_context,
-                        sub_id="optimize_func",
+                        eval_id="optimize_func",
                         strict=True,
                     )
-                    _args = substitute_templates(_args, _template_context, sub_id="args")
-                    _kwargs = substitute_templates(_kwargs, _template_context, sub_id="kwargs")
+                    _args = substitute_templates(_args, _template_context, eval_id="args")
+                    _kwargs = substitute_templates(_kwargs, _template_context, eval_id="kwargs")
                     func = jit_reg.resolve_option(nb.optimize_meta_nb, jitted)
                     func = ch_reg.resolve_option(func, chunked)
                     _allocations = func(
@@ -3092,11 +3092,11 @@ class PortfolioOptimizer(Analyzable):
                         __optimize_func = substitute_templates(
                             _optimize_func,
                             __template_context,
-                            sub_id="optimize_func",
+                            eval_id="optimize_func",
                             strict=True,
                         )
-                        __args = substitute_templates(_args, __template_context, sub_id="args")
-                        __kwargs = substitute_templates(_kwargs, __template_context, sub_id="kwargs")
+                        __args = substitute_templates(_args, __template_context, eval_id="args")
+                        __kwargs = substitute_templates(_kwargs, __template_context, eval_id="kwargs")
                         funcs_args.append((__optimize_func, __args, __kwargs))
 
                     _execute_kwargs = merge_dicts(
@@ -3119,7 +3119,7 @@ class PortfolioOptimizer(Analyzable):
                     _alloc_wait = substitute_templates(
                         _alloc_wait,
                         _template_context,
-                        sub_id="alloc_wait",
+                        eval_id="alloc_wait",
                         strict=True,
                     )
                     alloc_idx = _index_ranges[1] - 1 + _alloc_wait
@@ -3144,7 +3144,7 @@ class PortfolioOptimizer(Analyzable):
                 pbar.update(1)
 
         # Build column hierarchy
-        new_columns = combine_indexes((group_index, wrapper.columns), **index_stack_kwargs)
+        new_columns = combine_indexes((group_index, wrapper.columns), **clean_index_kwargs)
 
         # Create instance
         wrapper_kwargs = merge_dicts(

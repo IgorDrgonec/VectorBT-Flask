@@ -1979,17 +1979,26 @@ class TestFactory:
         np.testing.assert_array_equal(obj._input_mapper, np.array([0, 1, 2]))
         np.testing.assert_array_equal(obj._p1_mapper, np.array([0, 0, 0]))
         np.testing.assert_array_equal(obj._p2_mapper, np.array([2, 2, 2]))
-        assert obj._tuple_mapper == [(0, 2), (0, 2), (0, 2)]
+        assert_index_equal(
+            obj._tuple_mapper, pd.MultiIndex.from_tuples([(0, 2), (0, 2), (0, 2)], names=["custom_p1", "custom_p2"])
+        )
         obj = F.with_apply_func(lambda ts, p1, p2: ts * (p1 + p2)).run(ts, [0, 1], [1, 2])
         np.testing.assert_array_equal(obj._input_mapper, np.array([0, 1, 2, 0, 1, 2]))
         np.testing.assert_array_equal(obj._p1_mapper, np.array([0, 0, 0, 1, 1, 1]))
         np.testing.assert_array_equal(obj._p2_mapper, np.array([1, 1, 1, 2, 2, 2]))
-        assert obj._tuple_mapper == [(0, 1), (0, 1), (0, 1), (1, 2), (1, 2), (1, 2)]
+        assert_index_equal(
+            obj._tuple_mapper,
+            pd.MultiIndex.from_tuples(
+                [(0, 1), (0, 1), (0, 1), (1, 2), (1, 2), (1, 2)], names=["custom_p1", "custom_p2"]
+            ),
+        )
         obj = F.with_apply_func(lambda ts, p1, p2: ts * (p1 + p2)).run(ts, [0, 1, 2], 3, per_column=True)
         np.testing.assert_array_equal(obj._input_mapper, np.array([0, 1, 2]))
         np.testing.assert_array_equal(obj._p1_mapper, np.array([0, 1, 2]))
         np.testing.assert_array_equal(obj._p2_mapper, np.array([3, 3, 3]))
-        assert obj._tuple_mapper == [(0, 3), (1, 3), (2, 3)]
+        assert_index_equal(
+            obj._tuple_mapper, pd.MultiIndex.from_tuples([(0, 3), (1, 3), (2, 3)], names=["custom_p1", "custom_p2"])
+        )
 
     def test_properties(self):
         I = vbt.IndicatorFactory(
@@ -2413,6 +2422,7 @@ class TestFactory:
             "_p2_list",
             "_p2_loc",
             "_p2_mapper",
+            "_param_mapper",
             "_param_names",
             "_rec_id",
             "_run",
@@ -2423,10 +2433,14 @@ class TestFactory:
             "_ts",
             "_tuple_loc",
             "_tuple_mapper",
+            "_visible_param_mapper",
             "_wrapper",
             "_writeable_attrs",
             "_xloc",
+            "add_levels",
             "apply_func",
+            "apply_to_index",
+            "as_param",
             "build_metrics_doc",
             "build_subplots_doc",
             "cache_func",
@@ -2439,6 +2453,9 @@ class TestFactory:
             "decode_config",
             "decode_config_node",
             "deep_getattr",
+            "drop_duplicate_levels",
+            "drop_levels",
+            "drop_redundant_levels",
             "dropna",
             "dumps",
             "encode_config",
@@ -2466,6 +2483,7 @@ class TestFactory:
             "indexing_kwargs",
             "indexing_setter_func",
             "input_names",
+            "items",
             "lazy_output_names",
             "level_names",
             "load",
@@ -2504,6 +2522,8 @@ class TestFactory:
             "range_only_select",
             "rec_state",
             "regroup",
+            "rename",
+            "rename_levels",
             "replace",
             "resample",
             "reset_settings",
@@ -2524,6 +2544,7 @@ class TestFactory:
             "save",
             "select_col",
             "select_col_from_obj",
+            "select_levels",
             "self_aliases",
             "set_settings",
             "short_name",

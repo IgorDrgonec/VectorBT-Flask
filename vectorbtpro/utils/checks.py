@@ -166,7 +166,7 @@ def is_sequence(arg: tp.Any) -> bool:
 
 def is_complex_sequence(arg: tp.Any) -> bool:
     """Check whether the argument is a sequence but not a string or bytes object."""
-    if isinstance(arg, (str, bytes)):
+    if isinstance(arg, (str, bytes, bytearray)):
         return False
     return is_sequence(arg)
 
@@ -182,7 +182,7 @@ def is_iterable(arg: tp.Any) -> bool:
 
 def is_complex_iterable(arg: tp.Any) -> bool:
     """Check whether the argument is iterable but not a string or bytes object."""
-    if isinstance(arg, (str, bytes)):
+    if isinstance(arg, (str, bytes, bytearray)):
         return False
     return is_iterable(arg)
 
@@ -534,9 +534,9 @@ def assert_instance_of(arg: tp.Any, types: tp.TypeLike, arg_name: tp.Optional[st
         x = f"Argument '{arg_name}'"
     if not is_instance_of(arg, types):
         if isinstance(types, tuple):
-            raise AssertionError(f"{x} must be of one of the types {types}, not {type(arg)}")
+            raise AssertionError(f"{x} must be of one of types {types}, not {type(arg)}")
         else:
-            raise AssertionError(f"{x} must be of the type {types}, not {type(arg)}")
+            raise AssertionError(f"{x} must be of type {types}, not {type(arg)}")
 
 
 def assert_not_instance_of(arg: tp.Any, types: tp.TypeLike, arg_name: tp.Optional[str] = None) -> None:
@@ -547,9 +547,9 @@ def assert_not_instance_of(arg: tp.Any, types: tp.TypeLike, arg_name: tp.Optiona
         x = f"Argument '{arg_name}'"
     if is_instance_of(arg, types):
         if isinstance(types, tuple):
-            raise AssertionError(f"{x} cannot be of one of the types {types}")
+            raise AssertionError(f"{x} cannot be of one of types {types}")
         else:
-            raise AssertionError(f"{x} cannot be of the type {types}")
+            raise AssertionError(f"{x} cannot be of type {types}")
 
 
 def assert_subclass_of(arg: tp.Type, classes: tp.TypeLike, arg_name: tp.Optional[str] = None) -> None:
@@ -560,9 +560,9 @@ def assert_subclass_of(arg: tp.Type, classes: tp.TypeLike, arg_name: tp.Optional
         x = f"Argument '{arg_name}'"
     if not is_subclass_of(arg, classes):
         if isinstance(classes, tuple):
-            raise AssertionError(f"{x} must be a subclass of one of the types {classes}")
+            raise AssertionError(f"{x} must be a subclass of one of types {classes}")
         else:
-            raise AssertionError(f"{x} must be a subclass of the type {classes}")
+            raise AssertionError(f"{x} must be a subclass of type {classes}")
 
 
 def assert_not_subclass_of(arg: tp.Type, classes: tp.TypeLike, arg_name: tp.Optional[str] = None) -> None:
@@ -573,9 +573,9 @@ def assert_not_subclass_of(arg: tp.Type, classes: tp.TypeLike, arg_name: tp.Opti
         x = f"Argument '{arg_name}'"
     if is_subclass_of(arg, classes):
         if isinstance(classes, tuple):
-            raise AssertionError(f"{x} cannot be a subclass of one of the types {classes}")
+            raise AssertionError(f"{x} cannot be a subclass of one of types {classes}")
         else:
-            raise AssertionError(f"{x} cannot be a subclass of the type {classes}")
+            raise AssertionError(f"{x} cannot be a subclass of type {classes}")
 
 
 def assert_type_equal(arg1: tp.Any, arg2: tp.Any) -> None:
@@ -698,13 +698,13 @@ def assert_shape_equal(
                 raise AssertionError(f"Axis {axis} of {arg1.shape} and {arg2.shape} do not match")
 
 
-def assert_index_equal(arg1: pd.Index, arg2: pd.Index, check_names: bool = True) -> None:
+def assert_index_equal(arg1: tp.Index, arg2: tp.Index, check_names: bool = True) -> None:
     """Raise exception if the first argument and the second argument have different index."""
     if not is_index_equal(arg1, arg2, check_names=check_names):
         raise AssertionError(f"Indexes {arg1} and {arg2} do not match")
 
 
-def assert_columns_equal(arg1: pd.Index, arg2: pd.Index, check_names: bool = True) -> None:
+def assert_columns_equal(arg1: tp.Index, arg2: tp.Index, check_names: bool = True) -> None:
     """Raise exception if the first argument and the second argument have different columns."""
     if not is_index_equal(arg1, arg2, check_names=check_names):
         raise AssertionError(f"Columns {arg1} and {arg2} do not match")
@@ -743,7 +743,7 @@ def assert_array_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> None:
     raise AssertionError(f"Arrays {arg1} and {arg2} do not match")
 
 
-def assert_level_not_exists(arg: pd.Index, level_name: str) -> None:
+def assert_level_not_exists(arg: tp.Index, level_name: str) -> None:
     """Raise exception if index the argument has level `level_name`."""
     if isinstance(arg, pd.MultiIndex):
         names = arg.names

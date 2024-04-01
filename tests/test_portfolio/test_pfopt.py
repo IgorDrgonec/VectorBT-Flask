@@ -884,7 +884,7 @@ class TestPyPortfolioOpt:
             )
             assert_series_equal(
                 pd.Series(pfopt.riskfolio_optimize(
-                    longer_returns.vbt.stack_index(pd.Index(["C1", "C1", "C2", "C2", "C3"], name="my_class")),
+                    longer_returns.vbt.add_levels(pd.Index(["C1", "C1", "C2", "C2", "C3"], name="my_class")),
                     constraints=[dict(Type="Classes", Set="my_class", Position="C1", Sign="<=", Weight=0.2)],
                 )),
                 pd.Series({

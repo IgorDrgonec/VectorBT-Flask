@@ -4,11 +4,11 @@
 
 import uuid
 
-import attr
 import numpy as np
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.chunking import (
     ArgGetter,
     ArgSizer,
@@ -92,8 +92,8 @@ def get_group_lens_slice(group_lens: tp.Array1d, chunk_meta: ChunkMeta) -> slice
     return slice(start, end)
 
 
-@attr.s(frozen=True)
-class GroupLensMapper(ChunkMapper, ArgGetter):
+@define
+class GroupLensMapper(ChunkMapper, ArgGetter, DefineMixin):
     """Class for mapping chunk metadata to per-group column lengths.
 
     Argument can be either a group map tuple or a group lengths array."""
@@ -139,8 +139,8 @@ class ChunkedGroupMap(Chunked):
         return self.take_spec
 
 
-@attr.s(frozen=True)
-class GroupIdxsMapper(ChunkMapper, ArgGetter):
+@define
+class GroupIdxsMapper(ChunkMapper, ArgGetter, DefineMixin):
     """Class for mapping chunk metadata to per-group column indices.
 
     Argument must be a group map tuple."""
@@ -190,8 +190,8 @@ class FlexArraySizer(ArraySizer):
         raise ValueError(f"FlexArraySizer supports max 2 dimensions, not {len(obj.shape)}")
 
 
-@attr.s(frozen=True)
-class FlexArraySelector(ArraySelector):
+@define
+class FlexArraySelector(ArraySelector, DefineMixin):
     """Class for selecting one element from a NumPy array's axis flexibly based on the chunk index.
 
     The result is intended to be used together with `vectorbtpro.base.flex_indexing.flex_select_1d_nb`
@@ -242,8 +242,8 @@ class FlexArraySelector(ArraySelector):
         raise ValueError(f"FlexArraySelector supports max 2 dimensions, not {len(obj.shape)}")
 
 
-@attr.s(frozen=True)
-class FlexArraySlicer(ArraySlicer):
+@define
+class FlexArraySlicer(ArraySlicer, DefineMixin):
     """Class for selecting one element from a NumPy array's axis flexibly based on the chunk index.
 
     The result is intended to be used together with `vectorbtpro.base.flex_indexing.flex_select_1d_nb`

@@ -2208,6 +2208,48 @@ class TestFromSignals:
                 exits=exits,
                 order_type="limit",
                 slippage=0.01,
+                limit_order_price="hardlimit",
+                limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 1, 25.0, 4.0, 0.0, 0, 1, -1),
+                    (0, 1, 0, 0, 3, 33.333333333333336, 3.0, 0.0, 0, 1, -1),
+                    (0, 2, 0, 0, 1, 22.22222222222222, 4.5, 0.0, 0, 1, -1),
+                    (0, 3, 0, 0, 3, 40.0, 2.5, 0.0, 0, 1, -1),
+                    (0, 4, 0, 0, 4, 100.0, 1.0, 0.0, 0, 1, -1),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            _from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                order_type="limit",
+                slippage=0.01,
+                limit_order_price="close",
+                limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 1, 25.0, 4.0, 0.0, 0, 1, -1),
+                    (0, 1, 0, 0, 3, 50.0, 2.0, 0.0, 0, 1, -1),
+                    (0, 2, 0, 0, 1, 25.0, 4.0, 0.0, 0, 1, -1),
+                    (0, 3, 0, 0, 3, 50.0, 2.0, 0.0, 0, 1, -1),
+                    (0, 4, 0, 0, 4, 100.0, 1.0, 0.0, 0, 1, -1),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            _from_signals_longonly(
+                close=close,
+                entries=entries,
+                exits=exits,
+                order_type="limit",
+                slippage=0.01,
                 limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
                 delta_format="percent",
             ).order_records,
@@ -2314,6 +2356,54 @@ class TestFromSignals:
                     (0, 2, 0, 0, 1, 23.529411764705884, 4.25, 0.0, 0, 1, -1),
                     (0, 3, 0, 0, 1, 23.529411764705884, 4.25, 0.0, 0, 1, -1),
                     (0, 4, 0, 0, 2, 19.047619047619047, 5.25, 0.0, 0, 1, -1),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            _from_signals_longonly(
+                open=open,
+                high=high,
+                low=low,
+                close=close,
+                entries=entries,
+                exits=exits,
+                slippage=0.01,
+                order_type="limit",
+                limit_order_price="hardlimit",
+                limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 1, 25.0, 4.0, 0.0, 0, 1, -1),
+                    (0, 1, 0, 0, 3, 33.333333333333336, 3.0, 0.0, 0, 1, -1),
+                    (0, 2, 0, 0, 1, 22.22222222222222, 4.5, 0.0, 0, 1, -1),
+                    (0, 3, 0, 0, 3, 40.0, 2.5, 0.0, 0, 1, -1),
+                    (0, 4, 0, 0, 4, 100.0, 1.0, 0.0, 0, 1, -1),
+                ],
+                dtype=fs_order_dt,
+            ),
+        )
+        assert_records_close(
+            _from_signals_longonly(
+                open=open,
+                high=high,
+                low=low,
+                close=close,
+                entries=entries,
+                exits=exits,
+                slippage=0.01,
+                order_type="limit",
+                limit_order_price="close",
+                limit_delta=[[-np.inf, 0.0, -1 / 2, 1 / 6, 2 / 3, np.inf]],
+            ).order_records,
+            np.array(
+                [
+                    (0, 0, 0, 0, 1, 25.0, 4.0, 0.0, 0, 1, -1),
+                    (0, 1, 0, 0, 3, 50.0, 2.0, 0.0, 0, 1, -1),
+                    (0, 2, 0, 0, 1, 25.0, 4.0, 0.0, 0, 1, -1),
+                    (0, 3, 0, 0, 3, 50.0, 2.0, 0.0, 0, 1, -1),
+                    (0, 4, 0, 0, 4, 100.0, 1.0, 0.0, 0, 1, -1),
                 ],
                 dtype=fs_order_dt,
             ),
@@ -6582,6 +6672,221 @@ class TestFromHolding:
                 dynamic_mode=True,
                 close_at_end=True,
             ).order_records,
+        )
+
+    @pytest.mark.parametrize("test_ls", [False, True])
+    @pytest.mark.parametrize("test_flexible", [False, True])
+    def test_sim_range(self, test_ls, test_flexible):
+        if test_ls:
+            if test_flexible:
+                _from_signals_both = partial(from_ls_signals_both, adjust_func_nb=adjust_func_nb)
+            else:
+                _from_signals_both = from_ls_signals_both
+        else:
+            if test_flexible:
+                _from_signals_both = partial(from_signals_both, adjust_func_nb=adjust_func_nb)
+            else:
+                _from_signals_both = from_signals_both
+        _entries_wide = entries_wide.copy()
+        _exits_wide = exits_wide.copy()
+        _entries_wide.iloc[:1] = False
+        _exits_wide.iloc[:1] = False
+        assert_records_close(
+            _from_signals_both(entries=entries_wide, exits=exits_wide, sim_start=1).order_records,
+            _from_signals_both(entries=_entries_wide, exits=_exits_wide).order_records,
+        )
+        assert_records_close(
+            _from_signals_both(entries=entries_wide, exits=exits_wide, sim_start=1).order_records,
+            _from_signals_both(entries=_entries_wide, exits=_exits_wide, sim_start="auto").order_records,
+        )
+        _entries_wide = entries_wide.copy()
+        _exits_wide = exits_wide.copy()
+        _entries_wide.iloc[2:] = False
+        _exits_wide.iloc[2:] = False
+        assert_records_close(
+            _from_signals_both(entries=entries_wide, exits=exits_wide, sim_end=2).order_records,
+            _from_signals_both(entries=_entries_wide, exits=_exits_wide).order_records,
+        )
+        assert_records_close(
+            _from_signals_both(entries=entries_wide, exits=exits_wide, sim_end=2).order_records,
+            _from_signals_both(entries=_entries_wide, exits=_exits_wide, sim_end="auto").order_records,
+        )
+        _entries_wide = entries_wide.copy()
+        _exits_wide = exits_wide.copy()
+        _entries_wide.iloc[:1, 0] = False
+        _entries_wide.iloc[:2, 1] = False
+        _entries_wide.iloc[:3, 2] = False
+        _exits_wide.iloc[:1, 0] = False
+        _exits_wide.iloc[:2, 1] = False
+        _exits_wide.iloc[:3, 2] = False
+        assert_records_close(
+            _from_signals_both(
+                entries=entries_wide,
+                exits=exits_wide,
+                sim_start=[1, 2, 3],
+            ).order_records,
+            _from_signals_both(
+                entries=_entries_wide,
+                exits=_exits_wide,
+            ).order_records,
+        )
+        assert_records_close(
+            _from_signals_both(
+                entries=entries_wide,
+                exits=exits_wide,
+                sim_start=[1, 2, 3],
+            ).order_records,
+            _from_signals_both(
+                entries=_entries_wide,
+                exits=_exits_wide,
+                sim_start="auto",
+            ).order_records,
+        )
+        with pytest.raises(Exception):
+            _from_signals_both(
+                entries=entries_wide,
+                exits=exits_wide,
+                sim_start=[1, 2],
+            )
+        if not test_flexible:
+            assert_records_close(
+                _from_signals_both(
+                    close=price_wide,
+                    entries=entries_wide,
+                    exits=exits_wide,
+                    group_by=[0, 0, 1],
+                    sim_start=[1, 2, 3],
+                ).order_records,
+                _from_signals_both(
+                    close=price_wide,
+                    entries=_entries_wide,
+                    exits=_exits_wide,
+                    group_by=[0, 0, 1],
+                ).order_records,
+            )
+            assert_records_close(
+                _from_signals_both(
+                    close=price_wide,
+                    entries=entries_wide,
+                    exits=exits_wide,
+                    group_by=[0, 0, 1],
+                    sim_start=[1, 2, 3],
+                ).order_records,
+                _from_signals_both(
+                    close=price_wide,
+                    entries=_entries_wide,
+                    exits=_exits_wide,
+                    group_by=[0, 0, 1],
+                    sim_start="auto",
+                ).order_records,
+            )
+        _entries_wide = entries_wide.copy()
+        _exits_wide = exits_wide.copy()
+        _entries_wide.iloc[:1, 0] = False
+        _entries_wide.iloc[:2, 1] = False
+        _entries_wide.iloc[:2, 2] = False
+        _exits_wide.iloc[:1, 0] = False
+        _exits_wide.iloc[:2, 1] = False
+        _exits_wide.iloc[:2, 2] = False
+        assert_records_close(
+            _from_signals_both(
+                entries=entries_wide,
+                exits=exits_wide,
+                group_by=[0, 0, 1],
+                cash_sharing=True,
+                sim_start=[1, 2],
+            ).order_records,
+            _from_signals_both(
+                entries=_entries_wide,
+                exits=_exits_wide,
+                group_by=[0, 0, 1],
+                cash_sharing=True,
+            ).order_records,
+        )
+        assert_records_close(
+            _from_signals_both(
+                entries=entries_wide,
+                exits=exits_wide,
+                group_by=[0, 0, 1],
+                cash_sharing=True,
+                sim_start=[1, 2],
+            ).order_records,
+            _from_signals_both(
+                entries=_entries_wide,
+                exits=_exits_wide,
+                group_by=[0, 0, 1],
+                cash_sharing=True,
+                sim_start="auto",
+            ).order_records,
+        )
+
+    def test_ctx_helpers(self):
+        @njit
+        def post_signal_func_nb(c):
+            _ = vbt.pf_nb.get_position_nb(c)
+            _ = vbt.pf_nb.get_position_nb(c, col=1)
+            _ = vbt.pf_nb.in_position_nb(c)
+            _ = vbt.pf_nb.in_position_nb(c, col=1)
+            _ = vbt.pf_nb.in_long_position_nb(c)
+            _ = vbt.pf_nb.in_long_position_nb(c, col=1)
+            _ = vbt.pf_nb.in_short_position_nb(c)
+            _ = vbt.pf_nb.in_short_position_nb(c, col=1)
+            _ = vbt.pf_nb.get_n_active_positions_nb(c)
+            _ = vbt.pf_nb.get_n_active_positions_nb(c, all_groups=True)
+            _ = vbt.pf_nb.get_cash_nb(c)
+            _ = vbt.pf_nb.get_cash_nb(c, col_or_group=1)
+            _ = vbt.pf_nb.get_locked_cash_nb(c)
+            _ = vbt.pf_nb.get_locked_cash_nb(c, col=1)
+            _ = vbt.pf_nb.get_free_cash_nb(c)
+            _ = vbt.pf_nb.get_free_cash_nb(c, col_or_group=1)
+            _ = vbt.pf_nb.has_free_cash_nb(c)
+            _ = vbt.pf_nb.has_free_cash_nb(c, col_or_group=1)
+            _ = vbt.pf_nb.get_val_price_nb(c)
+            _ = vbt.pf_nb.get_val_price_nb(c, col=1)
+            _ = vbt.pf_nb.get_value_nb(c)
+            _ = vbt.pf_nb.get_value_nb(c, col_or_group=1)
+            _ = vbt.pf_nb.get_leverage_nb(c)
+            _ = vbt.pf_nb.get_leverage_nb(c, col=1)
+            _ = vbt.pf_nb.get_position_value_nb(c)
+            _ = vbt.pf_nb.get_position_value_nb(c, col=1)
+            _ = vbt.pf_nb.get_allocation_nb(c)
+            _ = vbt.pf_nb.get_allocation_nb(c, col=1)
+            _ = vbt.pf_nb.get_order_count_nb(c)
+            _ = vbt.pf_nb.get_order_count_nb(c, col=1)
+            _ = vbt.pf_nb.get_order_records_nb(c)
+            _ = vbt.pf_nb.get_order_records_nb(c, col=1)
+            _ = vbt.pf_nb.any_order_nb(c)
+            _ = vbt.pf_nb.any_order_nb(c, col=1)
+            _ = vbt.pf_nb.order_filled_nb(c)
+            _ = vbt.pf_nb.order_opened_position_nb(c)
+            _ = vbt.pf_nb.order_increased_position_nb(c)
+            _ = vbt.pf_nb.order_decreased_position_nb(c)
+            _ = vbt.pf_nb.order_closed_position_nb(c)
+            _ = vbt.pf_nb.order_reversed_position_nb(c)
+            _ = vbt.pf_nb.get_limit_target_price_nb(c)
+            _ = vbt.pf_nb.get_limit_target_price_nb(c, col=1)
+            _ = vbt.pf_nb.get_sl_target_price_nb(c)
+            _ = vbt.pf_nb.get_sl_target_price_nb(c, col=1)
+            _ = vbt.pf_nb.get_tsl_target_price_nb(c)
+            _ = vbt.pf_nb.get_tsl_target_price_nb(c, col=1)
+            _ = vbt.pf_nb.get_tp_target_price_nb(c)
+            _ = vbt.pf_nb.get_tp_target_price_nb(c, col=1)
+            _ = vbt.pf_nb.get_entry_trade_records_nb(c)
+            _ = vbt.pf_nb.get_entry_trade_records_nb(c, col=1)
+            _ = vbt.pf_nb.get_exit_trade_records_nb(c)
+            _ = vbt.pf_nb.get_exit_trade_records_nb(c, col=1)
+            _ = vbt.pf_nb.get_position_records_nb(c)
+            _ = vbt.pf_nb.get_position_records_nb(c, col=1)
+
+        _ = vbt.PF.from_signals(
+            [1],
+            long_entries=[[True, False]],
+            short_entries=[[False, True]],
+            init_cash=[100, 200],
+            post_signal_func_nb=post_signal_func_nb,
+            sl_stop=0.1,
+            tsl_stop=0.2,
+            tp_stop=0.3,
         )
 
 

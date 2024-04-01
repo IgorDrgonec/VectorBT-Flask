@@ -13,6 +13,8 @@ __all__ = [
     "flex_select_nb",
     "flex_select_row_nb",
     "flex_select_col_nb",
+    "flex_select_2d_row_nb",
+    "flex_select_2d_col_nb",
 ]
 
 
@@ -208,3 +210,23 @@ def flex_select_col_nb(arr: tp.FlexArray2d, col: int, rotate_cols: bool = _rotat
         Array must be two-dimensional."""
     flex_col = flex_choose_i_pc_nb(arr, col, rotate_cols=rotate_cols)
     return arr[:, flex_col]
+
+
+@register_jitted(cache=True)
+def flex_select_2d_row_nb(arr: tp.FlexArray2d, i: int, rotate_rows: bool = _rotate_rows) -> tp.Array2d:
+    """Select a row from a flexible 2-dim array. Returns a 2-dim array.
+
+    !!! note
+        Array must be two-dimensional."""
+    flex_i = flex_choose_i_pr_nb(arr, i, rotate_rows=rotate_rows)
+    return arr[flex_i : flex_i + 1]
+
+
+@register_jitted(cache=True)
+def flex_select_2d_col_nb(arr: tp.FlexArray2d, col: int, rotate_cols: bool = _rotate_cols) -> tp.Array2d:
+    """Select a column from a flexible 2-dim array. Returns a 2-dim array.
+
+    !!! note
+        Array must be two-dimensional."""
+    flex_col = flex_choose_i_pc_nb(arr, col, rotate_cols=rotate_cols)
+    return arr[:, flex_col : flex_col + 1]

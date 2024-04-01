@@ -4,14 +4,14 @@
 
 from string import Template
 
-import attr
 import importlib
 
 import vectorbtpro as vbt
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils import checks
+from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.config import merge_dicts
 from vectorbtpro.utils.eval_ import multiline_eval
-from vectorbtpro.utils.hashing import Hashable
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.search import any_in_obj, find_and_replace_in_obj
 from vectorbtpro.utils.module_ import package_shortcut_config
@@ -26,49 +26,47 @@ __all__ = [
 ]
 
 
-@attr.s(frozen=True)
-class CustomTemplate:
+@define
+class CustomTemplate(DefineMixin):
     """Class for substituting templates."""
 
-    template: tp.Any = attr.ib()
+    template: tp.Any = define.field()
     """Template to be processed."""
 
-    context: tp.KwargsLike = attr.ib(default=None)
+    context: tp.KwargsLike = define.field(default=None)
     """Context mapping."""
 
-    strict: tp.Optional[bool] = attr.ib(default=None)
+    strict: tp.Optional[bool] = define.field(default=None)
     """Whether to raise an error if processing template fails.
 
     If not None, overrides `strict` passed by `substitute_templates`."""
 
-    sub_id: tp.Optional[tp.MaybeCollection[Hashable]] = attr.ib(default=None)
-    """Substitution id or ids at which to evaluate this template
-
-    Checks against `sub_id` passed by `substitute_templates`."""
-
-    context_merge_kwargs: tp.KwargsLike = attr.ib(default=None)
+    context_merge_kwargs: tp.KwargsLike = define.field(default=None)
     """Keyword arguments passed to `vectorbtpro.utils.config.merge_dicts`."""
 
-    def meets_sub_id(self, sub_id: tp.Optional[Hashable] = None) -> bool:
-        """Return whether the substitution id of the template meets the global substitution id."""
-        if self.sub_id is not None and sub_id is not None:
-            if isinstance(self.sub_id, int):
-                if sub_id != self.sub_id:
+    eval_id: tp.Optional[tp.MaybeSequence[tp.Hashable]] = define.field(default=None)
+    """One or more identifiers at which to evaluate this instance."""
+
+    def meets_eval_id(self, eval_id: tp.Optional[tp.Hashable]) -> bool:
+        """Return whether the evaluation id of the instance meets the global evaluation id."""
+        if self.eval_id is not None and eval_id is not None:
+            if checks.is_complex_sequence(self.eval_id):
+                if eval_id not in self.eval_id:
                     return False
             else:
-                if sub_id not in self.sub_id:
+                if eval_id != self.eval_id:
                     return False
         return True
 
     def resolve_context(
         self,
         context: tp.KwargsLike = None,
-        sub_id: tp.Optional[Hashable] = None,
+        eval_id: tp.Optional[tp.Hashable] = None,
     ) -> tp.Kwargs:
         """Resolve `CustomTemplate.context`.
 
         Merges `context` in `vectorbtpro._settings.template`, `CustomTemplate.context`, and `context`.
-        Automatically appends `sub_id`, `np` (NumPy), `pd` (Pandas), and `vbt` (vectorbtpro)."""
+        Automatically appends `eval_id`, `np` (NumPy), `pd` (Pandas), and `vbt` (vectorbtpro)."""
         from vectorbtpro._settings import settings
 
         template_cfg = settings["template"]
@@ -84,8 +82,8 @@ class CustomTemplate:
         )
         if "context" not in new_context:
             new_context["context"] = dict(new_context)
-        if "sub_id" not in new_context:
-            new_context["sub_id"] = sub_id
+        if "eval_id" not in new_context:
+            new_context["eval_id"] = eval_id
         for k, v in package_shortcut_config.items():
             if k not in new_context:
                 try:
@@ -112,7 +110,7 @@ class CustomTemplate:
         self,
         context: tp.KwargsLike = None,
         strict: tp.Optional[bool] = None,
-        sub_id: tp.Optional[Hashable] = None,
+        eval_id: tp.Optional[tp.Hashable] = None,
     ) -> tp.Any:
         """Abstract method to substitute the template `CustomTemplate.template` using
         the context from merging `CustomTemplate.context` and `context`."""
@@ -128,12 +126,12 @@ class Sub(CustomTemplate):
         self,
         context: tp.KwargsLike = None,
         strict: tp.Optional[bool] = None,
-        sub_id: tp.Optional[Hashable] = None,
+        eval_id: tp.Optional[tp.Hashable] = None,
     ) -> tp.Any:
         """Substitute parts of `Sub.template` as a regular template."""
-        if not self.meets_sub_id(sub_id):
+        if not self.meets_eval_id(eval_id):
             return self
-        context = self.resolve_context(context=context, sub_id=sub_id)
+        context = self.resolve_context(context=context, eval_id=eval_id)
         strict = self.resolve_strict(strict=strict)
 
         try:
@@ -151,12 +149,12 @@ class Rep(CustomTemplate):
         self,
         context: tp.KwargsLike = None,
         strict: tp.Optional[bool] = None,
-        sub_id: tp.Optional[Hashable] = None,
+        eval_id: tp.Optional[tp.Hashable] = None,
     ) -> tp.Any:
         """Replace `Rep.template` as a key."""
-        if not self.meets_sub_id(sub_id):
+        if not self.meets_eval_id(eval_id):
             return self
-        context = self.resolve_context(context=context, sub_id=sub_id)
+        context = self.resolve_context(context=context, eval_id=eval_id)
         strict = self.resolve_strict(strict=strict)
 
         try:
@@ -175,12 +173,12 @@ class RepEval(CustomTemplate):
         self,
         context: tp.KwargsLike = None,
         strict: tp.Optional[bool] = None,
-        sub_id: tp.Optional[Hashable] = None,
+        eval_id: tp.Optional[tp.Hashable] = None,
     ) -> tp.Any:
         """Evaluate `RepEval.template` as an expression."""
-        if not self.meets_sub_id(sub_id):
+        if not self.meets_eval_id(eval_id):
             return self
-        context = self.resolve_context(context=context, sub_id=sub_id)
+        context = self.resolve_context(context=context, eval_id=eval_id)
         strict = self.resolve_strict(strict=strict)
 
         try:
@@ -198,12 +196,12 @@ class RepFunc(CustomTemplate):
         self,
         context: tp.KwargsLike = None,
         strict: tp.Optional[bool] = None,
-        sub_id: int = 0,
+        eval_id: int = 0,
     ) -> tp.Any:
         """Call `RepFunc.template` as a function."""
-        if not self.meets_sub_id(sub_id):
+        if not self.meets_eval_id(eval_id):
             return self
-        context = self.resolve_context(context=context, sub_id=sub_id)
+        context = self.resolve_context(context=context, eval_id=eval_id)
         strict = self.resolve_strict(strict=strict)
 
         func_arg_names = get_func_arg_names(self.template)
@@ -242,7 +240,7 @@ def substitute_templates(
     obj: tp.Any,
     context: tp.KwargsLike = None,
     strict: tp.Optional[bool] = None,
-    sub_id: tp.Optional[Hashable] = None,
+    eval_id: tp.Optional[tp.Hashable] = None,
     **kwargs,
 ) -> tp.Any:
     """Traverses the object recursively and, if any template found, substitutes it using a context.
@@ -288,7 +286,7 @@ def substitute_templates(
 
     def _replace_func(k, v):
         if isinstance(v, CustomTemplate):
-            return v.substitute(context=context, strict=strict, sub_id=sub_id)
+            return v.substitute(context=context, strict=strict, eval_id=eval_id)
         if isinstance(v, Template):
             return v.substitute(context=context)
 

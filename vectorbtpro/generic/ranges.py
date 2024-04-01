@@ -30,7 +30,7 @@ are 0 and 20 (not 19!) respectively.
 
 >>> ranges = vbt.Ranges.from_array(fast_below_slow, wrapper_kwargs=dict(freq='d'))
 
->>> ranges.records_readable
+>>> ranges.readable
    Range Id  Column           Start Timestamp             End Timestamp  \\
 0         0       0 2019-02-19 00:00:00+00:00 2019-07-25 00:00:00+00:00
 1         1       0 2019-08-08 00:00:00+00:00 2019-08-19 00:00:00+00:00
@@ -111,7 +111,6 @@ Name: group, dtype: object
 ![](/assets/images/api/ranges_plots.dark.svg#only-dark){: .iimg loading=lazy }
 """
 
-import attr
 import warnings
 
 import numpy as np
@@ -129,6 +128,7 @@ from vectorbtpro.records.mapped_array import MappedArray
 from vectorbtpro.registries.ch_registry import ch_reg
 from vectorbtpro.registries.jit_registry import jit_reg
 from vectorbtpro.utils import checks, datetime_ as dt
+from vectorbtpro.utils.attr_ import DefineMixin, define, MISSING
 from vectorbtpro.utils.colors import adjust_lightness
 from vectorbtpro.utils.config import resolve_dict, merge_dicts, Config, ReadonlyConfig, HybridConfig
 from vectorbtpro.utils.enum_ import map_enum_fields
@@ -145,10 +145,6 @@ __all__ = [
 ]
 
 __pdoc__ = {}
-
-
-class _DEF:
-    pass
 
 
 # ############# Ranges ############# #
@@ -555,7 +551,7 @@ class Ranges(PriceRecords):
         id_level: tp.Union[None, str, tp.IndexLike] = None,
         jitted: tp.JittedOption = None,
         wrap_kwargs: tp.KwargsLike = None,
-        index_stack_kwargs: tp.KwargsLike = None,
+        clean_index_kwargs: tp.KwargsLike = None,
     ) -> tp.Union[tp.Tuple[tp.Array1d, tp.Array2d], tp.Frame]:
         """Generate a projection for each range record.
 
@@ -668,7 +664,7 @@ class Ranges(PriceRecords):
                 columns=stack_indexes(
                     self.wrapper.columns[self.col_arr[ridxs]],
                     id_level[ridxs],
-                    **resolve_dict(index_stack_kwargs),
+                    **resolve_dict(clean_index_kwargs),
                 ),
             ),
             wrap_kwargs,
@@ -1194,7 +1190,7 @@ class Ranges(PriceRecords):
                         close=close,
                         ohlc=ohlc,
                     ),
-                    sub_id="shape_kwargs",
+                    eval_id="shape_kwargs",
                 )
                 _shape_kwargs = merge_dicts(
                     dict(
@@ -1520,56 +1516,56 @@ Ranges.override_subplots_doc(__pdoc__)
 PatternRangesT = tp.TypeVar("PatternRangesT", bound="PatternRanges")
 
 
-@attr.s(frozen=True, eq=False)
-class PSC:
+@define
+class PSC(DefineMixin):
     """Class that represents a pattern search config.
 
     Every field will be resolved into the format suitable for Numba."""
 
-    pattern: tp.Union[tp.ArrayLike] = attr.ib(default=_DEF)
+    pattern: tp.Union[tp.ArrayLike] = define.required_field()
     """Flexible pattern array.
     
     Can be smaller or bigger than the source array; in such a case, the values of the smaller array
     will be "stretched" by interpolation of the type in `PSC.interp_mode`."""
 
-    window: tp.Optional[int] = attr.ib(default=_DEF)
+    window: tp.Optional[int] = define.optional_field()
     """Minimum window.
     
     Defaults to the length of `PSC.pattern`."""
 
-    max_window: tp.Optional[int] = attr.ib(default=_DEF)
+    max_window: tp.Optional[int] = define.optional_field()
     """Maximum window (including)."""
 
-    row_select_prob: tp.Union[float] = attr.ib(default=_DEF)
+    row_select_prob: tp.Union[float] = define.optional_field()
     """Row selection probability."""
 
-    window_select_prob: tp.Union[float] = attr.ib(default=_DEF)
+    window_select_prob: tp.Union[float] = define.optional_field()
     """Window selection probability."""
 
-    roll_forward: tp.Union[bool] = attr.ib(default=_DEF)
+    roll_forward: tp.Union[bool] = define.optional_field()
     """Whether to roll windows to the left of the current row, otherwise to the right."""
 
-    interp_mode: tp.Union[int, str] = attr.ib(default=_DEF)
+    interp_mode: tp.Union[int, str] = define.optional_field()
     """Interpolation mode. See `vectorbtpro.generic.enums.InterpMode`."""
 
-    rescale_mode: tp.Union[int, str] = attr.ib(default=_DEF)
+    rescale_mode: tp.Union[int, str] = define.optional_field()
     """Rescaling mode. See `vectorbtpro.generic.enums.RescaleMode`."""
 
-    vmin: tp.Union[float] = attr.ib(default=_DEF)
+    vmin: tp.Union[float] = define.optional_field()
     """Minimum value of any window. Should only be used when the array has fixed bounds.
     
     Used in rescaling using `RescaleMode.MinMax` and checking against `PSC.min_pct_change` and `PSC.max_pct_change`.
     
     If `np.nan`, gets calculated dynamically."""
 
-    vmax: tp.Union[float] = attr.ib(default=_DEF)
+    vmax: tp.Union[float] = define.optional_field()
     """Maximum value of any window. Should only be used when the array has fixed bounds.
     
     Used in rescaling using `RescaleMode.MinMax` and checking against `PSC.min_pct_change` and `PSC.max_pct_change`.
     
     If `np.nan`, gets calculated dynamically."""
 
-    pmin: tp.Union[float] = attr.ib(default=_DEF)
+    pmin: tp.Union[float] = define.optional_field()
     """Value to be considered as the minimum of `PSC.pattern`.
     
     Used in rescaling using `RescaleMode.MinMax` and calculating the maximum distance at each point 
@@ -1577,7 +1573,7 @@ class PSC:
     
     If `np.nan`, gets calculated dynamically."""
 
-    pmax: tp.Union[float] = attr.ib(default=_DEF)
+    pmax: tp.Union[float] = define.optional_field()
     """Value to be considered as the maximum of `PSC.pattern`.
     
     Used in rescaling using `RescaleMode.MinMax` and calculating the maximum distance at each point 
@@ -1585,27 +1581,27 @@ class PSC:
     
     If `np.nan`, gets calculated dynamically."""
 
-    invert: tp.Union[bool] = attr.ib(default=_DEF)
+    invert: tp.Union[bool] = define.optional_field()
     """Whether to invert the pattern vertically."""
 
-    error_type: tp.Union[int, str] = attr.ib(default=_DEF)
+    error_type: tp.Union[int, str] = define.optional_field()
     """Error type. See `vectorbtpro.generic.enums.ErrorType`."""
 
-    distance_measure: tp.Union[int, str] = attr.ib(default=_DEF)
+    distance_measure: tp.Union[int, str] = define.optional_field()
     """Distance measure. See `vectorbtpro.generic.enums.DistanceMeasure`."""
 
-    max_error: tp.Union[tp.ArrayLike] = attr.ib(default=_DEF)
+    max_error: tp.Union[tp.ArrayLike] = define.optional_field()
     """Maximum error at each point. Can be provided as a flexible array.
     
     If `max_error` is an array, it must be of the same size as the pattern array.
     It also should be provided within the same scale as the pattern."""
 
-    max_error_interp_mode: tp.Union[None, int, str] = attr.ib(default=_DEF)
+    max_error_interp_mode: tp.Union[None, int, str] = define.optional_field()
     """Interpolation mode for `PSC.max_error`. See `vectorbtpro.generic.enums.InterpMode`.
     
     If None, defaults to `PSC.interp_mode`."""
 
-    max_error_as_maxdist: tp.Union[bool] = attr.ib(default=_DEF)
+    max_error_as_maxdist: tp.Union[bool] = define.optional_field()
     """Whether `PSC.max_error` should be used as the maximum distance at each point.
     
     If False, crossing `PSC.max_error` will set the distance to the maximum distance
@@ -1613,43 +1609,43 @@ class PSC:
     
     If True and any of the points in a window is `np.nan`, the point will be skipped."""
 
-    max_error_strict: tp.Union[bool] = attr.ib(default=_DEF)
+    max_error_strict: tp.Union[bool] = define.optional_field()
     """Whether crossing `PSC.max_error` even once should yield the similarity of `np.nan`."""
 
-    min_pct_change: tp.Union[float] = attr.ib(default=_DEF)
+    min_pct_change: tp.Union[float] = define.optional_field()
     """Minimum percentage change of the window to stay a candidate for search.
 
     If any window doesn't cross this mark, its similarity becomes `np.nan`."""
 
-    max_pct_change: tp.Union[float] = attr.ib(default=_DEF)
+    max_pct_change: tp.Union[float] = define.optional_field()
     """Maximum percentage change of the window to stay a candidate for search.
 
     If any window crosses this mark, its similarity becomes `np.nan`."""
 
-    min_similarity: tp.Union[float] = attr.ib(default=_DEF)
+    min_similarity: tp.Union[float] = define.optional_field()
     """Minimum similarity.
     
     If any window doesn't cross this mark, its similarity becomes `np.nan`."""
 
-    minp: tp.Optional[int] = attr.ib(default=_DEF)
+    minp: tp.Optional[int] = define.optional_field()
     """Minimum number of observations in price window required to have a value."""
 
-    overlap_mode: tp.Union[int, str] = attr.ib(default=_DEF)
+    overlap_mode: tp.Union[int, str] = define.optional_field()
     """Overlapping mode. See `vectorbtpro.generic.enums.OverlapMode`."""
 
-    max_records: tp.Optional[int] = attr.ib(default=_DEF)
+    max_records: tp.Optional[int] = define.optional_field()
     """Maximum number of records expected to be filled.
     
     Set to avoid creating empty arrays larger than needed."""
 
-    name: tp.Optional[str] = attr.ib(default=None)
+    name: tp.Optional[str] = define.field(default=None)
     """Name of the config."""
 
     def __eq__(self, other):
         return checks.is_deep_equal(self, other)
 
     def __hash__(self):
-        dct = attr.asdict(self)
+        dct = self.asdict()
         if isinstance(dct["pattern"], np.ndarray):
             dct["pattern"] = tuple(dct["pattern"])
         else:
@@ -1698,14 +1694,14 @@ class PatternRanges(Ranges):
             search_config = dict()
         if isinstance(search_config, dict):
             search_config = PSC(**search_config)
-        search_config = attr.asdict(search_config)
+        search_config = search_config.asdict()
         defaults = {}
         for k, v in get_func_kwargs(cls.from_pattern_search).items():
             if k in search_config:
                 defaults[k] = v
         defaults = merge_dicts(defaults, kwargs)
         for k, v in search_config.items():
-            if v is _DEF:
+            if v is MISSING:
                 v = defaults[k]
             if k == "pattern":
                 if v is None:
@@ -1766,7 +1762,7 @@ class PatternRanges(Ranges):
         jitted: tp.JittedOption = None,
         execute_kwargs: tp.KwargsLike = None,
         attach_as_close: bool = True,
-        index_stack_kwargs: tp.KwargsLike = None,
+        clean_index_kwargs: tp.KwargsLike = None,
         wrapper_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> PatternRangesT:
@@ -1794,12 +1790,12 @@ class PatternRanges(Ranges):
         `**kwargs` will be passed to `PatternRanges.__init__`."""
         if seed is not None:
             set_seed(seed)
-        if index_stack_kwargs is None:
-            index_stack_kwargs = {}
+        if clean_index_kwargs is None:
+            clean_index_kwargs = {}
         arr = to_pd_array(arr)
         arr_2d = to_2d_array(arr)
         arr_wrapper = ArrayWrapper.from_obj(arr)
-        psc_keys = [a.name for a in PSC.__attrs_attrs__ if a.name != "name"]
+        psc_keys = [a.name for a in PSC.fields if a.name != "name"]
         method_locals = {k: v for k, v in locals().items() if k in psc_keys}
 
         # Flatten search configs
@@ -1844,7 +1840,7 @@ class PatternRanges(Ranges):
             param_product, param_columns = combine_params(
                 param_dct,
                 random_subset=random_subset,
-                index_stack_kwargs=index_stack_kwargs,
+                clean_index_kwargs=clean_index_kwargs,
             )
             if len(flat_search_configs) == 0:
                 flat_search_configs = []
@@ -1859,8 +1855,8 @@ class PatternRanges(Ranges):
                 for i in range(len(param_columns)):
                     for search_config in flat_search_configs:
                         new_search_config = dict()
-                        for k, v in attr.asdict(search_config).items():
-                            if v is not _DEF:
+                        for k, v in search_config.asdict().items():
+                            if v is not MISSING:
                                 if k in param_product:
                                     raise ValueError(f"Parameter '{k}' is re-defined in a search configuration")
                                 new_search_config[k] = v
@@ -1885,7 +1881,7 @@ class PatternRanges(Ranges):
                 "arr": arr_2d[:, c % arr_2d.shape[1]],
             }
             new_search_config = cls.resolve_search_config(flat_search_configs[c], **method_locals)
-            for k, v in attr.asdict(new_search_config).items():
+            for k, v in new_search_config.asdict().items():
                 if k == "name":
                     continue
                 if isinstance(v, Param):
@@ -1910,13 +1906,13 @@ class PatternRanges(Ranges):
         n_config_params = len(psc_names) // arr_2d.shape[1]
         if param_columns is not None:
             if n_config_params == 0 or (n_config_params == 1 and psc_names_none):
-                new_columns = combine_indexes((param_columns, arr_wrapper.columns), **index_stack_kwargs)
+                new_columns = combine_indexes((param_columns, arr_wrapper.columns), **clean_index_kwargs)
             else:
                 search_config_index = pd.Index(psc_names, name="search_config")
                 base_columns = stack_indexes(
-                    (search_config_index, tile_index(arr_wrapper.columns, n_config_params)), **index_stack_kwargs
+                    (search_config_index, tile_index(arr_wrapper.columns, n_config_params)), **clean_index_kwargs
                 )
-                new_columns = combine_indexes((param_columns, base_columns), **index_stack_kwargs)
+                new_columns = combine_indexes((param_columns, base_columns), **clean_index_kwargs)
         else:
             if n_config_params == 0 or (n_config_params == 1 and psc_names_none):
                 new_columns = arr_wrapper.columns
@@ -1924,7 +1920,7 @@ class PatternRanges(Ranges):
                 search_config_index = pd.Index(psc_names, name="search_config")
                 new_columns = stack_indexes(
                     (search_config_index, tile_index(arr_wrapper.columns, n_config_params)),
-                    **index_stack_kwargs,
+                    **clean_index_kwargs,
                 )
 
         # Wrap with class

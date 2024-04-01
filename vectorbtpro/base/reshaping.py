@@ -4,7 +4,6 @@
 
 Reshape functions transform a Pandas object/NumPy array in some way."""
 
-import attr
 import functools
 import itertools
 
@@ -15,6 +14,7 @@ from vectorbtpro import _typing as tp
 from vectorbtpro.registries.jit_registry import register_jitted
 from vectorbtpro.base import indexes, wrapping, indexing
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.config import resolve_dict, merge_dicts
 from vectorbtpro.utils.params import combine_params, Param
 from vectorbtpro.utils.parsing import get_func_arg_names
@@ -451,7 +451,7 @@ def broadcast_index(
     ignore_sr_names: tp.Optional[bool] = None,
     ignore_ranges: tp.Optional[bool] = None,
     check_index_names: tp.Optional[bool] = None,
-    **index_stack_kwargs,
+    **clean_index_kwargs,
 ) -> tp.Optional[tp.Index]:
     """Produce a broadcast index/columns.
 
@@ -474,7 +474,7 @@ def broadcast_index(
             Conflicting Series names are those that are different but not None.
         ignore_ranges (bool): Whether to ignore indexes of type `pd.RangeIndex`.
         check_index_names (bool): See `vectorbtpro.utils.checks.is_index_equal`.
-        **index_stack_kwargs: Keyword arguments passed to `vectorbtpro.base.indexes.stack_indexes`.
+        **clean_index_kwargs: Keyword arguments passed to `vectorbtpro.base.indexes.clean_index`.
 
     For defaults, see `vectorbtpro._settings.broadcasting`.
 
@@ -546,7 +546,7 @@ def broadcast_index(
                                     new_index = indexes.repeat_index(new_index, len(index), ignore_ranges=ignore_ranges)
                                 elif len(index) < len(new_index):
                                     index = indexes.repeat_index(index, len(new_index), ignore_ranges=ignore_ranges)
-                            new_index = indexes.stack_indexes([new_index, index], **index_stack_kwargs)
+                            new_index = indexes.stack_indexes([new_index, index], **clean_index_kwargs)
         else:
             raise ValueError(f"Invalid value '{index_from}' for {'columns' if axis == 1 else 'index'}_from")
     else:
@@ -694,65 +694,65 @@ def align_pd_arrays(
     return tuple(args)
 
 
-@attr.s(frozen=True)
-class BCO:
+@define
+class BCO(DefineMixin):
     """Class that represents an object passed to `broadcast`.
 
     If any value is None, mostly defaults to the global value passed to `broadcast`."""
 
-    value: tp.Any = attr.ib()
+    value: tp.Any = define.field()
     """Value of the object."""
 
-    axis: tp.Optional[int] = attr.ib(default=None)
+    axis: tp.Optional[int] = define.field(default=None)
     """Axis to broadcast.
     
     Set to None to broadcast all axes."""
 
-    to_pd: tp.Optional[bool] = attr.ib(default=None)
+    to_pd: tp.Optional[bool] = define.field(default=None)
     """Whether to convert the output array to a Pandas object."""
 
-    keep_flex: tp.Optional[bool] = attr.ib(default=None)
+    keep_flex: tp.Optional[bool] = define.field(default=None)
     """Whether to keep the raw version of the output for flexible indexing.
     
     Only makes sure that the array can broadcast to the target shape."""
 
-    min_ndim: tp.Optional[int] = attr.ib(default=None)
+    min_ndim: tp.Optional[int] = define.field(default=None)
     """Minimum number of dimensions."""
 
-    expand_axis: tp.Optional[int] = attr.ib(default=None)
+    expand_axis: tp.Optional[int] = define.field(default=None)
     """Axis to expand if the array is 1-dim but the target shape is 2-dim."""
 
-    post_func: tp.Optional[tp.Callable] = attr.ib(default=None)
+    post_func: tp.Optional[tp.Callable] = define.field(default=None)
     """Function to post-process the output array."""
 
-    require_kwargs: tp.Optional[tp.Kwargs] = attr.ib(default=None)
+    require_kwargs: tp.Optional[tp.Kwargs] = define.field(default=None)
     """Keyword arguments passed to `np.require`."""
 
-    reindex_kwargs: tp.Optional[tp.Kwargs] = attr.ib(default=None)
+    reindex_kwargs: tp.Optional[tp.Kwargs] = define.field(default=None)
     """Keyword arguments passed to `pd.DataFrame.reindex`."""
 
-    merge_kwargs: tp.Optional[tp.Kwargs] = attr.ib(default=None)
+    merge_kwargs: tp.Optional[tp.Kwargs] = define.field(default=None)
     """Keyword arguments passed to `vectorbtpro.base.merging.column_stack_merge`."""
 
-    context: tp.KwargsLike = attr.ib(default=None)
+    context: tp.KwargsLike = define.field(default=None)
     """Context used in evaluation of templates.
     
     Will be merged over `template_context`."""
 
 
-@attr.s(frozen=True)
-class Default:
+@define
+class Default(DefineMixin):
     """Class for wrapping default values."""
 
-    value: tp.Any = attr.ib()
+    value: tp.Any = define.field()
     """Default value."""
 
 
-@attr.s(frozen=True)
-class Ref:
+@define
+class Ref(DefineMixin):
     """Class for wrapping references to other values."""
 
-    key: tp.Hashable = attr.ib()
+    key: tp.Hashable = define.field()
     """Reference to another key."""
 
 
@@ -808,7 +808,7 @@ def broadcast(
     ignore_sr_names: tp.Optional[bool] = None,
     ignore_ranges: tp.Optional[bool] = None,
     check_index_names: tp.Optional[bool] = None,
-    index_stack_kwargs: tp.KwargsLike = None,
+    clean_index_kwargs: tp.KwargsLike = None,
     template_context: tp.KwargsLike = None,
 ) -> tp.Any:
     """Bring any array-like object in `args` to the same shape by using NumPy-like broadcasting.
@@ -878,7 +878,7 @@ def broadcast(
         ignore_sr_names (bool): See `broadcast_index`.
         ignore_ranges (bool): See `broadcast_index`.
         check_index_names (bool): See `broadcast_index`.
-        index_stack_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.indexes.stack_indexes`.
+        clean_index_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.indexes.clean_index`.
         template_context (dict): Template context.
 
     For defaults, see `vectorbtpro._settings.broadcasting`.
@@ -889,7 +889,7 @@ def broadcast(
     * a sequence with value per object, and
     * a mapping with value per object name and the special key `_def` denoting the default value.
 
-    Additionally, any object can be passed wrapped with `BCO`, which attributes will override
+    Additionally, any object can be passed wrapped with `BCO`, which ibutes will override
     any of the above arguments if not None.
 
     Usage:
@@ -1185,8 +1185,8 @@ def broadcast(
         merge_arg_names = get_func_arg_names(pd.DataFrame.merge)
         if set(merge_kwargs) <= set(merge_arg_names):
             merge_kwargs_per_obj = False
-    if index_stack_kwargs is None:
-        index_stack_kwargs = {}
+    if clean_index_kwargs is None:
+        clean_index_kwargs = {}
     if checks.is_mapping(args[0]) and not isinstance(args[0], indexing.index_dict):
         if len(args) > 1:
             raise ValueError("Only one argument is allowed when passing a mapping")
@@ -1421,7 +1421,7 @@ def broadcast(
             ignore_sr_names=ignore_sr_names,
             ignore_ranges=ignore_ranges,
             check_index_names=check_index_names,
-            **index_stack_kwargs,
+            **clean_index_kwargs,
         )
         new_columns = broadcast_index(
             [v for k, v in aligned_objs.items() if obj_axis[k] in (None, 1)],
@@ -1431,7 +1431,7 @@ def broadcast(
             ignore_sr_names=ignore_sr_names,
             ignore_ranges=ignore_ranges,
             check_index_names=check_index_names,
-            **index_stack_kwargs,
+            **clean_index_kwargs,
         )
     else:
         new_index = pd.RangeIndex(stop=to_shape_2d[0])
@@ -1452,13 +1452,13 @@ def broadcast(
             param_dct,
             random_subset=random_subset,
             seed=seed,
-            index_stack_kwargs=index_stack_kwargs,
+            clean_index_kwargs=clean_index_kwargs,
         )
         n_params = len(param_columns)
 
         # Combine parameter columns with new columns
         if param_columns is not None and new_columns is not None:
-            new_columns = indexes.combine_indexes([param_columns, new_columns], **index_stack_kwargs)
+            new_columns = indexes.combine_indexes([param_columns, new_columns], **clean_index_kwargs)
 
     # Tile
     if tile is not None:
@@ -1467,7 +1467,7 @@ def broadcast(
                 new_columns = indexes.tile_index(new_columns, tile)
         else:
             if new_columns is not None:
-                new_columns = indexes.combine_indexes([tile, new_columns], **index_stack_kwargs)
+                new_columns = indexes.combine_indexes([tile, new_columns], **clean_index_kwargs)
             tile = len(tile)
         n_params = max(n_params, 1) * tile
 
@@ -1547,7 +1547,7 @@ def broadcast(
                         ),
                         _context,
                     )
-                    o = o.substitute(context, sub_id="broadcast")
+                    o = o.substitute(context, eval_id="broadcast")
                 o = to_2d_array(o)
                 if not _keep_flex:
                     needs_broadcasting = True
@@ -1638,7 +1638,7 @@ def broadcast(
                     ),
                     bco.context,
                 )
-                new_obj = bco.value.substitute(context, sub_id="broadcast")
+                new_obj = bco.value.substitute(context, eval_id="broadcast")
             else:
                 raise TypeError(f"Special type {type(bco.value)} is not supported")
         else:

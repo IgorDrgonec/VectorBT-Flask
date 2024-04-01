@@ -2,7 +2,6 @@
 
 """Base class for working with data sources."""
 
-import attr
 import warnings
 from pathlib import Path
 import traceback
@@ -1029,13 +1028,82 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         """`CustomData.set_settings` with `path_id="base"`."""
         cls.set_settings(*args, path_id="base", **kwargs)
 
+    # ############# Iteration ############# #
+
+    def items(
+        self,
+        over: str = "symbols",
+        group_by: tp.GroupByLike = None,
+        apply_group_by: bool = False,
+        keep_2d: bool = False,
+        key_as_index: bool = False,
+    ) -> tp.ItemGenerator:
+        """Iterate over columns (or groups if grouped and `Wrapping.group_select` is True), keys,
+        features, or symbols. The respective mode can be selected with `over`.
+
+        See `vectorbtpro.base.wrapping.Wrapping.items` for iteration over columns.
+        Iteration over keys supports `group_by` but doesn't support `apply_group_by`."""
+        if (
+            over.lower() == "columns"
+            or (over.lower() == "symbols" and self.feature_oriented)
+            or (over.lower() == "features" and self.symbol_oriented)
+        ):
+            for k, v in Analyzable.items(
+                self,
+                group_by=group_by,
+                apply_group_by=apply_group_by,
+                keep_2d=keep_2d,
+                key_as_index=key_as_index,
+            ):
+                yield k, v
+        elif (
+            over.lower() == "keys"
+            or (over.lower() == "features" and self.feature_oriented)
+            or (over.lower() == "symbols" and self.symbol_oriented)
+        ):
+            if apply_group_by:
+                raise ValueError("Cannot apply grouping to keys")
+            if group_by is not None:
+                key_wrapper = self.get_key_wrapper(group_by=group_by)
+                if key_wrapper.get_ndim() == 1:
+                    if key_as_index:
+                        yield key_wrapper.get_columns(), self
+                    else:
+                        yield key_wrapper.get_columns()[0], self
+                else:
+                    for group, group_idxs in key_wrapper.grouper.iter_groups(key_as_index=key_as_index):
+                        if keep_2d or len(group_idxs) > 1:
+                            yield group, self.select_keys([self.keys[i] for i in group_idxs])
+                        else:
+                            yield group, self.select_keys(self.keys[group_idxs[0]])
+            else:
+                key_wrapper = self.get_key_wrapper(attach_classes=False)
+                if key_wrapper.ndim == 1:
+                    if key_as_index:
+                        yield key_wrapper.columns, self
+                    else:
+                        yield key_wrapper.columns[0], self
+                else:
+                    for i in range(len(key_wrapper.columns)):
+                        if key_as_index:
+                            key = key_wrapper.columns[[i]]
+                        else:
+                            key = key_wrapper.columns[i]
+                        if keep_2d:
+                            yield key, self.select_keys([key])
+                        else:
+                            yield key, self.select_keys(key)
+        else:
+            raise ValueError(f"Invalid option='{over}'")
+
     # ############# Getting ############# #
 
     def get_key_wrapper(
         self,
         keys: tp.Optional[tp.MaybeKeys] = None,
         attach_classes: bool = True,
-        index_stack_kwargs: tp.KwargsLike = None,
+        clean_index_kwargs: tp.KwargsLike = None,
+        group_by: tp.GroupByLike = None,
         **kwargs,
     ) -> ArrayWrapper:
         """Get wrapper with keys as columns.
@@ -1044,8 +1112,8 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         the keys using `vectorbtpro.base.indexes.stack_indexes`.
 
         Other keyword arguments are passed to the constructor of the wrapper."""
-        if index_stack_kwargs is None:
-            index_stack_kwargs = {}
+        if clean_index_kwargs is None:
+            clean_index_kwargs = {}
         if keys is None:
             keys = self.keys
             ndim = 1 if self.single_key else 2
@@ -1094,8 +1162,10 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                     classes_columns = pd.Index(classes_frame.iloc[:, 0])
                 else:
                     classes_columns = pd.MultiIndex.from_frame(classes_frame)
-                key_columns = stack_indexes((classes_columns, wrapper.columns), **index_stack_kwargs)
+                key_columns = stack_indexes((classes_columns, wrapper.columns), **clean_index_kwargs)
                 wrapper = wrapper.replace(columns=key_columns)
+        if group_by is not None:
+            wrapper = wrapper.replace(group_by=group_by)
         return wrapper
 
     @cached_property
@@ -1235,14 +1305,14 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         self,
         keys: tp.Optional[tp.Symbols] = None,
         attach_classes: bool = True,
-        index_stack_kwargs: tp.KwargsLike = None,
+        clean_index_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> tp.Union[feature_dict, symbol_dict]:
         """Concatenate keys along columns."""
         key_wrapper = self.get_key_wrapper(
             keys=keys,
             attach_classes=attach_classes,
-            index_stack_kwargs=index_stack_kwargs,
+            clean_index_kwargs=clean_index_kwargs,
             **kwargs,
         )
         if keys is None:
@@ -2158,7 +2228,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             data = self.run(feature, **run_kwargs, unpack=True)
             data = self.symbol_wrapper.wrap(data, **wrap_kwargs)
         if isinstance(data, CustomTemplate):
-            data = data.substitute(dict(data=self), sub_id="data")
+            data = data.substitute(dict(data=self), eval_id="data")
         if isinstance(data, pd.Series) and self.symbol_wrapper.ndim == 1:
             data = data.copy(deep=False)
             data.name = self.symbols[0]
@@ -2191,7 +2261,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         if data is None:
             data = type(self).pull(symbol, **pull_kwargs).get(**get_kwargs)
         if isinstance(data, CustomTemplate):
-            data = data.substitute(dict(data=self), sub_id="data")
+            data = data.substitute(dict(data=self), eval_id="data")
         if isinstance(data, pd.Series) and self.feature_wrapper.ndim == 1:
             data = data.copy(deep=False)
             data.name = self.features[0]
@@ -2240,7 +2310,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
         Will try to determine the orientation automatically."""
         if data is not None:
             if isinstance(data, CustomTemplate):
-                data = data.substitute(dict(data=self), sub_id="data")
+                data = data.substitute(dict(data=self), eval_id="data")
             if isinstance(data, pd.Series):
                 columns = [data.name]
             else:
@@ -3242,9 +3312,9 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             template_context = {}
 
         def _transform(data, _template_context=None):
-            _transform_func = substitute_templates(transform_func, _template_context, sub_id="transform_func")
-            _args = substitute_templates(args, _template_context, sub_id="args")
-            _kwargs = substitute_templates(kwargs, _template_context, sub_id="kwargs")
+            _transform_func = substitute_templates(transform_func, _template_context, eval_id="transform_func")
+            _args = substitute_templates(args, _template_context, eval_id="args")
+            _kwargs = substitute_templates(kwargs, _template_context, eval_id="kwargs")
             return _transform_func(data, *_args, **_kwargs)
 
         if (self.feature_oriented and (per_feature and not per_symbol)) or (
@@ -3721,7 +3791,7 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
                 if is_merge_func_from_config(merge_func):
                     merge_kwargs = merge_dicts(dict(keys=keys), merge_kwargs)
                 if isinstance(merge_func, MergeFunc):
-                    merge_func = attr.evolve(merge_func, merge_kwargs=merge_kwargs, context=template_context)
+                    merge_func = merge_func.replace(merge_kwargs=merge_kwargs, context=template_context)
                 else:
                     merge_func = MergeFunc(merge_func, merge_kwargs=merge_kwargs, context=template_context)
                 if return_keys:
@@ -3883,9 +3953,9 @@ class Data(Analyzable, DataWithFeatures, OHLCDataMixin, metaclass=MetaData):
             else:
                 _arg = arg
         if isinstance(_arg, CustomTemplate):
-            _arg = _arg.substitute(template_context, sub_id=arg_name)
+            _arg = _arg.substitute(template_context, eval_id=arg_name)
         elif is_kwargs:
-            _arg = substitute_templates(_arg, template_context, sub_id=arg_name)
+            _arg = substitute_templates(_arg, template_context, eval_id=arg_name)
         return _arg
 
     def to_csv(

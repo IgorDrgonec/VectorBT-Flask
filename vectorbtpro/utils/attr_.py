@@ -2,6 +2,9 @@
 
 """Utilities for working with class/instance attributes."""
 
+import attr
+from attr.exceptions import NotAnAttrsClassError
+import enum
 import re
 import inspect
 from collections.abc import Iterable
@@ -11,12 +14,220 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.parsing import get_func_arg_names
+from vectorbtpro.utils.hashing import Hashable
+from vectorbtpro.utils.decorators import class_or_instanceproperty, class_or_instancemethod
 
 __all__ = [
+    "MISSING",
+    "DefineMixin",
+    "define",
     "deep_getattr",
 ]
+
+
+class _Missing(enum.Enum):
+    """Sentinel that represents a missing value."""
+
+    MISSING = enum.auto()
+
+    def __repr__(self):
+        return "MISSING"
+
+    def __bool__(self):
+        return False
+
+
+MISSING = _Missing.MISSING
+"""Sentinel that represents a missing value."""
+
+
+DefineMixinT = tp.TypeVar("DefineMixinT", bound="DefineMixin")
+
+
+class DefineMixin(Hashable):
+    """Mixin class for `define`."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        if not attr.has(type(self)):
+            msg = f"{type(self)!r} is not an attrs-decorated class."
+            raise NotAnAttrsClassError(msg)
+
+        self.__attrs_init__(*args, **kwargs)
+
+    @class_or_instanceproperty
+    def fields(cls_or_self) -> tp.Optional[tp.Tuple[attr.Attribute]]:
+        """Get a tuple of fields."""
+        if isinstance(cls_or_self, type):
+            cls = cls_or_self
+            if not attr.has(cls):
+                return None
+        else:
+            cls = type(cls_or_self)
+        return attr.fields(cls)
+
+    @class_or_instanceproperty
+    def fields_dict(cls_or_self) -> tp.Optional[tp.Dict[str, attr.Attribute]]:
+        """Get a dict of fields."""
+        if isinstance(cls_or_self, type):
+            cls = cls_or_self
+            if not attr.has(cls):
+                return None
+        else:
+            cls = type(cls_or_self)
+        return attr.fields_dict(cls)
+
+    @class_or_instancemethod
+    def get_field(cls_or_self, field_name: str) -> attr.Attribute:
+        """Get field."""
+        return cls_or_self.fields_dict[field_name]
+
+    @class_or_instancemethod
+    def is_field_required(cls_or_self, field_or_name: tp.Union[str, attr.Attribute]) -> None:
+        """Return whether a field is required."""
+        if isinstance(field_or_name, str):
+            field = cls_or_self.get_field(field_or_name)
+        else:
+            field = field_or_name
+        return field.default is MISSING and "default" not in field.metadata
+
+    @class_or_instancemethod
+    def is_field_optional(cls_or_self, field_or_name: tp.Union[str, attr.Attribute]) -> None:
+        """Return whether a field is optional."""
+        if isinstance(field_or_name, str):
+            field = cls_or_self.get_field(field_or_name)
+        else:
+            field = field_or_name
+        return field.default is MISSING and "default" in field.metadata
+
+    def resolve_field(self, field_or_name: tp.Union[str, attr.Attribute]) -> tp.Any:
+        """Resolve a field."""
+        if isinstance(field_or_name, str):
+            if getattr(self, field_or_name) is not MISSING:
+                return getattr(self, field_or_name)
+            field = self.get_field(field_or_name)
+        else:
+            if getattr(self, field_or_name.name) is not MISSING:
+                return getattr(self, field_or_name.name)
+            field = field_or_name
+        if field.default is not MISSING:
+            return field.default
+        return field.metadata.get("default", MISSING)
+
+    def is_field_missing(self, field_or_name: tp.Union[str, attr.Attribute]) -> None:
+        """Raise an error if a field is missing."""
+        return self.resolve_field(field_or_name) is MISSING
+
+    def assert_field_not_missing(self, field_or_name: tp.Union[str, attr.Attribute]) -> None:
+        """Raise an error if a field is missing."""
+        if isinstance(field_or_name, str):
+            field = self.get_field(field_or_name)
+        else:
+            field = field_or_name
+        if self.is_field_missing(field):
+            if self.is_field_required(field):
+                raise ValueError(f"Required field '{type(self).__name__}.{field.name}' is missing")
+            elif self.is_field_optional(field):
+                raise ValueError(f"Optional field '{type(self).__name__}.{field.name}' is missing")
+            else:
+                raise ValueError(f"Field '{type(self).__name__}.{field.name}' is missing")
+
+    def resolve(self: DefineMixinT, assert_not_missing: bool = True) -> DefineMixinT:
+        """Resolve a field or all fields."""
+        changes = {}
+        for field in self.fields:
+            if assert_not_missing:
+                self.assert_field_not_missing(field)
+            field_value = self.resolve_field(field)
+            if field_value is MISSING:
+                raise ValueError(f"Field '{type(self).__name__}.{field.name}' is missing")
+            changes[field.name] = field_value
+        return self.replace(**changes)
+
+    def asdict(self, full: bool = True) -> dict:
+        """Convert this instance to a dictionary.
+
+        If `full` is False, won't include fields with `MISSING` as value."""
+        dct = dict()
+        for field in self.fields:
+            k = field.name
+            v = getattr(self, k)
+            if full or v is not MISSING:
+                dct[k] = v
+        return dct
+
+    def replace(self: DefineMixinT, **changes) -> DefineMixinT:
+        """Create a new instance by making changes to the attribute values."""
+        return attr.evolve(self, **changes)
+
+    def merge_with(self: DefineMixinT, other: DefineMixinT, **changes) -> DefineMixinT:
+        """Merge this instance with another instance."""
+        from vectorbtpro.utils.config import merge_dicts
+
+        return self.replace(**merge_dicts(self.asdict(full=False), other.asdict(full=False), changes))
+
+    def merge_over(self: DefineMixinT, other: DefineMixinT, **changes) -> DefineMixinT:
+        """Merge this instance over another instance."""
+        from vectorbtpro.utils.config import merge_dicts
+
+        return self.replace(**merge_dicts(other.asdict(full=False), self.asdict(full=False), changes))
+
+    def __repr__(self):
+        dct = self.asdict(full=False)
+        new_cls = attr.make_class(type(self).__name__, list(dct.keys()), cmp=False)
+        new_obj = new_cls(**dct)
+        return new_obj.__repr__()
+
+    @property
+    def hash_key(self) -> tuple:
+        return tuple(self.asdict().items())
+
+
+class define:
+    """Prepare a class decorated with `define`.
+
+    Attaches `DefineMixin` as a base class (if not present) and applies `attr.define`."""
+
+    @classmethod
+    def field(cls, **kwargs) -> tp.Any:
+        """Alias for `attr.field`."""
+        return attr.field(**kwargs)
+
+    @classmethod
+    def required_field(cls, **kwargs) -> tp.Any:
+        """Alias for `attr.field` with `MISSING` as default.
+
+        Doesn't have `default` in metadata."""
+        return cls.field(default=MISSING, **kwargs)
+
+    @classmethod
+    def optional_field(
+        cls,
+        *,
+        default: tp.Any = MISSING,
+        metadata: tp.Optional[tp.Mapping] = None,
+        **kwargs,
+    ) -> tp.Any:
+        """Alias for `attr.field` with `MISSING` as default.
+
+        Has `default` in metadata."""
+        if metadata is None:
+            metadata = {}
+        else:
+            metadata = dict(metadata)
+        metadata["default"] = default
+        return cls.field(default=MISSING, metadata=metadata, **kwargs)
+
+    def __new__(cls, *args, **kwargs) -> tp.FlexClassWrapper:
+        def wrapper(wrapped_cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
+            if DefineMixin not in wrapped_cls.__bases__:
+                raise TypeError("DefineMixin missing among base classes")
+            return attr.define(frozen=True, slots=False, init=False, eq=False, repr=False, **kwargs)(wrapped_cls)
+
+        if len(args) == 0:
+            return wrapper
+        elif len(args) == 1:
+            return wrapper(args[0])
+        raise ValueError("Either class or keyword arguments must be passed")
 
 
 def get_dict_attr(obj: tp.Union[object, type], attr: str) -> tp.Any:
@@ -193,6 +404,9 @@ class AttrResolverMixin:
         Won't cache if `use_caching` is False or any passed argument is in `custom_arg_names`.
 
         Use `passed_kwargs_out` to get keyword arguments that were passed."""
+        from vectorbtpro.utils.config import merge_dicts
+        from vectorbtpro.utils.parsing import get_func_arg_names
+
         # Resolve defaults
         if custom_arg_names is None:
             custom_arg_names = list()

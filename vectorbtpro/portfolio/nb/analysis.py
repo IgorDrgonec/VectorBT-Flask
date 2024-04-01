@@ -638,7 +638,10 @@ def allocations_nb(
 
         for i in range(asset_value.shape[0]):
             for col in range(from_col, to_col):
-                out[i, col] = asset_value[i, col] / value[i, group]
+                if value[i, group] == 0:
+                    out[i, col] = np.nan
+                else:
+                    out[i, col] = asset_value[i, col] / value[i, group]
     return out
 
 

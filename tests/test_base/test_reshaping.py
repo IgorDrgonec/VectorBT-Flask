@@ -163,7 +163,7 @@ class TestReshaping:
             columns_from="stack",
             ignore_sr_names=True,
             align_index=False,
-            index_stack_kwargs=dict(drop_duplicates=True, drop_redundant=True),
+            clean_index_kwargs=dict(drop_duplicates=True, drop_redundant=True),
         )
         for i in range(len(broadcasted)):
             assert_series_equal(
@@ -193,7 +193,7 @@ class TestReshaping:
             columns_from="stack",
             ignore_sr_names=True,
             align_index=False,
-            index_stack_kwargs=dict(drop_duplicates=True, drop_redundant=True),
+            clean_index_kwargs=dict(drop_duplicates=True, drop_redundant=True),
         )
         for i in range(len(broadcasted)):
             assert_frame_equal(
@@ -222,7 +222,7 @@ class TestReshaping:
             columns_from="stack",
             ignore_sr_names=True,
             align_index=False,
-            index_stack_kwargs=dict(drop_duplicates=True, drop_redundant=True),
+            clean_index_kwargs=dict(drop_duplicates=True, drop_redundant=True),
         )
         assert_frame_equal(
             broadcasted[0],
@@ -249,7 +249,7 @@ class TestReshaping:
             columns_from="keep",
             ignore_sr_names=True,
             align_index=False,
-            index_stack_kwargs=dict(drop_duplicates=True, drop_redundant=True),
+            clean_index_kwargs=dict(drop_duplicates=True, drop_redundant=True),
         )
         for i in range(4):
             assert_series_equal(
@@ -280,7 +280,7 @@ class TestReshaping:
             columns_from="keep",
             ignore_sr_names=True,
             align_index=False,
-            index_stack_kwargs=dict(drop_duplicates=True, drop_redundant=True),
+            clean_index_kwargs=dict(drop_duplicates=True, drop_redundant=True),
         )
         for i in range(7):
             assert_frame_equal(
@@ -350,7 +350,7 @@ class TestReshaping:
             columns_from=["name"],  # should translate to Series name
             ignore_sr_names=True,
             align_index=False,
-            index_stack_kwargs=dict(drop_duplicates=True, drop_redundant=True),
+            clean_index_kwargs=dict(drop_duplicates=True, drop_redundant=True),
         )
         for i in range(len(broadcasted)):
             assert_series_equal(broadcasted[i], pd.Series(broadcasted_arrs[i], index=multi_i, name="name"))
@@ -360,7 +360,7 @@ class TestReshaping:
             columns_from=[0],  # should translate to None
             ignore_sr_names=True,
             align_index=False,
-            index_stack_kwargs=dict(drop_duplicates=True, drop_redundant=True),
+            clean_index_kwargs=dict(drop_duplicates=True, drop_redundant=True),
         )
         for i in range(len(broadcasted)):
             assert_series_equal(broadcasted[i], pd.Series(broadcasted_arrs[i], index=multi_i, name=None))
@@ -383,7 +383,7 @@ class TestReshaping:
             columns_from=multi_c,
             ignore_sr_names=True,
             align_index=False,
-            index_stack_kwargs=dict(drop_duplicates=True, drop_redundant=True),
+            clean_index_kwargs=dict(drop_duplicates=True, drop_redundant=True),
         )
         for i in range(len(broadcasted)):
             assert_frame_equal(
@@ -401,7 +401,7 @@ class TestReshaping:
             columns_from=-1,  # should translate to Series name
             ignore_sr_names=True,
             align_index=False,
-            index_stack_kwargs=dict(drop_duplicates=True, drop_redundant=True),
+            clean_index_kwargs=dict(drop_duplicates=True, drop_redundant=True),
         )
         for i in range(len(broadcasted)):
             assert_series_equal(
@@ -415,7 +415,7 @@ class TestReshaping:
                 columns_from=0,
                 ignore_sr_names=True,
                 align_index=False,
-                index_stack_kwargs=dict(drop_duplicates=True, drop_redundant=True),
+                clean_index_kwargs=dict(drop_duplicates=True, drop_redundant=True),
             )
         # 2d
         to_broadcast_a = 0, a1, a2, a3, a4, a5
@@ -436,7 +436,7 @@ class TestReshaping:
             columns_from=-1,
             ignore_sr_names=True,
             align_index=False,
-            index_stack_kwargs=dict(drop_duplicates=True, drop_redundant=True),
+            clean_index_kwargs=dict(drop_duplicates=True, drop_redundant=True),
         )
         for i in range(len(broadcasted)):
             assert_frame_equal(
@@ -454,7 +454,7 @@ class TestReshaping:
                 columns_from="stack",
                 ignore_sr_names=True,
                 align_index=False,
-                index_stack_kwargs=dict(drop_duplicates=True, drop_redundant=True),
+                clean_index_kwargs=dict(drop_duplicates=True, drop_redundant=True),
             )
         # 2d
         to_broadcast = df1, df2
@@ -465,7 +465,7 @@ class TestReshaping:
                 columns_from="strict",  # changing columns not allowed
                 ignore_sr_names=True,
                 align_index=False,
-                index_stack_kwargs=dict(drop_duplicates=True, drop_redundant=True),
+                clean_index_kwargs=dict(drop_duplicates=True, drop_redundant=True),
             )
 
     def test_broadcast_dirty(self):
@@ -478,7 +478,7 @@ class TestReshaping:
             columns_from="stack",
             ignore_sr_names=False,
             align_index=False,
-            index_stack_kwargs=dict(drop_duplicates=False, drop_redundant=False),
+            clean_index_kwargs=dict(drop_duplicates=False, drop_redundant=False),
         )
         for i in range(len(broadcasted)):
             assert_series_equal(
@@ -509,7 +509,7 @@ class TestReshaping:
             columns_from="stack",
             ignore_sr_names=True,
             align_index=False,
-            index_stack_kwargs=dict(drop_duplicates=True, drop_redundant=True),
+            clean_index_kwargs=dict(drop_duplicates=True, drop_redundant=True),
         )
         for i in range(len(broadcasted)):
             assert_frame_equal(
@@ -535,7 +535,7 @@ class TestReshaping:
             columns_from="stack",
             ignore_sr_names=True,
             align_index=False,
-            index_stack_kwargs=dict(drop_duplicates=True, drop_redundant=True),
+            clean_index_kwargs=dict(drop_duplicates=True, drop_redundant=True),
         )
         for i in range(len(broadcasted)):
             np.testing.assert_array_equal(broadcasted[i], broadcasted_arrs[i])

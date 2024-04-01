@@ -197,7 +197,7 @@ class TestArrayWrapper:
                 pd.MultiIndex.from_tuples([("a", "a"), ("b", "b")], names=["c1", "c2"]),
                 2,
             ),
-            index_stack_kwargs=dict(drop_duplicates=False),
+            clean_index_kwargs=dict(drop_duplicates=False),
         )
         assert_index_equal(
             wrapper.columns, pd.MultiIndex.from_tuples([("a", "a", "a"), ("b", "b", "b")], names=["c1", "c1", "c2"])

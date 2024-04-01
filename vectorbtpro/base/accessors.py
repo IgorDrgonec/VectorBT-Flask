@@ -15,6 +15,7 @@ from pandas.core.resample import Resampler as PandasResampler
 from vectorbtpro import _typing as tp
 from vectorbtpro.base import combining, reshaping, indexes
 from vectorbtpro.base.wrapping import ArrayWrapper, Wrapping
+from vectorbtpro.base.indexes import IndexApplier
 from vectorbtpro.base.indexing import (
     point_idxr_defaults,
     range_idxr_defaults,
@@ -31,10 +32,18 @@ from vectorbtpro.utils.parsing import get_context_vars
 from vectorbtpro.utils.template import substitute_templates
 from vectorbtpro.utils.eval_ import multiline_eval
 
+if tp.TYPE_CHECKING:
+    from vectorbtpro.generic.splitting.base import Splitter as SplitterT
+else:
+    SplitterT = tp.Any
+
 __all__ = ["BaseIDXAccessor", "BaseAccessor", "BaseSRAccessor", "BaseDFAccessor"]
 
 
-class BaseIDXAccessor(Configured):
+BaseIDXAccessorT = tp.TypeVar("BaseIDXAccessorT", bound="BaseIDXAccessor")
+
+
+class BaseIDXAccessor(Configured, IndexApplier):
     """Accessor on top of Index.
 
     Accessible via `pd.Index.vbt` and all child accessors."""
@@ -80,11 +89,18 @@ class BaseIDXAccessor(Configured):
             raise TypeError(f"Cannot convert index of type {type(index)} to period")
         return index
 
-    def to_period_ns(self, freq: tp.FrequencyLike, shift: bool = True) -> tp.Array1d:
+    def to_period_ts(self, *args, **kwargs) -> pd.DatetimeIndex:
+        """Convert index to period and then to timestamp."""
+        new_index = self.to_period(*args, **kwargs).to_timestamp()
+        if self.obj.tz is not None:
+            new_index = new_index.tz_localize(self.obj.tz)
+        return new_index
+
+    def to_period_ns(self, *args, **kwargs) -> tp.Array1d:
         """Convert index to period and then to an 64-bit integer array.
 
         Timestamps will be converted to nanoseconds."""
-        return dt.to_ns(self.to_period(freq, shift=shift))
+        return dt.to_ns(self.to_period_ts(*args, **kwargs))
 
     @classmethod
     def from_values(cls, *args, **kwargs) -> tp.Index:
@@ -149,25 +165,13 @@ class BaseIDXAccessor(Configured):
             objs = (cls_or_self.obj, *others)
         return indexes.concat_indexes(*objs, **kwargs)
 
-    def drop_levels(self, *args, **kwargs) -> tp.Index:
-        """See `vectorbtpro.base.indexes.drop_levels`."""
-        return indexes.drop_levels(self.obj, *args, **kwargs)
-
-    def rename_levels(self, *args, **kwargs) -> tp.Index:
-        """See `vectorbtpro.base.indexes.rename_levels`."""
-        return indexes.rename_levels(self.obj, *args, **kwargs)
-
-    def select_levels(self, *args, **kwargs) -> tp.Index:
-        """See `vectorbtpro.base.indexes.select_levels`."""
-        return indexes.select_levels(self.obj, *args, **kwargs)
-
-    def drop_redundant_levels(self, *args, **kwargs) -> tp.Index:
-        """See `vectorbtpro.base.indexes.drop_redundant_levels`."""
-        return indexes.drop_redundant_levels(self.obj, *args, **kwargs)
-
-    def drop_duplicate_levels(self, *args, **kwargs) -> tp.Index:
-        """See `vectorbtpro.base.indexes.drop_duplicate_levels`."""
-        return indexes.drop_duplicate_levels(self.obj, *args, **kwargs)
+    def apply_to_index(
+        self: BaseIDXAccessorT,
+        apply_func: tp.Callable,
+        *args,
+        **kwargs,
+    ) -> tp.Index:
+        return self.replace(obj=apply_func(self.obj, *args, **kwargs)).obj
 
     def align_to(self, *args, **kwargs) -> tp.IndexSlice:
         """See `vectorbtpro.base.indexes.align_index_to`."""
@@ -409,6 +413,16 @@ class BaseIDXAccessor(Configured):
     def get_ranges(self, *args, **kwargs) -> tp.Tuple[tp.Array1d, tp.Array1d]:
         """See `vectorbtpro.base.indexing.get_index_ranges`."""
         return get_index_ranges(self.obj, self.any_freq, *args, **kwargs)
+
+    # ############# Splitting ############# #
+
+    def split(self, *args, splitter_cls: tp.Optional[tp.Type[SplitterT]] = None, **kwargs) -> tp.Any:
+        """Split using `vectorbtpro.generic.splitting.base.Splitter.split_and_take`."""
+        from vectorbtpro.generic.splitting.base import Splitter
+
+        if splitter_cls is None:
+            splitter_cls = Splitter
+        return splitter_cls.split_and_take(self.obj, self.obj, *args, **kwargs)
 
 
 BaseAccessorT = tp.TypeVar("BaseAccessorT", bound="BaseAccessor")
@@ -761,133 +775,8 @@ class BaseAccessor(Wrapping):
 
     # ############# Indexes ############# #
 
-    def apply_on_index(
-        self,
-        apply_func: tp.Callable,
-        *args,
-        axis: tp.Optional[int] = None,
-        copy_data: bool = False,
-        **kwargs,
-    ) -> tp.Optional[tp.SeriesFrame]:
-        """Apply function `apply_func` on index of the pandas object.
-
-        Set `axis` to 1 for columns, 0 for index, and None to determine automatically.
-        Set `copy_data` to True to make a deep copy of the data."""
-        if axis is None:
-            axis = 0 if self.is_series() else 1
-        if self.is_series() and axis == 1:
-            raise TypeError("Axis 1 is not supported in Series")
-        checks.assert_in(axis, (0, 1))
-
-        if axis == 1:
-            obj_index = self.wrapper.columns
-        else:
-            obj_index = self.wrapper.index
-        obj_index = apply_func(obj_index, *args, **kwargs)
-        obj = self.obj.values
-        if copy_data:
-            obj = obj.copy()
-        if axis == 1:
-            return self.wrapper.wrap(obj, group_by=False, columns=obj_index)
-        return self.wrapper.wrap(obj, group_by=False, index=obj_index)
-
-    def stack_index(
-        self,
-        index: tp.Index,
-        axis: tp.Optional[int] = None,
-        copy_data: bool = False,
-        on_top: bool = True,
-        **kwargs,
-    ) -> tp.Optional[tp.SeriesFrame]:
-        """See `vectorbtpro.base.indexes.stack_indexes`.
-
-        Set `on_top` to False to stack at bottom.
-
-        See `BaseAccessor.apply_on_index` for other keyword arguments."""
-
-        def apply_func(obj_index: tp.Index) -> tp.Index:
-            if on_top:
-                return indexes.stack_indexes([index, obj_index], **kwargs)
-            return indexes.stack_indexes([obj_index, index], **kwargs)
-
-        return self.apply_on_index(apply_func, axis=axis, copy_data=copy_data)
-
-    def drop_levels(
-        self,
-        levels: tp.Union[indexes.ExceptLevel, tp.MaybeLevelSequence],
-        axis: tp.Optional[int] = None,
-        copy_data: bool = False,
-        strict: bool = True,
-    ) -> tp.Optional[tp.SeriesFrame]:
-        """See `vectorbtpro.base.indexes.drop_levels`.
-
-        See `BaseAccessor.apply_on_index` for other keyword arguments."""
-
-        def apply_func(obj_index: tp.Index) -> tp.Index:
-            return indexes.drop_levels(obj_index, levels, strict=strict)
-
-        return self.apply_on_index(apply_func, axis=axis, copy_data=copy_data)
-
-    def rename_levels(
-        self,
-        name_dict: tp.Dict[str, tp.Any],
-        axis: tp.Optional[int] = None,
-        copy_data: bool = False,
-        strict: bool = True,
-    ) -> tp.Optional[tp.SeriesFrame]:
-        """See `vectorbtpro.base.indexes.rename_levels`.
-
-        See `BaseAccessor.apply_on_index` for other keyword arguments."""
-
-        def apply_func(obj_index: tp.Index) -> tp.Index:
-            return indexes.rename_levels(obj_index, name_dict, strict=strict)
-
-        return self.apply_on_index(apply_func, axis=axis, copy_data=copy_data)
-
-    def select_levels(
-        self,
-        level_names: tp.Union[indexes.ExceptLevel, tp.MaybeLevelSequence],
-        axis: tp.Optional[int] = None,
-        copy_data: bool = False,
-        strict: bool = True,
-    ) -> tp.Optional[tp.SeriesFrame]:
-        """See `vectorbtpro.base.indexes.select_levels`.
-
-        See `BaseAccessor.apply_on_index` for other keyword arguments."""
-
-        def apply_func(obj_index: tp.Index) -> tp.Index:
-            return indexes.select_levels(obj_index, level_names, strict=strict)
-
-        return self.apply_on_index(apply_func, axis=axis, copy_data=copy_data)
-
-    def drop_redundant_levels(
-        self,
-        axis: tp.Optional[int] = None,
-        copy_data: bool = False,
-    ) -> tp.Optional[tp.SeriesFrame]:
-        """See `vectorbtpro.base.indexes.drop_redundant_levels`.
-
-        See `BaseAccessor.apply_on_index` for other keyword arguments."""
-
-        def apply_func(obj_index: tp.Index) -> tp.Index:
-            return indexes.drop_redundant_levels(obj_index)
-
-        return self.apply_on_index(apply_func, axis=axis, copy_data=copy_data)
-
-    def drop_duplicate_levels(
-        self,
-        keep: tp.Optional[str] = None,
-        axis: tp.Optional[int] = None,
-        copy_data: bool = False,
-    ) -> tp.Optional[tp.SeriesFrame]:
-        """See `vectorbtpro.base.indexes.drop_duplicate_levels`.
-
-        See `BaseAccessor.apply_on_index` for other keyword arguments."""
-
-        def apply_func(obj_index: tp.Index) -> tp.Index:
-            return indexes.drop_duplicate_levels(obj_index, keep=keep)
-
-        return self.apply_on_index(apply_func, axis=axis, copy_data=copy_data)
+    def apply_to_index(self: BaseAccessorT, *args, **kwargs) -> tp.SeriesFrame:
+        return Wrapping.apply_to_index(self, *args, **kwargs).obj
 
     # ############# Setting ############# #
 
@@ -932,8 +821,8 @@ class BaseAccessor(Wrapping):
                     ),
                     template_context,
                 )
-                _func_args = substitute_templates(args, _template_context, sub_id="func_args")
-                _func_kwargs = substitute_templates(func_kwargs, _template_context, sub_id="func_kwargs")
+                _func_args = substitute_templates(args, _template_context, eval_id="func_args")
+                _func_kwargs = substitute_templates(func_kwargs, _template_context, eval_id="func_kwargs")
                 v = value_or_func(*_func_args, **_func_kwargs)
                 if self.is_series() or columns is None:
                     obj.iloc[index_points[i]] = v
@@ -1003,8 +892,8 @@ class BaseAccessor(Wrapping):
                     ),
                     template_context,
                 )
-                _func_args = substitute_templates(args, _template_context, sub_id="func_args")
-                _func_kwargs = substitute_templates(func_kwargs, _template_context, sub_id="func_kwargs")
+                _func_args = substitute_templates(args, _template_context, eval_id="func_args")
+                _func_kwargs = substitute_templates(func_kwargs, _template_context, eval_id="func_kwargs")
                 v = value_or_func(*_func_args, **_func_kwargs)
             elif checks.is_sequence(value_or_func) and not isinstance(value_or_func, str):
                 v = value_or_func[i]
@@ -1362,8 +1251,8 @@ class BaseAccessor(Wrapping):
         elif not keep_pd:
             broadcast_named_args = {k: np.asarray(v) for k, v in broadcast_named_args.items()}
         template_context = merge_dicts(broadcast_named_args, template_context)
-        args = substitute_templates(args, template_context, sub_id="args")
-        kwargs = substitute_templates(kwargs, template_context, sub_id="kwargs")
+        args = substitute_templates(args, template_context, eval_id="args")
+        kwargs = substitute_templates(kwargs, template_context, eval_id="kwargs")
         out = apply_func(broadcast_named_args["obj"], *args, **kwargs)
         return wrapper.wrap(out, group_by=False, **resolve_dict(wrap_kwargs))
 
@@ -1501,8 +1390,8 @@ class BaseAccessor(Wrapping):
         elif not keep_pd:
             broadcast_named_args = {k: np.asarray(v) for k, v in broadcast_named_args.items()}
         template_context = merge_dicts(broadcast_named_args, dict(ntimes=ntimes), template_context)
-        args = substitute_templates(args, template_context, sub_id="args")
-        kwargs = substitute_templates(kwargs, template_context, sub_id="kwargs")
+        args = substitute_templates(args, template_context, eval_id="args")
+        kwargs = substitute_templates(kwargs, template_context, eval_id="kwargs")
         out = combining.apply_and_concat(ntimes, apply_func, broadcast_named_args["obj"], *args, **kwargs)
         if keys is not None:
             new_columns = indexes.combine_indexes([keys, wrapper.columns])
@@ -1551,7 +1440,7 @@ class BaseAccessor(Wrapping):
 
                 If True, see `vectorbtpro.base.combining.combine_and_concat`.
                 If False, see `vectorbtpro.base.combining.combine_multiple`.
-                If None, becomes True if there are more than two arguments to combine.
+                If None, becomes True if there are multiple objects to combine.
 
                 Can only concatenate using the instance method.
             keys (index_like): Outermost column level.
@@ -1659,6 +1548,8 @@ class BaseAccessor(Wrapping):
         else:
             if allow_multiple and isinstance(obj, (tuple, list)):
                 objs = obj
+                if concat is None:
+                    concat = True
             else:
                 objs = (obj,)
         objs = tuple(map(lambda x: x.obj if isinstance(x, BaseAccessor) else x, objs))
@@ -1680,8 +1571,8 @@ class BaseAccessor(Wrapping):
         elif not keep_pd:
             broadcast_named_args = {k: np.asarray(v) for k, v in broadcast_named_args.items()}
         template_context = merge_dicts(broadcast_named_args, template_context)
-        args = substitute_templates(args, template_context, sub_id="args")
-        kwargs = substitute_templates(kwargs, template_context, sub_id="kwargs")
+        args = substitute_templates(args, template_context, eval_id="args")
+        kwargs = substitute_templates(kwargs, template_context, eval_id="kwargs")
         inputs = [broadcast_named_args["obj_" + str(i)] for i in range(len(objs))]
 
         if concat is None:
@@ -1696,7 +1587,7 @@ class BaseAccessor(Wrapping):
             else:
                 top_columns = pd.Index(np.arange(len(objs) - 1), name="combine_idx")
                 new_columns = indexes.combine_indexes([top_columns, wrapper.columns])
-            return wrapper.wrap(out, **merge_dicts(dict(columns=new_columns), wrap_kwargs))
+            return wrapper.wrap(out, **merge_dicts(dict(columns=new_columns, force_2d=True), wrap_kwargs))
         else:
             # Combine arguments pairwise into one object
             out = combining.combine_multiple(inputs, combine_func, *args, **kwargs)
@@ -1770,6 +1661,36 @@ class BaseAccessor(Wrapping):
         else:
             out = multiline_eval(expr, context=objs)
         return wrapper.wrap(out, **wrap_kwargs)
+
+    def split(self, *args, splitter_cls: tp.Optional[tp.Type[SplitterT]] = None, **kwargs) -> tp.Any:
+        """Split using `vectorbtpro.generic.splitting.base.Splitter.split_and_take`.
+
+        Uses the option `into="reset_stacked"` by default.
+
+        !!! note
+            Splits Pandas object, not accessor!
+        """
+        from vectorbtpro.generic.splitting.base import Splitter
+
+        if splitter_cls is None:
+            splitter_cls = Splitter
+        return splitter_cls.split_and_take(
+            self.wrapper.index,
+            self.obj,
+            *args,
+            _take_kwargs=dict(into="reset_stacked"),
+            **kwargs,
+        )
+
+    # ############# Iteration ############# #
+
+    def items(self, *args, **kwargs) -> tp.ItemGenerator:
+        """See `vectorbtpro.base.wrapping.Wrapping.items`.
+
+        !!! note
+            Splits Pandas object, not accessor!"""
+        for k, v in Wrapping.items(self, *args, **kwargs):
+            yield k, v.obj
 
 
 class BaseSRAccessor(BaseAccessor):

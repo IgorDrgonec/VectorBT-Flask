@@ -48,6 +48,8 @@ from vectorbtpro.utils.array_ import insert_argsort_nb
         log=base_ch.flex_array_gl_slicer,
         val_price=base_ch.flex_array_gl_slicer,
         from_ago=base_ch.flex_array_gl_slicer,
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
         call_seq=base_ch.array_gl_slicer,
         auto_call_seq=None,
         ffill_val_price=None,
@@ -94,6 +96,8 @@ def from_orders_nb(
     log: tp.FlexArray2dLike = False,
     val_price: tp.FlexArray2dLike = np.inf,
     from_ago: tp.FlexArray2dLike = 0,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
     call_seq: tp.Optional[tp.Array2d] = None,
     auto_call_seq: bool = False,
     ffill_val_price: bool = True,
@@ -170,6 +174,15 @@ def from_orders_nb(
     log_ = to_2d_array_nb(np.asarray(log))
     val_price_ = to_2d_array_nb(np.asarray(val_price))
     from_ago_ = to_2d_array_nb(np.asarray(from_ago))
+
+    if sim_start is None:
+        sim_start_ = to_1d_array_nb(np.asarray(0).astype(np.int_))
+    else:
+        sim_start_ = to_1d_array_nb(np.asarray(sim_start).astype(np.int_))
+    if sim_end is None:
+        sim_end_ = to_1d_array_nb(np.asarray(target_shape[0]).astype(np.int_))
+    else:
+        sim_end_ = to_1d_array_nb(np.asarray(sim_end).astype(np.int_))
 
     order_records, log_records = prepare_records_nb(target_shape, max_order_records, max_log_records)
     order_counts = np.full(target_shape[1], 0, dtype=np.int_)
@@ -250,7 +263,14 @@ def from_orders_nb(
         to_col = group_end_idxs[group]
         group_len = to_col - from_col
 
-        for i in range(target_shape[0]):
+        _sim_start = flex_select_1d_pc_nb(sim_start_, group)
+        if _sim_start < 0:
+            _sim_start = target_shape[0] + _sim_start
+        _sim_end = flex_select_1d_pc_nb(sim_end_, group)
+        if _sim_end < 0:
+            _sim_end = target_shape[0] + _sim_end
+
+        for i in range(_sim_start, _sim_end):
             # Add cash
             _cash_deposits = flex_select_nb(cash_deposits_, i, group)
             if _cash_deposits < 0:

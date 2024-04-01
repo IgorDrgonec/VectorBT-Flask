@@ -2,10 +2,10 @@
 
 """Utilities for annotations."""
 
-import attr
 from collections import defaultdict
 
 from vectorbtpro import _typing as tp
+from vectorbtpro.utils.attr_ import DefineMixin, define
 
 __all__ = [
     "Annotatable",
@@ -173,40 +173,40 @@ def has_annotatables(func: tp.Callable, target_cls: tp.Type[Annotatable] = Annot
     return False
 
 
-@attr.s(frozen=True, init=False)
-class VarArgs(Annotatable):
+@define
+class VarArgs(Annotatable, DefineMixin):
     """Class representing annotations for variable positional arguments."""
 
-    args: tp.Tuple[tp.Annotation, ...] = attr.ib()
+    args: tp.Tuple[tp.Annotation, ...] = define.field()
     """Tuple with annotations."""
 
     def __init__(self, *args) -> None:
-        self.__attrs_init__(args=args)
+        DefineMixin.__init__(self, args=args)
 
 
-@attr.s(frozen=True, init=False)
-class VarKwargs(Annotatable):
+@define
+class VarKwargs(Annotatable, DefineMixin):
     """Class representing annotations for variable keyword arguments."""
 
-    kwargs: tp.Dict[str, tp.Annotation] = attr.ib()
+    kwargs: tp.Dict[str, tp.Annotation] = define.field()
     """Dict with annotations."""
 
     def __init__(self, **kwargs) -> None:
-        self.__attrs_init__(kwargs=kwargs)
+        DefineMixin.__init__(self, kwargs=kwargs)
 
 
-@attr.s(frozen=True, init=False)
-class Union(Annotatable):
+@define
+class Union(Annotatable, DefineMixin):
     """Class representing a union of one to multiple annotations."""
 
-    annotations: tp.Tuple[tp.Annotation, ...] = attr.ib()
+    annotations: tp.Tuple[tp.Annotation, ...] = define.field()
     """Annotations."""
 
-    resolved: bool = attr.ib(default=False)
+    resolved: bool = define.field(default=False)
     """Whether the instance is resolved."""
 
     def __init__(self, *annotations, resolved: bool = False) -> None:
-        self.__attrs_init__(annotations=annotations, resolved=resolved)
+        DefineMixin.__init__(self, annotations=annotations, resolved=resolved)
 
     def resolve(self) -> tp.Annotation:
         """Resolve the union."""

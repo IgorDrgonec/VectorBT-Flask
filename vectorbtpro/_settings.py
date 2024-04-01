@@ -29,17 +29,25 @@ For example, you can change default width and height of each plot:
 
 The main sub-configs such as for plotting can be also accessed/modified using the dot notation:
 
-```
+```pycon
 >>> vbt.settings.plotting['layout']['width'] = 800
 ```
 
-Some sub-configs allow the dot notation too but this depends whether they inherit the rules of the root config.
+Some sub-configs allow the dot notation too but this depends on whether they are an instance of `frozen_cfg`:
 
-```plaintext
->>> vbt.settings.data - ok
->>> vbt.settings.data.binance - ok
->>> vbt.settings.data.binance.api_key - error
->>> vbt.settings.data.binance['api_key'] - ok
+```pycon
+>>> type(vbt.settings)
+vectorbtpro._settings.frozen_cfg
+>>> vbt.settings.data  # ok
+
+>>> type(vbt.settings.data)
+vectorbtpro._settings.frozen_cfg
+>>> vbt.settings.data.silence_warnings  # ok
+
+>>> type(vbt.settings.data.custom)
+vectorbtpro._settings.flex_cfg
+>>> vbt.settings.data.custom.binance  # error
+>>> vbt.settings.data.custom["binance"]  # ok
 ```
 
 Since this is only visible when looking at the source code, the advice is to always use the bracket notation.
@@ -442,7 +450,7 @@ params = frozen_cfg(
     max_guesses=None,
     max_misses=None,
     seed=None,
-    index_stack_kwargs=flex_cfg(),
+    clean_index_kwargs=flex_cfg(),
     name_tuple_to_str=True,
     merge_func=None,
     merge_kwargs=flex_cfg(),
@@ -639,6 +647,7 @@ datetime = frozen_cfg(
     ),
     dateparser_kwargs=flex_cfg(),
     freq_from_n=20,
+    tz_naive_ns=True,
 )
 """_"""
 
@@ -1466,6 +1475,8 @@ portfolio = frozen_cfg(
     template_context=flex_cfg(),
     keep_inout_flex=True,
     from_ago=None,
+    sim_start=None,
+    sim_end=None,
     call_seq=None,
     attach_call_seq=False,
     max_order_records=None,
@@ -1515,6 +1526,7 @@ portfolio = frozen_cfg(
         limit_delta=np.nan,
         limit_tif=-1,
         limit_expiry=-1,
+        limit_order_price="limit",
         upon_adj_limit_conflict="keepignore",
         upon_opp_limit_conflict="cancelexecute",
         use_stops=None,
@@ -1846,7 +1858,7 @@ class SettingsConfig(Config):
                 __pdoc__[k] = substitute_templates(
                     v,
                     context=dict(config_doc=config_doc),
-                    sub_id="__pdoc__",
+                    eval_id="__pdoc__",
                 )
 
 

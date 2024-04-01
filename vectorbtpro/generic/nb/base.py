@@ -238,38 +238,38 @@ def set_by_mask_mult_nb(arr: tp.Array2d, mask: tp.Array2d, values: tp.Array2d) -
 
 
 @register_jitted(cache=True)
-def first_valid_index_1d_nb(arr: tp.Array1d) -> int:
+def first_valid_index_1d_nb(arr: tp.Array1d, check_inf: bool = True) -> int:
     """Get the index of the first valid value."""
     for i in range(arr.shape[0]):
-        if not np.isnan(arr[i]) and not np.isinf(arr[i]):
+        if not np.isnan(arr[i]) and (not check_inf or not np.isinf(arr[i])):
             return i
     return -1
 
 
 @register_jitted(cache=True)
-def first_valid_index_nb(arr):
+def first_valid_index_nb(arr, check_inf: bool = True):
     """2-dim version of `first_valid_index_1d_nb`."""
     out = np.empty(arr.shape[1], dtype=np.int_)
     for col in range(arr.shape[1]):
-        out[col] = first_valid_index_1d_nb(arr[:, col])
+        out[col] = first_valid_index_1d_nb(arr[:, col], check_inf=check_inf)
     return out
 
 
 @register_jitted(cache=True)
-def last_valid_index_1d_nb(arr: tp.Array1d) -> int:
+def last_valid_index_1d_nb(arr: tp.Array1d, check_inf: bool = True) -> int:
     """Get the index of the last valid value."""
     for i in range(arr.shape[0] - 1, -1, -1):
-        if not np.isnan(arr[i]) and not np.isinf(arr[i]):
+        if not np.isnan(arr[i]) and (not check_inf or not np.isinf(arr[i])):
             return i
     return -1
 
 
 @register_jitted(cache=True)
-def last_valid_index_nb(arr):
+def last_valid_index_nb(arr, check_inf: bool = True):
     """2-dim version of `last_valid_index_1d_nb`."""
     out = np.empty(arr.shape[1], dtype=np.int_)
     for col in range(arr.shape[1]):
-        out[col] = last_valid_index_1d_nb(arr[:, col])
+        out[col] = last_valid_index_1d_nb(arr[:, col], check_inf=check_inf)
     return out
 
 

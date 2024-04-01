@@ -3335,6 +3335,62 @@ class TestFromOrderFunc:
             ).order_records,
         )
 
+    @pytest.mark.parametrize("test_row_wise", [False, True])
+    @pytest.mark.parametrize("test_flexible", [False, True])
+    @pytest.mark.parametrize("test_jitted", [False, True])
+    def test_sim_range(self, test_row_wise, test_flexible, test_jitted):
+        order_func = flex_order_func_nb if test_flexible else order_func_nb
+        order_size = pd.Series([np.inf, -np.inf, np.nan, np.inf, -np.inf], index=price.index)
+        order_size_wide = order_size.vbt.tile(3, keys=["a", "b", "c"])
+
+        def _from_order_func(size, **kwargs):
+            return from_order_func(
+                price_wide,
+                order_func,
+                vbt.Rep("size"),
+                broadcast_named_args=dict(size=size),
+                row_wise=test_row_wise,
+                flexible=test_flexible,
+                jitted=test_jitted,
+                **kwargs,
+            )
+
+        _order_size_wide = order_size_wide.copy()
+        _order_size_wide.iloc[:1] = np.nan
+        assert_records_close(
+            _from_order_func(order_size_wide, sim_start=1).order_records,
+            _from_order_func(_order_size_wide).order_records
+        )
+        _order_size_wide = order_size_wide.copy()
+        _order_size_wide.iloc[2:] = np.nan
+        assert_records_close(
+            _from_order_func(order_size_wide, sim_end=2).order_records,
+            _from_order_func(_order_size_wide).order_records
+        )
+        if not test_row_wise:
+            _order_size_wide = order_size_wide.copy()
+            _order_size_wide.iloc[:1, 0] = np.nan
+            _order_size_wide.iloc[:2, 1] = np.nan
+            _order_size_wide.iloc[:3, 2] = np.nan
+            assert_records_close(
+                _from_order_func(order_size_wide, sim_start=[1, 2, 3]).order_records,
+                _from_order_func(_order_size_wide).order_records
+            )
+            with pytest.raises(Exception):
+                _from_order_func(order_size_wide, sim_start=[1, 2])
+            _order_size_wide = order_size_wide.copy()
+            _order_size_wide.iloc[:1, 0] = np.nan
+            _order_size_wide.iloc[:2, 1] = np.nan
+            _order_size_wide.iloc[:2, 2] = np.nan
+            assert_records_close(
+                _from_order_func(
+                    order_size_wide, sim_start=[1, 2], group_by=[0, 0, 1], cash_sharing=True
+                ).order_records,
+                _from_order_func(
+                    _order_size_wide, group_by=[0, 0, 1], cash_sharing=True
+                ).order_records
+            )
+
 
 # ############# from_def_order_func ############# #
 

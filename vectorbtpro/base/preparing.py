@@ -9,7 +9,6 @@ from datetime import timedelta, time
 from functools import partial, cached_property as cachedproperty
 from pathlib import Path
 
-import attr
 import numpy as np
 import pandas as pd
 
@@ -113,7 +112,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         if isinstance(value, (CustomTemplate, Ref)):
             return value
         if isinstance(value, (Param, BCO, Default)):
-            attr_dct = attr.asdict(value)
+            attr_dct = value.asdict()
             if isinstance(value, Param) and attr_dct["map_template"] is None:
                 attr_dct["map_template"] = RepFunc(lambda values: cls.map_enum_value(values, **kwargs))
             elif not isinstance(value, Param):
@@ -130,10 +129,10 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         return map_enum_fields(value, **kwargs)
 
     @classmethod
-    def prepare_td_obj(cls, td_obj: object) -> object:
+    def prepare_td_obj(cls, td_obj: object, old_as_keys: bool = True) -> object:
         """Prepare a timedelta object for broadcasting."""
         if isinstance(td_obj, Param):
-            return td_obj.map_value(cls.prepare_td_obj)
+            return td_obj.map_value(cls.prepare_td_obj, old_as_keys=old_as_keys)
 
         if isinstance(td_obj, (str, timedelta, pd.DateOffset, pd.Timedelta)):
             td_obj = dt.to_timedelta64(td_obj)
@@ -142,10 +141,15 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         return td_obj
 
     @classmethod
-    def prepare_dt_obj(cls, dt_obj: object, last_before: tp.Optional[bool] = None) -> object:
+    def prepare_dt_obj(
+        cls,
+        dt_obj: object,
+        old_as_keys: bool = True,
+        last_before: tp.Optional[bool] = None,
+    ) -> object:
         """Prepare a datetime object for broadcasting."""
         if isinstance(dt_obj, Param):
-            return dt_obj.map_value(partial(cls.prepare_dt_obj))
+            return dt_obj.map_value(cls.prepare_dt_obj, old_as_keys=old_as_keys)
 
         if isinstance(dt_obj, (str, time, timedelta, pd.DateOffset, pd.Timedelta)):
 
@@ -172,7 +176,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             def _to_td(wrapper, _dt_obj=dt_obj, _last_before=last_before):
                 if _last_before is None:
                     _last_before = True
-                target_index = wrapper.index.vbt.to_period(dt.to_freq(_dt_obj), shift=True).to_timestamp()
+                target_index = wrapper.index.vbt.to_period_ts(dt.to_freq(_dt_obj), shift=True)
                 if _last_before:
                     return _apply_last_before(wrapper.index, target_index, wrapper.freq)
                 return target_index.vbt.to_ns()
@@ -267,9 +271,16 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             if len(arg_config.get("map_enum_kwargs", {})) > 0:
                 arg = self.map_enum_value(arg, **arg_config["map_enum_kwargs"])
             if arg_config.get("is_td", False):
-                arg = self.prepare_td_obj(arg)
+                arg = self.prepare_td_obj(
+                    arg,
+                    old_as_keys=arg_config.get("old_as_keys", True),
+                )
             if arg_config.get("is_dt", False):
-                arg = self.prepare_dt_obj(arg, last_before=arg_config.get("last_before", None))
+                arg = self.prepare_dt_obj(
+                    arg,
+                    old_as_keys=arg_config.get("old_as_keys", True),
+                    last_before=arg_config.get("last_before", None),
+                )
         return arg
 
     def get_arg(self, arg_name: str, use_idx_setter: bool = True, use_default: bool = True) -> tp.Any:
@@ -299,7 +310,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         raise TypeError(f"'{type(self).__name__}' object is not iterable")
 
     @classmethod
-    def td_arr_to_ns(cls, td_arr: tp.ArrayLike) -> tp.ArrayLike:
+    def prepare_td_arr(cls, td_arr: tp.ArrayLike) -> tp.ArrayLike:
         """Prepare a timedelta array."""
         if td_arr.dtype == object:
             if td_arr.ndim in (0, 1):
@@ -314,10 +325,10 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                     td_arr_col = pd.to_timedelta(td_arr[:, col])
                     td_arr_cols.append(td_arr_col.values)
                 td_arr = column_stack_arrays(td_arr_cols)
-        return dt.to_ns(td_arr)
+        return td_arr
 
     @classmethod
-    def dt_arr_to_ns(cls, dt_arr: tp.ArrayLike) -> tp.ArrayLike:
+    def prepare_dt_arr(cls, dt_arr: tp.ArrayLike) -> tp.ArrayLike:
         """Prepare a datetime array."""
         if dt_arr.dtype == object:
             if dt_arr.ndim in (0, 1):
@@ -332,7 +343,17 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                     dt_arr_col = pd.to_datetime(dt_arr[:, col]).tz_localize(None)
                     dt_arr_cols.append(dt_arr_col.values)
                 dt_arr = column_stack_arrays(dt_arr_cols)
-        return dt.to_ns(dt_arr)
+        return dt_arr
+
+    @classmethod
+    def td_arr_to_ns(cls, td_arr: tp.ArrayLike) -> tp.ArrayLike:
+        """Prepare a timedelta array and convert it to nanoseconds."""
+        return dt.to_ns(cls.prepare_td_arr(td_arr))
+
+    @classmethod
+    def dt_arr_to_ns(cls, dt_arr: tp.ArrayLike) -> tp.ArrayLike:
+        """Prepare a datetime array and convert it to nanoseconds."""
+        return dt.to_ns(cls.prepare_dt_arr(dt_arr))
 
     def prepare_post_arg(self, arg_name: str, value: tp.Optional[tp.ArrayLike] = None) -> object:
         """Prepare an argument after broadcasting and/or template substitution."""
@@ -346,7 +367,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
         if arg is not None:
             arg_config = self.arg_config[arg_name]
             if arg_config.get("substitute_templates", False):
-                arg = substitute_templates(arg, self.template_context, sub_id=arg_name)
+                arg = substitute_templates(arg, self.template_context, eval_id=arg_name)
             if "map_enum_kwargs" in arg_config:
                 arg = map_enum_fields(arg, **arg_config["map_enum_kwargs"])
             if arg_config.get("is_td", False):
@@ -587,7 +608,7 @@ class BasePreparer(Configured, metaclass=MetaArgs):
             target_args = {}
             for k in func_arg_names:
                 arg_attr = target_arg_map.get(k, k)
-                if arg_attr is not None:
+                if arg_attr is not None and hasattr(self, arg_attr):
                     target_args[k] = getattr(self, arg_attr)
             return target_args
         return None

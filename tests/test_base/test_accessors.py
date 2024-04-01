@@ -244,7 +244,7 @@ class TestAccessors:
 
     def test_apply_func_on_index(self):
         assert_frame_equal(
-            df1.vbt.apply_on_index(lambda idx: idx + "_yo", axis=0),
+            df1.vbt.apply_to_index(lambda idx: idx + "_yo", axis=0),
             pd.DataFrame(
                 np.array([1]),
                 index=pd.Index(["x3_yo"], dtype="object", name="i3"),
@@ -252,23 +252,17 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
-            df1.vbt.apply_on_index(lambda idx: idx + "_yo", axis=1),
+            df1.vbt.apply_to_index(lambda idx: idx + "_yo", axis=1),
             pd.DataFrame(
                 np.array([1]),
                 index=pd.Index(["x3"], dtype="object", name="i3"),
                 columns=pd.Index(["a3_yo"], dtype="object", name="c3"),
             ),
         )
-        df1_copy = df1.vbt.apply_on_index(lambda idx: idx + "_yo", axis=0, copy_data=True)
-        df1_copy.iloc[0, 0] = -1
-        assert df1.iloc[0, 0] == 1
-        df1_copy2 = df1.vbt.apply_on_index(lambda idx: idx + "_yo", axis=1, copy_data=True)
-        df1_copy2.iloc[0, 0] = -1
-        assert df1.iloc[0, 0] == 1
 
-    def test_stack_index(self):
+    def test_add_levels(self):
         assert_frame_equal(
-            df5.vbt.stack_index([1, 2, 3], on_top=True),
+            df5.vbt.add_levels([1, 2, 3], on_top=True),
             pd.DataFrame(
                 df5.values,
                 index=df5.index,
@@ -279,7 +273,7 @@ class TestAccessors:
             ),
         )
         assert_frame_equal(
-            df5.vbt.stack_index([1, 2, 3], on_top=False),
+            df5.vbt.add_levels([1, 2, 3], on_top=False),
             pd.DataFrame(
                 df5.values,
                 index=df5.index,
@@ -314,13 +308,13 @@ class TestAccessors:
 
     def test_drop_redundant_levels(self):
         assert_frame_equal(
-            df5.vbt.stack_index(pd.RangeIndex(start=0, step=1, stop=3)).vbt.drop_redundant_levels(),
+            df5.vbt.add_levels(pd.RangeIndex(start=0, step=1, stop=3)).vbt.drop_redundant_levels(),
             df5,
         )
 
     def test_drop_duplicate_levels(self):
         assert_frame_equal(
-            df5.vbt.stack_index(df5.columns.get_level_values(0)).vbt.drop_duplicate_levels(),
+            df5.vbt.add_levels(df5.columns.get_level_values(0)).vbt.drop_duplicate_levels(),
             df5,
         )
 

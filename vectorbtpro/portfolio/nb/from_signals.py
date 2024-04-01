@@ -402,6 +402,8 @@ def signal_to_size_nb(
         upon_dir_conflict=base_ch.flex_array_gl_slicer,
         upon_opposite_entry=base_ch.flex_array_gl_slicer,
         from_ago=base_ch.flex_array_gl_slicer,
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
         call_seq=base_ch.array_gl_slicer,
         auto_call_seq=None,
         ffill_val_price=None,
@@ -455,6 +457,8 @@ def from_basic_signals_nb(
     upon_dir_conflict: tp.FlexArray2dLike = DirectionConflictMode.Ignore,
     upon_opposite_entry: tp.FlexArray2dLike = OppositeEntryMode.ReverseReduce,
     from_ago: tp.FlexArray2dLike = 0,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
     call_seq: tp.Optional[tp.Array2d] = None,
     auto_call_seq: bool = False,
     ffill_val_price: bool = True,
@@ -512,6 +516,15 @@ def from_basic_signals_nb(
     upon_dir_conflict_ = to_2d_array_nb(np.asarray(upon_dir_conflict))
     upon_opposite_entry_ = to_2d_array_nb(np.asarray(upon_opposite_entry))
     from_ago_ = to_2d_array_nb(np.asarray(from_ago))
+
+    if sim_start is None:
+        sim_start_ = to_1d_array_nb(np.asarray(0).astype(np.int_))
+    else:
+        sim_start_ = to_1d_array_nb(np.asarray(sim_start).astype(np.int_))
+    if sim_end is None:
+        sim_end_ = to_1d_array_nb(np.asarray(target_shape[0]).astype(np.int_))
+    else:
+        sim_end_ = to_1d_array_nb(np.asarray(sim_end).astype(np.int_))
 
     if max_order_records is None:
         order_records = np.empty((target_shape[0], target_shape[1]), dtype=fs_order_dt)
@@ -603,7 +616,14 @@ def from_basic_signals_nb(
         to_col = group_end_idxs[group]
         group_len = to_col - from_col
 
-        for i in range(target_shape[0]):
+        _sim_start = flex_select_1d_pc_nb(sim_start_, group)
+        if _sim_start < 0:
+            _sim_start = target_shape[0] + _sim_start
+        _sim_end = flex_select_1d_pc_nb(sim_end_, group)
+        if _sim_end < 0:
+            _sim_end = target_shape[0] + _sim_end
+
+        for i in range(_sim_start, _sim_end):
             # Add cash
             _cash_deposits = flex_select_nb(cash_deposits_, i, group)
             if _cash_deposits < 0:
@@ -903,7 +923,31 @@ def from_basic_signals_nb(
                         if main_info["type"][col] == OrderType.Limit:
                             _slippage = 0.0
                         else:
-                            _slippage = flex_select_nb(slippage_, _i, col)
+                            _slippage = float(flex_select_nb(slippage_, _i, col))
+                        _min_size = flex_select_nb(min_size_, _i, col)
+                        _max_size = flex_select_nb(max_size_, _i, col)
+                        _size_type = flex_select_nb(size_type_, _i, col)
+                        if _size_type != main_info["size_type"][col]:
+                            if not np.isnan(_min_size):
+                                _min_size, _ = resolve_size_nb(
+                                    size=_min_size,
+                                    size_type=_size_type,
+                                    position=position_now,
+                                    val_price=val_price_now,
+                                    value=value_now,
+                                    target_size_type=main_info["size_type"][col],
+                                    as_requirement=True,
+                                )
+                            if not np.isnan(_max_size):
+                                _max_size, _ = resolve_size_nb(
+                                    size=_max_size,
+                                    size_type=_size_type,
+                                    position=position_now,
+                                    val_price=val_price_now,
+                                    value=value_now,
+                                    target_size_type=main_info["size_type"][col],
+                                    as_requirement=True,
+                                )
                         order = order_nb(
                             size=main_info["size"][col],
                             price=main_info["price"][col],
@@ -912,8 +956,8 @@ def from_basic_signals_nb(
                             fees=flex_select_nb(fees_, _i, col),
                             fixed_fees=flex_select_nb(fixed_fees_, _i, col),
                             slippage=_slippage,
-                            min_size=flex_select_nb(min_size_, _i, col),
-                            max_size=flex_select_nb(max_size_, _i, col),
+                            min_size=_min_size,
+                            max_size=_max_size,
                             size_granularity=flex_select_nb(size_granularity_, _i, col),
                             leverage=flex_select_nb(leverage_, _i, col),
                             leverage_mode=flex_select_nb(leverage_mode_, _i, col),
@@ -1077,6 +1121,7 @@ def from_basic_signals_nb(
         limit_tif=base_ch.flex_array_gl_slicer,
         limit_expiry=base_ch.flex_array_gl_slicer,
         limit_reverse=base_ch.flex_array_gl_slicer,
+        limit_order_price=base_ch.flex_array_gl_slicer,
         upon_adj_limit_conflict=base_ch.flex_array_gl_slicer,
         upon_opp_limit_conflict=base_ch.flex_array_gl_slicer,
         use_stops=None,
@@ -1098,6 +1143,8 @@ def from_basic_signals_nb(
         delta_format=base_ch.flex_array_gl_slicer,
         time_delta_format=base_ch.flex_array_gl_slicer,
         from_ago=base_ch.flex_array_gl_slicer,
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
         call_seq=base_ch.array_gl_slicer,
         auto_call_seq=None,
         ffill_val_price=None,
@@ -1157,6 +1204,7 @@ def from_signals_nb(
     limit_tif: tp.FlexArray2dLike = -1,
     limit_expiry: tp.FlexArray2dLike = -1,
     limit_reverse: tp.FlexArray2dLike = False,
+    limit_order_price: tp.FlexArray2dLike = LimitOrderPrice.Limit,
     upon_adj_limit_conflict: tp.FlexArray2dLike = PendingConflictMode.KeepIgnore,
     upon_opp_limit_conflict: tp.FlexArray2dLike = PendingConflictMode.CancelExecute,
     use_stops: bool = True,
@@ -1178,6 +1226,8 @@ def from_signals_nb(
     delta_format: tp.FlexArray2dLike = DeltaFormat.Percent,
     time_delta_format: tp.FlexArray2dLike = TimeDeltaFormat.Index,
     from_ago: tp.FlexArray2dLike = 0,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
     call_seq: tp.Optional[tp.Array2d] = None,
     auto_call_seq: bool = False,
     ffill_val_price: bool = True,
@@ -1239,6 +1289,7 @@ def from_signals_nb(
     limit_tif_ = to_2d_array_nb(np.asarray(limit_tif))
     limit_expiry_ = to_2d_array_nb(np.asarray(limit_expiry))
     limit_reverse_ = to_2d_array_nb(np.asarray(limit_reverse))
+    limit_order_price_ = to_2d_array_nb(np.asarray(limit_order_price))
     upon_adj_limit_conflict_ = to_2d_array_nb(np.asarray(upon_adj_limit_conflict))
     upon_opp_limit_conflict_ = to_2d_array_nb(np.asarray(upon_opp_limit_conflict))
     sl_stop_ = to_2d_array_nb(np.asarray(sl_stop))
@@ -1258,6 +1309,15 @@ def from_signals_nb(
     delta_format_ = to_2d_array_nb(np.asarray(delta_format))
     time_delta_format_ = to_2d_array_nb(np.asarray(time_delta_format))
     from_ago_ = to_2d_array_nb(np.asarray(from_ago))
+
+    if sim_start is None:
+        sim_start_ = to_1d_array_nb(np.asarray(0).astype(np.int_))
+    else:
+        sim_start_ = to_1d_array_nb(np.asarray(sim_start).astype(np.int_))
+    if sim_end is None:
+        sim_end_ = to_1d_array_nb(np.asarray(target_shape[0]).astype(np.int_))
+    else:
+        sim_end_ = to_1d_array_nb(np.asarray(sim_end).astype(np.int_))
 
     n_sl_steps = sl_stop_.shape[0]
     n_tsl_steps = tsl_stop_.shape[0]
@@ -1356,6 +1416,7 @@ def from_signals_nb(
     last_limit_info["expiry"][:] = -1
     last_limit_info["time_delta_format"][:] = -1
     last_limit_info["reverse"][:] = False
+    last_limit_info["order_price"][:] = np.nan
 
     if use_stops:
         last_sl_info = np.empty(target_shape[1], dtype=sl_info_dt)
@@ -1461,7 +1522,14 @@ def from_signals_nb(
         to_col = group_end_idxs[group]
         group_len = to_col - from_col
 
-        for i in range(target_shape[0]):
+        _sim_start = flex_select_1d_pc_nb(sim_start_, group)
+        if _sim_start < 0:
+            _sim_start = target_shape[0] + _sim_start
+        _sim_end = flex_select_1d_pc_nb(sim_end_, group)
+        if _sim_end < 0:
+            _sim_end = target_shape[0] + _sim_end
+
+        for i in range(_sim_start, _sim_end):
             # Add cash
             _cash_deposits = flex_select_nb(cash_deposits_, i, group)
             if _cash_deposits < 0:
@@ -1599,6 +1667,7 @@ def from_signals_nb(
                     # Set initial info
                     exec_limit_set = False
                     exec_limit_set_on_open = False
+                    exec_limit_set_on_close = False
                     exec_limit_signal_i = -1
                     exec_limit_creation_i = -1
                     exec_limit_init_i = -1
@@ -1669,6 +1738,7 @@ def from_signals_nb(
                         _expiry = last_limit_info["expiry"][col]
                         _time_delta_format = last_limit_info["time_delta_format"][col]
                         _reverse = last_limit_info["reverse"][col]
+                        _order_price = last_limit_info["order_price"][col]
 
                         limit_expired_on_open, limit_expired = check_limit_expired_nb(
                             creation_idx=_creation_i,
@@ -1692,7 +1762,16 @@ def from_signals_nb(
                             limit_reverse=_reverse,
                             can_use_ohlc=True,
                             check_open=True,
+                            hard_limit=_order_price == LimitOrderPrice.HardLimit,
                         )
+
+                        # Resolve the price
+                        limit_price = resolve_limit_order_price_nb(
+                            limit_price=limit_price,
+                            close=_close,
+                            limit_order_price=_order_price,
+                        )
+
                         if limit_expired_on_open or (not limit_hit_on_open and limit_expired):
                             # Expired limit signal
                             any_limit_signal = False
@@ -1710,12 +1789,14 @@ def from_signals_nb(
                             last_limit_info["expiry"][col] = -1
                             last_limit_info["time_delta_format"][col] = -1
                             last_limit_info["reverse"][col] = False
+                            last_limit_info["order_price"][col] = np.nan
                         else:
                             # Save info
                             if limit_hit:
                                 # Executable limit signal
                                 exec_limit_set = True
                                 exec_limit_set_on_open = limit_hit_on_open
+                                exec_limit_set_on_close = _order_price == LimitOrderPrice.Close
                                 exec_limit_signal_i = _signal_i
                                 exec_limit_creation_i = _creation_i
                                 exec_limit_init_i = _init_i
@@ -2133,6 +2214,7 @@ def from_signals_nb(
                                         limit_reverse=False,
                                         can_use_ohlc=stop_hit_on_open,
                                         check_open=False,
+                                        hard_limit=False,
                                     )
                                     if can_execute:
                                         _price = limit_price
@@ -2277,6 +2359,7 @@ def from_signals_nb(
                                         limit_reverse=_limit_reverse,
                                         can_use_ohlc=can_use_ohlc,
                                         check_open=False,
+                                        hard_limit=False,
                                     )
                                     if can_execute:
                                         _price = limit_price
@@ -2311,7 +2394,10 @@ def from_signals_nb(
                             keep_limit = False
                             keep_stop = False
                             execute_limit = True
-                            exec_limit_bar_zone = BarZone.Open
+                            if exec_limit_set_on_close:
+                                exec_limit_bar_zone = BarZone.Close
+                            else:
+                                exec_limit_bar_zone = BarZone.Open
                         elif exec_stop_set_on_open:
                             keep_limit = False
                             keep_stop = _ladder
@@ -2446,6 +2532,7 @@ def from_signals_nb(
                             last_limit_info["expiry"][col] = -1
                             last_limit_info["time_delta_format"][col] = -1
                             last_limit_info["reverse"][col] = False
+                            last_limit_info["order_price"][col] = np.nan
 
                         # Process the stop signal
                         if execute_stop:
@@ -2457,6 +2544,7 @@ def from_signals_nb(
                                 _limit_tif = flex_select_nb(limit_tif_, i, col)
                                 _limit_expiry = flex_select_nb(limit_expiry_, i, col)
                                 _time_delta_format = flex_select_nb(time_delta_format_, i, col)
+                                _limit_order_price = flex_select_nb(limit_order_price_, i, col)
                                 last_limit_info["signal_idx"][col] = exec_stop_init_i
                                 last_limit_info["creation_idx"][col] = i
                                 last_limit_info["init_idx"][col] = i
@@ -2471,6 +2559,7 @@ def from_signals_nb(
                                 last_limit_info["expiry"][col] = _limit_expiry
                                 last_limit_info["time_delta_format"][col] = _time_delta_format
                                 last_limit_info["reverse"][col] = False
+                                last_limit_info["order_price"][col] = _limit_order_price
                             else:
                                 main_info["bar_zone"][col] = exec_stop_bar_zone
                                 main_info["signal_idx"][col] = exec_stop_init_i
@@ -2580,6 +2669,7 @@ def from_signals_nb(
                                     _limit_expiry = flex_select_nb(limit_expiry_, _i, col)
                                     _time_delta_format = flex_select_nb(time_delta_format_, _i, col)
                                     _limit_reverse = flex_select_nb(limit_reverse_, _i, col)
+                                    _limit_order_price = flex_select_nb(limit_order_price_, _i, col)
                                     last_limit_info["signal_idx"][col] = _i
                                     last_limit_info["creation_idx"][col] = i
                                     last_limit_info["init_idx"][col] = _i
@@ -2594,6 +2684,7 @@ def from_signals_nb(
                                     last_limit_info["expiry"][col] = _limit_expiry
                                     last_limit_info["time_delta_format"][col] = _time_delta_format
                                     last_limit_info["reverse"][col] = _limit_reverse
+                                    last_limit_info["order_price"][col] = _limit_order_price
                                 else:
                                     main_info["bar_zone"][col] = exec_user_bar_zone
                                     main_info["signal_idx"][col] = _i
@@ -2709,7 +2800,31 @@ def from_signals_nb(
                         if main_info["type"][col] == OrderType.Limit:
                             _slippage = 0.0
                         else:
-                            _slippage = flex_select_nb(slippage_, _i, col)
+                            _slippage = float(flex_select_nb(slippage_, _i, col))
+                        _min_size = flex_select_nb(min_size_, _i, col)
+                        _max_size = flex_select_nb(max_size_, _i, col)
+                        _size_type = flex_select_nb(size_type_, _i, col)
+                        if _size_type != main_info["size_type"][col]:
+                            if not np.isnan(_min_size):
+                                _min_size, _ = resolve_size_nb(
+                                    size=_min_size,
+                                    size_type=_size_type,
+                                    position=position_now,
+                                    val_price=val_price_now,
+                                    value=value_now,
+                                    target_size_type=main_info["size_type"][col],
+                                    as_requirement=True,
+                                )
+                            if not np.isnan(_max_size):
+                                _max_size, _ = resolve_size_nb(
+                                    size=_max_size,
+                                    size_type=_size_type,
+                                    position=position_now,
+                                    val_price=val_price_now,
+                                    value=value_now,
+                                    target_size_type=main_info["size_type"][col],
+                                    as_requirement=True,
+                                )
                         order = order_nb(
                             size=main_info["size"][col],
                             price=main_info["price"][col],
@@ -2718,8 +2833,8 @@ def from_signals_nb(
                             fees=flex_select_nb(fees_, _i, col),
                             fixed_fees=flex_select_nb(fixed_fees_, _i, col),
                             slippage=_slippage,
-                            min_size=flex_select_nb(min_size_, _i, col),
-                            max_size=flex_select_nb(max_size_, _i, col),
+                            min_size=_min_size,
+                            max_size=_max_size,
                             size_granularity=flex_select_nb(size_granularity_, _i, col),
                             leverage=flex_select_nb(leverage_, _i, col),
                             leverage_mode=flex_select_nb(leverage_mode_, _i, col),
@@ -3450,6 +3565,7 @@ PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
         limit_tif=base_ch.flex_array_gl_slicer,
         limit_expiry=base_ch.flex_array_gl_slicer,
         limit_reverse=base_ch.flex_array_gl_slicer,
+        limit_order_price=base_ch.flex_array_gl_slicer,
         upon_adj_limit_conflict=base_ch.flex_array_gl_slicer,
         upon_opp_limit_conflict=base_ch.flex_array_gl_slicer,
         use_stops=None,
@@ -3471,6 +3587,8 @@ PostSegmentFuncT = tp.Callable[[SignalSegmentContext, tp.VarArg()], None]
         delta_format=base_ch.flex_array_gl_slicer,
         time_delta_format=base_ch.flex_array_gl_slicer,
         from_ago=base_ch.flex_array_gl_slicer,
+        sim_start=base_ch.FlexArraySlicer(),
+        sim_end=base_ch.FlexArraySlicer(),
         call_seq=base_ch.array_gl_slicer,
         auto_call_seq=None,
         ffill_val_price=None,
@@ -3537,6 +3655,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     limit_tif: tp.FlexArray2dLike = -1,
     limit_expiry: tp.FlexArray2dLike = -1,
     limit_reverse: tp.FlexArray2dLike = False,
+    limit_order_price: tp.FlexArray2dLike = LimitOrderPrice.Limit,
     upon_adj_limit_conflict: tp.FlexArray2dLike = PendingConflictMode.KeepIgnore,
     upon_opp_limit_conflict: tp.FlexArray2dLike = PendingConflictMode.CancelExecute,
     use_stops: bool = True,
@@ -3558,6 +3677,8 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     delta_format: tp.FlexArray2dLike = DeltaFormat.Percent,
     time_delta_format: tp.FlexArray2dLike = TimeDeltaFormat.Index,
     from_ago: tp.FlexArray2dLike = 0,
+    sim_start: tp.Optional[tp.FlexArray1dLike] = None,
+    sim_end: tp.Optional[tp.FlexArray1dLike] = None,
     call_seq: tp.Optional[tp.Array2d] = None,
     auto_call_seq: bool = False,
     ffill_val_price: bool = True,
@@ -3621,6 +3742,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     limit_tif_ = to_2d_array_nb(np.asarray(limit_tif))
     limit_expiry_ = to_2d_array_nb(np.asarray(limit_expiry))
     limit_reverse_ = to_2d_array_nb(np.asarray(limit_reverse))
+    limit_order_price_ = to_2d_array_nb(np.asarray(limit_order_price))
     upon_adj_limit_conflict_ = to_2d_array_nb(np.asarray(upon_adj_limit_conflict))
     upon_opp_limit_conflict_ = to_2d_array_nb(np.asarray(upon_opp_limit_conflict))
     sl_stop_ = to_2d_array_nb(np.asarray(sl_stop))
@@ -3640,6 +3762,15 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     delta_format_ = to_2d_array_nb(np.asarray(delta_format))
     time_delta_format_ = to_2d_array_nb(np.asarray(time_delta_format))
     from_ago_ = to_2d_array_nb(np.asarray(from_ago))
+
+    if sim_start is None:
+        sim_start_ = to_1d_array_nb(np.asarray(0).astype(np.int_))
+    else:
+        sim_start_ = to_1d_array_nb(np.asarray(sim_start).astype(np.int_))
+    if sim_end is None:
+        sim_end_ = to_1d_array_nb(np.asarray(target_shape[0]).astype(np.int_))
+    else:
+        sim_end_ = to_1d_array_nb(np.asarray(sim_end).astype(np.int_))
 
     n_sl_steps = sl_stop_.shape[0]
     n_tsl_steps = tsl_stop_.shape[0]
@@ -3715,6 +3846,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
     last_limit_info["expiry"][:] = -1
     last_limit_info["time_delta_format"][:] = -1
     last_limit_info["reverse"][:] = False
+    last_limit_info["order_price"][:] = np.nan
 
     if use_stops:
         last_sl_info = np.empty(target_shape[1], dtype=sl_info_dt)
@@ -3820,7 +3952,14 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
         to_col = group_end_idxs[group]
         group_len = to_col - from_col
 
-        for i in range(target_shape[0]):
+        _sim_start = flex_select_1d_pc_nb(sim_start_, group)
+        if _sim_start < 0:
+            _sim_start = target_shape[0] + _sim_start
+        _sim_end = flex_select_1d_pc_nb(sim_end_, group)
+        if _sim_end < 0:
+            _sim_end = target_shape[0] + _sim_end
+
+        for i in range(_sim_start, _sim_end):
             # Add cash
             if cash_sharing:
                 _cash_deposits = flex_select_nb(cash_deposits_, i, group)
@@ -4067,6 +4206,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                     # Set initial info
                     exec_limit_set = False
                     exec_limit_set_on_open = False
+                    exec_limit_set_on_close = False
                     exec_limit_signal_i = -1
                     exec_limit_creation_i = -1
                     exec_limit_init_i = -1
@@ -4137,6 +4277,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                         _expiry = last_limit_info["expiry"][col]
                         _time_delta_format = last_limit_info["time_delta_format"][col]
                         _reverse = last_limit_info["reverse"][col]
+                        _order_price = last_limit_info["order_price"][col]
 
                         limit_expired_on_open, limit_expired = check_limit_expired_nb(
                             creation_idx=_creation_i,
@@ -4160,7 +4301,16 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                             limit_reverse=_reverse,
                             can_use_ohlc=True,
                             check_open=True,
+                            hard_limit=_order_price == LimitOrderPrice.HardLimit,
                         )
+
+                        # Resolve the price
+                        limit_price = resolve_limit_order_price_nb(
+                            limit_price=limit_price,
+                            close=_close,
+                            limit_order_price=_order_price,
+                        )
+
                         if limit_expired_on_open or (not limit_hit_on_open and limit_expired):
                             # Expired limit signal
                             any_limit_signal = False
@@ -4178,12 +4328,14 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                             last_limit_info["expiry"][col] = -1
                             last_limit_info["time_delta_format"][col] = -1
                             last_limit_info["reverse"][col] = False
+                            last_limit_info["order_price"][col] = np.nan
                         else:
                             # Save info
                             if limit_hit:
                                 # Executable limit signal
                                 exec_limit_set = True
                                 exec_limit_set_on_open = limit_hit_on_open
+                                exec_limit_set_on_close = _order_price == LimitOrderPrice.Close
                                 exec_limit_signal_i = _signal_i
                                 exec_limit_creation_i = _creation_i
                                 exec_limit_init_i = _init_i
@@ -4601,6 +4753,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                                         limit_reverse=False,
                                         can_use_ohlc=stop_hit_on_open,
                                         check_open=False,
+                                        hard_limit=False,
                                     )
                                     if can_execute:
                                         _price = limit_price
@@ -4745,6 +4898,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                                         limit_reverse=_limit_reverse,
                                         can_use_ohlc=can_use_ohlc,
                                         check_open=False,
+                                        hard_limit=False,
                                     )
                                     if can_execute:
                                         _price = limit_price
@@ -4779,7 +4933,10 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                             keep_limit = False
                             keep_stop = False
                             execute_limit = True
-                            exec_limit_bar_zone = BarZone.Open
+                            if exec_stop_set_on_close:
+                                exec_limit_bar_zone = BarZone.Close
+                            else:
+                                exec_limit_bar_zone = BarZone.Open
                         elif exec_stop_set_on_open:
                             keep_limit = False
                             keep_stop = _ladder
@@ -4914,6 +5071,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                             last_limit_info["expiry"][col] = -1
                             last_limit_info["time_delta_format"][col] = -1
                             last_limit_info["reverse"][col] = False
+                            last_limit_info["order_price"][col] = np.nan
 
                         # Process the stop signal
                         if execute_stop:
@@ -4925,6 +5083,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                                 _limit_tif = flex_select_nb(limit_tif_, i, col)
                                 _limit_expiry = flex_select_nb(limit_expiry_, i, col)
                                 _time_delta_format = flex_select_nb(time_delta_format_, i, col)
+                                _limit_order_price = flex_select_nb(limit_order_price_, i, col)
                                 last_limit_info["signal_idx"][col] = exec_stop_init_i
                                 last_limit_info["creation_idx"][col] = i
                                 last_limit_info["init_idx"][col] = i
@@ -4939,6 +5098,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                                 last_limit_info["expiry"][col] = _limit_expiry
                                 last_limit_info["time_delta_format"][col] = _time_delta_format
                                 last_limit_info["reverse"][col] = False
+                                last_limit_info["order_price"][col] = _limit_order_price
                             else:
                                 main_info["bar_zone"][col] = exec_stop_bar_zone
                                 main_info["signal_idx"][col] = exec_stop_init_i
@@ -5048,6 +5208,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                                     _limit_expiry = flex_select_nb(limit_expiry_, _i, col)
                                     _time_delta_format = flex_select_nb(time_delta_format_, _i, col)
                                     _limit_reverse = flex_select_nb(limit_reverse_, _i, col)
+                                    _limit_order_price = flex_select_nb(limit_order_price_, _i, col)
                                     last_limit_info["signal_idx"][col] = _i
                                     last_limit_info["creation_idx"][col] = i
                                     last_limit_info["init_idx"][col] = _i
@@ -5062,6 +5223,7 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                                     last_limit_info["expiry"][col] = _limit_expiry
                                     last_limit_info["time_delta_format"][col] = _time_delta_format
                                     last_limit_info["reverse"][col] = _limit_reverse
+                                    last_limit_info["order_price"][col] = _limit_order_price
                                 else:
                                     main_info["bar_zone"][col] = exec_user_bar_zone
                                     main_info["signal_idx"][col] = _i
@@ -5179,7 +5341,31 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                         if main_info["type"][col] == OrderType.Limit:
                             _slippage = 0.0
                         else:
-                            _slippage = flex_select_nb(slippage_, _i, col)
+                            _slippage = float(flex_select_nb(slippage_, _i, col))
+                        _min_size = flex_select_nb(min_size_, _i, col)
+                        _max_size = flex_select_nb(max_size_, _i, col)
+                        _size_type = flex_select_nb(size_type_, _i, col)
+                        if _size_type != main_info["size_type"][col]:
+                            if not np.isnan(_min_size):
+                                _min_size, _ = resolve_size_nb(
+                                    size=_min_size,
+                                    size_type=_size_type,
+                                    position=position_now,
+                                    val_price=val_price_now,
+                                    value=value_now,
+                                    target_size_type=main_info["size_type"][col],
+                                    as_requirement=True,
+                                )
+                            if not np.isnan(_max_size):
+                                _max_size, _ = resolve_size_nb(
+                                    size=_max_size,
+                                    size_type=_size_type,
+                                    position=position_now,
+                                    val_price=val_price_now,
+                                    value=value_now,
+                                    target_size_type=main_info["size_type"][col],
+                                    as_requirement=True,
+                                )
                         order = order_nb(
                             size=main_info["size"][col],
                             price=main_info["price"][col],
@@ -5188,8 +5374,8 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                             fees=flex_select_nb(fees_, _i, col),
                             fixed_fees=flex_select_nb(fixed_fees_, _i, col),
                             slippage=_slippage,
-                            min_size=flex_select_nb(min_size_, _i, col),
-                            max_size=flex_select_nb(max_size_, _i, col),
+                            min_size=_min_size,
+                            max_size=_max_size,
                             size_granularity=flex_select_nb(size_granularity_, _i, col),
                             leverage=flex_select_nb(leverage_, _i, col),
                             leverage_mode=flex_select_nb(leverage_mode_, _i, col),

@@ -344,12 +344,10 @@ non-precise type pyobject
     from other Numba functions since the convertion operation is done using Python.
 """
 
-import attr
-
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
+from vectorbtpro.utils.attr_ import DefineMixin, define
 from vectorbtpro.utils.config import merge_dicts, atomic_dict
-from vectorbtpro.utils.hashing import Hashable
 from vectorbtpro.utils.jitting import (
     Jitter,
     resolve_jitted_kwargs,
@@ -371,26 +369,26 @@ def get_func_full_name(func: tp.Callable) -> str:
     return func.__module__ + "." + func.__name__
 
 
-@attr.s(frozen=True, eq=False)
-class JitableSetup(Hashable):
+@define
+class JitableSetup(DefineMixin):
     """Class that represents a jitable setup.
 
     !!! note
         Hashed solely by `task_id` and `jitter_id`."""
 
-    task_id: tp.Hashable = attr.ib()
+    task_id: tp.Hashable = define.field()
     """Task id."""
 
-    jitter_id: tp.Hashable = attr.ib()
+    jitter_id: tp.Hashable = define.field()
     """Jitter id."""
 
-    py_func: tp.Callable = attr.ib()
+    py_func: tp.Callable = define.field()
     """Python function to be jitted."""
 
-    jitter_kwargs: tp.KwargsLike = attr.ib(default=None)
+    jitter_kwargs: tp.KwargsLike = define.field(default=None)
     """Keyword arguments passed to `vectorbtpro.utils.jitting.resolve_jitter`."""
 
-    tags: tp.SetLike = attr.ib(default=None)
+    tags: tp.SetLike = define.field(default=None)
     """Set of tags."""
 
     @staticmethod
@@ -402,18 +400,18 @@ class JitableSetup(Hashable):
         return (self.task_id, self.jitter_id)
 
 
-@attr.s(frozen=True, eq=False)
-class JittedSetup(Hashable):
+@define
+class JittedSetup(DefineMixin):
     """Class that represents a jitted setup.
 
     !!! note
         Hashed solely by sorted config of `jitter`. That is, two jitters with the same config
         will yield the same hash and the function won't be re-decorated."""
 
-    jitter: Jitter = attr.ib()
+    jitter: Jitter = define.field()
     """Jitter that decorated the function."""
 
-    jitted_func: tp.Callable = attr.ib()
+    jitted_func: tp.Callable = define.field()
     """Decorated function."""
 
     @staticmethod
@@ -512,7 +510,7 @@ class JITRegistry:
                 if expression is None:
                     result = True
                 else:
-                    result = RepEval(expression).substitute(context=merge_dicts(attr.asdict(setup), context))
+                    result = RepEval(expression).substitute(context=merge_dicts(setup.asdict(), context))
                     checks.assert_instance_of(result, bool)
 
                 if result:
@@ -531,7 +529,7 @@ class JITRegistry:
             if expression is None:
                 result = True
             else:
-                result = RepEval(expression).substitute(context=merge_dicts(attr.asdict(setup), context))
+                result = RepEval(expression).substitute(context=merge_dicts(setup.asdict(), context))
                 checks.assert_instance_of(result, bool)
 
             if result:
@@ -616,7 +614,7 @@ class JITRegistry:
             template_context,
             dict(task_id=task_id, py_func=py_func, task_setups=atomic_dict(task_setups)),
         )
-        jitter = substitute_templates(jitter, template_context, sub_id="jitter")
+        jitter = substitute_templates(jitter, template_context, eval_id="jitter")
 
         if jitter is None and py_func is not None:
             jitter = get_func_suffix(py_func)
@@ -649,7 +647,7 @@ class JITRegistry:
             template_context,
             dict(jitter_id=jitter_id, jitter=jitter, jitable_setup=jitable_setup),
         )
-        disable = substitute_templates(disable, template_context, sub_id="disable")
+        disable = substitute_templates(disable, template_context, eval_id="disable")
         if disable is None:
             disable = jitting_cfg["disable"]
         if disable:
@@ -667,7 +665,7 @@ class JITRegistry:
                 setup_cfg.get("resolve_kwargs", None),
                 jitter_kwargs,
             )
-            jitter_kwargs = substitute_templates(jitter_kwargs, template_context, sub_id="jitter_kwargs")
+            jitter_kwargs = substitute_templates(jitter_kwargs, template_context, eval_id="jitter_kwargs")
             jitter = resolve_jitter(jitter=jitter, **jitter_kwargs)
 
         if jitable_setup is not None:

@@ -35,20 +35,6 @@ def is_close_nb(
 
 
 @register_jitted(cache=True)
-def is_close_or_less_nb(
-    a: float,
-    b: float,
-    use_tol: bool = _use_tol,
-    rel_tol: float = _rel_tol,
-    abs_tol: float = _abs_tol,
-) -> bool:
-    """Tell whether the first value is approximately less than or equal to the second value."""
-    if use_tol and is_close_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
-        return True
-    return a < b
-
-
-@register_jitted(cache=True)
 def is_less_nb(
     a: float,
     b: float,
@@ -60,6 +46,48 @@ def is_less_nb(
     if use_tol and is_close_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
         return False
     return a < b
+
+
+@register_jitted(cache=True)
+def is_close_or_less_nb(
+    a: float,
+    b: float,
+    use_tol: bool = _use_tol,
+    rel_tol: float = _rel_tol,
+    abs_tol: float = _abs_tol,
+) -> bool:
+    """Tell whether the first value is approximately equal to or less than the second value."""
+    if use_tol and is_close_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
+        return True
+    return a < b
+
+
+@register_jitted(cache=True)
+def is_close_or_greater_nb(
+    a: float,
+    b: float,
+    use_tol: bool = _use_tol,
+    rel_tol: float = _rel_tol,
+    abs_tol: float = _abs_tol,
+) -> bool:
+    """Tell whether the first value is approximately equal to or greater than the second value."""
+    if use_tol and is_close_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
+        return True
+    return a > b
+
+
+@register_jitted(cache=True)
+def is_greater_nb(
+    a: float,
+    b: float,
+    use_tol: bool = _use_tol,
+    rel_tol: float = _rel_tol,
+    abs_tol: float = _abs_tol,
+) -> bool:
+    """Tell whether the first value is approximately greater than the second value."""
+    if use_tol and is_close_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
+        return False
+    return a > b
 
 
 @register_jitted(cache=True)

@@ -59,7 +59,13 @@ from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.eval_ import multiline_eval
 from vectorbtpro.utils.formatting import prettify
 from vectorbtpro.utils.mapping import to_value_mapping, apply_mapping
-from vectorbtpro.utils.params import to_typed_list, broadcast_params, create_param_product, params_to_list
+from vectorbtpro.utils.params import (
+    to_typed_list,
+    broadcast_params,
+    create_param_product,
+    is_single_param_value,
+    params_to_list,
+)
 from vectorbtpro.utils.parsing import (
     get_expr_var_names,
     get_func_arg_names,
@@ -102,26 +108,29 @@ except ImportError:
 
 
 def prepare_params(
-    param_list: tp.Sequence[tp.Params],
+    params: tp.MaybeParams,
     param_names: tp.Sequence[str],
     param_settings: tp.Sequence[tp.KwargsLike],
     input_shape: tp.Optional[tp.Shape] = None,
     to_2d: bool = False,
     context: tp.KwargsLike = None,
-) -> tp.List[tp.Params]:
+) -> tp.Tuple[tp.Params, bool]:
     """Prepare parameters.
 
-    Resolves references and performs broadcasting to the input shape."""
+    Resolves references and performs broadcasting to the input shape.
+
+    Returns prepared parameters as well as whether the user provided multiple parameters."""
     # Resolve references
     if context is None:
         context = {}
-    pool = dict(zip(param_names, param_list))
+    pool = dict(zip(param_names, params))
     for k in pool:
         pool[k] = resolve_ref(pool, k)
-    param_list = [pool[k] for k in param_names]
+    params = [pool[k] for k in param_names]
 
-    new_param_list = []
-    for i, p_values in enumerate(param_list):
+    new_params = []
+    params_are_multiple = False
+    for i, param_values in enumerate(params):
         # Resolve settings
         _param_settings = resolve_dict(param_settings[i])
         is_tuple = _param_settings.get("is_tuple", False)
@@ -131,9 +140,9 @@ def prepare_params(
             if dtype_kwargs is None:
                 dtype_kwargs = {}
             if checks.is_namedtuple(dtype):
-                p_values = map_enum_fields(p_values, dtype, **dtype_kwargs)
+                param_values = map_enum_fields(param_values, dtype, **dtype_kwargs)
             else:
-                p_values = apply_mapping(p_values, dtype, **dtype_kwargs)
+                param_values = apply_mapping(param_values, dtype, **dtype_kwargs)
         is_array_like = _param_settings.get("is_array_like", False)
         min_one_dim = _param_settings.get("min_one_dim", False)
         bc_to_input = _param_settings.get("bc_to_input", False)
@@ -143,18 +152,20 @@ def prepare_params(
         )
         template = _param_settings.get("template", None)
 
-        new_p_values = params_to_list(p_values, is_tuple, is_array_like)
+        if not is_single_param_value(param_values, is_tuple, is_array_like):
+            params_are_multiple = True
+        new_param_values = params_to_list(param_values, is_tuple, is_array_like)
         if template is not None:
-            new_p_values = [
-                template.substitute(context={param_names[i]: new_p_values[j], **context})
-                for j in range(len(new_p_values))
+            new_param_values = [
+                template.substitute(context={param_names[i]: new_param_values[j], **context})
+                for j in range(len(new_param_values))
             ]
         if not bc_to_input:
             if is_array_like:
                 if min_one_dim:
-                    new_p_values = list(map(reshaping.to_1d_array, new_p_values))
+                    new_param_values = list(map(reshaping.to_1d_array, new_param_values))
                 else:
-                    new_p_values = list(map(np.asarray, new_p_values))
+                    new_param_values = list(map(np.asarray, new_param_values))
         else:
             # Broadcast to input or its axis
             if is_tuple:
@@ -170,28 +181,28 @@ def prepare_params(
                     to_shape = (input_shape[0],)
                 else:
                     to_shape = (input_shape[1],) if len(input_shape) > 1 else (1,)
-            _new_p_values = reshaping.broadcast(*new_p_values, to_shape=to_shape, **broadcast_kwargs)
-            if len(new_p_values) == 1:
-                _new_p_values = [_new_p_values]
+            _new_param_values = reshaping.broadcast(*new_param_values, to_shape=to_shape, **broadcast_kwargs)
+            if len(new_param_values) == 1:
+                _new_param_values = [_new_param_values]
             else:
-                _new_p_values = list(_new_p_values)
+                _new_param_values = list(_new_param_values)
             if to_2d and bc_to_input is True:
                 # If inputs are meant to reshape to 2D, do the same to parameters
                 # But only to those that fully resemble inputs (= not raw)
-                __new_p_values = _new_p_values.copy()
-                for j, param in enumerate(__new_p_values):
+                __new_param_values = _new_param_values.copy()
+                for j, param in enumerate(__new_param_values):
                     keep_flex = broadcast_kwargs.get("keep_flex", False)
                     if keep_flex is False or (isinstance(keep_flex, (tuple, list)) and not keep_flex[j]):
-                        __new_p_values[j] = reshaping.to_2d(param)
-                new_p_values = __new_p_values
+                        __new_param_values[j] = reshaping.to_2d(param)
+                new_param_values = __new_param_values
             else:
-                new_p_values = _new_p_values
-        new_param_list.append(new_p_values)
-    return new_param_list
+                new_param_values = _new_param_values
+        new_params.append(new_param_values)
+    return new_params, params_are_multiple
 
 
 def build_columns(
-    param_list: tp.Sequence[tp.Params],
+    params: tp.Params,
     input_columns: tp.IndexLike,
     level_names: tp.Optional[tp.Sequence[str]] = None,
     hide_levels: tp.Optional[tp.Sequence[tp.Union[str, int]]] = None,
@@ -201,20 +212,20 @@ def build_columns(
     ignore_ranges: bool = False,
     **kwargs,
 ) -> tp.Tuple[tp.List[tp.Index], tp.Index]:
-    """For each parameter in `param_list`, create a new column level with parameter values
+    """For each parameter in `params`, create a new column level with parameter values
     and stack it on top of `input_columns`.
 
     Returns a list of parameter indexes and new columns."""
     if level_names is not None:
-        checks.assert_len_equal(param_list, level_names)
+        checks.assert_len_equal(params, level_names)
     if hide_levels is None:
         hide_levels = []
     input_columns = indexes.to_any_index(input_columns)
 
     param_indexes = []
-    shown_param_indexes = []
-    for i in range(len(param_list)):
-        p_values = param_list[i]
+    visible_param_indexes = []
+    for i in range(len(params)):
+        param_values = params[i]
         level_name = None
         if level_names is not None:
             level_name = level_names[i]
@@ -228,15 +239,15 @@ def build_columns(
                 dtype = to_value_mapping(dtype, reverse=False)
             else:
                 dtype = to_value_mapping(dtype, reverse=True)
-            p_values = apply_mapping(p_values, dtype)
+            param_values = apply_mapping(param_values, dtype)
         _per_column = _param_settings.get("per_column", False)
         _post_index_func = _param_settings.get("post_index_func", None)
         if per_column:
-            param_index = indexes.index_from_values(p_values, single_value=_single_value, name=level_name)
+            param_index = indexes.index_from_values(param_values, single_value=_single_value, name=level_name)
         else:
             if _per_column:
                 param_index = None
-                for p in p_values:
+                for p in param_values:
                     bc_param = broadcast_array_to(p, len(input_columns))
                     _param_index = indexes.index_from_values(bc_param, single_value=False, name=level_name)
                     if param_index is None:
@@ -247,18 +258,18 @@ def build_columns(
                     # When using flexible column-wise parameters
                     param_index = indexes.repeat_index(param_index, len(input_columns), ignore_ranges=ignore_ranges)
             else:
-                param_index = indexes.index_from_values(p_values, single_value=_single_value, name=level_name)
+                param_index = indexes.index_from_values(param_values, single_value=_single_value, name=level_name)
                 param_index = indexes.repeat_index(param_index, len(input_columns), ignore_ranges=ignore_ranges)
         if _post_index_func is not None:
             param_index = _post_index_func(param_index)
         param_indexes.append(param_index)
         if i not in hide_levels and (level_names is None or level_names[i] not in hide_levels):
-            shown_param_indexes.append(param_index)
+            visible_param_indexes.append(param_index)
     if not per_column:
-        n_param_values = len(param_list[0]) if len(param_list) > 0 else 1
+        n_param_values = len(params[0]) if len(params) > 0 else 1
         input_columns = indexes.tile_index(input_columns, n_param_values, ignore_ranges=ignore_ranges)
-    if len(shown_param_indexes) > 0:
-        stacked_columns = indexes.stack_indexes([*shown_param_indexes, input_columns], **kwargs)
+    if len(visible_param_indexes) > 0:
+        stacked_columns = indexes.stack_indexes([*visible_param_indexes, input_columns], **kwargs)
     else:
         stacked_columns = input_columns
     return param_indexes, stacked_columns
@@ -291,7 +302,7 @@ IndicatorBaseT = tp.TypeVar("IndicatorBaseT", bound="IndicatorBase")
 CacheOutputT = tp.Any
 RawOutputT = tp.Tuple[
     tp.List[tp.Array2d],
-    tp.List[tp.Tuple[tp.Param, ...]],
+    tp.List[tp.Tuple[tp.ParamValue, ...]],
     int,
     tp.List[tp.Any],
 ]
@@ -299,7 +310,7 @@ InputListT = tp.List[tp.Array2d]
 InputMapperT = tp.Optional[tp.Array1d]
 InOutputListT = tp.List[tp.Array2d]
 OutputListT = tp.List[tp.Array2d]
-ParamListT = tp.List[tp.List[tp.Param]]
+ParamListT = tp.List[tp.List[tp.ParamValue]]
 MapperListT = tp.List[tp.Index]
 OtherListT = tp.List[tp.Any]
 PipelineOutputT = tp.Tuple[
@@ -328,7 +339,38 @@ class IndicatorBase(Analyzable):
     _output_names: tp.ClassVar[tp.Tuple[str, ...]]
     _lazy_output_names: tp.ClassVar[tp.Tuple[str, ...]]
     _output_flags: tp.ClassVar[tp.Kwargs]
-    _level_names: tp.Tuple[str, ...]
+
+    def __getattr__(self, k: str) -> tp.Any:
+        """Redirect queries targeted at a generic output name by "output" or the short name of the indicator."""
+        short_name = object.__getattribute__(self, "short_name")
+        output_names = object.__getattribute__(self, "output_names")
+        if len(output_names) == 1:
+            if k.startswith("output") and "output" not in output_names:
+                new_k = k[len("output"):]
+                if len(new_k) == 0 or not new_k[0].isalnum():
+                    try:
+                        return object.__getattribute__(self, output_names[0] + new_k)
+                    except AttributeError:
+                        pass
+            if k.startswith(short_name) and short_name not in output_names:
+                new_k = k[len(short_name):]
+                if len(new_k) == 0 or not new_k[0].isalnum():
+                    try:
+                        return object.__getattribute__(self, output_names[0] + new_k)
+                    except AttributeError:
+                        pass
+            if k.lower().startswith(short_name.lower()) and short_name.lower() not in output_names:
+                new_k = k[len(short_name):].lower()
+                if len(new_k) == 0 or not new_k[0].isalnum():
+                    try:
+                        return object.__getattribute__(self, output_names[0] + new_k)
+                    except AttributeError:
+                        pass
+            try:
+                return object.__getattribute__(self, output_names[0] + "_" + k)
+            except AttributeError:
+                pass
+        return object.__getattribute__(self, k)
 
     @classmethod
     def run_pipeline(
@@ -346,7 +388,7 @@ class IndicatorBase(Analyzable):
         broadcast_named_args: tp.KwargsLike = None,
         broadcast_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
-        params: tp.Optional[tp.MappingSequence[tp.Params]] = None,
+        params: tp.Optional[tp.MaybeParams] = None,
         param_product: bool = False,
         random_subset: tp.Optional[int] = None,
         param_settings: tp.Optional[tp.MappingSequence[tp.KwargsLike]] = None,
@@ -467,7 +509,7 @@ class IndicatorBase(Analyzable):
             pass_wrapper (bool): Whether to pass the input wrapper to `custom_func` as keyword argument.
             level_names (list of str): A list of column level names corresponding to each parameter.
 
-                Must have the same length as `param_list`.
+                Must have the same length as `params`.
             hide_levels (list of int or str): A list of level names or indices of parameter levels to hide.
             build_col_kwargs (dict): Keyword arguments passed to `build_columns`.
             return_raw (bool or str): Whether to return raw outputs and hashed parameter tuples without
@@ -636,7 +678,7 @@ class IndicatorBase(Analyzable):
             ),
             template_context,
         )
-        param_list = prepare_params(
+        param_list, params_are_multiple = prepare_params(
             param_list,
             param_names,
             param_settings,
@@ -774,8 +816,8 @@ class IndicatorBase(Analyzable):
                     ),
                     template_context,
                 )
-                func_args = substitute_templates(func_args, template_context, sub_id="custom_func_args")
-                func_kwargs = substitute_templates(func_kwargs, template_context, sub_id="custom_func_kwargs")
+                func_args = substitute_templates(func_args, template_context, eval_id="custom_func_args")
+                func_kwargs = substitute_templates(func_kwargs, template_context, eval_id="custom_func_kwargs")
 
             # Run the custom function
             if checks.is_numba_func(custom_func):
@@ -921,6 +963,8 @@ class IndicatorBase(Analyzable):
 
         # Return artifacts: no pandas objects, just a wrapper and NumPy arrays
         new_ndim = len(input_shape) if output_list[0].shape[1] == 1 else output_list[0].ndim
+        if new_ndim == 1 and params_are_multiple:
+            new_ndim = 2
         wrapper = ArrayWrapper(input_index, new_columns, new_ndim, **wrapper_kwargs)
 
         return (
@@ -1077,7 +1121,6 @@ class IndicatorBase(Analyzable):
         "param_list",
         "mapper_list",
         "short_name",
-        "level_names",
     }
 
     def __init__(
@@ -1090,7 +1133,6 @@ class IndicatorBase(Analyzable):
         param_list: ParamListT,
         mapper_list: MapperListT,
         short_name: str,
-        level_names: tp.Tuple[str, ...],
         **kwargs,
     ) -> None:
         if input_mapper is not None:
@@ -1104,7 +1146,8 @@ class IndicatorBase(Analyzable):
         for mapper in mapper_list:
             checks.assert_equal(len(mapper), wrapper.shape_2d[1])
         checks.assert_instance_of(short_name, str)
-        checks.assert_len_equal(level_names, param_list)
+        if "level_names" in kwargs:
+            del kwargs["level_names"]  # deprecated
 
         Analyzable.__init__(
             self,
@@ -1116,13 +1159,10 @@ class IndicatorBase(Analyzable):
             param_list=param_list,
             mapper_list=mapper_list,
             short_name=short_name,
-            level_names=level_names,
             **kwargs,
         )
 
         setattr(self, "_short_name", short_name)
-        setattr(self, "_level_names", level_names)
-
         for i, ts_name in enumerate(self.input_names):
             setattr(self, f"_{ts_name}", input_list[i])
         setattr(self, "_input_mapper", input_mapper)
@@ -1133,9 +1173,60 @@ class IndicatorBase(Analyzable):
         for i, param_name in enumerate(self.param_names):
             setattr(self, f"_{param_name}_list", param_list[i])
             setattr(self, f"_{param_name}_mapper", mapper_list[i])
-        if len(self.param_names) > 1:
-            tuple_mapper = list(zip(*list(mapper_list)))
-            setattr(self, "_tuple_mapper", tuple_mapper)
+
+        # Initialize indexers
+        mapper_sr_list = []
+        for i, m in enumerate(mapper_list):
+            mapper_sr_list.append(pd.Series(m, index=wrapper.columns))
+        tuple_mapper = self._tuple_mapper
+        if tuple_mapper is not None:
+            level_names = tuple(tuple_mapper.names)
+            mapper_sr_list.append(pd.Series(tuple_mapper.tolist(), index=wrapper.columns))
+        else:
+            level_names = ()
+        self._level_names = level_names
+        for base_cls in type(self).__bases__:
+            if base_cls.__name__ == "ParamIndexer":
+                base_cls.__init__(self, mapper_sr_list, level_names=[*level_names, level_names])
+
+    @property
+    def _tuple_mapper(self) -> tp.Optional[pd.MultiIndex]:
+        """Mapper of multiple parameters."""
+        if len(self.param_names) <= 1:
+            return None
+        return pd.MultiIndex.from_arrays([getattr(self, f"_{name}_mapper") for name in self.param_names])
+
+    @property
+    def _param_mapper(self) -> tp.Optional[pd.Index]:
+        """Mapper of all parameters."""
+        if len(self.param_names) == 0:
+            return None
+        if len(self.param_names) == 1:
+            return getattr(self, f"_{self.param_names[0]}_mapper")
+        return self._tuple_mapper
+
+    @property
+    def _visible_param_mapper(self) -> tp.Optional[pd.Index]:
+        """Mapper of visible parameters."""
+        if len(self.param_names) == 0:
+            return None
+        if len(self.param_names) == 1:
+            mapper = getattr(self, f"_{self.param_names[0]}_mapper")
+            if mapper.name is None:
+                return None
+            if mapper.name not in self.wrapper.columns.names:
+                return None
+            return mapper
+        mapper = self._tuple_mapper
+        visible_indexes = []
+        for i, name in enumerate(mapper.names):
+            if name is not None and name in self.wrapper.columns.names:
+                visible_indexes.append(mapper.get_level_values(i))
+        if len(visible_indexes) == 0:
+            return None
+        if len(visible_indexes) == 1:
+            return visible_indexes[0]
+        return pd.MultiIndex.from_arrays(visible_indexes)
 
     def indexing_func(self: IndicatorBaseT, *args, wrapper_meta: tp.DictLike = None, **kwargs) -> IndicatorBaseT:
         """Perform indexing on `IndicatorBase`."""
@@ -1235,7 +1326,7 @@ class IndicatorBase(Analyzable):
         return cls_or_self._output_flags
 
     @property
-    def level_names(self) -> tp.Tuple[str, ...]:
+    def level_names(self) -> tp.Tuple[str]:
         """Column level names corresponding to each parameter."""
         return self._level_names
 
@@ -1281,6 +1372,82 @@ class IndicatorBase(Analyzable):
         if new_df.index.equals(df.index):
             return self
         return self.loc[new_df.index]
+
+    def rename(self: IndicatorBaseT, short_name: str) -> IndicatorBaseT:
+        """Replace the short name of the indicator."""
+        new_level_names = ()
+        for level_name in self.level_names:
+            if level_name.startswith(self.short_name + "_"):
+                level_name = level_name.replace(self.short_name, short_name, 1)
+            new_level_names += (level_name,)
+        new_mapper_list = []
+        for i, param_name in enumerate(self.param_names):
+            mapper = getattr(self, f"_{param_name}_mapper")
+            new_mapper_list.append(mapper.rename(new_level_names[i]))
+        new_columns = self.wrapper.columns
+        for i, name in enumerate(self.wrapper.columns.names):
+            if name in self.level_names:
+                new_columns = new_columns.rename({name: new_level_names[self.level_names.index(name)]})
+        new_wrapper = self.wrapper.replace(columns=new_columns)
+        return self.replace(wrapper=new_wrapper, mapper_list=new_mapper_list, short_name=short_name)
+
+    def rename_levels(
+        self: IndicatorBaseT,
+        mapper: tp.MaybeMappingSequence[tp.Level],
+        **kwargs,
+    ) -> IndicatorBaseT:
+        new_self = Analyzable.rename_levels(self, mapper, **kwargs)
+        old_column_names = self.wrapper.columns.names
+        new_column_names = new_self.wrapper.columns.names
+        new_level_names = ()
+        for level_name in new_self.level_names:
+            if level_name in old_column_names:
+                level_name = new_column_names[old_column_names.index(level_name)]
+            new_level_names += (level_name,)
+        new_mapper_list = []
+        for i, param_name in enumerate(new_self.param_names):
+            mapper = getattr(new_self, f"_{param_name}_mapper")
+            new_mapper_list.append(mapper.rename(new_level_names[i]))
+        return new_self.replace(mapper_list=new_mapper_list, level_names=new_level_names)
+
+    # ############# Iteration ############# #
+
+    def items(
+        self,
+        group_by: tp.GroupByLike = "params",
+        apply_group_by: bool = False,
+        keep_2d: bool = False,
+        key_as_index: bool = False,
+    ) -> tp.ItemGenerator:
+        """Iterate over columns (or groups if grouped and `Wrapping.group_select` is True).
+
+        Allows the following additional options for `group_by`: "all_params", "params"
+        (only those that aren't hidden), and parameter names."""
+        if isinstance(group_by, str):
+            if group_by not in self.wrapper.columns.names:
+                if group_by.lower() == "all_params":
+                    group_by = self._param_mapper
+                elif group_by.lower() == "params":
+                    group_by = self._visible_param_mapper
+                elif group_by in self.param_names:
+                    group_by = getattr(self, f"_{group_by}_mapper")
+        elif isinstance(group_by, (tuple, list)):
+            new_group_by = []
+            for g in group_by:
+                if isinstance(g, str):
+                    if g not in self.wrapper.columns.names:
+                        if g in self.param_names:
+                            g = getattr(self, f"_{g}_mapper")
+                new_group_by.append(g)
+            group_by = type(group_by)(new_group_by)
+        for k, v in Analyzable.items(
+            self,
+            group_by=group_by,
+            apply_group_by=apply_group_by,
+            keep_2d=keep_2d,
+            key_as_index=key_as_index,
+        ):
+            yield k, v
 
 
 class IndicatorFactory(Configured):
@@ -1486,7 +1653,7 @@ class IndicatorFactory(Configured):
 
         for param_name in param_names:
 
-            def param_list_prop(self, _param_name=param_name) -> tp.List[tp.Param]:
+            def param_list_prop(self, _param_name=param_name) -> tp.List[tp.ParamValue]:
                 return getattr(self, f"_{_param_name}_list")
 
             param_list_prop.__doc__ = f"List of `{param_name}` values."
@@ -1531,46 +1698,6 @@ class IndicatorFactory(Configured):
                     _output_flags = ", ".join(_output_flags)
                 output_prop.__doc__ += "\n\n" + _output_flags
             setattr(Indicator, output_name, property(output_prop))
-
-        # Add __init__ method
-        def __init__(
-            self,
-            wrapper: ArrayWrapper,
-            input_list: InputListT,
-            input_mapper: InputMapperT,
-            in_output_list: InOutputListT,
-            output_list: OutputListT,
-            param_list: ParamListT,
-            mapper_list: MapperListT,
-            short_name: str,
-            level_names: tp.Tuple[str, ...],
-        ) -> None:
-            IndicatorBase.__init__(
-                self,
-                wrapper,
-                input_list,
-                input_mapper,
-                in_output_list,
-                output_list,
-                param_list,
-                mapper_list,
-                short_name,
-                level_names,
-            )
-            if len(param_names) > 1:
-                tuple_mapper = list(zip(*list(mapper_list)))
-            else:
-                tuple_mapper = None
-
-            # Initialize indexers
-            mapper_sr_list = []
-            for i, m in enumerate(mapper_list):
-                mapper_sr_list.append(pd.Series(m, index=wrapper.columns))
-            if tuple_mapper is not None:
-                mapper_sr_list.append(pd.Series(tuple_mapper, index=wrapper.columns))
-            ParamIndexer.__init__(self, mapper_sr_list, level_names=[*level_names, level_names])
-
-        setattr(Indicator, "__init__", __init__)
 
         # Add user-defined outputs
         for prop_name, prop in lazy_outputs.items():
@@ -2036,7 +2163,7 @@ class IndicatorFactory(Configured):
 
         def _split_args(
             args: tp.Sequence,
-        ) -> tp.Tuple[tp.Dict[str, tp.ArrayLike], tp.Dict[str, tp.ArrayLike], tp.Dict[str, tp.Params], tp.Args]:
+        ) -> tp.Tuple[tp.Dict[str, tp.ArrayLike], tp.Dict[str, tp.ArrayLike], tp.Dict[str, tp.ParamValues], tp.Args]:
             inputs = dict(zip(input_names, args[: len(input_names)]))
             checks.assert_len_equal(inputs, input_names)
             args = args[len(input_names) :]
@@ -2151,7 +2278,6 @@ class IndicatorFactory(Configured):
                 new_param_list,
                 mapper_list,
                 short_name,
-                tuple(level_names),
             )
             if len(other_list) > 0:
                 return (obj, *tuple(other_list))
@@ -2614,7 +2740,7 @@ Other keyword arguments are passed to `{0}.run`.
         def custom_func(
             input_tuple: tp.Tuple[tp.AnyArray, ...],
             in_output_tuple: tp.Tuple[tp.List[tp.AnyArray], ...],
-            param_tuple: tp.Tuple[tp.List[tp.Param], ...],
+            param_tuple: tp.Tuple[tp.List[tp.ParamValue], ...],
             *_args,
             input_shape: tp.Optional[tp.Shape] = None,
             per_column: bool = False,
@@ -3415,7 +3541,7 @@ Other keyword arguments are passed to `{0}.run`.
         def apply_func(
             input_tuple: tp.Tuple[tp.Array2d, ...],
             in_output_tuple: tp.Tuple[tp.Array2d, ...],
-            param_tuple: tp.Tuple[tp.Param, ...],
+            param_tuple: tp.Tuple[tp.ParamValue, ...],
             timeframe: tp.Optional[tp.FrequencyLike] = None,
             **_kwargs,
         ) -> tp.MaybeTuple[tp.Array2d]:
@@ -3703,7 +3829,7 @@ Other keyword arguments are passed to `{0}.run`.
         def apply_func(
             input_tuple: tp.Tuple[tp.AnyArray, ...],
             in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
-            param_tuple: tp.Tuple[tp.Param, ...],
+            param_tuple: tp.Tuple[tp.ParamValue, ...],
             **_kwargs,
         ) -> tp.MaybeTuple[tp.Array2d]:
             is_series = isinstance(input_tuple[0], pd.Series)
@@ -3898,7 +4024,7 @@ Other keyword arguments are passed to `{0}.run`.
         def apply_func(
             input_tuple: tp.Tuple[tp.AnyArray, ...],
             in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
-            param_tuple: tp.Tuple[tp.Param, ...],
+            param_tuple: tp.Tuple[tp.ParamValue, ...],
             **_kwargs,
         ) -> tp.MaybeTuple[tp.Array2d]:
             is_series = isinstance(input_tuple[0], pd.Series)
@@ -4133,7 +4259,7 @@ Other keyword arguments are passed to `{0}.run`.
         def apply_func(
             input_tuple: tp.Tuple[tp.Series, ...],
             in_output_tuple: tp.Tuple[tp.Series, ...],
-            param_tuple: tp.Tuple[tp.Param, ...],
+            param_tuple: tp.Tuple[tp.ParamValue, ...],
             *_args,
             **_kwargs,
         ) -> tp.MaybeTuple[tp.Array1d]:
@@ -4842,7 +4968,7 @@ Other keyword arguments are passed to `{0}.run`.
         def apply_func(
             input_tuple: tp.Tuple[tp.AnyArray, ...],
             in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
-            param_tuple: tp.Tuple[tp.Param, ...],
+            param_tuple: tp.Tuple[tp.ParamValue, ...],
             **_kwargs,
         ) -> tp.MaybeTuple[tp.Array2d]:
             import vectorbtpro as vbt
