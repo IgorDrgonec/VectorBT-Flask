@@ -59,7 +59,7 @@ class GBMOHLCData(SyntheticData):
             dt (float): Time change (one period of time).
             seed (int): Seed to make output deterministic.
             jitted (any): See `vectorbtpro.utils.jitting.resolve_jitted_option`.
-            template_context (dict): Template context.
+            template_context (dict): Context used to substitute templates.
 
         For defaults, see `custom.gbm` in `vectorbtpro._settings.data`.
 

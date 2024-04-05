@@ -203,6 +203,7 @@ class SQLData(DBData):
         cls,
         pattern: tp.Optional[str] = None,
         use_regex: bool = False,
+        sort: bool = True,
         engine: tp.Union[None, str, EngineT] = None,
         engine_name: tp.Optional[str] = None,
         engine_config: tp.KwargsLike = None,
@@ -235,17 +236,20 @@ class SQLData(DBData):
             dispose_engine = should_dispose
         inspector = inspect(engine)
         all_schemas = inspector.get_schema_names(**kwargs)
-        schemas = set()
+        schemas = []
         for schema in all_schemas:
             if pattern is not None:
                 if not cls.key_match(schema, pattern, use_regex=use_regex):
                     continue
             if schema == "information_schema":
                 continue
-            schemas.add(schema)
+            if schema not in schemas:
+                schemas.append(schema)
         if dispose_engine:
             engine.dispose()
-        return sorted(schemas)
+        if sort:
+            return sorted(schemas)
+        return schemas
 
     @classmethod
     def list_tables(
@@ -254,6 +258,7 @@ class SQLData(DBData):
         schema_pattern: tp.Optional[str] = None,
         table_pattern: tp.Optional[str] = None,
         use_regex: bool = False,
+        sort: bool = True,
         schema: tp.Optional[str] = None,
         incl_views: bool = True,
         engine: tp.Union[None, str, EngineT] = None,
@@ -298,6 +303,7 @@ class SQLData(DBData):
             schemas = cls.list_schemas(
                 pattern=schema_pattern,
                 use_regex=use_regex,
+                sort=sort,
                 engine=engine,
                 engine_name=engine_name,
                 **kwargs,
@@ -316,7 +322,7 @@ class SQLData(DBData):
             schemas = [schema]
             prefix_schema = False
         inspector = inspect(engine)
-        tables = set()
+        tables = []
         for schema in schemas:
             all_tables = inspector.get_table_names(schema, **kwargs)
             if incl_views:
@@ -333,12 +339,14 @@ class SQLData(DBData):
                     if not cls.key_match(table, table_pattern, use_regex=use_regex):
                         continue
                 if prefix_schema and schema is not None:
-                    tables.add(str(schema) + ":" + table)
-                else:
-                    tables.add(table)
+                    table = str(schema) + ":" + table
+                if table not in tables:
+                    tables.append(table)
         if dispose_engine:
             engine.dispose()
-        return sorted(tables)
+        if sort:
+            return sorted(tables)
+        return tables
 
     @classmethod
     def has_schema(

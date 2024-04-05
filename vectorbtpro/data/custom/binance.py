@@ -126,6 +126,7 @@ class BinanceData(RemoteData):
         cls,
         pattern: tp.Optional[str] = None,
         use_regex: bool = False,
+        sort: bool = True,
         client: tp.Optional[BinanceClientT] = None,
         client_config: tp.KwargsLike = None,
     ) -> tp.List[str]:
@@ -142,7 +143,9 @@ class BinanceData(RemoteData):
                 if not cls.key_match(symbol, pattern, use_regex=use_regex):
                     continue
             all_symbols.append(symbol)
-        return sorted(all_symbols)
+        if sort:
+            return sorted(all_symbols)
+        return all_symbols
 
     @classmethod
     def fetch_symbol(

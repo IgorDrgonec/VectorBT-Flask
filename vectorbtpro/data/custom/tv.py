@@ -430,6 +430,7 @@ class TVClient(Configured):
         delay: tp.Optional[int] = None,
         show_progress: bool = True,
         pbar_kwargs: tp.KwargsLike = None,
+        max_pages: tp.Optional[int] = None,
     ) -> tp.List[dict]:
         """Search for a symbol."""
         if text is None:
@@ -438,18 +439,18 @@ class TVClient(Configured):
             exchange = ""
         if pbar_kwargs is None:
             pbar_kwargs = {}
-        symbols_remaining = None
         symbols_list = []
         pbar = None
+        pages_fetched = 0
 
-        while symbols_remaining is None or symbols_remaining > 0:
+        while True:
             url = SEARCH_URL.format(text=text, exchange=exchange.upper(), start=len(symbols_list))
             resp = requests.get(url)
             symbols_data = json.loads(resp.text)
             symbols_remaining = symbols_data.get("symbols_remaining", 0)
             new_symbols = symbols_data.get("symbols", [])
             symbols_list.extend(new_symbols)
-            if pbar is None and symbols_remaining > 0:
+            if max_pages is None and pbar is None and symbols_remaining > 0:
                 pbar = get_pbar(
                     total=len(new_symbols) + symbols_remaining,
                     show_progress=show_progress,
@@ -457,6 +458,11 @@ class TVClient(Configured):
                 )
             if pbar is not None:
                 pbar.update(len(new_symbols))
+            if symbols_remaining == 0:
+                break
+            pages_fetched += 1
+            if max_pages is not None and pages_fetched >= max_pages:
+                break
             if delay is not None:
                 time.sleep(delay / 1000)
         if pbar is not None:
@@ -523,6 +529,7 @@ class TVData(RemoteData):
         exchange_pattern: tp.Optional[str] = None,
         symbol_pattern: tp.Optional[str] = None,
         use_regex: bool = False,
+        sort: bool = True,
         client: tp.Optional[TVClient] = None,
         client_config: tp.DictLike = None,
         text: tp.Optional[str] = None,
@@ -530,6 +537,7 @@ class TVData(RemoteData):
         delay: tp.Optional[int] = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
+        max_pages: tp.Optional[int] = None,
         market: tp.Optional[str] = None,
         markets: tp.Optional[tp.List[str]] = None,
         fields: tp.Optional[tp.MaybeIterable[str]] = None,
@@ -661,6 +669,7 @@ class TVData(RemoteData):
                 delay=delay,
                 show_progress=show_progress,
                 pbar_kwargs=pbar_kwargs,
+                max_pages=max_pages,
             )
             all_symbols = map(lambda x: x["exchange"] + ":" + x["symbol"], data)
             return_field_data = False
@@ -747,9 +756,11 @@ class TVData(RemoteData):
                 if not cls.key_match(symbol.split(":")[1], symbol_pattern, use_regex=use_regex):
                     continue
             found_symbols.append(item)
-        if return_field_data:
-            return sorted(found_symbols, key=lambda x: x["symbol"])
-        return sorted(found_symbols)
+        if sort:
+            if return_field_data:
+                return sorted(found_symbols, key=lambda x: x["symbol"])
+            return sorted(found_symbols)
+        return found_symbols
 
     @classmethod
     def resolve_client(cls, client: tp.Optional[TVClient] = None, **client_config) -> TVClient:

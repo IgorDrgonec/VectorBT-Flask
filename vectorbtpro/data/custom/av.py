@@ -95,7 +95,7 @@ class AVData(RemoteData):
     _settings_path: tp.SettingsPath = dict(custom="data.custom.av")
 
     @classmethod
-    def list_symbols(cls, keywords: str, apikey: tp.Optional[str] = None) -> tp.List[str]:
+    def list_symbols(cls, keywords: str, apikey: tp.Optional[str] = None, sort: bool = True) -> tp.List[str]:
         """List all symbols."""
         apikey = cls.resolve_custom_setting(apikey, "apikey")
 
@@ -106,7 +106,9 @@ class AVData(RemoteData):
         query["apikey"] = apikey
         url = "https://www.alphavantage.co/query?" + urllib.parse.urlencode(query)
         df = pd.read_csv(url)
-        return sorted(df["symbol"].tolist())
+        if sort:
+            return sorted(df["symbol"].tolist())
+        return df["symbol"].tolist()
 
     @classmethod
     @lru_cache()

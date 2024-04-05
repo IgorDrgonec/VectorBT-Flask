@@ -76,6 +76,7 @@ class AlpacaData(RemoteData):
         cls,
         pattern: tp.Optional[str] = None,
         use_regex: bool = False,
+        sort: bool = True,
         status: tp.Optional[str] = None,
         asset_class: tp.Optional[str] = None,
         exchange: tp.Optional[str] = None,
@@ -129,7 +130,9 @@ class AlpacaData(RemoteData):
                 if not cls.key_match(symbol, pattern, use_regex=use_regex):
                     continue
             all_symbols.append(symbol)
-        return sorted(all_symbols)
+        if sort:
+            return sorted(all_symbols)
+        return all_symbols
 
     @classmethod
     def resolve_client(

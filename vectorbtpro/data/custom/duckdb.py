@@ -123,6 +123,7 @@ class DuckDBData(DBData):
         cls,
         pattern: tp.Optional[str] = None,
         use_regex: bool = False,
+        sort: bool = True,
         incl_system: bool = False,
         connection: tp.Union[None, str, DuckDBPyConnectionT] = None,
         connection_config: tp.KwargsLike = None,
@@ -136,7 +137,7 @@ class DuckDBData(DBData):
             connection_config = {}
         connection = cls.resolve_connection(connection, **connection_config)
         schemata_df = connection.sql("SELECT * FROM information_schema.schemata").df()
-        catalogs = set()
+        catalogs = []
         for catalog in schemata_df["catalog_name"].tolist():
             if pattern is not None:
                 if not cls.key_match(catalog, pattern, use_regex=use_regex):
@@ -145,8 +146,11 @@ class DuckDBData(DBData):
                 continue
             if not incl_system and catalog == "temp":
                 continue
-            catalogs.add(catalog)
-        return sorted(catalogs)
+            if catalog not in catalogs:
+                catalogs.append(catalog)
+        if sort:
+            return sorted(catalogs)
+        return catalogs
 
     @classmethod
     def list_schemas(
@@ -154,6 +158,7 @@ class DuckDBData(DBData):
         catalog_pattern: tp.Optional[str] = None,
         schema_pattern: tp.Optional[str] = None,
         use_regex: bool = False,
+        sort: bool = True,
         catalog: tp.Optional[str] = None,
         incl_system: bool = False,
         connection: tp.Union[None, str, DuckDBPyConnectionT] = None,
@@ -174,6 +179,7 @@ class DuckDBData(DBData):
             catalogs = cls.list_catalogs(
                 pattern=catalog_pattern,
                 use_regex=use_regex,
+                sort=sort,
                 incl_system=incl_system,
                 connection=connection,
                 connection_config=connection_config,
@@ -186,7 +192,7 @@ class DuckDBData(DBData):
             catalogs = [catalog]
             prefix_catalog = False
         schemata_df = connection.sql("SELECT * FROM information_schema.schemata").df()
-        schemas = set()
+        schemas = []
         for catalog in catalogs:
             all_schemas = schemata_df[schemata_df["catalog_name"] == catalog]["schema_name"].tolist()
             for schema in all_schemas:
@@ -198,10 +204,12 @@ class DuckDBData(DBData):
                 if not incl_system and schema == "pg_catalog":
                     continue
                 if prefix_catalog:
-                    schemas.add(catalog + ":" + schema)
-                else:
-                    schemas.add(schema)
-        return sorted(schemas)
+                    schema = catalog + ":" + schema
+                if schema not in schemas:
+                    schemas.append(schema)
+        if sort:
+            return sorted(schemas)
+        return schemas
 
     @classmethod
     def get_current_schema(
@@ -223,6 +231,7 @@ class DuckDBData(DBData):
         schema_pattern: tp.Optional[str] = None,
         table_pattern: tp.Optional[str] = None,
         use_regex: bool = False,
+        sort: bool = True,
         catalog: tp.Optional[str] = None,
         schema: tp.Optional[str] = None,
         incl_system: bool = False,
@@ -247,6 +256,7 @@ class DuckDBData(DBData):
             catalogs = cls.list_catalogs(
                 pattern=catalog_pattern,
                 use_regex=use_regex,
+                sort=sort,
                 incl_system=incl_system,
                 connection=connection,
                 connection_config=connection_config,
@@ -268,6 +278,7 @@ class DuckDBData(DBData):
                 catalog_schemas = cls.list_schemas(
                     schema_pattern=schema_pattern,
                     use_regex=use_regex,
+                    sort=sort,
                     catalog=catalog,
                     incl_system=incl_system,
                     connection=connection,
@@ -287,7 +298,7 @@ class DuckDBData(DBData):
                 catalogs_schemas.append((catalog, schema))
             prefix_schema = prefix_catalog
         tables_df = connection.sql("SELECT * FROM information_schema.tables").df()
-        tables = set()
+        tables = []
         for catalog, schema in catalogs_schemas:
             all_tables = []
             all_tables.extend(
@@ -318,12 +329,14 @@ class DuckDBData(DBData):
                     if not cls.key_match(table, table_pattern, use_regex=use_regex):
                         continue
                 if not prefix_catalog and prefix_schema:
-                    tables.add(schema + ":" + table)
+                    table = schema + ":" + table
                 elif prefix_catalog or prefix_schema:
-                    tables.add(catalog + ":" + schema + ":" + table)
-                else:
-                    tables.add(table)
-        return sorted(tables)
+                    table = catalog + ":" + schema + ":" + table
+                if table not in tables:
+                    tables.append(table)
+        if sort:
+            return sorted(tables)
+        return tables
 
     @classmethod
     def resolve_keys_meta(
