@@ -2201,23 +2201,27 @@ def from_signals_nb(
                                 can_execute = True
                                 if _stop_order_type == OrderType.Limit:
                                     # Use close to check whether the limit price was hit
-                                    limit_price, _, can_execute = check_limit_hit_nb(
-                                        open=_open,
-                                        high=_high,
-                                        low=_low,
-                                        close=_close,
-                                        price=_price,
-                                        size=_size,
-                                        direction=_direction,
-                                        limit_delta=_limit_delta,
-                                        delta_format=_delta_format,
-                                        limit_reverse=False,
-                                        can_use_ohlc=stop_hit_on_open,
-                                        check_open=False,
-                                        hard_limit=False,
-                                    )
+                                    if _stop_exit_price == StopExitPrice.Close:
+                                        # Cannot place a limit order at the close price and execute right away
+                                        can_execute = False
                                     if can_execute:
-                                        _price = limit_price
+                                        limit_price, _, can_execute = check_limit_hit_nb(
+                                            open=_open,
+                                            high=_high,
+                                            low=_low,
+                                            close=_close,
+                                            price=_price,
+                                            size=_size,
+                                            direction=_direction,
+                                            limit_delta=_limit_delta,
+                                            delta_format=_delta_format,
+                                            limit_reverse=False,
+                                            can_use_ohlc=stop_hit_on_open,
+                                            check_open=False,
+                                            hard_limit=False,
+                                        )
+                                        if can_execute:
+                                            _price = limit_price
 
                                 # Save info
                                 exec_stop_set = True
@@ -4740,23 +4744,27 @@ def from_signal_func_nb(  # %? line.replace("from_signal_func_nb", new_func_name
                                 can_execute = True
                                 if _stop_order_type == OrderType.Limit:
                                     # Use close to check whether the limit price was hit
-                                    limit_price, _, can_execute = check_limit_hit_nb(
-                                        open=_open,
-                                        high=_high,
-                                        low=_low,
-                                        close=_close,
-                                        price=_price,
-                                        size=_size,
-                                        direction=_direction,
-                                        limit_delta=_limit_delta,
-                                        delta_format=_delta_format,
-                                        limit_reverse=False,
-                                        can_use_ohlc=stop_hit_on_open,
-                                        check_open=False,
-                                        hard_limit=False,
-                                    )
+                                    if _stop_exit_price == StopExitPrice.Close:
+                                        # Cannot place a limit order at the close price and execute right away
+                                        can_execute = False
                                     if can_execute:
-                                        _price = limit_price
+                                        limit_price, _, can_execute = check_limit_hit_nb(
+                                            open=_open,
+                                            high=_high,
+                                            low=_low,
+                                            close=_close,
+                                            price=_price,
+                                            size=_size,
+                                            direction=_direction,
+                                            limit_delta=_limit_delta,
+                                            delta_format=_delta_format,
+                                            limit_reverse=False,
+                                            can_use_ohlc=stop_hit_on_open,
+                                            check_open=False,
+                                            hard_limit=False,
+                                        )
+                                        if can_execute:
+                                            _price = limit_price
 
                                 # Save info
                                 exec_stop_set = True
