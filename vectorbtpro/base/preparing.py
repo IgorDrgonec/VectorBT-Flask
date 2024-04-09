@@ -374,6 +374,8 @@ class BasePreparer(Configured, metaclass=MetaArgs):
                 arg = self.td_arr_to_ns(arg)
             if arg_config.get("is_dt", False):
                 arg = self.dt_arr_to_ns(arg)
+            if "type" in arg_config:
+                checks.assert_instance_of(arg, arg_config["type"], arg_name=arg_name)
             if "subdtype" in arg_config:
                 checks.assert_subdtype(arg, arg_config["subdtype"], arg_name=arg_name)
         return arg
