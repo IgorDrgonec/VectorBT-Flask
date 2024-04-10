@@ -912,6 +912,92 @@ def to_naive_datetime(dt: tp.DatetimeLike, **kwargs) -> datetime:
     return to_naive_timestamp(dt, **kwargs).to_pydatetime()
 
 
+def get_min_td_component(td: pd.Timedelta) -> int:
+    """Get index of the smallest timedelta component."""
+    td_components = td.components
+    if td_components.nanoseconds > 0:
+        return 6
+    if td_components.microseconds > 0:
+        return 5
+    if td_components.milliseconds > 0:
+        return 4
+    if td_components.seconds > 0:
+        return 3
+    if td_components.minutes > 0:
+        return 2
+    if td_components.hours > 0:
+        return 1
+    if td_components.days > 0:
+        return 0
+    return -1
+
+
+def readable_datetime(
+    dt: tp.DatetimeLike,
+    drop_tz: tp.Optional[bool] = None,
+    freq: tp.Optional[tp.FrequencyLike] = None,
+    **kwargs,
+) -> str:
+    """Get a human-readable datetime string."""
+    from vectorbtpro._settings import settings
+
+    datetime_cfg = settings["datetime"]
+    readable_cfg = datetime_cfg["readable"]
+
+    if drop_tz is None:
+        drop_tz = readable_cfg["drop_tz"]
+    if drop_tz:
+        ts = to_naive_timestamp(dt, **kwargs)
+    else:
+        ts = to_timestamp(dt, **kwargs)
+    if freq is not None:
+        freq = to_freq(freq)
+        if isinstance(freq, BaseOffset):
+            freq = offset_to_timedelta(freq)
+            if freq >= pd.Timedelta(days=1):
+                min_freq_component = 0
+            else:
+                min_freq_component = get_min_td_component(freq)
+        else:
+            min_freq_component = get_min_td_component(freq)
+    else:
+        min_freq_component = -1
+    td = ts - pd.Timestamp(0, tz=ts.tz)
+    ts_components = td.components
+    min_ts_component = get_min_td_component(td)
+    if min_ts_component == 6 or min_freq_component == 6:
+        return ts.strftime(
+            "%Y-%m-%d %H:%M:%S.{:03d}{:03d}{:03d}{}".format(
+                ts_components.milliseconds,
+                ts_components.microseconds,
+                ts_components.nanoseconds,
+                " %Z" if ts.tz is not None else "",
+            )
+        )
+    if min_ts_component == 5 or min_freq_component == 5:
+        return ts.strftime(
+            "%Y-%m-%d %H:%M:%S.{:03d}{:03d}{}".format(
+                ts_components.milliseconds,
+                ts_components.microseconds,
+                " %Z" if ts.tz is not None else "",
+            )
+        )
+    if min_ts_component == 4 or min_freq_component == 4:
+        return ts.strftime("%Y-%m-%d %H:%M:%S.{:03d}{}".format(
+            ts_components.milliseconds,
+            " %Z" if ts.tz is not None else "",
+        ))
+    if min_ts_component == 3 or min_freq_component == 3:
+        return ts.strftime("%Y-%m-%d %H:%M:%S{}".format(" %Z" if ts.tz is not None else ""))
+    if min_ts_component == 2 or min_freq_component == 2:
+        return ts.strftime("%Y-%m-%d %H:%M{}".format(" %Z" if ts.tz is not None else ""))
+    if min_ts_component == 1 or min_freq_component == 1:
+        return ts.strftime("%Y-%m-%d %H:%M{}".format(" %Z" if ts.tz is not None else ""))
+    if min_freq_component == 0:
+        return ts.strftime("%Y-%m-%d")
+    return ts.strftime("%Y-%m-%d %H:%M{}".format(" %Z" if ts.tz is not None else ""))
+
+
 # ############# Nanoseconds ############# #
 
 

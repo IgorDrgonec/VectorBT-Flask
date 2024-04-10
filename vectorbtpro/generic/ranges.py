@@ -1894,14 +1894,6 @@ class PatternRanges(Ranges):
             funcs_args.append((func, (), func_kwargs))
             new_search_configs.append(new_search_config)
 
-        # Execute each configuration
-        execute_kwargs = merge_dicts(
-            dict(show_progress=len(flat_search_configs) > 1),
-            execute_kwargs,
-        )
-        result_list = execute(funcs_args, **execute_kwargs)
-        records_arr = np.concatenate(result_list)
-
         # Build column hierarchy
         n_config_params = len(psc_names) // arr_2d.shape[1]
         if param_columns is not None:
@@ -1910,7 +1902,8 @@ class PatternRanges(Ranges):
             else:
                 search_config_index = pd.Index(psc_names, name="search_config")
                 base_columns = stack_indexes(
-                    (search_config_index, tile_index(arr_wrapper.columns, n_config_params)), **clean_index_kwargs
+                    (search_config_index, tile_index(arr_wrapper.columns, n_config_params)),
+                    **clean_index_kwargs,
                 )
                 new_columns = combine_indexes((param_columns, base_columns), **clean_index_kwargs)
         else:
@@ -1922,6 +1915,14 @@ class PatternRanges(Ranges):
                     (search_config_index, tile_index(arr_wrapper.columns, n_config_params)),
                     **clean_index_kwargs,
                 )
+
+        # Execute each configuration
+        execute_kwargs = merge_dicts(
+            dict(show_progress=len(flat_search_configs) > 1),
+            execute_kwargs,
+        )
+        result_list = execute(funcs_args, keys=new_columns, **execute_kwargs)
+        records_arr = np.concatenate(result_list)
 
         # Wrap with class
         wrapper = ArrayWrapper(

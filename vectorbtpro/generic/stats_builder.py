@@ -206,7 +206,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 * Raises a warning if it's None but the result of calculation has multiple values
             dropna (bool): Whether to hide metrics that are all NaN.
             silence_warnings (bool): Whether to silence all warnings.
-            template_context (mapping): Global context to replace templates.
+            template_context (mapping): Context used to substitute templates.
 
                 Gets merged over `template_context` from `StatsBuilderMixin.stats_defaults`.
 

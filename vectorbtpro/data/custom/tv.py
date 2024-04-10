@@ -10,12 +10,13 @@ import pandas as pd
 import requests
 import json
 import time
+import math
 from websocket import WebSocket
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts, Configured
-from vectorbtpro.utils.pbar import get_pbar
+from vectorbtpro.utils.pbar import get_pbar, set_pbar_description
 from vectorbtpro.utils.template import CustomTemplate
 from vectorbtpro.data.custom.remote import RemoteData
 
@@ -427,10 +428,12 @@ class TVClient(Configured):
         cls,
         text: tp.Optional[str] = None,
         exchange: tp.Optional[str] = None,
+        pages: tp.Optional[int] = None,
         delay: tp.Optional[int] = None,
+        retries: int = 3,
         show_progress: bool = True,
+        show_progress_keys: tp.Union[bool, str] = True,
         pbar_kwargs: tp.KwargsLike = None,
-        max_pages: tp.Optional[int] = None,
     ) -> tp.List[dict]:
         """Search for a symbol."""
         if text is None:
@@ -439,34 +442,70 @@ class TVClient(Configured):
             exchange = ""
         if pbar_kwargs is None:
             pbar_kwargs = {}
+        as_postfix = None
+        if isinstance(show_progress_keys, str):
+            if show_progress_keys.lower() == "as_postfix":
+                show_progress_keys = True
+                as_postfix = True
+            elif show_progress_keys.lower() == "as_prefix":
+                show_progress_keys = True
+                as_postfix = False
+            else:
+                raise ValueError(f"Invalid option show_progress_keys='{show_progress_keys}'")
+
         symbols_list = []
         pbar = None
         pages_fetched = 0
-
         while True:
-            url = SEARCH_URL.format(text=text, exchange=exchange.upper(), start=len(symbols_list))
-            resp = requests.get(url)
-            symbols_data = json.loads(resp.text)
+            for i in range(retries):
+                try:
+                    url = SEARCH_URL.format(text=text, exchange=exchange.upper(), start=len(symbols_list))
+                    resp = requests.get(url)
+                    symbols_data = json.loads(resp.text)
+                    break
+                except json.JSONDecodeError as e:
+                    if i == retries - 1:
+                        raise e
             symbols_remaining = symbols_data.get("symbols_remaining", 0)
             new_symbols = symbols_data.get("symbols", [])
             symbols_list.extend(new_symbols)
-            if max_pages is None and pbar is None and symbols_remaining > 0:
+            if pages is None and symbols_remaining > 0:
+                show_pbar = True
+            elif pages is not None and pages > 1:
+                show_pbar = True
+            else:
+                show_pbar = False
+            if pbar is None and show_pbar:
+                if pages is not None:
+                    total = pages
+                else:
+                    total = math.ceil((len(new_symbols) + symbols_remaining) / len(new_symbols))
                 pbar = get_pbar(
-                    total=len(new_symbols) + symbols_remaining,
+                    total=total,
                     show_progress=show_progress,
                     **pbar_kwargs,
                 )
             if pbar is not None:
-                pbar.update(len(new_symbols))
+                pbar.update(1)
+                if show_progress_keys:
+                    max_symbols = len(symbols_list) + symbols_remaining
+                    if pages is not None:
+                        max_symbols = min(max_symbols, pages * len(new_symbols))
+                    set_pbar_description(
+                        pbar,
+                        dict(symbols="%d/%d" % (len(symbols_list), max_symbols)),
+                        as_postfix=as_postfix,
+                    )
             if symbols_remaining == 0:
                 break
             pages_fetched += 1
-            if max_pages is not None and pages_fetched >= max_pages:
+            if pages is not None and pages_fetched >= pages:
                 break
             if delay is not None:
                 time.sleep(delay / 1000)
         if pbar is not None:
             pbar.close()
+
         return symbols_list
 
     @classmethod
@@ -534,10 +573,12 @@ class TVData(RemoteData):
         client_config: tp.DictLike = None,
         text: tp.Optional[str] = None,
         exchange: tp.Optional[str] = None,
+        pages: tp.Optional[int] = None,
         delay: tp.Optional[int] = None,
+        retries: tp.Optional[int] = None,
         show_progress: tp.Optional[bool] = None,
+        show_progress_keys: tp.Union[None, bool, str] = None,
         pbar_kwargs: tp.KwargsLike = None,
-        max_pages: tp.Optional[int] = None,
         market: tp.Optional[str] = None,
         markets: tp.Optional[tp.List[str]] = None,
         fields: tp.Optional[tp.MaybeIterable[str]] = None,
@@ -636,9 +677,14 @@ class TVData(RemoteData):
             ... )
             ```
         """
+        pages = cls.resolve_custom_setting(pages, "pages", sub_path="search", sub_path_only=True)
         delay = cls.resolve_custom_setting(delay, "delay", sub_path="search", sub_path_only=True)
+        retries = cls.resolve_custom_setting(retries, "retries", sub_path="search", sub_path_only=True)
         show_progress = cls.resolve_custom_setting(
             show_progress, "show_progress", sub_path="search", sub_path_only=True
+        )
+        show_progress_keys = cls.resolve_custom_setting(
+            show_progress_keys, "show_progress_keys", sub_path="search", sub_path_only=True
         )
         pbar_kwargs = cls.resolve_custom_setting(
             pbar_kwargs, "pbar_kwargs", merge=True, sub_path="search", sub_path_only=True
@@ -666,10 +712,12 @@ class TVData(RemoteData):
             data = client.search_symbol(
                 text=text,
                 exchange=exchange,
+                pages=pages,
                 delay=delay,
+                retries=retries,
                 show_progress=show_progress,
+                show_progress_keys=show_progress_keys,
                 pbar_kwargs=pbar_kwargs,
-                max_pages=max_pages,
             )
             all_symbols = map(lambda x: x["exchange"] + ":" + x["symbol"], data)
             return_field_data = False

@@ -460,7 +460,7 @@ class Config(pdict):
         readonly = _resolve_setting("readonly", False)
         nested = _resolve_setting("nested", True)
         convert_children = _resolve_setting("convert_children", False)
-        as_attrs = _resolve_setting("as_attrs", False)
+        as_attrs = _resolve_setting("as_attrs", frozen_keys or readonly)
         copy_kwargs = _resolve_setting(
             "copy_kwargs",
             dict(copy_mode="none", nested=nested),
@@ -972,7 +972,7 @@ class HasSettings:
             if path_id is not None:
                 raise SettingsNotFoundError(f"Found no settings associated with the path id '{path_id}'")
             else:
-                raise SettingsNotFoundError(f"Found no settings associated with the class '{cls.__name__}'")
+                raise SettingsNotFoundError(f"Found no settings associated with the class {cls.__name__}")
         setting_dicts = []
         for cls_, path in paths:
             path_settings = cls_.get_path_settings(path, sub_path=sub_path, sub_path_only=sub_path_only)
@@ -1068,7 +1068,7 @@ class HasSettings:
             if path_id is not None:
                 raise SettingsNotFoundError(f"Found no settings associated with the path id '{path_id}'")
             else:
-                raise SettingsNotFoundError(f"Found no settings associated with the class '{cls.__name__}'")
+                raise SettingsNotFoundError(f"Found no settings associated with the class {cls.__name__}")
         for cls_, path in paths:
             try:
                 return cls_.get_path_setting(path, key, sub_path=sub_path, sub_path_only=sub_path_only)
@@ -1088,12 +1088,12 @@ class HasSettings:
             else:
                 if sub_path is not None:
                     raise SettingNotFoundError(
-                        f"Found no key '{key}' under the settings associated with the class '{cls.__name__}' "
+                        f"Found no key '{key}' under the settings associated with the class {cls.__name__} "
                         f"and sub-path '{sub_path}'"
                     )
                 else:
                     raise SettingNotFoundError(
-                        f"Found no key '{key}' under the settings associated with the class '{cls.__name__}'"
+                        f"Found no key '{key}' under the settings associated with the class {cls.__name__}"
                     )
         return default
 
@@ -1194,7 +1194,7 @@ class HasSettings:
         else:
             path = cls._settings_path
         if path is None:
-            raise SettingsNotFoundError(f"Found no settings associated with the class '{cls.__name__}'")
+            raise SettingsNotFoundError(f"Found no settings associated with the class {cls.__name__}")
         if sub_path is not None:
             path = combine_pathlike_keys(path, sub_path)
         cls_cfg = get_dict_item(settings, path, populate=populate_)
@@ -1227,7 +1227,7 @@ class HasSettings:
         else:
             path = cls._settings_path
         if path is None:
-            raise SettingsNotFoundError(f"Found no settings associated with the class '{cls.__name__}'")
+            raise SettingsNotFoundError(f"Found no settings associated with the class {cls.__name__}")
         if sub_path is not None:
             path = combine_pathlike_keys(path, sub_path)
         if not cls.has_path_settings(path):

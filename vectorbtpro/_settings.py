@@ -321,27 +321,35 @@ ${config_doc}
 _settings["math"] = math
 
 execution = frozen_cfg(
+    executor_cls=None,
+    engine="SerialEngine",
+    engine_config=flex_cfg(),
     min_size=None,
     n_chunks=None,
     chunk_len=None,
+    chunk_meta=None,
     distribute="calls",
+    in_chunk_order=False,
     warmup=False,
     pre_execute_func=None,
-    pre_execute_kwargs=None,
+    pre_execute_kwargs=flex_cfg(),
     pre_chunk_func=None,
-    pre_chunk_kwargs=None,
+    pre_chunk_kwargs=flex_cfg(),
     post_chunk_func=None,
-    post_chunk_kwargs=None,
+    post_chunk_kwargs=flex_cfg(),
     post_execute_func=None,
-    post_execute_kwargs=None,
+    post_execute_kwargs=flex_cfg(),
     post_execute_on_sorted=False,
     show_progress=True,
+    show_progress_keys=True,
     pbar_kwargs=flex_cfg(),
     template_context=flex_cfg(),
+    merge_to_engine_config=True,
     engines=flex_cfg(
         serial=flex_cfg(
             cls="SerialEngine",
             show_progress=False,
+            show_progress_keys=True,
             pbar_kwargs=flex_cfg(),
             clear_cache=False,
             collect_garbage=False,
@@ -419,6 +427,7 @@ chunking = frozen_cfg(
     silence_warnings=False,
     forward_kwargs_as=flex_cfg(),
     execute_kwargs=flex_cfg(),
+    merge_to_execute_kwargs=True,
     options=flex_cfg(),
     override_setup_options=flex_cfg(),
     override_options=flex_cfg(),
@@ -466,6 +475,7 @@ params = frozen_cfg(
     return_meta=False,
     return_param_index=False,
     execute_kwargs=flex_cfg(),
+    merge_to_execute_kwargs=True,
 )
 """_"""
 
@@ -648,6 +658,9 @@ datetime = frozen_cfg(
     dateparser_kwargs=flex_cfg(),
     freq_from_n=20,
     tz_naive_ns=True,
+    readable=frozen_cfg(
+        drop_tz=True,
+    )
 )
 """_"""
 
@@ -817,6 +830,7 @@ data = frozen_cfg(
             limit=1000,
             delay=500,
             show_progress=True,
+            show_progress_keys=True,
             pbar_kwargs=flex_cfg(),
             silence_warnings=False,
             get_klines_kwargs=flex_cfg(),
@@ -836,6 +850,7 @@ data = frozen_cfg(
             retries=3,
             fetch_params=flex_cfg(),
             show_progress=True,
+            show_progress_keys=True,
             pbar_kwargs=flex_cfg(),
             silence_warnings=False,
             exchanges=flex_cfg(),
@@ -872,6 +887,7 @@ data = frozen_cfg(
             delay=500,
             retries=3,
             show_progress=True,
+            show_progress_keys=True,
             pbar_kwargs=flex_cfg(),
             silence_warnings=False,
         ),
@@ -924,7 +940,10 @@ data = frozen_cfg(
             limit=20000,
             search=flex_cfg(
                 delay=None,
+                pages=None,
+                retries=3,
                 show_progress=True,
+                show_progress_keys=True,
                 pbar_kwargs=flex_cfg(),
             ),
             scanner=flex_cfg(
@@ -1747,6 +1766,7 @@ pbar = frozen_cfg(
     disable=False,
     type="tqdm_auto",
     kwargs=flex_cfg(),
+    as_postfix=True,
 )
 """_"""
 

@@ -248,7 +248,9 @@ AnnArgQuery = Union[int, str, Regex]
 # Execution
 FuncArgs = Tuple[Callable, Args, Kwargs]
 FuncsArgs = Iterable[FuncArgs]
-EngineLike = Union[str, type, ExecutionEngine, Callable]
+ExecutionEngineLike = Union[str, type, ExecutionEngine, Callable]
+ExecOutput = Any
+ExecOutputs = List[Any]
 
 # JIT
 JittedOption = Union[None, bool, str, Callable, Kwargs]
@@ -260,7 +262,7 @@ MergeFuncLike = MaybeSequence[Union[None, str, Callable, MergeFunc]]
 
 # Chunking
 SizeFunc = Callable[[AnnArgs], int]
-SizeLike = Union[int, Sizer, SizeFunc]
+SizeLike = Union[int, str, Sizer, SizeFunc]
 ChunkMetaFunc = Callable[[AnnArgs], Iterable[ChunkMeta]]
 ChunkMetaLike = Union[Iterable[ChunkMeta], ChunkMetaGenerator, ChunkMetaFunc]
 TakeSpec = Union[None, Type[NotChunked], Type[ChunkTaker], NotChunked, ChunkTaker]

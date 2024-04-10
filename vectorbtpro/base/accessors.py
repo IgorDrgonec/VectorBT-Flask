@@ -1446,7 +1446,7 @@ class BaseAccessor(Wrapping):
             keys (index_like): Outermost column level.
             broadcast_named_args (dict): Dictionary with arguments to broadcast against each other.
             broadcast_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.reshaping.broadcast`.
-            template_context (dict): Mapping used to substitute templates in `args` and `kwargs`.
+            template_context (dict): Context used to substitute templates in `args` and `kwargs`.
             wrap_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.wrapping.ArrayWrapper.wrap`.
             **kwargs: Keyword arguments passed to `combine_func`.
 

@@ -5,7 +5,7 @@
 import numpy as np
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.pbar import get_pbar
+from vectorbtpro.utils.pbar import get_pbar, set_pbar_description
 
 __all__ = [
     "save_animation",
@@ -42,6 +42,7 @@ def save_animation(
     fps: int = 3,
     writer_kwargs: dict = None,
     show_progress: bool = True,
+    show_progress_keys: tp.Union[bool, str] = True,
     pbar_kwargs: tp.KwargsLike = None,
     to_image_kwargs: tp.KwargsLike = None,
     **kwargs,
@@ -63,9 +64,30 @@ def save_animation(
             Will be translated to `duration` by `1000 / fps`.
         writer_kwargs (dict): Keyword arguments passed to `imageio.get_writer`.
         show_progress (bool): Whether to show the progress bar.
+        show_progress_keys (bool or str): Whether to show keys in the progress bar.
+
+            Can be True, False, "as_prefix", and "as_postfix".
         pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
         to_image_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.to_image`.
         **kwargs: Keyword arguments passed to `plot_func`.
+
+    Usage:
+        ```pycon
+        >>> from vectorbtpro import *
+
+        >>> def plot_data_window(index, data):
+        ...     return data.loc[index].plot()
+
+        >>> data = vbt.YFData.pull("BTC-USD", start="2020", end="2021")
+        >>> vbt.save_animation(
+        ...     "plot_data_window.gif",
+        ...     data.index,
+        ...     plot_data_window,
+        ...     data,
+        ...     delta=90,
+        ...     step=10
+        ... )
+        ```
     """
     from vectorbtpro.utils.module_ import assert_can_import
 
@@ -85,9 +107,24 @@ def save_animation(
         delta = len(index) // 2
 
     with imageio.get_writer(fname, **writer_kwargs) as writer:
+        as_postfix = None
+        if isinstance(show_progress_keys, str):
+            if show_progress_keys.lower() == "as_postfix":
+                show_progress_keys = True
+                as_postfix = True
+            elif show_progress_keys.lower() == "as_prefix":
+                show_progress_keys = True
+                as_postfix = False
+            else:
+                raise ValueError(f"Invalid option show_progress_keys='{show_progress_keys}'")
         pbar = get_pbar(range(0, len(index) - delta + 1, step), show_progress=show_progress, **pbar_kwargs)
         for i in pbar:
-            pbar.set_description("{} - {}".format(str(index[i]), str(index[i + delta - 1])))
+            if show_progress_keys:
+                set_pbar_description(
+                    pbar,
+                    "{} → {}".format(str(index[i]), str(index[i + delta - 1])),
+                    as_postfix=as_postfix,
+                )
             fig = plot_func(index[i : i + delta], *args, **kwargs)
             if fig is None:
                 continue

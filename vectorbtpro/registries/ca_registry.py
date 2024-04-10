@@ -407,6 +407,7 @@ import warnings
 from datetime import datetime, timezone, timedelta
 from weakref import ref, ReferenceType
 from collections.abc import ValuesView
+from functools import wraps
 
 import humanize
 import pandas as pd
@@ -433,7 +434,9 @@ __all__ = [
     "disable_caching",
     "enable_caching",
     "CachingDisabled",
+    "with_caching_disabled",
     "CachingEnabled",
+    "with_caching_enabled",
 ]
 
 __pdoc__ = {}
@@ -2729,6 +2732,24 @@ class CachingDisabled:
                         setup.enable_caching(silence_warnings=self.silence_warnings)
 
 
+def with_caching_disabled(*args, **caching_disabled_kwargs) -> tp.Callable:
+    """Decorator to run a function with `CachingDisabled`."""
+
+    def decorator(func: tp.Callable) -> tp.Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs) -> tp.Any:
+            with CachingDisabled(**caching_disabled_kwargs):
+                return func(*args, **kwargs)
+
+        return wrapper
+
+    if len(args) == 0:
+        return decorator
+    elif len(args) == 1:
+        return decorator(args[0])
+    raise ValueError("Either function or keyword arguments must be passed")
+
+
 CachingEnabledT = tp.TypeVar("CachingEnabledT", bound="CachingEnabled")
 
 
@@ -2895,3 +2916,21 @@ class CachingEnabled:
                         setup.disable_whitelist()
                     if not setup_settings["use_cache"]:
                         setup.disable_caching(clear_cache=self.clear_cache)
+
+
+def with_caching_enabled(*args, **caching_enabled_kwargs) -> tp.Callable:
+    """Decorator to run a function with `CachingEnabled`."""
+
+    def decorator(func: tp.Callable) -> tp.Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs) -> tp.Any:
+            with CachingEnabled(**caching_enabled_kwargs):
+                return func(*args, **kwargs)
+
+        return wrapper
+
+    if len(args) == 0:
+        return decorator
+    elif len(args) == 1:
+        return decorator(args[0])
+    raise ValueError("Either function or keyword arguments must be passed")

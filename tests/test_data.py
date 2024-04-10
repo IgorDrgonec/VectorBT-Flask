@@ -2473,7 +2473,6 @@ class TestData:
             assert_frame_equal(data.run(lambda open, x, y=2: open + x + y, 100, 200), data.open + 100 + 200)
             assert_frame_equal(data.run(lambda open, x, y=2: open + x + y, x=100, y=200), data.open + 100 + 200)
             assert_frame_equal(data.run(lambda x, data: data.open + x, 100), data.open + 100)
-            assert_frame_equal(data.run(lambda x, y: x.open + y, 100, pass_as_first=True), data.open + 100)
             assert_frame_equal(data.run(lambda x, y: x.open + y, 100, rename_args={"x": "data"}), data.open + 100)
             assert_frame_equal(
                 data.run(["talib_sma", "talib_ema"], timeperiod=3, hide_params=True),

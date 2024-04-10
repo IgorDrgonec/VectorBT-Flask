@@ -7,7 +7,7 @@ from functools import wraps
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import checks
-from vectorbtpro.utils.config import Config, merge_dicts
+from vectorbtpro.utils.config import FrozenConfig, merge_dicts
 from vectorbtpro.utils.parsing import (
     annotate_args,
     flatten_ann_args,
@@ -265,24 +265,18 @@ def split(
         wrapper.func = func
         wrapper.name = func.__name__
         wrapper.is_split = True
-        wrapper.options = Config(
-            dict(
-                splitter=splitter,
-                splitter_cls=splitter_cls,
-                splitter_kwargs=splitter_kwargs,
-                index=index,
-                index_from=index_from,
-                takeable_args=takeable_args,
-                template_context=template_context,
-                forward_kwargs_as=forward_kwargs_as,
-                return_splitter=return_splitter,
-                apply_kwargs=apply_kwargs,
-                var_kwargs=var_kwargs,
-            ),
-            options_=dict(
-                frozen_keys=True,
-                as_attrs=True,
-            ),
+        wrapper.options = FrozenConfig(
+            splitter=splitter,
+            splitter_cls=splitter_cls,
+            splitter_kwargs=splitter_kwargs,
+            index=index,
+            index_from=index_from,
+            takeable_args=takeable_args,
+            template_context=template_context,
+            forward_kwargs_as=forward_kwargs_as,
+            return_splitter=return_splitter,
+            apply_kwargs=apply_kwargs,
+            var_kwargs=var_kwargs,
         )
         signature = inspect.signature(wrapper)
         lists_var_kwargs = False
@@ -435,6 +429,8 @@ def cv_split(
             )
             if "merge_func" in split_kwargs and "merge_func" not in parameterized_kwargs:
                 parameterized_kwargs["merge_func"] = split_kwargs["merge_func"]
+            if "show_progress" not in parameterized_kwargs:
+                parameterized_kwargs["show_progress"] = False
 
             all_grid_results = []
 
@@ -504,19 +500,13 @@ def cv_split(
         wrapper.name = func.__name__
         wrapper.is_parameterized = True
         wrapper.is_split = True
-        wrapper.options = Config(
-            dict(
-                parameterized_kwargs=parameterized_kwargs,
-                selection=selection,
-                return_grid=return_grid,
-                skip_errored=skip_errored,
-                template_context=template_context,
-                split_kwargs=split_kwargs,
-            ),
-            options_=dict(
-                frozen_keys=True,
-                as_attrs=True,
-            ),
+        wrapper.options = FrozenConfig(
+            parameterized_kwargs=parameterized_kwargs,
+            selection=selection,
+            return_grid=return_grid,
+            skip_errored=skip_errored,
+            template_context=template_context,
+            split_kwargs=split_kwargs,
         )
         signature = inspect.signature(wrapper)
         lists_var_kwargs = False

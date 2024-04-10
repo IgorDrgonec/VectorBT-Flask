@@ -13,7 +13,7 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.pbar import get_pbar
+from vectorbtpro.utils.pbar import get_pbar, set_pbar_description
 from vectorbtpro.data.custom.remote import RemoteData
 
 try:
@@ -142,6 +142,7 @@ class PolygonData(RemoteData):
         delay: tp.Optional[float] = None,
         retries: tp.Optional[int] = None,
         show_progress: tp.Optional[bool] = None,
+        show_progress_keys: tp.Union[None, bool, str] = None,
         pbar_kwargs: tp.KwargsLike = None,
         silence_warnings: tp.Optional[bool] = None,
     ) -> tp.SymbolData:
@@ -184,6 +185,9 @@ class PolygonData(RemoteData):
             delay (float): Time to sleep after each request (in milliseconds).
             retries (int): The number of retries on failure to fetch data.
             show_progress (bool): Whether to show the progress bar.
+            show_progress_keys (bool or str): Whether to show keys in the progress bar.
+
+                Can be True, False, "as_prefix", and "as_postfix".
             pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
             silence_warnings (bool): Whether to silence all warnings.
 
@@ -207,6 +211,7 @@ class PolygonData(RemoteData):
         delay = cls.resolve_custom_setting(delay, "delay")
         retries = cls.resolve_custom_setting(retries, "retries")
         show_progress = cls.resolve_custom_setting(show_progress, "show_progress")
+        show_progress_keys = cls.resolve_custom_setting(show_progress_keys, "show_progress_keys")
         pbar_kwargs = cls.resolve_custom_setting(pbar_kwargs, "pbar_kwargs", merge=True)
         silence_warnings = cls.resolve_custom_setting(silence_warnings, "silence_warnings")
 
@@ -302,8 +307,8 @@ class PolygonData(RemoteData):
 
         def _ts_to_str(ts: tp.Optional[int]) -> str:
             if ts is None:
-                return "/"
-            return str(pd.Timestamp(ts, unit="ms", tz="utc"))
+                return "?"
+            return dt.readable_datetime(pd.Timestamp(ts, unit="ms", tz="utc"), freq=timeframe)
 
         def _filter_func(d: tp.Dict, _prev_end_ts: tp.Optional[int] = None) -> bool:
             if start_ts is not None:
@@ -320,8 +325,23 @@ class PolygonData(RemoteData):
         # Iteratively collect the data
         data = []
         try:
+            as_postfix = None
+            if isinstance(show_progress_keys, str):
+                if show_progress_keys.lower() == "as_postfix":
+                    show_progress_keys = True
+                    as_postfix = True
+                elif show_progress_keys.lower() == "as_prefix":
+                    show_progress_keys = True
+                    as_postfix = False
+                else:
+                    raise ValueError(f"Invalid option show_progress_keys='{show_progress_keys}'")
             with get_pbar(show_progress=show_progress, **pbar_kwargs) as pbar:
-                pbar.set_description(_ts_to_str(start_ts if prev_end_ts is None else prev_end_ts))
+                if show_progress_keys:
+                    set_pbar_description(
+                        pbar,
+                        "{} → ?".format(_ts_to_str(start_ts if prev_end_ts is None else prev_end_ts)),
+                        as_postfix=as_postfix,
+                    )
                 while True:
                     # Fetch the klines for the next timeframe
                     next_data = _fetch(start_ts if prev_end_ts is None else prev_end_ts, limit)
@@ -333,13 +353,13 @@ class PolygonData(RemoteData):
                     data += next_data
                     if start_ts is None:
                         start_ts = next_data[0]["t"]
-                    pbar.set_description(
-                        "{} - {}".format(
-                            _ts_to_str(start_ts),
-                            _ts_to_str(next_data[-1]["t"]),
-                        )
-                    )
                     pbar.update(1)
+                    if show_progress_keys:
+                        set_pbar_description(
+                            pbar,
+                            "{} → {}".format(_ts_to_str(start_ts), _ts_to_str(next_data[-1]["t"])),
+                            as_postfix=as_postfix,
+                        )
                     prev_end_ts = next_data[-1]["t"]
                     if end_ts is not None and prev_end_ts >= end_ts:
                         break

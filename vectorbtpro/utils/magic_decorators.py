@@ -41,7 +41,8 @@ binary_magic_config = ReadonlyConfig(
         "__rand__": dict(func=lambda x, y: np.bitwise_and(y, x)),
         "__ror__": dict(func=lambda x, y: np.bitwise_or(y, x)),
         "__rxor__": dict(func=lambda x, y: np.bitwise_xor(y, x)),
-    }
+    },
+    options_=dict(as_attrs=False),
 )
 """_"""
 

@@ -10,12 +10,12 @@ import pandas as pd
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.returns.accessors import ReturnsAccessor
-from vectorbtpro.utils import checks
+from vectorbtpro.utils import checks, datetime_ as dt
 from vectorbtpro.utils.parsing import get_func_arg_names, warn_stdout, WarningsFiltered
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.template import substitute_templates, Rep, RepFunc, CustomTemplate
 from vectorbtpro.utils.execution import execute
-from vectorbtpro.utils.pbar import get_pbar
+from vectorbtpro.utils.pbar import get_pbar, set_pbar_description
 from vectorbtpro.utils.random_ import set_seed_nb
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.params import Param, combine_params, Parameterizer
@@ -1844,6 +1844,7 @@ class PortfolioOptimizer(Analyzable):
         clean_index_kwargs: tp.KwargsLike = None,
         wrapper_kwargs: tp.KwargsLike = None,
         show_progress: tp.Optional[bool] = None,
+        show_progress_keys: tp.Union[bool, str] = True,
         pbar_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> PortfolioOptimizerT:
@@ -2135,11 +2136,38 @@ class PortfolioOptimizer(Analyzable):
         # Generate allocations
         alloc_points = []
         allocations = []
+        dont_show_progress = False
         if show_progress is None:
             show_progress = len(group_configs) > 1
+            if show_progress:
+                dont_show_progress = True
+        elif show_progress is False:
+            dont_show_progress = True
+        as_postfix = None
+        if isinstance(show_progress_keys, str):
+            if show_progress_keys.lower() == "as_postfix":
+                show_progress_keys = True
+                as_postfix = True
+            elif show_progress_keys.lower() == "as_prefix":
+                show_progress_keys = True
+                as_postfix = False
+            else:
+                raise ValueError(f"Invalid option show_progress_keys='{show_progress_keys}'")
         with get_pbar(total=len(group_configs), show_progress=show_progress, **pbar_kwargs) as pbar:
             for g, group_config in enumerate(group_configs):
-                pbar.set_description(str(group_index[g]))
+                if show_progress_keys:
+                    if isinstance(group_index, pd.MultiIndex):
+                        set_pbar_description(
+                            pbar,
+                            dict(zip(group_index.names, group_index[g])),
+                            as_postfix=as_postfix,
+                        )
+                    else:
+                        set_pbar_description(
+                            pbar,
+                            dict(zip(group_index.names, [group_index[g]])),
+                            as_postfix=as_postfix,
+                        )
 
                 group_config = dict(group_config)
                 if pre_group_func is not None:
@@ -2249,8 +2277,15 @@ class PortfolioOptimizer(Analyzable):
                     _allocations = func(len(wrapper.columns), _index_points, _allocate_func, *_args, **_kwargs)
                 else:
                     funcs_args = []
+                    keys = []
                     for i in range(len(_index_points)):
-                        __template_context = merge_dicts(dict(i=i, index_point=_index_points[i]), _template_context)
+                        __template_context = merge_dicts(
+                            dict(
+                                i=i,
+                                index_point=_index_points[i],
+                            ),
+                            _template_context,
+                        )
                         __allocate_func = substitute_templates(
                             _allocate_func,
                             __template_context,
@@ -2260,15 +2295,20 @@ class PortfolioOptimizer(Analyzable):
                         __args = substitute_templates(_args, __template_context, eval_id="args")
                         __kwargs = substitute_templates(_kwargs, __template_context, eval_id="kwargs")
                         funcs_args.append((__allocate_func, __args, __kwargs))
-
+                        if isinstance(wrapper.index, pd.DatetimeIndex):
+                            keys.append(dt.readable_datetime(wrapper.index[_index_points[i]], freq=wrapper.freq))
+                        else:
+                            keys.append(str(wrapper.index[_index_points[i]]))
+                    _show_progress = False if dont_show_progress else len(_index_points) > 1
                     _execute_kwargs = merge_dicts(
                         dict(
-                            show_progress=False,
+                            show_progress=_show_progress,
+                            show_progress_keys=show_progress_keys,
                             pbar_kwargs=pbar_kwargs,
                         ),
                         _execute_kwargs,
                     )
-                    results = execute(funcs_args, **_execute_kwargs)
+                    results = execute(funcs_args, keys=keys, **_execute_kwargs)
                     _allocations = pd.DataFrame(results, columns=wrapper.columns)
                     if isinstance(_allocations.columns, pd.RangeIndex):
                         _allocations = _allocations.values
@@ -2585,6 +2625,7 @@ class PortfolioOptimizer(Analyzable):
         clean_index_kwargs: tp.KwargsLike = None,
         wrapper_kwargs: tp.KwargsLike = None,
         show_progress: tp.Optional[bool] = None,
+        show_progress_keys: tp.Union[bool, str] = True,
         pbar_kwargs: tp.KwargsLike = None,
         **kwargs,
     ) -> PortfolioOptimizerT:
@@ -2935,11 +2976,38 @@ class PortfolioOptimizer(Analyzable):
 
         alloc_ranges = []
         allocations = []
+        dont_show_progress = False
         if show_progress is None:
             show_progress = len(group_configs) > 1
+            if show_progress:
+                dont_show_progress = True
+        elif show_progress is False:
+            dont_show_progress = True
+        as_postfix = None
+        if isinstance(show_progress_keys, str):
+            if show_progress_keys.lower() == "as_postfix":
+                show_progress_keys = True
+                as_postfix = True
+            elif show_progress_keys.lower() == "as_prefix":
+                show_progress_keys = True
+                as_postfix = False
+            else:
+                raise ValueError(f"Invalid option show_progress_keys='{show_progress_keys}'")
         with get_pbar(total=len(group_configs), show_progress=show_progress, **pbar_kwargs) as pbar:
             for g, group_config in enumerate(group_configs):
-                pbar.set_description(str(group_index[g]))
+                if show_progress_keys:
+                    if isinstance(group_index, pd.MultiIndex):
+                        set_pbar_description(
+                            pbar,
+                            dict(zip(group_index.names, group_index[g])),
+                            as_postfix=as_postfix,
+                        )
+                    else:
+                        set_pbar_description(
+                            pbar,
+                            dict(zip(group_index.names, [group_index[g]])),
+                            as_postfix=as_postfix,
+                        )
 
                 group_config = dict(group_config)
                 if pre_group_func is not None:
@@ -3086,9 +3154,18 @@ class PortfolioOptimizer(Analyzable):
                     )
                 else:
                     funcs_args = []
+                    keys = []
                     for i in range(len(_index_ranges[0])):
                         index_slice = slice(max(0, _index_ranges[0][i]), _index_ranges[1][i])
-                        __template_context = merge_dicts(dict(i=i, index_slice=index_slice), _template_context)
+                        __template_context = merge_dicts(
+                            dict(
+                                i=i,
+                                index_slice=index_slice,
+                                index_start=_index_ranges[0][i],
+                                index_end=_index_ranges[1][i],
+                            ),
+                            _template_context,
+                        )
                         __optimize_func = substitute_templates(
                             _optimize_func,
                             __template_context,
@@ -3098,15 +3175,26 @@ class PortfolioOptimizer(Analyzable):
                         __args = substitute_templates(_args, __template_context, eval_id="args")
                         __kwargs = substitute_templates(_kwargs, __template_context, eval_id="kwargs")
                         funcs_args.append((__optimize_func, __args, __kwargs))
-
+                        if isinstance(wrapper.index, pd.DatetimeIndex):
+                            keys.append("{} → {}".format(
+                                dt.readable_datetime(wrapper.index[_index_ranges[0][i]], freq=wrapper.freq),
+                                dt.readable_datetime(wrapper.index[_index_ranges[1][i] - 1], freq=wrapper.freq),
+                            ))
+                        else:
+                            keys.append("{} → {}".format(
+                                str(wrapper.index[_index_ranges[0][i]]),
+                                str(wrapper.index[_index_ranges[1][i] - 1]),
+                            ))
+                    _show_progress = False if dont_show_progress else len(_index_ranges[0]) > 1
                     _execute_kwargs = merge_dicts(
                         dict(
-                            show_progress=False,
+                            show_progress=_show_progress,
+                            show_progress_keys=show_progress_keys,
                             pbar_kwargs=pbar_kwargs,
                         ),
                         _execute_kwargs,
                     )
-                    results = execute(funcs_args, **_execute_kwargs)
+                    results = execute(funcs_args, keys=keys, **_execute_kwargs)
                     _allocations = pd.DataFrame(results, columns=wrapper.columns)
                     if isinstance(_allocations.columns, pd.RangeIndex):
                         _allocations = _allocations.values

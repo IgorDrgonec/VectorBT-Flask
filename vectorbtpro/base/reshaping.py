@@ -879,7 +879,7 @@ def broadcast(
         ignore_ranges (bool): See `broadcast_index`.
         check_index_names (bool): See `broadcast_index`.
         clean_index_kwargs (dict): Keyword arguments passed to `vectorbtpro.base.indexes.clean_index`.
-        template_context (dict): Template context.
+        template_context (dict): Context used to substitute templates.
 
     For defaults, see `vectorbtpro._settings.broadcasting`.
 

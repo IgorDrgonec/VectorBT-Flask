@@ -3213,7 +3213,7 @@ class Portfolio(Analyzable, PortfolioWithInOutputs, metaclass=MetaPortfolio):
                 You can then pass argument names wrapped with `vectorbtpro.utils.template.Rep`
                 and this method will substitute them by their corresponding broadcasted objects.
             broadcast_kwargs (dict): See `Portfolio.from_orders`.
-            template_context (mapping): Mapping to replace templates in arguments.
+            template_context (mapping): Context used to substitute templates in arguments.
             jitted (any): See `Portfolio.from_orders`.
             chunked (any): See `Portfolio.from_orders`.
             staticized (bool, dict, hashable, or callable): Keyword arguments or task id for staticizing.

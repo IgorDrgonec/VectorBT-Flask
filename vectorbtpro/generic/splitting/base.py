@@ -530,7 +530,7 @@ class Splitter(Analyzable):
                 Otherwise, will use `Splitter.split_range` to split the range into multiple ranges.
             split_range_kwargs (dict): Keyword arguments passed to `Splitter.split_range`.
             range_bounds_kwargs (dict): Keyword arguments passed to `Splitter.get_range_bounds`.
-            template_context (dict): Mapping used to substitute templates in ranges.
+            template_context (dict): Context used to substitute templates in ranges.
             freq (any): Index frequency in case it cannot be parsed from `index`.
 
                 If None, will be parsed using `vectorbtpro.base.accessors.BaseIDXAccessor.get_freq`.
@@ -3721,7 +3721,9 @@ class Splitter(Analyzable):
                         yield _get_func_args(i, j)
 
             funcs_args = _get_generator()
-            results = execute(funcs_args, n_calls=n_splits * n_sets, **execute_kwargs)
+            keys = combine_indexes((split_labels, set_labels), **index_combine_kwargs)
+            execute_kwargs = merge_dicts(dict(show_progress=not one_split or not one_set), execute_kwargs)
+            results = execute(funcs_args, size=n_splits * n_sets, keys=keys, **execute_kwargs)
         elif iteration.lower() == "set_major":
 
             def _get_generator():
@@ -3730,7 +3732,9 @@ class Splitter(Analyzable):
                         yield _get_func_args(i, j)
 
             funcs_args = _get_generator()
-            results = execute(funcs_args, n_calls=n_splits * n_sets, **execute_kwargs)
+            keys = combine_indexes((set_labels, split_labels), **index_combine_kwargs)
+            execute_kwargs = merge_dicts(dict(show_progress=not one_split or not one_set), execute_kwargs)
+            results = execute(funcs_args, size=n_splits * n_sets, keys=keys, **execute_kwargs)
         elif iteration.lower() == "split_wise":
 
             def _process_chunk(chunk):
@@ -3747,7 +3751,8 @@ class Splitter(Analyzable):
                     yield _process_chunk, (chunk,), {}
 
             funcs_args = _get_generator()
-            results = execute(funcs_args, n_calls=n_splits, **execute_kwargs)
+            execute_kwargs = merge_dicts(dict(show_progress=not one_split), execute_kwargs)
+            results = execute(funcs_args, size=n_splits, keys=split_labels, **execute_kwargs)
         elif iteration.lower() == "set_wise":
 
             def _process_chunk(chunk):
@@ -3764,7 +3769,8 @@ class Splitter(Analyzable):
                     yield _process_chunk, (chunk,), {}
 
             funcs_args = _get_generator()
-            results = execute(funcs_args, n_calls=n_sets, **execute_kwargs)
+            execute_kwargs = merge_dicts(dict(show_progress=not one_set), execute_kwargs)
+            results = execute(funcs_args, size=n_sets, keys=set_labels, **execute_kwargs)
         else:
             raise ValueError(f"Invalid option iteration='{iteration}'")
 
