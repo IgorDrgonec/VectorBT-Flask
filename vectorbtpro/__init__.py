@@ -96,6 +96,7 @@ def _import_more_stuff():
     from collections import namedtuple
     from datetime import datetime, timedelta, time
     from time import sleep
+    from pathlib import Path
 
     import numpy as np
     import pandas as pd

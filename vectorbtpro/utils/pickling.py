@@ -215,7 +215,7 @@ def loads(bytes_: bytes, compression: tp.Union[None, bool, str] = None, **kwargs
 
 
 def save(
-    obj: object,
+    obj: tp.Any,
     path: tp.Optional[tp.PathLike] = None,
     mkdir_kwargs: tp.KwargsLike = None,
     compression: tp.Union[None, bool, str] = None,
@@ -244,7 +244,7 @@ def save(
     return path
 
 
-def load(path: tp.PathLike, compression: tp.Union[None, bool, str] = None, **kwargs) -> object:
+def load(path: tp.PathLike, compression: tp.Union[None, bool, str] = None, **kwargs) -> tp.Any:
     """Read a byte stream from a file and unpickle.
 
     Can recognize the compression algorithm based on the extension (see `dumps` for options).
@@ -333,7 +333,7 @@ def get_class_from_id(class_id: str) -> tp.Optional[tp.Type]:
     raise ValueError(f"Please register an instance of RecInfo for '{class_id}'")
 
 
-def reconstruct(cls: tp.Union[tp.Hashable, tp.Type], rec_state: RecState) -> object:
+def reconstruct(cls: tp.Union[tp.Hashable, tp.Type], rec_state: RecState) -> tp.Any:
     """Reconstruct an instance using a class and a reconstruction state."""
     from vectorbtpro.utils.module_ import find_class
 

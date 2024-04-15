@@ -331,6 +331,17 @@ execution = frozen_cfg(
     distribute="calls",
     in_chunk_order=False,
     warmup=False,
+    cache_chunks=False,
+    chunk_cache_dir=None,
+    chunk_cache_save_kwargs=flex_cfg(
+        mkdir_kwargs=dict(
+            mkdir=True,
+        ),
+    ),
+    chunk_cache_load_kwargs=flex_cfg(),
+    pre_clear_chunk_cache=False,
+    post_clear_chunk_cache=True,
+    release_chunk_cache=False,
     pre_execute_func=None,
     pre_execute_kwargs=flex_cfg(),
     pre_chunk_func=None,

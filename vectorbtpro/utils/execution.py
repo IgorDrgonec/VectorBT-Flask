@@ -5,6 +5,9 @@
 import concurrent.futures
 import time
 from functools import partial
+from pathlib import Path
+import warnings
+import enum
 
 import pandas as pd
 from numba.core.registry import CPUDispatcher
@@ -14,6 +17,8 @@ from vectorbtpro.utils.config import merge_dicts, Configured
 from vectorbtpro.utils.pbar import get_pbar, set_pbar_description
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.template import CustomTemplate, substitute_templates
+from vectorbtpro.utils.path_ import remove_dir, file_exists
+from vectorbtpro.utils.pickling import load, save
 
 try:
     if not tp.TYPE_CHECKING:
@@ -709,6 +714,22 @@ class RayEngine(ExecutionEngine):
         return results
 
 
+class _Dummy(enum.Enum):
+    """Sentinel that represents a dummy value."""
+
+    DUMMY = enum.auto()
+
+    def __repr__(self):
+        return "DUMMY"
+
+    def __bool__(self):
+        return False
+
+
+DUMMY = _Dummy.DUMMY
+"""Sentinel that represents a missing value."""
+
+
 class Executor(Configured):
     """Class responsible executing functions.
 
@@ -744,10 +765,10 @@ class Executor(Configured):
     processing the chunk. It should return either None to keep the old call outputs, or return new ones.
     Will also substitute any templates in `pre_chunk_kwargs` and `post_chunk_kwargs` and pass them as
     keyword arguments. The following additional arguments are available in the contexts: the index of
-    the current chunk `chunk_idx`, the list of call indices `call_indices` in the chunk, the list of
-    call outputs `call_outputs` returned by executing the chunk (only for `post_chunk_func`), and
-    whether the chunk was executed `chunk_executed` or otherwise returned by `pre_chunk_func`
-    (only for `post_chunk_func`).
+    the current chunk `chunk_idx`, the list of call indices `call_indices` in the chunk, the list of call
+    outputs `chunk_cache` returned from caching (only for `pre_chunk_func`), the list of call outputs
+    `call_outputs` returned by executing the chunk (only for `post_chunk_func`), and whether the chunk
+    was executed `chunk_executed` or otherwise returned by `pre_chunk_func` (only for `post_chunk_func`).
 
     !!! note
         The both callbacks above are effective only when `distribute` is "calls" and chunking is enabled.
@@ -778,6 +799,13 @@ class Executor(Configured):
         "chunk_meta",
         "distribute",
         "warmup",
+        "cache_chunks",
+        "chunk_cache_dir",
+        "chunk_cache_save_kwargs",
+        "chunk_cache_load_kwargs",
+        "pre_clear_chunk_cache",
+        "post_clear_chunk_cache",
+        "release_chunk_cache",
         "in_chunk_order",
         "pre_execute_func",
         "pre_execute_kwargs",
@@ -954,6 +982,13 @@ class Executor(Configured):
         distribute: tp.Optional[str] = None,
         in_chunk_order: tp.Optional[bool] = None,
         warmup: tp.Optional[bool] = None,
+        cache_chunks: tp.Optional[bool] = None,
+        chunk_cache_dir: tp.Optional[tp.PathLike] = None,
+        chunk_cache_save_kwargs: tp.KwargsLike = None,
+        chunk_cache_load_kwargs: tp.KwargsLike = None,
+        pre_clear_chunk_cache: tp.Optional[bool] = None,
+        post_clear_chunk_cache: tp.Optional[bool] = None,
+        release_chunk_cache: tp.Optional[bool] = None,
         pre_execute_func: tp.Optional[tp.Callable] = None,
         pre_execute_kwargs: tp.KwargsLike = None,
         pre_chunk_func: tp.Optional[tp.Callable] = None,
@@ -980,6 +1015,13 @@ class Executor(Configured):
             distribute=distribute,
             in_chunk_order=in_chunk_order,
             warmup=warmup,
+            cache_chunks=cache_chunks,
+            chunk_cache_dir=chunk_cache_dir,
+            chunk_cache_save_kwargs=chunk_cache_save_kwargs,
+            chunk_cache_load_kwargs=chunk_cache_load_kwargs,
+            pre_clear_chunk_cache=pre_clear_chunk_cache,
+            post_clear_chunk_cache=post_clear_chunk_cache,
+            release_chunk_cache=release_chunk_cache,
             pre_execute_func=pre_execute_func,
             pre_execute_kwargs=pre_execute_kwargs,
             pre_chunk_func=pre_chunk_func,
@@ -1033,6 +1075,43 @@ class Executor(Configured):
         warmup = self.resolve_engine_setting(
             warmup,
             "warmup",
+            engine_name=engine_name,
+        )
+        cache_chunks = self.resolve_engine_setting(
+            cache_chunks,
+            "cache_chunks",
+            engine_name=engine_name,
+        )
+        chunk_cache_dir = self.resolve_engine_setting(
+            chunk_cache_dir,
+            "chunk_cache_dir",
+            engine_name=engine_name,
+        )
+        chunk_cache_save_kwargs = self.resolve_engine_setting(
+            chunk_cache_save_kwargs,
+            "chunk_cache_save_kwargs",
+            merge=True,
+            engine_name=engine_name,
+        )
+        chunk_cache_load_kwargs = self.resolve_engine_setting(
+            chunk_cache_load_kwargs,
+            "chunk_cache_load_kwargs",
+            merge=True,
+            engine_name=engine_name,
+        )
+        pre_clear_chunk_cache = self.resolve_engine_setting(
+            pre_clear_chunk_cache,
+            "pre_clear_chunk_cache",
+            engine_name=engine_name,
+        )
+        post_clear_chunk_cache = self.resolve_engine_setting(
+            post_clear_chunk_cache,
+            "post_clear_chunk_cache",
+            engine_name=engine_name,
+        )
+        release_chunk_cache = self.resolve_engine_setting(
+            release_chunk_cache,
+            "release_chunk_cache",
             engine_name=engine_name,
         )
         in_chunk_order = self.resolve_engine_setting(
@@ -1089,6 +1168,8 @@ class Executor(Configured):
             "post_execute_on_sorted",
             engine_name=engine_name,
         )
+        if release_chunk_cache and post_execute_on_sorted:
+            raise ValueError("Cannot use release_chunk_cache and post_execute_on_sorted together")
         show_progress = self.resolve_setting(show_progress, "show_progress")
         show_progress_keys = self.resolve_setting(show_progress_keys, "show_progress_keys")
         pbar_kwargs = self.resolve_setting(pbar_kwargs, "pbar_kwargs", merge=True)
@@ -1107,6 +1188,13 @@ class Executor(Configured):
         self._distribute = distribute
         self._in_chunk_order = in_chunk_order
         self._warmup = warmup
+        self._cache_chunks = cache_chunks
+        self._chunk_cache_dir = chunk_cache_dir
+        self._chunk_cache_save_kwargs = chunk_cache_save_kwargs
+        self._chunk_cache_load_kwargs = chunk_cache_load_kwargs
+        self._pre_clear_chunk_cache = pre_clear_chunk_cache
+        self._post_clear_chunk_cache = post_clear_chunk_cache
+        self._release_chunk_cache = release_chunk_cache
         self._pre_execute_func = pre_execute_func
         self._pre_execute_kwargs = pre_execute_kwargs
         self._pre_chunk_func = pre_chunk_func
@@ -1162,6 +1250,42 @@ class Executor(Configured):
     def warmup(self) -> bool:
         """Whether to call the first item of `funcs_args` once before distribution."""
         return self._warmup
+
+    @property
+    def cache_chunks(self) -> bool:
+        """Whether to cache chunks."""
+        return self._cache_chunks
+
+    @property
+    def chunk_cache_dir(self) -> tp.PathLike:
+        """Directory where to put chunk cache files."""
+        return self._chunk_cache_dir
+
+    @property
+    def chunk_cache_save_kwargs(self) -> tp.Kwargs:
+        """Keyword arguments passed to `vectorbtpro.utils.pickling.save` for chunk caching."""
+        return self._chunk_cache_save_kwargs
+
+    @property
+    def chunk_cache_load_kwargs(self) -> tp.Kwargs:
+        """Keyword arguments passed to `vectorbtpro.utils.pickling.load` for chunk caching."""
+        return self._chunk_cache_load_kwargs
+
+    @property
+    def pre_clear_chunk_cache(self) -> bool:
+        """Whether to remove the chunk cache directory before execution."""
+        return self._pre_clear_chunk_cache
+
+    @property
+    def post_clear_chunk_cache(self) -> bool:
+        """Whether to remove the chunk cache directory after execution."""
+        return self._post_clear_chunk_cache
+
+    @property
+    def release_chunk_cache(self) -> bool:
+        """Whether to replace chunk cache with dummy objects once the chunk has been executed
+        and then load all cache at once after all chunks have been executed."""
+        return self._release_chunk_cache
 
     @property
     def pre_execute_func(self) -> tp.Optional[tp.Callable]:
@@ -1276,11 +1400,19 @@ class Executor(Configured):
     @classmethod
     def call_pre_execute_func(
         cls,
+        cache_chunks: bool = False,
+        chunk_cache_dir: tp.Optional[tp.PathLike] = None,
+        pre_clear_chunk_cache: bool = False,
         pre_execute_func: tp.Optional[tp.Callable] = None,
         pre_execute_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
     ) -> None:
         """Call `Executor.pre_execute_func`."""
+        if cache_chunks and pre_clear_chunk_cache:
+            if chunk_cache_dir is None:
+                raise ValueError("Must provide chunk_cache_dir")
+            remove_dir(chunk_cache_dir, missing_ok=True, with_contents=True)
+
         if pre_execute_kwargs is None:
             pre_execute_kwargs = {}
         if pre_execute_func is not None:
@@ -1301,16 +1433,36 @@ class Executor(Configured):
         cls,
         chunk_idx: int,
         call_indices: tp.List[int],
+        cache_chunks: bool = False,
+        chunk_cache_dir: tp.Optional[tp.PathLike] = None,
+        chunk_cache_load_kwargs: tp.KwargsLike = None,
+        release_chunk_cache: bool = False,
         pre_chunk_func: tp.Optional[tp.Callable] = None,
         pre_chunk_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
     ) -> tp.Optional[tp.ExecOutputs]:
         """Call `Executor.pre_chunk_func`."""
+        chunk_cache = None
+        if cache_chunks:
+            if chunk_cache_dir is None:
+                raise ValueError("Must provide chunk_cache_dir")
+            if not isinstance(chunk_cache_dir, Path):
+                chunk_cache_dir = Path(chunk_cache_dir)
+            chunk_path = chunk_cache_dir / ("chunk_%d.pickle" % chunk_idx)
+            if file_exists(chunk_path):
+                if release_chunk_cache:
+                    chunk_cache = [DUMMY] * len(call_indices)
+                else:
+                    if chunk_cache_load_kwargs is None:
+                        chunk_cache_load_kwargs = {}
+                    chunk_cache = load(chunk_path, **chunk_cache_load_kwargs)
+
         if pre_chunk_func is not None:
             template_context = merge_dicts(
                 dict(
                     chunk_idx=chunk_idx,
                     call_indices=call_indices,
+                    chunk_cache=chunk_cache,
                 ),
                 template_context,
             )
@@ -1324,8 +1476,10 @@ class Executor(Configured):
                 template_context,
                 eval_id="pre_chunk_kwargs",
             )
-            return pre_chunk_func(**pre_chunk_kwargs)
-        return None
+            call_outputs = pre_chunk_func(**pre_chunk_kwargs)
+            if call_outputs is not None:
+                return call_outputs
+        return chunk_cache
 
     @classmethod
     def call_execute(
@@ -1352,12 +1506,29 @@ class Executor(Configured):
         chunk_idx: int,
         call_indices: tp.List[int],
         call_outputs: tp.ExecOutputs,
+        cache_chunks: bool = False,
+        chunk_cache_dir: tp.Optional[tp.PathLike] = None,
+        chunk_cache_save_kwargs: tp.KwargsLike = None,
+        release_chunk_cache: bool = False,
         post_chunk_func: tp.Optional[tp.Callable] = None,
         post_chunk_kwargs: tp.KwargsLike = None,
         chunk_executed: bool = True,
         template_context: tp.KwargsLike = None,
     ) -> tp.ExecOutputs:
         """Call `Executor.post_chunk_func`."""
+        if chunk_executed:
+            if cache_chunks:
+                if chunk_cache_dir is None:
+                    raise ValueError("Must provide chunk_cache_dir")
+                if not isinstance(chunk_cache_dir, Path):
+                    chunk_cache_dir = Path(chunk_cache_dir)
+                chunk_path = chunk_cache_dir / ("chunk_%d.pickle" % chunk_idx)
+                if chunk_cache_save_kwargs is None:
+                    chunk_cache_save_kwargs = {}
+                save(call_outputs, chunk_path, **chunk_cache_save_kwargs)
+                if release_chunk_cache:
+                    call_outputs = [DUMMY] * len(call_indices)
+
         if post_chunk_func is not None:
             template_context = merge_dicts(
                 dict(
@@ -1387,11 +1558,35 @@ class Executor(Configured):
     def call_post_execute_func(
         cls,
         outputs: tp.ExecOutputs,
+        cache_chunks: bool = False,
+        chunk_cache_dir: tp.Optional[tp.PathLike] = None,
+        chunk_cache_load_kwargs: tp.KwargsLike = None,
+        post_clear_chunk_cache: bool = True,
+        release_chunk_cache: bool = False,
         post_execute_func: tp.Optional[tp.Callable] = None,
         post_execute_kwargs: tp.KwargsLike = None,
         template_context: tp.KwargsLike = None,
     ) -> tp.Optional[tp.ExecOutputs]:
         """Call `Executor.post_execute_func`."""
+        if cache_chunks and release_chunk_cache:
+            if chunk_cache_dir is None:
+                raise ValueError("Must provide chunk_cache_dir")
+            if not isinstance(chunk_cache_dir, Path):
+                chunk_cache_dir = Path(chunk_cache_dir)
+            if chunk_cache_load_kwargs is None:
+                chunk_cache_load_kwargs = {}
+            chunk_paths = Path(chunk_cache_dir).rglob("chunk_*.pickle")
+            chunk_paths = sorted(chunk_paths, key=lambda x: int(x.name.split("_")[1].split(".")[0]))
+            new_outputs = []
+            for chunk_path in chunk_paths:
+                chunk_cache = load(chunk_path, **chunk_cache_load_kwargs)
+                new_outputs.extend(chunk_cache)
+            outputs = new_outputs
+        if cache_chunks and post_clear_chunk_cache:
+            if chunk_cache_dir is None:
+                raise ValueError("Must provide chunk_cache_dir")
+            remove_dir(chunk_cache_dir, missing_ok=True, with_contents=True)
+
         if post_execute_func is not None:
             template_context = merge_dicts(
                 dict(outputs=outputs),
@@ -1429,6 +1624,13 @@ class Executor(Configured):
         distribute = self.distribute
         in_chunk_order = self.in_chunk_order
         warmup = self.warmup
+        cache_chunks = self.cache_chunks
+        chunk_cache_dir = self.chunk_cache_dir
+        chunk_cache_load_kwargs = self.chunk_cache_load_kwargs
+        chunk_cache_save_kwargs = self.chunk_cache_save_kwargs
+        pre_clear_chunk_cache = self.pre_clear_chunk_cache
+        post_clear_chunk_cache = self.post_clear_chunk_cache
+        release_chunk_cache = self.release_chunk_cache
         pre_execute_func = self.pre_execute_func
         pre_execute_kwargs = self.pre_execute_kwargs
         pre_chunk_func = self.pre_chunk_func
@@ -1452,22 +1654,34 @@ class Executor(Configured):
             funcs_args[0][0](*funcs_args[0][1], **funcs_args[0][2])
 
         if n_chunks is None and chunk_len is None and chunk_meta is None:
-            n_chunks = 1
-        if n_chunks == 1 and not isinstance(funcs_args, CustomTemplate):
-            self.call_pre_execute_func(
-                pre_execute_func=pre_execute_func,
-                pre_execute_kwargs=pre_execute_kwargs,
-                template_context=template_context,
-            )
-            if "n_chunks" not in template_context:
-                template_context["n_chunks"] = 1
-            outputs = self.call_execute(engine, funcs_args, size=size, keys=keys)
-            return self.call_post_execute_func(
-                outputs,
-                post_execute_func=post_execute_func,
-                post_execute_kwargs=post_execute_kwargs,
-                template_context=template_context,
-            )
+            if isinstance(funcs_args, CustomTemplate):
+                n_chunks = 1
+            else:
+                if cache_chunks:
+                    warnings.warn("Cannot cache chunks without chunking", stacklevel=2)
+                    cache_chunks = False
+                self.call_pre_execute_func(
+                    cache_chunks=cache_chunks,
+                    chunk_cache_dir=chunk_cache_dir,
+                    pre_clear_chunk_cache=pre_clear_chunk_cache,
+                    pre_execute_func=pre_execute_func,
+                    pre_execute_kwargs=pre_execute_kwargs,
+                    template_context=template_context,
+                )
+                if "n_chunks" not in template_context:
+                    template_context["n_chunks"] = 1
+                outputs = self.call_execute(engine, funcs_args, size=size, keys=keys)
+                return self.call_post_execute_func(
+                    outputs,
+                    cache_chunks=cache_chunks,
+                    chunk_cache_dir=chunk_cache_dir,
+                    chunk_cache_load_kwargs=chunk_cache_load_kwargs,
+                    post_clear_chunk_cache=post_clear_chunk_cache,
+                    release_chunk_cache=release_chunk_cache,
+                    post_execute_func=post_execute_func,
+                    post_execute_kwargs=post_execute_kwargs,
+                    template_context=template_context,
+                )
 
         if chunk_meta is None:
             from vectorbtpro.utils.chunking import yield_chunk_meta
@@ -1491,12 +1705,18 @@ class Executor(Configured):
                 template_context["chunk_meta"] = chunk_meta
 
         if isinstance(funcs_args, CustomTemplate):
+            if cache_chunks:
+                warnings.warn("Cannot cache chunks with custom chunking", stacklevel=2)
+                cache_chunks = False
             funcs_args = substitute_templates(funcs_args, template_context, eval_id="funcs_args")
             if hasattr(funcs_args, "__len__"):
                 size = len(funcs_args)
             else:
                 size = None
             self.call_pre_execute_func(
+                cache_chunks=cache_chunks,
+                chunk_cache_dir=chunk_cache_dir,
+                pre_clear_chunk_cache=pre_clear_chunk_cache,
                 pre_execute_func=pre_execute_func,
                 pre_execute_kwargs=pre_execute_kwargs,
                 template_context=template_context,
@@ -1511,6 +1731,11 @@ class Executor(Configured):
             )
             return self.call_post_execute_func(
                 outputs,
+                cache_chunks=cache_chunks,
+                chunk_cache_dir=chunk_cache_dir,
+                chunk_cache_load_kwargs=chunk_cache_load_kwargs,
+                post_clear_chunk_cache=post_clear_chunk_cache,
+                release_chunk_cache=release_chunk_cache,
                 post_execute_func=post_execute_func,
                 post_execute_kwargs=post_execute_kwargs,
                 template_context=template_context,
@@ -1543,6 +1768,9 @@ class Executor(Configured):
                 _funcs_args = []
 
                 self.call_pre_execute_func(
+                    cache_chunks=cache_chunks,
+                    chunk_cache_dir=chunk_cache_dir,
+                    pre_clear_chunk_cache=pre_clear_chunk_cache,
                     pre_execute_func=pre_execute_func,
                     pre_execute_kwargs=pre_execute_kwargs,
                     template_context=template_context,
@@ -1558,6 +1786,10 @@ class Executor(Configured):
                             call_outputs = self.call_pre_chunk_func(
                                 chunk_idx,
                                 call_indices,
+                                cache_chunks=cache_chunks,
+                                chunk_cache_dir=chunk_cache_dir,
+                                chunk_cache_load_kwargs=chunk_cache_load_kwargs,
+                                release_chunk_cache=release_chunk_cache,
                                 pre_chunk_func=pre_chunk_func,
                                 pre_chunk_kwargs=pre_chunk_kwargs,
                                 template_context=template_context,
@@ -1576,6 +1808,10 @@ class Executor(Configured):
                                 chunk_idx,
                                 call_indices,
                                 call_outputs,
+                                cache_chunks=cache_chunks,
+                                chunk_cache_dir=chunk_cache_dir,
+                                chunk_cache_save_kwargs=chunk_cache_save_kwargs,
+                                release_chunk_cache=release_chunk_cache,
                                 post_chunk_func=post_chunk_func,
                                 post_chunk_kwargs=post_chunk_kwargs,
                                 chunk_executed=chunk_executed,
@@ -1585,12 +1821,17 @@ class Executor(Configured):
                             chunk_idx += 1
                             _funcs_args = []
                             pbar.update(1)
+                            pbar.refresh()
                         _funcs_args.append(func_args)
                     if len(_funcs_args) > 0:
                         call_indices = all_call_indices[chunk_idx]
                         call_outputs = self.call_pre_chunk_func(
                             chunk_idx,
                             call_indices,
+                            cache_chunks=cache_chunks,
+                            chunk_cache_dir=chunk_cache_dir,
+                            chunk_cache_load_kwargs=chunk_cache_load_kwargs,
+                            release_chunk_cache=release_chunk_cache,
                             pre_chunk_func=pre_chunk_func,
                             pre_chunk_kwargs=pre_chunk_kwargs,
                             template_context=template_context,
@@ -1609,6 +1850,10 @@ class Executor(Configured):
                             chunk_idx,
                             call_indices,
                             call_outputs,
+                            cache_chunks=cache_chunks,
+                            chunk_cache_dir=chunk_cache_dir,
+                            chunk_cache_save_kwargs=chunk_cache_save_kwargs,
+                            release_chunk_cache=release_chunk_cache,
                             post_chunk_func=post_chunk_func,
                             post_chunk_kwargs=post_chunk_kwargs,
                             chunk_executed=chunk_executed,
@@ -1616,8 +1861,14 @@ class Executor(Configured):
                         )
                         outputs.extend(call_outputs)
                         pbar.update(1)
+                        pbar.refresh()
                 return self.call_post_execute_func(
                     outputs,
+                    cache_chunks=cache_chunks,
+                    chunk_cache_dir=chunk_cache_dir,
+                    chunk_cache_load_kwargs=chunk_cache_load_kwargs,
+                    post_clear_chunk_cache=post_clear_chunk_cache,
+                    release_chunk_cache=release_chunk_cache,
                     post_execute_func=post_execute_func,
                     post_execute_kwargs=post_execute_kwargs,
                     template_context=template_context,
@@ -1628,6 +1879,9 @@ class Executor(Configured):
                 output_indices = []
 
                 self.call_pre_execute_func(
+                    cache_chunks=cache_chunks,
+                    chunk_cache_dir=chunk_cache_dir,
+                    pre_clear_chunk_cache=pre_clear_chunk_cache,
                     pre_execute_func=pre_execute_func,
                     pre_execute_kwargs=pre_execute_kwargs,
                     template_context=template_context,
@@ -1641,6 +1895,10 @@ class Executor(Configured):
                         call_outputs = self.call_pre_chunk_func(
                             chunk_idx,
                             call_indices,
+                            cache_chunks=cache_chunks,
+                            chunk_cache_dir=chunk_cache_dir,
+                            chunk_cache_load_kwargs=chunk_cache_load_kwargs,
+                            release_chunk_cache=release_chunk_cache,
                             pre_chunk_func=pre_chunk_func,
                             pre_chunk_kwargs=pre_chunk_kwargs,
                             template_context=template_context,
@@ -1662,6 +1920,10 @@ class Executor(Configured):
                             chunk_idx,
                             call_indices,
                             call_outputs,
+                            cache_chunks=cache_chunks,
+                            chunk_cache_dir=chunk_cache_dir,
+                            chunk_cache_save_kwargs=chunk_cache_save_kwargs,
+                            release_chunk_cache=release_chunk_cache,
                             post_chunk_func=post_chunk_func,
                             post_chunk_kwargs=post_chunk_kwargs,
                             chunk_executed=chunk_executed,
@@ -1670,9 +1932,15 @@ class Executor(Configured):
                         outputs.extend(call_outputs)
                         output_indices.extend(call_indices)
                         pbar.update(1)
+                        pbar.refresh()
                 if not post_execute_on_sorted:
                     outputs = self.call_post_execute_func(
                         outputs,
+                        cache_chunks=cache_chunks,
+                        chunk_cache_dir=chunk_cache_dir,
+                        chunk_cache_load_kwargs=chunk_cache_load_kwargs,
+                        post_clear_chunk_cache=post_clear_chunk_cache,
+                        release_chunk_cache=release_chunk_cache,
                         post_execute_func=post_execute_func,
                         post_execute_kwargs=post_execute_kwargs,
                         template_context=template_context,
@@ -1682,18 +1950,30 @@ class Executor(Configured):
                 if post_execute_on_sorted:
                     outputs = self.call_post_execute_func(
                         outputs,
+                        cache_chunks=cache_chunks,
+                        chunk_cache_dir=chunk_cache_dir,
+                        chunk_cache_load_kwargs=chunk_cache_load_kwargs,
+                        post_clear_chunk_cache=post_clear_chunk_cache,
+                        release_chunk_cache=release_chunk_cache,
                         post_execute_func=post_execute_func,
                         post_execute_kwargs=post_execute_kwargs,
                         template_context=template_context,
                     )
                 return outputs
+
         elif distribute.lower() == "chunks":
+            if cache_chunks:
+                warnings.warn("Cannot cache chunks with chunk distribution", stacklevel=2)
+                cache_chunks = False
             if indices_sorted and not hasattr(funcs_args, "__len__"):
                 chunk_idx = 0
                 _funcs_args = []
                 funcs_args_chunks = []
 
                 self.call_pre_execute_func(
+                    cache_chunks=cache_chunks,
+                    chunk_cache_dir=chunk_cache_dir,
+                    pre_clear_chunk_cache=pre_clear_chunk_cache,
                     pre_execute_func=pre_execute_func,
                     pre_execute_kwargs=pre_execute_kwargs,
                     template_context=template_context,
@@ -1714,6 +1994,11 @@ class Executor(Configured):
                 outputs = [x for o in outputs for x in o]
                 return self.call_post_execute_func(
                     outputs,
+                    cache_chunks=cache_chunks,
+                    chunk_cache_dir=chunk_cache_dir,
+                    chunk_cache_load_kwargs=chunk_cache_load_kwargs,
+                    post_clear_chunk_cache=post_clear_chunk_cache,
+                    release_chunk_cache=release_chunk_cache,
                     post_execute_func=post_execute_func,
                     post_execute_kwargs=post_execute_kwargs,
                     template_context=template_context,
@@ -1724,6 +2009,9 @@ class Executor(Configured):
                 output_indices = []
 
                 self.call_pre_execute_func(
+                    cache_chunks=cache_chunks,
+                    chunk_cache_dir=chunk_cache_dir,
+                    pre_clear_chunk_cache=pre_clear_chunk_cache,
                     pre_execute_func=pre_execute_func,
                     pre_execute_kwargs=pre_execute_kwargs,
                     template_context=template_context,
@@ -1743,6 +2031,11 @@ class Executor(Configured):
                 if not post_execute_on_sorted:
                     outputs = self.call_post_execute_func(
                         outputs,
+                        cache_chunks=cache_chunks,
+                        chunk_cache_dir=chunk_cache_dir,
+                        chunk_cache_load_kwargs=chunk_cache_load_kwargs,
+                        post_clear_chunk_cache=post_clear_chunk_cache,
+                        release_chunk_cache=release_chunk_cache,
                         post_execute_func=post_execute_func,
                         post_execute_kwargs=post_execute_kwargs,
                         template_context=template_context,
@@ -1752,6 +2045,11 @@ class Executor(Configured):
                 if post_execute_on_sorted:
                     outputs = self.call_post_execute_func(
                         outputs,
+                        cache_chunks=cache_chunks,
+                        chunk_cache_dir=chunk_cache_dir,
+                        chunk_cache_load_kwargs=chunk_cache_load_kwargs,
+                        post_clear_chunk_cache=post_clear_chunk_cache,
+                        release_chunk_cache=release_chunk_cache,
                         post_execute_func=post_execute_func,
                         post_execute_kwargs=post_execute_kwargs,
                         template_context=template_context,
@@ -1775,6 +2073,13 @@ def execute(
     distribute: tp.Optional[str] = None,
     in_chunk_order: tp.Optional[bool] = None,
     warmup: tp.Optional[bool] = None,
+    cache_chunks: tp.Optional[bool] = None,
+    chunk_cache_dir: tp.Optional[tp.PathLike] = None,
+    chunk_cache_save_kwargs: tp.KwargsLike = None,
+    chunk_cache_load_kwargs: tp.KwargsLike = None,
+    pre_clear_chunk_cache: tp.Optional[bool] = None,
+    post_clear_chunk_cache: tp.Optional[bool] = None,
+    release_chunk_cache: tp.Optional[bool] = None,
     pre_execute_func: tp.Optional[tp.Callable] = None,
     pre_execute_kwargs: tp.KwargsLike = None,
     pre_chunk_func: tp.Optional[tp.Callable] = None,
@@ -1819,6 +2124,13 @@ def execute(
         distribute=distribute,
         in_chunk_order=in_chunk_order,
         warmup=warmup,
+        cache_chunks=cache_chunks,
+        chunk_cache_dir=chunk_cache_dir,
+        chunk_cache_save_kwargs=chunk_cache_save_kwargs,
+        chunk_cache_load_kwargs=chunk_cache_load_kwargs,
+        pre_clear_chunk_cache=pre_clear_chunk_cache,
+        post_clear_chunk_cache=post_clear_chunk_cache,
+        release_chunk_cache=release_chunk_cache,
         pre_execute_func=pre_execute_func,
         pre_execute_kwargs=pre_execute_kwargs,
         pre_chunk_func=pre_chunk_func,
