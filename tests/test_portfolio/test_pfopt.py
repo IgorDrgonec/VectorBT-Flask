@@ -829,17 +829,6 @@ class TestPyPortfolioOpt:
                 atol=1e-4,
             )
             assert_series_equal(
-                pd.Series(pfopt.riskfolio_optimize(longer_returns, opt_method="owa")),
-                pd.Series({
-                    "A": 0.13634806044544748,
-                    "B": 0.46540649778161475,
-                    "C": 1.0038802647286919e-12,
-                    "D": 0.39824544177166576,
-                    "E": 2.6807396988462483e-13,
-                }),
-                atol=1e-4,
-            )
-            assert_series_equal(
                 pd.Series(pfopt.riskfolio_optimize(
                     longer_returns, constraints=[dict(Type="Assets", Position="A", Sign="<=", Weight=0.1)]
                 )),

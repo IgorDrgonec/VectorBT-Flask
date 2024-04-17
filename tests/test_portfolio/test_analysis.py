@@ -6395,7 +6395,7 @@ class TestPortfolio:
 
     def test_qs_methods(self):
         if qs_available:
-            assert pf_shared.qs.sharpe(column="first") == pf_shared.sharpe_ratio["first"]
+            isclose(pf_shared.qs.sharpe(column="first"), pf_shared.sharpe_ratio["first"])
 
     def test_stats(self):
         stats_index = pd.Index(

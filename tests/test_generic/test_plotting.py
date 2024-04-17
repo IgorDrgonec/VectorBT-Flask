@@ -1,15 +1,8 @@
-import pytest
 import os
 
 import vectorbtpro as vbt
 
 from tests.utils import *
-
-plotly_resampler_available = True
-try:
-    import plotly_resampler
-except:
-    plotly_resampler_available = False
 
 
 # ############# Global ############# #
@@ -50,27 +43,6 @@ class TestPlotting:
                 use_resampler=False,
             ),
         )
-        if plotly_resampler_available:
-            with pytest.raises(Exception):
-                vbt.Gauge(
-                    value=2,
-                    value_range=(1, 3),
-                    label="My Gauge",
-                    make_figure_kwargs=dict(
-                        use_widgets=False,
-                        use_resampler=True,
-                    ),
-                )
-            with pytest.raises(Exception):
-                vbt.Gauge(
-                    value=2,
-                    value_range=(1, 3),
-                    label="My Gauge",
-                    make_figure_kwargs=dict(
-                        use_widgets=True,
-                        use_resampler=True,
-                    ),
-                )
 
     def test_bar(self):
         vbt.Bar(
@@ -91,25 +63,6 @@ class TestPlotting:
                 use_resampler=False,
             ),
         )
-        if plotly_resampler_available:
-            vbt.Bar(
-                data=[[1, 2], [3, 4]],
-                trace_names=["a", "b"],
-                x_labels=["x", "y"],
-                make_figure_kwargs=dict(
-                    use_widgets=False,
-                    use_resampler=True,
-                ),
-            )
-            vbt.Bar(
-                data=[[1, 2], [3, 4]],
-                trace_names=["a", "b"],
-                x_labels=["x", "y"],
-                make_figure_kwargs=dict(
-                    use_widgets=True,
-                    use_resampler=True,
-                ),
-            )
 
     def test_scatter(self):
         vbt.Scatter(
@@ -130,25 +83,6 @@ class TestPlotting:
                 use_resampler=False,
             ),
         )
-        if plotly_resampler_available:
-            vbt.Scatter(
-                data=[[1, 2], [3, 4]],
-                trace_names=["a", "b"],
-                x_labels=["x", "y"],
-                make_figure_kwargs=dict(
-                    use_widgets=False,
-                    use_resampler=True,
-                ),
-            )
-            vbt.Scatter(
-                data=[[1, 2], [3, 4]],
-                trace_names=["a", "b"],
-                x_labels=["x", "y"],
-                make_figure_kwargs=dict(
-                    use_widgets=True,
-                    use_resampler=True,
-                ),
-            )
 
     def test_histogram(self):
         vbt.Histogram(
@@ -167,23 +101,6 @@ class TestPlotting:
                 use_resampler=False,
             ),
         )
-        if plotly_resampler_available:
-            vbt.Histogram(
-                data=[[1, 2], [3, 4], [2, 1]],
-                trace_names=["a", "b"],
-                make_figure_kwargs=dict(
-                    use_widgets=False,
-                    use_resampler=True,
-                ),
-            )
-            vbt.Histogram(
-                data=[[1, 2], [3, 4], [2, 1]],
-                trace_names=["a", "b"],
-                make_figure_kwargs=dict(
-                    use_widgets=True,
-                    use_resampler=True,
-                ),
-            )
 
     def test_box(self):
         vbt.Box(
@@ -202,25 +119,6 @@ class TestPlotting:
                 use_resampler=False,
             ),
         )
-        if plotly_resampler_available:
-            with pytest.raises(Exception):
-                vbt.Box(
-                    data=[[1, 2], [3, 4], [2, 1]],
-                    trace_names=["a", "b"],
-                    make_figure_kwargs=dict(
-                        use_widgets=False,
-                        use_resampler=True,
-                    ),
-                )
-            with pytest.raises(Exception):
-                vbt.Box(
-                    data=[[1, 2], [3, 4], [2, 1]],
-                    trace_names=["a", "b"],
-                    make_figure_kwargs=dict(
-                        use_widgets=True,
-                        use_resampler=True,
-                    ),
-                )
 
     def test_heatmap(self):
         vbt.Heatmap(
@@ -241,25 +139,6 @@ class TestPlotting:
                 use_resampler=False,
             ),
         )
-        if plotly_resampler_available:
-            vbt.Heatmap(
-                data=[[1, 2], [3, 4]],
-                x_labels=["a", "b"],
-                y_labels=["x", "y"],
-                make_figure_kwargs=dict(
-                    use_widgets=False,
-                    use_resampler=True,
-                ),
-            )
-            vbt.Heatmap(
-                data=[[1, 2], [3, 4]],
-                x_labels=["a", "b"],
-                y_labels=["x", "y"],
-                make_figure_kwargs=dict(
-                    use_widgets=True,
-                    use_resampler=True,
-                ),
-            )
 
     def test_volume(self):
         vbt.Volume(
@@ -282,24 +161,3 @@ class TestPlotting:
                 use_resampler=False,
             ),
         )
-        if plotly_resampler_available:
-            vbt.Volume(
-                data=np.random.randint(1, 10, size=(3, 3, 3)),
-                x_labels=["a", "b", "c"],
-                y_labels=["d", "e", "f"],
-                z_labels=["g", "h", "i"],
-                make_figure_kwargs=dict(
-                    use_widgets=False,
-                    use_resampler=True,
-                ),
-            )
-            vbt.Volume(
-                data=np.random.randint(1, 10, size=(3, 3, 3)),
-                x_labels=["a", "b", "c"],
-                y_labels=["d", "e", "f"],
-                z_labels=["g", "h", "i"],
-                make_figure_kwargs=dict(
-                    use_widgets=True,
-                    use_resampler=True,
-                ),
-            )

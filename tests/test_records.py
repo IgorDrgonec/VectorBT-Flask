@@ -1084,7 +1084,7 @@ class TestMappedArray:
         assert_series_equal(mapped_array.mean(), mapped_array.to_pd().mean().rename("mean"))
         assert_series_equal(
             mapped_array_grouped.mean(),
-            pd.Series([12.166667, 11.0], index=pd.Index(["g1", "g2"], dtype="object")).rename("mean"),
+            pd.Series([12.166666666666666, 11.0], index=pd.Index(["g1", "g2"], dtype="object")).rename("mean"),
         )
 
     def test_median(self):
@@ -1160,8 +1160,8 @@ class TestMappedArray:
                 np.array(
                     [
                         [6.0, 3.0],
-                        [12.16666667, 11.0],
-                        [1.47196014, 1.0],
+                        [12.166666666666666, 11.0],
+                        [1.4719601443879746, 1.0],
                         [10.0, 10.0],
                         [11.25, 10.5],
                         [12.5, 11.0],
@@ -4615,8 +4615,8 @@ class TestDrawdowns:
                         [np.nan, np.nan, np.nan, np.nan],
                         [-0.5, np.nan, np.nan, np.nan],
                         [np.nan, -0.5, np.nan, np.nan],
-                        [-0.66666669, np.nan, np.nan, np.nan],
-                        [-0.75, -0.66666669, -0.66666669, np.nan],
+                        [-0.6666666666666666, np.nan, np.nan, np.nan],
+                        [-0.75, -0.6666666666666666, -0.6666666666666666, np.nan],
                     ]
                 ),
                 index=ts2.index,
@@ -4636,7 +4636,10 @@ class TestDrawdowns:
         assert drawdowns["a"].avg_drawdown == -0.6388888888888888
         assert_series_equal(
             drawdowns.avg_drawdown,
-            pd.Series(np.array([-0.63888889, -0.58333333, -0.66666667, np.nan]), index=wrapper.columns).rename(
+            pd.Series(
+                np.array([-0.6388888888888888, -0.5833333333333333, -0.6666666666666666, np.nan]),
+                index=wrapper.columns,
+            ).rename(
                 "avg_drawdown"
             ),
         )
@@ -4660,7 +4663,10 @@ class TestDrawdowns:
         assert drawdowns["a"].max_drawdown == -0.75
         assert_series_equal(
             drawdowns.max_drawdown,
-            pd.Series(np.array([-0.75, -0.66666667, -0.66666667, np.nan]), index=wrapper.columns).rename(
+            pd.Series(
+                np.array([-0.75, -0.6666666666666666, -0.6666666666666666, np.nan]),
+                index=wrapper.columns,
+            ).rename(
                 "max_drawdown"
             ),
         )
@@ -6640,13 +6646,14 @@ class TestExitTrades:
         assert exit_trades["a"].profit_factor == 18.9
         assert_series_equal(
             exit_trades.profit_factor,
-            pd.Series(np.array([18.9, 0.0, 2.45853659, np.nan]), index=ts2.columns).rename("profit_factor"),
+            pd.Series(np.array([18.9, 0.0, 2.458536585365853, np.nan]), index=ts2.columns).rename("profit_factor"),
         )
         assert_series_equal(
             exit_trades_grouped.profit_factor,
-            pd.Series(np.array([0.81818182, 2.45853659]), index=pd.Index(["g1", "g2"], dtype="object")).rename(
-                "profit_factor"
-            ),
+            pd.Series(
+                np.array([0.818181818181818, 2.458536585365853]),
+                index=pd.Index(["g1", "g2"], dtype="object"),
+            ).rename("profit_factor"),
         )
         assert_series_equal(
             exit_trades.rel_profit_factor,
@@ -6678,11 +6685,17 @@ class TestExitTrades:
         assert exit_trades["a"].sqn == 1.634155521947584
         assert_series_equal(
             exit_trades.sqn,
-            pd.Series(np.array([1.63415552, -2.13007307, 0.71660403, np.nan]), index=ts2.columns).rename("sqn"),
+            pd.Series(
+                np.array([1.634155521947584, -2.1300730719161516, 0.7166040292904912, np.nan]),
+                index=ts2.columns,
+            ).rename("sqn"),
         )
         assert_series_equal(
             exit_trades_grouped.sqn,
-            pd.Series(np.array([-0.20404671, 0.71660403]), index=pd.Index(["g1", "g2"], dtype="object")).rename("sqn"),
+            pd.Series(
+                np.array([-0.20404670761704502, 0.7166040292904912]),
+                index=pd.Index(["g1", "g2"], dtype="object"),
+            ).rename("sqn"),
         )
         assert_series_equal(
             exit_trades.rel_sqn,
