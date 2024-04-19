@@ -12,7 +12,7 @@ import pandas as pd
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts
-from vectorbtpro.utils.pbar import get_pbar, set_pbar_description
+from vectorbtpro.utils.pbar import ProgressBar
 from vectorbtpro.data.custom.remote import RemoteData
 
 try:
@@ -261,8 +261,6 @@ class CCXTData(RemoteData):
         fetch_params: tp.Optional[tp.KwargsLike] = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
-        show_progress_desc: tp.Optional[bool] = None,
-        pbar_desc_kwargs: tp.KwargsLike = None,
         silence_warnings: tp.Optional[bool] = None,
         return_fetch_method: bool = False,
     ) -> tp.Union[dict, tp.SymbolData]:
@@ -299,9 +297,7 @@ class CCXTData(RemoteData):
             retries (int): The number of retries on failure to fetch data.
             fetch_params (dict): Exchange-specific keyword arguments passed to `fetch_ohlcv`.
             show_progress (bool): Whether to show the progress bar.
-            pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
-            show_progress_desc (bool): Whether to show the progress bar description.
-            pbar_desc_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.set_pbar_description`.
+            pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.ProgressBar`.
             silence_warnings (bool): Whether to silence all warnings.
             return_fetch_method (bool): Required by `CCXTData.find_earliest_date`.
 
@@ -335,12 +331,6 @@ class CCXTData(RemoteData):
         )
         show_progress = cls.resolve_exchange_setting(show_progress, "show_progress", exchange_name=exchange_name)
         pbar_kwargs = cls.resolve_exchange_setting(pbar_kwargs, "pbar_kwargs", merge=True, exchange_name=exchange_name)
-        show_progress_desc = cls.resolve_exchange_setting(
-            show_progress_desc, "show_progress_desc", exchange_name=exchange_name
-        )
-        pbar_desc_kwargs = cls.resolve_exchange_setting(
-            pbar_desc_kwargs, "pbar_desc_kwargs", merge=True, exchange_name=exchange_name
-        )
         silence_warnings = cls.resolve_exchange_setting(
             silence_warnings, "silence_warnings", exchange_name=exchange_name
         )
@@ -424,13 +414,8 @@ class CCXTData(RemoteData):
         # Iteratively collect the data
         data = []
         try:
-            with get_pbar(show_progress=show_progress, **pbar_kwargs) as pbar:
-                if show_progress_desc:
-                    set_pbar_description(
-                        pbar,
-                        "{} → ?".format(_ts_to_str(start_ts if prev_end_ts is None else prev_end_ts)),
-                        **pbar_desc_kwargs,
-                    )
+            with ProgressBar(show_progress=show_progress, **pbar_kwargs) as pbar:
+                pbar.set_description("{}→?".format(_ts_to_str(start_ts if prev_end_ts is None else prev_end_ts)))
                 while True:
                     # Fetch the klines for the next timeframe
                     next_data = _fetch(start_ts if prev_end_ts is None else prev_end_ts, limit)
@@ -442,13 +427,8 @@ class CCXTData(RemoteData):
                     data += next_data
                     if start_ts is None:
                         start_ts = next_data[0][0]
-                    if show_progress_desc:
-                        set_pbar_description(
-                            pbar,
-                            "{} → {}".format(_ts_to_str(start_ts), _ts_to_str(next_data[-1][0])),
-                            **pbar_desc_kwargs,
-                        )
-                    pbar.update(1)
+                    pbar.set_description("{} → {}".format(_ts_to_str(start_ts), _ts_to_str(next_data[-1][0])))
+                    pbar.update()
                     prev_end_ts = next_data[-1][0]
                     if end_ts is not None and prev_end_ts >= end_ts:
                         break

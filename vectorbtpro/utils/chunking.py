@@ -1742,7 +1742,19 @@ class Chunker(Configured):
             return chunk_meta, funcs_args
         execute_kwargs = substitute_templates(execute_kwargs, template_context, eval_id="execute_kwargs")
         execute_kwargs = merge_dicts(dict(show_progress=False if len(chunk_meta) == 1 else None), execute_kwargs)
-        results = execute(funcs_args, size=len(chunk_meta), **execute_kwargs)
+        keys = []
+        for _chunk_meta in chunk_meta:
+            if _chunk_meta.indices is not None:
+                keys.append("{}..{}".format(_chunk_meta.indices[0], _chunk_meta.indices[-1]))
+            elif _chunk_meta.start is not None and _chunk_meta.end is not None:
+                if _chunk_meta.start == _chunk_meta.end - 1:
+                    keys.append(_chunk_meta.start)
+                else:
+                    keys.append("{}..{}".format(_chunk_meta.start, _chunk_meta.end - 1))
+            else:
+                keys.append(MISSING)
+        keys = pd.Index(keys, name="chunk_indices")
+        results = execute(funcs_args, size=len(chunk_meta), keys=keys, **execute_kwargs)
         if merge_func is not None:
             template_context["funcs_args"] = funcs_args
             if isinstance(merge_func, MergeFunc):

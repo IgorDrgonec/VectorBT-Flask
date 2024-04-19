@@ -16,7 +16,7 @@ from websocket import WebSocket
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils import datetime_ as dt
 from vectorbtpro.utils.config import merge_dicts, Configured
-from vectorbtpro.utils.pbar import get_pbar, set_pbar_description
+from vectorbtpro.utils.pbar import ProgressBar
 from vectorbtpro.utils.template import CustomTemplate
 from vectorbtpro.data.custom.remote import RemoteData
 
@@ -433,8 +433,6 @@ class TVClient(Configured):
         retries: int = 3,
         show_progress: bool = True,
         pbar_kwargs: tp.KwargsLike = None,
-        show_progress_desc: bool = True,
-        pbar_desc_kwargs: tp.KwargsLike = None,
     ) -> tp.List[dict]:
         """Search for a symbol."""
         if text is None:
@@ -443,8 +441,6 @@ class TVClient(Configured):
             exchange = ""
         if pbar_kwargs is None:
             pbar_kwargs = {}
-        if pbar_desc_kwargs is None:
-            pbar_desc_kwargs = {}
 
         symbols_list = []
         pbar = None
@@ -475,22 +471,17 @@ class TVClient(Configured):
                     total = pages
                 else:
                     total = math.ceil((len(new_symbols) + symbols_remaining) / len(new_symbols))
-                pbar = get_pbar(
+                pbar = ProgressBar(
                     total=total,
                     show_progress=show_progress,
                     **pbar_kwargs,
                 )
             if pbar is not None:
-                if show_progress_desc:
-                    max_symbols = len(symbols_list) + symbols_remaining
-                    if pages is not None:
-                        max_symbols = min(max_symbols, pages * len(new_symbols))
-                    set_pbar_description(
-                        pbar,
-                        dict(symbols="%d/%d" % (len(symbols_list), max_symbols)),
-                        **pbar_desc_kwargs,
-                    )
-                pbar.update(1)
+                max_symbols = len(symbols_list) + symbols_remaining
+                if pages is not None:
+                    max_symbols = min(max_symbols, pages * len(new_symbols))
+                pbar.set_description(dict(symbols="%d/%d" % (len(symbols_list), max_symbols)))
+                pbar.update()
             if symbols_remaining == 0:
                 break
             pages_fetched += 1
@@ -573,8 +564,6 @@ class TVData(RemoteData):
         retries: tp.Optional[int] = None,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
-        show_progress_desc: tp.Optional[bool] = None,
-        pbar_desc_kwargs: tp.KwargsLike = None,
         market: tp.Optional[str] = None,
         markets: tp.Optional[tp.List[str]] = None,
         fields: tp.Optional[tp.MaybeIterable[str]] = None,
@@ -682,12 +671,6 @@ class TVData(RemoteData):
         pbar_kwargs = cls.resolve_custom_setting(
             pbar_kwargs, "pbar_kwargs", merge=True, sub_path="search", sub_path_only=True
         )
-        show_progress_desc = cls.resolve_custom_setting(
-            show_progress_desc, "show_progress_desc", sub_path="search", sub_path_only=True
-        )
-        pbar_desc_kwargs = cls.resolve_custom_setting(
-            pbar_desc_kwargs, "pbar_desc_kwargs", merge=True, sub_path="search", sub_path_only=True
-        )
         markets = cls.resolve_custom_setting(markets, "markets", sub_path="scanner", sub_path_only=True)
         fields = cls.resolve_custom_setting(fields, "fields", sub_path="scanner", sub_path_only=True)
         filter_by = cls.resolve_custom_setting(filter_by, "filter_by", sub_path="scanner", sub_path_only=True)
@@ -716,8 +699,6 @@ class TVData(RemoteData):
                 retries=retries,
                 show_progress=show_progress,
                 pbar_kwargs=pbar_kwargs,
-                show_progress_desc=show_progress_desc,
-                pbar_desc_kwargs=pbar_desc_kwargs,
             )
             all_symbols = map(lambda x: x["exchange"] + ":" + x["symbol"], data)
             return_field_data = False

@@ -14,7 +14,7 @@ from numba.core.registry import CPUDispatcher
 
 from vectorbtpro import _typing as tp
 from vectorbtpro.utils.config import merge_dicts, Configured
-from vectorbtpro.utils.pbar import get_pbar, set_pbar_description
+from vectorbtpro.utils.pbar import ProgressBar
 from vectorbtpro.utils.parsing import get_func_arg_names
 from vectorbtpro.utils.template import CustomTemplate, substitute_templates
 from vectorbtpro.utils.path_ import remove_dir, file_exists
@@ -65,8 +65,6 @@ class SerialEngine(ExecutionEngine):
     _expected_keys: tp.ExpectedKeys = (ExecutionEngine._expected_keys or set()) | {
         "show_progress",
         "pbar_kwargs",
-        "show_progress_desc",
-        "pbar_desc_kwargs",
         "clear_cache",
         "collect_garbage",
         "cooldown",
@@ -76,8 +74,6 @@ class SerialEngine(ExecutionEngine):
         self,
         show_progress: tp.Optional[bool] = None,
         pbar_kwargs: tp.KwargsLike = None,
-        show_progress_desc: tp.Optional[bool] = None,
-        pbar_desc_kwargs: tp.KwargsLike = None,
         clear_cache: tp.Union[None, bool, int] = None,
         collect_garbage: tp.Union[None, bool, int] = None,
         cooldown: tp.Optional[int] = None,
@@ -87,8 +83,6 @@ class SerialEngine(ExecutionEngine):
             self,
             show_progress=show_progress,
             pbar_kwargs=pbar_kwargs,
-            show_progress_desc=show_progress_desc,
-            pbar_desc_kwargs=pbar_desc_kwargs,
             clear_cache=clear_cache,
             collect_garbage=collect_garbage,
             cooldown=cooldown,
@@ -97,8 +91,6 @@ class SerialEngine(ExecutionEngine):
 
         self._show_progress = self.resolve_setting(show_progress, "show_progress")
         self._pbar_kwargs = self.resolve_setting(pbar_kwargs, "pbar_kwargs", merge=True)
-        self._show_progress_desc = self.resolve_setting(show_progress_desc, "show_progress_desc")
-        self._pbar_desc_kwargs = self.resolve_setting(pbar_desc_kwargs, "pbar_desc_kwargs", merge=True)
         self._clear_cache = self.resolve_setting(clear_cache, "clear_cache")
         self._collect_garbage = self.resolve_setting(collect_garbage, "collect_garbage")
         self._cooldown = self.resolve_setting(cooldown, "cooldown")
@@ -110,18 +102,8 @@ class SerialEngine(ExecutionEngine):
 
     @property
     def pbar_kwargs(self) -> tp.Kwargs:
-        """Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`."""
+        """Keyword arguments passed to `vectorbtpro.utils.pbar.ProgressBar`."""
         return self._pbar_kwargs
-
-    @property
-    def show_progress_desc(self) -> bool:
-        """Whether to show the progress bar description."""
-        return self._show_progress_desc
-
-    @property
-    def pbar_desc_kwargs(self) -> tp.Kwargs:
-        """Keyword arguments passed to `vectorbtpro.utils.pbar.set_pbar_description`."""
-        return self._pbar_desc_kwargs
 
     @property
     def clear_cache(self) -> tp.Union[bool, int]:
@@ -154,15 +136,15 @@ class SerialEngine(ExecutionEngine):
         results = []
         if size is None and hasattr(funcs_args, "__len__"):
             size = len(funcs_args)
-        if self.show_progress_desc and keys is not None:
+        if keys is not None:
             keys = to_any_index(keys)
 
-        with get_pbar(total=size, show_progress=self.show_progress, **self.pbar_kwargs) as pbar:
-            if self.show_progress_desc and keys is not None:
+        with ProgressBar(total=size, show_progress=self.show_progress, **self.pbar_kwargs) as pbar:
+            if keys is not None:
                 if isinstance(keys, pd.MultiIndex):
-                    set_pbar_description(pbar, dict(zip(keys.names, keys[0])), **self.pbar_desc_kwargs)
+                    pbar.set_description(dict(zip(keys.names, keys[0])))
                 else:
-                    set_pbar_description(pbar, dict(zip(keys.names, [keys[0]])), **self.pbar_desc_kwargs)
+                    pbar.set_description(dict(zip(keys.names, [keys[0]])))
 
             for i, (func, args, kwargs) in enumerate(funcs_args):
                 results.append(func(*args, **kwargs))
@@ -179,12 +161,12 @@ class SerialEngine(ExecutionEngine):
                 if self.cooldown is not None:
                     time.sleep(self.cooldown)
 
-                if self.show_progress_desc and keys is not None and i + 1 < len(keys):
+                if keys is not None and i + 1 < len(keys):
                     if isinstance(keys, pd.MultiIndex):
-                        set_pbar_description(pbar, dict(zip(keys.names, keys[i + 1])), **self.pbar_desc_kwargs)
+                        pbar.set_description(dict(zip(keys.names, keys[i + 1])))
                     else:
-                        set_pbar_description(pbar, dict(zip(keys.names, [keys[i + 1]])), **self.pbar_desc_kwargs)
-                pbar.update(1)
+                        pbar.set_description(dict(zip(keys.names, [keys[i + 1]])))
+                pbar.update()
 
         return results
 
@@ -364,12 +346,12 @@ class PathosEngine(ExecutionEngine):
 
     @property
     def show_progress(self) -> bool:
-        """Whether to show the progress bar using `vectorbtpro.utils.pbar.get_pbar`."""
+        """Whether to show the progress bar."""
         return self._show_progress
 
     @property
     def pbar_kwargs(self) -> tp.Kwargs:
-        """Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`."""
+        """Keyword arguments passed to `vectorbtpro.utils.pbar.ProgressBar`."""
         return self._pbar_kwargs
 
     @property
@@ -408,7 +390,7 @@ class PathosEngine(ExecutionEngine):
                 total_futures = len(pending)
                 if self.timeout is not None:
                     end_time = self.timeout + time.monotonic()
-                with get_pbar(total=total_futures, show_progress=self.show_progress, **self.pbar_kwargs) as pbar:
+                with ProgressBar(total=total_futures, show_progress=self.show_progress, **self.pbar_kwargs) as pbar:
                     while pending:
                         pending = {async_result for async_result in pending if not async_result.ready()}
                         pbar.n = total_futures - len(pending)
@@ -820,8 +802,6 @@ class Executor(Configured):
         "post_execute_on_sorted",
         "show_progress",
         "pbar_kwargs",
-        "show_progress_desc",
-        "pbar_desc_kwargs",
         "template_context",
     }
 
@@ -1334,7 +1314,7 @@ class Executor(Configured):
 
     @property
     def pbar_kwargs(self) -> tp.Kwargs:
-        """Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`."""
+        """Keyword arguments passed to `vectorbtpro.utils.pbar.ProgressBar`."""
         return self._pbar_kwargs
 
     @property
@@ -1754,11 +1734,15 @@ class Executor(Configured):
                     pre_execute_kwargs=pre_execute_kwargs,
                     template_context=template_context,
                 )
-                with get_pbar(
-                    total=len(all_call_indices),
-                    show_progress=show_progress,
-                    **pbar_kwargs,
-                ) as pbar:
+                with ProgressBar(total=len(all_call_indices), show_progress=show_progress, **pbar_kwargs) as pbar:
+                    pbar.set_description(
+                        dict(
+                            chunk_calls="{}..{}".format(
+                                all_call_indices[chunk_idx][0],
+                                all_call_indices[chunk_idx][-1],
+                            )
+                        )
+                    )
                     for i, func_args in enumerate(funcs_args):
                         if i > all_call_indices[chunk_idx][-1]:
                             call_indices = all_call_indices[chunk_idx]
@@ -1799,7 +1783,16 @@ class Executor(Configured):
                             outputs.extend(call_outputs)
                             chunk_idx += 1
                             _funcs_args = []
-                            pbar.update(1)
+                            if chunk_idx < len(all_call_indices):
+                                pbar.set_description(
+                                    dict(
+                                        chunk_calls="{}..{}".format(
+                                            all_call_indices[chunk_idx][0],
+                                            all_call_indices[chunk_idx][-1],
+                                        )
+                                    )
+                                )
+                            pbar.update()
                         _funcs_args.append(func_args)
                     if len(_funcs_args) > 0:
                         call_indices = all_call_indices[chunk_idx]
@@ -1838,7 +1831,7 @@ class Executor(Configured):
                             template_context=template_context,
                         )
                         outputs.extend(call_outputs)
-                        pbar.update(1)
+                        pbar.update()
                 return self.call_post_execute_func(
                     outputs,
                     cache_chunks=cache_chunks,
@@ -1863,11 +1856,15 @@ class Executor(Configured):
                     pre_execute_kwargs=pre_execute_kwargs,
                     template_context=template_context,
                 )
-                with get_pbar(
-                    total=len(all_call_indices),
-                    show_progress=show_progress,
-                    **pbar_kwargs,
-                ) as pbar:
+                with ProgressBar(total=len(all_call_indices), show_progress=show_progress, **pbar_kwargs) as pbar:
+                    pbar.set_description(
+                        dict(
+                            chunk_calls="{}..{}".format(
+                                all_call_indices[0][0],
+                                all_call_indices[0][-1],
+                            )
+                        )
+                    )
                     for chunk_idx, call_indices in enumerate(all_call_indices):
                         call_outputs = self.call_pre_chunk_func(
                             chunk_idx,
@@ -1908,7 +1905,16 @@ class Executor(Configured):
                         )
                         outputs.extend(call_outputs)
                         output_indices.extend(call_indices)
-                        pbar.update(1)
+                        if chunk_idx + 1 < len(all_call_indices):
+                            pbar.set_description(
+                                dict(
+                                    chunk_calls="{}..{}".format(
+                                        all_call_indices[chunk_idx + 1][0],
+                                        all_call_indices[chunk_idx + 1][-1],
+                                    )
+                                )
+                            )
+                        pbar.update()
                 if not post_execute_on_sorted:
                     outputs = self.call_post_execute_func(
                         outputs,

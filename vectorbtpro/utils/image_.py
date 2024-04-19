@@ -5,7 +5,7 @@
 import numpy as np
 
 from vectorbtpro import _typing as tp
-from vectorbtpro.utils.pbar import get_pbar, set_pbar_description
+from vectorbtpro.utils.pbar import ProgressBar
 
 __all__ = [
     "save_animation",
@@ -43,8 +43,6 @@ def save_animation(
     writer_kwargs: dict = None,
     show_progress: bool = True,
     pbar_kwargs: tp.KwargsLike = None,
-    show_progress_desc: bool = True,
-    pbar_desc_kwargs: tp.KwargsLike = None,
     to_image_kwargs: tp.KwargsLike = None,
     **kwargs,
 ) -> None:
@@ -65,9 +63,7 @@ def save_animation(
             Will be translated to `duration` by `1000 / fps`.
         writer_kwargs (dict): Keyword arguments passed to `imageio.get_writer`.
         show_progress (bool): Whether to show the progress bar.
-        pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.get_pbar`.
-        show_progress_desc (bool): Whether to show the progress bar description.
-        pbar_desc_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.set_pbar_description`.
+        pbar_kwargs (dict): Keyword arguments passed to `vectorbtpro.utils.pbar.ProgressBar`.
         to_image_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.to_image`.
         **kwargs: Keyword arguments passed to `plot_func`.
 
@@ -101,8 +97,6 @@ def save_animation(
         writer_kwargs["duration"] = 1000 / fps
     if pbar_kwargs is None:
         pbar_kwargs = {}
-    if pbar_desc_kwargs is None:
-        pbar_desc_kwargs = {}
     if to_image_kwargs is None:
         to_image_kwargs = {}
     if delta is None:
@@ -110,13 +104,8 @@ def save_animation(
 
     with imageio.get_writer(fname, **writer_kwargs) as writer:
         index_steps = range(0, len(index) - delta + 1, step)
-        with get_pbar(index_steps, show_progress=show_progress, **pbar_kwargs) as pbar:
-            if show_progress_desc:
-                set_pbar_description(
-                    pbar,
-                    "{} → {}".format(str(index[0]), str(index[0 + delta - 1])),
-                    **pbar_desc_kwargs,
-                )
+        with ProgressBar(index_steps, show_progress=show_progress, **pbar_kwargs) as pbar:
+            pbar.set_description("{} → {}".format(str(index[0]), str(index[0 + delta - 1])))
 
             for i in range(len(index_steps)):
                 j = index_steps[i]
@@ -129,11 +118,7 @@ def save_animation(
                     fig = imageio.imread(fig)
                 writer.append_data(fig)
 
-                if show_progress_desc and i + 1 < len(index_steps):
+                if i + 1 < len(index_steps):
                     next_j = index_steps[i + 1]
-                    set_pbar_description(
-                        pbar,
-                        "{} → {}".format(str(index[next_j]), str(index[next_j + delta - 1])),
-                        **pbar_desc_kwargs,
-                    )
-                pbar.update(1)
+                    pbar.set_description("{} → {}".format(str(index[next_j]), str(index[next_j + delta - 1])))
+                pbar.update()

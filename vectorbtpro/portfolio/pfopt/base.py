@@ -15,7 +15,6 @@ from vectorbtpro.utils.parsing import get_func_arg_names, warn_stdout, WarningsF
 from vectorbtpro.utils.config import merge_dicts, Config, HybridConfig
 from vectorbtpro.utils.template import substitute_templates, Rep, RepFunc, CustomTemplate
 from vectorbtpro.utils.execution import execute
-from vectorbtpro.utils.pbar import get_pbar, set_pbar_description
 from vectorbtpro.utils.random_ import set_seed_nb
 from vectorbtpro.utils.enum_ import map_enum_fields
 from vectorbtpro.utils.params import Param, combine_params, Parameterizer
